@@ -1,0 +1,27 @@
+version: "3.5"
+
+services:
+  postgres:
+    image: postgres:18
+    container_name: concurrent-dev-mcp-postgres
+    ports:
+      - 5532:5432
+    environment:
+      - POSTGRES_PASSWORD=postgres
+    command: ["postgres", "-c", "log_statement=all"]
+    volumes:
+      - "./db/postgresql/data:/var/lib/postgresql/18/data"
+  pgbouncer:
+    image: edoburu/pgbouncer
+    container_name: concurrent-dev-mcp-pgbouncer
+    environment:
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 1000
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      AUTH_TYPE: plain
+    ports:
+      - 6432:5432
+    depends_on:
+      - postgres
