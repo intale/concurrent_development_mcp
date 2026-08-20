@@ -405,11 +405,13 @@ DEPENDENCIES
   brakeman
   bundler-audit
   debug
+  dry-auto_inject (>= 1.2.1)
   dry-operation (>= 1.1)
   dry-struct (>= 1.8.1)
   dry-system (>= 1.2.5)
   dry-types (>= 1.9.1)
   dry-validation (>= 1.11.1)
+  json
   mcp (>= 1.2)
   niceql (~> 0.5.1)
   pg (~> 1.1)

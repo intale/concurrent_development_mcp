@@ -1,0 +1,55 @@
+# frozen_string_literal: true
+
+module Coordinator
+  class EventSchemaRegistry
+    class UnknownSchema < KeyError; end
+    class SchemaMismatch < ArgumentError; end
+
+    DEFAULT_DEFINITIONS = {
+      [ "ChangeSetCreated", 1 ] => Events::ChangeSetCreatedV1,
+      [ "ChangeSetAcceptanceCriteriaDefined", 1 ] => Events::ChangeSetAcceptanceCriteriaDefinedV1,
+      [ "CommandCompleted", 1 ] => Events::CommandCompletedV1,
+      [ "WorkItemCreated", 1 ] => Events::WorkItemCreatedV1,
+      [ "WorkItemAddedToChangeSet", 1 ] => Events::WorkItemAddedToChangeSetV1,
+      [ "WorkItemDependencyDeclared", 1 ] => Events::WorkItemDependencyDeclaredV1
+    }.freeze
+
+    def initialize(definitions: DEFAULT_DEFINITIONS)
+      @definitions = definitions.dup.freeze
+    end
+
+    def fetch(type:, schema_version:)
+      @definitions.fetch([ type, schema_version ]) do
+        raise UnknownSchema, "unknown event schema: #{type}@#{schema_version}"
+      end
+    end
+
+    def verify!(event)
+      fetch(type: event.class.event_type, schema_version: event.class.schema_version)
+      event
+    end
+
+    def load(type:, schema_version:, data:)
+      payload_class = fetch(type:, schema_version:)
+      payload_class.new(deep_symbolize(data))
+    end
+
+    private
+
+    def deep_symbolize(value)
+      case value
+      when Hash
+        value.each_with_object({}) do |(key, nested), output|
+          symbol_key = key.to_sym
+          raise SchemaMismatch, "duplicate payload key: #{symbol_key.inspect}" if output.key?(symbol_key)
+
+          output[symbol_key] = deep_symbolize(nested)
+        end
+      when Array
+        value.map { deep_symbolize(_1) }
+      else
+        value
+      end
+    end
+  end
+end

@@ -2,6 +2,6 @@
 
 RSpec.describe "sample" do
   it "tests the truth" do
-    assert(true)
+    expect(true).to be(true)
   end
 end

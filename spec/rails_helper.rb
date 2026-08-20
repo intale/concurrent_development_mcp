@@ -8,6 +8,9 @@ abort("The Rails environment is running in production mode!") if Rails.env.produ
 # that will avoid rails generators crashing because migrations haven't been run yet
 # return unless Rails.env.test?
 require 'rspec/rails'
+require 'pg_eventstore/rspec/has_option_matcher'
+require 'pg_eventstore/rspec/test_helpers'
+
 # Add additional requires below this line. Rails is not loaded until this point!
 
 # Requires supporting ruby files with custom matchers and macros, etc, in
@@ -34,6 +37,7 @@ begin
 rescue ActiveRecord::PendingMigrationError => e
   abort e.to_s.strip
 end
+
 RSpec.configure do |config|
   # Remove this line if you're not using ActiveRecord or ActiveRecord fixtures
   config.fixture_paths = [
@@ -69,4 +73,29 @@ RSpec.configure do |config|
   config.filter_rails_from_backtrace!
   # arbitrary gems may also be filtered via:
   # config.filter_gems_from_backtrace("gem name")
+
+  config.before(:each, event_store: true) do
+    EventStoreTestSafety.verify!
+    PgEventstore::TestHelpers.clean_up_db
+  end
+
+  config.around(timecop: true) do |example|
+    if example.metadata[:timecop].is_a? Time
+      Timecop.freeze(example.metadata[:timecop]) { example.run }
+    else
+      Timecop.freeze { example.run }
+    end
+  end
+
+  config.around(skip_ci: true) do |example|
+    next if ENV['CI']
+
+    example.run
+  end
+
+  config.around(rbs_skip: true) do |example|
+    next if ENV['RBS_TEST_TARGET']
+
+    example.run
+  end
 end

@@ -36,14 +36,16 @@ gem "thruster", require: false
 # Use Rack CORS for handling Cross-Origin Resource Sharing (CORS), making cross-origin Ajax possible
 # gem "rack-cors"
 
-gem 'mcp', '>= 1.2'
-gem 'pg_eventstore', '>= 3.0'
-gem 'niceql', '~> 0.5.1', require: false
-gem 'dry-types', '>= 1.9.1'
-gem 'dry-validation', '>= 1.11.1'
-gem 'dry-struct', '>= 1.8.1'
-gem 'dry-operation', '>= 1.1'
-gem 'dry-system', '>= 1.2.5'
+gem "mcp", ">= 1.2"
+gem "pg_eventstore", ">= 3.0", require: [ "pg_eventstore", "pg_eventstore/web" ]
+gem "niceql", "~> 0.5.1", require: false
+gem "json"
+gem "dry-types", ">= 1.9.1"
+gem "dry-validation", ">= 1.11.1"
+gem "dry-struct", ">= 1.8.1"
+gem "dry-operation", ">= 1.1"
+gem "dry-system", ">= 1.2.5"
+gem "dry-auto_inject", ">= 1.2.1"
 
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
@@ -58,12 +60,12 @@ group :development, :test do
   # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
   gem "rubocop-rails-omakase", require: false
 
-  gem 'rspec-rails', '>= 8.0.4'
+  gem "rspec-rails", ">= 8.0.4"
 
-  gem 'rbs', '~> 3.5', '>= 3.5.2', require: false
+  gem "rbs", "~> 3.5", ">= 3.5.2", require: false
 end
 
 group :test do
-  gem 'timecop', '>= 0.9.11'
-  gem 'rack-test', '>= 2.2'
+  gem "timecop", ">= 0.9.11"
+  gem "rack-test", ">= 2.2"
 end

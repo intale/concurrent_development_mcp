@@ -1,0 +1,523 @@
+module Coordinator
+  type command_input = Hash[String | Symbol, untyped]
+  type attributes = Hash[Symbol, untyped]
+  type event_data = Hash[String | Symbol, untyped]
+
+  interface _EventStore
+    def multiple: [Result] () { () -> Result } -> Result
+    def read_all: (StreamReference) -> Array[PgEventstore::Event]
+    def append: (StreamReference, PgEventstore::Event | Array[PgEventstore::Event]) ->
+      (PgEventstore::Event | Array[PgEventstore::Event])
+  end
+
+  interface _Clock
+    def now: () -> String
+  end
+
+  interface _IdGenerator
+    def uuid_v7: () -> String
+  end
+
+  class Value
+    def to_h: () -> attributes
+  end
+
+  class CanonicalJson
+    def encode: (untyped value) -> String
+    def sha256: (untyped value) -> String
+  end
+
+  class StreamReference < Value
+    def context: () -> String
+    def stream_name: () -> String
+    def stream_id: () -> String
+  end
+
+  class StreamFactory
+    def command: (String command_id) -> StreamReference
+    def change_set: (String change_set_id) -> StreamReference
+    def work_item: (String work_item_id) -> StreamReference
+    def attempt: (String attempt_id) -> StreamReference
+  end
+
+  class PgStreamFactory
+    def call: (StreamReference reference) -> PgEventstore::Stream
+  end
+
+  class EventMetadata < Value
+    def command_id: () -> String
+    def actor_kind: () -> String
+    def actor_id: () -> String
+    def recorded_by: () -> String
+    def correlation_id: () -> String
+    def policy_version: () -> String?
+  end
+
+  class OutcomeError < Value
+    def code: () -> Symbol
+    def message: () -> String
+    def details: () -> Hash[Symbol, untyped]
+  end
+
+  class RequiredOutput < Value
+    def kind: () -> String
+    def key: () -> String
+  end
+
+  module CommandInputDocuments
+    class ActorV1 < Value
+      def actor_kind: () -> String
+      def actor_id: () -> String
+    end
+
+    class BaseV1 < Value
+      def schema: () -> String
+      def command_id: () -> String
+    end
+
+    class CreateChangeSetInputV1 < Value
+      def actor: () -> ActorV1
+      def change_set_id: () -> String
+      def goal: () -> String
+      def acceptance_criteria: () -> Array[String]
+    end
+
+    class CreateChangeSetV1 < BaseV1
+      def tool_name: () -> String
+      def input: () -> CreateChangeSetInputV1
+    end
+
+    class CreateWorkItemInputV1 < Value
+      def actor: () -> ActorV1
+      def change_set_id: () -> String
+      def work_item_id: () -> String
+      def repository_id: () -> String
+      def goal: () -> String
+      def acceptance_criteria: () -> Array[String]
+    end
+
+    class CreateWorkItemV1 < BaseV1
+      def tool_name: () -> String
+      def input: () -> CreateWorkItemInputV1
+    end
+
+    class DeclareWorkItemDependencyInputV1 < Value
+      def actor: () -> ActorV1
+      def change_set_id: () -> String
+      def dependency_id: () -> String
+      def producer_work_item_id: () -> String
+      def consumer_work_item_id: () -> String
+      def dependency_kind: () -> String
+      def required_output: () -> RequiredOutput?
+    end
+
+    class DeclareWorkItemDependencyV1 < BaseV1
+      def tool_name: () -> String
+      def input: () -> DeclareWorkItemDependencyInputV1
+    end
+  end
+
+  module CommandReceiptData
+    type value = ChangeSet | WorkItem | Dependency
+
+    class ChangeSet < Value
+      def change_set_id: () -> String
+    end
+
+    class WorkItem < Value
+      def change_set_id: () -> String
+      def work_item_id: () -> String
+    end
+
+    class Dependency < Value
+      def change_set_id: () -> String
+      def dependency_id: () -> String
+    end
+  end
+
+  class EventReference < Value
+    def event_id: () -> String
+    def type: () -> String
+    def stream_context: () -> String
+    def stream_name: () -> String
+    def stream_id: () -> String
+    def stream_revision: () -> Integer
+  end
+
+  class ProjectionBarrier < Value
+    def stream_context: () -> String
+    def stream_name: () -> String
+    def stream_id: () -> String
+    def stream_revision: () -> Integer
+  end
+
+  class ProjectionBarriers < Value
+    def coord_context_v1: () -> Array[ProjectionBarrier]
+  end
+
+  class NextAction < Value
+    type arguments = ChangeSetArguments | ContextArguments
+
+    class ChangeSetArguments < Value
+      def change_set_id: () -> String
+    end
+
+    class ContextArguments < Value
+      def change_set_id: () -> String
+      def after_command_id: () -> String
+    end
+
+    def tool: () -> String
+    def arguments: () -> arguments
+  end
+
+  class ContextTokenDocument < Value
+    type scope = ChangeSetScope | WorkItemScope
+
+    class ChangeSetScope < Value
+      def change_set_id: () -> String
+    end
+
+    class WorkItemScope < Value
+      def change_set_id: () -> String
+      def work_item_id: () -> String
+    end
+
+    def schema: () -> String
+    def scope: () -> scope
+    def projection_barriers: () -> ProjectionBarriers
+  end
+
+  module Commands
+    class Actor < Value
+      def kind: () -> String
+      def id: () -> String
+    end
+
+    class CreateChangeSet < Value
+      def command_id: () -> String
+      def actor: () -> Actor
+      def change_set_id: () -> String
+      def goal: () -> String
+      def acceptance_criteria: () -> Array[String]
+    end
+
+    class CreateWorkItem < Value
+      def command_id: () -> String
+      def actor: () -> Actor
+      def change_set_id: () -> String
+      def work_item_id: () -> String
+      def repository_id: () -> String
+      def goal: () -> String
+      def acceptance_criteria: () -> Array[String]
+    end
+
+    class DeclareWorkItemDependency < Value
+      def command_id: () -> String
+      def actor: () -> Actor
+      def change_set_id: () -> String
+      def dependency_id: () -> String
+      def producer_work_item_id: () -> String
+      def consumer_work_item_id: () -> String
+      def dependency_kind: () -> String
+      def required_output: () -> RequiredOutput?
+    end
+  end
+
+  module Events
+    class Base < Value
+      def self.event_type: () -> String
+      def self.schema_version: () -> Integer
+    end
+
+    class ChangeSetCreatedV1 < Base
+      def change_set_id: () -> String
+      def goal: () -> String
+      def created_at: () -> String
+    end
+
+    class ChangeSetAcceptanceCriteriaDefinedV1 < Base
+      def change_set_id: () -> String
+      def acceptance_criteria: () -> Array[String]
+      def defined_at: () -> String
+    end
+
+    class WorkItemCreatedV1 < Base
+      def work_item_id: () -> String
+      def change_set_id: () -> String
+      def repository_id: () -> String
+      def goal: () -> String
+      def acceptance_criteria: () -> Array[String]
+      def competitive_mode: () -> bool
+      def created_at: () -> String
+    end
+
+    class WorkItemAddedToChangeSetV1 < Base
+      def change_set_id: () -> String
+      def work_item_id: () -> String
+      def added_at: () -> String
+    end
+
+    class WorkItemDependencyDeclaredV1 < Base
+      def change_set_id: () -> String
+      def dependency_id: () -> String
+      def producer_work_item_id: () -> String
+      def consumer_work_item_id: () -> String
+      def dependency_kind: () -> String
+      def required_output: () -> RequiredOutput?
+      def declared_at: () -> String
+    end
+
+    class CommandCompletedV1 < Base
+      def command_id: () -> String
+      def tool_name: () -> String
+      def canonical_input_digest: () -> String
+      def status: () -> String
+      def summary: () -> String
+      def receipt: () -> String
+      def context_token: () -> String
+      def data: () -> CommandReceiptData::value
+      def warnings: () -> Array[String]
+      def next_actions: () -> Array[NextAction]
+      def emitted_events: () -> Array[EventReference]
+      def projection_barriers: () -> ProjectionBarriers
+      def completed_at: () -> String
+    end
+  end
+
+  class EventSchemaRegistry
+    def initialize: (?definitions: untyped) -> void
+    def fetch: (type: String, schema_version: Integer) -> singleton(Events::Base)
+    def verify!: (Events::Base event) -> Events::Base
+    def load: (type: String, schema_version: Integer, data: event_data) -> Events::Base
+  end
+
+  class EventFactory
+    def initialize: (?registry: EventSchemaRegistry) -> void
+    def build!: (
+      event: Events::Base,
+      event_id: String,
+      metadata: EventMetadata,
+      markers: Array[String],
+      ?caused_by: PgEventstore::Event?
+    ) -> PgEventstore::Event
+  end
+
+  class CommandInputDigest
+    def initialize: (?canonical_json: CanonicalJson) -> void
+    def create_change_set: (Commands::CreateChangeSet command) -> String
+    def create_change_set_document: (Commands::CreateChangeSet command) -> CommandInputDocuments::CreateChangeSetV1
+    def work_item_create: (Commands::CreateWorkItem command) -> String
+    def work_item_create_document: (Commands::CreateWorkItem command) -> CommandInputDocuments::CreateWorkItemV1
+    def work_item_dependency_declare: (Commands::DeclareWorkItemDependency command) -> String
+    def work_item_dependency_declare_document: (Commands::DeclareWorkItemDependency command) -> CommandInputDocuments::DeclareWorkItemDependencyV1
+  end
+
+  class CommandCompletionBuilder
+    def initialize: (
+      ?canonical_json: CanonicalJson,
+      ?persisted_events_contract: Contracts::PersistedEvents
+    ) -> void
+    def create_change_set: (
+      command: Commands::CreateChangeSet,
+      input_digest: String,
+      persisted_events: Array[PgEventstore::Event],
+      completed_at: String
+    ) -> Events::CommandCompletedV1
+    def work_item_create: (
+      command: Commands::CreateWorkItem,
+      input_digest: String,
+      persisted_events: Array[PgEventstore::Event],
+      completed_at: String
+    ) -> Events::CommandCompletedV1
+    def work_item_dependency_declare: (
+      command: Commands::DeclareWorkItemDependency,
+      input_digest: String,
+      persisted_events: Array[PgEventstore::Event],
+      completed_at: String
+    ) -> Events::CommandCompletedV1
+  end
+
+  class EventStore
+    include _EventStore
+
+    def initialize: (client: PgEventstore::Client, ?pg_stream_factory: PgStreamFactory) -> void
+  end
+
+  class IdGenerator
+    include _IdGenerator
+  end
+
+  class SystemClock
+    include _Clock
+  end
+
+  module Contracts
+    class CreateChangeSet
+      def call: (command_input) -> untyped
+    end
+
+    class CreateWorkItem
+      def call: (command_input) -> untyped
+    end
+
+    class DeclareWorkItemDependency
+      def call: (command_input) -> untyped
+    end
+
+    class PersistedEvents
+      def call: (command_input) -> untyped
+    end
+
+    module Text
+      def self.valid?: (untyped value, max_size: Integer) -> bool
+    end
+  end
+
+  module Domain
+    class EventWrite < Value
+      def stream: () -> StreamReference
+      def event: () -> Events::Base
+    end
+
+    class EventPlan < Value
+      def writes: () -> Array[EventWrite]
+      def events: () -> Array[Events::Base]
+    end
+
+    module ChangeSets
+      class Dependency < Value
+        def dependency_id: () -> String
+        def producer_work_item_id: () -> String
+        def consumer_work_item_id: () -> String
+        def dependency_kind: () -> String
+        def required_output: () -> RequiredOutput?
+      end
+
+      class State < Value
+        def self.initial: () -> State
+        def self.reduce: (Array[Events::Base] events) -> State
+
+        def change_set_id: () -> String?
+        def goal: () -> String?
+        def status: () -> String
+        def acceptance_criteria: () -> Array[String]
+        def work_item_ids: () -> Array[String]
+        def dependencies: () -> Array[Dependency]
+        def absent?: () -> bool
+        def apply: (Events::Base event) -> State
+      end
+
+      class Create
+        def initialize: (?stream_factory: StreamFactory) -> void
+        def call: (
+          state: State,
+          command: Commands::CreateChangeSet,
+          occurred_at: String
+        ) -> untyped
+      end
+
+      class DeclareWorkItemDependency
+        def initialize: (?stream_factory: StreamFactory) -> void
+        def call: (
+          state: State,
+          command: Commands::DeclareWorkItemDependency,
+          occurred_at: String
+        ) -> untyped
+      end
+    end
+
+    module WorkItems
+      class State < Value
+        def self.initial: () -> State
+        def self.reduce: (Array[Events::Base] events) -> State
+
+        def work_item_id: () -> String?
+        def change_set_id: () -> String?
+        def repository_id: () -> String?
+        def goal: () -> String?
+        def acceptance_criteria: () -> Array[String]
+        def status: () -> String
+        def absent?: () -> bool
+        def apply: (Events::Base event) -> State
+      end
+
+      class Create
+        def initialize: (?stream_factory: StreamFactory) -> void
+        def call: (
+          change_set_state: ChangeSets::State,
+          work_item_state: State,
+          command: Commands::CreateWorkItem,
+          occurred_at: String
+        ) -> untyped
+      end
+    end
+  end
+
+  module Operations
+    class PrepareCreateChangeSet
+      def initialize: (?contract: Contracts::CreateChangeSet) -> void
+      # dry-operation wraps call dynamically; runtime RBS prepending recurses through that wrapper.
+      %a{rbs:test:skip} def call: (command_input input) -> untyped
+    end
+
+    class PrepareCreateWorkItem
+      def initialize: (?contract: Contracts::CreateWorkItem) -> void
+      %a{rbs:test:skip} def call: (command_input input) -> untyped
+    end
+
+    class PrepareDeclareWorkItemDependency
+      def initialize: (?contract: Contracts::DeclareWorkItemDependency) -> void
+      %a{rbs:test:skip} def call: (command_input input) -> untyped
+    end
+
+    class ExecuteCreateChangeSet
+      def initialize: (
+        event_store: _EventStore,
+        ?preparer: PrepareCreateChangeSet,
+        ?decider: Domain::ChangeSets::Create,
+        ?input_digest: CommandInputDigest,
+        ?clock: _Clock,
+        ?id_generator: _IdGenerator,
+        ?event_factory: EventFactory,
+        ?schema_registry: EventSchemaRegistry,
+        ?stream_factory: StreamFactory,
+        ?completion_builder: CommandCompletionBuilder
+      ) -> void
+      %a{rbs:test:skip} def call: (command_input input) -> untyped
+    end
+
+    class ExecuteCreateWorkItem
+      def initialize: (
+        event_store: _EventStore,
+        ?preparer: PrepareCreateWorkItem,
+        ?decider: Domain::WorkItems::Create,
+        ?input_digest: CommandInputDigest,
+        ?clock: _Clock,
+        ?id_generator: _IdGenerator,
+        ?event_factory: EventFactory,
+        ?schema_registry: EventSchemaRegistry,
+        ?stream_factory: StreamFactory,
+        ?completion_builder: CommandCompletionBuilder
+      ) -> void
+      %a{rbs:test:skip} def call: (command_input input) -> untyped
+    end
+
+
+    class ExecuteDeclareWorkItemDependency
+      def initialize: (
+        event_store: _EventStore,
+        ?preparer: PrepareDeclareWorkItemDependency,
+        ?decider: Domain::ChangeSets::DeclareWorkItemDependency,
+        ?input_digest: CommandInputDigest,
+        ?clock: _Clock,
+        ?id_generator: _IdGenerator,
+        ?event_factory: EventFactory,
+        ?schema_registry: EventSchemaRegistry,
+        ?stream_factory: StreamFactory,
+        ?completion_builder: CommandCompletionBuilder
+      ) -> void
+      %a{rbs:test:skip} def call: (command_input input) -> untyped
+    end
+  end
+end
