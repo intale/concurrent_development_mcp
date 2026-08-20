@@ -50,5 +50,28 @@ module Coordinator
       maximum_count: 603,
       direction: :asc
     )
+
+    CHANGE_SET_MEMBERS_FOR_READINESS = EventReadCriteria.new(
+      event_types: [ "WorkItemAddedToChangeSet" ],
+      maximum_count: 100,
+      direction: :asc
+    )
+
+    CHANGE_SET_FOR_READINESS_EVALUATION = EventReadCriteria.new(
+      event_types: [
+        "ChangeSetCreated",
+        "WorkItemAddedToChangeSet",
+        "WorkItemDependencyDeclared",
+        "ChangeSetActivated"
+      ],
+      maximum_count: 602,
+      direction: :asc
+    )
+
+    WORK_ITEM_FOR_READINESS_EVALUATION = EventReadCriteria.new(
+      event_types: [ "WorkItemCreated", "WorkItemMadeReady" ],
+      maximum_count: 2,
+      direction: :asc
+    )
   end
 end

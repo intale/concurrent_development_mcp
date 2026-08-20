@@ -44,6 +44,27 @@ module Coordinator
       []
     end
 
+    def read_marked(reference, criteria)
+      stream = @pg_stream_factory.call(reference)
+
+      events = @client.read(
+        stream,
+        options: {
+          direction: criteria.direction,
+          max_count: criteria.query_max_count,
+          filter: {
+            event_types: [ { type: criteria.event_type, markers: [ criteria.marker ] } ]
+          }
+        }
+      )
+      return events if events.length <= criteria.maximum_count
+
+      raise EventHistoryLimitExceeded,
+            "Marked event read exceeded #{criteria.maximum_count} relevant events for #{reference.to_h.inspect}"
+    rescue PgEventstore::StreamNotFoundError
+      []
+    end
+
     def append(reference, events)
       stream = @pg_stream_factory.call(reference)
 

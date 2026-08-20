@@ -7,6 +7,7 @@ module Coordinator
     def multiple: [Result] () { () -> Result } -> Result
     def read: (StreamReference, EventReadCriteria) -> Array[PgEventstore::Event]
     def read_grouped: (StreamReference, GroupedEventReadCriteria) -> Array[PgEventstore::Event]
+    def read_marked: (StreamReference, MarkedEventReadCriteria) -> Array[PgEventstore::Event]
     def append: (StreamReference, PgEventstore::Event | Array[PgEventstore::Event]) ->
       (PgEventstore::Event | Array[PgEventstore::Event])
   end
@@ -26,6 +27,29 @@ module Coordinator
   class CanonicalJson
     def encode: (untyped value) -> String
     def sha256: (untyped value) -> String
+  end
+
+  class CompoundMarkerDefinitionV1 < Value
+    def purpose: () -> String
+    def components: () -> Array[String]
+  end
+
+  class CompoundMarkerDocumentV1 < Value
+    def schema: () -> String
+    def purpose: () -> String
+    def components: () -> Array[String]
+  end
+
+  class CompoundMarker < Value
+    def purpose: () -> String
+    def components: () -> Array[String]
+    def digest: () -> String
+    def marker: () -> String
+  end
+
+  class CompoundMarkerBuilder
+    def initialize: (?canonical_json: CanonicalJson) -> void
+    def call: (CompoundMarkerDefinitionV1 definition) -> CompoundMarker
   end
 
   class StreamReference < Value
@@ -55,6 +79,14 @@ module Coordinator
   class GroupedEventReadCriteria < Value
     def event_types: () -> Array[String]
     def direction: () -> Symbol
+  end
+
+  class MarkedEventReadCriteria < Value
+    def event_type: () -> String
+    def marker: () -> String
+    def maximum_count: () -> Integer
+    def direction: () -> Symbol
+    def query_max_count: () -> Integer
   end
 
   class EventHistoryLimitExceeded < StandardError
@@ -170,6 +202,119 @@ module Coordinator
     def stream_revision: () -> Integer
   end
 
+  module ProcessDecisions
+    class ReadinessV1 < Value
+      def schema: () -> String
+      def process_manager: () -> String
+      def policy_version: () -> String
+      def source_event: () -> EventReference
+      def target_work_item_id: () -> String
+      def process_step: () -> String
+      def component_markers: () -> Array[String]
+    end
+  end
+
+  class ReadinessDecisionIdentity < Value
+    def document: () -> ProcessDecisions::ReadinessV1
+    def compound_marker: () -> CompoundMarker
+    def command_id: () -> String
+    def readiness_decision_id: () -> String
+  end
+
+  class ChangeSetActivationSource < Value
+    def event: () -> PgEventstore::Event
+    def reference: () -> EventReference
+    def payload: () -> Events::ChangeSetActivatedV1
+    def correlation_id: () -> String
+  end
+
+  class InvalidSourceEvent < StandardError
+  end
+
+  class InvalidReadinessInvocation < StandardError
+  end
+
+  class InvalidReadinessEventPlan < StandardError
+  end
+
+  class ChangeSetActivationSourceBuilder
+    def initialize: (
+      ?contract: Contracts::ChangeSetActivationSourceEvent,
+      ?schema_registry: EventSchemaRegistry
+    ) -> void
+    def call: (PgEventstore::Event event) -> ChangeSetActivationSource
+  end
+
+  class ReadinessCommandBuilder
+    def initialize: (?compound_marker_builder: CompoundMarkerBuilder) -> void
+    def call: (source: ChangeSetActivationSource, work_item_id: String) -> Commands::EvaluateWorkItemReadiness
+  end
+
+  class ReadinessInvocation < Value
+    def command: () -> Commands::EvaluateWorkItemReadiness
+    def source: () -> ChangeSetActivationSource
+  end
+
+  class PreparedReadinessDecision < Value
+    def occurred_at: () -> String
+    def event_id: () -> String
+  end
+
+  class ReadinessTargets < Value
+    def work_item_ids: () -> Array[String]
+  end
+
+  class InvalidReadinessTargets < StandardError
+  end
+
+  class ReadinessTargetRejected < StandardError
+  end
+
+  class ReadinessTargetsBuilder
+    def initialize: (?contract: Contracts::ReadinessTargets) -> void
+    def call: (
+      source: ChangeSetActivationSource,
+      memberships: Array[Events::WorkItemAddedToChangeSetV1]
+    ) -> ReadinessTargets
+  end
+
+  module ProcessManagers
+    class ChangeSetReadiness
+      HANDLED_OUTCOME_CODES: Array[Symbol]
+
+      def initialize: (
+        event_store: _EventStore,
+        ?source_builder: ChangeSetActivationSourceBuilder,
+        ?targets_builder: ReadinessTargetsBuilder,
+        ?command_builder: ReadinessCommandBuilder,
+        ?operation: Operations::ExecuteEvaluateWorkItemReadiness,
+        ?schema_registry: EventSchemaRegistry,
+        ?stream_factory: StreamFactory
+      ) -> void
+      def call: (PgEventstore::Event event) -> void
+    end
+  end
+
+  module Subscriptions
+    class Definition < Value
+      def set_name: () -> String
+      def subscription_name: () -> String
+      def stream_context: () -> String
+      def stream_name: () -> String
+      def event_type: () -> String
+      def options: () -> Hash[Symbol, untyped]
+    end
+
+    class ChangeSetReadiness
+      DEFINITION: Definition
+
+      def initialize: (handler: ProcessManagers::ChangeSetReadiness, ?pull_interval: Integer | Float) -> void
+      def start: () -> PgEventstore::BasicRunner
+      def stop: () -> void
+      def processed_event_count: () -> Integer
+    end
+  end
+
   class ProjectionBarrier < Value
     def stream_context: () -> String
     def stream_name: () -> String
@@ -254,6 +399,20 @@ module Coordinator
       def actor: () -> Actor
       def change_set_id: () -> String
     end
+
+    class EvaluateWorkItemReadiness < Value
+      def command_id: () -> String
+      def actor: () -> Actor
+      def change_set_id: () -> String
+      def work_item_id: () -> String
+      def source_activation_event_id: () -> String
+      def source_activation_revision: () -> Integer
+      def policy_version: () -> String
+      def decision_identity: () -> ReadinessDecisionIdentity
+      def readiness_decision_id: () -> String
+      def process_decision_marker: () -> String
+      def process_decision_components: () -> Array[String]
+    end
   end
 
   module Events
@@ -305,6 +464,14 @@ module Coordinator
       def work_item_count: () -> Integer
       def dependency_count: () -> Integer
       def activated_at: () -> String
+    end
+
+    class WorkItemMadeReadyV1 < Base
+      def change_set_id: () -> String
+      def work_item_id: () -> String
+      def readiness_decision_id: () -> String
+      def reason: () -> String
+      def made_ready_at: () -> String
     end
 
     class CommandCompletedV1 < Base
@@ -420,6 +587,22 @@ module Coordinator
       def call: (command_input) -> untyped
     end
 
+    class ChangeSetActivationSourceEvent
+      def call: (command_input) -> untyped
+    end
+
+    class ReadinessInvocation
+      def call: (command_input) -> untyped
+    end
+
+    class ReadinessEventPlan
+      def call: (command_input) -> untyped
+    end
+
+    class ReadinessTargets
+      def call: (command_input) -> untyped
+    end
+
     module Text
       def self.valid?: (untyped value, max_size: Integer) -> bool
     end
@@ -512,6 +695,17 @@ module Coordinator
           occurred_at: String
         ) -> untyped
       end
+
+      class EvaluateReadiness
+        def initialize: (?stream_factory: StreamFactory) -> void
+        def call: (
+          change_set_state: ChangeSets::State,
+          work_item_state: State,
+          command: Commands::EvaluateWorkItemReadiness,
+          occurred_at: String,
+          decision_recorded: bool
+        ) -> untyped
+      end
     end
   end
 
@@ -601,6 +795,22 @@ module Coordinator
         ?completion_builder: CommandCompletionBuilder
       ) -> void
       %a{rbs:test:skip} def call: (command_input input) -> untyped
+    end
+
+
+    class ExecuteEvaluateWorkItemReadiness
+      def initialize: (
+        event_store: _EventStore,
+        ?decider: Domain::WorkItems::EvaluateReadiness,
+        ?clock: _Clock,
+        ?id_generator: _IdGenerator,
+        ?event_factory: EventFactory,
+        ?schema_registry: EventSchemaRegistry,
+        ?stream_factory: StreamFactory,
+        ?invocation_contract: Contracts::ReadinessInvocation,
+        ?event_plan_contract: Contracts::ReadinessEventPlan
+      ) -> void
+      %a{rbs:test:skip} def call: (ReadinessInvocation invocation) -> untyped
     end
   end
 end

@@ -13,12 +13,13 @@ RSpec.describe Coordinator::EventStore, :event_store do
   end
   let(:event) { build_event(type: "RealStoreProbe", data: { "probe" => true }) }
 
-  def build_event(type:, data: {})
+  def build_event(type:, data: {}, markers: [])
     PgEventstore::Event.new(
       id: Coordinator::IdGenerator.new.uuid_v7,
       type:,
       data:,
-      metadata: { "schema_version" => 1 }
+      metadata: { "schema_version" => 1 },
+      markers:
     )
   end
 
@@ -56,6 +57,29 @@ RSpec.describe Coordinator::EventStore, :event_store do
 
     expect(grouped.fetch("RealStoreProbe").id).to eq(newest_probe.id)
     expect(grouped.fetch("OtherProbe").data).to eq("version" => 1)
+  end
+
+  it "uses one compound marker as a bounded conjunctive event selector" do
+    target = build_event(
+      type: "RealStoreProbe",
+      markers: [ "locale:en", "resource:description", "compound:description:v1:sha256:target" ]
+    )
+    event_store.append(
+      stream,
+      [
+        build_event(type: "RealStoreProbe", markers: [ "locale:en" ]),
+        build_event(type: "RealStoreProbe", markers: [ "resource:description" ]),
+        target
+      ]
+    )
+    criteria = Coordinator::MarkedEventReadCriteria.new(
+      event_type: "RealStoreProbe",
+      marker: "compound:description:v1:sha256:target",
+      maximum_count: 1,
+      direction: :desc
+    )
+
+    expect(event_store.read_marked(stream, criteria).map(&:id)).to eq([ target.id ])
   end
 
   it "commits all real requests in one multiple transaction" do

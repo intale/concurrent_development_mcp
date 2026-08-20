@@ -10,6 +10,8 @@ module Coordinator
     SHA256_DIGEST_PATTERN = /\Asha256:[0-9a-f]{64}\z/
     TIMESTAMP_PATTERN = /\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z\z/
     UUID_V7_PATTERN = /\A[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/
+    MARKER_PURPOSE_PATTERN = /\A[a-z][a-z0-9-]{0,63}\z/
+    MARKER_COMPONENT_PATTERN = /\A(?!compound:)[^\u0000\r\n]{1,512}\z/
 
     ACTOR_KINDS = %w[
       agent
@@ -40,6 +42,10 @@ module Coordinator
     Sha256Digest = String.constrained(format: SHA256_DIGEST_PATTERN)
     Timestamp = String.constrained(format: TIMESTAMP_PATTERN)
     UuidV7 = String.constrained(format: UUID_V7_PATTERN)
+    Marker = String.constrained(min_size: 1, max_size: 512)
+    MarkerPurpose = String.constrained(format: MARKER_PURPOSE_PATTERN)
+    MarkerComponent = String.constrained(format: MARKER_COMPONENT_PATTERN)
+    MarkerComponents = Array.of(MarkerComponent).constrained(min_size: 2, max_size: 32)
     ActorKind = String.enum(*ACTOR_KINDS)
     DependencyKind = String.enum(*DEPENDENCY_KINDS)
     Goal = String.constrained(min_size: 1, max_size: 4_000)
@@ -49,5 +55,6 @@ module Coordinator
     StateAcceptanceCriteria = Array.of(Criterion).constrained(max_size: 100)
     WorkItemStateAcceptanceCriteria = Array.of(Criterion).constrained(max_size: 50)
     WorkItemIds = Array.of(Identifier).constrained(max_size: 100)
+    ReadinessWorkItemIds = Array.of(Identifier).constrained(min_size: 1, max_size: 100)
   end
 end

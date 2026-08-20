@@ -3,6 +3,9 @@
 module Coordinator
   class Container < Dry::System::Container
     register("canonical_json", memoize: true) { CanonicalJson.new }
+    register("compound_marker_builder", memoize: true) do
+      CompoundMarkerBuilder.new(canonical_json: self["canonical_json"])
+    end
     register("clock", memoize: true) { SystemClock.new }
     register("id_generator", memoize: true) { IdGenerator.new }
     register("stream_factory", memoize: true) { StreamFactory.new }
@@ -51,6 +54,20 @@ module Coordinator
     register("domain.change_sets.activate", memoize: true) do
       Domain::ChangeSets::Activate.new(stream_factory: self["stream_factory"])
     end
+
+    register("domain.work_items.evaluate_readiness", memoize: true) do
+      Domain::WorkItems::EvaluateReadiness.new(stream_factory: self["stream_factory"])
+    end
+
+    register("change_set_activation_source_builder", memoize: true) do
+      ChangeSetActivationSourceBuilder.new(schema_registry: self["event_schema_registry"])
+    end
+
+    register("readiness_command_builder", memoize: true) do
+      ReadinessCommandBuilder.new(compound_marker_builder: self["compound_marker_builder"])
+    end
+
+    register("readiness_targets_builder", memoize: true) { ReadinessTargetsBuilder.new }
 
     register("event_store", memoize: true) do
       EventStore.new(client: PgEventstore.client)
@@ -116,6 +133,35 @@ module Coordinator
         stream_factory: self["stream_factory"],
         completion_builder: self["command_completion_builder"]
       )
+    end
+
+    register("operations.execute_evaluate_work_item_readiness") do
+      Operations::ExecuteEvaluateWorkItemReadiness.new(
+        event_store: self["event_store"],
+        decider: self["domain.work_items.evaluate_readiness"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+
+    register("process_managers.change_set_readiness", memoize: true) do
+      ProcessManagers::ChangeSetReadiness.new(
+        event_store: self["event_store"],
+        source_builder: self["change_set_activation_source_builder"],
+        targets_builder: self["readiness_targets_builder"],
+        command_builder: self["readiness_command_builder"],
+        operation: self["operations.execute_evaluate_work_item_readiness"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("subscriptions.change_set_readiness") do
+      Subscriptions::ChangeSetReadiness.new(handler: self["process_managers.change_set_readiness"])
     end
   end
 

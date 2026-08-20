@@ -31,16 +31,28 @@ module Coordinator
         end
 
         def apply(event)
-          return self unless event.is_a?(Events::WorkItemCreatedV1)
-
-          self.class.new(
-            work_item_id: event.work_item_id,
-            change_set_id: event.change_set_id,
-            repository_id: event.repository_id,
-            goal: event.goal,
-            acceptance_criteria: event.acceptance_criteria,
-            status: "planned"
-          )
+          case event
+          when Events::WorkItemCreatedV1
+            self.class.new(
+              work_item_id: event.work_item_id,
+              change_set_id: event.change_set_id,
+              repository_id: event.repository_id,
+              goal: event.goal,
+              acceptance_criteria: event.acceptance_criteria,
+              status: "planned"
+            )
+          when Events::WorkItemMadeReadyV1
+            self.class.new(
+              work_item_id:,
+              change_set_id:,
+              repository_id:,
+              goal:,
+              acceptance_criteria:,
+              status: "ready"
+            )
+          else
+            self
+          end
         end
       end
     end
