@@ -73,5 +73,27 @@ module Coordinator
       maximum_count: 2,
       direction: :asc
     )
+
+    CHANGE_SET_FOR_ACQUISITION = EventReadCriteria.new(
+      event_types: [
+        "ChangeSetCreated",
+        "WorkItemAddedToChangeSet",
+        "ChangeSetActivated"
+      ],
+      maximum_count: 102,
+      direction: :asc
+    )
+
+    WORK_ITEM_FOR_ACQUISITION = EventReadCriteria.new(
+      event_types: [ "WorkItemCreated", "WorkItemMadeReady", "WorkItemAcquired" ],
+      maximum_count: 3,
+      direction: :asc
+    )
+
+    ATTEMPT_FOR_ACQUISITION = EventReadCriteria.new(
+      event_types: [ "AttemptAuthorized", "AttemptStarted" ],
+      maximum_count: 2,
+      direction: :asc
+    )
   end
 end

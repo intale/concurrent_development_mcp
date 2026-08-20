@@ -138,4 +138,48 @@ RSpec.describe Coordinator::CommandInputDigest do
       "sha256:b4c83e9946432f74040fe1be7ae68be144dddec298bab8067113c61d19539e71"
     )
   end
+
+  it "includes normalized repository evidence in the acquisition digest" do
+    acquisition_command = Coordinator::Commands::AcquireWorkItem.new(
+      command_id: "cmd-300",
+      actor: Coordinator::Commands::Actor.new(kind: "agent", id: "agent-a"),
+      change_set_id: "CS-100",
+      work_item_id: "W-200",
+      attempt_id: "A-300",
+      base_snapshots: [
+        Coordinator::RepositorySnapshotV1.new(
+          repository_id: "billing",
+          object_format: "sha1",
+          commit_oid: "0123456789abcdef0123456789abcdef01234567"
+        )
+      ]
+    )
+
+    expect(digest.work_item_acquire_document(acquisition_command)).to eq(
+      Coordinator::CommandInputDocuments::AcquireWorkItemV1.new(
+        schema: "command-input/v1",
+        command_id: "cmd-300",
+        tool_name: "work_item_acquire",
+        input: Coordinator::CommandInputDocuments::AcquireWorkItemInputV1.new(
+          actor: Coordinator::CommandInputDocuments::ActorV1.new(
+            actor_kind: "agent",
+            actor_id: "agent-a"
+          ),
+          change_set_id: "CS-100",
+          work_item_id: "W-200",
+          attempt_id: "A-300",
+          base_snapshots: [
+            Coordinator::CommandInputDocuments::RepositorySnapshotV1.new(
+              repository_id: "billing",
+              object_format: "sha1",
+              commit_oid: "0123456789abcdef0123456789abcdef01234567"
+            )
+          ]
+        )
+      )
+    )
+    expect(digest.work_item_acquire(acquisition_command)).to eq(
+      "sha256:11382b77d0f6e7e226d4bb927aebeebfbf3fb1b61d929d2121f804449e3d16f0"
+    )
+  end
 end

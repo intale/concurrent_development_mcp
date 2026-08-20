@@ -35,10 +35,12 @@ module Coordinator
       requires_contract
       requires_composite_verification
     ].freeze
+    GIT_OBJECT_FORMATS = %w[sha1 sha256].freeze
 
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)
     RepositoryId = String.constrained(format: REPOSITORY_ID_PATTERN)
     GitOid = String.constrained(format: GIT_OID_PATTERN)
+    GitObjectFormat = String.enum(*GIT_OBJECT_FORMATS)
     Sha256Digest = String.constrained(format: SHA256_DIGEST_PATTERN)
     Timestamp = String.constrained(format: TIMESTAMP_PATTERN)
     UuidV7 = String.constrained(format: UUID_V7_PATTERN)

@@ -116,6 +116,12 @@ module Coordinator
     def key: () -> String
   end
 
+  class RepositorySnapshotV1 < Value
+    def repository_id: () -> String
+    def object_format: () -> String
+    def commit_oid: () -> String
+  end
+
   module CommandInputDocuments
     class ActorV1 < Value
       def actor_kind: () -> String
@@ -177,10 +183,29 @@ module Coordinator
       def tool_name: () -> String
       def input: () -> ActivateChangeSetInputV1
     end
+
+    class RepositorySnapshotV1 < Value
+      def repository_id: () -> String
+      def object_format: () -> String
+      def commit_oid: () -> String
+    end
+
+    class AcquireWorkItemInputV1 < Value
+      def actor: () -> ActorV1
+      def change_set_id: () -> String
+      def work_item_id: () -> String
+      def attempt_id: () -> String
+      def base_snapshots: () -> Array[RepositorySnapshotV1]
+    end
+
+    class AcquireWorkItemV1 < BaseV1
+      def tool_name: () -> String
+      def input: () -> AcquireWorkItemInputV1
+    end
   end
 
   module CommandReceiptData
-    type value = ChangeSet | WorkItem | Dependency
+    type value = ChangeSet | WorkItem | Dependency | Attempt
 
     class ChangeSet < Value
       def change_set_id: () -> String
@@ -194,6 +219,12 @@ module Coordinator
     class Dependency < Value
       def change_set_id: () -> String
       def dependency_id: () -> String
+    end
+
+    class Attempt < Value
+      def change_set_id: () -> String
+      def work_item_id: () -> String
+      def attempt_id: () -> String
     end
   end
 
@@ -242,6 +273,16 @@ module Coordinator
   end
 
   class InvalidSubscriptionSet < StandardError
+  end
+
+  class InvalidAcquisitionEventPlan < StandardError
+  end
+
+  class PreparedAcquisition < Value
+    def occurred_at: () -> String
+    def input_digest: () -> String
+    def domain_event_ids: () -> Array[String]
+    def completion_event_id: () -> String
   end
 
   class ChangeSetActivationSourceBuilder
@@ -362,7 +403,7 @@ module Coordinator
   end
 
   class NextAction < Value
-    type arguments = ChangeSetArguments | ContextArguments
+    type arguments = ChangeSetArguments | ContextArguments | AttemptArguments
 
     class ChangeSetArguments < Value
       def change_set_id: () -> String
@@ -373,12 +414,18 @@ module Coordinator
       def after_command_id: () -> String
     end
 
+    class AttemptArguments < Value
+      def change_set_id: () -> String
+      def work_item_id: () -> String
+      def attempt_id: () -> String
+    end
+
     def tool: () -> String
     def arguments: () -> arguments
   end
 
   class ContextTokenDocument < Value
-    type scope = ChangeSetScope | WorkItemScope
+    type scope = ChangeSetScope | WorkItemScope | AttemptScope
 
     class ChangeSetScope < Value
       def change_set_id: () -> String
@@ -387,6 +434,12 @@ module Coordinator
     class WorkItemScope < Value
       def change_set_id: () -> String
       def work_item_id: () -> String
+    end
+
+    class AttemptScope < Value
+      def change_set_id: () -> String
+      def work_item_id: () -> String
+      def attempt_id: () -> String
     end
 
     def schema: () -> String
@@ -447,6 +500,15 @@ module Coordinator
       def readiness_decision_id: () -> String
       def process_decision_marker: () -> String
       def process_decision_components: () -> Array[String]
+    end
+
+    class AcquireWorkItem < Value
+      def command_id: () -> String
+      def actor: () -> Actor
+      def change_set_id: () -> String
+      def work_item_id: () -> String
+      def attempt_id: () -> String
+      def base_snapshots: () -> Array[RepositorySnapshotV1]
     end
   end
 
@@ -509,6 +571,30 @@ module Coordinator
       def made_ready_at: () -> String
     end
 
+    class WorkItemAcquiredV1 < Base
+      def change_set_id: () -> String
+      def work_item_id: () -> String
+      def attempt_id: () -> String
+      def agent_id: () -> String
+      def acquired_at: () -> String
+    end
+
+    class AttemptAuthorizedV1 < Base
+      def attempt_id: () -> String
+      def change_set_id: () -> String
+      def work_item_id: () -> String
+      def agent_id: () -> String
+      def base_snapshots: () -> Array[RepositorySnapshotV1]
+      def authorized_at: () -> String
+    end
+
+    class AttemptStartedV1 < Base
+      def attempt_id: () -> String
+      def change_set_id: () -> String
+      def work_item_id: () -> String
+      def started_at: () -> String
+    end
+
     class CommandCompletedV1 < Base
       def command_id: () -> String
       def tool_name: () -> String
@@ -554,6 +640,8 @@ module Coordinator
     def work_item_dependency_declare_document: (Commands::DeclareWorkItemDependency command) -> CommandInputDocuments::DeclareWorkItemDependencyV1
     def change_set_activate: (Commands::ActivateChangeSet command) -> String
     def change_set_activate_document: (Commands::ActivateChangeSet command) -> CommandInputDocuments::ActivateChangeSetV1
+    def work_item_acquire: (Commands::AcquireWorkItem command) -> String
+    def work_item_acquire_document: (Commands::AcquireWorkItem command) -> CommandInputDocuments::AcquireWorkItemV1
   end
 
   class CommandCompletionBuilder
@@ -581,6 +669,12 @@ module Coordinator
     ) -> Events::CommandCompletedV1
     def change_set_activate: (
       command: Commands::ActivateChangeSet,
+      input_digest: String,
+      persisted_events: Array[PgEventstore::Event],
+      completed_at: String
+    ) -> Events::CommandCompletedV1
+    def work_item_acquire: (
+      command: Commands::AcquireWorkItem,
       input_digest: String,
       persisted_events: Array[PgEventstore::Event],
       completed_at: String
@@ -639,6 +733,18 @@ module Coordinator
     end
 
     class SubscriptionSetRegistrations
+      def call: (command_input) -> untyped
+    end
+
+    class AcquireWorkItem
+      def call: (command_input) -> untyped
+    end
+
+    class GitObjectIds
+      def call: (command_input) -> untyped
+    end
+
+    class AcquisitionEventPlan
       def call: (command_input) -> untyped
     end
 
@@ -721,6 +827,8 @@ module Coordinator
         def goal: () -> String?
         def acceptance_criteria: () -> Array[String]
         def status: () -> String
+        def active_attempt_id: () -> String?
+        def active_agent_id: () -> String?
         def absent?: () -> bool
         def apply: (Events::Base event) -> State
       end
@@ -745,6 +853,33 @@ module Coordinator
           decision_recorded: bool
         ) -> untyped
       end
+
+      class Acquire
+        def initialize: (?stream_factory: StreamFactory) -> void
+        def call: (
+          change_set_state: ChangeSets::State,
+          work_item_state: State,
+          attempt_state: Attempts::State,
+          command: Commands::AcquireWorkItem,
+          occurred_at: String
+        ) -> untyped
+      end
+    end
+
+    module Attempts
+      class State < Value
+        def self.initial: () -> State
+        def self.reduce: (Array[Events::Base] events) -> State
+
+        def attempt_id: () -> String?
+        def change_set_id: () -> String?
+        def work_item_id: () -> String?
+        def agent_id: () -> String?
+        def base_snapshots: () -> Array[RepositorySnapshotV1]
+        def status: () -> String
+        def absent?: () -> bool
+        def apply: (Events::Base event) -> State
+      end
     end
   end
 
@@ -767,6 +902,14 @@ module Coordinator
 
     class PrepareActivateChangeSet
       def initialize: (?contract: Contracts::ActivateChangeSet) -> void
+      %a{rbs:test:skip} def call: (command_input input) -> untyped
+    end
+
+    class PrepareAcquireWorkItem
+      def initialize: (
+        ?contract: Contracts::AcquireWorkItem,
+        ?git_object_ids_contract: Contracts::GitObjectIds
+      ) -> void
       %a{rbs:test:skip} def call: (command_input input) -> untyped
     end
 
@@ -850,6 +993,23 @@ module Coordinator
         ?event_plan_contract: Contracts::ReadinessEventPlan
       ) -> void
       %a{rbs:test:skip} def call: (ReadinessInvocation invocation) -> untyped
+    end
+
+    class ExecuteAcquireWorkItem
+      def initialize: (
+        event_store: _EventStore,
+        ?preparer: PrepareAcquireWorkItem,
+        ?decider: Domain::WorkItems::Acquire,
+        ?input_digest: CommandInputDigest,
+        ?clock: _Clock,
+        ?id_generator: _IdGenerator,
+        ?event_factory: EventFactory,
+        ?schema_registry: EventSchemaRegistry,
+        ?stream_factory: StreamFactory,
+        ?completion_builder: CommandCompletionBuilder,
+        ?event_plan_contract: Contracts::AcquisitionEventPlan
+      ) -> void
+      %a{rbs:test:skip} def call: (command_input input) -> untyped
     end
   end
 end

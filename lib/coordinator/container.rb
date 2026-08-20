@@ -39,6 +39,10 @@ module Coordinator
       Operations::PrepareActivateChangeSet.new
     end
 
+    register("operations.prepare_acquire_work_item", memoize: true) do
+      Operations::PrepareAcquireWorkItem.new
+    end
+
     register("domain.change_sets.create", memoize: true) do
       Domain::ChangeSets::Create.new(stream_factory: self["stream_factory"])
     end
@@ -57,6 +61,10 @@ module Coordinator
 
     register("domain.work_items.evaluate_readiness", memoize: true) do
       Domain::WorkItems::EvaluateReadiness.new(stream_factory: self["stream_factory"])
+    end
+
+    register("domain.work_items.acquire", memoize: true) do
+      Domain::WorkItems::Acquire.new(stream_factory: self["stream_factory"])
     end
 
     register("change_set_activation_source_builder", memoize: true) do
@@ -144,6 +152,21 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("operations.execute_acquire_work_item") do
+      Operations::ExecuteAcquireWorkItem.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_acquire_work_item"],
+        decider: self["domain.work_items.acquire"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
       )
     end
 

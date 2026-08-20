@@ -102,6 +102,26 @@ module Coordinator
       )
     end
 
+    def work_item_acquire(command:, input_digest:, persisted_events:, completed_at:)
+      attempt_arguments = NextAction::AttemptArguments.new(
+        change_set_id: command.change_set_id,
+        work_item_id: command.work_item_id,
+        attempt_id: command.attempt_id
+      )
+
+      build_completion(
+        command:,
+        tool_name: "work_item_acquire",
+        summary: "WorkItem acquired and Attempt started.",
+        data: CommandReceiptData::Attempt.new(attempt_arguments.to_h),
+        scope: ContextTokenDocument::AttemptScope.new(attempt_arguments.to_h),
+        next_actions: [ NextAction.new(tool: "write_set_reserve", arguments: attempt_arguments) ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
 
     def build_completion(command:, tool_name:, summary:, data:, scope:, next_actions:, input_digest:, persisted_events:, completed_at:)

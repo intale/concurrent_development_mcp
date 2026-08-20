@@ -62,5 +62,26 @@ module Coordinator
       attribute :tool_name, Types::String.enum("change_set_activate")
       attribute :input, ActivateChangeSetInputV1
     end
+
+    class RepositorySnapshotV1 < Value
+      attribute :repository_id, Types::RepositoryId
+      attribute :object_format, Types::GitObjectFormat
+      attribute :commit_oid, Types::GitOid
+    end
+
+    class AcquireWorkItemInputV1 < Value
+      Snapshot = Types.Instance(RepositorySnapshotV1)
+
+      attribute :actor, ActorV1
+      attribute :change_set_id, Types::Identifier
+      attribute :work_item_id, Types::Identifier
+      attribute :attempt_id, Types::Identifier
+      attribute :base_snapshots, Types::Array.of(Snapshot).constrained(max_size: 100)
+    end
+
+    class AcquireWorkItemV1 < BaseV1
+      attribute :tool_name, Types::String.enum("work_item_acquire")
+      attribute :input, AcquireWorkItemInputV1
+    end
   end
 end

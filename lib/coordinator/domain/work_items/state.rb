@@ -10,6 +10,8 @@ module Coordinator
         attribute :goal, Types::Goal.optional
         attribute :acceptance_criteria, Types::WorkItemStateAcceptanceCriteria
         attribute :status, Types::String.enum("absent", "planned", "ready", "active")
+        attribute :active_attempt_id, Types::Identifier.optional.default(nil)
+        attribute :active_agent_id, Types::Identifier.optional.default(nil)
 
         def self.initial
           new(
@@ -18,7 +20,9 @@ module Coordinator
             repository_id: nil,
             goal: nil,
             acceptance_criteria: [],
-            status: "absent"
+            status: "absent",
+            active_attempt_id: nil,
+            active_agent_id: nil
           )
         end
 
@@ -39,7 +43,9 @@ module Coordinator
               repository_id: event.repository_id,
               goal: event.goal,
               acceptance_criteria: event.acceptance_criteria,
-              status: "planned"
+              status: "planned",
+              active_attempt_id: nil,
+              active_agent_id: nil
             )
           when Events::WorkItemMadeReadyV1
             self.class.new(
@@ -48,7 +54,20 @@ module Coordinator
               repository_id:,
               goal:,
               acceptance_criteria:,
-              status: "ready"
+              status: "ready",
+              active_attempt_id:,
+              active_agent_id:
+            )
+          when Events::WorkItemAcquiredV1
+            self.class.new(
+              work_item_id:,
+              change_set_id:,
+              repository_id:,
+              goal:,
+              acceptance_criteria:,
+              status: "active",
+              active_attempt_id: event.attempt_id,
+              active_agent_id: event.agent_id
             )
           else
             self

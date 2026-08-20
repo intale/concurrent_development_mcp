@@ -13,7 +13,10 @@ module Coordinator
       [ "WorkItemAddedToChangeSet", 1 ] => Events::WorkItemAddedToChangeSetV1,
       [ "WorkItemDependencyDeclared", 1 ] => Events::WorkItemDependencyDeclaredV1,
       [ "ChangeSetActivated", 1 ] => Events::ChangeSetActivatedV1,
-      [ "WorkItemMadeReady", 1 ] => Events::WorkItemMadeReadyV1
+      [ "WorkItemMadeReady", 1 ] => Events::WorkItemMadeReadyV1,
+      [ "WorkItemAcquired", 1 ] => Events::WorkItemAcquiredV1,
+      [ "AttemptAuthorized", 1 ] => Events::AttemptAuthorizedV1,
+      [ "AttemptStarted", 1 ] => Events::AttemptStartedV1
     }.freeze
 
     def initialize(definitions: DEFAULT_DEFINITIONS)

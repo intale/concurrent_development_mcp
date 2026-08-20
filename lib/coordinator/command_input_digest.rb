@@ -81,6 +81,27 @@ module Coordinator
       )
     end
 
+    def work_item_acquire(command)
+      @canonical_json.sha256(work_item_acquire_document(command).to_h)
+    end
+
+    def work_item_acquire_document(command)
+      CommandInputDocuments::AcquireWorkItemV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "work_item_acquire",
+        input: CommandInputDocuments::AcquireWorkItemInputV1.new(
+          actor: actor_document(command.actor),
+          change_set_id: command.change_set_id,
+          work_item_id: command.work_item_id,
+          attempt_id: command.attempt_id,
+          base_snapshots: command.base_snapshots.map do |snapshot|
+            CommandInputDocuments::RepositorySnapshotV1.new(snapshot.to_h)
+          end
+        )
+      )
+    end
+
     private
 
     def actor_document(actor)

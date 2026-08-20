@@ -11,7 +11,13 @@ module Coordinator
       attribute :after_command_id, Types::Identifier
     end
 
-    Arguments = ChangeSetArguments | ContextArguments
+    class AttemptArguments < Value
+      attribute :change_set_id, Types::Identifier
+      attribute :work_item_id, Types::Identifier
+      attribute :attempt_id, Types::Identifier
+    end
+
+    Arguments = ChangeSetArguments | ContextArguments | AttemptArguments
 
     attribute :tool, Types::Identifier
     attribute :arguments, Arguments

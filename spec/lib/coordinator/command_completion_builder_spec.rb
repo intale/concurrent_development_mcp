@@ -207,4 +207,81 @@ RSpec.describe Coordinator::CommandCompletionBuilder do
       )
     )
   end
+
+  it "builds an Attempt-scoped acquisition receipt and exact two-stream barriers" do
+    acquisition_command = Coordinator::Commands::AcquireWorkItem.new(
+      command_id: "cmd-300",
+      actor: Coordinator::Commands::Actor.new(kind: "agent", id: "agent-a"),
+      change_set_id: "CS-100",
+      work_item_id: "W-200",
+      attempt_id: "A-300",
+      base_snapshots: [
+        Coordinator::RepositorySnapshotV1.new(
+          repository_id: "billing",
+          object_format: "sha1",
+          commit_oid: "0123456789abcdef0123456789abcdef01234567"
+        )
+      ]
+    )
+    stream_factory = Coordinator::StreamFactory.new
+    pg_stream_factory = Coordinator::PgStreamFactory.new
+    work_item_stream = pg_stream_factory.call(stream_factory.work_item("W-200"))
+    attempt_stream = pg_stream_factory.call(stream_factory.attempt("A-300"))
+    events = [
+      PgEventstore::Event.new(
+        id: "018fd0f0-0000-7000-8000-000000000040",
+        type: "WorkItemAcquired",
+        stream: work_item_stream,
+        stream_revision: 2
+      ),
+      PgEventstore::Event.new(
+        id: "018fd0f0-0000-7000-8000-000000000041",
+        type: "AttemptAuthorized",
+        stream: attempt_stream,
+        stream_revision: 0
+      ),
+      PgEventstore::Event.new(
+        id: "018fd0f0-0000-7000-8000-000000000042",
+        type: "AttemptStarted",
+        stream: attempt_stream,
+        stream_revision: 1
+      )
+    ]
+
+    completion = builder.work_item_acquire(
+      command: acquisition_command,
+      input_digest: "sha256:#{"4" * 64}",
+      persisted_events: events,
+      completed_at: "2026-08-20T14:20:00.000000Z"
+    )
+
+    attempt_arguments = Coordinator::NextAction::AttemptArguments.new(
+      change_set_id: "CS-100",
+      work_item_id: "W-200",
+      attempt_id: "A-300"
+    )
+    expect(completion.data).to eq(
+      Coordinator::CommandReceiptData::Attempt.new(attempt_arguments.to_h)
+    )
+    expect(completion.next_actions).to contain_exactly(
+      Coordinator::NextAction.new(tool: "write_set_reserve", arguments: attempt_arguments)
+    )
+    expect(completion.emitted_events.map(&:type)).to eq(
+      [ "WorkItemAcquired", "AttemptAuthorized", "AttemptStarted" ]
+    )
+    expect(completion.projection_barriers.coord_context_v1).to contain_exactly(
+      Coordinator::ProjectionBarrier.new(
+        stream_context: "DevelopmentExecution",
+        stream_name: "WorkItem",
+        stream_id: "W-200",
+        stream_revision: 2
+      ),
+      Coordinator::ProjectionBarrier.new(
+        stream_context: "DevelopmentExecution",
+        stream_name: "Attempt",
+        stream_id: "A-300",
+        stream_revision: 1
+      )
+    )
+  end
 end

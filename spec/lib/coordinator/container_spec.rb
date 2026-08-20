@@ -13,6 +13,7 @@ RSpec.describe Coordinator::Container do
     dependency_operation = described_class["operations.execute_declare_work_item_dependency"]
     activation_operation = described_class["operations.execute_activate_change_set"]
     readiness_operation = described_class["operations.execute_evaluate_work_item_readiness"]
+    acquisition_operation = described_class["operations.execute_acquire_work_item"]
     readiness_process_manager = described_class["process_managers.change_set_readiness"]
     subscription_manager = described_class["subscription_managers.process_managers"]
     subscription_set = described_class["subscription_sets.process_managers"]
@@ -22,6 +23,7 @@ RSpec.describe Coordinator::Container do
     expect(dependency_operation).to be_a(Coordinator::Operations::ExecuteDeclareWorkItemDependency)
     expect(activation_operation).to be_a(Coordinator::Operations::ExecuteActivateChangeSet)
     expect(readiness_operation).to be_a(Coordinator::Operations::ExecuteEvaluateWorkItemReadiness)
+    expect(acquisition_operation).to be_a(Coordinator::Operations::ExecuteAcquireWorkItem)
     expect(readiness_process_manager).to be_a(Coordinator::ProcessManagers::ChangeSetReadiness)
     expect(subscription_manager).to be_a(PgEventstore::SubscriptionsManager)
     expect(subscription_set).to be_a(Coordinator::Subscriptions::ProcessManagerSet)
