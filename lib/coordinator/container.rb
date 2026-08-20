@@ -32,6 +32,10 @@ module Coordinator
       Operations::PrepareDeclareWorkItemDependency.new
     end
 
+    register("operations.prepare_activate_change_set", memoize: true) do
+      Operations::PrepareActivateChangeSet.new
+    end
+
     register("domain.change_sets.create", memoize: true) do
       Domain::ChangeSets::Create.new(stream_factory: self["stream_factory"])
     end
@@ -42,6 +46,10 @@ module Coordinator
 
     register("domain.change_sets.declare_work_item_dependency", memoize: true) do
       Domain::ChangeSets::DeclareWorkItemDependency.new(stream_factory: self["stream_factory"])
+    end
+
+    register("domain.change_sets.activate", memoize: true) do
+      Domain::ChangeSets::Activate.new(stream_factory: self["stream_factory"])
     end
 
     register("event_store", memoize: true) do
@@ -85,6 +93,21 @@ module Coordinator
         event_store: self["event_store"],
         preparer: self["operations.prepare_declare_work_item_dependency"],
         decider: self["domain.change_sets.declare_work_item_dependency"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
+    register("operations.execute_activate_change_set") do
+      Operations::ExecuteActivateChangeSet.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_activate_change_set"],
+        decider: self["domain.change_sets.activate"],
         input_digest: self["command_input_digest"],
         clock: self["clock"],
         id_generator: self["id_generator"],

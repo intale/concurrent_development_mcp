@@ -112,4 +112,30 @@ RSpec.describe Coordinator::CommandInputDigest do
       "sha256:ed3e6cad9dc37c0a8498d1e5c576f6c1e6c1b87e492ac091efc5463ae51a6df8"
     )
   end
+
+  it "freezes the complete typed activation input into a golden digest" do
+    activation_command = Coordinator::Commands::ActivateChangeSet.new(
+      command_id: "cmd-250",
+      actor: Coordinator::Commands::Actor.new(kind: "agent", id: "planner-1"),
+      change_set_id: "CS-100"
+    )
+
+    expect(digest.change_set_activate_document(activation_command)).to eq(
+      Coordinator::CommandInputDocuments::ActivateChangeSetV1.new(
+        schema: "command-input/v1",
+        command_id: "cmd-250",
+        tool_name: "change_set_activate",
+        input: Coordinator::CommandInputDocuments::ActivateChangeSetInputV1.new(
+          actor: Coordinator::CommandInputDocuments::ActorV1.new(
+            actor_kind: "agent",
+            actor_id: "planner-1"
+          ),
+          change_set_id: "CS-100"
+        )
+      )
+    )
+    expect(digest.change_set_activate(activation_command)).to eq(
+      "sha256:b4c83e9946432f74040fe1be7ae68be144dddec298bab8067113c61d19539e71"
+    )
+  end
 end

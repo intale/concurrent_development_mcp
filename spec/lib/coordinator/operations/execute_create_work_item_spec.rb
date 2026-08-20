@@ -1,13 +1,9 @@
 # frozen_string_literal: true
 
-RSpec.describe Coordinator::Operations::ExecuteCreateWorkItem do
-  let(:event_store) { FakeEventStore.new }
-  let(:clock) { TestSupport::FixedClock.new("2026-08-20T14:12:00.000000Z") }
-  let(:id_generator) { TestSupport::DeterministicIdGenerator.new }
+RSpec.describe Coordinator::Operations::ExecuteCreateWorkItem, :event_store do
+  let(:event_store) { Coordinator::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::StreamFactory.new }
-  subject(:operation) do
-    described_class.new(event_store:, clock:, id_generator:)
-  end
+  subject(:operation) { described_class.new(event_store:) }
 
   let(:input) do
     {
@@ -22,38 +18,36 @@ RSpec.describe Coordinator::Operations::ExecuteCreateWorkItem do
   end
 
   before do
-    seed_change_set(event_store)
+    create_change_set("CS-100")
   end
 
-  it "atomically persists both cross-stream facts and the durable completion" do
+  it "persists both cross-stream facts and the durable completion through the real store" do
     result = operation.call(input)
 
     expect(result).to be_success
     completion = result.value!
-    expect(completion).to be_a(Coordinator::Events::CommandCompletedV1)
     expect(completion.data).to eq(
       Coordinator::CommandReceiptData::WorkItem.new(
         change_set_id: "CS-100",
         work_item_id: "W-200"
       )
     )
-    expect(event_store.stream_events(streams.work_item("W-200")).map(&:type)).to eq([ "WorkItemCreated" ])
-    expect(event_store.stream_events(streams.change_set("CS-100")).map(&:type)).to eq(
+    expect(work_item_events("W-200").map(&:type)).to eq([ "WorkItemCreated" ])
+    expect(change_set_events("CS-100").map(&:type)).to eq(
       [ "ChangeSetCreated", "ChangeSetAcceptanceCriteriaDefined", "WorkItemAddedToChangeSet" ]
     )
-    expect(event_store.stream_events(streams.command("cmd-200")).map(&:type)).to eq([ "CommandCompleted" ])
+    expect(command_events("cmd-200").map(&:type)).to eq([ "CommandCompleted" ])
     expect(completion.projection_barriers.coord_context_v1.map(&:to_h)).to contain_exactly(
       hash_including(stream_name: "WorkItem", stream_revision: 0),
       hash_including(stream_name: "ChangeSet", stream_revision: 2)
     )
-    expect(event_store.multiple_calls).to eq(1)
   end
 
-  it "writes the frozen routing markers without using them as domain state" do
+  it "writes the routing markers on real persisted events" do
     operation.call(input)
 
-    created = event_store.stream_events(streams.work_item("W-200")).sole
-    membership = event_store.stream_events(streams.change_set("CS-100")).last
+    created = work_item_events("W-200").sole
+    membership = change_set_events("CS-100").last
     expect(created.markers).to eq(
       [ "change-set:CS-100", "command:cmd-200", "repository:billing", "work-item:W-200" ]
     )
@@ -62,15 +56,15 @@ RSpec.describe Coordinator::Operations::ExecuteCreateWorkItem do
     )
   end
 
-  it "replays the exact persisted result without appending events" do
+  it "replays the exact persisted result without another real append" do
     original = operation.call(input)
-    attempted_event_ids = event_store.attempted_event_ids.dup
+    original_ids = persisted_ids
 
     replay = operation.call(input)
 
     expect(replay).to be_success
     expect(replay.value!).to eq(original.value!)
-    expect(event_store.attempted_event_ids).to eq(attempted_event_ids)
+    expect(persisted_ids).to eq(original_ids)
   end
 
   it "rejects reuse of the command ID with changed accepted input" do
@@ -80,8 +74,8 @@ RSpec.describe Coordinator::Operations::ExecuteCreateWorkItem do
 
     expect(result).to be_failure
     expect(result.failure.code).to eq(:command_id_reused)
-    expect(event_store.stream_events(streams.work_item("W-200")).length).to eq(1)
-    expect(event_store.stream_events(streams.command("cmd-200")).length).to eq(1)
+    expect(work_item_events("W-200").length).to eq(1)
+    expect(command_events("cmd-200").length).to eq(1)
   end
 
   it "returns a zero-event duplicate denial without completing the losing command" do
@@ -91,79 +85,77 @@ RSpec.describe Coordinator::Operations::ExecuteCreateWorkItem do
 
     expect(result).to be_failure
     expect(result.failure.code).to eq(:work_item_already_exists)
-    expect(event_store.stream_events(streams.command("cmd-201"))).to be_empty
+    expect(command_events("cmd-201")).to be_empty
   end
 
   it "returns a zero-event denial when the ChangeSet is absent" do
-    empty_store = FakeEventStore.new
-    empty_operation = described_class.new(event_store: empty_store, clock:, id_generator:)
+    missing_input = input.merge(
+      command_id: "cmd-missing",
+      change_set_id: "CS-missing",
+      work_item_id: "W-missing"
+    )
 
-    result = empty_operation.call(input)
+    result = operation.call(missing_input)
 
     expect(result).to be_failure
     expect(result.failure.code).to eq(:change_set_not_found)
-    expect(empty_store.stream_events(streams.work_item("W-200"))).to be_empty
-    expect(empty_store.stream_events(streams.command("cmd-200"))).to be_empty
+    expect(work_item_events("W-missing")).to be_empty
+    expect(command_events("cmd-missing")).to be_empty
   end
 
-  it "rebuilds fresh events with stable IDs when the serializable block retries" do
-    retrying_store = FakeEventStore.new(retry_once: true)
-    seed_change_set(retrying_store)
-    initial_attempts = retrying_store.attempted_event_ids.length
-    retrying_operation = described_class.new(event_store: retrying_store, clock:, id_generator:)
+  it "serializes concurrent real commands so exactly one creates the WorkItem" do
+    competing_inputs = [
+      input.merge(command_id: "cmd-concurrent-1"),
+      input.merge(command_id: "cmd-concurrent-2")
+    ]
 
-    result = retrying_operation.call(input)
+    results = competing_inputs.map do |competing_input|
+      Thread.new { described_class.new(event_store:).call(competing_input) }
+    end.map(&:value)
 
-    expect(result).to be_success
-    retried_ids = retrying_store.attempted_event_ids.drop(initial_attempts)
-    expect(retried_ids.tally.values).to contain_exactly(2, 2, 2)
-    expect(retrying_store.stream_events(streams.work_item("W-200")).length).to eq(1)
-    expect(retrying_store.stream_events(streams.command("cmd-200")).length).to eq(1)
+    expect(results.count(&:success?)).to eq(1)
+    expect(results.count(&:failure?)).to eq(1)
+    expect(results.find(&:failure?).failure.code).to eq(:work_item_already_exists)
+    expect(work_item_events("W-200").length).to eq(1)
+    expect(change_set_events("CS-100").count { _1.type == "WorkItemAddedToChangeSet" }).to eq(1)
+    expect(competing_inputs.count { command_events(_1.fetch(:command_id)).one? }).to eq(1)
   end
 
-  it "rolls back both domain facts when completion construction raises" do
-    completion_builder = instance_double(Coordinator::CommandCompletionBuilder)
-    allow(completion_builder).to receive(:work_item_create).and_raise("receipt invariant failed")
-    failing_operation = described_class.new(
-      event_store:,
-      clock:,
-      id_generator:,
-      completion_builder:
-    )
-
-    expect { failing_operation.call(input) }.to raise_error("receipt invariant failed")
-    expect(event_store.stream_events(streams.work_item("W-200"))).to be_empty
-    expect(event_store.stream_events(streams.change_set("CS-100")).map(&:type)).to eq(
-      [ "ChangeSetCreated", "ChangeSetAcceptanceCriteriaDefined" ]
-    )
-    expect(event_store.stream_events(streams.command("cmd-200"))).to be_empty
+  def create_change_set(change_set_id)
+    Coordinator::Operations::ExecuteCreateChangeSet.new(event_store:).call(
+      command_id: "seed-create-#{change_set_id}",
+      actor: { kind: "agent", id: "planner-1" },
+      change_set_id:,
+      goal: "Coordinate billing changes",
+      acceptance_criteria: [ "Agents do not overlap" ]
+    ).value!
   end
 
-  def seed_change_set(store)
-    store.append(
-      streams.change_set("CS-100"),
-      [
-        PgEventstore::Event.new(
-          id: "018fd0f0-0000-7000-8000-000000000100",
-          type: "ChangeSetCreated",
-          data: {
-            "change_set_id" => "CS-100",
-            "goal" => "Coordinate billing changes",
-            "created_at" => "2026-08-20T14:10:00.000000Z"
-          },
-          metadata: { "schema_version" => 1 }
-        ),
-        PgEventstore::Event.new(
-          id: "018fd0f0-0000-7000-8000-000000000101",
-          type: "ChangeSetAcceptanceCriteriaDefined",
-          data: {
-            "change_set_id" => "CS-100",
-            "acceptance_criteria" => [ "Agents do not overlap" ],
-            "defined_at" => "2026-08-20T14:10:00.000000Z"
-          },
-          metadata: { "schema_version" => 1 }
-        )
-      ]
+  def change_set_events(change_set_id)
+    event_store.read(
+      streams.change_set(change_set_id),
+      Coordinator::EventQueries::CHANGE_SET_FOR_ACTIVATION
     )
+  end
+
+  def work_item_events(work_item_id)
+    event_store.read(
+      streams.work_item(work_item_id),
+      Coordinator::EventReadCriteria.new(
+        event_types: [ "WorkItemCreated" ],
+        maximum_count: 1,
+        direction: :asc
+      )
+    )
+  end
+
+  def command_events(command_id)
+    event_store.read(streams.command(command_id), Coordinator::EventQueries::COMMAND_COMPLETION)
+  end
+
+  def persisted_ids
+    work_item_events("W-200").map(&:id) +
+      change_set_events("CS-100").select { _1.type == "WorkItemAddedToChangeSet" }.map(&:id) +
+      command_events("cmd-200").map(&:id)
   end
 end

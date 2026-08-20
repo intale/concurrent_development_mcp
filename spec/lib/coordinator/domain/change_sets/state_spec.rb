@@ -42,4 +42,24 @@ RSpec.describe Coordinator::Domain::ChangeSets::State do
       )
     )
   end
+
+  it "folds activation as the boundary that closes structural planning" do
+    state = described_class.reduce(
+      [
+        Coordinator::Events::ChangeSetCreatedV1.new(
+          change_set_id: "CS-100",
+          goal: "Coordinate billing changes",
+          created_at: "2026-08-20T14:10:00.000000Z"
+        ),
+        Coordinator::Events::ChangeSetActivatedV1.new(
+          change_set_id: "CS-100",
+          work_item_count: 1,
+          dependency_count: 0,
+          activated_at: "2026-08-20T14:15:00.000000Z"
+        )
+      ]
+    )
+
+    expect(state.status).to eq("active")
+  end
 end

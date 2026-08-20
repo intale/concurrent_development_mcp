@@ -76,6 +76,15 @@ module Coordinator
                 )
               ]
             )
+          when Events::ChangeSetActivatedV1
+            self.class.new(
+              change_set_id:,
+              goal:,
+              status: "active",
+              acceptance_criteria:,
+              work_item_ids:,
+              dependencies:
+            )
           else
             self
           end

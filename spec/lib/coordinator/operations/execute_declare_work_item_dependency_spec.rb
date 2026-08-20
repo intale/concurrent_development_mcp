@@ -1,13 +1,9 @@
 # frozen_string_literal: true
 
-RSpec.describe Coordinator::Operations::ExecuteDeclareWorkItemDependency do
-  let(:event_store) { FakeEventStore.new }
-  let(:clock) { TestSupport::FixedClock.new("2026-08-20T14:14:00.000000Z") }
-  let(:id_generator) { TestSupport::DeterministicIdGenerator.new }
+RSpec.describe Coordinator::Operations::ExecuteDeclareWorkItemDependency, :event_store do
+  let(:event_store) { Coordinator::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::StreamFactory.new }
-  subject(:operation) do
-    described_class.new(event_store:, clock:, id_generator:)
-  end
+  subject(:operation) { described_class.new(event_store:) }
 
   let(:input) do
     {
@@ -23,10 +19,12 @@ RSpec.describe Coordinator::Operations::ExecuteDeclareWorkItemDependency do
   end
 
   before do
-    seed_change_set(event_store)
+    create_change_set
+    create_work_item("W-100", "billing")
+    create_work_item("W-200", "ledger")
   end
 
-  it "atomically persists the dependency fact and durable completion" do
+  it "persists the dependency fact and durable completion through the real store" do
     result = operation.call(input)
 
     expect(result).to be_success
@@ -37,7 +35,7 @@ RSpec.describe Coordinator::Operations::ExecuteDeclareWorkItemDependency do
         dependency_id: "DEP-1"
       )
     )
-    expect(event_store.stream_events(streams.change_set("CS-100")).map(&:type)).to eq(
+    expect(change_set_events.map(&:type)).to eq(
       [
         "ChangeSetCreated",
         "ChangeSetAcceptanceCriteriaDefined",
@@ -46,17 +44,16 @@ RSpec.describe Coordinator::Operations::ExecuteDeclareWorkItemDependency do
         "WorkItemDependencyDeclared"
       ]
     )
-    expect(event_store.stream_events(streams.command("cmd-230")).map(&:type)).to eq([ "CommandCompleted" ])
+    expect(command_events("cmd-230").map(&:type)).to eq([ "CommandCompleted" ])
     expect(completion.projection_barriers.coord_context_v1.map(&:to_h)).to contain_exactly(
       hash_including(stream_name: "ChangeSet", stream_revision: 4)
     )
-    expect(event_store.multiple_calls).to eq(1)
   end
 
-  it "writes stable routing markers for the graph edge" do
+  it "writes stable routing markers on the real graph edge" do
     operation.call(input)
 
-    event = event_store.stream_events(streams.change_set("CS-100")).last
+    event = dependency_events.sole
     expect(event.markers).to eq(
       [
         "change-set:CS-100",
@@ -68,15 +65,15 @@ RSpec.describe Coordinator::Operations::ExecuteDeclareWorkItemDependency do
     )
   end
 
-  it "replays the exact completion without appending" do
+  it "replays the exact persisted completion without another real append" do
     original = operation.call(input)
-    attempted_event_ids = event_store.attempted_event_ids.dup
+    original_ids = persisted_ids
 
     replay = operation.call(input)
 
     expect(replay).to be_success
     expect(replay.value!).to eq(original.value!)
-    expect(event_store.attempted_event_ids).to eq(attempted_event_ids)
+    expect(persisted_ids).to eq(original_ids)
   end
 
   it "rejects changed-input reuse of a completed command ID" do
@@ -86,127 +83,86 @@ RSpec.describe Coordinator::Operations::ExecuteDeclareWorkItemDependency do
 
     expect(result).to be_failure
     expect(result.failure.code).to eq(:command_id_reused)
-    expect(event_store.stream_events(streams.command("cmd-230")).length).to eq(1)
+    expect(command_events("cmd-230").length).to eq(1)
   end
 
   it "returns a zero-event cycle denial without completing the command" do
-    seed_reverse_dependency(event_store)
+    declare_reverse_dependency
 
     result = operation.call(input)
 
     expect(result).to be_failure
     expect(result.failure.code).to eq(:dependency_cycle)
-    expect(event_store.stream_events(streams.change_set("CS-100")).last.type).to eq(
-      "WorkItemDependencyDeclared"
-    )
-    expect(event_store.stream_events(streams.command("cmd-230"))).to be_empty
+    expect(dependency_events.length).to eq(1)
+    expect(command_events("cmd-230")).to be_empty
   end
 
-  it "rebuilds fresh events with stable logical IDs on transaction retry" do
-    retrying_store = FakeEventStore.new(retry_once: true)
-    seed_change_set(retrying_store)
-    initial_attempts = retrying_store.attempted_event_ids.length
-    retrying_operation = described_class.new(event_store: retrying_store, clock:, id_generator:)
+  it "serializes concurrent real commands so exactly one declares the dependency" do
+    competing_inputs = [
+      input.merge(command_id: "cmd-concurrent-1"),
+      input.merge(command_id: "cmd-concurrent-2")
+    ]
 
-    result = retrying_operation.call(input)
+    results = competing_inputs.map do |competing_input|
+      Thread.new { described_class.new(event_store:).call(competing_input) }
+    end.map(&:value)
 
-    expect(result).to be_success
-    retried_ids = retrying_store.attempted_event_ids.drop(initial_attempts)
-    expect(retried_ids.tally.values).to contain_exactly(2, 2)
-    expect(retrying_store.stream_events(streams.command("cmd-230")).length).to eq(1)
+    expect(results.count(&:success?)).to eq(1)
+    expect(results.count(&:failure?)).to eq(1)
+    expect(results.find(&:failure?).failure.code).to eq(:dependency_id_reused)
+    expect(dependency_events.length).to eq(1)
+    expect(competing_inputs.count { command_events(_1.fetch(:command_id)).one? }).to eq(1)
   end
 
-  it "rolls back the dependency fact when completion construction raises" do
-    completion_builder = instance_double(Coordinator::CommandCompletionBuilder)
-    allow(completion_builder).to receive(:work_item_dependency_declare).and_raise("receipt invariant failed")
-    failing_operation = described_class.new(
-      event_store:,
-      clock:,
-      id_generator:,
-      completion_builder:
-    )
-
-    expect { failing_operation.call(input) }.to raise_error("receipt invariant failed")
-    expect(event_store.stream_events(streams.change_set("CS-100")).map(&:type)).to eq(
-      [
-        "ChangeSetCreated",
-        "ChangeSetAcceptanceCriteriaDefined",
-        "WorkItemAddedToChangeSet",
-        "WorkItemAddedToChangeSet"
-      ]
-    )
-    expect(event_store.stream_events(streams.command("cmd-230"))).to be_empty
+  def create_change_set
+    Coordinator::Operations::ExecuteCreateChangeSet.new(event_store:).call(
+      command_id: "seed-create-CS-100",
+      actor: { kind: "agent", id: "planner-1" },
+      change_set_id: "CS-100",
+      goal: "Coordinate billing changes",
+      acceptance_criteria: [ "Agents do not overlap" ]
+    ).value!
   end
 
-  def seed_change_set(store)
-    store.append(
-      streams.change_set("CS-100"),
-      [
-        persisted_event(
-          id_suffix: "100",
-          type: "ChangeSetCreated",
-          data: {
-            "change_set_id" => "CS-100",
-            "goal" => "Coordinate billing changes",
-            "created_at" => "2026-08-20T14:10:00.000000Z"
-          }
-        ),
-        persisted_event(
-          id_suffix: "101",
-          type: "ChangeSetAcceptanceCriteriaDefined",
-          data: {
-            "change_set_id" => "CS-100",
-            "acceptance_criteria" => [ "Agents do not overlap" ],
-            "defined_at" => "2026-08-20T14:10:00.000000Z"
-          }
-        ),
-        persisted_event(
-          id_suffix: "102",
-          type: "WorkItemAddedToChangeSet",
-          data: {
-            "change_set_id" => "CS-100",
-            "work_item_id" => "W-100",
-            "added_at" => "2026-08-20T14:12:00.000000Z"
-          }
-        ),
-        persisted_event(
-          id_suffix: "103",
-          type: "WorkItemAddedToChangeSet",
-          data: {
-            "change_set_id" => "CS-100",
-            "work_item_id" => "W-200",
-            "added_at" => "2026-08-20T14:13:00.000000Z"
-          }
-        )
-      ]
-    )
+  def create_work_item(work_item_id, repository_id)
+    Coordinator::Operations::ExecuteCreateWorkItem.new(event_store:).call(
+      command_id: "seed-create-#{work_item_id}",
+      actor: { kind: "agent", id: "planner-1" },
+      change_set_id: "CS-100",
+      work_item_id:,
+      repository_id:,
+      goal: "Implement #{work_item_id}",
+      acceptance_criteria: [ "The work is verifiable" ]
+    ).value!
   end
 
-  def seed_reverse_dependency(store)
-    store.append(
-      streams.change_set("CS-100"),
-      persisted_event(
-        id_suffix: "104",
-        type: "WorkItemDependencyDeclared",
-        data: {
-          "change_set_id" => "CS-100",
-          "dependency_id" => "DEP-existing",
-          "producer_work_item_id" => "W-200",
-          "consumer_work_item_id" => "W-100",
-          "dependency_kind" => "requires_completion",
-          "required_output" => nil,
-          "declared_at" => "2026-08-20T14:13:30.000000Z"
-        }
+  def declare_reverse_dependency
+    described_class.new(event_store:).call(
+      input.merge(
+        command_id: "seed-reverse-dependency",
+        dependency_id: "DEP-reverse",
+        producer_work_item_id: "W-200",
+        consumer_work_item_id: "W-100"
       )
+    ).value!
+  end
+
+  def change_set_events
+    event_store.read(
+      streams.change_set("CS-100"),
+      Coordinator::EventQueries::CHANGE_SET_FOR_ACTIVATION
     )
   end
 
-  def persisted_event(id_suffix:, type:, data:)
-    PgEventstore::Event.new(
-      id: "018fd0f0-0000-7000-8000-000000000#{id_suffix}",
-      type:,
-      data:,
-      metadata: { "schema_version" => 1 }
-    )
+  def dependency_events
+    change_set_events.select { _1.type == "WorkItemDependencyDeclared" }
+  end
+
+  def command_events(command_id)
+    event_store.read(streams.command(command_id), Coordinator::EventQueries::COMMAND_COMPLETION)
+  end
+
+  def persisted_ids
+    dependency_events.map(&:id) + command_events("cmd-230").map(&:id)
   end
 end

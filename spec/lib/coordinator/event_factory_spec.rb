@@ -108,4 +108,24 @@ RSpec.describe Coordinator::EventFactory do
       )
     end.to raise_error(Dry::Struct::Error, /unexpected keys/)
   end
+
+  it "reconstructs nested dry values from historical event hashes" do
+    loaded = Coordinator::EventSchemaRegistry.new.load(
+      type: "WorkItemDependencyDeclared",
+      schema_version: 1,
+      data: {
+        "change_set_id" => "CS-100",
+        "dependency_id" => "DEP-1",
+        "producer_work_item_id" => "W-100",
+        "consumer_work_item_id" => "W-200",
+        "dependency_kind" => "requires_artifact",
+        "required_output" => { "kind" => "artifact", "key" => "openapi-v1" },
+        "declared_at" => "2026-08-20T14:14:00.000000Z"
+      }
+    )
+
+    expect(loaded.required_output).to eq(
+      Coordinator::RequiredOutput.new(kind: "artifact", key: "openapi-v1")
+    )
+  end
 end

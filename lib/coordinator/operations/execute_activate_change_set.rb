@@ -2,13 +2,13 @@
 
 module Coordinator
   module Operations
-    class ExecuteCreateWorkItem < Dry::Operation
-      TOOL_NAME = "work_item_create"
+    class ExecuteActivateChangeSet < Dry::Operation
+      TOOL_NAME = "change_set_activate"
 
       def initialize(
         event_store:,
-        preparer: PrepareCreateWorkItem.new,
-        decider: Domain::WorkItems::Create.new,
+        preparer: PrepareActivateChangeSet.new,
+        decider: Domain::ChangeSets::Activate.new,
         input_digest: CommandInputDigest.new,
         clock: SystemClock.new,
         id_generator: IdGenerator.new,
@@ -41,8 +41,8 @@ module Coordinator
       def prepare_logical_values(command)
         {
           occurred_at: @clock.now,
-          input_digest: @input_digest.work_item_create(command),
-          domain_event_ids: 2.times.map { @id_generator.uuid_v7 }.freeze,
+          input_digest: @input_digest.change_set_activate(command),
+          domain_event_id: @id_generator.uuid_v7,
           completion_event_id: @id_generator.uuid_v7
         }.freeze
       end
@@ -52,8 +52,7 @@ module Coordinator
         return replay if replay
 
         decision = @decider.call(
-          change_set_state: load_change_set_state(command.change_set_id),
-          work_item_state: load_work_item_state(command.work_item_id),
+          state: load_change_set_state(command.change_set_id),
           command:,
           occurred_at: prepared.fetch(:occurred_at)
         )
@@ -62,9 +61,9 @@ module Coordinator
         persisted_domain_events = persist_domain_plan(
           decision.value!,
           command:,
-          event_ids: prepared.fetch(:domain_event_ids)
+          event_id: prepared.fetch(:domain_event_id)
         )
-        completion = @completion_builder.work_item_create(
+        completion = @completion_builder.change_set_activate(
           command:,
           input_digest: prepared.fetch(:input_digest),
           persisted_events: persisted_domain_events,
@@ -111,19 +110,10 @@ module Coordinator
       def load_change_set_state(change_set_id)
         events = @event_store.read(
           @stream_factory.change_set(change_set_id),
-          EventQueries::CHANGE_SET_FOR_WORK_ITEM_CREATION
+          EventQueries::CHANGE_SET_FOR_ACTIVATION
         ).map { load_event(_1) }
 
         Domain::ChangeSets::State.reduce(events)
-      end
-
-      def load_work_item_state(work_item_id)
-        events = @event_store.read_grouped(
-          @stream_factory.work_item(work_item_id),
-          EventQueries::WORK_ITEM_EXISTENCE
-        ).map { load_event(_1) }
-
-        Domain::WorkItems::State.reduce(events)
       end
 
       def load_event(event)
@@ -134,49 +124,24 @@ module Coordinator
         )
       end
 
-      def persist_domain_plan(plan, command:, event_ids:)
-        validate_domain_plan!(plan, command:, event_ids:)
-        metadata = command_metadata(command)
-
-        plan.writes.zip(event_ids).map do |write, event_id|
-          event = @event_factory.build!(
-            event: write.event,
-            event_id:,
-            metadata:,
-            markers: markers_for(write.event, command)
-          )
-
-          @event_store.append(write.stream, [ event ]).fetch(0)
-        end
-      end
-
-      def validate_domain_plan!(plan, command:, event_ids:)
-        unless plan.writes.length == event_ids.length
-          raise "Prepared event ID count does not match the decided write plan"
+      def persist_domain_plan(plan, command:, event_id:)
+        expected_stream = @stream_factory.change_set(command.change_set_id)
+        write = plan.writes.sole
+        unless write.stream == expected_stream && write.event.class == Events::ChangeSetActivatedV1
+          raise "ActivateChangeSet plan does not match its frozen ChangeSet-stream contract"
         end
 
-        expected_streams = [
-          @stream_factory.work_item(command.work_item_id),
-          @stream_factory.change_set(command.change_set_id)
-        ]
-        expected_event_classes = [
-          Events::WorkItemCreatedV1,
-          Events::WorkItemAddedToChangeSetV1
-        ]
+        event = @event_factory.build!(
+          event: write.event,
+          event_id:,
+          metadata: command_metadata(command),
+          markers: [
+            "change-set:#{command.change_set_id}",
+            "command:#{command.command_id}"
+          ]
+        )
 
-        unless plan.writes.map(&:stream) == expected_streams && plan.events.map(&:class) == expected_event_classes
-          raise "CreateWorkItem domain plan does not match its frozen cross-stream contract"
-        end
-      end
-
-      def markers_for(event, command)
-        markers = [
-          "change-set:#{command.change_set_id}",
-          "work-item:#{command.work_item_id}",
-          "command:#{command.command_id}"
-        ]
-        markers << "repository:#{command.repository_id}" if event.is_a?(Events::WorkItemCreatedV1)
-        markers
+        @event_store.append(write.stream, [ event ])
       end
 
       def persist_completion(completion, command:, event_id:)

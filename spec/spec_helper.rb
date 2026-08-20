@@ -16,6 +16,7 @@
 
 ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
+require "pg_eventstore/rspec/test_helpers"
 
 abort("The Rails environment is running in production mode!") if Rails.env.production?
 
@@ -34,15 +35,6 @@ RSpec.configure do |config|
     # ...rather than:
     #     # => "be bigger than 2"
     expectations.include_chain_clauses_in_custom_matcher_descriptions = true
-  end
-
-  # rspec-mocks config goes here. You can use an alternate test double
-  # library (such as bogus or mocha) by changing the `mock_with` option here.
-  config.mock_with :rspec do |mocks|
-    # Prevents you from mocking or stubbing a method that does not exist on
-    # a real object. This is generally recommended, and will default to
-    # `true` in RSpec 4.
-    mocks.verify_partial_doubles = true
   end
 
   # This option will default to `:apply_to_host_groups` in RSpec 4 (and will
@@ -92,6 +84,11 @@ RSpec.configure do |config|
   # the seed, which is printed after each run.
   #     --seed 1234
   config.order = :random
+
+  config.before(:each, event_store: true) do
+    EventStoreTestSafety.verify!
+    PgEventstore::TestHelpers.clean_up_db
+  end
 
   # Seed global randomization in this process using the `--seed` CLI option.
   # Setting this allows you to use `--seed` to deterministically reproduce

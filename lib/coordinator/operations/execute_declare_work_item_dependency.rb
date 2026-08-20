@@ -98,19 +98,20 @@ module Coordinator
       end
 
       def load_completion(command_id)
-        completions = @event_store.read_all(@stream_factory.command(command_id)).select do |event|
-          event.type == "CommandCompleted"
-        end
-        raise "Command stream contains multiple completions: #{command_id}" if completions.length > 1
-
-        event = completions.first
+        event = @event_store.read(
+          @stream_factory.command(command_id),
+          EventQueries::COMMAND_COMPLETION
+        ).first
         return unless event
 
         load_event(event)
       end
 
       def load_change_set_state(change_set_id)
-        events = @event_store.read_all(@stream_factory.change_set(change_set_id)).map { load_event(_1) }
+        events = @event_store.read(
+          @stream_factory.change_set(change_set_id),
+          EventQueries::CHANGE_SET_FOR_DEPENDENCY_DECLARATION
+        ).map { load_event(_1) }
 
         Domain::ChangeSets::State.reduce(events)
       end

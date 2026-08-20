@@ -11,10 +11,12 @@ RSpec.describe Coordinator::Container do
     change_set_operation = described_class["operations.execute_create_change_set"]
     work_item_operation = described_class["operations.execute_create_work_item"]
     dependency_operation = described_class["operations.execute_declare_work_item_dependency"]
+    activation_operation = described_class["operations.execute_activate_change_set"]
 
     expect(change_set_operation).to be_a(Coordinator::Operations::ExecuteCreateChangeSet)
     expect(work_item_operation).to be_a(Coordinator::Operations::ExecuteCreateWorkItem)
     expect(dependency_operation).to be_a(Coordinator::Operations::ExecuteDeclareWorkItemDependency)
+    expect(activation_operation).to be_a(Coordinator::Operations::ExecuteActivateChangeSet)
   end
 
   it "provides constructor injection through Coordinator::Import" do

@@ -11,7 +11,8 @@ module Coordinator
       [ "CommandCompleted", 1 ] => Events::CommandCompletedV1,
       [ "WorkItemCreated", 1 ] => Events::WorkItemCreatedV1,
       [ "WorkItemAddedToChangeSet", 1 ] => Events::WorkItemAddedToChangeSetV1,
-      [ "WorkItemDependencyDeclared", 1 ] => Events::WorkItemDependencyDeclaredV1
+      [ "WorkItemDependencyDeclared", 1 ] => Events::WorkItemDependencyDeclaredV1,
+      [ "ChangeSetActivated", 1 ] => Events::ChangeSetActivatedV1
     }.freeze
 
     def initialize(definitions: DEFAULT_DEFINITIONS)

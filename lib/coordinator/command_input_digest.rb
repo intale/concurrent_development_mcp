@@ -65,6 +65,22 @@ module Coordinator
       )
     end
 
+    def change_set_activate(command)
+      @canonical_json.sha256(change_set_activate_document(command).to_h)
+    end
+
+    def change_set_activate_document(command)
+      CommandInputDocuments::ActivateChangeSetV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "change_set_activate",
+        input: CommandInputDocuments::ActivateChangeSetInputV1.new(
+          actor: actor_document(command.actor),
+          change_set_id: command.change_set_id
+        )
+      )
+    end
+
     private
 
     def actor_document(actor)

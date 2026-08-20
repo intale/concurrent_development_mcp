@@ -5,7 +5,8 @@ module Coordinator
 
   interface _EventStore
     def multiple: [Result] () { () -> Result } -> Result
-    def read_all: (StreamReference) -> Array[PgEventstore::Event]
+    def read: (StreamReference, EventReadCriteria) -> Array[PgEventstore::Event]
+    def read_grouped: (StreamReference, GroupedEventReadCriteria) -> Array[PgEventstore::Event]
     def append: (StreamReference, PgEventstore::Event | Array[PgEventstore::Event]) ->
       (PgEventstore::Event | Array[PgEventstore::Event])
   end
@@ -42,6 +43,21 @@ module Coordinator
 
   class PgStreamFactory
     def call: (StreamReference reference) -> PgEventstore::Stream
+  end
+
+  class EventReadCriteria < Value
+    def event_types: () -> Array[String]
+    def maximum_count: () -> Integer
+    def direction: () -> Symbol
+    def query_max_count: () -> Integer
+  end
+
+  class GroupedEventReadCriteria < Value
+    def event_types: () -> Array[String]
+    def direction: () -> Symbol
+  end
+
+  class EventHistoryLimitExceeded < StandardError
   end
 
   class EventMetadata < Value
@@ -114,6 +130,16 @@ module Coordinator
     class DeclareWorkItemDependencyV1 < BaseV1
       def tool_name: () -> String
       def input: () -> DeclareWorkItemDependencyInputV1
+    end
+
+    class ActivateChangeSetInputV1 < Value
+      def actor: () -> ActorV1
+      def change_set_id: () -> String
+    end
+
+    class ActivateChangeSetV1 < BaseV1
+      def tool_name: () -> String
+      def input: () -> ActivateChangeSetInputV1
     end
   end
 
@@ -222,6 +248,12 @@ module Coordinator
       def dependency_kind: () -> String
       def required_output: () -> RequiredOutput?
     end
+
+    class ActivateChangeSet < Value
+      def command_id: () -> String
+      def actor: () -> Actor
+      def change_set_id: () -> String
+    end
   end
 
   module Events
@@ -268,6 +300,13 @@ module Coordinator
       def declared_at: () -> String
     end
 
+    class ChangeSetActivatedV1 < Base
+      def change_set_id: () -> String
+      def work_item_count: () -> Integer
+      def dependency_count: () -> Integer
+      def activated_at: () -> String
+    end
+
     class CommandCompletedV1 < Base
       def command_id: () -> String
       def tool_name: () -> String
@@ -311,6 +350,8 @@ module Coordinator
     def work_item_create_document: (Commands::CreateWorkItem command) -> CommandInputDocuments::CreateWorkItemV1
     def work_item_dependency_declare: (Commands::DeclareWorkItemDependency command) -> String
     def work_item_dependency_declare_document: (Commands::DeclareWorkItemDependency command) -> CommandInputDocuments::DeclareWorkItemDependencyV1
+    def change_set_activate: (Commands::ActivateChangeSet command) -> String
+    def change_set_activate_document: (Commands::ActivateChangeSet command) -> CommandInputDocuments::ActivateChangeSetV1
   end
 
   class CommandCompletionBuilder
@@ -332,6 +373,12 @@ module Coordinator
     ) -> Events::CommandCompletedV1
     def work_item_dependency_declare: (
       command: Commands::DeclareWorkItemDependency,
+      input_digest: String,
+      persisted_events: Array[PgEventstore::Event],
+      completed_at: String
+    ) -> Events::CommandCompletedV1
+    def change_set_activate: (
+      command: Commands::ActivateChangeSet,
       input_digest: String,
       persisted_events: Array[PgEventstore::Event],
       completed_at: String
@@ -366,6 +413,10 @@ module Coordinator
     end
 
     class PersistedEvents
+      def call: (command_input) -> untyped
+    end
+
+    class ActivateChangeSet
       def call: (command_input) -> untyped
     end
 
@@ -425,6 +476,16 @@ module Coordinator
           occurred_at: String
         ) -> untyped
       end
+
+
+      class Activate
+        def initialize: (?stream_factory: StreamFactory) -> void
+        def call: (
+          state: State,
+          command: Commands::ActivateChangeSet,
+          occurred_at: String
+        ) -> untyped
+      end
     end
 
     module WorkItems
@@ -471,6 +532,11 @@ module Coordinator
       %a{rbs:test:skip} def call: (command_input input) -> untyped
     end
 
+    class PrepareActivateChangeSet
+      def initialize: (?contract: Contracts::ActivateChangeSet) -> void
+      %a{rbs:test:skip} def call: (command_input input) -> untyped
+    end
+
     class ExecuteCreateChangeSet
       def initialize: (
         event_store: _EventStore,
@@ -509,6 +575,23 @@ module Coordinator
         event_store: _EventStore,
         ?preparer: PrepareDeclareWorkItemDependency,
         ?decider: Domain::ChangeSets::DeclareWorkItemDependency,
+        ?input_digest: CommandInputDigest,
+        ?clock: _Clock,
+        ?id_generator: _IdGenerator,
+        ?event_factory: EventFactory,
+        ?schema_registry: EventSchemaRegistry,
+        ?stream_factory: StreamFactory,
+        ?completion_builder: CommandCompletionBuilder
+      ) -> void
+      %a{rbs:test:skip} def call: (command_input input) -> untyped
+    end
+
+
+    class ExecuteActivateChangeSet
+      def initialize: (
+        event_store: _EventStore,
+        ?preparer: PrepareActivateChangeSet,
+        ?decider: Domain::ChangeSets::Activate,
         ?input_digest: CommandInputDigest,
         ?clock: _Clock,
         ?id_generator: _IdGenerator,

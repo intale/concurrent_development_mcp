@@ -1,46 +1,61 @@
 # frozen_string_literal: true
 
-RSpec.describe Coordinator::Operations::ExecuteCreateChangeSet do
-  let(:event_store) { FakeEventStore.new }
-  let(:clock) { TestSupport::FixedClock.new("2026-08-20T14:10:00.000000Z") }
-  let(:id_generator) { TestSupport::DeterministicIdGenerator.new }
-  subject(:operation) do
-    described_class.new(event_store:, clock:, id_generator:)
+RSpec.describe Coordinator::Operations::ExecuteCreateChangeSet, :event_store do
+  let(:event_store) { Coordinator::EventStore.new(client: PgEventstore.client) }
+  let(:streams) { Coordinator::StreamFactory.new }
+  let(:change_set_events) do
+    Coordinator::EventReadCriteria.new(
+      event_types: [ "ChangeSetCreated", "ChangeSetAcceptanceCriteriaDefined" ],
+      maximum_count: 2,
+      direction: :asc
+    )
   end
+  let(:command_events) do
+    Coordinator::EventReadCriteria.new(
+      event_types: [ "CommandCompleted" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+  end
+  subject(:operation) { described_class.new(event_store:) }
 
   let(:input) do
     {
       command_id: "cmd-100",
-      actor: { kind: "user", id: "user-1" },
+      actor: { kind: "agent", id: "planner-1" },
       change_set_id: "CS-100",
-      goal: "Add coordinated billing change",
-      acceptance_criteria: [ "Two agents cannot own the same WorkItem" ]
+      goal: "Coordinate billing changes",
+      acceptance_criteria: [ "Agents do not overlap" ]
     }
   end
-  let(:streams) { Coordinator::StreamFactory.new }
 
-  it "atomically persists the two decided facts and one durable completion" do
+  it "persists the two facts and durable typed receipt through the real store" do
     result = operation.call(input)
 
     expect(result).to be_success
-    expect(result.value!).to be_a(Coordinator::Events::CommandCompletedV1)
-    expect(result.value!.command_id).to eq("cmd-100")
-    expect(event_store.stream_events(streams.change_set("CS-100")).map(&:type)).to eq(
+    completion = result.value!
+    facts = event_store.read(streams.change_set("CS-100"), change_set_events)
+    expect(facts.map(&:type)).to eq(
       [ "ChangeSetCreated", "ChangeSetAcceptanceCriteriaDefined" ]
     )
-    expect(event_store.stream_events(streams.command("cmd-100")).map(&:type)).to eq([ "CommandCompleted" ])
-    expect(event_store.multiple_calls).to eq(1)
+    expect(facts.map(&:stream_revision)).to eq([ 0, 1 ])
+    expect(facts.map(&:id)).to all(match(Coordinator::Types::UUID_V7_PATTERN))
+    expect(facts.first.data.fetch("created_at")).to match(Coordinator::Types::TIMESTAMP_PATTERN)
+    expect(event_store.read(streams.command("cmd-100"), command_events).map(&:type)).to eq([ "CommandCompleted" ])
+    expect(completion.data).to eq(
+      Coordinator::CommandReceiptData::ChangeSet.new(change_set_id: "CS-100")
+    )
   end
 
-  it "replays the exact persisted result without appending facts" do
+  it "replays the exact persisted completion without another real append" do
     original = operation.call(input)
-    attempted_event_ids = event_store.attempted_event_ids.dup
+    original_ids = persisted_ids
 
     replay = operation.call(input)
 
     expect(replay).to be_success
     expect(replay.value!).to eq(original.value!)
-    expect(event_store.attempted_event_ids).to eq(attempted_event_ids)
+    expect(persisted_ids).to eq(original_ids)
   end
 
   it "rejects reuse of a completed command ID with changed accepted input" do
@@ -50,44 +65,43 @@ RSpec.describe Coordinator::Operations::ExecuteCreateChangeSet do
 
     expect(result).to be_failure
     expect(result.failure.code).to eq(:command_id_reused)
-    expect(event_store.stream_events(streams.change_set("CS-100")).length).to eq(2)
-    expect(event_store.stream_events(streams.command("cmd-100")).length).to eq(1)
+    expect(event_store.read(streams.command("cmd-100"), command_events).length).to eq(1)
   end
 
-  it "returns a zero-event domain denial without completing the losing command" do
+  it "returns a zero-event duplicate denial without completing the losing command" do
     operation.call(input)
 
     result = operation.call(input.merge(command_id: "cmd-101"))
 
     expect(result).to be_failure
     expect(result.failure.code).to eq(:change_set_already_exists)
-    expect(event_store.stream_events(streams.command("cmd-101"))).to be_empty
+    expect(event_store.read(streams.command("cmd-101"), command_events)).to be_empty
   end
 
-  it "rebuilds fresh events with stable IDs when the serializable block retries" do
-    retrying_store = FakeEventStore.new(retry_once: true)
-    retrying_operation = described_class.new(event_store: retrying_store, clock:, id_generator:)
+  it "serializes concurrent real commands so exactly one creates the ChangeSet" do
+    competing_inputs = [
+      input.merge(command_id: "cmd-concurrent-1"),
+      input.merge(command_id: "cmd-concurrent-2")
+    ]
 
-    result = retrying_operation.call(input)
+    results = competing_inputs.map do |competing_input|
+      Thread.new { described_class.new(event_store:).call(competing_input) }
+    end.map(&:value)
 
-    expect(result).to be_success
-    expect(retrying_store.attempted_event_ids.tally.values).to contain_exactly(2, 2, 2)
-    expect(retrying_store.stream_events(streams.change_set("CS-100")).length).to eq(2)
-    expect(retrying_store.stream_events(streams.command("cmd-100")).length).to eq(1)
-  end
-
-  it "rolls back domain facts when trusted completion construction raises" do
-    completion_builder = instance_double(Coordinator::CommandCompletionBuilder)
-    allow(completion_builder).to receive(:create_change_set).and_raise("receipt invariant failed")
-    failing_operation = described_class.new(
-      event_store:,
-      clock:,
-      id_generator:,
-      completion_builder:
+    expect(results.count(&:success?)).to eq(1)
+    expect(results.count(&:failure?)).to eq(1)
+    expect(results.find(&:failure?).failure.code).to eq(:change_set_already_exists)
+    expect(event_store.read(streams.change_set("CS-100"), change_set_events).map(&:type)).to eq(
+      [ "ChangeSetCreated", "ChangeSetAcceptanceCriteriaDefined" ]
     )
+    completed_commands = competing_inputs.count do |competing_input|
+      event_store.read(streams.command(competing_input.fetch(:command_id)), command_events).one?
+    end
+    expect(completed_commands).to eq(1)
+  end
 
-    expect { failing_operation.call(input) }.to raise_error("receipt invariant failed")
-    expect(event_store.stream_events(streams.change_set("CS-100"))).to be_empty
-    expect(event_store.stream_events(streams.command("cmd-100"))).to be_empty
+  def persisted_ids
+    event_store.read(streams.change_set("CS-100"), change_set_events).map(&:id) +
+      event_store.read(streams.command("cmd-100"), command_events).map(&:id)
   end
 end

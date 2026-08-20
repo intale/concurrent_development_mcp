@@ -52,5 +52,15 @@ module Coordinator
       attribute :tool_name, Types::String.enum("work_item_dependency_declare")
       attribute :input, DeclareWorkItemDependencyInputV1
     end
+
+    class ActivateChangeSetInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :change_set_id, Types::Identifier
+    end
+
+    class ActivateChangeSetV1 < BaseV1
+      attribute :tool_name, Types::String.enum("change_set_activate")
+      attribute :input, ActivateChangeSetInputV1
+    end
   end
 end

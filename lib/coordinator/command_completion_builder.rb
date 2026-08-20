@@ -80,6 +80,28 @@ module Coordinator
       )
     end
 
+    def change_set_activate(command:, input_digest:, persisted_events:, completed_at:)
+      build_completion(
+        command:,
+        tool_name: "change_set_activate",
+        summary: "ChangeSet activated.",
+        data: CommandReceiptData::ChangeSet.new(change_set_id: command.change_set_id),
+        scope: ContextTokenDocument::ChangeSetScope.new(change_set_id: command.change_set_id),
+        next_actions: [
+          NextAction.new(
+            tool: "coord_context",
+            arguments: NextAction::ContextArguments.new(
+              change_set_id: command.change_set_id,
+              after_command_id: command.command_id
+            )
+          )
+        ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
 
     def build_completion(command:, tool_name:, summary:, data:, scope:, next_actions:, input_digest:, persisted_events:, completed_at:)

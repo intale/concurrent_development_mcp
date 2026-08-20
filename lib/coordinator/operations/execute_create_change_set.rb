@@ -99,11 +99,10 @@ module Coordinator
       end
 
       def load_completion(command_id)
-        stream = @stream_factory.command(command_id)
-        completions = @event_store.read_all(stream).select { _1.type == "CommandCompleted" }
-        raise "Command stream contains multiple completions: #{command_id}" if completions.length > 1
-
-        event = completions.first
+        event = @event_store.read(
+          @stream_factory.command(command_id),
+          EventQueries::COMMAND_COMPLETION
+        ).first
         return unless event
 
         @schema_registry.load(
@@ -114,7 +113,10 @@ module Coordinator
       end
 
       def load_change_set_state(change_set_id)
-        events = @event_store.read_all(@stream_factory.change_set(change_set_id)).map do |event|
+        events = @event_store.read_grouped(
+          @stream_factory.change_set(change_set_id),
+          EventQueries::CHANGE_SET_EXISTENCE
+        ).map do |event|
           @schema_registry.load(
             type: event.type,
             schema_version: event.metadata.fetch("schema_version"),

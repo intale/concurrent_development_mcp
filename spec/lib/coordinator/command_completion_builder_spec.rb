@@ -172,4 +172,39 @@ RSpec.describe Coordinator::CommandCompletionBuilder do
       )
     )
   end
+
+  it "builds activation data and its causally anchored context action" do
+    activation_command = Coordinator::Commands::ActivateChangeSet.new(
+      command_id: "cmd-250",
+      actor: Coordinator::Commands::Actor.new(kind: "agent", id: "planner-1"),
+      change_set_id: "CS-100"
+    )
+    event = PgEventstore::Event.new(
+      id: "018fd0f0-0000-7000-8000-000000000030",
+      type: "ChangeSetActivated",
+      stream:,
+      stream_revision: 5
+    )
+
+    completion = builder.change_set_activate(
+      command: activation_command,
+      input_digest: "sha256:#{"3" * 64}",
+      persisted_events: [ event ],
+      completed_at: "2026-08-20T14:15:00.000000Z"
+    )
+
+    expect(completion.tool_name).to eq("change_set_activate")
+    expect(completion.data).to eq(
+      Coordinator::CommandReceiptData::ChangeSet.new(change_set_id: "CS-100")
+    )
+    expect(completion.next_actions).to contain_exactly(
+      Coordinator::NextAction.new(
+        tool: "coord_context",
+        arguments: Coordinator::NextAction::ContextArguments.new(
+          change_set_id: "CS-100",
+          after_command_id: "cmd-250"
+        )
+      )
+    )
+  end
 end
