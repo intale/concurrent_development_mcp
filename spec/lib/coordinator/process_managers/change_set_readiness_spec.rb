@@ -31,22 +31,43 @@ RSpec.describe Coordinator::ProcessManagers::ChangeSetReadiness, :event_store do
   it "handles a real filtered pg_eventstore subscription from activation to readiness" do
     create_change_set("CS-100")
     create_work_item("CS-100", "W-100")
-    subscription = Coordinator::Subscriptions::ChangeSetReadiness.new(
+    registration = Coordinator::Subscriptions::ChangeSetReadiness.new(
       handler: process_manager,
       pull_interval: 0.2
     )
+    subscription_set = build_subscription_set([ registration ])
 
     begin
-      subscription.start
+      subscription_set.start
       activation = activate_change_set("CS-100")
-      wait_for_subscription(subscription)
+      wait_for_subscription(subscription_set, registration.definition.subscription_name)
 
       made_ready = readiness_events("W-100").sole
       expect(made_ready.causation_id).to eq(activation.id)
       expect(made_ready.correlation_id).to eq(activation.correlation_id)
     ensure
-      subscription.stop
+      subscription_set.stop
     end
+  end
+
+  it "stacks every registration for the set on one subscriptions manager" do
+    readiness = Coordinator::Subscriptions::ChangeSetReadiness.new(handler: process_manager)
+    audit = Coordinator::Subscriptions::Registration.new(
+      definition: Coordinator::Subscriptions::Definition.new(
+        set_name: Coordinator::Subscriptions::ProcessManagerSet::SET_NAME,
+        subscription_name: "process-manager-audit-probe-v1",
+        stream_context: "DevelopmentPlanning",
+        stream_name: "ChangeSet",
+        event_type: "ChangeSetActivated"
+      ),
+      handler: ->(_event) { }
+    )
+
+    subscription_set = build_subscription_set([ readiness, audit ])
+
+    expect(subscription_set.subscription_names).to eq(
+      [ "change-set-readiness-v1", "process-manager-audit-probe-v1" ]
+    )
   end
 
   it "publishes the frozen subscription filter through a typed definition" do
@@ -129,10 +150,17 @@ RSpec.describe Coordinator::ProcessManagers::ChangeSetReadiness, :event_store do
     ).select { _1.type == "WorkItemMadeReady" }
   end
 
-  def wait_for_subscription(subscription)
+  def build_subscription_set(registrations)
+    manager = PgEventstore.subscriptions_manager(
+      subscription_set: Coordinator::Subscriptions::ProcessManagerSet::SET_NAME
+    )
+    Coordinator::Subscriptions::ProcessManagerSet.new(manager:, registrations:)
+  end
+
+  def wait_for_subscription(subscription_set, subscription_name)
     deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 10
 
-    until subscription.processed_event_count >= 1
+    until subscription_set.processed_event_count(subscription_name) >= 1
       raise "readiness subscription did not process the activation within 10 seconds" if
         Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
 

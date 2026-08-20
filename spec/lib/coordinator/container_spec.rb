@@ -14,6 +14,8 @@ RSpec.describe Coordinator::Container do
     activation_operation = described_class["operations.execute_activate_change_set"]
     readiness_operation = described_class["operations.execute_evaluate_work_item_readiness"]
     readiness_process_manager = described_class["process_managers.change_set_readiness"]
+    subscription_manager = described_class["subscription_managers.process_managers"]
+    subscription_set = described_class["subscription_sets.process_managers"]
 
     expect(change_set_operation).to be_a(Coordinator::Operations::ExecuteCreateChangeSet)
     expect(work_item_operation).to be_a(Coordinator::Operations::ExecuteCreateWorkItem)
@@ -21,6 +23,9 @@ RSpec.describe Coordinator::Container do
     expect(activation_operation).to be_a(Coordinator::Operations::ExecuteActivateChangeSet)
     expect(readiness_operation).to be_a(Coordinator::Operations::ExecuteEvaluateWorkItemReadiness)
     expect(readiness_process_manager).to be_a(Coordinator::ProcessManagers::ChangeSetReadiness)
+    expect(subscription_manager).to be_a(PgEventstore::SubscriptionsManager)
+    expect(subscription_set).to be_a(Coordinator::Subscriptions::ProcessManagerSet)
+    expect(subscription_set.subscription_names).to eq([ "change-set-readiness-v1" ])
   end
 
   it "provides constructor injection through Coordinator::Import" do

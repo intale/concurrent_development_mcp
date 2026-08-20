@@ -20,6 +20,10 @@ module Coordinator
     def uuid_v7: () -> String
   end
 
+  interface _SubscriptionHandler
+    def call: (PgEventstore::Event event) -> untyped
+  end
+
   class Value
     def to_h: () -> attributes
   end
@@ -237,6 +241,9 @@ module Coordinator
   class InvalidReadinessEventPlan < StandardError
   end
 
+  class InvalidSubscriptionSet < StandardError
+  end
+
   class ChangeSetActivationSourceBuilder
     def initialize: (
       ?contract: Contracts::ChangeSetActivationSourceEvent,
@@ -305,13 +312,35 @@ module Coordinator
       def options: () -> Hash[Symbol, untyped]
     end
 
-    class ChangeSetReadiness
+    class Registration
+      attr_reader definition: Definition
+
+      def initialize: (
+        definition: Definition,
+        handler: _SubscriptionHandler,
+        ?pull_interval: Integer | Float
+      ) -> void
+      def register: (PgEventstore::SubscriptionsManager manager) -> bool
+    end
+
+    class ProcessManagerSet
+      SET_NAME: String
+
+      def initialize: (
+        manager: PgEventstore::SubscriptionsManager,
+        registrations: Array[Registration],
+        ?contract: Contracts::SubscriptionSetRegistrations
+      ) -> void
+      def start: () -> PgEventstore::BasicRunner
+      def stop: () -> void
+      def subscription_names: () -> Array[String]
+      def processed_event_count: (String subscription_name) -> Integer
+    end
+
+    class ChangeSetReadiness < Registration
       DEFINITION: Definition
 
       def initialize: (handler: ProcessManagers::ChangeSetReadiness, ?pull_interval: Integer | Float) -> void
-      def start: () -> PgEventstore::BasicRunner
-      def stop: () -> void
-      def processed_event_count: () -> Integer
     end
   end
 
@@ -600,6 +629,10 @@ module Coordinator
     end
 
     class ReadinessTargets
+      def call: (command_input) -> untyped
+    end
+
+    class SubscriptionSetRegistrations
       def call: (command_input) -> untyped
     end
 

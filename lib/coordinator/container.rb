@@ -160,8 +160,21 @@ module Coordinator
       )
     end
 
-    register("subscriptions.change_set_readiness") do
+    register("subscriptions.change_set_readiness", memoize: true) do
       Subscriptions::ChangeSetReadiness.new(handler: self["process_managers.change_set_readiness"])
+    end
+
+    register("subscription_managers.process_managers", memoize: true) do
+      PgEventstore.subscriptions_manager(
+        subscription_set: Subscriptions::ProcessManagerSet::SET_NAME
+      )
+    end
+
+    register("subscription_sets.process_managers", memoize: true) do
+      Subscriptions::ProcessManagerSet.new(
+        manager: self["subscription_managers.process_managers"],
+        registrations: [ self["subscriptions.change_set_readiness"] ]
+      )
     end
   end
 
