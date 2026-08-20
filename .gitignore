@@ -38,3 +38,4 @@
 .to_review/
 /dev_scripts/
 tmp/
+.build/

@@ -1,6 +1,15 @@
 require_relative "boot"
 
-require "rails/all"
+require "active_record/railtie"
+# require "active_storage/engine"
+require "action_controller/railtie"
+# require "action_view/railtie"
+# require "action_mailer/railtie"
+require "active_job/railtie"
+# require "action_cable/engine"
+# require "action_mailbox/engine"
+# require "action_text/engine"
+# require "rails/test_unit/railtie"
 
 # Require the gems listed in Gemfile, including any gems
 # you've limited to :test, :development, or :production.
@@ -30,8 +39,8 @@ module ConcurrentDevelopmentMcp
     config.api_only = true
 
     console do
-      if ENV['DEBUG'] == '1' || !Rails.env.production?
-        require 'niceql'
+      if ENV["DEBUG"] == "1" || !Rails.env.production?
+        require "niceql"
         logger = Logger.new($stdout)
         logger.level = :debug
         logger.formatter = proc do |_severity, _time, _progname, msg|
