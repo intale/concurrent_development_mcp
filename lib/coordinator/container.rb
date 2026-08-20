@@ -81,6 +81,73 @@ module Coordinator
       EventStore.new(client: PgEventstore.client)
     end
 
+    register("repositories.processed_projection_events", memoize: true) do
+      Repositories::ProcessedProjectionEvents.new
+    end
+
+    register("repositories.command_receipts", memoize: true) do
+      Repositories::CommandReceipts.new(schema_registry: self["event_schema_registry"])
+    end
+
+    register("repositories.coord_contexts", memoize: true) do
+      Repositories::CoordContexts.new
+    end
+
+    register("projectors.coord_context_v1", memoize: true) do
+      Projectors::CoordContextV1.new(
+        schema_registry: self["event_schema_registry"],
+        processed_events: self["repositories.processed_projection_events"]
+      )
+    end
+
+    register("projectors.command_receipts_v1", memoize: true) do
+      Projectors::CommandReceiptsV1.new(
+        schema_registry: self["event_schema_registry"],
+        receipts: self["repositories.command_receipts"],
+        processed_events: self["repositories.processed_projection_events"]
+      )
+    end
+
+    register("command_completion_lookup", memoize: true) do
+      CommandCompletionLookup.new(
+        receipts: self["repositories.command_receipts"],
+        event_store: self["event_store"],
+        stream_factory: self["stream_factory"],
+        schema_registry: self["event_schema_registry"]
+      )
+    end
+
+    register("coord_context_progress", memoize: true) do
+      CoordContextProgress.new(
+        processed_events: self["repositories.processed_projection_events"]
+      )
+    end
+
+    register("queries.operation_get") do
+      Queries::OperationGet.new(
+        completion_lookup: self["command_completion_lookup"],
+        progress: self["coord_context_progress"]
+      )
+    end
+
+    register("queries.coord_context") do
+      Queries::CoordContext.new(
+        contexts: self["repositories.coord_contexts"],
+        completion_lookup: self["command_completion_lookup"],
+        progress: self["coord_context_progress"],
+        canonical_json: self["canonical_json"]
+      )
+    end
+
+    register("mcp.settings", memoize: true) { Mcp::SettingsLoader.new.call }
+    register("mcp.server", memoize: true) { Mcp::ServerFactory.new.call }
+    register("mcp.transport", memoize: true) do
+      Mcp::TransportFactory.new.call(
+        server: self["mcp.server"],
+        settings: self["mcp.settings"]
+      )
+    end
+
     register("operations.execute_create_change_set") do
       Operations::ExecuteCreateChangeSet.new(
         event_store: self["event_store"],
@@ -187,6 +254,14 @@ module Coordinator
       Subscriptions::ChangeSetReadiness.new(handler: self["process_managers.change_set_readiness"])
     end
 
+    register("subscriptions.coord_context", memoize: true) do
+      Subscriptions::CoordContext.new(handler: self["projectors.coord_context_v1"])
+    end
+
+    register("subscriptions.command_receipts", memoize: true) do
+      Subscriptions::CommandReceipts.new(handler: self["projectors.command_receipts_v1"])
+    end
+
     register("subscription_managers.process_managers", memoize: true) do
       PgEventstore.subscriptions_manager(
         subscription_set: Subscriptions::ProcessManagerSet::SET_NAME
@@ -197,6 +272,23 @@ module Coordinator
       Subscriptions::ProcessManagerSet.new(
         manager: self["subscription_managers.process_managers"],
         registrations: [ self["subscriptions.change_set_readiness"] ]
+      )
+    end
+
+
+    register("subscription_managers.read_models", memoize: true) do
+      PgEventstore.subscriptions_manager(
+        subscription_set: Subscriptions::ReadModelSet::SET_NAME
+      )
+    end
+
+    register("subscription_sets.read_models", memoize: true) do
+      Subscriptions::ReadModelSet.new(
+        manager: self["subscription_managers.read_models"],
+        registrations: [
+          self["subscriptions.coord_context"],
+          self["subscriptions.command_receipts"]
+        ]
       )
     end
   end

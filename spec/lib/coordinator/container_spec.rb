@@ -17,6 +17,11 @@ RSpec.describe Coordinator::Container do
     readiness_process_manager = described_class["process_managers.change_set_readiness"]
     subscription_manager = described_class["subscription_managers.process_managers"]
     subscription_set = described_class["subscription_sets.process_managers"]
+    read_model_manager = described_class["subscription_managers.read_models"]
+    read_model_set = described_class["subscription_sets.read_models"]
+    operation_query = described_class["queries.operation_get"]
+    context_query = described_class["queries.coord_context"]
+    mcp_transport = described_class["mcp.transport"]
 
     expect(change_set_operation).to be_a(Coordinator::Operations::ExecuteCreateChangeSet)
     expect(work_item_operation).to be_a(Coordinator::Operations::ExecuteCreateWorkItem)
@@ -28,6 +33,12 @@ RSpec.describe Coordinator::Container do
     expect(subscription_manager).to be_a(PgEventstore::SubscriptionsManager)
     expect(subscription_set).to be_a(Coordinator::Subscriptions::ProcessManagerSet)
     expect(subscription_set.subscription_names).to eq([ "change-set-readiness-v1" ])
+    expect(read_model_manager).to be_a(PgEventstore::SubscriptionsManager)
+    expect(read_model_set).to be_a(Coordinator::Subscriptions::ReadModelSet)
+    expect(read_model_set.subscription_names).to eq([ "command-receipts-v1", "coord-context-v1" ])
+    expect(operation_query).to be_a(Coordinator::Queries::OperationGet)
+    expect(context_query).to be_a(Coordinator::Queries::CoordContext)
+    expect(mcp_transport).to be_a(MCP::Server::Transports::StreamableHTTPTransport)
   end
 
   it "provides constructor injection through Coordinator::Import" do

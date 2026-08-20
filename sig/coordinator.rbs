@@ -360,10 +360,10 @@ module Coordinator
     end
 
     class Registration
-      attr_reader definition: Definition
+      attr_reader definition: Definition | ReadModelDefinition
 
       def initialize: (
-        definition: Definition,
+        definition: Definition | ReadModelDefinition,
         handler: _SubscriptionHandler,
         ?pull_interval: Integer | Float
       ) -> void
@@ -403,7 +403,7 @@ module Coordinator
   end
 
   class NextAction < Value
-    type arguments = ChangeSetArguments | ContextArguments | AttemptArguments
+    type arguments = ChangeSetArguments | ContextArguments | AttemptArguments | WorkItemArguments | OperationArguments | WorkItemContextArguments | AttemptContextArguments
 
     class ChangeSetArguments < Value
       def change_set_id: () -> String
@@ -418,6 +418,25 @@ module Coordinator
       def change_set_id: () -> String
       def work_item_id: () -> String
       def attempt_id: () -> String
+    end
+
+    class WorkItemArguments < Value
+      def change_set_id: () -> String
+      def work_item_id: () -> String
+    end
+
+    class OperationArguments < Value
+      def command_id: () -> String
+    end
+
+    class WorkItemContextArguments < Value
+      def work_item_id: () -> String
+      def after_command_id: () -> String
+    end
+
+    class AttemptContextArguments < Value
+      def attempt_id: () -> String
+      def after_command_id: () -> String
     end
 
     def tool: () -> String
@@ -1010,6 +1029,451 @@ module Coordinator
         ?event_plan_contract: Contracts::AcquisitionEventPlan
       ) -> void
       %a{rbs:test:skip} def call: (command_input input) -> untyped
+    end
+  end
+
+  class ProjectionDefinition < Value
+    def name: () -> String
+    def version: () -> Integer
+  end
+
+  class ProjectionEventIdentity < Value
+    def self.from_event: (PgEventstore::Event event) -> ProjectionEventIdentity
+    def stream_context: () -> String
+    def stream_name: () -> String
+    def stream_id: () -> String
+    def stream_revision: () -> Integer
+    def event_id: () -> String
+    def event_type: () -> String
+    def command_id: () -> String?
+    def barrier: () -> ProjectionBarrier
+  end
+
+  class ProjectionScopeRoot < Value
+    def scope_kind: () -> String
+    def scope_id: () -> String
+    def change_set_id: () -> String
+  end
+
+  class ProjectionScopeRootsBuilder
+    def call: (Events::Base event) -> Array[ProjectionScopeRoot]
+  end
+
+  class OperationGetQueryV1 < Value
+    def command_id: () -> String
+    def projections: () -> Array[String]
+  end
+
+  class CoordContextQueryV1 < Value
+    def scope_kind: () -> String
+    def scope_id: () -> String
+    def after_command_id: () -> String?
+    def context_token: () -> String?
+  end
+
+  class ProjectionProgressV1 < Value
+    def projection_name: () -> String
+    def projection_version: () -> Integer
+    def complete: () -> bool
+    def missing_barriers: () -> Array[ProjectionBarrier]
+  end
+
+  class ContextBlockerV1 < Value
+    def code: () -> String
+    def dependency_id: () -> String
+    def producer_work_item_id: () -> String
+    def consumer_work_item_id: () -> String
+    def dependency_kind: () -> String
+  end
+
+  class CoordContextSnapshot < Value
+    def state: () -> Projections::CoordContextStateV1
+    def source_positions: () -> Array[ProjectionBarrier]
+    def last_processed_at: () -> String
+  end
+
+  class InvalidProjectionSource < StandardError
+  end
+
+  class ProjectionStateError < StandardError
+  end
+
+  class UnknownProjectionEvent < StandardError
+  end
+
+  module Projections
+    class CoordContextStateV1 < Value
+      class ChangeSet < Value
+        def change_set_id: () -> String
+        def goal: () -> String
+        def acceptance_criteria: () -> Array[String]
+        def status: () -> String
+        def created_at: () -> String
+        def activated_at: () -> String?
+      end
+
+      class WorkItem < Value
+        def work_item_id: () -> String
+        def change_set_id: () -> String
+        def repository_id: () -> String
+        def goal: () -> String
+        def acceptance_criteria: () -> Array[String]
+        def competitive_mode: () -> bool
+        def status: () -> String
+        def active_attempt_id: () -> String?
+        def active_agent_id: () -> String?
+        def created_at: () -> String
+        def made_ready_at: () -> String?
+        def acquired_at: () -> String?
+      end
+
+      class Dependency < Value
+        def dependency_id: () -> String
+        def producer_work_item_id: () -> String
+        def consumer_work_item_id: () -> String
+        def dependency_kind: () -> String
+        def required_output: () -> RequiredOutput?
+        def declared_at: () -> String
+      end
+
+      class Attempt < Value
+        def attempt_id: () -> String
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def agent_id: () -> String
+        def base_snapshots: () -> Array[RepositorySnapshotV1]
+        def status: () -> String
+        def authorized_at: () -> String
+        def started_at: () -> String?
+      end
+
+      def self.initial: () -> CoordContextStateV1
+      def schema: () -> String
+      def change_set: () -> ChangeSet?
+      def work_item_ids: () -> Array[String]
+      def work_items: () -> Array[WorkItem]
+      def dependencies: () -> Array[Dependency]
+      def attempts: () -> Array[Attempt]
+      def candidate_checkpoints: () -> Array[untyped]
+    end
+
+    class CoordContextReducer
+      def apply: (CoordContextStateV1 state, Events::Base event) -> CoordContextStateV1
+    end
+  end
+
+  module ReadModels
+    class ProcessedProjectionEvent
+    end
+
+    class CommandReceipt
+    end
+
+    class CoordContext
+    end
+
+    class CoordContextScope
+    end
+  end
+
+  module Repositories
+    class ProcessedProjectionEvents
+      def claim: (
+        definition: ProjectionDefinition,
+        identity: ProjectionEventIdentity,
+        processed_at: Time
+      ) -> bool
+      def missing: (
+        definition: ProjectionDefinition,
+        barriers: Array[ProjectionBarrier]
+      ) -> Array[ProjectionBarrier]
+      def processed?: (
+        definition: ProjectionDefinition,
+        barrier: ProjectionBarrier
+      ) -> bool
+    end
+
+    class CommandReceipts
+      def initialize: (?schema_registry: EventSchemaRegistry) -> void
+      def fetch: (String command_id) -> Events::CommandCompletedV1?
+      def store: (
+        event: PgEventstore::Event,
+        completion: Events::CommandCompletedV1
+      ) -> untyped
+    end
+
+    class CoordContexts
+      def fetch: (String change_set_id) -> CoordContextSnapshot?
+      def resolve: (scope_kind: String, scope_id: String) -> CoordContextSnapshot?
+    end
+  end
+
+  module Projectors
+    class CoordContextV1
+      PROJECTION: ProjectionDefinition
+
+      def initialize: (
+        ?contract: Contracts::CoordContextSourceEvent,
+        ?schema_registry: EventSchemaRegistry,
+        ?reducer: Projections::CoordContextReducer,
+        ?scope_roots_builder: ProjectionScopeRootsBuilder,
+        ?processed_events: Repositories::ProcessedProjectionEvents
+      ) -> void
+      def call: (PgEventstore::Event event) -> void
+    end
+
+    class CommandReceiptsV1
+      PROJECTION: ProjectionDefinition
+
+      def initialize: (
+        ?contract: Contracts::CommandReceiptSourceEvent,
+        ?schema_registry: EventSchemaRegistry,
+        ?receipts: Repositories::CommandReceipts,
+        ?processed_events: Repositories::ProcessedProjectionEvents
+      ) -> void
+      def call: (PgEventstore::Event event) -> void
+    end
+  end
+
+  class CommandCompletionLookup
+    def initialize: (
+      ?receipts: Repositories::CommandReceipts,
+      ?event_store: _EventStore,
+      ?stream_factory: StreamFactory,
+      ?schema_registry: EventSchemaRegistry
+    ) -> void
+    def fetch: (String command_id) -> Events::CommandCompletedV1?
+  end
+
+  class CoordContextProgress
+    def initialize: (?processed_events: Repositories::ProcessedProjectionEvents) -> void
+    def call: (Events::CommandCompletedV1 completion) -> ProjectionProgressV1
+  end
+
+  class ContextScopeBuilder
+    def call: (
+      CoordContextQueryV1 query,
+      Projections::CoordContextStateV1 state
+    ) -> ContextTokenDocument::scope?
+  end
+
+  class ContextBlockersBuilder
+    def call: (
+      ContextTokenDocument::scope scope,
+      Projections::CoordContextStateV1 state
+    ) -> Array[ContextBlockerV1]
+  end
+
+  class ContextNextActionsBuilder
+    def call: (Projections::CoordContextStateV1 state) -> Array[NextAction]
+  end
+
+  class McpResultV1 < Value
+    class EmptyData < Value
+    end
+
+    class DomainError < Value
+      def code: () -> String
+      def message: () -> String
+      def details: () -> Hash[Symbol | String, untyped]
+    end
+
+    class OperationData < Value
+      def result: () -> CommandReceiptData::value
+      def emitted_events: () -> Array[EventReference]
+      def projection_barriers: () -> ProjectionBarriers
+      def projection_progress: () -> Array[ProjectionProgressV1]
+    end
+
+    class PendingContextData < Value
+      def scope: () -> ContextTokenDocument::scope
+      def projection_progress: () -> Array[ProjectionProgressV1]
+    end
+
+    class ContextData < Value
+      def scope: () -> ContextTokenDocument::scope
+      def context: () -> Projections::CoordContextStateV1
+      def blockers: () -> Array[ContextBlockerV1]
+      def source_positions: () -> Array[ProjectionBarrier]
+      def freshness: () -> String
+      def last_processed_at: () -> String
+    end
+
+    class NotModifiedData < Value
+      def scope: () -> ContextTokenDocument::scope
+      def freshness: () -> String
+      def last_processed_at: () -> String
+    end
+
+    type data = EmptyData | DomainError | OperationData | PendingContextData | ContextData | NotModifiedData | CommandReceiptData::value
+
+    def status: () -> String
+    def summary: () -> String
+    def command_id: () -> String?
+    def receipt: () -> String?
+    def context_token: () -> String?
+    def data: () -> data
+    def warnings: () -> Array[String]
+    def next_actions: () -> Array[NextAction]
+    def projection_status: () -> String?
+  end
+
+  module Queries
+    class OperationGet
+      def initialize: (
+        ?contract: Contracts::OperationGet,
+        ?completion_lookup: CommandCompletionLookup,
+        ?progress: CoordContextProgress
+      ) -> void
+      %a{rbs:test:skip} def call: (command_input input) -> untyped
+    end
+
+    class CoordContext
+      def initialize: (
+        ?contract: Contracts::CoordContext,
+        ?contexts: Repositories::CoordContexts,
+        ?completion_lookup: CommandCompletionLookup,
+        ?progress: CoordContextProgress,
+        ?scope_builder: ContextScopeBuilder,
+        ?blockers_builder: ContextBlockersBuilder,
+        ?next_actions_builder: ContextNextActionsBuilder,
+        ?canonical_json: CanonicalJson
+      ) -> void
+      %a{rbs:test:skip} def call: (command_input input) -> untyped
+    end
+  end
+
+  module Contracts
+    class CoordContextSourceEvent
+      def call: (command_input) -> untyped
+    end
+
+    class CommandReceiptSourceEvent
+      def call: (command_input) -> untyped
+    end
+
+    class OperationGet
+      def call: (command_input) -> untyped
+    end
+
+    class CoordContext
+      def call: (command_input) -> untyped
+    end
+
+    class McpSettings
+      def call: (command_input) -> untyped
+    end
+  end
+
+  module Subscriptions
+    class StreamFilter < Value
+      def context: () -> String
+      def stream_name: () -> String
+    end
+
+    class ReadModelDefinition < Value
+      def set_name: () -> String
+      def subscription_name: () -> String
+      def streams: () -> Array[StreamFilter]
+      def event_types: () -> Array[String]
+      def identity: () -> Identity
+      def options: () -> Hash[Symbol, untyped]
+    end
+
+    class ReadModelSet
+      SET_NAME: String
+
+      def initialize: (
+        manager: PgEventstore::SubscriptionsManager,
+        registrations: Array[Registration],
+        ?contract: Contracts::SubscriptionSetRegistrations
+      ) -> void
+      def start: () -> PgEventstore::BasicRunner
+      def stop: () -> void
+      def subscription_names: () -> Array[String]
+      def processed_event_count: (String subscription_name) -> Integer
+    end
+
+    class CoordContext < Registration
+      DEFINITION: ReadModelDefinition
+      def initialize: (handler: Projectors::CoordContextV1, ?pull_interval: Integer | Float) -> void
+    end
+
+    class CommandReceipts < Registration
+      DEFINITION: ReadModelDefinition
+      def initialize: (handler: Projectors::CommandReceiptsV1, ?pull_interval: Integer | Float) -> void
+    end
+  end
+
+  module Mcp
+    class Settings < Value
+      def allowed_hosts: () -> Array[String]
+      def allowed_origins: () -> Array[String]
+      def max_request_bytes: () -> Integer
+    end
+
+    class SettingsLoader
+      def initialize: (?contract: Contracts::McpSettings) -> void
+      def call: (?untyped environment) -> Settings
+    end
+
+    module Schemas
+      def self.envelope: () -> Hash[Symbol, untyped]
+      def self.change_set_create: () -> Hash[Symbol, untyped]
+      def self.work_item_create: () -> Hash[Symbol, untyped]
+      def self.work_item_dependency_declare: () -> Hash[Symbol, untyped]
+      def self.change_set_activate: () -> Hash[Symbol, untyped]
+      def self.work_item_acquire: () -> Hash[Symbol, untyped]
+      def self.operation_get: () -> Hash[Symbol, untyped]
+      def self.coord_context: () -> Hash[Symbol, untyped]
+    end
+
+    class ResultMapper
+      def call: (untyped result, ?command_id: String?) -> McpResultV1
+    end
+
+    class Tool
+    end
+
+    class MutationTool < Tool
+      def self.operation: () -> String
+                        | (String key) -> String
+      def self.call: (?server_context: untyped, **untyped arguments) -> untyped
+    end
+
+    class QueryTool < Tool
+      def self.query: () -> String
+                    | (String key) -> String
+      def self.call: (?server_context: untyped, **untyped arguments) -> untyped
+    end
+
+    module Tools
+      class ChangeSetCreate < MutationTool
+      end
+      class WorkItemCreate < MutationTool
+      end
+      class WorkItemDependencyDeclare < MutationTool
+      end
+      class ChangeSetActivate < MutationTool
+      end
+      class WorkItemAcquire < MutationTool
+      end
+      class OperationGet < QueryTool
+      end
+      class CoordContext < QueryTool
+      end
+    end
+
+    module ToolRegistry
+      def self.all: () -> Array[untyped]
+    end
+
+    class ServerFactory
+      def call: () -> untyped
+    end
+
+    class TransportFactory
+      def call: (server: untyped, settings: Settings) -> untyped
     end
   end
 end
