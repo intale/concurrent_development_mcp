@@ -41,6 +41,9 @@ gem 'pg_eventstore', '>= 3.0'
 gem 'niceql', '~> 0.5.1', require: false
 gem 'dry-types', '>= 1.9.1'
 gem 'dry-validation', '>= 1.11.1'
+gem 'dry-struct', '>= 1.8.1'
+gem 'dry-operation', '>= 1.1'
+gem 'dry-system', '>= 1.2.5'
 
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
