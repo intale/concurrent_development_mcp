@@ -82,6 +82,7 @@ When changing an implemented event, update the model and affected scenarios firs
 - Flag events without exactly one producing command, and commands whose multi-event write plan is not atomic through `Client#multiple`.
 - Flag cross-boundary synchronous assumptions and missing eventual-consistency behavior.
 - Flag invariants that depend on a projection or broad scan when a static stream or precisely selected Dynamic Consistency Boundary is required.
+- Flag payload scans used only to differentiate events that could be selected by a stable marker, and flag multi-marker selectors that incorrectly assume AND semantics instead of using a compound marker.
 - Flag Dynamic Consistency Boundaries whose competing commands do not demonstrably select an overlapping serialized event set.
 - Flag Given/When/Then scenarios that use vague state, combine multiple commands in `When`, or mix atomic facts with eventual projection assertions.
 - Flag slices that cannot be demonstrated through an input, resulting facts, and observable output.

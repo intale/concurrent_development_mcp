@@ -50,6 +50,9 @@ When the application uses `pg_eventstore`:
 
 - perform authoritative reads and appends within `PgEventstore.client.multiple`;
 - express the boundary with the narrowest event-type and marker criteria that preserve the overlap proof;
+- use a stable, normalized marker when one event type must be selected by a payload discriminator such as locale, repository, policy, or resource identity; do not load every event of that type and scan its payload to reconstruct the selector;
+- remember that a marker list is matched with OR semantics. When the decision requires several dimensions simultaneously, derive one versioned compound marker from the complete normalized tuple and select by that marker; separate component markers do not express an AND condition;
+- use the same marker derivation for reads, writes, and expected-revision/DCB selectors, and retain the discriminating fields in the event payload as domain data rather than treating the marker as the only record of them;
 - do not pass per-stream expected revisions inside `multiple`;
 - do not consult Active Record projections to decide the invariant;
 - prepare stable logical IDs and times outside the retryable block, then instantiate fresh events from those values on every attempt;
@@ -57,6 +60,18 @@ When the application uses `pg_eventstore`:
 - keep the work bounded and translate serialization exhaustion to an explicit retryable outcome.
 
 Only a command execution appends events inside the DCB transaction. A Saga/process manager, projector, subscription handler, scheduler, or transport may invoke that command but may not decide or append its downstream events.
+
+### Compound-marker convention
+
+Treat a compound marker as a third marker representing the conjunction of its component markers; keep the component markers on the event when their individual lookups are also useful. Define one project convention rather than concatenating arbitrary strings ad hoc. A robust convention:
+
+1. normalize each complete component marker according to its own dimension;
+2. remove duplicates and byte-sort the components, because conjunction is order-independent;
+3. construct a named versioned document containing `schema`, `purpose`, and the ordered `components`;
+4. hash its canonical encoding; and
+5. format the physical marker as `compound:<purpose>:v1:sha256:<lowercase-hex>`.
+
+The purpose distinguishes different conjunction meanings even when their components happen to match. Do not nest compound markers as components. Persist or otherwise freeze the document schema and canonicalization rules so every writer, reader, and revision selector derives identical marker bytes.
 
 Use a static stream instead when its revision already provides the needed contention boundary. Use `multiple` across a small fixed set of streams when atomicity spans those streams but no dynamic event selector is needed.
 
