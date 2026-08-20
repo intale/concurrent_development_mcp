@@ -13,8 +13,10 @@ module Coordinator
         foreign_sets = definitions.reject { _1.set_name == values[:set_name] }
         key(:registrations).failure("must all belong to the requested subscription set") if foreign_sets.any?
 
-        names = definitions.map(&:subscription_name)
-        key(:registrations).failure("must have unique subscription names") unless names.uniq.length == names.length
+        identities = definitions.map(&:identity)
+        unless identities.uniq.length == identities.length
+          key(:registrations).failure("must have unique subscription-set/name identities")
+        end
       end
     end
   end

@@ -9,6 +9,10 @@ module Coordinator
       attribute :stream_name, Types::Identifier
       attribute :event_type, Types::Identifier
 
+      def identity
+        Identity.new(set_name:, subscription_name:)
+      end
+
       def options
         {
           filter: {

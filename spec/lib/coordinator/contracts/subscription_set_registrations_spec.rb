@@ -34,6 +34,15 @@ RSpec.describe Coordinator::Contracts::SubscriptionSetRegistrations do
     expect(duplicate.errors.to_h).to include(:registrations)
   end
 
+  it "treats set name and subscription name together as the durable identity" do
+    first = registration("coordinator-process-managers-v1", "readiness-v1").definition.identity
+    same = registration("coordinator-process-managers-v1", "readiness-v1").definition.identity
+    another_set = registration("coordinator-read-models-v1", "readiness-v1").definition.identity
+
+    expect(first).to eq(same)
+    expect(first).not_to eq(another_set)
+  end
+
   def registration(set_name, subscription_name)
     Coordinator::Subscriptions::Registration.new(
       definition: Coordinator::Subscriptions::Definition.new(

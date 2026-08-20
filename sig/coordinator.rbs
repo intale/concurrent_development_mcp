@@ -303,12 +303,18 @@ module Coordinator
   end
 
   module Subscriptions
+    class Identity < Value
+      def set_name: () -> String
+      def subscription_name: () -> String
+    end
+
     class Definition < Value
       def set_name: () -> String
       def subscription_name: () -> String
       def stream_context: () -> String
       def stream_name: () -> String
       def event_type: () -> String
+      def identity: () -> Identity
       def options: () -> Hash[Symbol, untyped]
     end
 
