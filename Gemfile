@@ -65,4 +65,5 @@ end
 
 group :test do
   gem 'timecop', '>= 0.9.11'
+  gem 'rack-test', '>= 2.2'
 end
