@@ -63,9 +63,12 @@ group :development, :test do
   gem "rspec-rails", ">= 8.0.4"
 
   gem "rbs", "~> 3.5", ">= 3.5.2", require: false
+
+  gem 'cucumber-rails', '>= 4.1', require: false
 end
 
 group :test do
   gem "timecop", ">= 0.9.11"
   gem "rack-test", ">= 2.2"
+  gem 'database_cleaner', '>= 2.1'
 end

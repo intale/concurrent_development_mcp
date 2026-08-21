@@ -20,7 +20,7 @@ require "pg_eventstore/rspec/test_helpers"
 
 abort("The Rails environment is running in production mode!") if Rails.env.production?
 
-Dir[File.join(File.expand_path(".", __dir__), "support/**/*.rb")].sort.each { require(_1) }
+Dir[Rails.root.join("spec/support/**/*.rb")].sort.each { require(_1) }
 
 RSpec.configure do |config|
   # rspec-expectations config goes here. You can use an alternate

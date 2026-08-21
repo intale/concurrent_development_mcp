@@ -31,6 +31,14 @@ require 'rspec/rails'
 # recreate the test database by loading the schema.
 # If you are not using ActiveRecord, you can remove these lines.
 begin
+  ActiveRecord.connection.with do |conn|
+    conn.exec(<<~SQL)
+      SELECT pg_terminate_backend(pg_stat_activity.pid)
+      FROM pg_stat_activity
+      WHERE pg_stat_activity.datname = 'concurrent_development_mcp_test' OR pg_stat_activity.datname = 'eventstore_test'
+        AND pid <> pg_backend_pid();
+    SQL
+  end
   ActiveRecord::Migration.maintain_test_schema!
 rescue ActiveRecord::PendingMigrationError => e
   abort e.to_s.strip
