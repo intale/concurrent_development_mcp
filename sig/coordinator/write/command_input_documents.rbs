@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandInputDocuments
-      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1
+      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1
 
       class ActorV1 < Shared::Value
         def actor_kind: () -> String
@@ -143,6 +143,26 @@ module Coordinator
       class RenewLeaseSetV1 < BaseV1
         def tool_name: () -> String
         def input: () -> RenewLeaseSetInputV1
+      end
+
+      class LeaseReleaseReferenceV1 < Shared::Value
+        def resource_key_hash: () -> String
+        def lease_id: () -> String
+        def fencing_token: () -> Integer
+      end
+
+      class ReleaseLeaseSetInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def attempt_id: () -> String
+        def lease_set_id: () -> String
+        def leases: () -> Array[LeaseReleaseReferenceV1]
+      end
+
+      class ReleaseLeaseSetV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> ReleaseLeaseSetInputV1
       end
     end
   end

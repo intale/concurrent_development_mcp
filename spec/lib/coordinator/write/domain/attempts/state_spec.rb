@@ -43,6 +43,7 @@ RSpec.describe Coordinator::Write::Domain::Attempts::State do
       lease_reserved_at: nil,
       lease_renewed_at: nil,
       lease_expires_at: nil,
+      lease_released_at: nil,
       status: "active"
     )
     expect(state).to be_frozen

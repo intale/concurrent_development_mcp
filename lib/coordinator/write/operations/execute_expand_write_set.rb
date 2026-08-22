@@ -148,15 +148,17 @@ module Coordinator::Write
 
       def load_attempt_state(attempt_id)
         stream = @stream_factory.attempt(attempt_id)
-        events = @event_store.read(
+        membership = @event_store.read(
           stream,
           EventQueries::ATTEMPT_FOR_WRITE_SET_EXPANSION
-        ) + @event_store.read_grouped(
-          stream,
-          EventQueries::ATTEMPT_LATEST_WRITE_SET_RENEWAL
         )
+        lifecycle = @event_store.read_grouped(
+          stream,
+          EventQueries::ATTEMPT_LATEST_WRITE_SET_LIFECYCLE
+        )
+        events = SpecificStreamEventSequence.merge(membership, lifecycle.reverse)
 
-        Domain::Attempts::State.reduce(events.sort_by(&:stream_revision).map { load_event(_1) })
+        Domain::Attempts::State.reduce(events.map { load_event(_1) })
       end
 
       def load_resource_states(attempt_state:, command:)
@@ -171,7 +173,7 @@ module Coordinator::Write
         events = @event_store.read_grouped(
           @stream_factory.resource_lease(resource_key_hash),
           EventQueries::RESOURCE_LEASE_FOR_RESERVATION
-        ).sort_by(&:stream_revision).map { load_event(_1) }
+        ).reverse.map { load_event(_1) }
 
         Domain::ResourceLeases::State.reduce(events)
       end

@@ -20,6 +20,7 @@ module Coordinator::Write
       when Commands::ReserveWriteSet then write_set_reserve_document(command)
       when Commands::ExpandWriteSet then write_set_expand_document(command)
       when Commands::RenewLeaseSet then lease_renew_document(command)
+      when Commands::ReleaseLeaseSet then lease_release_document(command)
       else
         raise ArgumentError, "Unsupported coordination command: #{command.class.name}"
       end
@@ -188,6 +189,28 @@ module Coordinator::Write
             CommandInputDocuments::LeaseRenewalReferenceV1.new(reference.to_h)
           end,
           lease_duration_seconds: command.lease_duration_seconds
+        )
+      )
+    end
+
+    def lease_release(command)
+      @canonical_json.sha256(lease_release_document(command).to_h)
+    end
+
+    def lease_release_document(command)
+      CommandInputDocuments::ReleaseLeaseSetV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "lease_release",
+        input: CommandInputDocuments::ReleaseLeaseSetInputV1.new(
+          actor: actor_document(command.actor),
+          change_set_id: command.change_set_id,
+          work_item_id: command.work_item_id,
+          attempt_id: command.attempt_id,
+          lease_set_id: command.lease_set_id,
+          leases: command.leases.map do |reference|
+            CommandInputDocuments::LeaseReleaseReferenceV1.new(reference.to_h)
+          end
         )
       )
     end

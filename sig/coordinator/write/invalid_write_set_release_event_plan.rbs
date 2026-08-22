@@ -1,0 +1,6 @@
+module Coordinator
+  module Write
+    class InvalidWriteSetReleaseEventPlan < StandardError
+    end
+  end
+end

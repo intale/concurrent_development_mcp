@@ -1,0 +1,8 @@
+module Coordinator
+  module Write
+    class LeaseReleaseAttemptObservationV1 < Shared::Value
+      def state: () -> Domain::Attempts::State
+      def release_event: () -> PgEventstore::Event?
+    end
+  end
+end

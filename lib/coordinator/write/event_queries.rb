@@ -121,13 +121,13 @@ module Coordinator::Write
       direction: :asc
     )
 
-    ATTEMPT_LATEST_WRITE_SET_RENEWAL = GroupedEventReadCriteria.new(
-      event_types: [ "WriteSetRenewed" ],
+    ATTEMPT_LATEST_WRITE_SET_LIFECYCLE = GroupedEventReadCriteria.new(
+      event_types: [ "WriteSetRenewed", "WriteSetReleased" ],
       direction: :desc
     )
 
     RESOURCE_LEASE_FOR_RESERVATION = GroupedEventReadCriteria.new(
-      event_types: [ "ResourceLeaseAcquired", "ResourceLeaseRenewed" ],
+      event_types: [ "ResourceLeaseAcquired", "ResourceLeaseRenewed", "ResourceLeaseReleased" ],
       direction: :desc
     )
   end

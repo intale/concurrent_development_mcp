@@ -17,6 +17,7 @@ module Coordinator
           def lease_reserved_at: () -> String?
           def lease_renewed_at: () -> String?
           def lease_expires_at: () -> String?
+          def lease_released_at: () -> String?
           def status: () -> String
           def absent?: () -> bool
           def apply: (Events::Base event) -> State

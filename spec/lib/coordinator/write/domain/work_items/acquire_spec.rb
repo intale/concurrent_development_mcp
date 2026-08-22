@@ -103,6 +103,7 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Acquire do
       lease_reserved_at: nil,
       lease_renewed_at: nil,
       lease_expires_at: nil,
+      lease_released_at: nil,
       status: "active"
     )
     wrong_repository = Coordinator::Write::Commands::AcquireWorkItem.new(

@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    class LeaseSetReleaseDecisionV1 < Shared::Value
+      def self.release: (Domain::EventPlan plan) -> LeaseSetReleaseDecisionV1
+      def self.already_released: () -> LeaseSetReleaseDecisionV1
+      def kind: () -> String
+      def plan: () -> Domain::EventPlan?
+      def release?: () -> bool
+    end
+  end
+end

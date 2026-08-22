@@ -199,6 +199,36 @@ module Coordinator::Write
       )
     end
 
+    def lease_release(command:, release:, input_digest:, persisted_events:, completed_at:)
+      attempt_arguments = NextAction::AttemptArguments.new(
+        change_set_id: command.change_set_id,
+        work_item_id: command.work_item_id,
+        attempt_id: command.attempt_id
+      )
+
+      build_completion(
+        command:,
+        tool_name: "lease_release",
+        summary: "Lease set released.",
+        data: CommandReceiptData::LeaseSetRelease.new(
+          change_set_id: command.change_set_id,
+          work_item_id: command.work_item_id,
+          attempt_id: command.attempt_id,
+          repository_id: release.repository_id,
+          lease_set_id: release.lease_set_id,
+          policy_version: release.policy_version,
+          resources: release.resources,
+          resource_count: release.resource_count,
+          previous_expires_at: release.previous_expires_at,
+          released_at: release.released_at
+        ),
+        next_actions: [ NextAction.new(tool: "coord_context", arguments: attempt_arguments) ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
 
     def build_completion(command:, tool_name:, summary:, data:, next_actions:, input_digest:, persisted_events:, completed_at:)

@@ -19,6 +19,7 @@ module Coordinator::Write
         attribute :lease_reserved_at, Types::Timestamp.optional
         attribute :lease_renewed_at, Types::Timestamp.optional
         attribute :lease_expires_at, Types::Timestamp.optional
+        attribute :lease_released_at, Types::Timestamp.optional
         attribute :status, Types::String.enum("absent", "authorized", "active")
 
         def self.initial
@@ -35,6 +36,7 @@ module Coordinator::Write
             lease_reserved_at: nil,
             lease_renewed_at: nil,
             lease_expires_at: nil,
+            lease_released_at: nil,
             status: "absent"
           )
         end
@@ -63,6 +65,7 @@ module Coordinator::Write
               lease_reserved_at: nil,
               lease_renewed_at: nil,
               lease_expires_at: nil,
+              lease_released_at: nil,
               status: "authorized"
             )
           when Events::AttemptStartedV1
@@ -79,6 +82,7 @@ module Coordinator::Write
               lease_reserved_at:,
               lease_renewed_at:,
               lease_expires_at:,
+              lease_released_at:,
               status: "active"
             )
           when Events::WriteSetReservedV1
@@ -95,6 +99,7 @@ module Coordinator::Write
               lease_reserved_at: event.reserved_at,
               lease_renewed_at: nil,
               lease_expires_at: event.expires_at,
+              lease_released_at: nil,
               status:
             )
           when Events::WriteSetExpandedV1
@@ -111,6 +116,7 @@ module Coordinator::Write
               lease_reserved_at:,
               lease_renewed_at:,
               lease_expires_at: event.expires_at,
+              lease_released_at:,
               status:
             )
           when Events::WriteSetRenewedV1
@@ -127,6 +133,24 @@ module Coordinator::Write
               lease_reserved_at:,
               lease_renewed_at: event.renewed_at,
               lease_expires_at: event.expires_at,
+              lease_released_at:,
+              status:
+            )
+          when Events::WriteSetReleasedV1
+            self.class.new(
+              attempt_id:,
+              change_set_id:,
+              work_item_id:,
+              agent_id:,
+              base_snapshots:,
+              lease_set_id: event.lease_set_id,
+              lease_repository_id: event.repository_id,
+              lease_policy_version: event.policy_version,
+              lease_resources: event.resources,
+              lease_reserved_at:,
+              lease_renewed_at:,
+              lease_expires_at: event.previous_expires_at,
+              lease_released_at: event.released_at,
               status:
             )
           else

@@ -16,7 +16,7 @@ module Coordinator
       ATTEMPT_FOR_ACQUISITION: EventReadCriteria
       ATTEMPT_FOR_WRITE_SET_RESERVATION: EventReadCriteria
       ATTEMPT_FOR_WRITE_SET_EXPANSION: EventReadCriteria
-      ATTEMPT_LATEST_WRITE_SET_RENEWAL: GroupedEventReadCriteria
+      ATTEMPT_LATEST_WRITE_SET_LIFECYCLE: GroupedEventReadCriteria
       RESOURCE_LEASE_FOR_RESERVATION: GroupedEventReadCriteria
     end
   end

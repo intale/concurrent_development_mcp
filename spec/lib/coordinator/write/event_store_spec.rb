@@ -53,8 +53,10 @@ RSpec.describe Coordinator::Write::EventStore, :event_store do
       direction: :desc
     )
 
-    grouped = event_store.read_grouped(stream, criteria).to_h { [ _1.type, _1 ] }
+    grouped_events = event_store.read_grouped(stream, criteria)
+    grouped = grouped_events.to_h { [ _1.type, _1 ] }
 
+    expect(grouped_events.map(&:stream_revision)).to eq([ 2, 1 ])
     expect(grouped.fetch("RealStoreProbe").id).to eq(newest_probe.id)
     expect(grouped.fetch("OtherProbe").data).to eq("version" => 1)
   end

@@ -1,0 +1,7 @@
+module Coordinator
+  module Write
+    module SpecificStreamEventSequence
+      def self.merge: (Array[PgEventstore::Event] left, Array[PgEventstore::Event] right) -> Array[PgEventstore::Event]
+    end
+  end
+end

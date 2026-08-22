@@ -92,6 +92,14 @@ module Coordinator::Write
               requested_lease_set_id: command.lease_set_id
             )
           end
+          if attempt_state.lease_released_at
+            return failure(
+              :write_set_released,
+              "The Attempt's write set has already been released",
+              command,
+              released_at: attempt_state.lease_released_at
+            )
+          end
           return if attempt_state.lease_repository_id == command.repository_id
 
           failure(:repository_base_mismatch, "Reserved write set belongs to another repository", command)
@@ -164,7 +172,8 @@ module Coordinator::Write
             state.attempt_id == attempt_state.attempt_id &&
             state.agent_id == attempt_state.agent_id &&
             state.fencing_token == reference.fencing_token &&
-            state.expires_at == attempt_state.lease_expires_at
+            state.expires_at == attempt_state.lease_expires_at &&
+            state.released_at.nil?
         end
 
         def additions(attempt_state:, requested_observations:)

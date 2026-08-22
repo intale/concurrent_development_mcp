@@ -3,61 +3,42 @@
 module Coordinator::Write
   module Domain
     module ResourceLeases
-      class Renew
+      class Release
         include Dry::Monads[:result]
 
         def initialize(stream_factory: StreamFactory.new)
           @stream_factory = stream_factory
         end
 
-        def call(attempt_state:, current_observations:, command:, renewed_at:, expires_at:)
-          denial = denied(
-            attempt_state:,
-            current_observations:,
-            command:,
-            renewed_at:,
-            expires_at:
-          )
+        def call(attempt_state:, current_observations:, command:, released_at:)
+          denial = attempt_denied(attempt_state:, command:)
           return denial if denial
 
+          snapshot_denial = snapshot_denied(attempt_state:, command:)
+          return snapshot_denial if snapshot_denial
+
+          return Success(LeaseSetReleaseDecisionV1.already_released) if attempt_state.lease_released_at
+
+          current_denial = current_set_denied(
+            attempt_state:,
+            current_observations:,
+            command:
+          )
+          return current_denial if current_denial
+
           Success(
-            build_plan(
-              attempt_state:,
-              current_observations:,
-              command:,
-              renewed_at:,
-              expires_at:
+            LeaseSetReleaseDecisionV1.release(
+              build_plan(
+                attempt_state:,
+                current_observations:,
+                command:,
+                released_at:
+              )
             )
           )
         end
 
         private
-
-        def denied(attempt_state:, current_observations:, command:, renewed_at:, expires_at:)
-          attempt_denial = attempt_denied(attempt_state:, command:)
-          return attempt_denial if attempt_denial
-
-          snapshot_denial = snapshot_denied(attempt_state:, command:)
-          return snapshot_denial if snapshot_denial
-
-          current_denial = current_set_denied(
-            attempt_state:,
-            current_observations:,
-            command:,
-            renewed_at:
-          )
-          return current_denial if current_denial
-
-          return unless expires_at <= attempt_state.lease_expires_at
-
-          failure(
-            :lease_deadline_not_extended,
-            "The requested duration does not extend the current lease-set deadline",
-            command,
-            current_expires_at: attempt_state.lease_expires_at,
-            requested_expires_at: expires_at
-          )
-        end
 
         def attempt_denied(attempt_state:, command:)
           return failure(:attempt_not_found, "Attempt does not exist", command) if attempt_state.absent?
@@ -73,25 +54,15 @@ module Coordinator::Write
           unless attempt_state.lease_set_id
             return failure(:write_set_not_reserved, "Attempt does not have a reserved write set", command)
           end
-          unless attempt_state.lease_set_id == command.lease_set_id
-            return failure(
-              :lease_set_mismatch,
-              "Lease-set ID does not match the Attempt's current write set",
-              command,
-              current_lease_set_id: attempt_state.lease_set_id,
-              requested_lease_set_id: command.lease_set_id
-            )
-          end
-          if attempt_state.lease_released_at
-            return failure(
-              :write_set_released,
-              "The Attempt's write set has already been released",
-              command,
-              released_at: attempt_state.lease_released_at
-            )
-          end
+          return if attempt_state.lease_set_id == command.lease_set_id
 
-          nil
+          failure(
+            :lease_set_mismatch,
+            "Lease-set ID does not match the Attempt's write set",
+            command,
+            current_lease_set_id: attempt_state.lease_set_id,
+            requested_lease_set_id: command.lease_set_id
+          )
         end
 
         def snapshot_denied(attempt_state:, command:)
@@ -100,7 +71,7 @@ module Coordinator::Write
           unless requested_hashes == current_hashes
             return failure(
               :lease_set_snapshot_mismatch,
-              "Submitted lease members do not equal the Attempt's current write set",
+              "Submitted lease members do not equal the Attempt's write set",
               command,
               current_resource_key_hashes: current_hashes,
               requested_resource_key_hashes: requested_hashes
@@ -127,37 +98,24 @@ module Coordinator::Write
           )
         end
 
-        def current_set_denied(attempt_state:, current_observations:, command:, renewed_at:)
+        def current_set_denied(attempt_state:, current_observations:, command:)
           stale = current_observations.find do |observation|
             !current_lease?(attempt_state:, observation:)
           end
-          if stale
-            return failure(
-              :lease_set_not_current,
-              "A write-set member is no longer owned by this lease set",
-              command,
-              resource_key_hash: stale.reference.resource_key_hash,
-              expected_lease_id: stale.reference.lease_id,
-              current_lease_id: stale.state.lease_id,
-              expected_fencing_token: stale.reference.fencing_token,
-              current_fencing_token: stale.state.fencing_token,
-              current_lease_set_id: stale.state.lease_set_id,
-              current_attempt_id: stale.state.attempt_id,
-              current_expires_at: stale.state.expires_at
-            )
-          end
+          return unless stale
 
-          return unless attempt_state.lease_expires_at <= renewed_at
-
-          reference = attempt_state.lease_resources.first
           failure(
-            :lease_set_expired,
-            "The current write set has expired and cannot be renewed",
+            :lease_set_not_current,
+            "A write-set member is no longer owned by this lease set",
             command,
-            resource_key_hash: reference.resource_key_hash,
-            lease_id: reference.lease_id,
-            fencing_token: reference.fencing_token,
-            expires_at: attempt_state.lease_expires_at
+            resource_key_hash: stale.reference.resource_key_hash,
+            expected_lease_id: stale.reference.lease_id,
+            current_lease_id: stale.state.lease_id,
+            expected_fencing_token: stale.reference.fencing_token,
+            current_fencing_token: stale.state.fencing_token,
+            current_lease_set_id: stale.state.lease_set_id,
+            current_attempt_id: stale.state.attempt_id,
+            current_released_at: stale.state.released_at
           )
         end
 
@@ -187,19 +145,18 @@ module Coordinator::Write
             state.released_at.nil?
         end
 
-        def build_plan(attempt_state:, current_observations:, command:, renewed_at:, expires_at:)
-          renewals = current_observations.map do |observation|
-            build_renewal(
+        def build_plan(attempt_state:, current_observations:, command:, released_at:)
+          releases = current_observations.map do |observation|
+            build_release(
               attempt_state:,
-              reference: observation.reference,
+              observation:,
               command:,
-              renewed_at:,
-              expires_at:
+              released_at:
             )
           end
 
           EventPlan.new(
-            writes: renewals.map do |event|
+            writes: releases.map do |event|
               EventWrite.new(
                 stream: @stream_factory.resource_lease(event.resource_key_hash),
                 event:
@@ -207,7 +164,7 @@ module Coordinator::Write
             end + [
               EventWrite.new(
                 stream: @stream_factory.attempt(command.attempt_id),
-                event: Events::WriteSetRenewedV1.new(
+                event: Events::WriteSetReleasedV1.new(
                   lease_set_id: command.lease_set_id,
                   change_set_id: command.change_set_id,
                   work_item_id: command.work_item_id,
@@ -216,18 +173,19 @@ module Coordinator::Write
                   policy_version: attempt_state.lease_policy_version,
                   resources: attempt_state.lease_resources,
                   resource_count: attempt_state.lease_resources.length,
-                  renewed_at:,
                   previous_expires_at: attempt_state.lease_expires_at,
-                  expires_at:
+                  released_at:
                 )
               )
             ]
           )
         end
 
-        def build_renewal(attempt_state:, reference:, command:, renewed_at:, expires_at:)
+        def build_release(attempt_state:, observation:, command:, released_at:)
+          reference = observation.reference
+          state = observation.state
           snapshot = attempt_state.base_snapshots.first
-          Events::ResourceLeaseRenewedV1.new(
+          Events::ResourceLeaseReleasedV1.new(
             lease_id: reference.lease_id,
             lease_set_id: command.lease_set_id,
             resource_key: reference.resource_key,
@@ -245,9 +203,9 @@ module Coordinator::Write
             base_commit_oid: snapshot.commit_oid,
             base_blob_oid: reference.base_blob_oid,
             fencing_token: reference.fencing_token,
-            renewed_at:,
+            acquired_at: state.acquired_at,
             previous_expires_at: attempt_state.lease_expires_at,
-            expires_at:
+            released_at:
           )
         end
 

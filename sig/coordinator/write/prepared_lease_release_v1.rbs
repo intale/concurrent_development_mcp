@@ -1,0 +1,8 @@
+module Coordinator
+  module Write
+    class PreparedLeaseReleaseV1 < Shared::Value
+      def reference: () -> LeaseReleaseReferenceV1
+      def event_id: () -> String
+    end
+  end
+end
