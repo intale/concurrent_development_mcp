@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    class InterpretationProposalPreparationV1 < Shared::Value
+      def proposed_at: () -> String
+      def input_digest: () -> String
+      def proposal_event_id: () -> String
+      def clarification_event_id: () -> String
+      def completion_event_id: () -> String
+    end
+  end
+end

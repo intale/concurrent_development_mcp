@@ -99,6 +99,13 @@ module Coordinator::Write
       attribute :recorded_at, Types::Timestamp
     end
 
+    class InterpretationProposal < Value
+      attribute :interpretation_id, Types::Identifier
+      attribute :source_message_id, Types::Identifier
+      attribute :assessment, Interpretations::InterpretationAssessmentV1
+      attribute :proposed_at, Types::Timestamp
+    end
+
     Type = ChangeSet |
            WorkItem |
            Dependency |
@@ -108,6 +115,7 @@ module Coordinator::Write
            LeaseSetRenewal |
            LeaseSetRelease |
            ResourceLeaseExpiry |
-           Guidance
+           Guidance |
+           InterpretationProposal
   end
 end

@@ -117,3 +117,14 @@ Feature: Checkpointed cooperative coordination
       And agent "host-2" tries to record the same message in conversation "C-CUC-GDN-OTHER"
       Then the second guidance Task completes with message identity denial
       And only the first Conversation owns the forwarded evidence
+
+  Rule: Classifier interpretations remain concurrent atomic proposals until adjudication
+
+    Scenario: Two classifiers propose different readings of one guidance message
+      Given guidance "Use RSpec." is durably recorded as message "M-CUC-GDN-3" in conversation "C-CUC-GDN-3"
+      When two classifiers independently propose atomic interpretations through Tasks
+      Then both proposal Tasks complete while no policy is activated
+      And the hard proposal and its clarification are persisted atomically
+      And the available interpretation query honestly reports no proposals before projection
+      When the interpretation proposals reach the read side
+      Then the available query lists both proposal-only interpretations without a freshness claim

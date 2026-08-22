@@ -18,6 +18,17 @@ module Coordinator::Write
       )
     end
 
+    def self.interpretation_proposal(marker)
+      GlobalMarkedEventReadCriteria.new(
+        stream_context: "HumanGuidance",
+        stream_name: "Interpretation",
+        event_types: [ "DecisionInterpretationProposed" ],
+        marker:,
+        maximum_count: 1,
+        direction: :asc
+      )
+    end
+
     COMMAND_COMPLETION = EventReadCriteria.new(
       event_types: [ "CommandCompleted" ],
       maximum_count: 1,

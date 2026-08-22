@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Interpretations
+      class DecisionValueV1 < Shared::Value
+        def schema: () -> String
+        def name: () -> String?
+        def items: () -> Array[String]?
+        def target_kind: () -> String?
+        def target_id: () -> String?
+        def action: () -> String?
+      end
+    end
+  end
+end

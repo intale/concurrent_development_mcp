@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Interpretations
+      class DecisionValidityV1 < Shared::Value
+        def valid_from: () -> String?
+        def valid_until: () -> String?
+        def until_event: () -> UntilEventConditionV1?
+      end
+    end
+  end
+end

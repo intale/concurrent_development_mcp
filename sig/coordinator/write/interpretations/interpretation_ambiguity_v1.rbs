@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Interpretations
+      class InterpretationAmbiguityV1 < Shared::Value
+        def field: () -> String
+        def code: () -> String
+        def description: () -> String
+        def options: () -> Array[String]
+      end
+    end
+  end
+end

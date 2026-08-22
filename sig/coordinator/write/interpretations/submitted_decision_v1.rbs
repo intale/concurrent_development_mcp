@@ -1,0 +1,19 @@
+module Coordinator
+  module Write
+    module Interpretations
+      class SubmittedDecisionV1 < Shared::Value
+        def statement_kind: () -> String
+        def topic_id: () -> String
+        def effect: () -> String?
+        def modality: () -> String?
+        def value: () -> DecisionValueV1
+        def scope: () -> DecisionScopeV1?
+        def conditions: () -> DecisionConditionsV1
+        def validity: () -> DecisionValidityV1
+        def authority: () -> DecisionAuthorityV1
+        def enforcement: () -> DecisionEnforcementV1
+        def relations: () -> DecisionRelationsV1
+      end
+    end
+  end
+end

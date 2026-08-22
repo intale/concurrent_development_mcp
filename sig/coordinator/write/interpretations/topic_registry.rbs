@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Interpretations
+      class TopicRegistry
+        DEFINITIONS: Hash[String, TopicDefinitionV1]
+
+        def fetch: (String topic_id) -> TopicDefinitionV1?
+      end
+    end
+  end
+end

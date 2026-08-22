@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Interpretations
+      class SourceSpanV1 < Shared::Value
+        def start_character: () -> Integer
+        def end_character: () -> Integer
+        def text: () -> String
+      end
+    end
+  end
+end

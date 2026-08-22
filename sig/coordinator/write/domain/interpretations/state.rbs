@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Domain
+      module Interpretations
+        class State < Shared::Value
+          def source: () -> Write::Interpretations::GuidanceSourceEvidenceV1?
+          def proposal_exists: () -> bool
+        end
+      end
+    end
+  end
+end

@@ -1,0 +1,24 @@
+module Coordinator
+  module Write
+    module Domain
+      module Interpretations
+        class Propose
+          def initialize: (
+            ?stream_factory: StreamFactory,
+            ?topic_registry: Write::Interpretations::TopicRegistry,
+            ?topic_value_contract: Contracts::InterpretationTopicValue,
+            ?source_contract: Contracts::InterpretationSourceEvidence,
+            ?scope_resolver: ScopeResolver,
+            ?assessment: ProposalAssessment
+          ) -> void
+
+          def call: (
+            state: State,
+            command: Commands::ProposeDecisionInterpretation,
+            proposed_at: String
+          ) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

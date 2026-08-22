@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Tasks
       class TargetExecutor
-        def initialize: (event_store: _EventStore, ?create_change_set: Operations::ExecuteCreateChangeSet, ?create_work_item: Operations::ExecuteCreateWorkItem, ?declare_work_item_dependency: Operations::ExecuteDeclareWorkItemDependency, ?activate_change_set: Operations::ExecuteActivateChangeSet, ?acquire_work_item: Operations::ExecuteAcquireWorkItem, ?reserve_write_set: Operations::ExecuteReserveWriteSet, ?expand_write_set: Operations::ExecuteExpandWriteSet, ?renew_lease_set: Operations::ExecuteRenewLeaseSet, ?release_lease_set: Operations::ExecuteReleaseLeaseSet, ?record_guidance: Operations::ExecuteRecordGuidance) -> void
+        def initialize: (event_store: _EventStore, ?create_change_set: Operations::ExecuteCreateChangeSet, ?create_work_item: Operations::ExecuteCreateWorkItem, ?declare_work_item_dependency: Operations::ExecuteDeclareWorkItemDependency, ?activate_change_set: Operations::ExecuteActivateChangeSet, ?acquire_work_item: Operations::ExecuteAcquireWorkItem, ?reserve_write_set: Operations::ExecuteReserveWriteSet, ?expand_write_set: Operations::ExecuteExpandWriteSet, ?renew_lease_set: Operations::ExecuteRenewLeaseSet, ?release_lease_set: Operations::ExecuteReleaseLeaseSet, ?record_guidance: Operations::ExecuteRecordGuidance, ?propose_decision_interpretation: Operations::ExecuteProposeDecisionInterpretation) -> void
         def call: (coordination_command command, caused_by: PgEventstore::Event) -> Dry::Monads::Result
       end
     end

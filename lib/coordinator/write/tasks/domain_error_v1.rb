@@ -111,6 +111,29 @@ module Coordinator::Write
         attribute :message_id, Types::Identifier
       end
 
+      class GuidanceMessageDetails < Value
+        attribute :message_id, Types::Identifier
+      end
+
+      class InterpretationDetails < Value
+        attribute :interpretation_id, Types::Identifier
+      end
+
+      class SourceSpanMismatchDetails < Value
+        attribute :message_id, Types::Identifier
+        attribute :interpretation_id, Types::Identifier
+      end
+
+      class TopicDetails < Value
+        attribute :topic_id, Types::Identifier
+      end
+
+      class TopicValueDetails < Value
+        attribute :topic_id, Types::Identifier
+        attribute :expected_schema, Types::DecisionValueSchema
+        attribute :supplied_schema, Types::DecisionValueSchema
+      end
+
       class ChangeSetError < Value
         attribute :code, Types::String.enum(
           "change_set_already_exists",
@@ -247,6 +270,36 @@ module Coordinator::Write
         attribute :details, MessageAlreadyRecordedDetails
       end
 
+      class GuidanceMessageNotFoundError < Value
+        attribute :code, Types::String.enum("guidance_message_not_found")
+        attribute :message, Types::String
+        attribute :details, GuidanceMessageDetails
+      end
+
+      class InterpretationAlreadyProposedError < Value
+        attribute :code, Types::String.enum("interpretation_already_proposed")
+        attribute :message, Types::String
+        attribute :details, InterpretationDetails
+      end
+
+      class SourceSpanMismatchError < Value
+        attribute :code, Types::String.enum("source_span_mismatch")
+        attribute :message, Types::String
+        attribute :details, SourceSpanMismatchDetails
+      end
+
+      class TopicNotSupportedError < Value
+        attribute :code, Types::String.enum("topic_not_supported")
+        attribute :message, Types::String
+        attribute :details, TopicDetails
+      end
+
+      class TopicValueInvalidError < Value
+        attribute :code, Types::String.enum("topic_value_invalid")
+        attribute :message, Types::String
+        attribute :details, TopicValueDetails
+      end
+
       Type = ChangeSetError |
              ActivationDependencyError |
              WorkItemError |
@@ -263,7 +316,12 @@ module Coordinator::Write
              LeaseSetSnapshotMismatchError |
              LeaseReferenceMismatchError |
              LeaseDeadlineNotExtendedError |
-             MessageAlreadyRecordedError
+             MessageAlreadyRecordedError |
+             GuidanceMessageNotFoundError |
+             InterpretationAlreadyProposedError |
+             SourceSpanMismatchError |
+             TopicNotSupportedError |
+             TopicValueInvalidError
     end
   end
 end

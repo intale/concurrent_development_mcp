@@ -195,6 +195,23 @@ module Coordinator::Write
       attribute :input, RecordGuidanceInputV1
     end
 
+    class ProposeDecisionInterpretationInputV1 < Value
+      Ambiguity = Interpretations::InterpretationAmbiguityV1
+
+      attribute :actor, ActorV1
+      attribute :interpretation_id, Types::Identifier
+      attribute :source_message_id, Types::Identifier
+      attribute :source_span, Interpretations::SourceSpanV1.optional
+      attribute :classifier, Interpretations::ClassifierAttributionV1
+      attribute :proposed_decision, Interpretations::SubmittedDecisionV1
+      attribute :ambiguities, Types::Array.of(Ambiguity).constrained(max_size: 20)
+    end
+
+    class ProposeDecisionInterpretationV1 < BaseV1
+      attribute :tool_name, Types::String.enum("decision_interpretation_propose")
+      attribute :input, ProposeDecisionInterpretationInputV1
+    end
+
     class ExpireResourceLeaseInputV1 < Value
       attribute :actor, ActorV1
       attribute :resource_key_hash, Types::Sha256Digest
@@ -218,7 +235,8 @@ module Coordinator::Write
            ExpandWriteSetV1 |
            RenewLeaseSetV1 |
            ReleaseLeaseSetV1 |
-           RecordGuidanceV1
+           RecordGuidanceV1 |
+           ProposeDecisionInterpretationV1
 
     DigestType = Type | ExpireResourceLeaseV1
   end

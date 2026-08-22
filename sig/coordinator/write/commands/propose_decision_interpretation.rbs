@@ -1,0 +1,18 @@
+module Coordinator
+  module Write
+    module Commands
+      class ProposeDecisionInterpretation < Shared::Value
+        Ambiguity: singleton(Interpretations::InterpretationAmbiguityV1)
+
+        def command_id: () -> String
+        def actor: () -> Actor
+        def interpretation_id: () -> String
+        def source_message_id: () -> String
+        def source_span: () -> Interpretations::SourceSpanV1?
+        def classifier: () -> Interpretations::ClassifierAttributionV1
+        def proposed_decision: () -> Interpretations::SubmittedDecisionV1
+        def ambiguities: () -> Array[Interpretations::InterpretationAmbiguityV1]
+      end
+    end
+  end
+end

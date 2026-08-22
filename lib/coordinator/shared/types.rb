@@ -38,6 +38,65 @@ module Coordinator::Shared
     ].freeze
     GIT_OBJECT_FORMATS = %w[sha1 sha256].freeze
     GUIDANCE_SOURCES = %w[mcp_client agent_forwarded].freeze
+    STATEMENT_KINDS = %w[
+      directive
+      preference
+      approval
+      rejection
+      fact
+      goal
+      priority
+      evaluation
+      question
+      hypothesis
+    ].freeze
+    DECISION_EFFECTS = %w[
+      require
+      forbid
+      prefer
+      avoid
+      allow
+      select
+      defer
+      approve
+      reject
+      prioritize
+    ].freeze
+    DECISION_MODALITIES = %w[must must_not should should_not may].freeze
+    DECISION_VALUE_SCHEMAS = %w[named-choice/v1 string-set/v1 target-action/v1].freeze
+    INTERPRETATION_ASSESSMENT_STATUSES = %w[
+      accepted_for_activation
+      confirmation_required
+      needs_classification
+    ].freeze
+    SCOPE_PROVENANCE_KINDS = %w[explicit inferred unresolved].freeze
+    SCOPE_ANCHOR_LEVELS = %w[workspace repository change_set work_item attempt unresolved].freeze
+    DECISION_PHASES = %w[planning implementation verification integration deployment].freeze
+    ENFORCEMENT_LEVELS = %w[
+      advisory
+      planning_gate
+      implementation_gate
+      verification_gate
+      merge_gate
+      deployment_gate
+    ].freeze
+    RETROACTIVITY_KINDS = %w[
+      future_only
+      active_attempts
+      all_unverified_candidates
+      all_unmerged_candidates
+      all_artifacts
+    ].freeze
+    VIOLATION_ACTIONS = %w[warn block block_and_replan require_confirmation].freeze
+    RESOLUTION_STRATEGIES = %w[single_choice set_union manual_resolution].freeze
+    MERGE_TARGET_KINDS = %w[candidate change_set repository].freeze
+    MERGE_ACTIONS = %w[defer approve reject].freeze
+    SUPPORTED_INTERPRETATION_TOPICS = %w[
+      testing.framework
+      testing.required_suites
+      implementation.dependencies.forbidden
+      delivery.merge
+    ].freeze
     COORDINATION_TOOL_NAMES = %w[
       change_set_create
       work_item_create
@@ -49,6 +108,7 @@ module Coordinator::Shared
       lease_renew
       lease_release
       guidance_record
+      decision_interpretation_propose
     ].freeze
 
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)
@@ -85,5 +145,34 @@ module Coordinator::Shared
     ReadinessWorkItemIds = Array.of(Identifier).constrained(min_size: 1, max_size: 100)
     GuidanceRepositoryIds = Array.of(RepositoryId).constrained(max_size: 100)
     EvidencePolicyStatus = String.enum("evidence_only")
+    InterpretationPolicyStatus = String.enum("proposal_only")
+    StatementKind = String.enum(*STATEMENT_KINDS)
+    DecisionEffect = String.enum(*DECISION_EFFECTS)
+    DecisionModality = String.enum(*DECISION_MODALITIES)
+    DecisionValueSchema = String.enum(*DECISION_VALUE_SCHEMAS)
+    InterpretationAssessmentStatus = String.enum(*INTERPRETATION_ASSESSMENT_STATUSES)
+    ScopeProvenanceKind = String.enum(*SCOPE_PROVENANCE_KINDS)
+    ScopeAnchorLevel = String.enum(*SCOPE_ANCHOR_LEVELS)
+    DecisionPhase = String.enum(*DECISION_PHASES)
+    EnforcementLevel = String.enum(*ENFORCEMENT_LEVELS)
+    RetroactivityKind = String.enum(*RETROACTIVITY_KINDS)
+    ViolationAction = String.enum(*VIOLATION_ACTIONS)
+    ResolutionStrategy = String.enum(*RESOLUTION_STRATEGIES)
+    MergeTargetKind = String.enum(*MERGE_TARGET_KINDS)
+    MergeAction = String.enum(*MERGE_ACTIONS)
+    SupportedInterpretationTopic = String.enum(*SUPPORTED_INTERPRETATION_TOPICS)
+    ClassifierConfidenceMillionths = Integer.constrained(gteq: 0, lteq: 1_000_000)
+    SourceCharacterIndex = Integer.constrained(gteq: 0)
+    InterpretationLabel = String.constrained(min_size: 1, max_size: 200)
+    InterpretationDescription = String.constrained(min_size: 1, max_size: 500)
+    InterpretationLabels = Array.of(InterpretationLabel).constrained(max_size: 100)
+    InterpretationOptions = Array.of(InterpretationLabel).constrained(max_size: 10)
+    DecisionIdentifiers = Array.of(Identifier).constrained(max_size: 20)
+    ScopeIdentifiers = Array.of(Identifier).constrained(max_size: 100)
+    ScopeRepositoryIds = Array.of(RepositoryId).constrained(max_size: 100)
+    ScopePaths = Array.of(ResourcePath).constrained(max_size: 100)
+    InterpretationReasons = Array.of(Identifier).constrained(max_size: 20)
+    InterpretationPageLimit = Integer.constrained(gteq: 1, lteq: 100)
+    StreamRevisionCursor = Integer.constrained(gteq: -1)
   end
 end

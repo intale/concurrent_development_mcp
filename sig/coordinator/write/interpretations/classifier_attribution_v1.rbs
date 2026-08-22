@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Interpretations
+      class ClassifierAttributionV1 < Shared::Value
+        def id: () -> String
+        def version: () -> String
+        def ontology_version: () -> Integer
+        def confidence_millionths: () -> Integer
+      end
+    end
+  end
+end

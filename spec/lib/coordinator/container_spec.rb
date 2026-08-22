@@ -20,6 +20,7 @@ RSpec.describe Coordinator::Container do
     release_operation = described_class["operations.execute_release_lease_set"]
     expiry_operation = described_class["operations.execute_expire_resource_lease"]
     guidance_operation = described_class["operations.execute_record_guidance"]
+    interpretation_operation = described_class["operations.execute_propose_decision_interpretation"]
     readiness_process_manager = described_class["process_managers.change_set_readiness"]
     task_executor = described_class["process_managers.coordination_task_executor"]
     subscription_manager = described_class["subscription_managers.process_managers"]
@@ -29,6 +30,7 @@ RSpec.describe Coordinator::Container do
     operation_query = described_class["queries.operation_get"]
     context_query = described_class["queries.coord_context"]
     guidance_query = described_class["queries.guidance_get"]
+    interpretation_query = described_class["queries.decision_interpretation_list"]
     task_submissions = %w[
       operations.submit_create_change_set_task
       operations.submit_create_work_item_task
@@ -40,6 +42,7 @@ RSpec.describe Coordinator::Container do
       operations.submit_renew_lease_set_task
       operations.submit_release_lease_set_task
       operations.submit_record_guidance_task
+      operations.submit_propose_decision_interpretation_task
     ].map { described_class[_1] }
     tasks_extension = described_class["mcp.tasks.extension"]
     mcp_transport = described_class["mcp.transport"]
@@ -56,6 +59,9 @@ RSpec.describe Coordinator::Container do
     expect(release_operation).to be_a(Coordinator::Write::Operations::ExecuteReleaseLeaseSet)
     expect(expiry_operation).to be_a(Coordinator::Write::Operations::ExecuteExpireResourceLease)
     expect(guidance_operation).to be_a(Coordinator::Write::Operations::ExecuteRecordGuidance)
+    expect(interpretation_operation).to be_a(
+      Coordinator::Write::Operations::ExecuteProposeDecisionInterpretation
+    )
     expect(readiness_process_manager).to be_a(Coordinator::Processes::ProcessManagers::ChangeSetReadiness)
     expect(task_executor).to be_a(Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor)
     expect(subscription_manager).to be_a(PgEventstore::SubscriptionsManager)
@@ -66,11 +72,17 @@ RSpec.describe Coordinator::Container do
     expect(read_model_manager).to be_a(PgEventstore::SubscriptionsManager)
     expect(read_model_set).to be_a(Coordinator::Read::Subscriptions::ReadModelSet)
     expect(read_model_set.subscription_names).to eq(
-      [ "command-receipts-v1", "coord-context-v1", "user-utterances-v1" ]
+      [
+        "command-receipts-v1",
+        "coord-context-v1",
+        "decision-interpretations-v1",
+        "user-utterances-v1"
+      ]
     )
     expect(operation_query).to be_a(Coordinator::Read::Queries::OperationGet)
     expect(context_query).to be_a(Coordinator::Read::Queries::CoordContext)
     expect(guidance_query).to be_a(Coordinator::Read::Queries::GuidanceGet)
+    expect(interpretation_query).to be_a(Coordinator::Read::Queries::DecisionInterpretationList)
     expect(task_submissions).to all(
       be_a(Coordinator::Write::Operations::PrepareAndSubmitCoordinationTask)
     )

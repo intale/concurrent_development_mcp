@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_22_151000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_22_160000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -45,6 +45,40 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_22_151000) do
     t.integer "projection_version", null: false
     t.jsonb "source_positions", default: [], null: false
     t.datetime "updated_at", null: false
+  end
+
+  create_table "decision_interpretations", primary_key: "interpretation_id", id: :string, force: :cascade do |t|
+    t.string "actor_id", null: false
+    t.string "actor_kind", null: false
+    t.jsonb "ambiguities", default: [], null: false
+    t.jsonb "assessment", null: false
+    t.string "causation_id"
+    t.string "clarification_event_id"
+    t.boolean "clarification_required", default: false, null: false
+    t.datetime "clarification_required_at_domain"
+    t.bigint "clarification_stream_revision"
+    t.jsonb "classifier", null: false
+    t.string "correlation_id"
+    t.datetime "created_at", null: false
+    t.string "event_id", null: false
+    t.string "event_type", null: false
+    t.string "message_id", null: false
+    t.string "policy_status", null: false
+    t.string "proposal_status", null: false
+    t.datetime "proposed_at_domain", null: false
+    t.jsonb "proposed_decision", null: false
+    t.jsonb "scope_provenance", null: false
+    t.jsonb "source_event", null: false
+    t.jsonb "source_span"
+    t.string "stream_context", null: false
+    t.string "stream_id", null: false
+    t.string "stream_name", null: false
+    t.bigint "stream_revision", null: false
+    t.datetime "updated_at", null: false
+    t.index ["clarification_event_id"], name: "index_decision_interpretations_on_clarification_event_id", unique: true
+    t.index ["event_id"], name: "index_decision_interpretations_on_event_id", unique: true
+    t.index ["message_id", "stream_revision"], name: "idx_on_message_id_stream_revision_4258fdb4a5", unique: true
+    t.index ["proposal_status"], name: "index_decision_interpretations_on_proposal_status"
   end
 
   create_table "processed_projection_events", id: false, force: :cascade do |t|

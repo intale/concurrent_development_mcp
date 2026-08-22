@@ -20,12 +20,23 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       pull_interval: 0.2
     )
   end
+  let(:interpretation_registration) do
+    Coordinator::Read::Subscriptions::DecisionInterpretations.new(
+      handler: Coordinator::Read::Projectors::DecisionInterpretationsV1.new,
+      pull_interval: 0.2
+    )
+  end
 
-  it "stacks three unique durable subscriptions on one read-model manager" do
+  it "stacks four unique durable subscriptions on one read-model manager" do
     subscription_set = build_set
 
     expect(subscription_set.subscription_names).to eq(
-      [ "command-receipts-v1", "coord-context-v1", "user-utterances-v1" ]
+      [
+        "command-receipts-v1",
+        "coord-context-v1",
+        "decision-interpretations-v1",
+        "user-utterances-v1"
+      ]
     )
     expect(context_registration.definition.identity.to_h).to eq(
       set_name: "coordinator-read-models-v1",
@@ -38,6 +49,10 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
     expect(utterance_registration.definition.identity.to_h).to eq(
       set_name: "coordinator-read-models-v1",
       subscription_name: "user-utterances-v1"
+    )
+    expect(interpretation_registration.definition.identity.to_h).to eq(
+      set_name: "coordinator-read-models-v1",
+      subscription_name: "decision-interpretations-v1"
     )
   end
 
@@ -67,10 +82,19 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
           attempt_id: nil
         }
       ).value!
+      Coordinator::Write::Operations::ExecuteProposeDecisionInterpretation.new(event_store:).call(
+        InterpretationInput.build(
+          command_id: "cmd-subscription-interpretation",
+          interpretation_id: "I-subscription",
+          source_message_id: "M-subscription",
+          source_span: { start_character: 19, end_character: 27, text: "guidance" }
+        )
+      ).value!
 
       wait_for(subscription_set, "coord-context-v1", minimum: 2)
-      wait_for(subscription_set, "command-receipts-v1", minimum: 2)
+      wait_for(subscription_set, "command-receipts-v1", minimum: 3)
       wait_for(subscription_set, "user-utterances-v1", minimum: 1)
+      wait_for(subscription_set, "decision-interpretations-v1", minimum: 1)
 
       expect(Coordinator::Read::CoordContext.find("CS-SUB-100").document).to include(
         "schema" => "coord-context/v1"
@@ -80,6 +104,10 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       )
       expect(Coordinator::Read::UserUtterance.find("M-subscription").policy_status).to eq(
         "evidence_only"
+      )
+      expect(Coordinator::Read::DecisionInterpretation.find("I-subscription")).to have_attributes(
+        message_id: "M-subscription",
+        policy_status: "proposal_only"
       )
     ensure
       subscription_set.stop
@@ -92,7 +120,12 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
     )
     described_class.new(
       manager:,
-      registrations: [ context_registration, receipt_registration, utterance_registration ]
+      registrations: [
+        context_registration,
+        receipt_registration,
+        utterance_registration,
+        interpretation_registration
+      ]
     )
   end
 

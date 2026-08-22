@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Interpretations
+      class GuidanceSourceEvidenceV1 < Shared::Value
+        def message_id: () -> String
+        def text: () -> String
+        def anchors: () -> GuidanceAnchorsV1
+        def event: () -> EventReference
+      end
+    end
+  end
+end

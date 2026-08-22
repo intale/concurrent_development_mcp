@@ -33,7 +33,17 @@ module Coordinator::Read
       attribute :guidance, GuidanceUtteranceV1
     end
 
-    Data = EmptyData | DomainError | OperationData | ContextData | NotModifiedData | GuidanceData
+    class InterpretationPageData < Value
+      attribute :page, InterpretationPageV1
+    end
+
+    Data = EmptyData |
+           DomainError |
+           OperationData |
+           ContextData |
+           NotModifiedData |
+           GuidanceData |
+           InterpretationPageData
     Action = Coordinator::Write::NextAction | NextAction
 
     attribute :status, Types::String.enum("ok", "not_found", "invalid", "not_modified")

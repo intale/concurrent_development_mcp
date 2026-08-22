@@ -1,0 +1,19 @@
+module Coordinator
+  module Write
+    module Domain
+      module Interpretations
+        class ScopeResolver
+          class Result < Data
+            def scope: () -> Write::Interpretations::DecisionScopeV1
+            def provenance: () -> Write::Interpretations::DecisionScopeProvenanceV1
+          end
+
+          def call: (
+            submitted_scope: Write::Interpretations::DecisionScopeV1?,
+            source: Write::Interpretations::GuidanceSourceEvidenceV1
+          ) -> Result
+        end
+      end
+    end
+  end
+end

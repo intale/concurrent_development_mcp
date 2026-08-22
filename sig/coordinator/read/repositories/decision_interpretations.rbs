@@ -1,0 +1,22 @@
+module Coordinator
+  module Read
+    module Repositories
+      class DecisionInterpretations
+        class Page < Data
+          def records: () -> Array[InterpretationProposalV1]
+          def next_after_revision: () -> Integer?
+        end
+
+        def page: (InterpretationListQueryV1 query) -> Page
+        def store_proposal: (
+          event: PgEventstore::Event,
+          proposal: Write::Events::DecisionInterpretationProposedV1
+        ) -> DecisionInterpretation
+        def require_clarification: (
+          event: PgEventstore::Event,
+          clarification: Write::Events::DecisionClarificationRequiredV1
+        ) -> bool
+      end
+    end
+  end
+end

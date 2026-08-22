@@ -16,6 +16,21 @@ module Coordinator
       OUTPUT_REQUIRED_DEPENDENCY_KINDS: Array[String]
       GIT_OBJECT_FORMATS: Array[String]
       GUIDANCE_SOURCES: Array[String]
+      STATEMENT_KINDS: Array[String]
+      DECISION_EFFECTS: Array[String]
+      DECISION_MODALITIES: Array[String]
+      DECISION_VALUE_SCHEMAS: Array[String]
+      INTERPRETATION_ASSESSMENT_STATUSES: Array[String]
+      SCOPE_PROVENANCE_KINDS: Array[String]
+      SCOPE_ANCHOR_LEVELS: Array[String]
+      DECISION_PHASES: Array[String]
+      ENFORCEMENT_LEVELS: Array[String]
+      RETROACTIVITY_KINDS: Array[String]
+      VIOLATION_ACTIONS: Array[String]
+      RESOLUTION_STRATEGIES: Array[String]
+      MERGE_TARGET_KINDS: Array[String]
+      MERGE_ACTIONS: Array[String]
+      SUPPORTED_INTERPRETATION_TOPICS: Array[String]
       COORDINATION_TOOL_NAMES: Array[String]
 
       Identifier: untyped
@@ -52,6 +67,35 @@ module Coordinator
       ReadinessWorkItemIds: untyped
       GuidanceRepositoryIds: untyped
       EvidencePolicyStatus: untyped
+      InterpretationPolicyStatus: untyped
+      StatementKind: untyped
+      DecisionEffect: untyped
+      DecisionModality: untyped
+      DecisionValueSchema: untyped
+      InterpretationAssessmentStatus: untyped
+      ScopeProvenanceKind: untyped
+      ScopeAnchorLevel: untyped
+      DecisionPhase: untyped
+      EnforcementLevel: untyped
+      RetroactivityKind: untyped
+      ViolationAction: untyped
+      ResolutionStrategy: untyped
+      MergeTargetKind: untyped
+      MergeAction: untyped
+      SupportedInterpretationTopic: untyped
+      ClassifierConfidenceMillionths: untyped
+      SourceCharacterIndex: untyped
+      InterpretationLabel: untyped
+      InterpretationDescription: untyped
+      InterpretationLabels: untyped
+      InterpretationOptions: untyped
+      DecisionIdentifiers: untyped
+      ScopeIdentifiers: untyped
+      ScopeRepositoryIds: untyped
+      ScopePaths: untyped
+      InterpretationReasons: untyped
+      InterpretationPageLimit: untyped
+      StreamRevisionCursor: untyped
     end
   end
 end

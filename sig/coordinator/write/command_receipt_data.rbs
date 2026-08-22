@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandReceiptData
-      type value = ChangeSet | WorkItem | Dependency | Attempt | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance
+      type value = ChangeSet | WorkItem | Dependency | Attempt | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal
 
       class ChangeSet < Shared::Value
         def change_set_id: () -> String
@@ -92,6 +92,13 @@ module Coordinator
         def source: () -> String
         def policy_status: () -> String
         def recorded_at: () -> String
+      end
+
+      class InterpretationProposal < Shared::Value
+        def interpretation_id: () -> String
+        def source_message_id: () -> String
+        def assessment: () -> Interpretations::InterpretationAssessmentV1
+        def proposed_at: () -> String
       end
     end
   end

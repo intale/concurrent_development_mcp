@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Interpretations
+      class DecisionScopeProvenanceV1 < Shared::Value
+        def kind: () -> String
+        def anchor_level: () -> String
+        def source_message_id: () -> String
+      end
+    end
+  end
+end

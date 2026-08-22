@@ -12,8 +12,10 @@ module Coordinator
       def self.lease_renew: () -> json_schema
       def self.lease_release: () -> json_schema
       def self.guidance_record: () -> json_schema
+      def self.decision_interpretation_propose: () -> json_schema
       def self.operation_get: () -> json_schema
       def self.guidance_get: () -> json_schema
+      def self.decision_interpretation_list: () -> json_schema
       def self.coord_context: () -> json_schema
       def self.common_mutation_properties: () -> json_schema
       def self.object_schema: (properties: json_schema, required: Array[String], ?one_of: Array[json_schema]?) -> json_schema
@@ -25,6 +27,17 @@ module Coordinator
       def self.write_set_resource: () -> json_schema
       def self.lease_renewal_reference: () -> json_schema
       def self.lease_release_reference: () -> json_schema
+      def self.interpretation_source_span: () -> json_schema
+      def self.interpretation_classifier: () -> json_schema
+      def self.interpretation_decision: () -> json_schema
+      def self.interpretation_value: () -> json_schema
+      def self.interpretation_scope: () -> json_schema
+      def self.interpretation_conditions: () -> json_schema
+      def self.interpretation_validity: () -> json_schema
+      def self.interpretation_relations: () -> json_schema
+      def self.interpretation_ambiguity: () -> json_schema
+      def self.identifier_array: (?max_items: Integer) -> json_schema
+      def self.nullable_enum: (Array[String] values) -> json_schema
       def self.string_array: (min_items: Integer, max_items: Integer, max_length: Integer) -> json_schema
     end
   end

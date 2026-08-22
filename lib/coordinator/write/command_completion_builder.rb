@@ -273,6 +273,31 @@ module Coordinator::Write
       )
     end
 
+    def decision_interpretation_propose(command:, proposal:, input_digest:, persisted_events:, completed_at:)
+      build_completion(
+        command:,
+        tool_name: "decision_interpretation_propose",
+        summary: "Atomic decision interpretation proposed without activating policy.",
+        data: CommandReceiptData::InterpretationProposal.new(
+          interpretation_id: command.interpretation_id,
+          source_message_id: command.source_message_id,
+          assessment: proposal.assessment,
+          proposed_at: proposal.proposed_at
+        ),
+        next_actions: [
+          NextAction.new(
+            tool: "decision_interpretation_list",
+            arguments: NextAction::InterpretationListArguments.new(
+              message_id: command.source_message_id
+            )
+          )
+        ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
 
     def build_completion(command:, tool_name:, summary:, data:, next_actions:, input_digest:, persisted_events:, completed_at:)

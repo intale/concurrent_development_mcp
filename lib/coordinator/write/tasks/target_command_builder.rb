@@ -25,6 +25,8 @@ module Coordinator::Write
           build_release_lease_set(document)
         when CommandInputDocuments::RecordGuidanceV1
           build_record_guidance(document)
+        when CommandInputDocuments::ProposeDecisionInterpretationV1
+          build_propose_decision_interpretation(document)
         end
       end
 
@@ -158,6 +160,20 @@ module Coordinator::Write
           source: input.source,
           text: input.text,
           anchors: GuidanceAnchorsV1.new(input.anchors.to_h)
+        )
+      end
+
+      def build_propose_decision_interpretation(document)
+        input = document.input
+        Commands::ProposeDecisionInterpretation.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          interpretation_id: input.interpretation_id,
+          source_message_id: input.source_message_id,
+          source_span: input.source_span,
+          classifier: input.classifier,
+          proposed_decision: input.proposed_decision,
+          ambiguities: input.ambiguities
         )
       end
 

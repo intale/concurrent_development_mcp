@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    class InterpretationPageV1 < Shared::Value
+      Proposal: singleton(InterpretationProposalV1)
+
+      def message_id: () -> String
+      def interpretations: () -> Array[InterpretationProposalV1]
+      def next_after_revision: () -> Integer?
+    end
+  end
+end

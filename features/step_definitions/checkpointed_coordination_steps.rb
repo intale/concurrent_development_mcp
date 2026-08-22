@@ -1155,3 +1155,202 @@ Then("only the first Conversation owns the forwarded evidence") do
     "Duplicate guidance completion"
   )
 end
+
+Given(
+  "guidance {string} is durably recorded as message {string} in conversation {string}"
+) do |text, message_id, conversation_id|
+  @interpretation_message_id = message_id
+  @interpretation_conversation_id = conversation_id
+  submit_and_execute(
+    "guidance_record",
+    command_id: "cmd-cuc-interpretation-source",
+    actor: { kind: "agent", id: "host-1" },
+    message_id:,
+    conversation_id:,
+    source: "mcp_client",
+    text:,
+    anchors: {
+      repository_ids: [ "billing" ],
+      change_set_id: "CS-CUC-GDN-3",
+      work_item_id: nil,
+      attempt_id: nil
+    }
+  )
+  assert_acceptance_equal(
+    [ "UserUtteranceRecorded" ],
+    guidance_events(conversation_id).map(&:type),
+    "Interpretation source facts"
+  )
+end
+
+When("two classifiers independently propose atomic interpretations through Tasks") do
+  shared = {
+    source_message_id: @interpretation_message_id,
+    source_span: { start_character: 4, end_character: 9, text: "RSpec" },
+    proposed_decision: {
+      statement_kind: "preference",
+      topic_id: "testing.framework",
+      effect: "prefer",
+      modality: "should",
+      value: {
+        schema: "named-choice/v1",
+        name: "rspec",
+        items: nil,
+        target_kind: nil,
+        target_id: nil,
+        action: nil
+      },
+      scope: nil,
+      conditions: {
+        phases: [ "implementation" ],
+        languages: [ "ruby" ],
+        tags: [],
+        repository_kinds: [],
+        artifact_kinds: [],
+        environments: []
+      },
+      validity: { valid_from: nil, valid_until: nil, until_event: nil },
+      authority: { actor_id: "user-label", role: "project-owner" },
+      enforcement: {
+        level: "advisory",
+        retroactivity: "future_only",
+        on_violation: "warn"
+      },
+      relations: { corrects: [], supersedes: [], exception_to: [], revokes: [] }
+    },
+    ambiguities: []
+  }
+  first = shared.merge(
+    command_id: "cmd-cuc-interpretation-a",
+    actor: { kind: "agent", id: "classifier-host-a" },
+    interpretation_id: "I-CUC-A",
+    classifier: {
+      id: "classifier-a",
+      version: "decision-classifier-v1",
+      ontology_version: 1,
+      confidence_millionths: 940_000
+    }
+  )
+  second = shared.merge(
+    command_id: "cmd-cuc-interpretation-b",
+    actor: { kind: "agent", id: "classifier-host-b" },
+    interpretation_id: "I-CUC-B",
+    classifier: {
+      id: "classifier-b",
+      version: "decision-classifier-v1",
+      ontology_version: 1,
+      confidence_millionths: 810_000
+    },
+    proposed_decision: shared.fetch(:proposed_decision).merge(
+      statement_kind: "directive",
+      effect: "require",
+      modality: "must",
+      enforcement: {
+        level: "merge_gate",
+        retroactivity: "future_only",
+        on_violation: "block"
+      }
+    )
+  )
+
+  @interpretation_tasks = [ first, second ].map do |arguments|
+    response = call_tool("decision_interpretation_propose", arguments)
+    task_id = response.dig("result", "taskId")
+    assert_acceptance(
+      task_id,
+      "decision_interpretation_propose did not return a Task handle: #{response.inspect}"
+    )
+    {
+      arguments:,
+      task_id:
+    }
+  end
+  @interpretation_tasks.map do |entry|
+    Thread.new { execute_task(entry.fetch(:task_id)) }
+  end.each(&:value)
+  @interpretation_tasks.each do |entry|
+    entry[:state] = task_request("tasks/get", entry.fetch(:task_id))
+  end
+end
+
+Then("both proposal Tasks complete while no policy is activated") do
+  @interpretation_tasks.each do |entry|
+    state = entry.fetch(:state)
+    assert_acceptance_equal("completed", state.dig("result", "status"), "Proposal Task status")
+    assert_acceptance_equal(false, state.dig("result", "result", "isError"), "Proposal tool error")
+  end
+  facts = interpretation_events(@interpretation_message_id)
+  assert_acceptance_equal(
+    2,
+    facts.count { _1.type == "DecisionInterpretationProposed" },
+    "Atomic proposal facts"
+  )
+  assert_acceptance(
+    facts.none? { _1.type.include?("Activated") },
+    "A proposal command must not activate policy"
+  )
+end
+
+Then("the hard proposal and its clarification are persisted atomically") do
+  facts = interpretation_events(@interpretation_message_id)
+  hard_proposal = facts.find { _1.data.fetch("interpretation_id") == "I-CUC-B" && _1.type == "DecisionInterpretationProposed" }
+  clarification = facts.find { _1.data.fetch("interpretation_id") == "I-CUC-B" && _1.type == "DecisionClarificationRequired" }
+
+  assert_acceptance(hard_proposal, "The hard proposal fact is missing")
+  assert_acceptance(clarification, "The clarification fact is missing")
+  assert_acceptance_equal(
+    hard_proposal.stream_revision + 1,
+    clarification.stream_revision,
+    "Hard proposal event-plan revisions"
+  )
+  assert_acceptance_equal(
+    1,
+    command_events("cmd-cuc-interpretation-b").length,
+    "Hard proposal completion"
+  )
+end
+
+Then("the available interpretation query honestly reports no proposals before projection") do
+  payload = call_tool(
+    "decision_interpretation_list",
+    { message_id: @interpretation_message_id, after_revision: -1, limit: 20 }
+  ).dig("result", "structuredContent")
+  assert_acceptance_equal("not_found", payload.fetch("status"), "Pre-projection proposal status")
+  assert_acceptance_equal(
+    "interpretations_not_observed",
+    payload.dig("data", "code"),
+    "Pre-projection proposal reason"
+  )
+end
+
+When("the interpretation proposals reach the read side") do
+  project_interpretations(@interpretation_message_id)
+end
+
+Then("the available query lists both proposal-only interpretations without a freshness claim") do
+  payload = call_tool(
+    "decision_interpretation_list",
+    { message_id: @interpretation_message_id, after_revision: -1, limit: 20 }
+  ).dig("result", "structuredContent")
+  proposals = payload.dig("data", "page", "interpretations")
+
+  assert_acceptance_equal("ok", payload.fetch("status"), "Available proposal status")
+  assert_acceptance_equal(
+    %w[I-CUC-A I-CUC-B],
+    proposals.map { _1.fetch("interpretation_id") }.sort,
+    "Available proposals"
+  )
+  assert_acceptance(
+    proposals.all? { _1.fetch("policy_status") == "proposal_only" },
+    "Projected interpretations must remain proposals"
+  )
+  assert_acceptance_equal(
+    [ "accepted_for_activation", "confirmation_required" ],
+    proposals.map { _1.dig("assessment", "status") }.sort,
+    "Proposal assessments"
+  )
+  assert_acceptance(
+    (payload.keys & %w[active fresh pending projection_status]).empty?,
+    "Interpretation query must not claim freshness or activity"
+  )
+end

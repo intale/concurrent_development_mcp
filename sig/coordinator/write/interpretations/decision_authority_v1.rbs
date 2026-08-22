@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Interpretations
+      class DecisionAuthorityV1 < Shared::Value
+        def actor_id: () -> String
+        def role: () -> String
+      end
+    end
+  end
+end

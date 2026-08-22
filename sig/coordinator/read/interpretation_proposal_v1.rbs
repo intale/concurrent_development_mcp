@@ -1,0 +1,25 @@
+module Coordinator
+  module Read
+    class InterpretationProposalV1 < Shared::Value
+      Ambiguity: singleton(Write::Interpretations::InterpretationAmbiguityV1)
+
+      def interpretation_id: () -> String
+      def message_id: () -> String
+      def source_event: () -> Write::EventReference
+      def source_span: () -> Write::Interpretations::SourceSpanV1?
+      def classifier: () -> Write::Interpretations::ClassifierAttributionV1
+      def proposed_decision: () -> Write::Interpretations::ProposedDecisionV1
+      def scope_provenance: () -> Write::Interpretations::DecisionScopeProvenanceV1
+      def ambiguities: () -> Array[Write::Interpretations::InterpretationAmbiguityV1]
+      def assessment: () -> Write::Interpretations::InterpretationAssessmentV1
+      def policy_status: () -> String
+      def actor: () -> AttributedActorV1
+      def event: () -> Write::EventReference
+      def clarification_event: () -> Write::EventReference?
+      def proposed_at: () -> String
+      def clarification_required_at: () -> String?
+      def causation_id: () -> String?
+      def correlation_id: () -> String?
+    end
+  end
+end

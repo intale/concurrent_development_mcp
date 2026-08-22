@@ -1,0 +1,16 @@
+module Coordinator
+  module Write
+    module Events
+      class DecisionClarificationRequiredV1 < Base
+        Question: singleton(Interpretations::ClarificationQuestionV1)
+
+        def interpretation_id: () -> String
+        def source_message_id: () -> String
+        def status: () -> String
+        def reasons: () -> Array[String]
+        def questions: () -> Array[Interpretations::ClarificationQuestionV1]
+        def required_at: () -> String
+      end
+    end
+  end
+end

@@ -27,6 +27,8 @@ module Coordinator::Write
       [ "WriteSetReleased", 1 ] => Events::WriteSetReleasedV1,
       [ "UserUtteranceRecorded", 1 ] => Events::UserUtteranceRecordedV1,
       [ "UserUtteranceForwardedByAgent", 1 ] => Events::UserUtteranceForwardedByAgentV1,
+      [ "DecisionInterpretationProposed", 1 ] => Events::DecisionInterpretationProposedV1,
+      [ "DecisionClarificationRequired", 1 ] => Events::DecisionClarificationRequiredV1,
       [ "CoordinationTaskSubmitted", 1 ] => Events::CoordinationTaskSubmittedV1,
       [ "CoordinationTaskExecutionStarted", 1 ] => Events::CoordinationTaskExecutionStartedV1,
       [ "CoordinationTaskCompleted", 1 ] => Events::CoordinationTaskCompletedV1,

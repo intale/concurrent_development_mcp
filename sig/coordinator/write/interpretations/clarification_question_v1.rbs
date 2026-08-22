@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Interpretations
+      class ClarificationQuestionV1 < Shared::Value
+        def field: () -> String
+        def prompt: () -> String
+        def options: () -> Array[String]
+      end
+    end
+  end
+end

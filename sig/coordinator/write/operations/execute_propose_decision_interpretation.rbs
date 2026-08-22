@@ -1,0 +1,29 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecuteProposeDecisionInterpretation
+        TOOL_NAME: String
+
+        def initialize: (
+          event_store: _EventStore,
+          ?preparer: PrepareProposeDecisionInterpretation,
+          ?decider: Domain::Interpretations::Propose,
+          ?input_digest: CommandInputDigest,
+          ?clock: Shared::_Clock,
+          ?id_generator: Shared::_IdGenerator,
+          ?event_factory: EventFactory,
+          ?schema_registry: EventSchemaRegistry,
+          ?stream_factory: StreamFactory,
+          ?completion_builder: CommandCompletionBuilder,
+          ?event_plan_contract: Contracts::InterpretationProposalEventPlan
+        ) -> void
+        %a{rbs:test:skip}
+        def call: (command_input input) -> Dry::Monads::Result
+        def call_command: (
+          Commands::ProposeDecisionInterpretation command,
+          ?caused_by: PgEventstore::Event?
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

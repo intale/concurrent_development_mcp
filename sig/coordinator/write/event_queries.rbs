@@ -4,6 +4,7 @@ module Coordinator
       GUIDANCE_MESSAGE_EVENT_TYPES: Array[String]
 
       def self.guidance_message: (String marker) -> GlobalMarkedEventReadCriteria
+      def self.interpretation_proposal: (String marker) -> GlobalMarkedEventReadCriteria
 
       COMMAND_COMPLETION: EventReadCriteria
       COORDINATION_TASK_HISTORY: EventReadCriteria

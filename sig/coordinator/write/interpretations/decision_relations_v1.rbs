@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Interpretations
+      class DecisionRelationsV1 < Shared::Value
+        def corrects: () -> Array[String]
+        def supersedes: () -> Array[String]
+        def exception_to: () -> Array[String]
+        def revokes: () -> Array[String]
+      end
+    end
+  end
+end

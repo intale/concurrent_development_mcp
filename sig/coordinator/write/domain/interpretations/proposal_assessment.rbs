@@ -1,0 +1,20 @@
+module Coordinator
+  module Write
+    module Domain
+      module Interpretations
+        class ProposalAssessment
+          NON_NORMATIVE_KINDS: Array[String]
+          HARD_EFFECTS: Array[String]
+          HARD_MODALITIES: Array[String]
+          HIGH_IMPACT_LEVELS: Array[String]
+
+          def call: (
+            command: Commands::ProposeDecisionInterpretation,
+            scope: Write::Interpretations::DecisionScopeV1,
+            provenance: Write::Interpretations::DecisionScopeProvenanceV1
+          ) -> Write::Interpretations::InterpretationAssessmentV1
+        end
+      end
+    end
+  end
+end

@@ -1,0 +1,9 @@
+module Coordinator
+  module Read
+    class InterpretationListQueryV1 < Shared::Value
+      def message_id: () -> String
+      def after_revision: () -> Integer
+      def limit: () -> Integer
+    end
+  end
+end

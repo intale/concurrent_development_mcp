@@ -1,0 +1,21 @@
+module Coordinator
+  module Write
+    module Interpretations
+      class DecisionScopeV1 < Shared::Value
+        def workspace_id: () -> String?
+        def repository_ids: () -> Array[String]
+        def branch_selectors: () -> Array[String]
+        def change_set_id: () -> String?
+        def work_item_id: () -> String?
+        def attempt_id: () -> String?
+        def candidate_id: () -> String?
+        def path_selectors: () -> Array[String]
+        def symbol_selectors: () -> Array[String]
+        def contract_selectors: () -> Array[String]
+        def schema_selectors: () -> Array[String]
+        def environments: () -> Array[String]
+        def agent_roles: () -> Array[String]
+      end
+    end
+  end
+end

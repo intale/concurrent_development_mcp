@@ -26,6 +26,8 @@ module Coordinator
       def lease_expire_policy_document: (Commands::ExpireResourceLease command) -> CommandInputDocuments::ExpireResourceLeaseV1
       def guidance_record: (Commands::RecordGuidance command) -> String
       def guidance_record_document: (Commands::RecordGuidance command) -> CommandInputDocuments::RecordGuidanceV1
+      def decision_interpretation_propose: (Commands::ProposeDecisionInterpretation command) -> String
+      def decision_interpretation_propose_document: (Commands::ProposeDecisionInterpretation command) -> CommandInputDocuments::ProposeDecisionInterpretationV1
     end
   end
 end

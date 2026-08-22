@@ -224,6 +224,29 @@ module Coordinator
         )
       end
 
+      def decision_interpretation_propose
+        object_schema(
+          properties: common_mutation_properties.merge(
+            interpretation_id: identifier,
+            source_message_id: identifier,
+            source_span: {
+              anyOf: [ interpretation_source_span, { type: "null" } ]
+            },
+            classifier: interpretation_classifier,
+            proposed_decision: interpretation_decision,
+            ambiguities: {
+              type: "array",
+              maxItems: 20,
+              items: interpretation_ambiguity
+            }
+          ),
+          required: %w[
+            command_id actor interpretation_id source_message_id source_span
+            classifier proposed_decision ambiguities
+          ]
+        )
+      end
+
       def operation_get
         object_schema(
           properties: {
@@ -236,6 +259,21 @@ module Coordinator
       def guidance_get
         object_schema(
           properties: { message_id: identifier },
+          required: %w[message_id]
+        )
+      end
+
+      def decision_interpretation_list
+        object_schema(
+          properties: {
+            message_id: identifier,
+            after_revision: {
+              anyOf: [ { type: "integer", minimum: -1 }, { type: "null" } ]
+            },
+            limit: {
+              anyOf: [ { type: "integer", minimum: 1, maximum: 100 }, { type: "null" } ]
+            }
+          },
           required: %w[message_id]
         )
       end
@@ -331,6 +369,173 @@ module Coordinator
 
       def lease_release_reference
         lease_renewal_reference
+      end
+
+      def interpretation_source_span
+        object_schema(
+          properties: {
+            start_character: { type: "integer", minimum: 0 },
+            end_character: { type: "integer", minimum: 0 },
+            text: { type: "string", minLength: 1, maxLength: 16_000 }
+          },
+          required: %w[start_character end_character text]
+        )
+      end
+
+      def interpretation_classifier
+        object_schema(
+          properties: {
+            id: identifier,
+            version: { type: "string", minLength: 1, maxLength: 200 },
+            ontology_version: { type: "integer", const: 1 },
+            confidence_millionths: { type: "integer", minimum: 0, maximum: 1_000_000 }
+          },
+          required: %w[id version ontology_version confidence_millionths]
+        )
+      end
+
+      def interpretation_decision
+        object_schema(
+          properties: {
+            statement_kind: { type: "string", enum: Types::STATEMENT_KINDS },
+            topic_id: identifier,
+            effect: nullable_enum(Types::DECISION_EFFECTS),
+            modality: nullable_enum(Types::DECISION_MODALITIES),
+            value: interpretation_value,
+            scope: { anyOf: [ interpretation_scope, { type: "null" } ] },
+            conditions: interpretation_conditions,
+            validity: interpretation_validity,
+            authority: object_schema(
+              properties: { actor_id: identifier, role: identifier },
+              required: %w[actor_id role]
+            ),
+            enforcement: object_schema(
+              properties: {
+                level: { type: "string", enum: Types::ENFORCEMENT_LEVELS },
+                retroactivity: { type: "string", enum: Types::RETROACTIVITY_KINDS },
+                on_violation: { type: "string", enum: Types::VIOLATION_ACTIONS }
+              },
+              required: %w[level retroactivity on_violation]
+            ),
+            relations: interpretation_relations
+          },
+          required: %w[
+            statement_kind topic_id effect modality value scope conditions validity
+            authority enforcement relations
+          ]
+        )
+      end
+
+      def interpretation_value
+        object_schema(
+          properties: {
+            schema: { type: "string", enum: Types::DECISION_VALUE_SCHEMAS },
+            name: nullable_string,
+            items: {
+              anyOf: [ string_array(min_items: 1, max_items: 100, max_length: 200), { type: "null" } ]
+            },
+            target_kind: nullable_enum(Types::MERGE_TARGET_KINDS),
+            target_id: nullable_identifier,
+            action: nullable_enum(Types::MERGE_ACTIONS)
+          },
+          required: %w[schema name items target_kind target_id action]
+        )
+      end
+
+      def interpretation_scope
+        properties = {
+          workspace_id: nullable_identifier,
+          repository_ids: {
+            type: "array",
+            maxItems: 100,
+            uniqueItems: true,
+            items: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" }
+          },
+          branch_selectors: identifier_array,
+          change_set_id: nullable_identifier,
+          work_item_id: nullable_identifier,
+          attempt_id: nullable_identifier,
+          candidate_id: nullable_identifier,
+          path_selectors: string_array(min_items: 0, max_items: 100, max_length: 1_024),
+          symbol_selectors: identifier_array,
+          contract_selectors: identifier_array,
+          schema_selectors: identifier_array,
+          environments: identifier_array,
+          agent_roles: identifier_array
+        }
+        object_schema(properties:, required: properties.keys.map(&:to_s))
+      end
+
+      def interpretation_conditions
+        properties = {
+          phases: {
+            type: "array",
+            maxItems: 5,
+            uniqueItems: true,
+            items: { type: "string", enum: Types::DECISION_PHASES }
+          },
+          languages: identifier_array,
+          tags: identifier_array,
+          repository_kinds: identifier_array,
+          artifact_kinds: identifier_array,
+          environments: identifier_array
+        }
+        object_schema(properties:, required: properties.keys.map(&:to_s))
+      end
+
+      def interpretation_validity
+        until_event = object_schema(
+          properties: {
+            event_type: identifier,
+            stream_context: identifier,
+            stream_name: identifier,
+            stream_id: identifier
+          },
+          required: %w[event_type stream_context stream_name stream_id]
+        )
+        object_schema(
+          properties: {
+            valid_from: nullable_string,
+            valid_until: nullable_string,
+            until_event: { anyOf: [ until_event, { type: "null" } ] }
+          },
+          required: %w[valid_from valid_until until_event]
+        )
+      end
+
+      def interpretation_relations
+        properties = {
+          corrects: identifier_array(max_items: 20),
+          supersedes: identifier_array(max_items: 20),
+          exception_to: identifier_array(max_items: 20),
+          revokes: identifier_array(max_items: 20)
+        }
+        object_schema(properties:, required: properties.keys.map(&:to_s))
+      end
+
+      def interpretation_ambiguity
+        object_schema(
+          properties: {
+            field: identifier,
+            code: identifier,
+            description: { type: "string", minLength: 1, maxLength: 500 },
+            options: string_array(min_items: 0, max_items: 10, max_length: 200)
+          },
+          required: %w[field code description options]
+        )
+      end
+
+      def identifier_array(max_items: 100)
+        {
+          type: "array",
+          maxItems: max_items,
+          uniqueItems: true,
+          items: identifier
+        }
+      end
+
+      def nullable_enum(values)
+        { anyOf: [ { type: "string", enum: values }, { type: "null" } ] }
       end
 
       def string_array(min_items:, max_items:, max_length:)

@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Interpretations
+      class DecisionConditionsV1 < Shared::Value
+        def phases: () -> Array[String]
+        def languages: () -> Array[String]
+        def tags: () -> Array[String]
+        def repository_kinds: () -> Array[String]
+        def artifact_kinds: () -> Array[String]
+        def environments: () -> Array[String]
+      end
+    end
+  end
+end

@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandInputDocuments
-      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1
+      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1
       type digest_value = value | ExpireResourceLeaseV1
 
       class ActorV1 < Shared::Value
@@ -185,6 +185,23 @@ module Coordinator
       class RecordGuidanceV1 < BaseV1
         def tool_name: () -> String
         def input: () -> RecordGuidanceInputV1
+      end
+
+      class ProposeDecisionInterpretationInputV1 < Shared::Value
+        Ambiguity: singleton(Interpretations::InterpretationAmbiguityV1)
+
+        def actor: () -> ActorV1
+        def interpretation_id: () -> String
+        def source_message_id: () -> String
+        def source_span: () -> Interpretations::SourceSpanV1?
+        def classifier: () -> Interpretations::ClassifierAttributionV1
+        def proposed_decision: () -> Interpretations::SubmittedDecisionV1
+        def ambiguities: () -> Array[Interpretations::InterpretationAmbiguityV1]
+      end
+
+      class ProposeDecisionInterpretationV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> ProposeDecisionInterpretationInputV1
       end
 
       class ExpireResourceLeaseInputV1 < Shared::Value

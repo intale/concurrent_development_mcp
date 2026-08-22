@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Contracts
+      class InterpretationTopicValue
+        def call: (command_input input) -> Dry::Validation::Result
+      end
+    end
+  end
+end

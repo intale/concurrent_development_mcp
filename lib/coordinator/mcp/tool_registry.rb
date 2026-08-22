@@ -10,6 +10,7 @@ module Coordinator
           Tools::CoordContext,
           Tools::OperationGet,
           Tools::GuidanceGet,
+          Tools::DecisionInterpretationList,
           Tools::ChangeSetCreate,
           Tools::WorkItemCreate,
           Tools::WorkItemDependencyDeclare,
@@ -19,7 +20,8 @@ module Coordinator
           Tools::WriteSetExpand,
           Tools::LeaseRenew,
           Tools::LeaseRelease,
-          Tools::GuidanceRecord
+          Tools::GuidanceRecord,
+          Tools::DecisionInterpretationPropose
         ].freeze
       end
     end

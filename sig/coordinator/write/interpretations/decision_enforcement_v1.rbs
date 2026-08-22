@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Interpretations
+      class DecisionEnforcementV1 < Shared::Value
+        def level: () -> String
+        def retroactivity: () -> String
+        def on_violation: () -> String
+      end
+    end
+  end
+end

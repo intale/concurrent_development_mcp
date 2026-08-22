@@ -31,7 +31,11 @@ module Coordinator
         def guidance: () -> GuidanceUtteranceV1
       end
 
-      type data = EmptyData | DomainError | OperationData | ContextData | NotModifiedData | GuidanceData
+      class InterpretationPageData < Shared::Value
+        def page: () -> InterpretationPageV1
+      end
+
+      type data = EmptyData | DomainError | OperationData | ContextData | NotModifiedData | GuidanceData | InterpretationPageData
       type action = Write::NextAction | NextAction
 
       def status: () -> String

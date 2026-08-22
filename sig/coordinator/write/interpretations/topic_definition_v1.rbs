@@ -1,0 +1,18 @@
+module Coordinator
+  module Write
+    module Interpretations
+      class TopicDefinitionV1 < Shared::Value
+        def topic_id: () -> String
+        def parent_topic_id: () -> String
+        def value_schema: () -> String
+        def resolution_strategy: () -> String
+        def inheritable: () -> bool
+        def default_modality: () -> String
+        def default_enforcement: () -> String
+        def conflict_dimension: () -> String
+        def ontology_version: () -> Integer
+        def aliases: () -> Array[String]
+      end
+    end
+  end
+end

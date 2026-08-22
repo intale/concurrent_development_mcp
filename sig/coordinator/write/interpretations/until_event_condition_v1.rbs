@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Interpretations
+      class UntilEventConditionV1 < Shared::Value
+        def event_type: () -> String
+        def stream_context: () -> String
+        def stream_name: () -> String
+        def stream_id: () -> String
+      end
+    end
+  end
+end

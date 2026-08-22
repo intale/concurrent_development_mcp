@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Tasks
       module DomainErrorV1
-        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError
+        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError
 
         class ChangeSetDetails < Shared::Value
           def change_set_id: () -> String
@@ -112,6 +112,29 @@ module Coordinator
           def message_id: () -> String
         end
 
+        class GuidanceMessageDetails < Shared::Value
+          def message_id: () -> String
+        end
+
+        class InterpretationDetails < Shared::Value
+          def interpretation_id: () -> String
+        end
+
+        class SourceSpanMismatchDetails < Shared::Value
+          def message_id: () -> String
+          def interpretation_id: () -> String
+        end
+
+        class TopicDetails < Shared::Value
+          def topic_id: () -> String
+        end
+
+        class TopicValueDetails < Shared::Value
+          def topic_id: () -> String
+          def expected_schema: () -> String
+          def supplied_schema: () -> String
+        end
+
         class ChangeSetError < Shared::Value
           def code: () -> String
           def message: () -> String
@@ -214,6 +237,36 @@ module Coordinator
           def code: () -> String
           def message: () -> String
           def details: () -> MessageAlreadyRecordedDetails
+        end
+
+        class GuidanceMessageNotFoundError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> GuidanceMessageDetails
+        end
+
+        class InterpretationAlreadyProposedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> InterpretationDetails
+        end
+
+        class SourceSpanMismatchError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> SourceSpanMismatchDetails
+        end
+
+        class TopicNotSupportedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> TopicDetails
+        end
+
+        class TopicValueInvalidError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> TopicValueDetails
         end
       end
     end

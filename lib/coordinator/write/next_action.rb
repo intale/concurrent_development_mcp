@@ -16,9 +16,14 @@ module Coordinator::Write
       attribute :message_id, Types::Identifier
     end
 
+    class InterpretationListArguments < Value
+      attribute :message_id, Types::Identifier
+    end
+
     Arguments = ChangeSetArguments |
                 AttemptArguments |
-                GuidanceArguments
+                GuidanceArguments |
+                InterpretationListArguments
 
     attribute :tool, Types::Identifier
     attribute :arguments, Arguments

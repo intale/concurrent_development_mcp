@@ -49,5 +49,13 @@ module Coordinator::Write
         stream_id: conversation_id
       )
     end
+
+    def interpretation(message_id)
+      StreamReference.new(
+        context: "HumanGuidance",
+        stream_name: "Interpretation",
+        stream_id: message_id
+      )
+    end
   end
 end

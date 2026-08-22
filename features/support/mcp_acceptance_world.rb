@@ -174,6 +174,22 @@ module McpAcceptanceWorld
     guidance_events(conversation_id).each { projector.call(_1) }
   end
 
+  def interpretation_events(message_id)
+    event_store.read(
+      streams.interpretation(message_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[DecisionInterpretationProposed DecisionClarificationRequired],
+        maximum_count: 100,
+        direction: :asc
+      )
+    )
+  end
+
+  def project_interpretations(message_id)
+    projector = Coordinator::Container["projectors.decision_interpretations_v1"]
+    interpretation_events(message_id).each { projector.call(_1) }
+  end
+
   def lease_events(path)
     resource = Coordinator::Write::FileResourceNormalizer.new.call(
       repository_id: "billing",

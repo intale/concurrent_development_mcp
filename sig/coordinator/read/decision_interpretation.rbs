@@ -1,0 +1,32 @@
+module Coordinator
+  module Read
+    class DecisionInterpretation < ApplicationRecord
+      def interpretation_id: () -> String
+      def message_id: () -> String
+      def source_event: () -> Hash[String, untyped]
+      def source_span: () -> Hash[String, untyped]?
+      def classifier: () -> Hash[String, untyped]
+      def proposed_decision: () -> Hash[String, untyped]
+      def scope_provenance: () -> Hash[String, untyped]
+      def ambiguities: () -> Array[Hash[String, untyped]]
+      def assessment: () -> Hash[String, untyped]
+      def proposal_status: () -> String
+      def policy_status: () -> String
+      def clarification_required: () -> bool
+      def clarification_event_id: () -> String?
+      def clarification_stream_revision: () -> Integer?
+      def clarification_required_at_domain: () -> Time?
+      def actor_kind: () -> String
+      def actor_id: () -> String
+      def event_id: () -> String
+      def event_type: () -> String
+      def stream_context: () -> String
+      def stream_name: () -> String
+      def stream_id: () -> String
+      def stream_revision: () -> Integer
+      def causation_id: () -> String?
+      def correlation_id: () -> String?
+      def proposed_at_domain: () -> Time
+    end
+  end
+end
