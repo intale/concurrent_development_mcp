@@ -21,7 +21,7 @@ Then  DescriptionChanged(description: "New description")
 
 If the prior description already equals the command description, `Then` is zero events with an explicit no-change outcome. The event payload comes from the validated command; the decision to emit it comes from comparison with authoritative prior state.
 
-One command may return several events. Validate the complete ordered plan first and persist it through one `PgEventstore::Client#multiple` transaction so no subset can commit.
+One command may return several events. Validate the complete ordered plan first. If every event targets one stream, append the array atomically with the expected revision that covers the authoritative read. If the plan targets two or more streams in one event-store config, use one `PgEventstore::Client#multiple` transaction. Across configs/connections, use an explicit asynchronous boundary.
 
 ## Required examples per transition
 

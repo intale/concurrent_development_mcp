@@ -13,7 +13,7 @@ Use Event Modeling to derive event-sourced behavior from an end-to-end story. Tr
 - Implement a command as the Event Modeling Given/When/Then decision: **Given** authoritative prior events/state, **When** one command is applied, **Then** return zero, one, or multiple new events.
 - A denial or semantic no-op returns zero events. The command result must still make the outcome explicit according to the accepted idempotency contract.
 - A Saga/process manager reacts to an event by issuing deterministic command(s). Each target command rereads authoritative state and decides its own events.
-- Validate the complete event-write plan before appending. When one command produces multiple events, persist all of them through one `PgEventstore::Client#multiple` transaction so they commit or roll back together.
+- Validate the complete event-write plan before appending. For one stream, append its one-or-many events atomically with the expected revision covering the authoritative read. When consistency spans two or more streams in one `pg_eventstore` config, persist the complete plan through one `PgEventstore::Client#multiple` transaction. Across configs/connections, model an asynchronous boundary instead.
 - An event factory may serialize a command's validated event plan; it has no event-producing decision authority.
 
 For any system or feature with more than one state transition, read [references/modeling-workbook.md](references/modeling-workbook.md) and use its artifact structure.
@@ -64,7 +64,7 @@ Do not mark an event contract implementation-ready until its model identifies:
 - owning boundary and intended stream/aggregate;
 - immediate and eventual consumers;
 - consistency and ordering expectations;
-- whether the command produces multiple events and therefore requires one `Client#multiple` transaction;
+- whether the command writes one stream with optimistic expected revision, two or more streams through one same-config `Client#multiple`, or crosses configs through an asynchronous process;
 - the selected consistency pattern and, for a Dynamic Consistency Boundary, its exact event-type/marker selector;
 - duplicate, retry, and concurrency behavior;
 - executable Given/When/Then examples for success and every material invariant, plus retry/concurrency cases where relevant;
@@ -79,7 +79,7 @@ When changing an implemented event, update the model and affected scenarios firs
 - Flag fields without an authoritative source.
 - Flag automations hidden inside projectors or reducers.
 - Flag any domain event appended or decided outside a command execution.
-- Flag events without exactly one producing command, and commands whose multi-event write plan is not atomic through `Client#multiple`.
+- Flag events without exactly one producing command, single-stream plans without an expected revision covering the read, and multi-stream plans that do not use same-config `Client#multiple` or an explicit asynchronous boundary.
 - Flag cross-boundary synchronous assumptions and missing eventual-consistency behavior.
 - Flag invariants that depend on a projection or broad scan when a static stream or precisely selected Dynamic Consistency Boundary is required.
 - Flag payload scans used only to differentiate events that could be selected by a stable marker, and flag multi-marker selectors that incorrectly assume AND semantics instead of using a compound marker.

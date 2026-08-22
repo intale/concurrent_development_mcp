@@ -51,7 +51,7 @@ Create one record for every state-changing decision:
 | Required view/state | Exact information used to decide |
 | Preconditions | Authorization and business invariants |
 | Resulting facts | Ordered event list, or no event for denial |
-| Write plan | Zero/one event append, or multi-event `Client#multiple` transaction |
+| Write plan | Single-stream expected-revision append (one or many events), same-config multi-stream `Client#multiple`, or asynchronous cross-config process |
 | Consistency | Atomic facts and boundaries crossed asynchronously |
 | Concurrency | Expected version, lock, uniqueness, or conflict rule |
 | Consistency pattern | Static stream, Dynamic Consistency Boundary, or explicit cross-boundary process |
@@ -100,7 +100,7 @@ decide(authoritative Given history/state, one When command)
   -> zero, one, or multiple Then events
 ```
 
-If the result contains multiple events, the implementation write plan uses one `PgEventstore::Client#multiple` transaction.
+Choose atomicity by consistency topology, not event count. Append one or many events to one stream with the expected revision covering the read. Use one `PgEventstore::Client#multiple` transaction when the command writes two or more streams in the same config. A boundary spanning configs/connections cannot use `multiple` and must coordinate asynchronously.
 
 ## 7. Given/When/Then scenario format
 

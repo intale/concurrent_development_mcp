@@ -13,7 +13,7 @@ Implement an accepted Event Model as an explicitly separated event-sourced write
 - Keep the read side available and eventually consistent. Serve an existing projection without comparing it with the write store, withholding stale content, or exposing a `pending_projection` gate.
 - Only a command decides domain events. A process manager consumes an event and invokes a deterministic command; a projector updates a disposable view; neither appends downstream domain events directly.
 - Put MCP Tasks and their authoritative lifecycle in the write side. Task polling reads task facts from `pg_eventstore`, never a projection. Keep ordinary query tools on the read side.
-- For explicit expected-revision writes outside `Client#multiple`, bound public `WrongExpectedRevision` retries, reread and re-decide with stable logical IDs/times, and return a typed retryable outcome after exhaustion. Do not reinterpret or wrap `Client#multiple`'s internal serialization/deadlock transaction restarts as public retries.
+- Prefer optimistic expected revision for a one-stream read/decide/write or whenever read and write cannot share a transaction. Bound public `WrongExpectedRevision` retries, reread and re-decide with stable logical IDs/times, and return a typed retryable outcome after exhaustion. Use `Client#multiple` only for two-or-more-stream consistency within one event-store config; do not wrap its internal transaction restarts.
 - Keep the composition root as the only place that wires across sides. Do not hide cross-side access behind a shared repository or generic service.
 
 Before moving or adding application code, read [references/module-boundaries.md](references/module-boundaries.md). When implementing commands, subscriptions, Tasks, or schemas, also read [references/implementation-patterns.md](references/implementation-patterns.md). Before writing or reorganizing tests, read [references/testing.md](references/testing.md).
@@ -23,7 +23,7 @@ Before moving or adding application code, read [references/module-boundaries.md]
 1. Link the slice to accepted Event Modeling artifacts, decisions, GWT scenario IDs, and its selected consistency boundary.
 2. Classify every class as shared, write, read, process, MCP transport, or composition root; correct dependency violations before adding behavior.
 3. Define strict dry-rb input, command, event, and persisted protocol schemas. Use RBS—not internal runtime class guards—for trusted internal method contracts.
-4. Implement pure reducers/deciders, then the bounded event-store operation and finite conflict translation. Persist a command's multi-event plan atomically with `PgEventstore::Client#multiple`.
+4. Implement pure reducers/deciders, then the bounded event-store operation and finite conflict translation. Use optimistic locking for one stream, same-config `Client#multiple` for two or more streams, and an explicit asynchronous process across configs.
 5. Implement process managers and projectors as separate subscribers with stable, unique `(subscription_set, subscription_name)` identities.
 6. Expose the behavior through MCP. Mutations create durable Tasks before returning a handle; queries serve the latest read-side state without write-side freshness checks.
 7. Verify the acceptance invariant through real MCP, PostgreSQL, and `pg_eventstore`; verify lower layers through RSpec and RBS instrumentation.

@@ -25,7 +25,7 @@ For each candidate DCB:
 4. Show how command data produces the dynamic selector. Normalize keys before selection.
 5. Prove overlap: any two commands that could jointly violate the invariant must select at least one common serialized event set/partition.
 6. State the maximum selected keys/events and reject or partition commands that exceed the bound.
-7. Define the zero/one/many events returned by the command decision. If it returns multiple events, append the validated plan atomically through `Client#multiple`.
+7. Define the zero/one/many events returned by the command decision. Choose expected revision for one stream and same-config `Client#multiple` for two or more streams; a cross-config plan requires an asynchronous boundary.
 8. Define retry behavior: reread the boundary, rebuild state, and reevaluate the command; never reuse mutable event instances.
 9. Add Given/When/Then concurrency examples that demonstrate one winner or the intended compatible result.
 
@@ -54,6 +54,7 @@ When the application uses `pg_eventstore`:
 - remember that a marker list is matched with OR semantics. When the decision requires several dimensions simultaneously, derive one versioned compound marker from the complete normalized tuple and select by that marker; separate component markers do not express an AND condition;
 - use the same marker derivation for reads, writes, and expected-revision/DCB selectors, and retain the discriminating fields in the event payload as domain data rather than treating the marker as the only record of them;
 - do not pass per-stream expected revisions inside `multiple`;
+- use `multiple` only when every read/write shares one `pg_eventstore` config and therefore one database connection/transaction; it cannot make separate configs or distributed stores atomic;
 - do not consult Active Record projections to decide the invariant;
 - prepare stable logical IDs and times outside the retryable block, then instantiate fresh events from those values on every attempt;
 - assume the serializable block can rerun, including when a new event-type partition is created;
@@ -73,7 +74,7 @@ Treat a compound marker as a third marker representing the conjunction of its co
 
 The purpose distinguishes different conjunction meanings even when their components happen to match. Do not nest compound markers as components. Persist or otherwise freeze the document schema and canonicalization rules so every writer, reader, and revision selector derives identical marker bytes.
 
-Use a static stream instead when its revision already provides the needed contention boundary. Use `multiple` across a small fixed set of streams when atomicity spans those streams but no dynamic event selector is needed.
+Use a static stream and optimistic expected revision when its revision provides the contention boundary. This is preferred for a single-stream decision and also applies when the read and write cannot share one transaction block. Use `multiple` across a small fixed set of streams only when they share one config/connection and atomicity spans them but no dynamic event selector is needed.
 
 ## Required proof scenarios
 
