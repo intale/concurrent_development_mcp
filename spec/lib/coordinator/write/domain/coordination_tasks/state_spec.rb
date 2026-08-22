@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 RSpec.describe Coordinator::Write::Domain::CoordinationTasks::State do
-  let(:task_id) { "A" * 43 }
+  let(:task_id) { "01919191-9191-7191-8191-919191919191" }
   let(:submitted) { task_submitted(task_id:) }
 
   it "folds a completed Task from its bounded authoritative history" do

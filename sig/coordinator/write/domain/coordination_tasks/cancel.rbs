@@ -3,7 +3,7 @@ module Coordinator
     module Domain
       module CoordinationTasks
         class Cancel
-          def call: (state: State, command: Commands::CancelCoordinationTask) -> untyped
+          def call: (state: State, command: Commands::CancelCoordinationTask) -> Dry::Monads::Result
         end
       end
     end

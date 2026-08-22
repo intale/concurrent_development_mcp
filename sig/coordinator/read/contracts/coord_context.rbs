@@ -4,7 +4,7 @@ module Coordinator
       class CoordContext
         ROOT_KEYS: Array[Symbol]
 
-        def call: (command_input input) -> untyped
+        def call: (command_input input) -> Dry::Validation::Result
       end
     end
   end

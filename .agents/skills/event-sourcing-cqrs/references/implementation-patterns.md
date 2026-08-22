@@ -38,7 +38,7 @@ tasks/get
 ```
 
 - Return `CreateTaskResult` only after `TaskSubmitted` is committed and `tasks/get` can resolve it.
-- Use a high-entropy server-generated Task ID and treat it as a bearer handle. Do not provide task enumeration.
+- Use the modeled server-generated Task ID (UUIDv7 in this application), treat it as a bearer handle, and do not provide task enumeration.
 - Store only modeled request data and outcome facts, not raw conversations or incidental transport traffic.
 - The executor is a process manager: it invokes commands and never appends target or task events directly.
 - Derive deterministic target command identity from the Task fact so delivery retries do not duplicate a logical command.

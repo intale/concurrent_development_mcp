@@ -4,7 +4,7 @@ module Coordinator
       module ChangeSets
         class DeclareWorkItemDependency
           def initialize: (?stream_factory: StreamFactory) -> void
-          def call: (state: State, command: Commands::DeclareWorkItemDependency, occurred_at: String) -> untyped
+          def call: (state: State, command: Commands::DeclareWorkItemDependency, occurred_at: String) -> Dry::Monads::Result
         end
       end
     end

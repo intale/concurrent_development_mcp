@@ -15,7 +15,7 @@ RSpec.describe Coordinator::Write::Contracts::CoordinationTaskSubmission do
   let(:digest) { Coordinator::Write::CommandInputDigest.new }
   let(:event) do
     Coordinator::Write::Events::CoordinationTaskSubmittedV1.new(
-      task_id: "A" * 43,
+      task_id: "01919191-9191-7191-8191-919191919191",
       tool_name: "change_set_create",
       command_id: target_command.command_id,
       canonical_input_digest: digest.call(target_command),

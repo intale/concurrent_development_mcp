@@ -4,7 +4,7 @@ module Coordinator
       class PrepareCreateWorkItem
         def initialize: (?contract: Contracts::CreateWorkItem) -> void
         %a{rbs:test:skip}
-        def call: (command_input input) -> untyped
+        def call: (command_input input) -> Dry::Monads::Result
       end
     end
   end

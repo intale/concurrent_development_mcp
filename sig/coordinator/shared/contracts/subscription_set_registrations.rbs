@@ -2,7 +2,7 @@ module Coordinator
   module Shared
     module Contracts
       class SubscriptionSetRegistrations
-        def call: (Hash[String | Symbol, untyped]) -> untyped
+        def call: (Hash[String | Symbol, untyped]) -> Dry::Validation::Result
       end
     end
   end

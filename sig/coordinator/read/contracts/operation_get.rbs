@@ -2,7 +2,7 @@ module Coordinator
   module Read
     module Contracts
       class OperationGet
-        def call: (command_input input) -> untyped
+        def call: (command_input input) -> Dry::Validation::Result
       end
     end
   end

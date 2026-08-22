@@ -4,7 +4,7 @@ module Coordinator
       class PrepareAcquireWorkItem
         def initialize: (?contract: Contracts::AcquireWorkItem, ?git_object_ids_contract: Contracts::GitObjectIds) -> void
         %a{rbs:test:skip}
-        def call: (command_input input) -> untyped
+        def call: (command_input input) -> Dry::Monads::Result
       end
     end
   end

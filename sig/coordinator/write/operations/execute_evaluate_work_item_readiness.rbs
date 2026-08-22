@@ -4,7 +4,7 @@ module Coordinator
       class ExecuteEvaluateWorkItemReadiness
         def initialize: (event_store: _EventStore, ?decider: Domain::WorkItems::EvaluateReadiness, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?invocation_contract: Contracts::ReadinessInvocation, ?event_plan_contract: Contracts::ReadinessEventPlan) -> void
         %a{rbs:test:skip}
-        def call: (ReadinessInvocation invocation) -> untyped
+        def call: (ReadinessInvocation invocation) -> Dry::Monads::Result
       end
     end
   end

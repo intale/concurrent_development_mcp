@@ -1,0 +1,11 @@
+module Dry
+  module Validation
+    class Result
+      def success?: (*untyped, **untyped) -> untyped
+      def failure?: (*untyped, **untyped) -> untyped
+      def errors: (*untyped, **untyped) -> untyped
+      def to_h: (*untyped, **untyped) -> untyped
+      def []: (*untyped, **untyped) -> untyped
+    end
+  end
+end

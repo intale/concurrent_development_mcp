@@ -2,7 +2,7 @@ module Coordinator
   module Processes
     module Contracts
       class ChangeSetActivationSourceEvent
-        def call: ({ event: PgEventstore::Event } input) -> untyped
+        def call: ({ event: PgEventstore::Event } input) -> Dry::Validation::Result
       end
     end
   end

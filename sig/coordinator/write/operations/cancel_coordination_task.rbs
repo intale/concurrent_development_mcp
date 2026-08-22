@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Operations
+      class CancelCoordinationTask
+        def initialize: (transition: ApplyCoordinationTaskTransition, ?decider: Domain::CoordinationTasks::Cancel, ?clock: Shared::SystemClock) -> void
+        def call: (task_id: String) -> Dry::Monads::Result
+      end
+    end
+  end
+end

@@ -4,7 +4,7 @@ module Coordinator
       module WorkItems
         class Acquire
           def initialize: (?stream_factory: StreamFactory) -> void
-          def call: (change_set_state: ChangeSets::State, work_item_state: State, attempt_state: Attempts::State, command: Commands::AcquireWorkItem, occurred_at: String) -> untyped
+          def call: (change_set_state: ChangeSets::State, work_item_state: State, attempt_state: Attempts::State, command: Commands::AcquireWorkItem, occurred_at: String) -> Dry::Monads::Result
         end
       end
     end

@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExpectedRevisionRetry
+        MAX_ATTEMPTS: Integer
+
+        def initialize: (?maximum_attempts: Integer) -> void
+        def call: (task_id: String) { () -> Dry::Monads::Result } -> Dry::Monads::Result
+      end
+    end
+  end
+end

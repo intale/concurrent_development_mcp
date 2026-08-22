@@ -1,0 +1,23 @@
+module Coordinator
+  module Write
+    module Operations
+      class ApplyCoordinationTaskTransition
+        def initialize: (
+          event_store: _EventStore,
+          ?loader: Tasks::Loader,
+          ?stream_factory: StreamFactory,
+          ?event_factory: EventFactory,
+          ?id_generator: Shared::IdGenerator,
+          ?retry_policy: ExpectedRevisionRetry
+        ) -> void
+
+        def call: (
+          command: lifecycle_command,
+          decider: _CoordinationTaskDecider,
+          transition_name: String,
+          ?caused_by: PgEventstore::Event?
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

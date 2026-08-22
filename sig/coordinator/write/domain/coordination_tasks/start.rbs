@@ -3,7 +3,7 @@ module Coordinator
     module Domain
       module CoordinationTasks
         class Start
-          def call: (state: State, command: Commands::StartCoordinationTask) -> untyped
+          def call: (state: State, command: Commands::StartCoordinationTask) -> Dry::Monads::Result
         end
       end
     end

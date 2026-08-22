@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 RSpec.describe "Coordination Task command transitions" do
-  let(:task_id) { "A" * 43 }
+  let(:task_id) { "01919191-9191-7191-8191-919191919191" }
   let(:submitted) { submission_event(task_id:) }
   let(:initial) { Coordinator::Write::Domain::CoordinationTasks::State.initial }
 

@@ -4,7 +4,7 @@ module Coordinator
       module ChangeSets
         class Activate
           def initialize: (?stream_factory: StreamFactory) -> void
-          def call: (state: State, command: Commands::ActivateChangeSet, occurred_at: String) -> untyped
+          def call: (state: State, command: Commands::ActivateChangeSet, occurred_at: String) -> Dry::Monads::Result
         end
       end
     end

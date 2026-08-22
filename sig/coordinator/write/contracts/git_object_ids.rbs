@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Contracts
       class GitObjectIds
-        def call: (command_input) -> untyped
+        def call: (command_input) -> Dry::Validation::Result
       end
     end
   end

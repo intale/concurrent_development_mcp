@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Tasks
+      class Snapshot < Shared::Value
+        def state: () -> Domain::CoordinationTasks::State
+        def latest_revision: () -> Integer?
+      end
+    end
+  end
+end

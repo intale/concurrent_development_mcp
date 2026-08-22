@@ -7,6 +7,13 @@ module Coordinator
                                 Commands::DeclareWorkItemDependency |
                                 Commands::ActivateChangeSet |
                                 Commands::AcquireWorkItem
+    type lifecycle_command = Commands::StartCoordinationTask |
+                             Commands::RecordCoordinationTaskOutcome |
+                             Commands::CancelCoordinationTask
+
+    interface _CoordinationTaskDecider
+      def call: (state: Domain::CoordinationTasks::State, command: lifecycle_command) -> Dry::Monads::Result
+    end
 
     interface _EventStore
       def multiple: [Result] () { () -> Result } -> Result

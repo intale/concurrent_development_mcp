@@ -3,7 +3,7 @@ module Coordinator
     module Domain
       module CoordinationTasks
         class RecordOutcome
-          def call: (state: State, command: Commands::RecordCoordinationTaskOutcome) -> untyped
+          def call: (state: State, command: Commands::RecordCoordinationTaskOutcome) -> Dry::Monads::Result
         end
       end
     end

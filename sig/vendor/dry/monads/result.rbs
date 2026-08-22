@@ -1,0 +1,14 @@
+module Dry
+  module Monads
+    class Result
+      def success?: (*untyped, **untyped) -> untyped
+      def failure?: (*untyped, **untyped) -> untyped
+      def value!: (*untyped, **untyped) -> untyped
+      def failure: (*untyped, **untyped) -> untyped
+      def value_or: (*untyped, **untyped) { (*untyped) -> untyped } -> untyped
+      def bind: (*untyped, **untyped) { (*untyped) -> untyped } -> untyped
+      def fmap: (*untyped, **untyped) { (*untyped) -> untyped } -> untyped
+      def or: (*untyped, **untyped) { (*untyped) -> untyped } -> untyped
+    end
+  end
+end
