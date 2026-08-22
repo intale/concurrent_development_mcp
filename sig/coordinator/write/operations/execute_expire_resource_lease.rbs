@@ -18,7 +18,9 @@ module Coordinator
           ?event_plan_contract: Contracts::ResourceLeaseExpiryEventPlan
         ) -> void
 
-        def call: (Commands::ExpireResourceLease, caused_by: PgEventstore::Event) -> Dry::Monads::Result
+        %a{rbs:test:skip}
+        def call: (Commands::ExpireResourceLease command, caused_by: PgEventstore::Event) -> Dry::Monads::Result
+        def call_command: (Commands::ExpireResourceLease command, caused_by: PgEventstore::Event) -> Dry::Monads::Result
       end
     end
   end

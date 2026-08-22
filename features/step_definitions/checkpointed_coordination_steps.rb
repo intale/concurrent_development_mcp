@@ -854,3 +854,151 @@ Then("available context exposes the observed release without a freshness claim")
     "Released projection must not claim freshness or activity"
   )
 end
+
+When(
+  "agent {string} reserves {string} for {int} seconds at {string}"
+) do |agent_id, path, duration, started_at|
+  @expiry_predecessor = @lease_participants.find { _1.fetch(:agent_id) == agent_id }
+  assert_acceptance(@expiry_predecessor, "Unknown predecessor agent #{agent_id}")
+
+  @expiry_path = path
+  @expiry_started_at = Time.iso8601(started_at)
+  @expiry_predecessor_command_id = "cmd-cuc-expiry-predecessor"
+  @expiry_predecessor_task_id = Timecop.freeze(@expiry_started_at) do
+    task_id = call_tool(
+      "write_set_reserve",
+      {
+        command_id: @expiry_predecessor_command_id,
+        actor: { kind: "agent", id: agent_id },
+        change_set_id: @lease_change_set_id,
+        work_item_id: @expiry_predecessor.fetch(:work_item_id),
+        attempt_id: @expiry_predecessor.fetch(:attempt_id),
+        repository_id: "billing",
+        base_commit_oid: "a" * 40,
+        resources: [ { kind: "file", path: } ],
+        lease_duration_seconds: duration
+      }
+    ).dig("result", "taskId")
+    execute_task(task_id)
+    task_id
+  end
+  @expiry_predecessor_state = task_request("tasks/get", @expiry_predecessor_task_id)
+  @expiry_predecessor_result = @expiry_predecessor_state.dig(
+    "result", "result", "structuredContent", "data"
+  )
+  @expiry_source = lease_events(path).sole
+end
+
+When("that reservation reaches the available read side") do
+  project_attempt_context(
+    change_set_id: @lease_change_set_id,
+    work_item_id: @expiry_predecessor.fetch(:work_item_id),
+    attempt_id: @expiry_predecessor.fetch(:attempt_id)
+  )
+  @expiry_predecessor_context = call_tool(
+    "coord_context",
+    { attempt_id: @expiry_predecessor.fetch(:attempt_id) }
+  )
+end
+
+When(
+  "after its deadline agent {string} reserves the same file before the expiry policy runs"
+) do |agent_id|
+  @expiry_successor = @lease_participants.find { _1.fetch(:agent_id) == agent_id }
+  assert_acceptance(@expiry_successor, "Unknown successor agent #{agent_id}")
+
+  @expiry_successor_task_id = Timecop.freeze(@expiry_started_at + 31) do
+    task_id = call_tool(
+      "write_set_reserve",
+      {
+        command_id: "cmd-cuc-expiry-successor",
+        actor: { kind: "agent", id: agent_id },
+        change_set_id: @lease_change_set_id,
+        work_item_id: @expiry_successor.fetch(:work_item_id),
+        attempt_id: @expiry_successor.fetch(:attempt_id),
+        repository_id: "billing",
+        base_commit_oid: "a" * 40,
+        resources: [ { kind: "file", path: @expiry_path } ],
+        lease_duration_seconds: 300
+      }
+    ).dig("result", "taskId")
+    execute_task(task_id)
+    task_id
+  end
+  @expiry_successor_state = task_request("tasks/get", @expiry_successor_task_id)
+  @expiry_successor_result = @expiry_successor_state.dig(
+    "result", "result", "structuredContent", "data"
+  )
+end
+
+Then("the successor reservation Task succeeds with the next fencing token") do
+  result = @expiry_successor_state.dig("result", "result")
+  reference = @expiry_successor_result.fetch("resources").sole
+
+  assert_acceptance_equal("completed", @expiry_successor_state.dig("result", "status"), "Successor Task")
+  assert_acceptance_equal(false, result.fetch("isError"), "Successor tool error flag")
+  assert_acceptance_equal(2, reference.fetch("fencing_token"), "Successor fencing token")
+  assert_acceptance_equal(@expiry_path, reference.fetch("resource_path"), "Successor resource")
+end
+
+Then("the successor was admitted without an expiry audit fact") do
+  events = lease_events(@expiry_path)
+
+  assert_acceptance_equal(
+    [ "ResourceLeaseAcquired", "ResourceLeaseAcquired" ],
+    events.map(&:type),
+    "Lease lifecycle before the old timer"
+  )
+  assert_acceptance_equal([ 1, 2 ], events.map { _1.data.fetch("fencing_token") }, "Fencing history")
+end
+
+When("the expired predecessor timer is handled") do
+  source = Coordinator::Container["lease_expiry_source_builder"].call(@expiry_source)
+  locator = Coordinator::Processes::LeaseExpirySourceLocatorV1.from_source(source)
+  @expiry_policy_result = Timecop.freeze(@expiry_started_at + 32) do
+    Coordinator::Container["lease_expiry_policy"].call(locator)
+  end
+end
+
+Then("the timer is superseded and cannot affect the successor") do
+  assert_acceptance(@expiry_policy_result.success?, "The old timer policy failed unexpectedly")
+  assert_acceptance_equal(
+    "lease_observation_superseded",
+    @expiry_policy_result.value!.outcome,
+    "Old timer outcome"
+  )
+  assert_acceptance_equal(
+    [ "ResourceLeaseAcquired", "ResourceLeaseAcquired" ],
+    lease_events(@expiry_path).map(&:type),
+    "Lease lifecycle after the old timer"
+  )
+  assert_acceptance_equal(
+    [],
+    command_events(@expiry_source.id),
+    "Superseded expiry command completion"
+  )
+end
+
+Then("the predecessor's older context remains available without a freshness claim") do
+  current = call_tool(
+    "coord_context",
+    { attempt_id: @expiry_predecessor.fetch(:attempt_id) }
+  )
+  previous_payload = @expiry_predecessor_context.dig("result", "structuredContent")
+  payload = current.dig("result", "structuredContent")
+  write_set = payload.dig("data", "context", "attempts", 0, "write_set")
+
+  assert_acceptance_equal("ok", payload.fetch("status"), "Elapsed predecessor context status")
+  assert_acceptance_equal(previous_payload.fetch("context_token"), payload.fetch("context_token"), "Context token")
+  assert_acceptance_equal(@expiry_path, write_set.fetch("resources").sole.fetch("resource_path"), "Observed file")
+  assert_acceptance_equal(
+    @expiry_predecessor_result.fetch("expires_at"),
+    write_set.fetch("expires_at"),
+    "Observed predecessor deadline"
+  )
+  assert_acceptance(
+    (write_set.keys & %w[active fresh pending]).empty?,
+    "Elapsed projection must not claim freshness or activity"
+  )
+  assert_acceptance(!payload.key?("projection_status"), "Elapsed context must not expose a projection gate")
+end

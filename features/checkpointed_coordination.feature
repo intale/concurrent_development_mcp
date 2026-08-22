@@ -89,3 +89,16 @@ Feature: Checkpointed cooperative coordination
       And the previous context remains available before release projection
       When the write-set release reaches the read side
       Then available context exposes the observed release without a freshness claim
+
+  Rule: Elapsed lease availability does not wait for expiry audit
+
+    Scenario: A successor reserves an elapsed file before the predecessor timer runs
+      Given agents "agent-a" and "agent-b" have active Attempts in ChangeSet "CS-CUC-EXPIRY"
+      When agent "agent-a" reserves "app/shared.rb" for 30 seconds at "2026-08-22T10:00:00Z"
+      And that reservation reaches the available read side
+      And after its deadline agent "agent-b" reserves the same file before the expiry policy runs
+      Then the successor reservation Task succeeds with the next fencing token
+      And the successor was admitted without an expiry audit fact
+      When the expired predecessor timer is handled
+      Then the timer is superseded and cannot affect the successor
+      And the predecessor's older context remains available without a freshness claim

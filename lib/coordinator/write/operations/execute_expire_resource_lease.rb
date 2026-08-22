@@ -32,9 +32,15 @@ module Coordinator::Write
       end
 
       def call(command, caused_by:)
-        prepared = prepare_logical_values(command)
+        step call_command(command, caused_by:)
+      end
 
-        step @event_store.multiple { execute_attempt(command:, prepared:, caused_by:) }
+      def call_command(command, caused_by:)
+        steps do
+          prepared = prepare_logical_values(command)
+
+          step @event_store.multiple { execute_attempt(command:, prepared:, caused_by:) }
+        end
       end
 
       private

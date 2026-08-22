@@ -168,7 +168,12 @@ module McpAcceptanceWorld
     event_store.read(
       streams.resource_lease(resource.resource_key_hash),
       Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "ResourceLeaseAcquired" ],
+        event_types: [
+          "ResourceLeaseAcquired",
+          "ResourceLeaseRenewed",
+          "ResourceLeaseReleased",
+          "ResourceLeaseExpired"
+        ],
         maximum_count: 10,
         direction: :asc
       )
