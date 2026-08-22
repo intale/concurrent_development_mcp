@@ -2,6 +2,8 @@ module Coordinator
   module Write
     class CommandInputDigest
       def initialize: (?canonical_json: Shared::CanonicalJson) -> void
+      def call: (coordination_command command) -> String
+      def document: (coordination_command command) -> CommandInputDocuments::value
       def create_change_set: (Commands::CreateChangeSet command) -> String
       def create_change_set_document: (Commands::CreateChangeSet command) -> CommandInputDocuments::CreateChangeSetV1
       def work_item_create: (Commands::CreateWorkItem command) -> String

@@ -1,6 +1,8 @@
 module Coordinator
   module Write
     module CommandInputDocuments
+      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1
+
       class ActorV1 < Shared::Value
         def actor_kind: () -> String
         def actor_id: () -> String

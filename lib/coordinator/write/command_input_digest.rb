@@ -6,6 +6,22 @@ module Coordinator::Write
       @canonical_json = canonical_json
     end
 
+    def call(command)
+      @canonical_json.sha256(document(command).to_h)
+    end
+
+    def document(command)
+      case command
+      when Commands::CreateChangeSet then create_change_set_document(command)
+      when Commands::CreateWorkItem then work_item_create_document(command)
+      when Commands::DeclareWorkItemDependency then work_item_dependency_declare_document(command)
+      when Commands::ActivateChangeSet then change_set_activate_document(command)
+      when Commands::AcquireWorkItem then work_item_acquire_document(command)
+      else
+        raise ArgumentError, "Unsupported coordination command: #{command.class.name}"
+      end
+    end
+
     def create_change_set(command)
       @canonical_json.sha256(create_change_set_document(command).to_h)
     end

@@ -1,0 +1,31 @@
+module Coordinator
+  module Write
+    module Domain
+      module CoordinationTasks
+        class State < Shared::Value
+          def self.initial: () -> State
+          def self.reduce: (Array[Events::Base] events, ?contract: Contracts::CoordinationTaskHistory) -> State
+
+          def task_id: () -> String?
+          def status: () -> String
+          def status_message: () -> String?
+          def tool_name: () -> String?
+          def command_id: () -> String?
+          def canonical_input_digest: () -> String?
+          def command_input: () -> CommandInputDocuments::value?
+          def created_at: () -> String?
+          def last_updated_at: () -> String?
+          def ttl_ms: () -> nil
+          def poll_interval_ms: () -> Integer?
+          def started: () -> bool
+          def cancellation_requested: () -> bool
+          def result: () -> Tasks::ToolResultV1?
+          def error: () -> Tasks::JsonRpcErrorV1?
+          def absent?: () -> bool
+          def terminal?: () -> bool
+          def apply: (Events::Base event) -> State
+        end
+      end
+    end
+  end
+end

@@ -1,0 +1,18 @@
+module Coordinator
+  module Write
+    module Tasks
+      class StructuredContentV1 < Shared::Value
+        type data = DomainErrorV1::domain_error | CommandReceiptData::value
+
+        def status: () -> String
+        def summary: () -> String
+        def command_id: () -> String?
+        def receipt: () -> String?
+        def context_token: () -> String?
+        def data: () -> data
+        def warnings: () -> Array[String]
+        def next_actions: () -> Array[NextAction]
+      end
+    end
+  end
+end

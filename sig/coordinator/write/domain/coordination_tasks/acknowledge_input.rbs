@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Domain
+      module CoordinationTasks
+        class AcknowledgeInput
+          def call: (state: State, command: Commands::AcknowledgeTaskInput) -> untyped
+        end
+      end
+    end
+  end
+end

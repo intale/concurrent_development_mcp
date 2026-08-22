@@ -65,10 +65,11 @@ module Coordinator::Write
       []
     end
 
-    def append(reference, events)
+    def append(reference, events, expected_revision: nil)
       stream = @pg_stream_factory.call(reference)
+      options = expected_revision.nil? ? {} : { expected_revision: }
 
-      @client.append_to_stream(stream, events)
+      @client.append_to_stream(stream, events, options:)
     end
   end
 end

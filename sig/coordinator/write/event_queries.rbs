@@ -2,6 +2,7 @@ module Coordinator
   module Write
     module EventQueries
       COMMAND_COMPLETION: EventReadCriteria
+      COORDINATION_TASK_HISTORY: EventReadCriteria
       CHANGE_SET_EXISTENCE: GroupedEventReadCriteria
       WORK_ITEM_EXISTENCE: GroupedEventReadCriteria
       CHANGE_SET_FOR_WORK_ITEM_CREATION: EventReadCriteria

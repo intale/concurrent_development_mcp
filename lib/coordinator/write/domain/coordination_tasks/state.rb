@@ -1,0 +1,109 @@
+# frozen_string_literal: true
+
+module Coordinator::Write
+  module Domain
+    module CoordinationTasks
+      class State < Value
+        attribute :task_id, Types::TaskId.optional
+        attribute :status, Types::String.enum("absent", "working", "completed", "failed", "cancelled")
+        attribute :status_message, Types::String.optional
+        attribute :tool_name, Types::Identifier.optional
+        attribute :command_id, Types::Identifier.optional
+        attribute :canonical_input_digest, Types::Sha256Digest.optional
+        attribute :command_input, CommandInputDocuments::Type.optional
+        attribute :created_at, Types::Timestamp.optional
+        attribute :last_updated_at, Types::Timestamp.optional
+        attribute :ttl_ms, Types::Nil
+        attribute :poll_interval_ms, Types::Integer.optional
+        attribute :started, Types::Strict::Bool
+        attribute :cancellation_requested, Types::Strict::Bool
+        attribute :result, Tasks::ToolResultV1.optional
+        attribute :error, Tasks::JsonRpcErrorV1.optional
+
+        def self.initial
+          new(
+            task_id: nil,
+            status: "absent",
+            status_message: nil,
+            tool_name: nil,
+            command_id: nil,
+            canonical_input_digest: nil,
+            command_input: nil,
+            created_at: nil,
+            last_updated_at: nil,
+            ttl_ms: nil,
+            poll_interval_ms: nil,
+            started: false,
+            cancellation_requested: false,
+            result: nil,
+            error: nil
+          )
+        end
+
+        def self.reduce(events, contract: Contracts::CoordinationTaskHistory.new)
+          validation = contract.call(events:)
+          raise InvalidCoordinationTaskHistory, validation.errors.to_h.inspect if validation.failure?
+
+          events.reduce(initial) { |state, event| state.apply(event) }
+        end
+
+        def absent?
+          status == "absent"
+        end
+
+        def terminal?
+          %w[completed failed cancelled].include?(status)
+        end
+
+        def apply(event)
+          attributes = case event
+          when Events::CoordinationTaskSubmittedV1
+                         {
+                           task_id: event.task_id,
+                           status: "working",
+                           status_message: nil,
+                           tool_name: event.tool_name,
+                           command_id: event.command_id,
+                           canonical_input_digest: event.canonical_input_digest,
+                           command_input: event.command_input,
+                           created_at: event.submitted_at,
+                           last_updated_at: event.submitted_at,
+                           ttl_ms: event.ttl_ms,
+                           poll_interval_ms: event.poll_interval_ms
+                         }
+          when Events::CoordinationTaskExecutionStartedV1
+                         { started: true, last_updated_at: event.started_at }
+          when Events::CoordinationTaskCancellationRequestedV1
+                         {
+                           cancellation_requested: true,
+                           status_message: "Cancellation requested; execution may still complete",
+                           last_updated_at: event.requested_at
+                         }
+          when Events::CoordinationTaskCompletedV1
+                         {
+                           status: "completed",
+                           status_message: nil,
+                           result: event.result,
+                           last_updated_at: event.completed_at
+                         }
+          when Events::CoordinationTaskFailedV1
+                         {
+                           status: "failed",
+                           status_message: event.error.message,
+                           error: event.error,
+                           last_updated_at: event.failed_at
+                         }
+          when Events::CoordinationTaskCancelledV1
+                         {
+                           status: "cancelled",
+                           status_message: "Cancelled before execution",
+                           last_updated_at: event.cancelled_at
+                         }
+          end
+
+          self.class.new(to_h.merge(attributes))
+        end
+      end
+    end
+  end
+end

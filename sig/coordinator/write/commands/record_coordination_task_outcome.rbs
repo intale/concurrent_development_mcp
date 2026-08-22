@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Commands
+      class RecordCoordinationTaskOutcome < Shared::Value
+        def task_id: () -> String
+        def outcome: () -> Tasks::OutcomeV1::value
+        def recorded_at: () -> String
+      end
+    end
+  end
+end

@@ -8,6 +8,19 @@ module Coordinator::Write
       direction: :desc
     )
 
+    COORDINATION_TASK_HISTORY = EventReadCriteria.new(
+      event_types: [
+        "CoordinationTaskSubmitted",
+        "CoordinationTaskExecutionStarted",
+        "CoordinationTaskCompleted",
+        "CoordinationTaskFailed",
+        "CoordinationTaskCancellationRequested",
+        "CoordinationTaskCancelled"
+      ],
+      maximum_count: 4,
+      direction: :asc
+    )
+
     CHANGE_SET_EXISTENCE = GroupedEventReadCriteria.new(
       event_types: [ "ChangeSetCreated" ],
       direction: :desc

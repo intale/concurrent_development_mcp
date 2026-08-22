@@ -1,0 +1,80 @@
+module Coordinator
+  module Write
+    module Tasks
+      module DomainErrorV1
+        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError
+
+        class ChangeSetDetails < Shared::Value
+          def change_set_id: () -> String
+        end
+
+        class ActivationDependencyDetails < Shared::Value
+          def change_set_id: () -> String
+          def dependency_id: () -> String
+        end
+
+        class WorkItemDetails < Shared::Value
+          def change_set_id: () -> String
+          def work_item_id: () -> String
+        end
+
+        class DependencyDetails < Shared::Value
+          def change_set_id: () -> String
+          def dependency_id: () -> String
+          def producer_work_item_id: () -> String
+          def consumer_work_item_id: () -> String
+        end
+
+        class AttemptDetails < Shared::Value
+          def change_set_id: () -> String
+          def work_item_id: () -> String
+          def attempt_id: () -> String
+        end
+
+        class CommandIdReusedDetails < Shared::Value
+          def command_id: () -> String
+          def existing_tool_name: () -> String
+          def existing_input_digest: () -> String
+          def requested_tool_name: () -> String
+          def requested_input_digest: () -> String
+        end
+
+        class ChangeSetError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> ChangeSetDetails
+        end
+
+        class ActivationDependencyError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> ActivationDependencyDetails
+        end
+
+        class WorkItemError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> WorkItemDetails
+        end
+
+        class DependencyError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> DependencyDetails
+        end
+
+        class AttemptError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> AttemptDetails
+        end
+
+        class CommandIdReusedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> CommandIdReusedDetails
+        end
+      end
+    end
+  end
+end

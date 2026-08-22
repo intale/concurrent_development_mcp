@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Tasks
+      class ToolResultV1 < Shared::Value
+        def content: () -> Array[TextContentV1]
+        def is_error: () -> bool
+        def structured_content: () -> StructuredContentV1
+      end
+    end
+  end
+end

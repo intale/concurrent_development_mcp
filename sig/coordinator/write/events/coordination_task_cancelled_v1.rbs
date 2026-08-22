@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Events
+      class CoordinationTaskCancelledV1 < Base
+        def task_id: () -> String
+        def reason: () -> String
+        def cancelled_at: () -> String
+      end
+    end
+  end
+end

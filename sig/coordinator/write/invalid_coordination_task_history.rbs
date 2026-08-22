@@ -1,0 +1,6 @@
+module Coordinator
+  module Write
+    class InvalidCoordinationTaskHistory < StandardError
+    end
+  end
+end

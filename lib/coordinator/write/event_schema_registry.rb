@@ -16,11 +16,22 @@ module Coordinator::Write
       [ "WorkItemMadeReady", 1 ] => Events::WorkItemMadeReadyV1,
       [ "WorkItemAcquired", 1 ] => Events::WorkItemAcquiredV1,
       [ "AttemptAuthorized", 1 ] => Events::AttemptAuthorizedV1,
-      [ "AttemptStarted", 1 ] => Events::AttemptStartedV1
+      [ "AttemptStarted", 1 ] => Events::AttemptStartedV1,
+      [ "CoordinationTaskSubmitted", 1 ] => Events::CoordinationTaskSubmittedV1,
+      [ "CoordinationTaskExecutionStarted", 1 ] => Events::CoordinationTaskExecutionStartedV1,
+      [ "CoordinationTaskCompleted", 1 ] => Events::CoordinationTaskCompletedV1,
+      [ "CoordinationTaskFailed", 1 ] => Events::CoordinationTaskFailedV1,
+      [ "CoordinationTaskCancellationRequested", 1 ] => Events::CoordinationTaskCancellationRequestedV1,
+      [ "CoordinationTaskCancelled", 1 ] => Events::CoordinationTaskCancelledV1
     }.freeze
 
-    def initialize(definitions: DEFAULT_DEFINITIONS)
+    DEFAULT_VALIDATORS = {
+      Events::CoordinationTaskSubmittedV1 => Contracts::CoordinationTaskSubmission.new
+    }.freeze
+
+    def initialize(definitions: DEFAULT_DEFINITIONS, validators: DEFAULT_VALIDATORS)
       @definitions = definitions.dup.freeze
+      @validators = validators.dup.freeze
     end
 
     def fetch(type:, schema_version:)
@@ -31,15 +42,26 @@ module Coordinator::Write
 
     def verify!(event)
       fetch(type: event.class.event_type, schema_version: event.class.schema_version)
+      validate!(event)
       event
     end
 
     def load(type:, schema_version:, data:)
       payload_class = fetch(type:, schema_version:)
-      payload_class.new(deep_symbolize(data))
+      payload = payload_class.new(deep_symbolize(data))
+      validate!(payload)
+      payload
     end
 
     private
+
+    def validate!(event)
+      validator = @validators[event.class]
+      return unless validator
+
+      result = validator.call(event:)
+      raise InvalidCoordinationTaskSubmission, result.errors.to_h.inspect if result.failure?
+    end
 
     def deep_symbolize(value)
       case value

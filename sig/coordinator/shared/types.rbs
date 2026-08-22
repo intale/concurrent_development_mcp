@@ -7,6 +7,7 @@ module Coordinator
       SHA256_DIGEST_PATTERN: Regexp
       TIMESTAMP_PATTERN: Regexp
       UUID_V7_PATTERN: Regexp
+      TASK_ID_PATTERN: Regexp
       MARKER_PURPOSE_PATTERN: Regexp
       MARKER_COMPONENT_PATTERN: Regexp
 
@@ -22,6 +23,7 @@ module Coordinator
       Sha256Digest: untyped
       Timestamp: untyped
       UuidV7: untyped
+      TaskId: untyped
       Marker: untyped
       MarkerPurpose: untyped
       MarkerComponent: untyped

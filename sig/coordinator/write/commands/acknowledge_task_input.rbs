@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Commands
+      class AcknowledgeTaskInput < Shared::Value
+        def task_id: () -> String
+      end
+    end
+  end
+end

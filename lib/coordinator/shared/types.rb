@@ -10,6 +10,7 @@ module Coordinator::Shared
     SHA256_DIGEST_PATTERN = /\Asha256:[0-9a-f]{64}\z/
     TIMESTAMP_PATTERN = /\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z\z/
     UUID_V7_PATTERN = /\A[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/
+    TASK_ID_PATTERN = /\A[A-Za-z0-9_-]{43}\z/
     MARKER_PURPOSE_PATTERN = /\A[a-z][a-z0-9-]{0,63}\z/
     MARKER_COMPONENT_PATTERN = /\A(?!compound:)[^\u0000\r\n]{1,512}\z/
 
@@ -44,6 +45,7 @@ module Coordinator::Shared
     Sha256Digest = String.constrained(format: SHA256_DIGEST_PATTERN)
     Timestamp = String.constrained(format: TIMESTAMP_PATTERN)
     UuidV7 = String.constrained(format: UUID_V7_PATTERN)
+    TaskId = String.constrained(format: TASK_ID_PATTERN)
     Marker = String.constrained(min_size: 1, max_size: 512)
     MarkerPurpose = String.constrained(format: MARKER_PURPOSE_PATTERN)
     MarkerComponent = String.constrained(format: MARKER_COMPONENT_PATTERN)

@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     class EventSchemaRegistry
-      def initialize: (?definitions: untyped) -> void
+      def initialize: (?definitions: untyped, ?validators: untyped) -> void
       def fetch: (type: String, schema_version: Integer) -> singleton(Events::Base)
       def verify!: (Events::Base event) -> Events::Base
       def load: (type: String, schema_version: Integer, data: event_data) -> Events::Base

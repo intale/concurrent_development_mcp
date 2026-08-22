@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Commands
+      class StartCoordinationTask < Shared::Value
+        def task_id: () -> String
+        def started_at: () -> String
+      end
+    end
+  end
+end

@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Domain
+      module CoordinationTasks
+        class Start
+          def call: (state: State, command: Commands::StartCoordinationTask) -> untyped
+        end
+      end
+    end
+  end
+end

@@ -83,5 +83,11 @@ module Coordinator::Write
       attribute :tool_name, Types::String.enum("work_item_acquire")
       attribute :input, AcquireWorkItemInputV1
     end
+
+    Type = CreateChangeSetV1 |
+           CreateWorkItemV1 |
+           DeclareWorkItemDependencyV1 |
+           ActivateChangeSetV1 |
+           AcquireWorkItemV1
   end
 end

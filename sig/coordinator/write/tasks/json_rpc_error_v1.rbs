@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Tasks
+      class JsonRpcErrorV1 < Shared::Value
+        def code: () -> Integer
+        def message: () -> String
+      end
+    end
+  end
+end

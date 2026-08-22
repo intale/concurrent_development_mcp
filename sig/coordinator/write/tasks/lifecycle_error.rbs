@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Tasks
+      class LifecycleError < Shared::Value
+        def code: () -> Symbol
+        def message: () -> String
+        def task_id: () -> String
+      end
+    end
+  end
+end

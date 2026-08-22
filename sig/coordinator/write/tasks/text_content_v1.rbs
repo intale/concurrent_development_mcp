@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Tasks
+      class TextContentV1 < Shared::Value
+        def type: () -> String
+        def text: () -> String
+      end
+    end
+  end
+end

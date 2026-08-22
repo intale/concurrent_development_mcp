@@ -1,0 +1,7 @@
+module Coordinator
+  module Write
+    class TaskIdGenerator
+      def call: () -> String
+    end
+  end
+end

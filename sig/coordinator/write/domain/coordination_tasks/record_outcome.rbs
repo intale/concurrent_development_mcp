@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Domain
+      module CoordinationTasks
+        class RecordOutcome
+          def call: (state: State, command: Commands::RecordCoordinationTaskOutcome) -> untyped
+        end
+      end
+    end
+  end
+end

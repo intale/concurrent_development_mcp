@@ -6,6 +6,10 @@ module Coordinator::Write
       StreamReference.new(context: "CoordinatorControl", stream_name: "Command", stream_id: command_id)
     end
 
+    def coordination_task(task_id)
+      StreamReference.new(context: "CoordinatorControl", stream_name: "CoordinationTask", stream_id: task_id)
+    end
+
     def change_set(change_set_id)
       StreamReference.new(
         context: "DevelopmentPlanning",
