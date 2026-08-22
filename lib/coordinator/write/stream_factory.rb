@@ -41,5 +41,13 @@ module Coordinator::Write
         stream_id: resource_key_hash
       )
     end
+
+    def conversation(conversation_id)
+      StreamReference.new(
+        context: "HumanGuidance",
+        stream_name: "Conversation",
+        stream_id: conversation_id
+      )
+    end
   end
 end

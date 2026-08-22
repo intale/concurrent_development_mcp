@@ -14,12 +14,18 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       pull_interval: 0.2
     )
   end
+  let(:utterance_registration) do
+    Coordinator::Read::Subscriptions::UserUtterances.new(
+      handler: Coordinator::Read::Projectors::UserUtterancesV1.new,
+      pull_interval: 0.2
+    )
+  end
 
-  it "stacks two unique durable subscriptions on one read-model manager" do
+  it "stacks three unique durable subscriptions on one read-model manager" do
     subscription_set = build_set
 
     expect(subscription_set.subscription_names).to eq(
-      [ "command-receipts-v1", "coord-context-v1" ]
+      [ "command-receipts-v1", "coord-context-v1", "user-utterances-v1" ]
     )
     expect(context_registration.definition.identity.to_h).to eq(
       set_name: "coordinator-read-models-v1",
@@ -29,9 +35,13 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       set_name: "coordinator-read-models-v1",
       subscription_name: "command-receipts-v1"
     )
+    expect(utterance_registration.definition.identity.to_h).to eq(
+      set_name: "coordinator-read-models-v1",
+      subscription_name: "user-utterances-v1"
+    )
   end
 
-  it "runs both projections through a real filtered pg_eventstore subscription set" do
+  it "runs all projections through a real filtered pg_eventstore subscription set" do
     subscription_set = build_set
 
     begin
@@ -43,15 +53,33 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         goal: "Exercise both read models",
         acceptance_criteria: [ "Both subscriptions advance" ]
       ).value!
+      Coordinator::Write::Operations::ExecuteRecordGuidance.new(event_store:).call(
+        command_id: "cmd-subscription-guidance",
+        actor: { kind: "agent", id: "host-1" },
+        message_id: "M-subscription",
+        conversation_id: "C-subscription",
+        source: "mcp_client",
+        text: "Project attributed guidance evidence.",
+        anchors: {
+          repository_ids: [],
+          change_set_id: nil,
+          work_item_id: nil,
+          attempt_id: nil
+        }
+      ).value!
 
       wait_for(subscription_set, "coord-context-v1", minimum: 2)
-      wait_for(subscription_set, "command-receipts-v1", minimum: 1)
+      wait_for(subscription_set, "command-receipts-v1", minimum: 2)
+      wait_for(subscription_set, "user-utterances-v1", minimum: 1)
 
       expect(Coordinator::Read::CoordContext.find("CS-SUB-100").document).to include(
         "schema" => "coord-context/v1"
       )
       expect(Coordinator::Read::CommandReceipt.find("cmd-subscription-100").tool_name).to eq(
         "change_set_create"
+      )
+      expect(Coordinator::Read::UserUtterance.find("M-subscription").policy_status).to eq(
+        "evidence_only"
       )
     ensure
       subscription_set.stop
@@ -64,7 +92,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
     )
     described_class.new(
       manager:,
-      registrations: [ context_registration, receipt_registration ]
+      registrations: [ context_registration, receipt_registration, utterance_registration ]
     )
   end
 

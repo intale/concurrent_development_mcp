@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     class NextAction < Shared::Value
-      type arguments = ChangeSetArguments | AttemptArguments
+      type arguments = ChangeSetArguments | AttemptArguments | GuidanceArguments
 
       class ChangeSetArguments < Shared::Value
         def change_set_id: () -> String
@@ -11,6 +11,10 @@ module Coordinator
         def change_set_id: () -> String
         def work_item_id: () -> String
         def attempt_id: () -> String
+      end
+
+      class GuidanceArguments < Shared::Value
+        def message_id: () -> String
       end
 
       def tool: () -> String

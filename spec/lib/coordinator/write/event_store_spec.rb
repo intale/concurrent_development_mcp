@@ -93,6 +93,22 @@ RSpec.describe Coordinator::Write::EventStore, :event_store do
     expect(event_store.read_marked(stream, criteria).map(&:id)).to eq([ target.id ])
   end
 
+  it "reads one globally marked fact only within the declared context, stream name, and types" do
+    target = build_event(type: "UserUtteranceRecorded", markers: [ "message:M-real-store" ])
+    event_store.append(
+      Coordinator::Write::StreamFactory.new.conversation("C-real-store"),
+      [ target ]
+    )
+    event_store.append(
+      stream,
+      [ build_event(type: "UserUtteranceRecorded", markers: [ "message:M-real-store" ]) ]
+    )
+
+    criteria = Coordinator::Write::EventQueries.guidance_message("message:M-real-store")
+
+    expect(event_store.read_global_marked(criteria).map(&:id)).to eq([ target.id ])
+  end
+
   it "commits all real requests in one multiple transaction" do
     result = event_store.multiple do
       event_store.append(stream, [ event ])

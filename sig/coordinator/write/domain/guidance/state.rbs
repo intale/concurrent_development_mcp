@@ -1,0 +1,17 @@
+module Coordinator
+  module Write
+    module Domain
+      module Guidance
+        class State < Shared::Value
+          EVENT_CLASSES: Array[singleton(Events::UserUtteranceRecordedV1) | singleton(Events::UserUtteranceForwardedByAgentV1)]
+
+          def message_id: () -> String?
+          def self.initial: () -> State
+          def self.reduce: (Array[Events::UserUtteranceRecordedV1 | Events::UserUtteranceForwardedByAgentV1]) -> State
+          def absent?: () -> bool
+          def apply: (Events::UserUtteranceRecordedV1 | Events::UserUtteranceForwardedByAgentV1) -> State
+        end
+      end
+    end
+  end
+end

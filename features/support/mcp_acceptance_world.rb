@@ -158,6 +158,22 @@ module McpAcceptanceWorld
     )
   end
 
+  def guidance_events(conversation_id)
+    event_store.read(
+      streams.conversation(conversation_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: Coordinator::Write::EventQueries::GUIDANCE_MESSAGE_EVENT_TYPES,
+        maximum_count: 10,
+        direction: :asc
+      )
+    )
+  end
+
+  def project_guidance(conversation_id)
+    projector = Coordinator::Container["projectors.user_utterances_v1"]
+    guidance_events(conversation_id).each { projector.call(_1) }
+  end
+
   def lease_events(path)
     resource = Coordinator::Write::FileResourceNormalizer.new.call(
       repository_id: "billing",

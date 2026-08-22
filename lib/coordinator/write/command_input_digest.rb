@@ -21,6 +21,7 @@ module Coordinator::Write
       when Commands::ExpandWriteSet then write_set_expand_document(command)
       when Commands::RenewLeaseSet then lease_renew_document(command)
       when Commands::ReleaseLeaseSet then lease_release_document(command)
+      when Commands::RecordGuidance then guidance_record_document(command)
       when Commands::ExpireResourceLease then lease_expire_policy_document(command)
       else
         raise ArgumentError, "Unsupported coordination command: #{command.class.name}"
@@ -232,6 +233,26 @@ module Coordinator::Write
           lease_set_id: command.lease_set_id,
           fencing_token: command.fencing_token,
           expected_expires_at: command.expected_expires_at
+        )
+      )
+    end
+
+    def guidance_record(command)
+      @canonical_json.sha256(guidance_record_document(command).to_h)
+    end
+
+    def guidance_record_document(command)
+      CommandInputDocuments::RecordGuidanceV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "guidance_record",
+        input: CommandInputDocuments::RecordGuidanceInputV1.new(
+          actor: actor_document(command.actor),
+          message_id: command.message_id,
+          conversation_id: command.conversation_id,
+          source: command.source,
+          text: command.text,
+          anchors: CommandInputDocuments::GuidanceAnchorsV1.new(command.anchors.to_h)
         )
       )
     end

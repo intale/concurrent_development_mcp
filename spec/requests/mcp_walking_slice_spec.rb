@@ -30,6 +30,7 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
     expect(tools.map { _1.fetch("name") }).to contain_exactly(
       "coord_context",
       "operation_get",
+      "guidance_get",
       "change_set_create",
       "work_item_create",
       "work_item_dependency_declare",
@@ -38,7 +39,8 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
       "write_set_reserve",
       "write_set_expand",
       "lease_renew",
-      "lease_release"
+      "lease_release",
+      "guidance_record"
     )
     expect(tools.find { _1.fetch("name") == "operation_get" }.fetch("annotations")).to include(
       "readOnlyHint" => true,

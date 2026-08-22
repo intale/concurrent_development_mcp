@@ -1002,3 +1002,156 @@ Then("the predecessor's older context remains available without a freshness clai
   )
   assert_acceptance(!payload.key?("projection_status"), "Elapsed context must not expose a projection gate")
 end
+
+When(
+  "agent {string} records direct guidance {string} as message {string} in conversation {string}"
+) do |agent_id, guidance_text, message_id, conversation_id|
+  @guidance_agent_id = agent_id
+  @guidance_text = guidance_text
+  @guidance_message_id = message_id
+  @guidance_conversation_id = conversation_id
+  @guidance_task_id = submit_and_execute(
+    "guidance_record",
+    command_id: "cmd-cuc-guidance-direct",
+    actor: { kind: "agent", id: agent_id },
+    message_id:,
+    conversation_id:,
+    source: "mcp_client",
+    text: guidance_text,
+    anchors: {
+      repository_ids: [ "billing" ],
+      change_set_id: nil,
+      work_item_id: nil,
+      attempt_id: nil
+    }
+  )
+  @guidance_task_state = task_request("tasks/get", @guidance_task_id)
+end
+
+Then("the guidance Task records one evidence-only fact") do
+  task_result = @guidance_task_state.dig("result", "result")
+  data = task_result.fetch("structuredContent").fetch("data")
+  facts = guidance_events(@guidance_conversation_id)
+
+  assert_acceptance_equal("completed", @guidance_task_state.dig("result", "status"), "Guidance Task")
+  assert_acceptance_equal(false, task_result.fetch("isError"), "Guidance tool error flag")
+  assert_acceptance_equal("evidence_only", data.fetch("policy_status"), "Guidance policy status")
+  assert_acceptance_equal([ "UserUtteranceRecorded" ], facts.map(&:type), "Guidance facts")
+  assert_acceptance_equal(@guidance_text, facts.sole.data.fetch("text"), "Recorded guidance text")
+end
+
+Then("the available guidance query honestly reports that message as not observed") do
+  response = call_tool("guidance_get", { message_id: @guidance_message_id })
+  payload = response.dig("result", "structuredContent")
+
+  assert_acceptance_equal("not_found", payload.fetch("status"), "Pre-projection guidance status")
+  assert_acceptance_equal(
+    "guidance_not_observed",
+    payload.dig("data", "code"),
+    "Pre-projection guidance reason"
+  )
+end
+
+When("the guidance reaches the read side") do
+  project_guidance(@guidance_conversation_id)
+  @guidance_query = call_tool("guidance_get", { message_id: @guidance_message_id })
+end
+
+Then(
+  "the available guidance preserves its text and unauthenticated attribution without a freshness claim"
+) do
+  payload = @guidance_query.dig("result", "structuredContent")
+  guidance = payload.dig("data", "guidance")
+
+  assert_acceptance_equal("ok", payload.fetch("status"), "Available guidance status")
+  assert_acceptance_equal(@guidance_text, guidance.fetch("text"), "Available guidance text")
+  assert_acceptance_equal("evidence_only", guidance.fetch("policy_status"), "Available policy status")
+  assert_acceptance_equal(
+    { "kind" => "agent", "id" => @guidance_agent_id, "authenticated" => false },
+    guidance.fetch("actor"),
+    "Available attributed actor"
+  )
+  assert_acceptance(
+    (payload.keys & %w[active fresh pending projection_status]).empty?,
+    "Guidance query must not claim freshness or activity"
+  )
+end
+
+When(
+  "agent {string} forwards guidance {string} as message {string} in conversation {string}"
+) do |agent_id, guidance_text, message_id, conversation_id|
+  @forwarded_message_id = message_id
+  @forwarded_conversation_id = conversation_id
+  @forwarded_task_id = submit_and_execute(
+    "guidance_record",
+    command_id: "cmd-cuc-guidance-forwarded",
+    actor: { kind: "agent", id: agent_id },
+    message_id:,
+    conversation_id:,
+    source: "agent_forwarded",
+    text: guidance_text,
+    anchors: {
+      repository_ids: [],
+      change_set_id: nil,
+      work_item_id: nil,
+      attempt_id: nil
+    }
+  )
+end
+
+When(
+  "agent {string} tries to record the same message in conversation {string}"
+) do |agent_id, conversation_id|
+  @duplicate_guidance_conversation_id = conversation_id
+  @duplicate_guidance_command_id = "cmd-cuc-guidance-duplicate"
+  @duplicate_guidance_task_id = submit_and_execute(
+    "guidance_record",
+    command_id: @duplicate_guidance_command_id,
+    actor: { kind: "agent", id: agent_id },
+    message_id: @forwarded_message_id,
+    conversation_id:,
+    source: "mcp_client",
+    text: "Keep tests on RSpec.",
+    anchors: {
+      repository_ids: [],
+      change_set_id: nil,
+      work_item_id: nil,
+      attempt_id: nil
+    }
+  )
+  @duplicate_guidance_task_state = task_request("tasks/get", @duplicate_guidance_task_id)
+end
+
+Then("the second guidance Task completes with message identity denial") do
+  result = @duplicate_guidance_task_state.dig("result", "result")
+
+  assert_acceptance_equal(
+    "completed",
+    @duplicate_guidance_task_state.dig("result", "status"),
+    "Duplicate guidance Task"
+  )
+  assert_acceptance_equal(true, result.fetch("isError"), "Duplicate guidance error flag")
+  assert_acceptance_equal(
+    "message_already_recorded",
+    result.dig("structuredContent", "data", "code"),
+    "Duplicate guidance denial"
+  )
+end
+
+Then("only the first Conversation owns the forwarded evidence") do
+  assert_acceptance_equal(
+    [ "UserUtteranceForwardedByAgent" ],
+    guidance_events(@forwarded_conversation_id).map(&:type),
+    "Forwarded guidance facts"
+  )
+  assert_acceptance_equal(
+    [],
+    guidance_events(@duplicate_guidance_conversation_id),
+    "Duplicate Conversation facts"
+  )
+  assert_acceptance_equal(
+    [],
+    command_events(@duplicate_guidance_command_id),
+    "Duplicate guidance completion"
+  )
+end

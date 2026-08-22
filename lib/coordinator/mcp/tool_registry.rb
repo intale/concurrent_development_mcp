@@ -9,6 +9,7 @@ module Coordinator
         [
           Tools::CoordContext,
           Tools::OperationGet,
+          Tools::GuidanceGet,
           Tools::ChangeSetCreate,
           Tools::WorkItemCreate,
           Tools::WorkItemDependencyDeclare,
@@ -17,7 +18,8 @@ module Coordinator
           Tools::WriteSetReserve,
           Tools::WriteSetExpand,
           Tools::LeaseRenew,
-          Tools::LeaseRelease
+          Tools::LeaseRelease,
+          Tools::GuidanceRecord
         ].freeze
       end
     end

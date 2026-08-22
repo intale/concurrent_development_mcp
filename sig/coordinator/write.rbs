@@ -10,7 +10,8 @@ module Coordinator
                                 Commands::ReserveWriteSet |
                                 Commands::ExpandWriteSet |
                                 Commands::RenewLeaseSet |
-                                Commands::ReleaseLeaseSet
+                                Commands::ReleaseLeaseSet |
+                                Commands::RecordGuidance
     type write_command = coordination_command | Commands::ExpireResourceLease
     type lifecycle_command = Commands::StartCoordinationTask |
                              Commands::RecordCoordinationTaskOutcome |
@@ -30,6 +31,8 @@ module Coordinator
       def read_at: (StreamReference, Integer stream_revision) -> PgEventstore::Event?
 
       def read_marked: (StreamReference, MarkedEventReadCriteria) -> Array[PgEventstore::Event]
+
+      def read_global_marked: (GlobalMarkedEventReadCriteria) -> Array[PgEventstore::Event]
 
       def append: (
         StreamReference,

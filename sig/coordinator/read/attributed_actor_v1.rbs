@@ -1,0 +1,9 @@
+module Coordinator
+  module Read
+    class AttributedActorV1 < Shared::Value
+      def kind: () -> String
+      def id: () -> String
+      def authenticated: () -> bool
+    end
+  end
+end

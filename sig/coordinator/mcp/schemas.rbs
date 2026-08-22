@@ -11,7 +11,9 @@ module Coordinator
       def self.write_set_expand: () -> json_schema
       def self.lease_renew: () -> json_schema
       def self.lease_release: () -> json_schema
+      def self.guidance_record: () -> json_schema
       def self.operation_get: () -> json_schema
+      def self.guidance_get: () -> json_schema
       def self.coord_context: () -> json_schema
       def self.common_mutation_properties: () -> json_schema
       def self.object_schema: (properties: json_schema, required: Array[String], ?one_of: Array[json_schema]?) -> json_schema

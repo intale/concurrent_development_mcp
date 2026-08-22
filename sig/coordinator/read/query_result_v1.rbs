@@ -27,7 +27,11 @@ module Coordinator
         def last_processed_at: () -> String
       end
 
-      type data = EmptyData | DomainError | OperationData | ContextData | NotModifiedData
+      class GuidanceData < Shared::Value
+        def guidance: () -> GuidanceUtteranceV1
+      end
+
+      type data = EmptyData | DomainError | OperationData | ContextData | NotModifiedData | GuidanceData
       type action = Write::NextAction | NextAction
 
       def status: () -> String

@@ -197,12 +197,46 @@ module Coordinator
         )
       end
 
+      def guidance_record
+        anchors = object_schema(
+          properties: {
+            repository_ids: {
+              type: "array",
+              items: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+              maxItems: 100,
+              uniqueItems: true
+            },
+            change_set_id: nullable_identifier,
+            work_item_id: nullable_identifier,
+            attempt_id: nullable_identifier
+          },
+          required: %w[repository_ids change_set_id work_item_id attempt_id]
+        )
+        object_schema(
+          properties: common_mutation_properties.merge(
+            message_id: identifier,
+            conversation_id: identifier,
+            source: { type: "string", enum: Types::GUIDANCE_SOURCES },
+            text: { type: "string", minLength: 1, maxLength: 16_000 },
+            anchors:
+          ),
+          required: %w[command_id actor message_id conversation_id source text anchors]
+        )
+      end
+
       def operation_get
         object_schema(
           properties: {
             command_id: identifier
           },
           required: %w[command_id]
+        )
+      end
+
+      def guidance_get
+        object_schema(
+          properties: { message_id: identifier },
+          required: %w[message_id]
         )
       end
 

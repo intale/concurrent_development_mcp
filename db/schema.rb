@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_20_184500) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_22_151000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -60,5 +60,28 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_20_184500) do
     t.bigint "stream_revision", null: false
     t.index ["projection_name", "projection_version", "command_id"], name: "idx_processed_projection_events_command"
     t.index ["projection_name", "projection_version", "stream_context", "stream_name", "stream_id", "stream_revision"], name: "idx_processed_projection_events_identity", unique: true
+  end
+
+  create_table "user_utterances", primary_key: "message_id", id: :string, force: :cascade do |t|
+    t.string "actor_id", null: false
+    t.string "actor_kind", null: false
+    t.jsonb "anchors", default: {}, null: false
+    t.string "causation_id"
+    t.string "conversation_id", null: false
+    t.string "correlation_id"
+    t.datetime "created_at", null: false
+    t.string "event_id", null: false
+    t.string "event_type", null: false
+    t.string "policy_status", null: false
+    t.datetime "recorded_at_domain", null: false
+    t.string "source", null: false
+    t.string "stream_context", null: false
+    t.string "stream_id", null: false
+    t.string "stream_name", null: false
+    t.bigint "stream_revision", null: false
+    t.text "text", null: false
+    t.datetime "updated_at", null: false
+    t.index ["conversation_id"], name: "index_user_utterances_on_conversation_id"
+    t.index ["event_id"], name: "index_user_utterances_on_event_id", unique: true
   end
 end

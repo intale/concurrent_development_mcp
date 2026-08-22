@@ -1,0 +1,23 @@
+module Coordinator
+  module Read
+    class UserUtterance < ApplicationRecord
+      def message_id: () -> String
+      def conversation_id: () -> String
+      def text: () -> String
+      def source: () -> String
+      def anchors: () -> Hash[String, untyped]
+      def actor_kind: () -> String
+      def actor_id: () -> String
+      def policy_status: () -> String
+      def event_id: () -> String
+      def event_type: () -> String
+      def stream_context: () -> String
+      def stream_name: () -> String
+      def stream_id: () -> String
+      def stream_revision: () -> Integer
+      def causation_id: () -> String?
+      def correlation_id: () -> String?
+      def recorded_at_domain: () -> Time
+    end
+  end
+end

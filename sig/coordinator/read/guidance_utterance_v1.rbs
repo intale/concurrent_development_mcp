@@ -1,0 +1,17 @@
+module Coordinator
+  module Read
+    class GuidanceUtteranceV1 < Shared::Value
+      def message_id: () -> String
+      def conversation_id: () -> String
+      def text: () -> String
+      def source: () -> String
+      def anchors: () -> Write::GuidanceAnchorsV1
+      def actor: () -> AttributedActorV1
+      def policy_status: () -> String
+      def recorded_at: () -> String
+      def event: () -> Write::EventReference
+      def causation_id: () -> String?
+      def correlation_id: () -> String?
+    end
+  end
+end

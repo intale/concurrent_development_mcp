@@ -24,6 +24,8 @@ module Coordinator
       def lease_release_document: (Commands::ReleaseLeaseSet command) -> CommandInputDocuments::ReleaseLeaseSetV1
       def lease_expire_policy: (Commands::ExpireResourceLease command) -> String
       def lease_expire_policy_document: (Commands::ExpireResourceLease command) -> CommandInputDocuments::ExpireResourceLeaseV1
+      def guidance_record: (Commands::RecordGuidance command) -> String
+      def guidance_record_document: (Commands::RecordGuidance command) -> CommandInputDocuments::RecordGuidanceV1
     end
   end
 end

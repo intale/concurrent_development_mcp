@@ -23,6 +23,8 @@ module Coordinator::Write
           build_renew_lease_set(document)
         when CommandInputDocuments::ReleaseLeaseSetV1
           build_release_lease_set(document)
+        when CommandInputDocuments::RecordGuidanceV1
+          build_record_guidance(document)
         end
       end
 
@@ -143,6 +145,19 @@ module Coordinator::Write
           attempt_id: input.attempt_id,
           lease_set_id: input.lease_set_id,
           leases: input.leases.map { LeaseReleaseReferenceV1.new(_1.to_h) }
+        )
+      end
+
+      def build_record_guidance(document)
+        input = document.input
+        Commands::RecordGuidance.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          message_id: input.message_id,
+          conversation_id: input.conversation_id,
+          source: input.source,
+          text: input.text,
+          anchors: GuidanceAnchorsV1.new(input.anchors.to_h)
         )
       end
 

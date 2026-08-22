@@ -81,6 +81,26 @@ module Coordinator::Write
       []
     end
 
+    def read_global_marked(criteria)
+      events = @client.read(
+        PgEventstore::Stream.all_stream,
+        options: {
+          direction: criteria.direction,
+          max_count: criteria.query_max_count,
+          filter: {
+            streams: [ { context: criteria.stream_context, stream_name: criteria.stream_name } ],
+            event_types: criteria.event_types.map do |event_type|
+              { type: event_type, markers: [ criteria.marker ] }
+            end
+          }
+        }
+      )
+      return events if events.length <= criteria.maximum_count
+
+      raise EventHistoryLimitExceeded,
+            "Global marked event read exceeded #{criteria.maximum_count} relevant events for #{criteria.marker.inspect}"
+    end
+
     def append(reference, events, expected_revision: nil)
       stream = @pg_stream_factory.call(reference)
       options = expected_revision.nil? ? {} : { expected_revision: }

@@ -1,6 +1,10 @@
 module Coordinator
   module Write
     module EventQueries
+      GUIDANCE_MESSAGE_EVENT_TYPES: Array[String]
+
+      def self.guidance_message: (String marker) -> GlobalMarkedEventReadCriteria
+
       COMMAND_COMPLETION: EventReadCriteria
       COORDINATION_TASK_HISTORY: EventReadCriteria
       CHANGE_SET_EXISTENCE: GroupedEventReadCriteria

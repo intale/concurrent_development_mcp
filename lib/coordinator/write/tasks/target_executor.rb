@@ -13,7 +13,8 @@ module Coordinator::Write
         reserve_write_set: Operations::ExecuteReserveWriteSet.new(event_store:),
         expand_write_set: Operations::ExecuteExpandWriteSet.new(event_store:),
         renew_lease_set: Operations::ExecuteRenewLeaseSet.new(event_store:),
-        release_lease_set: Operations::ExecuteReleaseLeaseSet.new(event_store:)
+        release_lease_set: Operations::ExecuteReleaseLeaseSet.new(event_store:),
+        record_guidance: Operations::ExecuteRecordGuidance.new(event_store:)
       )
         @create_change_set = create_change_set
         @create_work_item = create_work_item
@@ -24,6 +25,7 @@ module Coordinator::Write
         @expand_write_set = expand_write_set
         @renew_lease_set = renew_lease_set
         @release_lease_set = release_lease_set
+        @record_guidance = record_guidance
       end
 
       def call(command, caused_by:)
@@ -46,6 +48,8 @@ module Coordinator::Write
           @renew_lease_set.call_command(command, caused_by:)
         when Commands::ReleaseLeaseSet
           @release_lease_set.call_command(command, caused_by:)
+        when Commands::RecordGuidance
+          @record_guidance.call_command(command, caused_by:)
         end
       end
     end

@@ -102,3 +102,18 @@ Feature: Checkpointed cooperative coordination
       When the expired predecessor timer is handled
       Then the timer is superseded and cannot affect the successor
       And the predecessor's older context remains available without a freshness claim
+
+  Rule: Deliberately submitted guidance remains attributed evidence until a later decision
+
+    Scenario: Direct guidance becomes available without activating policy
+      When agent "host-1" records direct guidance "Do not use Redis in billing." as message "M-CUC-GDN-1" in conversation "C-CUC-GDN-1"
+      Then the guidance Task records one evidence-only fact
+      And the available guidance query honestly reports that message as not observed
+      When the guidance reaches the read side
+      Then the available guidance preserves its text and unauthenticated attribution without a freshness claim
+
+    Scenario: A globally reused forwarded message identity is denied
+      When agent "host-1" forwards guidance "Keep tests on RSpec." as message "M-CUC-GDN-2" in conversation "C-CUC-GDN-2"
+      And agent "host-2" tries to record the same message in conversation "C-CUC-GDN-OTHER"
+      Then the second guidance Task completes with message identity denial
+      And only the first Conversation owns the forwarded evidence

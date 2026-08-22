@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    class GuidanceAnchorsV1 < Shared::Value
+      def repository_ids: () -> Array[String]
+      def change_set_id: () -> String?
+      def work_item_id: () -> String?
+      def attempt_id: () -> String?
+    end
+  end
+end

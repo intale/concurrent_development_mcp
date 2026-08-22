@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandInputDocuments
-      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1
+      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1
       type digest_value = value | ExpireResourceLeaseV1
 
       class ActorV1 < Shared::Value
@@ -164,6 +164,27 @@ module Coordinator
       class ReleaseLeaseSetV1 < BaseV1
         def tool_name: () -> String
         def input: () -> ReleaseLeaseSetInputV1
+      end
+
+      class GuidanceAnchorsV1 < Shared::Value
+        def repository_ids: () -> Array[String]
+        def change_set_id: () -> String?
+        def work_item_id: () -> String?
+        def attempt_id: () -> String?
+      end
+
+      class RecordGuidanceInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def message_id: () -> String
+        def conversation_id: () -> String
+        def source: () -> String
+        def text: () -> String
+        def anchors: () -> GuidanceAnchorsV1
+      end
+
+      class RecordGuidanceV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> RecordGuidanceInputV1
       end
 
       class ExpireResourceLeaseInputV1 < Shared::Value

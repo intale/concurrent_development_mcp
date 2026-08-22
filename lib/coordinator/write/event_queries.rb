@@ -2,6 +2,22 @@
 
 module Coordinator::Write
   module EventQueries
+    GUIDANCE_MESSAGE_EVENT_TYPES = [
+      "UserUtteranceRecorded",
+      "UserUtteranceForwardedByAgent"
+    ].freeze
+
+    def self.guidance_message(marker)
+      GlobalMarkedEventReadCriteria.new(
+        stream_context: "HumanGuidance",
+        stream_name: "Conversation",
+        event_types: GUIDANCE_MESSAGE_EVENT_TYPES,
+        marker:,
+        maximum_count: 1,
+        direction: :asc
+      )
+    end
+
     COMMAND_COMPLETION = EventReadCriteria.new(
       event_types: [ "CommandCompleted" ],
       maximum_count: 1,

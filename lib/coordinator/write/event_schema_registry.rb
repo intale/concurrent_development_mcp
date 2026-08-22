@@ -25,6 +25,8 @@ module Coordinator::Write
       [ "WriteSetExpanded", 1 ] => Events::WriteSetExpandedV1,
       [ "WriteSetRenewed", 1 ] => Events::WriteSetRenewedV1,
       [ "WriteSetReleased", 1 ] => Events::WriteSetReleasedV1,
+      [ "UserUtteranceRecorded", 1 ] => Events::UserUtteranceRecordedV1,
+      [ "UserUtteranceForwardedByAgent", 1 ] => Events::UserUtteranceForwardedByAgentV1,
       [ "CoordinationTaskSubmitted", 1 ] => Events::CoordinationTaskSubmittedV1,
       [ "CoordinationTaskExecutionStarted", 1 ] => Events::CoordinationTaskExecutionStartedV1,
       [ "CoordinationTaskCompleted", 1 ] => Events::CoordinationTaskCompletedV1,

@@ -37,6 +37,7 @@ module Coordinator::Shared
       requires_composite_verification
     ].freeze
     GIT_OBJECT_FORMATS = %w[sha1 sha256].freeze
+    GUIDANCE_SOURCES = %w[mcp_client agent_forwarded].freeze
     COORDINATION_TOOL_NAMES = %w[
       change_set_create
       work_item_create
@@ -47,12 +48,14 @@ module Coordinator::Shared
       write_set_expand
       lease_renew
       lease_release
+      guidance_record
     ].freeze
 
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)
     RepositoryId = String.constrained(format: REPOSITORY_ID_PATTERN)
     GitOid = String.constrained(format: GIT_OID_PATTERN)
     GitObjectFormat = String.enum(*GIT_OBJECT_FORMATS)
+    GuidanceSource = String.enum(*GUIDANCE_SOURCES)
     Sha256Digest = String.constrained(format: SHA256_DIGEST_PATTERN)
     Timestamp = String.constrained(format: TIMESTAMP_PATTERN)
     UuidV7 = String.constrained(format: UUID_V7_PATTERN)
@@ -72,6 +75,7 @@ module Coordinator::Shared
     ActorKind = String.enum(*ACTOR_KINDS)
     DependencyKind = String.enum(*DEPENDENCY_KINDS)
     Goal = String.constrained(min_size: 1, max_size: 4_000)
+    GuidanceText = String.constrained(min_size: 1, max_size: 16_000)
     Criterion = String.constrained(min_size: 1, max_size: 2_000)
     AcceptanceCriteria = Array.of(Criterion).constrained(min_size: 1, max_size: 100)
     WorkItemAcceptanceCriteria = Array.of(Criterion).constrained(min_size: 1, max_size: 50)
@@ -79,5 +83,7 @@ module Coordinator::Shared
     WorkItemStateAcceptanceCriteria = Array.of(Criterion).constrained(max_size: 50)
     WorkItemIds = Array.of(Identifier).constrained(max_size: 100)
     ReadinessWorkItemIds = Array.of(Identifier).constrained(min_size: 1, max_size: 100)
+    GuidanceRepositoryIds = Array.of(RepositoryId).constrained(max_size: 100)
+    EvidencePolicyStatus = String.enum("evidence_only")
   end
 end

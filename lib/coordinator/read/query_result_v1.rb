@@ -29,7 +29,11 @@ module Coordinator::Read
       attribute :last_processed_at, Types::Timestamp
     end
 
-    Data = EmptyData | DomainError | OperationData | ContextData | NotModifiedData
+    class GuidanceData < Value
+      attribute :guidance, GuidanceUtteranceV1
+    end
+
+    Data = EmptyData | DomainError | OperationData | ContextData | NotModifiedData | GuidanceData
     Action = Coordinator::Write::NextAction | NextAction
 
     attribute :status, Types::String.enum("ok", "not_found", "invalid", "not_modified")

@@ -107,6 +107,10 @@ module Coordinator::Write
         attribute :requested_expires_at, Types::Timestamp
       end
 
+      class MessageAlreadyRecordedDetails < Value
+        attribute :message_id, Types::Identifier
+      end
+
       class ChangeSetError < Value
         attribute :code, Types::String.enum(
           "change_set_already_exists",
@@ -237,6 +241,12 @@ module Coordinator::Write
         attribute :details, LeaseDeadlineNotExtendedDetails
       end
 
+      class MessageAlreadyRecordedError < Value
+        attribute :code, Types::String.enum("message_already_recorded")
+        attribute :message, Types::String
+        attribute :details, MessageAlreadyRecordedDetails
+      end
+
       Type = ChangeSetError |
              ActivationDependencyError |
              WorkItemError |
@@ -252,7 +262,8 @@ module Coordinator::Write
              WriteSetReleasedError |
              LeaseSetSnapshotMismatchError |
              LeaseReferenceMismatchError |
-             LeaseDeadlineNotExtendedError
+             LeaseDeadlineNotExtendedError |
+             MessageAlreadyRecordedError
     end
   end
 end

@@ -249,6 +249,30 @@ module Coordinator::Write
       )
     end
 
+    def guidance_record(command:, input_digest:, persisted_events:, completed_at:)
+      build_completion(
+        command:,
+        tool_name: "guidance_record",
+        summary: "Guidance evidence recorded without activating policy.",
+        data: CommandReceiptData::Guidance.new(
+          message_id: command.message_id,
+          conversation_id: command.conversation_id,
+          source: command.source,
+          policy_status: "evidence_only",
+          recorded_at: completed_at
+        ),
+        next_actions: [
+          NextAction.new(
+            tool: "guidance_get",
+            arguments: NextAction::GuidanceArguments.new(message_id: command.message_id)
+          )
+        ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
 
     def build_completion(command:, tool_name:, summary:, data:, next_actions:, input_digest:, persisted_events:, completed_at:)

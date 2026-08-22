@@ -1,0 +1,10 @@
+module Coordinator
+  module Read
+    module Repositories
+      class UserUtterances
+        def fetch: (String message_id) -> GuidanceUtteranceV1?
+        def store: (event: PgEventstore::Event, utterance: Write::Events::UserUtteranceRecordedV1 | Write::Events::UserUtteranceForwardedByAgentV1) -> UserUtterance
+      end
+    end
+  end
+end

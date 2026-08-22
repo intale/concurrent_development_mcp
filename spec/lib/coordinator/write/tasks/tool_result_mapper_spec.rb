@@ -203,6 +203,12 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         },
         Coordinator::Write::Tasks::DomainErrorV1::LeaseDeadlineNotExtendedError,
         "denied"
+      ],
+      [
+        :message_already_recorded,
+        { message_id: "M-task-result" },
+        Coordinator::Write::Tasks::DomainErrorV1::MessageAlreadyRecordedError,
+        "denied"
       ]
     ]
 

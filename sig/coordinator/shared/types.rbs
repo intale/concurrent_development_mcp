@@ -15,12 +15,14 @@ module Coordinator
       DEPENDENCY_KINDS: Array[String]
       OUTPUT_REQUIRED_DEPENDENCY_KINDS: Array[String]
       GIT_OBJECT_FORMATS: Array[String]
+      GUIDANCE_SOURCES: Array[String]
       COORDINATION_TOOL_NAMES: Array[String]
 
       Identifier: untyped
       RepositoryId: untyped
       GitOid: untyped
       GitObjectFormat: untyped
+      GuidanceSource: untyped
       Sha256Digest: untyped
       Timestamp: untyped
       UuidV7: untyped
@@ -40,6 +42,7 @@ module Coordinator
       ActorKind: untyped
       DependencyKind: untyped
       Goal: untyped
+      GuidanceText: untyped
       Criterion: untyped
       AcceptanceCriteria: untyped
       WorkItemAcceptanceCriteria: untyped
@@ -47,6 +50,8 @@ module Coordinator
       WorkItemStateAcceptanceCriteria: untyped
       WorkItemIds: untyped
       ReadinessWorkItemIds: untyped
+      GuidanceRepositoryIds: untyped
+      EvidencePolicyStatus: untyped
     end
   end
 end

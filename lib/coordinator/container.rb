@@ -59,6 +59,10 @@ module Coordinator
       Write::Operations::PrepareReleaseLeaseSet.new
     end
 
+    register("operations.prepare_record_guidance", memoize: true) do
+      Write::Operations::PrepareRecordGuidance.new
+    end
+
     register("domain.change_sets.create", memoize: true) do
       Write::Domain::ChangeSets::Create.new(stream_factory: self["stream_factory"])
     end
@@ -101,6 +105,10 @@ module Coordinator
 
     register("domain.resource_leases.expire", memoize: true) do
       Write::Domain::ResourceLeases::Expire.new(stream_factory: self["stream_factory"])
+    end
+
+    register("domain.guidance.record", memoize: true) do
+      Write::Domain::Guidance::Record.new(stream_factory: self["stream_factory"])
     end
 
     register("change_set_activation_source_builder", memoize: true) do
@@ -170,6 +178,10 @@ module Coordinator
       Read::Repositories::CoordContexts.new
     end
 
+    register("repositories.user_utterances", memoize: true) do
+      Read::Repositories::UserUtterances.new
+    end
+
     register("projectors.coord_context_v1", memoize: true) do
       Read::Projectors::CoordContextV1.new(
         schema_registry: self["event_schema_registry"],
@@ -181,6 +193,14 @@ module Coordinator
       Read::Projectors::CommandReceiptsV1.new(
         schema_registry: self["event_schema_registry"],
         receipts: self["repositories.command_receipts"],
+        processed_events: self["repositories.processed_projection_events"]
+      )
+    end
+
+    register("projectors.user_utterances_v1", memoize: true) do
+      Read::Projectors::UserUtterancesV1.new(
+        schema_registry: self["event_schema_registry"],
+        utterances: self["repositories.user_utterances"],
         processed_events: self["repositories.processed_projection_events"]
       )
     end
@@ -201,6 +221,12 @@ module Coordinator
       Read::Queries::CoordContext.new(
         contexts: self["repositories.coord_contexts"],
         canonical_json: self["canonical_json"]
+      )
+    end
+
+    register("queries.guidance_get") do
+      Read::Queries::GuidanceGet.new(
+        utterances: self["repositories.user_utterances"]
       )
     end
 
@@ -392,6 +418,21 @@ module Coordinator
       )
     end
 
+    register("operations.execute_record_guidance") do
+      Write::Operations::ExecuteRecordGuidance.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_record_guidance"],
+        decider: self["domain.guidance.record"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
     register("lease_expiry_policy", memoize: true) do
       Processes::LeaseExpiryPolicy.new(
         source_loader: self["lease_expiry_source_loader"],
@@ -411,7 +452,8 @@ module Coordinator
         reserve_write_set: self["operations.execute_reserve_write_set"],
         expand_write_set: self["operations.execute_expand_write_set"],
         renew_lease_set: self["operations.execute_renew_lease_set"],
-        release_lease_set: self["operations.execute_release_lease_set"]
+        release_lease_set: self["operations.execute_release_lease_set"],
+        record_guidance: self["operations.execute_record_guidance"]
       )
     end
 
@@ -495,6 +537,13 @@ module Coordinator
     register("operations.submit_release_lease_set_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_release_lease_set"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_record_guidance_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_record_guidance"],
         submitter: self["operations.submit_coordination_task"]
       )
     end
@@ -593,6 +642,10 @@ module Coordinator
       Read::Subscriptions::CommandReceipts.new(handler: self["projectors.command_receipts_v1"])
     end
 
+    register("subscriptions.user_utterances", memoize: true) do
+      Read::Subscriptions::UserUtterances.new(handler: self["projectors.user_utterances_v1"])
+    end
+
     register("subscription_managers.process_managers", memoize: true) do
       PgEventstore.subscriptions_manager(
         subscription_set: Processes::Subscriptions::ProcessManagerSet::SET_NAME
@@ -622,7 +675,8 @@ module Coordinator
         manager: self["subscription_managers.read_models"],
         registrations: [
           self["subscriptions.coord_context"],
-          self["subscriptions.command_receipts"]
+          self["subscriptions.command_receipts"],
+          self["subscriptions.user_utterances"]
         ]
       )
     end

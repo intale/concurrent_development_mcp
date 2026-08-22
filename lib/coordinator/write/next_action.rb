@@ -12,8 +12,13 @@ module Coordinator::Write
       attribute :attempt_id, Types::Identifier
     end
 
+    class GuidanceArguments < Value
+      attribute :message_id, Types::Identifier
+    end
+
     Arguments = ChangeSetArguments |
-                AttemptArguments
+                AttemptArguments |
+                GuidanceArguments
 
     attribute :tool, Types::Identifier
     attribute :arguments, Arguments

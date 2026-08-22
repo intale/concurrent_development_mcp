@@ -7,6 +7,7 @@ module Coordinator
       def work_item: (String work_item_id) -> StreamReference
       def attempt: (String attempt_id) -> StreamReference
       def resource_lease: (String resource_key_hash) -> StreamReference
+      def conversation: (String conversation_id) -> StreamReference
     end
   end
 end

@@ -91,6 +91,14 @@ module Coordinator::Write
       attribute :expired_at, Types::Timestamp
     end
 
+    class Guidance < Value
+      attribute :message_id, Types::Identifier
+      attribute :conversation_id, Types::Identifier
+      attribute :source, Types::GuidanceSource
+      attribute :policy_status, Types::EvidencePolicyStatus
+      attribute :recorded_at, Types::Timestamp
+    end
+
     Type = ChangeSet |
            WorkItem |
            Dependency |
@@ -99,6 +107,7 @@ module Coordinator::Write
            LeaseSetExpansion |
            LeaseSetRenewal |
            LeaseSetRelease |
-           ResourceLeaseExpiry
+           ResourceLeaseExpiry |
+           Guidance
   end
 end
