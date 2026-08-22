@@ -8,7 +8,7 @@ module Coordinator::Processes
         subscription_name: "coordination-task-executor-v1",
         stream_context: "CoordinatorControl",
         stream_name: "CoordinationTask",
-        event_type: "CoordinationTaskSubmitted"
+        event_types: [ "CoordinationTaskSubmitted" ]
       )
 
       def initialize(handler:, pull_interval: 1.0)

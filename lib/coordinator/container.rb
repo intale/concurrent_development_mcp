@@ -107,6 +107,19 @@ module Coordinator
       Processes::ChangeSetActivationSourceBuilder.new(schema_registry: self["event_schema_registry"])
     end
 
+    register("lease_expiry_source_builder", memoize: true) do
+      Processes::LeaseExpirySourceBuilder.new(
+        contract: Processes::Contracts::LeaseExpirySourceEvent.new(
+          compound_marker_builder: self["compound_marker_builder"]
+        ),
+        schema_registry: self["event_schema_registry"]
+      )
+    end
+
+    register("lease_expiry_command_builder", memoize: true) do
+      Processes::LeaseExpiryCommandBuilder.new
+    end
+
     register("readiness_command_builder", memoize: true) do
       Processes::ReadinessCommandBuilder.new(compound_marker_builder: self["compound_marker_builder"])
     end
@@ -115,6 +128,18 @@ module Coordinator
 
     register("event_store", memoize: true) do
       Write::EventStore.new(client: PgEventstore.client)
+    end
+
+    register("lease_expiry_source_loader", memoize: true) do
+      Processes::LeaseExpirySourceLoader.new(
+        event_store: self["event_store"],
+        source_builder: self["lease_expiry_source_builder"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("lease_expiry_job_scheduler", memoize: true) do
+      Processes::LeaseExpiryJobScheduler.new(policy: self["lease_expiry_policy"])
     end
 
     register("tasks.loader", memoize: true) do
@@ -367,6 +392,14 @@ module Coordinator
       )
     end
 
+    register("lease_expiry_policy", memoize: true) do
+      Processes::LeaseExpiryPolicy.new(
+        source_loader: self["lease_expiry_source_loader"],
+        command_builder: self["lease_expiry_command_builder"],
+        operation: self["operations.execute_expire_resource_lease"]
+      )
+    end
+
     register("tasks.target_executor", memoize: true) do
       Write::Tasks::TargetExecutor.new(
         event_store: self["event_store"],
@@ -529,6 +562,13 @@ module Coordinator
       )
     end
 
+    register("process_managers.lease_expiry_scheduler", memoize: true) do
+      Processes::ProcessManagers::LeaseExpiryScheduler.new(
+        source_builder: self["lease_expiry_source_builder"],
+        job_scheduler: self["lease_expiry_job_scheduler"]
+      )
+    end
+
     register("subscriptions.change_set_readiness", memoize: true) do
       Processes::Subscriptions::ChangeSetReadiness.new(handler: self["process_managers.change_set_readiness"])
     end
@@ -536,6 +576,12 @@ module Coordinator
     register("subscriptions.coordination_task_executor", memoize: true) do
       Processes::Subscriptions::CoordinationTaskExecutor.new(
         handler: self["process_managers.coordination_task_executor"]
+      )
+    end
+
+    register("subscriptions.lease_expiry_scheduler", memoize: true) do
+      Processes::Subscriptions::LeaseExpiryScheduler.new(
+        handler: self["process_managers.lease_expiry_scheduler"]
       )
     end
 
@@ -558,7 +604,8 @@ module Coordinator
         manager: self["subscription_managers.process_managers"],
         registrations: [
           self["subscriptions.change_set_readiness"],
-          self["subscriptions.coordination_task_executor"]
+          self["subscriptions.coordination_task_executor"],
+          self["subscriptions.lease_expiry_scheduler"]
         ]
       )
     end

@@ -61,6 +61,15 @@ RSpec.describe Coordinator::Write::EventStore, :event_store do
     expect(grouped.fetch("OtherProbe").data).to eq("version" => 1)
   end
 
+  it "reloads one exact specific-stream revision without scanning the stream" do
+    first = build_event(type: "FirstProbe")
+    target = build_event(type: "TargetProbe")
+    event_store.append(stream, [ first, target, build_event(type: "LaterProbe") ])
+
+    expect(event_store.read_at(stream, 1)).to have_attributes(id: target.id, stream_revision: 1)
+    expect(event_store.read_at(stream, 9)).to be_nil
+  end
+
   it "uses one compound marker as a bounded conjunctive event selector" do
     target = build_event(
       type: "RealStoreProbe",

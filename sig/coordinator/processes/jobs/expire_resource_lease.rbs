@@ -1,0 +1,13 @@
+module Coordinator
+  module Processes
+    module Jobs
+      class ExpireResourceLease < ApplicationJob
+        def self.policy: () -> LeaseExpiryPolicy
+        def self.job_scheduler: () -> LeaseExpiryJobScheduler
+        def self.configure: (policy: LeaseExpiryPolicy, job_scheduler: LeaseExpiryJobScheduler) -> void
+
+        def perform: (String source_event_id, String resource_key_hash, Integer stream_revision) -> ActiveJob::Base?
+      end
+    end
+  end
+end

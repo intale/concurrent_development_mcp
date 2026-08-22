@@ -1,0 +1,9 @@
+module Coordinator
+  module Processes
+    class LeaseExpiryCommandBuilder
+      POLICY_ID: String
+
+      def call: (LeaseExpirySource source) -> Write::Commands::ExpireResourceLease
+    end
+  end
+end

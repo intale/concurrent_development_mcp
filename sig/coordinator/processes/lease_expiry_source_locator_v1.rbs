@@ -1,0 +1,11 @@
+module Coordinator
+  module Processes
+    class LeaseExpirySourceLocatorV1 < Shared::Value
+      def self.from_source: (LeaseExpirySource source) -> LeaseExpirySourceLocatorV1
+
+      def source_event_id: () -> String
+      def resource_key_hash: () -> String
+      def stream_revision: () -> Integer
+    end
+  end
+end

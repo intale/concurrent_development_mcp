@@ -17,6 +17,8 @@ RSpec.describe Coordinator::Container do
     reservation_operation = described_class["operations.execute_reserve_write_set"]
     expansion_operation = described_class["operations.execute_expand_write_set"]
     renewal_operation = described_class["operations.execute_renew_lease_set"]
+    release_operation = described_class["operations.execute_release_lease_set"]
+    expiry_operation = described_class["operations.execute_expire_resource_lease"]
     readiness_process_manager = described_class["process_managers.change_set_readiness"]
     task_executor = described_class["process_managers.coordination_task_executor"]
     subscription_manager = described_class["subscription_managers.process_managers"]
@@ -47,12 +49,14 @@ RSpec.describe Coordinator::Container do
     expect(reservation_operation).to be_a(Coordinator::Write::Operations::ExecuteReserveWriteSet)
     expect(expansion_operation).to be_a(Coordinator::Write::Operations::ExecuteExpandWriteSet)
     expect(renewal_operation).to be_a(Coordinator::Write::Operations::ExecuteRenewLeaseSet)
+    expect(release_operation).to be_a(Coordinator::Write::Operations::ExecuteReleaseLeaseSet)
+    expect(expiry_operation).to be_a(Coordinator::Write::Operations::ExecuteExpireResourceLease)
     expect(readiness_process_manager).to be_a(Coordinator::Processes::ProcessManagers::ChangeSetReadiness)
     expect(task_executor).to be_a(Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor)
     expect(subscription_manager).to be_a(PgEventstore::SubscriptionsManager)
     expect(subscription_set).to be_a(Coordinator::Processes::Subscriptions::ProcessManagerSet)
     expect(subscription_set.subscription_names).to eq(
-      [ "change-set-readiness-v1", "coordination-task-executor-v1" ]
+      [ "change-set-readiness-v1", "coordination-task-executor-v1", "lease-expiry-scheduler-v1" ]
     )
     expect(read_model_manager).to be_a(PgEventstore::SubscriptionsManager)
     expect(read_model_set).to be_a(Coordinator::Read::Subscriptions::ReadModelSet)

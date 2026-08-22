@@ -162,7 +162,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
       subscription_name: "coordination-task-executor-v1",
       stream_context: "CoordinatorControl",
       stream_name: "CoordinationTask",
-      event_type: "CoordinationTaskSubmitted"
+      event_types: [ "CoordinationTaskSubmitted" ]
     )
     expect(definition.options).to eq(
       filter: {

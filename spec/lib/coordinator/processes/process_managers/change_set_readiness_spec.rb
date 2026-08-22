@@ -58,7 +58,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::ChangeSetReadiness, :eve
         subscription_name: "process-manager-audit-probe-v1",
         stream_context: "DevelopmentPlanning",
         stream_name: "ChangeSet",
-        event_type: "ChangeSetActivated"
+        event_types: [ "ChangeSetActivated" ]
       ),
       handler: ->(_event) { }
     )
@@ -78,7 +78,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::ChangeSetReadiness, :eve
       subscription_name: "change-set-readiness-v1",
       stream_context: "DevelopmentPlanning",
       stream_name: "ChangeSet",
-      event_type: "ChangeSetActivated"
+      event_types: [ "ChangeSetActivated" ]
     )
     expect(definition.options).to eq(
       filter: {

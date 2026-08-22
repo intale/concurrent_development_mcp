@@ -27,6 +27,8 @@ module Coordinator
 
       def read_grouped: (StreamReference, GroupedEventReadCriteria) -> Array[PgEventstore::Event]
 
+      def read_at: (StreamReference, Integer stream_revision) -> PgEventstore::Event?
+
       def read_marked: (StreamReference, MarkedEventReadCriteria) -> Array[PgEventstore::Event]
 
       def append: (

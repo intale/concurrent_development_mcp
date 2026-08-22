@@ -50,7 +50,7 @@ RSpec.describe Coordinator::Shared::Contracts::SubscriptionSetRegistrations do
         subscription_name:,
         stream_context: "DevelopmentPlanning",
         stream_name: "ChangeSet",
-        event_type: "ChangeSetActivated"
+        event_types: [ "ChangeSetActivated" ]
       ),
       handler: ->(_event) { }
     )

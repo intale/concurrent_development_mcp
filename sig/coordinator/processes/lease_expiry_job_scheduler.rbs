@@ -1,0 +1,8 @@
+module Coordinator
+  module Processes
+    class LeaseExpiryJobScheduler
+      def initialize: (policy: LeaseExpiryPolicy) -> void
+      def call: (LeaseExpirySourceLocatorV1 locator, wait_until: String) -> ActiveJob::Base
+    end
+  end
+end

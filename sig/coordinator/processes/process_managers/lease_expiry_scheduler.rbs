@@ -1,0 +1,10 @@
+module Coordinator
+  module Processes
+    module ProcessManagers
+      class LeaseExpiryScheduler
+        def initialize: (?source_builder: LeaseExpirySourceBuilder, job_scheduler: LeaseExpiryJobScheduler) -> void
+        def call: (PgEventstore::Event event) -> nil
+      end
+    end
+  end
+end

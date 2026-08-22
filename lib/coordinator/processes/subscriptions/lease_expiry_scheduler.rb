@@ -2,13 +2,13 @@
 
 module Coordinator::Processes
   module Subscriptions
-    class ChangeSetReadiness < Coordinator::Shared::Subscriptions::Registration
+    class LeaseExpiryScheduler < Coordinator::Shared::Subscriptions::Registration
       DEFINITION = Coordinator::Shared::Subscriptions::Definition.new(
         set_name: ProcessManagerSet::SET_NAME,
-        subscription_name: "change-set-readiness-v1",
-        stream_context: "DevelopmentPlanning",
-        stream_name: "ChangeSet",
-        event_types: [ "ChangeSetActivated" ]
+        subscription_name: "lease-expiry-scheduler-v1",
+        stream_context: "DevelopmentCoordination",
+        stream_name: "ResourceLease",
+        event_types: [ "ResourceLeaseAcquired", "ResourceLeaseRenewed" ]
       )
 
       def initialize(handler:, pull_interval: 1.0)

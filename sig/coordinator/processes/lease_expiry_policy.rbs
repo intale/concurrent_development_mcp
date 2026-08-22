@@ -1,0 +1,15 @@
+module Coordinator
+  module Processes
+    class LeaseExpiryPolicy
+      HANDLED_OUTCOME_CODES: Array[Symbol]
+
+      def initialize: (
+        source_loader: LeaseExpirySourceLoader,
+        ?command_builder: LeaseExpiryCommandBuilder,
+        operation: Write::Operations::ExecuteExpireResourceLease
+      ) -> void
+
+      def call: (LeaseExpirySourceLocatorV1 locator) -> Dry::Monads::Result
+    end
+  end
+end

@@ -1,0 +1,9 @@
+module Coordinator
+  module Processes
+    module Contracts
+      class ReloadedLeaseExpirySource < Dry::Validation::Contract
+        def call: ({ locator: LeaseExpirySourceLocatorV1, source: LeaseExpirySource } input) -> Dry::Validation::Result
+      end
+    end
+  end
+end

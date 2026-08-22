@@ -1,0 +1,9 @@
+module Coordinator
+  module Processes
+    class LeaseExpiryHandledV1 < Shared::Value
+      OUTCOMES: Array[String]
+
+      def outcome: () -> String
+    end
+  end
+end

@@ -7,7 +7,7 @@ module Coordinator::Shared
       attribute :subscription_name, Types::Identifier
       attribute :stream_context, Types::Identifier
       attribute :stream_name, Types::Identifier
-      attribute :event_type, Types::Identifier
+      attribute :event_types, Types::Array.of(Types::Identifier).constrained(min_size: 1, max_size: 100)
 
       def identity
         Identity.new(set_name:, subscription_name:)
@@ -17,7 +17,7 @@ module Coordinator::Shared
         {
           filter: {
             streams: [ { context: stream_context, stream_name: } ],
-            event_types: [ event_type ]
+            event_types:
           }
         }
       end

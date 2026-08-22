@@ -1,0 +1,14 @@
+module Coordinator
+  module Processes
+    class LeaseExpirySourceLoader
+      def initialize: (
+        event_store: Write::_EventStore,
+        ?source_builder: LeaseExpirySourceBuilder,
+        ?stream_factory: Write::StreamFactory,
+        ?reloaded_source_contract: Contracts::ReloadedLeaseExpirySource
+      ) -> void
+
+      def call: (LeaseExpirySourceLocatorV1 locator) -> LeaseExpirySource
+    end
+  end
+end

@@ -44,6 +44,22 @@ module Coordinator::Write
       []
     end
 
+    def read_at(reference, stream_revision)
+      stream = @pg_stream_factory.call(reference)
+      event = @client.read(
+        stream,
+        options: {
+          direction: :asc,
+          from_revision: stream_revision,
+          max_count: 1
+        }
+      ).first
+
+      event if event&.stream_revision == stream_revision
+    rescue PgEventstore::StreamNotFoundError
+      nil
+    end
+
     def read_marked(reference, criteria)
       stream = @pg_stream_factory.call(reference)
 
