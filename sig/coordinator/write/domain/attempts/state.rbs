@@ -11,6 +11,11 @@ module Coordinator
           def agent_id: () -> String?
           def base_snapshots: () -> Array[RepositorySnapshotV1]
           def lease_set_id: () -> String?
+          def lease_repository_id: () -> String?
+          def lease_policy_version: () -> String?
+          def lease_resources: () -> Array[LeaseReferenceV1]
+          def lease_reserved_at: () -> String?
+          def lease_expires_at: () -> String?
           def status: () -> String
           def absent?: () -> bool
           def apply: (Events::Base event) -> State

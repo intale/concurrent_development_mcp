@@ -29,6 +29,8 @@ module Coordinator
       ResourceKind: untyped
       LeaseMode: untyped
       LeaseDurationSeconds: untyped
+      WriteSetSize: untyped
+      ExpandedWriteSetSize: untyped
       FencingToken: untyped
       CoordinationToolName: untyped
       Marker: untyped

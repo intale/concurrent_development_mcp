@@ -111,11 +111,30 @@ module Coordinator::Write
       attribute :input, ReserveWriteSetInputV1
     end
 
+    class ExpandWriteSetInputV1 < Value
+      Resource = FileResourceV1
+
+      attribute :actor, ActorV1
+      attribute :change_set_id, Types::Identifier
+      attribute :work_item_id, Types::Identifier
+      attribute :attempt_id, Types::Identifier
+      attribute :lease_set_id, Types::UuidV7
+      attribute :repository_id, Types::RepositoryId
+      attribute :base_commit_oid, Types::GitOid
+      attribute :resources, Types::Array.of(Resource).constrained(min_size: 1, max_size: 32)
+    end
+
+    class ExpandWriteSetV1 < BaseV1
+      attribute :tool_name, Types::String.enum("write_set_expand")
+      attribute :input, ExpandWriteSetInputV1
+    end
+
     Type = CreateChangeSetV1 |
            CreateWorkItemV1 |
            DeclareWorkItemDependencyV1 |
            ActivateChangeSetV1 |
            AcquireWorkItemV1 |
-           ReserveWriteSetV1
+           ReserveWriteSetV1 |
+           ExpandWriteSetV1
   end
 end

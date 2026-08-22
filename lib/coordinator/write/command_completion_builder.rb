@@ -138,6 +138,36 @@ module Coordinator::Write
       )
     end
 
+    def write_set_expand(command:, expansion:, input_digest:, persisted_events:, completed_at:)
+      attempt_arguments = NextAction::AttemptArguments.new(
+        change_set_id: command.change_set_id,
+        work_item_id: command.work_item_id,
+        attempt_id: command.attempt_id
+      )
+
+      build_completion(
+        command:,
+        tool_name: "write_set_expand",
+        summary: "Write set expanded.",
+        data: CommandReceiptData::LeaseSetExpansion.new(
+          change_set_id: command.change_set_id,
+          work_item_id: command.work_item_id,
+          attempt_id: command.attempt_id,
+          repository_id: command.repository_id,
+          lease_set_id: expansion.lease_set_id,
+          policy_version: expansion.policy_version,
+          expanded_at: expansion.expanded_at,
+          expires_at: expansion.expires_at,
+          added_resources: expansion.added_resources,
+          resource_count: expansion.resource_count
+        ),
+        next_actions: [ NextAction.new(tool: "coord_context", arguments: attempt_arguments) ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
 
     def build_completion(command:, tool_name:, summary:, data:, next_actions:, input_digest:, persisted_events:, completed_at:)

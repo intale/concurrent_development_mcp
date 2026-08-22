@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandInputDocuments
-      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1
+      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1
 
       class ActorV1 < Shared::Value
         def actor_kind: () -> String
@@ -106,6 +106,22 @@ module Coordinator
       class ReserveWriteSetV1 < BaseV1
         def tool_name: () -> String
         def input: () -> ReserveWriteSetInputV1
+      end
+
+      class ExpandWriteSetInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def attempt_id: () -> String
+        def lease_set_id: () -> String
+        def repository_id: () -> String
+        def base_commit_oid: () -> String
+        def resources: () -> Array[FileResourceV1]
+      end
+
+      class ExpandWriteSetV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> ExpandWriteSetInputV1
       end
     end
   end

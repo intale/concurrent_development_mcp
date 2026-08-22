@@ -97,6 +97,11 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Acquire do
       agent_id: "agent-b",
       base_snapshots: [ snapshot ],
       lease_set_id: nil,
+      lease_repository_id: nil,
+      lease_policy_version: nil,
+      lease_resources: [],
+      lease_reserved_at: nil,
+      lease_expires_at: nil,
       status: "active"
     )
     wrong_repository = Coordinator::Write::Commands::AcquireWorkItem.new(

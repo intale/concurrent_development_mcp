@@ -115,6 +115,12 @@ module Coordinator::Write
       direction: :asc
     )
 
+    ATTEMPT_FOR_WRITE_SET_EXPANSION = EventReadCriteria.new(
+      event_types: [ "AttemptAuthorized", "AttemptStarted", "WriteSetReserved", "WriteSetExpanded" ],
+      maximum_count: 34,
+      direction: :asc
+    )
+
     RESOURCE_LEASE_FOR_RESERVATION = GroupedEventReadCriteria.new(
       event_types: [ "ResourceLeaseAcquired" ],
       direction: :desc

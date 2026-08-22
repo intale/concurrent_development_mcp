@@ -182,4 +182,49 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
       "sha256:11382b77d0f6e7e226d4bb927aebeebfbf3fb1b61d929d2121f804449e3d16f0"
     )
   end
+
+  it "freezes the lease-set identity and normalized additions in the expansion digest" do
+    resource = Coordinator::Write::FileResourceNormalizer.new.call(
+      repository_id: "billing",
+      kind: "file",
+      path: "app/models/invoice.rb",
+      base_blob_oid: "b" * 40
+    ).value!
+    expansion_command = Coordinator::Write::Commands::ExpandWriteSet.new(
+      command_id: "cmd-expand-300",
+      actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "agent-a"),
+      change_set_id: "CS-100",
+      work_item_id: "W-200",
+      attempt_id: "A-300",
+      lease_set_id: "01919191-9191-7191-8191-919191919191",
+      repository_id: "billing",
+      base_commit_oid: "a" * 40,
+      resources: [ resource ]
+    )
+
+    document = digest.write_set_expand_document(expansion_command)
+
+    expect(document).to eq(
+      Coordinator::Write::CommandInputDocuments::ExpandWriteSetV1.new(
+        schema: "command-input/v1",
+        command_id: "cmd-expand-300",
+        tool_name: "write_set_expand",
+        input: Coordinator::Write::CommandInputDocuments::ExpandWriteSetInputV1.new(
+          actor: Coordinator::Write::CommandInputDocuments::ActorV1.new(
+            actor_kind: "agent",
+            actor_id: "agent-a"
+          ),
+          change_set_id: "CS-100",
+          work_item_id: "W-200",
+          attempt_id: "A-300",
+          lease_set_id: "01919191-9191-7191-8191-919191919191",
+          repository_id: "billing",
+          base_commit_oid: "a" * 40,
+          resources: [ Coordinator::Write::CommandInputDocuments::FileResourceV1.new(resource.to_h) ]
+        )
+      )
+    )
+    expect(digest.write_set_expand(expansion_command)).to match(/\Asha256:[0-9a-f]{64}\z/)
+    expect(digest.call(expansion_command)).to eq(digest.write_set_expand(expansion_command))
+  end
 end

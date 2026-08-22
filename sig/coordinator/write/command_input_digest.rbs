@@ -16,6 +16,8 @@ module Coordinator
       def work_item_acquire_document: (Commands::AcquireWorkItem command) -> CommandInputDocuments::AcquireWorkItemV1
       def write_set_reserve: (Commands::ReserveWriteSet command) -> String
       def write_set_reserve_document: (Commands::ReserveWriteSet command) -> CommandInputDocuments::ReserveWriteSetV1
+      def write_set_expand: (Commands::ExpandWriteSet command) -> String
+      def write_set_expand_document: (Commands::ExpandWriteSet command) -> CommandInputDocuments::ExpandWriteSetV1
     end
   end
 end

@@ -19,6 +19,7 @@ module Coordinator::Write
       [ "AttemptStarted", 1 ] => Events::AttemptStartedV1,
       [ "ResourceLeaseAcquired", 1 ] => Events::ResourceLeaseAcquiredV1,
       [ "WriteSetReserved", 1 ] => Events::WriteSetReservedV1,
+      [ "WriteSetExpanded", 1 ] => Events::WriteSetExpandedV1,
       [ "CoordinationTaskSubmitted", 1 ] => Events::CoordinationTaskSubmittedV1,
       [ "CoordinationTaskExecutionStarted", 1 ] => Events::CoordinationTaskExecutionStartedV1,
       [ "CoordinationTaskCompleted", 1 ] => Events::CoordinationTaskCompletedV1,

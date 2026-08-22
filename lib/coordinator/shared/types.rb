@@ -58,6 +58,8 @@ module Coordinator::Shared
     ResourceKind = String.enum("file")
     LeaseMode = String.enum("exclusive")
     LeaseDurationSeconds = Integer.constrained(gteq: 30, lteq: 3_600)
+    WriteSetSize = Integer.constrained(gteq: 1, lteq: 32)
+    ExpandedWriteSetSize = Integer.constrained(gteq: 2, lteq: 32)
     FencingToken = Integer.constrained(gteq: 1)
     CoordinationToolName = String.enum(*COORDINATION_TOOL_NAMES)
     Marker = String.constrained(min_size: 1, max_size: 512)
