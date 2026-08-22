@@ -58,6 +58,7 @@ module Coordinator::Read
         attribute :last_renewed_at, Types::Timestamp.optional
         attribute :previous_expires_at, Types::Timestamp.optional
         attribute :expires_at, Types::Timestamp
+        attribute :released_at, Types::Timestamp.optional
       end
 
       class Attempt < Value

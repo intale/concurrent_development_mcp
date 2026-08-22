@@ -18,6 +18,7 @@ module Coordinator::Read
         when Coordinator::Write::Events::WriteSetReservedV1 then apply_write_set_reserved(state, event)
         when Coordinator::Write::Events::WriteSetExpandedV1 then apply_write_set_expanded(state, event)
         when Coordinator::Write::Events::WriteSetRenewedV1 then apply_write_set_renewed(state, event)
+        when Coordinator::Write::Events::WriteSetReleasedV1 then apply_write_set_released(state, event)
         else
           raise UnknownProjectionEvent, "coord_context/v1 does not handle #{event.class.name}"
         end
@@ -176,7 +177,8 @@ module Coordinator::Read
           last_expanded_at: nil,
           last_renewed_at: nil,
           previous_expires_at: nil,
-          expires_at: event.expires_at
+          expires_at: event.expires_at,
+          released_at: nil
         )
 
         replace(
@@ -258,6 +260,36 @@ module Coordinator::Read
             state.attempts,
             :attempt_id,
             CoordContextStateV1::Attempt.new(attempt.attributes.merge(write_set: renewed))
+          )
+        )
+      end
+
+      def apply_write_set_released(state, event)
+        attempt = require_attempt(state, event.attempt_id, event.change_set_id, event.work_item_id)
+        write_set = attempt.write_set
+        raise ProjectionStateError, "Attempt #{event.attempt_id} has no projected write set" unless write_set
+        unless write_set.lease_set_id == event.lease_set_id &&
+               write_set.repository_id == event.repository_id &&
+               write_set.policy_version == event.policy_version
+          raise ProjectionStateError, "Attempt #{event.attempt_id} write-set identity changed"
+        end
+        unless write_set.resources.map(&:to_h) == event.resources.map(&:to_h) &&
+               write_set.resources.length == event.resource_count
+          raise ProjectionStateError, "Attempt #{event.attempt_id} write-set membership changed during release"
+        end
+        unless write_set.expires_at == event.previous_expires_at && write_set.released_at.nil?
+          raise ProjectionStateError, "Attempt #{event.attempt_id} release is not contiguous"
+        end
+
+        released = CoordContextStateV1::WriteSet.new(
+          write_set.attributes.merge(released_at: event.released_at)
+        )
+        replace(
+          state,
+          attempts: upsert(
+            state.attempts,
+            :attempt_id,
+            CoordContextStateV1::Attempt.new(attempt.attributes.merge(write_set: released))
           )
         )
       end

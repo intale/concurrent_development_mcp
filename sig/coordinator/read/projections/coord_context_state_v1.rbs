@@ -55,6 +55,7 @@ module Coordinator
           def last_renewed_at: () -> String?
           def previous_expires_at: () -> String?
           def expires_at: () -> String
+          def released_at: () -> String?
         end
 
         class Attempt < Shared::Value

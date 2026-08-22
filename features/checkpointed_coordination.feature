@@ -79,3 +79,13 @@ Feature: Checkpointed cooperative coordination
       And the previous context remains available before renewal projection
       When the write-set renewal reaches the read side
       Then available context exposes the later observed deadline without a freshness claim
+
+  Rule: An agent releases its complete observed lease set
+
+    Scenario: A durable release frees the set while an older context remains available
+      Given agent "agent-a" has reserved "app/a.rb" and "app/b.rb" for releasable Attempt "A-CUC-RELEASE" in ChangeSet "CS-CUC-RELEASE"
+      When the agent releases the complete observed lease set
+      Then the release Task succeeds without changing lease identities or fencing tokens
+      And the previous context remains available before release projection
+      When the write-set release reaches the read side
+      Then available context exposes the observed release without a freshness claim

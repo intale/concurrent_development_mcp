@@ -118,6 +118,21 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
       end,
       lease_duration_seconds: 600
     ).value!.data
+    release = Coordinator::Write::Operations::ExecuteReleaseLeaseSet.new(event_store:).call(
+      command_id: "release-A-100",
+      actor: { kind: "agent", id: "agent-1" },
+      change_set_id: "CS-100",
+      work_item_id: "W-100",
+      attempt_id: "A-100",
+      lease_set_id: reservation.lease_set_id,
+      leases: (reservation.resources + expansion.added_resources).map do |reference|
+        {
+          resource_key_hash: reference.resource_key_hash,
+          lease_id: reference.lease_id,
+          fencing_token: reference.fencing_token
+        }
+      end
+    ).value!.data
 
     planning = change_set_events("CS-100")
     work = work_item_events("W-100")
@@ -127,8 +142,8 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
     ) + event_store.read(
       streams.attempt("A-100"),
       Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "WriteSetRenewed" ],
-        maximum_count: 1,
+        event_types: [ "WriteSetRenewed", "WriteSetReleased" ],
+        maximum_count: 2,
         direction: :asc
       )
     )
@@ -170,6 +185,8 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
     expect(write_set.last_expanded_at).to be > write_set.reserved_at
     expect(write_set.last_renewed_at).to be > write_set.reserved_at
     expect(write_set.previous_expires_at).to eq(reservation.expires_at)
+    expect(write_set.released_at).to eq(release.released_at)
+    expect(write_set.expires_at).to eq(release.previous_expires_at)
     expect(write_set.to_h.keys & %i[active fresh pending]).to be_empty
     expect(Coordinator::Read::ContextNextActionsBuilder.new.call(snapshot.state)).to be_empty
   end
