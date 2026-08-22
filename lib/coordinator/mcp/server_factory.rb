@@ -21,6 +21,8 @@ module Coordinator
         which may be stale; command decisions recheck authoritative event-store facts.
         After acquiring a WorkItem, reserve its complete initial file write set before editing,
         and expand that same set before editing any additional file. Expansion never renews expiry.
+        Renew the entire exact observed lease set before its deadline when more work time is needed;
+        a stale set, lease ID, or fencing token is safely rejected by authoritative event facts.
         The coordinator records attributed evidence and does not execute Git, CI, or agent work.
       TEXT
 

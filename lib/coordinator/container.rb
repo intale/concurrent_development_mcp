@@ -51,6 +51,10 @@ module Coordinator
       Write::Operations::PrepareExpandWriteSet.new
     end
 
+    register("operations.prepare_renew_lease_set", memoize: true) do
+      Write::Operations::PrepareRenewLeaseSet.new
+    end
+
     register("domain.change_sets.create", memoize: true) do
       Write::Domain::ChangeSets::Create.new(stream_factory: self["stream_factory"])
     end
@@ -81,6 +85,10 @@ module Coordinator
 
     register("domain.resource_leases.expand", memoize: true) do
       Write::Domain::ResourceLeases::Expand.new(stream_factory: self["stream_factory"])
+    end
+
+    register("domain.resource_leases.renew", memoize: true) do
+      Write::Domain::ResourceLeases::Renew.new(stream_factory: self["stream_factory"])
     end
 
     register("change_set_activation_source_builder", memoize: true) do
@@ -300,6 +308,22 @@ module Coordinator
       )
     end
 
+    register("operations.execute_renew_lease_set") do
+      Write::Operations::ExecuteRenewLeaseSet.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_renew_lease_set"],
+        decider: self["domain.resource_leases.renew"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"],
+        compound_marker_builder: self["compound_marker_builder"]
+      )
+    end
+
     register("tasks.target_executor", memoize: true) do
       Write::Tasks::TargetExecutor.new(
         event_store: self["event_store"],
@@ -309,7 +333,8 @@ module Coordinator
         activate_change_set: self["operations.execute_activate_change_set"],
         acquire_work_item: self["operations.execute_acquire_work_item"],
         reserve_write_set: self["operations.execute_reserve_write_set"],
-        expand_write_set: self["operations.execute_expand_write_set"]
+        expand_write_set: self["operations.execute_expand_write_set"],
+        renew_lease_set: self["operations.execute_renew_lease_set"]
       )
     end
 
@@ -379,6 +404,13 @@ module Coordinator
     register("operations.submit_expand_write_set_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_expand_write_set"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_renew_lease_set_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_renew_lease_set"],
         submitter: self["operations.submit_coordination_task"]
       )
     end

@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Tasks
       module DomainErrorV1
-        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError
+        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError
 
         class ChangeSetDetails < Shared::Value
           def change_set_id: () -> String
@@ -84,6 +84,24 @@ module Coordinator
           def current_expires_at: () -> String?
         end
 
+        class LeaseSetSnapshotMismatchDetails < AttemptDetails
+          def current_resource_key_hashes: () -> Array[String]
+          def requested_resource_key_hashes: () -> Array[String]
+        end
+
+        class LeaseReferenceMismatchDetails < AttemptDetails
+          def resource_key_hash: () -> String
+          def current_lease_id: () -> String
+          def requested_lease_id: () -> String
+          def current_fencing_token: () -> Integer
+          def requested_fencing_token: () -> Integer
+        end
+
+        class LeaseDeadlineNotExtendedDetails < AttemptDetails
+          def current_expires_at: () -> String
+          def requested_expires_at: () -> String
+        end
+
         class ChangeSetError < Shared::Value
           def code: () -> String
           def message: () -> String
@@ -155,6 +173,25 @@ module Coordinator
           def code: () -> String
           def message: () -> String
           def details: () -> LeaseSetNotCurrentDetails
+        end
+
+
+        class LeaseSetSnapshotMismatchError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> LeaseSetSnapshotMismatchDetails
+        end
+
+        class LeaseReferenceMismatchError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> LeaseReferenceMismatchDetails
+        end
+
+        class LeaseDeadlineNotExtendedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> LeaseDeadlineNotExtendedDetails
         end
       end
     end

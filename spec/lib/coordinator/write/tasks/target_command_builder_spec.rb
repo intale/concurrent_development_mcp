@@ -98,6 +98,22 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
             policy_version: "coordinator-resource-key/v1"
           )
         ]
+      ),
+      Coordinator::Write::Commands::RenewLeaseSet.new(
+        command_id: "cmd-task-build-8",
+        actor:,
+        change_set_id: "CS-task-build",
+        work_item_id: "W-task-build",
+        attempt_id: "ATT-task-build",
+        lease_set_id: "0198e03a-d112-7000-8000-000000000007",
+        leases: [
+          Coordinator::Write::LeaseRenewalReferenceV1.new(
+            resource_key_hash: "sha256:f42d279fef1baf9ea3a532d1a89b57de451648cab46bba073a397a509382c67b",
+            lease_id: "0198e03a-d112-7000-8000-000000000008",
+            fencing_token: 4
+          )
+        ],
+        lease_duration_seconds: 600
       )
     ]
 

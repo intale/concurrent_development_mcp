@@ -9,6 +9,7 @@ module Coordinator
       def self.work_item_acquire: () -> json_schema
       def self.write_set_reserve: () -> json_schema
       def self.write_set_expand: () -> json_schema
+      def self.lease_renew: () -> json_schema
       def self.operation_get: () -> json_schema
       def self.coord_context: () -> json_schema
       def self.common_mutation_properties: () -> json_schema
@@ -19,6 +20,7 @@ module Coordinator
       def self.git_oid: () -> json_schema
       def self.uuid_v7: () -> json_schema
       def self.write_set_resource: () -> json_schema
+      def self.lease_renewal_reference: () -> json_schema
       def self.string_array: (min_items: Integer, max_items: Integer, max_length: Integer) -> json_schema
     end
   end

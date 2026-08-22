@@ -19,6 +19,8 @@ module Coordinator::Write
           build_reserve_write_set(document)
         when CommandInputDocuments::ExpandWriteSetV1
           build_expand_write_set(document)
+        when CommandInputDocuments::RenewLeaseSetV1
+          build_renew_lease_set(document)
         end
       end
 
@@ -112,6 +114,20 @@ module Coordinator::Write
           repository_id: input.repository_id,
           base_commit_oid: input.base_commit_oid,
           resources: input.resources.map { FileResourceV1.new(_1.to_h) }
+        )
+      end
+
+      def build_renew_lease_set(document)
+        input = document.input
+        Commands::RenewLeaseSet.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          change_set_id: input.change_set_id,
+          work_item_id: input.work_item_id,
+          attempt_id: input.attempt_id,
+          lease_set_id: input.lease_set_id,
+          leases: input.leases.map { LeaseRenewalReferenceV1.new(_1.to_h) },
+          lease_duration_seconds: input.lease_duration_seconds
         )
       end
 

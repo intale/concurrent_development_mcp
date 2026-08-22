@@ -151,6 +151,45 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         },
         Coordinator::Write::Tasks::DomainErrorV1::LeaseSetNotCurrentError,
         "denied"
+      ],
+      [
+        :lease_set_snapshot_mismatch,
+        {
+          change_set_id: "CS-task-result",
+          work_item_id: "W-task-result",
+          attempt_id: "ATT-task-result",
+          current_resource_key_hashes: [ "sha256:#{'a' * 64}" ],
+          requested_resource_key_hashes: [ "sha256:#{'b' * 64}" ]
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::LeaseSetSnapshotMismatchError,
+        "denied"
+      ],
+      [
+        :lease_reference_mismatch,
+        {
+          change_set_id: "CS-task-result",
+          work_item_id: "W-task-result",
+          attempt_id: "ATT-task-result",
+          resource_key_hash: "sha256:#{'a' * 64}",
+          current_lease_id: "0198e03a-d112-7000-8000-000000000001",
+          requested_lease_id: "0198e03a-d112-7000-8000-000000000002",
+          current_fencing_token: 7,
+          requested_fencing_token: 6
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::LeaseReferenceMismatchError,
+        "denied"
+      ],
+      [
+        :lease_deadline_not_extended,
+        {
+          change_set_id: "CS-task-result",
+          work_item_id: "W-task-result",
+          attempt_id: "ATT-task-result",
+          current_expires_at: "2026-08-22T10:30:00.000000Z",
+          requested_expires_at: "2026-08-22T10:29:00.000000Z"
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::LeaseDeadlineNotExtendedError,
+        "denied"
       ]
     ]
 

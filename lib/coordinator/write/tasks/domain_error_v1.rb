@@ -83,6 +83,24 @@ module Coordinator::Write
         attribute :current_expires_at, Types::Timestamp.optional
       end
 
+      class LeaseSetSnapshotMismatchDetails < AttemptDetails
+        attribute :current_resource_key_hashes, Types::Array.of(Types::Sha256Digest).constrained(max_size: 32)
+        attribute :requested_resource_key_hashes, Types::Array.of(Types::Sha256Digest).constrained(max_size: 32)
+      end
+
+      class LeaseReferenceMismatchDetails < AttemptDetails
+        attribute :resource_key_hash, Types::Sha256Digest
+        attribute :current_lease_id, Types::UuidV7
+        attribute :requested_lease_id, Types::UuidV7
+        attribute :current_fencing_token, Types::FencingToken
+        attribute :requested_fencing_token, Types::FencingToken
+      end
+
+      class LeaseDeadlineNotExtendedDetails < AttemptDetails
+        attribute :current_expires_at, Types::Timestamp
+        attribute :requested_expires_at, Types::Timestamp
+      end
+
       class ChangeSetError < Value
         attribute :code, Types::String.enum(
           "change_set_already_exists",
@@ -189,6 +207,24 @@ module Coordinator::Write
         attribute :details, LeaseSetNotCurrentDetails
       end
 
+      class LeaseSetSnapshotMismatchError < Value
+        attribute :code, Types::String.enum("lease_set_snapshot_mismatch")
+        attribute :message, Types::String
+        attribute :details, LeaseSetSnapshotMismatchDetails
+      end
+
+      class LeaseReferenceMismatchError < Value
+        attribute :code, Types::String.enum("lease_reference_mismatch")
+        attribute :message, Types::String
+        attribute :details, LeaseReferenceMismatchDetails
+      end
+
+      class LeaseDeadlineNotExtendedError < Value
+        attribute :code, Types::String.enum("lease_deadline_not_extended")
+        attribute :message, Types::String
+        attribute :details, LeaseDeadlineNotExtendedDetails
+      end
+
       Type = ChangeSetError |
              ActivationDependencyError |
              WorkItemError |
@@ -200,7 +236,10 @@ module Coordinator::Write
              ResourceEvidenceConflictError |
              WriteSetLimitError |
              LeaseSetExpiredError |
-             LeaseSetNotCurrentError
+             LeaseSetNotCurrentError |
+             LeaseSetSnapshotMismatchError |
+             LeaseReferenceMismatchError |
+             LeaseDeadlineNotExtendedError
     end
   end
 end
