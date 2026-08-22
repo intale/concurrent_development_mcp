@@ -107,6 +107,37 @@ module Coordinator
         )
       end
 
+      def write_set_reserve
+        resource = object_schema(
+          properties: {
+            kind: { type: "string", enum: [ "file" ] },
+            path: { type: "string", minLength: 1, maxLength: 1_024 },
+            base_blob_oid: { anyOf: [ git_oid, { type: "null" } ] }
+          },
+          required: %w[kind path]
+        )
+        object_schema(
+          properties: common_mutation_properties.merge(
+            change_set_id: identifier,
+            work_item_id: identifier,
+            attempt_id: identifier,
+            repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+            base_commit_oid: git_oid,
+            resources: {
+              type: "array",
+              items: resource,
+              minItems: 1,
+              maxItems: 32
+            },
+            lease_duration_seconds: { type: "integer", minimum: 30, maximum: 3_600 }
+          ),
+          required: %w[
+            command_id actor change_set_id work_item_id attempt_id repository_id
+            base_commit_oid resources lease_duration_seconds
+          ]
+        )
+      end
+
       def operation_get
         object_schema(
           properties: {
@@ -167,6 +198,10 @@ module Coordinator
 
       def nullable_string
         { type: [ "string", "null" ] }
+      end
+
+      def git_oid
+        { type: "string", pattern: "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" }
       end
 
       def string_array(min_items:, max_items:, max_length:)

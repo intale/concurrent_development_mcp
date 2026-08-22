@@ -13,7 +13,8 @@ module Coordinator
           Tools::WorkItemCreate,
           Tools::WorkItemDependencyDeclare,
           Tools::ChangeSetActivate,
-          Tools::WorkItemAcquire
+          Tools::WorkItemAcquire,
+          Tools::WriteSetReserve
         ].freeze
       end
     end

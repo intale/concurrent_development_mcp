@@ -37,6 +37,14 @@ module Coordinator::Shared
       requires_composite_verification
     ].freeze
     GIT_OBJECT_FORMATS = %w[sha1 sha256].freeze
+    COORDINATION_TOOL_NAMES = %w[
+      change_set_create
+      work_item_create
+      work_item_dependency_declare
+      change_set_activate
+      work_item_acquire
+      write_set_reserve
+    ].freeze
 
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)
     RepositoryId = String.constrained(format: REPOSITORY_ID_PATTERN)
@@ -51,6 +59,7 @@ module Coordinator::Shared
     LeaseMode = String.enum("exclusive")
     LeaseDurationSeconds = Integer.constrained(gteq: 30, lteq: 3_600)
     FencingToken = Integer.constrained(gteq: 1)
+    CoordinationToolName = String.enum(*COORDINATION_TOOL_NAMES)
     Marker = String.constrained(min_size: 1, max_size: 512)
     MarkerPurpose = String.constrained(format: MARKER_PURPOSE_PATTERN)
     MarkerComponent = String.constrained(format: MARKER_COMPONENT_PATTERN)

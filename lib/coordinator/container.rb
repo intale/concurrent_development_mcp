@@ -43,6 +43,10 @@ module Coordinator
       Write::Operations::PrepareAcquireWorkItem.new
     end
 
+    register("operations.prepare_reserve_write_set", memoize: true) do
+      Write::Operations::PrepareReserveWriteSet.new
+    end
+
     register("domain.change_sets.create", memoize: true) do
       Write::Domain::ChangeSets::Create.new(stream_factory: self["stream_factory"])
     end
@@ -65,6 +69,10 @@ module Coordinator
 
     register("domain.work_items.acquire", memoize: true) do
       Write::Domain::WorkItems::Acquire.new(stream_factory: self["stream_factory"])
+    end
+
+    register("domain.resource_leases.reserve", memoize: true) do
+      Write::Domain::ResourceLeases::Reserve.new(stream_factory: self["stream_factory"])
     end
 
     register("change_set_activation_source_builder", memoize: true) do
@@ -252,6 +260,22 @@ module Coordinator
       )
     end
 
+    register("operations.execute_reserve_write_set") do
+      Write::Operations::ExecuteReserveWriteSet.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_reserve_write_set"],
+        decider: self["domain.resource_leases.reserve"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"],
+        compound_marker_builder: self["compound_marker_builder"]
+      )
+    end
+
     register("tasks.target_executor", memoize: true) do
       Write::Tasks::TargetExecutor.new(
         event_store: self["event_store"],
@@ -259,7 +283,8 @@ module Coordinator
         create_work_item: self["operations.execute_create_work_item"],
         declare_work_item_dependency: self["operations.execute_declare_work_item_dependency"],
         activate_change_set: self["operations.execute_activate_change_set"],
-        acquire_work_item: self["operations.execute_acquire_work_item"]
+        acquire_work_item: self["operations.execute_acquire_work_item"],
+        reserve_write_set: self["operations.execute_reserve_write_set"]
       )
     end
 
@@ -315,6 +340,13 @@ module Coordinator
     register("operations.submit_acquire_work_item_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_acquire_work_item"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_reserve_write_set_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_reserve_write_set"],
         submitter: self["operations.submit_coordination_task"]
       )
     end

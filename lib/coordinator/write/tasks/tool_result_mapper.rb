@@ -6,7 +6,8 @@ module Coordinator::Write
       STATUS_BY_CODE = {
         command_id_reused: "command_id_reused",
         work_item_unavailable: "conflict",
-        attempt_already_exists: "conflict"
+        attempt_already_exists: "conflict",
+        lease_busy: "busy"
       }.freeze
 
       def call(result, command_id:)

@@ -38,6 +38,16 @@ module Coordinator::Write
         attribute :requested_input_digest, Types::Sha256Digest
       end
 
+      class LeaseBusyDetails < Value
+        attribute :resource_key, Types::String
+        attribute :resource_key_hash, Types::Sha256Digest
+        attribute :lease_id, Types::UuidV7
+        attribute :owner_attempt_id, Types::Identifier
+        attribute :owner_agent_id, Types::Identifier
+        attribute :fencing_token, Types::FencingToken
+        attribute :expires_at, Types::Timestamp
+      end
+
       class ChangeSetError < Value
         attribute :code, Types::String.enum(
           "change_set_already_exists",
@@ -89,7 +99,12 @@ module Coordinator::Write
           "work_item_not_ready",
           "work_item_unavailable",
           "attempt_already_exists",
-          "repository_base_mismatch"
+          "repository_base_mismatch",
+          "attempt_not_found",
+          "attempt_not_active",
+          "attempt_scope_mismatch",
+          "attempt_owner_mismatch",
+          "write_set_already_reserved"
         )
         attribute :message, Types::String
         attribute :details, AttemptDetails
@@ -101,12 +116,19 @@ module Coordinator::Write
         attribute :details, CommandIdReusedDetails
       end
 
+      class LeaseBusyError < Value
+        attribute :code, Types::String.enum("lease_busy")
+        attribute :message, Types::String
+        attribute :details, LeaseBusyDetails
+      end
+
       Type = ChangeSetError |
              ActivationDependencyError |
              WorkItemError |
              DependencyError |
              AttemptError |
-             CommandIdReusedError
+             CommandIdReusedError |
+             LeaseBusyError
     end
   end
 end

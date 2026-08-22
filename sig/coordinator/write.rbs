@@ -6,7 +6,8 @@ module Coordinator
                                 Commands::CreateWorkItem |
                                 Commands::DeclareWorkItemDependency |
                                 Commands::ActivateChangeSet |
-                                Commands::AcquireWorkItem
+                                Commands::AcquireWorkItem |
+                                Commands::ReserveWriteSet
     type lifecycle_command = Commands::StartCoordinationTask |
                              Commands::RecordCoordinationTaskOutcome |
                              Commands::CancelCoordinationTask

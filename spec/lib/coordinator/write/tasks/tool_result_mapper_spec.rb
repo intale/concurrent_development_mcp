@@ -57,6 +57,20 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         },
         Coordinator::Write::Tasks::DomainErrorV1::CommandIdReusedError,
         "command_id_reused"
+      ],
+      [
+        :lease_busy,
+        {
+          resource_key: "repo:billing:file:app/models/invoice.rb",
+          resource_key_hash: "sha256:4ef29088b0a3df37b0bdf49785a9dce3dad97985b7f22d5ab5d86e04cdc4049a",
+          lease_id: "0198e03a-d112-7000-8000-000000000001",
+          owner_attempt_id: "ATT-task-result-owner",
+          owner_agent_id: "agent-owner",
+          fencing_token: 7,
+          expires_at: "2026-08-22T10:30:00.000000Z"
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::LeaseBusyError,
+        "busy"
       ]
     ]
 

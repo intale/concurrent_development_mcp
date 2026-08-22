@@ -14,6 +14,7 @@ RSpec.describe Coordinator::Container do
     activation_operation = described_class["operations.execute_activate_change_set"]
     readiness_operation = described_class["operations.execute_evaluate_work_item_readiness"]
     acquisition_operation = described_class["operations.execute_acquire_work_item"]
+    reservation_operation = described_class["operations.execute_reserve_write_set"]
     readiness_process_manager = described_class["process_managers.change_set_readiness"]
     task_executor = described_class["process_managers.coordination_task_executor"]
     subscription_manager = described_class["subscription_managers.process_managers"]
@@ -28,6 +29,7 @@ RSpec.describe Coordinator::Container do
       operations.submit_declare_work_item_dependency_task
       operations.submit_activate_change_set_task
       operations.submit_acquire_work_item_task
+      operations.submit_reserve_write_set_task
     ].map { described_class[_1] }
     tasks_extension = described_class["mcp.tasks.extension"]
     mcp_transport = described_class["mcp.transport"]
@@ -38,6 +40,7 @@ RSpec.describe Coordinator::Container do
     expect(activation_operation).to be_a(Coordinator::Write::Operations::ExecuteActivateChangeSet)
     expect(readiness_operation).to be_a(Coordinator::Write::Operations::ExecuteEvaluateWorkItemReadiness)
     expect(acquisition_operation).to be_a(Coordinator::Write::Operations::ExecuteAcquireWorkItem)
+    expect(reservation_operation).to be_a(Coordinator::Write::Operations::ExecuteReserveWriteSet)
     expect(readiness_process_manager).to be_a(Coordinator::Processes::ProcessManagers::ChangeSetReadiness)
     expect(task_executor).to be_a(Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor)
     expect(subscription_manager).to be_a(PgEventstore::SubscriptionsManager)

@@ -57,6 +57,26 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
             commit_oid: "a" * 40
           )
         ]
+      ),
+      Coordinator::Write::Commands::ReserveWriteSet.new(
+        command_id: "cmd-task-build-6",
+        actor:,
+        change_set_id: "CS-task-build",
+        work_item_id: "W-task-build",
+        attempt_id: "ATT-task-build",
+        repository_id: "billing",
+        base_commit_oid: "a" * 40,
+        resources: [
+          Coordinator::Write::FileResourceV1.new(
+            kind: "file",
+            path: "app/models/invoice.rb",
+            base_blob_oid: "b" * 40,
+            resource_key: "repo:billing:file:app/models/invoice.rb",
+            resource_key_hash: "sha256:4ef29088b0a3df37b0bdf49785a9dce3dad97985b7f22d5ab5d86e04cdc4049a",
+            policy_version: "coordinator-resource-key/v1"
+          )
+        ],
+        lease_duration_seconds: 300
       )
     ]
 

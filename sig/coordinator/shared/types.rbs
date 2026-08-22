@@ -15,6 +15,7 @@ module Coordinator
       DEPENDENCY_KINDS: Array[String]
       OUTPUT_REQUIRED_DEPENDENCY_KINDS: Array[String]
       GIT_OBJECT_FORMATS: Array[String]
+      COORDINATION_TOOL_NAMES: Array[String]
 
       Identifier: untyped
       RepositoryId: untyped
@@ -29,6 +30,7 @@ module Coordinator
       LeaseMode: untyped
       LeaseDurationSeconds: untyped
       FencingToken: untyped
+      CoordinationToolName: untyped
       Marker: untyped
       MarkerPurpose: untyped
       MarkerComponent: untyped

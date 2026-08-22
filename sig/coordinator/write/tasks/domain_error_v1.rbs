@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Tasks
       module DomainErrorV1
-        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError
+        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError
 
         class ChangeSetDetails < Shared::Value
           def change_set_id: () -> String
@@ -39,6 +39,16 @@ module Coordinator
           def requested_input_digest: () -> String
         end
 
+        class LeaseBusyDetails < Shared::Value
+          def resource_key: () -> String
+          def resource_key_hash: () -> String
+          def lease_id: () -> String
+          def owner_attempt_id: () -> String
+          def owner_agent_id: () -> String
+          def fencing_token: () -> Integer
+          def expires_at: () -> String
+        end
+
         class ChangeSetError < Shared::Value
           def code: () -> String
           def message: () -> String
@@ -73,6 +83,12 @@ module Coordinator
           def code: () -> String
           def message: () -> String
           def details: () -> CommandIdReusedDetails
+        end
+
+        class LeaseBusyError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> LeaseBusyDetails
         end
       end
     end
