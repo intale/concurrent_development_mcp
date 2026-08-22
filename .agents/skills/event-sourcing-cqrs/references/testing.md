@@ -16,7 +16,7 @@ Do not mock or stub event stores, databases, Rack/MCP requests, subscription del
 
 ## Required scenarios
 
-For every command, cover success, each material denial, exact replay, concurrent conflict, and retry exhaustion where relevant. Assert authoritative events separately from eventual views.
+For every command, cover success, each material denial, exact replay, and concurrent conflict. Cover retry exhaustion only for an application-owned explicit expected-revision workflow; do not simulate or count `Client#multiple`'s internal SERIALIZABLE transaction restarts. Assert authoritative events separately from eventual views.
 
 For each MCP Task mutation, cover:
 

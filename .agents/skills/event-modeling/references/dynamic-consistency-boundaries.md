@@ -57,7 +57,7 @@ When the application uses `pg_eventstore`:
 - do not consult Active Record projections to decide the invariant;
 - prepare stable logical IDs and times outside the retryable block, then instantiate fresh events from those values on every attempt;
 - assume the serializable block can rerun, including when a new event-type partition is created;
-- keep the work bounded and translate serialization exhaustion to an explicit retryable outcome.
+- keep the read-condition-write work bounded. Treat `Client#multiple`'s internal serialization/deadlock restarts as part of its SERIALIZABLE transaction implementation; do not wrap them in an application retry counter. Only explicit expected-revision workflows outside `multiple` expose a bounded application retry/exhaustion outcome.
 
 Only a command execution appends events inside the DCB transaction. A Saga/process manager, projector, subscription handler, scheduler, or transport may invoke that command but may not decide or append its downstream events.
 

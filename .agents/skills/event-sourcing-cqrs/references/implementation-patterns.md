@@ -9,9 +9,11 @@ Implement one state-changing intent in these layers:
 3. A pure reducer builds authoritative state from those events.
 4. A pure decider applies one command and returns a typed zero/one/many event plan plus an explicit outcome.
 5. An operation executes the read/decide/append unit. It creates stable IDs and timestamps before retryable work, instantiates fresh event objects on each attempt, and commits a multi-event plan with one `Client#multiple` call.
-6. A finite retry policy translates expected-revision/serialization exhaustion into a typed result stating that nothing committed and a later retry may succeed.
+6. When the operation uses an explicit expected revision outside `Client#multiple`, a finite application retry policy translates `WrongExpectedRevision` exhaustion into a typed result stating that nothing committed and a later retry may succeed.
 
 Do not use a read model, projected receipt, cache, or transport state to authorize the decision. Semantic no-op/denial commands return zero domain events unless the accepted Event Model defines an audit fact; a separate task-outcome command may persist the protocol lifecycle result.
+
+`Client#multiple` is a SERIALIZABLE transaction facility. Put the complete bounded read-condition-write decision inside its block, do not pass expected revisions inside it, and let `pg_eventstore` own its internal serialization/deadlock restarts. Prepare retry-stable logical values before the block and construct fresh event instances during each execution. Do not add an application counter around those internal transaction restarts.
 
 ## MCP Task path
 

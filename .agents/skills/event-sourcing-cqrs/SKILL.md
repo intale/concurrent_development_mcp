@@ -13,7 +13,7 @@ Implement an accepted Event Model as an explicitly separated event-sourced write
 - Keep the read side available and eventually consistent. Serve an existing projection without comparing it with the write store, withholding stale content, or exposing a `pending_projection` gate.
 - Only a command decides domain events. A process manager consumes an event and invokes a deterministic command; a projector updates a disposable view; neither appends downstream domain events directly.
 - Put MCP Tasks and their authoritative lifecycle in the write side. Task polling reads task facts from `pg_eventstore`, never a projection. Keep ordinary query tools on the read side.
-- Bound concurrency retries. Reread and re-decide on every retry using stable logical IDs/times, and return a typed retryable outcome after exhaustion.
+- For explicit expected-revision writes outside `Client#multiple`, bound public `WrongExpectedRevision` retries, reread and re-decide with stable logical IDs/times, and return a typed retryable outcome after exhaustion. Do not reinterpret or wrap `Client#multiple`'s internal serialization/deadlock transaction restarts as public retries.
 - Keep the composition root as the only place that wires across sides. Do not hide cross-side access behind a shared repository or generic service.
 
 Before moving or adding application code, read [references/module-boundaries.md](references/module-boundaries.md). When implementing commands, subscriptions, Tasks, or schemas, also read [references/implementation-patterns.md](references/implementation-patterns.md). Before writing or reorganizing tests, read [references/testing.md](references/testing.md).
@@ -36,7 +36,7 @@ Reject an implementation when:
 - the read side must contact the write store before serving an existing view;
 - a transport, projector, or process manager constructs/appends a downstream domain event;
 - an unbounded history read or payload scan substitutes for a modeled stream/marker selector;
-- a retry loop is unbounded or reuses mutable event instances;
+- an application-owned expected-revision retry loop is unbounded or reuses mutable event instances;
 - a task handle is returned before its authoritative task fact is queryable;
 - a logical/tool error is represented as MCP Task `failed` instead of terminal `completed` with the original tool result;
 - module names and paths do not match Zeitwerk, or application code uses `require`/`require_relative` dependency wiring;
