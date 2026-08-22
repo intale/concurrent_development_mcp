@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Decisions
+      class DecisionDefinitionV1 < Shared::Value
+        def document: () -> DecisionDefinitionDocumentV1
+        def digest: () -> String
+      end
+    end
+  end
+end

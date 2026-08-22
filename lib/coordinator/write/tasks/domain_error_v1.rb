@@ -146,6 +146,33 @@ module Coordinator::Write
         attribute :supplied_schema, Types::DecisionValueSchema
       end
 
+      class DecisionExistingDetails < Value
+        attribute :decision_id, Types::Identifier
+        attribute :event_id, Types::UuidV7
+        attribute :event_type, Types::Identifier
+      end
+
+      class InterpretationActivationDetails < InterpretationDetails
+        attribute :decision_id, Types::Identifier
+        attribute :event_id, Types::UuidV7
+      end
+
+      class DecisionDefinitionIneligibleDetails < Value
+        attribute :reasons, Types::DecisionActivationIneligibilityReasons
+      end
+
+      class DecisionSlotOccupiedDetails < Value
+        attribute :slot_id, Types::Identifier
+        attribute :decision_id, Types::Identifier
+        attribute :event_id, Types::UuidV7
+      end
+
+      class DecisionPartitionLimitDetails < Value
+        attribute :decision_id, Types::Identifier
+        attribute :partition_count, Types::Integer.constrained(gteq: 33)
+        attribute :maximum_partition_count, Types::Integer.constrained(eql: 32)
+      end
+
       class ChangeSetError < Value
         attribute :code, Types::String.enum(
           "change_set_already_exists",
@@ -336,6 +363,42 @@ module Coordinator::Write
         attribute :details, TopicValueDetails
       end
 
+      class InterpretationNotAcceptedError < Value
+        attribute :code, Types::String.enum("interpretation_not_accepted")
+        attribute :message, Types::String
+        attribute :details, InterpretationDetails
+      end
+
+      class DecisionAlreadyExistsError < Value
+        attribute :code, Types::String.enum("decision_already_exists")
+        attribute :message, Types::String
+        attribute :details, DecisionExistingDetails
+      end
+
+      class InterpretationAlreadyActivatedError < Value
+        attribute :code, Types::String.enum("interpretation_already_activated")
+        attribute :message, Types::String
+        attribute :details, InterpretationActivationDetails
+      end
+
+      class DecisionDefinitionNotActivatableError < Value
+        attribute :code, Types::String.enum("decision_definition_not_activatable")
+        attribute :message, Types::String
+        attribute :details, DecisionDefinitionIneligibleDetails
+      end
+
+      class DecisionSlotOccupiedError < Value
+        attribute :code, Types::String.enum("decision_slot_occupied")
+        attribute :message, Types::String
+        attribute :details, DecisionSlotOccupiedDetails
+      end
+
+      class DecisionPartitionLimitReachedError < Value
+        attribute :code, Types::String.enum("decision_partition_limit_reached")
+        attribute :message, Types::String
+        attribute :details, DecisionPartitionLimitDetails
+      end
+
       Type = ChangeSetError |
              ActivationDependencyError |
              WorkItemError |
@@ -361,7 +424,13 @@ module Coordinator::Write
              InterpretationSlotAlreadyAcceptedError |
              SourceSpanMismatchError |
              TopicNotSupportedError |
-             TopicValueInvalidError
+             TopicValueInvalidError |
+             InterpretationNotAcceptedError |
+             DecisionAlreadyExistsError |
+             InterpretationAlreadyActivatedError |
+             DecisionDefinitionNotActivatableError |
+             DecisionSlotOccupiedError |
+             DecisionPartitionLimitReachedError
     end
   end
 end

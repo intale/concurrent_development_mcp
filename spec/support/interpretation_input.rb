@@ -114,4 +114,44 @@ module InterpretationInput
       ]
     }
   end
+
+  def activation(
+    command_id: "cmd-decision-activation-1",
+    decision_id: "D-1",
+    interpretation_id: "I-1",
+    rationale: { code: "user_confirmed", summary: "Activate the accepted policy." }
+  )
+    {
+      command_id:,
+      actor: { kind: "orchestrator", id: "guidance-host" },
+      decision_id:,
+      interpretation_id:,
+      rationale:
+    }
+  end
+
+  def scope(
+    workspace_id: nil,
+    repository_ids: [],
+    change_set_id: nil,
+    work_item_id: nil,
+    attempt_id: nil,
+    candidate_id: nil
+  )
+    {
+      workspace_id:,
+      repository_ids:,
+      branch_selectors: [],
+      change_set_id:,
+      work_item_id:,
+      attempt_id:,
+      candidate_id:,
+      path_selectors: [],
+      symbol_selectors: [],
+      contract_selectors: [],
+      schema_selectors: [],
+      environments: [],
+      agent_roles: []
+    }
+  end
 end

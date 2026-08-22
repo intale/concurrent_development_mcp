@@ -1,0 +1,6 @@
+module Dry
+  class Operation
+    def step: (untyped value) -> untyped
+    def steps: () { () -> untyped } -> untyped
+  end
+end

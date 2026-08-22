@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Decisions
+      class DecisionDefinitionBuilder
+        def initialize: (?topic_registry: Interpretations::TopicRegistry, ?canonical_json: Shared::CanonicalJson) -> void
+        def call: (proposal: Events::DecisionInterpretationProposedV1, activated_at: String) -> DecisionDefinitionV1
+      end
+    end
+  end
+end

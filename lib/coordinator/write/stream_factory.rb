@@ -57,5 +57,29 @@ module Coordinator::Write
         stream_id: message_id
       )
     end
+
+    def decision(decision_id)
+      StreamReference.new(
+        context: "HumanGuidance",
+        stream_name: "Decision",
+        stream_id: decision_id
+      )
+    end
+
+    def decision_slot(slot_id)
+      StreamReference.new(
+        context: "HumanGuidance",
+        stream_name: "DecisionSlot",
+        stream_id: slot_id
+      )
+    end
+
+    def decision_partition(partition_id)
+      StreamReference.new(
+        context: "HumanGuidance",
+        stream_name: "DecisionPartition",
+        stream_id: partition_id
+      )
+    end
   end
 end

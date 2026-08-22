@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Decisions
+      class DecisionPartitionV1 < Shared::Value
+        def partition_id: () -> String
+        def topic_root: () -> String
+        def anchor_kind: () -> String
+        def anchor_id: () -> String
+      end
+    end
+  end
+end

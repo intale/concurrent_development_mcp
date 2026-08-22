@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Domain
+      module Decisions
+        class PrepareActivation
+          def initialize: (?eligibility: ActivationEligibility, ?definition_builder: Write::Decisions::DecisionDefinitionBuilder, ?slot_builder: Write::Decisions::DecisionSlotBuilder, ?partition_builder: Write::Decisions::DecisionPartitionBuilder) -> void
+          def call: (command: Commands::ActivateDecision, proposal: Write::Interpretations::InterpretationProposalEvidenceV1?, acceptance: Write::Decisions::InterpretationAcceptanceEvidenceV1?, activated_at: String, recorded_event: EventReference, activated_event: EventReference) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

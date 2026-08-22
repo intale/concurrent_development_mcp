@@ -243,6 +243,58 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         },
         Coordinator::Write::Tasks::DomainErrorV1::InterpretationSlotAlreadyAcceptedError,
         "conflict"
+      ],
+      [
+        :interpretation_not_accepted,
+        { interpretation_id: "I-task-result" },
+        Coordinator::Write::Tasks::DomainErrorV1::InterpretationNotAcceptedError,
+        "denied"
+      ],
+      [
+        :decision_already_exists,
+        {
+          decision_id: "D-task-result",
+          event_id: "0198e03a-d112-7000-8000-000000000001",
+          event_type: "DecisionRecorded"
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::DecisionAlreadyExistsError,
+        "denied"
+      ],
+      [
+        :interpretation_already_activated,
+        {
+          interpretation_id: "I-task-result",
+          decision_id: "D-task-result",
+          event_id: "0198e03a-d112-7000-8000-000000000001"
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::InterpretationAlreadyActivatedError,
+        "denied"
+      ],
+      [
+        :decision_definition_not_activatable,
+        { reasons: [ "scope_unresolved" ] },
+        Coordinator::Write::Tasks::DomainErrorV1::DecisionDefinitionNotActivatableError,
+        "denied"
+      ],
+      [
+        :decision_slot_occupied,
+        {
+          slot_id: "compound:decision-slot:v1:sha256:#{'a' * 64}",
+          decision_id: "D-task-result",
+          event_id: "0198e03a-d112-7000-8000-000000000001"
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::DecisionSlotOccupiedError,
+        "conflict"
+      ],
+      [
+        :decision_partition_limit_reached,
+        {
+          decision_id: "D-task-result",
+          partition_count: 33,
+          maximum_partition_count: 32
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::DecisionPartitionLimitReachedError,
+        "denied"
       ]
     ]
 

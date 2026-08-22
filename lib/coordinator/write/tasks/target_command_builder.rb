@@ -29,6 +29,8 @@ module Coordinator::Write
           build_propose_decision_interpretation(document)
         when CommandInputDocuments::AdjudicateDecisionInterpretationV1
           build_adjudicate_decision_interpretation(document)
+        when CommandInputDocuments::ActivateDecisionV1
+          build_activate_decision(document)
         end
       end
 
@@ -189,6 +191,17 @@ module Coordinator::Write
           action: input.action,
           rationale: input.rationale,
           clarification: input.clarification
+        )
+      end
+
+      def build_activate_decision(document)
+        input = document.input
+        Commands::ActivateDecision.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          decision_id: input.decision_id,
+          interpretation_id: input.interpretation_id,
+          rationale: input.rationale
         )
       end
 

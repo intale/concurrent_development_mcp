@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module Domain
+      module Decisions
+        class ActivationState < Shared::Value
+          def candidate: () -> Write::Decisions::DecisionActivationCandidateV1
+          def existing_decision: () -> EventReference?
+          def existing_activation: () -> Write::Decisions::DecisionActivationEvidenceV1?
+          def slot_head: () -> Write::Decisions::DecisionHeadV1?
+          def partition_states: () -> Array[Write::Decisions::DecisionPartitionStateV1]
+        end
+      end
+    end
+  end
+end

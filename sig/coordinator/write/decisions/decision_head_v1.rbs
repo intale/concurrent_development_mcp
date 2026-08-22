@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Decisions
+      class DecisionHeadV1 < Shared::Value
+        def decision_id: () -> String
+        def decision_revision: () -> Integer
+        def event: () -> EventReference
+      end
+    end
+  end
+end

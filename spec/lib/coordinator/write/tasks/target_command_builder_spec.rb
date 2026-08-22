@@ -136,6 +136,9 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
           action: "request_clarification",
           clarification: InterpretationInput.clarification
         )
+      ).value!,
+      Coordinator::Write::Operations::PrepareActivateDecision.new.call(
+        InterpretationInput.activation(command_id: "cmd-task-build-11")
       ).value!
     ]
 

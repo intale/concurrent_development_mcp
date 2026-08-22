@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Decisions
+      class DecisionPartitionReceiptV1 < Shared::Value
+        def partition: () -> DecisionPartitionV1
+        def partition_revision: () -> Integer
+      end
+    end
+  end
+end

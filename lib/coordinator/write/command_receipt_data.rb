@@ -116,6 +116,19 @@ module Coordinator::Write
       attribute :adjudicated_at, Types::Timestamp
     end
 
+    class DecisionActivation < Value
+      PartitionReceipt = Decisions::DecisionPartitionReceiptV1
+
+      attribute :decision_id, Types::Identifier
+      attribute :interpretation_id, Types::Identifier
+      attribute :outcome, Types::DecisionActivationOutcome
+      attribute :policy_status, Types::DecisionPolicyStatus
+      attribute :definition_digest, Types::Sha256Digest
+      attribute :slot, Decisions::DecisionSlotV1.optional
+      attribute :partitions, Types::Array.of(PartitionReceipt).constrained(min_size: 1, max_size: 32)
+      attribute :activated_at, Types::Timestamp
+    end
+
     Type = ChangeSet |
            WorkItem |
            Dependency |
@@ -127,6 +140,7 @@ module Coordinator::Write
            ResourceLeaseExpiry |
            Guidance |
            InterpretationProposal |
-           InterpretationAdjudication
+           InterpretationAdjudication |
+           DecisionActivation
   end
 end

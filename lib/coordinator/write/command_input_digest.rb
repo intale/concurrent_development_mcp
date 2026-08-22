@@ -24,6 +24,7 @@ module Coordinator::Write
       when Commands::RecordGuidance then guidance_record_document(command)
       when Commands::ProposeDecisionInterpretation then decision_interpretation_propose_document(command)
       when Commands::AdjudicateDecisionInterpretation then decision_interpretation_adjudicate_document(command)
+      when Commands::ActivateDecision then decision_activate_document(command)
       when Commands::ExpireResourceLease then lease_expire_policy_document(command)
       else
         raise ArgumentError, "Unsupported coordination command: #{command.class.name}"
@@ -296,6 +297,24 @@ module Coordinator::Write
           action: command.action,
           rationale: command.rationale,
           clarification: command.clarification
+        )
+      )
+    end
+
+    def decision_activate(command)
+      @canonical_json.sha256(decision_activate_document(command).to_h)
+    end
+
+    def decision_activate_document(command)
+      CommandInputDocuments::ActivateDecisionV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "decision_activate",
+        input: CommandInputDocuments::ActivateDecisionInputV1.new(
+          actor: actor_document(command.actor),
+          decision_id: command.decision_id,
+          interpretation_id: command.interpretation_id,
+          rationale: command.rationale
         )
       )
     end

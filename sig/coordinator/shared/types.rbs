@@ -21,6 +21,16 @@ module Coordinator
       DECISION_MODALITIES: Array[String]
       DECISION_VALUE_SCHEMAS: Array[String]
       INTERPRETATION_ASSESSMENT_STATUSES: Array[String]
+      INTERPRETATION_ADJUDICATION_ACTIONS: Array[String]
+      INTERPRETATION_CLARIFICATION_STATUSES: Array[String]
+      INTERPRETATION_CLARIFICATION_ORIGINS: Array[String]
+      INTERPRETATION_LIFECYCLE_STATUSES: Array[String]
+      INTERPRETATION_ADJUDICATION_OUTCOMES: Array[String]
+      DECISION_ACTIVATION_OUTCOMES: Array[String]
+      DECISION_POLICY_STATUSES: Array[String]
+      DECISION_PARTITION_ANCHOR_KINDS: Array[String]
+      DECISION_CHANGE_KINDS: Array[String]
+      DECISION_ACTIVATION_INELIGIBILITY_REASONS: Array[String]
       SCOPE_PROVENANCE_KINDS: Array[String]
       SCOPE_ANCHOR_LEVELS: Array[String]
       DECISION_PHASES: Array[String]
@@ -78,6 +88,12 @@ module Coordinator
       InterpretationClarificationOrigin: untyped
       InterpretationLifecycleStatus: untyped
       InterpretationAdjudicationOutcome: untyped
+      DecisionActivationOutcome: untyped
+      DecisionPolicyStatus: untyped
+      DecisionPartitionAnchorKind: untyped
+      DecisionChangeKind: untyped
+      DecisionActivationIneligibilityReason: untyped
+      DecisionActivationIneligibilityReasons: untyped
       ScopeProvenanceKind: untyped
       ScopeAnchorLevel: untyped
       DecisionPhase: untyped
@@ -101,6 +117,8 @@ module Coordinator
       InterpretationReasons: untyped
       InterpretationPageLimit: untyped
       StreamRevisionCursor: untyped
+      StreamRevision: untyped
+      DecisionPartitions: untyped
     end
   end
 end

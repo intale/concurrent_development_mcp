@@ -30,6 +30,8 @@ module Coordinator
       def decision_interpretation_propose_document: (Commands::ProposeDecisionInterpretation command) -> CommandInputDocuments::ProposeDecisionInterpretationV1
       def decision_interpretation_adjudicate: (Commands::AdjudicateDecisionInterpretation command) -> String
       def decision_interpretation_adjudicate_document: (Commands::AdjudicateDecisionInterpretation command) -> CommandInputDocuments::AdjudicateDecisionInterpretationV1
+      def decision_activate: (Commands::ActivateDecision command) -> String
+      def decision_activate_document: (Commands::ActivateDecision command) -> CommandInputDocuments::ActivateDecisionV1
     end
   end
 end

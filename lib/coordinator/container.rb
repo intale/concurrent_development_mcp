@@ -82,6 +82,10 @@ module Coordinator
       Write::Operations::PrepareAdjudicateDecisionInterpretation.new
     end
 
+    register("operations.prepare_activate_decision", memoize: true) do
+      Write::Operations::PrepareActivateDecision.new
+    end
+
     register("domain.change_sets.create", memoize: true) do
       Write::Domain::ChangeSets::Create.new(stream_factory: self["stream_factory"])
     end
@@ -139,6 +143,43 @@ module Coordinator
 
     register("domain.interpretations.adjudicate", memoize: true) do
       Write::Domain::Interpretations::Adjudicate.new(stream_factory: self["stream_factory"])
+    end
+
+    register("decisions.definition_builder", memoize: true) do
+      Write::Decisions::DecisionDefinitionBuilder.new(
+        topic_registry: self["interpretations.topic_registry"],
+        canonical_json: self["canonical_json"]
+      )
+    end
+
+    register("decisions.slot_builder", memoize: true) do
+      Write::Decisions::DecisionSlotBuilder.new(
+        canonical_json: self["canonical_json"],
+        compound_marker_builder: self["compound_marker_builder"]
+      )
+    end
+
+    register("decisions.partition_builder", memoize: true) do
+      Write::Decisions::DecisionPartitionBuilder.new
+    end
+
+    register("domain.decisions.activation_eligibility", memoize: true) do
+      Write::Domain::Decisions::ActivationEligibility.new(
+        topic_registry: self["interpretations.topic_registry"]
+      )
+    end
+
+    register("domain.decisions.prepare_activation", memoize: true) do
+      Write::Domain::Decisions::PrepareActivation.new(
+        eligibility: self["domain.decisions.activation_eligibility"],
+        definition_builder: self["decisions.definition_builder"],
+        slot_builder: self["decisions.slot_builder"],
+        partition_builder: self["decisions.partition_builder"]
+      )
+    end
+
+    register("domain.decisions.activate", memoize: true) do
+      Write::Domain::Decisions::Activate.new(stream_factory: self["stream_factory"])
     end
 
     register("change_set_activation_source_builder", memoize: true) do
@@ -512,6 +553,22 @@ module Coordinator
       )
     end
 
+    register("operations.execute_activate_decision") do
+      Write::Operations::ExecuteActivateDecision.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_activate_decision"],
+        candidate_preparer: self["domain.decisions.prepare_activation"],
+        decider: self["domain.decisions.activate"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
     register("lease_expiry_policy", memoize: true) do
       Processes::LeaseExpiryPolicy.new(
         source_loader: self["lease_expiry_source_loader"],
@@ -534,7 +591,8 @@ module Coordinator
         release_lease_set: self["operations.execute_release_lease_set"],
         record_guidance: self["operations.execute_record_guidance"],
         propose_decision_interpretation: self["operations.execute_propose_decision_interpretation"],
-        adjudicate_decision_interpretation: self["operations.execute_adjudicate_decision_interpretation"]
+        adjudicate_decision_interpretation: self["operations.execute_adjudicate_decision_interpretation"],
+        activate_decision: self["operations.execute_activate_decision"]
       )
     end
 
@@ -639,6 +697,13 @@ module Coordinator
     register("operations.submit_adjudicate_decision_interpretation_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_adjudicate_decision_interpretation"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_activate_decision_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_activate_decision"],
         submitter: self["operations.submit_coordination_task"]
       )
     end

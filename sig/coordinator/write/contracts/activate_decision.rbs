@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Contracts
+      class ActivateDecision < Dry::Validation::Contract
+        def call: (Write::command_input input) -> Dry::Validation::Result
+      end
+    end
+  end
+end

@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Decisions
+      class DecisionSlotDocumentV1 < Shared::Value
+        def schema: () -> String
+        def topic_id: () -> String
+        def exact_scope: () -> Interpretations::DecisionScopeV1
+        def exact_conditions: () -> Interpretations::DecisionConditionsV1
+        def conflict_dimension: () -> String
+        def resolution_strategy: () -> String
+      end
+    end
+  end
+end

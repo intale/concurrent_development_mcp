@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Tasks
       module DomainErrorV1
-        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError
+        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError | InterpretationNotAcceptedError | DecisionAlreadyExistsError | InterpretationAlreadyActivatedError | DecisionDefinitionNotActivatableError | DecisionSlotOccupiedError | DecisionPartitionLimitReachedError
 
         class ChangeSetDetails < Shared::Value
           def change_set_id: () -> String
@@ -145,6 +145,33 @@ module Coordinator
           def topic_id: () -> String
           def expected_schema: () -> String
           def supplied_schema: () -> String
+        end
+
+        class DecisionExistingDetails < Shared::Value
+          def decision_id: () -> String
+          def event_id: () -> String
+          def event_type: () -> String
+        end
+
+        class InterpretationActivationDetails < InterpretationDetails
+          def decision_id: () -> String
+          def event_id: () -> String
+        end
+
+        class DecisionDefinitionIneligibleDetails < Shared::Value
+          def reasons: () -> Array[String]
+        end
+
+        class DecisionSlotOccupiedDetails < Shared::Value
+          def slot_id: () -> String
+          def decision_id: () -> String
+          def event_id: () -> String
+        end
+
+        class DecisionPartitionLimitDetails < Shared::Value
+          def decision_id: () -> String
+          def partition_count: () -> Integer
+          def maximum_partition_count: () -> Integer
         end
 
         class ChangeSetError < Shared::Value
@@ -303,6 +330,43 @@ module Coordinator
           def code: () -> String
           def message: () -> String
           def details: () -> TopicValueDetails
+        end
+
+
+        class InterpretationNotAcceptedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> InterpretationDetails
+        end
+
+        class DecisionAlreadyExistsError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> DecisionExistingDetails
+        end
+
+        class InterpretationAlreadyActivatedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> InterpretationActivationDetails
+        end
+
+        class DecisionDefinitionNotActivatableError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> DecisionDefinitionIneligibleDetails
+        end
+
+        class DecisionSlotOccupiedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> DecisionSlotOccupiedDetails
+        end
+
+        class DecisionPartitionLimitReachedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> DecisionPartitionLimitDetails
         end
       end
     end

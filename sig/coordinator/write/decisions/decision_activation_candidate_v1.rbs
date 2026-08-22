@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module Decisions
+      class DecisionActivationCandidateV1 < Shared::Value
+        def proposal: () -> Interpretations::InterpretationProposalEvidenceV1
+        def acceptance: () -> InterpretationAcceptanceEvidenceV1
+        def definition: () -> DecisionDefinitionV1
+        def slot: () -> DecisionSlotV1?
+        def partitions: () -> Array[DecisionPartitionV1]
+        def recorded_event: () -> EventReference
+        def activated_event: () -> EventReference
+      end
+    end
+  end
+end

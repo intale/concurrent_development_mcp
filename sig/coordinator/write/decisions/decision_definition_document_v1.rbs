@@ -1,0 +1,21 @@
+module Coordinator
+  module Write
+    module Decisions
+      class DecisionDefinitionDocumentV1 < Shared::Value
+        def schema: () -> String
+        def statement_kind: () -> String
+        def topic: () -> Interpretations::TopicDefinitionV1
+        def effect: () -> String
+        def modality: () -> String
+        def value: () -> Interpretations::DecisionValueV1
+        def scope: () -> Interpretations::DecisionScopeV1
+        def conditions: () -> Interpretations::DecisionConditionsV1
+        def validity: () -> Interpretations::DecisionValidityV1
+        def authority: () -> Interpretations::DecisionAuthorityV1
+        def enforcement: () -> Interpretations::DecisionEnforcementV1
+        def relations: () -> Interpretations::DecisionRelationsV1
+        def topic_root: () -> String
+      end
+    end
+  end
+end

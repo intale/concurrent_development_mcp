@@ -20,10 +20,15 @@ module Coordinator::Write
       attribute :message_id, Types::Identifier
     end
 
+    class DecisionArguments < Value
+      attribute :decision_id, Types::Identifier
+    end
+
     Arguments = ChangeSetArguments |
                 AttemptArguments |
                 GuidanceArguments |
-                InterpretationListArguments
+                InterpretationListArguments |
+                DecisionArguments
 
     attribute :tool, Types::Identifier
     attribute :arguments, Arguments

@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Decisions
+      class DecisionSlotV1 < Shared::Value
+        def slot_id: () -> String
+        def document: () -> DecisionSlotDocumentV1
+        def compound_marker: () -> Shared::CompoundMarker
+      end
+    end
+  end
+end

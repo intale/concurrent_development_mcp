@@ -331,6 +331,33 @@ module Coordinator::Write
       )
     end
 
+    def decision_activate(command:, activation:, partitions:, input_digest:, persisted_events:, completed_at:)
+      build_completion(
+        command:,
+        tool_name: "decision_activate",
+        summary: "Accepted interpretation activated as authoritative policy.",
+        data: CommandReceiptData::DecisionActivation.new(
+          decision_id: command.decision_id,
+          interpretation_id: command.interpretation_id,
+          outcome: "activated",
+          policy_status: "active",
+          definition_digest: activation.definition_digest,
+          slot: activation.slot,
+          partitions:,
+          activated_at: activation.activated_at
+        ),
+        next_actions: [
+          NextAction.new(
+            tool: "decision_get",
+            arguments: NextAction::DecisionArguments.new(decision_id: command.decision_id)
+          )
+        ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
 
     def build_completion(command:, tool_name:, summary:, data:, next_actions:, input_digest:, persisted_events:, completed_at:)

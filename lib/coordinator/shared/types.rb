@@ -93,6 +93,27 @@ module Coordinator::Shared
       rejected
       clarification_required
     ].freeze
+    DECISION_ACTIVATION_OUTCOMES = %w[activated].freeze
+    DECISION_POLICY_STATUSES = %w[recorded active].freeze
+    DECISION_PARTITION_ANCHOR_KINDS = %w[
+      workspace
+      repo
+      changeset
+      workitem
+      attempt
+      candidate
+    ].freeze
+    DECISION_CHANGE_KINDS = %w[activated].freeze
+    DECISION_ACTIVATION_INELIGIBILITY_REASONS = %w[
+      non_normative_statement_kind
+      missing_effect
+      missing_modality
+      scope_unresolved
+      lifecycle_relation_requires_specific_command
+      validity_elapsed
+      until_event_requires_expiry_policy
+      topic_registry_mismatch
+    ].freeze
     SCOPE_PROVENANCE_KINDS = %w[explicit inferred unresolved].freeze
     SCOPE_ANCHOR_LEVELS = %w[workspace repository change_set work_item attempt unresolved].freeze
     DECISION_PHASES = %w[planning implementation verification integration deployment].freeze
@@ -134,6 +155,7 @@ module Coordinator::Shared
       guidance_record
       decision_interpretation_propose
       decision_interpretation_adjudicate
+      decision_activate
     ].freeze
 
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)
@@ -181,6 +203,12 @@ module Coordinator::Shared
     InterpretationClarificationOrigin = String.enum(*INTERPRETATION_CLARIFICATION_ORIGINS)
     InterpretationLifecycleStatus = String.enum(*INTERPRETATION_LIFECYCLE_STATUSES)
     InterpretationAdjudicationOutcome = String.enum(*INTERPRETATION_ADJUDICATION_OUTCOMES)
+    DecisionActivationOutcome = String.enum(*DECISION_ACTIVATION_OUTCOMES)
+    DecisionPolicyStatus = String.enum(*DECISION_POLICY_STATUSES)
+    DecisionPartitionAnchorKind = String.enum(*DECISION_PARTITION_ANCHOR_KINDS)
+    DecisionChangeKind = String.enum(*DECISION_CHANGE_KINDS)
+    DecisionActivationIneligibilityReason = String.enum(*DECISION_ACTIVATION_INELIGIBILITY_REASONS)
+    DecisionActivationIneligibilityReasons = Array.of(DecisionActivationIneligibilityReason).constrained(min_size: 1, max_size: 10)
     ScopeProvenanceKind = String.enum(*SCOPE_PROVENANCE_KINDS)
     ScopeAnchorLevel = String.enum(*SCOPE_ANCHOR_LEVELS)
     DecisionPhase = String.enum(*DECISION_PHASES)
@@ -204,5 +232,7 @@ module Coordinator::Shared
     InterpretationReasons = Array.of(Identifier).constrained(max_size: 20)
     InterpretationPageLimit = Integer.constrained(gteq: 1, lteq: 100)
     StreamRevisionCursor = Integer.constrained(gteq: -1)
+    StreamRevision = Integer.constrained(gteq: 0)
+    DecisionPartitions = Integer.constrained(gteq: 1, lteq: 32)
   end
 end

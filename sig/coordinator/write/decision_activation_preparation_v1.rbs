@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    class DecisionActivationPreparationV1 < Shared::Value
+      def activated_at: () -> String
+      def input_digest: () -> String
+      def recorded_event_id: () -> String
+      def activated_event_id: () -> String
+      def slot_opened_event_id: () -> String
+      def slot_head_event_id: () -> String
+      def partition_event_ids: () -> Array[String]
+      def completion_event_id: () -> String
+    end
+  end
+end

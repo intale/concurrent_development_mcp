@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module Events
+      class DecisionPartitionAdvancedV1 < Base
+        def partition: () -> Decisions::DecisionPartitionV1
+        def partition_revision: () -> Integer
+        def decision: () -> Decisions::DecisionHeadV1
+        def change_kind: () -> String
+        def advanced_at: () -> String
+      end
+    end
+  end
+end

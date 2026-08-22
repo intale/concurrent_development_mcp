@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Events
+      class DecisionSlotHeadChangedV1 < Base
+        def slot_id: () -> String
+        def previous_head: () -> Decisions::DecisionHeadV1?
+        def head: () -> Decisions::DecisionHeadV1
+        def changed_at: () -> String
+      end
+    end
+  end
+end

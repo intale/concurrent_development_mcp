@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Decisions
+      class DecisionActivationEvidenceV1 < Shared::Value
+        def decision_id: () -> String
+        def interpretation_id: () -> String
+        def event: () -> EventReference
+      end
+    end
+  end
+end

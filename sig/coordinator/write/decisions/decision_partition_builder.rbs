@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Decisions
+      class DecisionPartitionBuilder
+        def call: (DecisionDefinitionV1 definition) -> Array[DecisionPartitionV1]
+      end
+    end
+  end
+end

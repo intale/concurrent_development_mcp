@@ -8,7 +8,8 @@ module Coordinator::Write
         work_item_unavailable: "conflict",
         attempt_already_exists: "conflict",
         lease_busy: "busy",
-        interpretation_slot_already_accepted: "conflict"
+        interpretation_slot_already_accepted: "conflict",
+        decision_slot_occupied: "conflict"
       }.freeze
 
       def call(result, command_id:)

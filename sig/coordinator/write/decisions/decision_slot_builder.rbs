@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Decisions
+      class DecisionSlotBuilder
+        EXCLUSIVE_STRATEGIES: Array[String]
+
+        def initialize: (?canonical_json: Shared::CanonicalJson, ?compound_marker_builder: Shared::CompoundMarkerBuilder) -> void
+        def call: (DecisionDefinitionV1 definition) -> DecisionSlotV1?
+      end
+    end
+  end
+end

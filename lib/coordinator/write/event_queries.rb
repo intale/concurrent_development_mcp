@@ -51,9 +51,47 @@ module Coordinator::Write
       )
     end
 
+    def self.interpretation_acceptance(marker)
+      GlobalMarkedEventReadCriteria.new(
+        stream_context: "HumanGuidance",
+        stream_name: "Interpretation",
+        event_types: [ "DecisionInterpretationAccepted" ],
+        marker:,
+        maximum_count: 1,
+        direction: :asc
+      )
+    end
+
+    def self.decision_activation(marker)
+      GlobalMarkedEventReadCriteria.new(
+        stream_context: "HumanGuidance",
+        stream_name: "Decision",
+        event_types: [ "DecisionActivated" ],
+        marker:,
+        maximum_count: 1,
+        direction: :asc
+      )
+    end
+
     COMMAND_COMPLETION = EventReadCriteria.new(
       event_types: [ "CommandCompleted" ],
       maximum_count: 1,
+      direction: :desc
+    )
+
+    DECISION_EXISTENCE = EventReadCriteria.new(
+      event_types: [ "DecisionRecorded", "DecisionActivated" ],
+      maximum_count: 2,
+      direction: :asc
+    )
+
+    DECISION_SLOT_LATEST = GroupedEventReadCriteria.new(
+      event_types: [ "DecisionSlotOpened", "DecisionSlotHeadChanged" ],
+      direction: :desc
+    )
+
+    DECISION_PARTITION_LATEST = GroupedEventReadCriteria.new(
+      event_types: [ "DecisionPartitionAdvanced" ],
       direction: :desc
     )
 
