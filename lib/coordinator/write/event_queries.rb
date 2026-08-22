@@ -85,6 +85,11 @@ module Coordinator::Write
       direction: :asc
     )
 
+    DECISION_CORRECTION_STATE = GroupedEventReadCriteria.new(
+      event_types: [ "DecisionRecorded", "DecisionActivated", "DecisionDefinitionCorrected" ],
+      direction: :desc
+    )
+
     DECISION_SLOT_LATEST = GroupedEventReadCriteria.new(
       event_types: [ "DecisionSlotOpened", "DecisionSlotHeadChanged" ],
       direction: :desc

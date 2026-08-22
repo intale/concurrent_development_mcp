@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Decisions
+      class DecisionCorrectionRationaleV1 < Shared::Value
+        def code: () -> String
+        def summary: () -> String
+      end
+    end
+  end
+end

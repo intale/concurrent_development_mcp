@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    class DecisionCorrectionPreparationV1 < Shared::Value
+      def corrected_at: () -> String
+      def input_digest: () -> String
+      def correction_event_id: () -> String
+      def slot_event_ids: () -> Array[String]
+      def partition_event_ids: () -> Array[String]
+      def completion_event_id: () -> String
+    end
+  end
+end

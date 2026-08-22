@@ -33,6 +33,7 @@ module Coordinator::Write
       [ "DecisionInterpretationRejected", 1 ] => Events::DecisionInterpretationRejectedV1,
       [ "DecisionRecorded", 1 ] => Events::DecisionRecordedV1,
       [ "DecisionActivated", 1 ] => Events::DecisionActivatedV1,
+      [ "DecisionDefinitionCorrected", 1 ] => Events::DecisionDefinitionCorrectedV1,
       [ "DecisionSlotOpened", 1 ] => Events::DecisionSlotOpenedV1,
       [ "DecisionSlotHeadChanged", 1 ] => Events::DecisionSlotHeadChangedV1,
       [ "DecisionPartitionAdvanced", 1 ] => Events::DecisionPartitionAdvancedV1,

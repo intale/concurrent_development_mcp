@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandInputDocuments
-      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1
+      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1
       type digest_value = value | ExpireResourceLeaseV1
 
       class ActorV1 < Shared::Value
@@ -228,6 +228,28 @@ module Coordinator
       class ActivateDecisionV1 < BaseV1
         def tool_name: () -> String
         def input: () -> ActivateDecisionInputV1
+      end
+
+      class EventReferenceV1 < Shared::Value
+        def event_id: () -> String
+        def type: () -> String
+        def stream_context: () -> String
+        def stream_name: () -> String
+        def stream_id: () -> String
+        def stream_revision: () -> Integer
+      end
+
+      class CorrectDecisionInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def decision_id: () -> String
+        def interpretation_id: () -> String
+        def expected_head: () -> EventReferenceV1
+        def rationale: () -> Decisions::DecisionCorrectionRationaleV1
+      end
+
+      class CorrectDecisionV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> CorrectDecisionInputV1
       end
 
       class ExpireResourceLeaseInputV1 < Shared::Value

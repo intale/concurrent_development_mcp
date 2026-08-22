@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Decisions
+      class DecisionSlotStateV1 < Shared::Value
+        def slot: () -> DecisionSlotV1
+        def opened: () -> bool
+        def head: () -> DecisionHeadV1?
+      end
+    end
+  end
+end

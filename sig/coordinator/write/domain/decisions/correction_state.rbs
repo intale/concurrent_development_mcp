@@ -1,0 +1,17 @@
+module Coordinator
+  module Write
+    module Domain
+      module Decisions
+        class CorrectionState < Shared::Value
+          SlotState: singleton(Write::Decisions::DecisionSlotStateV1)
+          PartitionState: singleton(Write::Decisions::DecisionPartitionStateV1)
+
+          def current: () -> Write::Decisions::DecisionCurrentStateV1
+          def candidate: () -> Write::Decisions::DecisionCorrectionCandidateV1
+          def slot_states: () -> Array[Write::Decisions::DecisionSlotStateV1]
+          def partition_states: () -> Array[Write::Decisions::DecisionPartitionStateV1]
+        end
+      end
+    end
+  end
+end

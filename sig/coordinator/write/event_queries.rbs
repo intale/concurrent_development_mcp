@@ -12,6 +12,7 @@ module Coordinator
 
       COMMAND_COMPLETION: EventReadCriteria
       DECISION_EXISTENCE: EventReadCriteria
+      DECISION_CORRECTION_STATE: GroupedEventReadCriteria
       DECISION_SLOT_LATEST: GroupedEventReadCriteria
       DECISION_PARTITION_LATEST: GroupedEventReadCriteria
       COORDINATION_TASK_HISTORY: EventReadCriteria

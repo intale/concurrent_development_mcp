@@ -358,6 +358,43 @@ module Coordinator::Write
       )
     end
 
+    def decision_correct(
+      command:,
+      correction:,
+      correction_event:,
+      partitions:,
+      input_digest:,
+      persisted_events:,
+      completed_at:
+    )
+      build_completion(
+        command:,
+        tool_name: "decision_correct",
+        summary: "Active Decision definition corrected from accepted interpretation evidence.",
+        data: CommandReceiptData::DecisionCorrection.new(
+          decision_id: command.decision_id,
+          interpretation_id: command.interpretation_id,
+          outcome: "corrected",
+          policy_status: "active",
+          previous_definition_digest: correction.previous_definition_digest,
+          definition_digest: correction.definition.digest,
+          correction_event:,
+          slot: correction.slot,
+          partitions:,
+          corrected_at: correction.corrected_at
+        ),
+        next_actions: [
+          NextAction.new(
+            tool: "decision_get",
+            arguments: NextAction::DecisionArguments.new(decision_id: command.decision_id)
+          )
+        ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
 
     def build_completion(command:, tool_name:, summary:, data:, next_actions:, input_digest:, persisted_events:, completed_at:)

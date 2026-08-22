@@ -11,7 +11,7 @@ module Coordinator::Write
         @canonical_json = canonical_json
       end
 
-      def call(proposal:, activated_at:)
+      def call(proposal:, valid_from_default:)
         proposed = proposal.proposed_decision
         topic = @topic_registry.fetch(proposed.topic_id)
         document = DecisionDefinitionDocumentV1.new(
@@ -23,7 +23,7 @@ module Coordinator::Write
           value: normalize_value(proposed.value),
           scope: normalize_scope(proposed.scope),
           conditions: normalize_conditions(proposed.conditions),
-          validity: normalize_validity(proposed.validity, activated_at),
+          validity: normalize_validity(proposed.validity, valid_from_default),
           authority: proposed.authority,
           enforcement: proposed.enforcement,
           relations: normalize_relations(proposed.relations)
@@ -75,9 +75,9 @@ module Coordinator::Write
         )
       end
 
-      def normalize_validity(validity, activated_at)
+      def normalize_validity(validity, valid_from_default)
         Interpretations::DecisionValidityV1.new(
-          valid_from: validity.valid_from || activated_at,
+          valid_from: validity.valid_from || valid_from_default,
           valid_until: validity.valid_until,
           until_event: validity.until_event
         )

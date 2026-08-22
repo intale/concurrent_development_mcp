@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module Decisions
+      class DecisionCurrentStateV1 < Shared::Value
+        Partition: untyped
+
+        def decision_id: () -> String
+        def definition: () -> DecisionDefinitionV1
+        def head: () -> DecisionHeadV1
+        def slot: () -> DecisionSlotV1?
+        def partitions: () -> Array[DecisionPartitionV1]
+      end
+    end
+  end
+end

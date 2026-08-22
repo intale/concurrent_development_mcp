@@ -3,11 +3,11 @@
 module Coordinator::Write
   module Domain
     module Decisions
-      class PrepareActivation
+      class PrepareCorrection
         include Dry::Monads[:result]
 
         def initialize(
-          eligibility: ActivationEligibility.new,
+          eligibility: CorrectionEligibility.new,
           definition_builder: Coordinator::Write::Decisions::DecisionDefinitionBuilder.new,
           slot_builder: Coordinator::Write::Decisions::DecisionSlotBuilder.new,
           partition_builder: Coordinator::Write::Decisions::DecisionPartitionBuilder.new
@@ -18,28 +18,28 @@ module Coordinator::Write
           @partition_builder = partition_builder
         end
 
-        def call(command:, proposal:, acceptance:, activated_at:, recorded_event:, activated_event:)
+        def call(command:, current:, proposal:, acceptance:, corrected_at:, correction_event:)
           return not_accepted(command) unless accepted_evidence?(command, proposal, acceptance)
+          return wrong_relation(command, proposal.proposal) unless correction_relation?(command, proposal.proposal)
 
-          eligibility = @eligibility.call(proposal: proposal.proposal, activated_at:)
+          eligibility = @eligibility.call(proposal: proposal.proposal, current:, corrected_at:)
           return eligibility if eligibility.failure?
 
           definition = @definition_builder.call(
             proposal: proposal.proposal,
-            valid_from_default: activated_at
+            valid_from_default: current.definition.document.validity.valid_from
           )
           partitions = @partition_builder.call(definition)
           return partition_limit(command, partitions.length) if partitions.length > 32
 
           Success(
-            Coordinator::Write::Decisions::DecisionActivationCandidateV1.new(
+            Coordinator::Write::Decisions::DecisionCorrectionCandidateV1.new(
               proposal:,
               acceptance:,
               definition:,
               slot: @slot_builder.call(definition),
               partitions:,
-              recorded_event:,
-              activated_event:
+              correction_event:
             )
           )
         end
@@ -57,12 +57,34 @@ module Coordinator::Write
             accepted.proposal_event == proposal.event
         end
 
+        def correction_relation?(command, proposal)
+          relations = proposal.proposed_decision.relations
+          relations.corrects == [ command.decision_id ] &&
+            relations.supersedes.empty? &&
+            relations.exception_to.empty? &&
+            relations.revokes.empty?
+        end
+
         def not_accepted(command)
           Failure(
             OutcomeError.new(
               code: :interpretation_not_accepted,
-              message: "Decision activation requires an accepted interpretation",
+              message: "Decision correction requires an accepted interpretation",
               details: { interpretation_id: command.interpretation_id }
+            )
+          )
+        end
+
+        def wrong_relation(command, proposal)
+          Failure(
+            OutcomeError.new(
+              code: :interpretation_not_a_correction,
+              message: "Accepted interpretation must correct exactly the target Decision",
+              details: {
+                interpretation_id: command.interpretation_id,
+                decision_id: command.decision_id,
+                relations: proposal.proposed_decision.relations.to_h
+              }
             )
           )
         end
@@ -71,7 +93,7 @@ module Coordinator::Write
           Failure(
             OutcomeError.new(
               code: :decision_partition_limit_reached,
-              message: "Decision activation affects more than 32 partitions",
+              message: "Corrected Decision affects more than 32 partitions",
               details: {
                 decision_id: command.decision_id,
                 partition_count: count,

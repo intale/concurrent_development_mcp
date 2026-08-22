@@ -227,4 +227,44 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
     expect(digest.write_set_expand(expansion_command)).to match(/\Asha256:[0-9a-f]{64}\z/)
     expect(digest.call(expansion_command)).to eq(digest.write_set_expand(expansion_command))
   end
+
+  it "binds Decision correction replay to the exact authoritative predecessor" do
+    expected_head = Coordinator::Write::EventReference.new(
+      event_id: "01900000-0000-7000-8000-000000000001",
+      type: "DecisionActivated",
+      stream_context: "HumanGuidance",
+      stream_name: "Decision",
+      stream_id: "D-1",
+      stream_revision: 1
+    )
+    correction_command = Coordinator::Write::Commands::CorrectDecision.new(
+      command_id: "cmd-correction-1",
+      actor: Coordinator::Write::Commands::Actor.new(kind: "orchestrator", id: "guidance-host"),
+      decision_id: "D-1",
+      interpretation_id: "I-2",
+      expected_head:,
+      rationale: Coordinator::Write::Decisions::DecisionCorrectionRationaleV1.new(
+        code: "normalization_corrected",
+        summary: "Apply the accepted correction."
+      )
+    )
+
+    document = digest.decision_correct_document(correction_command)
+    changed = Coordinator::Write::Commands::CorrectDecision.new(
+      correction_command.to_h.merge(
+        expected_head: Coordinator::Write::EventReference.new(
+          expected_head.to_h.merge(
+            event_id: "01900000-0000-7000-8000-000000000002",
+            type: "DecisionDefinitionCorrected",
+            stream_revision: 2
+          )
+        )
+      )
+    )
+
+    expect(document.input.expected_head.to_h).to eq(expected_head.to_h)
+    expect(digest.decision_correct(correction_command)).to match(/\Asha256:[0-9a-f]{64}\z/)
+    expect(digest.call(correction_command)).to eq(digest.decision_correct(correction_command))
+    expect(digest.decision_correct(changed)).not_to eq(digest.decision_correct(correction_command))
+  end
 end

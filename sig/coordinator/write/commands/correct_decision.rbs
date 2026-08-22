@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Commands
+      class CorrectDecision < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def decision_id: () -> String
+        def interpretation_id: () -> String
+        def expected_head: () -> EventReference
+        def rationale: () -> Decisions::DecisionCorrectionRationaleV1
+      end
+    end
+  end
+end

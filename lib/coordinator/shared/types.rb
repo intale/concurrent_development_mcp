@@ -94,6 +94,7 @@ module Coordinator::Shared
       clarification_required
     ].freeze
     DECISION_ACTIVATION_OUTCOMES = %w[activated].freeze
+    DECISION_CORRECTION_OUTCOMES = %w[corrected].freeze
     DECISION_POLICY_STATUSES = %w[recorded active].freeze
     DECISION_PARTITION_ANCHOR_KINDS = %w[
       workspace
@@ -103,7 +104,7 @@ module Coordinator::Shared
       attempt
       candidate
     ].freeze
-    DECISION_CHANGE_KINDS = %w[activated].freeze
+    DECISION_CHANGE_KINDS = %w[activated corrected].freeze
     DECISION_ACTIVATION_INELIGIBILITY_REASONS = %w[
       non_normative_statement_kind
       missing_effect
@@ -156,6 +157,7 @@ module Coordinator::Shared
       decision_interpretation_propose
       decision_interpretation_adjudicate
       decision_activate
+      decision_correct
     ].freeze
 
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)
@@ -204,6 +206,7 @@ module Coordinator::Shared
     InterpretationLifecycleStatus = String.enum(*INTERPRETATION_LIFECYCLE_STATUSES)
     InterpretationAdjudicationOutcome = String.enum(*INTERPRETATION_ADJUDICATION_OUTCOMES)
     DecisionActivationOutcome = String.enum(*DECISION_ACTIVATION_OUTCOMES)
+    DecisionCorrectionOutcome = String.enum(*DECISION_CORRECTION_OUTCOMES)
     DecisionPolicyStatus = String.enum(*DECISION_POLICY_STATUSES)
     DecisionPartitionAnchorKind = String.enum(*DECISION_PARTITION_ANCHOR_KINDS)
     DecisionChangeKind = String.enum(*DECISION_CHANGE_KINDS)

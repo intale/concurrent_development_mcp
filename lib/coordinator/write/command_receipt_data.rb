@@ -129,6 +129,21 @@ module Coordinator::Write
       attribute :activated_at, Types::Timestamp
     end
 
+    class DecisionCorrection < Value
+      PartitionReceipt = Decisions::DecisionPartitionReceiptV1
+
+      attribute :decision_id, Types::Identifier
+      attribute :interpretation_id, Types::Identifier
+      attribute :outcome, Types::DecisionCorrectionOutcome
+      attribute :policy_status, Types::DecisionPolicyStatus
+      attribute :previous_definition_digest, Types::Sha256Digest
+      attribute :definition_digest, Types::Sha256Digest
+      attribute :correction_event, EventReference
+      attribute :slot, Decisions::DecisionSlotV1.optional
+      attribute :partitions, Types::Array.of(PartitionReceipt).constrained(min_size: 1, max_size: 32)
+      attribute :corrected_at, Types::Timestamp
+    end
+
     Type = ChangeSet |
            WorkItem |
            Dependency |
@@ -141,6 +156,7 @@ module Coordinator::Write
            Guidance |
            InterpretationProposal |
            InterpretationAdjudication |
-           DecisionActivation
+           DecisionActivation |
+           DecisionCorrection
   end
 end

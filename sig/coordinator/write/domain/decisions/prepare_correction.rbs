@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Domain
+      module Decisions
+        class PrepareCorrection
+          def initialize: (?eligibility: CorrectionEligibility, ?definition_builder: Write::Decisions::DecisionDefinitionBuilder, ?slot_builder: Write::Decisions::DecisionSlotBuilder, ?partition_builder: Write::Decisions::DecisionPartitionBuilder) -> void
+          def call: (command: Commands::CorrectDecision, current: Write::Decisions::DecisionCurrentStateV1, proposal: Write::Interpretations::InterpretationProposalEvidenceV1?, acceptance: Write::Decisions::InterpretationAcceptanceEvidenceV1?, corrected_at: String, correction_event: EventReference) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

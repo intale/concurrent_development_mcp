@@ -238,6 +238,28 @@ module Coordinator::Write
       attribute :input, ActivateDecisionInputV1
     end
 
+    class EventReferenceV1 < Value
+      attribute :event_id, Types::UuidV7
+      attribute :type, Types::Identifier
+      attribute :stream_context, Types::Identifier
+      attribute :stream_name, Types::Identifier
+      attribute :stream_id, Types::Identifier
+      attribute :stream_revision, Types::StreamRevision
+    end
+
+    class CorrectDecisionInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :decision_id, Types::Identifier
+      attribute :interpretation_id, Types::Identifier
+      attribute :expected_head, EventReferenceV1
+      attribute :rationale, Decisions::DecisionCorrectionRationaleV1
+    end
+
+    class CorrectDecisionV1 < BaseV1
+      attribute :tool_name, Types::String.enum("decision_correct")
+      attribute :input, CorrectDecisionInputV1
+    end
+
     class ExpireResourceLeaseInputV1 < Value
       attribute :actor, ActorV1
       attribute :resource_key_hash, Types::Sha256Digest
@@ -264,7 +286,8 @@ module Coordinator::Write
            RecordGuidanceV1 |
            ProposeDecisionInterpretationV1 |
            AdjudicateDecisionInterpretationV1 |
-           ActivateDecisionV1
+           ActivateDecisionV1 |
+           CorrectDecisionV1
 
     DigestType = Type | ExpireResourceLeaseV1
   end

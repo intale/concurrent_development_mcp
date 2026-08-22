@@ -89,6 +89,7 @@ module Coordinator
       InterpretationLifecycleStatus: untyped
       InterpretationAdjudicationOutcome: untyped
       DecisionActivationOutcome: untyped
+      DecisionCorrectionOutcome: untyped
       DecisionPolicyStatus: untyped
       DecisionPartitionAnchorKind: untyped
       DecisionChangeKind: untyped

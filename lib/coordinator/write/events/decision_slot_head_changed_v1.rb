@@ -7,7 +7,7 @@ module Coordinator::Write
 
       attribute :slot_id, Types::Identifier
       attribute :previous_head, Decisions::DecisionHeadV1.optional
-      attribute :head, Decisions::DecisionHeadV1
+      attribute :head, Decisions::DecisionHeadV1.optional
       attribute :changed_at, Types::Timestamp
     end
   end

@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Domain
+      module Decisions
+        class CorrectionEligibility
+          NON_NORMATIVE_KINDS: Array[String]
+
+          def initialize: (?topic_registry: Write::Interpretations::TopicRegistry) -> void
+          def call: (proposal: Events::DecisionInterpretationProposedV1, current: Write::Decisions::DecisionCurrentStateV1, corrected_at: String) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

@@ -14,7 +14,9 @@ module InterpretationInput
     modality: "should",
     value: named_choice("rspec"),
     scope: nil,
+    validity: { valid_from: nil, valid_until: nil, until_event: nil },
     enforcement: advisory_enforcement,
+    relations: { corrects: [], supersedes: [], exception_to: [], revokes: [] },
     ambiguities: []
   )
     {
@@ -44,10 +46,10 @@ module InterpretationInput
           artifact_kinds: [],
           environments: []
         },
-        validity: { valid_from: nil, valid_until: nil, until_event: nil },
+        validity:,
         authority: { actor_id: "user-label", role: "project-owner" },
         enforcement:,
-        relations: { corrects: [], supersedes: [], exception_to: [], revokes: [] }
+        relations:
       },
       ambiguities:
     }
@@ -126,6 +128,23 @@ module InterpretationInput
       actor: { kind: "orchestrator", id: "guidance-host" },
       decision_id:,
       interpretation_id:,
+      rationale:
+    }
+  end
+
+  def correction(
+    expected_head:,
+    command_id: "cmd-decision-correction-1",
+    decision_id: "D-1",
+    interpretation_id: "I-2",
+    rationale: { code: "normalization_corrected", summary: "Apply the accepted correction." }
+  )
+    {
+      command_id:,
+      actor: { kind: "orchestrator", id: "guidance-host" },
+      decision_id:,
+      interpretation_id:,
+      expected_head:,
       rationale:
     }
   end
