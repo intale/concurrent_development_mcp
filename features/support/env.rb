@@ -6,7 +6,6 @@
 
 
 require 'cucumber/rails'
-require "pg_eventstore/rspec/test_helpers"
 
 # By default, any exception happening in your Rails application will bubble up
 # to Cucumber so that your scenario will fail. This is a different from how
@@ -43,11 +42,6 @@ DatabaseCleaner.strategy = :transaction
 #   # this setting.
 #   DatabaseCleaner.strategy = :truncation
 # end
-
-Before('not @no-txn', 'not @selenium', 'not @culerity', 'not @celerity', 'not @javascript') do
-  DatabaseCleaner.clean
-  PgEventstore::TestHelpers.clean_up_db
-end
 
 # Possible values are :truncation and :transaction
 # The :transaction strategy is faster, but might give you threading problems.
