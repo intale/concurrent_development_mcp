@@ -14,8 +14,13 @@ module Coordinator
       def proposal_event: () -> Write::EventReference
       def acceptance_event: () -> Write::EventReference
       def rationale: () -> Write::Decisions::DecisionActivationRationaleV1?
+      def correction_rationale: () -> Write::Decisions::DecisionCorrectionRationaleV1?
+      def previous_definition_digest: () -> String?
+      def correction_count: () -> Integer
       def recorded: () -> DecisionLifecycleEvidenceV1
       def activated: () -> DecisionLifecycleEvidenceV1?
+      def corrected: () -> DecisionLifecycleEvidenceV1?
+      def current_head: () -> DecisionLifecycleEvidenceV1?
     end
   end
 end

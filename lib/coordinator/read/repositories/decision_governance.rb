@@ -61,6 +61,34 @@ module Coordinator::Read
         )
       end
 
+      def correct_decision(event:, correction:)
+        record = Coordinator::Read::DecisionDefinition.find(correction.decision_id)
+        record.update!(
+          interpretation_id: correction.interpretation_id,
+          source_message_id: correction.source_message_id,
+          definition_digest: correction.definition.digest,
+          definition: correction.definition.to_h,
+          slot: correction.slot&.to_h,
+          partitions: correction.partitions.map(&:to_h),
+          classifier: correction.classifier.to_h,
+          scope_provenance: correction.scope_provenance.to_h,
+          source_event: correction.source_event.to_h,
+          proposal_event: correction.proposal_event.to_h,
+          acceptance_event: correction.acceptance_event.to_h,
+          previous_definition_digest: correction.previous_definition_digest,
+          correction_rationale: correction.rationale.to_h,
+          corrected_event: event_reference(event).to_h,
+          corrected_actor: actor(event).to_h,
+          corrected_markers: event.markers,
+          corrected_metadata: event.metadata,
+          corrected_causation_id: event.causation_id,
+          corrected_correlation_id: event.correlation_id,
+          corrected_at_domain: correction.corrected_at,
+          corrected_at_store: event.created_at,
+          correction_count: record.correction_count + 1
+        )
+      end
+
       def open_slot(event:, opening:)
         Coordinator::Read::DecisionSlotHead.create!(
           slot_id: opening.slot.slot_id,
@@ -83,8 +111,8 @@ module Coordinator::Read
       def change_slot_head(event:, change:)
         record = Coordinator::Read::DecisionSlotHead.find(change.slot_id)
         record.update!(
-          decision_id: change.head.decision_id,
-          head: change.head.to_h,
+          decision_id: change.head&.decision_id,
+          head: change.head&.to_h,
           changed_event: event_reference(event).to_h,
           actor: actor(event).to_h,
           markers: event.markers,
@@ -123,6 +151,8 @@ module Coordinator::Read
       private
 
       def build_decision(record)
+        activated = activated_evidence(record)
+        corrected = corrected_evidence(record)
         DecisionViewV1.new(
           decision_id: record.decision_id,
           interpretation_id: record.interpretation_id,
@@ -143,6 +173,12 @@ module Coordinator::Read
           proposal_event: Coordinator::Write::EventReference.new(symbolize(record.proposal_event)),
           acceptance_event: Coordinator::Write::EventReference.new(symbolize(record.acceptance_event)),
           rationale: optional_value(Coordinator::Write::Decisions::DecisionActivationRationaleV1, record.rationale),
+          correction_rationale: optional_value(
+            Coordinator::Write::Decisions::DecisionCorrectionRationaleV1,
+            record.correction_rationale
+          ),
+          previous_definition_digest: record.previous_definition_digest,
+          correction_count: record.correction_count,
           recorded: lifecycle_evidence(
             event: record.recorded_event,
             actor: record.recorded_actor,
@@ -151,7 +187,9 @@ module Coordinator::Read
             causation_id: record.recorded_causation_id,
             correlation_id: record.recorded_correlation_id
           ),
-          activated: activated_evidence(record)
+          activated:,
+          corrected:,
+          current_head: corrected || activated
         )
       end
 
@@ -165,6 +203,19 @@ module Coordinator::Read
           persisted_at: record.activated_at_store,
           causation_id: record.activated_causation_id,
           correlation_id: record.activated_correlation_id
+        )
+      end
+
+      def corrected_evidence(record)
+        return unless record.corrected_event
+
+        lifecycle_evidence(
+          event: record.corrected_event,
+          actor: record.corrected_actor,
+          occurred_at: record.corrected_at_domain,
+          persisted_at: record.corrected_at_store,
+          causation_id: record.corrected_causation_id,
+          correlation_id: record.corrected_correlation_id
         )
       end
 

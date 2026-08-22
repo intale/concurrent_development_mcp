@@ -26,6 +26,9 @@ module Coordinator
         Release the entire exact observed lease set when editing is finished; partial release is not available.
         Accepted interpretations are still non-normative: use decision_activate to establish policy,
         persist its Task handle, and use decision_get only as latest available projected evidence.
+        To correct active policy, first accept a correction interpretation, then call decision_correct
+        with decision_get's current_head event. A stale projected head is still served and may produce
+        a decision_revision_changed conflict; refresh decision_get and submit a new command when appropriate.
         The coordinator records attributed evidence and does not execute Git, CI, or agent work.
       TEXT
 

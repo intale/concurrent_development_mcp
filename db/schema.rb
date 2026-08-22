@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_22_204500) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_22_213000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -58,12 +58,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_22_204500) do
     t.jsonb "activated_markers"
     t.jsonb "activated_metadata"
     t.jsonb "classifier", null: false
+    t.jsonb "corrected_actor"
+    t.datetime "corrected_at_domain"
+    t.datetime "corrected_at_store"
+    t.string "corrected_causation_id"
+    t.string "corrected_correlation_id"
+    t.jsonb "corrected_event"
+    t.jsonb "corrected_markers", default: [], null: false
+    t.jsonb "corrected_metadata", default: {}, null: false
+    t.integer "correction_count", default: 0, null: false
+    t.jsonb "correction_rationale"
     t.datetime "created_at", null: false
     t.jsonb "definition", null: false
     t.string "definition_digest", null: false
     t.string "interpretation_id", null: false
     t.jsonb "partitions", default: [], null: false
     t.string "policy_status", null: false
+    t.string "previous_definition_digest"
     t.jsonb "proposal_event", null: false
     t.jsonb "rationale"
     t.jsonb "recorded_actor", null: false
@@ -148,9 +159,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_22_204500) do
     t.jsonb "changed_event"
     t.string "correlation_id"
     t.datetime "created_at", null: false
-    t.string "decision_id", null: false
+    t.string "decision_id"
     t.datetime "event_created_at", null: false
-    t.jsonb "head", null: false
+    t.jsonb "head"
     t.jsonb "markers", default: [], null: false
     t.jsonb "metadata", default: {}, null: false
     t.datetime "opened_at_domain", null: false

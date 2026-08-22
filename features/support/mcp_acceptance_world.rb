@@ -220,7 +220,11 @@ module McpAcceptanceWorld
   def decision_events(decision_id)
     event_store.read(
       streams.decision(decision_id),
-      Coordinator::Write::EventQueries::DECISION_EXISTENCE
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[DecisionRecorded DecisionActivated DecisionDefinitionCorrected],
+        maximum_count: 10,
+        direction: :asc
+      )
     )
   end
 
@@ -229,7 +233,7 @@ module McpAcceptanceWorld
       streams.decision_slot(slot_id),
       Coordinator::Write::EventReadCriteria.new(
         event_types: %w[DecisionSlotOpened DecisionSlotHeadChanged],
-        maximum_count: 2,
+        maximum_count: 10,
         direction: :asc
       )
     )
@@ -258,12 +262,115 @@ module McpAcceptanceWorld
   end
 
   def project_remaining_decision_facts(decision_id)
-    recorded, activated = decision_events(decision_id)
+    recorded, activated = decision_events(decision_id).first(2)
     assert_acceptance(recorded && activated, "Decision #{decision_id} is not completely persisted")
     slot_id = activated.data.fetch("slot").fetch("slot_id")
     [ activated, *decision_slot_events(slot_id), *decision_partition_events ].each do |event|
       decision_projector.call(event)
     end
+  end
+
+  def project_decision_correction(decision_id)
+    event = decision_events(decision_id).find { _1.type == "DecisionDefinitionCorrected" }
+    assert_acceptance(event, "Decision #{decision_id} has no DecisionDefinitionCorrected fact")
+    decision_projector.call(event)
+  end
+
+  def accept_correction_interpretation(decision_id:, interpretation_id:, message_id:, value:, suffix:)
+    task_ids = []
+    task_ids << submit_and_execute(
+      "guidance_record",
+      command_id: "cmd-cuc-correction-guidance-#{suffix}",
+      actor: { kind: "user", id: "user-label" },
+      message_id:,
+      conversation_id: "C-CUC-COR-#{suffix}",
+      source: "mcp_client",
+      text: "Use #{value} as the test framework.",
+      anchors: {
+        repository_ids: [ "billing" ],
+        change_set_id: nil,
+        work_item_id: nil,
+        attempt_id: nil
+      }
+    )
+    task_ids << submit_and_execute(
+      "decision_interpretation_propose",
+      command_id: "cmd-cuc-correction-proposal-#{suffix}",
+      actor: { kind: "agent", id: "classifier-correction-#{suffix}" },
+      interpretation_id:,
+      source_message_id: message_id,
+      source_span: nil,
+      classifier: {
+        id: "classifier-correction-#{suffix}",
+        version: "decision-classifier-v1",
+        ontology_version: 1,
+        confidence_millionths: 940_000
+      },
+      proposed_decision: {
+        statement_kind: "preference",
+        topic_id: "testing.framework",
+        effect: "prefer",
+        modality: "should",
+        value: {
+          schema: "named-choice/v1",
+          name: value,
+          items: nil,
+          target_kind: nil,
+          target_id: nil,
+          action: nil
+        },
+        scope: nil,
+        conditions: {
+          phases: [ "implementation" ],
+          languages: [ "ruby" ],
+          tags: [],
+          repository_kinds: [],
+          artifact_kinds: [],
+          environments: []
+        },
+        validity: { valid_from: nil, valid_until: nil, until_event: nil },
+        authority: { actor_id: "user-label", role: "project-owner" },
+        enforcement: {
+          level: "advisory",
+          retroactivity: "future_only",
+          on_violation: "warn"
+        },
+        relations: {
+          corrects: [ decision_id ],
+          supersedes: [],
+          exception_to: [],
+          revokes: []
+        }
+      },
+      ambiguities: []
+    )
+    task_ids << submit_and_execute(
+      "decision_interpretation_adjudicate",
+      command_id: "cmd-cuc-correction-adjudication-#{suffix}",
+      actor: { kind: "orchestrator", id: "guidance-host" },
+      source_message_id: message_id,
+      interpretation_id:,
+      action: "accept",
+      rationale: {
+        code: "user_confirmed",
+        summary: "The correction matches the intended guidance."
+      },
+      clarification: nil
+    )
+
+    task_ids.each do |task_id|
+      state = task_request("tasks/get", task_id)
+      assert_acceptance_equal("completed", state.dig("result", "status"), "Correction setup Task status")
+      assert_acceptance_equal(false, state.dig("result", "result", "isError"), "Correction setup error")
+    end
+
+    {
+      decision_id:,
+      interpretation_id:,
+      message_id:,
+      value:,
+      command_id: "cmd-cuc-decision-correction-#{suffix}"
+    }
   end
 
   def lease_events(path)

@@ -31,6 +31,7 @@ module Coordinator
       DECISION_PARTITION_ANCHOR_KINDS: Array[String]
       DECISION_CHANGE_KINDS: Array[String]
       DECISION_ACTIVATION_INELIGIBILITY_REASONS: Array[String]
+      DECISION_CORRECTION_INELIGIBILITY_REASONS: Array[String]
       SCOPE_PROVENANCE_KINDS: Array[String]
       SCOPE_ANCHOR_LEVELS: Array[String]
       DECISION_PHASES: Array[String]
@@ -95,6 +96,8 @@ module Coordinator
       DecisionChangeKind: untyped
       DecisionActivationIneligibilityReason: untyped
       DecisionActivationIneligibilityReasons: untyped
+      DecisionCorrectionIneligibilityReason: untyped
+      DecisionCorrectionIneligibilityReasons: untyped
       ScopeProvenanceKind: untyped
       ScopeAnchorLevel: untyped
       DecisionPhase: untyped

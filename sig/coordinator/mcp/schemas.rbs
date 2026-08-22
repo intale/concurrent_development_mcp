@@ -15,6 +15,7 @@ module Coordinator
       def self.decision_interpretation_propose: () -> json_schema
       def self.decision_interpretation_adjudicate: () -> json_schema
       def self.decision_activate: () -> json_schema
+      def self.decision_correct: () -> json_schema
       def self.operation_get: () -> json_schema
       def self.guidance_get: () -> json_schema
       def self.decision_interpretation_list: () -> json_schema

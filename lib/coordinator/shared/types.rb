@@ -115,6 +115,16 @@ module Coordinator::Shared
       until_event_requires_expiry_policy
       topic_registry_mismatch
     ].freeze
+    DECISION_CORRECTION_INELIGIBILITY_REASONS = %w[
+      non_normative_statement_kind
+      missing_effect
+      missing_modality
+      scope_unresolved
+      until_event_requires_expiry_policy
+      validity_future
+      validity_elapsed
+      topic_registry_mismatch
+    ].freeze
     SCOPE_PROVENANCE_KINDS = %w[explicit inferred unresolved].freeze
     SCOPE_ANCHOR_LEVELS = %w[workspace repository change_set work_item attempt unresolved].freeze
     DECISION_PHASES = %w[planning implementation verification integration deployment].freeze
@@ -212,6 +222,8 @@ module Coordinator::Shared
     DecisionChangeKind = String.enum(*DECISION_CHANGE_KINDS)
     DecisionActivationIneligibilityReason = String.enum(*DECISION_ACTIVATION_INELIGIBILITY_REASONS)
     DecisionActivationIneligibilityReasons = Array.of(DecisionActivationIneligibilityReason).constrained(min_size: 1, max_size: 10)
+    DecisionCorrectionIneligibilityReason = String.enum(*DECISION_CORRECTION_INELIGIBILITY_REASONS)
+    DecisionCorrectionIneligibilityReasons = Array.of(DecisionCorrectionIneligibilityReason).constrained(min_size: 1, max_size: 10)
     ScopeProvenanceKind = String.enum(*SCOPE_PROVENANCE_KINDS)
     ScopeAnchorLevel = String.enum(*SCOPE_ANCHOR_LEVELS)
     DecisionPhase = String.enum(*DECISION_PHASES)

@@ -95,6 +95,77 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :event_store
     expect(head.decision).to include("decision_id" => "D-B")
   end
 
+  it "projects a corrected definition and vacated/moved slot without withholding the older view" do
+    activation_receipt = activate_decision
+    recorded, activated = decision_events("D-project").first(2)
+    old_slot_id = activation_receipt.data.slot.slot_id
+    old_slot_events = slot_events(old_slot_id).first(2)
+    old_partition = partition_events("repo:billing:testing").first
+    [ recorded, activated, *old_slot_events, old_partition ].each { projector.call(_1) }
+
+    stale_available = repository.fetch("D-project")
+    expect(stale_available).to have_attributes(
+      interpretation_id: "I-project",
+      correction_count: 0,
+      corrected: nil,
+      current_head: have_attributes(event: have_attributes(event_id: activated.id))
+    )
+
+    correction_receipt = correct_decision(activated)
+    correction = decision_events("D-project").last
+    new_slot_id = correction_receipt.data.slot.slot_id
+    correction_slot_events = [
+      slot_events(old_slot_id).last,
+      *slot_events(new_slot_id)
+    ]
+    correction_partitions = [
+      partition_events("repo:billing:testing").last,
+      partition_events("workitem:W-42:testing").sole
+    ]
+
+    projector.call(correction)
+    projector.call(correction)
+    corrected = repository.fetch("D-project")
+    expect(corrected).to have_attributes(
+      interpretation_id: "I-correction",
+      source_message_id: "M-correction",
+      policy_status: "active",
+      previous_definition_digest: stale_available.definition.digest,
+      correction_count: 1
+    )
+    expect(corrected.definition.document.value.name).to eq("minitest")
+    expect(corrected.definition.document.scope.work_item_id).to eq("W-42")
+    expect(corrected.correction_rationale).to have_attributes(code: "normalization_corrected")
+    expect(corrected.corrected.to_h).to include(
+      event: include(event_id: correction.id, type: "DecisionDefinitionCorrected", stream_revision: 2),
+      causation_id: correction.causation_id,
+      correlation_id: correction.correlation_id
+    )
+    expect(corrected.current_head).to eq(corrected.corrected)
+
+    [ *correction_slot_events, *correction_partitions ].each do |event|
+      projector.call(event)
+      projector.call(event)
+    end
+    expect(Coordinator::Read::DecisionSlotHead.find(old_slot_id)).to have_attributes(
+      decision_id: nil,
+      head: nil
+    )
+    expect(Coordinator::Read::DecisionSlotHead.find(new_slot_id)).to have_attributes(
+      decision_id: "D-project"
+    )
+    expect(Coordinator::Read::DecisionPartitionHead.find("repo:billing:testing")).to have_attributes(
+      decision_id: "D-project",
+      partition_revision: 1,
+      change_kind: "corrected"
+    )
+    expect(Coordinator::Read::DecisionPartitionHead.find("workitem:W-42:testing")).to have_attributes(
+      decision_id: "D-project",
+      partition_revision: 0,
+      change_kind: "corrected"
+    )
+  end
+
   def activate_decision(
     command_suffix: "project",
     decision_id: "D-project",
@@ -138,12 +209,42 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :event_store
     })
   end
 
+  def correct_decision(activated)
+    record_guidance(message_id: "M-correction", command_suffix: "correction")
+    execute(Coordinator::Write::Operations::ExecuteProposeDecisionInterpretation, InterpretationInput.build(
+      command_id: "cmd-proposal-correction",
+      interpretation_id: "I-correction",
+      source_message_id: "M-correction",
+      value: InterpretationInput.named_choice("minitest"),
+      scope: InterpretationInput.scope(repository_ids: [ "billing" ], work_item_id: "W-42"),
+      relations: { corrects: [ "D-project" ], supersedes: [], exception_to: [], revokes: [] }
+    ))
+    execute(Coordinator::Write::Operations::ExecuteAdjudicateDecisionInterpretation, InterpretationInput.adjudication(
+      command_id: "cmd-adjudication-correction",
+      source_message_id: "M-correction",
+      interpretation_id: "I-correction"
+    ))
+    execute(Coordinator::Write::Operations::ExecuteCorrectDecision, InterpretationInput.correction(
+      command_id: "cmd-correction-project",
+      decision_id: "D-project",
+      interpretation_id: "I-correction",
+      expected_head: reference(activated)
+    ))
+  end
+
   def execute(operation_class, input)
     operation_class.new(event_store:).call(input).value!
   end
 
   def decision_events(decision_id)
-    event_store.read(streams.decision(decision_id), Coordinator::Write::EventQueries::DECISION_EXISTENCE)
+    event_store.read(
+      streams.decision(decision_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[DecisionRecorded DecisionActivated DecisionDefinitionCorrected],
+        maximum_count: 10,
+        direction: :asc
+      )
+    )
   end
 
   def slot_events(slot_id)
@@ -151,7 +252,7 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :event_store
       streams.decision_slot(slot_id),
       Coordinator::Write::EventReadCriteria.new(
         event_types: %w[DecisionSlotOpened DecisionSlotHeadChanged],
-        maximum_count: 2,
+        maximum_count: 10,
         direction: :asc
       )
     )
@@ -177,5 +278,17 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :event_store
       projection_name: "decision_governance",
       projection_version: 1
     )
+  end
+
+
+  def reference(event)
+    {
+      event_id: event.id,
+      type: event.type,
+      stream_context: event.stream.context,
+      stream_name: event.stream.stream_name,
+      stream_id: event.stream.stream_id,
+      stream_revision: event.stream_revision
+    }
   end
 end

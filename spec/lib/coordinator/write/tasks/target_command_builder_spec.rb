@@ -139,6 +139,19 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
       ).value!,
       Coordinator::Write::Operations::PrepareActivateDecision.new.call(
         InterpretationInput.activation(command_id: "cmd-task-build-11")
+      ).value!,
+      Coordinator::Write::Operations::PrepareCorrectDecision.new.call(
+        InterpretationInput.correction(
+          command_id: "cmd-task-build-12",
+          expected_head: {
+            event_id: "0198e03a-d112-7000-8000-000000000012",
+            type: "DecisionActivated",
+            stream_context: "HumanGuidance",
+            stream_name: "Decision",
+            stream_id: "D-1",
+            stream_revision: 1
+          }
+        )
       ).value!
     ]
 

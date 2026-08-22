@@ -300,6 +300,38 @@ module Coordinator
         )
       end
 
+      def decision_correct
+        expected_head = object_schema(
+          properties: {
+            event_id: uuid_v7,
+            type: { type: "string", enum: %w[DecisionActivated DecisionDefinitionCorrected] },
+            stream_context: { type: "string", const: "HumanGuidance" },
+            stream_name: { type: "string", const: "Decision" },
+            stream_id: identifier,
+            stream_revision: { type: "integer", minimum: 0 }
+          },
+          required: %w[event_id type stream_context stream_name stream_id stream_revision]
+        )
+        rationale = object_schema(
+          properties: {
+            code: identifier,
+            summary: { type: "string", minLength: 1, maxLength: 500 }
+          },
+          required: %w[code summary]
+        )
+        object_schema(
+          properties: common_mutation_properties.merge(
+            decision_id: identifier,
+            interpretation_id: identifier,
+            expected_head:,
+            rationale:
+          ),
+          required: %w[
+            command_id actor decision_id interpretation_id expected_head rationale
+          ]
+        )
+      end
+
       def operation_get
         object_schema(
           properties: {

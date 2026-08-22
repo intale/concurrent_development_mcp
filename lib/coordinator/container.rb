@@ -86,6 +86,10 @@ module Coordinator
       Write::Operations::PrepareActivateDecision.new
     end
 
+    register("operations.prepare_correct_decision", memoize: true) do
+      Write::Operations::PrepareCorrectDecision.new
+    end
+
     register("domain.change_sets.create", memoize: true) do
       Write::Domain::ChangeSets::Create.new(stream_factory: self["stream_factory"])
     end
@@ -180,6 +184,25 @@ module Coordinator
 
     register("domain.decisions.activate", memoize: true) do
       Write::Domain::Decisions::Activate.new(stream_factory: self["stream_factory"])
+    end
+
+    register("domain.decisions.correction_eligibility", memoize: true) do
+      Write::Domain::Decisions::CorrectionEligibility.new(
+        topic_registry: self["interpretations.topic_registry"]
+      )
+    end
+
+    register("domain.decisions.prepare_correction", memoize: true) do
+      Write::Domain::Decisions::PrepareCorrection.new(
+        eligibility: self["domain.decisions.correction_eligibility"],
+        definition_builder: self["decisions.definition_builder"],
+        slot_builder: self["decisions.slot_builder"],
+        partition_builder: self["decisions.partition_builder"]
+      )
+    end
+
+    register("domain.decisions.correct", memoize: true) do
+      Write::Domain::Decisions::Correct.new(stream_factory: self["stream_factory"])
     end
 
     register("change_set_activation_source_builder", memoize: true) do
@@ -587,6 +610,22 @@ module Coordinator
       )
     end
 
+    register("operations.execute_correct_decision") do
+      Write::Operations::ExecuteCorrectDecision.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_correct_decision"],
+        candidate_preparer: self["domain.decisions.prepare_correction"],
+        decider: self["domain.decisions.correct"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
     register("lease_expiry_policy", memoize: true) do
       Processes::LeaseExpiryPolicy.new(
         source_loader: self["lease_expiry_source_loader"],
@@ -610,7 +649,8 @@ module Coordinator
         record_guidance: self["operations.execute_record_guidance"],
         propose_decision_interpretation: self["operations.execute_propose_decision_interpretation"],
         adjudicate_decision_interpretation: self["operations.execute_adjudicate_decision_interpretation"],
-        activate_decision: self["operations.execute_activate_decision"]
+        activate_decision: self["operations.execute_activate_decision"],
+        correct_decision: self["operations.execute_correct_decision"]
       )
     end
 
@@ -722,6 +762,13 @@ module Coordinator
     register("operations.submit_activate_decision_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_activate_decision"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_correct_decision_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_correct_decision"],
         submitter: self["operations.submit_coordination_task"]
       )
     end

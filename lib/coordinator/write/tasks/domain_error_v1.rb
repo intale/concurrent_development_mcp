@@ -173,6 +173,33 @@ module Coordinator::Write
         attribute :maximum_partition_count, Types::Integer.constrained(eql: 32)
       end
 
+      class DecisionIdentityDetails < Value
+        attribute :decision_id, Types::Identifier
+      end
+
+      class DecisionLifecycleDetails < DecisionIdentityDetails
+        attribute :event, EventReference
+      end
+
+      class InterpretationCorrectionRelationDetails < InterpretationDetails
+        attribute :decision_id, Types::Identifier
+        attribute :relations, Interpretations::DecisionRelationsV1
+      end
+
+      class DecisionCorrectionIneligibleDetails < Value
+        attribute :reasons, Types::DecisionCorrectionIneligibilityReasons
+      end
+
+      class DecisionRevisionChangedDetails < DecisionIdentityDetails
+        attribute :expected_head, EventReference
+        attribute :current_head, EventReference
+      end
+
+      class DecisionSlotStateInvalidDetails < Value
+        attribute :slot_id, Types::Identifier
+        attribute :head, Decisions::DecisionHeadV1.optional
+      end
+
       class ChangeSetError < Value
         attribute :code, Types::String.enum(
           "change_set_already_exists",
@@ -399,6 +426,42 @@ module Coordinator::Write
         attribute :details, DecisionPartitionLimitDetails
       end
 
+      class DecisionNotFoundError < Value
+        attribute :code, Types::String.enum("decision_not_found")
+        attribute :message, Types::String
+        attribute :details, DecisionIdentityDetails
+      end
+
+      class DecisionNotActiveError < Value
+        attribute :code, Types::String.enum("decision_not_active")
+        attribute :message, Types::String
+        attribute :details, DecisionLifecycleDetails
+      end
+
+      class InterpretationNotACorrectionError < Value
+        attribute :code, Types::String.enum("interpretation_not_a_correction")
+        attribute :message, Types::String
+        attribute :details, InterpretationCorrectionRelationDetails
+      end
+
+      class DecisionDefinitionNotCorrectableError < Value
+        attribute :code, Types::String.enum("decision_definition_not_correctable")
+        attribute :message, Types::String
+        attribute :details, DecisionCorrectionIneligibleDetails
+      end
+
+      class DecisionRevisionChangedError < Value
+        attribute :code, Types::String.enum("decision_revision_changed")
+        attribute :message, Types::String
+        attribute :details, DecisionRevisionChangedDetails
+      end
+
+      class DecisionSlotStateInvalidError < Value
+        attribute :code, Types::String.enum("decision_slot_state_invalid")
+        attribute :message, Types::String
+        attribute :details, DecisionSlotStateInvalidDetails
+      end
+
       Type = ChangeSetError |
              ActivationDependencyError |
              WorkItemError |
@@ -430,7 +493,13 @@ module Coordinator::Write
              InterpretationAlreadyActivatedError |
              DecisionDefinitionNotActivatableError |
              DecisionSlotOccupiedError |
-             DecisionPartitionLimitReachedError
+             DecisionPartitionLimitReachedError |
+             DecisionNotFoundError |
+             DecisionNotActiveError |
+             InterpretationNotACorrectionError |
+             DecisionDefinitionNotCorrectableError |
+             DecisionRevisionChangedError |
+             DecisionSlotStateInvalidError
     end
   end
 end

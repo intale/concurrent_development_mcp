@@ -9,7 +9,9 @@ module Coordinator::Write
         attempt_already_exists: "conflict",
         lease_busy: "busy",
         interpretation_slot_already_accepted: "conflict",
-        decision_slot_occupied: "conflict"
+        decision_slot_occupied: "conflict",
+        decision_revision_changed: "conflict",
+        decision_slot_state_invalid: "conflict"
       }.freeze
 
       def call(result, command_id:)

@@ -5,6 +5,7 @@ module Coordinator
         def fetch: (String decision_id) -> DecisionViewV1?
         def store_decision: (event: PgEventstore::Event, decision: Write::Events::DecisionRecordedV1) -> void
         def activate_decision: (event: PgEventstore::Event, activation: Write::Events::DecisionActivatedV1) -> void
+        def correct_decision: (event: PgEventstore::Event, correction: Write::Events::DecisionDefinitionCorrectedV1) -> void
         def open_slot: (event: PgEventstore::Event, opening: Write::Events::DecisionSlotOpenedV1) -> void
         def change_slot_head: (event: PgEventstore::Event, change: Write::Events::DecisionSlotHeadChangedV1) -> void
         def advance_partition: (event: PgEventstore::Event, advancement: Write::Events::DecisionPartitionAdvancedV1) -> void

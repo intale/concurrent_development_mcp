@@ -1796,3 +1796,159 @@ Then("the losing activation writes no Decision or command facts") do
     "Winning command facts"
   )
 end
+
+Given("these correction interpretations are accepted for Decision {string}:") do |decision_id, table|
+  @decision_correction_candidates = table.hashes.each_with_index.map do |row, index|
+    accept_correction_interpretation(
+      decision_id:,
+      interpretation_id: row.fetch("interpretation_id"),
+      message_id: row.fetch("message_id"),
+      value: row.fetch("value"),
+      suffix: index + 1
+    )
+  end
+end
+
+When(
+  "the host corrects Decision {string} with interpretation {string} using the available head"
+) do |decision_id, interpretation_id|
+  @decision_correction_expected_head = decision_view(decision_id)
+    .dig("data", "decision", "current_head", "event")
+  candidate = @decision_correction_candidates.find do |entry|
+    entry.fetch(:decision_id) == decision_id && entry.fetch(:interpretation_id) == interpretation_id
+  end
+  assert_acceptance(candidate, "No accepted correction matches #{decision_id}/#{interpretation_id}")
+  @decision_correction = candidate
+  @decision_correction_task_id = submit_and_execute(
+    "decision_correct",
+    command_id: candidate.fetch(:command_id),
+    actor: { kind: "orchestrator", id: "guidance-host" },
+    decision_id:,
+    interpretation_id:,
+    expected_head: @decision_correction_expected_head,
+    rationale: {
+      code: "normalization_corrected",
+      summary: "Apply the accepted correction."
+    }
+  )
+  @decision_correction_state = task_request("tasks/get", @decision_correction_task_id)
+end
+
+Then("the correction Task succeeds while the previous Decision view remains available") do
+  result = @decision_correction_state.dig("result", "result")
+  assert_acceptance_equal("completed", @decision_correction_state.dig("result", "status"), "Task status")
+  assert_acceptance_equal(false, result.fetch("isError"), "Correction error flag")
+  data = result.dig("structuredContent", "data")
+  decision_id = @decision_correction.fetch(:decision_id)
+  slot_id = data.dig("slot", "slot_id")
+
+  assert_acceptance_equal(
+    %w[DecisionRecorded DecisionActivated DecisionDefinitionCorrected],
+    decision_events(decision_id).map(&:type),
+    "Decision correction event plan"
+  )
+  assert_acceptance_equal(
+    %w[DecisionSlotOpened DecisionSlotHeadChanged DecisionSlotHeadChanged],
+    decision_slot_events(slot_id).map(&:type),
+    "Decision correction slot plan"
+  )
+  assert_acceptance_equal(
+    %w[DecisionPartitionAdvanced DecisionPartitionAdvanced],
+    decision_partition_events.map(&:type),
+    "Decision correction partition plan"
+  )
+  assert_acceptance_equal(
+    1,
+    command_events(@decision_correction.fetch(:command_id)).length,
+    "Decision correction completion"
+  )
+
+  view = decision_view(decision_id)
+  decision = view.dig("data", "decision")
+  assert_acceptance_equal("ok", view.fetch("status"), "Stale Decision availability")
+  assert_acceptance_equal(
+    @decision_activation.fetch(:interpretation_id),
+    decision.fetch("interpretation_id"),
+    "Previously projected interpretation"
+  )
+  assert_acceptance_equal(0, decision.fetch("correction_count"), "Unprojected correction count")
+  assert_acceptance_equal(
+    @decision_correction_expected_head.fetch("event_id"),
+    decision.dig("current_head", "event", "event_id"),
+    "Previously projected head"
+  )
+end
+
+When(
+  "the host corrects Decision {string} with interpretation {string} using the same stale head"
+) do |decision_id, interpretation_id|
+  candidate = @decision_correction_candidates.find do |entry|
+    entry.fetch(:decision_id) == decision_id && entry.fetch(:interpretation_id) == interpretation_id
+  end
+  assert_acceptance(candidate, "No accepted stale correction matches #{decision_id}/#{interpretation_id}")
+  @stale_decision_correction = candidate
+  @stale_decision_correction_task_id = submit_and_execute(
+    "decision_correct",
+    command_id: candidate.fetch(:command_id),
+    actor: { kind: "orchestrator", id: "guidance-host" },
+    decision_id:,
+    interpretation_id:,
+    expected_head: @decision_correction_expected_head,
+    rationale: {
+      code: "normalization_corrected",
+      summary: "Apply the accepted correction."
+    }
+  )
+  @stale_decision_correction_state = task_request("tasks/get", @stale_decision_correction_task_id)
+end
+
+Then("the stale correction Task reports a Decision revision conflict without new policy facts") do
+  result = @stale_decision_correction_state.dig("result", "result")
+  content = result.fetch("structuredContent")
+  assert_acceptance_equal("completed", @stale_decision_correction_state.dig("result", "status"), "Task status")
+  assert_acceptance_equal(true, result.fetch("isError"), "Stale correction error flag")
+  assert_acceptance_equal("conflict", content.fetch("status"), "Stale correction status")
+  assert_acceptance_equal("decision_revision_changed", content.dig("data", "code"), "Stale correction denial")
+  assert_acceptance_equal(
+    [],
+    command_events(@stale_decision_correction.fetch(:command_id)),
+    "Denied correction command facts"
+  )
+  assert_acceptance_equal(
+    1,
+    decision_events(@stale_decision_correction.fetch(:decision_id)).count {
+      _1.type == "DecisionDefinitionCorrected"
+    },
+    "Completed correction facts"
+  )
+end
+
+When("the correction fact for Decision {string} reaches the read side") do |decision_id|
+  project_decision_correction(decision_id)
+end
+
+Then(
+  "the available Decision {string} exposes correction interpretation {string} without a freshness claim"
+) do |decision_id, interpretation_id|
+  payload = decision_view(decision_id)
+  decision = payload.dig("data", "decision")
+  corrected = decision.fetch("corrected")
+  assert_acceptance_equal("ok", payload.fetch("status"), "Corrected Decision status")
+  assert_acceptance_equal("active", decision.fetch("policy_status"), "Corrected policy status")
+  assert_acceptance_equal(interpretation_id, decision.fetch("interpretation_id"), "Correction interpretation")
+  assert_acceptance_equal(1, decision.fetch("correction_count"), "Correction count")
+  assert_acceptance_equal(
+    "DecisionDefinitionCorrected",
+    corrected.dig("event", "type"),
+    "Correction evidence"
+  )
+  assert_acceptance_equal(
+    corrected.dig("event", "event_id"),
+    decision.dig("current_head", "event", "event_id"),
+    "Current Decision head"
+  )
+  assert_acceptance(
+    (payload.keys & %w[active fresh pending projection_status stream_revision]).empty?,
+    "Decision query must not claim freshness"
+  )
+end

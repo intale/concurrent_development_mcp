@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Tasks
       module DomainErrorV1
-        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError | InterpretationNotAcceptedError | DecisionAlreadyExistsError | InterpretationAlreadyActivatedError | DecisionDefinitionNotActivatableError | DecisionSlotOccupiedError | DecisionPartitionLimitReachedError
+        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError | InterpretationNotAcceptedError | DecisionAlreadyExistsError | InterpretationAlreadyActivatedError | DecisionDefinitionNotActivatableError | DecisionSlotOccupiedError | DecisionPartitionLimitReachedError | DecisionNotFoundError | DecisionNotActiveError | InterpretationNotACorrectionError | DecisionDefinitionNotCorrectableError | DecisionRevisionChangedError | DecisionSlotStateInvalidError
 
         class ChangeSetDetails < Shared::Value
           def change_set_id: () -> String
@@ -172,6 +172,33 @@ module Coordinator
           def decision_id: () -> String
           def partition_count: () -> Integer
           def maximum_partition_count: () -> Integer
+        end
+
+        class DecisionIdentityDetails < Shared::Value
+          def decision_id: () -> String
+        end
+
+        class DecisionLifecycleDetails < DecisionIdentityDetails
+          def event: () -> EventReference
+        end
+
+        class InterpretationCorrectionRelationDetails < InterpretationDetails
+          def decision_id: () -> String
+          def relations: () -> Interpretations::DecisionRelationsV1
+        end
+
+        class DecisionCorrectionIneligibleDetails < Shared::Value
+          def reasons: () -> Array[String]
+        end
+
+        class DecisionRevisionChangedDetails < DecisionIdentityDetails
+          def expected_head: () -> EventReference
+          def current_head: () -> EventReference
+        end
+
+        class DecisionSlotStateInvalidDetails < Shared::Value
+          def slot_id: () -> String
+          def head: () -> Decisions::DecisionHeadV1?
         end
 
         class ChangeSetError < Shared::Value
@@ -367,6 +394,42 @@ module Coordinator
           def code: () -> String
           def message: () -> String
           def details: () -> DecisionPartitionLimitDetails
+        end
+
+        class DecisionNotFoundError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> DecisionIdentityDetails
+        end
+
+        class DecisionNotActiveError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> DecisionLifecycleDetails
+        end
+
+        class InterpretationNotACorrectionError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> InterpretationCorrectionRelationDetails
+        end
+
+        class DecisionDefinitionNotCorrectableError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> DecisionCorrectionIneligibleDetails
+        end
+
+        class DecisionRevisionChangedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> DecisionRevisionChangedDetails
+        end
+
+        class DecisionSlotStateInvalidError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> DecisionSlotStateInvalidDetails
         end
       end
     end

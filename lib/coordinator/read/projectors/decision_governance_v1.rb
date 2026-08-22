@@ -60,7 +60,8 @@ module Coordinator::Read
       def verify_stream_identity!(event, payload)
         expected_id = case payload
         when Coordinator::Write::Events::DecisionRecordedV1,
-             Coordinator::Write::Events::DecisionActivatedV1
+             Coordinator::Write::Events::DecisionActivatedV1,
+             Coordinator::Write::Events::DecisionDefinitionCorrectedV1
           payload.decision_id
         when Coordinator::Write::Events::DecisionSlotOpenedV1
           payload.slot.slot_id
@@ -80,6 +81,8 @@ module Coordinator::Read
           @governance.store_decision(event:, decision: payload)
         when Coordinator::Write::Events::DecisionActivatedV1
           @governance.activate_decision(event:, activation: payload)
+        when Coordinator::Write::Events::DecisionDefinitionCorrectedV1
+          @governance.correct_decision(event:, correction: payload)
         when Coordinator::Write::Events::DecisionSlotOpenedV1
           @governance.open_slot(event:, opening: payload)
         when Coordinator::Write::Events::DecisionSlotHeadChangedV1

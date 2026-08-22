@@ -31,6 +31,8 @@ module Coordinator::Write
           build_adjudicate_decision_interpretation(document)
         when CommandInputDocuments::ActivateDecisionV1
           build_activate_decision(document)
+        when CommandInputDocuments::CorrectDecisionV1
+          build_correct_decision(document)
         end
       end
 
@@ -201,6 +203,18 @@ module Coordinator::Write
           actor: build_actor(input.actor),
           decision_id: input.decision_id,
           interpretation_id: input.interpretation_id,
+          rationale: input.rationale
+        )
+      end
+
+      def build_correct_decision(document)
+        input = document.input
+        Commands::CorrectDecision.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          decision_id: input.decision_id,
+          interpretation_id: input.interpretation_id,
+          expected_head: EventReference.new(input.expected_head.to_h),
           rationale: input.rationale
         )
       end

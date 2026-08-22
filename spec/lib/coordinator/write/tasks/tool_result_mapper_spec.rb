@@ -295,6 +295,82 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         },
         Coordinator::Write::Tasks::DomainErrorV1::DecisionPartitionLimitReachedError,
         "denied"
+      ],
+      [
+        :decision_not_found,
+        { decision_id: "D-task-result" },
+        Coordinator::Write::Tasks::DomainErrorV1::DecisionNotFoundError,
+        "denied"
+      ],
+      [
+        :decision_not_active,
+        {
+          decision_id: "D-task-result",
+          event: {
+            event_id: "0198e03a-d112-7000-8000-000000000001",
+            type: "DecisionRecorded",
+            stream_context: "HumanGuidance",
+            stream_name: "Decision",
+            stream_id: "D-task-result",
+            stream_revision: 0
+          }
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::DecisionNotActiveError,
+        "denied"
+      ],
+      [
+        :interpretation_not_a_correction,
+        {
+          interpretation_id: "I-task-result",
+          decision_id: "D-task-result",
+          relations: {
+            corrects: [],
+            supersedes: [ "D-task-result" ],
+            exception_to: [],
+            revokes: []
+          }
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::InterpretationNotACorrectionError,
+        "denied"
+      ],
+      [
+        :decision_definition_not_correctable,
+        { reasons: [ "validity_future" ] },
+        Coordinator::Write::Tasks::DomainErrorV1::DecisionDefinitionNotCorrectableError,
+        "denied"
+      ],
+      [
+        :decision_revision_changed,
+        {
+          decision_id: "D-task-result",
+          expected_head: {
+            event_id: "0198e03a-d112-7000-8000-000000000001",
+            type: "DecisionActivated",
+            stream_context: "HumanGuidance",
+            stream_name: "Decision",
+            stream_id: "D-task-result",
+            stream_revision: 1
+          },
+          current_head: {
+            event_id: "0198e03a-d112-7000-8000-000000000002",
+            type: "DecisionDefinitionCorrected",
+            stream_context: "HumanGuidance",
+            stream_name: "Decision",
+            stream_id: "D-task-result",
+            stream_revision: 2
+          }
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::DecisionRevisionChangedError,
+        "conflict"
+      ],
+      [
+        :decision_slot_state_invalid,
+        {
+          slot_id: "compound:decision-slot:v1:sha256:#{'a' * 64}",
+          head: nil
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::DecisionSlotStateInvalidError,
+        "conflict"
       ]
     ]
 

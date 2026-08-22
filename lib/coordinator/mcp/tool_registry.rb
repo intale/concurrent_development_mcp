@@ -24,7 +24,8 @@ module Coordinator
           Tools::GuidanceRecord,
           Tools::DecisionInterpretationPropose,
           Tools::DecisionInterpretationAdjudicate,
-          Tools::DecisionActivate
+          Tools::DecisionActivate,
+          Tools::DecisionCorrect
         ].freeze
       end
     end

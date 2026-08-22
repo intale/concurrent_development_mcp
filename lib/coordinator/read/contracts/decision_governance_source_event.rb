@@ -6,6 +6,7 @@ module Coordinator::Read
       STREAM_BY_EVENT_TYPE = {
         "DecisionRecorded" => "Decision",
         "DecisionActivated" => "Decision",
+        "DecisionDefinitionCorrected" => "Decision",
         "DecisionSlotOpened" => "DecisionSlot",
         "DecisionSlotHeadChanged" => "DecisionSlot",
         "DecisionPartitionAdvanced" => "DecisionPartition"

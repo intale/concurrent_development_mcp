@@ -17,7 +17,12 @@ module Coordinator::Read
     attribute :proposal_event, Coordinator::Write::EventReference
     attribute :acceptance_event, Coordinator::Write::EventReference
     attribute :rationale, Coordinator::Write::Decisions::DecisionActivationRationaleV1.optional
+    attribute :correction_rationale, Coordinator::Write::Decisions::DecisionCorrectionRationaleV1.optional
+    attribute :previous_definition_digest, Types::Sha256Digest.optional
+    attribute :correction_count, Types::Integer.constrained(gteq: 0)
     attribute :recorded, DecisionLifecycleEvidenceV1
     attribute :activated, DecisionLifecycleEvidenceV1.optional
+    attribute :corrected, DecisionLifecycleEvidenceV1.optional
+    attribute :current_head, DecisionLifecycleEvidenceV1.optional
   end
 end
