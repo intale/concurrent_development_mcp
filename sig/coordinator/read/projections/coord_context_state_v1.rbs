@@ -51,6 +51,7 @@ module Coordinator
           def policy_version: () -> String
           def resources: () -> Array[WriteSetResource]
           def reserved_at: () -> String
+          def last_expanded_at: () -> String?
           def expires_at: () -> String
         end
 

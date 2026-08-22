@@ -16,6 +16,7 @@ module Coordinator::Read
         when Coordinator::Write::Events::AttemptAuthorizedV1 then apply_attempt_authorized(state, event)
         when Coordinator::Write::Events::AttemptStartedV1 then apply_attempt_started(state, event)
         when Coordinator::Write::Events::WriteSetReservedV1 then apply_write_set_reserved(state, event)
+        when Coordinator::Write::Events::WriteSetExpandedV1 then apply_write_set_expanded(state, event)
         else
           raise UnknownProjectionEvent, "coord_context/v1 does not handle #{event.class.name}"
         end
@@ -171,6 +172,7 @@ module Coordinator::Read
             CoordContextStateV1::WriteSetResource.new(resource.to_h)
           end,
           reserved_at: event.reserved_at,
+          last_expanded_at: nil,
           expires_at: event.expires_at
         )
 
@@ -180,6 +182,45 @@ module Coordinator::Read
             state.attempts,
             :attempt_id,
             CoordContextStateV1::Attempt.new(attempt.attributes.merge(write_set:))
+          )
+        )
+      end
+
+      def apply_write_set_expanded(state, event)
+        attempt = require_attempt(state, event.attempt_id, event.change_set_id, event.work_item_id)
+        write_set = attempt.write_set
+        raise ProjectionStateError, "Attempt #{event.attempt_id} has no projected write set" unless write_set
+        unless write_set.lease_set_id == event.lease_set_id &&
+               write_set.repository_id == event.repository_id &&
+               write_set.policy_version == event.policy_version &&
+               write_set.expires_at == event.expires_at
+          raise ProjectionStateError, "Attempt #{event.attempt_id} write-set identity changed"
+        end
+
+        resources = event.added_resources.reduce(write_set.resources) do |observed, reference|
+          upsert(
+            observed,
+            :resource_key_hash,
+            CoordContextStateV1::WriteSetResource.new(reference.to_h)
+          )
+        end.sort_by { _1.resource_key_hash.b }
+        unless resources.length == event.resource_count
+          raise ProjectionStateError, "Attempt #{event.attempt_id} write-set count changed"
+        end
+
+        expanded = CoordContextStateV1::WriteSet.new(
+          write_set.attributes.merge(
+            resources:,
+            last_expanded_at: event.expanded_at,
+            expires_at: event.expires_at
+          )
+        )
+        replace(
+          state,
+          attempts: upsert(
+            state.attempts,
+            :attempt_id,
+            CoordContextStateV1::Attempt.new(attempt.attributes.merge(write_set: expanded))
           )
         )
       end

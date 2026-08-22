@@ -18,7 +18,8 @@ module Coordinator::Read
            Coordinator::Write::Events::WorkItemAcquiredV1,
            Coordinator::Write::Events::AttemptAuthorizedV1,
            Coordinator::Write::Events::AttemptStartedV1,
-           Coordinator::Write::Events::WriteSetReservedV1
+           Coordinator::Write::Events::WriteSetReservedV1,
+           Coordinator::Write::Events::WriteSetExpandedV1
         roots << ProjectionScopeRoot.new(
           scope_kind: "work_item",
           scope_id: event.work_item_id,
@@ -29,7 +30,8 @@ module Coordinator::Read
       case event
       when Coordinator::Write::Events::AttemptAuthorizedV1,
            Coordinator::Write::Events::AttemptStartedV1,
-           Coordinator::Write::Events::WriteSetReservedV1
+           Coordinator::Write::Events::WriteSetReservedV1,
+           Coordinator::Write::Events::WriteSetExpandedV1
         roots << ProjectionScopeRoot.new(
           scope_kind: "attempt",
           scope_id: event.attempt_id,

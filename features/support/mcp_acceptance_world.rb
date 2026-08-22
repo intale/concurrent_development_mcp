@@ -124,12 +124,16 @@ module McpAcceptanceWorld
   def attempt_events(attempt_id)
     event_store.read(
       streams.attempt(attempt_id),
-      Coordinator::Write::EventQueries::ATTEMPT_FOR_WRITE_SET_RESERVATION
+      Coordinator::Write::EventQueries::ATTEMPT_FOR_WRITE_SET_EXPANSION
     )
   end
 
   def write_set_events(attempt_id)
     attempt_events(attempt_id).select { _1.type == "WriteSetReserved" }
+  end
+
+  def write_set_expansion_events(attempt_id)
+    attempt_events(attempt_id).select { _1.type == "WriteSetExpanded" }
   end
 
   def lease_events(path)

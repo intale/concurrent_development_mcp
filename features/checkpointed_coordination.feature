@@ -59,3 +59,13 @@ Feature: Checkpointed cooperative coordination
       And the loser owns no partial write set
       When the winning Attempt reservation reaches the read side
       Then available context exposes the observed lease evidence without a freshness claim
+
+  Rule: An agent expands its current write set without renewing it
+
+    Scenario: Added file evidence reaches an available read model after the durable Task
+      Given agent "agent-a" has reserved "app/a.rb" for active Attempt "A-CUC-EXPAND" in ChangeSet "CS-CUC-EXPAND"
+      When the agent expands the current write set with "app/b.rb"
+      Then the expansion Task succeeds without extending the lease deadline
+      And the previous context remains available before expansion projection
+      When the write-set expansion reaches the read side
+      Then available context exposes both observed files without a freshness claim

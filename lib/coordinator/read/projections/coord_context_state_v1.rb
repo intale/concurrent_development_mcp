@@ -54,6 +54,7 @@ module Coordinator::Read
         attribute :policy_version, Types::String.enum(Coordinator::Write::ResourceKeyDocumentV1::POLICY_VERSION)
         attribute :resources, Types::Array.of(Resource).constrained(min_size: 1, max_size: 32)
         attribute :reserved_at, Types::Timestamp
+        attribute :last_expanded_at, Types::Timestamp.optional
         attribute :expires_at, Types::Timestamp
       end
 

@@ -371,3 +371,162 @@ Then("available context exposes the observed lease evidence without a freshness 
     "Projected write set must not claim freshness or current activity"
   )
 end
+
+Given(
+  "agent {string} has reserved {string} for active Attempt {string} in ChangeSet {string}"
+) do |agent_id, initial_path, attempt_id, change_set_id|
+  @expansion_agent_id = agent_id
+  @expansion_initial_path = initial_path
+  @expansion_attempt_id = attempt_id
+  @expansion_change_set_id = change_set_id
+  @expansion_work_item_id = "W-CUC-EXPAND"
+
+  submit_and_execute(
+    "change_set_create",
+    command_id: "cmd-cuc-expand-create",
+    actor: { kind: "agent", id: "planner-1" },
+    change_set_id:,
+    goal: "Coordinate write-set expansion",
+    acceptance_criteria: [ "Expansion preserves the current deadline" ]
+  )
+  submit_and_execute(
+    "work_item_create",
+    command_id: "cmd-cuc-expand-work-item",
+    actor: { kind: "agent", id: "planner-1" },
+    change_set_id:,
+    work_item_id: @expansion_work_item_id,
+    repository_id: "billing",
+    goal: "Implement the expanded change",
+    acceptance_criteria: [ "Both files are coordinated" ]
+  )
+  submit_and_execute(
+    "change_set_activate",
+    command_id: "cmd-cuc-expand-activate",
+    actor: { kind: "agent", id: "planner-1" },
+    change_set_id:
+  )
+  activation = change_set_events(change_set_id).find { _1.type == "ChangeSetActivated" }
+  Coordinator::Container["process_managers.change_set_readiness"].call(activation)
+  submit_and_execute(
+    "work_item_acquire",
+    command_id: "cmd-cuc-expand-acquire",
+    actor: { kind: "agent", id: agent_id },
+    change_set_id:,
+    work_item_id: @expansion_work_item_id,
+    attempt_id:,
+    base_snapshots: [ { repository_id: "billing", commit_oid: "a" * 40 } ]
+  )
+  reservation_task_id = submit_and_execute(
+    "write_set_reserve",
+    command_id: "cmd-cuc-expand-reserve",
+    actor: { kind: "agent", id: agent_id },
+    change_set_id:,
+    work_item_id: @expansion_work_item_id,
+    attempt_id:,
+    repository_id: "billing",
+    base_commit_oid: "a" * 40,
+    resources: [ { kind: "file", path: initial_path } ],
+    lease_duration_seconds: 300
+  )
+  @expansion_reservation = task_request("tasks/get", reservation_task_id).dig(
+    "result", "result", "structuredContent", "data"
+  )
+
+  project_attempt_context(
+    change_set_id:,
+    work_item_id: @expansion_work_item_id,
+    attempt_id:
+  )
+  @context_before_expansion = call_tool("coord_context", { attempt_id: })
+end
+
+When("the agent expands the current write set with {string}") do |additional_path|
+  @expansion_additional_path = additional_path
+  @expansion_command_id = "cmd-cuc-expand-add"
+  @expansion_task_id = call_tool(
+    "write_set_expand",
+    {
+      command_id: @expansion_command_id,
+      actor: { kind: "agent", id: @expansion_agent_id },
+      change_set_id: @expansion_change_set_id,
+      work_item_id: @expansion_work_item_id,
+      attempt_id: @expansion_attempt_id,
+      lease_set_id: @expansion_reservation.fetch("lease_set_id"),
+      repository_id: "billing",
+      base_commit_oid: "a" * 40,
+      resources: [ { kind: "file", path: additional_path } ]
+    }
+  ).dig("result", "taskId")
+  execute_task(@expansion_task_id)
+  @expansion_task_state = task_request("tasks/get", @expansion_task_id)
+end
+
+Then("the expansion Task succeeds without extending the lease deadline") do
+  result = @expansion_task_state.dig("result", "result")
+  data = result.fetch("structuredContent").fetch("data")
+
+  assert_acceptance_equal("completed", @expansion_task_state.dig("result", "status"), "Expansion Task status")
+  assert_acceptance_equal(false, result.fetch("isError"), "Expansion tool error flag")
+  assert_acceptance_equal(
+    @expansion_reservation.fetch("lease_set_id"),
+    data.fetch("lease_set_id"),
+    "Expansion lease-set identity"
+  )
+  assert_acceptance_equal(
+    @expansion_reservation.fetch("expires_at"),
+    data.fetch("expires_at"),
+    "Expansion deadline"
+  )
+  assert_acceptance_equal(
+    [ @expansion_additional_path ],
+    data.fetch("added_resources").map { _1.fetch("resource_path") },
+    "Expansion additions"
+  )
+end
+
+Then("the previous context remains available before expansion projection") do
+  lagging = call_tool("coord_context", { attempt_id: @expansion_attempt_id })
+  before_payload = @context_before_expansion.dig("result", "structuredContent")
+  lagging_payload = lagging.dig("result", "structuredContent")
+  write_set = lagging_payload.dig("data", "context", "attempts", 0, "write_set")
+
+  assert_acceptance_equal("ok", lagging_payload.fetch("status"), "Lagging context status")
+  assert_acceptance_equal(
+    before_payload.fetch("context_token"),
+    lagging_payload.fetch("context_token"),
+    "Lagging context token"
+  )
+  assert_acceptance_equal(
+    [ @expansion_initial_path ],
+    write_set.fetch("resources").map { _1.fetch("resource_path") },
+    "Lagging write-set evidence"
+  )
+end
+
+When("the write-set expansion reaches the read side") do
+  expansion = write_set_expansion_events(@expansion_attempt_id).sole
+  Coordinator::Container["projectors.coord_context_v1"].call(expansion)
+  @expanded_context = call_tool("coord_context", { attempt_id: @expansion_attempt_id })
+end
+
+Then("available context exposes both observed files without a freshness claim") do
+  payload = @expanded_context.dig("result", "structuredContent")
+  write_set = payload.dig("data", "context", "attempts", 0, "write_set")
+
+  assert_acceptance_equal("ok", payload.fetch("status"), "Expanded context status")
+  assert_acceptance_equal(
+    [ @expansion_initial_path, @expansion_additional_path ].sort,
+    write_set.fetch("resources").map { _1.fetch("resource_path") }.sort,
+    "Expanded projected resources"
+  )
+  assert_acceptance_equal(
+    @expansion_reservation.fetch("expires_at"),
+    write_set.fetch("expires_at"),
+    "Projected expansion deadline"
+  )
+  assert_acceptance(write_set.key?("last_expanded_at"), "Projected expansion time is missing")
+  assert_acceptance(
+    (write_set.keys & %w[active fresh pending]).empty?,
+    "Expanded projection must not claim freshness or activity"
+  )
+end

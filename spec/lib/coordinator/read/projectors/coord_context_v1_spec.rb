@@ -74,7 +74,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
         { repository_id: "billing", commit_oid: "a" * 40 }
       ]
     ).value!
-    Coordinator::Write::Operations::ExecuteReserveWriteSet.new(event_store:).call(
+    reservation = Coordinator::Write::Operations::ExecuteReserveWriteSet.new(event_store:).call(
       command_id: "reserve-A-100",
       actor: { kind: "agent", id: "agent-1" },
       change_set_id: "CS-100",
@@ -87,13 +87,27 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
         { kind: "file", path: "db/schema.rb" }
       ],
       lease_duration_seconds: 300
+    ).value!.data
+    Coordinator::Write::Operations::ExecuteExpandWriteSet.new(event_store:).call(
+      command_id: "expand-A-100",
+      actor: { kind: "agent", id: "agent-1" },
+      change_set_id: "CS-100",
+      work_item_id: "W-100",
+      attempt_id: "A-100",
+      lease_set_id: reservation.lease_set_id,
+      repository_id: "billing",
+      base_commit_oid: "a" * 40,
+      resources: [
+        { kind: "file", path: "app/models/invoice.rb", base_blob_oid: "b" * 40 },
+        { kind: "file", path: "app/services/tax.rb", base_blob_oid: "c" * 40 }
+      ]
     ).value!
 
     planning = change_set_events("CS-100")
     work = work_item_events("W-100")
     attempt = event_store.read(
       streams.attempt("A-100"),
-      Coordinator::Write::EventQueries::ATTEMPT_FOR_WRITE_SET_RESERVATION
+      Coordinator::Write::EventQueries::ATTEMPT_FOR_WRITE_SET_EXPANSION
     )
     [ planning[0], planning[1], work[0], planning[2], planning[3], work[1], work[2], *attempt ].each do |event|
       projector.call(event)
@@ -122,11 +136,15 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
       policy_version: "coordinator-resource-key/v1"
     )
     expect(write_set.lease_set_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
-    expect(write_set.resources.map(&:resource_path)).to eq(
-      [ "app/models/invoice.rb", "db/schema.rb" ]
+    expect(write_set.resources).to eq(write_set.resources.sort_by { _1.resource_key_hash.b })
+    expect(write_set.resources.map(&:resource_path)).to contain_exactly(
+      "app/models/invoice.rb",
+      "app/services/tax.rb",
+      "db/schema.rb"
     )
-    expect(write_set.resources.map(&:fencing_token)).to eq([ 1, 1 ])
+    expect(write_set.resources.map(&:fencing_token)).to eq([ 1, 1, 1 ])
     expect(write_set.expires_at).to be > write_set.reserved_at
+    expect(write_set.last_expanded_at).to be > write_set.reserved_at
     expect(Coordinator::Read::ContextNextActionsBuilder.new.call(snapshot.state)).to be_empty
   end
 
