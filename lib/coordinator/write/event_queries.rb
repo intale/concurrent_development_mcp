@@ -100,6 +100,18 @@ module Coordinator::Write
       direction: :desc
     )
 
+    AGENT_CHOICE_EXISTENCE = EventReadCriteria.new(
+      event_types: [ "AgentChoiceRecorded", "AgentChoiceAccepted" ],
+      maximum_count: 2,
+      direction: :asc
+    )
+
+    ATTEMPT_FOR_AGENT_CHOICE = EventReadCriteria.new(
+      event_types: [ "AttemptAuthorized", "AttemptStarted" ],
+      maximum_count: 2,
+      direction: :asc
+    )
+
     COORDINATION_TASK_HISTORY = EventReadCriteria.new(
       event_types: [
         "CoordinationTaskSubmitted",

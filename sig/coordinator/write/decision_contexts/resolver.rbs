@@ -1,0 +1,18 @@
+module Coordinator
+  module Write
+    module DecisionContexts
+      class Resolver
+        TOPIC_ID: String
+        APPLICABILITY_REASONS: Array[String]
+        ANCHOR_RANKS: Hash[String, Integer]
+
+        def call: (
+          context: QueryContextV1,
+          observations: Array[PartitionObservationV1],
+          decisions: Array[Decisions::DecisionCurrentStateV1],
+          resolved_at: String
+        ) -> ResultV1
+      end
+    end
+  end
+end

@@ -81,5 +81,13 @@ module Coordinator::Write
         stream_id: partition_id
       )
     end
+
+    def agent_choice(choice_id)
+      StreamReference.new(
+        context: "AgentGovernance",
+        stream_name: "AgentChoice",
+        stream_id: choice_id
+      )
+    end
   end
 end

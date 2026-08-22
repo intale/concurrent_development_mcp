@@ -260,6 +260,24 @@ module Coordinator::Write
       attribute :input, CorrectDecisionInputV1
     end
 
+    class RecordAgentChoiceInputV1 < Value
+      Option = AgentChoices::ChoiceOptionV1
+
+      attribute :actor, ActorV1
+      attribute :choice_id, Types::Identifier
+      attribute :choice_type, Types::AgentChoiceType
+      attribute :selected, Option
+      attribute :alternatives, Types::Array.of(Option).constrained(max_size: 10)
+      attribute :reason_summary, Types::String.constrained(min_size: 1, max_size: 1_000)
+      attribute :context, DecisionContexts::QueryContextV1
+      attribute :decision_context, DecisionContexts::ContextV1
+    end
+
+    class RecordAgentChoiceV1 < BaseV1
+      attribute :tool_name, Types::String.enum("agent_choice_record")
+      attribute :input, RecordAgentChoiceInputV1
+    end
+
     class ExpireResourceLeaseInputV1 < Value
       attribute :actor, ActorV1
       attribute :resource_key_hash, Types::Sha256Digest
@@ -287,7 +305,8 @@ module Coordinator::Write
            ProposeDecisionInterpretationV1 |
            AdjudicateDecisionInterpretationV1 |
            ActivateDecisionV1 |
-           CorrectDecisionV1
+           CorrectDecisionV1 |
+           RecordAgentChoiceV1
 
     DigestType = Type | ExpireResourceLeaseV1
   end

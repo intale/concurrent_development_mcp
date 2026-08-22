@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module AgentChoices
+      class ChoiceAssessmentV1 < Shared::Value
+        Head: singleton(Decisions::DecisionHeadV1)
+        Warning: untyped
+
+        def basis: () -> String
+        def based_on_decisions: () -> Array[Decisions::DecisionHeadV1]
+        def warnings: () -> Array[String]
+      end
+    end
+  end
+end

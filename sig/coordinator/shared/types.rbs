@@ -30,6 +30,9 @@ module Coordinator
       DECISION_POLICY_STATUSES: Array[String]
       DECISION_PARTITION_ANCHOR_KINDS: Array[String]
       DECISION_CHANGE_KINDS: Array[String]
+      AGENT_CHOICE_TYPES: Array[String]
+      AGENT_CHOICE_ASSESSMENT_BASES: Array[String]
+      AGENT_CHOICE_OUTCOMES: Array[String]
       DECISION_ACTIVATION_INELIGIBILITY_REASONS: Array[String]
       DECISION_CORRECTION_INELIGIBILITY_REASONS: Array[String]
       SCOPE_PROVENANCE_KINDS: Array[String]
@@ -94,6 +97,9 @@ module Coordinator
       DecisionPolicyStatus: untyped
       DecisionPartitionAnchorKind: untyped
       DecisionChangeKind: untyped
+      AgentChoiceType: untyped
+      AgentChoiceAssessmentBasis: untyped
+      AgentChoiceOutcome: untyped
       DecisionActivationIneligibilityReason: untyped
       DecisionActivationIneligibilityReasons: untyped
       DecisionCorrectionIneligibilityReason: untyped

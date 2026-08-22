@@ -37,6 +37,8 @@ module Coordinator::Write
       [ "DecisionSlotOpened", 1 ] => Events::DecisionSlotOpenedV1,
       [ "DecisionSlotHeadChanged", 1 ] => Events::DecisionSlotHeadChangedV1,
       [ "DecisionPartitionAdvanced", 1 ] => Events::DecisionPartitionAdvancedV1,
+      [ "AgentChoiceRecorded", 1 ] => Events::AgentChoiceRecordedV1,
+      [ "AgentChoiceAccepted", 1 ] => Events::AgentChoiceAcceptedV1,
       [ "CoordinationTaskSubmitted", 1 ] => Events::CoordinationTaskSubmittedV1,
       [ "CoordinationTaskExecutionStarted", 1 ] => Events::CoordinationTaskExecutionStartedV1,
       [ "CoordinationTaskCompleted", 1 ] => Events::CoordinationTaskCompletedV1,

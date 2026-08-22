@@ -144,6 +144,21 @@ module Coordinator::Write
       attribute :corrected_at, Types::Timestamp
     end
 
+    class AgentChoice < Value
+      Head = Decisions::DecisionHeadV1
+
+      attribute :choice_id, Types::Identifier
+      attribute :choice_type, Types::AgentChoiceType
+      attribute :outcome, Types::AgentChoiceOutcome
+      attribute :assessment_basis, Types::AgentChoiceAssessmentBasis
+      attribute :context_digest, Types::Sha256Digest
+      attribute :recorded_event, EventReference
+      attribute :accepted_event, EventReference
+      attribute :based_on_decisions, Types::Array.of(Head).constrained(max_size: 1)
+      attribute :warnings, Types::Array.of(AgentChoices::ChoiceAssessmentV1::Warning).constrained(max_size: 10)
+      attribute :accepted_at, Types::Timestamp
+    end
+
     Type = ChangeSet |
            WorkItem |
            Dependency |
@@ -157,6 +172,7 @@ module Coordinator::Write
            InterpretationProposal |
            InterpretationAdjudication |
            DecisionActivation |
-           DecisionCorrection
+           DecisionCorrection |
+           AgentChoice
   end
 end

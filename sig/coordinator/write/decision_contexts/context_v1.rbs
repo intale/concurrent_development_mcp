@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module DecisionContexts
+      class ContextV1 < Shared::Value
+        def document: () -> ContextDocumentV1
+        def digest: () -> String
+        def resolved_at: () -> String
+      end
+    end
+  end
+end

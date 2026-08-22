@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module Domain
+      module AgentChoices
+        class Record
+          POSITIVE_EFFECTS: Array[String]
+          NEGATIVE_EFFECTS: Array[String]
+
+          def initialize: (?stream_factory: StreamFactory) -> void
+          def call: (state: State, command: Commands::RecordAgentChoice, recorded_at: String, recorded_event: EventReference) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

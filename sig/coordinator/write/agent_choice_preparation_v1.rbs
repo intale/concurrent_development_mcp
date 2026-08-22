@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    class AgentChoicePreparationV1 < Shared::Value
+      def recorded_at: () -> String
+      def input_digest: () -> String
+      def recorded_event_id: () -> String
+      def accepted_event_id: () -> String
+      def completion_event_id: () -> String
+    end
+  end
+end

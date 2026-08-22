@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module DecisionContexts
+      class PartitionObservationV1 < Shared::Value
+        Head: singleton(Decisions::DecisionHeadV1)
+
+        def partition: () -> Decisions::DecisionPartitionV1
+        def partition_revision: () -> Integer?
+        def event: () -> EventReference?
+        def active_decisions: () -> Array[Decisions::DecisionHeadV1]
+      end
+    end
+  end
+end

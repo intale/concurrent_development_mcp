@@ -24,11 +24,16 @@ module Coordinator::Write
       attribute :decision_id, Types::Identifier
     end
 
+    class AgentChoiceArguments < Value
+      attribute :choice_id, Types::Identifier
+    end
+
     Arguments = ChangeSetArguments |
                 AttemptArguments |
                 GuidanceArguments |
                 InterpretationListArguments |
-                DecisionArguments
+                DecisionArguments |
+                AgentChoiceArguments
 
     attribute :tool, Types::Identifier
     attribute :arguments, Arguments

@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module DecisionContexts
+      class Builder
+        def initialize: (?canonical_json: Shared::CanonicalJson) -> void
+        def call: (
+          context: QueryContextV1,
+          observations: Array[PartitionObservationV1],
+          resolution: ResultV1,
+          resolved_at: String
+        ) -> ContextV1
+      end
+    end
+  end
+end

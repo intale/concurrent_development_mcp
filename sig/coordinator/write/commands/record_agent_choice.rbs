@@ -1,0 +1,19 @@
+module Coordinator
+  module Write
+    module Commands
+      class RecordAgentChoice < Shared::Value
+        Option: singleton(AgentChoices::ChoiceOptionV1)
+
+        def command_id: () -> String
+        def actor: () -> Actor
+        def choice_id: () -> String
+        def choice_type: () -> String
+        def selected: () -> AgentChoices::ChoiceOptionV1
+        def alternatives: () -> Array[AgentChoices::ChoiceOptionV1]
+        def reason_summary: () -> String
+        def context: () -> DecisionContexts::QueryContextV1
+        def decision_context: () -> DecisionContexts::ContextV1
+      end
+    end
+  end
+end

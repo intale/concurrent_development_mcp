@@ -1,0 +1,20 @@
+module Coordinator
+  module Write
+    module Contracts
+      module DecisionContextSchemas
+        EVENT_REFERENCE: untyped
+        DECISION_HEAD: untyped
+        PARTITION: untyped
+        PARTITION_OBSERVATION: untyped
+        QUERY_CONTEXT: untyped
+        DECISION_VALUE: untyped
+        ENFORCEMENT: untyped
+        RESOLVED_DECISION: untyped
+        SHADOWED_DECISION: untyped
+        CONFLICT: untyped
+        DOCUMENT: untyped
+        CONTEXT: untyped
+      end
+    end
+  end
+end

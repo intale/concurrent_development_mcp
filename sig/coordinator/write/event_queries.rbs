@@ -15,6 +15,8 @@ module Coordinator
       DECISION_CORRECTION_STATE: GroupedEventReadCriteria
       DECISION_SLOT_LATEST: GroupedEventReadCriteria
       DECISION_PARTITION_LATEST: GroupedEventReadCriteria
+      AGENT_CHOICE_EXISTENCE: EventReadCriteria
+      ATTEMPT_FOR_AGENT_CHOICE: EventReadCriteria
       COORDINATION_TASK_HISTORY: EventReadCriteria
       CHANGE_SET_EXISTENCE: GroupedEventReadCriteria
       WORK_ITEM_EXISTENCE: GroupedEventReadCriteria

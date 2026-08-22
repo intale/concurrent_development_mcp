@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module DecisionContexts
+      class PartitionSelector
+        TOPIC_ROOT: String
+
+        def call: (QueryContextV1 context) -> Array[Decisions::DecisionPartitionV1]
+      end
+    end
+  end
+end

@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module DecisionContexts
+      class ConflictV1 < Shared::Value
+        Decision: singleton(ResolvedDecisionV1)
+
+        def decisions: () -> Array[ResolvedDecisionV1]
+        def reason: () -> String
+      end
+    end
+  end
+end

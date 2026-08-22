@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module AgentChoices
+      class ChoiceOptionV1 < Shared::Value
+        def option_id: () -> String
+        def summary: () -> String
+      end
+    end
+  end
+end

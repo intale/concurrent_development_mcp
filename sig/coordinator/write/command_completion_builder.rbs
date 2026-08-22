@@ -17,6 +17,7 @@ module Coordinator
       def decision_interpretation_adjudicate: (command: Commands::AdjudicateDecisionInterpretation, slot: Interpretations::InterpretationSlotV1?, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
       def decision_activate: (command: Commands::ActivateDecision, activation: Events::DecisionActivatedV1, partitions: Array[Decisions::DecisionPartitionReceiptV1], input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
       def decision_correct: (command: Commands::CorrectDecision, correction: Events::DecisionDefinitionCorrectedV1, correction_event: EventReference, partitions: Array[Decisions::DecisionPartitionReceiptV1], input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
+      def agent_choice_record: (command: Commands::RecordAgentChoice, acceptance: Events::AgentChoiceAcceptedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
     end
   end
 end

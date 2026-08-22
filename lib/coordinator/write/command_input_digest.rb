@@ -26,6 +26,7 @@ module Coordinator::Write
       when Commands::AdjudicateDecisionInterpretation then decision_interpretation_adjudicate_document(command)
       when Commands::ActivateDecision then decision_activate_document(command)
       when Commands::CorrectDecision then decision_correct_document(command)
+      when Commands::RecordAgentChoice then agent_choice_record_document(command)
       when Commands::ExpireResourceLease then lease_expire_policy_document(command)
       else
         raise ArgumentError, "Unsupported coordination command: #{command.class.name}"
@@ -335,6 +336,28 @@ module Coordinator::Write
           interpretation_id: command.interpretation_id,
           expected_head: CommandInputDocuments::EventReferenceV1.new(command.expected_head.to_h),
           rationale: command.rationale
+        )
+      )
+    end
+
+    def agent_choice_record(command)
+      @canonical_json.sha256(agent_choice_record_document(command).to_h)
+    end
+
+    def agent_choice_record_document(command)
+      CommandInputDocuments::RecordAgentChoiceV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "agent_choice_record",
+        input: CommandInputDocuments::RecordAgentChoiceInputV1.new(
+          actor: actor_document(command.actor),
+          choice_id: command.choice_id,
+          choice_type: command.choice_type,
+          selected: command.selected,
+          alternatives: command.alternatives,
+          reason_summary: command.reason_summary,
+          context: command.context,
+          decision_context: command.decision_context
         )
       )
     end

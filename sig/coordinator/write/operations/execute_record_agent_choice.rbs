@@ -1,0 +1,16 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecuteRecordAgentChoice < Dry::Operation
+        TOOL_NAME: String
+        MAXIMUM_PARTITIONS: Integer
+        MAXIMUM_ACTIVE_DECISIONS: Integer
+
+        def initialize: (event_store: _EventStore, ?preparer: PrepareRecordAgentChoice, ?partition_selector: DecisionContexts::PartitionSelector, ?resolver: DecisionContexts::Resolver, ?context_builder: DecisionContexts::Builder, ?decider: Domain::AgentChoices::Record, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?completion_builder: CommandCompletionBuilder, ?event_plan_contract: Contracts::AgentChoiceEventPlan) -> void
+        %a{rbs:test:skip}
+        def call: (command_input input) -> Dry::Monads::Result
+        def call_command: (Commands::RecordAgentChoice command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
+      end
+    end
+  end
+end

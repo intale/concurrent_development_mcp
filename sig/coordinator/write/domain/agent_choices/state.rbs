@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Domain
+      module AgentChoices
+        class State < Shared::Value
+          def attempt: () -> Attempts::State
+          def existing_choice: () -> EventReference?
+          def current_context: () -> DecisionContexts::ContextV1
+          def resolution: () -> DecisionContexts::ResultV1
+        end
+      end
+    end
+  end
+end

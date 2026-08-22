@@ -1,0 +1,19 @@
+module Coordinator
+  module Write
+    module DecisionContexts
+      class ContextDocumentV1 < Shared::Value
+        Partition: singleton(PartitionObservationV1)
+        Shadowed: singleton(ShadowedDecisionV1)
+
+        def schema: () -> String
+        def resolution_policy: () -> String
+        def topic_id: () -> String
+        def query_context: () -> QueryContextV1
+        def partitions: () -> Array[PartitionObservationV1]
+        def effective_decision: () -> ResolvedDecisionV1?
+        def shadowed_decisions: () -> Array[ShadowedDecisionV1]
+        def conflict: () -> ConflictV1?
+      end
+    end
+  end
+end

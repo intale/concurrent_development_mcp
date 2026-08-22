@@ -1,0 +1,20 @@
+module Coordinator
+  module Write
+    module DecisionContexts
+      class QueryContextV1 < Shared::Value
+        Path: untyped
+
+        def workspace_id: () -> String?
+        def repository_id: () -> String
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def attempt_id: () -> String
+        def phase: () -> String
+        def language: () -> String
+        def paths: () -> Array[String]
+        def environment: () -> String?
+        def agent_role: () -> String
+      end
+    end
+  end
+end
