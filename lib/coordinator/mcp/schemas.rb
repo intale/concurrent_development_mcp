@@ -370,6 +370,37 @@ module Coordinator
         )
       end
 
+      def decision_resolve
+        context = object_schema(
+          properties: {
+            workspace_id: nullable_identifier,
+            repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+            change_set_id: identifier,
+            work_item_id: identifier,
+            attempt_id: identifier,
+            phase: { type: "string", const: "implementation" },
+            language: identifier,
+            paths: {
+              type: "array",
+              maxItems: 32,
+              items: { type: "string", minLength: 1, maxLength: 1_024 }
+            },
+            environment: nullable_identifier,
+            agent_role: identifier
+          },
+          required: %w[
+            repository_id change_set_id work_item_id attempt_id phase language paths agent_role
+          ]
+        )
+        object_schema(
+          properties: {
+            topic_id: { type: "string", const: "testing.framework" },
+            context:
+          },
+          required: %w[topic_id context]
+        )
+      end
+
       def coord_context
         roots = %w[change_set_id work_item_id attempt_id]
         object_schema(

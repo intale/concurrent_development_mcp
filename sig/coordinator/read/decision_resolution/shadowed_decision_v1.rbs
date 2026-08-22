@@ -1,0 +1,10 @@
+module Coordinator
+  module Read
+    module DecisionResolution
+      class ShadowedDecisionV1 < Shared::Value
+        def decision: () -> ResolvedDecisionV1
+        def reason: () -> String
+      end
+    end
+  end
+end

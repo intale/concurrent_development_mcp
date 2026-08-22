@@ -8,6 +8,22 @@ module Coordinator::Read
         record && build_decision(record)
       end
 
+      def fetch_many(decision_ids)
+        Coordinator::Read::DecisionDefinition.where(decision_id: decision_ids)
+          .order(:decision_id)
+          .map { build_decision(_1) }
+      end
+
+      def partition_observations(partitions)
+        records = Coordinator::Read::DecisionPartitionHead.where(
+          partition_id: partitions.map(&:partition_id)
+        ).index_by(&:partition_id)
+
+        partitions.map do |partition|
+          partition_observation(partition, records[partition.partition_id])
+        end
+      end
+
       def store_decision(event:, decision:)
         Coordinator::Read::DecisionDefinition.create!(
           decision_id: decision.decision_id,
@@ -150,6 +166,24 @@ module Coordinator::Read
       end
 
       private
+
+      def partition_observation(partition, record)
+        return DecisionResolution::PartitionObservationV1.new(
+          partition:,
+          partition_revision: nil,
+          event: nil,
+          active_decisions: []
+        ) unless record
+
+        DecisionResolution::PartitionObservationV1.new(
+          partition:,
+          partition_revision: record.partition_revision,
+          event: Coordinator::Write::EventReference.new(symbolize(record.event)),
+          active_decisions: record.active_decisions.map do |head|
+            Coordinator::Write::Decisions::DecisionHeadV1.new(symbolize(head))
+          end.sort_by { [ _1.decision_id.b, _1.event.event_id.b ] }
+        )
+      end
 
       def build_decision(record)
         activated = activated_evidence(record)

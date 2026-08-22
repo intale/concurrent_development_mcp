@@ -3,6 +3,10 @@ module Coordinator
     module Repositories
       class DecisionGovernance
         def fetch: (String decision_id) -> DecisionViewV1?
+        def fetch_many: (Array[String] decision_ids) -> Array[DecisionViewV1]
+        def partition_observations: (
+          Array[Write::Decisions::DecisionPartitionV1] partitions
+        ) -> Array[DecisionResolution::PartitionObservationV1]
         def store_decision: (event: PgEventstore::Event, decision: Write::Events::DecisionRecordedV1) -> void
         def activate_decision: (event: PgEventstore::Event, activation: Write::Events::DecisionActivatedV1) -> void
         def correct_decision: (event: PgEventstore::Event, correction: Write::Events::DecisionDefinitionCorrectedV1) -> void

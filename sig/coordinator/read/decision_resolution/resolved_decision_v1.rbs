@@ -1,0 +1,20 @@
+module Coordinator
+  module Read
+    module DecisionResolution
+      class ResolvedDecisionV1 < Shared::Value
+        ANCHOR_KINDS: Array[String]
+
+        def head: () -> Write::Decisions::DecisionHeadV1
+        def definition_digest: () -> String
+        def topic_id: () -> String
+        def effect: () -> String
+        def modality: () -> String
+        def value: () -> Write::Interpretations::DecisionValueV1
+        def enforcement: () -> Write::Interpretations::DecisionEnforcementV1
+        def anchor_kind: () -> String
+        def anchor_rank: () -> Integer
+        def applicability_reasons: () -> Array[String]
+      end
+    end
+  end
+end

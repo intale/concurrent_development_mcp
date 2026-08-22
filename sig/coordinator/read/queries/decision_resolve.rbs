@@ -1,0 +1,21 @@
+module Coordinator
+  module Read
+    module Queries
+      class DecisionResolve
+        MAXIMUM_PARTITIONS: Integer
+        MAXIMUM_ACTIVE_DECISIONS: Integer
+
+        def initialize: (
+          ?contract: Contracts::DecisionResolve,
+          ?governance: Repositories::DecisionGovernance,
+          ?partition_selector: DecisionResolution::PartitionSelector,
+          ?resolver: DecisionResolution::Resolver,
+          ?canonical_json: Shared::CanonicalJson,
+          ?clock: Shared::_Clock
+        ) -> void
+        %a{rbs:test:skip}
+        def call: (Write::command_input input) -> QueryResultV1
+      end
+    end
+  end
+end

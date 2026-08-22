@@ -41,6 +41,10 @@ module Coordinator::Read
       attribute :decision, DecisionViewV1
     end
 
+    class DecisionContextData < Value
+      attribute :decision_context, DecisionResolution::ContextV1
+    end
+
     Data = EmptyData |
            DomainError |
            OperationData |
@@ -48,10 +52,18 @@ module Coordinator::Read
            NotModifiedData |
            GuidanceData |
            InterpretationPageData |
-           DecisionData
+           DecisionData |
+           DecisionContextData
     Action = Coordinator::Write::NextAction | NextAction
 
-    attribute :status, Types::String.enum("ok", "not_found", "invalid", "not_modified")
+    attribute :status, Types::String.enum(
+      "ok",
+      "not_found",
+      "invalid",
+      "not_modified",
+      "conflict",
+      "limit_reached"
+    )
     attribute :summary, Types::String
     attribute :command_id, Types::Identifier.optional
     attribute :receipt, Types::Identifier.optional

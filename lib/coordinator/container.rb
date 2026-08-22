@@ -360,6 +360,14 @@ module Coordinator
       )
     end
 
+    register("queries.decision_resolve") do
+      Read::Queries::DecisionResolve.new(
+        governance: self["repositories.decision_governance"],
+        canonical_json: self["canonical_json"],
+        clock: self["clock"]
+      )
+    end
+
     register("mcp.settings", memoize: true) { Mcp::SettingsLoader.new.call }
     register("mcp.tasks.result_mapper", memoize: true) { Mcp::Tasks::ResultMapper.new }
     register("mcp.tasks.extension", memoize: true) do

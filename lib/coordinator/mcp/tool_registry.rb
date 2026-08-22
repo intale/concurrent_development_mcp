@@ -12,6 +12,7 @@ module Coordinator
           Tools::GuidanceGet,
           Tools::DecisionInterpretationList,
           Tools::DecisionGet,
+          Tools::DecisionResolve,
           Tools::ChangeSetCreate,
           Tools::WorkItemCreate,
           Tools::WorkItemDependencyDeclare,

@@ -1,0 +1,16 @@
+module Coordinator
+  module Read
+    module DecisionResolution
+      class ResultV1 < Shared::Value
+        Head: singleton(Write::Decisions::DecisionHeadV1)
+
+        def effective_decision: () -> ResolvedDecisionV1?
+        def shadowed_decisions: () -> Array[ShadowedDecisionV1]
+        def conflict: () -> ConflictV1?
+        def unsupported_dimensions: () -> Array[String]
+        def unsupported_decisions: () -> Array[Write::Decisions::DecisionHeadV1]
+        def unresolved_decisions: () -> Array[Write::Decisions::DecisionHeadV1]
+      end
+    end
+  end
+end

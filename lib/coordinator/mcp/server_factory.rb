@@ -29,6 +29,8 @@ module Coordinator
         To correct active policy, first accept a correction interpretation, then call decision_correct
         with decision_get's current_head event. A stale projected head is still served and may produce
         a decision_revision_changed conflict; refresh decision_get and submit a new command when appropriate.
+        Use decision_resolve for the latest available testing-framework context of an Attempt. Its digest
+        and partition evidence may lag and are context for a later authoritative command, never authority alone.
         The coordinator records attributed evidence and does not execute Git, CI, or agent work.
       TEXT
 

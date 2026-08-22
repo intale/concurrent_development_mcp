@@ -21,7 +21,8 @@ module Coordinator::Mcp
       "command_id_reused",
       "denied",
       "conflict",
-      "busy"
+      "busy",
+      "limit_reached"
     )
     attribute :summary, Types::String
     attribute :command_id, Types::Identifier.optional

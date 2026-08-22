@@ -1,0 +1,8 @@
+module Coordinator
+  module Read
+    class DecisionResolveQueryV1 < Shared::Value
+      def topic_id: () -> String
+      def context: () -> DecisionResolution::QueryContextV1
+    end
+  end
+end
