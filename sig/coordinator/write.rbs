@@ -8,7 +8,8 @@ module Coordinator
                                 Commands::ActivateChangeSet |
                                 Commands::AcquireWorkItem |
                                 Commands::ReserveWriteSet |
-                                Commands::ExpandWriteSet
+                                Commands::ExpandWriteSet |
+                                Commands::RenewLeaseSet
     type lifecycle_command = Commands::StartCoordinationTask |
                              Commands::RecordCoordinationTaskOutcome |
                              Commands::CancelCoordinationTask

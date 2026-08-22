@@ -18,6 +18,8 @@ module Coordinator
       def write_set_reserve_document: (Commands::ReserveWriteSet command) -> CommandInputDocuments::ReserveWriteSetV1
       def write_set_expand: (Commands::ExpandWriteSet command) -> String
       def write_set_expand_document: (Commands::ExpandWriteSet command) -> CommandInputDocuments::ExpandWriteSetV1
+      def lease_renew: (Commands::RenewLeaseSet command) -> String
+      def lease_renew_document: (Commands::RenewLeaseSet command) -> CommandInputDocuments::RenewLeaseSetV1
     end
   end
 end

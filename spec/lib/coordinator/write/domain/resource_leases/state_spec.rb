@@ -24,6 +24,15 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::State do
       expires_at: "2026-08-22T10:15:00.000000Z"
     )
   end
+  let(:renewed) do
+    Coordinator::Write::Events::ResourceLeaseRenewedV1.new(
+      acquired.to_h.except(:acquired_at, :expires_at).merge(
+        renewed_at: "2026-08-22T10:05:00.000000Z",
+        previous_expires_at: acquired.expires_at,
+        expires_at: "2026-08-22T10:20:00.000000Z"
+      )
+    )
+  end
 
   it "folds the latest acquisition and advances fencing monotonically" do
     state = described_class.reduce([ acquired ])
@@ -31,5 +40,20 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::State do
     expect(state).to be_active_at("2026-08-22T10:14:59.999999Z")
     expect(state).not_to be_active_at("2026-08-22T10:15:00.000000Z")
     expect(state.next_fencing_token).to eq(5)
+  end
+
+  it "folds renewal after acquisition while preserving lease and fencing identity" do
+    state = described_class.reduce([ acquired, renewed ])
+
+    expect(state.to_h).to include(
+      lease_id: acquired.lease_id,
+      lease_set_id: acquired.lease_set_id,
+      fencing_token: 4,
+      acquired_at: acquired.acquired_at,
+      renewed_at: renewed.renewed_at,
+      expires_at: renewed.expires_at
+    )
+    expect(state.next_fencing_token).to eq(5)
+    expect(state).to be_active_at("2026-08-22T10:19:59.999999Z")
   end
 end

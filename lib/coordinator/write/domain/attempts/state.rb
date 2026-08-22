@@ -17,6 +17,7 @@ module Coordinator::Write
         attribute :lease_policy_version, Types::String.optional
         attribute :lease_resources, Types::Array.of(LeaseReference).constrained(max_size: 32)
         attribute :lease_reserved_at, Types::Timestamp.optional
+        attribute :lease_renewed_at, Types::Timestamp.optional
         attribute :lease_expires_at, Types::Timestamp.optional
         attribute :status, Types::String.enum("absent", "authorized", "active")
 
@@ -32,6 +33,7 @@ module Coordinator::Write
             lease_policy_version: nil,
             lease_resources: [],
             lease_reserved_at: nil,
+            lease_renewed_at: nil,
             lease_expires_at: nil,
             status: "absent"
           )
@@ -59,6 +61,7 @@ module Coordinator::Write
               lease_policy_version: nil,
               lease_resources: [],
               lease_reserved_at: nil,
+              lease_renewed_at: nil,
               lease_expires_at: nil,
               status: "authorized"
             )
@@ -74,6 +77,7 @@ module Coordinator::Write
               lease_policy_version:,
               lease_resources:,
               lease_reserved_at:,
+              lease_renewed_at:,
               lease_expires_at:,
               status: "active"
             )
@@ -89,6 +93,7 @@ module Coordinator::Write
               lease_policy_version: event.policy_version,
               lease_resources: event.resources,
               lease_reserved_at: event.reserved_at,
+              lease_renewed_at: nil,
               lease_expires_at: event.expires_at,
               status:
             )
@@ -104,6 +109,23 @@ module Coordinator::Write
               lease_policy_version: event.policy_version,
               lease_resources: (lease_resources + event.added_resources).sort_by(&:resource_key_hash),
               lease_reserved_at:,
+              lease_renewed_at:,
+              lease_expires_at: event.expires_at,
+              status:
+            )
+          when Events::WriteSetRenewedV1
+            self.class.new(
+              attempt_id:,
+              change_set_id:,
+              work_item_id:,
+              agent_id:,
+              base_snapshots:,
+              lease_set_id: event.lease_set_id,
+              lease_repository_id: event.repository_id,
+              lease_policy_version: event.policy_version,
+              lease_resources: event.resources,
+              lease_reserved_at:,
+              lease_renewed_at: event.renewed_at,
               lease_expires_at: event.expires_at,
               status:
             )

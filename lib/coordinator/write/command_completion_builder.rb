@@ -168,6 +168,37 @@ module Coordinator::Write
       )
     end
 
+    def lease_renew(command:, renewal:, input_digest:, persisted_events:, completed_at:)
+      attempt_arguments = NextAction::AttemptArguments.new(
+        change_set_id: command.change_set_id,
+        work_item_id: command.work_item_id,
+        attempt_id: command.attempt_id
+      )
+
+      build_completion(
+        command:,
+        tool_name: "lease_renew",
+        summary: "Lease set renewed.",
+        data: CommandReceiptData::LeaseSetRenewal.new(
+          change_set_id: command.change_set_id,
+          work_item_id: command.work_item_id,
+          attempt_id: command.attempt_id,
+          repository_id: renewal.repository_id,
+          lease_set_id: renewal.lease_set_id,
+          policy_version: renewal.policy_version,
+          resources: renewal.resources,
+          resource_count: renewal.resource_count,
+          renewed_at: renewal.renewed_at,
+          previous_expires_at: renewal.previous_expires_at,
+          expires_at: renewal.expires_at
+        ),
+        next_actions: [ NextAction.new(tool: "coord_context", arguments: attempt_arguments) ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
 
     def build_completion(command:, tool_name:, summary:, data:, next_actions:, input_digest:, persisted_events:, completed_at:)

@@ -101,6 +101,7 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Acquire do
       lease_policy_version: nil,
       lease_resources: [],
       lease_reserved_at: nil,
+      lease_renewed_at: nil,
       lease_expires_at: nil,
       status: "active"
     )

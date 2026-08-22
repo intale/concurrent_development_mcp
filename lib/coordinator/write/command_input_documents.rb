@@ -129,12 +129,36 @@ module Coordinator::Write
       attribute :input, ExpandWriteSetInputV1
     end
 
+    class LeaseRenewalReferenceV1 < Value
+      attribute :resource_key_hash, Types::Sha256Digest
+      attribute :lease_id, Types::UuidV7
+      attribute :fencing_token, Types::FencingToken
+    end
+
+    class RenewLeaseSetInputV1 < Value
+      Reference = LeaseRenewalReferenceV1
+
+      attribute :actor, ActorV1
+      attribute :change_set_id, Types::Identifier
+      attribute :work_item_id, Types::Identifier
+      attribute :attempt_id, Types::Identifier
+      attribute :lease_set_id, Types::UuidV7
+      attribute :leases, Types::Array.of(Reference).constrained(min_size: 1, max_size: 32)
+      attribute :lease_duration_seconds, Types::LeaseDurationSeconds
+    end
+
+    class RenewLeaseSetV1 < BaseV1
+      attribute :tool_name, Types::String.enum("lease_renew")
+      attribute :input, RenewLeaseSetInputV1
+    end
+
     Type = CreateChangeSetV1 |
            CreateWorkItemV1 |
            DeclareWorkItemDependencyV1 |
            ActivateChangeSetV1 |
            AcquireWorkItemV1 |
            ReserveWriteSetV1 |
-           ExpandWriteSetV1
+           ExpandWriteSetV1 |
+           RenewLeaseSetV1
   end
 end

@@ -2,13 +2,13 @@
 
 module Coordinator::Write
   module Operations
-    class ExecuteReserveWriteSet < Dry::Operation
-      TOOL_NAME = "write_set_reserve"
+    class ExecuteRenewLeaseSet < Dry::Operation
+      TOOL_NAME = "lease_renew"
 
       def initialize(
         event_store:,
-        preparer: PrepareReserveWriteSet.new,
-        decider: Domain::ResourceLeases::Reserve.new,
+        preparer: PrepareRenewLeaseSet.new,
+        decider: Domain::ResourceLeases::Renew.new,
         input_digest: CommandInputDigest.new,
         clock: SystemClock.new,
         id_generator: IdGenerator.new,
@@ -17,7 +17,7 @@ module Coordinator::Write
         stream_factory: StreamFactory.new,
         completion_builder: CommandCompletionBuilder.new,
         compound_marker_builder: CompoundMarkerBuilder.new,
-        event_plan_contract: Contracts::WriteSetReservationEventPlan.new
+        event_plan_contract: Contracts::WriteSetRenewalEventPlan.new
       )
         @event_store = event_store
         @preparer = preparer
@@ -49,22 +49,17 @@ module Coordinator::Write
       private
 
       def prepare_logical_values(command)
-        acquired_at = @clock.now
-        expires_at = (Time.iso8601(acquired_at) + command.lease_duration_seconds).utc.iso8601(6)
+        renewed_at = @clock.now
+        expires_at = (Time.iso8601(renewed_at) + command.lease_duration_seconds).utc.iso8601(6)
 
-        PreparedWriteSetReservation.new(
-          acquired_at:,
+        PreparedLeaseSetRenewal.new(
+          renewed_at:,
           expires_at:,
-          input_digest: @input_digest.write_set_reserve(command),
-          lease_set_id: @id_generator.uuid_v7,
-          resources: command.resources.map do |resource|
-            PreparedLeaseResourceV1.new(
-              resource:,
-              lease_id: @id_generator.uuid_v7,
-              event_id: @id_generator.uuid_v7
-            )
+          input_digest: @input_digest.lease_renew(command),
+          renewals: command.leases.map do |reference|
+            PreparedLeaseRenewalV1.new(reference:, event_id: @id_generator.uuid_v7)
           end,
-          reservation_event_id: @id_generator.uuid_v7,
+          write_set_event_id: @id_generator.uuid_v7,
           completion_event_id: @id_generator.uuid_v7
         )
       end
@@ -74,33 +69,37 @@ module Coordinator::Write
         return replay if replay
 
         attempt_state = load_attempt_state(command.attempt_id)
-        lease_states = command.resources.map { load_lease_state(_1.resource_key_hash) }
+        current_observations = load_current_observations(attempt_state)
         decision = @decider.call(
           attempt_state:,
-          lease_states:,
+          current_observations:,
           command:,
-          lease_set_id: prepared.lease_set_id,
-          lease_ids: prepared.resources.map(&:lease_id),
-          acquired_at: prepared.acquired_at,
+          renewed_at: prepared.renewed_at,
           expires_at: prepared.expires_at
         )
         return decision if decision.failure?
 
         plan = decision.value!
-        verify_event_plan!(plan, command:, prepared:, lease_states:)
+        verify_event_plan!(
+          plan,
+          command:,
+          attempt_state:,
+          current_observations:,
+          prepared:
+        )
         persisted_domain_events = persist_domain_plan(
           plan,
           command:,
           prepared:,
           caused_by:
         )
-        reservation = plan.events.last
-        completion = @completion_builder.write_set_reserve(
+        renewal = plan.events.last
+        completion = @completion_builder.lease_renew(
           command:,
-          reservation:,
+          renewal:,
           input_digest: prepared.input_digest,
           persisted_events: persisted_domain_events,
-          completed_at: prepared.acquired_at
+          completed_at: prepared.renewed_at
         )
         persist_completion(
           completion,
@@ -146,12 +145,25 @@ module Coordinator::Write
       end
 
       def load_attempt_state(attempt_id)
+        stream = @stream_factory.attempt(attempt_id)
         events = @event_store.read(
-          @stream_factory.attempt(attempt_id),
-          EventQueries::ATTEMPT_FOR_WRITE_SET_RESERVATION
-        ).map { load_event(_1) }
+          stream,
+          EventQueries::ATTEMPT_FOR_WRITE_SET_EXPANSION
+        ) + @event_store.read_grouped(
+          stream,
+          EventQueries::ATTEMPT_LATEST_WRITE_SET_RENEWAL
+        )
 
-        Domain::Attempts::State.reduce(events)
+        Domain::Attempts::State.reduce(events.sort_by(&:stream_revision).map { load_event(_1) })
+      end
+
+      def load_current_observations(attempt_state)
+        attempt_state.lease_resources.map do |reference|
+          CurrentLeaseObservationV1.new(
+            reference:,
+            state: load_lease_state(reference.resource_key_hash)
+          )
+        end
       end
 
       def load_lease_state(resource_key_hash)
@@ -171,24 +183,22 @@ module Coordinator::Write
         )
       end
 
-      def verify_event_plan!(plan, command:, prepared:, lease_states:)
+      def verify_event_plan!(plan, command:, attempt_state:, current_observations:, prepared:)
         result = @event_plan_contract.call(
           plan:,
           command:,
-          attempt_stream: @stream_factory.attempt(command.attempt_id),
-          lease_states:,
-          lease_set_id: prepared.lease_set_id,
-          lease_ids: prepared.resources.map(&:lease_id),
-          acquired_at: prepared.acquired_at,
+          attempt_state:,
+          current_observations:,
+          renewed_at: prepared.renewed_at,
           expires_at: prepared.expires_at
         )
         return if result.success?
 
-        raise InvalidWriteSetReservationEventPlan, result.errors.to_h.inspect
+        raise InvalidWriteSetRenewalEventPlan, result.errors.to_h.inspect
       end
 
       def persist_domain_plan(plan, command:, prepared:, caused_by:)
-        event_ids = prepared.resources.map(&:event_id) + [ prepared.reservation_event_id ]
+        event_ids = prepared.renewals.map(&:event_id) + [ prepared.write_set_event_id ]
 
         plan.writes.zip(event_ids).map do |write, event_id|
           event = @event_factory.build!(
@@ -208,10 +218,11 @@ module Coordinator::Write
           "change-set:#{command.change_set_id}",
           "work-item:#{command.work_item_id}",
           "attempt:#{command.attempt_id}",
-          "repository:#{command.repository_id}",
-          "command:#{command.command_id}"
+          "repository:#{event.repository_id}",
+          "command:#{command.command_id}",
+          "lease-set:#{event.lease_set_id}"
         ]
-        return common + [ "lease-set:#{event.lease_set_id}" ] unless event.is_a?(Events::ResourceLeaseAcquiredV1)
+        return common unless event.is_a?(Events::ResourceLeaseRenewedV1)
 
         components = [
           "repository:#{event.repository_id}",
@@ -225,7 +236,7 @@ module Coordinator::Write
           )
         )
 
-        common + components + [ "lease-set:#{event.lease_set_id}", compound.marker ]
+        common + components + [ compound.marker ]
       end
 
       def persist_completion(completion, command:, event_id:, caused_by:)

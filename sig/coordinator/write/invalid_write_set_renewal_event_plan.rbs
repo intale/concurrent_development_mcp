@@ -1,0 +1,6 @@
+module Coordinator
+  module Write
+    class InvalidWriteSetRenewalEventPlan < StandardError
+    end
+  end
+end
