@@ -1,0 +1,8 @@
+module Coordinator
+  module Mcp
+    module Tools
+      class DecisionActivate < MutationTool
+      end
+    end
+  end
+end

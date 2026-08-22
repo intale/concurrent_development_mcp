@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    module Subscriptions
+      class DecisionGovernance < Shared::Subscriptions::Registration
+        DEFINITION: ReadModelDefinition
+
+        def initialize: (handler: Shared::_SubscriptionHandler, ?pull_interval: Float) -> void
+      end
+    end
+  end
+end

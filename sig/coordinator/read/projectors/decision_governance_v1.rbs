@@ -1,0 +1,12 @@
+module Coordinator
+  module Read
+    module Projectors
+      class DecisionGovernanceV1
+        PROJECTION: ProjectionDefinition
+
+        def initialize: (?contract: Contracts::DecisionGovernanceSourceEvent, ?schema_registry: Write::EventSchemaRegistry, ?governance: Repositories::DecisionGovernance, ?processed_events: Repositories::ProcessedProjectionEvents) -> void
+        def call: (PgEventstore::Event event) -> void
+      end
+    end
+  end
+end

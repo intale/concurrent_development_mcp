@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    module Queries
+      class DecisionGet
+        def initialize: (?contract: Contracts::DecisionGet, ?governance: Repositories::DecisionGovernance) -> void
+        %a{rbs:test:skip}
+        def call: (Write::command_input input) -> QueryResultV1
+      end
+    end
+  end
+end

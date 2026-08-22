@@ -217,6 +217,55 @@ module McpAcceptanceWorld
     }
   end
 
+  def decision_events(decision_id)
+    event_store.read(
+      streams.decision(decision_id),
+      Coordinator::Write::EventQueries::DECISION_EXISTENCE
+    )
+  end
+
+  def decision_slot_events(slot_id)
+    event_store.read(
+      streams.decision_slot(slot_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[DecisionSlotOpened DecisionSlotHeadChanged],
+        maximum_count: 2,
+        direction: :asc
+      )
+    )
+  end
+
+  def decision_partition_events(partition_id = "repo:billing:testing")
+    event_store.read(
+      streams.decision_partition(partition_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: [ "DecisionPartitionAdvanced" ],
+        maximum_count: 10,
+        direction: :asc
+      )
+    )
+  end
+
+  def decision_view(decision_id)
+    call_tool("decision_get", { decision_id: })
+      .dig("result", "structuredContent")
+  end
+
+  def project_decision_recorded(decision_id)
+    event = decision_events(decision_id).find { _1.type == "DecisionRecorded" }
+    assert_acceptance(event, "Decision #{decision_id} has no DecisionRecorded fact")
+    decision_projector.call(event)
+  end
+
+  def project_remaining_decision_facts(decision_id)
+    recorded, activated = decision_events(decision_id)
+    assert_acceptance(recorded && activated, "Decision #{decision_id} is not completely persisted")
+    slot_id = activated.data.fetch("slot").fetch("slot_id")
+    [ activated, *decision_slot_events(slot_id), *decision_partition_events ].each do |event|
+      decision_projector.call(event)
+    end
+  end
+
   def lease_events(path)
     resource = Coordinator::Write::FileResourceNormalizer.new.call(
       repository_id: "billing",
@@ -270,6 +319,10 @@ module McpAcceptanceWorld
   end
 
   private
+
+  def decision_projector
+    Coordinator::Container["projectors.decision_governance_v1"]
+  end
 
   def mcp_session
     @mcp_session ||= ActionDispatch::Integration::Session.new(Rails.application).tap do |session|

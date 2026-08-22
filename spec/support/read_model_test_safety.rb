@@ -12,11 +12,6 @@ module ReadModelTestSafety
 
   def clean!
     verify!
-    Coordinator::Read::ProcessedProjectionEvent.delete_all
-    Coordinator::Read::UserUtterance.delete_all
-    Coordinator::Read::DecisionInterpretation.delete_all
-    Coordinator::Read::CommandReceipt.delete_all
-    Coordinator::Read::CoordContextScope.delete_all
-    Coordinator::Read::CoordContext.delete_all
+    DatabaseCleaner.clean_with(:truncation)
   end
 end

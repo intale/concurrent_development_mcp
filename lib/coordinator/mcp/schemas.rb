@@ -282,6 +282,24 @@ module Coordinator
         )
       end
 
+      def decision_activate
+        rationale = object_schema(
+          properties: {
+            code: identifier,
+            summary: { type: "string", minLength: 1, maxLength: 500 }
+          },
+          required: %w[code summary]
+        )
+        object_schema(
+          properties: common_mutation_properties.merge(
+            decision_id: identifier,
+            interpretation_id: identifier,
+            rationale:
+          ),
+          required: %w[command_id actor decision_id interpretation_id rationale]
+        )
+      end
+
       def operation_get
         object_schema(
           properties: {
@@ -310,6 +328,13 @@ module Coordinator
             }
           },
           required: %w[message_id]
+        )
+      end
+
+      def decision_get
+        object_schema(
+          properties: { decision_id: identifier },
+          required: %w[decision_id]
         )
       end
 

@@ -1,0 +1,6 @@
+module Coordinator
+  module Read
+    class DecisionSlotHead < ApplicationRecord
+    end
+  end
+end

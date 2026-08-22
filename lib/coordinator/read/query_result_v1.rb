@@ -37,13 +37,18 @@ module Coordinator::Read
       attribute :page, InterpretationPageV1
     end
 
+    class DecisionData < Value
+      attribute :decision, DecisionViewV1
+    end
+
     Data = EmptyData |
            DomainError |
            OperationData |
            ContextData |
            NotModifiedData |
            GuidanceData |
-           InterpretationPageData
+           InterpretationPageData |
+           DecisionData
     Action = Coordinator::Write::NextAction | NextAction
 
     attribute :status, Types::String.enum("ok", "not_found", "invalid", "not_modified")

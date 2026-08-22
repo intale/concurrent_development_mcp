@@ -26,14 +26,21 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       pull_interval: 0.2
     )
   end
+  let(:decision_registration) do
+    Coordinator::Read::Subscriptions::DecisionGovernance.new(
+      handler: Coordinator::Read::Projectors::DecisionGovernanceV1.new,
+      pull_interval: 0.2
+    )
+  end
 
-  it "stacks four unique durable subscriptions on one read-model manager" do
+  it "stacks five unique durable subscriptions on one read-model manager" do
     subscription_set = build_set
 
     expect(subscription_set.subscription_names).to eq(
       [
         "command-receipts-v1",
         "coord-context-v1",
+        "decision-governance-v1",
         "decision-interpretations-v1",
         "user-utterances-v1"
       ]
@@ -53,6 +60,10 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
     expect(interpretation_registration.definition.identity.to_h).to eq(
       set_name: "coordinator-read-models-v1",
       subscription_name: "decision-interpretations-v1"
+    )
+    expect(decision_registration.definition.identity.to_h).to eq(
+      set_name: "coordinator-read-models-v1",
+      subscription_name: "decision-governance-v1"
     )
   end
 
@@ -76,7 +87,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         source: "mcp_client",
         text: "Project attributed guidance evidence.",
         anchors: {
-          repository_ids: [],
+          repository_ids: [ "billing" ],
           change_set_id: nil,
           work_item_id: nil,
           attempt_id: nil
@@ -90,11 +101,26 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
           source_span: { start_character: 19, end_character: 27, text: "guidance" }
         )
       ).value!
+      Coordinator::Write::Operations::ExecuteAdjudicateDecisionInterpretation.new(event_store:).call(
+        InterpretationInput.adjudication(
+          command_id: "cmd-subscription-adjudication",
+          source_message_id: "M-subscription",
+          interpretation_id: "I-subscription"
+        )
+      ).value!
+      activation = Coordinator::Write::Operations::ExecuteActivateDecision.new(event_store:).call(
+        InterpretationInput.activation(
+          command_id: "cmd-subscription-decision",
+          decision_id: "D-subscription",
+          interpretation_id: "I-subscription"
+        )
+      ).value!
 
       wait_for(subscription_set, "coord-context-v1", minimum: 2)
-      wait_for(subscription_set, "command-receipts-v1", minimum: 3)
+      wait_for(subscription_set, "command-receipts-v1", minimum: 5)
       wait_for(subscription_set, "user-utterances-v1", minimum: 1)
-      wait_for(subscription_set, "decision-interpretations-v1", minimum: 1)
+      wait_for(subscription_set, "decision-interpretations-v1", minimum: 2)
+      wait_for(subscription_set, "decision-governance-v1", minimum: 5)
 
       expect(Coordinator::Read::CoordContext.find("CS-SUB-100").document).to include(
         "schema" => "coord-context/v1"
@@ -107,7 +133,19 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       )
       expect(Coordinator::Read::DecisionInterpretation.find("I-subscription")).to have_attributes(
         message_id: "M-subscription",
-        policy_status: "proposal_only"
+        policy_status: "proposal_only",
+        lifecycle_status: "accepted"
+      )
+      expect(Coordinator::Read::DecisionDefinition.find("D-subscription")).to have_attributes(
+        interpretation_id: "I-subscription",
+        policy_status: "active"
+      )
+      expect(Coordinator::Read::DecisionSlotHead.find(activation.data.slot.slot_id)).to have_attributes(
+        decision_id: "D-subscription"
+      )
+      expect(Coordinator::Read::DecisionPartitionHead.find("repo:billing:testing")).to have_attributes(
+        decision_id: "D-subscription",
+        partition_revision: 0
       )
     ensure
       subscription_set.stop
@@ -124,7 +162,8 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         context_registration,
         receipt_registration,
         utterance_registration,
-        interpretation_registration
+        interpretation_registration,
+        decision_registration
       ]
     )
   end

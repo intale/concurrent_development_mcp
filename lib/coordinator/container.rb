@@ -257,6 +257,10 @@ module Coordinator
       Read::Repositories::DecisionInterpretations.new
     end
 
+    register("repositories.decision_governance", memoize: true) do
+      Read::Repositories::DecisionGovernance.new
+    end
+
     register("projectors.coord_context_v1", memoize: true) do
       Read::Projectors::CoordContextV1.new(
         schema_registry: self["event_schema_registry"],
@@ -284,6 +288,14 @@ module Coordinator
       Read::Projectors::DecisionInterpretationsV1.new(
         schema_registry: self["event_schema_registry"],
         interpretations: self["repositories.decision_interpretations"],
+        processed_events: self["repositories.processed_projection_events"]
+      )
+    end
+
+    register("projectors.decision_governance_v1", memoize: true) do
+      Read::Projectors::DecisionGovernanceV1.new(
+        schema_registry: self["event_schema_registry"],
+        governance: self["repositories.decision_governance"],
         processed_events: self["repositories.processed_projection_events"]
       )
     end
@@ -316,6 +328,12 @@ module Coordinator
     register("queries.decision_interpretation_list") do
       Read::Queries::DecisionInterpretationList.new(
         interpretations: self["repositories.decision_interpretations"]
+      )
+    end
+
+    register("queries.decision_get") do
+      Read::Queries::DecisionGet.new(
+        governance: self["repositories.decision_governance"]
       )
     end
 
@@ -812,6 +830,12 @@ module Coordinator
       )
     end
 
+    register("subscriptions.decision_governance", memoize: true) do
+      Read::Subscriptions::DecisionGovernance.new(
+        handler: self["projectors.decision_governance_v1"]
+      )
+    end
+
     register("subscription_managers.process_managers", memoize: true) do
       PgEventstore.subscriptions_manager(
         subscription_set: Processes::Subscriptions::ProcessManagerSet::SET_NAME
@@ -843,6 +867,7 @@ module Coordinator
           self["subscriptions.coord_context"],
           self["subscriptions.command_receipts"],
           self["subscriptions.user_utterances"],
+          self["subscriptions.decision_governance"],
           self["subscriptions.decision_interpretations"]
         ]
       )

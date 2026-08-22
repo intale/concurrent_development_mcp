@@ -33,6 +33,7 @@ RSpec.describe Coordinator::Container do
     context_query = described_class["queries.coord_context"]
     guidance_query = described_class["queries.guidance_get"]
     interpretation_query = described_class["queries.decision_interpretation_list"]
+    decision_query = described_class["queries.decision_get"]
     task_submissions = %w[
       operations.submit_create_change_set_task
       operations.submit_create_work_item_task
@@ -85,6 +86,7 @@ RSpec.describe Coordinator::Container do
       [
         "command-receipts-v1",
         "coord-context-v1",
+        "decision-governance-v1",
         "decision-interpretations-v1",
         "user-utterances-v1"
       ]
@@ -93,6 +95,7 @@ RSpec.describe Coordinator::Container do
     expect(context_query).to be_a(Coordinator::Read::Queries::CoordContext)
     expect(guidance_query).to be_a(Coordinator::Read::Queries::GuidanceGet)
     expect(interpretation_query).to be_a(Coordinator::Read::Queries::DecisionInterpretationList)
+    expect(decision_query).to be_a(Coordinator::Read::Queries::DecisionGet)
     expect(task_submissions).to all(
       be_a(Coordinator::Write::Operations::PrepareAndSubmitCoordinationTask)
     )

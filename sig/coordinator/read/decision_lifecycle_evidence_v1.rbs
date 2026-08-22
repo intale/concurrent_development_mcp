@@ -1,0 +1,12 @@
+module Coordinator
+  module Read
+    class DecisionLifecycleEvidenceV1 < Shared::Value
+      def event: () -> Write::EventReference
+      def actor: () -> AttributedActorV1
+      def occurred_at: () -> String
+      def persisted_at: () -> String
+      def causation_id: () -> String?
+      def correlation_id: () -> String?
+    end
+  end
+end

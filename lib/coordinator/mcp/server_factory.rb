@@ -24,6 +24,8 @@ module Coordinator
         Renew the entire exact observed lease set before its deadline when more work time is needed;
         a stale set, lease ID, or fencing token is safely rejected by authoritative event facts.
         Release the entire exact observed lease set when editing is finished; partial release is not available.
+        Accepted interpretations are still non-normative: use decision_activate to establish policy,
+        persist its Task handle, and use decision_get only as latest available projected evidence.
         The coordinator records attributed evidence and does not execute Git, CI, or agent work.
       TEXT
 

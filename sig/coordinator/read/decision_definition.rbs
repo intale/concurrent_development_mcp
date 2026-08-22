@@ -1,0 +1,6 @@
+module Coordinator
+  module Read
+    class DecisionDefinition < ApplicationRecord
+    end
+  end
+end

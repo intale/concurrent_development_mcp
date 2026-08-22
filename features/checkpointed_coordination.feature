@@ -153,3 +153,28 @@ Feature: Checkpointed cooperative coordination
       Then the rejection Task succeeds while the clarification view remains available
       When the interpretation adjudications reach the read side
       Then the available interpretation is rejected without activating policy
+
+  Rule: Accepted interpretations become policy only through explicit activation
+
+    Scenario: Available Decision evidence converges after the activation Task commits
+      Given these interpretations are accepted for activation:
+        | interpretation_id | message_id     | decision_id    |
+        | I-CUC-DEC-1       | M-CUC-DEC-1    | D-CUC-DEC-1    |
+      Then acceptance has emitted no Decision facts
+      When the host activates interpretation "I-CUC-DEC-1" as Decision "D-CUC-DEC-1" through a Task
+      Then the activation Task succeeds with one complete consistency boundary
+      And Decision "D-CUC-DEC-1" is honestly not observed before projection
+      When the DecisionRecorded fact for "D-CUC-DEC-1" reaches the read side
+      Then the available Decision "D-CUC-DEC-1" is recorded without a freshness claim
+      When the remaining facts for Decision "D-CUC-DEC-1" reach the read side
+      Then the available Decision "D-CUC-DEC-1" is active without a freshness claim
+
+    Scenario: Concurrent activation of one normative slot has one winner
+      Given these interpretations are accepted for activation:
+        | interpretation_id | message_id     | decision_id    |
+        | I-CUC-DEC-A       | M-CUC-DEC-A    | D-CUC-DEC-A    |
+        | I-CUC-DEC-B       | M-CUC-DEC-B    | D-CUC-DEC-B    |
+      Then acceptance has emitted no Decision facts
+      When the host concurrently activates all accepted interpretations through Tasks
+      Then one activation Task succeeds and the other reports an occupied Decision slot
+      And the losing activation writes no Decision or command facts

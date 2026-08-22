@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_22_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_22_204500) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -45,6 +45,43 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_22_170000) do
     t.integer "projection_version", null: false
     t.jsonb "source_positions", default: [], null: false
     t.datetime "updated_at", null: false
+  end
+
+  create_table "decision_definitions", primary_key: "decision_id", id: :string, force: :cascade do |t|
+    t.jsonb "acceptance_event", null: false
+    t.jsonb "activated_actor"
+    t.datetime "activated_at_domain"
+    t.datetime "activated_at_store"
+    t.string "activated_causation_id"
+    t.string "activated_correlation_id"
+    t.jsonb "activated_event"
+    t.jsonb "activated_markers"
+    t.jsonb "activated_metadata"
+    t.jsonb "classifier", null: false
+    t.datetime "created_at", null: false
+    t.jsonb "definition", null: false
+    t.string "definition_digest", null: false
+    t.string "interpretation_id", null: false
+    t.jsonb "partitions", default: [], null: false
+    t.string "policy_status", null: false
+    t.jsonb "proposal_event", null: false
+    t.jsonb "rationale"
+    t.jsonb "recorded_actor", null: false
+    t.datetime "recorded_at_domain", null: false
+    t.datetime "recorded_at_store", null: false
+    t.string "recorded_causation_id"
+    t.string "recorded_correlation_id"
+    t.jsonb "recorded_event", null: false
+    t.jsonb "recorded_markers", default: [], null: false
+    t.jsonb "recorded_metadata", default: {}, null: false
+    t.jsonb "scope_provenance", null: false
+    t.jsonb "slot"
+    t.jsonb "source_event", null: false
+    t.string "source_message_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["definition_digest"], name: "index_decision_definitions_on_definition_digest"
+    t.index ["interpretation_id"], name: "index_decision_definitions_on_interpretation_id", unique: true
+    t.index ["policy_status"], name: "index_decision_definitions_on_policy_status"
   end
 
   create_table "decision_interpretations", primary_key: "interpretation_id", id: :string, force: :cascade do |t|
@@ -82,6 +119,45 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_22_170000) do
     t.index ["lifecycle_status"], name: "index_decision_interpretations_on_lifecycle_status"
     t.index ["message_id", "stream_revision"], name: "idx_on_message_id_stream_revision_4258fdb4a5", unique: true
     t.index ["proposal_status"], name: "index_decision_interpretations_on_proposal_status"
+  end
+
+  create_table "decision_partition_heads", primary_key: "partition_id", id: :string, force: :cascade do |t|
+    t.jsonb "actor", null: false
+    t.datetime "advanced_at_domain", null: false
+    t.string "causation_id"
+    t.string "change_kind", null: false
+    t.string "correlation_id"
+    t.datetime "created_at", null: false
+    t.jsonb "decision", null: false
+    t.string "decision_id", null: false
+    t.jsonb "event", null: false
+    t.datetime "event_created_at", null: false
+    t.jsonb "markers", default: [], null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.jsonb "partition", null: false
+    t.bigint "partition_revision", null: false
+    t.datetime "updated_at", null: false
+    t.index ["decision_id"], name: "index_decision_partition_heads_on_decision_id"
+    t.index ["partition_revision"], name: "index_decision_partition_heads_on_partition_revision"
+  end
+
+  create_table "decision_slot_heads", primary_key: "slot_id", id: :string, force: :cascade do |t|
+    t.jsonb "actor", null: false
+    t.string "causation_id"
+    t.datetime "changed_at_domain"
+    t.jsonb "changed_event"
+    t.string "correlation_id"
+    t.datetime "created_at", null: false
+    t.string "decision_id", null: false
+    t.datetime "event_created_at", null: false
+    t.jsonb "head", null: false
+    t.jsonb "markers", default: [], null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "opened_at_domain", null: false
+    t.jsonb "opened_event", null: false
+    t.jsonb "slot", null: false
+    t.datetime "updated_at", null: false
+    t.index ["decision_id"], name: "index_decision_slot_heads_on_decision_id"
   end
 
   create_table "processed_projection_events", id: false, force: :cascade do |t|

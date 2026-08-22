@@ -1,0 +1,7 @@
+module Coordinator
+  module Read
+    class DecisionGetQueryV1 < Shared::Value
+      def decision_id: () -> String
+    end
+  end
+end

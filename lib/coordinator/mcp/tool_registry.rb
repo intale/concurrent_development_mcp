@@ -11,6 +11,7 @@ module Coordinator
           Tools::OperationGet,
           Tools::GuidanceGet,
           Tools::DecisionInterpretationList,
+          Tools::DecisionGet,
           Tools::ChangeSetCreate,
           Tools::WorkItemCreate,
           Tools::WorkItemDependencyDeclare,
@@ -22,7 +23,8 @@ module Coordinator
           Tools::LeaseRelease,
           Tools::GuidanceRecord,
           Tools::DecisionInterpretationPropose,
-          Tools::DecisionInterpretationAdjudicate
+          Tools::DecisionInterpretationAdjudicate,
+          Tools::DecisionActivate
         ].freeze
       end
     end
