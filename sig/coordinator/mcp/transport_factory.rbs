@@ -1,7 +1,7 @@
 module Coordinator
   module Mcp
     class TransportFactory
-      def call: (server: untyped, settings: Settings) -> untyped
+      def call: (server: Tasks::Server, settings: Settings) -> Tasks::StreamableHttpTransport
     end
   end
 end

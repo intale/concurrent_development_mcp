@@ -1,0 +1,6 @@
+module MCP
+  class ServerContext
+    def client_capabilities: () -> Hash[untyped, untyped]?
+    def modern?: () -> bool
+  end
+end

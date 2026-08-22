@@ -1,0 +1,14 @@
+module Coordinator
+  module Mcp
+    module Tasks
+      module Capability
+        EXTENSION_ID: String
+        EXTENSIONS: Hash[String, Hash[untyped, untyped]]
+        REQUIRED_CAPABILITIES: Hash[Symbol, untyped]
+
+        def self.require!: (Hash[untyped, untyped]? capabilities, modern: bool, request: Hash[Symbol, untyped]?) -> void
+        def self.declared?: (Hash[untyped, untyped]? capabilities) -> bool
+      end
+    end
+  end
+end

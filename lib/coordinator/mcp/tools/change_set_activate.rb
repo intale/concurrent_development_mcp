@@ -8,7 +8,7 @@ module Coordinator
         title "Activate a ChangeSet"
         description "Freeze a valid plan for execution and trigger internal readiness evaluation."
         input_schema Schemas.change_set_activate
-        operation "operations.execute_activate_change_set"
+        operation "operations.submit_activate_change_set_task"
       end
     end
   end

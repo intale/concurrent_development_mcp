@@ -1,0 +1,15 @@
+module Coordinator
+  module Mcp
+    module Tasks
+      class RequestError < ::MCP::Server::RequestHandlerError
+        MISSING_CAPABILITY_CODE: Integer
+        INVALID_PARAMS_CODE: Integer
+        INTERNAL_ERROR_CODE: Integer
+
+        def self.missing_capability: (untyped request) -> RequestError
+        def self.invalid_task_request: (Hash[Symbol, untyped] errors, untyped request) -> RequestError
+        def self.operation_failure: (Coordinator::Write::Tasks::LifecycleError | Coordinator::Write::OutcomeError error, untyped request) -> RequestError
+      end
+    end
+  end
+end

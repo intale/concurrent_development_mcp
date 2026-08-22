@@ -1,0 +1,9 @@
+module Coordinator
+  module Mcp
+    module Tasks
+      class StreamableHttpTransport < ::MCP::Server::Transports::StreamableHTTPTransport
+        TASK_METHODS: Array[String]
+      end
+    end
+  end
+end

@@ -1,0 +1,9 @@
+module MCP
+  class Server
+    module Transports
+      class StreamableHTTPTransport
+        def initialize: (Server server, **untyped options) -> void
+      end
+    end
+  end
+end

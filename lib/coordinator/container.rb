@@ -144,7 +144,18 @@ module Coordinator
     end
 
     register("mcp.settings", memoize: true) { Mcp::SettingsLoader.new.call }
-    register("mcp.server", memoize: true) { Mcp::ServerFactory.new.call }
+    register("mcp.tasks.result_mapper", memoize: true) { Mcp::Tasks::ResultMapper.new }
+    register("mcp.tasks.extension", memoize: true) do
+      Mcp::Tasks::Extension.new(
+        get_task: self["operations.get_coordination_task"],
+        acknowledge_task_input: self["operations.acknowledge_task_input"],
+        cancel_task: self["operations.cancel_coordination_task"],
+        result_mapper: self["mcp.tasks.result_mapper"]
+      )
+    end
+    register("mcp.server", memoize: true) do
+      Mcp::ServerFactory.new(tasks_extension: self["mcp.tasks.extension"]).call
+    end
     register("mcp.transport", memoize: true) do
       Mcp::TransportFactory.new.call(
         server: self["mcp.server"],
@@ -270,6 +281,41 @@ module Coordinator
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
         stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("operations.submit_create_change_set_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_create_change_set"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_create_work_item_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_create_work_item"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_declare_work_item_dependency_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_declare_work_item_dependency"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_activate_change_set_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_activate_change_set"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_acquire_work_item_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_acquire_work_item"],
+        submitter: self["operations.submit_coordination_task"]
       )
     end
 

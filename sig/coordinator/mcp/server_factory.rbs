@@ -1,9 +1,11 @@
 module Coordinator
   module Mcp
     class ServerFactory
+      CAPABILITIES: Hash[Symbol, untyped]
       INSTRUCTIONS: String
 
-      def call: () -> untyped
+      def initialize: (tasks_extension: Tasks::Extension) -> void
+      def call: () -> Tasks::Server
     end
   end
 end

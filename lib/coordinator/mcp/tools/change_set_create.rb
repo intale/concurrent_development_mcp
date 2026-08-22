@@ -8,7 +8,7 @@ module Coordinator
         title "Create a ChangeSet"
         description "Create a multi-repository coordination goal and its acceptance criteria."
         input_schema Schemas.change_set_create
-        operation "operations.execute_create_change_set"
+        operation "operations.submit_create_change_set_task"
       end
     end
   end

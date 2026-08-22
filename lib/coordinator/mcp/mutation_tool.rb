@@ -28,7 +28,10 @@ module Coordinator
         end
 
         def call(server_context: nil, **arguments)
-          invoke(operation, arguments)
+          result = Container[operation].call(arguments)
+          raise Tasks::RequestError.operation_failure(result.failure, arguments) if result.failure?
+
+          Container["mcp.tasks.result_mapper"].created(result.value!)
         end
       end
     end

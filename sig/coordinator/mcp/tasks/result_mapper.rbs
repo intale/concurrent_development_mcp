@@ -1,0 +1,11 @@
+module Coordinator
+  module Mcp
+    module Tasks
+      class ResultMapper
+        def created: (Coordinator::Write::Domain::CoordinationTasks::State state) -> ResultV1::Created
+        def detailed: (Coordinator::Write::Domain::CoordinationTasks::State state) -> ResultV1::detailed
+        def acknowledgement: () -> ResultV1::Acknowledgement
+      end
+    end
+  end
+end

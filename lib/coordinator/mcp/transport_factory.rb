@@ -4,7 +4,7 @@ module Coordinator
   module Mcp
     class TransportFactory
       def call(server:, settings:)
-        ::MCP::Server::Transports::StreamableHTTPTransport.new(
+        Tasks::StreamableHttpTransport.new(
           server,
           stateless: true,
           enable_json_response: true,

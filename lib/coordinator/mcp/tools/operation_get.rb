@@ -6,7 +6,7 @@ module Coordinator
       class OperationGet < QueryTool
         tool_name "operation_get"
         title "Get operation result"
-        description "Recover a durable command result and inspect every exact projection barrier."
+        description "Read the latest available projected command receipt without a freshness gate."
         input_schema Schemas.operation_get
         query "queries.operation_get"
       end

@@ -8,7 +8,7 @@ module Coordinator
         title "Acquire a WorkItem"
         description "Atomically acquire one ready WorkItem and start an Attempt at exact repository bases."
         input_schema Schemas.work_item_acquire
-        operation "operations.execute_acquire_work_item"
+        operation "operations.submit_acquire_work_item_task"
       end
     end
   end

@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Operations
+      interface _CoordinationTaskPreparer
+        def call: (Hash[Symbol, untyped] input) -> Dry::Monads::Result
+      end
+
+      class PrepareAndSubmitCoordinationTask
+        def initialize: (preparer: _CoordinationTaskPreparer, submitter: SubmitCoordinationTask) -> void
+        def call: (Hash[Symbol, untyped] input) -> Dry::Monads::Result
+      end
+    end
+  end
+end

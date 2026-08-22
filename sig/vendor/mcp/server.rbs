@@ -1,0 +1,10 @@
+module MCP
+  class Server
+    class RequestHandlerError < StandardError
+      def initialize: (*untyped arguments, **untyped options) -> void
+    end
+
+    def initialize: (**untyped options) -> void
+    def define_custom_method: (method_name: String) { (*untyped arguments, **untyped options) -> untyped } -> untyped
+  end
+end

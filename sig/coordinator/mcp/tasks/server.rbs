@@ -1,0 +1,8 @@
+module Coordinator
+  module Mcp
+    module Tasks
+      class Server < ::MCP::Server
+      end
+    end
+  end
+end

@@ -6,7 +6,7 @@ module Coordinator
       class CoordContext < QueryTool
         tool_name "coord_context"
         title "Get coordination context"
-        description "Load a checkpointed ChangeSet, WorkItem, or Attempt context with explicit projection freshness."
+        description "Load the latest available checkpointed ChangeSet, WorkItem, or Attempt context."
         input_schema Schemas.coord_context
         query "queries.coord_context"
       end

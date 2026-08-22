@@ -1,0 +1,11 @@
+module Coordinator
+  module Mcp
+    module Tasks
+      module Contracts
+        class UpdateTaskRequest < Dry::Validation::Contract
+          def call: (untyped input) -> Dry::Validation::Result
+        end
+      end
+    end
+  end
+end

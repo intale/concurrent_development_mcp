@@ -1,0 +1,60 @@
+module Coordinator
+  module Mcp
+    module Tasks
+      module ResultV1
+        class Base < Shared::Value
+          def taskId: () -> String
+          def createdAt: () -> String
+          def lastUpdatedAt: () -> String
+          def ttlMs: () -> nil
+          def pollIntervalMs: () -> Integer
+        end
+
+        class CallToolResult < Shared::Value
+          def content: () -> Array[Coordinator::Write::Tasks::TextContentV1]
+          def isError: () -> bool
+          def structuredContent: () -> Coordinator::Write::Tasks::StructuredContentV1
+        end
+
+        class Created < Base
+          def resultType: () -> String
+          def status: () -> String
+        end
+
+        class Working < Base
+          def resultType: () -> String
+          def status: () -> String
+        end
+
+        class WorkingWithMessage < Working
+          def statusMessage: () -> String
+        end
+
+        class Completed < Base
+          def resultType: () -> String
+          def status: () -> String
+          def result: () -> CallToolResult
+        end
+
+        class Failed < Base
+          def resultType: () -> String
+          def status: () -> String
+          def statusMessage: () -> String
+          def error: () -> Coordinator::Write::Tasks::JsonRpcErrorV1
+        end
+
+        class Cancelled < Base
+          def resultType: () -> String
+          def status: () -> String
+          def statusMessage: () -> String
+        end
+
+        class Acknowledgement < Shared::Value
+          def resultType: () -> String
+        end
+
+        type detailed = Working | WorkingWithMessage | Completed | Failed | Cancelled
+      end
+    end
+  end
+end

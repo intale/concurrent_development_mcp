@@ -22,6 +22,14 @@ RSpec.describe Coordinator::Container do
     read_model_set = described_class["subscription_sets.read_models"]
     operation_query = described_class["queries.operation_get"]
     context_query = described_class["queries.coord_context"]
+    task_submissions = %w[
+      operations.submit_create_change_set_task
+      operations.submit_create_work_item_task
+      operations.submit_declare_work_item_dependency_task
+      operations.submit_activate_change_set_task
+      operations.submit_acquire_work_item_task
+    ].map { described_class[_1] }
+    tasks_extension = described_class["mcp.tasks.extension"]
     mcp_transport = described_class["mcp.transport"]
 
     expect(change_set_operation).to be_a(Coordinator::Write::Operations::ExecuteCreateChangeSet)
@@ -42,7 +50,11 @@ RSpec.describe Coordinator::Container do
     expect(read_model_set.subscription_names).to eq([ "command-receipts-v1", "coord-context-v1" ])
     expect(operation_query).to be_a(Coordinator::Read::Queries::OperationGet)
     expect(context_query).to be_a(Coordinator::Read::Queries::CoordContext)
-    expect(mcp_transport).to be_a(MCP::Server::Transports::StreamableHTTPTransport)
+    expect(task_submissions).to all(
+      be_a(Coordinator::Write::Operations::PrepareAndSubmitCoordinationTask)
+    )
+    expect(tasks_extension).to be_a(Coordinator::Mcp::Tasks::Extension)
+    expect(mcp_transport).to be_a(Coordinator::Mcp::Tasks::StreamableHttpTransport)
   end
 
   it "provides constructor injection through Coordinator::Import" do

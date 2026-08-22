@@ -8,7 +8,7 @@ module Coordinator
         title "Declare a WorkItem dependency"
         description "Declare one typed dependency edge inside a planning ChangeSet."
         input_schema Schemas.work_item_dependency_declare
-        operation "operations.execute_declare_work_item_dependency"
+        operation "operations.submit_declare_work_item_dependency_task"
       end
     end
   end

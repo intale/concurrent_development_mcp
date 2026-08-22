@@ -8,7 +8,7 @@ module Coordinator
         title "Create a WorkItem"
         description "Add one repository-scoped unit of work to a planning ChangeSet."
         input_schema Schemas.work_item_create
-        operation "operations.execute_create_work_item"
+        operation "operations.submit_create_work_item_task"
       end
     end
   end
