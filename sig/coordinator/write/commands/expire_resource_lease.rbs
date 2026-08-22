@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module Commands
+      class ExpireResourceLease < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def resource_key_hash: () -> String
+        def lease_id: () -> String
+        def lease_set_id: () -> String
+        def fencing_token: () -> Integer
+        def expected_expires_at: () -> String
+      end
+    end
+  end
+end

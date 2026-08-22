@@ -116,7 +116,8 @@ module Coordinator::Write
             current_lease_set_id: stale.state.lease_set_id,
             current_attempt_id: stale.state.attempt_id,
             current_expires_at: stale.state.expires_at,
-            current_released_at: stale.state.released_at
+            current_released_at: stale.state.released_at,
+            current_expired_at: stale.state.expired_at
           )
         end
 
@@ -143,7 +144,8 @@ module Coordinator::Write
             state.base_commit_oid == snapshot.commit_oid &&
             state.fencing_token == reference.fencing_token &&
             state.expires_at == attempt_state.lease_expires_at &&
-            state.released_at.nil?
+            state.released_at.nil? &&
+            state.expired_at.nil?
         end
 
         def build_plan(attempt_state:, current_observations:, command:, released_at:)

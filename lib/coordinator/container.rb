@@ -99,6 +99,10 @@ module Coordinator
       Write::Domain::ResourceLeases::Release.new(stream_factory: self["stream_factory"])
     end
 
+    register("domain.resource_leases.expire", memoize: true) do
+      Write::Domain::ResourceLeases::Expire.new(stream_factory: self["stream_factory"])
+    end
+
     register("change_set_activation_source_builder", memoize: true) do
       Processes::ChangeSetActivationSourceBuilder.new(schema_registry: self["event_schema_registry"])
     end
@@ -337,6 +341,21 @@ module Coordinator
         event_store: self["event_store"],
         preparer: self["operations.prepare_release_lease_set"],
         decider: self["domain.resource_leases.release"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"],
+        compound_marker_builder: self["compound_marker_builder"]
+      )
+    end
+
+    register("operations.execute_expire_resource_lease") do
+      Write::Operations::ExecuteExpireResourceLease.new(
+        event_store: self["event_store"],
+        decider: self["domain.resource_leases.expire"],
         input_digest: self["command_input_digest"],
         clock: self["clock"],
         id_generator: self["id_generator"],

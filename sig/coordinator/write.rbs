@@ -11,6 +11,7 @@ module Coordinator
                                 Commands::ExpandWriteSet |
                                 Commands::RenewLeaseSet |
                                 Commands::ReleaseLeaseSet
+    type write_command = coordination_command | Commands::ExpireResourceLease
     type lifecycle_command = Commands::StartCoordinationTask |
                              Commands::RecordCoordinationTaskOutcome |
                              Commands::CancelCoordinationTask

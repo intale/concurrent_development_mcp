@@ -26,6 +26,7 @@ module Coordinator
           def renewed_at: () -> String?
           def expires_at: () -> String?
           def released_at: () -> String?
+          def expired_at: () -> String?
           def active_at?: (String timestamp) -> bool
           def next_fencing_token: () -> Integer
           def apply: (Events::Base event) -> State

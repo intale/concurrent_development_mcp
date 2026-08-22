@@ -41,6 +41,14 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::State do
       )
     )
   end
+  let(:expired) do
+    Coordinator::Write::Events::ResourceLeaseExpiredV1.new(
+      acquired.to_h.merge(
+        renewed_at: nil,
+        expired_at: acquired.expires_at
+      )
+    )
+  end
 
   it "folds the latest acquisition and advances fencing monotonically" do
     state = described_class.reduce([ acquired ])
@@ -74,6 +82,19 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::State do
       fencing_token: 4,
       expires_at: acquired.expires_at,
       released_at: released.released_at
+    )
+    expect(state.next_fencing_token).to eq(5)
+  end
+
+  it "folds explicit expiry as inactive audit evidence while preserving fencing" do
+    state = described_class.reduce([ acquired, expired ])
+
+    expect(state).not_to be_active_at("2026-08-22T10:14:00.000000Z")
+    expect(state.to_h).to include(
+      lease_id: acquired.lease_id,
+      fencing_token: 4,
+      expires_at: acquired.expires_at,
+      expired_at: acquired.expires_at
     )
     expect(state.next_fencing_token).to eq(5)
   end

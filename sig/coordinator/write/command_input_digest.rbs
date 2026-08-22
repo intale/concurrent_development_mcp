@@ -2,8 +2,8 @@ module Coordinator
   module Write
     class CommandInputDigest
       def initialize: (?canonical_json: Shared::CanonicalJson) -> void
-      def call: (coordination_command command) -> String
-      def document: (coordination_command command) -> CommandInputDocuments::value
+      def call: (write_command command) -> String
+      def document: (write_command command) -> CommandInputDocuments::digest_value
       def create_change_set: (Commands::CreateChangeSet command) -> String
       def create_change_set_document: (Commands::CreateChangeSet command) -> CommandInputDocuments::CreateChangeSetV1
       def work_item_create: (Commands::CreateWorkItem command) -> String
@@ -22,6 +22,8 @@ module Coordinator
       def lease_renew_document: (Commands::RenewLeaseSet command) -> CommandInputDocuments::RenewLeaseSetV1
       def lease_release: (Commands::ReleaseLeaseSet command) -> String
       def lease_release_document: (Commands::ReleaseLeaseSet command) -> CommandInputDocuments::ReleaseLeaseSetV1
+      def lease_expire_policy: (Commands::ExpireResourceLease command) -> String
+      def lease_expire_policy_document: (Commands::ExpireResourceLease command) -> CommandInputDocuments::ExpireResourceLeaseV1
     end
   end
 end

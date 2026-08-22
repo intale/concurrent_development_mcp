@@ -82,6 +82,23 @@ module Coordinator::Write
       attribute :released_at, Types::Timestamp
     end
 
-    Type = ChangeSet | WorkItem | Dependency | Attempt | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease
+    class ResourceLeaseExpiry < Value
+      attribute :resource_key_hash, Types::Sha256Digest
+      attribute :lease_id, Types::UuidV7
+      attribute :lease_set_id, Types::UuidV7
+      attribute :fencing_token, Types::FencingToken
+      attribute :expires_at, Types::Timestamp
+      attribute :expired_at, Types::Timestamp
+    end
+
+    Type = ChangeSet |
+           WorkItem |
+           Dependency |
+           Attempt |
+           LeaseSet |
+           LeaseSetExpansion |
+           LeaseSetRenewal |
+           LeaseSetRelease |
+           ResourceLeaseExpiry
   end
 end

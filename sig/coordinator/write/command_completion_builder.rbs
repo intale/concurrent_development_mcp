@@ -11,6 +11,7 @@ module Coordinator
       def write_set_expand: (command: Commands::ExpandWriteSet, expansion: Events::WriteSetExpandedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
       def lease_renew: (command: Commands::RenewLeaseSet, renewal: Events::WriteSetRenewedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
       def lease_release: (command: Commands::ReleaseLeaseSet, release: Events::WriteSetReleasedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
+      def lease_expire_policy: (command: Commands::ExpireResourceLease, expiration: Events::ResourceLeaseExpiredV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
     end
   end
 end

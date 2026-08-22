@@ -148,7 +148,8 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
           current_lease_set_id: "0198e03a-d112-7000-8000-000000000003",
           current_attempt_id: "ATT-task-result-other",
           current_expires_at: "2026-08-22T10:45:00.000000Z",
-          current_released_at: nil
+          current_released_at: nil,
+          current_expired_at: nil
         },
         Coordinator::Write::Tasks::DomainErrorV1::LeaseSetNotCurrentError,
         "denied"

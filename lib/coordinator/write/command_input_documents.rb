@@ -174,6 +174,20 @@ module Coordinator::Write
       attribute :input, ReleaseLeaseSetInputV1
     end
 
+    class ExpireResourceLeaseInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :resource_key_hash, Types::Sha256Digest
+      attribute :lease_id, Types::UuidV7
+      attribute :lease_set_id, Types::UuidV7
+      attribute :fencing_token, Types::FencingToken
+      attribute :expected_expires_at, Types::Timestamp
+    end
+
+    class ExpireResourceLeaseV1 < BaseV1
+      attribute :tool_name, Types::String.enum("lease_expire_policy")
+      attribute :input, ExpireResourceLeaseInputV1
+    end
+
     Type = CreateChangeSetV1 |
            CreateWorkItemV1 |
            DeclareWorkItemDependencyV1 |
@@ -183,5 +197,7 @@ module Coordinator::Write
            ExpandWriteSetV1 |
            RenewLeaseSetV1 |
            ReleaseLeaseSetV1
+
+    DigestType = Type | ExpireResourceLeaseV1
   end
 end

@@ -21,6 +21,7 @@ module Coordinator::Write
       when Commands::ExpandWriteSet then write_set_expand_document(command)
       when Commands::RenewLeaseSet then lease_renew_document(command)
       when Commands::ReleaseLeaseSet then lease_release_document(command)
+      when Commands::ExpireResourceLease then lease_expire_policy_document(command)
       else
         raise ArgumentError, "Unsupported coordination command: #{command.class.name}"
       end
@@ -211,6 +212,26 @@ module Coordinator::Write
           leases: command.leases.map do |reference|
             CommandInputDocuments::LeaseReleaseReferenceV1.new(reference.to_h)
           end
+        )
+      )
+    end
+
+    def lease_expire_policy(command)
+      @canonical_json.sha256(lease_expire_policy_document(command).to_h)
+    end
+
+    def lease_expire_policy_document(command)
+      CommandInputDocuments::ExpireResourceLeaseV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "lease_expire_policy",
+        input: CommandInputDocuments::ExpireResourceLeaseInputV1.new(
+          actor: actor_document(command.actor),
+          resource_key_hash: command.resource_key_hash,
+          lease_id: command.lease_id,
+          lease_set_id: command.lease_set_id,
+          fencing_token: command.fencing_token,
+          expected_expires_at: command.expected_expires_at
         )
       )
     end

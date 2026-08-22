@@ -83,6 +83,7 @@ module Coordinator
           def current_attempt_id: () -> String?
           def current_expires_at: () -> String?
           def current_released_at: () -> String?
+          def current_expired_at: () -> String?
         end
 
         class WriteSetReleasedDetails < AttemptDetails

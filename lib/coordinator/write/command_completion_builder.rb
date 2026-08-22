@@ -229,6 +229,26 @@ module Coordinator::Write
       )
     end
 
+    def lease_expire_policy(command:, expiration:, input_digest:, persisted_events:, completed_at:)
+      build_completion(
+        command:,
+        tool_name: "lease_expire_policy",
+        summary: "Resource lease explicitly expired.",
+        data: CommandReceiptData::ResourceLeaseExpiry.new(
+          resource_key_hash: expiration.resource_key_hash,
+          lease_id: expiration.lease_id,
+          lease_set_id: expiration.lease_set_id,
+          fencing_token: expiration.fencing_token,
+          expires_at: expiration.expires_at,
+          expired_at: expiration.expired_at
+        ),
+        next_actions: [],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
 
     def build_completion(command:, tool_name:, summary:, data:, next_actions:, input_digest:, persisted_events:, completed_at:)

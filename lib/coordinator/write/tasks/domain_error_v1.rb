@@ -82,6 +82,7 @@ module Coordinator::Write
         attribute :current_attempt_id, Types::Identifier.optional
         attribute :current_expires_at, Types::Timestamp.optional
         attribute :current_released_at, Types::Timestamp.optional
+        attribute :current_expired_at, Types::Timestamp.optional
       end
 
       class WriteSetReleasedDetails < AttemptDetails

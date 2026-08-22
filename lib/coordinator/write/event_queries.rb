@@ -127,7 +127,12 @@ module Coordinator::Write
     )
 
     RESOURCE_LEASE_FOR_RESERVATION = GroupedEventReadCriteria.new(
-      event_types: [ "ResourceLeaseAcquired", "ResourceLeaseRenewed", "ResourceLeaseReleased" ],
+      event_types: [
+        "ResourceLeaseAcquired",
+        "ResourceLeaseRenewed",
+        "ResourceLeaseReleased",
+        "ResourceLeaseExpired"
+      ],
       direction: :desc
     )
   end

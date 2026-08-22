@@ -25,6 +25,7 @@ module Coordinator::Write
         attribute :renewed_at, Types::Timestamp.optional
         attribute :expires_at, Types::Timestamp.optional
         attribute :released_at, Types::Timestamp.optional
+        attribute :expired_at, Types::Timestamp.optional
 
         def self.initial
           new(
@@ -48,7 +49,8 @@ module Coordinator::Write
             acquired_at: nil,
             renewed_at: nil,
             expires_at: nil,
-            released_at: nil
+            released_at: nil,
+            expired_at: nil
           )
         end
 
@@ -57,7 +59,7 @@ module Coordinator::Write
         end
 
         def active_at?(timestamp)
-          !lease_id.nil? && released_at.nil? && expires_at > timestamp
+          !lease_id.nil? && released_at.nil? && expired_at.nil? && expires_at > timestamp
         end
 
         def next_fencing_token
@@ -72,6 +74,8 @@ module Coordinator::Write
             from_renewal(event)
           when Events::ResourceLeaseReleasedV1
             from_release(event)
+          when Events::ResourceLeaseExpiredV1
+            from_expiration(event)
           else
             self
           end
@@ -101,7 +105,8 @@ module Coordinator::Write
             acquired_at: event.acquired_at,
             renewed_at: nil,
             expires_at: event.expires_at,
-            released_at: nil
+            released_at: nil,
+            expired_at: nil
           )
         end
 
@@ -127,7 +132,8 @@ module Coordinator::Write
             acquired_at:,
             renewed_at: event.renewed_at,
             expires_at: event.expires_at,
-            released_at: nil
+            released_at: nil,
+            expired_at: nil
           )
         end
 
@@ -153,7 +159,35 @@ module Coordinator::Write
             acquired_at: event.acquired_at,
             renewed_at:,
             expires_at: event.previous_expires_at,
-            released_at: event.released_at
+            released_at: event.released_at,
+            expired_at: nil
+          )
+        end
+
+        def from_expiration(event)
+          self.class.new(
+            lease_id: event.lease_id,
+            lease_set_id: event.lease_set_id,
+            resource_key: event.resource_key,
+            resource_key_hash: event.resource_key_hash,
+            resource_kind: event.resource_kind,
+            resource_path: event.resource_path,
+            policy_version: event.policy_version,
+            mode: event.mode,
+            change_set_id: event.change_set_id,
+            work_item_id: event.work_item_id,
+            attempt_id: event.attempt_id,
+            agent_id: event.agent_id,
+            repository_id: event.repository_id,
+            object_format: event.object_format,
+            base_commit_oid: event.base_commit_oid,
+            base_blob_oid: event.base_blob_oid,
+            fencing_token: event.fencing_token,
+            acquired_at: event.acquired_at,
+            renewed_at: event.renewed_at,
+            expires_at: event.expires_at,
+            released_at: nil,
+            expired_at: event.expired_at
           )
         end
       end

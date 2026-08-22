@@ -1,0 +1,6 @@
+module Coordinator
+  module Write
+    class InvalidResourceLeaseExpiryEventPlan < StandardError
+    end
+  end
+end

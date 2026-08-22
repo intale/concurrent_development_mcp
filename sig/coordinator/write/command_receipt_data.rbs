@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandReceiptData
-      type value = ChangeSet | WorkItem | Dependency | Attempt | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease
+      type value = ChangeSet | WorkItem | Dependency | Attempt | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry
 
       class ChangeSet < Shared::Value
         def change_set_id: () -> String
@@ -74,6 +74,15 @@ module Coordinator
         def resource_count: () -> Integer
         def previous_expires_at: () -> String
         def released_at: () -> String
+      end
+
+      class ResourceLeaseExpiry < Shared::Value
+        def resource_key_hash: () -> String
+        def lease_id: () -> String
+        def lease_set_id: () -> String
+        def fencing_token: () -> Integer
+        def expires_at: () -> String
+        def expired_at: () -> String
       end
     end
   end
