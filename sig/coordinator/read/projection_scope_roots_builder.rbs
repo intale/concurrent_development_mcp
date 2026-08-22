@@ -1,0 +1,7 @@
+module Coordinator
+  module Read
+    class ProjectionScopeRootsBuilder
+      def call: (Write::Events::Base event) -> Array[ProjectionScopeRoot]
+    end
+  end
+end

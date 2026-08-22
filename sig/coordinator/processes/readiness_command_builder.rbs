@@ -1,0 +1,8 @@
+module Coordinator
+  module Processes
+    class ReadinessCommandBuilder
+      def initialize: (?compound_marker_builder: Shared::CompoundMarkerBuilder) -> void
+      def call: (source: ChangeSetActivationSource, work_item_id: String) -> Write::Commands::EvaluateWorkItemReadiness
+    end
+  end
+end

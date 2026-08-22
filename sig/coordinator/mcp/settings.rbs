@@ -1,0 +1,9 @@
+module Coordinator
+  module Mcp
+    class Settings < Shared::Value
+      def allowed_hosts: () -> Array[String]
+      def allowed_origins: () -> Array[String]
+      def max_request_bytes: () -> Integer
+    end
+  end
+end

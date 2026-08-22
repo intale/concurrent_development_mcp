@@ -1,0 +1,7 @@
+module Coordinator
+  module Write
+    class PgStreamFactory
+      def call: (StreamReference reference) -> PgEventstore::Stream
+    end
+  end
+end

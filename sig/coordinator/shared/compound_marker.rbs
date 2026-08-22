@@ -1,0 +1,10 @@
+module Coordinator
+  module Shared
+    class CompoundMarker < Value
+      def purpose: () -> String
+      def components: () -> Array[String]
+      def digest: () -> String
+      def marker: () -> String
+    end
+  end
+end

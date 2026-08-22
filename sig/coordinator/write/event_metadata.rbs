@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    class EventMetadata < Shared::Value
+      def command_id: () -> String
+      def actor_kind: () -> String
+      def actor_id: () -> String
+      def recorded_by: () -> String
+      def correlation_id: () -> String
+      def policy_version: () -> String?
+    end
+  end
+end

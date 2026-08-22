@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    class EventReadCriteria < Shared::Value
+      def event_types: () -> Array[String]
+      def maximum_count: () -> Integer
+      def direction: () -> Symbol
+      def query_max_count: () -> Integer
+    end
+  end
+end

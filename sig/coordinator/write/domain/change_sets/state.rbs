@@ -1,0 +1,20 @@
+module Coordinator
+  module Write
+    module Domain
+      module ChangeSets
+        class State < Shared::Value
+          def self.initial: () -> State
+          def self.reduce: (Array[Events::Base] events) -> State
+          def change_set_id: () -> String?
+          def goal: () -> String?
+          def status: () -> String
+          def acceptance_criteria: () -> Array[String]
+          def work_item_ids: () -> Array[String]
+          def dependencies: () -> Array[Dependency]
+          def absent?: () -> bool
+          def apply: (Events::Base event) -> State
+        end
+      end
+    end
+  end
+end

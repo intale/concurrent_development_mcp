@@ -1,0 +1,9 @@
+module Coordinator
+  module Processes
+    module Contracts
+      class ChangeSetActivationSourceEvent
+        def call: ({ event: PgEventstore::Event } input) -> untyped
+      end
+    end
+  end
+end

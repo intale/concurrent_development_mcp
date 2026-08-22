@@ -1,0 +1,6 @@
+module Coordinator
+  module Write
+    class InvalidAcquisitionEventPlan < StandardError
+    end
+  end
+end

@@ -1,0 +1,20 @@
+module Coordinator
+  module Processes
+    module ProcessManagers
+      class ChangeSetReadiness
+        HANDLED_OUTCOME_CODES: Array[Symbol]
+
+        def initialize: (
+          event_store: Write::_EventStore,
+          ?source_builder: ChangeSetActivationSourceBuilder,
+          ?targets_builder: ReadinessTargetsBuilder,
+          ?command_builder: ReadinessCommandBuilder,
+          ?operation: Write::Operations::ExecuteEvaluateWorkItemReadiness,
+          ?schema_registry: Write::EventSchemaRegistry,
+          ?stream_factory: Write::StreamFactory
+        ) -> void
+        def call: (PgEventstore::Event event) -> void
+      end
+    end
+  end
+end

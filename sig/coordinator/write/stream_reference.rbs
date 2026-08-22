@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    class StreamReference < Shared::Value
+      def context: () -> String
+      def stream_name: () -> String
+      def stream_id: () -> String
+    end
+  end
+end

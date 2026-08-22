@@ -1,0 +1,6 @@
+module Coordinator
+  module Processes
+    class InvalidSourceEvent < StandardError
+    end
+  end
+end

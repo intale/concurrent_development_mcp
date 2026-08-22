@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    module Queries
+      class OperationGet
+        def initialize: (?contract: Contracts::OperationGet, ?completions: CommandCompletionLookup) -> void
+        %a{rbs:test:skip}
+        def call: (command_input input) -> untyped
+      end
+    end
+  end
+end

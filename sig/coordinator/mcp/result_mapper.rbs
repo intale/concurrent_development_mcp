@@ -1,0 +1,7 @@
+module Coordinator
+  module Mcp
+    class ResultMapper
+      def call: (untyped result, ?command_id: String?) -> ResultV1
+    end
+  end
+end

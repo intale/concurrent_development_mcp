@@ -1,0 +1,9 @@
+module Coordinator
+  module Mcp
+    class MutationTool < Tool
+      def self.operation: () -> String
+                        | (String key) -> String
+      def self.call: (?server_context: untyped, **untyped arguments) -> untyped
+    end
+  end
+end

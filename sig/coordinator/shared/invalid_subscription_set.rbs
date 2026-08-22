@@ -1,0 +1,6 @@
+module Coordinator
+  module Shared
+    class InvalidSubscriptionSet < StandardError
+    end
+  end
+end

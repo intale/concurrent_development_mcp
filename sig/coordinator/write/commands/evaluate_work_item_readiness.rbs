@@ -1,0 +1,19 @@
+module Coordinator
+  module Write
+    module Commands
+      class EvaluateWorkItemReadiness < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def source_activation_event_id: () -> String
+        def source_activation_revision: () -> Integer
+        def policy_version: () -> String
+        def decision_identity: () -> ReadinessDecisionIdentity
+        def readiness_decision_id: () -> String
+        def process_decision_marker: () -> String
+        def process_decision_components: () -> Array[String]
+      end
+    end
+  end
+end

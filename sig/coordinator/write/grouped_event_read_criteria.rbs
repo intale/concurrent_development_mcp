@@ -1,0 +1,8 @@
+module Coordinator
+  module Write
+    class GroupedEventReadCriteria < Shared::Value
+      def event_types: () -> Array[String]
+      def direction: () -> Symbol
+    end
+  end
+end

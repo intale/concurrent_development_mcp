@@ -28,11 +28,10 @@ module Coordinator
                 },
                 required: %w[tool arguments]
               }
-            },
-            projection_status: nullable_string
+            }
           },
           required: %w[
-            status summary command_id receipt context_token data warnings next_actions projection_status
+            status summary command_id receipt context_token data warnings next_actions
           ]
         }
       end
@@ -111,14 +110,7 @@ module Coordinator
       def operation_get
         object_schema(
           properties: {
-            command_id: identifier,
-            projections: {
-              type: "array",
-              minItems: 1,
-              maxItems: 10,
-              uniqueItems: true,
-              items: { type: "string", enum: [ "coord_context_v1" ] }
-            }
+            command_id: identifier
           },
           required: %w[command_id]
         )
@@ -131,7 +123,6 @@ module Coordinator
             change_set_id: nullable_identifier,
             work_item_id: nullable_identifier,
             attempt_id: nullable_identifier,
-            after_command_id: nullable_identifier,
             context_token: {
               type: [ "string", "null" ],
               pattern: "^sha256:[0-9a-f]{64}$"

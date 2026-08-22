@@ -1,0 +1,7 @@
+module Coordinator
+  module Read
+    class OperationGetQueryV1 < Shared::Value
+      def command_id: () -> String
+    end
+  end
+end

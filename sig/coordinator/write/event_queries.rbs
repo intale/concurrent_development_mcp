@@ -1,0 +1,18 @@
+module Coordinator
+  module Write
+    module EventQueries
+      COMMAND_COMPLETION: EventReadCriteria
+      CHANGE_SET_EXISTENCE: GroupedEventReadCriteria
+      WORK_ITEM_EXISTENCE: GroupedEventReadCriteria
+      CHANGE_SET_FOR_WORK_ITEM_CREATION: EventReadCriteria
+      CHANGE_SET_FOR_DEPENDENCY_DECLARATION: EventReadCriteria
+      CHANGE_SET_FOR_ACTIVATION: EventReadCriteria
+      CHANGE_SET_MEMBERS_FOR_READINESS: EventReadCriteria
+      CHANGE_SET_FOR_READINESS_EVALUATION: EventReadCriteria
+      WORK_ITEM_FOR_READINESS_EVALUATION: EventReadCriteria
+      CHANGE_SET_FOR_ACQUISITION: EventReadCriteria
+      WORK_ITEM_FOR_ACQUISITION: EventReadCriteria
+      ATTEMPT_FOR_ACQUISITION: EventReadCriteria
+    end
+  end
+end

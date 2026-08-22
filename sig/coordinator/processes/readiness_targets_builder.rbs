@@ -1,0 +1,11 @@
+module Coordinator
+  module Processes
+    class ReadinessTargetsBuilder
+      def initialize: (?contract: Contracts::ReadinessTargets) -> void
+      def call: (
+        source: ChangeSetActivationSource,
+        memberships: Array[Write::Events::WorkItemAddedToChangeSetV1]
+      ) -> ReadinessTargets
+    end
+  end
+end

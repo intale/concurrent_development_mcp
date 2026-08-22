@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    class ContextBlockerV1 < Shared::Value
+      def code: () -> String
+      def dependency_id: () -> String
+      def producer_work_item_id: () -> String
+      def consumer_work_item_id: () -> String
+      def dependency_kind: () -> String
+    end
+  end
+end

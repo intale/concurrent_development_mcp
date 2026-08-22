@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    module Contracts
+      class CoordContext
+        ROOT_KEYS: Array[Symbol]
+
+        def call: (command_input input) -> untyped
+      end
+    end
+  end
+end

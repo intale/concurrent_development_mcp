@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Events
+      class ChangeSetActivatedV1 < Base
+        def change_set_id: () -> String
+        def work_item_count: () -> Integer
+        def dependency_count: () -> Integer
+        def activated_at: () -> String
+      end
+    end
+  end
+end

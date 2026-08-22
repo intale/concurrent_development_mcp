@@ -1,0 +1,16 @@
+module Coordinator
+  module Write
+    module Commands
+      class DeclareWorkItemDependency < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def change_set_id: () -> String
+        def dependency_id: () -> String
+        def producer_work_item_id: () -> String
+        def consumer_work_item_id: () -> String
+        def dependency_kind: () -> String
+        def required_output: () -> RequiredOutput?
+      end
+    end
+  end
+end

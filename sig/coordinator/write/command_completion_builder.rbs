@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    class CommandCompletionBuilder
+      def initialize: (?persisted_events_contract: Contracts::PersistedEvents) -> void
+      def create_change_set: (command: Commands::CreateChangeSet, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
+      def work_item_create: (command: Commands::CreateWorkItem, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
+      def work_item_dependency_declare: (command: Commands::DeclareWorkItemDependency, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
+      def change_set_activate: (command: Commands::ActivateChangeSet, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
+      def work_item_acquire: (command: Commands::AcquireWorkItem, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
+    end
+  end
+end

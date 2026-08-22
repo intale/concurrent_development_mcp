@@ -1,0 +1,4 @@
+module Coordinator
+  class Container
+  end
+end

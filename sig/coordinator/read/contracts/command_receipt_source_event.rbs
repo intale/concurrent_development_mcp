@@ -1,0 +1,9 @@
+module Coordinator
+  module Read
+    module Contracts
+      class CommandReceiptSourceEvent
+        def call: (command_input input) -> untyped
+      end
+    end
+  end
+end

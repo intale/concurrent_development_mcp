@@ -1,0 +1,10 @@
+module Coordinator
+  module Shared
+    module Subscriptions
+      class Identity < Value
+        def set_name: () -> String
+        def subscription_name: () -> String
+      end
+    end
+  end
+end

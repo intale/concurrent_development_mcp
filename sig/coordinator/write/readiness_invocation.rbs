@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    class ReadinessInvocation < Shared::Value
+      def command: () -> Commands::EvaluateWorkItemReadiness
+      def source_event: () -> PgEventstore::Event
+      def source_reference: () -> EventReference
+      def source_change_set_id: () -> String
+      def correlation_id: () -> String
+    end
+  end
+end

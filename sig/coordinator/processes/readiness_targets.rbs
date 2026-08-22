@@ -1,0 +1,7 @@
+module Coordinator
+  module Processes
+    class ReadinessTargets < Shared::Value
+      def work_item_ids: () -> Array[String]
+    end
+  end
+end

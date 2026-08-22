@@ -1,0 +1,8 @@
+module Coordinator
+  module Shared
+    class CompoundMarkerBuilder
+      def initialize: (?canonical_json: CanonicalJson) -> void
+      def call: (CompoundMarkerDefinitionV1 definition) -> CompoundMarker
+    end
+  end
+end

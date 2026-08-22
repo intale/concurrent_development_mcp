@@ -1,0 +1,13 @@
+module Coordinator
+  module Read
+    module Repositories
+      class ProcessedProjectionEvents
+        IDENTITY_INDEX: String
+
+        def claim: (definition: ProjectionDefinition, identity: ProjectionEventIdentity, processed_at: Time) -> bool
+        def missing: (definition: ProjectionDefinition, barriers: Array[ProjectionBarrier]) -> Array[ProjectionBarrier]
+        def processed?: (definition: ProjectionDefinition, barrier: ProjectionBarrier) -> bool
+      end
+    end
+  end
+end

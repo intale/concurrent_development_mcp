@@ -1,0 +1,15 @@
+module Coordinator
+  module Read
+    class ProjectionEventIdentity < Shared::Value
+      def self.from_event: (PgEventstore::Event event) -> ProjectionEventIdentity
+      def stream_context: () -> String
+      def stream_name: () -> String
+      def stream_id: () -> String
+      def stream_revision: () -> Integer
+      def event_id: () -> String
+      def event_type: () -> String
+      def command_id: () -> String?
+      def barrier: () -> ProjectionBarrier
+    end
+  end
+end

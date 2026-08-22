@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Domain
+      module ChangeSets
+        class DeclareWorkItemDependency
+          def initialize: (?stream_factory: StreamFactory) -> void
+          def call: (state: State, command: Commands::DeclareWorkItemDependency, occurred_at: String) -> untyped
+        end
+      end
+    end
+  end
+end

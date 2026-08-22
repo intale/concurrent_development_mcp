@@ -33,20 +33,19 @@ module Coordinator
         end
 
         def unexpected_failure
-          McpResultV1.new(
+          ResultV1.new(
             status: "invalid",
             summary: "The coordinator could not complete the request.",
             command_id: nil,
             receipt: nil,
             context_token: nil,
-            data: McpResultV1::DomainError.new(
+            data: ResultV1::DomainError.new(
               code: "internal_error",
               message: "An unexpected coordinator error occurred",
               details: {}
             ),
             warnings: [],
-            next_actions: [],
-            projection_status: nil
+            next_actions: []
           )
         end
       end

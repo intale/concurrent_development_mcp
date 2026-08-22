@@ -1,0 +1,12 @@
+module Coordinator
+  module Shared
+    module Subscriptions
+      class Registration
+        attr_reader definition: _SubscriptionDefinition
+
+        def initialize: (definition: _SubscriptionDefinition, handler: _SubscriptionHandler, ?pull_interval: Integer | Float) -> void
+        def register: (PgEventstore::SubscriptionsManager manager) -> bool
+      end
+    end
+  end
+end

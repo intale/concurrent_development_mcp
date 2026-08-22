@@ -1,0 +1,27 @@
+module Coordinator
+  module Write
+    module CommandReceiptData
+      type value = ChangeSet | WorkItem | Dependency | Attempt
+
+      class ChangeSet < Shared::Value
+        def change_set_id: () -> String
+      end
+
+      class WorkItem < Shared::Value
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+      end
+
+      class Dependency < Shared::Value
+        def change_set_id: () -> String
+        def dependency_id: () -> String
+      end
+
+      class Attempt < Shared::Value
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def attempt_id: () -> String
+      end
+    end
+  end
+end

@@ -1,0 +1,9 @@
+module Coordinator
+  module Read
+    class ProjectionScopeRoot < Shared::Value
+      def scope_kind: () -> String
+      def scope_id: () -> String
+      def change_set_id: () -> String
+    end
+  end
+end

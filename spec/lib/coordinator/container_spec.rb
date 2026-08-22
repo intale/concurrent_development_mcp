@@ -23,21 +23,21 @@ RSpec.describe Coordinator::Container do
     context_query = described_class["queries.coord_context"]
     mcp_transport = described_class["mcp.transport"]
 
-    expect(change_set_operation).to be_a(Coordinator::Operations::ExecuteCreateChangeSet)
-    expect(work_item_operation).to be_a(Coordinator::Operations::ExecuteCreateWorkItem)
-    expect(dependency_operation).to be_a(Coordinator::Operations::ExecuteDeclareWorkItemDependency)
-    expect(activation_operation).to be_a(Coordinator::Operations::ExecuteActivateChangeSet)
-    expect(readiness_operation).to be_a(Coordinator::Operations::ExecuteEvaluateWorkItemReadiness)
-    expect(acquisition_operation).to be_a(Coordinator::Operations::ExecuteAcquireWorkItem)
-    expect(readiness_process_manager).to be_a(Coordinator::ProcessManagers::ChangeSetReadiness)
+    expect(change_set_operation).to be_a(Coordinator::Write::Operations::ExecuteCreateChangeSet)
+    expect(work_item_operation).to be_a(Coordinator::Write::Operations::ExecuteCreateWorkItem)
+    expect(dependency_operation).to be_a(Coordinator::Write::Operations::ExecuteDeclareWorkItemDependency)
+    expect(activation_operation).to be_a(Coordinator::Write::Operations::ExecuteActivateChangeSet)
+    expect(readiness_operation).to be_a(Coordinator::Write::Operations::ExecuteEvaluateWorkItemReadiness)
+    expect(acquisition_operation).to be_a(Coordinator::Write::Operations::ExecuteAcquireWorkItem)
+    expect(readiness_process_manager).to be_a(Coordinator::Processes::ProcessManagers::ChangeSetReadiness)
     expect(subscription_manager).to be_a(PgEventstore::SubscriptionsManager)
-    expect(subscription_set).to be_a(Coordinator::Subscriptions::ProcessManagerSet)
+    expect(subscription_set).to be_a(Coordinator::Processes::Subscriptions::ProcessManagerSet)
     expect(subscription_set.subscription_names).to eq([ "change-set-readiness-v1" ])
     expect(read_model_manager).to be_a(PgEventstore::SubscriptionsManager)
-    expect(read_model_set).to be_a(Coordinator::Subscriptions::ReadModelSet)
+    expect(read_model_set).to be_a(Coordinator::Read::Subscriptions::ReadModelSet)
     expect(read_model_set.subscription_names).to eq([ "command-receipts-v1", "coord-context-v1" ])
-    expect(operation_query).to be_a(Coordinator::Queries::OperationGet)
-    expect(context_query).to be_a(Coordinator::Queries::CoordContext)
+    expect(operation_query).to be_a(Coordinator::Read::Queries::OperationGet)
+    expect(context_query).to be_a(Coordinator::Read::Queries::CoordContext)
     expect(mcp_transport).to be_a(MCP::Server::Transports::StreamableHTTPTransport)
   end
 

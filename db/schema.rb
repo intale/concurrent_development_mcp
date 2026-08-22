@@ -19,7 +19,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_20_184500) do
     t.bigint "command_stream_revision", null: false
     t.datetime "completed_at_domain", null: false
     t.jsonb "completion", default: {}, null: false
-    t.string "context_token", null: false
     t.datetime "created_at", null: false
     t.string "receipt", null: false
     t.string "status", null: false

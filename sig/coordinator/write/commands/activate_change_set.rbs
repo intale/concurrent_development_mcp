@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Commands
+      class ActivateChangeSet < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def change_set_id: () -> String
+      end
+    end
+  end
+end

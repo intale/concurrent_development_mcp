@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Domain
+      module ChangeSets
+        class Create
+          def initialize: (?stream_factory: StreamFactory) -> void
+          def call: (state: State, command: Commands::CreateChangeSet, occurred_at: String) -> untyped
+        end
+      end
+    end
+  end
+end

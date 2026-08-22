@@ -1,0 +1,9 @@
+module Coordinator
+  module Mcp
+    class ServerFactory
+      INSTRUCTIONS: String
+
+      def call: () -> untyped
+    end
+  end
+end

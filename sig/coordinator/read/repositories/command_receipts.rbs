@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    module Repositories
+      class CommandReceipts
+        def initialize: (?schema_registry: Write::EventSchemaRegistry) -> void
+        def fetch: (String command_id) -> Write::Events::CommandCompletedV1?
+        def store: (event: PgEventstore::Event, completion: Write::Events::CommandCompletedV1) -> CommandReceipt
+      end
+    end
+  end
+end

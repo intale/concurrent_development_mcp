@@ -1,0 +1,26 @@
+module Coordinator
+  module Read
+    class ContextTokenDocument < Shared::Value
+      type scope = ChangeSetScope | WorkItemScope | AttemptScope
+
+      class ChangeSetScope < Shared::Value
+        def change_set_id: () -> String
+      end
+
+      class WorkItemScope < Shared::Value
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+      end
+
+      class AttemptScope < Shared::Value
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def attempt_id: () -> String
+      end
+
+      def schema: () -> String
+      def scope: () -> scope
+      def source_positions: () -> Array[ProjectionBarrier]
+    end
+  end
+end

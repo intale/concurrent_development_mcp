@@ -1,0 +1,17 @@
+module Coordinator
+  module Write
+    class CommandInputDigest
+      def initialize: (?canonical_json: Shared::CanonicalJson) -> void
+      def create_change_set: (Commands::CreateChangeSet command) -> String
+      def create_change_set_document: (Commands::CreateChangeSet command) -> CommandInputDocuments::CreateChangeSetV1
+      def work_item_create: (Commands::CreateWorkItem command) -> String
+      def work_item_create_document: (Commands::CreateWorkItem command) -> CommandInputDocuments::CreateWorkItemV1
+      def work_item_dependency_declare: (Commands::DeclareWorkItemDependency command) -> String
+      def work_item_dependency_declare_document: (Commands::DeclareWorkItemDependency command) -> CommandInputDocuments::DeclareWorkItemDependencyV1
+      def change_set_activate: (Commands::ActivateChangeSet command) -> String
+      def change_set_activate_document: (Commands::ActivateChangeSet command) -> CommandInputDocuments::ActivateChangeSetV1
+      def work_item_acquire: (Commands::AcquireWorkItem command) -> String
+      def work_item_acquire_document: (Commands::AcquireWorkItem command) -> CommandInputDocuments::AcquireWorkItemV1
+    end
+  end
+end

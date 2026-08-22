@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Events
+      class AttemptStartedV1 < Base
+        def attempt_id: () -> String
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def started_at: () -> String
+      end
+    end
+  end
+end

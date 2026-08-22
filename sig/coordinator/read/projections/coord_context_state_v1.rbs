@@ -1,0 +1,60 @@
+module Coordinator
+  module Read
+    module Projections
+      class CoordContextStateV1 < Shared::Value
+        class ChangeSet < Shared::Value
+          def change_set_id: () -> String
+          def goal: () -> String
+          def acceptance_criteria: () -> Array[String]
+          def status: () -> String
+          def created_at: () -> String
+          def activated_at: () -> String?
+        end
+
+        class WorkItem < Shared::Value
+          def work_item_id: () -> String
+          def change_set_id: () -> String
+          def repository_id: () -> String
+          def goal: () -> String
+          def acceptance_criteria: () -> Array[String]
+          def competitive_mode: () -> bool
+          def status: () -> String
+          def active_attempt_id: () -> String?
+          def active_agent_id: () -> String?
+          def created_at: () -> String
+          def made_ready_at: () -> String?
+          def acquired_at: () -> String?
+        end
+
+        class Dependency < Shared::Value
+          def dependency_id: () -> String
+          def producer_work_item_id: () -> String
+          def consumer_work_item_id: () -> String
+          def dependency_kind: () -> String
+          def required_output: () -> Write::RequiredOutput?
+          def declared_at: () -> String
+        end
+
+        class Attempt < Shared::Value
+          def attempt_id: () -> String
+          def change_set_id: () -> String
+          def work_item_id: () -> String
+          def agent_id: () -> String
+          def base_snapshots: () -> Array[Write::RepositorySnapshotV1]
+          def status: () -> String
+          def authorized_at: () -> String
+          def started_at: () -> String?
+        end
+
+        def self.initial: () -> CoordContextStateV1
+        def schema: () -> String
+        def change_set: () -> ChangeSet?
+        def work_item_ids: () -> Array[String]
+        def work_items: () -> Array[WorkItem]
+        def dependencies: () -> Array[Dependency]
+        def attempts: () -> Array[Attempt]
+        def candidate_checkpoints: () -> Array[untyped]
+      end
+    end
+  end
+end

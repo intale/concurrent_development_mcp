@@ -1,0 +1,23 @@
+module Coordinator
+  module Mcp
+    class ResultV1 < Shared::Value
+      class DomainError < Shared::Value
+        def code: () -> String
+        def message: () -> String
+        def details: () -> Hash[Symbol | String, untyped]
+      end
+
+      type data = DomainError | Write::CommandReceiptData::value | Read::QueryResultV1::data
+      type action = Write::NextAction | Read::NextAction
+
+      def status: () -> String
+      def summary: () -> String
+      def command_id: () -> String?
+      def receipt: () -> String?
+      def context_token: () -> String?
+      def data: () -> data
+      def warnings: () -> Array[String]
+      def next_actions: () -> Array[action]
+    end
+  end
+end

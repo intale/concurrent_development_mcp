@@ -1,0 +1,5 @@
+module Coordinator
+  module Read
+    type command_input = Hash[String | Symbol, untyped]
+  end
+end

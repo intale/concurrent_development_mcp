@@ -1,0 +1,7 @@
+module Coordinator
+  module Read
+    class ContextBlockersBuilder
+      def call: (ContextTokenDocument::scope scope, Projections::CoordContextStateV1 state) -> Array[ContextBlockerV1]
+    end
+  end
+end

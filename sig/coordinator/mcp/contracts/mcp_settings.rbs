@@ -1,0 +1,9 @@
+module Coordinator
+  module Mcp
+    module Contracts
+      class McpSettings
+        def call: (Hash[Symbol, untyped] input) -> untyped
+      end
+    end
+  end
+end

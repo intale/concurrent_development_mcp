@@ -1,0 +1,8 @@
+module Coordinator
+  module Read
+    class ProjectionDefinition < Shared::Value
+      def name: () -> String
+      def version: () -> Integer
+    end
+  end
+end

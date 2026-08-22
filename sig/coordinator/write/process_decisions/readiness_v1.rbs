@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module ProcessDecisions
+      class ReadinessV1 < Shared::Value
+        def schema: () -> String
+        def process_manager: () -> String
+        def policy_version: () -> String
+        def source_event: () -> EventReference
+        def target_work_item_id: () -> String
+        def process_step: () -> String
+        def component_markers: () -> Array[String]
+      end
+    end
+  end
+end

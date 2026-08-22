@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 RSpec.describe "D-045 MCP walking slice", :event_store, :read_model do
-  let(:event_store) { Coordinator::EventStore.new(client: PgEventstore.client) }
-  let(:streams) { Coordinator::StreamFactory.new }
+  let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
+  let(:streams) { Coordinator::Write::StreamFactory.new }
   let(:session) do
     ActionDispatch::Integration::Session.new(Rails.application).tap do |integration|
       integration.host! "localhost"
@@ -45,7 +45,7 @@ RSpec.describe "D-045 MCP walking slice", :event_store, :read_model do
     )
   end
 
-  it "commits, replays, recovers by operation, and returns barrier-confirmed context" do
+  it "commits, replays, and serves independently projected reads without freshness gates" do
     arguments = {
       command_id: "cmd-mcp-100",
       actor: { kind: "agent", id: "planner-1" },
@@ -63,32 +63,31 @@ RSpec.describe "D-045 MCP walking slice", :event_store, :read_model do
     expect(accepted_payload).to include(
       "status" => "ok",
       "command_id" => "cmd-mcp-100",
-      "receipt" => "cmd-mcp-100",
-      "projection_status" => "pending"
+      "receipt" => "cmd-mcp-100"
     )
     expect(JSON.parse(accepted.dig("result", "content").sole.fetch("text"))).to eq(accepted_payload)
     expect(replayed_payload).to eq(accepted_payload)
     expect(command_events("cmd-mcp-100").length).to eq(1)
     expect(change_set_events("CS-MCP-100").length).to eq(2)
 
-    pending = call_tool("operation_get", { command_id: "cmd-mcp-100" }, id: 3)
-    expect(pending.dig("result", "structuredContent", "status")).to eq("pending_projection")
+    absent = call_tool("operation_get", { command_id: "cmd-mcp-100" }, id: 3)
+    expect(absent.dig("result", "structuredContent", "status")).to eq("not_found")
 
-    projector = Coordinator::Projectors::CoordContextV1.new
-    change_set_events("CS-MCP-100").each { projector.call(_1) }
+    receipt_projector = Coordinator::Read::Projectors::CommandReceiptsV1.new
+    receipt_projector.call(command_events("cmd-mcp-100").sole)
     current_operation = call_tool("operation_get", { command_id: "cmd-mcp-100" }, id: 4)
     expect(current_operation.dig("result", "structuredContent", "status")).to eq("ok")
 
+    context_projector = Coordinator::Read::Projectors::CoordContextV1.new
+    change_set_events("CS-MCP-100").each { context_projector.call(_1) }
     context = call_tool(
       "coord_context",
-      { change_set_id: "CS-MCP-100", after_command_id: "cmd-mcp-100" },
+      { change_set_id: "CS-MCP-100" },
       id: 5
     )
     context_payload = context.dig("result", "structuredContent")
-    expect(context_payload).to include(
-      "status" => "ok",
-      "projection_status" => "current_for_requested_command"
-    )
+    expect(context_payload).to include("status" => "ok")
+    expect(context_payload).not_to have_key("projection_status")
     expect(context_payload.dig("data", "context", "change_set", "goal")).to eq("Coordinate repositories")
   end
 
@@ -154,10 +153,10 @@ RSpec.describe "D-045 MCP walking slice", :event_store, :read_model do
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
   end
 
   def change_set_events(change_set_id)
-    event_store.read(streams.change_set(change_set_id), Coordinator::EventQueries::CHANGE_SET_FOR_ACTIVATION)
+    event_store.read(streams.change_set(change_set_id), Coordinator::Write::EventQueries::CHANGE_SET_FOR_ACTIVATION)
   end
 end

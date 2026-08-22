@@ -1,0 +1,20 @@
+module Coordinator
+  module Mcp
+    module Schemas
+      def self.envelope: () -> json_schema
+      def self.change_set_create: () -> json_schema
+      def self.work_item_create: () -> json_schema
+      def self.work_item_dependency_declare: () -> json_schema
+      def self.change_set_activate: () -> json_schema
+      def self.work_item_acquire: () -> json_schema
+      def self.operation_get: () -> json_schema
+      def self.coord_context: () -> json_schema
+      def self.common_mutation_properties: () -> json_schema
+      def self.object_schema: (properties: json_schema, required: Array[String], ?one_of: Array[json_schema]?) -> json_schema
+      def self.identifier: () -> json_schema
+      def self.nullable_identifier: () -> json_schema
+      def self.nullable_string: () -> json_schema
+      def self.string_array: (min_items: Integer, max_items: Integer, max_length: Integer) -> json_schema
+    end
+  end
+end

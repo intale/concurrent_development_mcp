@@ -1,0 +1,11 @@
+module Coordinator
+  module Processes
+    module Subscriptions
+      class ChangeSetReadiness < Shared::Subscriptions::Registration
+        DEFINITION: Shared::Subscriptions::Definition
+
+        def initialize: (handler: ProcessManagers::ChangeSetReadiness, ?pull_interval: Integer | Float) -> void
+      end
+    end
+  end
+end

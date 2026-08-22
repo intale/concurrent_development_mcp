@@ -1,0 +1,9 @@
+module Coordinator
+  module Read
+    class CoordContextQueryV1 < Shared::Value
+      def scope_kind: () -> String
+      def scope_id: () -> String
+      def context_token: () -> String?
+    end
+  end
+end

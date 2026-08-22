@@ -1,0 +1,20 @@
+module Coordinator
+  module Write
+    module Domain
+      module Attempts
+        class State < Shared::Value
+          def self.initial: () -> State
+          def self.reduce: (Array[Events::Base] events) -> State
+          def attempt_id: () -> String?
+          def change_set_id: () -> String?
+          def work_item_id: () -> String?
+          def agent_id: () -> String?
+          def base_snapshots: () -> Array[RepositorySnapshotV1]
+          def status: () -> String
+          def absent?: () -> bool
+          def apply: (Events::Base event) -> State
+        end
+      end
+    end
+  end
+end

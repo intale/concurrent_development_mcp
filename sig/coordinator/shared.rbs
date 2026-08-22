@@ -1,0 +1,23 @@
+module Coordinator
+  module Shared
+    type attributes = Hash[Symbol, untyped]
+
+    interface _Clock
+      def now: () -> String
+    end
+
+    interface _IdGenerator
+      def uuid_v7: () -> String
+    end
+
+    interface _SubscriptionHandler
+      def call: (PgEventstore::Event event) -> untyped
+    end
+
+    interface _SubscriptionDefinition
+      def subscription_name: () -> String
+
+      def options: () -> Hash[Symbol, untyped]
+    end
+  end
+end

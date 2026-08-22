@@ -1,0 +1,6 @@
+module Coordinator
+  module Mcp
+    class Tool
+    end
+  end
+end

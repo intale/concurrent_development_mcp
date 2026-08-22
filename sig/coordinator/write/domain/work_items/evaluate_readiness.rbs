@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Domain
+      module WorkItems
+        class EvaluateReadiness
+          def initialize: (?stream_factory: StreamFactory) -> void
+          def call: (change_set_state: ChangeSets::State, work_item_state: State, command: Commands::EvaluateWorkItemReadiness, occurred_at: String, decision_recorded: bool) -> untyped
+        end
+      end
+    end
+  end
+end

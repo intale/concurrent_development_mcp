@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    class RepositorySnapshotV1 < Shared::Value
+      def repository_id: () -> String
+      def object_format: () -> String
+      def commit_oid: () -> String
+    end
+  end
+end

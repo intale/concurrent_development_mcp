@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module Commands
+      class CreateWorkItem < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def repository_id: () -> String
+        def goal: () -> String
+        def acceptance_criteria: () -> Array[String]
+      end
+    end
+  end
+end

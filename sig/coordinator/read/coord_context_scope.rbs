@@ -1,0 +1,6 @@
+module Coordinator
+  module Read
+    class CoordContextScope < ApplicationRecord
+    end
+  end
+end

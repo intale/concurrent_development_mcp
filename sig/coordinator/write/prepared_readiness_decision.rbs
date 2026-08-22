@@ -1,0 +1,8 @@
+module Coordinator
+  module Write
+    class PreparedReadinessDecision < Shared::Value
+      def occurred_at: () -> String
+      def event_id: () -> String
+    end
+  end
+end

@@ -1,0 +1,9 @@
+module Coordinator
+  module Shared
+    class CompoundMarkerDocumentV1 < Value
+      def schema: () -> String
+      def purpose: () -> String
+      def components: () -> Array[String]
+    end
+  end
+end

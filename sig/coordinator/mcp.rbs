@@ -1,0 +1,5 @@
+module Coordinator
+  module Mcp
+    type json_schema = Hash[Symbol, untyped]
+  end
+end

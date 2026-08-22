@@ -1,0 +1,8 @@
+module Coordinator
+  module Processes
+    class ChangeSetActivationSourceBuilder
+      def initialize: (?contract: Contracts::ChangeSetActivationSourceEvent, ?schema_registry: Write::EventSchemaRegistry) -> void
+      def call: (PgEventstore::Event event) -> ChangeSetActivationSource
+    end
+  end
+end

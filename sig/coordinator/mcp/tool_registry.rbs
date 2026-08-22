@@ -1,0 +1,7 @@
+module Coordinator
+  module Mcp
+    module ToolRegistry
+      def self.all: () -> Array[singleton(Tool)]
+    end
+  end
+end

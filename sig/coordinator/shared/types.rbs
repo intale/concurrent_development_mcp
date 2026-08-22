@@ -1,0 +1,41 @@
+module Coordinator
+  module Shared
+    module Types
+      IDENTIFIER_PATTERN: Regexp
+      REPOSITORY_ID_PATTERN: Regexp
+      GIT_OID_PATTERN: Regexp
+      SHA256_DIGEST_PATTERN: Regexp
+      TIMESTAMP_PATTERN: Regexp
+      UUID_V7_PATTERN: Regexp
+      MARKER_PURPOSE_PATTERN: Regexp
+      MARKER_COMPONENT_PATTERN: Regexp
+
+      ACTOR_KINDS: Array[String]
+      DEPENDENCY_KINDS: Array[String]
+      OUTPUT_REQUIRED_DEPENDENCY_KINDS: Array[String]
+      GIT_OBJECT_FORMATS: Array[String]
+
+      Identifier: untyped
+      RepositoryId: untyped
+      GitOid: untyped
+      GitObjectFormat: untyped
+      Sha256Digest: untyped
+      Timestamp: untyped
+      UuidV7: untyped
+      Marker: untyped
+      MarkerPurpose: untyped
+      MarkerComponent: untyped
+      MarkerComponents: untyped
+      ActorKind: untyped
+      DependencyKind: untyped
+      Goal: untyped
+      Criterion: untyped
+      AcceptanceCriteria: untyped
+      WorkItemAcceptanceCriteria: untyped
+      StateAcceptanceCriteria: untyped
+      WorkItemStateAcceptanceCriteria: untyped
+      WorkItemIds: untyped
+      ReadinessWorkItemIds: untyped
+    end
+  end
+end

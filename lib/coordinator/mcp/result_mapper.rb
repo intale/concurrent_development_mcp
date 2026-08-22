@@ -23,36 +23,38 @@ module Coordinator
       private
 
       def success_result(value)
-        return value if value.is_a?(McpResultV1)
+        return query_result(value) if value.is_a?(Coordinator::Read::QueryResultV1)
 
-        McpResultV1.new(
+        ResultV1.new(
           status: "ok",
           summary: value.summary,
           command_id: value.command_id,
           receipt: value.receipt,
-          context_token: value.context_token,
+          context_token: nil,
           data: value.data,
           warnings: value.warnings,
-          next_actions: value.next_actions,
-          projection_status: "pending"
+          next_actions: value.next_actions
         )
       end
 
+      def query_result(value)
+        ResultV1.new(value.to_h)
+      end
+
       def failure_result(error, command_id:)
-        McpResultV1.new(
+        ResultV1.new(
           status: STATUS_BY_CODE.fetch(error.code, "denied"),
           summary: error.message,
           command_id:,
           receipt: nil,
           context_token: nil,
-          data: McpResultV1::DomainError.new(
+          data: ResultV1::DomainError.new(
             code: error.code.to_s,
             message: error.message,
             details: error.details
           ),
           warnings: [],
-          next_actions: [],
-          projection_status: nil
+          next_actions: []
         )
       end
     end

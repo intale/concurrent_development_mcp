@@ -1,0 +1,8 @@
+module Coordinator
+  module Shared
+    class Value
+      def initialize: (attributes) -> void
+      def to_h: () -> attributes
+    end
+  end
+end

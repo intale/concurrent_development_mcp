@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    class ReadinessDecisionIdentity < Shared::Value
+      def document: () -> ProcessDecisions::ReadinessV1
+      def compound_marker: () -> Shared::CompoundMarker
+      def command_id: () -> String
+      def readiness_decision_id: () -> String
+    end
+  end
+end

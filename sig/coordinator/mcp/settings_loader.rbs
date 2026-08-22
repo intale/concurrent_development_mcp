@@ -1,0 +1,8 @@
+module Coordinator
+  module Mcp
+    class SettingsLoader
+      def initialize: (?contract: Contracts::McpSettings) -> void
+      def call: (?untyped environment) -> Settings
+    end
+  end
+end

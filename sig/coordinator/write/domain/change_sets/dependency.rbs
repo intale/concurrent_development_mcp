@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module Domain
+      module ChangeSets
+        class Dependency < Shared::Value
+          def dependency_id: () -> String
+          def producer_work_item_id: () -> String
+          def consumer_work_item_id: () -> String
+          def dependency_kind: () -> String
+          def required_output: () -> RequiredOutput?
+        end
+      end
+    end
+  end
+end

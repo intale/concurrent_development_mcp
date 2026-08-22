@@ -38,7 +38,6 @@ class CreateCoordinatorReadModels < ActiveRecord::Migration[8.1]
       t.string :status, null: false
       t.string :summary, null: false
       t.string :receipt, null: false
-      t.string :context_token, null: false
       t.jsonb :completion, null: false, default: {}
       t.datetime :completed_at_domain, null: false, precision: 6
       t.timestamps null: false, precision: 6

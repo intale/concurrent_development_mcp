@@ -1,0 +1,19 @@
+module Coordinator
+  module Processes
+    module Subscriptions
+      class ProcessManagerSet
+        SET_NAME: String
+
+        def initialize: (
+          manager: PgEventstore::SubscriptionsManager,
+          registrations: Array[Shared::Subscriptions::Registration],
+          ?contract: Shared::Contracts::SubscriptionSetRegistrations
+        ) -> void
+        def start: () -> PgEventstore::BasicRunner
+        def stop: () -> void
+        def subscription_names: () -> Array[String]
+        def processed_event_count: (String subscription_name) -> Integer
+      end
+    end
+  end
+end

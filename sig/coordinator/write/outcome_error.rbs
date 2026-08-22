@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    class OutcomeError < Shared::Value
+      def code: () -> Symbol
+      def message: () -> String
+      def details: () -> Hash[Symbol, untyped]
+    end
+  end
+end

@@ -1,0 +1,6 @@
+module Coordinator
+  module Read
+    class ProcessedProjectionEvent < ApplicationRecord
+    end
+  end
+end

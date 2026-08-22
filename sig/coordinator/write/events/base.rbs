@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class Base < Shared::Value
+        def self.event_type: () -> String
+        def self.schema_version: () -> Integer
+      end
+    end
+  end
+end

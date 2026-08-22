@@ -1,0 +1,8 @@
+module Coordinator
+  module Shared
+    class CanonicalJson
+      def encode: (untyped value) -> String
+      def sha256: (untyped value) -> String
+    end
+  end
+end

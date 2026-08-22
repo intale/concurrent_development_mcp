@@ -1,0 +1,7 @@
+module Coordinator
+  module Mcp
+    class TransportFactory
+      def call: (server: untyped, settings: Settings) -> untyped
+    end
+  end
+end

@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Domain
+      class EventWrite < Shared::Value
+        def stream: () -> StreamReference
+        def event: () -> Events::Base
+      end
+    end
+  end
+end

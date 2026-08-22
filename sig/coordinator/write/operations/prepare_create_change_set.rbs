@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Operations
+      class PrepareCreateChangeSet
+        def initialize: (?contract: Contracts::CreateChangeSet) -> void
+        %a{rbs:test:skip}
+        def call: (command_input input) -> untyped
+      end
+    end
+  end
+end

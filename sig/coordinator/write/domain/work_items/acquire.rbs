@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Domain
+      module WorkItems
+        class Acquire
+          def initialize: (?stream_factory: StreamFactory) -> void
+          def call: (change_set_state: ChangeSets::State, work_item_state: State, attempt_state: Attempts::State, command: Commands::AcquireWorkItem, occurred_at: String) -> untyped
+        end
+      end
+    end
+  end
+end

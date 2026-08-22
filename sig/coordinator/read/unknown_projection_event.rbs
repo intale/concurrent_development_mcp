@@ -1,0 +1,6 @@
+module Coordinator
+  module Read
+    class UnknownProjectionEvent < StandardError
+    end
+  end
+end

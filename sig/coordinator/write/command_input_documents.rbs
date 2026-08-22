@@ -1,0 +1,85 @@
+module Coordinator
+  module Write
+    module CommandInputDocuments
+      class ActorV1 < Shared::Value
+        def actor_kind: () -> String
+        def actor_id: () -> String
+      end
+
+      class BaseV1 < Shared::Value
+        def schema: () -> String
+        def command_id: () -> String
+      end
+
+      class CreateChangeSetInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def change_set_id: () -> String
+        def goal: () -> String
+        def acceptance_criteria: () -> Array[String]
+      end
+
+      class CreateChangeSetV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> CreateChangeSetInputV1
+      end
+
+      class CreateWorkItemInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def repository_id: () -> String
+        def goal: () -> String
+        def acceptance_criteria: () -> Array[String]
+      end
+
+      class CreateWorkItemV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> CreateWorkItemInputV1
+      end
+
+      class DeclareWorkItemDependencyInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def change_set_id: () -> String
+        def dependency_id: () -> String
+        def producer_work_item_id: () -> String
+        def consumer_work_item_id: () -> String
+        def dependency_kind: () -> String
+        def required_output: () -> RequiredOutput?
+      end
+
+      class DeclareWorkItemDependencyV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> DeclareWorkItemDependencyInputV1
+      end
+
+      class ActivateChangeSetInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def change_set_id: () -> String
+      end
+
+      class ActivateChangeSetV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> ActivateChangeSetInputV1
+      end
+
+      class RepositorySnapshotV1 < Shared::Value
+        def repository_id: () -> String
+        def object_format: () -> String
+        def commit_oid: () -> String
+      end
+
+      class AcquireWorkItemInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def attempt_id: () -> String
+        def base_snapshots: () -> Array[RepositorySnapshotV1]
+      end
+
+      class AcquireWorkItemV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> AcquireWorkItemInputV1
+      end
+    end
+  end
+end

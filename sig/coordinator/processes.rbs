@@ -1,0 +1,4 @@
+module Coordinator
+  module Processes
+  end
+end

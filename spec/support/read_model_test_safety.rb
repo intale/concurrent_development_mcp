@@ -12,9 +12,9 @@ module ReadModelTestSafety
 
   def clean!
     verify!
-    Coordinator::ReadModels::ProcessedProjectionEvent.delete_all
-    Coordinator::ReadModels::CommandReceipt.delete_all
-    Coordinator::ReadModels::CoordContextScope.delete_all
-    Coordinator::ReadModels::CoordContext.delete_all
+    Coordinator::Read::ProcessedProjectionEvent.delete_all
+    Coordinator::Read::CommandReceipt.delete_all
+    Coordinator::Read::CoordContextScope.delete_all
+    Coordinator::Read::CoordContext.delete_all
   end
 end

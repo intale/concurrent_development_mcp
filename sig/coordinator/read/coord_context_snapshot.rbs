@@ -1,0 +1,9 @@
+module Coordinator
+  module Read
+    class CoordContextSnapshot < Shared::Value
+      def state: () -> Projections::CoordContextStateV1
+      def source_positions: () -> Array[ProjectionBarrier]
+      def last_processed_at: () -> String
+    end
+  end
+end

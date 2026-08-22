@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Operations
+      class PrepareAcquireWorkItem
+        def initialize: (?contract: Contracts::AcquireWorkItem, ?git_object_ids_contract: Contracts::GitObjectIds) -> void
+        %a{rbs:test:skip}
+        def call: (command_input input) -> untyped
+      end
+    end
+  end
+end

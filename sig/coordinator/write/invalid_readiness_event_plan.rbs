@@ -1,0 +1,6 @@
+module Coordinator
+  module Write
+    class InvalidReadinessEventPlan < StandardError
+    end
+  end
+end

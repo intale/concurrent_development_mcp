@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    class EventStore
+      include _EventStore
+
+      def initialize: (client: PgEventstore::Client, ?pg_stream_factory: PgStreamFactory) -> void
+    end
+  end
+end

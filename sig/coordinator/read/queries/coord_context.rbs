@@ -1,0 +1,18 @@
+module Coordinator
+  module Read
+    module Queries
+      class CoordContext
+        def initialize: (
+          ?contract: Contracts::CoordContext,
+          ?contexts: Repositories::CoordContexts,
+          ?scope_builder: ContextScopeBuilder,
+          ?blockers_builder: ContextBlockersBuilder,
+          ?next_actions_builder: ContextNextActionsBuilder,
+          ?canonical_json: Shared::CanonicalJson
+        ) -> void
+        %a{rbs:test:skip}
+        def call: (command_input input) -> untyped
+      end
+    end
+  end
+end

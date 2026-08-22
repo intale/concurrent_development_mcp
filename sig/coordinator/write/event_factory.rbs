@@ -1,0 +1,8 @@
+module Coordinator
+  module Write
+    class EventFactory
+      def initialize: (?registry: EventSchemaRegistry) -> void
+      def build!: (event: Events::Base, event_id: String, metadata: EventMetadata, markers: Array[String], ?caused_by: PgEventstore::Event?) -> PgEventstore::Event
+    end
+  end
+end

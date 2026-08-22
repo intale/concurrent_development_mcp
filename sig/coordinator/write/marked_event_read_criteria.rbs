@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    class MarkedEventReadCriteria < Shared::Value
+      def event_type: () -> String
+      def marker: () -> String
+      def maximum_count: () -> Integer
+      def direction: () -> Symbol
+      def query_max_count: () -> Integer
+    end
+  end
+end

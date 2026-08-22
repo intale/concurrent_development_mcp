@@ -1,0 +1,10 @@
+module Coordinator
+  module Read
+    module Repositories
+      class CoordContexts
+        def fetch: (String change_set_id) -> CoordContextSnapshot?
+        def resolve: (scope_kind: String, scope_id: String) -> CoordContextSnapshot?
+      end
+    end
+  end
+end

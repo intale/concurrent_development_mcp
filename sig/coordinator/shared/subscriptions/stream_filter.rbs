@@ -1,0 +1,10 @@
+module Coordinator
+  module Shared
+    module Subscriptions
+      class StreamFilter < Value
+        def context: () -> String
+        def stream_name: () -> String
+      end
+    end
+  end
+end

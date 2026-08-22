@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Commands
+      class AcquireWorkItem < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def attempt_id: () -> String
+        def base_snapshots: () -> Array[RepositorySnapshotV1]
+      end
+    end
+  end
+end

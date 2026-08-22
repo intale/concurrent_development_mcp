@@ -1,0 +1,7 @@
+module Coordinator
+  module Shared
+    class IdGenerator
+      include _IdGenerator
+    end
+  end
+end

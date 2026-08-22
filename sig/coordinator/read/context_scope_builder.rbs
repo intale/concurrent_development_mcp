@@ -1,0 +1,7 @@
+module Coordinator
+  module Read
+    class ContextScopeBuilder
+      def call: (CoordContextQueryV1 query, Projections::CoordContextStateV1 state) -> ContextTokenDocument::scope?
+    end
+  end
+end

@@ -1,0 +1,8 @@
+module Coordinator
+  module Read
+    class CommandCompletionLookup
+      def initialize: (?receipts: Repositories::CommandReceipts) -> void
+      def fetch: (String command_id) -> Write::Events::CommandCompletedV1?
+    end
+  end
+end

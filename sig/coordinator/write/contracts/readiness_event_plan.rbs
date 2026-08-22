@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Contracts
+      class ReadinessEventPlan
+        def call: (command_input) -> untyped
+      end
+    end
+  end
+end

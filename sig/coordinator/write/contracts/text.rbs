@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Contracts
+      module Text
+        def self.valid?: (untyped value, max_size: Integer) -> bool
+      end
+    end
+  end
+end

@@ -1,0 +1,8 @@
+module Coordinator
+  module Write
+    class RequiredOutput < Shared::Value
+      def kind: () -> String
+      def key: () -> String
+    end
+  end
+end

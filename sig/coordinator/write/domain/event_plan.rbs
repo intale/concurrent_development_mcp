@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Domain
+      class EventPlan < Shared::Value
+        def writes: () -> Array[EventWrite]
+        def events: () -> Array[Events::Base]
+      end
+    end
+  end
+end

@@ -1,0 +1,7 @@
+module Coordinator
+  module Shared
+    class SystemClock
+      include _Clock
+    end
+  end
+end

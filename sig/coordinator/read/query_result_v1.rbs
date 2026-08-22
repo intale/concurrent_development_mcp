@@ -1,0 +1,43 @@
+module Coordinator
+  module Read
+    class QueryResultV1 < Shared::Value
+      class EmptyData < Shared::Value
+      end
+
+      class DomainError < Shared::Value
+        def code: () -> String
+        def message: () -> String
+        def details: () -> Hash[Symbol | String, untyped]
+      end
+
+      class OperationData < Shared::Value
+        def result: () -> Write::CommandReceiptData::value
+        def emitted_events: () -> Array[Write::EventReference]
+      end
+
+      class ContextData < Shared::Value
+        def scope: () -> ContextTokenDocument::scope
+        def context: () -> Projections::CoordContextStateV1
+        def blockers: () -> Array[ContextBlockerV1]
+        def last_processed_at: () -> String
+      end
+
+      class NotModifiedData < Shared::Value
+        def scope: () -> ContextTokenDocument::scope
+        def last_processed_at: () -> String
+      end
+
+      type data = EmptyData | DomainError | OperationData | ContextData | NotModifiedData
+      type action = Write::NextAction | NextAction
+
+      def status: () -> String
+      def summary: () -> String
+      def command_id: () -> String?
+      def receipt: () -> String?
+      def context_token: () -> String?
+      def data: () -> data
+      def warnings: () -> Array[String]
+      def next_actions: () -> Array[action]
+    end
+  end
+end
