@@ -13,7 +13,6 @@ module Coordinator::Processes
         key.failure("must be ChangeSetActivated@1") unless activation_schema?(value)
         key.failure("must belong to the ChangeSet stream") unless activation_stream?(value)
         key.failure("must identify the same ChangeSet in stream and payload") unless matching_change_set?(value)
-        key.failure("must carry the root command correlation ID") unless valid_correlation?(value)
         key.failure("must carry a pg_eventstore trace correlation ID") unless valid_trace_correlation?(value)
       end
 
@@ -35,10 +34,6 @@ module Coordinator::Processes
         change_set_id = event.data["change_set_id"]
 
         Types::IDENTIFIER_PATTERN.match?(change_set_id.to_s) && change_set_id == stream_id
-      end
-
-      def valid_correlation?(event)
-        Types::IDENTIFIER_PATTERN.match?(event.metadata["correlation_id"].to_s)
       end
 
       def valid_trace_correlation?(event)

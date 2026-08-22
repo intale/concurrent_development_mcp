@@ -16,7 +16,6 @@ RSpec.describe Coordinator::Write::EventFactory do
       actor_kind: "agent",
       actor_id: "planner-1",
       recorded_by: "coordinator",
-      correlation_id: "cmd-100",
       policy_version: nil
     )
   end
@@ -43,7 +42,6 @@ RSpec.describe Coordinator::Write::EventFactory do
       "actor_kind" => "agent",
       "actor_id" => "planner-1",
       "recorded_by" => "coordinator",
-      "correlation_id" => "cmd-100",
       "schema_version" => 1
     )
     expect(event.markers).to eq([ "change-set:CS-100", "command:cmd-100" ])

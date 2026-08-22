@@ -74,7 +74,6 @@ module Coordinator::Write
             actor_kind: target_command.actor.kind,
             actor_id: target_command.actor.id,
             recorded_by: "coordinator",
-            correlation_id: "task:#{event.task_id}",
             policy_version: "coordination-task/v1"
           ),
           markers: [

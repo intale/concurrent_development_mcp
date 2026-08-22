@@ -1,0 +1,9 @@
+module Coordinator
+  module Processes
+    module Subscriptions
+      class CoordinationTaskExecutor < Shared::Subscriptions::Registration
+        def initialize: (handler: ProcessManagers::CoordinationTaskExecutor, ?pull_interval: Float) -> void
+      end
+    end
+  end
+end

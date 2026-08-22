@@ -33,9 +33,15 @@ module Coordinator::Write
 
       def call(input)
         command = step @preparer.call(input)
-        prepared = prepare_logical_values(command)
+        step call_command(command)
+      end
 
-        step @event_store.multiple { execute_attempt(command:, prepared:) }
+      def call_command(command, caused_by: nil)
+        steps do
+          prepared = prepare_logical_values(command)
+
+          step @event_store.multiple { execute_attempt(command:, prepared:, caused_by:) }
+        end
       end
 
       private
@@ -49,7 +55,7 @@ module Coordinator::Write
         )
       end
 
-      def execute_attempt(command:, prepared:)
+      def execute_attempt(command:, prepared:, caused_by:)
         replay = replay_result(command:, input_digest: prepared.input_digest)
         return replay if replay
 
@@ -62,14 +68,24 @@ module Coordinator::Write
         )
         return decision if decision.failure?
 
-        persisted_domain_events = persist_domain_plan(decision.value!, command:, prepared:)
+        persisted_domain_events = persist_domain_plan(
+          decision.value!,
+          command:,
+          prepared:,
+          caused_by:
+        )
         completion = @completion_builder.work_item_acquire(
           command:,
           input_digest: prepared.input_digest,
           persisted_events: persisted_domain_events,
           completed_at: prepared.occurred_at
         )
-        persist_completion(completion, command:, event_id: prepared.completion_event_id)
+        persist_completion(
+          completion,
+          command:,
+          event_id: prepared.completion_event_id,
+          caused_by:
+        )
 
         Success(completion)
       end
@@ -142,7 +158,7 @@ module Coordinator::Write
         )
       end
 
-      def persist_domain_plan(plan, command:, prepared:)
+      def persist_domain_plan(plan, command:, prepared:, caused_by:)
         work_item_stream = @stream_factory.work_item(command.work_item_id)
         attempt_stream = @stream_factory.attempt(command.attempt_id)
         verify_event_plan!(plan, command:, work_item_stream:, attempt_stream:)
@@ -153,7 +169,8 @@ module Coordinator::Write
             event: write.event,
             event_id:,
             metadata:,
-            markers: event_markers(command)
+            markers: event_markers(command),
+            caused_by:
           )
 
           @event_store.append(write.stream, [ event ]).fetch(0)
@@ -177,12 +194,13 @@ module Coordinator::Write
         ]
       end
 
-      def persist_completion(completion, command:, event_id:)
+      def persist_completion(completion, command:, event_id:, caused_by:)
         event = @event_factory.build!(
           event: completion,
           event_id:,
           metadata: command_metadata(command),
-          markers: [ "command:#{command.command_id}" ]
+          markers: [ "command:#{command.command_id}" ],
+          caused_by:
         )
 
         @event_store.append(@stream_factory.command(command.command_id), [ event ])
@@ -194,7 +212,6 @@ module Coordinator::Write
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
-          correlation_id: command.command_id,
           policy_version: nil
         )
       end

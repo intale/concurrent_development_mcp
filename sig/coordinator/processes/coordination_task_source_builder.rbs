@@ -1,0 +1,8 @@
+module Coordinator
+  module Processes
+    class CoordinationTaskSourceBuilder
+      def initialize: (?contract: Contracts::CoordinationTaskSourceEvent, ?schema_registry: Write::EventSchemaRegistry) -> void
+      def call: (PgEventstore::Event event) -> CoordinationTaskSource
+    end
+  end
+end

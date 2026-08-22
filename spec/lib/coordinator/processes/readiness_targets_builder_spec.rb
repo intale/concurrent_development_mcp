@@ -20,8 +20,7 @@ RSpec.describe Coordinator::Processes::ReadinessTargetsBuilder do
         work_item_count: 2,
         dependency_count: 0,
         activated_at: "2026-08-20T14:15:00.000000Z"
-      ),
-      correlation_id: "cmd-250"
+      )
     )
   end
   let(:memberships) do

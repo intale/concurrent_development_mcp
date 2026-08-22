@@ -81,6 +81,22 @@ module Coordinator
       Write::EventStore.new(client: PgEventstore.client)
     end
 
+    register("tasks.loader", memoize: true) do
+      Write::Tasks::Loader.new(
+        event_store: self["event_store"],
+        stream_factory: self["stream_factory"],
+        schema_registry: self["event_schema_registry"]
+      )
+    end
+
+    register("tasks.target_command_builder", memoize: true) do
+      Write::Tasks::TargetCommandBuilder.new
+    end
+
+    register("tasks.tool_result_mapper", memoize: true) do
+      Write::Tasks::ToolResultMapper.new
+    end
+
     register("repositories.processed_projection_events", memoize: true) do
       Read::Repositories::ProcessedProjectionEvents.new
     end
@@ -225,6 +241,73 @@ module Coordinator
       )
     end
 
+    register("tasks.target_executor", memoize: true) do
+      Write::Tasks::TargetExecutor.new(
+        event_store: self["event_store"],
+        create_change_set: self["operations.execute_create_change_set"],
+        create_work_item: self["operations.execute_create_work_item"],
+        declare_work_item_dependency: self["operations.execute_declare_work_item_dependency"],
+        activate_change_set: self["operations.execute_activate_change_set"],
+        acquire_work_item: self["operations.execute_acquire_work_item"]
+      )
+    end
+
+    register("operations.apply_coordination_task_transition", memoize: true) do
+      Write::Operations::ApplyCoordinationTaskTransition.new(
+        event_store: self["event_store"],
+        loader: self["tasks.loader"],
+        stream_factory: self["stream_factory"],
+        event_factory: self["event_factory"],
+        id_generator: self["id_generator"]
+      )
+    end
+
+    register("operations.submit_coordination_task") do
+      Write::Operations::SubmitCoordinationTask.new(
+        event_store: self["event_store"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("operations.start_coordination_task", memoize: true) do
+      Write::Operations::StartCoordinationTask.new(
+        transition: self["operations.apply_coordination_task_transition"],
+        clock: self["clock"]
+      )
+    end
+
+    register("operations.record_coordination_task_outcome", memoize: true) do
+      Write::Operations::RecordCoordinationTaskOutcome.new(
+        transition: self["operations.apply_coordination_task_transition"],
+        clock: self["clock"]
+      )
+    end
+
+    register("operations.cancel_coordination_task") do
+      Write::Operations::CancelCoordinationTask.new(
+        transition: self["operations.apply_coordination_task_transition"],
+        clock: self["clock"]
+      )
+    end
+
+    register("operations.get_coordination_task") do
+      Write::Operations::GetCoordinationTask.new(loader: self["tasks.loader"])
+    end
+
+    register("operations.acknowledge_task_input") do
+      Write::Operations::AcknowledgeTaskInput.new(loader: self["tasks.loader"])
+    end
+
+    register("coordination_task_source_builder", memoize: true) do
+      Processes::CoordinationTaskSourceBuilder.new(
+        schema_registry: self["event_schema_registry"]
+      )
+    end
+
 
     register("process_managers.change_set_readiness", memoize: true) do
       Processes::ProcessManagers::ChangeSetReadiness.new(
@@ -238,8 +321,29 @@ module Coordinator
       )
     end
 
+    register("process_managers.coordination_task_executor", memoize: true) do
+      Processes::ProcessManagers::CoordinationTaskExecutor.new(
+        event_store: self["event_store"],
+        source_builder: self["coordination_task_source_builder"],
+        task_loader: self["tasks.loader"],
+        transition: self["operations.apply_coordination_task_transition"],
+        start_task: self["operations.start_coordination_task"],
+        record_outcome: self["operations.record_coordination_task_outcome"],
+        target_command_builder: self["tasks.target_command_builder"],
+        target_executor: self["tasks.target_executor"],
+        tool_result_mapper: self["tasks.tool_result_mapper"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
     register("subscriptions.change_set_readiness", memoize: true) do
       Processes::Subscriptions::ChangeSetReadiness.new(handler: self["process_managers.change_set_readiness"])
+    end
+
+    register("subscriptions.coordination_task_executor", memoize: true) do
+      Processes::Subscriptions::CoordinationTaskExecutor.new(
+        handler: self["process_managers.coordination_task_executor"]
+      )
     end
 
     register("subscriptions.coord_context", memoize: true) do
@@ -259,7 +363,10 @@ module Coordinator
     register("subscription_sets.process_managers", memoize: true) do
       Processes::Subscriptions::ProcessManagerSet.new(
         manager: self["subscription_managers.process_managers"],
-        registrations: [ self["subscriptions.change_set_readiness"] ]
+        registrations: [
+          self["subscriptions.change_set_readiness"],
+          self["subscriptions.coordination_task_executor"]
+        ]
       )
     end
 

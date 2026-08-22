@@ -5,7 +5,6 @@ module Coordinator
       def actor_kind: () -> String
       def actor_id: () -> String
       def recorded_by: () -> String
-      def correlation_id: () -> String
       def policy_version: () -> String?
     end
   end

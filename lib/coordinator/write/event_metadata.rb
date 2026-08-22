@@ -6,7 +6,6 @@ module Coordinator::Write
     attribute :actor_kind, Types::ActorKind
     attribute :actor_id, Types::Identifier
     attribute :recorded_by, Types::String.enum("coordinator")
-    attribute :correlation_id, Types::Identifier
     attribute :policy_version, Types::String.optional
   end
 end

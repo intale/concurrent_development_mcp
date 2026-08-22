@@ -5,6 +5,7 @@ module Coordinator
         def initialize: (event_store: _EventStore, ?preparer: PrepareDeclareWorkItemDependency, ?decider: Domain::ChangeSets::DeclareWorkItemDependency, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?completion_builder: CommandCompletionBuilder) -> void
         %a{rbs:test:skip}
         def call: (command_input input) -> Dry::Monads::Result
+        def call_command: (Commands::DeclareWorkItemDependency command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
       end
     end
   end

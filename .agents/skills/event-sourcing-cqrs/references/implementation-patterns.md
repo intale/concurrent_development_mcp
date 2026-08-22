@@ -52,6 +52,8 @@ tasks/get
 ## Process managers and subscriptions
 
 - Give each event-to-command reaction a deterministic decision identity derived from the complete source event identity and target command purpose.
+- Pass the actual persisted immediate parent event as `caused_by` when a command emits the next event in a Saga. Let `PgEventstore::Middleware::EventTracing` derive `causation_id` from that parent and propagate one `correlation_id` across the connected chain.
+- Read tracing values through `PgEventstore::Event#causation_id` and `#correlation_id`. Do not duplicate them under application-owned metadata keys such as `metadata["correlation_id"]` or manually compete with the tracing middleware.
 - Use DCB plus a decision marker only when the modeled idempotency invariant spans a dynamic set. Otherwise a task/command stream and stable command ID are sufficient.
 - Stack subscriptions in one manager per semantic set. Keep `(subscription_set, subscription_name)` globally intentional and unique within the set.
 - Prefer separate semantic sets for process managers and read projectors; split them into separate OS processes only for measured capacity/isolation needs.

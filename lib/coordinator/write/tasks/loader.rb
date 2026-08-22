@@ -28,7 +28,8 @@ module Coordinator::Write
 
         Snapshot.new(
           state: Domain::CoordinationTasks::State.reduce(payloads),
-          latest_revision: events.last&.stream_revision
+          latest_revision: events.last&.stream_revision,
+          persisted_events: events
         )
       end
     end

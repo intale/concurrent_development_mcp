@@ -1,0 +1,89 @@
+# frozen_string_literal: true
+
+module Coordinator::Write
+  module Tasks
+    class TargetCommandBuilder
+      def call(document)
+        case document
+        when CommandInputDocuments::CreateChangeSetV1
+          build_create_change_set(document)
+        when CommandInputDocuments::CreateWorkItemV1
+          build_create_work_item(document)
+        when CommandInputDocuments::DeclareWorkItemDependencyV1
+          build_declare_work_item_dependency(document)
+        when CommandInputDocuments::ActivateChangeSetV1
+          build_activate_change_set(document)
+        when CommandInputDocuments::AcquireWorkItemV1
+          build_acquire_work_item(document)
+        end
+      end
+
+      private
+
+      def build_create_change_set(document)
+        input = document.input
+        Commands::CreateChangeSet.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          change_set_id: input.change_set_id,
+          goal: input.goal,
+          acceptance_criteria: input.acceptance_criteria
+        )
+      end
+
+      def build_create_work_item(document)
+        input = document.input
+        Commands::CreateWorkItem.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          change_set_id: input.change_set_id,
+          work_item_id: input.work_item_id,
+          repository_id: input.repository_id,
+          goal: input.goal,
+          acceptance_criteria: input.acceptance_criteria
+        )
+      end
+
+      def build_declare_work_item_dependency(document)
+        input = document.input
+        Commands::DeclareWorkItemDependency.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          change_set_id: input.change_set_id,
+          dependency_id: input.dependency_id,
+          producer_work_item_id: input.producer_work_item_id,
+          consumer_work_item_id: input.consumer_work_item_id,
+          dependency_kind: input.dependency_kind,
+          required_output: input.required_output
+        )
+      end
+
+      def build_activate_change_set(document)
+        input = document.input
+        Commands::ActivateChangeSet.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          change_set_id: input.change_set_id
+        )
+      end
+
+      def build_acquire_work_item(document)
+        input = document.input
+        Commands::AcquireWorkItem.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          change_set_id: input.change_set_id,
+          work_item_id: input.work_item_id,
+          attempt_id: input.attempt_id,
+          base_snapshots: input.base_snapshots.map do |snapshot|
+            RepositorySnapshotV1.new(snapshot.to_h)
+          end
+        )
+      end
+
+      def build_actor(actor)
+        Commands::Actor.new(kind: actor.actor_kind, id: actor.actor_id)
+      end
+    end
+  end
+end

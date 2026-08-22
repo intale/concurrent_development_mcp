@@ -92,7 +92,6 @@ RSpec.describe Coordinator::Write::Operations::ExpectedRevisionRetry, :event_sto
             actor_kind: "system",
             actor_id: "coordinator",
             recorded_by: "coordinator",
-            correlation_id: "task:#{task_id}",
             policy_version: "coordination-task/v1"
           ),
           markers: [ "task:#{task_id}" ]

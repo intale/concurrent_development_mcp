@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
 module Coordinator::Processes
-  class ChangeSetActivationSourceBuilder
+  class CoordinationTaskSourceBuilder
     def initialize(
-      contract: Contracts::ChangeSetActivationSourceEvent.new,
+      contract: Contracts::CoordinationTaskSourceEvent.new,
       schema_registry: Coordinator::Write::EventSchemaRegistry.new
     )
       @contract = contract
@@ -20,7 +20,7 @@ module Coordinator::Processes
         data: event.data
       )
 
-      ChangeSetActivationSource.new(
+      CoordinationTaskSource.new(
         event:,
         reference: Coordinator::Write::EventReference.new(
           event_id: event.id,
@@ -32,7 +32,9 @@ module Coordinator::Processes
         ),
         payload:
       )
-    rescue Dry::Struct::Error, Coordinator::Write::EventSchemaRegistry::UnknownSchema, Coordinator::Write::EventSchemaRegistry::SchemaMismatch => error
+    rescue Dry::Struct::Error,
+           Coordinator::Write::EventSchemaRegistry::UnknownSchema,
+           Coordinator::Write::EventSchemaRegistry::SchemaMismatch => error
       raise InvalidSourceEvent, error.message
     end
   end

@@ -5,6 +5,7 @@ module Coordinator::Write
     class Snapshot < Value
       attribute :state, Types.Instance(Domain::CoordinationTasks::State)
       attribute :latest_revision, Types::Integer.optional
+      attribute :persisted_events, Types::Array.of(Types.Instance(PgEventstore::Event)).constrained(max_size: 4)
     end
   end
 end

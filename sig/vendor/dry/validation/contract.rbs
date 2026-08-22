@@ -1,0 +1,7 @@
+module Dry
+  module Validation
+    class Contract
+      def call: (*untyped, **untyped) -> Result
+    end
+  end
+end

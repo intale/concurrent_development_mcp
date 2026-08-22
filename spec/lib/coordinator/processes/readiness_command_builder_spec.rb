@@ -25,8 +25,7 @@ RSpec.describe Coordinator::Processes::ReadinessCommandBuilder do
     Coordinator::Processes::ChangeSetActivationSource.new(
       event: PgEventstore::Event.new(id: source_reference.event_id, type: "ChangeSetActivated"),
       reference: source_reference,
-      payload: source_payload,
-      correlation_id: "cmd-250"
+      payload: source_payload
     )
   end
 

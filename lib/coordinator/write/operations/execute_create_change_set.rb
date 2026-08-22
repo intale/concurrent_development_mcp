@@ -31,9 +31,15 @@ module Coordinator::Write
 
       def call(input)
         command = step @preparer.call(input)
-        prepared = prepare_logical_values(command)
+        step call_command(command)
+      end
 
-        step @event_store.multiple { execute_attempt(command:, prepared:) }
+      def call_command(command, caused_by: nil)
+        steps do
+          prepared = prepare_logical_values(command)
+
+          step @event_store.multiple { execute_attempt(command:, prepared:, caused_by:) }
+        end
       end
 
       private
@@ -47,7 +53,7 @@ module Coordinator::Write
         }.freeze
       end
 
-      def execute_attempt(command:, prepared:)
+      def execute_attempt(command:, prepared:, caused_by:)
         replay = replay_result(command:, input_digest: prepared.fetch(:input_digest))
         return replay if replay
 
@@ -58,7 +64,8 @@ module Coordinator::Write
         persisted_domain_events = persist_domain_plan(
           decision.value!,
           command:,
-          event_ids: prepared.fetch(:domain_event_ids)
+          event_ids: prepared.fetch(:domain_event_ids),
+          caused_by:
         )
         completion = @completion_builder.create_change_set(
           command:,
@@ -69,7 +76,8 @@ module Coordinator::Write
         persist_completion(
           completion,
           command:,
-          event_id: prepared.fetch(:completion_event_id)
+          event_id: prepared.fetch(:completion_event_id),
+          caused_by:
         )
 
         Success(completion)
@@ -127,7 +135,7 @@ module Coordinator::Write
         Domain::ChangeSets::State.reduce(events)
       end
 
-      def persist_domain_plan(plan, command:, event_ids:)
+      def persist_domain_plan(plan, command:, event_ids:, caused_by:)
         unless plan.writes.length == event_ids.length
           raise "Prepared event ID count does not match the decided write plan"
         end
@@ -144,19 +152,21 @@ module Coordinator::Write
             markers: [
               "change-set:#{command.change_set_id}",
               "command:#{command.command_id}"
-            ]
+            ],
+            caused_by:
           )
         end
 
         @event_store.append(streams.first, events)
       end
 
-      def persist_completion(completion, command:, event_id:)
+      def persist_completion(completion, command:, event_id:, caused_by:)
         event = @event_factory.build!(
           event: completion,
           event_id:,
           metadata: command_metadata(command),
-          markers: [ "command:#{command.command_id}" ]
+          markers: [ "command:#{command.command_id}" ],
+          caused_by:
         )
 
         @event_store.append(@stream_factory.command(command.command_id), [ event ])
@@ -168,7 +178,6 @@ module Coordinator::Write
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
-          correlation_id: command.command_id,
           policy_version: nil
         )
       end

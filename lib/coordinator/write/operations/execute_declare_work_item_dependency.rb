@@ -31,9 +31,15 @@ module Coordinator::Write
 
       def call(input)
         command = step @preparer.call(input)
-        prepared = prepare_logical_values(command)
+        step call_command(command)
+      end
 
-        step @event_store.multiple { execute_attempt(command:, prepared:) }
+      def call_command(command, caused_by: nil)
+        steps do
+          prepared = prepare_logical_values(command)
+
+          step @event_store.multiple { execute_attempt(command:, prepared:, caused_by:) }
+        end
       end
 
       private
@@ -47,7 +53,7 @@ module Coordinator::Write
         }.freeze
       end
 
-      def execute_attempt(command:, prepared:)
+      def execute_attempt(command:, prepared:, caused_by:)
         replay = replay_result(command:, input_digest: prepared.fetch(:input_digest))
         return replay if replay
 
@@ -61,7 +67,8 @@ module Coordinator::Write
         persisted_domain_events = persist_domain_plan(
           decision.value!,
           command:,
-          event_id: prepared.fetch(:domain_event_id)
+          event_id: prepared.fetch(:domain_event_id),
+          caused_by:
         )
         completion = @completion_builder.work_item_dependency_declare(
           command:,
@@ -69,7 +76,12 @@ module Coordinator::Write
           persisted_events: persisted_domain_events,
           completed_at: prepared.fetch(:occurred_at)
         )
-        persist_completion(completion, command:, event_id: prepared.fetch(:completion_event_id))
+        persist_completion(
+          completion,
+          command:,
+          event_id: prepared.fetch(:completion_event_id),
+          caused_by:
+        )
 
         Success(completion)
       end
@@ -124,7 +136,7 @@ module Coordinator::Write
         )
       end
 
-      def persist_domain_plan(plan, command:, event_id:)
+      def persist_domain_plan(plan, command:, event_id:, caused_by:)
         expected_stream = @stream_factory.change_set(command.change_set_id)
         write = plan.writes.sole
         unless write.stream == expected_stream
@@ -141,18 +153,20 @@ module Coordinator::Write
             "dependency:#{command.dependency_id}",
             "work-item:#{command.producer_work_item_id}",
             "work-item:#{command.consumer_work_item_id}"
-          ]
+          ],
+          caused_by:
         )
 
         @event_store.append(write.stream, [ event ])
       end
 
-      def persist_completion(completion, command:, event_id:)
+      def persist_completion(completion, command:, event_id:, caused_by:)
         event = @event_factory.build!(
           event: completion,
           event_id:,
           metadata: command_metadata(command),
-          markers: [ "command:#{command.command_id}" ]
+          markers: [ "command:#{command.command_id}" ],
+          caused_by:
         )
 
         @event_store.append(@stream_factory.command(command.command_id), [ event ])
@@ -164,7 +178,6 @@ module Coordinator::Write
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
-          correlation_id: command.command_id,
           policy_version: nil
         )
       end

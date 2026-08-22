@@ -141,7 +141,6 @@ module Coordinator::Write
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
-          correlation_id: invocation.correlation_id,
           policy_version: command.policy_version
         )
       end

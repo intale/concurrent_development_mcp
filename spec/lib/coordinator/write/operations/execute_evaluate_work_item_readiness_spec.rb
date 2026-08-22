@@ -37,7 +37,6 @@ RSpec.describe Coordinator::Write::Operations::ExecuteEvaluateWorkItemReadiness,
       "command_id" => command.command_id,
       "actor_kind" => "system",
       "actor_id" => "change-set-readiness",
-      "correlation_id" => "seed-activate-CS-100",
       "policy_version" => "change-set-readiness/v1",
       "schema_version" => 1
     )
@@ -144,8 +143,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteEvaluateWorkItemReadiness,
       command:,
       source_event: source.event,
       source_reference: source.reference,
-      source_change_set_id: source.payload.change_set_id,
-      correlation_id: source.correlation_id
+      source_change_set_id: source.payload.change_set_id
     )
   end
 

@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Tasks
+      class TargetCommandBuilder
+        def call: (CommandInputDocuments::value document) -> coordination_command
+      end
+    end
+  end
+end

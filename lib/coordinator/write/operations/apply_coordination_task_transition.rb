@@ -32,7 +32,13 @@ module Coordinator::Write
           event = decision.value!
           next Success(snapshot.state) unless event
 
-          append(event:, snapshot:, transition_name:, event_id:, caused_by:)
+          append(
+            event:,
+            snapshot:,
+            transition_name:,
+            event_id:,
+            caused_by: caused_by || snapshot.persisted_events.first
+          )
           Success(snapshot.state.apply(event))
         end
       end
@@ -49,7 +55,6 @@ module Coordinator::Write
             actor_kind: "system",
             actor_id: "coordinator",
             recorded_by: "coordinator",
-            correlation_id: "task:#{task_id}",
             policy_version: "coordination-task/v1"
           ),
           markers: [ "task:#{task_id}" ],

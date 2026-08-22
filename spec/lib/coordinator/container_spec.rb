@@ -15,6 +15,7 @@ RSpec.describe Coordinator::Container do
     readiness_operation = described_class["operations.execute_evaluate_work_item_readiness"]
     acquisition_operation = described_class["operations.execute_acquire_work_item"]
     readiness_process_manager = described_class["process_managers.change_set_readiness"]
+    task_executor = described_class["process_managers.coordination_task_executor"]
     subscription_manager = described_class["subscription_managers.process_managers"]
     subscription_set = described_class["subscription_sets.process_managers"]
     read_model_manager = described_class["subscription_managers.read_models"]
@@ -30,9 +31,12 @@ RSpec.describe Coordinator::Container do
     expect(readiness_operation).to be_a(Coordinator::Write::Operations::ExecuteEvaluateWorkItemReadiness)
     expect(acquisition_operation).to be_a(Coordinator::Write::Operations::ExecuteAcquireWorkItem)
     expect(readiness_process_manager).to be_a(Coordinator::Processes::ProcessManagers::ChangeSetReadiness)
+    expect(task_executor).to be_a(Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor)
     expect(subscription_manager).to be_a(PgEventstore::SubscriptionsManager)
     expect(subscription_set).to be_a(Coordinator::Processes::Subscriptions::ProcessManagerSet)
-    expect(subscription_set.subscription_names).to eq([ "change-set-readiness-v1" ])
+    expect(subscription_set.subscription_names).to eq(
+      [ "change-set-readiness-v1", "coordination-task-executor-v1" ]
+    )
     expect(read_model_manager).to be_a(PgEventstore::SubscriptionsManager)
     expect(read_model_set).to be_a(Coordinator::Read::Subscriptions::ReadModelSet)
     expect(read_model_set.subscription_names).to eq([ "command-receipts-v1", "coord-context-v1" ])
