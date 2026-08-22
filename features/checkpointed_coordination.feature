@@ -69,3 +69,13 @@ Feature: Checkpointed cooperative coordination
       And the previous context remains available before expansion projection
       When the write-set expansion reaches the read side
       Then available context exposes both observed files without a freshness claim
+
+  Rule: An agent renews its complete observed lease set
+
+    Scenario: A durable renewal extends ownership while an older context remains available
+      Given agent "agent-a" has reserved "app/a.rb" and "app/b.rb" for renewable Attempt "A-CUC-RENEW" in ChangeSet "CS-CUC-RENEW"
+      When the agent renews the complete observed lease set
+      Then the renewal Task succeeds without changing lease identities or fencing tokens
+      And the previous context remains available before renewal projection
+      When the write-set renewal reaches the read side
+      Then available context exposes the later observed deadline without a freshness claim

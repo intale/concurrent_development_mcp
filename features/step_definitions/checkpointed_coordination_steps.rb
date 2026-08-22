@@ -530,3 +530,164 @@ Then("available context exposes both observed files without a freshness claim") 
     "Expanded projection must not claim freshness or activity"
   )
 end
+
+Given(
+  "agent {string} has reserved {string} and {string} for renewable Attempt {string} in ChangeSet {string}"
+) do |agent_id, first_path, second_path, attempt_id, change_set_id|
+  @renewal_agent_id = agent_id
+  @renewal_paths = [ first_path, second_path ]
+  @renewal_attempt_id = attempt_id
+  @renewal_change_set_id = change_set_id
+  @renewal_work_item_id = "W-CUC-RENEW"
+
+  submit_and_execute(
+    "change_set_create",
+    command_id: "cmd-cuc-renew-create",
+    actor: { kind: "agent", id: "planner-1" },
+    change_set_id:,
+    goal: "Coordinate complete lease-set renewal",
+    acceptance_criteria: [ "Renewal preserves every lease identity" ]
+  )
+  submit_and_execute(
+    "work_item_create",
+    command_id: "cmd-cuc-renew-work-item",
+    actor: { kind: "agent", id: "planner-1" },
+    change_set_id:,
+    work_item_id: @renewal_work_item_id,
+    repository_id: "billing",
+    goal: "Implement the renewable change",
+    acceptance_criteria: [ "Both files remain owned together" ]
+  )
+  submit_and_execute(
+    "change_set_activate",
+    command_id: "cmd-cuc-renew-activate",
+    actor: { kind: "agent", id: "planner-1" },
+    change_set_id:
+  )
+  activation = change_set_events(change_set_id).find { _1.type == "ChangeSetActivated" }
+  Coordinator::Container["process_managers.change_set_readiness"].call(activation)
+  submit_and_execute(
+    "work_item_acquire",
+    command_id: "cmd-cuc-renew-acquire",
+    actor: { kind: "agent", id: agent_id },
+    change_set_id:,
+    work_item_id: @renewal_work_item_id,
+    attempt_id:,
+    base_snapshots: [ { repository_id: "billing", commit_oid: "a" * 40 } ]
+  )
+  reservation_task_id = submit_and_execute(
+    "write_set_reserve",
+    command_id: "cmd-cuc-renew-reserve",
+    actor: { kind: "agent", id: agent_id },
+    change_set_id:,
+    work_item_id: @renewal_work_item_id,
+    attempt_id:,
+    repository_id: "billing",
+    base_commit_oid: "a" * 40,
+    resources: @renewal_paths.map { { kind: "file", path: _1 } },
+    lease_duration_seconds: 300
+  )
+  @renewal_reservation = task_request("tasks/get", reservation_task_id).dig(
+    "result", "result", "structuredContent", "data"
+  )
+
+  project_attempt_context(
+    change_set_id:,
+    work_item_id: @renewal_work_item_id,
+    attempt_id:
+  )
+  @context_before_renewal = call_tool("coord_context", { attempt_id: })
+end
+
+When("the agent renews the complete observed lease set") do
+  @renewal_task_id = call_tool(
+    "lease_renew",
+    {
+      command_id: "cmd-cuc-renew-set",
+      actor: { kind: "agent", id: @renewal_agent_id },
+      change_set_id: @renewal_change_set_id,
+      work_item_id: @renewal_work_item_id,
+      attempt_id: @renewal_attempt_id,
+      lease_set_id: @renewal_reservation.fetch("lease_set_id"),
+      leases: @renewal_reservation.fetch("resources").map do |reference|
+        {
+          resource_key_hash: reference.fetch("resource_key_hash"),
+          lease_id: reference.fetch("lease_id"),
+          fencing_token: reference.fetch("fencing_token")
+        }
+      end,
+      lease_duration_seconds: 600
+    }
+  ).dig("result", "taskId")
+  execute_task(@renewal_task_id)
+  @renewal_task_state = task_request("tasks/get", @renewal_task_id)
+end
+
+Then("the renewal Task succeeds without changing lease identities or fencing tokens") do
+  result = @renewal_task_state.dig("result", "result")
+  data = result.fetch("structuredContent").fetch("data")
+  before_refs = @renewal_reservation.fetch("resources").map do |reference|
+    reference.values_at("resource_key_hash", "lease_id", "fencing_token")
+  end
+  after_refs = data.fetch("resources").map do |reference|
+    reference.values_at("resource_key_hash", "lease_id", "fencing_token")
+  end
+
+  assert_acceptance_equal("completed", @renewal_task_state.dig("result", "status"), "Renewal Task status")
+  assert_acceptance_equal(false, result.fetch("isError"), "Renewal tool error flag")
+  assert_acceptance_equal(before_refs, after_refs, "Renewed lease references")
+  assert_acceptance_equal(
+    @renewal_reservation.fetch("expires_at"),
+    data.fetch("previous_expires_at"),
+    "Renewal previous deadline"
+  )
+  assert_acceptance(
+    data.fetch("expires_at") > @renewal_reservation.fetch("expires_at"),
+    "Renewal must move the deadline forward"
+  )
+  @renewal_result = data
+end
+
+Then("the previous context remains available before renewal projection") do
+  lagging = call_tool("coord_context", { attempt_id: @renewal_attempt_id })
+  before_payload = @context_before_renewal.dig("result", "structuredContent")
+  lagging_payload = lagging.dig("result", "structuredContent")
+  write_set = lagging_payload.dig("data", "context", "attempts", 0, "write_set")
+
+  assert_acceptance_equal("ok", lagging_payload.fetch("status"), "Lagging renewal context status")
+  assert_acceptance_equal(
+    before_payload.fetch("context_token"),
+    lagging_payload.fetch("context_token"),
+    "Lagging renewal context token"
+  )
+  assert_acceptance_equal(
+    @renewal_reservation.fetch("expires_at"),
+    write_set.fetch("expires_at"),
+    "Lagging observed deadline"
+  )
+  assert_acceptance(!lagging_payload.key?("projection_status"), "Lagging context must remain available")
+end
+
+When("the write-set renewal reaches the read side") do
+  renewal = write_set_renewal_events(@renewal_attempt_id).sole
+  Coordinator::Container["projectors.coord_context_v1"].call(renewal)
+  @renewed_context = call_tool("coord_context", { attempt_id: @renewal_attempt_id })
+end
+
+Then("available context exposes the later observed deadline without a freshness claim") do
+  payload = @renewed_context.dig("result", "structuredContent")
+  write_set = payload.dig("data", "context", "attempts", 0, "write_set")
+
+  assert_acceptance_equal("ok", payload.fetch("status"), "Renewed context status")
+  assert_acceptance_equal(@renewal_result.fetch("expires_at"), write_set.fetch("expires_at"), "Observed deadline")
+  assert_acceptance_equal(
+    @renewal_reservation.fetch("expires_at"),
+    write_set.fetch("previous_expires_at"),
+    "Observed previous deadline"
+  )
+  assert_acceptance(write_set.key?("last_renewed_at"), "Projected renewal time is missing")
+  assert_acceptance(
+    (write_set.keys & %w[active fresh pending]).empty?,
+    "Renewed projection must not claim freshness or activity"
+  )
+end

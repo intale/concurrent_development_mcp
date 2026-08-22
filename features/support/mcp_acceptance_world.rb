@@ -136,6 +136,17 @@ module McpAcceptanceWorld
     attempt_events(attempt_id).select { _1.type == "WriteSetExpanded" }
   end
 
+  def write_set_renewal_events(attempt_id)
+    event_store.read(
+      streams.attempt(attempt_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: [ "WriteSetRenewed" ],
+        maximum_count: 10,
+        direction: :asc
+      )
+    )
+  end
+
   def lease_events(path)
     resource = Coordinator::Write::FileResourceNormalizer.new.call(
       repository_id: "billing",

@@ -17,6 +17,7 @@ module Coordinator::Read
         when Coordinator::Write::Events::AttemptStartedV1 then apply_attempt_started(state, event)
         when Coordinator::Write::Events::WriteSetReservedV1 then apply_write_set_reserved(state, event)
         when Coordinator::Write::Events::WriteSetExpandedV1 then apply_write_set_expanded(state, event)
+        when Coordinator::Write::Events::WriteSetRenewedV1 then apply_write_set_renewed(state, event)
         else
           raise UnknownProjectionEvent, "coord_context/v1 does not handle #{event.class.name}"
         end
@@ -173,6 +174,8 @@ module Coordinator::Read
           end,
           reserved_at: event.reserved_at,
           last_expanded_at: nil,
+          last_renewed_at: nil,
+          previous_expires_at: nil,
           expires_at: event.expires_at
         )
 
@@ -221,6 +224,40 @@ module Coordinator::Read
             state.attempts,
             :attempt_id,
             CoordContextStateV1::Attempt.new(attempt.attributes.merge(write_set: expanded))
+          )
+        )
+      end
+
+      def apply_write_set_renewed(state, event)
+        attempt = require_attempt(state, event.attempt_id, event.change_set_id, event.work_item_id)
+        write_set = attempt.write_set
+        raise ProjectionStateError, "Attempt #{event.attempt_id} has no projected write set" unless write_set
+        unless write_set.lease_set_id == event.lease_set_id &&
+               write_set.repository_id == event.repository_id &&
+               write_set.policy_version == event.policy_version
+          raise ProjectionStateError, "Attempt #{event.attempt_id} write-set identity changed"
+        end
+        unless write_set.resources.map(&:to_h) == event.resources.map(&:to_h) &&
+               write_set.resources.length == event.resource_count
+          raise ProjectionStateError, "Attempt #{event.attempt_id} write-set membership changed during renewal"
+        end
+        unless write_set.expires_at == event.previous_expires_at && event.expires_at > event.previous_expires_at
+          raise ProjectionStateError, "Attempt #{event.attempt_id} renewal deadline is not contiguous"
+        end
+
+        renewed = CoordContextStateV1::WriteSet.new(
+          write_set.attributes.merge(
+            last_renewed_at: event.renewed_at,
+            previous_expires_at: event.previous_expires_at,
+            expires_at: event.expires_at
+          )
+        )
+        replace(
+          state,
+          attempts: upsert(
+            state.attempts,
+            :attempt_id,
+            CoordContextStateV1::Attempt.new(attempt.attributes.merge(write_set: renewed))
           )
         )
       end

@@ -88,7 +88,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
       ],
       lease_duration_seconds: 300
     ).value!.data
-    Coordinator::Write::Operations::ExecuteExpandWriteSet.new(event_store:).call(
+    expansion = Coordinator::Write::Operations::ExecuteExpandWriteSet.new(event_store:).call(
       command_id: "expand-A-100",
       actor: { kind: "agent", id: "agent-1" },
       change_set_id: "CS-100",
@@ -101,13 +101,36 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
         { kind: "file", path: "app/models/invoice.rb", base_blob_oid: "b" * 40 },
         { kind: "file", path: "app/services/tax.rb", base_blob_oid: "c" * 40 }
       ]
-    ).value!
+    ).value!.data
+    renewal = Coordinator::Write::Operations::ExecuteRenewLeaseSet.new(event_store:).call(
+      command_id: "renew-A-100",
+      actor: { kind: "agent", id: "agent-1" },
+      change_set_id: "CS-100",
+      work_item_id: "W-100",
+      attempt_id: "A-100",
+      lease_set_id: reservation.lease_set_id,
+      leases: (reservation.resources + expansion.added_resources).map do |reference|
+        {
+          resource_key_hash: reference.resource_key_hash,
+          lease_id: reference.lease_id,
+          fencing_token: reference.fencing_token
+        }
+      end,
+      lease_duration_seconds: 600
+    ).value!.data
 
     planning = change_set_events("CS-100")
     work = work_item_events("W-100")
     attempt = event_store.read(
       streams.attempt("A-100"),
       Coordinator::Write::EventQueries::ATTEMPT_FOR_WRITE_SET_EXPANSION
+    ) + event_store.read(
+      streams.attempt("A-100"),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: [ "WriteSetRenewed" ],
+        maximum_count: 1,
+        direction: :asc
+      )
     )
     [ planning[0], planning[1], work[0], planning[2], planning[3], work[1], work[2], *attempt ].each do |event|
       projector.call(event)
@@ -143,8 +166,11 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
       "db/schema.rb"
     )
     expect(write_set.resources.map(&:fencing_token)).to eq([ 1, 1, 1 ])
-    expect(write_set.expires_at).to be > write_set.reserved_at
+    expect(write_set.expires_at).to eq(renewal.expires_at)
     expect(write_set.last_expanded_at).to be > write_set.reserved_at
+    expect(write_set.last_renewed_at).to be > write_set.reserved_at
+    expect(write_set.previous_expires_at).to eq(reservation.expires_at)
+    expect(write_set.to_h.keys & %i[active fresh pending]).to be_empty
     expect(Coordinator::Read::ContextNextActionsBuilder.new.call(snapshot.state)).to be_empty
   end
 

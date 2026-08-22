@@ -52,6 +52,8 @@ module Coordinator
           def resources: () -> Array[WriteSetResource]
           def reserved_at: () -> String
           def last_expanded_at: () -> String?
+          def last_renewed_at: () -> String?
+          def previous_expires_at: () -> String?
           def expires_at: () -> String
         end
 
