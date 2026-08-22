@@ -72,7 +72,7 @@ module Coordinator::Processes
       def execute_target(command, started_event:)
         result = @target_executor.call(command, caused_by: started_event)
         tool_result = @tool_result_mapper.call(result, command_id: command.command_id)
-        parent_event = result.success? ? command_completion_event(command.command_id) : started_event
+        parent_event = outcome_parent_event(result, command:, started_event:)
 
         [ Coordinator::Write::Tasks::OutcomeV1::Completed.new(result: tool_result), parent_event ]
       rescue StandardError => error
@@ -85,6 +85,19 @@ module Coordinator::Processes
           @stream_factory.command(command_id),
           Coordinator::Write::EventQueries::COMMAND_COMPLETION
         ).sole
+      end
+
+      def outcome_parent_event(result, command:, started_event:)
+        return started_event if result.failure?
+
+        completion_parent_event(command.command_id, started_event:)
+      end
+
+      def completion_parent_event(command_id, started_event:)
+        completion = command_completion_event(command_id)
+        return completion if completion.causation_id == started_event.id
+
+        started_event
       end
 
       def transition_value!(result, transition:)

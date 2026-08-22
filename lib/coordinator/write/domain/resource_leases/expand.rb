@@ -157,7 +157,8 @@ module Coordinator::Write
             current_fencing_token: stale.state.fencing_token,
             current_lease_set_id: stale.state.lease_set_id,
             current_attempt_id: stale.state.attempt_id,
-            current_expires_at: stale.state.expires_at
+            current_expires_at: stale.state.expires_at,
+            current_released_at: stale.state.released_at
           )
         end
 

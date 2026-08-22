@@ -16,7 +16,8 @@ module Coordinator
           Tools::WorkItemAcquire,
           Tools::WriteSetReserve,
           Tools::WriteSetExpand,
-          Tools::LeaseRenew
+          Tools::LeaseRenew,
+          Tools::LeaseRelease
         ].freeze
       end
     end

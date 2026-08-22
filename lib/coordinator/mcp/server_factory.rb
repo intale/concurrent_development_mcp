@@ -23,6 +23,7 @@ module Coordinator
         and expand that same set before editing any additional file. Expansion never renews expiry.
         Renew the entire exact observed lease set before its deadline when more work time is needed;
         a stale set, lease ID, or fencing token is safely rejected by authoritative event facts.
+        Release the entire exact observed lease set when editing is finished; partial release is not available.
         The coordinator records attributed evidence and does not execute Git, CI, or agent work.
       TEXT
 

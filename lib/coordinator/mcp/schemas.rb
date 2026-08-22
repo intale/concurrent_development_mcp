@@ -176,6 +176,27 @@ module Coordinator
         )
       end
 
+      def lease_release
+        object_schema(
+          properties: common_mutation_properties.merge(
+            change_set_id: identifier,
+            work_item_id: identifier,
+            attempt_id: identifier,
+            lease_set_id: uuid_v7,
+            leases: {
+              type: "array",
+              items: lease_release_reference,
+              minItems: 1,
+              maxItems: 32,
+              uniqueItems: true
+            }
+          ),
+          required: %w[
+            command_id actor change_set_id work_item_id attempt_id lease_set_id leases
+          ]
+        )
+      end
+
       def operation_get
         object_schema(
           properties: {
@@ -272,6 +293,10 @@ module Coordinator
           },
           required: %w[resource_key_hash lease_id fencing_token]
         )
+      end
+
+      def lease_release_reference
+        lease_renewal_reference
       end
 
       def string_array(min_items:, max_items:, max_length:)

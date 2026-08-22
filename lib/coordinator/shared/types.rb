@@ -46,6 +46,7 @@ module Coordinator::Shared
       write_set_reserve
       write_set_expand
       lease_renew
+      lease_release
     ].freeze
 
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)

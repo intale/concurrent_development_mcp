@@ -37,7 +37,8 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
       "work_item_acquire",
       "write_set_reserve",
       "write_set_expand",
-      "lease_renew"
+      "lease_renew",
+      "lease_release"
     )
     expect(tools.find { _1.fetch("name") == "operation_get" }.fetch("annotations")).to include(
       "readOnlyHint" => true,

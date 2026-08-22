@@ -147,9 +147,21 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
           current_fencing_token: 8,
           current_lease_set_id: "0198e03a-d112-7000-8000-000000000003",
           current_attempt_id: "ATT-task-result-other",
-          current_expires_at: "2026-08-22T10:45:00.000000Z"
+          current_expires_at: "2026-08-22T10:45:00.000000Z",
+          current_released_at: nil
         },
         Coordinator::Write::Tasks::DomainErrorV1::LeaseSetNotCurrentError,
+        "denied"
+      ],
+      [
+        :write_set_released,
+        {
+          change_set_id: "CS-task-result",
+          work_item_id: "W-task-result",
+          attempt_id: "ATT-task-result",
+          released_at: "2026-08-22T10:40:00.000000Z"
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::WriteSetReleasedError,
         "denied"
       ],
       [

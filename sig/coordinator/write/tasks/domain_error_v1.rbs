@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Tasks
       module DomainErrorV1
-        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError
+        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError
 
         class ChangeSetDetails < Shared::Value
           def change_set_id: () -> String
@@ -82,6 +82,11 @@ module Coordinator
           def current_lease_set_id: () -> String?
           def current_attempt_id: () -> String?
           def current_expires_at: () -> String?
+          def current_released_at: () -> String?
+        end
+
+        class WriteSetReleasedDetails < AttemptDetails
+          def released_at: () -> String
         end
 
         class LeaseSetSnapshotMismatchDetails < AttemptDetails
@@ -173,6 +178,12 @@ module Coordinator
           def code: () -> String
           def message: () -> String
           def details: () -> LeaseSetNotCurrentDetails
+        end
+
+        class WriteSetReleasedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> WriteSetReleasedDetails
         end
 
 

@@ -81,6 +81,11 @@ module Coordinator::Write
         attribute :current_lease_set_id, Types::UuidV7.optional
         attribute :current_attempt_id, Types::Identifier.optional
         attribute :current_expires_at, Types::Timestamp.optional
+        attribute :current_released_at, Types::Timestamp.optional
+      end
+
+      class WriteSetReleasedDetails < AttemptDetails
+        attribute :released_at, Types::Timestamp
       end
 
       class LeaseSetSnapshotMismatchDetails < AttemptDetails
@@ -207,6 +212,12 @@ module Coordinator::Write
         attribute :details, LeaseSetNotCurrentDetails
       end
 
+      class WriteSetReleasedError < Value
+        attribute :code, Types::String.enum("write_set_released")
+        attribute :message, Types::String
+        attribute :details, WriteSetReleasedDetails
+      end
+
       class LeaseSetSnapshotMismatchError < Value
         attribute :code, Types::String.enum("lease_set_snapshot_mismatch")
         attribute :message, Types::String
@@ -237,6 +248,7 @@ module Coordinator::Write
              WriteSetLimitError |
              LeaseSetExpiredError |
              LeaseSetNotCurrentError |
+             WriteSetReleasedError |
              LeaseSetSnapshotMismatchError |
              LeaseReferenceMismatchError |
              LeaseDeadlineNotExtendedError

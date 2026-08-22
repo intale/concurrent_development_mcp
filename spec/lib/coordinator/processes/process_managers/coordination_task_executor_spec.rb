@@ -82,6 +82,22 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
     )
   end
 
+  it "keeps an exact command replay inside the new Task Saga correlation" do
+    first_task_id, first_source = submit_task(create_change_set_command)
+    process_manager.call(first_source)
+    replay_task_id, replay_source = submit_task(create_change_set_command)
+
+    process_manager.call(replay_source)
+
+    replay_submitted, replay_started, replay_completed = task_events(replay_task_id)
+    expect(replay_task_id).not_to eq(first_task_id)
+    expect(replay_completed.causation_id).to eq(replay_started.id)
+    expect([ replay_submitted, replay_started, replay_completed ].map(&:correlation_id).uniq).to eq(
+      [ replay_submitted.correlation_id ]
+    )
+    expect(command_events.length).to eq(1)
+  end
+
   it "completes a domain denial as an error CallToolResult without target facts" do
     Coordinator::Write::Operations::ExecuteCreateChangeSet.new(event_store:).call_command(
       create_change_set_command(command_id: "cmd-seed-existing")
