@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Tasks
       module DomainErrorV1
-        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError | InterpretationNotAcceptedError | DecisionAlreadyExistsError | InterpretationAlreadyActivatedError | DecisionDefinitionNotActivatableError | DecisionSlotOccupiedError | DecisionPartitionLimitReachedError | DecisionNotFoundError | DecisionNotActiveError | InterpretationNotACorrectionError | DecisionDefinitionNotCorrectableError | DecisionRevisionChangedError | DecisionSlotStateInvalidError
+        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError | InterpretationNotAcceptedError | DecisionAlreadyExistsError | InterpretationAlreadyActivatedError | DecisionDefinitionNotActivatableError | DecisionSlotOccupiedError | DecisionPartitionLimitReachedError | DecisionPartitionCapacityReachedError | DecisionPartitionStateInvalidError | DecisionNotFoundError | DecisionNotActiveError | InterpretationNotACorrectionError | DecisionDefinitionNotCorrectableError | DecisionRevisionChangedError | DecisionSlotStateInvalidError
 
         class ChangeSetDetails < Shared::Value
           def change_set_id: () -> String
@@ -172,6 +172,19 @@ module Coordinator
           def decision_id: () -> String
           def partition_count: () -> Integer
           def maximum_partition_count: () -> Integer
+        end
+
+        class DecisionPartitionCapacityDetails < Shared::Value
+          def partition_id: () -> String
+          def active_decision_count: () -> Integer
+          def maximum_active_decisions: () -> Integer
+        end
+
+        class DecisionPartitionStateInvalidDetails < Shared::Value
+          def partition_id: () -> String
+          def decision_id: () -> String
+          def expected_head: () -> Decisions::DecisionHeadV1
+          def observed_head: () -> Decisions::DecisionHeadV1?
         end
 
         class DecisionIdentityDetails < Shared::Value
@@ -394,6 +407,18 @@ module Coordinator
           def code: () -> String
           def message: () -> String
           def details: () -> DecisionPartitionLimitDetails
+        end
+
+        class DecisionPartitionCapacityReachedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> DecisionPartitionCapacityDetails
+        end
+
+        class DecisionPartitionStateInvalidError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> DecisionPartitionStateInvalidDetails
         end
 
         class DecisionNotFoundError < Shared::Value

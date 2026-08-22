@@ -10,6 +10,8 @@ module Coordinator::Write
         lease_busy: "busy",
         interpretation_slot_already_accepted: "conflict",
         decision_slot_occupied: "conflict",
+        decision_partition_capacity_reached: "conflict",
+        decision_partition_state_invalid: "conflict",
         decision_revision_changed: "conflict",
         decision_slot_state_invalid: "conflict"
       }.freeze

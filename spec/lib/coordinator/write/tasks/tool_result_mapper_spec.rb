@@ -297,6 +297,38 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         "denied"
       ],
       [
+        :decision_partition_capacity_reached,
+        {
+          partition_id: "repo:billing:testing",
+          active_decision_count: 32,
+          maximum_active_decisions: 32
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::DecisionPartitionCapacityReachedError,
+        "conflict"
+      ],
+      [
+        :decision_partition_state_invalid,
+        {
+          partition_id: "repo:billing:testing",
+          decision_id: "D-task-result",
+          expected_head: {
+            decision_id: "D-task-result",
+            decision_revision: 1,
+            event: {
+              event_id: "0198e03a-d112-7000-8000-000000000001",
+              type: "DecisionActivated",
+              stream_context: "HumanGuidance",
+              stream_name: "Decision",
+              stream_id: "D-task-result",
+              stream_revision: 1
+            }
+          },
+          observed_head: nil
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::DecisionPartitionStateInvalidError,
+        "conflict"
+      ],
+      [
         :decision_not_found,
         { decision_id: "D-task-result" },
         Coordinator::Write::Tasks::DomainErrorV1::DecisionNotFoundError,

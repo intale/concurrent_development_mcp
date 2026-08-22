@@ -45,7 +45,11 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
       "decision_id" => "D-1",
       "decision_revision" => 2
     )
-    expect(partition_events("repo:billing:testing").map(&:stream_revision)).to eq([ 0, 1 ])
+    partition_history = partition_events("repo:billing:testing")
+    expect(partition_history.map(&:stream_revision)).to eq([ 0, 1 ])
+    expect(load(partition_history.last).active_decisions).to contain_exactly(
+      have_attributes(decision_id: "D-1", decision_revision: 2)
+    )
     expect(original.value!.data).to have_attributes(
       outcome: "corrected",
       policy_status: "active",
@@ -73,6 +77,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
     expect(slot_events(new_slot_id).map(&:type)).to eq(%w[DecisionSlotOpened DecisionSlotHeadChanged])
     expect(partition_events("repo:billing:testing").map(&:stream_revision)).to eq([ 0, 1 ])
     expect(partition_events("workitem:W-42:testing").map(&:stream_revision)).to eq([ 0 ])
+    expect(load(partition_events("repo:billing:testing").last).active_decisions).to be_empty
+    expect(load(partition_events("workitem:W-42:testing").sole).active_decisions).to contain_exactly(
+      have_attributes(decision_id: "D-1", decision_revision: 2)
+    )
     expect(result.value!.data.partitions.map { _1.partition.partition_id }).to eq(
       %w[repo:billing:testing workitem:W-42:testing]
     )
@@ -176,6 +184,50 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
     expect(result).to be_failure
     expect(result.failure).to have_attributes(code: :decision_partition_limit_reached)
     expect(decision_events("D-1").map(&:type)).to eq(%w[DecisionRecorded DecisionActivated])
+  end
+
+  it "denies a correction that would exceed the bounded active-head snapshot" do
+    activation = seed_active_decision(
+      topic_id: "testing.required_suites",
+      effect: "require",
+      modality: "must",
+      value: InterpretationInput.string_set([ "rspec" ])
+    )
+    seed_active_decision(
+      decision_id: "D-2",
+      interpretation_id: "I-target",
+      message_id: "M-target",
+      command_suffix: "target",
+      topic_id: "testing.required_suites",
+      effect: "require",
+      modality: "must",
+      value: InterpretationInput.string_set([ "cucumber" ]),
+      scope: InterpretationInput.scope(repository_ids: [ "billing" ], work_item_id: "W-42")
+    )
+    seed_correction(
+      topic_id: "testing.required_suites",
+      effect: "require",
+      modality: "must",
+      value: InterpretationInput.string_set(%w[rspec cucumber]),
+      scope: InterpretationInput.scope(repository_ids: [ "billing" ], work_item_id: "W-42")
+    )
+    bounded_operation = described_class.new(
+      event_store:,
+      decider: Coordinator::Write::Domain::Decisions::Correct.new(maximum_active_decisions: 1)
+    )
+
+    result = bounded_operation.call(InterpretationInput.correction(expected_head: reference(activation)))
+
+    expect(result.failure).to have_attributes(
+      code: :decision_partition_capacity_reached,
+      details: include(
+        partition_id: "workitem:W-42:testing",
+        active_decision_count: 1,
+        maximum_active_decisions: 1
+      )
+    )
+    expect(decision_events("D-1").map(&:type)).to eq(%w[DecisionRecorded DecisionActivated])
+    expect(load(partition_events("workitem:W-42:testing").sole).active_decisions.map(&:decision_id)).to eq([ "D-2" ])
   end
 
   def seed_active_decision(

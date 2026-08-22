@@ -6,14 +6,22 @@ module Coordinator::Write
       class Activate
         include Dry::Monads[:result]
 
-        def initialize(stream_factory: StreamFactory.new)
+        MAXIMUM_ACTIVE_DECISIONS = 32
+
+        def initialize(
+          stream_factory: StreamFactory.new,
+          maximum_active_decisions: MAXIMUM_ACTIVE_DECISIONS
+        )
           @stream_factory = stream_factory
+          @maximum_active_decisions = maximum_active_decisions
         end
 
         def call(state:, command:, activated_at:)
           return decision_exists(state.existing_decision, command) if state.existing_decision
           return interpretation_used(state.existing_activation) if state.existing_activation
           return slot_occupied(state.slot_head, state.candidate.slot) if state.slot_head
+          capacity_error = partition_capacity_error(state, command)
+          return capacity_error if capacity_error
 
           Success(build_plan(state, command, activated_at))
         end
@@ -107,11 +115,39 @@ module Coordinator::Write
                 partition: state.partition,
                 partition_revision: next_revision,
                 decision: decision_head,
+                active_decisions: next_active_decisions(state, decision_head),
                 change_kind: "activated",
                 advanced_at: activated_at
               )
             )
           end
+        end
+
+        def next_active_decisions(state, decision_head)
+          (state.active_decisions + [ decision_head ])
+            .uniq(&:decision_id)
+            .sort_by { _1.decision_id.b }
+            .freeze
+        end
+
+        def partition_capacity_error(state, command)
+          full = state.partition_states.find do |partition_state|
+            partition_state.active_decisions.none? { _1.decision_id == command.decision_id } &&
+              partition_state.active_decisions.length >= @maximum_active_decisions
+          end
+          return unless full
+
+          Failure(
+            OutcomeError.new(
+              code: :decision_partition_capacity_reached,
+              message: "DecisionPartition already contains the maximum active Decision heads",
+              details: {
+                partition_id: full.partition.partition_id,
+                active_decision_count: full.active_decisions.length,
+                maximum_active_decisions: @maximum_active_decisions
+              }
+            )
+          )
         end
 
         def decision_exists(event, command)

@@ -238,9 +238,11 @@ module Coordinator::Write
           @stream_factory.decision_partition(partition.partition_id),
           EventQueries::DECISION_PARTITION_LATEST
         ).first
+        payload = event && load_event(event)
         Decisions::DecisionPartitionStateV1.new(
           partition:,
-          latest_revision: event&.stream_revision
+          latest_revision: event&.stream_revision,
+          active_decisions: payload ? payload.active_decisions : []
         )
       end
 

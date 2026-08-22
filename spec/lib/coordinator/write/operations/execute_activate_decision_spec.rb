@@ -47,6 +47,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
       type: "DecisionPartitionAdvanced",
       stream_revision: 0
     )
+    expect(load(partition_events("repo:billing:testing").sole).active_decisions).to contain_exactly(
+      have_attributes(decision_id: "D-1", decision_revision: 1)
+    )
     expect(command_events("cmd-decision-activation-1").length).to eq(1)
   end
 
@@ -184,8 +187,55 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
 
     expect(results).to all(be_success)
     expect(results.map { _1.value!.data.slot }).to all(be_nil)
-    expect(partition_events("repo:billing:testing").map(&:stream_revision)).to eq([ 0, 1 ])
+    partition_history = partition_events("repo:billing:testing")
+    expect(partition_history.map(&:stream_revision)).to eq([ 0, 1 ])
+    expect(load(partition_history.first).active_decisions.map(&:decision_id)).to eq([ "D-A" ])
+    expect(load(partition_history.last).active_decisions.map(&:decision_id)).to eq(%w[D-A D-B])
     expect(results.map { _1.value!.data.partitions.sole.partition_revision }.sort).to eq([ 0, 1 ])
+  end
+
+  it "denies an activation that would exceed the bounded active-head snapshot" do
+    seed_accepted_interpretation(
+      interpretation_id: "I-A",
+      message_id: "M-A",
+      command_suffix: "a",
+      topic_id: "testing.required_suites",
+      effect: "require",
+      modality: "must",
+      value: InterpretationInput.string_set([ "rspec" ])
+    )
+    seed_accepted_interpretation(
+      interpretation_id: "I-B",
+      message_id: "M-B",
+      command_suffix: "b",
+      topic_id: "testing.required_suites",
+      effect: "require",
+      modality: "must",
+      value: InterpretationInput.string_set([ "cucumber" ])
+    )
+    bounded_operation = described_class.new(
+      event_store:,
+      decider: Coordinator::Write::Domain::Decisions::Activate.new(maximum_active_decisions: 1)
+    )
+
+    first = bounded_operation.call(
+      InterpretationInput.activation(command_id: "cmd-activate-a", decision_id: "D-A", interpretation_id: "I-A")
+    )
+    second = bounded_operation.call(
+      InterpretationInput.activation(command_id: "cmd-activate-b", decision_id: "D-B", interpretation_id: "I-B")
+    )
+
+    expect(first).to be_success
+    expect(second.failure).to have_attributes(
+      code: :decision_partition_capacity_reached,
+      details: include(
+        partition_id: "repo:billing:testing",
+        active_decision_count: 1,
+        maximum_active_decisions: 1
+      )
+    )
+    expect(decision_events("D-B")).to be_empty
+    expect(load(partition_events("repo:billing:testing").sole).active_decisions.map(&:decision_id)).to eq([ "D-A" ])
   end
 
   def seed_accepted_interpretation(
@@ -271,5 +321,13 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
 
   def command_events(command_id)
     event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+  end
+
+  def load(event)
+    Coordinator::Write::EventSchemaRegistry.new.load(
+      type: event.type,
+      schema_version: event.metadata.fetch("schema_version"),
+      data: event.data
+    )
   end
 end

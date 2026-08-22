@@ -2,8 +2,10 @@ module Coordinator
   module Write
     module Decisions
       class DecisionPartitionStateV1 < Shared::Value
+        Head: singleton(DecisionHeadV1)
         def partition: () -> DecisionPartitionV1
         def latest_revision: () -> Integer?
+        def active_decisions: () -> Array[DecisionHeadV1]
       end
     end
   end

@@ -106,11 +106,23 @@ module Coordinator::Write
         writes.zip(state.partition_states).each do |write, partition_state|
           event = write.event
           expected_revision = partition_state.latest_revision ? partition_state.latest_revision + 1 : 0
+          expected_head = Decisions::DecisionHeadV1.new(
+            decision_id: command.decision_id,
+            decision_revision: state.candidate.correction_event.stream_revision,
+            event: state.candidate.correction_event
+          )
+          expected_heads = partition_state.active_decisions.reject do |head|
+            head.decision_id == command.decision_id
+          end
+          if state.candidate.partitions.any? { _1.partition_id == partition_state.partition.partition_id }
+            expected_heads << expected_head
+          end
+          expected_heads = expected_heads.sort_by { _1.decision_id.b }
           unless write.stream == streams.decision_partition(partition_state.partition.partition_id) &&
                  event.partition == partition_state.partition &&
                  event.partition_revision == expected_revision &&
-                 event.decision.decision_id == command.decision_id &&
-                 event.decision.event == state.candidate.correction_event &&
+                 event.decision == expected_head &&
+                 event.active_decisions == expected_heads &&
                  event.change_kind == "corrected"
             key.failure("DecisionPartition write does not match its authoritative predecessor")
           end

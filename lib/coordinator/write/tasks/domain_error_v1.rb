@@ -173,6 +173,19 @@ module Coordinator::Write
         attribute :maximum_partition_count, Types::Integer.constrained(eql: 32)
       end
 
+      class DecisionPartitionCapacityDetails < Value
+        attribute :partition_id, Types::Identifier
+        attribute :active_decision_count, Types::Integer.constrained(gteq: 1, lteq: 32)
+        attribute :maximum_active_decisions, Types::Integer.constrained(gteq: 1, lteq: 32)
+      end
+
+      class DecisionPartitionStateInvalidDetails < Value
+        attribute :partition_id, Types::Identifier
+        attribute :decision_id, Types::Identifier
+        attribute :expected_head, Decisions::DecisionHeadV1
+        attribute :observed_head, Decisions::DecisionHeadV1.optional
+      end
+
       class DecisionIdentityDetails < Value
         attribute :decision_id, Types::Identifier
       end
@@ -426,6 +439,18 @@ module Coordinator::Write
         attribute :details, DecisionPartitionLimitDetails
       end
 
+      class DecisionPartitionCapacityReachedError < Value
+        attribute :code, Types::String.enum("decision_partition_capacity_reached")
+        attribute :message, Types::String
+        attribute :details, DecisionPartitionCapacityDetails
+      end
+
+      class DecisionPartitionStateInvalidError < Value
+        attribute :code, Types::String.enum("decision_partition_state_invalid")
+        attribute :message, Types::String
+        attribute :details, DecisionPartitionStateInvalidDetails
+      end
+
       class DecisionNotFoundError < Value
         attribute :code, Types::String.enum("decision_not_found")
         attribute :message, Types::String
@@ -494,6 +519,8 @@ module Coordinator::Write
              DecisionDefinitionNotActivatableError |
              DecisionSlotOccupiedError |
              DecisionPartitionLimitReachedError |
+             DecisionPartitionCapacityReachedError |
+             DecisionPartitionStateInvalidError |
              DecisionNotFoundError |
              DecisionNotActiveError |
              InterpretationNotACorrectionError |

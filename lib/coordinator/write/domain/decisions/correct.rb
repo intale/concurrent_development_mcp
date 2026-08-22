@@ -6,8 +6,14 @@ module Coordinator::Write
       class Correct
         include Dry::Monads[:result]
 
-        def initialize(stream_factory: StreamFactory.new)
+        MAXIMUM_ACTIVE_DECISIONS = 32
+
+        def initialize(
+          stream_factory: StreamFactory.new,
+          maximum_active_decisions: MAXIMUM_ACTIVE_DECISIONS
+        )
           @stream_factory = stream_factory
+          @maximum_active_decisions = maximum_active_decisions
         end
 
         def call(state:, command:, corrected_at:)
@@ -15,6 +21,8 @@ module Coordinator::Write
 
           slot_error = validate_slots(state)
           return slot_error if slot_error
+          partition_error = validate_partitions(state, command)
+          return partition_error if partition_error
 
           Success(build_plan(state, command, corrected_at))
         end
@@ -36,7 +44,14 @@ module Coordinator::Write
             )
           ]
           writes.concat(slot_writes(state, correction_head, corrected_at))
-          writes.concat(partition_writes(state.partition_states, correction_head, corrected_at))
+          writes.concat(
+            partition_writes(
+              state.partition_states,
+              correction_head,
+              corrected_at,
+              candidate.partitions.map(&:partition_id)
+            )
+          )
 
           EventPlan.new(writes:)
         end
@@ -107,7 +122,7 @@ module Coordinator::Write
           )
         end
 
-        def partition_writes(states, correction_head, corrected_at)
+        def partition_writes(states, correction_head, corrected_at, corrected_partition_ids)
           states.map do |state|
             next_revision = state.latest_revision ? state.latest_revision + 1 : 0
             EventWrite.new(
@@ -116,11 +131,78 @@ module Coordinator::Write
                 partition: state.partition,
                 partition_revision: next_revision,
                 decision: correction_head,
+                active_decisions: next_active_decisions(
+                  state,
+                  correction_head,
+                  corrected_partition_ids
+                ),
                 change_kind: "corrected",
                 advanced_at: corrected_at
               )
             )
           end
+        end
+
+        def next_active_decisions(state, correction_head, corrected_partition_ids)
+          heads = state.active_decisions.reject do |head|
+            head.decision_id == correction_head.decision_id
+          end
+          if corrected_partition_ids.include?(state.partition.partition_id)
+            heads << correction_head
+          end
+          heads.sort_by { _1.decision_id.b }.freeze
+        end
+
+        def validate_partitions(state, command)
+          corrected_partition_ids = state.candidate.partitions.map(&:partition_id)
+          invalid = state.current.partitions.filter_map do |partition|
+            partition_state = state.partition_states.find do |candidate|
+              candidate.partition.partition_id == partition.partition_id
+            end
+            observed = partition_state.active_decisions.find do |head|
+              head.decision_id == command.decision_id
+            end
+            [ partition_state, observed ] unless observed == state.current.head
+          end.first
+          return invalid_partition(command, state.current.head, *invalid) if invalid
+
+          full = state.partition_states.find do |partition_state|
+            corrected_partition_ids.include?(partition_state.partition.partition_id) &&
+              partition_state.active_decisions.none? { _1.decision_id == command.decision_id } &&
+              partition_state.active_decisions.length >= @maximum_active_decisions
+          end
+          return partition_capacity(full) if full
+
+          nil
+        end
+
+        def invalid_partition(command, expected, partition_state, observed)
+          Failure(
+            OutcomeError.new(
+              code: :decision_partition_state_invalid,
+              message: "DecisionPartition does not contain the exact current Decision head",
+              details: {
+                partition_id: partition_state.partition.partition_id,
+                decision_id: command.decision_id,
+                expected_head: expected.to_h,
+                observed_head: observed&.to_h
+              }
+            )
+          )
+        end
+
+        def partition_capacity(partition_state)
+          Failure(
+            OutcomeError.new(
+              code: :decision_partition_capacity_reached,
+              message: "Corrected DecisionPartition already contains the maximum active Decision heads",
+              details: {
+                partition_id: partition_state.partition.partition_id,
+                active_decision_count: partition_state.active_decisions.length,
+                maximum_active_decisions: @maximum_active_decisions
+              }
+            )
+          )
         end
 
         def validate_slots(state)

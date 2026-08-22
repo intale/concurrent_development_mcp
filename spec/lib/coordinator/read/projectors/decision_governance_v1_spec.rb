@@ -53,10 +53,14 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :event_store
     expect(Coordinator::Read::DecisionSlotHead.find(activation.data.slot.slot_id)).to have_attributes(
       decision_id: "D-project"
     )
-    expect(Coordinator::Read::DecisionPartitionHead.find("repo:billing:testing")).to have_attributes(
+    partition_head = Coordinator::Read::DecisionPartitionHead.find("repo:billing:testing")
+    expect(partition_head).to have_attributes(
       decision_id: "D-project",
       partition_revision: 0,
       change_kind: "activated"
+    )
+    expect(partition_head.active_decisions).to contain_exactly(
+      include("decision_id" => "D-project", "decision_revision" => 1)
     )
     expect(processed_events.count).to eq(5)
   end
@@ -93,6 +97,7 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :event_store
     head = Coordinator::Read::DecisionPartitionHead.find("repo:billing:testing")
     expect(head).to have_attributes(decision_id: "D-B", partition_revision: 1, change_kind: "activated")
     expect(head.decision).to include("decision_id" => "D-B")
+    expect(head.active_decisions.map { _1.fetch("decision_id") }).to eq(%w[D-A D-B])
   end
 
   it "projects a corrected definition and vacated/moved slot without withholding the older view" do
@@ -154,15 +159,21 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :event_store
     expect(Coordinator::Read::DecisionSlotHead.find(new_slot_id)).to have_attributes(
       decision_id: "D-project"
     )
-    expect(Coordinator::Read::DecisionPartitionHead.find("repo:billing:testing")).to have_attributes(
+    repository_partition = Coordinator::Read::DecisionPartitionHead.find("repo:billing:testing")
+    expect(repository_partition).to have_attributes(
       decision_id: "D-project",
       partition_revision: 1,
       change_kind: "corrected"
     )
-    expect(Coordinator::Read::DecisionPartitionHead.find("workitem:W-42:testing")).to have_attributes(
+    expect(repository_partition.active_decisions).to be_empty
+    work_item_partition = Coordinator::Read::DecisionPartitionHead.find("workitem:W-42:testing")
+    expect(work_item_partition).to have_attributes(
       decision_id: "D-project",
       partition_revision: 0,
       change_kind: "corrected"
+    )
+    expect(work_item_partition.active_decisions).to contain_exactly(
+      include("decision_id" => "D-project", "decision_revision" => 2)
     )
   end
 

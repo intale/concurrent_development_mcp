@@ -135,6 +135,7 @@ module Coordinator::Read
           partition: advancement.partition.to_h,
           partition_revision: advancement.partition_revision,
           decision: advancement.decision.to_h,
+          active_decisions: advancement.active_decisions.map(&:to_h),
           change_kind: advancement.change_kind,
           event: event_reference(event).to_h,
           actor: actor(event).to_h,

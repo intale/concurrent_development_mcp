@@ -3,7 +3,9 @@ module Coordinator
     module Domain
       module Decisions
         class Activate
-          def initialize: (?stream_factory: StreamFactory) -> void
+          MAXIMUM_ACTIVE_DECISIONS: Integer
+
+          def initialize: (?stream_factory: StreamFactory, ?maximum_active_decisions: Integer) -> void
           def call: (state: ActivationState, command: Commands::ActivateDecision, activated_at: String) -> Dry::Monads::Result
         end
       end
