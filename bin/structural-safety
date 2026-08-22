@@ -1,0 +1,72 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+ROOT = File.expand_path("..", __dir__)
+SOURCE_EXTENSIONS = %w[.rb .rake .sql .yml .yaml].freeze
+
+CHECKS = [
+  {
+    name: "manual application dependency loading",
+    paths: %w[app lib/coordinator config/initializers],
+    patterns: [ /^\s*require(?:_relative)?\s*(?:\(|["'])/ ]
+  },
+  {
+    name: "session-scoped PostgreSQL features",
+    paths: %w[app lib/coordinator config/initializers db/migrate],
+    patterns: [
+      /\b(?:pg_)?(?:try_)?advisory_(?:lock|unlock)\s*\(/i,
+      /\bwith_advisory_lock!?\b/i,
+      /(?:^\s*|["'`]\s*)(?:LISTEN|NOTIFY)\s+(?:[a-z_"]|#\{)/i,
+      /(?:^\s*|["'`]\s*)CREATE\s+(?:TEMP|TEMPORARY)\s+TABLE\b/i,
+      /(?:^\s*|["'`]\s*)PREPARE\s+[a-z_"]\w*\s+AS\b/i,
+      /(?:^\s*|["'`]\s*)DEALLOCATE(?:\s+PREPARE)?\s+[a-z_"]\w*/i,
+      /(?:^\s*|["'`]\s*)DECLARE\s+[a-z_"]\w*\s+(?:NO\s+SCROLL\s+)?CURSOR\b/i,
+      /(?:^\s*|["'`]\s*)SET\s+(?:SESSION\b|ROLE\b|SESSION\s+AUTHORIZATION\b)/i,
+      /(?:^\s*|["'`]\s*)SET\s+(?!TRANSACTION\b|LOCAL\b|CONSTRAINTS\b)[a-z_"][a-z0-9_."]*\s*(?:=|TO)\b/i,
+      /(?:^\s*|["'`]\s*)RESET\s+(?:ALL|ROLE|SESSION\s+AUTHORIZATION)\b/i,
+      /(?:^\s*|["'`]\s*)DISCARD\s+ALL\b/i,
+      /\bpg_backend_pid\s*\(/i,
+      /\bset_config\s*\([^,]+,[^,]+,\s*false\s*\)/i
+    ]
+  }
+].freeze
+
+def source_files(paths)
+  paths.flat_map do |relative_path|
+    path = File.join(ROOT, relative_path)
+    candidates = File.directory?(path) ? Dir.glob(File.join(path, "**", "*")) : [ path ]
+    candidates.select do |candidate|
+      File.file?(candidate) && SOURCE_EXTENSIONS.include?(File.extname(candidate))
+    end
+  end.uniq.sort
+end
+
+findings = CHECKS.flat_map do |check|
+  source_files(check.fetch(:paths)).flat_map do |path|
+    File.foreach(path).with_index(1).filter_map do |line, line_number|
+      next if line.lstrip.start_with?("#")
+      next unless check.fetch(:patterns).any? { _1.match?(line) }
+
+      {
+        check: check.fetch(:name),
+        path: path.delete_prefix("#{ROOT}/"),
+        line_number:,
+        source: line.strip
+      }
+    end
+  end
+end
+
+if findings.empty?
+  puts "Structural safety checks passed (autoloading and transaction-pool compatibility)."
+  exit 0
+end
+
+findings.group_by { _1.fetch(:check) }.each do |check, violations|
+  warn "#{check}:"
+  violations.each do |violation|
+    warn "  #{violation.fetch(:path)}:#{violation.fetch(:line_number)}: #{violation.fetch(:source)}"
+  end
+end
+
+exit 1
