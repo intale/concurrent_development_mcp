@@ -52,9 +52,27 @@ module McpAcceptanceWorld
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
   end
 
+  def submit_and_execute(tool, **arguments)
+    task_id = call_tool(tool, arguments).dig("result", "taskId")
+    assert_acceptance(task_id, "#{tool} did not return a Task handle")
+    execute_task(task_id)
+    task_id
+  end
+
   def project_change_set(change_set_id)
     projector = Coordinator::Container["projectors.coord_context_v1"]
     change_set_events(change_set_id).each { projector.call(_1) }
+  end
+
+  def project_attempt_context(change_set_id:, work_item_id:, attempt_id:)
+    projector = Coordinator::Container["projectors.coord_context_v1"]
+    planning = change_set_events(change_set_id)
+    work = work_item_events(work_item_id)
+    planning.first(2).each { projector.call(_1) }
+    projector.call(work.first)
+    planning.drop(2).each { projector.call(_1) }
+    work.drop(1).each { projector.call(_1) }
+    attempt_events(attempt_id).each { projector.call(_1) }
   end
 
   def task_events(task_id)
@@ -100,6 +118,34 @@ module McpAcceptanceWorld
     event_store.read(
       streams.work_item(work_item_id),
       Coordinator::Write::EventQueries::WORK_ITEM_FOR_ACQUISITION
+    )
+  end
+
+  def attempt_events(attempt_id)
+    event_store.read(
+      streams.attempt(attempt_id),
+      Coordinator::Write::EventQueries::ATTEMPT_FOR_WRITE_SET_RESERVATION
+    )
+  end
+
+  def write_set_events(attempt_id)
+    attempt_events(attempt_id).select { _1.type == "WriteSetReserved" }
+  end
+
+  def lease_events(path)
+    resource = Coordinator::Write::FileResourceNormalizer.new.call(
+      repository_id: "billing",
+      kind: "file",
+      path:,
+      base_blob_oid: nil
+    ).value!
+    event_store.read(
+      streams.resource_lease(resource.resource_key_hash),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: [ "ResourceLeaseAcquired" ],
+        maximum_count: 10,
+        direction: :asc
+      )
     )
   end
 

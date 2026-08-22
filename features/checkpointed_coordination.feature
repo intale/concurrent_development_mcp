@@ -48,3 +48,14 @@ Feature: Checkpointed cooperative coordination
       When agent "planner-1" attempts ChangeSet "CS-CUC-CAPABILITY" with command "cmd-cuc-capability"
       Then the server requires the Tasks extension
       And the rejected request writes no coordination facts
+
+  Rule: Overlapping write sets are reserved atomically
+
+    Scenario: Two active agents request an overlapping file through concurrent Tasks
+      Given agents "agent-a" and "agent-b" have active Attempts in ChangeSet "CS-CUC-LSE"
+      When both agents concurrently reserve initial write sets overlapping on "db/schema.rb"
+      Then one reservation Task succeeds and the other completes busy
+      And the winner owns its complete write set
+      And the loser owns no partial write set
+      When the winning Attempt reservation reaches the read side
+      Then available context exposes the observed lease evidence without a freshness claim

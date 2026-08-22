@@ -70,7 +70,7 @@ module Coordinator::Write
     end
 
     class AcquireWorkItemInputV1 < Value
-      Snapshot = Types.Instance(RepositorySnapshotV1)
+      Snapshot = RepositorySnapshotV1
 
       attribute :actor, ActorV1
       attribute :change_set_id, Types::Identifier

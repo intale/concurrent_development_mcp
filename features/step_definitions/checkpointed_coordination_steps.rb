@@ -193,3 +193,181 @@ Then("the rejected request writes no coordination facts") do
   )
   assert_no_current_coordination_facts
 end
+
+Given(
+  "agents {string} and {string} have active Attempts in ChangeSet {string}"
+) do |first_agent_id, second_agent_id, change_set_id|
+  @lease_change_set_id = change_set_id
+  @lease_participants = [
+    {
+      agent_id: first_agent_id,
+      work_item_id: "W-CUC-LSE-A",
+      attempt_id: "A-CUC-LSE-A",
+      unique_path: "app/models/alpha.rb"
+    },
+    {
+      agent_id: second_agent_id,
+      work_item_id: "W-CUC-LSE-B",
+      attempt_id: "A-CUC-LSE-B",
+      unique_path: "app/models/beta.rb"
+    }
+  ]
+
+  submit_and_execute(
+    "change_set_create",
+    command_id: "cmd-cuc-lse-create",
+    actor: { kind: "agent", id: "planner-1" },
+    change_set_id:,
+    goal: "Coordinate overlapping file work",
+    acceptance_criteria: [ "No two active agents own the same file" ]
+  )
+  @lease_participants.each do |participant|
+    submit_and_execute(
+      "work_item_create",
+      command_id: "cmd-cuc-lse-create-#{participant.fetch(:work_item_id)}",
+      actor: { kind: "agent", id: "planner-1" },
+      change_set_id:,
+      work_item_id: participant.fetch(:work_item_id),
+      repository_id: "billing",
+      goal: "Implement #{participant.fetch(:work_item_id)}",
+      acceptance_criteria: [ "The work is verifiable" ]
+    )
+  end
+  submit_and_execute(
+    "change_set_activate",
+    command_id: "cmd-cuc-lse-activate",
+    actor: { kind: "agent", id: "planner-1" },
+    change_set_id:
+  )
+  activation = change_set_events(change_set_id).find { _1.type == "ChangeSetActivated" }
+  Coordinator::Container["process_managers.change_set_readiness"].call(activation)
+
+  @lease_participants.each do |participant|
+    submit_and_execute(
+      "work_item_acquire",
+      command_id: "cmd-cuc-lse-acquire-#{participant.fetch(:attempt_id)}",
+      actor: { kind: "agent", id: participant.fetch(:agent_id) },
+      change_set_id:,
+      work_item_id: participant.fetch(:work_item_id),
+      attempt_id: participant.fetch(:attempt_id),
+      base_snapshots: [
+        { repository_id: "billing", commit_oid: "a" * 40 }
+      ]
+    )
+  end
+end
+
+When(
+  "both agents concurrently reserve initial write sets overlapping on {string}"
+) do |shared_path|
+  @shared_lease_path = shared_path
+  @reservation_tasks = @lease_participants.map.with_index do |participant, index|
+    arguments = {
+      command_id: "cmd-cuc-lse-reserve-#{index + 1}",
+      actor: { kind: "agent", id: participant.fetch(:agent_id) },
+      change_set_id: @lease_change_set_id,
+      work_item_id: participant.fetch(:work_item_id),
+      attempt_id: participant.fetch(:attempt_id),
+      repository_id: "billing",
+      base_commit_oid: "a" * 40,
+      resources: [
+        { kind: "file", path: participant.fetch(:unique_path) },
+        { kind: "file", path: shared_path }
+      ],
+      lease_duration_seconds: 300
+    }
+    task_id = call_tool("write_set_reserve", arguments).dig("result", "taskId")
+    participant.merge(task_id:, arguments:)
+  end
+
+  @reservation_tasks.map do |reservation|
+    Thread.new { execute_task(reservation.fetch(:task_id)) }
+  end.each(&:value)
+  @reservation_tasks.each do |reservation|
+    reservation[:state] = task_request("tasks/get", reservation.fetch(:task_id))
+    reservation[:outcome] = reservation.dig(:state, "result", "result", "structuredContent")
+  end
+end
+
+Then("one reservation Task succeeds and the other completes busy") do
+  statuses = @reservation_tasks.map { _1.dig(:outcome, "status") }
+  assert_acceptance_equal([ "busy", "ok" ], statuses.sort, "Reservation Task outcomes")
+  assert_acceptance(
+    @reservation_tasks.all? { _1.dig(:state, "result", "status") == "completed" },
+    "Both reservation Tasks must terminate as completed"
+  )
+
+  @winning_reservation = @reservation_tasks.find { _1.dig(:outcome, "status") == "ok" }
+  @losing_reservation = @reservation_tasks.find { _1.dig(:outcome, "status") == "busy" }
+  busy_details = @losing_reservation.dig(:outcome, "data", "details")
+  assert_acceptance_equal(
+    @winning_reservation.fetch(:attempt_id),
+    busy_details.fetch("owner_attempt_id"),
+    "Persisted busy owner"
+  )
+  assert_acceptance_equal(1, busy_details.fetch("fencing_token"), "Winning fencing token")
+end
+
+Then("the winner owns its complete write set") do
+  event = write_set_events(@winning_reservation.fetch(:attempt_id)).sole
+  expected_paths = [ @winning_reservation.fetch(:unique_path), @shared_lease_path ].sort
+  assert_acceptance_equal(
+    expected_paths,
+    event.data.fetch("resources").map { _1.fetch("resource_path") }.sort,
+    "Winning write-set resources"
+  )
+  expected_paths.each do |path|
+    assert_acceptance_equal(1, lease_events(path).length, "Lease facts for #{path}")
+  end
+end
+
+Then("the loser owns no partial write set") do
+  assert_acceptance_equal(
+    [],
+    write_set_events(@losing_reservation.fetch(:attempt_id)),
+    "Losing Attempt write set"
+  )
+  assert_acceptance_equal(
+    [],
+    lease_events(@losing_reservation.fetch(:unique_path)),
+    "Losing unique resource lease"
+  )
+  assert_acceptance_equal(
+    [],
+    command_events(@losing_reservation.dig(:arguments, :command_id)),
+    "Losing command completion"
+  )
+end
+
+When("the winning Attempt reservation reaches the read side") do
+  project_attempt_context(
+    change_set_id: @lease_change_set_id,
+    work_item_id: @winning_reservation.fetch(:work_item_id),
+    attempt_id: @winning_reservation.fetch(:attempt_id)
+  )
+  @winning_context = call_tool(
+    "coord_context",
+    { attempt_id: @winning_reservation.fetch(:attempt_id) }
+  )
+end
+
+Then("available context exposes the observed lease evidence without a freshness claim") do
+  payload = @winning_context.dig("result", "structuredContent")
+  attempt = payload.dig("data", "context", "attempts").find do |candidate|
+    candidate.fetch("attempt_id") == @winning_reservation.fetch(:attempt_id)
+  end
+  write_set = attempt.fetch("write_set")
+
+  assert_acceptance_equal("ok", payload.fetch("status"), "Available context status")
+  assert_acceptance(!payload.key?("projection_status"), "Context must not expose a projection gate")
+  assert_acceptance_equal(
+    [ @shared_lease_path, @winning_reservation.fetch(:unique_path) ].sort,
+    write_set.fetch("resources").map { _1.fetch("resource_path") }.sort,
+    "Projected resource evidence"
+  )
+  assert_acceptance(write_set.key?("expires_at"), "Projected write set must preserve expiry evidence")
+  assert_acceptance(
+    (write_set.keys & %w[active fresh pending]).empty?,
+    "Projected write set must not claim freshness or current activity"
+  )
+end

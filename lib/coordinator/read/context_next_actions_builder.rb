@@ -28,7 +28,9 @@ module Coordinator::Read
           )
         )
       end
-      attempt_actions = state.attempts.select { _1.status == "started" }.map do |attempt|
+      attempt_actions = state.attempts.select do |attempt|
+        attempt.status == "started" && attempt.write_set.nil?
+      end.map do |attempt|
         NextAction.new(
           tool: "write_set_reserve",
           arguments: NextAction::AttemptArguments.new(

@@ -54,7 +54,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
     expect(Coordinator::Read::CoordContext.find("CS-100").document).to eq(first_document)
   end
 
-  it "projects activation, readiness, ownership, and exact Attempt bases" do
+  it "projects activation, ownership, exact Attempt bases, and observed write-set evidence" do
     create_change_set("CS-100")
     create_work_item("CS-100", "W-100")
     Coordinator::Write::Operations::ExecuteActivateChangeSet.new(event_store:).call(
@@ -74,12 +74,26 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
         { repository_id: "billing", commit_oid: "a" * 40 }
       ]
     ).value!
+    Coordinator::Write::Operations::ExecuteReserveWriteSet.new(event_store:).call(
+      command_id: "reserve-A-100",
+      actor: { kind: "agent", id: "agent-1" },
+      change_set_id: "CS-100",
+      work_item_id: "W-100",
+      attempt_id: "A-100",
+      repository_id: "billing",
+      base_commit_oid: "a" * 40,
+      resources: [
+        { kind: "file", path: "app/models/invoice.rb", base_blob_oid: "b" * 40 },
+        { kind: "file", path: "db/schema.rb" }
+      ],
+      lease_duration_seconds: 300
+    ).value!
 
     planning = change_set_events("CS-100")
     work = work_item_events("W-100")
     attempt = event_store.read(
       streams.attempt("A-100"),
-      Coordinator::Write::EventQueries::ATTEMPT_FOR_ACQUISITION
+      Coordinator::Write::EventQueries::ATTEMPT_FOR_WRITE_SET_RESERVATION
     )
     [ planning[0], planning[1], work[0], planning[2], planning[3], work[1], work[2], *attempt ].each do |event|
       projector.call(event)
@@ -102,6 +116,18 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
         { repository_id: "billing", object_format: "sha1", commit_oid: "a" * 40 }
       ]
     )
+    write_set = snapshot.state.attempts.sole.write_set
+    expect(write_set.to_h).to include(
+      repository_id: "billing",
+      policy_version: "coordinator-resource-key/v1"
+    )
+    expect(write_set.lease_set_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
+    expect(write_set.resources.map(&:resource_path)).to eq(
+      [ "app/models/invoice.rb", "db/schema.rb" ]
+    )
+    expect(write_set.resources.map(&:fencing_token)).to eq([ 1, 1 ])
+    expect(write_set.expires_at).to be > write_set.reserved_at
+    expect(Coordinator::Read::ContextNextActionsBuilder.new.call(snapshot.state)).to be_empty
   end
 
   def create_change_set(change_set_id)

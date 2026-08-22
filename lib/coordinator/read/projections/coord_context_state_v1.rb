@@ -36,6 +36,27 @@ module Coordinator::Read
         attribute :declared_at, Types::Timestamp
       end
 
+      class WriteSetResource < Value
+        attribute :lease_id, Types::UuidV7
+        attribute :resource_key, Types::String
+        attribute :resource_key_hash, Types::Sha256Digest
+        attribute :resource_kind, Types::ResourceKind
+        attribute :resource_path, Types::ResourcePath
+        attribute :base_blob_oid, Types::GitOid.optional
+        attribute :fencing_token, Types::FencingToken
+      end
+
+      class WriteSet < Value
+        Resource = WriteSetResource
+
+        attribute :lease_set_id, Types::UuidV7
+        attribute :repository_id, Types::RepositoryId
+        attribute :policy_version, Types::String.enum(Coordinator::Write::ResourceKeyDocumentV1::POLICY_VERSION)
+        attribute :resources, Types::Array.of(Resource).constrained(min_size: 1, max_size: 32)
+        attribute :reserved_at, Types::Timestamp
+        attribute :expires_at, Types::Timestamp
+      end
+
       class Attempt < Value
         attribute :attempt_id, Types::Identifier
         attribute :change_set_id, Types::Identifier
@@ -45,6 +66,7 @@ module Coordinator::Read
         attribute :status, Types::String.enum("authorized", "started")
         attribute :authorized_at, Types::Timestamp
         attribute :started_at, Types::Timestamp.optional
+        attribute :write_set, WriteSet.optional
       end
 
       attribute :schema, Types::String.enum("coord-context/v1")

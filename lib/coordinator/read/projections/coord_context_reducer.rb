@@ -15,6 +15,7 @@ module Coordinator::Read
         when Coordinator::Write::Events::WorkItemAcquiredV1 then apply_work_item_acquired(state, event)
         when Coordinator::Write::Events::AttemptAuthorizedV1 then apply_attempt_authorized(state, event)
         when Coordinator::Write::Events::AttemptStartedV1 then apply_attempt_started(state, event)
+        when Coordinator::Write::Events::WriteSetReservedV1 then apply_write_set_reserved(state, event)
         else
           raise UnknownProjectionEvent, "coord_context/v1 does not handle #{event.class.name}"
         end
@@ -138,18 +139,15 @@ module Coordinator::Read
           base_snapshots: event.base_snapshots,
           status: "authorized",
           authorized_at: event.authorized_at,
-          started_at: nil
+          started_at: nil,
+          write_set: nil
         )
 
         replace(state, attempts: upsert(state.attempts, :attempt_id, attempt))
       end
 
       def apply_attempt_started(state, event)
-        attempt = state.attempts.find { _1.attempt_id == event.attempt_id }
-        raise ProjectionStateError, "Attempt #{event.attempt_id} is not projected" unless attempt
-        unless attempt.change_set_id == event.change_set_id && attempt.work_item_id == event.work_item_id
-          raise ProjectionStateError, "Attempt #{event.attempt_id} scope changed"
-        end
+        attempt = require_attempt(state, event.attempt_id, event.change_set_id, event.work_item_id)
 
         replace(
           state,
@@ -159,6 +157,29 @@ module Coordinator::Read
             CoordContextStateV1::Attempt.new(
               attempt.attributes.merge(status: "started", started_at: event.started_at)
             )
+          )
+        )
+      end
+
+      def apply_write_set_reserved(state, event)
+        attempt = require_attempt(state, event.attempt_id, event.change_set_id, event.work_item_id)
+        write_set = CoordContextStateV1::WriteSet.new(
+          lease_set_id: event.lease_set_id,
+          repository_id: event.repository_id,
+          policy_version: event.policy_version,
+          resources: event.resources.map do |resource|
+            CoordContextStateV1::WriteSetResource.new(resource.to_h)
+          end,
+          reserved_at: event.reserved_at,
+          expires_at: event.expires_at
+        )
+
+        replace(
+          state,
+          attempts: upsert(
+            state.attempts,
+            :attempt_id,
+            CoordContextStateV1::Attempt.new(attempt.attributes.merge(write_set:))
           )
         )
       end
@@ -177,6 +198,16 @@ module Coordinator::Read
         raise ProjectionStateError, "WorkItem #{work_item_id} scope changed" unless work_item.change_set_id == change_set_id
 
         work_item
+      end
+
+      def require_attempt(state, attempt_id, change_set_id, work_item_id)
+        attempt = state.attempts.find { _1.attempt_id == attempt_id }
+        raise ProjectionStateError, "Attempt #{attempt_id} is not projected" unless attempt
+        unless attempt.change_set_id == change_set_id && attempt.work_item_id == work_item_id
+          raise ProjectionStateError, "Attempt #{attempt_id} scope changed"
+        end
+
+        attempt
       end
 
       def replace(state, **changes)

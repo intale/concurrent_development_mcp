@@ -7,6 +7,7 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
     Coordinator::Write::Commands::Actor.new(kind: "agent", id: "agent-a")
   end
   let(:digest) { Coordinator::Write::CommandInputDigest.new }
+  let(:schemas) { Coordinator::Write::EventSchemaRegistry.new }
 
   it "round-trips every persisted command document into its exact typed command" do
     commands = [
@@ -80,7 +81,24 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
       )
     ]
 
-    rebuilt = commands.map { builder.call(digest.document(_1)) }
+    rebuilt = commands.map do |command|
+      submitted = Coordinator::Write::Events::CoordinationTaskSubmittedV1.new(
+        task_id: "0198e03a-d112-7000-8000-000000000001",
+        tool_name: digest.document(command).tool_name,
+        command_id: command.command_id,
+        canonical_input_digest: digest.call(command),
+        command_input: digest.document(command),
+        submitted_at: "2026-08-22T10:30:00.000000Z",
+        ttl_ms: nil,
+        poll_interval_ms: 500
+      )
+      reloaded = schemas.load(
+        type: "CoordinationTaskSubmitted",
+        schema_version: 1,
+        data: JSON.parse(JSON.generate(submitted.to_h))
+      )
+      builder.call(reloaded.command_input)
+    end
 
     expect(rebuilt).to eq(commands)
   end

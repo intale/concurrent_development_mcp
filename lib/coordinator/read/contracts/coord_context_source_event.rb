@@ -13,7 +13,8 @@ module Coordinator::Read
         "WorkItemMadeReady" => [ "DevelopmentExecution", "WorkItem" ],
         "WorkItemAcquired" => [ "DevelopmentExecution", "WorkItem" ],
         "AttemptAuthorized" => [ "DevelopmentExecution", "Attempt" ],
-        "AttemptStarted" => [ "DevelopmentExecution", "Attempt" ]
+        "AttemptStarted" => [ "DevelopmentExecution", "Attempt" ],
+        "WriteSetReserved" => [ "DevelopmentExecution", "Attempt" ]
       }.freeze
 
       config.validate_keys = true
