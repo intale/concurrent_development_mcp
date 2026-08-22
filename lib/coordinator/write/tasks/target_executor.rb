@@ -10,7 +10,8 @@ module Coordinator::Write
         declare_work_item_dependency: Operations::ExecuteDeclareWorkItemDependency.new(event_store:),
         activate_change_set: Operations::ExecuteActivateChangeSet.new(event_store:),
         acquire_work_item: Operations::ExecuteAcquireWorkItem.new(event_store:),
-        reserve_write_set: Operations::ExecuteReserveWriteSet.new(event_store:)
+        reserve_write_set: Operations::ExecuteReserveWriteSet.new(event_store:),
+        expand_write_set: Operations::ExecuteExpandWriteSet.new(event_store:)
       )
         @create_change_set = create_change_set
         @create_work_item = create_work_item
@@ -18,6 +19,7 @@ module Coordinator::Write
         @activate_change_set = activate_change_set
         @acquire_work_item = acquire_work_item
         @reserve_write_set = reserve_write_set
+        @expand_write_set = expand_write_set
       end
 
       def call(command, caused_by:)
@@ -34,6 +36,8 @@ module Coordinator::Write
           @acquire_work_item.call_command(command, caused_by:)
         when Commands::ReserveWriteSet
           @reserve_write_set.call_command(command, caused_by:)
+        when Commands::ExpandWriteSet
+          @expand_write_set.call_command(command, caused_by:)
         end
       end
     end

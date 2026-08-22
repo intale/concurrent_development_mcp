@@ -44,6 +44,7 @@ module Coordinator::Shared
       change_set_activate
       work_item_acquire
       write_set_reserve
+      write_set_expand
     ].freeze
 
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)

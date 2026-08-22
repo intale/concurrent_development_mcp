@@ -19,7 +19,8 @@ module Coordinator
         pollIntervalMs, and use tasks/cancel for cooperative cancellation. Reuse command_id
         after an unknown mutation result. Read tools return the latest available projection,
         which may be stale; command decisions recheck authoritative event-store facts.
-        After acquiring a WorkItem, reserve its complete initial file write set before editing.
+        After acquiring a WorkItem, reserve its complete initial file write set before editing,
+        and expand that same set before editing any additional file. Expansion never renews expiry.
         The coordinator records attributed evidence and does not execute Git, CI, or agent work.
       TEXT
 

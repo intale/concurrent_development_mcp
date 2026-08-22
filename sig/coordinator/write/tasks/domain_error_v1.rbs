@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Tasks
       module DomainErrorV1
-        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError
+        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError
 
         class ChangeSetDetails < Shared::Value
           def change_set_id: () -> String
@@ -49,6 +49,41 @@ module Coordinator
           def expires_at: () -> String
         end
 
+        class LeaseSetMismatchDetails < AttemptDetails
+          def current_lease_set_id: () -> String
+          def requested_lease_set_id: () -> String
+        end
+
+        class ResourceEvidenceConflictDetails < AttemptDetails
+          def resource_key: () -> String
+          def resource_key_hash: () -> String
+          def current_base_blob_oid: () -> String?
+          def requested_base_blob_oid: () -> String?
+        end
+
+        class WriteSetLimitDetails < AttemptDetails
+          def current_resource_count: () -> Integer
+          def requested_addition_count: () -> Integer
+        end
+
+        class LeaseSetExpiredDetails < AttemptDetails
+          def resource_key_hash: () -> String
+          def lease_id: () -> String
+          def fencing_token: () -> Integer
+          def expires_at: () -> String
+        end
+
+        class LeaseSetNotCurrentDetails < AttemptDetails
+          def resource_key_hash: () -> String
+          def expected_lease_id: () -> String
+          def current_lease_id: () -> String?
+          def expected_fencing_token: () -> Integer
+          def current_fencing_token: () -> Integer
+          def current_lease_set_id: () -> String?
+          def current_attempt_id: () -> String?
+          def current_expires_at: () -> String?
+        end
+
         class ChangeSetError < Shared::Value
           def code: () -> String
           def message: () -> String
@@ -89,6 +124,37 @@ module Coordinator
           def code: () -> String
           def message: () -> String
           def details: () -> LeaseBusyDetails
+        end
+
+
+        class LeaseSetMismatchError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> LeaseSetMismatchDetails
+        end
+
+        class ResourceEvidenceConflictError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> ResourceEvidenceConflictDetails
+        end
+
+        class WriteSetLimitError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> WriteSetLimitDetails
+        end
+
+        class LeaseSetExpiredError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> LeaseSetExpiredDetails
+        end
+
+        class LeaseSetNotCurrentError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> LeaseSetNotCurrentDetails
         end
       end
     end

@@ -108,14 +108,6 @@ module Coordinator
       end
 
       def write_set_reserve
-        resource = object_schema(
-          properties: {
-            kind: { type: "string", enum: [ "file" ] },
-            path: { type: "string", minLength: 1, maxLength: 1_024 },
-            base_blob_oid: { anyOf: [ git_oid, { type: "null" } ] }
-          },
-          required: %w[kind path]
-        )
         object_schema(
           properties: common_mutation_properties.merge(
             change_set_id: identifier,
@@ -125,7 +117,7 @@ module Coordinator
             base_commit_oid: git_oid,
             resources: {
               type: "array",
-              items: resource,
+              items: write_set_resource,
               minItems: 1,
               maxItems: 32
             },
@@ -134,6 +126,29 @@ module Coordinator
           required: %w[
             command_id actor change_set_id work_item_id attempt_id repository_id
             base_commit_oid resources lease_duration_seconds
+          ]
+        )
+      end
+
+      def write_set_expand
+        object_schema(
+          properties: common_mutation_properties.merge(
+            change_set_id: identifier,
+            work_item_id: identifier,
+            attempt_id: identifier,
+            lease_set_id: uuid_v7,
+            repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+            base_commit_oid: git_oid,
+            resources: {
+              type: "array",
+              items: write_set_resource,
+              minItems: 1,
+              maxItems: 32
+            }
+          ),
+          required: %w[
+            command_id actor change_set_id work_item_id attempt_id lease_set_id
+            repository_id base_commit_oid resources
           ]
         )
       end
@@ -202,6 +217,24 @@ module Coordinator
 
       def git_oid
         { type: "string", pattern: "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" }
+      end
+
+      def uuid_v7
+        {
+          type: "string",
+          pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        }
+      end
+
+      def write_set_resource
+        object_schema(
+          properties: {
+            kind: { type: "string", enum: [ "file" ] },
+            path: { type: "string", minLength: 1, maxLength: 1_024 },
+            base_blob_oid: { anyOf: [ git_oid, { type: "null" } ] }
+          },
+          required: %w[kind path]
+        )
       end
 
       def string_array(min_items:, max_items:, max_length:)

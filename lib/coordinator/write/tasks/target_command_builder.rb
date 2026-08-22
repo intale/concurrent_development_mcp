@@ -17,6 +17,8 @@ module Coordinator::Write
           build_acquire_work_item(document)
         when CommandInputDocuments::ReserveWriteSetV1
           build_reserve_write_set(document)
+        when CommandInputDocuments::ExpandWriteSetV1
+          build_expand_write_set(document)
         end
       end
 
@@ -95,6 +97,21 @@ module Coordinator::Write
           base_commit_oid: input.base_commit_oid,
           resources: input.resources.map { FileResourceV1.new(_1.to_h) },
           lease_duration_seconds: input.lease_duration_seconds
+        )
+      end
+
+      def build_expand_write_set(document)
+        input = document.input
+        Commands::ExpandWriteSet.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          change_set_id: input.change_set_id,
+          work_item_id: input.work_item_id,
+          attempt_id: input.attempt_id,
+          lease_set_id: input.lease_set_id,
+          repository_id: input.repository_id,
+          base_commit_oid: input.base_commit_oid,
+          resources: input.resources.map { FileResourceV1.new(_1.to_h) }
         )
       end
 

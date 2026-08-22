@@ -71,6 +71,86 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         },
         Coordinator::Write::Tasks::DomainErrorV1::LeaseBusyError,
         "busy"
+      ],
+      [
+        :write_set_unchanged,
+        {
+          change_set_id: "CS-task-result",
+          work_item_id: "W-task-result",
+          attempt_id: "ATT-task-result"
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::AttemptError,
+        "denied"
+      ],
+      [
+        :lease_set_mismatch,
+        {
+          change_set_id: "CS-task-result",
+          work_item_id: "W-task-result",
+          attempt_id: "ATT-task-result",
+          current_lease_set_id: "0198e03a-d112-7000-8000-000000000001",
+          requested_lease_set_id: "0198e03a-d112-7000-8000-000000000002"
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::LeaseSetMismatchError,
+        "denied"
+      ],
+      [
+        :resource_evidence_conflict,
+        {
+          change_set_id: "CS-task-result",
+          work_item_id: "W-task-result",
+          attempt_id: "ATT-task-result",
+          resource_key: "repo:billing:file:app/models/invoice.rb",
+          resource_key_hash: "sha256:4ef29088b0a3df37b0bdf49785a9dce3dad97985b7f22d5ab5d86e04cdc4049a",
+          current_base_blob_oid: "a" * 40,
+          requested_base_blob_oid: "b" * 40
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::ResourceEvidenceConflictError,
+        "denied"
+      ],
+      [
+        :write_set_limit_reached,
+        {
+          change_set_id: "CS-task-result",
+          work_item_id: "W-task-result",
+          attempt_id: "ATT-task-result",
+          current_resource_count: 31,
+          requested_addition_count: 2
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::WriteSetLimitError,
+        "denied"
+      ],
+      [
+        :lease_set_expired,
+        {
+          change_set_id: "CS-task-result",
+          work_item_id: "W-task-result",
+          attempt_id: "ATT-task-result",
+          resource_key_hash: "sha256:4ef29088b0a3df37b0bdf49785a9dce3dad97985b7f22d5ab5d86e04cdc4049a",
+          lease_id: "0198e03a-d112-7000-8000-000000000001",
+          fencing_token: 7,
+          expires_at: "2026-08-22T10:30:00.000000Z"
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::LeaseSetExpiredError,
+        "denied"
+      ],
+      [
+        :lease_set_not_current,
+        {
+          change_set_id: "CS-task-result",
+          work_item_id: "W-task-result",
+          attempt_id: "ATT-task-result",
+          resource_key_hash: "sha256:4ef29088b0a3df37b0bdf49785a9dce3dad97985b7f22d5ab5d86e04cdc4049a",
+          expected_lease_id: "0198e03a-d112-7000-8000-000000000001",
+          current_lease_id: "0198e03a-d112-7000-8000-000000000002",
+          expected_fencing_token: 7,
+          current_fencing_token: 8,
+          current_lease_set_id: "0198e03a-d112-7000-8000-000000000003",
+          current_attempt_id: "ATT-task-result-other",
+          current_expires_at: "2026-08-22T10:45:00.000000Z"
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::LeaseSetNotCurrentError,
+        "denied"
       ]
     ]
 

@@ -48,6 +48,41 @@ module Coordinator::Write
         attribute :expires_at, Types::Timestamp
       end
 
+      class LeaseSetMismatchDetails < AttemptDetails
+        attribute :current_lease_set_id, Types::UuidV7
+        attribute :requested_lease_set_id, Types::UuidV7
+      end
+
+      class ResourceEvidenceConflictDetails < AttemptDetails
+        attribute :resource_key, Types::String
+        attribute :resource_key_hash, Types::Sha256Digest
+        attribute :current_base_blob_oid, Types::GitOid.optional
+        attribute :requested_base_blob_oid, Types::GitOid.optional
+      end
+
+      class WriteSetLimitDetails < AttemptDetails
+        attribute :current_resource_count, Types::WriteSetSize
+        attribute :requested_addition_count, Types::WriteSetSize
+      end
+
+      class LeaseSetExpiredDetails < AttemptDetails
+        attribute :resource_key_hash, Types::Sha256Digest
+        attribute :lease_id, Types::UuidV7
+        attribute :fencing_token, Types::FencingToken
+        attribute :expires_at, Types::Timestamp
+      end
+
+      class LeaseSetNotCurrentDetails < AttemptDetails
+        attribute :resource_key_hash, Types::Sha256Digest
+        attribute :expected_lease_id, Types::UuidV7
+        attribute :current_lease_id, Types::UuidV7.optional
+        attribute :expected_fencing_token, Types::FencingToken
+        attribute :current_fencing_token, Types::Integer.constrained(gteq: 0)
+        attribute :current_lease_set_id, Types::UuidV7.optional
+        attribute :current_attempt_id, Types::Identifier.optional
+        attribute :current_expires_at, Types::Timestamp.optional
+      end
+
       class ChangeSetError < Value
         attribute :code, Types::String.enum(
           "change_set_already_exists",
@@ -104,7 +139,9 @@ module Coordinator::Write
           "attempt_not_active",
           "attempt_scope_mismatch",
           "attempt_owner_mismatch",
-          "write_set_already_reserved"
+          "write_set_already_reserved",
+          "write_set_not_reserved",
+          "write_set_unchanged"
         )
         attribute :message, Types::String
         attribute :details, AttemptDetails
@@ -122,13 +159,48 @@ module Coordinator::Write
         attribute :details, LeaseBusyDetails
       end
 
+      class LeaseSetMismatchError < Value
+        attribute :code, Types::String.enum("lease_set_mismatch")
+        attribute :message, Types::String
+        attribute :details, LeaseSetMismatchDetails
+      end
+
+      class ResourceEvidenceConflictError < Value
+        attribute :code, Types::String.enum("resource_evidence_conflict")
+        attribute :message, Types::String
+        attribute :details, ResourceEvidenceConflictDetails
+      end
+
+      class WriteSetLimitError < Value
+        attribute :code, Types::String.enum("write_set_limit_reached")
+        attribute :message, Types::String
+        attribute :details, WriteSetLimitDetails
+      end
+
+      class LeaseSetExpiredError < Value
+        attribute :code, Types::String.enum("lease_set_expired")
+        attribute :message, Types::String
+        attribute :details, LeaseSetExpiredDetails
+      end
+
+      class LeaseSetNotCurrentError < Value
+        attribute :code, Types::String.enum("lease_set_not_current")
+        attribute :message, Types::String
+        attribute :details, LeaseSetNotCurrentDetails
+      end
+
       Type = ChangeSetError |
              ActivationDependencyError |
              WorkItemError |
              DependencyError |
              AttemptError |
              CommandIdReusedError |
-             LeaseBusyError
+             LeaseBusyError |
+             LeaseSetMismatchError |
+             ResourceEvidenceConflictError |
+             WriteSetLimitError |
+             LeaseSetExpiredError |
+             LeaseSetNotCurrentError
     end
   end
 end
