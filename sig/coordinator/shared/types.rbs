@@ -7,6 +7,7 @@ module Coordinator
       SHA256_DIGEST_PATTERN: Regexp
       TIMESTAMP_PATTERN: Regexp
       UUID_V7_PATTERN: Regexp
+      RESOURCE_PATH_PATTERN: Regexp
       MARKER_PURPOSE_PATTERN: Regexp
       MARKER_COMPONENT_PATTERN: Regexp
 
@@ -23,6 +24,11 @@ module Coordinator
       Timestamp: untyped
       UuidV7: untyped
       TaskId: untyped
+      ResourcePath: untyped
+      ResourceKind: untyped
+      LeaseMode: untyped
+      LeaseDurationSeconds: untyped
+      FencingToken: untyped
       Marker: untyped
       MarkerPurpose: untyped
       MarkerComponent: untyped

@@ -7,6 +7,7 @@ module Coordinator
       def work_item_dependency_declare: (command: Commands::DeclareWorkItemDependency, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
       def change_set_activate: (command: Commands::ActivateChangeSet, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
       def work_item_acquire: (command: Commands::AcquireWorkItem, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
+      def write_set_reserve: (command: Commands::ReserveWriteSet, reservation: Events::WriteSetReservedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
     end
   end
 end

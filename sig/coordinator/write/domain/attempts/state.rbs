@@ -10,6 +10,7 @@ module Coordinator
           def work_item_id: () -> String?
           def agent_id: () -> String?
           def base_snapshots: () -> Array[RepositorySnapshotV1]
+          def lease_set_id: () -> String?
           def status: () -> String
           def absent?: () -> bool
           def apply: (Events::Base event) -> State

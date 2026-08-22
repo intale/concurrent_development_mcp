@@ -22,6 +22,20 @@ module Coordinator::Write
       attribute :attempt_id, Types::Identifier
     end
 
-    Type = ChangeSet | WorkItem | Dependency | Attempt
+    class LeaseSet < Value
+      Reference = LeaseReferenceV1
+
+      attribute :change_set_id, Types::Identifier
+      attribute :work_item_id, Types::Identifier
+      attribute :attempt_id, Types::Identifier
+      attribute :repository_id, Types::RepositoryId
+      attribute :lease_set_id, Types::UuidV7
+      attribute :policy_version, Types::String.enum(ResourceKeyDocumentV1::POLICY_VERSION)
+      attribute :acquired_at, Types::Timestamp
+      attribute :expires_at, Types::Timestamp
+      attribute :resources, Types::Array.of(Reference).constrained(min_size: 1, max_size: 32)
+    end
+
+    Type = ChangeSet | WorkItem | Dependency | Attempt | LeaseSet
   end
 end

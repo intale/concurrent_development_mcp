@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    class FileResourceV1 < Shared::Value
+      def kind: () -> String
+      def path: () -> String
+      def base_blob_oid: () -> String?
+      def resource_key: () -> String
+      def resource_key_hash: () -> String
+      def policy_version: () -> String
+    end
+  end
+end

@@ -84,10 +84,38 @@ module Coordinator::Write
       attribute :input, AcquireWorkItemInputV1
     end
 
+    class FileResourceV1 < Value
+      attribute :kind, Types::ResourceKind
+      attribute :path, Types::ResourcePath
+      attribute :base_blob_oid, Types::GitOid.optional
+      attribute :resource_key, Types::String
+      attribute :resource_key_hash, Types::Sha256Digest
+      attribute :policy_version, Types::String.enum(ResourceKeyDocumentV1::POLICY_VERSION)
+    end
+
+    class ReserveWriteSetInputV1 < Value
+      Resource = FileResourceV1
+
+      attribute :actor, ActorV1
+      attribute :change_set_id, Types::Identifier
+      attribute :work_item_id, Types::Identifier
+      attribute :attempt_id, Types::Identifier
+      attribute :repository_id, Types::RepositoryId
+      attribute :base_commit_oid, Types::GitOid
+      attribute :resources, Types::Array.of(Resource).constrained(min_size: 1, max_size: 32)
+      attribute :lease_duration_seconds, Types::LeaseDurationSeconds
+    end
+
+    class ReserveWriteSetV1 < BaseV1
+      attribute :tool_name, Types::String.enum("write_set_reserve")
+      attribute :input, ReserveWriteSetInputV1
+    end
+
     Type = CreateChangeSetV1 |
            CreateWorkItemV1 |
            DeclareWorkItemDependencyV1 |
            ActivateChangeSetV1 |
-           AcquireWorkItemV1
+           AcquireWorkItemV1 |
+           ReserveWriteSetV1
   end
 end

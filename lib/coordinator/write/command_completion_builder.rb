@@ -109,6 +109,35 @@ module Coordinator::Write
       )
     end
 
+    def write_set_reserve(command:, reservation:, input_digest:, persisted_events:, completed_at:)
+      attempt_arguments = NextAction::AttemptArguments.new(
+        change_set_id: command.change_set_id,
+        work_item_id: command.work_item_id,
+        attempt_id: command.attempt_id
+      )
+
+      build_completion(
+        command:,
+        tool_name: "write_set_reserve",
+        summary: "Write set reserved.",
+        data: CommandReceiptData::LeaseSet.new(
+          change_set_id: command.change_set_id,
+          work_item_id: command.work_item_id,
+          attempt_id: command.attempt_id,
+          repository_id: command.repository_id,
+          lease_set_id: reservation.lease_set_id,
+          policy_version: reservation.policy_version,
+          acquired_at: reservation.reserved_at,
+          expires_at: reservation.expires_at,
+          resources: reservation.resources
+        ),
+        next_actions: [ NextAction.new(tool: "coord_context", arguments: attempt_arguments) ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
 
     def build_completion(command:, tool_name:, summary:, data:, next_actions:, input_digest:, persisted_events:, completed_at:)

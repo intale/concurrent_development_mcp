@@ -14,6 +14,8 @@ module Coordinator
       CHANGE_SET_FOR_ACQUISITION: EventReadCriteria
       WORK_ITEM_FOR_ACQUISITION: EventReadCriteria
       ATTEMPT_FOR_ACQUISITION: EventReadCriteria
+      ATTEMPT_FOR_WRITE_SET_RESERVATION: EventReadCriteria
+      RESOURCE_LEASE_FOR_RESERVATION: GroupedEventReadCriteria
     end
   end
 end

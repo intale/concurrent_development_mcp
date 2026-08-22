@@ -1,0 +1,24 @@
+module Coordinator
+  module Write
+    module Domain
+      module ResourceLeases
+        class State < Shared::Value
+          def self.initial: () -> State
+          def self.reduce: (Array[Events::Base] events) -> State
+          def lease_id: () -> String?
+          def lease_set_id: () -> String?
+          def resource_key: () -> String?
+          def resource_key_hash: () -> String?
+          def attempt_id: () -> String?
+          def agent_id: () -> String?
+          def fencing_token: () -> Integer
+          def acquired_at: () -> String?
+          def expires_at: () -> String?
+          def active_at?: (String timestamp) -> bool
+          def next_fencing_token: () -> Integer
+          def apply: (Events::Base event) -> State
+        end
+      end
+    end
+  end
+end

@@ -11,6 +11,7 @@ module Coordinator::Write
         attribute :work_item_id, Types::Identifier.optional
         attribute :agent_id, Types::Identifier.optional
         attribute :base_snapshots, Types::Array.of(Snapshot).constrained(max_size: 1)
+        attribute :lease_set_id, Types::UuidV7.optional
         attribute :status, Types::String.enum("absent", "authorized", "active")
 
         def self.initial
@@ -20,6 +21,7 @@ module Coordinator::Write
             work_item_id: nil,
             agent_id: nil,
             base_snapshots: [],
+            lease_set_id: nil,
             status: "absent"
           )
         end
@@ -41,6 +43,7 @@ module Coordinator::Write
               work_item_id: event.work_item_id,
               agent_id: event.agent_id,
               base_snapshots: event.base_snapshots,
+              lease_set_id: nil,
               status: "authorized"
             )
           when Events::AttemptStartedV1
@@ -50,7 +53,18 @@ module Coordinator::Write
               work_item_id:,
               agent_id:,
               base_snapshots:,
+              lease_set_id:,
               status: "active"
+            )
+          when Events::WriteSetReservedV1
+            self.class.new(
+              attempt_id:,
+              change_set_id:,
+              work_item_id:,
+              agent_id:,
+              base_snapshots:,
+              lease_set_id: event.lease_set_id,
+              status:
             )
           else
             self

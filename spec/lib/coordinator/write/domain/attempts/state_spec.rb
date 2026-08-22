@@ -36,6 +36,7 @@ RSpec.describe Coordinator::Write::Domain::Attempts::State do
       work_item_id: "W-200",
       agent_id: "agent-a",
       base_snapshots: [ snapshot.to_h ],
+      lease_set_id: nil,
       status: "active"
     )
     expect(state).to be_frozen

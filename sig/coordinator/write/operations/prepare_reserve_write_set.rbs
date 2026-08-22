@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Operations
+      class PrepareReserveWriteSet
+        def initialize: (?contract: Contracts::ReserveWriteSet, ?git_object_ids_contract: Contracts::GitObjectIds, ?resource_normalizer: FileResourceNormalizer) -> void
+        %a{rbs:test:skip}
+        def call: (command_input input) -> Dry::Monads::Result
+      end
+    end
+  end
+end

@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandReceiptData
-      type value = ChangeSet | WorkItem | Dependency | Attempt
+      type value = ChangeSet | WorkItem | Dependency | Attempt | LeaseSet
 
       class ChangeSet < Shared::Value
         def change_set_id: () -> String
@@ -21,6 +21,19 @@ module Coordinator
         def change_set_id: () -> String
         def work_item_id: () -> String
         def attempt_id: () -> String
+      end
+
+
+      class LeaseSet < Shared::Value
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def attempt_id: () -> String
+        def repository_id: () -> String
+        def lease_set_id: () -> String
+        def policy_version: () -> String
+        def acquired_at: () -> String
+        def expires_at: () -> String
+        def resources: () -> Array[LeaseReferenceV1]
       end
     end
   end

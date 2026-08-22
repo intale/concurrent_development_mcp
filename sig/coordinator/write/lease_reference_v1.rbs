@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    class LeaseReferenceV1 < Shared::Value
+      def lease_id: () -> String
+      def resource_key: () -> String
+      def resource_key_hash: () -> String
+      def resource_kind: () -> String
+      def resource_path: () -> String
+      def base_blob_oid: () -> String?
+      def fencing_token: () -> Integer
+    end
+  end
+end

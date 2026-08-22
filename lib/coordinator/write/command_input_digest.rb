@@ -17,6 +17,7 @@ module Coordinator::Write
       when Commands::DeclareWorkItemDependency then work_item_dependency_declare_document(command)
       when Commands::ActivateChangeSet then change_set_activate_document(command)
       when Commands::AcquireWorkItem then work_item_acquire_document(command)
+      when Commands::ReserveWriteSet then write_set_reserve_document(command)
       else
         raise ArgumentError, "Unsupported coordination command: #{command.class.name}"
       end
@@ -114,6 +115,30 @@ module Coordinator::Write
           base_snapshots: command.base_snapshots.map do |snapshot|
             CommandInputDocuments::RepositorySnapshotV1.new(snapshot.to_h)
           end
+        )
+      )
+    end
+
+    def write_set_reserve(command)
+      @canonical_json.sha256(write_set_reserve_document(command).to_h)
+    end
+
+    def write_set_reserve_document(command)
+      CommandInputDocuments::ReserveWriteSetV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "write_set_reserve",
+        input: CommandInputDocuments::ReserveWriteSetInputV1.new(
+          actor: actor_document(command.actor),
+          change_set_id: command.change_set_id,
+          work_item_id: command.work_item_id,
+          attempt_id: command.attempt_id,
+          repository_id: command.repository_id,
+          base_commit_oid: command.base_commit_oid,
+          resources: command.resources.map do |resource|
+            CommandInputDocuments::FileResourceV1.new(resource.to_h)
+          end,
+          lease_duration_seconds: command.lease_duration_seconds
         )
       )
     end
