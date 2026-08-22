@@ -33,7 +33,9 @@ module Coordinator::Read
           ambiguities: proposal.ambiguities.map(&:to_h),
           assessment: proposal.assessment.to_h,
           proposal_status: proposal.assessment.status,
+          lifecycle_status: "proposed",
           policy_status: "proposal_only",
+          adjudication: nil,
           clarification_required: false,
           actor_kind: event.metadata.fetch("actor_kind"),
           actor_id: event.metadata.fetch("actor_id"),
@@ -54,17 +56,67 @@ module Coordinator::Read
           interpretation_id: clarification.interpretation_id,
           message_id: clarification.source_message_id
         )
-        record.update!(
+        attributes = {
           assessment: {
             status: clarification.status,
             reasons: clarification.reasons,
             questions: clarification.questions.map(&:to_h)
           },
           proposal_status: clarification.status,
+          lifecycle_status: "clarification_required",
           clarification_required: true,
           clarification_event_id: event.id,
           clarification_stream_revision: event.stream_revision,
           clarification_required_at_domain: clarification.required_at
+        }
+        if clarification.origin == "adjudication"
+          attributes[:adjudication] = build_adjudication(
+            event:,
+            action: "request_clarification",
+            outcome: "clarification_required",
+            rationale: clarification.rationale,
+            clarification: Coordinator::Write::Interpretations::AdjudicationClarificationV1.new(
+              status: clarification.status,
+              questions: clarification.questions
+            ),
+            slot: nil,
+            adjudicated_at: clarification.required_at
+          ).to_h
+        end
+        record.update!(attributes)
+      end
+
+      def accept(event:, acceptance:)
+        record = find_interpretation(acceptance)
+        record.update!(
+          lifecycle_status: "accepted",
+          clarification_required: false,
+          adjudication: build_adjudication(
+            event:,
+            action: "accept",
+            outcome: "accepted_for_activation",
+            rationale: acceptance.rationale,
+            clarification: nil,
+            slot: acceptance.slot,
+            adjudicated_at: acceptance.accepted_at
+          ).to_h
+        )
+      end
+
+      def reject(event:, rejection:)
+        record = find_interpretation(rejection)
+        record.update!(
+          lifecycle_status: "rejected",
+          clarification_required: false,
+          adjudication: build_adjudication(
+            event:,
+            action: "reject",
+            outcome: "rejected",
+            rationale: rejection.rationale,
+            clarification: nil,
+            slot: nil,
+            adjudicated_at: rejection.rejected_at
+          ).to_h
         )
       end
 
@@ -83,7 +135,9 @@ module Coordinator::Read
             Coordinator::Write::Interpretations::InterpretationAmbiguityV1.new(symbolize(ambiguity))
           end,
           assessment: Coordinator::Write::Interpretations::InterpretationAssessmentV1.new(symbolize(record.assessment)),
+          lifecycle_status: record.lifecycle_status,
           policy_status: record.policy_status,
+          adjudication: build_optional(InterpretationAdjudicationV1, record.adjudication),
           actor: AttributedActorV1.new(
             kind: record.actor_kind,
             id: record.actor_id,
@@ -106,6 +160,43 @@ module Coordinator::Read
           stream_name: record.stream_name,
           stream_id: record.stream_id,
           stream_revision: record.stream_revision
+        )
+      end
+
+      def build_adjudication(event:, action:, outcome:, rationale:, clarification:, slot:, adjudicated_at:)
+        InterpretationAdjudicationV1.new(
+          action:,
+          outcome:,
+          rationale:,
+          clarification:,
+          slot:,
+          actor: AttributedActorV1.new(
+            kind: event.metadata.fetch("actor_kind"),
+            id: event.metadata.fetch("actor_id"),
+            authenticated: false
+          ),
+          event: persisted_event_reference(event),
+          adjudicated_at:,
+          causation_id: event.causation_id,
+          correlation_id: event.correlation_id
+        )
+      end
+
+      def find_interpretation(lifecycle_event)
+        Coordinator::Read::DecisionInterpretation.find_by!(
+          interpretation_id: lifecycle_event.interpretation_id,
+          message_id: lifecycle_event.source_message_id
+        )
+      end
+
+      def persisted_event_reference(event)
+        Coordinator::Write::EventReference.new(
+          event_id: event.id,
+          type: event.type,
+          stream_context: event.stream.context,
+          stream_name: event.stream.stream_name,
+          stream_id: event.stream.stream_id,
+          stream_revision: event.stream_revision
         )
       end
 

@@ -15,7 +15,8 @@ module Coordinator::Write
         renew_lease_set: Operations::ExecuteRenewLeaseSet.new(event_store:),
         release_lease_set: Operations::ExecuteReleaseLeaseSet.new(event_store:),
         record_guidance: Operations::ExecuteRecordGuidance.new(event_store:),
-        propose_decision_interpretation: Operations::ExecuteProposeDecisionInterpretation.new(event_store:)
+        propose_decision_interpretation: Operations::ExecuteProposeDecisionInterpretation.new(event_store:),
+        adjudicate_decision_interpretation: Operations::ExecuteAdjudicateDecisionInterpretation.new(event_store:)
       )
         @create_change_set = create_change_set
         @create_work_item = create_work_item
@@ -28,6 +29,7 @@ module Coordinator::Write
         @release_lease_set = release_lease_set
         @record_guidance = record_guidance
         @propose_decision_interpretation = propose_decision_interpretation
+        @adjudicate_decision_interpretation = adjudicate_decision_interpretation
       end
 
       def call(command, caused_by:)
@@ -54,6 +56,8 @@ module Coordinator::Write
           @record_guidance.call_command(command, caused_by:)
         when Commands::ProposeDecisionInterpretation
           @propose_decision_interpretation.call_command(command, caused_by:)
+        when Commands::AdjudicateDecisionInterpretation
+          @adjudicate_decision_interpretation.call_command(command, caused_by:)
         end
       end
     end

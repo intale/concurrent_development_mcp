@@ -23,7 +23,7 @@ RSpec.describe Coordinator::Read::Projectors::DecisionInterpretationsV1, :event_
     ).value!
   end
 
-  it "stores one proposal, applies its clarification, and ignores duplicate delivery" do
+  it "stores one proposal, applies its clarification and acceptance, and ignores duplicate delivery" do
     enforcement = InterpretationInput.advisory_enforcement.merge(
       level: "merge_gate",
       on_violation: "block"
@@ -39,12 +39,21 @@ RSpec.describe Coordinator::Read::Projectors::DecisionInterpretationsV1, :event_
         enforcement:
       )
     ).value!
-    proposal, clarification = interpretation_events
+    Coordinator::Write::Operations::ExecuteAdjudicateDecisionInterpretation.new(event_store:).call(
+      InterpretationInput.adjudication(
+        command_id: "cmd-accept-project-interpretation",
+        source_message_id: "M-project-interpretation",
+        interpretation_id: "I-project"
+      )
+    ).value!
+    proposal, clarification, acceptance = interpretation_events
 
     projector.call(proposal)
     projector.call(proposal)
     projector.call(clarification)
     projector.call(clarification)
+    projector.call(acceptance)
+    projector.call(acceptance)
 
     projected = Coordinator::Read::Repositories::DecisionInterpretations.new.page(
       Coordinator::Read::InterpretationListQueryV1.new(
@@ -56,6 +65,7 @@ RSpec.describe Coordinator::Read::Projectors::DecisionInterpretationsV1, :event_
     expect(projected.to_h).to include(
       interpretation_id: "I-project",
       message_id: "M-project-interpretation",
+      lifecycle_status: "accepted",
       policy_status: "proposal_only"
     )
     expect(projected.assessment.status).to eq("confirmation_required")
@@ -70,6 +80,17 @@ RSpec.describe Coordinator::Read::Projectors::DecisionInterpretationsV1, :event_
       stream_revision: 1
     )
     expect(projected.source_event.type).to eq("UserUtteranceRecorded")
+    expect(projected.adjudication.to_h).to include(
+      action: "accept",
+      outcome: "accepted_for_activation",
+      rationale: include(code: "user_confirmed"),
+      event: include(event_id: acceptance.id, type: "DecisionInterpretationAccepted"),
+      actor: include(kind: "orchestrator", id: "guidance-host", authenticated: false)
+    )
+    expect(projected.adjudication.slot.compound_marker.marker).to start_with(
+      "compound:interpretation-slot:v1:sha256:"
+    )
+    expect(projected.adjudication.correlation_id).to eq(acceptance.correlation_id)
     expect(projected.actor.to_h).to eq(
       kind: "agent",
       id: "classifier-host",
@@ -81,17 +102,83 @@ RSpec.describe Coordinator::Read::Projectors::DecisionInterpretationsV1, :event_
       Coordinator::Read::ProcessedProjectionEvent.where(
         projection_name: "decision_interpretations"
       ).count
-    ).to eq(2)
+    ).to eq(3)
+  end
+
+  it "serves explicit clarification before a later rejection without activating policy" do
+    Coordinator::Write::Operations::ExecuteProposeDecisionInterpretation.new(event_store:).call(
+      InterpretationInput.build(
+        command_id: "cmd-propose-clarify-project-interpretation",
+        interpretation_id: "I-project",
+        source_message_id: "M-project-interpretation",
+        source_span: { start_character: 21, end_character: 26, text: "RSpec" }
+      )
+    ).value!
+    Coordinator::Write::Operations::ExecuteAdjudicateDecisionInterpretation.new(event_store:).call(
+      InterpretationInput.adjudication(
+        command_id: "cmd-clarify-project-interpretation",
+        source_message_id: "M-project-interpretation",
+        interpretation_id: "I-project",
+        action: "request_clarification",
+        clarification: InterpretationInput.clarification
+      )
+    ).value!
+    Coordinator::Write::Operations::ExecuteAdjudicateDecisionInterpretation.new(event_store:).call(
+      InterpretationInput.adjudication(
+        command_id: "cmd-reject-project-interpretation",
+        source_message_id: "M-project-interpretation",
+        interpretation_id: "I-project",
+        action: "reject",
+        rationale: { code: "user_rejected", summary: "The reading does not match the intended guidance." }
+      )
+    ).value!
+    proposal, clarification, rejection = interpretation_events
+
+    projector.call(proposal)
+    projector.call(clarification)
+    clarified = projected_interpretation
+    expect(clarified.lifecycle_status).to eq("clarification_required")
+    expect(clarified.policy_status).to eq("proposal_only")
+    expect(clarified.adjudication.to_h).to include(
+      action: "request_clarification",
+      outcome: "clarification_required",
+      clarification: include(status: "needs_classification")
+    )
+
+    projector.call(rejection)
+    rejected = projected_interpretation
+    expect(rejected.lifecycle_status).to eq("rejected")
+    expect(rejected.policy_status).to eq("proposal_only")
+    expect(rejected.adjudication.to_h).to include(
+      action: "reject",
+      outcome: "rejected",
+      event: include(event_id: rejection.id)
+    )
   end
 
   def interpretation_events
     event_store.read(
       streams.interpretation("M-project-interpretation"),
       Coordinator::Write::EventReadCriteria.new(
-        event_types: %w[DecisionInterpretationProposed DecisionClarificationRequired],
+        event_types: %w[
+          DecisionInterpretationProposed
+          DecisionClarificationRequired
+          DecisionInterpretationAccepted
+          DecisionInterpretationRejected
+        ],
         maximum_count: 10,
         direction: :asc
       )
     )
+  end
+
+  def projected_interpretation
+    Coordinator::Read::Repositories::DecisionInterpretations.new.page(
+      Coordinator::Read::InterpretationListQueryV1.new(
+        message_id: "M-project-interpretation",
+        after_revision: -1,
+        limit: 20
+      )
+    ).records.sole
   end
 end

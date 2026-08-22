@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Interpretations
+      class InterpretationTerminalEvidenceV1 < Shared::Value
+        def status: () -> String
+        def interpretation_id: () -> String
+        def event: () -> EventReference
+      end
+    end
+  end
+end

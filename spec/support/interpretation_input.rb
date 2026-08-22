@@ -82,4 +82,36 @@ module InterpretationInput
       on_violation: "warn"
     }
   end
+
+  def adjudication(
+    command_id: "cmd-adjudication-1",
+    source_message_id: "M-1",
+    interpretation_id: "I-1",
+    action: "accept",
+    rationale: { code: "user_confirmed", summary: "The proposed reading matches the intended guidance." },
+    clarification: nil
+  )
+    {
+      command_id:,
+      actor: { kind: "orchestrator", id: "guidance-host" },
+      source_message_id:,
+      interpretation_id:,
+      action:,
+      rationale:,
+      clarification:
+    }
+  end
+
+  def clarification
+    {
+      status: "needs_classification",
+      questions: [
+        {
+          field: "scope",
+          prompt: "Which repository should this interpretation govern?",
+          options: [ "billing", "orders" ]
+        }
+      ]
+    }
+  end
 end

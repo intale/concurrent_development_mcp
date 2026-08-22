@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module Domain
+      module Interpretations
+        class AdjudicationState < Shared::Value
+          def proposal: () -> Write::Interpretations::InterpretationProposalEvidenceV1?
+          def terminal: () -> Write::Interpretations::InterpretationTerminalEvidenceV1?
+          def slot_acceptance: () -> Write::Interpretations::InterpretationTerminalEvidenceV1?
+        end
+      end
+    end
+  end
+end

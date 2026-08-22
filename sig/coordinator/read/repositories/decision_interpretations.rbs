@@ -16,6 +16,14 @@ module Coordinator
           event: PgEventstore::Event,
           clarification: Write::Events::DecisionClarificationRequiredV1
         ) -> bool
+        def accept: (
+          event: PgEventstore::Event,
+          acceptance: Write::Events::DecisionInterpretationAcceptedV1
+        ) -> bool
+        def reject: (
+          event: PgEventstore::Event,
+          rejection: Write::Events::DecisionInterpretationRejectedV1
+        ) -> bool
       end
     end
   end

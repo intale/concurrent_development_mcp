@@ -16,11 +16,10 @@ RSpec.describe Coordinator::Read::Contracts::DecisionInterpretationSourceEvent d
     }
   end
 
-  it "accepts both modeled facts only on an Interpretation source" do
-    expect(contract.call(valid_input)).to be_success
-    expect(
-      contract.call(valid_input.merge(event_type: "DecisionClarificationRequired"))
-    ).to be_success
+  it "accepts all modeled lifecycle facts only on an Interpretation source" do
+    described_class::EVENT_TYPES.each do |event_type|
+      expect(contract.call(valid_input.merge(event_type:))).to be_success
+    end
   end
 
   it "rejects another type, stream, schema, actor, revision, or identifier" do

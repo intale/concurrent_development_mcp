@@ -12,7 +12,9 @@ module Coordinator
       def scope_provenance: () -> Write::Interpretations::DecisionScopeProvenanceV1
       def ambiguities: () -> Array[Write::Interpretations::InterpretationAmbiguityV1]
       def assessment: () -> Write::Interpretations::InterpretationAssessmentV1
+      def lifecycle_status: () -> String
       def policy_status: () -> String
+      def adjudication: () -> InterpretationAdjudicationV1?
       def actor: () -> AttributedActorV1
       def event: () -> Write::EventReference
       def clarification_event: () -> Write::EventReference?

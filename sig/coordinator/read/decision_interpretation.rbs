@@ -11,7 +11,9 @@ module Coordinator
       def ambiguities: () -> Array[Hash[String, untyped]]
       def assessment: () -> Hash[String, untyped]
       def proposal_status: () -> String
+      def lifecycle_status: () -> String
       def policy_status: () -> String
+      def adjudication: () -> Hash[String, untyped]?
       def clarification_required: () -> bool
       def clarification_event_id: () -> String?
       def clarification_stream_revision: () -> Integer?

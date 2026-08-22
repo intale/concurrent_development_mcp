@@ -14,6 +14,7 @@ module Coordinator
       def lease_expire_policy: (command: Commands::ExpireResourceLease, expiration: Events::ResourceLeaseExpiredV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
       def guidance_record: (command: Commands::RecordGuidance, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
       def decision_interpretation_propose: (command: Commands::ProposeDecisionInterpretation, proposal: Events::DecisionInterpretationProposedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
+      def decision_interpretation_adjudicate: (command: Commands::AdjudicateDecisionInterpretation, slot: Interpretations::InterpretationSlotV1?, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
     end
   end
 end

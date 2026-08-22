@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module Interpretations
+      class InterpretationSlotBuilder
+        def initialize: (
+          ?topic_registry: TopicRegistry,
+          ?canonical_json: Shared::CanonicalJson,
+          ?compound_marker_builder: Shared::CompoundMarkerBuilder
+        ) -> void
+
+        def call: (Events::DecisionInterpretationProposedV1 proposal) -> InterpretationSlotV1
+      end
+    end
+  end
+end

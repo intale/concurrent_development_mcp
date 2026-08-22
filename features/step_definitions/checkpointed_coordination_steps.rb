@@ -1354,3 +1354,177 @@ Then("the available query lists both proposal-only interpretations without a fre
     "Interpretation query must not claim freshness or activity"
   )
 end
+
+When("the host concurrently accepts both interpretation proposals through Tasks") do
+  @interpretation_lifecycle_before_adjudication = interpretation_page(
+    @interpretation_message_id
+  ).to_h { [ _1.fetch("interpretation_id"), _1.fetch("lifecycle_status") ] }
+  inputs = %w[I-CUC-A I-CUC-B].each_with_index.map do |interpretation_id, index|
+    interpretation_adjudication_arguments(
+      command_id: "cmd-cuc-accept-#{index + 1}",
+      interpretation_id:,
+      action: "accept"
+    )
+  end
+  @adjudication_tasks = inputs.map do |arguments|
+    task_id = call_tool("decision_interpretation_adjudicate", arguments).dig("result", "taskId")
+    assert_acceptance(task_id, "Adjudication did not return a Task handle")
+    { arguments:, task_id: }
+  end
+  @adjudication_tasks.map do |entry|
+    Thread.new { execute_task(entry.fetch(:task_id)) }
+  end.each(&:value)
+  @adjudication_tasks.each do |entry|
+    entry[:state] = task_request("tasks/get", entry.fetch(:task_id))
+  end
+end
+
+Then("one acceptance Task succeeds and the other reports a slot conflict") do
+  results = @adjudication_tasks.map { _1.fetch(:state).dig("result", "result") }
+  assert_acceptance_equal(
+    [ false, true ],
+    results.map { _1.fetch("isError") }.sort_by { _1 ? 1 : 0 },
+    "Acceptance Task outcomes"
+  )
+  denial = results.find { _1.fetch("isError") }
+  assert_acceptance_equal(
+    "interpretation_slot_already_accepted",
+    denial.dig("structuredContent", "data", "code"),
+    "Same-slot denial"
+  )
+  assert_acceptance_equal(
+    1,
+    interpretation_events(@interpretation_message_id).count { _1.type == "DecisionInterpretationAccepted" },
+    "Accepted interpretation facts"
+  )
+end
+
+Then("the projected interpretation view remains available at its previous lifecycle state") do
+  current = interpretation_page(@interpretation_message_id).to_h do
+    [ _1.fetch("interpretation_id"), _1.fetch("lifecycle_status") ]
+  end
+  assert_acceptance_equal(
+    @interpretation_lifecycle_before_adjudication,
+    current,
+    "Available lifecycle before adjudication projection"
+  )
+end
+
+When("the interpretation adjudications reach the read side") do
+  project_interpretations(@interpretation_message_id)
+end
+
+Then("exactly one proposal is accepted for later activation without activating policy") do
+  interpretations = interpretation_page(@interpretation_message_id)
+  assert_acceptance_equal(
+    1,
+    interpretations.count { _1.fetch("lifecycle_status") == "accepted" },
+    "Projected accepted interpretations"
+  )
+  assert_acceptance(
+    interpretations.all? { _1.fetch("policy_status") == "proposal_only" },
+    "Adjudication must not activate policy"
+  )
+  accepted = interpretations.find { _1.fetch("lifecycle_status") == "accepted" }
+  assert_acceptance_equal(
+    "accepted_for_activation",
+    accepted.dig("adjudication", "outcome"),
+    "Accepted adjudication outcome"
+  )
+  assert_acceptance(
+    interpretation_events(@interpretation_message_id).none? { _1.type.include?("Activated") },
+    "No activation fact may be emitted"
+  )
+end
+
+When("the host requests clarification for interpretation {string} through a Task") do |interpretation_id|
+  @clarification_interpretation_id = interpretation_id
+  @lifecycle_before_clarification = interpretation_page(@interpretation_message_id)
+    .find { _1.fetch("interpretation_id") == interpretation_id }
+    .fetch("lifecycle_status")
+  arguments = interpretation_adjudication_arguments(
+    command_id: "cmd-cuc-explicit-clarification",
+    interpretation_id:,
+    action: "request_clarification",
+    clarification: {
+      status: "needs_classification",
+      questions: [
+        {
+          field: "scope",
+          prompt: "Which repository should this interpretation govern?",
+          options: [ "billing", "orders" ]
+        }
+      ]
+    }
+  )
+  @clarification_task_id = submit_and_execute("decision_interpretation_adjudicate", **arguments)
+  @clarification_task_state = task_request("tasks/get", @clarification_task_id)
+end
+
+Then("the clarification Task succeeds while the prior view remains available") do
+  result = @clarification_task_state.dig("result", "result")
+  assert_acceptance_equal(false, result.fetch("isError"), "Clarification tool error")
+  assert_acceptance_equal(
+    "clarification_required",
+    result.dig("structuredContent", "data", "outcome"),
+    "Clarification outcome"
+  )
+  current = interpretation_page(@interpretation_message_id)
+    .find { _1.fetch("interpretation_id") == @clarification_interpretation_id }
+  assert_acceptance_equal(
+    @lifecycle_before_clarification,
+    current.fetch("lifecycle_status"),
+    "Available lifecycle before clarification projection"
+  )
+end
+
+Then("the available interpretation exposes a nonterminal clarification") do
+  current = interpretation_page(@interpretation_message_id)
+    .find { _1.fetch("interpretation_id") == @clarification_interpretation_id }
+  assert_acceptance_equal("clarification_required", current.fetch("lifecycle_status"), "Lifecycle")
+  assert_acceptance_equal(
+    "request_clarification",
+    current.dig("adjudication", "action"),
+    "Adjudication action"
+  )
+  assert_acceptance_equal("proposal_only", current.fetch("policy_status"), "Policy status")
+end
+
+When("the host rejects interpretation {string} through a Task") do |interpretation_id|
+  arguments = interpretation_adjudication_arguments(
+    command_id: "cmd-cuc-reject-interpretation",
+    interpretation_id:,
+    action: "reject"
+  )
+  @rejection_task_id = submit_and_execute("decision_interpretation_adjudicate", **arguments)
+  @rejection_task_state = task_request("tasks/get", @rejection_task_id)
+end
+
+Then("the rejection Task succeeds while the clarification view remains available") do
+  result = @rejection_task_state.dig("result", "result")
+  assert_acceptance_equal(false, result.fetch("isError"), "Rejection tool error")
+  assert_acceptance_equal(
+    "rejected",
+    result.dig("structuredContent", "data", "outcome"),
+    "Rejection outcome"
+  )
+  current = interpretation_page(@interpretation_message_id)
+    .find { _1.fetch("interpretation_id") == @clarification_interpretation_id }
+  assert_acceptance_equal(
+    "clarification_required",
+    current.fetch("lifecycle_status"),
+    "Available lifecycle before rejection projection"
+  )
+end
+
+Then("the available interpretation is rejected without activating policy") do
+  current = interpretation_page(@interpretation_message_id)
+    .find { _1.fetch("interpretation_id") == @clarification_interpretation_id }
+  assert_acceptance_equal("rejected", current.fetch("lifecycle_status"), "Lifecycle")
+  assert_acceptance_equal("reject", current.dig("adjudication", "action"), "Adjudication action")
+  assert_acceptance_equal("proposal_only", current.fetch("policy_status"), "Policy status")
+  assert_acceptance(
+    interpretation_events(@interpretation_message_id).none? { _1.type.include?("Activated") },
+    "No activation fact may be emitted"
+  )
+end

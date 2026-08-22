@@ -13,7 +13,9 @@ module Coordinator::Read
     attribute :scope_provenance, Coordinator::Write::Interpretations::DecisionScopeProvenanceV1
     attribute :ambiguities, Types::Array.of(Ambiguity).constrained(max_size: 20)
     attribute :assessment, Coordinator::Write::Interpretations::InterpretationAssessmentV1
+    attribute :lifecycle_status, Types::InterpretationLifecycleStatus
     attribute :policy_status, Types::InterpretationPolicyStatus
+    attribute :adjudication, InterpretationAdjudicationV1.optional
     attribute :actor, AttributedActorV1
     attribute :event, Coordinator::Write::EventReference
     attribute :clarification_event, Coordinator::Write::EventReference.optional

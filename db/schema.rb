@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_22_160000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_22_170000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -50,6 +50,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_22_160000) do
   create_table "decision_interpretations", primary_key: "interpretation_id", id: :string, force: :cascade do |t|
     t.string "actor_id", null: false
     t.string "actor_kind", null: false
+    t.jsonb "adjudication"
     t.jsonb "ambiguities", default: [], null: false
     t.jsonb "assessment", null: false
     t.string "causation_id"
@@ -62,6 +63,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_22_160000) do
     t.datetime "created_at", null: false
     t.string "event_id", null: false
     t.string "event_type", null: false
+    t.string "lifecycle_status", default: "proposed", null: false
     t.string "message_id", null: false
     t.string "policy_status", null: false
     t.string "proposal_status", null: false
@@ -77,6 +79,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_22_160000) do
     t.datetime "updated_at", null: false
     t.index ["clarification_event_id"], name: "index_decision_interpretations_on_clarification_event_id", unique: true
     t.index ["event_id"], name: "index_decision_interpretations_on_event_id", unique: true
+    t.index ["lifecycle_status"], name: "index_decision_interpretations_on_lifecycle_status"
     t.index ["message_id", "stream_revision"], name: "idx_on_message_id_stream_revision_4258fdb4a5", unique: true
     t.index ["proposal_status"], name: "index_decision_interpretations_on_proposal_status"
   end

@@ -212,6 +212,20 @@ module Coordinator::Write
       attribute :input, ProposeDecisionInterpretationInputV1
     end
 
+    class AdjudicateDecisionInterpretationInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :source_message_id, Types::Identifier
+      attribute :interpretation_id, Types::Identifier
+      attribute :action, Types::InterpretationAdjudicationAction
+      attribute :rationale, Interpretations::AdjudicationRationaleV1
+      attribute :clarification, Interpretations::AdjudicationClarificationV1.optional
+    end
+
+    class AdjudicateDecisionInterpretationV1 < BaseV1
+      attribute :tool_name, Types::String.enum("decision_interpretation_adjudicate")
+      attribute :input, AdjudicateDecisionInterpretationInputV1
+    end
+
     class ExpireResourceLeaseInputV1 < Value
       attribute :actor, ActorV1
       attribute :resource_key_hash, Types::Sha256Digest
@@ -236,7 +250,8 @@ module Coordinator::Write
            RenewLeaseSetV1 |
            ReleaseLeaseSetV1 |
            RecordGuidanceV1 |
-           ProposeDecisionInterpretationV1
+           ProposeDecisionInterpretationV1 |
+           AdjudicateDecisionInterpretationV1
 
     DigestType = Type | ExpireResourceLeaseV1
   end

@@ -209,6 +209,40 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         { message_id: "M-task-result" },
         Coordinator::Write::Tasks::DomainErrorV1::MessageAlreadyRecordedError,
         "denied"
+      ],
+      [
+        :interpretation_not_found,
+        { interpretation_id: "I-task-result", message_id: "M-task-result" },
+        Coordinator::Write::Tasks::DomainErrorV1::InterpretationNotFoundError,
+        "denied"
+      ],
+      [
+        :interpretation_already_accepted,
+        {
+          interpretation_id: "I-task-result",
+          event_id: "0198e03a-d112-7000-8000-000000000001"
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::InterpretationAlreadyAcceptedError,
+        "denied"
+      ],
+      [
+        :interpretation_already_rejected,
+        {
+          interpretation_id: "I-task-result",
+          event_id: "0198e03a-d112-7000-8000-000000000001"
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::InterpretationAlreadyRejectedError,
+        "denied"
+      ],
+      [
+        :interpretation_slot_already_accepted,
+        {
+          interpretation_id: "I-task-result-other",
+          event_id: "0198e03a-d112-7000-8000-000000000001",
+          slot_digest: "sha256:#{'a' * 64}"
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::InterpretationSlotAlreadyAcceptedError,
+        "conflict"
       ]
     ]
 

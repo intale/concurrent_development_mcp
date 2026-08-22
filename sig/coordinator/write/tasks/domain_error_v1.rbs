@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Tasks
       module DomainErrorV1
-        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError
+        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError
 
         class ChangeSetDetails < Shared::Value
           def change_set_id: () -> String
@@ -118,6 +118,18 @@ module Coordinator
 
         class InterpretationDetails < Shared::Value
           def interpretation_id: () -> String
+        end
+
+        class InterpretationMessageDetails < InterpretationDetails
+          def message_id: () -> String
+        end
+
+        class InterpretationTerminalDetails < InterpretationDetails
+          def event_id: () -> String
+        end
+
+        class InterpretationSlotDetails < InterpretationTerminalDetails
+          def slot_digest: () -> String
         end
 
         class SourceSpanMismatchDetails < Shared::Value
@@ -249,6 +261,30 @@ module Coordinator
           def code: () -> String
           def message: () -> String
           def details: () -> InterpretationDetails
+        end
+
+        class InterpretationNotFoundError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> InterpretationMessageDetails
+        end
+
+        class InterpretationAlreadyAcceptedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> InterpretationTerminalDetails
+        end
+
+        class InterpretationAlreadyRejectedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> InterpretationTerminalDetails
+        end
+
+        class InterpretationSlotAlreadyAcceptedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> InterpretationSlotDetails
         end
 
         class SourceSpanMismatchError < Shared::Value

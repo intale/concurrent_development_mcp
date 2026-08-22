@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Contracts
+      class InterpretationAdjudicationEventPlan < Dry::Validation::Contract
+        EVENT_BY_ACTION: Hash[String, singleton(Events::DecisionInterpretationAcceptedV1) | singleton(Events::DecisionInterpretationRejectedV1) | singleton(Events::DecisionClarificationRequiredV1)]
+
+        def call: (command_input input) -> Dry::Validation::Result
+      end
+    end
+  end
+end

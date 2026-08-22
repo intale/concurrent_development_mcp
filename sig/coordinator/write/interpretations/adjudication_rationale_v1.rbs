@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Interpretations
+      class AdjudicationRationaleV1 < Shared::Value
+        def code: () -> String
+        def summary: () -> String
+      end
+    end
+  end
+end

@@ -1,0 +1,16 @@
+module Coordinator
+  module Read
+    class InterpretationAdjudicationV1 < Shared::Value
+      def action: () -> String
+      def outcome: () -> String
+      def rationale: () -> Write::Interpretations::AdjudicationRationaleV1?
+      def clarification: () -> Write::Interpretations::AdjudicationClarificationV1?
+      def slot: () -> Write::Interpretations::InterpretationSlotV1?
+      def actor: () -> AttributedActorV1
+      def event: () -> Write::EventReference
+      def adjudicated_at: () -> String
+      def causation_id: () -> String?
+      def correlation_id: () -> String?
+    end
+  end
+end

@@ -73,6 +73,11 @@ module Coordinator
       DecisionModality: untyped
       DecisionValueSchema: untyped
       InterpretationAssessmentStatus: untyped
+      InterpretationAdjudicationAction: untyped
+      InterpretationClarificationStatus: untyped
+      InterpretationClarificationOrigin: untyped
+      InterpretationLifecycleStatus: untyped
+      InterpretationAdjudicationOutcome: untyped
       ScopeProvenanceKind: untyped
       ScopeAnchorLevel: untyped
       DecisionPhase: untyped

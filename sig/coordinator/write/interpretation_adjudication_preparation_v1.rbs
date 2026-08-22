@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    class InterpretationAdjudicationPreparationV1 < Shared::Value
+      def adjudicated_at: () -> String
+      def input_digest: () -> String
+      def lifecycle_event_id: () -> String
+      def completion_event_id: () -> String
+    end
+  end
+end

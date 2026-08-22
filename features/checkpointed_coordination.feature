@@ -128,3 +128,28 @@ Feature: Checkpointed cooperative coordination
       And the available interpretation query honestly reports no proposals before projection
       When the interpretation proposals reach the read side
       Then the available query lists both proposal-only interpretations without a freshness claim
+
+  Rule: Adjudication serializes competing interpretations without activating policy
+
+    Scenario: Concurrent acceptance of one canonical slot has one winner
+      Given guidance "Use RSpec." is durably recorded as message "M-CUC-GDN-4" in conversation "C-CUC-GDN-4"
+      When two classifiers independently propose atomic interpretations through Tasks
+      And the interpretation proposals reach the read side
+      When the host concurrently accepts both interpretation proposals through Tasks
+      Then one acceptance Task succeeds and the other reports a slot conflict
+      And the projected interpretation view remains available at its previous lifecycle state
+      When the interpretation adjudications reach the read side
+      Then exactly one proposal is accepted for later activation without activating policy
+
+    Scenario: Clarification remains nonterminal and can be followed by rejection
+      Given guidance "Use RSpec." is durably recorded as message "M-CUC-GDN-5" in conversation "C-CUC-GDN-5"
+      When two classifiers independently propose atomic interpretations through Tasks
+      And the interpretation proposals reach the read side
+      When the host requests clarification for interpretation "I-CUC-A" through a Task
+      Then the clarification Task succeeds while the prior view remains available
+      When the interpretation adjudications reach the read side
+      Then the available interpretation exposes a nonterminal clarification
+      When the host rejects interpretation "I-CUC-A" through a Task
+      Then the rejection Task succeeds while the clarification view remains available
+      When the interpretation adjudications reach the read side
+      Then the available interpretation is rejected without activating policy

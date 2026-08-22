@@ -21,6 +21,7 @@ RSpec.describe Coordinator::Container do
     expiry_operation = described_class["operations.execute_expire_resource_lease"]
     guidance_operation = described_class["operations.execute_record_guidance"]
     interpretation_operation = described_class["operations.execute_propose_decision_interpretation"]
+    adjudication_operation = described_class["operations.execute_adjudicate_decision_interpretation"]
     readiness_process_manager = described_class["process_managers.change_set_readiness"]
     task_executor = described_class["process_managers.coordination_task_executor"]
     subscription_manager = described_class["subscription_managers.process_managers"]
@@ -43,6 +44,7 @@ RSpec.describe Coordinator::Container do
       operations.submit_release_lease_set_task
       operations.submit_record_guidance_task
       operations.submit_propose_decision_interpretation_task
+      operations.submit_adjudicate_decision_interpretation_task
     ].map { described_class[_1] }
     tasks_extension = described_class["mcp.tasks.extension"]
     mcp_transport = described_class["mcp.transport"]
@@ -61,6 +63,9 @@ RSpec.describe Coordinator::Container do
     expect(guidance_operation).to be_a(Coordinator::Write::Operations::ExecuteRecordGuidance)
     expect(interpretation_operation).to be_a(
       Coordinator::Write::Operations::ExecuteProposeDecisionInterpretation
+    )
+    expect(adjudication_operation).to be_a(
+      Coordinator::Write::Operations::ExecuteAdjudicateDecisionInterpretation
     )
     expect(readiness_process_manager).to be_a(Coordinator::Processes::ProcessManagers::ChangeSetReadiness)
     expect(task_executor).to be_a(Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor)

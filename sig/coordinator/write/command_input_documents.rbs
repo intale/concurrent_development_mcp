@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandInputDocuments
-      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1
+      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1
       type digest_value = value | ExpireResourceLeaseV1
 
       class ActorV1 < Shared::Value
@@ -202,6 +202,20 @@ module Coordinator
       class ProposeDecisionInterpretationV1 < BaseV1
         def tool_name: () -> String
         def input: () -> ProposeDecisionInterpretationInputV1
+      end
+
+      class AdjudicateDecisionInterpretationInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def source_message_id: () -> String
+        def interpretation_id: () -> String
+        def action: () -> String
+        def rationale: () -> Interpretations::AdjudicationRationaleV1
+        def clarification: () -> Interpretations::AdjudicationClarificationV1?
+      end
+
+      class AdjudicateDecisionInterpretationV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> AdjudicateDecisionInterpretationInputV1
       end
 
       class ExpireResourceLeaseInputV1 < Shared::Value

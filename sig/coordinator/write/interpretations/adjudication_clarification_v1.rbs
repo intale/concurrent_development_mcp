@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Interpretations
+      class AdjudicationClarificationV1 < Shared::Value
+        Question: singleton(ClarificationQuestionV1)
+
+        def status: () -> String
+        def questions: () -> Array[ClarificationQuestionV1]
+      end
+    end
+  end
+end

@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandReceiptData
-      type value = ChangeSet | WorkItem | Dependency | Attempt | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal
+      type value = ChangeSet | WorkItem | Dependency | Attempt | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication
 
       class ChangeSet < Shared::Value
         def change_set_id: () -> String
@@ -99,6 +99,16 @@ module Coordinator
         def source_message_id: () -> String
         def assessment: () -> Interpretations::InterpretationAssessmentV1
         def proposed_at: () -> String
+      end
+
+      class InterpretationAdjudication < Shared::Value
+        def interpretation_id: () -> String
+        def source_message_id: () -> String
+        def action: () -> String
+        def outcome: () -> String
+        def policy_status: () -> String
+        def slot: () -> Interpretations::InterpretationSlotV1?
+        def adjudicated_at: () -> String
       end
     end
   end

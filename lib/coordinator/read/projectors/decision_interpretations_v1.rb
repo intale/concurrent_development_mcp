@@ -69,6 +69,10 @@ module Coordinator::Read
           @interpretations.store_proposal(event:, proposal: payload)
         when Coordinator::Write::Events::DecisionClarificationRequiredV1
           @interpretations.require_clarification(event:, clarification: payload)
+        when Coordinator::Write::Events::DecisionInterpretationAcceptedV1
+          @interpretations.accept(event:, acceptance: payload)
+        when Coordinator::Write::Events::DecisionInterpretationRejectedV1
+          @interpretations.reject(event:, rejection: payload)
         end
       end
     end

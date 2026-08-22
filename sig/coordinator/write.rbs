@@ -12,7 +12,8 @@ module Coordinator
                                 Commands::RenewLeaseSet |
                                 Commands::ReleaseLeaseSet |
                                 Commands::RecordGuidance |
-                                Commands::ProposeDecisionInterpretation
+                                Commands::ProposeDecisionInterpretation |
+                                Commands::AdjudicateDecisionInterpretation
     type write_command = coordination_command | Commands::ExpireResourceLease
     type lifecycle_command = Commands::StartCoordinationTask |
                              Commands::RecordCoordinationTaskOutcome |

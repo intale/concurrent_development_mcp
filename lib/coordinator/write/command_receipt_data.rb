@@ -106,6 +106,16 @@ module Coordinator::Write
       attribute :proposed_at, Types::Timestamp
     end
 
+    class InterpretationAdjudication < Value
+      attribute :interpretation_id, Types::Identifier
+      attribute :source_message_id, Types::Identifier
+      attribute :action, Types::InterpretationAdjudicationAction
+      attribute :outcome, Types::InterpretationAdjudicationOutcome
+      attribute :policy_status, Types::InterpretationPolicyStatus
+      attribute :slot, Interpretations::InterpretationSlotV1.optional
+      attribute :adjudicated_at, Types::Timestamp
+    end
+
     Type = ChangeSet |
            WorkItem |
            Dependency |
@@ -116,6 +126,7 @@ module Coordinator::Write
            LeaseSetRelease |
            ResourceLeaseExpiry |
            Guidance |
-           InterpretationProposal
+           InterpretationProposal |
+           InterpretationAdjudication
   end
 end

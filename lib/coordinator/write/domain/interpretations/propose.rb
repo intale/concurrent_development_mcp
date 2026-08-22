@@ -125,8 +125,10 @@ module Coordinator::Write
               interpretation_id: proposal.interpretation_id,
               source_message_id: proposal.source_message_id,
               status: assessment.status,
+              origin: "proposal_assessment",
               reasons: assessment.reasons,
               questions: assessment.questions,
+              rationale: nil,
               required_at: proposed_at
             )
           end

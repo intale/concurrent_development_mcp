@@ -13,6 +13,7 @@ module Coordinator
       def self.lease_release: () -> json_schema
       def self.guidance_record: () -> json_schema
       def self.decision_interpretation_propose: () -> json_schema
+      def self.decision_interpretation_adjudicate: () -> json_schema
       def self.operation_get: () -> json_schema
       def self.guidance_get: () -> json_schema
       def self.decision_interpretation_list: () -> json_schema
@@ -36,6 +37,7 @@ module Coordinator
       def self.interpretation_validity: () -> json_schema
       def self.interpretation_relations: () -> json_schema
       def self.interpretation_ambiguity: () -> json_schema
+      def self.interpretation_question: () -> json_schema
       def self.identifier_array: (?max_items: Integer) -> json_schema
       def self.nullable_enum: (Array[String] values) -> json_schema
       def self.string_array: (min_items: Integer, max_items: Integer, max_length: Integer) -> json_schema

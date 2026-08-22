@@ -129,7 +129,14 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
             fencing_token: 4
           )
         ]
-      )
+      ),
+      Coordinator::Write::Operations::PrepareAdjudicateDecisionInterpretation.new.call(
+        InterpretationInput.adjudication(
+          command_id: "cmd-task-build-10",
+          action: "request_clarification",
+          clarification: InterpretationInput.clarification
+        )
+      ).value!
     ]
 
     rebuilt = commands.map do |command|

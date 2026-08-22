@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Operations
+      class PrepareAdjudicateDecisionInterpretation
+        def initialize: (?contract: Contracts::AdjudicateDecisionInterpretation) -> void
+        %a{rbs:test:skip}
+        def call: (command_input input) -> Dry::Monads::Result
+      end
+    end
+  end
+end

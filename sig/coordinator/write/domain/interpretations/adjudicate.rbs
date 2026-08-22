@@ -1,0 +1,17 @@
+module Coordinator
+  module Write
+    module Domain
+      module Interpretations
+        class Adjudicate
+          def initialize: (?stream_factory: StreamFactory) -> void
+          def call: (
+            state: AdjudicationState,
+            command: Commands::AdjudicateDecisionInterpretation,
+            slot: Write::Interpretations::InterpretationSlotV1?,
+            adjudicated_at: String
+          ) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

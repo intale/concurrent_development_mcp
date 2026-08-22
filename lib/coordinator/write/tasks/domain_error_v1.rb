@@ -119,6 +119,18 @@ module Coordinator::Write
         attribute :interpretation_id, Types::Identifier
       end
 
+      class InterpretationMessageDetails < InterpretationDetails
+        attribute :message_id, Types::Identifier
+      end
+
+      class InterpretationTerminalDetails < InterpretationDetails
+        attribute :event_id, Types::UuidV7
+      end
+
+      class InterpretationSlotDetails < InterpretationTerminalDetails
+        attribute :slot_digest, Types::Sha256Digest
+      end
+
       class SourceSpanMismatchDetails < Value
         attribute :message_id, Types::Identifier
         attribute :interpretation_id, Types::Identifier
@@ -282,6 +294,30 @@ module Coordinator::Write
         attribute :details, InterpretationDetails
       end
 
+      class InterpretationNotFoundError < Value
+        attribute :code, Types::String.enum("interpretation_not_found")
+        attribute :message, Types::String
+        attribute :details, InterpretationMessageDetails
+      end
+
+      class InterpretationAlreadyAcceptedError < Value
+        attribute :code, Types::String.enum("interpretation_already_accepted")
+        attribute :message, Types::String
+        attribute :details, InterpretationTerminalDetails
+      end
+
+      class InterpretationAlreadyRejectedError < Value
+        attribute :code, Types::String.enum("interpretation_already_rejected")
+        attribute :message, Types::String
+        attribute :details, InterpretationTerminalDetails
+      end
+
+      class InterpretationSlotAlreadyAcceptedError < Value
+        attribute :code, Types::String.enum("interpretation_slot_already_accepted")
+        attribute :message, Types::String
+        attribute :details, InterpretationSlotDetails
+      end
+
       class SourceSpanMismatchError < Value
         attribute :code, Types::String.enum("source_span_mismatch")
         attribute :message, Types::String
@@ -319,6 +355,10 @@ module Coordinator::Write
              MessageAlreadyRecordedError |
              GuidanceMessageNotFoundError |
              InterpretationAlreadyProposedError |
+             InterpretationNotFoundError |
+             InterpretationAlreadyAcceptedError |
+             InterpretationAlreadyRejectedError |
+             InterpretationSlotAlreadyAcceptedError |
              SourceSpanMismatchError |
              TopicNotSupportedError |
              TopicValueInvalidError

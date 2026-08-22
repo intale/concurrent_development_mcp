@@ -178,7 +178,12 @@ module McpAcceptanceWorld
     event_store.read(
       streams.interpretation(message_id),
       Coordinator::Write::EventReadCriteria.new(
-        event_types: %w[DecisionInterpretationProposed DecisionClarificationRequired],
+        event_types: %w[
+          DecisionInterpretationProposed
+          DecisionClarificationRequired
+          DecisionInterpretationAccepted
+          DecisionInterpretationRejected
+        ],
         maximum_count: 100,
         direction: :asc
       )
@@ -188,6 +193,28 @@ module McpAcceptanceWorld
   def project_interpretations(message_id)
     projector = Coordinator::Container["projectors.decision_interpretations_v1"]
     interpretation_events(message_id).each { projector.call(_1) }
+  end
+
+  def interpretation_page(message_id)
+    call_tool(
+      "decision_interpretation_list",
+      { message_id:, after_revision: -1, limit: 20 }
+    ).dig("result", "structuredContent", "data", "page", "interpretations")
+  end
+
+  def interpretation_adjudication_arguments(command_id:, interpretation_id:, action:, clarification: nil)
+    {
+      command_id:,
+      actor: { kind: "orchestrator", id: "guidance-host" },
+      source_message_id: @interpretation_message_id,
+      interpretation_id:,
+      action:,
+      rationale: {
+        code: action == "reject" ? "user_rejected" : "user_confirmed",
+        summary: action == "reject" ? "The reading is not intended." : "The host assessed the proposed reading."
+      },
+      clarification:
+    }
   end
 
   def lease_events(path)

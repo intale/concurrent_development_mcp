@@ -5,6 +5,8 @@ module Coordinator
 
       def self.guidance_message: (String marker) -> GlobalMarkedEventReadCriteria
       def self.interpretation_proposal: (String marker) -> GlobalMarkedEventReadCriteria
+      def self.interpretation_terminal: (String marker) -> GlobalMarkedEventReadCriteria
+      def self.interpretation_slot_acceptance: (String marker) -> GlobalMarkedEventReadCriteria
 
       COMMAND_COMPLETION: EventReadCriteria
       COORDINATION_TASK_HISTORY: EventReadCriteria

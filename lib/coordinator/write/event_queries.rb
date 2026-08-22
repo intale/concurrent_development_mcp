@@ -29,6 +29,28 @@ module Coordinator::Write
       )
     end
 
+    def self.interpretation_terminal(marker)
+      GlobalMarkedEventReadCriteria.new(
+        stream_context: "HumanGuidance",
+        stream_name: "Interpretation",
+        event_types: [ "DecisionInterpretationAccepted", "DecisionInterpretationRejected" ],
+        marker:,
+        maximum_count: 1,
+        direction: :asc
+      )
+    end
+
+    def self.interpretation_slot_acceptance(marker)
+      GlobalMarkedEventReadCriteria.new(
+        stream_context: "HumanGuidance",
+        stream_name: "Interpretation",
+        event_types: [ "DecisionInterpretationAccepted" ],
+        marker:,
+        maximum_count: 1,
+        direction: :asc
+      )
+    end
+
     COMMAND_COMPLETION = EventReadCriteria.new(
       event_types: [ "CommandCompleted" ],
       maximum_count: 1,

@@ -7,7 +7,8 @@ module Coordinator::Write
         command_id_reused: "command_id_reused",
         work_item_unavailable: "conflict",
         attempt_already_exists: "conflict",
-        lease_busy: "busy"
+        lease_busy: "busy",
+        interpretation_slot_already_accepted: "conflict"
       }.freeze
 
       def call(result, command_id:)

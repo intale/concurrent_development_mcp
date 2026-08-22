@@ -69,6 +69,30 @@ module Coordinator::Shared
       confirmation_required
       needs_classification
     ].freeze
+    INTERPRETATION_ADJUDICATION_ACTIONS = %w[
+      accept
+      reject
+      request_clarification
+    ].freeze
+    INTERPRETATION_CLARIFICATION_STATUSES = %w[
+      confirmation_required
+      needs_classification
+    ].freeze
+    INTERPRETATION_CLARIFICATION_ORIGINS = %w[
+      proposal_assessment
+      adjudication
+    ].freeze
+    INTERPRETATION_LIFECYCLE_STATUSES = %w[
+      proposed
+      clarification_required
+      accepted
+      rejected
+    ].freeze
+    INTERPRETATION_ADJUDICATION_OUTCOMES = %w[
+      accepted_for_activation
+      rejected
+      clarification_required
+    ].freeze
     SCOPE_PROVENANCE_KINDS = %w[explicit inferred unresolved].freeze
     SCOPE_ANCHOR_LEVELS = %w[workspace repository change_set work_item attempt unresolved].freeze
     DECISION_PHASES = %w[planning implementation verification integration deployment].freeze
@@ -109,6 +133,7 @@ module Coordinator::Shared
       lease_release
       guidance_record
       decision_interpretation_propose
+      decision_interpretation_adjudicate
     ].freeze
 
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)
@@ -151,6 +176,11 @@ module Coordinator::Shared
     DecisionModality = String.enum(*DECISION_MODALITIES)
     DecisionValueSchema = String.enum(*DECISION_VALUE_SCHEMAS)
     InterpretationAssessmentStatus = String.enum(*INTERPRETATION_ASSESSMENT_STATUSES)
+    InterpretationAdjudicationAction = String.enum(*INTERPRETATION_ADJUDICATION_ACTIONS)
+    InterpretationClarificationStatus = String.enum(*INTERPRETATION_CLARIFICATION_STATUSES)
+    InterpretationClarificationOrigin = String.enum(*INTERPRETATION_CLARIFICATION_ORIGINS)
+    InterpretationLifecycleStatus = String.enum(*INTERPRETATION_LIFECYCLE_STATUSES)
+    InterpretationAdjudicationOutcome = String.enum(*INTERPRETATION_ADJUDICATION_OUTCOMES)
     ScopeProvenanceKind = String.enum(*SCOPE_PROVENANCE_KINDS)
     ScopeAnchorLevel = String.enum(*SCOPE_ANCHOR_LEVELS)
     DecisionPhase = String.enum(*DECISION_PHASES)

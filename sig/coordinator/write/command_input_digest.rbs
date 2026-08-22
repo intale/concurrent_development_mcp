@@ -28,6 +28,8 @@ module Coordinator
       def guidance_record_document: (Commands::RecordGuidance command) -> CommandInputDocuments::RecordGuidanceV1
       def decision_interpretation_propose: (Commands::ProposeDecisionInterpretation command) -> String
       def decision_interpretation_propose_document: (Commands::ProposeDecisionInterpretation command) -> CommandInputDocuments::ProposeDecisionInterpretationV1
+      def decision_interpretation_adjudicate: (Commands::AdjudicateDecisionInterpretation command) -> String
+      def decision_interpretation_adjudicate_document: (Commands::AdjudicateDecisionInterpretation command) -> CommandInputDocuments::AdjudicateDecisionInterpretationV1
     end
   end
 end

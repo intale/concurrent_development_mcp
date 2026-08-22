@@ -27,6 +27,8 @@ module Coordinator::Write
           build_record_guidance(document)
         when CommandInputDocuments::ProposeDecisionInterpretationV1
           build_propose_decision_interpretation(document)
+        when CommandInputDocuments::AdjudicateDecisionInterpretationV1
+          build_adjudicate_decision_interpretation(document)
         end
       end
 
@@ -174,6 +176,19 @@ module Coordinator::Write
           classifier: input.classifier,
           proposed_decision: input.proposed_decision,
           ambiguities: input.ambiguities
+        )
+      end
+
+      def build_adjudicate_decision_interpretation(document)
+        input = document.input
+        Commands::AdjudicateDecisionInterpretation.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          source_message_id: input.source_message_id,
+          interpretation_id: input.interpretation_id,
+          action: input.action,
+          rationale: input.rationale,
+          clarification: input.clarification
         )
       end
 

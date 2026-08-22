@@ -29,6 +29,8 @@ module Coordinator::Write
       [ "UserUtteranceForwardedByAgent", 1 ] => Events::UserUtteranceForwardedByAgentV1,
       [ "DecisionInterpretationProposed", 1 ] => Events::DecisionInterpretationProposedV1,
       [ "DecisionClarificationRequired", 1 ] => Events::DecisionClarificationRequiredV1,
+      [ "DecisionInterpretationAccepted", 1 ] => Events::DecisionInterpretationAcceptedV1,
+      [ "DecisionInterpretationRejected", 1 ] => Events::DecisionInterpretationRejectedV1,
       [ "CoordinationTaskSubmitted", 1 ] => Events::CoordinationTaskSubmittedV1,
       [ "CoordinationTaskExecutionStarted", 1 ] => Events::CoordinationTaskExecutionStartedV1,
       [ "CoordinationTaskCompleted", 1 ] => Events::CoordinationTaskCompletedV1,

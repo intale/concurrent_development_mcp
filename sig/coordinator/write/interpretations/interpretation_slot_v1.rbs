@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Interpretations
+      class InterpretationSlotV1 < Shared::Value
+        def document: () -> InterpretationSlotDocumentV1
+        def scope_digest: () -> String
+        def compound_marker: () -> Shared::CompoundMarker
+      end
+    end
+  end
+end

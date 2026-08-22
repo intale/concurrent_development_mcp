@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe "GDN-02 MCP interpretation proposals", :event_store, :read_model do
+RSpec.describe "GDN-02/03 MCP interpretation lifecycle", :event_store, :read_model do
   INTERPRETATION_PROTOCOL_VERSION = "2026-07-28"
   INTERPRETATION_TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
 
@@ -123,12 +123,144 @@ RSpec.describe "GDN-02 MCP interpretation proposals", :event_store, :read_model 
     expect(interpretation_events.length).to eq(2)
   end
 
-  def call_tool(name, tool_arguments, id:)
+  it "accepts a proposal through a traced Task while the available view may lag" do
+    proposal_task_id = call_tool(
+      "decision_interpretation_propose",
+      arguments,
+      id: 1
+    ).dig("result", "taskId")
+    execute_task(proposal_task_id)
+    projector = Coordinator::Container["projectors.decision_interpretations_v1"]
+    interpretation_events.each { projector.call(_1) }
+
+    before_adjudication = interpretation_list(id: 2).dig("data", "page", "interpretations").sole
+    expect(before_adjudication).to include(
+      "lifecycle_status" => "clarification_required",
+      "policy_status" => "proposal_only",
+      "adjudication" => nil
+    )
+
+    adjudication = InterpretationInput.adjudication(
+      command_id: "cmd-mcp-interpretation-accept",
+      source_message_id: "M-mcp-interpretation",
+      interpretation_id: "I-mcp-interpretation"
+    )
+    created = call_tool("decision_interpretation_adjudicate", adjudication, id: 3)
+    task_id = created.dig("result", "taskId")
+    expect(task_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
+    expect(task_events(task_id).map(&:type)).to eq([ "CoordinationTaskSubmitted" ])
+
+    execute_task(task_id)
+    completed = task_request("tasks/get", task_id, id: 4)
+    result = completed.dig("result", "result", "structuredContent")
+    expect(completed.dig("result", "status")).to eq("completed")
+    expect(completed.dig("result", "result", "isError")).to be(false)
+    expect(result).to include(
+      "status" => "ok",
+      "data" => include(
+        "interpretation_id" => "I-mcp-interpretation",
+        "action" => "accept",
+        "outcome" => "accepted_for_activation",
+        "policy_status" => "proposal_only",
+        "slot" => include(
+          "compound_marker" => include(
+            "marker" => a_string_starting_with("compound:interpretation-slot:v1:sha256:")
+          )
+        )
+      )
+    )
+
+    submitted, started, task_completed = task_events(task_id)
+    acceptance = interpretation_events.find { _1.type == "DecisionInterpretationAccepted" }
+    completion = command_events(adjudication.fetch(:command_id)).sole
+    expect(acceptance).not_to be_nil
+    expect([ acceptance, completion ].map(&:causation_id).uniq).to eq([ started.id ])
+    expect(task_completed.causation_id).to eq(completion.id)
+    expect([ submitted, started, acceptance, completion, task_completed ].map(&:correlation_id).uniq).to eq(
+      [ submitted.correlation_id ]
+    )
+    expect(acceptance.markers).to include(
+      "resolution-strategy:single_choice",
+      a_string_starting_with("compound:interpretation-slot:v1:sha256:")
+    )
+
+    still_available = interpretation_list(id: 5).dig("data", "page", "interpretations").sole
+    expect(still_available).to include(
+      "lifecycle_status" => "clarification_required",
+      "policy_status" => "proposal_only",
+      "adjudication" => nil
+    )
+
+    projector.call(acceptance)
+    observed = interpretation_list(id: 6).dig("data", "page", "interpretations").sole
+    expect(observed).to include(
+      "lifecycle_status" => "accepted",
+      "policy_status" => "proposal_only",
+      "adjudication" => include(
+        "action" => "accept",
+        "outcome" => "accepted_for_activation",
+        "event" => include("event_id" => acceptance.id)
+      )
+    )
+    expect(interpretation_events).to all(satisfy { !_1.type.include?("Activated") })
+  end
+
+  it "returns missing-proposal denial as a Task result and rejects malformed input before allocation" do
+    missing_arguments = InterpretationInput.adjudication(
+      command_id: "cmd-mcp-interpretation-missing",
+      source_message_id: "M-mcp-interpretation",
+      interpretation_id: "I-missing"
+    )
+    missing_task_id = call_tool(
+      "decision_interpretation_adjudicate",
+      missing_arguments,
+      id: 1
+    ).dig("result", "taskId")
+    execute_task(missing_task_id)
+    missing = task_request("tasks/get", missing_task_id, id: 2)
+
+    expect(missing.dig("result", "status")).to eq("completed")
+    expect(missing.dig("result", "result")).to include(
+      "isError" => true,
+      "structuredContent" => include(
+        "status" => "denied",
+        "data" => include(
+          "code" => "interpretation_not_found",
+          "details" => include(
+            "interpretation_id" => "I-missing",
+            "message_id" => "M-mcp-interpretation"
+          )
+        )
+      )
+    )
+    expect(command_events(missing_arguments.fetch(:command_id))).to be_empty
+
+    malformed_arguments = InterpretationInput.adjudication(
+      command_id: "cmd-mcp-interpretation-malformed",
+      source_message_id: "M-mcp-interpretation",
+      interpretation_id: "I-mcp-interpretation",
+      clarification: InterpretationInput.clarification
+    )
+    malformed = call_tool(
+      "decision_interpretation_adjudicate",
+      malformed_arguments,
+      id: 3,
+      expected_status: 400
+    )
+
+    expect(malformed.dig("error", "code")).to eq(-32_602)
+    expect(malformed.dig("error", "data", "code")).to eq("invalid_input")
+    expect(malformed.dig("error", "data", "details")).to include("clarification")
+    expect(task_events_for_command(malformed_arguments.fetch(:command_id))).to be_empty
+  end
+
+  def call_tool(name, tool_arguments, id:, expected_status: 200)
     mcp_request(
       id:,
       method: "tools/call",
       name:,
-      params: { name:, arguments: tool_arguments }
+      params: { name:, arguments: tool_arguments },
+      expected_status:
     )
   end
 
@@ -144,7 +276,7 @@ RSpec.describe "GDN-02 MCP interpretation proposals", :event_store, :read_model 
     mcp_request(id:, method:, name: task_id, params: { taskId: task_id })
   end
 
-  def mcp_request(id:, method:, params:, name:)
+  def mcp_request(id:, method:, params:, name:, expected_status: 200)
     session.post(
       "/mcp",
       params: JSON.generate(
@@ -161,7 +293,7 @@ RSpec.describe "GDN-02 MCP interpretation proposals", :event_store, :read_model 
         "Mcp-Name" => name
       }
     )
-    expect(session.response.status).to eq(200), session.response.body
+    expect(session.response.status).to eq(expected_status), session.response.body
     JSON.parse(session.response.body)
   end
 
@@ -189,6 +321,24 @@ RSpec.describe "GDN-02 MCP interpretation proposals", :event_store, :read_model 
     )
   end
 
+  def task_events_for_command(command_id)
+    PgEventstore.client.read(
+      PgEventstore::Stream.all_stream,
+      options: {
+        direction: :asc,
+        max_count: 1,
+        filter: {
+          event_types: [
+            {
+              type: "CoordinationTaskSubmitted",
+              markers: [ "command:#{command_id}" ]
+            }
+          ]
+        }
+      }
+    )
+  end
+
   def guidance_events
     event_store.read(
       streams.conversation("C-mcp-interpretation"),
@@ -204,7 +354,12 @@ RSpec.describe "GDN-02 MCP interpretation proposals", :event_store, :read_model 
     event_store.read(
       streams.interpretation("M-mcp-interpretation"),
       Coordinator::Write::EventReadCriteria.new(
-        event_types: %w[DecisionInterpretationProposed DecisionClarificationRequired],
+        event_types: %w[
+          DecisionInterpretationProposed
+          DecisionClarificationRequired
+          DecisionInterpretationAccepted
+          DecisionInterpretationRejected
+        ],
         maximum_count: 20,
         direction: :asc
       )

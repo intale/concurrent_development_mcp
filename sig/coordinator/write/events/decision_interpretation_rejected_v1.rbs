@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module Events
+      class DecisionInterpretationRejectedV1 < Base
+        def interpretation_id: () -> String
+        def source_message_id: () -> String
+        def proposal_event: () -> EventReference
+        def rationale: () -> Interpretations::AdjudicationRationaleV1
+        def rejected_at: () -> String
+      end
+    end
+  end
+end

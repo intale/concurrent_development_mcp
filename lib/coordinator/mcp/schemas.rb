@@ -247,6 +247,41 @@ module Coordinator
         )
       end
 
+      def decision_interpretation_adjudicate
+        rationale = object_schema(
+          properties: {
+            code: identifier,
+            summary: { type: "string", minLength: 1, maxLength: 500 }
+          },
+          required: %w[code summary]
+        )
+        clarification = object_schema(
+          properties: {
+            status: { type: "string", enum: Types::INTERPRETATION_CLARIFICATION_STATUSES },
+            questions: {
+              type: "array",
+              minItems: 1,
+              maxItems: 20,
+              uniqueItems: true,
+              items: interpretation_question
+            }
+          },
+          required: %w[status questions]
+        )
+        object_schema(
+          properties: common_mutation_properties.merge(
+            source_message_id: identifier,
+            interpretation_id: identifier,
+            action: { type: "string", enum: Types::INTERPRETATION_ADJUDICATION_ACTIONS },
+            rationale:,
+            clarification: { anyOf: [ clarification, { type: "null" } ] }
+          ),
+          required: %w[
+            command_id actor source_message_id interpretation_id action rationale clarification
+          ]
+        )
+      end
+
       def operation_get
         object_schema(
           properties: {
@@ -522,6 +557,17 @@ module Coordinator
             options: string_array(min_items: 0, max_items: 10, max_length: 200)
           },
           required: %w[field code description options]
+        )
+      end
+
+      def interpretation_question
+        object_schema(
+          properties: {
+            field: identifier,
+            prompt: { type: "string", minLength: 1, maxLength: 500 },
+            options: string_array(min_items: 0, max_items: 10, max_length: 200)
+          },
+          required: %w[field prompt options]
         )
       end
 

@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module Commands
+      class AdjudicateDecisionInterpretation < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def source_message_id: () -> String
+        def interpretation_id: () -> String
+        def action: () -> String
+        def rationale: () -> Interpretations::AdjudicationRationaleV1
+        def clarification: () -> Interpretations::AdjudicationClarificationV1?
+      end
+    end
+  end
+end

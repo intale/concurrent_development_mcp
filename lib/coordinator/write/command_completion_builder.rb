@@ -298,6 +298,39 @@ module Coordinator::Write
       )
     end
 
+    def decision_interpretation_adjudicate(command:, slot:, input_digest:, persisted_events:, completed_at:)
+      outcome = {
+        "accept" => "accepted_for_activation",
+        "reject" => "rejected",
+        "request_clarification" => "clarification_required"
+      }.fetch(command.action)
+      build_completion(
+        command:,
+        tool_name: "decision_interpretation_adjudicate",
+        summary: "Interpretation adjudication recorded without activating policy.",
+        data: CommandReceiptData::InterpretationAdjudication.new(
+          interpretation_id: command.interpretation_id,
+          source_message_id: command.source_message_id,
+          action: command.action,
+          outcome:,
+          policy_status: "proposal_only",
+          slot: command.action == "accept" ? slot : nil,
+          adjudicated_at: completed_at
+        ),
+        next_actions: [
+          NextAction.new(
+            tool: "decision_interpretation_list",
+            arguments: NextAction::InterpretationListArguments.new(
+              message_id: command.source_message_id
+            )
+          )
+        ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
 
     def build_completion(command:, tool_name:, summary:, data:, next_actions:, input_digest:, persisted_events:, completed_at:)

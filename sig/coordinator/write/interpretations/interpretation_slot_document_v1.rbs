@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Interpretations
+      class InterpretationSlotDocumentV1 < Shared::Value
+        def schema: () -> String
+        def source_message_id: () -> String
+        def topic_id: () -> String
+        def exact_scope: () -> DecisionScopeV1
+        def conflict_dimension: () -> String
+        def resolution_strategy: () -> String
+      end
+    end
+  end
+end

@@ -6,6 +6,8 @@ module Coordinator::Read
       EVENT_TYPES = %w[
         DecisionInterpretationProposed
         DecisionClarificationRequired
+        DecisionInterpretationAccepted
+        DecisionInterpretationRejected
       ].freeze
 
       params do

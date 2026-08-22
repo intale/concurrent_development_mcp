@@ -21,7 +21,8 @@ module Coordinator
           Tools::LeaseRenew,
           Tools::LeaseRelease,
           Tools::GuidanceRecord,
-          Tools::DecisionInterpretationPropose
+          Tools::DecisionInterpretationPropose,
+          Tools::DecisionInterpretationAdjudicate
         ].freeze
       end
     end
