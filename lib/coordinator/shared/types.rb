@@ -171,6 +171,7 @@ module Coordinator::Shared
       decision_interpretation_adjudicate
       decision_activate
       decision_correct
+      agent_choice_record
     ].freeze
 
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)

@@ -31,6 +31,10 @@ module Coordinator
         a decision_revision_changed conflict; refresh decision_get and submit a new command when appropriate.
         Use decision_resolve for the latest available testing-framework context of an Attempt. Its digest
         and partition evidence may lag and are context for a later authoritative command, never authority alone.
+        Before committing to a significant testing-framework selection, call decision_resolve and pass its
+        exact decision_context to agent_choice_record. A stale_context result means no choice was recorded;
+        refresh decision_resolve and submit a new command. A confirmation_required result has no bypass in
+        this protocol version and must be escalated instead of silently accepted.
         The coordinator records attributed evidence and does not execute Git, CI, or agent work.
       TEXT
 

@@ -213,6 +213,62 @@ module Coordinator::Write
         attribute :head, Decisions::DecisionHeadV1.optional
       end
 
+      class AgentChoiceAlreadyExistsDetails < Value
+        attribute :choice_id, Types::Identifier
+        attribute :recorded_event, EventReference
+      end
+
+      class StaleDecisionContextDetails < Value
+        attribute :changed_partition_ids, Types::Array.of(Types::Identifier).constrained(min_size: 1, max_size: 8)
+        attribute :submitted_digest, Types::Sha256Digest
+        attribute :current_digest, Types::Sha256Digest
+      end
+
+      class DecisionContextMismatchDetails < Value
+        attribute :submitted_digest, Types::Sha256Digest
+        attribute :current_digest, Types::Sha256Digest
+      end
+
+      class DecisionContextConflictDetails < Value
+        attribute :conflict, DecisionContexts::ConflictV1
+      end
+
+      class DecisionContextLimitDetails < Value
+        attribute :partition_count, Types::Integer.constrained(gteq: 0)
+        attribute :maximum_partition_count, Types::Integer.constrained(eql: 8)
+        attribute :active_decision_count, Types::Integer.constrained(gteq: 0)
+        attribute :maximum_active_decision_count, Types::Integer.constrained(eql: 32)
+      end
+
+      class UnsupportedDecisionContextDetails < Value
+        attribute :dimensions, Types::Array.of(Types::Identifier).constrained(min_size: 1, max_size: 32)
+        attribute :decision_heads, Types::Array.of(Decisions::DecisionHeadV1).constrained(min_size: 1, max_size: 32)
+      end
+
+      class AgentChoicePolicyDetails < Value
+        attribute :decision_head, Decisions::DecisionHeadV1
+        attribute :effect, Types::DecisionEffect
+        attribute :selected_option_id, Types::Identifier
+        attribute :decision_option_id, Types::Identifier
+        attribute :on_violation, Types::ViolationAction
+      end
+
+      class AgentChoicePartitionSnapshotInvalidDetails < Value
+        attribute :partition_id, Types::Identifier
+        attribute :stream_revision, Types::StreamRevision
+        attribute :reason, Types::String.enum("snapshot_invariant_violated")
+      end
+
+      class AgentChoiceDecisionHeadInvalidDetails < Value
+        attribute :decision_id, Types::Identifier
+        attribute :expected_head, Decisions::DecisionHeadV1
+        attribute :current_head, Decisions::DecisionHeadV1.optional
+      end
+
+      class AgentChoiceUnresolvedHeadsDetails < Value
+        attribute :decision_heads, Types::Array.of(Decisions::DecisionHeadV1).constrained(min_size: 1, max_size: 32)
+      end
+
       class ChangeSetError < Value
         attribute :code, Types::String.enum(
           "change_set_already_exists",
@@ -487,6 +543,72 @@ module Coordinator::Write
         attribute :details, DecisionSlotStateInvalidDetails
       end
 
+      class AgentChoiceAlreadyExistsError < Value
+        attribute :code, Types::String.enum("agent_choice_already_exists")
+        attribute :message, Types::String
+        attribute :details, AgentChoiceAlreadyExistsDetails
+      end
+
+      class StaleDecisionContextError < Value
+        attribute :code, Types::String.enum("stale_decision_context")
+        attribute :message, Types::String
+        attribute :details, StaleDecisionContextDetails
+      end
+
+      class DecisionContextMismatchError < Value
+        attribute :code, Types::String.enum("decision_context_mismatch")
+        attribute :message, Types::String
+        attribute :details, DecisionContextMismatchDetails
+      end
+
+      class DecisionContextConflictError < Value
+        attribute :code, Types::String.enum("decision_context_conflict")
+        attribute :message, Types::String
+        attribute :details, DecisionContextConflictDetails
+      end
+
+      class DecisionContextLimitReachedError < Value
+        attribute :code, Types::String.enum("decision_context_limit_reached")
+        attribute :message, Types::String
+        attribute :details, DecisionContextLimitDetails
+      end
+
+      class UnsupportedDecisionContextError < Value
+        attribute :code, Types::String.enum("unsupported_decision_context")
+        attribute :message, Types::String
+        attribute :details, UnsupportedDecisionContextDetails
+      end
+
+      class AgentChoiceBlockedByDecisionError < Value
+        attribute :code, Types::String.enum("agent_choice_blocked_by_decision")
+        attribute :message, Types::String
+        attribute :details, AgentChoicePolicyDetails
+      end
+
+      class AgentChoiceConfirmationRequiredError < Value
+        attribute :code, Types::String.enum("agent_choice_confirmation_required")
+        attribute :message, Types::String
+        attribute :details, AgentChoicePolicyDetails
+      end
+
+      class AgentChoicePartitionSnapshotInvalidError < Value
+        attribute :code, Types::String.enum("decision_partition_state_invalid")
+        attribute :message, Types::String
+        attribute :details, AgentChoicePartitionSnapshotInvalidDetails
+      end
+
+      class AgentChoiceDecisionHeadInvalidError < Value
+        attribute :code, Types::String.enum("decision_partition_state_invalid")
+        attribute :message, Types::String
+        attribute :details, AgentChoiceDecisionHeadInvalidDetails
+      end
+
+      class AgentChoiceUnresolvedHeadsError < Value
+        attribute :code, Types::String.enum("decision_partition_state_invalid")
+        attribute :message, Types::String
+        attribute :details, AgentChoiceUnresolvedHeadsDetails
+      end
+
       Type = ChangeSetError |
              ActivationDependencyError |
              WorkItemError |
@@ -526,7 +648,18 @@ module Coordinator::Write
              InterpretationNotACorrectionError |
              DecisionDefinitionNotCorrectableError |
              DecisionRevisionChangedError |
-             DecisionSlotStateInvalidError
+             DecisionSlotStateInvalidError |
+             AgentChoiceAlreadyExistsError |
+             StaleDecisionContextError |
+             DecisionContextMismatchError |
+             DecisionContextConflictError |
+             DecisionContextLimitReachedError |
+             UnsupportedDecisionContextError |
+             AgentChoiceBlockedByDecisionError |
+             AgentChoiceConfirmationRequiredError |
+             AgentChoicePartitionSnapshotInvalidError |
+             AgentChoiceDecisionHeadInvalidError |
+             AgentChoiceUnresolvedHeadsError
     end
   end
 end

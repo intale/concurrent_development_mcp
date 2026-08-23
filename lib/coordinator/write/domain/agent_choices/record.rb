@@ -163,8 +163,8 @@ module Coordinator::Write
           failure(
             :unsupported_decision_context,
             "Effective Decision does not use the testing.framework named-choice value",
-            decision_head: decision.head.to_h,
-            value_schema: decision.value.schema
+            dimensions: [ "value.schema" ],
+            decision_heads: [ decision.head.to_h ]
           )
         end
 

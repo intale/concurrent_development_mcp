@@ -33,6 +33,8 @@ module Coordinator::Write
           build_activate_decision(document)
         when CommandInputDocuments::CorrectDecisionV1
           build_correct_decision(document)
+        when CommandInputDocuments::RecordAgentChoiceV1
+          build_record_agent_choice(document)
         end
       end
 
@@ -216,6 +218,21 @@ module Coordinator::Write
           interpretation_id: input.interpretation_id,
           expected_head: EventReference.new(input.expected_head.to_h),
           rationale: input.rationale
+        )
+      end
+
+      def build_record_agent_choice(document)
+        input = document.input
+        Commands::RecordAgentChoice.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          choice_id: input.choice_id,
+          choice_type: input.choice_type,
+          selected: input.selected,
+          alternatives: input.alternatives,
+          reason_summary: input.reason_summary,
+          context: input.context,
+          decision_context: input.decision_context
         )
       end
 

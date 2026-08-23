@@ -16,6 +16,7 @@ module Coordinator
       def self.decision_interpretation_adjudicate: () -> json_schema
       def self.decision_activate: () -> json_schema
       def self.decision_correct: () -> json_schema
+      def self.agent_choice_record: () -> json_schema
       def self.operation_get: () -> json_schema
       def self.guidance_get: () -> json_schema
       def self.decision_interpretation_list: () -> json_schema
@@ -23,6 +24,15 @@ module Coordinator
       def self.decision_resolve: () -> json_schema
       def self.coord_context: () -> json_schema
       def self.common_mutation_properties: () -> json_schema
+      def self.agent_actor: () -> json_schema
+      def self.decision_query_context: (?require_nullable_fields: bool) -> json_schema
+      def self.decision_context_v1: () -> json_schema
+      def self.decision_context_document: () -> json_schema
+      def self.decision_partition_observation: () -> json_schema
+      def self.decision_event_reference: () -> json_schema
+      def self.decision_head: () -> json_schema
+      def self.resolved_decision: () -> json_schema
+      def self.decision_context_conflict: () -> json_schema
       def self.object_schema: (properties: json_schema, required: Array[String], ?one_of: Array[json_schema]?) -> json_schema
       def self.identifier: () -> json_schema
       def self.nullable_identifier: () -> json_schema

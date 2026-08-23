@@ -23,6 +23,8 @@ RSpec.describe Coordinator::Container do
     interpretation_operation = described_class["operations.execute_propose_decision_interpretation"]
     adjudication_operation = described_class["operations.execute_adjudicate_decision_interpretation"]
     decision_activation_operation = described_class["operations.execute_activate_decision"]
+    decision_correction_operation = described_class["operations.execute_correct_decision"]
+    agent_choice_operation = described_class["operations.execute_record_agent_choice"]
     readiness_process_manager = described_class["process_managers.change_set_readiness"]
     task_executor = described_class["process_managers.coordination_task_executor"]
     subscription_manager = described_class["subscription_managers.process_managers"]
@@ -48,6 +50,8 @@ RSpec.describe Coordinator::Container do
       operations.submit_propose_decision_interpretation_task
       operations.submit_adjudicate_decision_interpretation_task
       operations.submit_activate_decision_task
+      operations.submit_correct_decision_task
+      operations.submit_record_agent_choice_task
     ].map { described_class[_1] }
     tasks_extension = described_class["mcp.tasks.extension"]
     mcp_transport = described_class["mcp.transport"]
@@ -72,6 +76,12 @@ RSpec.describe Coordinator::Container do
     )
     expect(decision_activation_operation).to be_a(
       Coordinator::Write::Operations::ExecuteActivateDecision
+    )
+    expect(decision_correction_operation).to be_a(
+      Coordinator::Write::Operations::ExecuteCorrectDecision
+    )
+    expect(agent_choice_operation).to be_a(
+      Coordinator::Write::Operations::ExecuteRecordAgentChoice
     )
     expect(readiness_process_manager).to be_a(Coordinator::Processes::ProcessManagers::ChangeSetReadiness)
     expect(task_executor).to be_a(Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor)

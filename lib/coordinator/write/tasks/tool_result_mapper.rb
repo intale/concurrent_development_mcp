@@ -13,7 +13,12 @@ module Coordinator::Write
         decision_partition_capacity_reached: "conflict",
         decision_partition_state_invalid: "conflict",
         decision_revision_changed: "conflict",
-        decision_slot_state_invalid: "conflict"
+        decision_slot_state_invalid: "conflict",
+        agent_choice_already_exists: "conflict",
+        stale_decision_context: "stale_context",
+        decision_context_conflict: "conflict",
+        decision_context_limit_reached: "conflict",
+        agent_choice_confirmation_required: "confirmation_required"
       }.freeze
 
       def call(result, command_id:)

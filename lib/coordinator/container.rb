@@ -90,6 +90,10 @@ module Coordinator
       Write::Operations::PrepareCorrectDecision.new
     end
 
+    register("operations.prepare_record_agent_choice", memoize: true) do
+      Write::Operations::PrepareRecordAgentChoice.new
+    end
+
     register("domain.change_sets.create", memoize: true) do
       Write::Domain::ChangeSets::Create.new(stream_factory: self["stream_factory"])
     end
@@ -203,6 +207,22 @@ module Coordinator
 
     register("domain.decisions.correct", memoize: true) do
       Write::Domain::Decisions::Correct.new(stream_factory: self["stream_factory"])
+    end
+
+    register("decision_contexts.partition_selector", memoize: true) do
+      Write::DecisionContexts::PartitionSelector.new
+    end
+
+    register("decision_contexts.resolver", memoize: true) do
+      Write::DecisionContexts::Resolver.new
+    end
+
+    register("decision_contexts.builder", memoize: true) do
+      Write::DecisionContexts::Builder.new(canonical_json: self["canonical_json"])
+    end
+
+    register("domain.agent_choices.record", memoize: true) do
+      Write::Domain::AgentChoices::Record.new(stream_factory: self["stream_factory"])
     end
 
     register("change_set_activation_source_builder", memoize: true) do
@@ -634,6 +654,24 @@ module Coordinator
       )
     end
 
+    register("operations.execute_record_agent_choice") do
+      Write::Operations::ExecuteRecordAgentChoice.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_record_agent_choice"],
+        partition_selector: self["decision_contexts.partition_selector"],
+        resolver: self["decision_contexts.resolver"],
+        context_builder: self["decision_contexts.builder"],
+        decider: self["domain.agent_choices.record"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
     register("lease_expiry_policy", memoize: true) do
       Processes::LeaseExpiryPolicy.new(
         source_loader: self["lease_expiry_source_loader"],
@@ -658,7 +696,8 @@ module Coordinator
         propose_decision_interpretation: self["operations.execute_propose_decision_interpretation"],
         adjudicate_decision_interpretation: self["operations.execute_adjudicate_decision_interpretation"],
         activate_decision: self["operations.execute_activate_decision"],
-        correct_decision: self["operations.execute_correct_decision"]
+        correct_decision: self["operations.execute_correct_decision"],
+        record_agent_choice: self["operations.execute_record_agent_choice"]
       )
     end
 
@@ -777,6 +816,13 @@ module Coordinator
     register("operations.submit_correct_decision_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_correct_decision"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_record_agent_choice_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_record_agent_choice"],
         submitter: self["operations.submit_coordination_task"]
       )
     end

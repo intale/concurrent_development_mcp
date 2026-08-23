@@ -332,6 +332,37 @@ module Coordinator
         )
       end
 
+      def agent_choice_record
+        option = object_schema(
+          properties: {
+            option_id: identifier,
+            summary: { type: "string", minLength: 1, maxLength: 500 }
+          },
+          required: %w[option_id summary]
+        )
+        object_schema(
+          properties: common_mutation_properties.merge(
+            actor: agent_actor,
+            choice_id: identifier,
+            choice_type: { type: "string", const: "testing.framework" },
+            selected: option,
+            alternatives: {
+              type: "array",
+              maxItems: 10,
+              uniqueItems: true,
+              items: option
+            },
+            reason_summary: { type: "string", minLength: 1, maxLength: 1_000 },
+            context: decision_query_context,
+            decision_context: decision_context_v1
+          ),
+          required: %w[
+            command_id actor choice_id choice_type selected alternatives reason_summary
+            context decision_context
+          ]
+        )
+      end
+
       def operation_get
         object_schema(
           properties: {
@@ -371,31 +402,10 @@ module Coordinator
       end
 
       def decision_resolve
-        context = object_schema(
-          properties: {
-            workspace_id: nullable_identifier,
-            repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
-            change_set_id: identifier,
-            work_item_id: identifier,
-            attempt_id: identifier,
-            phase: { type: "string", const: "implementation" },
-            language: identifier,
-            paths: {
-              type: "array",
-              maxItems: 32,
-              items: { type: "string", minLength: 1, maxLength: 1_024 }
-            },
-            environment: nullable_identifier,
-            agent_role: identifier
-          },
-          required: %w[
-            repository_id change_set_id work_item_id attempt_id phase language paths agent_role
-          ]
-        )
         object_schema(
           properties: {
             topic_id: { type: "string", const: "testing.framework" },
-            context:
+            context: decision_query_context
           },
           required: %w[topic_id context]
         )
@@ -429,6 +439,195 @@ module Coordinator
             required: %w[kind id]
           )
         }
+      end
+
+      def agent_actor
+        object_schema(
+          properties: {
+            kind: { type: "string", const: "agent" },
+            id: identifier
+          },
+          required: %w[kind id]
+        )
+      end
+
+      def decision_query_context(require_nullable_fields: false)
+        required = %w[
+          repository_id change_set_id work_item_id attempt_id phase language paths agent_role
+        ]
+        required += %w[workspace_id environment] if require_nullable_fields
+        object_schema(
+          properties: {
+            workspace_id: nullable_identifier,
+            repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+            change_set_id: identifier,
+            work_item_id: identifier,
+            attempt_id: identifier,
+            phase: { type: "string", const: "implementation" },
+            language: identifier,
+            paths: {
+              type: "array",
+              maxItems: 32,
+              uniqueItems: true,
+              items: { type: "string", minLength: 1, maxLength: 1_024 }
+            },
+            environment: nullable_identifier,
+            agent_role: identifier
+          },
+          required:
+        )
+      end
+
+      def decision_context_v1
+        object_schema(
+          properties: {
+            document: decision_context_document,
+            digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
+            resolved_at: {
+              type: "string",
+              pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$"
+            }
+          },
+          required: %w[document digest resolved_at]
+        )
+      end
+
+      def decision_context_document
+        object_schema(
+          properties: {
+            schema: { type: "string", const: "decision-context/v1" },
+            resolution_policy: { type: "string", const: "testing-framework-resolution/v1" },
+            topic_id: { type: "string", const: "testing.framework" },
+            query_context: decision_query_context(require_nullable_fields: true),
+            partitions: {
+              type: "array",
+              minItems: 4,
+              maxItems: 5,
+              uniqueItems: true,
+              items: decision_partition_observation
+            },
+            effective_decision: {
+              anyOf: [ resolved_decision, { type: "null" } ]
+            },
+            shadowed_decisions: {
+              type: "array",
+              maxItems: 32,
+              items: object_schema(
+                properties: {
+                  decision: resolved_decision,
+                  reason: { type: "string", const: "less_specific" }
+                },
+                required: %w[decision reason]
+              )
+            },
+            conflict: {
+              anyOf: [ decision_context_conflict, { type: "null" } ]
+            }
+          },
+          required: %w[
+            schema resolution_policy topic_id query_context partitions effective_decision
+            shadowed_decisions conflict
+          ]
+        )
+      end
+
+      def decision_partition_observation
+        object_schema(
+          properties: {
+            partition: object_schema(
+              properties: {
+                partition_id: identifier,
+                topic_root: { type: "string", const: "testing" },
+                anchor_kind: { type: "string", enum: Types::DECISION_PARTITION_ANCHOR_KINDS },
+                anchor_id: identifier
+              },
+              required: %w[partition_id topic_root anchor_kind anchor_id]
+            ),
+            partition_revision: {
+              anyOf: [ { type: "integer", minimum: 0 }, { type: "null" } ]
+            },
+            event: { anyOf: [ decision_event_reference, { type: "null" } ] },
+            active_decisions: {
+              type: "array",
+              maxItems: 32,
+              uniqueItems: true,
+              items: decision_head
+            }
+          },
+          required: %w[partition partition_revision event active_decisions]
+        )
+      end
+
+      def decision_event_reference
+        object_schema(
+          properties: {
+            event_id: uuid_v7,
+            type: identifier,
+            stream_context: identifier,
+            stream_name: identifier,
+            stream_id: identifier,
+            stream_revision: { type: "integer", minimum: 0 }
+          },
+          required: %w[event_id type stream_context stream_name stream_id stream_revision]
+        )
+      end
+
+      def decision_head
+        object_schema(
+          properties: {
+            decision_id: identifier,
+            decision_revision: { type: "integer", minimum: 0 },
+            event: decision_event_reference
+          },
+          required: %w[decision_id decision_revision event]
+        )
+      end
+
+      def resolved_decision
+        object_schema(
+          properties: {
+            head: decision_head,
+            definition_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
+            topic_id: { type: "string", const: "testing.framework" },
+            effect: { type: "string", enum: Types::DECISION_EFFECTS },
+            modality: { type: "string", enum: Types::DECISION_MODALITIES },
+            value: interpretation_value,
+            enforcement: object_schema(
+              properties: {
+                level: { type: "string", enum: Types::ENFORCEMENT_LEVELS },
+                retroactivity: { type: "string", enum: Types::RETROACTIVITY_KINDS },
+                on_violation: { type: "string", enum: Types::VIOLATION_ACTIONS }
+              },
+              required: %w[level retroactivity on_violation]
+            ),
+            anchor_kind: {
+              type: "string",
+              enum: Write::DecisionContexts::ResolvedDecisionV1::ANCHOR_KINDS
+            },
+            anchor_rank: { type: "integer", minimum: 1, maximum: 5 },
+            applicability_reasons: identifier_array(max_items: 10).merge(minItems: 1)
+          },
+          required: %w[
+            head definition_digest topic_id effect modality value enforcement anchor_kind
+            anchor_rank applicability_reasons
+          ]
+        )
+      end
+
+      def decision_context_conflict
+        object_schema(
+          properties: {
+            decisions: {
+              type: "array",
+              minItems: 2,
+              maxItems: 32,
+              uniqueItems: true,
+              items: resolved_decision
+            },
+            reason: { type: "string", const: "tied_most_specific" }
+          },
+          required: %w[decisions reason]
+        )
       end
 
       def object_schema(properties:, required:, one_of: nil)

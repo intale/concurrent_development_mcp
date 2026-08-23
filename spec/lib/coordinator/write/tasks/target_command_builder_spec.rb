@@ -152,7 +152,26 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
             stream_revision: 1
           }
         )
-      ).value!
+      ).value!,
+      Coordinator::Write::Commands::RecordAgentChoice.new(
+        command_id: "cmd-task-build-13",
+        actor:,
+        choice_id: "CHO-task-build",
+        choice_type: "testing.framework",
+        selected: Coordinator::Write::AgentChoices::ChoiceOptionV1.new(
+          option_id: "rspec",
+          summary: "RSpec"
+        ),
+        alternatives: [
+          Coordinator::Write::AgentChoices::ChoiceOptionV1.new(
+            option_id: "minitest",
+            summary: "Minitest"
+          )
+        ],
+        reason_summary: "Use the testing framework selected for this Attempt.",
+        context: agent_choice_query_context,
+        decision_context: empty_decision_context
+      )
     ]
 
     rebuilt = commands.map do |command|
@@ -175,5 +194,47 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
     end
 
     expect(rebuilt).to eq(commands)
+  end
+
+  def agent_choice_query_context
+    Coordinator::Write::DecisionContexts::QueryContextV1.new(
+      workspace_id: nil,
+      repository_id: "billing",
+      change_set_id: "CS-task-build",
+      work_item_id: "W-task-build",
+      attempt_id: "ATT-task-build",
+      phase: "implementation",
+      language: "ruby",
+      paths: [ "spec/models/invoice_spec.rb" ],
+      environment: "test",
+      agent_role: "implementer"
+    )
+  end
+
+  def empty_decision_context
+    observations = Coordinator::Write::DecisionContexts::PartitionSelector.new
+      .call(agent_choice_query_context)
+      .map do |partition|
+        Coordinator::Write::DecisionContexts::PartitionObservationV1.new(
+          partition:,
+          partition_revision: nil,
+          event: nil,
+          active_decisions: []
+        )
+      end
+    resolution = Coordinator::Write::DecisionContexts::ResultV1.new(
+      effective_decision: nil,
+      shadowed_decisions: [],
+      conflict: nil,
+      unresolved_decisions: [],
+      unsupported_decisions: [],
+      unsupported_dimensions: []
+    )
+    Coordinator::Write::DecisionContexts::Builder.new.call(
+      context: agent_choice_query_context,
+      observations:,
+      resolution:,
+      resolved_at: "2026-08-22T10:30:00.000000Z"
+    )
   end
 end

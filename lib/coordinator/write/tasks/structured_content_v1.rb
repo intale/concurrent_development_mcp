@@ -11,7 +11,9 @@ module Coordinator::Write
         "command_id_reused",
         "denied",
         "conflict",
-        "busy"
+        "busy",
+        "stale_context",
+        "confirmation_required"
       )
       attribute :summary, Types::String
       attribute :command_id, Types::Identifier.optional

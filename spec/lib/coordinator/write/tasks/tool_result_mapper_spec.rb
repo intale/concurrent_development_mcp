@@ -403,6 +403,110 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         },
         Coordinator::Write::Tasks::DomainErrorV1::DecisionSlotStateInvalidError,
         "conflict"
+      ],
+      [
+        :agent_choice_already_exists,
+        {
+          choice_id: "CHO-task-result",
+          recorded_event: event_reference(
+            event_id: "0198e03a-d112-7000-8000-000000000010",
+            type: "AgentChoiceRecorded",
+            stream_context: "AgentGovernance",
+            stream_name: "AgentChoice",
+            stream_id: "CHO-task-result",
+            stream_revision: 0
+          )
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::AgentChoiceAlreadyExistsError,
+        "conflict"
+      ],
+      [
+        :stale_decision_context,
+        {
+          changed_partition_ids: [ "repo:billing:testing" ],
+          submitted_digest: "sha256:#{'a' * 64}",
+          current_digest: "sha256:#{'b' * 64}"
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::StaleDecisionContextError,
+        "stale_context"
+      ],
+      [
+        :decision_context_mismatch,
+        {
+          submitted_digest: "sha256:#{'a' * 64}",
+          current_digest: "sha256:#{'b' * 64}"
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::DecisionContextMismatchError,
+        "denied"
+      ],
+      [
+        :decision_context_conflict,
+        {
+          conflict: {
+            decisions: [ resolved_decision("D-task-result-a"), resolved_decision("D-task-result-b") ],
+            reason: "tied_most_specific"
+          }
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::DecisionContextConflictError,
+        "conflict"
+      ],
+      [
+        :decision_context_limit_reached,
+        {
+          partition_count: 5,
+          maximum_partition_count: 8,
+          active_decision_count: 33,
+          maximum_active_decision_count: 32
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::DecisionContextLimitReachedError,
+        "conflict"
+      ],
+      [
+        :unsupported_decision_context,
+        {
+          dimensions: [ "value.schema" ],
+          decision_heads: [ decision_head("D-task-result") ]
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::UnsupportedDecisionContextError,
+        "denied"
+      ],
+      [
+        :agent_choice_blocked_by_decision,
+        policy_details(on_violation: "block"),
+        Coordinator::Write::Tasks::DomainErrorV1::AgentChoiceBlockedByDecisionError,
+        "denied"
+      ],
+      [
+        :agent_choice_confirmation_required,
+        policy_details(on_violation: "require_confirmation"),
+        Coordinator::Write::Tasks::DomainErrorV1::AgentChoiceConfirmationRequiredError,
+        "confirmation_required"
+      ],
+      [
+        :decision_partition_state_invalid,
+        {
+          partition_id: "repo:billing:testing",
+          stream_revision: 2,
+          reason: "snapshot_invariant_violated"
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::AgentChoicePartitionSnapshotInvalidError,
+        "conflict"
+      ],
+      [
+        :decision_partition_state_invalid,
+        {
+          decision_id: "D-task-result",
+          expected_head: decision_head("D-task-result"),
+          current_head: nil
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::AgentChoiceDecisionHeadInvalidError,
+        "conflict"
+      ],
+      [
+        :decision_partition_state_invalid,
+        { decision_heads: [ decision_head("D-task-result") ] },
+        Coordinator::Write::Tasks::DomainErrorV1::AgentChoiceUnresolvedHeadsError,
+        "conflict"
       ]
     ]
 
@@ -422,5 +526,67 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         JSON.parse(JSON.generate(result.structured_content.to_h))
       )
     end
+  end
+
+  def event_reference(event_id:, type:, stream_context:, stream_name:, stream_id:, stream_revision:)
+    {
+      event_id:,
+      type:,
+      stream_context:,
+      stream_name:,
+      stream_id:,
+      stream_revision:
+    }
+  end
+
+  def decision_head(decision_id)
+    {
+      decision_id:,
+      decision_revision: 1,
+      event: event_reference(
+        event_id: "0198e03a-d112-7000-8000-000000000011",
+        type: "DecisionActivated",
+        stream_context: "HumanGuidance",
+        stream_name: "Decision",
+        stream_id: decision_id,
+        stream_revision: 1
+      )
+    }
+  end
+
+  def resolved_decision(decision_id)
+    {
+      head: decision_head(decision_id),
+      definition_digest: "sha256:#{'c' * 64}",
+      topic_id: "testing.framework",
+      effect: "require",
+      modality: "must",
+      value: {
+        schema: "named-choice/v1",
+        name: "rspec",
+        items: nil,
+        target_kind: nil,
+        target_id: nil,
+        action: nil
+      },
+      enforcement: {
+        level: "implementation_gate",
+        retroactivity: "future_only",
+        on_violation: "block"
+      },
+      anchor_kind: "repository",
+      anchor_rank: 2,
+      applicability_reasons: [ "repository" ]
+    }
+  end
+
+  def policy_details(on_violation:)
+    {
+      decision_head: decision_head("D-task-result"),
+      effect: "require",
+      selected_option_id: "minitest",
+      decision_option_id: "rspec",
+      on_violation:
+    }
   end
 end

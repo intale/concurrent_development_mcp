@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Tasks
       module DomainErrorV1
-        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError | InterpretationNotAcceptedError | DecisionAlreadyExistsError | InterpretationAlreadyActivatedError | DecisionDefinitionNotActivatableError | DecisionSlotOccupiedError | DecisionPartitionLimitReachedError | DecisionPartitionCapacityReachedError | DecisionPartitionStateInvalidError | DecisionNotFoundError | DecisionNotActiveError | InterpretationNotACorrectionError | DecisionDefinitionNotCorrectableError | DecisionRevisionChangedError | DecisionSlotStateInvalidError
+        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError | InterpretationNotAcceptedError | DecisionAlreadyExistsError | InterpretationAlreadyActivatedError | DecisionDefinitionNotActivatableError | DecisionSlotOccupiedError | DecisionPartitionLimitReachedError | DecisionPartitionCapacityReachedError | DecisionPartitionStateInvalidError | DecisionNotFoundError | DecisionNotActiveError | InterpretationNotACorrectionError | DecisionDefinitionNotCorrectableError | DecisionRevisionChangedError | DecisionSlotStateInvalidError | AgentChoiceAlreadyExistsError | StaleDecisionContextError | DecisionContextMismatchError | DecisionContextConflictError | DecisionContextLimitReachedError | UnsupportedDecisionContextError | AgentChoiceBlockedByDecisionError | AgentChoiceConfirmationRequiredError | AgentChoicePartitionSnapshotInvalidError | AgentChoiceDecisionHeadInvalidError | AgentChoiceUnresolvedHeadsError
 
         class ChangeSetDetails < Shared::Value
           def change_set_id: () -> String
@@ -212,6 +212,62 @@ module Coordinator
         class DecisionSlotStateInvalidDetails < Shared::Value
           def slot_id: () -> String
           def head: () -> Decisions::DecisionHeadV1?
+        end
+
+        class AgentChoiceAlreadyExistsDetails < Shared::Value
+          def choice_id: () -> String
+          def recorded_event: () -> EventReference
+        end
+
+        class StaleDecisionContextDetails < Shared::Value
+          def changed_partition_ids: () -> Array[String]
+          def submitted_digest: () -> String
+          def current_digest: () -> String
+        end
+
+        class DecisionContextMismatchDetails < Shared::Value
+          def submitted_digest: () -> String
+          def current_digest: () -> String
+        end
+
+        class DecisionContextConflictDetails < Shared::Value
+          def conflict: () -> DecisionContexts::ConflictV1
+        end
+
+        class DecisionContextLimitDetails < Shared::Value
+          def partition_count: () -> Integer
+          def maximum_partition_count: () -> Integer
+          def active_decision_count: () -> Integer
+          def maximum_active_decision_count: () -> Integer
+        end
+
+        class UnsupportedDecisionContextDetails < Shared::Value
+          def dimensions: () -> Array[String]
+          def decision_heads: () -> Array[Decisions::DecisionHeadV1]
+        end
+
+        class AgentChoicePolicyDetails < Shared::Value
+          def decision_head: () -> Decisions::DecisionHeadV1
+          def effect: () -> String
+          def selected_option_id: () -> String
+          def decision_option_id: () -> String
+          def on_violation: () -> String
+        end
+
+        class AgentChoicePartitionSnapshotInvalidDetails < Shared::Value
+          def partition_id: () -> String
+          def stream_revision: () -> Integer
+          def reason: () -> String
+        end
+
+        class AgentChoiceDecisionHeadInvalidDetails < Shared::Value
+          def decision_id: () -> String
+          def expected_head: () -> Decisions::DecisionHeadV1
+          def current_head: () -> Decisions::DecisionHeadV1?
+        end
+
+        class AgentChoiceUnresolvedHeadsDetails < Shared::Value
+          def decision_heads: () -> Array[Decisions::DecisionHeadV1]
         end
 
         class ChangeSetError < Shared::Value
@@ -455,6 +511,72 @@ module Coordinator
           def code: () -> String
           def message: () -> String
           def details: () -> DecisionSlotStateInvalidDetails
+        end
+
+        class AgentChoiceAlreadyExistsError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> AgentChoiceAlreadyExistsDetails
+        end
+
+        class StaleDecisionContextError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> StaleDecisionContextDetails
+        end
+
+        class DecisionContextMismatchError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> DecisionContextMismatchDetails
+        end
+
+        class DecisionContextConflictError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> DecisionContextConflictDetails
+        end
+
+        class DecisionContextLimitReachedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> DecisionContextLimitDetails
+        end
+
+        class UnsupportedDecisionContextError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> UnsupportedDecisionContextDetails
+        end
+
+        class AgentChoiceBlockedByDecisionError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> AgentChoicePolicyDetails
+        end
+
+        class AgentChoiceConfirmationRequiredError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> AgentChoicePolicyDetails
+        end
+
+        class AgentChoicePartitionSnapshotInvalidError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> AgentChoicePartitionSnapshotInvalidDetails
+        end
+
+        class AgentChoiceDecisionHeadInvalidError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> AgentChoiceDecisionHeadInvalidDetails
+        end
+
+        class AgentChoiceUnresolvedHeadsError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> AgentChoiceUnresolvedHeadsDetails
         end
       end
     end

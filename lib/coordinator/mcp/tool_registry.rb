@@ -26,7 +26,8 @@ module Coordinator
           Tools::DecisionInterpretationPropose,
           Tools::DecisionInterpretationAdjudicate,
           Tools::DecisionActivate,
-          Tools::DecisionCorrect
+          Tools::DecisionCorrect,
+          Tools::AgentChoiceRecord
         ].freeze
       end
     end

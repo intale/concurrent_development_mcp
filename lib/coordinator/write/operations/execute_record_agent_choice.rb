@@ -196,7 +196,7 @@ module Coordinator::Write
             details: {
               partition_id: partition.partition_id,
               stream_revision: event.stream_revision,
-              snapshot: payload.to_h
+              reason: "snapshot_invariant_violated"
             }
           )
         )
