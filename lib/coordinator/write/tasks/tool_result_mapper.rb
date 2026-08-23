@@ -18,7 +18,11 @@ module Coordinator::Write
         stale_decision_context: "stale_context",
         decision_context_conflict: "conflict",
         decision_context_limit_reached: "conflict",
-        agent_choice_confirmation_required: "confirmation_required"
+        agent_choice_confirmation_required: "confirmation_required",
+        candidate_id_already_used: "conflict",
+        candidate_head_already_registered: "conflict",
+        lease_observations_mismatch: "conflict",
+        lease_not_active: "conflict"
       }.freeze
 
       def call(result, command_id:)

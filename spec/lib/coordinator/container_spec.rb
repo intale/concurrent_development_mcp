@@ -25,6 +25,7 @@ RSpec.describe Coordinator::Container do
     decision_activation_operation = described_class["operations.execute_activate_decision"]
     decision_correction_operation = described_class["operations.execute_correct_decision"]
     agent_choice_operation = described_class["operations.execute_record_agent_choice"]
+    candidate_operation = described_class["operations.execute_submit_candidate"]
     impact_scan_start = described_class["operations.execute_start_agent_choice_impact_scan"]
     impact_scan_progress = described_class["operations.execute_progress_agent_choice_impact_scan"]
     impact_assessment = described_class["operations.execute_assess_agent_choice_decision_impact"]
@@ -42,6 +43,8 @@ RSpec.describe Coordinator::Container do
     decision_query = described_class["queries.decision_get"]
     agent_choice_query = described_class["queries.agent_choice_get"]
     agent_choice_impact_query = described_class["queries.agent_choice_impact_list"]
+    candidate_get_query = described_class["queries.candidate_get"]
+    candidate_list_query = described_class["queries.candidate_list"]
     task_submissions = %w[
       operations.submit_create_change_set_task
       operations.submit_create_work_item_task
@@ -58,6 +61,7 @@ RSpec.describe Coordinator::Container do
       operations.submit_activate_decision_task
       operations.submit_correct_decision_task
       operations.submit_record_agent_choice_task
+      operations.submit_candidate_task
     ].map { described_class[_1] }
     tasks_extension = described_class["mcp.tasks.extension"]
     mcp_transport = described_class["mcp.transport"]
@@ -89,6 +93,7 @@ RSpec.describe Coordinator::Container do
     expect(agent_choice_operation).to be_a(
       Coordinator::Write::Operations::ExecuteRecordAgentChoice
     )
+    expect(candidate_operation).to be_a(Coordinator::Write::Operations::ExecuteSubmitCandidate)
     expect(impact_scan_start).to be_a(
       Coordinator::Write::Operations::ExecuteStartAgentChoiceImpactScan
     )
@@ -119,6 +124,7 @@ RSpec.describe Coordinator::Container do
       [
         "agent-choice-impacts-v1",
         "agent-choices-v1",
+        "candidates-v1",
         "command-receipts-v1",
         "coord-context-v1",
         "decision-governance-v1",
@@ -133,6 +139,8 @@ RSpec.describe Coordinator::Container do
     expect(decision_query).to be_a(Coordinator::Read::Queries::DecisionGet)
     expect(agent_choice_query).to be_a(Coordinator::Read::Queries::AgentChoiceGet)
     expect(agent_choice_impact_query).to be_a(Coordinator::Read::Queries::AgentChoiceImpactList)
+    expect(candidate_get_query).to be_a(Coordinator::Read::Queries::CandidateGet)
+    expect(candidate_list_query).to be_a(Coordinator::Read::Queries::CandidateList)
     expect(task_submissions).to all(
       be_a(Coordinator::Write::Operations::PrepareAndSubmitCoordinationTask)
     )

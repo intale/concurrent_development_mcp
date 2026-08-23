@@ -41,6 +41,13 @@ module Coordinator
         resurrect the old Choice. Use agent_choice_impact_list with the Attempt ID to inspect paginated
         explicit invalidating and no-effect assessments. Both Choice queries may lag, and no observed status
         is a freshness or write-authorization claim.
+        Use candidate_submit to checkpoint an attributed commit only after passing the full exact lease set,
+        lease IDs, resource hashes, fencing tokens, and a typed change manifest. The mutation is a durable Task;
+        stale or unauthorized observations are rejected from authoritative event-store facts. Candidate evidence
+        remains attributed_unverified because the coordinator does not inspect Git or run CI. candidate_get serves
+        every currently observed evidence component, candidate_list retains bounded Attempt checkpoint history,
+        and coord_context carries only the latest observed checkpoint per Attempt. These available views may lag
+        and never authorize a Candidate submission.
         The coordinator records attributed evidence and does not execute Git, CI, or agent work.
       TEXT
 

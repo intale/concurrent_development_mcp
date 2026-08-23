@@ -380,6 +380,7 @@ module Coordinator::Write
           attempt_id: command.attempt_id,
           repository_id: command.repository_id,
           target_branch: command.target_branch,
+          object_format: command.object_format,
           base_commit_oid: command.base_commit_oid,
           head_commit_oid: command.head_commit_oid,
           checkpoint_kind: command.checkpoint_kind,
@@ -392,7 +393,10 @@ module Coordinator::Write
             )
           end,
           change_manifest: candidate_manifest_document(command.manifest),
-          build_context: candidate_build_context_document(command.build_context)
+          build_context: candidate_build_context_document(command.build_context),
+          actual_resources: command.actual_resources.map do |resource|
+            CommandInputDocuments::FileResourceV1.new(resource.to_h)
+          end
         )
       )
     end
@@ -401,6 +405,8 @@ module Coordinator::Write
 
     def candidate_manifest_document(manifest)
       CommandInputDocuments::CandidateChangeManifestV1.new(
+        policy_version: manifest.policy_version,
+        digest: manifest.digest,
         collector_version: manifest.collector.collector_version,
         files: manifest.files.map do |file|
           CommandInputDocuments::CandidateManifestFileV1.new(
@@ -420,6 +426,8 @@ module Coordinator::Write
       return unless context
 
       CommandInputDocuments::CandidateBuildContextV1.new(
+        policy_version: context.policy_version,
+        digest: context.digest,
         collector_version: context.collector.collector_version,
         inputs: context.inputs.map do |input|
           CommandInputDocuments::CandidateBuildInputV1.new(

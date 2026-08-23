@@ -21,7 +21,8 @@ module Coordinator::Read
            Coordinator::Write::Events::WriteSetReservedV1,
            Coordinator::Write::Events::WriteSetExpandedV1,
            Coordinator::Write::Events::WriteSetRenewedV1,
-           Coordinator::Write::Events::WriteSetReleasedV1
+           Coordinator::Write::Events::WriteSetReleasedV1,
+           Coordinator::Write::Events::CandidateAttachedToAttemptV1
         roots << ProjectionScopeRoot.new(
           scope_kind: "work_item",
           scope_id: event.work_item_id,
@@ -35,7 +36,8 @@ module Coordinator::Read
            Coordinator::Write::Events::WriteSetReservedV1,
            Coordinator::Write::Events::WriteSetExpandedV1,
            Coordinator::Write::Events::WriteSetRenewedV1,
-           Coordinator::Write::Events::WriteSetReleasedV1
+           Coordinator::Write::Events::WriteSetReleasedV1,
+           Coordinator::Write::Events::CandidateAttachedToAttemptV1
         roots << ProjectionScopeRoot.new(
           scope_kind: "attempt",
           scope_id: event.attempt_id,

@@ -271,6 +271,54 @@ module Coordinator::Write
         attribute :decision_heads, Types::Array.of(Decisions::DecisionHeadV1).constrained(min_size: 1, max_size: 32)
       end
 
+      class CandidateExistingDetails < Value
+        attribute :candidate_id, Types::Identifier
+        attribute :existing_event, EventReference
+      end
+
+      class CandidateHeadExistingDetails < CandidateExistingDetails
+        attribute :repository_id, Types::RepositoryId
+        attribute :object_format, Types::GitObjectFormat
+        attribute :head_commit_oid, Types::GitOid
+      end
+
+      class CandidateLeaseObservationsMismatchDetails < Value
+        attribute :attempt_id, Types::Identifier
+        attribute :expected_resource_key_hashes,
+                  Types::Array.of(Types::Sha256Digest).constrained(max_size: 32)
+        attribute :submitted_resource_key_hashes,
+                  Types::Array.of(Types::Sha256Digest).constrained(max_size: 32)
+      end
+
+      class CandidateLeaseNotActiveDetails < Value
+        attribute :attempt_id, Types::Identifier
+        attribute :resource_key_hash, Types::Sha256Digest
+        attribute :submitted_lease_id, Types::UuidV7
+        attribute :current_lease_id, Types::UuidV7.optional
+        attribute :current_fencing_token, Types::Integer.constrained(gteq: 0)
+        attribute :expires_at, Types::Timestamp.optional
+      end
+
+      class CandidateUnauthorizedResource < Value
+        attribute :resource_key_hash, Types::Sha256Digest
+        attribute :path, Types::ResourcePath
+      end
+
+      class CandidateUnauthorizedResourcesDetails < Value
+        Resource = CandidateUnauthorizedResource
+
+        attribute :candidate_id, Types::Identifier
+        attribute :resources, Types::Array.of(Resource).constrained(min_size: 1, max_size: 32)
+      end
+
+      class CandidateManifestBaseMismatchDetails < Value
+        attribute :candidate_id, Types::Identifier
+        attribute :resource_key_hash, Types::Sha256Digest
+        attribute :path, Types::ResourcePath
+        attribute :expected_base_blob_oid, Types::GitOid.optional
+        attribute :submitted_base_blob_oid, Types::GitOid.optional
+      end
+
       class ChangeSetError < Value
         attribute :code, Types::String.enum(
           "change_set_already_exists",
@@ -326,6 +374,7 @@ module Coordinator::Write
           "attempt_not_found",
           "attempt_not_active",
           "attempt_scope_mismatch",
+          "attempt_actor_mismatch",
           "attempt_owner_mismatch",
           "write_set_already_reserved",
           "write_set_not_reserved",
@@ -611,6 +660,48 @@ module Coordinator::Write
         attribute :details, AgentChoiceUnresolvedHeadsDetails
       end
 
+      class CandidateAlreadyExistsError < Value
+        attribute :code, Types::String.enum("candidate_id_already_used")
+        attribute :message, Types::String
+        attribute :details, CandidateExistingDetails
+      end
+
+      class CandidateHeadAlreadyRegisteredError < Value
+        attribute :code, Types::String.enum("candidate_head_already_registered")
+        attribute :message, Types::String
+        attribute :details, CandidateHeadExistingDetails
+      end
+
+      class CandidateLeaseObservationsMismatchError < Value
+        attribute :code, Types::String.enum("lease_observations_mismatch")
+        attribute :message, Types::String
+        attribute :details, CandidateLeaseObservationsMismatchDetails
+      end
+
+      class CandidateLeaseNotActiveScopeError < Value
+        attribute :code, Types::String.enum("lease_not_active")
+        attribute :message, Types::String
+        attribute :details, AttemptDetails
+      end
+
+      class CandidateLeaseNotActiveError < Value
+        attribute :code, Types::String.enum("lease_not_active")
+        attribute :message, Types::String
+        attribute :details, CandidateLeaseNotActiveDetails
+      end
+
+      class CandidateUnauthorizedResourcesError < Value
+        attribute :code, Types::String.enum("actual_write_set_not_authorized")
+        attribute :message, Types::String
+        attribute :details, CandidateUnauthorizedResourcesDetails
+      end
+
+      class CandidateManifestBaseMismatchError < Value
+        attribute :code, Types::String.enum("manifest_base_evidence_mismatch")
+        attribute :message, Types::String
+        attribute :details, CandidateManifestBaseMismatchDetails
+      end
+
       Type = ChangeSetError |
              ActivationDependencyError |
              WorkItemError |
@@ -661,7 +752,14 @@ module Coordinator::Write
              AgentChoiceConfirmationRequiredError |
              AgentChoicePartitionSnapshotInvalidError |
              AgentChoiceDecisionHeadInvalidError |
-             AgentChoiceUnresolvedHeadsError
+             AgentChoiceUnresolvedHeadsError |
+             CandidateAlreadyExistsError |
+             CandidateHeadAlreadyRegisteredError |
+             CandidateLeaseObservationsMismatchError |
+             CandidateLeaseNotActiveScopeError |
+             CandidateLeaseNotActiveError |
+             CandidateUnauthorizedResourcesError |
+             CandidateManifestBaseMismatchError
     end
   end
 end

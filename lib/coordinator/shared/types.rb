@@ -249,6 +249,7 @@ module Coordinator::Shared
       decision_activate
       decision_correct
       agent_choice_record
+      candidate_submit
     ].freeze
 
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)

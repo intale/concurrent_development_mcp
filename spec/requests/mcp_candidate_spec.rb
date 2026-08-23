@@ -1,0 +1,215 @@
+# frozen_string_literal: true
+
+RSpec.describe "CAN-01 MCP Candidate coordination", :event_store, :read_model do
+  CANDIDATE_PROTOCOL_VERSION = "2026-07-28"
+  CANDIDATE_TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
+
+  let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
+  let(:streams) { Coordinator::Write::StreamFactory.new }
+  let(:session) do
+    ActionDispatch::Integration::Session.new(Rails.application).tap do |integration|
+      integration.host! "localhost"
+    end
+  end
+
+  it "submits a traced Task and serves every available Candidate projection stage" do
+    prepared = CandidateScenario.prepare(prefix: "mcp-candidate")
+    arguments = prepared.fetch(:input).merge(
+      build_context: CandidateScenario.build_context_for("lib/candidate.rb")
+    )
+
+    created = call_tool("candidate_submit", arguments, id: 1)
+    expect(created).to include("result" => include("taskId" => a_string_matching(
+      Coordinator::Shared::Types::UUID_V7_PATTERN
+    )))
+    task_id = created.dig("result", "taskId")
+    expect(task_events(task_id).map(&:type)).to eq([ "CoordinationTaskSubmitted" ])
+
+    execute_task(task_id)
+    completed = task_request("tasks/get", task_id, id: 2)
+    result = completed.dig("result", "result", "structuredContent")
+    expect(completed.dig("result", "status")).to eq("completed")
+    expect(result).to include(
+      "status" => "ok",
+      "command_id" => "cmd-mcp-candidate",
+      "data" => include(
+        "candidate_id" => "CAN-mcp-candidate",
+        "evidence_status" => "attributed_unverified",
+        "head_commit_oid" => "b" * 40
+      )
+    )
+
+    submitted, started, task_completed = task_events(task_id)
+    candidate_facts = CandidateScenario.candidate_events("CAN-mcp-candidate")
+    completion = command_events("cmd-mcp-candidate").sole
+    expect(candidate_facts.map(&:type)).to eq(%w[
+      CandidateSubmitted
+      CandidateChangeManifestCaptured
+      CandidateBuildContextCaptured
+    ])
+    expect([ *candidate_facts, completion ].map(&:causation_id).uniq).to eq([ started.id ])
+    expect(task_completed.causation_id).to eq(completion.id)
+    expect([ submitted, started, *candidate_facts, completion, task_completed ].map(&:correlation_id).uniq).to eq(
+      [ submitted.correlation_id ]
+    )
+
+    absent = call_tool("candidate_get", { candidate_id: "CAN-mcp-candidate" }, id: 3)
+    expect(absent.dig("result", "structuredContent")).to include(
+      "status" => "not_found",
+      "data" => include("code" => "candidate_not_observed")
+    )
+
+    projector = Coordinator::Container["projectors.candidates_v1"]
+    projector.call(candidate_facts.first)
+    partial = call_tool("candidate_get", { candidate_id: "CAN-mcp-candidate" }, id: 4)
+      .dig("result", "structuredContent")
+    expect(partial).to include(
+      "status" => "ok",
+      "data" => include(
+        "candidate" => include(
+          "candidate_id" => "CAN-mcp-candidate",
+          "manifest" => nil,
+          "build_context" => nil,
+          "submitted" => include(
+            "causation_id" => candidate_facts.first.causation_id,
+            "correlation_id" => candidate_facts.first.correlation_id
+          )
+        )
+      )
+    )
+
+    candidate_facts.drop(1).each { projector.call(_1) }
+    full = call_tool("candidate_get", { candidate_id: "CAN-mcp-candidate" }, id: 5)
+      .dig("result", "structuredContent", "data", "candidate")
+    expect(full).to include(
+      "evidence_status" => "attributed_unverified",
+      "manifest" => include("digest" => full.fetch("manifest_digest")),
+      "build_context" => include("digest" => full.fetch("build_context_digest"))
+    )
+    expect(full.keys & %w[fresh pending projection_status]).to be_empty
+
+    page = call_tool(
+      "candidate_list",
+      { attempt_id: "A-mcp-candidate", limit: 20 },
+      id: 6
+    ).dig("result", "structuredContent", "data", "page")
+    expect(page).to include("has_more" => false, "next_global_position" => nil)
+    expect(page.fetch("items").sole).to include(
+      "candidate_id" => "CAN-mcp-candidate",
+      "manifest_observed" => true,
+      "build_context_observed" => true
+    )
+  end
+
+  it "completes a stale lease Task as a conflict without target facts" do
+    prepared = CandidateScenario.prepare(prefix: "mcp-candidate-stale")
+    arguments = prepared.fetch(:input)
+    arguments[:leases] = arguments.fetch(:leases).map do |lease|
+      lease.merge(fencing_token: lease.fetch(:fencing_token) + 1)
+    end
+
+    created = call_tool("candidate_submit", arguments, id: 1)
+    expect(created).to include("result" => include("taskId" => a_string_matching(
+      Coordinator::Shared::Types::UUID_V7_PATTERN
+    )))
+    task_id = created.dig("result", "taskId")
+    execute_task(task_id)
+    completed = task_request("tasks/get", task_id, id: 2)
+
+    expect(completed.dig("result", "status")).to eq("completed")
+    expect(completed.dig("result", "result")).to include(
+      "isError" => true,
+      "structuredContent" => include(
+        "status" => "conflict",
+        "data" => include("code" => "lease_observations_mismatch")
+      )
+    )
+    expect(CandidateScenario.candidate_events("CAN-mcp-candidate-stale")).to be_empty
+    expect(command_events("cmd-mcp-candidate-stale")).to be_empty
+  end
+
+  it "rejects malformed evidence before allocating a Task" do
+    arguments = CandidateScenario.prepare(prefix: "mcp-candidate-invalid").fetch(:input)
+    arguments[:leases] = []
+
+    response = call_tool("candidate_submit", arguments, id: 1)
+
+    expect(response.dig("result")).to include(
+      "isError" => true,
+      "content" => [ include("text" => include("array size at `/leases` is less than: 1")) ]
+    )
+    expect(task_events_for_command("cmd-mcp-candidate-invalid")).to be_empty
+  end
+
+  def call_tool(name, arguments, id:, expected_status: 200)
+    mcp_request(id:, method: "tools/call", name:, params: { name:, arguments: }, expected_status:)
+  end
+
+  def task_request(method, task_id, id:)
+    mcp_request(id:, method:, name: task_id, params: { taskId: task_id }, expected_status: 200)
+  end
+
+  def mcp_request(id:, method:, params:, name:, expected_status:)
+    session.post(
+      "/mcp",
+      params: JSON.generate(jsonrpc: "2.0", id:, method:, params: modern_params(params)),
+      headers: {
+        "Content-Type" => "application/json",
+        "Accept" => "application/json, text/event-stream",
+        "MCP-Protocol-Version" => CANDIDATE_PROTOCOL_VERSION,
+        "Mcp-Method" => method,
+        "Mcp-Name" => name
+      }
+    )
+    expect(session.response.status).to eq(expected_status), session.response.body
+    JSON.parse(session.response.body)
+  end
+
+  def modern_params(params)
+    params.merge(
+      _meta: {
+        "io.modelcontextprotocol/protocolVersion" => CANDIDATE_PROTOCOL_VERSION,
+        "io.modelcontextprotocol/clientCapabilities" => {
+          extensions: { CANDIDATE_TASKS_EXTENSION => {} }
+        },
+        "io.modelcontextprotocol/clientInfo" => { name: "rspec", version: "1.0" }
+      }
+    )
+  end
+
+  def execute_task(task_id)
+    submitted = task_events(task_id).find { _1.type == "CoordinationTaskSubmitted" }
+    collector = ReportedErrorCollector.new
+    Rails.error.subscribe(collector)
+    Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
+    raise collector.errors.first if collector.errors.any?
+  ensure
+    Rails.error.unsubscribe(collector) if collector
+  end
+
+  def task_events(task_id)
+    event_store.read(
+      streams.coordination_task(task_id),
+      Coordinator::Write::EventQueries::COORDINATION_TASK_HISTORY
+    )
+  end
+
+  def task_events_for_command(command_id)
+    PgEventstore.client.read(
+      PgEventstore::Stream.all_stream,
+      options: {
+        direction: :asc,
+        max_count: 1,
+        filter: {
+          event_types: [
+            { type: "CoordinationTaskSubmitted", markers: [ "command:#{command_id}" ] }
+          ]
+        }
+      }
+    )
+  end
+
+  def command_events(command_id)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+  end
+end

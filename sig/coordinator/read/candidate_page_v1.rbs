@@ -1,0 +1,10 @@
+module Coordinator
+  module Read
+    class CandidatePageV1 < Shared::Value
+      attr_reader attempt_id: String
+      attr_reader items: Array[CandidateSummaryV1]
+      attr_reader next_global_position: Integer?
+      attr_reader has_more: bool
+    end
+  end
+end

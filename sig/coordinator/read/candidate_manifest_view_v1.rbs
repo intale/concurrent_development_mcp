@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    class CandidateManifestViewV1 < Shared::Value
+      attr_reader policy_version: String
+      attr_reader digest: String
+      attr_reader files: Array[Write::Candidates::ManifestFileV1]
+      attr_reader collector: Write::Candidates::EvidenceCollectorV1
+      attr_reader evidence: CandidateSourceEvidenceV1
+    end
+  end
+end

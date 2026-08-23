@@ -191,6 +191,40 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
     expect(Coordinator::Read::ContextNextActionsBuilder.new.call(snapshot.state)).to be_empty
   end
 
+  it "keeps the latest observed Candidate checkpoint per Attempt while history remains separate" do
+    prepared = CandidateScenario.prepare(prefix: "context-candidate")
+    first_input = prepared.fetch(:input)
+    second_input = first_input.merge(
+      command_id: "cmd-context-candidate-2",
+      candidate_id: "CAN-context-candidate-2",
+      head_commit_oid: "e" * 40,
+      checkpoint_kind: "handoff"
+    )
+    CandidateScenario.execute(Coordinator::Write::Operations::ExecuteSubmitCandidate, first_input)
+    CandidateScenario.execute(Coordinator::Write::Operations::ExecuteSubmitCandidate, second_input)
+    project_candidate_context_sources(prepared.fetch(:ids))
+    CandidateScenario.attachment_events(prepared.dig(:ids, :attempt_id)).each do |event|
+      projector.call(event)
+    end
+
+    snapshot = Coordinator::Read::Repositories::CoordContexts.new.resolve(
+      scope_kind: "attempt",
+      scope_id: prepared.dig(:ids, :attempt_id)
+    )
+    checkpoint = snapshot.state.candidate_checkpoints.sole
+    expect(checkpoint).to have_attributes(
+      candidate_id: "CAN-context-candidate-2",
+      attempt_id: "A-context-candidate",
+      checkpoint_kind: "handoff",
+      head_commit_oid: "e" * 40,
+      manifest_digest: match(Coordinator::Shared::Types::SHA256_DIGEST_PATTERN)
+    )
+    expect(checkpoint.candidate_event).to have_attributes(
+      stream_id: "CAN-context-candidate-2",
+      type: "CandidateSubmitted"
+    )
+  end
+
   def create_change_set(change_set_id)
     Coordinator::Write::Operations::ExecuteCreateChangeSet.new(event_store:).call(
       command_id: "create-#{change_set_id}",
@@ -225,5 +259,38 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
       streams.work_item(work_item_id),
       Coordinator::Write::EventQueries::WORK_ITEM_FOR_ACQUISITION
     )
+  end
+
+  def project_candidate_context_sources(ids)
+    planning = event_store.read(
+      streams.change_set(ids.fetch(:change_set_id)),
+      Coordinator::Write::EventQueries::CHANGE_SET_FOR_ACTIVATION
+    )
+    work = event_store.read(
+      streams.work_item(ids.fetch(:work_item_id)),
+      Coordinator::Write::EventQueries::WORK_ITEM_FOR_ACQUISITION
+    )
+    attempt = event_store.read(
+      streams.attempt(ids.fetch(:attempt_id)),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[AttemptAuthorized AttemptStarted WriteSetReserved],
+        maximum_count: 3,
+        direction: :asc
+      )
+    )
+    event_types = %w[
+      ChangeSetCreated
+      ChangeSetAcceptanceCriteriaDefined
+      WorkItemCreated
+      WorkItemAddedToChangeSet
+      ChangeSetActivated
+      WorkItemMadeReady
+      WorkItemAcquired
+      AttemptAuthorized
+      AttemptStarted
+      WriteSetReserved
+    ]
+    events = planning + work + attempt
+    event_types.each { |type| projector.call(events.find { _1.type == type }) }
   end
 end

@@ -1,0 +1,52 @@
+module Coordinator
+  module Read
+    class Candidate < ApplicationRecord
+      def candidate_id: () -> String
+      def change_set_id: () -> String
+      def work_item_id: () -> String
+      def attempt_id: () -> String
+      def agent_id: () -> String
+      def repository_id: () -> String
+      def target_branch: () -> String
+      def object_format: () -> String
+      def base_commit_oid: () -> String
+      def head_commit_oid: () -> String
+      def checkpoint_kind: () -> String
+      def lease_set_id: () -> String
+      def lease_policy_version: () -> String
+      def lease_references: () -> Array[Hash[String, untyped]]
+      def manifest_digest: () -> String
+      def build_context_digest: () -> String?
+      def evidence_status: () -> String
+      def submitted_event: () -> Hash[String, untyped]
+      def submitted_actor: () -> Hash[String, untyped]
+      def submitted_markers: () -> Array[String]
+      def submitted_metadata: () -> Hash[String, untyped]
+      def submitted_causation_id: () -> String?
+      def submitted_correlation_id: () -> String?
+      def submitted_global_position: () -> Integer
+      def submitted_at_domain: () -> Time
+      def submitted_at_store: () -> Time
+      def manifest: () -> Hash[String, untyped]?
+      def manifest_event: () -> Hash[String, untyped]?
+      def manifest_actor: () -> Hash[String, untyped]?
+      def manifest_markers: () -> Array[String]?
+      def manifest_metadata: () -> Hash[String, untyped]?
+      def manifest_causation_id: () -> String?
+      def manifest_correlation_id: () -> String?
+      def manifest_global_position: () -> Integer?
+      def manifest_at_domain: () -> Time?
+      def manifest_at_store: () -> Time?
+      def build_context: () -> Hash[String, untyped]?
+      def build_context_event: () -> Hash[String, untyped]?
+      def build_context_actor: () -> Hash[String, untyped]?
+      def build_context_markers: () -> Array[String]?
+      def build_context_metadata: () -> Hash[String, untyped]?
+      def build_context_causation_id: () -> String?
+      def build_context_correlation_id: () -> String?
+      def build_context_global_position: () -> Integer?
+      def build_context_at_domain: () -> Time?
+      def build_context_at_store: () -> Time?
+    end
+  end
+end

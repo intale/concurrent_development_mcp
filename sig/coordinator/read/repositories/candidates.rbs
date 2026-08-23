@@ -1,0 +1,13 @@
+module Coordinator
+  module Read
+    module Repositories
+      class Candidates
+        def fetch: (String candidate_id) -> CandidateViewV1?
+        def store_submission: (event: PgEventstore::Event, candidate: Write::Events::CandidateSubmittedV1) -> Candidate
+        def store_manifest: (event: PgEventstore::Event, manifest: Write::Events::CandidateChangeManifestCapturedV1) -> Candidate
+        def store_build_context: (event: PgEventstore::Event, build_context: Write::Events::CandidateBuildContextCapturedV1) -> Candidate
+        def page: (CandidateListQueryV1 query) -> CandidatePageV1
+      end
+    end
+  end
+end

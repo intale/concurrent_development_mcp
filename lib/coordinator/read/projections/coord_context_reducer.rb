@@ -19,6 +19,7 @@ module Coordinator::Read
         when Coordinator::Write::Events::WriteSetExpandedV1 then apply_write_set_expanded(state, event)
         when Coordinator::Write::Events::WriteSetRenewedV1 then apply_write_set_renewed(state, event)
         when Coordinator::Write::Events::WriteSetReleasedV1 then apply_write_set_released(state, event)
+        when Coordinator::Write::Events::CandidateAttachedToAttemptV1 then apply_candidate_attached(state, event)
         else
           raise UnknownProjectionEvent, "coord_context/v1 does not handle #{event.class.name}"
         end
@@ -290,6 +291,35 @@ module Coordinator::Read
             state.attempts,
             :attempt_id,
             CoordContextStateV1::Attempt.new(attempt.attributes.merge(write_set: released))
+          )
+        )
+      end
+
+      def apply_candidate_attached(state, event)
+        require_attempt(state, event.attempt_id, event.change_set_id, event.work_item_id)
+        checkpoint = CoordContextStateV1::CandidateCheckpoint.new(
+          candidate_id: event.candidate_id,
+          candidate_event: event.candidate_event,
+          change_set_id: event.change_set_id,
+          work_item_id: event.work_item_id,
+          attempt_id: event.attempt_id,
+          repository_id: event.repository_id,
+          target_branch: event.target_branch,
+          object_format: event.object_format,
+          base_commit_oid: event.base_commit_oid,
+          head_commit_oid: event.head_commit_oid,
+          checkpoint_kind: event.checkpoint_kind,
+          manifest_digest: event.manifest_digest,
+          build_context_digest: event.build_context_digest,
+          attached_at: event.attached_at
+        )
+
+        replace(
+          state,
+          candidate_checkpoints: upsert(
+            state.candidate_checkpoints,
+            :attempt_id,
+            checkpoint
           )
         )
       end

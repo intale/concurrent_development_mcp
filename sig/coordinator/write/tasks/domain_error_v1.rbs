@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Tasks
       module DomainErrorV1
-        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError | InterpretationNotAcceptedError | DecisionAlreadyExistsError | InterpretationAlreadyActivatedError | DecisionDefinitionNotActivatableError | DecisionSlotOccupiedError | DecisionPartitionLimitReachedError | DecisionPartitionCapacityReachedError | DecisionPartitionStateInvalidError | DecisionNotFoundError | DecisionNotActiveError | InterpretationNotACorrectionError | DecisionDefinitionNotCorrectableError | DecisionRevisionChangedError | DecisionSlotStateInvalidError | AgentChoiceAlreadyExistsError | StaleDecisionContextError | DecisionContextMismatchError | DecisionContextConflictError | DecisionContextLimitReachedError | UnsupportedDecisionContextError | AgentChoiceBlockedByDecisionError | AgentChoiceConfirmationRequiredError | AgentChoicePartitionSnapshotInvalidError | AgentChoiceDecisionHeadInvalidError | AgentChoiceUnresolvedHeadsError
+        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError | InterpretationNotAcceptedError | DecisionAlreadyExistsError | InterpretationAlreadyActivatedError | DecisionDefinitionNotActivatableError | DecisionSlotOccupiedError | DecisionPartitionLimitReachedError | DecisionPartitionCapacityReachedError | DecisionPartitionStateInvalidError | DecisionNotFoundError | DecisionNotActiveError | InterpretationNotACorrectionError | DecisionDefinitionNotCorrectableError | DecisionRevisionChangedError | DecisionSlotStateInvalidError | AgentChoiceAlreadyExistsError | StaleDecisionContextError | DecisionContextMismatchError | DecisionContextConflictError | DecisionContextLimitReachedError | UnsupportedDecisionContextError | AgentChoiceBlockedByDecisionError | AgentChoiceConfirmationRequiredError | AgentChoicePartitionSnapshotInvalidError | AgentChoiceDecisionHeadInvalidError | AgentChoiceUnresolvedHeadsError | CandidateAlreadyExistsError | CandidateHeadAlreadyRegisteredError | CandidateLeaseObservationsMismatchError | CandidateLeaseNotActiveScopeError | CandidateLeaseNotActiveError | CandidateUnauthorizedResourcesError | CandidateManifestBaseMismatchError
 
         class ChangeSetDetails < Shared::Value
           def change_set_id: () -> String
@@ -270,6 +270,50 @@ module Coordinator
 
         class AgentChoiceUnresolvedHeadsDetails < Shared::Value
           def decision_heads: () -> Array[Decisions::DecisionHeadV1]
+        end
+
+        class CandidateExistingDetails < Shared::Value
+          def candidate_id: () -> String
+          def existing_event: () -> EventReference
+        end
+
+        class CandidateHeadExistingDetails < CandidateExistingDetails
+          def repository_id: () -> String
+          def object_format: () -> String
+          def head_commit_oid: () -> String
+        end
+
+        class CandidateLeaseObservationsMismatchDetails < Shared::Value
+          def attempt_id: () -> String
+          def expected_resource_key_hashes: () -> Array[String]
+          def submitted_resource_key_hashes: () -> Array[String]
+        end
+
+        class CandidateLeaseNotActiveDetails < Shared::Value
+          def attempt_id: () -> String
+          def resource_key_hash: () -> String
+          def submitted_lease_id: () -> String
+          def current_lease_id: () -> String?
+          def current_fencing_token: () -> Integer
+          def expires_at: () -> String?
+        end
+
+        class CandidateUnauthorizedResource < Shared::Value
+          def resource_key_hash: () -> String
+          def path: () -> String
+        end
+
+        class CandidateUnauthorizedResourcesDetails < Shared::Value
+          def candidate_id: () -> String
+          def resources: () -> Array[CandidateUnauthorizedResource]
+        end
+
+        class CandidateManifestBaseMismatchDetails < Shared::Value
+          def candidate_id: () -> String
+          def resource_key_hash: () -> String
+          def path: () -> String
+          def expected_base_blob_oid: () -> String?
+          def submitted_base_blob_oid: () -> String?
         end
 
         class ChangeSetError < Shared::Value
@@ -579,6 +623,48 @@ module Coordinator
           def code: () -> String
           def message: () -> String
           def details: () -> AgentChoiceUnresolvedHeadsDetails
+        end
+
+        class CandidateAlreadyExistsError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> CandidateExistingDetails
+        end
+
+        class CandidateHeadAlreadyRegisteredError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> CandidateHeadExistingDetails
+        end
+
+        class CandidateLeaseObservationsMismatchError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> CandidateLeaseObservationsMismatchDetails
+        end
+
+        class CandidateLeaseNotActiveScopeError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> AttemptDetails
+        end
+
+        class CandidateLeaseNotActiveError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> CandidateLeaseNotActiveDetails
+        end
+
+        class CandidateUnauthorizedResourcesError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> CandidateUnauthorizedResourcesDetails
+        end
+
+        class CandidateManifestBaseMismatchError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> CandidateManifestBaseMismatchDetails
         end
       end
     end

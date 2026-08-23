@@ -17,8 +17,11 @@ module Coordinator
       def self.decision_activate: () -> json_schema
       def self.decision_correct: () -> json_schema
       def self.agent_choice_record: () -> json_schema
+      def self.candidate_submit: () -> json_schema
       def self.agent_choice_get: () -> json_schema
       def self.agent_choice_impact_list: () -> json_schema
+      def self.candidate_get: () -> json_schema
+      def self.candidate_list: () -> json_schema
       def self.operation_get: () -> json_schema
       def self.guidance_get: () -> json_schema
       def self.decision_interpretation_list: () -> json_schema
@@ -44,6 +47,10 @@ module Coordinator
       def self.write_set_resource: () -> json_schema
       def self.lease_renewal_reference: () -> json_schema
       def self.lease_release_reference: () -> json_schema
+      def self.candidate_change_manifest: () -> json_schema
+      def self.candidate_manifest_file: () -> json_schema
+      def self.candidate_build_context: () -> json_schema
+      def self.nullable_sha256_digest: () -> json_schema
       def self.interpretation_source_span: () -> json_schema
       def self.interpretation_classifier: () -> json_schema
       def self.interpretation_decision: () -> json_schema

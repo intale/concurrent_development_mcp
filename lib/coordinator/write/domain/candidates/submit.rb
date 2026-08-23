@@ -73,11 +73,28 @@ module Coordinator::Write
         def denied_write_set(state, command, submitted_at:)
           attempt = state.attempt
           return scoped_failure(:write_set_not_reserved, "Attempt has no reserved write set", command) unless attempt.lease_set_id
-          return scoped_failure(:lease_set_released, "Attempt write set has been released", command) if attempt.lease_released_at
+          if attempt.lease_released_at
+            return failure(
+              :lease_set_released,
+              "Attempt write set has been released",
+              change_set_id: command.change_set_id,
+              work_item_id: command.work_item_id,
+              attempt_id: command.attempt_id,
+              released_at: attempt.lease_released_at
+            )
+          end
           unless attempt.lease_set_id == command.lease_set_id &&
                  attempt.lease_repository_id == command.repository_id &&
                  attempt.lease_policy_version == ResourceKeyDocumentV1::POLICY_VERSION
-            return scoped_failure(:lease_set_mismatch, "Lease set does not match the Attempt", command)
+            return failure(
+              :lease_set_mismatch,
+              "Lease set does not match the Attempt",
+              change_set_id: command.change_set_id,
+              work_item_id: command.work_item_id,
+              attempt_id: command.attempt_id,
+              current_lease_set_id: attempt.lease_set_id,
+              requested_lease_set_id: command.lease_set_id
+            )
           end
 
           expected = attempt.lease_resources.map { [ _1.resource_key_hash, _1.lease_id, _1.fencing_token ] }
@@ -227,6 +244,9 @@ module Coordinator::Write
               event: Events::CandidateAttachedToAttemptV1.new(
                 candidate_id: command.candidate_id,
                 candidate_event:,
+                change_set_id: command.change_set_id,
+                work_item_id: command.work_item_id,
+                attempt_id: command.attempt_id,
                 repository_id: command.repository_id,
                 target_branch: command.target_branch,
                 object_format: command.object_format,

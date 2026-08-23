@@ -287,6 +287,8 @@ module Coordinator
       end
 
       class CandidateChangeManifestV1 < Shared::Value
+        def policy_version: () -> String
+        def digest: () -> String
         def collector_version: () -> String
         def files: () -> Array[CandidateManifestFileV1]
       end
@@ -303,6 +305,8 @@ module Coordinator
       end
 
       class CandidateBuildContextV1 < Shared::Value
+        def policy_version: () -> String
+        def digest: () -> String
         def collector_version: () -> String
         def inputs: () -> Array[CandidateBuildInputV1]
         def environment: () -> Array[CandidateEnvironmentEntryV1]
@@ -318,6 +322,7 @@ module Coordinator
         def attempt_id: () -> String
         def repository_id: () -> String
         def target_branch: () -> String
+        def object_format: () -> String
         def base_commit_oid: () -> String
         def head_commit_oid: () -> String
         def checkpoint_kind: () -> String
@@ -325,6 +330,7 @@ module Coordinator
         def leases: () -> Array[CandidateLeaseObservationV1]
         def change_manifest: () -> CandidateChangeManifestV1
         def build_context: () -> CandidateBuildContextV1?
+        def actual_resources: () -> Array[FileResourceV1]
       end
 
       class SubmitCandidateV1 < BaseV1

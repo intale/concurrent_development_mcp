@@ -7,6 +7,9 @@ module Coordinator::Write
 
       attribute :candidate_id, Types::Identifier
       attribute :candidate_event, EventReference
+      attribute :change_set_id, Types::Identifier
+      attribute :work_item_id, Types::Identifier
+      attribute :attempt_id, Types::Identifier
       attribute :repository_id, Types::RepositoryId
       attribute :target_branch, Types::CandidateTargetBranch
       attribute :object_format, Types::GitObjectFormat

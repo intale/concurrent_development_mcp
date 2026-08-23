@@ -1,0 +1,14 @@
+module Coordinator
+  module Read
+    class CandidateBuildContextViewV1 < Shared::Value
+      attr_reader policy_version: String
+      attr_reader digest: String
+      attr_reader inputs: Array[Write::Candidates::BuildInputV1]
+      attr_reader environment: Array[Write::Candidates::EnvironmentEntryV1]
+      attr_reader dependency_graph_digest: String?
+      attr_reader test_environment_digest: String?
+      attr_reader collector: Write::Candidates::EvidenceCollectorV1
+      attr_reader evidence: CandidateSourceEvidenceV1
+    end
+  end
+end

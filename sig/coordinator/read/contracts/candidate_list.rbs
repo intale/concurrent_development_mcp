@@ -1,0 +1,9 @@
+module Coordinator
+  module Read
+    module Contracts
+      class CandidateList < Dry::Validation::Contract
+        def call: (command_input input) -> Dry::Validation::Result
+      end
+    end
+  end
+end

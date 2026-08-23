@@ -17,7 +17,8 @@ module Coordinator::Read
         "WriteSetReserved" => [ "DevelopmentExecution", "Attempt" ],
         "WriteSetExpanded" => [ "DevelopmentExecution", "Attempt" ],
         "WriteSetRenewed" => [ "DevelopmentExecution", "Attempt" ],
-        "WriteSetReleased" => [ "DevelopmentExecution", "Attempt" ]
+        "WriteSetReleased" => [ "DevelopmentExecution", "Attempt" ],
+        "CandidateAttachedToAttempt" => [ "DevelopmentExecution", "Attempt" ]
       }.freeze
 
       config.validate_keys = true

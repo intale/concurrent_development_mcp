@@ -325,7 +325,7 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
       Coordinator::Write::CommandInputDocuments::CandidateBuildContextV1
     )
     expect(digest.candidate_submit(candidate_command)).to eq(
-      "sha256:395bb974c3d46ffcc936283e908bbe5d3610eadfbe43b6b692b01daa5dd740bf"
+      "sha256:9adfc66ec0a215dfcb15124aa1572681227a290abfaf9b8f451db696958f1679"
     )
     expect(digest.call(candidate_command)).to eq(digest.candidate_submit(candidate_command))
   end

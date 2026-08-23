@@ -35,6 +35,8 @@ module Coordinator::Write
           build_correct_decision(document)
         when CommandInputDocuments::RecordAgentChoiceV1
           build_record_agent_choice(document)
+        when CommandInputDocuments::SubmitCandidateV1
+          build_submit_candidate(document)
         end
       end
 
@@ -233,6 +235,61 @@ module Coordinator::Write
           reason_summary: input.reason_summary,
           context: input.context,
           decision_context: input.decision_context
+        )
+      end
+
+      def build_submit_candidate(document)
+        input = document.input
+        actor = build_actor(input.actor)
+        Commands::SubmitCandidate.new(
+          command_id: document.command_id,
+          actor:,
+          candidate_id: input.candidate_id,
+          change_set_id: input.change_set_id,
+          work_item_id: input.work_item_id,
+          attempt_id: input.attempt_id,
+          repository_id: input.repository_id,
+          target_branch: input.target_branch,
+          object_format: input.object_format,
+          base_commit_oid: input.base_commit_oid,
+          head_commit_oid: input.head_commit_oid,
+          checkpoint_kind: input.checkpoint_kind,
+          lease_set_id: input.lease_set_id,
+          leases: input.leases.map { Candidates::LeaseObservationV1.new(_1.to_h) },
+          manifest: candidate_manifest(input.change_manifest, actor:),
+          build_context: candidate_build_context(input.build_context, actor:),
+          actual_resources: input.actual_resources.map { FileResourceV1.new(_1.to_h) }
+        )
+      end
+
+      def candidate_manifest(document, actor:)
+        Candidates::ChangeManifestV1.new(
+          policy_version: document.policy_version,
+          digest: document.digest,
+          files: document.files.map { Candidates::ManifestFileV1.new(_1.to_h) },
+          collector: candidate_collector(document.collector_version, actor:)
+        )
+      end
+
+      def candidate_build_context(document, actor:)
+        return unless document
+
+        Candidates::BuildContextV1.new(
+          policy_version: document.policy_version,
+          digest: document.digest,
+          inputs: document.inputs.map { Candidates::BuildInputV1.new(_1.to_h) },
+          environment: document.environment.map { Candidates::EnvironmentEntryV1.new(_1.to_h) },
+          dependency_graph_digest: document.dependency_graph_digest,
+          test_environment_digest: document.test_environment_digest,
+          collector: candidate_collector(document.collector_version, actor:)
+        )
+      end
+
+      def candidate_collector(version, actor:)
+        Candidates::EvidenceCollectorV1.new(
+          kind: actor.kind,
+          id: actor.id,
+          collector_version: version
         )
       end
 

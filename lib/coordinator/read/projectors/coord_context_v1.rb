@@ -21,6 +21,7 @@ module Coordinator::Read
 
       def call(event)
         payload = load_payload(event)
+        verify_stream_identity!(event, payload)
         identity = ProjectionEventIdentity.from_event(event)
         processed_at = Time.now.utc
 
@@ -50,6 +51,13 @@ module Coordinator::Read
       end
 
       private
+
+      def verify_stream_identity!(event, payload)
+        return unless payload.is_a?(Coordinator::Write::Events::CandidateAttachedToAttemptV1)
+        return if event.stream.stream_id == payload.attempt_id
+
+        raise InvalidProjectionSource, "Candidate checkpoint Attempt does not match its source stream"
+      end
 
       def load_payload(event)
         result = @contract.call(

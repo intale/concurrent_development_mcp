@@ -363,6 +363,38 @@ module Coordinator
         )
       end
 
+      def candidate_submit
+        object_schema(
+          properties: common_mutation_properties.merge(
+            actor: agent_actor,
+            candidate_id: identifier,
+            change_set_id: identifier,
+            work_item_id: identifier,
+            attempt_id: identifier,
+            repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+            target_branch: { type: "string", minLength: 1, maxLength: 255 },
+            base_commit_oid: git_oid,
+            head_commit_oid: git_oid,
+            checkpoint_kind: { type: "string", enum: Types::CANDIDATE_CHECKPOINT_KINDS },
+            lease_set_id: uuid_v7,
+            leases: {
+              type: "array",
+              minItems: 1,
+              maxItems: 32,
+              uniqueItems: true,
+              items: lease_renewal_reference
+            },
+            change_manifest: candidate_change_manifest,
+            build_context: { anyOf: [ candidate_build_context, { type: "null" } ] }
+          ),
+          required: %w[
+            command_id actor candidate_id change_set_id work_item_id attempt_id repository_id
+            target_branch base_commit_oid head_commit_oid checkpoint_kind lease_set_id leases
+            change_manifest
+          ]
+        )
+      end
+
       def operation_get
         object_schema(
           properties: {
@@ -376,6 +408,28 @@ module Coordinator
         object_schema(
           properties: { choice_id: identifier },
           required: %w[choice_id]
+        )
+      end
+
+      def candidate_get
+        object_schema(
+          properties: { candidate_id: identifier },
+          required: %w[candidate_id]
+        )
+      end
+
+      def candidate_list
+        object_schema(
+          properties: {
+            attempt_id: identifier,
+            after_global_position: {
+              anyOf: [ { type: "integer", minimum: 0 }, { type: "null" } ]
+            },
+            limit: {
+              anyOf: [ { type: "integer", minimum: 1, maximum: 100 }, { type: "null" } ]
+            }
+          },
+          required: %w[attempt_id]
         )
       end
 
@@ -713,6 +767,83 @@ module Coordinator
 
       def lease_release_reference
         lease_renewal_reference
+      end
+
+      def candidate_change_manifest
+        object_schema(
+          properties: {
+            collector_version: { type: "string", minLength: 1, maxLength: 100 },
+            files: {
+              type: "array",
+              minItems: 1,
+              maxItems: 256,
+              uniqueItems: true,
+              items: candidate_manifest_file
+            }
+          },
+          required: %w[collector_version files]
+        )
+      end
+
+      def candidate_manifest_file
+        nullable_oid = { anyOf: [ git_oid, { type: "null" } ] }
+        nullable_path = {
+          anyOf: [ { type: "string", minLength: 1, maxLength: 1_024 }, { type: "null" } ]
+        }
+        nullable_mode = {
+          anyOf: [ { type: "string", enum: Types::CANDIDATE_GIT_FILE_MODES }, { type: "null" } ]
+        }
+        object_schema(
+          properties: {
+            status: { type: "string", enum: Types::CANDIDATE_MANIFEST_STATUSES },
+            old_path: nullable_path,
+            new_path: nullable_path,
+            old_blob_oid: nullable_oid,
+            new_blob_oid: nullable_oid,
+            old_mode: nullable_mode,
+            new_mode: nullable_mode
+          },
+          required: %w[status]
+        )
+      end
+
+      def candidate_build_context
+        input = object_schema(
+          properties: {
+            kind: { type: "string", enum: Types::CANDIDATE_BUILD_INPUT_KINDS },
+            path: { type: "string", minLength: 1, maxLength: 1_024 },
+            blob_oid: git_oid
+          },
+          required: %w[kind path blob_oid]
+        )
+        environment = object_schema(
+          properties: {
+            name: { type: "string", minLength: 1, maxLength: 100 },
+            value: { type: "string", minLength: 1, maxLength: 500 }
+          },
+          required: %w[name value]
+        )
+        object_schema(
+          properties: {
+            collector_version: { type: "string", minLength: 1, maxLength: 100 },
+            inputs: { type: "array", maxItems: 64, uniqueItems: true, items: input },
+            environment: {
+              type: "array", maxItems: 32, uniqueItems: true, items: environment
+            },
+            dependency_graph_digest: nullable_sha256_digest,
+            test_environment_digest: nullable_sha256_digest
+          },
+          required: %w[collector_version inputs environment]
+        )
+      end
+
+      def nullable_sha256_digest
+        {
+          anyOf: [
+            { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
+            { type: "null" }
+          ]
+        }
       end
 
       def interpretation_source_span

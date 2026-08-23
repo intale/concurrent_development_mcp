@@ -73,13 +73,31 @@ module Coordinator::Read
         attribute :write_set, WriteSet.optional
       end
 
+      class CandidateCheckpoint < Value
+        attribute :candidate_id, Types::Identifier
+        attribute :candidate_event, Coordinator::Write::EventReference
+        attribute :change_set_id, Types::Identifier
+        attribute :work_item_id, Types::Identifier
+        attribute :attempt_id, Types::Identifier
+        attribute :repository_id, Types::RepositoryId
+        attribute :target_branch, Types::CandidateTargetBranch
+        attribute :object_format, Types::GitObjectFormat
+        attribute :base_commit_oid, Types::GitOid
+        attribute :head_commit_oid, Types::GitOid
+        attribute :checkpoint_kind, Types::CandidateCheckpointKind
+        attribute :manifest_digest, Types::Sha256Digest
+        attribute :build_context_digest, Types::Sha256Digest.optional
+        attribute :attached_at, Types::Timestamp
+      end
+
       attribute :schema, Types::String.enum("coord-context/v1")
       attribute :change_set, ChangeSet.optional
       attribute :work_item_ids, Types::WorkItemIds
       attribute :work_items, Types::Array.of(WorkItem).constrained(max_size: 100)
       attribute :dependencies, Types::Array.of(Dependency).constrained(max_size: 500)
       attribute :attempts, Types::Array.of(Attempt).constrained(max_size: 100)
-      attribute :candidate_checkpoints, Types::Array.constrained(size: 0)
+      attribute :candidate_checkpoints,
+                Types::Array.of(CandidateCheckpoint).constrained(max_size: 100)
 
       def self.initial
         new(

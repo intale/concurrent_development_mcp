@@ -53,6 +53,14 @@ module Coordinator::Read
       attribute :page, AgentChoiceImpactPageV1
     end
 
+    class CandidateData < Value
+      attribute :candidate, CandidateViewV1
+    end
+
+    class CandidatePageData < Value
+      attribute :page, CandidatePageV1
+    end
+
     Data = EmptyData |
            DomainError |
            OperationData |
@@ -63,7 +71,9 @@ module Coordinator::Read
            DecisionData |
            DecisionContextData |
            AgentChoiceData |
-           AgentChoiceImpactPageData
+           AgentChoiceImpactPageData |
+           CandidateData |
+           CandidatePageData
     Action = Coordinator::Write::NextAction | NextAction
 
     attribute :status, Types::String.enum(

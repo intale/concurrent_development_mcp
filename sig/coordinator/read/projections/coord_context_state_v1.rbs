@@ -70,6 +70,23 @@ module Coordinator
           def write_set: () -> WriteSet?
         end
 
+        class CandidateCheckpoint < Shared::Value
+          def candidate_id: () -> String
+          def candidate_event: () -> Write::EventReference
+          def change_set_id: () -> String
+          def work_item_id: () -> String
+          def attempt_id: () -> String
+          def repository_id: () -> String
+          def target_branch: () -> String
+          def object_format: () -> String
+          def base_commit_oid: () -> String
+          def head_commit_oid: () -> String
+          def checkpoint_kind: () -> String
+          def manifest_digest: () -> String
+          def build_context_digest: () -> String?
+          def attached_at: () -> String
+        end
+
         def self.initial: () -> CoordContextStateV1
         def schema: () -> String
         def change_set: () -> ChangeSet?
@@ -77,7 +94,7 @@ module Coordinator
         def work_items: () -> Array[WorkItem]
         def dependencies: () -> Array[Dependency]
         def attempts: () -> Array[Attempt]
-        def candidate_checkpoints: () -> Array[untyped]
+        def candidate_checkpoints: () -> Array[CandidateCheckpoint]
       end
     end
   end

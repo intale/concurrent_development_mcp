@@ -94,6 +94,10 @@ module Coordinator
       Write::Operations::PrepareRecordAgentChoice.new
     end
 
+    register("operations.prepare_submit_candidate", memoize: true) do
+      Write::Operations::PrepareSubmitCandidate.new
+    end
+
     register("domain.change_sets.create", memoize: true) do
       Write::Domain::ChangeSets::Create.new(stream_factory: self["stream_factory"])
     end
@@ -225,6 +229,10 @@ module Coordinator
       Write::Domain::AgentChoices::Record.new(stream_factory: self["stream_factory"])
     end
 
+    register("domain.candidates.submit", memoize: true) do
+      Write::Domain::Candidates::Submit.new(stream_factory: self["stream_factory"])
+    end
+
     register("change_set_activation_source_builder", memoize: true) do
       Processes::ChangeSetActivationSourceBuilder.new(schema_registry: self["event_schema_registry"])
     end
@@ -312,6 +320,10 @@ module Coordinator
       Read::Repositories::AgentChoiceImpacts.new
     end
 
+    register("repositories.candidates", memoize: true) do
+      Read::Repositories::Candidates.new
+    end
+
     register("projectors.coord_context_v1", memoize: true) do
       Read::Projectors::CoordContextV1.new(
         schema_registry: self["event_schema_registry"],
@@ -364,6 +376,14 @@ module Coordinator
         schema_registry: self["event_schema_registry"],
         impacts: self["repositories.agent_choice_impacts"],
         choices: self["repositories.agent_choices"],
+        processed_events: self["repositories.processed_projection_events"]
+      )
+    end
+
+    register("projectors.candidates_v1", memoize: true) do
+      Read::Projectors::CandidatesV1.new(
+        schema_registry: self["event_schema_registry"],
+        candidates: self["repositories.candidates"],
         processed_events: self["repositories.processed_projection_events"]
       )
     end
@@ -423,6 +443,14 @@ module Coordinator
       Read::Queries::AgentChoiceImpactList.new(
         impacts: self["repositories.agent_choice_impacts"]
       )
+    end
+
+    register("queries.candidate_get") do
+      Read::Queries::CandidateGet.new(candidates: self["repositories.candidates"])
+    end
+
+    register("queries.candidate_list") do
+      Read::Queries::CandidateList.new(candidates: self["repositories.candidates"])
     end
 
     register("mcp.settings", memoize: true) { Mcp::SettingsLoader.new.call }
@@ -709,6 +737,21 @@ module Coordinator
       )
     end
 
+    register("operations.execute_submit_candidate") do
+      Write::Operations::ExecuteSubmitCandidate.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_submit_candidate"],
+        decider: self["domain.candidates.submit"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
     register("operations.execute_start_agent_choice_impact_scan", memoize: true) do
       Write::Operations::ExecuteStartAgentChoiceImpactScan.new(
         event_store: self["event_store"],
@@ -764,7 +807,8 @@ module Coordinator
         adjudicate_decision_interpretation: self["operations.execute_adjudicate_decision_interpretation"],
         activate_decision: self["operations.execute_activate_decision"],
         correct_decision: self["operations.execute_correct_decision"],
-        record_agent_choice: self["operations.execute_record_agent_choice"]
+        record_agent_choice: self["operations.execute_record_agent_choice"],
+        submit_candidate: self["operations.execute_submit_candidate"]
       )
     end
 
@@ -890,6 +934,13 @@ module Coordinator
     register("operations.submit_record_agent_choice_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_record_agent_choice"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_candidate_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_submit_candidate"],
         submitter: self["operations.submit_coordination_task"]
       )
     end
@@ -1031,6 +1082,10 @@ module Coordinator
       )
     end
 
+    register("subscriptions.candidates", memoize: true) do
+      Read::Subscriptions::Candidates.new(handler: self["projectors.candidates_v1"])
+    end
+
     register("subscription_managers.process_managers", memoize: true) do
       PgEventstore.subscriptions_manager(
         subscription_set: Processes::Subscriptions::ProcessManagerSet::SET_NAME
@@ -1066,7 +1121,8 @@ module Coordinator
           self["subscriptions.decision_governance"],
           self["subscriptions.decision_interpretations"],
           self["subscriptions.agent_choices"],
-          self["subscriptions.agent_choice_impacts"]
+          self["subscriptions.agent_choice_impacts"],
+          self["subscriptions.candidates"]
         ]
       )
     end

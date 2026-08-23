@@ -51,7 +51,15 @@ module Coordinator
         def page: () -> AgentChoiceImpactPageV1
       end
 
-      type data = EmptyData | DomainError | OperationData | ContextData | NotModifiedData | GuidanceData | InterpretationPageData | DecisionData | DecisionContextData | AgentChoiceData | AgentChoiceImpactPageData
+      class CandidateData < Shared::Value
+        def candidate: () -> CandidateViewV1
+      end
+
+      class CandidatePageData < Shared::Value
+        def page: () -> CandidatePageV1
+      end
+
+      type data = EmptyData | DomainError | OperationData | ContextData | NotModifiedData | GuidanceData | InterpretationPageData | DecisionData | DecisionContextData | AgentChoiceData | AgentChoiceImpactPageData | CandidateData | CandidatePageData
       type action = Write::NextAction | NextAction
 
       def status: () -> String

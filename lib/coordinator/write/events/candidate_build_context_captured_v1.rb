@@ -3,8 +3,8 @@
 module Coordinator::Write
   module Events
     class CandidateBuildContextCapturedV1 < Base
-      Input = Types.Instance(Candidates::BuildInputV1)
-      Environment = Types.Instance(Candidates::EnvironmentEntryV1)
+      Input = Candidates::BuildInputV1
+      Environment = Candidates::EnvironmentEntryV1
 
       contract type: "CandidateBuildContextCaptured", version: 1
 
@@ -19,7 +19,7 @@ module Coordinator::Write
       attribute :environment, Types::Array.of(Environment).constrained(max_size: 32)
       attribute :dependency_graph_digest, Types::Sha256Digest.optional
       attribute :test_environment_digest, Types::Sha256Digest.optional
-      attribute :collector, Types.Instance(Candidates::EvidenceCollectorV1)
+      attribute :collector, Candidates::EvidenceCollectorV1
       attribute :captured_at, Types::Timestamp
     end
   end

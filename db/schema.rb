@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_23_123000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_23_141500) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -79,6 +79,60 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_23_123000) do
     t.datetime "updated_at", null: false
     t.index ["choice_type"], name: "index_agent_choices_on_choice_type"
     t.index ["observation_status"], name: "index_agent_choices_on_observation_status"
+  end
+
+  create_table "candidates", primary_key: "candidate_id", id: :string, force: :cascade do |t|
+    t.string "agent_id", null: false
+    t.string "attempt_id", null: false
+    t.string "base_commit_oid", null: false
+    t.jsonb "build_context"
+    t.jsonb "build_context_actor"
+    t.datetime "build_context_at_domain"
+    t.datetime "build_context_at_store"
+    t.string "build_context_causation_id"
+    t.string "build_context_correlation_id"
+    t.string "build_context_digest"
+    t.jsonb "build_context_event"
+    t.bigint "build_context_global_position"
+    t.jsonb "build_context_markers"
+    t.jsonb "build_context_metadata"
+    t.string "change_set_id", null: false
+    t.string "checkpoint_kind", null: false
+    t.datetime "created_at", null: false
+    t.string "evidence_status", null: false
+    t.string "head_commit_oid", null: false
+    t.string "lease_policy_version", null: false
+    t.jsonb "lease_references", default: [], null: false
+    t.string "lease_set_id", null: false
+    t.jsonb "manifest"
+    t.jsonb "manifest_actor"
+    t.datetime "manifest_at_domain"
+    t.datetime "manifest_at_store"
+    t.string "manifest_causation_id"
+    t.string "manifest_correlation_id"
+    t.string "manifest_digest", null: false
+    t.jsonb "manifest_event"
+    t.bigint "manifest_global_position"
+    t.jsonb "manifest_markers"
+    t.jsonb "manifest_metadata"
+    t.string "object_format", null: false
+    t.string "repository_id", null: false
+    t.jsonb "submitted_actor", null: false
+    t.datetime "submitted_at_domain", null: false
+    t.datetime "submitted_at_store", null: false
+    t.string "submitted_causation_id"
+    t.string "submitted_correlation_id"
+    t.jsonb "submitted_event", null: false
+    t.bigint "submitted_global_position", null: false
+    t.jsonb "submitted_markers", default: [], null: false
+    t.jsonb "submitted_metadata", default: {}, null: false
+    t.string "target_branch", null: false
+    t.datetime "updated_at", null: false
+    t.string "work_item_id", null: false
+    t.index ["attempt_id", "submitted_global_position"], name: "idx_candidates_attempt_position"
+    t.index ["change_set_id"], name: "index_candidates_on_change_set_id"
+    t.index ["repository_id", "object_format", "head_commit_oid"], name: "idx_on_repository_id_object_format_head_commit_oid_9c83b0d102", unique: true
+    t.index ["work_item_id"], name: "index_candidates_on_work_item_id"
   end
 
   create_table "command_receipts", primary_key: "command_id", id: :string, force: :cascade do |t|

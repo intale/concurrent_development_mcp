@@ -44,14 +44,21 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       pull_interval: 0.2
     )
   end
+  let(:candidate_registration) do
+    Coordinator::Read::Subscriptions::Candidates.new(
+      handler: Coordinator::Read::Projectors::CandidatesV1.new,
+      pull_interval: 0.2
+    )
+  end
 
-  it "stacks seven unique durable subscriptions on one read-model manager" do
+  it "stacks eight unique durable subscriptions on one read-model manager" do
     subscription_set = build_set
 
     expect(subscription_set.subscription_names).to eq(
       [
         "agent-choice-impacts-v1",
         "agent-choices-v1",
+        "candidates-v1",
         "command-receipts-v1",
         "coord-context-v1",
         "decision-governance-v1",
@@ -86,6 +93,10 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
     expect(agent_choice_impact_registration.definition.identity.to_h).to eq(
       set_name: "coordinator-read-models-v1",
       subscription_name: "agent-choice-impacts-v1"
+    )
+    expect(candidate_registration.definition.identity.to_h).to eq(
+      set_name: "coordinator-read-models-v1",
+      subscription_name: "candidates-v1"
     )
   end
 
@@ -141,6 +152,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         prefix: "subscription-choice",
         repository_id: "choice-subscription"
       )
+      CandidateScenario.submit(prefix: "subscription-candidate", build_context: false)
 
       wait_for(subscription_set, "coord-context-v1", minimum: 2)
       wait_for(subscription_set, "command-receipts-v1", minimum: 5)
@@ -148,6 +160,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       wait_for(subscription_set, "decision-interpretations-v1", minimum: 2)
       wait_for(subscription_set, "decision-governance-v1", minimum: 5)
       wait_for(subscription_set, "agent-choices-v1", minimum: 2)
+      wait_for(subscription_set, "candidates-v1", minimum: 2)
 
       expect(Coordinator::Read::CoordContext.find("CS-SUB-100").document).to include(
         "schema" => "coord-context/v1"
@@ -178,6 +191,10 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         choice_type: "testing.framework",
         observation_status: "accepted"
       )
+      expect(Coordinator::Read::Candidate.find("CAN-subscription-candidate")).to have_attributes(
+        attempt_id: "A-subscription-candidate",
+        evidence_status: "attributed_unverified"
+      )
     ensure
       subscription_set.stop
     end
@@ -196,7 +213,8 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         interpretation_registration,
         decision_registration,
         agent_choice_registration,
-        agent_choice_impact_registration
+        agent_choice_impact_registration,
+        candidate_registration
       ]
     )
   end

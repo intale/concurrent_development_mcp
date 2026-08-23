@@ -295,8 +295,10 @@ module Coordinator::Write
     end
 
     class CandidateChangeManifestV1 < Value
-      File = Types.Instance(CandidateManifestFileV1)
+      File = CandidateManifestFileV1
 
+      attribute :policy_version, Types::String.enum(Candidates::ChangeManifestDocumentV1::SCHEMA)
+      attribute :digest, Types::Sha256Digest
       attribute :collector_version, Types::CandidateCollectorVersion
       attribute :files, Types::Array.of(File).constrained(min_size: 1, max_size: 256)
     end
@@ -313,9 +315,11 @@ module Coordinator::Write
     end
 
     class CandidateBuildContextV1 < Value
-      Input = Types.Instance(CandidateBuildInputV1)
-      Environment = Types.Instance(CandidateEnvironmentEntryV1)
+      Input = CandidateBuildInputV1
+      Environment = CandidateEnvironmentEntryV1
 
+      attribute :policy_version, Types::String.enum(Candidates::BuildContextDocumentV1::SCHEMA)
+      attribute :digest, Types::Sha256Digest
       attribute :collector_version, Types::CandidateCollectorVersion
       attribute :inputs, Types::Array.of(Input).constrained(max_size: 64)
       attribute :environment, Types::Array.of(Environment).constrained(max_size: 32)
@@ -324,7 +328,8 @@ module Coordinator::Write
     end
 
     class SubmitCandidateInputV1 < Value
-      Lease = Types.Instance(CandidateLeaseObservationV1)
+      Lease = CandidateLeaseObservationV1
+      Resource = FileResourceV1
 
       attribute :actor, ActorV1
       attribute :candidate_id, Types::Identifier
@@ -333,13 +338,15 @@ module Coordinator::Write
       attribute :attempt_id, Types::Identifier
       attribute :repository_id, Types::RepositoryId
       attribute :target_branch, Types::CandidateTargetBranch
+      attribute :object_format, Types::GitObjectFormat
       attribute :base_commit_oid, Types::GitOid
       attribute :head_commit_oid, Types::GitOid
       attribute :checkpoint_kind, Types::CandidateCheckpointKind
       attribute :lease_set_id, Types::UuidV7
       attribute :leases, Types::Array.of(Lease).constrained(min_size: 1, max_size: 32)
-      attribute :change_manifest, Types.Instance(CandidateChangeManifestV1)
-      attribute :build_context, Types.Instance(CandidateBuildContextV1).optional
+      attribute :change_manifest, CandidateChangeManifestV1
+      attribute :build_context, CandidateBuildContextV1.optional
+      attribute :actual_resources, Types::Array.of(Resource).constrained(min_size: 1, max_size: 32)
     end
 
     class SubmitCandidateV1 < BaseV1

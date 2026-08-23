@@ -123,6 +123,9 @@ module Coordinator::Write
         Events::CandidateAttachedToAttemptV1.new(
           candidate_id: command.candidate_id,
           candidate_event:,
+          change_set_id: command.change_set_id,
+          work_item_id: command.work_item_id,
+          attempt_id: command.attempt_id,
           repository_id: command.repository_id,
           target_branch: command.target_branch,
           object_format: command.object_format,

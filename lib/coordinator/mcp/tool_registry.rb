@@ -15,6 +15,8 @@ module Coordinator
           Tools::DecisionResolve,
           Tools::AgentChoiceGet,
           Tools::AgentChoiceImpactList,
+          Tools::CandidateGet,
+          Tools::CandidateList,
           Tools::ChangeSetCreate,
           Tools::WorkItemCreate,
           Tools::WorkItemDependencyDeclare,
@@ -29,7 +31,8 @@ module Coordinator
           Tools::DecisionInterpretationAdjudicate,
           Tools::DecisionActivate,
           Tools::DecisionCorrect,
-          Tools::AgentChoiceRecord
+          Tools::AgentChoiceRecord,
+          Tools::CandidateSubmit
         ].freeze
       end
     end

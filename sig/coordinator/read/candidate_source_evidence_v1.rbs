@@ -1,0 +1,15 @@
+module Coordinator
+  module Read
+    class CandidateSourceEvidenceV1 < Shared::Value
+      attr_reader event: Write::EventReference
+      attr_reader actor: AttributedActorV1
+      attr_reader markers: Array[String]
+      attr_reader metadata: Hash[untyped, untyped]
+      attr_reader global_position: Integer
+      attr_reader occurred_at: String
+      attr_reader persisted_at: String
+      attr_reader causation_id: String?
+      attr_reader correlation_id: String?
+    end
+  end
+end

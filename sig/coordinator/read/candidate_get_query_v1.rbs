@@ -1,0 +1,7 @@
+module Coordinator
+  module Read
+    class CandidateGetQueryV1 < Shared::Value
+      attr_reader candidate_id: String
+    end
+  end
+end

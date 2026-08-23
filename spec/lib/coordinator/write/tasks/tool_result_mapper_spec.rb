@@ -509,6 +509,90 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         { decision_heads: [ decision_head("D-task-result") ] },
         Coordinator::Write::Tasks::DomainErrorV1::AgentChoiceUnresolvedHeadsError,
         "conflict"
+      ],
+      [
+        :candidate_id_already_used,
+        {
+          candidate_id: "CAN-task-result",
+          existing_event: candidate_event_reference("CAN-task-result")
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::CandidateAlreadyExistsError,
+        "conflict"
+      ],
+      [
+        :candidate_head_already_registered,
+        {
+          candidate_id: "CAN-task-result",
+          repository_id: "billing",
+          object_format: "sha1",
+          head_commit_oid: "b" * 40,
+          existing_event: event_reference(
+            event_id: "0198e03a-d112-7000-8000-000000000021",
+            type: "CandidateHeadRegistered",
+            stream_context: "DevelopmentIntegration",
+            stream_name: "CandidateHead",
+            stream_id: "sha256:#{'c' * 64}",
+            stream_revision: 0
+          )
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::CandidateHeadAlreadyRegisteredError,
+        "conflict"
+      ],
+      [
+        :lease_observations_mismatch,
+        {
+          attempt_id: "A-task-result",
+          expected_resource_key_hashes: [ "sha256:#{'a' * 64}" ],
+          submitted_resource_key_hashes: [ "sha256:#{'b' * 64}" ]
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::CandidateLeaseObservationsMismatchError,
+        "conflict"
+      ],
+      [
+        :lease_not_active,
+        {
+          change_set_id: "CS-task-result",
+          work_item_id: "W-task-result",
+          attempt_id: "A-task-result"
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::CandidateLeaseNotActiveScopeError,
+        "conflict"
+      ],
+      [
+        :lease_not_active,
+        {
+          attempt_id: "A-task-result",
+          resource_key_hash: "sha256:#{'a' * 64}",
+          submitted_lease_id: "0198e03a-d112-7000-8000-000000000001",
+          current_lease_id: "0198e03a-d112-7000-8000-000000000002",
+          current_fencing_token: 2,
+          expires_at: "2026-08-22T10:30:00.000000Z"
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::CandidateLeaseNotActiveError,
+        "conflict"
+      ],
+      [
+        :actual_write_set_not_authorized,
+        {
+          candidate_id: "CAN-task-result",
+          resources: [
+            { resource_key_hash: "sha256:#{'a' * 64}", path: "lib/candidate.rb" }
+          ]
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::CandidateUnauthorizedResourcesError,
+        "denied"
+      ],
+      [
+        :manifest_base_evidence_mismatch,
+        {
+          candidate_id: "CAN-task-result",
+          resource_key_hash: "sha256:#{'a' * 64}",
+          path: "lib/candidate.rb",
+          expected_base_blob_oid: "a" * 40,
+          submitted_base_blob_oid: "b" * 40
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::CandidateManifestBaseMismatchError,
+        "denied"
       ]
     ]
 
@@ -562,6 +646,17 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         stream_revision: 1
       )
     }
+  end
+
+  def candidate_event_reference(candidate_id)
+    event_reference(
+      event_id: "0198e03a-d112-7000-8000-000000000020",
+      type: "CandidateSubmitted",
+      stream_context: "DevelopmentIntegration",
+      stream_name: "Candidate",
+      stream_id: candidate_id,
+      stream_revision: 0
+    )
   end
 
   def resolved_decision(decision_id)

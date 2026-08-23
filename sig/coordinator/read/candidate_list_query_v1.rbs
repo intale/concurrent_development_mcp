@@ -1,0 +1,9 @@
+module Coordinator
+  module Read
+    class CandidateListQueryV1 < Shared::Value
+      attr_reader attempt_id: String
+      attr_reader after_global_position: Integer?
+      attr_reader limit: Integer
+    end
+  end
+end
