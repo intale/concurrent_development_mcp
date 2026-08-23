@@ -1,0 +1,17 @@
+module Coordinator
+  module Write
+    module Domain
+      module AgentChoices
+        class PolicyEvaluator
+          POSITIVE_EFFECTS: Array[String]
+          NEGATIVE_EFFECTS: Array[String]
+
+          def call: (
+            resolution: DecisionContexts::ResultV1,
+            selected_option_id: String
+          ) -> Write::AgentChoices::PolicyEvaluationV1
+        end
+      end
+    end
+  end
+end

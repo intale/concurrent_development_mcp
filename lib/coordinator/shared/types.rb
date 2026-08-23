@@ -107,6 +107,34 @@ module Coordinator::Shared
     DECISION_CHANGE_KINDS = %w[activated corrected].freeze
     AGENT_CHOICE_TYPES = %w[testing.framework].freeze
     AGENT_CHOICE_ASSESSMENT_BASES = %w[no_policy compliant advisory_violation].freeze
+    AGENT_CHOICE_POLICY_EVALUATION_STATUSES = %w[
+      allowed
+      blocked
+      confirmation_required
+      conflict
+      unsupported
+      unresolved
+    ].freeze
+    AGENT_CHOICE_POLICY_EVALUATION_BASES = %w[
+      no_policy
+      compliant
+      advisory_violation
+      blocking_violation
+      confirmation_required
+      decision_conflict
+      unsupported_context
+      unresolved_head
+    ].freeze
+    AGENT_CHOICE_POLICY_REASON_CODES = %w[
+      no_active_decision
+      selected_option_satisfies_decision
+      selected_option_violates_advisory_decision
+      selected_option_violates_blocking_decision
+      selected_option_requires_confirmation
+      tied_most_specific_decisions
+      unsupported_decision_context
+      unresolved_decision_head
+    ].freeze
     AGENT_CHOICE_OUTCOMES = %w[accepted].freeze
     AGENT_CHOICE_OBSERVATION_STATUSES = %w[recorded accepted].freeze
     AGENT_CHOICE_IMPACT_POLICY_VERSIONS = %w[agent-choice-decision-impact/v1].freeze
@@ -230,6 +258,9 @@ module Coordinator::Shared
     DecisionChangeKind = String.enum(*DECISION_CHANGE_KINDS)
     AgentChoiceType = String.enum(*AGENT_CHOICE_TYPES)
     AgentChoiceAssessmentBasis = String.enum(*AGENT_CHOICE_ASSESSMENT_BASES)
+    AgentChoicePolicyEvaluationStatus = String.enum(*AGENT_CHOICE_POLICY_EVALUATION_STATUSES)
+    AgentChoicePolicyEvaluationBasis = String.enum(*AGENT_CHOICE_POLICY_EVALUATION_BASES)
+    AgentChoicePolicyReasonCode = String.enum(*AGENT_CHOICE_POLICY_REASON_CODES)
     AgentChoiceOutcome = String.enum(*AGENT_CHOICE_OUTCOMES)
     AgentChoiceObservationStatus = String.enum(*AGENT_CHOICE_OBSERVATION_STATUSES)
     AgentChoiceImpactPolicyVersion = String.enum(*AGENT_CHOICE_IMPACT_POLICY_VERSIONS)

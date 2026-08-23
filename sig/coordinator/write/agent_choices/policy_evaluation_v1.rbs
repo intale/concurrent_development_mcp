@@ -1,0 +1,17 @@
+module Coordinator
+  module Write
+    module AgentChoices
+      class PolicyEvaluationV1 < Shared::Value
+        Head: singleton(Decisions::DecisionHeadV1)
+        Warning: untyped
+
+        def status: () -> String
+        def effective_decision: () -> Decisions::DecisionHeadV1?
+        def contributing_decisions: () -> Array[Decisions::DecisionHeadV1]
+        def basis: () -> String
+        def warnings: () -> Array[String]
+        def reason_codes: () -> Array[String]
+      end
+    end
+  end
+end

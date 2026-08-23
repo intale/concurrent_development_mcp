@@ -6,18 +6,20 @@ module Coordinator::Write
       class Record
         include Dry::Monads[:result]
 
-        POSITIVE_EFFECTS = %w[require prefer select approve prioritize].freeze
-        NEGATIVE_EFFECTS = %w[forbid avoid reject].freeze
-
-        def initialize(stream_factory: StreamFactory.new)
+        def initialize(stream_factory: StreamFactory.new, policy_evaluator: PolicyEvaluator.new)
           @stream_factory = stream_factory
+          @policy_evaluator = policy_evaluator
         end
 
         def call(state:, command:, recorded_at:, recorded_event:)
           denial = denied(state, command)
           return denial if denial
 
-          assessment = assess(state.resolution.effective_decision, command)
+          evaluation = @policy_evaluator.call(
+            resolution: state.resolution,
+            selected_option_id: command.selected.option_id
+          )
+          assessment = assess(evaluation, state.resolution.effective_decision, command)
           return assessment if assessment.failure?
 
           Success(build_plan(command, state.current_context, assessment.value!, recorded_at, recorded_event))
@@ -108,56 +110,24 @@ module Coordinator::Write
             .sort_by(&:b)
         end
 
-        def assess(decision, command)
-          return Success(no_policy_assessment) unless decision
-          return unsupported_value(decision) unless named_choice?(decision)
-          return Success(compliant_assessment(decision)) unless violation?(decision, command.selected.option_id)
-
-          case decision.enforcement.on_violation
-          when "warn"
-            Success(advisory_assessment(decision))
-          when "block", "block_and_replan"
+        def assess(evaluation, decision, command)
+          case evaluation.status
+          when "allowed"
+            Success(accepted_assessment(evaluation))
+          when "blocked"
             policy_failure(:agent_choice_blocked_by_decision, "Agent choice is blocked by an active Decision", decision, command)
-          when "require_confirmation"
+          when "confirmation_required"
             policy_failure(:agent_choice_confirmation_required, "Agent choice requires confirmation", decision, command)
+          when "unsupported"
+            unsupported_value(decision)
           end
         end
 
-        def named_choice?(decision)
-          decision.value.schema == "named-choice/v1" && decision.value.name
-        end
-
-        def violation?(decision, selected_option_id)
-          if POSITIVE_EFFECTS.include?(decision.effect)
-            selected_option_id != decision.value.name
-          elsif NEGATIVE_EFFECTS.include?(decision.effect)
-            selected_option_id == decision.value.name
-          else
-            false
-          end
-        end
-
-        def no_policy_assessment
+        def accepted_assessment(evaluation)
           Coordinator::Write::AgentChoices::ChoiceAssessmentV1.new(
-            basis: "no_policy",
-            based_on_decisions: [],
-            warnings: []
-          )
-        end
-
-        def compliant_assessment(decision)
-          Coordinator::Write::AgentChoices::ChoiceAssessmentV1.new(
-            basis: "compliant",
-            based_on_decisions: [ decision.head ],
-            warnings: []
-          )
-        end
-
-        def advisory_assessment(decision)
-          Coordinator::Write::AgentChoices::ChoiceAssessmentV1.new(
-            basis: "advisory_violation",
-            based_on_decisions: [ decision.head ],
-            warnings: [ "decision-warning:#{decision.head.decision_id}:#{decision.head.event.event_id}" ]
+            basis: evaluation.basis,
+            based_on_decisions: [ evaluation.effective_decision ].compact,
+            warnings: evaluation.warnings
           )
         end
 

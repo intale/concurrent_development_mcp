@@ -32,6 +32,9 @@ module Coordinator
       DECISION_CHANGE_KINDS: Array[String]
       AGENT_CHOICE_TYPES: Array[String]
       AGENT_CHOICE_ASSESSMENT_BASES: Array[String]
+      AGENT_CHOICE_POLICY_EVALUATION_STATUSES: Array[String]
+      AGENT_CHOICE_POLICY_EVALUATION_BASES: Array[String]
+      AGENT_CHOICE_POLICY_REASON_CODES: Array[String]
       AGENT_CHOICE_OUTCOMES: Array[String]
       AGENT_CHOICE_OBSERVATION_STATUSES: Array[String]
       AGENT_CHOICE_IMPACT_POLICY_VERSIONS: Array[String]
@@ -103,6 +106,9 @@ module Coordinator
       DecisionChangeKind: untyped
       AgentChoiceType: untyped
       AgentChoiceAssessmentBasis: untyped
+      AgentChoicePolicyEvaluationStatus: untyped
+      AgentChoicePolicyEvaluationBasis: untyped
+      AgentChoicePolicyReasonCode: untyped
       AgentChoiceOutcome: untyped
       AgentChoiceObservationStatus: untyped
       AgentChoiceImpactPolicyVersion: untyped
