@@ -13,11 +13,12 @@ module McpAcceptanceWorld
     @tasks_capable != false
   end
 
-  def call_tool(name, arguments)
+  def call_tool(name, arguments, expected_status: 200)
     mcp_request(
       method: "tools/call",
       params: { name:, arguments: },
-      name:
+      name:,
+      expected_status:
     )
   end
 
@@ -29,7 +30,7 @@ module McpAcceptanceWorld
     )
   end
 
-  def mcp_request(method:, params:, name: nil)
+  def mcp_request(method:, params:, name: nil, expected_status: 200)
     mcp_session.post(
       "/mcp",
       params: JSON.generate(
@@ -41,8 +42,8 @@ module McpAcceptanceWorld
       headers: request_headers(method:, name:)
     )
     assert_acceptance(
-      mcp_session.response.status == 200,
-      "Expected HTTP 200, got #{mcp_session.response.status}: #{mcp_session.response.body}"
+      mcp_session.response.status == expected_status,
+      "Expected HTTP #{expected_status}, got #{mcp_session.response.status}: #{mcp_session.response.body}"
     )
     JSON.parse(mcp_session.response.body)
   end

@@ -88,6 +88,7 @@ module CandidateAcceptanceWorld
     ids = coordination.fetch(:ids)
     reservation = coordination.fetch(:reservation)
     path = coordination.fetch(:path)
+    repository_id = coordination.fetch(:repository_id, "billing")
     arguments = {
       command_id:,
       actor: { kind: "agent", id: coordination.fetch(:agent_id) },
@@ -95,7 +96,7 @@ module CandidateAcceptanceWorld
       change_set_id: ids.fetch(:change_set_id),
       work_item_id: ids.fetch(:work_item_id),
       attempt_id: ids.fetch(:attempt_id),
-      repository_id: "billing",
+      repository_id:,
       target_branch: "main",
       base_commit_oid: BASE_COMMIT_OID,
       head_commit_oid: head_character * 40,
@@ -155,8 +156,9 @@ module CandidateAcceptanceWorld
           CandidateSubmitted
           CandidateChangeManifestCaptured
           CandidateBuildContextCaptured
+          CandidateImpactSurfaceDerived
         ],
-        maximum_count: 3,
+        maximum_count: 4,
         direction: :asc
       )
     )
