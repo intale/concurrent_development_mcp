@@ -109,6 +109,45 @@ RSpec.describe Coordinator::Write::EventStore, :event_store do
     expect(event_store.read_global_marked(criteria).map(&:id)).to eq([ target.id ])
   end
 
+  it "reads one bounded global page using an intentional OR union of markers" do
+    choice_streams = Coordinator::Write::StreamFactory.new
+    first = event_store.append(
+      choice_streams.agent_choice("CHO-page-1"),
+      [ build_event(type: "AgentChoiceAccepted", markers: [ "decision-partition:repo:billing:testing" ]) ]
+    ).sole
+    event_store.append(
+      choice_streams.agent_choice("CHO-page-ignored"),
+      [ build_event(type: "AgentChoiceAccepted", markers: [ "decision-partition:repo:catalog:testing" ]) ]
+    )
+    second = event_store.append(
+      choice_streams.agent_choice("CHO-page-2"),
+      [ build_event(type: "AgentChoiceAccepted", markers: [ "decision-partition:attempt:A-2:testing" ]) ]
+    ).sole
+    event_store.append(
+      choice_streams.agent_choice("CHO-page-after-bound"),
+      [ build_event(type: "AgentChoiceAccepted", markers: [ "decision-partition:repo:billing:testing" ]) ]
+    )
+    criteria = Coordinator::Write::GlobalMarkedEventPageCriteria.new(
+      stream_context: "AgentGovernance",
+      stream_name: "AgentChoice",
+      event_type: "AgentChoiceAccepted",
+      markers: [
+        "decision-partition:repo:billing:testing",
+        "decision-partition:attempt:A-2:testing"
+      ],
+      from_position: first.global_position,
+      to_position: second.global_position,
+      page_size: 1,
+      direction: :asc
+    )
+
+    page = event_store.read_global_marked_page(criteria)
+
+    expect(page.map(&:id)).to eq([ first.id, second.id ])
+    expect(page.map(&:global_position)).to eq(page.map(&:global_position).sort)
+    expect(page.length).to eq(criteria.page_size + 1)
+  end
+
   it "commits all real requests in one multiple transaction" do
     result = event_store.multiple do
       event_store.append(stream, [ event ])

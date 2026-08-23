@@ -332,6 +332,7 @@ module Coordinator::Write
       end
 
       def persist_domain_plan(plan, command:, preparation:, caused_by:)
+        recorded = plan.events.fetch(0)
         assessment = plan.events.fetch(1).assessment
         event_ids = [ preparation.recorded_event_id, preparation.accepted_event_id ]
         events = plan.events.zip(event_ids).map do |payload, event_id|
@@ -339,15 +340,15 @@ module Coordinator::Write
             event: payload,
             event_id:,
             metadata: command_metadata(command),
-            markers: event_markers(command, assessment),
+            markers: event_markers(command, assessment, recorded.decision_context),
             caused_by:
           )
         end
         @event_store.append(@stream_factory.agent_choice(command.choice_id), events)
       end
 
-      def event_markers(command, assessment)
-        [
+      def event_markers(command, assessment, decision_context)
+        markers = [
           "choice:#{command.choice_id}",
           "choice-type:#{command.choice_type}",
           "attempt:#{command.context.attempt_id}",
@@ -356,6 +357,12 @@ module Coordinator::Write
           "repository:#{command.context.repository_id}",
           "command:#{command.command_id}"
         ] + assessment.based_on_decisions.map { "decision:#{_1.decision_id}" }
+        markers.concat(
+          decision_context.document.partitions.map do |observation|
+            "decision-partition:#{observation.partition.partition_id}"
+          end
+        )
+        markers.uniq.freeze
       end
 
       def persist_completion(completion, command:, event_id:, caused_by:)

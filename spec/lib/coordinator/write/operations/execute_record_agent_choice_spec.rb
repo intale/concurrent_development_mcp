@@ -33,7 +33,11 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordAgentChoice, :event_
           "choice-type:testing.framework",
           "attempt:A-CHO",
           "repository:billing",
-          "command:cmd-choice-1"
+          "command:cmd-choice-1",
+          "decision-partition:repo:billing:testing",
+          "decision-partition:changeset:CS-CHO:testing",
+          "decision-partition:workitem:W-CHO:testing",
+          "decision-partition:attempt:A-CHO:testing"
         )
       )
     )
