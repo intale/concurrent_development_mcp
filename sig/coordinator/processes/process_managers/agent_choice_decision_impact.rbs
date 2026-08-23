@@ -1,0 +1,23 @@
+module Coordinator
+  module Processes
+    module ProcessManagers
+      class AgentChoiceDecisionImpact
+        HANDLED_START_CODES: Array[Symbol]
+        HANDLED_PROGRESS_CODES: Array[Symbol]
+
+        def initialize: (
+          event_store: Write::_EventStore,
+          ?source_builder: AgentChoiceImpacts::SourceBuilder,
+          ?checkpoint_loader: AgentChoiceImpacts::ScanCheckpointLoader,
+          ?page_reader: AgentChoiceImpacts::PageReader,
+          ?repair_planner: AgentChoiceImpacts::RepairPlanner,
+          ?command_builder: AgentChoiceImpacts::CommandBuilder,
+          ?start_scan: Write::Operations::ExecuteStartAgentChoiceImpactScan,
+          ?progress_scan: Write::Operations::ExecuteProgressAgentChoiceImpactScan,
+          ?assess_impact: Write::Operations::ExecuteAssessAgentChoiceDecisionImpact
+        ) -> void
+        def call: (PgEventstore::Event event) -> nil
+      end
+    end
+  end
+end

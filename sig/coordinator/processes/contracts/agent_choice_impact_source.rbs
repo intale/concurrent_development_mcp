@@ -1,0 +1,8 @@
+module Coordinator
+  module Processes
+    module Contracts
+      class AgentChoiceImpactSource < Dry::Validation::Contract
+      end
+    end
+  end
+end

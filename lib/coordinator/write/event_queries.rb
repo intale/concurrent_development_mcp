@@ -90,6 +90,11 @@ module Coordinator::Write
       direction: :desc
     )
 
+    DECISION_LATEST_IMPACT_CHANGE = GroupedEventReadCriteria.new(
+      event_types: [ "DecisionActivated", "DecisionDefinitionCorrected" ],
+      direction: :desc
+    )
+
     DECISION_SLOT_LATEST = GroupedEventReadCriteria.new(
       event_types: [ "DecisionSlotOpened", "DecisionSlotHeadChanged" ],
       direction: :desc

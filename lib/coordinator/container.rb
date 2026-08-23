@@ -690,6 +690,36 @@ module Coordinator
       )
     end
 
+    register("operations.execute_start_agent_choice_impact_scan", memoize: true) do
+      Write::Operations::ExecuteStartAgentChoiceImpactScan.new(
+        event_store: self["event_store"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("operations.execute_progress_agent_choice_impact_scan", memoize: true) do
+      Write::Operations::ExecuteProgressAgentChoiceImpactScan.new(
+        event_store: self["event_store"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("operations.execute_assess_agent_choice_decision_impact", memoize: true) do
+      Write::Operations::ExecuteAssessAgentChoiceDecisionImpact.new(
+        event_store: self["event_store"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
     register("lease_expiry_policy", memoize: true) do
       Processes::LeaseExpiryPolicy.new(
         source_loader: self["lease_expiry_source_loader"],
@@ -915,6 +945,15 @@ module Coordinator
       )
     end
 
+    register("process_managers.agent_choice_decision_impact", memoize: true) do
+      Processes::ProcessManagers::AgentChoiceDecisionImpact.new(
+        event_store: self["event_store"],
+        start_scan: self["operations.execute_start_agent_choice_impact_scan"],
+        progress_scan: self["operations.execute_progress_agent_choice_impact_scan"],
+        assess_impact: self["operations.execute_assess_agent_choice_decision_impact"]
+      )
+    end
+
     register("subscriptions.change_set_readiness", memoize: true) do
       Processes::Subscriptions::ChangeSetReadiness.new(handler: self["process_managers.change_set_readiness"])
     end
@@ -928,6 +967,12 @@ module Coordinator
     register("subscriptions.lease_expiry_scheduler", memoize: true) do
       Processes::Subscriptions::LeaseExpiryScheduler.new(
         handler: self["process_managers.lease_expiry_scheduler"]
+      )
+    end
+
+    register("subscriptions.agent_choice_decision_impact", memoize: true) do
+      Processes::Subscriptions::AgentChoiceDecisionImpact.new(
+        handler: self["process_managers.agent_choice_decision_impact"]
       )
     end
 
@@ -973,7 +1018,8 @@ module Coordinator
         registrations: [
           self["subscriptions.change_set_readiness"],
           self["subscriptions.coordination_task_executor"],
-          self["subscriptions.lease_expiry_scheduler"]
+          self["subscriptions.lease_expiry_scheduler"],
+          self["subscriptions.agent_choice_decision_impact"]
         ]
       )
     end

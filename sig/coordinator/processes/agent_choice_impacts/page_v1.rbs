@@ -1,0 +1,11 @@
+module Coordinator
+  module Processes
+    module AgentChoiceImpacts
+      class PageV1 < Shared::Value
+        def accepted_choices: () -> Array[PgEventstore::Event]
+        def last_processed_position: () -> Integer?
+        def has_more: () -> bool
+      end
+    end
+  end
+end

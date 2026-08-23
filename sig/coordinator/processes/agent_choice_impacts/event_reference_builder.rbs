@@ -1,0 +1,9 @@
+module Coordinator
+  module Processes
+    module AgentChoiceImpacts
+      class EventReferenceBuilder
+        def call: (PgEventstore::Event event) -> Write::EventReference
+      end
+    end
+  end
+end

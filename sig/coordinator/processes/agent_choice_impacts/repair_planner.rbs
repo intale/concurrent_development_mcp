@@ -1,0 +1,20 @@
+module Coordinator
+  module Processes
+    module AgentChoiceImpacts
+      class RepairPlanner
+        MAX_HEADS: Integer
+
+        def initialize: (
+          event_store: Write::_EventStore,
+          ?choice_loader: Write::AgentChoiceImpacts::ChoiceLoader,
+          ?partition_loader: PartitionSnapshotLoader,
+          ?source_builder: SourceBuilder,
+          ?decision_change_builder: Write::AgentChoiceImpacts::DecisionChangeEvidenceBuilder,
+          ?stream_factory: Write::StreamFactory,
+          ?contract: Contracts::AgentChoiceImpactRepairSource
+        ) -> void
+        def call: (SourceV1 source) -> RepairPlanV1
+      end
+    end
+  end
+end

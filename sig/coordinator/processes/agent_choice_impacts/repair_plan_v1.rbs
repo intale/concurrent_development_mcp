@@ -1,0 +1,11 @@
+module Coordinator
+  module Processes
+    module AgentChoiceImpacts
+      class RepairPlanV1 < Shared::Value
+        def accepted_choice: () -> PgEventstore::Event
+        def accepted_choice_reference: () -> Write::EventReference
+        def targets: () -> Array[RepairTargetV1]
+      end
+    end
+  end
+end

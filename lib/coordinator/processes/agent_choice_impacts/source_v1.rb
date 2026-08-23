@@ -1,0 +1,17 @@
+# frozen_string_literal: true
+
+module Coordinator::Processes
+  module AgentChoiceImpacts
+    class SourceV1 < Value
+      Payload = Types.Instance(Coordinator::Write::Events::DecisionActivatedV1) |
+                Types.Instance(Coordinator::Write::Events::DecisionDefinitionCorrectedV1) |
+                Types.Instance(Coordinator::Write::Events::AgentChoiceAcceptedV1) |
+                Types.Instance(Coordinator::Write::Events::AgentChoiceImpactScanStartedV1) |
+                Types.Instance(Coordinator::Write::Events::AgentChoiceImpactScanProgressedV1)
+
+      attribute :event, Types.Instance(PgEventstore::Event)
+      attribute :reference, Coordinator::Write::EventReference
+      attribute :payload, Payload
+    end
+  end
+end

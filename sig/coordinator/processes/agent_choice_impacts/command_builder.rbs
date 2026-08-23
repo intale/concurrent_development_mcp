@@ -1,0 +1,25 @@
+module Coordinator
+  module Processes
+    module AgentChoiceImpacts
+      class CommandBuilder
+        POLICY_VERSION: String
+        ACTOR: Write::Commands::Actor
+
+        def initialize: (
+          event_store: Write::_EventStore,
+          ?decision_change_builder: Write::AgentChoiceImpacts::DecisionChangeEvidenceBuilder,
+          ?scan_identity_builder: Write::AgentChoiceImpacts::ScanIdentityBuilder,
+          ?assessment_identity_builder: Write::AgentChoiceImpacts::AssessmentIdentityBuilder,
+          ?reference_builder: EventReferenceBuilder
+        ) -> void
+        def start: (SourceV1 source) -> Write::AgentChoiceImpactScanInvocation
+        def assess: (
+          accepted_choice: PgEventstore::Event,
+          decision_change: Write::AgentChoiceImpacts::DecisionChangeEvidenceV1,
+          caused_by: PgEventstore::Event
+        ) -> Write::AgentChoiceImpactAssessmentInvocation
+        def progress: (checkpoint: ScanCheckpointV1, page: PageV1) -> Write::AgentChoiceImpactScanProgressInvocation
+      end
+    end
+  end
+end

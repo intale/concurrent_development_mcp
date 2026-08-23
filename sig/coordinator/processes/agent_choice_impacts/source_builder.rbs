@@ -1,0 +1,16 @@
+module Coordinator
+  module Processes
+    module AgentChoiceImpacts
+      class SourceBuilder
+        def initialize: (
+          event_store: Write::_EventStore,
+          ?envelope_contract: Contracts::AgentChoiceImpactSourceEvent,
+          ?source_contract: Contracts::AgentChoiceImpactSource,
+          ?schema_registry: Write::EventSchemaRegistry,
+          ?reference_builder: EventReferenceBuilder
+        ) -> void
+        def call: (PgEventstore::Event event) -> SourceV1
+      end
+    end
+  end
+end

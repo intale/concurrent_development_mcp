@@ -1,0 +1,16 @@
+module Coordinator
+  module Processes
+    module AgentChoiceImpacts
+      class PartitionSnapshotLoader
+        def initialize: (
+          event_store: Write::_EventStore,
+          ?stream_factory: Write::StreamFactory,
+          ?schema_registry: Write::EventSchemaRegistry,
+          ?reference_builder: EventReferenceBuilder,
+          ?contract: Contracts::AgentChoiceImpactPartitionSnapshot
+        ) -> void
+        def call: (Write::Decisions::DecisionPartitionV1 partition) -> Write::DecisionContexts::PartitionObservationV1
+      end
+    end
+  end
+end

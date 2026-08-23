@@ -1,0 +1,14 @@
+module Coordinator
+  module Processes
+    module AgentChoiceImpacts
+      class ScanCheckpointLoader
+        def initialize: (
+          event_store: Write::_EventStore,
+          ?loader: Write::AgentChoiceImpacts::ScanLoader,
+          ?contract: Contracts::AgentChoiceImpactScanCheckpointSource
+        ) -> void
+        def call: (SourceV1 source) -> ScanCheckpointV1?
+      end
+    end
+  end
+end

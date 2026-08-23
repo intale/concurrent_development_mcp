@@ -1,0 +1,15 @@
+module Coordinator
+  module Processes
+    module AgentChoiceImpacts
+      class SourceV1 < Shared::Value
+        def event: () -> PgEventstore::Event
+        def reference: () -> Write::EventReference
+        def payload: () -> (Write::Events::DecisionActivatedV1 |
+                            Write::Events::DecisionDefinitionCorrectedV1 |
+                            Write::Events::AgentChoiceAcceptedV1 |
+                            Write::Events::AgentChoiceImpactScanStartedV1 |
+                            Write::Events::AgentChoiceImpactScanProgressedV1)
+      end
+    end
+  end
+end

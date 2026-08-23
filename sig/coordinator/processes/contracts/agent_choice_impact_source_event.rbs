@@ -1,0 +1,9 @@
+module Coordinator
+  module Processes
+    module Contracts
+      class AgentChoiceImpactSourceEvent < Dry::Validation::Contract
+        STREAM_BY_TYPE: Hash[String, Array[String]]
+      end
+    end
+  end
+end

@@ -1,0 +1,14 @@
+module Coordinator
+  module Processes
+    module Subscriptions
+      class ProcessDefinition < Shared::Value
+        include Shared::_SubscriptionDefinition
+
+        def set_name: () -> String
+        def streams: () -> Array[Shared::Subscriptions::StreamFilter]
+        def event_types: () -> Array[String]
+        def identity: () -> Shared::Subscriptions::Identity
+      end
+    end
+  end
+end

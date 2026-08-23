@@ -25,8 +25,12 @@ RSpec.describe Coordinator::Container do
     decision_activation_operation = described_class["operations.execute_activate_decision"]
     decision_correction_operation = described_class["operations.execute_correct_decision"]
     agent_choice_operation = described_class["operations.execute_record_agent_choice"]
+    impact_scan_start = described_class["operations.execute_start_agent_choice_impact_scan"]
+    impact_scan_progress = described_class["operations.execute_progress_agent_choice_impact_scan"]
+    impact_assessment = described_class["operations.execute_assess_agent_choice_decision_impact"]
     readiness_process_manager = described_class["process_managers.change_set_readiness"]
     task_executor = described_class["process_managers.coordination_task_executor"]
+    impact_process_manager = described_class["process_managers.agent_choice_decision_impact"]
     subscription_manager = described_class["subscription_managers.process_managers"]
     subscription_set = described_class["subscription_sets.process_managers"]
     read_model_manager = described_class["subscription_managers.read_models"]
@@ -84,12 +88,29 @@ RSpec.describe Coordinator::Container do
     expect(agent_choice_operation).to be_a(
       Coordinator::Write::Operations::ExecuteRecordAgentChoice
     )
+    expect(impact_scan_start).to be_a(
+      Coordinator::Write::Operations::ExecuteStartAgentChoiceImpactScan
+    )
+    expect(impact_scan_progress).to be_a(
+      Coordinator::Write::Operations::ExecuteProgressAgentChoiceImpactScan
+    )
+    expect(impact_assessment).to be_a(
+      Coordinator::Write::Operations::ExecuteAssessAgentChoiceDecisionImpact
+    )
     expect(readiness_process_manager).to be_a(Coordinator::Processes::ProcessManagers::ChangeSetReadiness)
     expect(task_executor).to be_a(Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor)
+    expect(impact_process_manager).to be_a(
+      Coordinator::Processes::ProcessManagers::AgentChoiceDecisionImpact
+    )
     expect(subscription_manager).to be_a(PgEventstore::SubscriptionsManager)
     expect(subscription_set).to be_a(Coordinator::Processes::Subscriptions::ProcessManagerSet)
     expect(subscription_set.subscription_names).to eq(
-      [ "change-set-readiness-v1", "coordination-task-executor-v1", "lease-expiry-scheduler-v1" ]
+      [
+        "agent-choice-decision-impact-v1",
+        "change-set-readiness-v1",
+        "coordination-task-executor-v1",
+        "lease-expiry-scheduler-v1"
+      ]
     )
     expect(read_model_manager).to be_a(PgEventstore::SubscriptionsManager)
     expect(read_model_set).to be_a(Coordinator::Read::Subscriptions::ReadModelSet)

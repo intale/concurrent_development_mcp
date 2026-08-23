@@ -18,8 +18,9 @@ module AgentChoiceImpactScenario
     }
   end
 
-  def record_choice(prepared:, option_id:)
+  def record_choice(prepared:, option_id:, choice_id: nil)
     identifiers = prepared.fetch(:identifiers)
+    identifiers = identifiers.merge(choice_id:) if choice_id
     context = prepared.fetch(:context)
     decision_context = authoritative_context(context)
     execute(Coordinator::Write::Operations::ExecuteRecordAgentChoice, {
