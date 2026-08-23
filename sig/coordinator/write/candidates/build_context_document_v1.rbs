@@ -1,0 +1,18 @@
+module Coordinator
+  module Write
+    module Candidates
+      class BuildContextDocumentV1 < Coordinator::Shared::Value
+        SCHEMA: String
+        attr_reader schema: String
+        attr_reader candidate_id: String
+        attr_reader repository_id: String
+        attr_reader object_format: String
+        attr_reader head_commit_oid: String
+        attr_reader inputs: Array[BuildInputV1]
+        attr_reader environment: Array[EnvironmentEntryV1]
+        attr_reader dependency_graph_digest: String?
+        attr_reader test_environment_digest: String?
+      end
+    end
+  end
+end

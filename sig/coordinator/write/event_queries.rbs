@@ -21,6 +21,8 @@ module Coordinator
       AGENT_CHOICE_FOR_IMPACT: EventReadCriteria
       AGENT_CHOICE_IMPACT_ASSESSMENT: EventReadCriteria
       ATTEMPT_FOR_AGENT_CHOICE: EventReadCriteria
+      CANDIDATE_EXISTENCE: EventReadCriteria
+      CANDIDATE_HEAD_REGISTRATION: EventReadCriteria
       COORDINATION_TASK_HISTORY: EventReadCriteria
       CHANGE_SET_EXISTENCE: GroupedEventReadCriteria
       WORK_ITEM_EXISTENCE: GroupedEventReadCriteria
@@ -35,8 +37,10 @@ module Coordinator
       ATTEMPT_FOR_ACQUISITION: EventReadCriteria
       ATTEMPT_FOR_WRITE_SET_RESERVATION: EventReadCriteria
       ATTEMPT_FOR_WRITE_SET_EXPANSION: EventReadCriteria
+      ATTEMPT_FOR_CANDIDATE_SUBMISSION: EventReadCriteria
       ATTEMPT_LATEST_WRITE_SET_LIFECYCLE: GroupedEventReadCriteria
       RESOURCE_LEASE_FOR_RESERVATION: GroupedEventReadCriteria
+      RESOURCE_LEASE_FOR_CANDIDATE_SUBMISSION: GroupedEventReadCriteria
     end
   end
 end

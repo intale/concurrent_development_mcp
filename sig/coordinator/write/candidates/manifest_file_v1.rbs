@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module Candidates
+      class ManifestFileV1 < Coordinator::Shared::Value
+        attr_reader status: String
+        attr_reader old_path: String?
+        attr_reader new_path: String?
+        attr_reader old_blob_oid: String?
+        attr_reader new_blob_oid: String?
+        attr_reader old_mode: String?
+        attr_reader new_mode: String?
+      end
+    end
+  end
+end

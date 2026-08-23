@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Candidates
+      class BuildInputV1 < Coordinator::Shared::Value
+        attr_reader kind: String
+        attr_reader path: String
+        attr_reader blob_oid: String
+      end
+    end
+  end
+end

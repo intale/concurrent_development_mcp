@@ -28,6 +28,10 @@ module Coordinator::Write
       attribute :choice_id, Types::Identifier
     end
 
+    class CandidateArguments < Value
+      attribute :candidate_id, Types::Identifier
+    end
+
     class DecisionResolutionArguments < Value
       attribute :topic_id, Types::AgentChoiceType
       attribute :context, DecisionContexts::QueryContextV1
@@ -39,6 +43,7 @@ module Coordinator::Write
                 InterpretationListArguments |
                 DecisionArguments |
                 AgentChoiceArguments |
+                CandidateArguments |
                 DecisionResolutionArguments
 
     attribute :tool, Types::Identifier

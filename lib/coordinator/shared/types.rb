@@ -165,6 +165,26 @@ module Coordinator::Shared
       unsupported_policy_introduced
       unresolved_policy_introduced
     ].freeze
+    CANDIDATE_CHECKPOINT_KINDS = %w[intermediate handoff final].freeze
+    CANDIDATE_MANIFEST_STATUSES = %w[
+      added
+      modified
+      deleted
+      renamed
+      copied
+      type_changed
+      submodule_changed
+    ].freeze
+    CANDIDATE_GIT_FILE_MODES = %w[100644 100755 120000 160000].freeze
+    CANDIDATE_BUILD_INPUT_KINDS = %w[
+      dependency_manifest
+      dependency_lockfile
+      runtime_version
+      toolchain_config
+      public_contract
+      generated_source_origin
+    ].freeze
+    CANDIDATE_EVIDENCE_STATUSES = %w[attributed_unverified].freeze
     DECISION_ACTIVATION_INELIGIBILITY_REASONS = %w[
       non_normative_statement_kind
       missing_effect
@@ -294,6 +314,19 @@ module Coordinator::Shared
     AgentChoiceImpactAssessmentOutcome = String.enum(*AGENT_CHOICE_IMPACT_ASSESSMENT_OUTCOMES)
     AgentChoiceImpactAssessmentReason = String.enum(*AGENT_CHOICE_IMPACT_ASSESSMENT_REASONS)
     AgentChoiceInvalidationReason = String.enum(*AGENT_CHOICE_INVALIDATION_REASONS)
+    CandidateCheckpointKind = String.enum(*CANDIDATE_CHECKPOINT_KINDS)
+    CandidateManifestStatus = String.enum(*CANDIDATE_MANIFEST_STATUSES)
+    CandidateGitFileMode = String.enum(*CANDIDATE_GIT_FILE_MODES)
+    CandidateBuildInputKind = String.enum(*CANDIDATE_BUILD_INPUT_KINDS)
+    CandidateEvidenceStatus = String.enum(*CANDIDATE_EVIDENCE_STATUSES)
+    CandidateEvidenceRevision = Integer.enum(1)
+    CandidateManifestSize = Integer.constrained(gteq: 1, lteq: 256)
+    CandidateBuildInputCount = Integer.constrained(gteq: 0, lteq: 64)
+    CandidateEnvironmentCount = Integer.constrained(gteq: 0, lteq: 32)
+    CandidateCollectorVersion = String.constrained(min_size: 1, max_size: 100)
+    CandidateEnvironmentName = String.constrained(min_size: 1, max_size: 100)
+    CandidateEnvironmentValue = String.constrained(min_size: 1, max_size: 500)
+    CandidateTargetBranch = String.constrained(min_size: 1, max_size: 255)
     GlobalPosition = Integer.constrained(gteq: 0)
     AgentChoiceImpactPageSize = Integer.enum(50)
     AgentChoiceImpactPageChoiceCount = Integer.constrained(gteq: 0, lteq: 50)

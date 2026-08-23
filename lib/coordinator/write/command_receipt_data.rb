@@ -159,6 +159,24 @@ module Coordinator::Write
       attribute :accepted_at, Types::Timestamp
     end
 
+    class CandidateSubmission < Value
+      attribute :candidate_id, Types::Identifier
+      attribute :change_set_id, Types::Identifier
+      attribute :work_item_id, Types::Identifier
+      attribute :attempt_id, Types::Identifier
+      attribute :repository_id, Types::RepositoryId
+      attribute :target_branch, Types::CandidateTargetBranch
+      attribute :object_format, Types::GitObjectFormat
+      attribute :base_commit_oid, Types::GitOid
+      attribute :head_commit_oid, Types::GitOid
+      attribute :checkpoint_kind, Types::CandidateCheckpointKind
+      attribute :manifest_digest, Types::Sha256Digest
+      attribute :build_context_digest, Types::Sha256Digest.optional
+      attribute :evidence_status, Types::CandidateEvidenceStatus
+      attribute :candidate_event, EventReference
+      attribute :submitted_at, Types::Timestamp
+    end
+
     Type = ChangeSet |
            WorkItem |
            Dependency |
@@ -173,6 +191,7 @@ module Coordinator::Write
            InterpretationAdjudication |
            DecisionActivation |
            DecisionCorrection |
-           AgentChoice
+           AgentChoice |
+           CandidateSubmission
   end
 end

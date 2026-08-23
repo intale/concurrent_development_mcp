@@ -36,6 +36,8 @@ module Coordinator
       def decision_correct_document: (Commands::CorrectDecision command) -> CommandInputDocuments::CorrectDecisionV1
       def agent_choice_record: (Commands::RecordAgentChoice command) -> String
       def agent_choice_record_document: (Commands::RecordAgentChoice command) -> CommandInputDocuments::RecordAgentChoiceV1
+      def candidate_submit: (Commands::SubmitCandidate command) -> String
+      def candidate_submit_document: (Commands::SubmitCandidate command) -> CommandInputDocuments::SubmitCandidateV1
     end
   end
 end

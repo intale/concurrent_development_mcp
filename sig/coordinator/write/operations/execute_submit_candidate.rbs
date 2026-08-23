@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecuteSubmitCandidate
+        TOOL_NAME: String
+
+        def initialize: (event_store: _EventStore, ?preparer: PrepareSubmitCandidate, ?decider: Domain::Candidates::Submit, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?head_identity_builder: Candidates::HeadIdentityBuilder, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?completion_builder: CommandCompletionBuilder, ?event_plan_contract: Contracts::CandidateSubmissionEventPlan) -> void
+        %a{rbs:test:skip}
+        def call: (command_input input) -> Dry::Monads::Result
+        def call_command: (Commands::SubmitCandidate command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
+      end
+    end
+  end
+end

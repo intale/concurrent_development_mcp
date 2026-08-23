@@ -143,6 +143,18 @@ module Coordinator::Write
       direction: :asc
     )
 
+    CANDIDATE_EXISTENCE = EventReadCriteria.new(
+      event_types: [ "CandidateSubmitted" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+
+    CANDIDATE_HEAD_REGISTRATION = EventReadCriteria.new(
+      event_types: [ "CandidateHeadRegistered" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+
     COORDINATION_TASK_HISTORY = EventReadCriteria.new(
       event_types: [
         "CoordinationTaskSubmitted",
@@ -256,12 +268,28 @@ module Coordinator::Write
       direction: :asc
     )
 
+    ATTEMPT_FOR_CANDIDATE_SUBMISSION = EventReadCriteria.new(
+      event_types: [ "AttemptAuthorized", "AttemptStarted", "WriteSetReserved", "WriteSetExpanded" ],
+      maximum_count: 34,
+      direction: :asc
+    )
+
     ATTEMPT_LATEST_WRITE_SET_LIFECYCLE = GroupedEventReadCriteria.new(
       event_types: [ "WriteSetRenewed", "WriteSetReleased" ],
       direction: :desc
     )
 
     RESOURCE_LEASE_FOR_RESERVATION = GroupedEventReadCriteria.new(
+      event_types: [
+        "ResourceLeaseAcquired",
+        "ResourceLeaseRenewed",
+        "ResourceLeaseReleased",
+        "ResourceLeaseExpired"
+      ],
+      direction: :desc
+    )
+
+    RESOURCE_LEASE_FOR_CANDIDATE_SUBMISSION = GroupedEventReadCriteria.new(
       event_types: [
         "ResourceLeaseAcquired",
         "ResourceLeaseRenewed",

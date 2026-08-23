@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Domain
+      module Candidates
+        class SubmissionState < Coordinator::Shared::Value
+          attr_reader existing_candidate: Coordinator::Write::EventReference?
+          attr_reader existing_head: Coordinator::Write::EventReference?
+          attr_reader attempt: Coordinator::Write::Domain::Attempts::State
+          attr_reader current_leases: Array[Coordinator::Write::CurrentLeaseObservationV1]
+        end
+      end
+    end
+  end
+end

@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandReceiptData
-      type value = ChangeSet | WorkItem | Dependency | Attempt | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice
+      type value = ChangeSet | WorkItem | Dependency | Attempt | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission
 
       class ChangeSet < Shared::Value
         def change_set_id: () -> String
@@ -148,6 +148,24 @@ module Coordinator
         def based_on_decisions: () -> Array[Decisions::DecisionHeadV1]
         def warnings: () -> Array[String]
         def accepted_at: () -> String
+      end
+
+      class CandidateSubmission < Shared::Value
+        def candidate_id: () -> String
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def attempt_id: () -> String
+        def repository_id: () -> String
+        def target_branch: () -> String
+        def object_format: () -> String
+        def base_commit_oid: () -> String
+        def head_commit_oid: () -> String
+        def checkpoint_kind: () -> String
+        def manifest_digest: () -> String
+        def build_context_digest: () -> String?
+        def evidence_status: () -> String
+        def candidate_event: () -> EventReference
+        def submitted_at: () -> String
       end
     end
   end

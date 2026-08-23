@@ -1,0 +1,6 @@
+module Coordinator
+  module Write
+    class InvalidCandidateSubmissionEventPlan < StandardError
+    end
+  end
+end

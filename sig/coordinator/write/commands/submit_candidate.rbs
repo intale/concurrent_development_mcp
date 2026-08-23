@@ -1,0 +1,25 @@
+module Coordinator
+  module Write
+    module Commands
+      class SubmitCandidate < Coordinator::Shared::Value
+        attr_reader command_id: String
+        attr_reader actor: Actor
+        attr_reader candidate_id: String
+        attr_reader change_set_id: String
+        attr_reader work_item_id: String
+        attr_reader attempt_id: String
+        attr_reader repository_id: String
+        attr_reader target_branch: String
+        attr_reader object_format: String
+        attr_reader base_commit_oid: String
+        attr_reader head_commit_oid: String
+        attr_reader checkpoint_kind: String
+        attr_reader lease_set_id: String
+        attr_reader leases: Array[Coordinator::Write::Candidates::LeaseObservationV1]
+        attr_reader manifest: Coordinator::Write::Candidates::ChangeManifestV1
+        attr_reader build_context: Coordinator::Write::Candidates::BuildContextV1?
+        attr_reader actual_resources: Array[Coordinator::Write::FileResourceV1]
+      end
+    end
+  end
+end

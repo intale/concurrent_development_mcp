@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Candidates
+      class ChangeManifestV1 < Coordinator::Shared::Value
+        attr_reader policy_version: String
+        attr_reader digest: String
+        attr_reader files: Array[ManifestFileV1]
+        attr_reader collector: EvidenceCollectorV1
+      end
+    end
+  end
+end

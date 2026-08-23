@@ -267,4 +267,66 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
     expect(digest.call(correction_command)).to eq(digest.decision_correct(correction_command))
     expect(digest.decision_correct(changed)).not_to eq(digest.decision_correct(correction_command))
   end
+
+  it "freezes normalized Candidate submission evidence into a typed golden digest" do
+    input = {
+      command_id: "cmd-candidate-digest-1",
+      actor: { kind: "agent", id: "agent-7" },
+      candidate_id: "CAN-41",
+      change_set_id: "CS-1",
+      work_item_id: "W-1",
+      attempt_id: "A-18",
+      repository_id: "billing",
+      target_branch: "main",
+      base_commit_oid: "a" * 40,
+      head_commit_oid: "b" * 40,
+      checkpoint_kind: "final",
+      lease_set_id: "01919191-9191-7191-8191-919191919191",
+      leases: [
+        {
+          resource_key_hash: "sha256:#{"1" * 64}",
+          lease_id: "01919191-9191-7191-8191-919191919192",
+          fencing_token: 3
+        }
+      ],
+      change_manifest: {
+        collector_version: "git-evidence-v1",
+        files: [
+          {
+            status: "modified",
+            old_path: "lib/./example.rb",
+            new_path: "lib/example.rb",
+            old_blob_oid: "c" * 40,
+            new_blob_oid: "d" * 40,
+            old_mode: "100644",
+            new_mode: "100644"
+          }
+        ]
+      },
+      build_context: {
+        collector_version: "build-context-v1",
+        inputs: [
+          { kind: "runtime_version", path: ".ruby-version", blob_oid: "e" * 40 }
+        ],
+        environment: [
+          { name: "RUBY_ENGINE", value: "ruby" }
+        ],
+        dependency_graph_digest: "sha256:#{"f" * 64}"
+      }
+    }
+    candidate_command = Coordinator::Write::Operations::PrepareSubmitCandidate.new.call(input).value!
+    document = digest.candidate_submit_document(candidate_command)
+
+    expect(document).to be_a(Coordinator::Write::CommandInputDocuments::SubmitCandidateV1)
+    expect(document.input.change_manifest).to be_a(
+      Coordinator::Write::CommandInputDocuments::CandidateChangeManifestV1
+    )
+    expect(document.input.build_context).to be_a(
+      Coordinator::Write::CommandInputDocuments::CandidateBuildContextV1
+    )
+    expect(digest.candidate_submit(candidate_command)).to eq(
+      "sha256:395bb974c3d46ffcc936283e908bbe5d3610eadfbe43b6b692b01daa5dd740bf"
+    )
+    expect(digest.call(candidate_command)).to eq(digest.candidate_submit(candidate_command))
+  end
 end

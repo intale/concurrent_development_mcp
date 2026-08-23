@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Candidates
+      class SubmissionEvidenceBuilder
+        def initialize: (?resource_normalizer: Coordinator::Write::FileResourceNormalizer, ?canonical_json: Coordinator::Shared::CanonicalJson, ?uniqueness_contract: Coordinator::Write::Contracts::CandidateEvidenceUniqueness) -> void
+        %a{rbs:test:skip}
+        def call: (Hash[Symbol, untyped] attributes) -> Dry::Monads::Result
+      end
+    end
+  end
+end

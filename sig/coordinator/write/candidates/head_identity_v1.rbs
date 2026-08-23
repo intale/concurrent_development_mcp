@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Candidates
+      class HeadIdentityV1 < Coordinator::Shared::Value
+        attr_reader document: HeadIdentityDocumentV1
+        attr_reader registry_id: String
+        attr_reader marker: String
+      end
+    end
+  end
+end

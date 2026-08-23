@@ -43,6 +43,11 @@ module Coordinator
       AGENT_CHOICE_IMPACT_ASSESSMENT_OUTCOMES: Array[String]
       AGENT_CHOICE_IMPACT_ASSESSMENT_REASONS: Array[String]
       AGENT_CHOICE_INVALIDATION_REASONS: Array[String]
+      CANDIDATE_CHECKPOINT_KINDS: Array[String]
+      CANDIDATE_MANIFEST_STATUSES: Array[String]
+      CANDIDATE_GIT_FILE_MODES: Array[String]
+      CANDIDATE_BUILD_INPUT_KINDS: Array[String]
+      CANDIDATE_EVIDENCE_STATUSES: Array[String]
       DECISION_ACTIVATION_INELIGIBILITY_REASONS: Array[String]
       DECISION_CORRECTION_INELIGIBILITY_REASONS: Array[String]
       SCOPE_PROVENANCE_KINDS: Array[String]
@@ -120,6 +125,19 @@ module Coordinator
       AgentChoiceImpactAssessmentOutcome: untyped
       AgentChoiceImpactAssessmentReason: untyped
       AgentChoiceInvalidationReason: untyped
+      CandidateCheckpointKind: untyped
+      CandidateManifestStatus: untyped
+      CandidateGitFileMode: untyped
+      CandidateBuildInputKind: untyped
+      CandidateEvidenceStatus: untyped
+      CandidateEvidenceRevision: untyped
+      CandidateManifestSize: untyped
+      CandidateBuildInputCount: untyped
+      CandidateEnvironmentCount: untyped
+      CandidateCollectorVersion: untyped
+      CandidateEnvironmentName: untyped
+      CandidateEnvironmentValue: untyped
+      CandidateTargetBranch: untyped
       GlobalPosition: untyped
       AgentChoiceImpactPageSize: untyped
       AgentChoiceImpactPageChoiceCount: untyped

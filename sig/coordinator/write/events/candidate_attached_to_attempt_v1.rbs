@@ -1,0 +1,19 @@
+module Coordinator
+  module Write
+    module Events
+      class CandidateAttachedToAttemptV1 < Base
+        attr_reader candidate_id: String
+        attr_reader candidate_event: Coordinator::Write::EventReference
+        attr_reader repository_id: String
+        attr_reader target_branch: String
+        attr_reader object_format: String
+        attr_reader base_commit_oid: String
+        attr_reader head_commit_oid: String
+        attr_reader checkpoint_kind: String
+        attr_reader manifest_digest: String
+        attr_reader build_context_digest: String?
+        attr_reader attached_at: String
+      end
+    end
+  end
+end

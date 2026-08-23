@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Candidates
+      class EvidenceCollectorV1 < Coordinator::Shared::Value
+        attr_reader kind: String
+        attr_reader id: String
+        attr_reader collector_version: String
+      end
+    end
+  end
+end

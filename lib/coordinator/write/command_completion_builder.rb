@@ -424,6 +424,40 @@ module Coordinator::Write
       )
     end
 
+    def candidate_submit(command:, submission:, input_digest:, persisted_events:, completed_at:)
+      build_completion(
+        command:,
+        tool_name: "candidate_submit",
+        summary: "Candidate submitted with attributed, unverified source evidence.",
+        data: CommandReceiptData::CandidateSubmission.new(
+          candidate_id: command.candidate_id,
+          change_set_id: command.change_set_id,
+          work_item_id: command.work_item_id,
+          attempt_id: command.attempt_id,
+          repository_id: command.repository_id,
+          target_branch: command.target_branch,
+          object_format: command.object_format,
+          base_commit_oid: command.base_commit_oid,
+          head_commit_oid: command.head_commit_oid,
+          checkpoint_kind: command.checkpoint_kind,
+          manifest_digest: submission.manifest_digest,
+          build_context_digest: submission.build_context_digest,
+          evidence_status: submission.evidence_status,
+          candidate_event: event_reference(persisted_events.fetch(0)),
+          submitted_at: submission.submitted_at
+        ),
+        next_actions: [
+          NextAction.new(
+            tool: "candidate_get",
+            arguments: NextAction::CandidateArguments.new(candidate_id: command.candidate_id)
+          )
+        ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
 
     def build_completion(command:, tool_name:, summary:, data:, next_actions:, input_digest:, persisted_events:, completed_at:)

@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module Candidates
+      class HeadIdentityDocumentV1 < Coordinator::Shared::Value
+        SCHEMA: String
+        attr_reader schema: String
+        attr_reader repository_id: String
+        attr_reader object_format: String
+        attr_reader head_commit_oid: String
+      end
+    end
+  end
+end

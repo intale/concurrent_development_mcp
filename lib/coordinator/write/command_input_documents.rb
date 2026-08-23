@@ -278,6 +278,75 @@ module Coordinator::Write
       attribute :input, RecordAgentChoiceInputV1
     end
 
+    class CandidateLeaseObservationV1 < Value
+      attribute :resource_key_hash, Types::Sha256Digest
+      attribute :lease_id, Types::UuidV7
+      attribute :fencing_token, Types::FencingToken
+    end
+
+    class CandidateManifestFileV1 < Value
+      attribute :status, Types::CandidateManifestStatus
+      attribute :old_path, Types::ResourcePath.optional
+      attribute :new_path, Types::ResourcePath.optional
+      attribute :old_blob_oid, Types::GitOid.optional
+      attribute :new_blob_oid, Types::GitOid.optional
+      attribute :old_mode, Types::CandidateGitFileMode.optional
+      attribute :new_mode, Types::CandidateGitFileMode.optional
+    end
+
+    class CandidateChangeManifestV1 < Value
+      File = Types.Instance(CandidateManifestFileV1)
+
+      attribute :collector_version, Types::CandidateCollectorVersion
+      attribute :files, Types::Array.of(File).constrained(min_size: 1, max_size: 256)
+    end
+
+    class CandidateBuildInputV1 < Value
+      attribute :kind, Types::CandidateBuildInputKind
+      attribute :path, Types::ResourcePath
+      attribute :blob_oid, Types::GitOid
+    end
+
+    class CandidateEnvironmentEntryV1 < Value
+      attribute :name, Types::CandidateEnvironmentName
+      attribute :value, Types::CandidateEnvironmentValue
+    end
+
+    class CandidateBuildContextV1 < Value
+      Input = Types.Instance(CandidateBuildInputV1)
+      Environment = Types.Instance(CandidateEnvironmentEntryV1)
+
+      attribute :collector_version, Types::CandidateCollectorVersion
+      attribute :inputs, Types::Array.of(Input).constrained(max_size: 64)
+      attribute :environment, Types::Array.of(Environment).constrained(max_size: 32)
+      attribute :dependency_graph_digest, Types::Sha256Digest.optional
+      attribute :test_environment_digest, Types::Sha256Digest.optional
+    end
+
+    class SubmitCandidateInputV1 < Value
+      Lease = Types.Instance(CandidateLeaseObservationV1)
+
+      attribute :actor, ActorV1
+      attribute :candidate_id, Types::Identifier
+      attribute :change_set_id, Types::Identifier
+      attribute :work_item_id, Types::Identifier
+      attribute :attempt_id, Types::Identifier
+      attribute :repository_id, Types::RepositoryId
+      attribute :target_branch, Types::CandidateTargetBranch
+      attribute :base_commit_oid, Types::GitOid
+      attribute :head_commit_oid, Types::GitOid
+      attribute :checkpoint_kind, Types::CandidateCheckpointKind
+      attribute :lease_set_id, Types::UuidV7
+      attribute :leases, Types::Array.of(Lease).constrained(min_size: 1, max_size: 32)
+      attribute :change_manifest, Types.Instance(CandidateChangeManifestV1)
+      attribute :build_context, Types.Instance(CandidateBuildContextV1).optional
+    end
+
+    class SubmitCandidateV1 < BaseV1
+      attribute :tool_name, Types::String.enum("candidate_submit")
+      attribute :input, SubmitCandidateInputV1
+    end
+
     class ExpireResourceLeaseInputV1 < Value
       attribute :actor, ActorV1
       attribute :resource_key_hash, Types::Sha256Digest
@@ -306,7 +375,8 @@ module Coordinator::Write
            AdjudicateDecisionInterpretationV1 |
            ActivateDecisionV1 |
            CorrectDecisionV1 |
-           RecordAgentChoiceV1
+           RecordAgentChoiceV1 |
+           SubmitCandidateV1
 
     DigestType = Type | ExpireResourceLeaseV1
   end

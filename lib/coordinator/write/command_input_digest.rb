@@ -27,6 +27,7 @@ module Coordinator::Write
       when Commands::ActivateDecision then decision_activate_document(command)
       when Commands::CorrectDecision then decision_correct_document(command)
       when Commands::RecordAgentChoice then agent_choice_record_document(command)
+      when Commands::SubmitCandidate then candidate_submit_document(command)
       when Commands::ExpireResourceLease then lease_expire_policy_document(command)
       else
         raise ArgumentError, "Unsupported coordination command: #{command.class.name}"
@@ -362,7 +363,81 @@ module Coordinator::Write
       )
     end
 
+    def candidate_submit(command)
+      @canonical_json.sha256(candidate_submit_document(command).to_h)
+    end
+
+    def candidate_submit_document(command)
+      CommandInputDocuments::SubmitCandidateV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "candidate_submit",
+        input: CommandInputDocuments::SubmitCandidateInputV1.new(
+          actor: actor_document(command.actor),
+          candidate_id: command.candidate_id,
+          change_set_id: command.change_set_id,
+          work_item_id: command.work_item_id,
+          attempt_id: command.attempt_id,
+          repository_id: command.repository_id,
+          target_branch: command.target_branch,
+          base_commit_oid: command.base_commit_oid,
+          head_commit_oid: command.head_commit_oid,
+          checkpoint_kind: command.checkpoint_kind,
+          lease_set_id: command.lease_set_id,
+          leases: command.leases.map do |lease|
+            CommandInputDocuments::CandidateLeaseObservationV1.new(
+              resource_key_hash: lease.resource_key_hash,
+              lease_id: lease.lease_id,
+              fencing_token: lease.fencing_token
+            )
+          end,
+          change_manifest: candidate_manifest_document(command.manifest),
+          build_context: candidate_build_context_document(command.build_context)
+        )
+      )
+    end
+
     private
+
+    def candidate_manifest_document(manifest)
+      CommandInputDocuments::CandidateChangeManifestV1.new(
+        collector_version: manifest.collector.collector_version,
+        files: manifest.files.map do |file|
+          CommandInputDocuments::CandidateManifestFileV1.new(
+            status: file.status,
+            old_path: file.old_path,
+            new_path: file.new_path,
+            old_blob_oid: file.old_blob_oid,
+            new_blob_oid: file.new_blob_oid,
+            old_mode: file.old_mode,
+            new_mode: file.new_mode
+          )
+        end
+      )
+    end
+
+    def candidate_build_context_document(context)
+      return unless context
+
+      CommandInputDocuments::CandidateBuildContextV1.new(
+        collector_version: context.collector.collector_version,
+        inputs: context.inputs.map do |input|
+          CommandInputDocuments::CandidateBuildInputV1.new(
+            kind: input.kind,
+            path: input.path,
+            blob_oid: input.blob_oid
+          )
+        end,
+        environment: context.environment.map do |entry|
+          CommandInputDocuments::CandidateEnvironmentEntryV1.new(
+            name: entry.name,
+            value: entry.value
+          )
+        end,
+        dependency_graph_digest: context.dependency_graph_digest,
+        test_environment_digest: context.test_environment_digest
+      )
+    end
 
     def actor_document(actor)
       CommandInputDocuments::ActorV1.new(

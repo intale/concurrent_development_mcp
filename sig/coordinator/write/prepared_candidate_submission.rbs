@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    class PreparedCandidateSubmission < Shared::Value
+      def submitted_at: () -> String
+      def input_digest: () -> String
+      def head_identity: () -> Candidates::HeadIdentityV1
+      def candidate_event_id: () -> String
+      def manifest_event_id: () -> String
+      def build_context_event_id: () -> String?
+      def head_registration_event_id: () -> String
+      def attachment_event_id: () -> String
+      def completion_event_id: () -> String
+    end
+  end
+end

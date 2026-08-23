@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Candidates
+      class EnvironmentEntryV1 < Coordinator::Shared::Value
+        attr_reader name: String
+        attr_reader value: String
+      end
+    end
+  end
+end

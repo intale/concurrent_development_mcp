@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module Candidates
+      class NormalizedBuildContextV1 < Shared::Value
+        def inputs: () -> Array[BuildInputV1]
+        def environment: () -> Array[EnvironmentEntryV1]
+        def dependency_graph_digest: () -> String?
+        def test_environment_digest: () -> String?
+        def collector: () -> EvidenceCollectorV1
+      end
+    end
+  end
+end

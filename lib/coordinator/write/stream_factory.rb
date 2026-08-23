@@ -105,5 +105,21 @@ module Coordinator::Write
         stream_id: assessment_id
       )
     end
+
+    def candidate(candidate_id)
+      StreamReference.new(
+        context: "DevelopmentIntegration",
+        stream_name: "Candidate",
+        stream_id: candidate_id
+      )
+    end
+
+    def candidate_head(registry_id)
+      StreamReference.new(
+        context: "DevelopmentIntegration",
+        stream_name: "CandidateHead",
+        stream_id: registry_id
+      )
+    end
   end
 end

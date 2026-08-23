@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandInputDocuments
-      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1
+      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1 | SubmitCandidateV1
       type digest_value = value | ExpireResourceLeaseV1
 
       class ActorV1 < Shared::Value
@@ -268,6 +268,68 @@ module Coordinator
       class RecordAgentChoiceV1 < BaseV1
         def tool_name: () -> String
         def input: () -> RecordAgentChoiceInputV1
+      end
+
+      class CandidateLeaseObservationV1 < Shared::Value
+        def resource_key_hash: () -> String
+        def lease_id: () -> String
+        def fencing_token: () -> Integer
+      end
+
+      class CandidateManifestFileV1 < Shared::Value
+        def status: () -> String
+        def old_path: () -> String?
+        def new_path: () -> String?
+        def old_blob_oid: () -> String?
+        def new_blob_oid: () -> String?
+        def old_mode: () -> String?
+        def new_mode: () -> String?
+      end
+
+      class CandidateChangeManifestV1 < Shared::Value
+        def collector_version: () -> String
+        def files: () -> Array[CandidateManifestFileV1]
+      end
+
+      class CandidateBuildInputV1 < Shared::Value
+        def kind: () -> String
+        def path: () -> String
+        def blob_oid: () -> String
+      end
+
+      class CandidateEnvironmentEntryV1 < Shared::Value
+        def name: () -> String
+        def value: () -> String
+      end
+
+      class CandidateBuildContextV1 < Shared::Value
+        def collector_version: () -> String
+        def inputs: () -> Array[CandidateBuildInputV1]
+        def environment: () -> Array[CandidateEnvironmentEntryV1]
+        def dependency_graph_digest: () -> String?
+        def test_environment_digest: () -> String?
+      end
+
+      class SubmitCandidateInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def candidate_id: () -> String
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def attempt_id: () -> String
+        def repository_id: () -> String
+        def target_branch: () -> String
+        def base_commit_oid: () -> String
+        def head_commit_oid: () -> String
+        def checkpoint_kind: () -> String
+        def lease_set_id: () -> String
+        def leases: () -> Array[CandidateLeaseObservationV1]
+        def change_manifest: () -> CandidateChangeManifestV1
+        def build_context: () -> CandidateBuildContextV1?
+      end
+
+      class SubmitCandidateV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> SubmitCandidateInputV1
       end
 
       class ExpireResourceLeaseInputV1 < Shared::Value

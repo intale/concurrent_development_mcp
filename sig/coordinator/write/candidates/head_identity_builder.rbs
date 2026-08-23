@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Candidates
+      class HeadIdentityBuilder
+        def initialize: (?canonical_json: Coordinator::Shared::CanonicalJson, ?compound_marker_builder: Coordinator::Shared::CompoundMarkerBuilder) -> void
+        def call: (repository_id: String, object_format: String, head_commit_oid: String) -> HeadIdentityV1
+      end
+    end
+  end
+end

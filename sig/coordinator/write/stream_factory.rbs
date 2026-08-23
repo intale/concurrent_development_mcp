@@ -15,6 +15,8 @@ module Coordinator
       def agent_choice: (String choice_id) -> StreamReference
       def agent_choice_impact_scan: (String scan_id) -> StreamReference
       def agent_choice_impact: (String assessment_id) -> StreamReference
+      def candidate: (String candidate_id) -> StreamReference
+      def candidate_head: (String registry_id) -> StreamReference
     end
   end
 end
