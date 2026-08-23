@@ -13,6 +13,7 @@ module Coordinator
       def decision_slot: (String slot_id) -> StreamReference
       def decision_partition: (String partition_id) -> StreamReference
       def agent_choice: (String choice_id) -> StreamReference
+      def agent_choice_impact_scan: (String scan_id) -> StreamReference
     end
   end
 end

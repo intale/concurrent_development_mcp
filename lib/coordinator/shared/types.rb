@@ -109,6 +109,9 @@ module Coordinator::Shared
     AGENT_CHOICE_ASSESSMENT_BASES = %w[no_policy compliant advisory_violation].freeze
     AGENT_CHOICE_OUTCOMES = %w[accepted].freeze
     AGENT_CHOICE_OBSERVATION_STATUSES = %w[recorded accepted].freeze
+    AGENT_CHOICE_IMPACT_POLICY_VERSIONS = %w[agent-choice-decision-impact/v1].freeze
+    AGENT_CHOICE_IMPACT_SCAN_STATUSES = %w[absent running skipped completed].freeze
+    AGENT_CHOICE_IMPACT_SCAN_SKIP_REASONS = %w[future_only candidate_scope artifact_scope].freeze
     DECISION_ACTIVATION_INELIGIBILITY_REASONS = %w[
       non_normative_statement_kind
       missing_effect
@@ -229,6 +232,12 @@ module Coordinator::Shared
     AgentChoiceAssessmentBasis = String.enum(*AGENT_CHOICE_ASSESSMENT_BASES)
     AgentChoiceOutcome = String.enum(*AGENT_CHOICE_OUTCOMES)
     AgentChoiceObservationStatus = String.enum(*AGENT_CHOICE_OBSERVATION_STATUSES)
+    AgentChoiceImpactPolicyVersion = String.enum(*AGENT_CHOICE_IMPACT_POLICY_VERSIONS)
+    AgentChoiceImpactScanStatus = String.enum(*AGENT_CHOICE_IMPACT_SCAN_STATUSES)
+    AgentChoiceImpactScanSkipReason = String.enum(*AGENT_CHOICE_IMPACT_SCAN_SKIP_REASONS)
+    GlobalPosition = Integer.constrained(gteq: 0)
+    AgentChoiceImpactPageSize = Integer.enum(50)
+    AgentChoiceImpactPageChoiceCount = Integer.constrained(gteq: 0, lteq: 50)
     DecisionActivationIneligibilityReason = String.enum(*DECISION_ACTIVATION_INELIGIBILITY_REASONS)
     DecisionActivationIneligibilityReasons = Array.of(DecisionActivationIneligibilityReason).constrained(min_size: 1, max_size: 10)
     DecisionCorrectionIneligibilityReason = String.enum(*DECISION_CORRECTION_INELIGIBILITY_REASONS)

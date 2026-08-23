@@ -1,0 +1,119 @@
+# frozen_string_literal: true
+
+module Coordinator::Write
+  module AgentChoiceImpacts
+    class ScanLoader
+      def initialize(
+        event_store:,
+        stream_factory: StreamFactory.new,
+        schema_registry: EventSchemaRegistry.new
+      )
+        @event_store = event_store
+        @stream_factory = stream_factory
+        @schema_registry = schema_registry
+      end
+
+      def call(scan_id)
+        events = @event_store.read_grouped(
+          @stream_factory.agent_choice_impact_scan(scan_id),
+          EventQueries::AGENT_CHOICE_IMPACT_SCAN_STATE
+        )
+        payloads = events.map { load(_1) }
+
+        ScanSnapshot.new(
+          state: build_state(events, payloads),
+          latest_revision: events.first&.stream_revision,
+          persisted_events: events
+        )
+      end
+
+      private
+
+      def build_state(events, payloads)
+        return Domain::AgentChoiceImpacts::ScanState.initial if events.empty?
+
+        skipped = payloads.find { _1.is_a?(Events::AgentChoiceImpactScanSkippedV1) }
+        return skipped_state(skipped, events.fetch(payloads.index(skipped))) if skipped
+
+        started = payloads.find { _1.is_a?(Events::AgentChoiceImpactScanStartedV1) }
+        started_event = events.fetch(payloads.index(started))
+        completed = payloads.find { _1.is_a?(Events::AgentChoiceImpactScanCompletedV1) }
+        return completed_state(started, started_event, completed, events.fetch(payloads.index(completed))) if completed
+
+        progressed = payloads.find { _1.is_a?(Events::AgentChoiceImpactScanProgressedV1) }
+        running_state(started, started_event, progressed, progressed && events.fetch(payloads.index(progressed)))
+      end
+
+      def skipped_state(payload, event)
+        Domain::AgentChoiceImpacts::ScanState.new(
+          status: "skipped",
+          scan_id: payload.scan_id,
+          decision_change: payload.decision_change,
+          started_event: nil,
+          checkpoint_event: reference(event),
+          from_position: nil,
+          to_position: payload.decision_change.source_global_position,
+          page_size: nil,
+          page_count: 0,
+          total_choice_count: 0,
+          policy_version: payload.policy_version,
+          skip_reason: payload.reason
+        )
+      end
+
+      def completed_state(started, started_event, completed, completed_event)
+        Domain::AgentChoiceImpacts::ScanState.new(
+          status: "completed",
+          scan_id: started.scan_id,
+          decision_change: started.decision_change,
+          started_event: reference(started_event),
+          checkpoint_event: reference(completed_event),
+          from_position: completed.final_from_position,
+          to_position: started.to_position,
+          page_size: started.page_size,
+          page_count: completed.page_count,
+          total_choice_count: completed.total_choice_count,
+          policy_version: started.policy_version,
+          skip_reason: nil
+        )
+      end
+
+      def running_state(started, started_event, progressed, progressed_event)
+        checkpoint = progressed_event || started_event
+        Domain::AgentChoiceImpacts::ScanState.new(
+          status: "running",
+          scan_id: started.scan_id,
+          decision_change: started.decision_change,
+          started_event: reference(started_event),
+          checkpoint_event: reference(checkpoint),
+          from_position: progressed ? progressed.next_from_position : started.from_position,
+          to_position: started.to_position,
+          page_size: started.page_size,
+          page_count: progressed ? progressed.page_number : 0,
+          total_choice_count: progressed ? progressed.total_choice_count : 0,
+          policy_version: started.policy_version,
+          skip_reason: nil
+        )
+      end
+
+      def load(event)
+        @schema_registry.load(
+          type: event.type,
+          schema_version: event.metadata.fetch("schema_version"),
+          data: event.data
+        )
+      end
+
+      def reference(event)
+        EventReference.new(
+          event_id: event.id,
+          type: event.type,
+          stream_context: event.stream.context,
+          stream_name: event.stream.stream_name,
+          stream_id: event.stream.stream_id,
+          stream_revision: event.stream_revision
+        )
+      end
+    end
+  end
+end

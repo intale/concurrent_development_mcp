@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module AgentChoiceImpacts
+      class DecisionChangeEvidenceBuilder
+        def initialize: (event_store: _EventStore, ?source_contract: Contracts::DecisionChangeSourceEvent, ?schema_registry: EventSchemaRegistry) -> void
+        def call: (PgEventstore::Event source_event) -> Dry::Monads::Result
+      end
+    end
+  end
+end

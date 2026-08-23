@@ -106,6 +106,16 @@ module Coordinator::Write
       direction: :asc
     )
 
+    AGENT_CHOICE_IMPACT_SCAN_STATE = GroupedEventReadCriteria.new(
+      event_types: [
+        "AgentChoiceImpactScanStarted",
+        "AgentChoiceImpactScanSkipped",
+        "AgentChoiceImpactScanProgressed",
+        "AgentChoiceImpactScanCompleted"
+      ],
+      direction: :desc
+    )
+
     ATTEMPT_FOR_AGENT_CHOICE = EventReadCriteria.new(
       event_types: [ "AttemptAuthorized", "AttemptStarted" ],
       maximum_count: 2,

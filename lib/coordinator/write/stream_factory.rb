@@ -89,5 +89,13 @@ module Coordinator::Write
         stream_id: choice_id
       )
     end
+
+    def agent_choice_impact_scan(scan_id)
+      StreamReference.new(
+        context: "AgentGovernance",
+        stream_name: "AgentChoiceImpactScan",
+        stream_id: scan_id
+      )
+    end
   end
 end

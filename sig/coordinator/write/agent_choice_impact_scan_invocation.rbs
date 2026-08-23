@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    class AgentChoiceImpactScanInvocation < Shared::Value
+      def command: () -> Commands::StartAgentChoiceImpactScan
+      def source_event: () -> PgEventstore::Event
+      def source_reference: () -> EventReference
+    end
+  end
+end

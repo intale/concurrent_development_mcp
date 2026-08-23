@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Domain
+      module AgentChoiceImpacts
+        class StartScan
+          PAGE_SIZE: Integer
+
+          def initialize: (?stream_factory: StreamFactory) -> void
+          def call: (state: ScanState, command: Commands::StartAgentChoiceImpactScan, decision_change: Coordinator::Write::AgentChoiceImpacts::DecisionChangeEvidenceV1, started_at: String) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

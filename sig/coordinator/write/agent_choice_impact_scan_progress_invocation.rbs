@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    class AgentChoiceImpactScanProgressInvocation < Shared::Value
+      def command: () -> Commands::ProgressAgentChoiceImpactScan
+      def checkpoint_event: () -> PgEventstore::Event
+      def checkpoint_reference: () -> EventReference
+    end
+  end
+end

@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Commands
+      class StartAgentChoiceImpactScan < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def scan_id: () -> String
+        def source_event: () -> EventReference
+        def source_global_position: () -> Integer
+        def policy_version: () -> String
+      end
+    end
+  end
+end

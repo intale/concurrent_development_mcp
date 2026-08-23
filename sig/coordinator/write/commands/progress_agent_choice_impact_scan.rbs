@@ -1,0 +1,17 @@
+module Coordinator
+  module Write
+    module Commands
+      class ProgressAgentChoiceImpactScan < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def scan_id: () -> String
+        def expected_checkpoint: () -> EventReference
+        def previous_from_position: () -> Integer
+        def last_processed_position: () -> Integer?
+        def page_choice_count: () -> Integer
+        def has_more: () -> bool
+        def policy_version: () -> String
+      end
+    end
+  end
+end

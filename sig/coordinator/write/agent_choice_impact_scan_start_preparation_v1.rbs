@@ -1,0 +1,8 @@
+module Coordinator
+  module Write
+    class AgentChoiceImpactScanStartPreparationV1 < Shared::Value
+      def started_at: () -> String
+      def event_id: () -> String
+    end
+  end
+end
