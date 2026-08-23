@@ -1,0 +1,16 @@
+module Coordinator::Processes
+  module CandidateObligations
+    class PolicyObserver
+      TOPIC_ID: String
+      def initialize: (
+        event_store: Coordinator::Write::_EventStore,
+        ?stream_factory: Coordinator::Write::StreamFactory,
+        ?source_builder: SourceBuilder,
+        ?definition_loader: Coordinator::Write::CandidateObligations::DecisionDefinitionLoader,
+        ?policy_loader: Coordinator::Write::CandidateObligations::ImpactPolicyLoader
+      ) -> void
+      def from_partition: (SourceV1 source) -> PolicyTriggerV1?
+      def current_for_registration: (SourceV1 source) -> PolicyTriggerV1?
+    end
+  end
+end

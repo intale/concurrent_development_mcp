@@ -1,0 +1,8 @@
+module Coordinator::Write
+  module CandidateObligationScans
+    class ProgressPreparationV1 < Coordinator::Shared::Value
+      def progressed_at: () -> String
+      def event_id: () -> String
+    end
+  end
+end

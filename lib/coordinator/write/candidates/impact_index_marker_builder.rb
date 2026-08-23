@@ -14,21 +14,42 @@ module Coordinator::Write
       end
 
       def call(evidence:, surface:)
-        repository_id = evidence.submission.repository_id
-        changed = changed_paths(evidence.manifest)
-        observed = evidence.build_context&.inputs&.map(&:path) || []
-        source_semantic = surface.produces.map(&:impact_key) + surface.may_affect.map(&:impact_key)
-        target_semantic = surface.consumes.map(&:impact_key) + surface.assumes.map(&:impact_key)
+        (role_markers(role: "source", evidence:, surface:) +
+          role_markers(role: "target", evidence:, surface:)).uniq.sort_by(&:b).freeze
+      end
 
-        markers = []
-        markers.concat(build_markers(role: "source", kind: "path", values: changed, repository_id:))
-        markers.concat(build_markers(role: "target", kind: "path", values: changed + observed, repository_id:))
-        markers.concat(build_markers(role: "source", kind: "semantic", values: source_semantic, repository_id: nil))
-        markers.concat(build_markers(role: "target", kind: "semantic", values: target_semantic, repository_id: nil))
-        markers.uniq.sort_by(&:b).freeze
+      def counterpart(evidence:, surface:, direction:)
+        role = direction == "outgoing" ? "target" : "source"
+        values_role = direction == "outgoing" ? "source" : "target"
+
+        role_markers(role:, evidence:, surface:, values_role:).freeze
       end
 
       private
+
+      def role_markers(role:, evidence:, surface:, values_role: role)
+        repository_id = evidence.submission.repository_id
+        paths = path_values(evidence, values_role)
+        semantics = semantic_values(surface, values_role)
+
+        (
+          build_markers(role:, kind: "path", values: paths, repository_id:) +
+          build_markers(role:, kind: "semantic", values: semantics, repository_id: nil)
+        ).uniq.sort_by(&:b)
+      end
+
+      def path_values(evidence, role)
+        changed = changed_paths(evidence.manifest)
+        return changed if role == "source"
+
+        changed + (evidence.build_context&.inputs&.map(&:path) || [])
+      end
+
+      def semantic_values(surface, role)
+        return surface.produces.map(&:impact_key) + surface.may_affect.map(&:impact_key) if role == "source"
+
+        surface.consumes.map(&:impact_key) + surface.assumes.map(&:impact_key)
+      end
 
       def build_markers(role:, kind:, values:, repository_id:)
         values.uniq.map { bucket(kind:, value: _1) }.uniq.map do |bucket|

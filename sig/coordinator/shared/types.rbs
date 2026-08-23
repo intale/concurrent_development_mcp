@@ -59,6 +59,12 @@ module Coordinator
       CANDIDATE_IMPACT_POLICY_ENFORCEMENT_LEVELS: Array[String]
       CANDIDATE_IMPACT_REQUIRED_EVIDENCE_KINDS: Array[String]
       CANDIDATE_COMPATIBILITY_OBLIGATION_RULE_VERSIONS: Array[String]
+      CANDIDATE_IMPACT_INDEX_POLICY_VERSIONS: Array[String]
+      CANDIDATE_IMPACT_REGISTRY_SWEEP_RULE_VERSIONS: Array[String]
+      CANDIDATE_IMPACT_PAIR_SCAN_RULE_VERSIONS: Array[String]
+      CANDIDATE_IMPACT_SCAN_STATUSES: Array[String]
+      CANDIDATE_IMPACT_REGISTRY_SWEEP_SKIP_REASONS: Array[String]
+      CANDIDATE_IMPACT_PAIR_SCAN_SKIP_REASONS: Array[String]
       VERIFICATION_OBLIGATION_KINDS: Array[String]
       VERIFICATION_OBLIGATION_STATUSES: Array[String]
       CANDIDATE_OBLIGATION_POLICY_STATUSES: Array[String]
@@ -158,6 +164,16 @@ module Coordinator
       CandidateImpactRequiredEvidenceKind: untyped
       CandidateImpactRequiredEvidenceKinds: untyped
       CandidateCompatibilityObligationRuleVersion: untyped
+      CandidateImpactIndexPolicyVersion: untyped
+      CandidateImpactRegistrySweepRuleVersion: untyped
+      CandidateImpactPairScanRuleVersion: untyped
+      CandidateImpactScanRuleVersion: untyped
+      CandidateImpactScanStatus: untyped
+      CandidateImpactRegistrySweepSkipReason: untyped
+      CandidateImpactPairScanSkipReason: untyped
+      CandidateImpactScanPageSize: untyped
+      CandidateImpactScanPageRegistrationCount: untyped
+      CandidateImpactPairScanMarkers: untyped
       VerificationObligationKind: untyped
       VerificationObligationStatus: untyped
       CandidateObligationPolicyStatus: untyped

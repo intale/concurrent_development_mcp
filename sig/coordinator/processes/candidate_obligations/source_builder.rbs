@@ -1,0 +1,13 @@
+module Coordinator::Processes
+  module CandidateObligations
+    class SourceBuilder
+      def initialize: (
+        event_store: Coordinator::Write::_EventStore,
+        ?exact_loader: Coordinator::Write::CandidateObligations::ExactEventLoader,
+        ?reference_builder: EventReferenceBuilder,
+        ?contract: Coordinator::Processes::Contracts::CandidateObligationProcessSource
+      ) -> void
+      def call: (PgEventstore::Event event) -> SourceV1
+    end
+  end
+end

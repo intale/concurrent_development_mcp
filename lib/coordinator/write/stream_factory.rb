@@ -130,6 +130,22 @@ module Coordinator::Write
       )
     end
 
+    def candidate_impact_registry_sweep(scan_id)
+      StreamReference.new(
+        context: "DevelopmentIntegration",
+        stream_name: "CandidateImpactRegistrySweep",
+        stream_id: scan_id
+      )
+    end
+
+    def candidate_impact_pair_scan(scan_id)
+      StreamReference.new(
+        context: "DevelopmentIntegration",
+        stream_name: "CandidateImpactPairScan",
+        stream_id: scan_id
+      )
+    end
+
     def verification_obligation(obligation_id)
       StreamReference.new(
         context: "DevelopmentIntegration",

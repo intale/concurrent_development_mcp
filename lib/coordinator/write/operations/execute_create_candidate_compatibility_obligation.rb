@@ -61,7 +61,8 @@ module Coordinator::Write
         )
         verify_command!(command, source:, target:, identity:)
         policy = @policy_loader.call(
-          command:,
+          policy_partition_event: command.policy_partition_event,
+          policy_head: command.policy_head,
           change_set_id: source.subject.change_set_id,
           observed_at: preparation.created_at
         )

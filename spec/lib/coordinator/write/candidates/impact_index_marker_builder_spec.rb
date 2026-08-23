@@ -15,6 +15,19 @@ RSpec.describe Coordinator::Write::Candidates::ImpactIndexMarkerBuilder do
     ].sort_by(&:b))
   end
 
+  it "derives reciprocal counterpart roles from the same exact evidence" do
+    registered = builder.call(evidence:, surface:)
+    outgoing = builder.counterpart(evidence:, surface:, direction: "outgoing")
+    incoming = builder.counterpart(evidence:, surface:, direction: "incoming")
+
+    expect(outgoing).to eq(outgoing.uniq.sort_by(&:b))
+    expect(incoming).to eq(incoming.uniq.sort_by(&:b))
+    expect(outgoing.length).to eq(2)
+    expect(incoming.length).to eq(3)
+    expect(outgoing & registered).to have_attributes(length: 1)
+    expect(incoming & registered).to have_attributes(length: 1)
+  end
+
   def evidence
     Coordinator::Write::Candidates::ImpactSurfaceEvidenceV1.new(
       submission:,

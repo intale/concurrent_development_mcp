@@ -1,0 +1,4 @@
+module Coordinator::Write::Contracts
+  class CandidateImpactRegistrySweepStart < Dry::Validation::Contract
+  end
+end

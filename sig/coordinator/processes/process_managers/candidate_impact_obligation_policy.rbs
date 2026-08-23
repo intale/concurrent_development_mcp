@@ -1,0 +1,25 @@
+module Coordinator::Processes
+  module ProcessManagers
+    class CandidateImpactObligationPolicy
+      HANDLED_REGISTRY_START_CODES: Array[Symbol]
+      HANDLED_PAIR_START_CODES: Array[Symbol]
+      HANDLED_REGISTRY_PROGRESS_CODES: Array[Symbol]
+      HANDLED_PAIR_PROGRESS_CODES: Array[Symbol]
+
+      def initialize: (
+        event_store: Coordinator::Write::_EventStore,
+        ?source_builder: Coordinator::Processes::CandidateObligations::SourceBuilder,
+        ?policy_observer: Coordinator::Processes::CandidateObligations::PolicyObserver,
+        ?checkpoint_loader: Coordinator::Processes::CandidateObligations::CheckpointLoader,
+        ?page_reader: Coordinator::Processes::CandidateObligations::PageReader,
+        ?command_builder: Coordinator::Processes::CandidateObligations::CommandBuilder,
+        ?start_registry_sweep: Coordinator::Write::Operations::ExecuteStartCandidateImpactRegistrySweep,
+        ?progress_registry_sweep: Coordinator::Write::Operations::ExecuteProgressCandidateImpactRegistrySweep,
+        ?start_pair_scan: Coordinator::Write::Operations::ExecuteStartCandidateImpactPairScan,
+        ?progress_pair_scan: Coordinator::Write::Operations::ExecuteProgressCandidateImpactPairScan,
+        ?create_obligation: Coordinator::Write::Operations::ExecuteCreateCandidateCompatibilityObligation
+      ) -> void
+      def call: (PgEventstore::Event event) -> nil
+    end
+  end
+end

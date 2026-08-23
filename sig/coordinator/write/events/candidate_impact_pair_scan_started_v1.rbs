@@ -1,0 +1,19 @@
+module Coordinator::Write
+  module Events
+    class CandidateImpactPairScanStartedV1 < Base
+      def scan_id: () -> String
+      def change_set_id: () -> String
+      def source_registration: () -> EventReference
+      def direction: () -> String
+      def policy_partition_event: () -> EventReference
+      def policy_head: () -> Decisions::DecisionHeadV1
+      def markers: () -> Array[String]
+      def from_revision: () -> Integer
+      def to_revision: () -> Integer
+      def page_size: () -> Integer
+      def index_policy_version: () -> String
+      def rule_version: () -> String
+      def started_at: () -> String
+    end
+  end
+end

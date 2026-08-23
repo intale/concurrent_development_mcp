@@ -1,0 +1,7 @@
+module Coordinator::Processes
+  module CandidateObligations
+    class EventReferenceBuilder
+      def call: (PgEventstore::Event event) -> Coordinator::Write::EventReference
+    end
+  end
+end

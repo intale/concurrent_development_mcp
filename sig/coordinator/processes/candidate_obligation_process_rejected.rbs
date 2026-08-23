@@ -1,0 +1,4 @@
+module Coordinator::Processes
+  class CandidateObligationProcessRejected < StandardError
+  end
+end

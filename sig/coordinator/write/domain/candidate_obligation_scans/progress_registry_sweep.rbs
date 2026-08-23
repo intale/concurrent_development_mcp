@@ -1,0 +1,14 @@
+module Coordinator::Write
+  module Domain
+    module CandidateObligationScans
+      class ProgressRegistrySweep
+        def initialize: (?stream_factory: StreamFactory) -> void
+        def call: (
+          state: RegistrySweepState,
+          command: Commands::ProgressCandidateImpactRegistrySweep,
+          progressed_at: String
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

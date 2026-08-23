@@ -171,6 +171,31 @@ module Coordinator::Write
       direction: :asc
     )
 
+    CANDIDATE_IMPACT_REGISTRY_LATEST = GroupedEventReadCriteria.new(
+      event_types: [ "CandidateImpactSurfaceRegistered" ],
+      direction: :desc
+    )
+
+    CANDIDATE_IMPACT_REGISTRY_SWEEP_STATE = GroupedEventReadCriteria.new(
+      event_types: [
+        "CandidateImpactRegistrySweepStarted",
+        "CandidateImpactRegistrySweepSkipped",
+        "CandidateImpactRegistrySweepProgressed",
+        "CandidateImpactRegistrySweepCompleted"
+      ],
+      direction: :desc
+    )
+
+    CANDIDATE_IMPACT_PAIR_SCAN_STATE = GroupedEventReadCriteria.new(
+      event_types: [
+        "CandidateImpactPairScanStarted",
+        "CandidateImpactPairScanSkipped",
+        "CandidateImpactPairScanProgressed",
+        "CandidateImpactPairScanCompleted"
+      ],
+      direction: :desc
+    )
+
     COORDINATION_TASK_HISTORY = EventReadCriteria.new(
       event_types: [
         "CoordinationTaskSubmitted",

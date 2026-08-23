@@ -1,0 +1,22 @@
+module Coordinator::Write
+  module Commands
+    class ProgressCandidateImpactPairScan < Coordinator::Shared::Value
+      def command_id: () -> String
+      def actor: () -> Actor
+      def scan_id: () -> String
+      def change_set_id: () -> String
+      def source_registration: () -> EventReference
+      def direction: () -> String
+      def policy_partition_event: () -> EventReference
+      def policy_head: () -> Decisions::DecisionHeadV1
+      def expected_checkpoint: () -> EventReference
+      def previous_from_revision: () -> Integer
+      def last_processed_revision: () -> Integer?
+      def page_registration_count: () -> Integer
+      def has_more: () -> bool
+      def page_size: () -> Integer
+      def index_policy_version: () -> String
+      def rule_version: () -> String
+    end
+  end
+end

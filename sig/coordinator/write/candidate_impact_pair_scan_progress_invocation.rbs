@@ -1,0 +1,7 @@
+module Coordinator::Write
+  class CandidateImpactPairScanProgressInvocation < Coordinator::Shared::Value
+    def command: () -> Coordinator::Write::Commands::ProgressCandidateImpactPairScan
+    def checkpoint_event: () -> PgEventstore::Event
+    def checkpoint_reference: () -> Coordinator::Write::EventReference
+  end
+end

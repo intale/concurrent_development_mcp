@@ -8,28 +8,30 @@ module Coordinator::Write
       def initialize(
         event_store:,
         exact_loader: ExactEventLoader.new(event_store:),
+        definition_loader: DecisionDefinitionLoader.new(event_store:, exact_loader:),
         stream_factory: StreamFactory.new,
         canonical_json: CanonicalJson.new,
         definition_contract: Contracts::CandidateImpactPolicyDefinition.new
       )
         @event_store = event_store
         @exact_loader = exact_loader
+        @definition_loader = definition_loader
         @stream_factory = stream_factory
         @canonical_json = canonical_json
         @definition_contract = definition_contract
       end
 
-      def call(command:, change_set_id:, observed_at:)
-        persisted_partition = @exact_loader.call(command.policy_partition_event)
+      def call(policy_partition_event:, policy_head:, change_set_id:, observed_at:)
+        persisted_partition = @exact_loader.call(policy_partition_event)
         partition_event = payload!(persisted_partition, Events::DecisionPartitionAdvancedV1)
         partition = expected_partition(change_set_id)
         validate_partition!(persisted_partition.reference, partition_event, partition)
-        definition = load_definition(command.policy_head, partition)
+        definition = @definition_loader.call(head: policy_head, partition:)
         validate_definition!(definition, change_set_id)
 
         current = current_partition_event(partition.partition_id)
         return PolicyObservationV1.stale unless current == persisted_partition.reference
-        return PolicyObservationV1.stale unless partition_event.active_decisions.include?(command.policy_head)
+        return PolicyObservationV1.stale unless partition_event.active_decisions.include?(policy_head)
 
         level = definition.document.enforcement.level
         return PolicyObservationV1.non_gating unless GATE_LEVELS.include?(level)
@@ -41,7 +43,7 @@ module Coordinator::Write
           ImpactPolicyEvidenceV1.new(
             partition_event: persisted_partition.reference,
             partition:,
-            head: command.policy_head,
+            head: policy_head,
             definition_digest: definition.digest,
             change_set_id:,
             required_evidence: definition.document.value.items,
@@ -89,56 +91,6 @@ module Coordinator::Write
           partition_event: reference.to_h,
           expected_partition: expected.to_h
         )
-      end
-
-      def load_definition(head, partition)
-        validate_head_reference!(head)
-        persisted = @exact_loader.call(head.event)
-        case persisted.payload
-        when Events::DecisionActivatedV1
-          definition_from_activation(head, persisted.payload, partition)
-        when Events::DecisionDefinitionCorrectedV1
-          definition_from_correction(head, persisted.payload, partition)
-        else
-          invalid!("candidate_impact_policy_head_type_invalid", decision_head: head.to_h)
-        end
-      end
-
-      def validate_head_reference!(head)
-        reference = head.event
-        valid = head.decision_revision == reference.stream_revision &&
-                reference.stream_context == "HumanGuidance" &&
-                reference.stream_name == "Decision" &&
-                reference.stream_id == head.decision_id &&
-                %w[DecisionActivated DecisionDefinitionCorrected].include?(reference.type)
-        return if valid
-
-        invalid!("candidate_impact_policy_head_invalid", decision_head: head.to_h)
-      end
-
-      def definition_from_activation(head, activation, partition)
-        recorded = @exact_loader.call(activation.recorded_event)
-        definition_event = payload!(recorded, Events::DecisionRecordedV1)
-        valid = activation.decision_id == head.decision_id &&
-                activation.partitions.include?(partition) &&
-                definition_event.decision_id == head.decision_id &&
-                definition_event.definition.digest == activation.definition_digest &&
-                recorded.reference.stream_context == "HumanGuidance" &&
-                recorded.reference.stream_name == "Decision" &&
-                recorded.reference.stream_id == head.decision_id
-        return definition_event.definition if valid
-
-        invalid!("candidate_impact_policy_activation_invalid", decision_head: head.to_h)
-      end
-
-      def definition_from_correction(head, correction, partition)
-        valid = correction.decision_id == head.decision_id &&
-                correction.previous_head.decision_id == head.decision_id &&
-                correction.previous_head.decision_revision < head.decision_revision &&
-                correction.partitions.include?(partition)
-        return correction.definition if valid
-
-        invalid!("candidate_impact_policy_correction_invalid", decision_head: head.to_h)
       end
 
       def validate_definition!(definition, change_set_id)

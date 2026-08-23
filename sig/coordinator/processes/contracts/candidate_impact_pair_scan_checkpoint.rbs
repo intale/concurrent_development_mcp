@@ -1,0 +1,4 @@
+module Coordinator::Processes::Contracts
+  class CandidateImpactPairScanCheckpoint < Dry::Validation::Contract
+  end
+end

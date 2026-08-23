@@ -820,6 +820,56 @@ module Coordinator
       )
     end
 
+    register("operations.execute_start_candidate_impact_registry_sweep", memoize: true) do
+      Write::Operations::ExecuteStartCandidateImpactRegistrySweep.new(
+        event_store: self["event_store"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("operations.execute_progress_candidate_impact_registry_sweep", memoize: true) do
+      Write::Operations::ExecuteProgressCandidateImpactRegistrySweep.new(
+        event_store: self["event_store"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("operations.execute_start_candidate_impact_pair_scan", memoize: true) do
+      Write::Operations::ExecuteStartCandidateImpactPairScan.new(
+        event_store: self["event_store"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("operations.execute_progress_candidate_impact_pair_scan", memoize: true) do
+      Write::Operations::ExecuteProgressCandidateImpactPairScan.new(
+        event_store: self["event_store"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("operations.execute_create_candidate_compatibility_obligation", memoize: true) do
+      Write::Operations::ExecuteCreateCandidateCompatibilityObligation.new(
+        event_store: self["event_store"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
     register("lease_expiry_policy", memoize: true) do
       Processes::LeaseExpiryPolicy.new(
         source_loader: self["lease_expiry_source_loader"],
@@ -1071,6 +1121,17 @@ module Coordinator
       )
     end
 
+    register("process_managers.candidate_impact_obligation_policy", memoize: true) do
+      Processes::ProcessManagers::CandidateImpactObligationPolicy.new(
+        event_store: self["event_store"],
+        start_registry_sweep: self["operations.execute_start_candidate_impact_registry_sweep"],
+        progress_registry_sweep: self["operations.execute_progress_candidate_impact_registry_sweep"],
+        start_pair_scan: self["operations.execute_start_candidate_impact_pair_scan"],
+        progress_pair_scan: self["operations.execute_progress_candidate_impact_pair_scan"],
+        create_obligation: self["operations.execute_create_candidate_compatibility_obligation"]
+      )
+    end
+
     register("subscriptions.change_set_readiness", memoize: true) do
       Processes::Subscriptions::ChangeSetReadiness.new(handler: self["process_managers.change_set_readiness"])
     end
@@ -1090,6 +1151,12 @@ module Coordinator
     register("subscriptions.agent_choice_decision_impact", memoize: true) do
       Processes::Subscriptions::AgentChoiceDecisionImpact.new(
         handler: self["process_managers.agent_choice_decision_impact"]
+      )
+    end
+
+    register("subscriptions.candidate_impact_obligation_policy", memoize: true) do
+      Processes::Subscriptions::CandidateImpactObligationPolicy.new(
+        handler: self["process_managers.candidate_impact_obligation_policy"]
       )
     end
 
@@ -1146,7 +1213,8 @@ module Coordinator
           self["subscriptions.change_set_readiness"],
           self["subscriptions.coordination_task_executor"],
           self["subscriptions.lease_expiry_scheduler"],
-          self["subscriptions.agent_choice_decision_impact"]
+          self["subscriptions.agent_choice_decision_impact"],
+          self["subscriptions.candidate_impact_obligation_policy"]
         ]
       )
     end

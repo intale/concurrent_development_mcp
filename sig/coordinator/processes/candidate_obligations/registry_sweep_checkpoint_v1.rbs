@@ -1,0 +1,9 @@
+module Coordinator::Processes
+  module CandidateObligations
+    class RegistrySweepCheckpointV1 < Coordinator::Shared::Value
+      def event: () -> PgEventstore::Event
+      def reference: () -> Coordinator::Write::EventReference
+      def state: () -> Coordinator::Write::Domain::CandidateObligationScans::RegistrySweepState
+    end
+  end
+end

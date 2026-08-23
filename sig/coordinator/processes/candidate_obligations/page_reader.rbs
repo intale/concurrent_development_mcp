@@ -1,0 +1,13 @@
+module Coordinator::Processes
+  module CandidateObligations
+    class PageReader
+      def initialize: (
+        event_store: Coordinator::Write::_EventStore,
+        ?stream_factory: Coordinator::Write::StreamFactory,
+        ?contract: Coordinator::Processes::Contracts::CandidateImpactRevisionPage
+      ) -> void
+      def registry: (RegistrySweepCheckpointV1 checkpoint) -> RevisionPageV1
+      def pair: (PairScanCheckpointV1 checkpoint) -> RevisionPageV1
+    end
+  end
+end

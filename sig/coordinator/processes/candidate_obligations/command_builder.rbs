@@ -1,0 +1,42 @@
+module Coordinator::Processes
+  module CandidateObligations
+    class CommandBuilder
+      ACTOR: Coordinator::Write::Commands::Actor
+      REGISTRY_RULE_VERSION: String
+      PAIR_RULE_VERSION: String
+      OBLIGATION_RULE_VERSION: String
+      INDEX_POLICY_VERSION: String
+      PAGE_SIZE: Integer
+
+      def initialize: (
+        event_store: Coordinator::Write::_EventStore,
+        ?identity_builder: Coordinator::Write::CandidateObligationScans::IdentityBuilder,
+        ?obligation_identity_builder: Coordinator::Write::CandidateObligations::IdentityBuilder,
+        ?candidate_loader: Coordinator::Write::CandidateObligations::CandidateEvidenceLoader,
+        ?reference_builder: EventReferenceBuilder
+      ) -> void
+      def registry_start: (
+        trigger: PolicyTriggerV1,
+        source: SourceV1
+      ) -> Coordinator::Write::CandidateImpactRegistrySweepInvocation
+      def pair_start: (
+        registration: PgEventstore::Event,
+        direction: String,
+        trigger: PolicyTriggerV1,
+        caused_by: SourceV1 | RegistrySweepCheckpointV1
+      ) -> Coordinator::Write::CandidateImpactPairScanInvocation
+      def registry_progress: (
+        checkpoint: RegistrySweepCheckpointV1,
+        page: RevisionPageV1
+      ) -> Coordinator::Write::CandidateImpactRegistrySweepProgressInvocation
+      def pair_progress: (
+        checkpoint: PairScanCheckpointV1,
+        page: RevisionPageV1
+      ) -> Coordinator::Write::CandidateImpactPairScanProgressInvocation
+      def obligation: (
+        checkpoint: PairScanCheckpointV1,
+        target_registration: PgEventstore::Event
+      ) -> Coordinator::Write::CandidateCompatibilityObligationInvocation
+    end
+  end
+end

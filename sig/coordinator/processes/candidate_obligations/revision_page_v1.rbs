@@ -1,0 +1,9 @@
+module Coordinator::Processes
+  module CandidateObligations
+    class RevisionPageV1 < Coordinator::Shared::Value
+      def registrations: () -> Array[PgEventstore::Event]
+      def last_processed_revision: () -> Integer?
+      def has_more: () -> bool
+    end
+  end
+end

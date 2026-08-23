@@ -1,0 +1,4 @@
+module Coordinator::Processes::Contracts
+  class CandidateImpactRevisionPage < Dry::Validation::Contract
+  end
+end

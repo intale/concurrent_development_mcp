@@ -1,0 +1,15 @@
+module Coordinator::Processes
+  module CandidateObligations
+    class CheckpointLoader
+      def initialize: (
+        event_store: Coordinator::Write::_EventStore,
+        ?registry_loader: Coordinator::Write::CandidateObligationScans::RegistrySweepLoader,
+        ?pair_loader: Coordinator::Write::CandidateObligationScans::PairScanLoader,
+        ?registry_contract: Coordinator::Processes::Contracts::CandidateImpactRegistrySweepCheckpoint,
+        ?pair_contract: Coordinator::Processes::Contracts::CandidateImpactPairScanCheckpoint
+      ) -> void
+      def registry: (SourceV1 source) -> RegistrySweepCheckpointV1?
+      def pair: (SourceV1 source) -> PairScanCheckpointV1?
+    end
+  end
+end

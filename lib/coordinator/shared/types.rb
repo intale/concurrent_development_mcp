@@ -213,6 +213,23 @@ module Coordinator::Shared
     CANDIDATE_COMPATIBILITY_OBLIGATION_RULE_VERSIONS = %w[
       candidate-compatibility-obligation/v1
     ].freeze
+    CANDIDATE_IMPACT_INDEX_POLICY_VERSIONS = %w[candidate-impact-bucket-index/v1].freeze
+    CANDIDATE_IMPACT_REGISTRY_SWEEP_RULE_VERSIONS = %w[candidate-impact-registry-sweep/v1].freeze
+    CANDIDATE_IMPACT_PAIR_SCAN_RULE_VERSIONS = %w[candidate-impact-pair-scan/v1].freeze
+    CANDIDATE_IMPACT_SCAN_STATUSES = %w[absent running skipped completed].freeze
+    CANDIDATE_IMPACT_REGISTRY_SWEEP_SKIP_REASONS = %w[
+      stale_policy
+      non_gating_policy
+      inactive_policy
+      empty_registry
+    ].freeze
+    CANDIDATE_IMPACT_PAIR_SCAN_SKIP_REASONS = %w[
+      stale_policy
+      non_gating_policy
+      inactive_policy
+      no_predecessors
+      no_routing_markers
+    ].freeze
     VERIFICATION_OBLIGATION_KINDS = %w[candidate_compatibility].freeze
     VERIFICATION_OBLIGATION_STATUSES = %w[open].freeze
     CANDIDATE_OBLIGATION_POLICY_STATUSES = %w[
@@ -385,6 +402,19 @@ module Coordinator::Shared
     CandidateImpactRequiredEvidenceKinds = Array.of(CandidateImpactRequiredEvidenceKind)
       .constrained(min_size: 1, max_size: 8)
     CandidateCompatibilityObligationRuleVersion = String.enum(*CANDIDATE_COMPATIBILITY_OBLIGATION_RULE_VERSIONS)
+    CandidateImpactIndexPolicyVersion = String.enum(*CANDIDATE_IMPACT_INDEX_POLICY_VERSIONS)
+    CandidateImpactRegistrySweepRuleVersion = String.enum(*CANDIDATE_IMPACT_REGISTRY_SWEEP_RULE_VERSIONS)
+    CandidateImpactPairScanRuleVersion = String.enum(*CANDIDATE_IMPACT_PAIR_SCAN_RULE_VERSIONS)
+    CandidateImpactScanRuleVersion = String.enum(
+      *CANDIDATE_IMPACT_REGISTRY_SWEEP_RULE_VERSIONS,
+      *CANDIDATE_IMPACT_PAIR_SCAN_RULE_VERSIONS
+    )
+    CandidateImpactScanStatus = String.enum(*CANDIDATE_IMPACT_SCAN_STATUSES)
+    CandidateImpactRegistrySweepSkipReason = String.enum(*CANDIDATE_IMPACT_REGISTRY_SWEEP_SKIP_REASONS)
+    CandidateImpactPairScanSkipReason = String.enum(*CANDIDATE_IMPACT_PAIR_SCAN_SKIP_REASONS)
+    CandidateImpactScanPageSize = Integer.enum(50)
+    CandidateImpactScanPageRegistrationCount = Integer.constrained(gteq: 0, lteq: 50)
+    CandidateImpactPairScanMarkers = Array.of(Marker).constrained(max_size: 32)
     VerificationObligationKind = String.enum(*VERIFICATION_OBLIGATION_KINDS)
     VerificationObligationStatus = String.enum(*VERIFICATION_OBLIGATION_STATUSES)
     CandidateObligationPolicyStatus = String.enum(*CANDIDATE_OBLIGATION_POLICY_STATUSES)

@@ -43,6 +43,10 @@ module Coordinator
 
       def read_global_marked_page: (GlobalMarkedEventPageCriteria) -> Array[PgEventstore::Event]
 
+      def read_stream_page: (StreamReference, StreamEventPageCriteria) -> Array[PgEventstore::Event]
+
+      def read_stream_marked_page: (StreamReference, StreamMarkedEventPageCriteria) -> Array[PgEventstore::Event]
+
       def append: (
         StreamReference,
         Array[PgEventstore::Event],

@@ -1,0 +1,10 @@
+module Coordinator::Write
+  class StreamEventPageCriteria < Coordinator::Shared::Value
+    def event_type: () -> String
+    def from_revision: () -> Integer
+    def to_revision: () -> Integer
+    def page_size: () -> Integer
+    def direction: () -> Symbol
+    def query_max_count: () -> Integer
+  end
+end

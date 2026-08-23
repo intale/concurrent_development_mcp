@@ -1,0 +1,16 @@
+module Coordinator::Write
+  module Domain
+    module CandidateObligationScans
+      class StartPairScan
+        def initialize: (?stream_factory: StreamFactory) -> void
+        def call: (
+          state: PairScanState,
+          command: Commands::StartCandidateImpactPairScan,
+          policy: Coordinator::Write::CandidateObligations::PolicyObservationV1,
+          markers: Array[String],
+          started_at: String
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

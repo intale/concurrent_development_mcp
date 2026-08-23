@@ -1,0 +1,21 @@
+module Coordinator::Write
+  module Events
+    class CandidateImpactRegistrySweepProgressedV1 < Base
+      def scan_id: () -> String
+      def change_set_id: () -> String
+      def policy_partition_event: () -> EventReference
+      def policy_head: () -> Decisions::DecisionHeadV1
+      def started_event: () -> EventReference
+      def previous_checkpoint: () -> EventReference
+      def previous_from_revision: () -> Integer
+      def next_from_revision: () -> Integer
+      def to_revision: () -> Integer
+      def page_size: () -> Integer
+      def page_number: () -> Integer
+      def page_registration_count: () -> Integer
+      def total_registration_count: () -> Integer
+      def rule_version: () -> String
+      def progressed_at: () -> String
+    end
+  end
+end

@@ -1,0 +1,4 @@
+module Coordinator::Write::Contracts
+  class CandidateImpactPairScanProgressEventPlan < Dry::Validation::Contract
+  end
+end

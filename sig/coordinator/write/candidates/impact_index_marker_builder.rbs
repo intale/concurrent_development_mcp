@@ -11,6 +11,11 @@ module Coordinator::Write
         evidence: ImpactSurfaceEvidenceV1,
         surface: Coordinator::Write::Events::CandidateImpactSurfaceDerivedV1
       ) -> Array[String]
+      def counterpart: (
+        evidence: ImpactSurfaceEvidenceV1,
+        surface: Coordinator::Write::Events::CandidateImpactSurfaceDerivedV1,
+        direction: String
+      ) -> Array[String]
     end
   end
 end

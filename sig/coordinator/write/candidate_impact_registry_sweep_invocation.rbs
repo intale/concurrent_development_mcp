@@ -1,0 +1,7 @@
+module Coordinator::Write
+  class CandidateImpactRegistrySweepInvocation < Coordinator::Shared::Value
+    def command: () -> Coordinator::Write::Commands::StartCandidateImpactRegistrySweep
+    def source_event: () -> PgEventstore::Event
+    def source_reference: () -> Coordinator::Write::EventReference
+  end
+end

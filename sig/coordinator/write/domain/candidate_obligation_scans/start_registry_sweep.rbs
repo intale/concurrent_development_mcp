@@ -1,0 +1,16 @@
+module Coordinator::Write
+  module Domain
+    module CandidateObligationScans
+      class StartRegistrySweep
+        def initialize: (?stream_factory: StreamFactory) -> void
+        def call: (
+          state: RegistrySweepState,
+          command: Commands::StartCandidateImpactRegistrySweep,
+          policy: Coordinator::Write::CandidateObligations::PolicyObservationV1,
+          latest_registry_revision: Integer?,
+          started_at: String
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

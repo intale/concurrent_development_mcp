@@ -1,0 +1,9 @@
+module Coordinator::Processes
+  module CandidateObligations
+    class SourceV1 < Coordinator::Shared::Value
+      def event: () -> PgEventstore::Event
+      def reference: () -> Coordinator::Write::EventReference
+      def payload: () -> Coordinator::Write::Events::Base
+    end
+  end
+end

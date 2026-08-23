@@ -1,0 +1,30 @@
+module Coordinator::Write
+  module Domain
+    module CandidateObligationScans
+      class PairScanState < Coordinator::Shared::Value
+        def self.initial: () -> PairScanState
+        def status: () -> String
+        def scan_id: () -> String?
+        def change_set_id: () -> String?
+        def source_registration: () -> EventReference?
+        def direction: () -> String?
+        def policy_partition_event: () -> EventReference?
+        def policy_head: () -> Coordinator::Write::Decisions::DecisionHeadV1?
+        def markers: () -> Array[String]
+        def started_event: () -> EventReference?
+        def checkpoint_event: () -> EventReference?
+        def from_revision: () -> Integer?
+        def to_revision: () -> Integer?
+        def page_size: () -> Integer?
+        def page_count: () -> Integer
+        def total_registration_count: () -> Integer
+        def index_policy_version: () -> String?
+        def rule_version: () -> String?
+        def skip_reason: () -> String?
+        def absent?: () -> bool
+        def running?: () -> bool
+        def terminal?: () -> bool
+      end
+    end
+  end
+end

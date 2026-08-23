@@ -1,0 +1,9 @@
+module Coordinator::Write
+  module CandidateObligationScans
+    class PairScanSnapshot < Coordinator::Shared::Value
+      def state: () -> Coordinator::Write::Domain::CandidateObligationScans::PairScanState
+      def latest_revision: () -> Integer?
+      def persisted_events: () -> Array[PgEventstore::Event]
+    end
+  end
+end

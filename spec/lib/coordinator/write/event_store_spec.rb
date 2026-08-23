@@ -148,6 +148,35 @@ RSpec.describe Coordinator::Write::EventStore, :event_store do
     expect(page.length).to eq(criteria.page_size + 1)
   end
 
+  it "reads a specific-stream revision page using an intentional OR union of compound markers" do
+    registry = Coordinator::Write::StreamFactory.new.candidate_impact_registry("CS-marker-page")
+    events = Array.new(55) do |index|
+      build_event(
+        type: "CandidateImpactSurfaceRegistered",
+        markers: [ index.even? ? "compound:candidate-impact-index:v1:sha256:a" :
+          "compound:candidate-impact-index:v1:sha256:b" ]
+      )
+    end
+    event_store.append(registry, events)
+    criteria = Coordinator::Write::StreamMarkedEventPageCriteria.new(
+      event_type: "CandidateImpactSurfaceRegistered",
+      markers: [
+        "compound:candidate-impact-index:v1:sha256:a",
+        "compound:candidate-impact-index:v1:sha256:b"
+      ],
+      from_revision: 2,
+      to_revision: 53,
+      page_size: 50,
+      direction: :asc
+    )
+
+    page = event_store.read_stream_marked_page(registry, criteria)
+
+    expect(page.length).to eq(51)
+    expect(page.map(&:stream_revision)).to eq((2..52).to_a)
+    expect(page.map(&:type).uniq).to eq([ "CandidateImpactSurfaceRegistered" ])
+  end
+
   it "commits all real requests in one multiple transaction" do
     result = event_store.multiple do
       event_store.append(stream, [ event ])

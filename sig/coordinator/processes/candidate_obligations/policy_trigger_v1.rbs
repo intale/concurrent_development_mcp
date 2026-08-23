@@ -1,0 +1,9 @@
+module Coordinator::Processes
+  module CandidateObligations
+    class PolicyTriggerV1 < Coordinator::Shared::Value
+      def change_set_id: () -> String
+      def partition_event: () -> Coordinator::Write::EventReference
+      def head: () -> Coordinator::Write::Decisions::DecisionHeadV1
+    end
+  end
+end

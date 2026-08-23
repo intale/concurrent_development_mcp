@@ -1,0 +1,7 @@
+module Coordinator::Write
+  class CandidateImpactPairScanInvocation < Coordinator::Shared::Value
+    def command: () -> Coordinator::Write::Commands::StartCandidateImpactPairScan
+    def source_event: () -> PgEventstore::Event
+    def source_reference: () -> Coordinator::Write::EventReference
+  end
+end

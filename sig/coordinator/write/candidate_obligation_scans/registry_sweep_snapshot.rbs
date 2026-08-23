@@ -1,0 +1,9 @@
+module Coordinator::Write
+  module CandidateObligationScans
+    class RegistrySweepSnapshot < Coordinator::Shared::Value
+      def state: () -> Coordinator::Write::Domain::CandidateObligationScans::RegistrySweepState
+      def latest_revision: () -> Integer?
+      def persisted_events: () -> Array[PgEventstore::Event]
+    end
+  end
+end

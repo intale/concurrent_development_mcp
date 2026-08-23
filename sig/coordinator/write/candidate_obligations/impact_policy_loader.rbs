@@ -6,12 +6,14 @@ module Coordinator::Write
       def initialize: (
         event_store: Coordinator::Write::_EventStore,
         ?exact_loader: ExactEventLoader,
+        ?definition_loader: DecisionDefinitionLoader,
         ?stream_factory: Coordinator::Write::StreamFactory,
         ?canonical_json: Coordinator::Shared::CanonicalJson,
         ?definition_contract: Coordinator::Write::Contracts::CandidateImpactPolicyDefinition
       ) -> void
       def call: (
-        command: Coordinator::Write::Commands::CreateCandidateCompatibilityObligation,
+        policy_partition_event: Coordinator::Write::EventReference,
+        policy_head: Coordinator::Write::Decisions::DecisionHeadV1,
         change_set_id: String,
         observed_at: String
       ) -> PolicyObservationV1

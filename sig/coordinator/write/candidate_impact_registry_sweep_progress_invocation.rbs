@@ -1,0 +1,7 @@
+module Coordinator::Write
+  class CandidateImpactRegistrySweepProgressInvocation < Coordinator::Shared::Value
+    def command: () -> Coordinator::Write::Commands::ProgressCandidateImpactRegistrySweep
+    def checkpoint_event: () -> PgEventstore::Event
+    def checkpoint_reference: () -> Coordinator::Write::EventReference
+  end
+end

@@ -117,6 +117,38 @@ module Coordinator::Write
       )
     end
 
+    def read_stream_page(reference, criteria)
+      @client.read(
+        @pg_stream_factory.call(reference),
+        options: {
+          direction: criteria.direction,
+          from_revision: criteria.from_revision,
+          to_revision: criteria.to_revision,
+          max_count: criteria.query_max_count,
+          filter: { event_types: [ criteria.event_type ] }
+        }
+      )
+    rescue PgEventstore::StreamNotFoundError
+      []
+    end
+
+    def read_stream_marked_page(reference, criteria)
+      @client.read(
+        @pg_stream_factory.call(reference),
+        options: {
+          direction: criteria.direction,
+          from_revision: criteria.from_revision,
+          to_revision: criteria.to_revision,
+          max_count: criteria.query_max_count,
+          filter: {
+            event_types: [ { type: criteria.event_type, markers: criteria.markers } ]
+          }
+        }
+      )
+    rescue PgEventstore::StreamNotFoundError
+      []
+    end
+
     def append(reference, events, expected_revision: nil)
       stream = @pg_stream_factory.call(reference)
       options = expected_revision.nil? ? {} : { expected_revision: }

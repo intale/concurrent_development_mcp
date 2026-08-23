@@ -1,0 +1,12 @@
+module Coordinator::Processes
+  module Subscriptions
+    class CandidateImpactObligationPolicy < Coordinator::Shared::Subscriptions::Registration
+      DEFINITION: ProcessDefinition
+
+      def initialize: (
+        handler: ProcessManagers::CandidateImpactObligationPolicy,
+        ?pull_interval: Integer | Float
+      ) -> void
+    end
+  end
+end

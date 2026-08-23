@@ -1,0 +1,14 @@
+module Coordinator::Write
+  module CandidateObligations
+    class DecisionDefinitionLoader
+      def initialize: (
+        event_store: Coordinator::Write::_EventStore,
+        ?exact_loader: ExactEventLoader
+      ) -> void
+      def call: (
+        head: Coordinator::Write::Decisions::DecisionHeadV1,
+        partition: Coordinator::Write::Decisions::DecisionPartitionV1
+      ) -> Coordinator::Write::Decisions::DecisionDefinitionV1
+    end
+  end
+end

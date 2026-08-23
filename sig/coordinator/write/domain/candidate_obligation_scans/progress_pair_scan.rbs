@@ -1,0 +1,14 @@
+module Coordinator::Write
+  module Domain
+    module CandidateObligationScans
+      class ProgressPairScan
+        def initialize: (?stream_factory: StreamFactory) -> void
+        def call: (
+          state: PairScanState,
+          command: Commands::ProgressCandidateImpactPairScan,
+          progressed_at: String
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

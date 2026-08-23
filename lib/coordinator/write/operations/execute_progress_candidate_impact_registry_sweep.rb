@@ -1,0 +1,118 @@
+# frozen_string_literal: true
+
+module Coordinator::Write
+  module Operations
+    class ExecuteProgressCandidateImpactRegistrySweep
+      include Dry::Monads[:result]
+
+      def initialize(
+        event_store:,
+        exact_loader: CandidateObligations::ExactEventLoader.new(event_store:),
+        loader: CandidateObligationScans::RegistrySweepLoader.new(event_store:),
+        decider: Domain::CandidateObligationScans::ProgressRegistrySweep.new,
+        retry_policy: CandidateObligationScans::ExpectedRevisionRetry.new,
+        identity_builder: CandidateObligationScans::IdentityBuilder.new,
+        clock: SystemClock.new,
+        id_generator: IdGenerator.new,
+        event_factory: EventFactory.new,
+        stream_factory: StreamFactory.new,
+        input_contract: Contracts::CandidateImpactRegistrySweepProgress.new,
+        event_plan_contract: Contracts::CandidateImpactRegistrySweepProgressEventPlan.new
+      )
+        @event_store = event_store
+        @exact_loader = exact_loader
+        @loader = loader
+        @decider = decider
+        @retry_policy = retry_policy
+        @identity_builder = identity_builder
+        @clock = clock
+        @id_generator = id_generator
+        @event_factory = event_factory
+        @stream_factory = stream_factory
+        @input_contract = input_contract
+        @event_plan_contract = event_plan_contract
+      end
+
+      def call(invocation)
+        verify_input!(invocation)
+        preparation = CandidateObligationScans::ProgressPreparationV1.new(
+          progressed_at: @clock.now,
+          event_id: @id_generator.uuid_v7
+        )
+
+        @retry_policy.call(scan_id: invocation.command.scan_id) do
+          execute_attempt(invocation:, preparation:)
+        end
+      end
+
+      private
+
+      def execute_attempt(invocation:, preparation:)
+        command = invocation.command
+        checkpoint = @exact_loader.call(invocation.checkpoint_reference)
+        snapshot = @loader.call(command.scan_id)
+        decision = @decider.call(
+          state: snapshot.state,
+          command:,
+          progressed_at: preparation.progressed_at
+        )
+        return decision if decision.failure?
+
+        plan = decision.value!
+        stream = @stream_factory.candidate_impact_registry_sweep(command.scan_id)
+        verify_event_plan!(plan, command:, state: snapshot.state, expected_stream: stream)
+        physical = @event_factory.build!(
+          event: plan.events.sole,
+          event_id: preparation.event_id,
+          metadata: metadata(command),
+          markers: markers(command),
+          caused_by: checkpoint.event
+        )
+        persisted = @event_store.append(
+          stream,
+          [ physical ],
+          expected_revision: snapshot.latest_revision
+        ).sole
+
+        Success(persisted)
+      end
+
+      def verify_input!(invocation)
+        command = invocation.command
+        expected_identity = @identity_builder.progress(
+          checkpoint_event: command.expected_checkpoint,
+          rule_version: command.rule_version
+        )
+        result = @input_contract.call(invocation:, expected_identity:)
+        return if result.success?
+
+        raise ArgumentError, "registry sweep progress violates its dry-rb contract: #{result.errors.to_h.inspect}"
+      end
+
+      def verify_event_plan!(plan, command:, state:, expected_stream:)
+        result = @event_plan_contract.call(plan:, command:, state:, expected_stream:)
+        return if result.success?
+
+        raise ArgumentError, "registry sweep progress plan violates its dry-rb contract: #{result.errors.to_h.inspect}"
+      end
+
+      def metadata(command)
+        EventMetadata.new(
+          command_id: command.command_id,
+          actor_kind: command.actor.kind,
+          actor_id: command.actor.id,
+          recorded_by: "coordinator",
+          policy_version: command.rule_version
+        )
+      end
+
+      def markers(command)
+        [
+          "candidate-impact-registry-sweep:#{command.scan_id}",
+          "change-set:#{command.change_set_id}",
+          "command:#{command.command_id}"
+        ].freeze
+      end
+    end
+  end
+end

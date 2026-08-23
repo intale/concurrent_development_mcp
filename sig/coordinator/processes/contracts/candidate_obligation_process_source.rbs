@@ -1,0 +1,5 @@
+module Coordinator::Processes::Contracts
+  class CandidateObligationProcessSource < Dry::Validation::Contract
+    ALLOWED: Hash[String, Array[String]]
+  end
+end
