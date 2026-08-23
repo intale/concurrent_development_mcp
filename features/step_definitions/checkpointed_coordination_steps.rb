@@ -2027,21 +2027,11 @@ end
 When(
   "the agent records testing-framework choice {string} as {string} through a Task"
 ) do |option_id, choice_id|
-  @choice_id = choice_id
-  @choice_command_id = "cmd-cuc-choice-record-#{choice_id}"
-  @choice_task_id = submit_and_execute(
-    "agent_choice_record",
-    command_id: @choice_command_id,
-    actor: { kind: "agent", id: @choice_agent_id },
-    choice_id:,
-    choice_type: "testing.framework",
-    selected: { option_id:, summary: option_id.capitalize },
-    alternatives: [ { option_id: "minitest", summary: "Minitest" } ],
-    reason_summary: "Use the framework that fits the available coordination policy.",
-    context: @choice_context,
-    decision_context: @choice_decision_context
-  )
-  @choice_task_state = task_request("tasks/get", @choice_task_id)
+  choice = record_testing_framework_choice(choice_id:, option_id:)
+  @choice_id = choice.fetch(:choice_id)
+  @choice_command_id = choice.fetch(:command_id)
+  @choice_task_id = choice.fetch(:task_id)
+  @choice_task_state = choice.fetch(:state)
 end
 
 Then("the choice Task succeeds with accepted authoritative facts") do
@@ -2137,4 +2127,213 @@ Then("the stale choice writes no AgentChoice or command facts") do
   assert_acceptance_equal([], agent_choice_events(@choice_id), "Denied AgentChoice facts")
   assert_acceptance_equal([], command_events(@choice_command_id), "Denied choice command facts")
   assert_acceptance_equal("not_found", agent_choice_view(@choice_id).fetch("status"), "Denied Choice view")
+end
+
+When("the accepted AgentChoice {string} reaches the read side") do |choice_id|
+  project_agent_choice_event(choice_id, "AgentChoiceRecorded")
+  project_agent_choice_event(choice_id, "AgentChoiceAccepted")
+end
+
+When(
+  "the host activates active-attempt Decision {string} requiring {string} through Tasks"
+) do |decision_id, option_id|
+  @impact_decision_id = decision_id
+  @impact_source = activate_impact_decision(
+    decision_id:,
+    option_id:,
+    available: false
+  )
+end
+
+Given(
+  "active-attempt Decision {string} requiring {string} is active and available"
+) do |decision_id, option_id|
+  @impact_decision_id = decision_id
+  @impact_source = activate_impact_decision(
+    decision_id:,
+    option_id:,
+    available: true
+  )
+end
+
+When(
+  "the host corrects Decision {string} to advisory active-attempt choice {string} through Tasks"
+) do |decision_id, option_id|
+  @impact_source = correct_impact_decision(decision_id:, option_id:)
+end
+
+When("the impact Saga processes and redrives the Decision change") do
+  @impact_saga = drive_impact_saga(@impact_source)
+end
+
+Then(
+  "one invalidating assessment and one terminal invalidation are durable for {string}"
+) do |choice_id|
+  assessment = impact_assessment_event(choice_id)
+  assert_acceptance(assessment, "AgentChoice #{choice_id} has no impact assessment")
+  payload = impact_payload(assessment)
+  invalidations = impact_choice_events(choice_id).select do |event|
+    event.type == "AgentChoiceInvalidatedByDecision"
+  end
+  assert_acceptance_equal("invalidated", payload.assessment.outcome, "Impact outcome")
+  assert_acceptance_equal("blocking_policy_introduced", payload.assessment.reason, "Impact reason")
+  assert_acceptance_equal(1, invalidations.length, "Terminal invalidation count")
+  assert_acceptance_equal(@impact_saga.fetch(:started).id, assessment.causation_id, "Assessment parent")
+  assert_acceptance_equal(
+    @impact_saga.fetch(:started).id,
+    invalidations.sole.causation_id,
+    "Invalidation parent"
+  )
+  assert_acceptance_equal(@impact_source.correlation_id, assessment.correlation_id, "Saga correlation")
+end
+
+Then(
+  "Attempt {string} has no projected impacts while AgentChoice {string} remains accepted"
+) do |attempt_id, choice_id|
+  page = impact_page(attempt_id:)
+  choice = agent_choice_view(choice_id).dig("data", "choice")
+  assert_acceptance_equal([], page.fetch("items"), "Unprojected impact page")
+  assert_acceptance_equal(false, page.fetch("has_more"), "Unprojected impact continuation")
+  assert_acceptance_equal("accepted", choice.fetch("observation_status"), "Lagging Choice status")
+end
+
+When("the impact assessment for {string} reaches the read side") do |choice_id|
+  project_impact_assessment(choice_id)
+end
+
+Then(
+  "Attempt {string} exposes the invalidating assessment while AgentChoice {string} remains accepted"
+) do |attempt_id, choice_id|
+  item = impact_page(attempt_id:).fetch("items").sole
+  choice = agent_choice_view(choice_id).dig("data", "choice")
+  assert_acceptance_equal(choice_id, item.fetch("choice_id"), "Impact Choice ID")
+  assert_acceptance_equal("invalidated", item.fetch("outcome"), "Projected impact outcome")
+  assert_acceptance_equal("guidance-host", item.dig("source_actor", "id"), "Decision source actor")
+  assert_acceptance_equal(
+    "agent-choice-decision-impact",
+    item.dig("assessment_evidence", "actor", "id"),
+    "Assessment actor"
+  )
+  assert_acceptance_equal("accepted", choice.fetch("observation_status"), "Independently lagging Choice")
+  assert_acceptance(
+    (choice.keys & %w[active fresh pending projection_status stream_revision]).empty?,
+    "Lagging Choice must not expose a freshness gate"
+  )
+end
+
+When("the invalidation for AgentChoice {string} reaches the read side") do |choice_id|
+  project_choice_invalidation(choice_id)
+end
+
+Then(
+  "AgentChoice {string} is invalidated and tells the agent to resolve current Decisions"
+) do |choice_id|
+  payload = agent_choice_view(choice_id)
+  choice = payload.dig("data", "choice")
+  action = payload.fetch("next_actions").sole
+  assert_acceptance_equal("invalidated", choice.fetch("observation_status"), "Choice status")
+  assert_acceptance_equal("blocking_policy_introduced", choice.dig("invalidation", "reason"), "Invalidation")
+  assert_acceptance_equal("decision_resolve", action.fetch("tool"), "Recovery tool")
+  assert_acceptance_equal("testing.framework", action.dig("arguments", "topic_id"), "Recovery topic")
+  assert_acceptance(
+    (choice.keys & %w[active fresh pending projection_status stream_revision]).empty?,
+    "Invalidated Choice must not expose a freshness gate"
+  )
+end
+
+Then(
+  "one still-valid assessment and no invalidation are durable for {string}"
+) do |choice_id|
+  assessment = impact_assessment_event(choice_id)
+  assert_acceptance(assessment, "AgentChoice #{choice_id} has no impact assessment")
+  payload = impact_payload(assessment)
+  invalidations = impact_choice_events(choice_id).select do |event|
+    event.type == "AgentChoiceInvalidatedByDecision"
+  end
+  assert_acceptance_equal("still_valid", payload.assessment.outcome, "Impact outcome")
+  assert_acceptance_equal("compliant_or_advisory", payload.assessment.reason, "Impact reason")
+  assert_acceptance_equal([], invalidations, "Compatible Choice invalidations")
+end
+
+Then(
+  "Attempt {string} exposes a still-valid assessment and AgentChoice {string} remains accepted"
+) do |attempt_id, choice_id|
+  item = impact_page(attempt_id:).fetch("items").sole
+  choice = agent_choice_view(choice_id).dig("data", "choice")
+  assert_acceptance_equal(choice_id, item.fetch("choice_id"), "Impact Choice ID")
+  assert_acceptance_equal("still_valid", item.fetch("outcome"), "Impact outcome")
+  assert_acceptance_equal("accepted", choice.fetch("observation_status"), "Compatible Choice status")
+  assert_acceptance_equal(nil, choice.fetch("invalidation"), "Compatible Choice invalidation")
+end
+
+When(
+  "the agent records {int} testing-framework choices starting at {string} through Tasks"
+) do |count, prefix|
+  @impact_choices = Array.new(count) do |index|
+    record_testing_framework_choice(
+      choice_id: "#{prefix}-#{index + 1}",
+      option_id: "rspec"
+    )
+  end
+end
+
+Then("all impact-test choices have accepted authoritative facts") do
+  @impact_choices.each do |choice|
+    state = choice.fetch(:state)
+    choice_id = choice.fetch(:choice_id)
+    assert_acceptance_equal("completed", state.dig("result", "status"), "Choice Task status")
+    assert_acceptance_equal(false, state.dig("result", "result", "isError"), "Choice Task error")
+    assert_acceptance_equal(
+      %w[AgentChoiceRecorded AgentChoiceAccepted],
+      impact_choice_events(choice_id).map(&:type),
+      "Authoritative Choice facts"
+    )
+  end
+end
+
+When("all impact-test AgentChoices reach the read side") do
+  @impact_choices.each do |choice|
+    choice_id = choice.fetch(:choice_id)
+    project_agent_choice_event(choice_id, "AgentChoiceRecorded")
+    project_agent_choice_event(choice_id, "AgentChoiceAccepted")
+  end
+end
+
+Then("every impact-test Choice has one assessment and one invalidation") do
+  @impact_choices.each do |choice|
+    choice_id = choice.fetch(:choice_id)
+    assessment = impact_assessment_event(choice_id)
+    invalidations = impact_choice_events(choice_id).count do |event|
+      event.type == "AgentChoiceInvalidatedByDecision"
+    end
+    assert_acceptance(assessment, "AgentChoice #{choice_id} has no assessment")
+    assert_acceptance_equal(1, invalidations, "AgentChoice #{choice_id} invalidations")
+  end
+end
+
+When("all impact-test assessments reach the read side") do
+  @impact_choices.each do |choice|
+    choice_id = choice.fetch(:choice_id)
+    project_impact_assessment(choice_id)
+    project_impact_assessment(choice_id)
+  end
+end
+
+Then(
+  "the agent retrieves every impact once in two-item pages for Attempt {string}"
+) do |attempt_id|
+  first = impact_page(attempt_id:, limit: 2)
+  second = impact_page(
+    attempt_id:,
+    after_global_position: first.fetch("next_global_position"),
+    limit: 2
+  )
+  expected = @impact_choices.map { _1.fetch(:choice_id) }
+  observed = [ *first.fetch("items"), *second.fetch("items") ].map { _1.fetch("choice_id") }
+  assert_acceptance_equal(true, first.fetch("has_more"), "First impact-page continuation")
+  assert_acceptance(first.fetch("next_global_position"), "First impact page has no cursor")
+  assert_acceptance_equal(false, second.fetch("has_more"), "Final impact-page continuation")
+  assert_acceptance_equal(nil, second.fetch("next_global_position"), "Final impact cursor")
+  assert_acceptance_equal(expected, observed, "Paginated impact Choice IDs")
+  assert_acceptance_equal(observed, observed.uniq, "Paginated impacts must not duplicate")
 end

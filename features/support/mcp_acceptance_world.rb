@@ -3,6 +3,7 @@
 module McpAcceptanceWorld
   PROTOCOL_VERSION = "2026-07-28"
   TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
+  IMPACT_POLICY_VERSION = "agent-choice-decision-impact/v1"
 
   def tasks_capable=(value)
     @tasks_capable = value
@@ -292,6 +293,311 @@ module McpAcceptanceWorld
     event = agent_choice_events(choice_id).find { _1.type == event_type }
     assert_acceptance(event, "AgentChoice #{choice_id} has no #{event_type} fact")
     Coordinator::Container["projectors.agent_choices_v1"].call(event)
+  end
+
+  def record_testing_framework_choice(choice_id:, option_id:)
+    command_id = "cmd-cuc-choice-record-#{choice_id}"
+    task_id = submit_and_execute(
+      "agent_choice_record",
+      command_id:,
+      actor: { kind: "agent", id: @choice_agent_id },
+      choice_id:,
+      choice_type: "testing.framework",
+      selected: { option_id:, summary: choice_option_summary(option_id) },
+      alternatives: [ alternative_choice(option_id) ],
+      reason_summary: "Use the framework that fits the available coordination policy.",
+      context: @choice_context,
+      decision_context: @choice_decision_context
+    )
+    {
+      choice_id:,
+      command_id:,
+      task_id:,
+      state: task_request("tasks/get", task_id)
+    }
+  end
+
+  def accept_impact_interpretation(decision_id:, option_id:, correction:, advisory:)
+    suffix = correction ? "#{decision_id}-correction" : "#{decision_id}-activation"
+    message_id = "M-CUC-#{suffix}"
+    interpretation_id = "I-CUC-#{suffix}"
+    tasks = []
+    tasks << submit_and_execute(
+      "guidance_record",
+      command_id: "cmd-cuc-impact-guidance-#{suffix}",
+      actor: { kind: "user", id: "user-label" },
+      message_id:,
+      conversation_id: "C-CUC-#{suffix}",
+      source: "mcp_client",
+      text: "Use #{option_id}.",
+      anchors: {
+        repository_ids: [ "billing" ],
+        change_set_id: nil,
+        work_item_id: nil,
+        attempt_id: nil
+      }
+    )
+    tasks << submit_and_execute(
+      "decision_interpretation_propose",
+      **impact_interpretation_arguments(
+        suffix:,
+        message_id:,
+        interpretation_id:,
+        decision_id:,
+        option_id:,
+        correction:,
+        advisory:
+      )
+    )
+    tasks << submit_and_execute(
+      "decision_interpretation_adjudicate",
+      command_id: "cmd-cuc-impact-adjudication-#{suffix}",
+      actor: { kind: "orchestrator", id: "guidance-host" },
+      source_message_id: message_id,
+      interpretation_id:,
+      action: "accept",
+      rationale: {
+        code: "user_confirmed",
+        summary: "The impact policy matches the intended guidance."
+      },
+      clarification: nil
+    )
+    tasks.each { assert_successful_task(_1, "Impact interpretation setup") }
+    { interpretation_id:, message_id: }
+  end
+
+  def activate_impact_decision(decision_id:, option_id:, available:)
+    candidate = accept_impact_interpretation(
+      decision_id:,
+      option_id:,
+      correction: false,
+      advisory: false
+    )
+    task_id = submit_and_execute(
+      "decision_activate",
+      command_id: "cmd-cuc-impact-activate-#{decision_id}",
+      actor: { kind: "orchestrator", id: "guidance-host" },
+      decision_id:,
+      interpretation_id: candidate.fetch(:interpretation_id),
+      rationale: { code: "user_confirmed", summary: "Activate the accepted impact policy." }
+    )
+    assert_successful_task(task_id, "Impact Decision activation")
+    source = decision_events(decision_id).find { _1.type == "DecisionActivated" }
+    assert_acceptance(source, "Decision #{decision_id} has no activation source")
+    if available
+      project_decision_recorded(decision_id)
+      project_remaining_decision_facts(decision_id)
+    end
+    source
+  end
+
+  def correct_impact_decision(decision_id:, option_id:)
+    candidate = accept_impact_interpretation(
+      decision_id:,
+      option_id:,
+      correction: true,
+      advisory: true
+    )
+    expected_head = decision_view(decision_id).dig("data", "decision", "current_head", "event")
+    assert_acceptance(expected_head, "Decision #{decision_id} has no available correction head")
+    task_id = submit_and_execute(
+      "decision_correct",
+      command_id: "cmd-cuc-impact-correct-#{decision_id}",
+      actor: { kind: "orchestrator", id: "guidance-host" },
+      decision_id:,
+      interpretation_id: candidate.fetch(:interpretation_id),
+      expected_head:,
+      rationale: {
+        code: "normalization_corrected",
+        summary: "Apply the compatible active-attempt correction."
+      }
+    )
+    assert_successful_task(task_id, "Impact Decision correction")
+    source = decision_events(decision_id).find { _1.type == "DecisionDefinitionCorrected" }
+    assert_acceptance(source, "Decision #{decision_id} has no correction source")
+    source
+  end
+
+  def drive_impact_saga(source)
+    process_manager = Coordinator::Container["process_managers.agent_choice_decision_impact"]
+    process_manager.call(source)
+    started = impact_scan_events(source).find { _1.type == "AgentChoiceImpactScanStarted" }
+    assert_acceptance(started, "Decision change #{source.id} did not start an impact scan")
+    process_manager.call(started)
+    process_manager.call(source)
+    process_manager.call(started)
+    completed = impact_scan_events(source).find { _1.type == "AgentChoiceImpactScanCompleted" }
+    assert_acceptance(completed, "Decision change #{source.id} did not complete its impact scan")
+    { started:, completed: }
+  end
+
+  def impact_scan_events(source)
+    scan_id = Coordinator::Write::AgentChoiceImpacts::ScanIdentityBuilder.new.start(
+      source_event: impact_event_reference(source),
+      policy_version: IMPACT_POLICY_VERSION
+    )
+    event_store.read_grouped(
+      streams.agent_choice_impact_scan(scan_id),
+      Coordinator::Write::EventQueries::AGENT_CHOICE_IMPACT_SCAN_STATE
+    )
+  end
+
+  def impact_choice_events(choice_id)
+    event_store.read(
+      streams.agent_choice(choice_id),
+      Coordinator::Write::EventQueries::AGENT_CHOICE_FOR_IMPACT
+    )
+  end
+
+  def impact_assessment_event(choice_id, source = @impact_source)
+    accepted = impact_choice_events(choice_id).find { _1.type == "AgentChoiceAccepted" }
+    assert_acceptance(accepted, "AgentChoice #{choice_id} has no accepted source")
+    assessment_id = Coordinator::Write::AgentChoiceImpacts::AssessmentIdentityBuilder.new.call(
+      accepted_choice: impact_event_reference(accepted),
+      decision_change: impact_event_reference(source),
+      policy_version: IMPACT_POLICY_VERSION
+    )
+    event_store.read(
+      streams.agent_choice_impact(assessment_id),
+      Coordinator::Write::EventQueries::AGENT_CHOICE_IMPACT_ASSESSMENT
+    ).first
+  end
+
+  def impact_payload(event)
+    Coordinator::Container["event_schema_registry"].load(
+      type: event.type,
+      schema_version: event.metadata.fetch("schema_version"),
+      data: event.data
+    )
+  end
+
+  def project_impact_assessment(choice_id)
+    event = impact_assessment_event(choice_id)
+    assert_acceptance(event, "AgentChoice #{choice_id} has no impact assessment")
+    Coordinator::Container["projectors.agent_choice_impacts_v1"].call(event)
+  end
+
+  def project_choice_invalidation(choice_id)
+    event = impact_choice_events(choice_id).find { _1.type == "AgentChoiceInvalidatedByDecision" }
+    assert_acceptance(event, "AgentChoice #{choice_id} has no invalidation")
+    Coordinator::Container["projectors.agent_choice_impacts_v1"].call(event)
+  end
+
+  def impact_page(attempt_id:, after_global_position: nil, limit: 20)
+    arguments = { attempt_id:, limit: }
+    arguments[:after_global_position] = after_global_position if after_global_position
+    call_tool("agent_choice_impact_list", arguments)
+      .dig("result", "structuredContent", "data", "page")
+  end
+
+  def impact_event_reference(event)
+    Coordinator::Write::EventReference.new(
+      event_id: event.id,
+      type: event.type,
+      stream_context: event.stream.context,
+      stream_name: event.stream.stream_name,
+      stream_id: event.stream.stream_id,
+      stream_revision: event.stream_revision
+    )
+  end
+
+  def impact_interpretation_arguments(
+    suffix:,
+    message_id:,
+    interpretation_id:,
+    decision_id:,
+    option_id:,
+    correction:,
+    advisory:
+  )
+    {
+      command_id: "cmd-cuc-impact-proposal-#{suffix}",
+      actor: { kind: "agent", id: "classifier-impact" },
+      interpretation_id:,
+      source_message_id: message_id,
+      source_span: {
+        start_character: 4,
+        end_character: 4 + option_id.length,
+        text: option_id
+      },
+      classifier: {
+        id: "classifier-impact",
+        version: "decision-classifier-v1",
+        ontology_version: 1,
+        confidence_millionths: 950_000
+      },
+      proposed_decision: {
+        statement_kind: advisory ? "preference" : "directive",
+        topic_id: "testing.framework",
+        effect: advisory ? "prefer" : "require",
+        modality: advisory ? "should" : "must",
+        value: {
+          schema: "named-choice/v1",
+          name: option_id,
+          items: nil,
+          target_kind: nil,
+          target_id: nil,
+          action: nil
+        },
+        scope: impact_repository_scope,
+        conditions: {
+          phases: [ "implementation" ],
+          languages: [ "ruby" ],
+          tags: [],
+          repository_kinds: [],
+          artifact_kinds: [],
+          environments: []
+        },
+        validity: { valid_from: nil, valid_until: nil, until_event: nil },
+        authority: { actor_id: "user-label", role: "project-owner" },
+        enforcement: {
+          level: advisory ? "advisory" : "implementation_gate",
+          retroactivity: "active_attempts",
+          on_violation: advisory ? "warn" : "block"
+        },
+        relations: {
+          corrects: correction ? [ decision_id ] : [],
+          supersedes: [],
+          exception_to: [],
+          revokes: []
+        }
+      },
+      ambiguities: []
+    }
+  end
+
+  def impact_repository_scope
+    {
+      workspace_id: nil,
+      repository_ids: [ "billing" ],
+      branch_selectors: [],
+      change_set_id: nil,
+      work_item_id: nil,
+      attempt_id: nil,
+      candidate_id: nil,
+      path_selectors: [],
+      symbol_selectors: [],
+      contract_selectors: [],
+      schema_selectors: [],
+      environments: [],
+      agent_roles: []
+    }
+  end
+
+  def assert_successful_task(task_id, context)
+    state = task_request("tasks/get", task_id)
+    assert_acceptance_equal("completed", state.dig("result", "status"), "#{context} status")
+    assert_acceptance_equal(false, state.dig("result", "result", "isError"), "#{context} error")
+    state
+  end
+
+  def choice_option_summary(option_id)
+    option_id == "rspec" ? "RSpec" : option_id.capitalize
+  end
+
+  def alternative_choice(option_id)
+    alternative = option_id == "rspec" ? "minitest" : "rspec"
+    { option_id: alternative, summary: choice_option_summary(alternative) }
   end
 
   def accept_correction_interpretation(decision_id:, interpretation_id:, message_id:, value:, suffix:)
