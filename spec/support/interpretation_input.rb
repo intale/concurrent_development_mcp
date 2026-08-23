@@ -14,6 +14,7 @@ module InterpretationInput
     modality: "should",
     value: named_choice("rspec"),
     scope: nil,
+    conditions: default_conditions,
     validity: { valid_from: nil, valid_until: nil, until_event: nil },
     enforcement: advisory_enforcement,
     relations: { corrects: [], supersedes: [], exception_to: [], revokes: [] },
@@ -38,14 +39,7 @@ module InterpretationInput
         modality:,
         value:,
         scope:,
-        conditions: {
-          phases: [ "implementation" ],
-          languages: [ "ruby" ],
-          tags: [],
-          repository_kinds: [],
-          artifact_kinds: [],
-          environments: []
-        },
+        conditions:,
         validity:,
         authority: { actor_id: "user-label", role: "project-owner" },
         enforcement:,
@@ -82,6 +76,55 @@ module InterpretationInput
       level: "advisory",
       retroactivity: "future_only",
       on_violation: "warn"
+    }
+  end
+
+  def impact_policy(
+    level:,
+    required_evidence: [ "combined_tests" ],
+    change_set_id: "CS-1",
+    **overrides
+  )
+    build(**impact_policy_attributes(level:, required_evidence:, change_set_id:).merge(overrides))
+  end
+
+  def impact_policy_attributes(level:, required_evidence: [ "combined_tests" ], change_set_id: "CS-1")
+    {
+      statement_kind: "directive",
+      topic_id: "candidate.impact_policy",
+      effect: "require",
+      modality: "must",
+      value: string_set(required_evidence),
+      scope: scope(change_set_id:),
+      conditions: empty_conditions,
+      validity: { valid_from: nil, valid_until: nil, until_event: nil },
+      enforcement: {
+        level:,
+        retroactivity: "all_unmerged_candidates",
+        on_violation: %w[verification_gate merge_gate].include?(level) ? "block" : "warn"
+      }
+    }
+  end
+
+  def default_conditions
+    {
+      phases: [ "implementation" ],
+      languages: [ "ruby" ],
+      tags: [],
+      repository_kinds: [],
+      artifact_kinds: [],
+      environments: []
+    }
+  end
+
+  def empty_conditions
+    {
+      phases: [],
+      languages: [],
+      tags: [],
+      repository_kinds: [],
+      artifact_kinds: [],
+      environments: []
     }
   end
 

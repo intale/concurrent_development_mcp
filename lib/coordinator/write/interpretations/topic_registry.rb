@@ -5,6 +5,18 @@ module Coordinator::Write
     class TopicRegistry
       DEFINITIONS = [
         TopicDefinitionV1.new(
+          topic_id: "candidate.impact_policy",
+          parent_topic_id: "candidate.impact",
+          value_schema: "string-set/v1",
+          resolution_strategy: "single_choice",
+          inheritable: false,
+          default_modality: "must",
+          default_enforcement: "disabled",
+          conflict_dimension: "candidate_impact_policy",
+          ontology_version: 1,
+          aliases: []
+        ),
+        TopicDefinitionV1.new(
           topic_id: "testing.framework",
           parent_topic_id: "testing",
           value_schema: "named-choice/v1",

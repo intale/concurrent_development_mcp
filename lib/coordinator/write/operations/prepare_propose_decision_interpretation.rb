@@ -3,14 +3,20 @@
 module Coordinator::Write
   module Operations
     class PrepareProposeDecisionInterpretation < Dry::Operation
-      def initialize(contract: Contracts::ProposeDecisionInterpretation.new)
+      def initialize(
+        contract: Contracts::ProposeDecisionInterpretation.new,
+        topic_policy_contract: Contracts::CandidateImpactPolicyProposal.new
+      )
         @contract = contract
+        @topic_policy_contract = topic_policy_contract
       end
 
       def call(input)
         attributes = step validate(input)
 
-        step build_command(attributes)
+        command = step build_command(attributes)
+
+        step validate_topic_policy(command)
       end
 
       private
@@ -40,6 +46,19 @@ module Coordinator::Write
             classifier: build_classifier(attributes.fetch(:classifier)),
             proposed_decision: build_proposed_decision(attributes.fetch(:proposed_decision)),
             ambiguities: attributes.fetch(:ambiguities).map { build_ambiguity(_1) }
+          )
+        )
+      end
+
+      def validate_topic_policy(command)
+        result = @topic_policy_contract.call(decision: command.proposed_decision)
+        return Success(command) if result.success?
+
+        Failure(
+          OutcomeError.new(
+            code: :invalid_input,
+            message: "ProposeDecisionInterpretation topic policy is invalid",
+            details: { proposed_decision: result.errors.to_h.fetch(:decision) }
           )
         )
       end

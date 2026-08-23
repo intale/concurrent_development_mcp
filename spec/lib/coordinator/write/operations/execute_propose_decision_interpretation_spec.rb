@@ -113,6 +113,27 @@ RSpec.describe Coordinator::Write::Operations::ExecuteProposeDecisionInterpretat
     expect(inputs.all? { command_events(_1.fetch(:command_id)).one? }).to be(true)
   end
 
+  it "accepts every exact Candidate impact policy level through the public preparer" do
+    levels = Coordinator::Shared::Types::CANDIDATE_IMPACT_POLICY_ENFORCEMENT_LEVELS
+    results = levels.each_with_index.map do |level, index|
+      operation.call(
+        InterpretationInput.impact_policy(
+          level:,
+          command_id: "cmd-impact-policy-#{index}",
+          interpretation_id: "I-impact-policy-#{index}",
+          source_message_id: "M-1",
+          required_evidence: %w[combined_tests contract_compatibility_review]
+        )
+      )
+    end
+
+    expect(results).to all(be_success)
+    proposals = interpretation_events("M-1").select { _1.type == "DecisionInterpretationProposed" }
+    expect(proposals.map { _1.data.dig("proposed_decision", "enforcement", "level") }).to eq(levels)
+    expect(proposals.map { _1.data.dig("assessment", "status") }.uniq).to eq([ "confirmation_required" ])
+    expect(levels.each_index.all? { command_events("cmd-impact-policy-#{_1}").one? }).to be(true)
+  end
+
   it "serializes a concurrent global interpretation ID claim" do
     record_guidance(
       command_id: "cmd-guidance-2",

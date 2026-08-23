@@ -194,6 +194,43 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
     expect(results.map { _1.value!.data.partitions.sole.partition_revision }.sort).to eq([ 0, 1 ])
   end
 
+  it "activates every exact Candidate impact policy into its ChangeSet Candidate partition" do
+    levels = Coordinator::Shared::Types::CANDIDATE_IMPACT_POLICY_ENFORCEMENT_LEVELS
+
+    results = levels.each_with_index.map do |level, index|
+      suffix = "impact-#{index}"
+      change_set_id = "CS-impact-#{index}"
+      seed_accepted_interpretation(
+        interpretation_id: "I-#{suffix}",
+        message_id: "M-#{suffix}",
+        command_suffix: suffix,
+        **InterpretationInput.impact_policy_attributes(level:, change_set_id:)
+      )
+      operation.call(
+        InterpretationInput.activation(
+          command_id: "cmd-activate-#{suffix}",
+          decision_id: "D-#{suffix}",
+          interpretation_id: "I-#{suffix}"
+        )
+      )
+    end
+
+    expect(results).to all(be_success)
+    results.each_with_index do |result, index|
+      level = levels.fetch(index)
+      recorded = load(decision_events("D-impact-#{index}").first)
+      expect(recorded.definition.document).to have_attributes(
+        topic_root: "candidate",
+        enforcement: have_attributes(level:)
+      )
+      expect(result.value!.data.partitions.sole.partition).to have_attributes(
+        partition_id: "changeset:CS-impact-#{index}:candidate",
+        anchor_kind: "changeset",
+        anchor_id: "CS-impact-#{index}"
+      )
+    end
+  end
+
   it "denies an activation that would exceed the bounded active-head snapshot" do
     seed_accepted_interpretation(
       interpretation_id: "I-A",

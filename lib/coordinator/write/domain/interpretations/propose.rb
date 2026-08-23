@@ -10,6 +10,7 @@ module Coordinator::Write
           stream_factory: StreamFactory.new,
           topic_registry: Coordinator::Write::Interpretations::TopicRegistry.new,
           topic_value_contract: Contracts::InterpretationTopicValue.new,
+          topic_policy_contract: Contracts::CandidateImpactPolicyProposal.new,
           source_contract: Contracts::InterpretationSourceEvidence.new,
           scope_resolver: ScopeResolver.new,
           assessment: ProposalAssessment.new
@@ -17,6 +18,7 @@ module Coordinator::Write
           @stream_factory = stream_factory
           @topic_registry = topic_registry
           @topic_value_contract = topic_value_contract
+          @topic_policy_contract = topic_policy_contract
           @source_contract = source_contract
           @scope_resolver = scope_resolver
           @assessment = assessment
@@ -84,7 +86,10 @@ module Coordinator::Write
             expected_schema: definition.value_schema,
             value_schema: command.proposed_decision.value.schema
           )
-          return Success() if result.success?
+          if result.success?
+            result = @topic_policy_contract.call(decision: command.proposed_decision)
+            return Success() if result.success?
+          end
 
           Failure(
             OutcomeError.new(

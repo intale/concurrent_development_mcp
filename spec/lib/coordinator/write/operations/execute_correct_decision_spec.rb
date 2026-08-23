@@ -186,6 +186,40 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
     expect(decision_events("D-1").map(&:type)).to eq(%w[DecisionRecorded DecisionActivated])
   end
 
+  it "corrects one Candidate impact policy head within the exact ChangeSet partition" do
+    activation = seed_active_decision(
+      **InterpretationInput.impact_policy_attributes(
+        level: "advisory",
+        change_set_id: "CS-impact-policy"
+      )
+    )
+    seed_correction(
+      **InterpretationInput.impact_policy_attributes(
+        level: "merge_gate",
+        required_evidence: %w[combined_tests security_review],
+        change_set_id: "CS-impact-policy"
+      )
+    )
+
+    result = operation.call(InterpretationInput.correction(expected_head: reference(activation)))
+
+    expect(result).to be_success
+    corrected = load(decision_events("D-1").last)
+    expect(corrected.definition.document).to have_attributes(
+      topic_root: "candidate",
+      enforcement: have_attributes(
+        level: "merge_gate",
+        retroactivity: "all_unmerged_candidates",
+        on_violation: "block"
+      )
+    )
+    expect(corrected.definition.document.value.items).to eq(%w[combined_tests security_review])
+    expect(partition_events("changeset:CS-impact-policy:candidate").map(&:stream_revision)).to eq([ 0, 1 ])
+    expect(load(partition_events("changeset:CS-impact-policy:candidate").last).active_decisions).to contain_exactly(
+      have_attributes(decision_id: "D-1", decision_revision: 2)
+    )
+  end
+
   it "denies a correction that would exceed the bounded active-head snapshot" do
     activation = seed_active_decision(
       topic_id: "testing.required_suites",

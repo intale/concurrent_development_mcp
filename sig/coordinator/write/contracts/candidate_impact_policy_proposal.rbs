@@ -1,0 +1,12 @@
+module Coordinator::Write
+  module Contracts
+    class CandidateImpactPolicyProposal
+      TOPIC_ID: String
+      GATE_LEVELS: Array[String]
+
+      def call: (
+        decision: Coordinator::Write::Interpretations::SubmittedDecisionV1
+      ) -> Dry::Validation::Result
+    end
+  end
+end

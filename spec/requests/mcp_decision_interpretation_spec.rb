@@ -252,6 +252,25 @@ RSpec.describe "GDN-02/03 MCP interpretation lifecycle", :event_store, :read_mod
     expect(malformed.dig("error", "data", "code")).to eq("invalid_input")
     expect(malformed.dig("error", "data", "details")).to include("clarification")
     expect(task_events_for_command(malformed_arguments.fetch(:command_id))).to be_empty
+
+    invalid_policy = InterpretationInput.impact_policy(
+      level: "verification_gate",
+      command_id: "cmd-mcp-impact-policy-invalid",
+      interpretation_id: "I-mcp-impact-policy-invalid",
+      source_message_id: "M-mcp-interpretation"
+    )
+    invalid_policy[:proposed_decision][:enforcement][:on_violation] = "warn"
+    rejected_policy = call_tool(
+      "decision_interpretation_propose",
+      invalid_policy,
+      id: 4,
+      expected_status: 400
+    )
+
+    expect(rejected_policy.dig("error", "code")).to eq(-32_602)
+    expect(rejected_policy.dig("error", "data", "code")).to eq("invalid_input")
+    expect(rejected_policy.dig("error", "data", "details")).to include("proposed_decision")
+    expect(task_events_for_command(invalid_policy.fetch(:command_id))).to be_empty
   end
 
   def call_tool(name, tool_arguments, id:, expected_status: 200)

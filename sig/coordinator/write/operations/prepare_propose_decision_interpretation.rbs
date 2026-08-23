@@ -2,7 +2,10 @@ module Coordinator
   module Write
     module Operations
       class PrepareProposeDecisionInterpretation
-        def initialize: (?contract: Contracts::ProposeDecisionInterpretation) -> void
+        def initialize: (
+          ?contract: Contracts::ProposeDecisionInterpretation,
+          ?topic_policy_contract: Contracts::CandidateImpactPolicyProposal
+        ) -> void
         %a{rbs:test:skip}
         def call: (command_input input) -> Dry::Monads::Result
       end

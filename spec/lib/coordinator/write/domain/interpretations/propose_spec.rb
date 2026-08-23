@@ -236,4 +236,22 @@ RSpec.describe Coordinator::Write::Domain::Interpretations::Propose do
       interpretation_already_proposed
     ])
   end
+
+  it "defends the Candidate impact policy invariant when a typed command bypasses public preparation" do
+    valid = command(InterpretationInput.impact_policy(level: "verification_gate"))
+    invalid_enforcement = Coordinator::Write::Interpretations::DecisionEnforcementV1.new(
+      valid.proposed_decision.enforcement.to_h.merge(on_violation: "warn")
+    )
+    invalid_decision = Coordinator::Write::Interpretations::SubmittedDecisionV1.new(
+      valid.proposed_decision.to_h.merge(enforcement: invalid_enforcement)
+    )
+    invalid_command = Coordinator::Write::Commands::ProposeDecisionInterpretation.new(
+      valid.to_h.merge(proposed_decision: invalid_decision)
+    )
+
+    result = decider.call(state: state, command: invalid_command, proposed_at:)
+
+    expect(result).to be_failure
+    expect(result.failure).to have_attributes(code: :topic_value_invalid)
+  end
 end

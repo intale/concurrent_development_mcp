@@ -197,6 +197,19 @@ module Coordinator::Shared
     CANDIDATE_IMPACT_INDEX_ROLES = %w[source target].freeze
     CANDIDATE_IMPACT_INDEX_KINDS = %w[path semantic].freeze
     CANDIDATE_IMPACT_INDEX_BUCKETS = ("0".."9").to_a.concat(("a".."f").to_a).freeze
+    CANDIDATE_IMPACT_POLICY_ENFORCEMENT_LEVELS = %w[
+      disabled
+      advisory
+      verification_gate
+      merge_gate
+    ].freeze
+    CANDIDATE_IMPACT_REQUIRED_EVIDENCE_KINDS = %w[
+      combined_tests
+      agent_compatibility_review
+      contract_compatibility_review
+      schema_migration_review
+      security_review
+    ].freeze
     DECISION_ACTIVATION_INELIGIBILITY_REASONS = %w[
       non_normative_statement_kind
       missing_effect
@@ -221,6 +234,7 @@ module Coordinator::Shared
     SCOPE_ANCHOR_LEVELS = %w[workspace repository change_set work_item attempt unresolved].freeze
     DECISION_PHASES = %w[planning implementation verification integration deployment].freeze
     ENFORCEMENT_LEVELS = %w[
+      disabled
       advisory
       planning_gate
       implementation_gate
@@ -240,6 +254,7 @@ module Coordinator::Shared
     MERGE_TARGET_KINDS = %w[candidate change_set repository].freeze
     MERGE_ACTIONS = %w[defer approve reject].freeze
     SUPPORTED_INTERPRETATION_TOPICS = %w[
+      candidate.impact_policy
       testing.framework
       testing.required_suites
       implementation.dependencies.forbidden
@@ -346,6 +361,10 @@ module Coordinator::Shared
     CandidateImpactIndexRole = String.enum(*CANDIDATE_IMPACT_INDEX_ROLES)
     CandidateImpactIndexKind = String.enum(*CANDIDATE_IMPACT_INDEX_KINDS)
     CandidateImpactIndexBucket = String.enum(*CANDIDATE_IMPACT_INDEX_BUCKETS)
+    CandidateImpactPolicyEnforcementLevel = String.enum(*CANDIDATE_IMPACT_POLICY_ENFORCEMENT_LEVELS)
+    CandidateImpactRequiredEvidenceKind = String.enum(*CANDIDATE_IMPACT_REQUIRED_EVIDENCE_KINDS)
+    CandidateImpactRequiredEvidenceKinds = Array.of(CandidateImpactRequiredEvidenceKind)
+      .constrained(min_size: 1, max_size: 8)
     CandidateEvidenceRevision = Integer.enum(1)
     CandidateManifestSize = Integer.constrained(gteq: 1, lteq: 256)
     CandidateBuildInputCount = Integer.constrained(gteq: 0, lteq: 64)

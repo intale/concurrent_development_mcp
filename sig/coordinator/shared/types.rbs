@@ -56,6 +56,8 @@ module Coordinator
       CANDIDATE_IMPACT_INDEX_ROLES: Array[String]
       CANDIDATE_IMPACT_INDEX_KINDS: Array[String]
       CANDIDATE_IMPACT_INDEX_BUCKETS: Array[String]
+      CANDIDATE_IMPACT_POLICY_ENFORCEMENT_LEVELS: Array[String]
+      CANDIDATE_IMPACT_REQUIRED_EVIDENCE_KINDS: Array[String]
       DECISION_ACTIVATION_INELIGIBILITY_REASONS: Array[String]
       DECISION_CORRECTION_INELIGIBILITY_REASONS: Array[String]
       SCOPE_PROVENANCE_KINDS: Array[String]
@@ -147,6 +149,9 @@ module Coordinator
       CandidateImpactIndexRole: untyped
       CandidateImpactIndexKind: untyped
       CandidateImpactIndexBucket: untyped
+      CandidateImpactPolicyEnforcementLevel: untyped
+      CandidateImpactRequiredEvidenceKind: untyped
+      CandidateImpactRequiredEvidenceKinds: untyped
       CandidateEvidenceRevision: untyped
       CandidateManifestSize: untyped
       CandidateBuildInputCount: untyped

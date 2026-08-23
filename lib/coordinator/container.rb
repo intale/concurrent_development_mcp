@@ -13,6 +13,9 @@ module Coordinator
     register("interpretations.topic_registry", memoize: true) do
       Write::Interpretations::TopicRegistry.new
     end
+    register("contracts.candidate_impact_policy_proposal", memoize: true) do
+      Write::Contracts::CandidateImpactPolicyProposal.new
+    end
 
     register("interpretations.slot_builder", memoize: true) do
       Write::Interpretations::InterpretationSlotBuilder.new(
@@ -75,7 +78,9 @@ module Coordinator
     end
 
     register("operations.prepare_propose_decision_interpretation", memoize: true) do
-      Write::Operations::PrepareProposeDecisionInterpretation.new
+      Write::Operations::PrepareProposeDecisionInterpretation.new(
+        topic_policy_contract: self["contracts.candidate_impact_policy_proposal"]
+      )
     end
 
     register("operations.prepare_adjudicate_decision_interpretation", memoize: true) do
@@ -153,7 +158,8 @@ module Coordinator
     register("domain.interpretations.propose", memoize: true) do
       Write::Domain::Interpretations::Propose.new(
         stream_factory: self["stream_factory"],
-        topic_registry: self["interpretations.topic_registry"]
+        topic_registry: self["interpretations.topic_registry"],
+        topic_policy_contract: self["contracts.candidate_impact_policy_proposal"]
       )
     end
 
