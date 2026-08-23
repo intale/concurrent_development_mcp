@@ -43,6 +43,8 @@ module Coordinator::Write
       [ "AgentChoiceImpactScanSkipped", 1 ] => Events::AgentChoiceImpactScanSkippedV1,
       [ "AgentChoiceImpactScanProgressed", 1 ] => Events::AgentChoiceImpactScanProgressedV1,
       [ "AgentChoiceImpactScanCompleted", 1 ] => Events::AgentChoiceImpactScanCompletedV1,
+      [ "AgentChoiceImpactAssessed", 1 ] => Events::AgentChoiceImpactAssessedV1,
+      [ "AgentChoiceInvalidatedByDecision", 1 ] => Events::AgentChoiceInvalidatedByDecisionV1,
       [ "CoordinationTaskSubmitted", 1 ] => Events::CoordinationTaskSubmittedV1,
       [ "CoordinationTaskExecutionStarted", 1 ] => Events::CoordinationTaskExecutionStartedV1,
       [ "CoordinationTaskCompleted", 1 ] => Events::CoordinationTaskCompletedV1,

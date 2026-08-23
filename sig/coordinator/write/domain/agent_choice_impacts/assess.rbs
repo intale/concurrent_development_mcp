@@ -1,0 +1,19 @@
+module Coordinator
+  module Write
+    module Domain
+      module AgentChoiceImpacts
+        class Assess
+          INVALIDATION_REASONS: Hash[String, String]
+
+          def initialize: (?stream_factory: StreamFactory) -> void
+          def call: (
+            state: AssessmentState,
+            command: Commands::AssessAgentChoiceDecisionImpact,
+            assessed_at: String,
+            assessment_event: EventReference
+          ) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

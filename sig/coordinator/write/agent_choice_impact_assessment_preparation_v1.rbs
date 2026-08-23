@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    class AgentChoiceImpactAssessmentPreparationV1 < Shared::Value
+      def assessed_at: () -> String
+      def assessment_event_id: () -> String
+      def invalidation_event_id: () -> String
+    end
+  end
+end

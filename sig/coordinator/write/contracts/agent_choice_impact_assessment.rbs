@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Contracts
+      class AgentChoiceImpactAssessment < Dry::Validation::Contract
+        REASONS_BY_OUTCOME: Hash[String, Array[String]]
+      end
+    end
+  end
+end

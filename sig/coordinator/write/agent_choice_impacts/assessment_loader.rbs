@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module AgentChoiceImpacts
+      class AssessmentLoader
+        def initialize: (
+          event_store: _EventStore,
+          ?stream_factory: StreamFactory,
+          ?schema_registry: EventSchemaRegistry,
+          ?assessment_contract: Contracts::AgentChoiceImpactAssessment
+        ) -> void
+        def call: (Commands::AssessAgentChoiceDecisionImpact command) -> PgEventstore::Event?
+      end
+    end
+  end
+end

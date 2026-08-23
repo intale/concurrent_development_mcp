@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module Events
+      class AgentChoiceImpactAssessedV1 < Base
+        def assessment_id: () -> String
+        def choice_id: () -> String
+        def attempt_id: () -> String
+        def accepted_choice: () -> EventReference
+        def decision_change: () -> AgentChoiceImpacts::DecisionChangeEvidenceV1
+        def assessment: () -> AgentChoiceImpacts::AssessmentV1
+        def assessed_at: () -> String
+      end
+    end
+  end
+end

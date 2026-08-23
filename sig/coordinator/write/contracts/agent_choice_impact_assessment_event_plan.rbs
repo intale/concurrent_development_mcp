@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Contracts
+      class AgentChoiceImpactAssessmentEventPlan < Dry::Validation::Contract
+        ASSESSMENT_CONTRACT: AgentChoiceImpactAssessment
+      end
+    end
+  end
+end

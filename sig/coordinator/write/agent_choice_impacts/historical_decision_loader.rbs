@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module AgentChoiceImpacts
+      class HistoricalDecisionLoader
+        def initialize: (
+          event_store: _EventStore,
+          ?stream_factory: StreamFactory,
+          ?schema_registry: EventSchemaRegistry
+        ) -> void
+        def call: (Decisions::DecisionHeadV1 head) -> Decisions::DecisionCurrentStateV1
+      end
+    end
+  end
+end

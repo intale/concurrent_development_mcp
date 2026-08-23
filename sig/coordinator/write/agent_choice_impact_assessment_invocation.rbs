@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    class AgentChoiceImpactAssessmentInvocation < Shared::Value
+      def command: () -> Commands::AssessAgentChoiceDecisionImpact
+      def caused_by: () -> PgEventstore::Event
+      def caused_by_reference: () -> EventReference
+    end
+  end
+end

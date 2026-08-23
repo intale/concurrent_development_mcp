@@ -1,0 +1,19 @@
+module Coordinator
+  module Write
+    module AgentChoiceImpacts
+      class AssessmentV1 < Shared::Value
+        Evaluation: singleton(AgentChoices::PolicyEvaluationV1)
+        Advancement: untyped
+
+        def policy_version: () -> String
+        def before_context_digest: () -> String
+        def after_context_digest: () -> String
+        def before_evaluation: () -> AgentChoices::PolicyEvaluationV1
+        def after_evaluation: () -> AgentChoices::PolicyEvaluationV1
+        def source_advancements: () -> Array[EventReference]
+        def outcome: () -> String
+        def reason: () -> String
+      end
+    end
+  end
+end

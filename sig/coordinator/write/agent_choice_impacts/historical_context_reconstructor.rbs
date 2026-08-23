@@ -1,0 +1,23 @@
+module Coordinator
+  module Write
+    module AgentChoiceImpacts
+      class HistoricalContextReconstructor
+        MAXIMUM_HISTORICAL_HEADS: Integer
+
+        def initialize: (
+          event_store: _EventStore,
+          ?stream_factory: StreamFactory,
+          ?schema_registry: EventSchemaRegistry,
+          ?decision_loader: HistoricalDecisionLoader,
+          ?resolver: DecisionContexts::Resolver,
+          ?context_builder: DecisionContexts::Builder,
+          ?policy_evaluator: Domain::AgentChoices::PolicyEvaluator
+        ) -> void
+        def call: (
+          recorded_choice: Events::AgentChoiceRecordedV1,
+          decision_change: DecisionChangeEvidenceV1
+        ) -> ReconstructionV1
+      end
+    end
+  end
+end

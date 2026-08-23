@@ -1,0 +1,26 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecuteAssessAgentChoiceDecisionImpact
+        def initialize: (
+          event_store: _EventStore,
+          ?source_builder: AgentChoiceImpacts::DecisionChangeEvidenceBuilder,
+          ?choice_loader: AgentChoiceImpacts::ChoiceLoader,
+          ?assessment_loader: AgentChoiceImpacts::AssessmentLoader,
+          ?attempt_loader: AgentChoiceImpacts::AttemptLoader,
+          ?reconstructor: AgentChoiceImpacts::HistoricalContextReconstructor,
+          ?identity_builder: AgentChoiceImpacts::AssessmentIdentityBuilder,
+          ?decider: Domain::AgentChoiceImpacts::Assess,
+          ?clock: Shared::_Clock,
+          ?id_generator: Shared::_IdGenerator,
+          ?event_factory: EventFactory,
+          ?stream_factory: StreamFactory,
+          ?invocation_contract: Contracts::AgentChoiceImpactAssessmentInvocation,
+          ?command_contract: Contracts::AgentChoiceImpactAssessmentCommand,
+          ?event_plan_contract: Contracts::AgentChoiceImpactAssessmentEventPlan
+        ) -> void
+        def call: (AgentChoiceImpactAssessmentInvocation invocation) -> Dry::Monads::Result
+      end
+    end
+  end
+end

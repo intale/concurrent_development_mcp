@@ -1,0 +1,16 @@
+module Coordinator
+  module Write
+    module AgentChoiceImpacts
+      class ReconstructionV1 < Shared::Value
+        Advancement: untyped
+
+        def before_context: () -> DecisionContexts::ContextV1
+        def after_context: () -> DecisionContexts::ContextV1
+        def before_evaluation: () -> AgentChoices::PolicyEvaluationV1
+        def after_evaluation: () -> AgentChoices::PolicyEvaluationV1
+        def source_advancements: () -> Array[EventReference]
+        def source_already_observed: () -> bool
+      end
+    end
+  end
+end

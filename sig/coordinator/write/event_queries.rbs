@@ -17,6 +17,8 @@ module Coordinator
       DECISION_PARTITION_LATEST: GroupedEventReadCriteria
       AGENT_CHOICE_EXISTENCE: EventReadCriteria
       AGENT_CHOICE_IMPACT_SCAN_STATE: GroupedEventReadCriteria
+      AGENT_CHOICE_FOR_IMPACT: EventReadCriteria
+      AGENT_CHOICE_IMPACT_ASSESSMENT: EventReadCriteria
       ATTEMPT_FOR_AGENT_CHOICE: EventReadCriteria
       COORDINATION_TASK_HISTORY: EventReadCriteria
       CHANGE_SET_EXISTENCE: GroupedEventReadCriteria

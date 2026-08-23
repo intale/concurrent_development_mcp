@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module AgentChoiceImpacts
+      class AttemptLoader
+        def initialize: (
+          event_store: _EventStore,
+          ?stream_factory: StreamFactory,
+          ?schema_registry: EventSchemaRegistry
+        ) -> void
+        def call: (Events::AgentChoiceRecordedV1 recorded_choice) -> Domain::Attempts::State
+      end
+    end
+  end
+end

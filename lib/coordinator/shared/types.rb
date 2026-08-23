@@ -140,6 +140,31 @@ module Coordinator::Shared
     AGENT_CHOICE_IMPACT_POLICY_VERSIONS = %w[agent-choice-decision-impact/v1].freeze
     AGENT_CHOICE_IMPACT_SCAN_STATUSES = %w[absent running skipped completed].freeze
     AGENT_CHOICE_IMPACT_SCAN_SKIP_REASONS = %w[future_only candidate_scope artifact_scope].freeze
+    AGENT_CHOICE_IMPACT_ASSESSMENT_OUTCOMES = %w[
+      still_valid
+      invalidated
+      not_applicable
+      already_invalidated
+    ].freeze
+    AGENT_CHOICE_IMPACT_ASSESSMENT_REASONS = %w[
+      compliant_or_advisory
+      noncompliance_preceded_change
+      attempt_not_active
+      change_already_observed
+      choice_terminal
+      blocking_policy_introduced
+      confirmation_policy_introduced
+      decision_conflict_introduced
+      unsupported_policy_introduced
+      unresolved_policy_introduced
+    ].freeze
+    AGENT_CHOICE_INVALIDATION_REASONS = %w[
+      blocking_policy_introduced
+      confirmation_policy_introduced
+      decision_conflict_introduced
+      unsupported_policy_introduced
+      unresolved_policy_introduced
+    ].freeze
     DECISION_ACTIVATION_INELIGIBILITY_REASONS = %w[
       non_normative_statement_kind
       missing_effect
@@ -266,6 +291,9 @@ module Coordinator::Shared
     AgentChoiceImpactPolicyVersion = String.enum(*AGENT_CHOICE_IMPACT_POLICY_VERSIONS)
     AgentChoiceImpactScanStatus = String.enum(*AGENT_CHOICE_IMPACT_SCAN_STATUSES)
     AgentChoiceImpactScanSkipReason = String.enum(*AGENT_CHOICE_IMPACT_SCAN_SKIP_REASONS)
+    AgentChoiceImpactAssessmentOutcome = String.enum(*AGENT_CHOICE_IMPACT_ASSESSMENT_OUTCOMES)
+    AgentChoiceImpactAssessmentReason = String.enum(*AGENT_CHOICE_IMPACT_ASSESSMENT_REASONS)
+    AgentChoiceInvalidationReason = String.enum(*AGENT_CHOICE_INVALIDATION_REASONS)
     GlobalPosition = Integer.constrained(gteq: 0)
     AgentChoiceImpactPageSize = Integer.enum(50)
     AgentChoiceImpactPageChoiceCount = Integer.constrained(gteq: 0, lteq: 50)

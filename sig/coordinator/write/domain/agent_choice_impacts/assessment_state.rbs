@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module Domain
+      module AgentChoiceImpacts
+        class AssessmentState < Shared::Value
+          def choice: () -> Coordinator::Write::AgentChoiceImpacts::ChoiceSnapshotV1
+          def attempt: () -> Attempts::State
+          def reconstruction: () -> Coordinator::Write::AgentChoiceImpacts::ReconstructionV1
+        end
+      end
+    end
+  end
+end

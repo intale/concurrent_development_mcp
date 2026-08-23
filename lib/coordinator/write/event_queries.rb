@@ -116,6 +116,22 @@ module Coordinator::Write
       direction: :desc
     )
 
+    AGENT_CHOICE_FOR_IMPACT = EventReadCriteria.new(
+      event_types: [
+        "AgentChoiceRecorded",
+        "AgentChoiceAccepted",
+        "AgentChoiceInvalidatedByDecision"
+      ],
+      maximum_count: 3,
+      direction: :asc
+    )
+
+    AGENT_CHOICE_IMPACT_ASSESSMENT = EventReadCriteria.new(
+      event_types: [ "AgentChoiceImpactAssessed" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+
     ATTEMPT_FOR_AGENT_CHOICE = EventReadCriteria.new(
       event_types: [ "AttemptAuthorized", "AttemptStarted" ],
       maximum_count: 2,

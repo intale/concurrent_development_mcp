@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module AgentChoiceImpacts
+      class AssessmentIdentityDocumentV1 < Shared::Value
+        def schema: () -> String
+        def policy_version: () -> String
+        def accepted_choice: () -> EventReference
+        def decision_change: () -> EventReference
+      end
+    end
+  end
+end

@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Contracts
+      class AgentChoiceImpactAssessmentInvocation < Dry::Validation::Contract
+        PARENT_TYPES: Array[String]
+      end
+    end
+  end
+end

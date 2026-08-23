@@ -1,0 +1,16 @@
+module Coordinator
+  module Write
+    module AgentChoiceImpacts
+      class ChoiceLoader
+        def initialize: (
+          event_store: _EventStore,
+          ?stream_factory: StreamFactory,
+          ?schema_registry: EventSchemaRegistry,
+          ?partition_selector: DecisionContexts::PartitionSelector,
+          ?canonical_json: Shared::CanonicalJson
+        ) -> void
+        def call: (choice_id: String, accepted_choice: EventReference) -> ChoiceSnapshotV1
+      end
+    end
+  end
+end

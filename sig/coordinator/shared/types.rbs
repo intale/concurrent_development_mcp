@@ -40,6 +40,9 @@ module Coordinator
       AGENT_CHOICE_IMPACT_POLICY_VERSIONS: Array[String]
       AGENT_CHOICE_IMPACT_SCAN_STATUSES: Array[String]
       AGENT_CHOICE_IMPACT_SCAN_SKIP_REASONS: Array[String]
+      AGENT_CHOICE_IMPACT_ASSESSMENT_OUTCOMES: Array[String]
+      AGENT_CHOICE_IMPACT_ASSESSMENT_REASONS: Array[String]
+      AGENT_CHOICE_INVALIDATION_REASONS: Array[String]
       DECISION_ACTIVATION_INELIGIBILITY_REASONS: Array[String]
       DECISION_CORRECTION_INELIGIBILITY_REASONS: Array[String]
       SCOPE_PROVENANCE_KINDS: Array[String]
@@ -114,6 +117,9 @@ module Coordinator
       AgentChoiceImpactPolicyVersion: untyped
       AgentChoiceImpactScanStatus: untyped
       AgentChoiceImpactScanSkipReason: untyped
+      AgentChoiceImpactAssessmentOutcome: untyped
+      AgentChoiceImpactAssessmentReason: untyped
+      AgentChoiceInvalidationReason: untyped
       GlobalPosition: untyped
       AgentChoiceImpactPageSize: untyped
       AgentChoiceImpactPageChoiceCount: untyped
