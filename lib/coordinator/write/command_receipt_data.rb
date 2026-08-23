@@ -183,6 +183,7 @@ module Coordinator::Write
       attribute :evidence_revision, Types::CandidateEvidenceRevision
       attribute :evidence_status, Types::CandidateEvidenceStatus
       attribute :surface_event, EventReference
+      attribute :registration_event, EventReference
       attribute :derived_at, Types::Timestamp
     end
 

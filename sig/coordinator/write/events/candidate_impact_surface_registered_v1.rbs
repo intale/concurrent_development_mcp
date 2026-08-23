@@ -1,0 +1,22 @@
+module Coordinator::Write
+  module Events
+    class CandidateImpactSurfaceRegisteredV1 < Base
+      def candidate_id: () -> String
+      def change_set_id: () -> String
+      def work_item_id: () -> String
+      def attempt_id: () -> String
+      def repository_id: () -> String
+      def target_branch: () -> String
+      def object_format: () -> String
+      def base_commit_oid: () -> String
+      def head_commit_oid: () -> String
+      def candidate_event: () -> Coordinator::Write::EventReference
+      def manifest_event: () -> Coordinator::Write::EventReference
+      def build_context_event: () -> Coordinator::Write::EventReference?
+      def surface_event: () -> Coordinator::Write::EventReference
+      def surface_digest: () -> String
+      def index_policy_version: () -> String
+      def registered_at: () -> String
+    end
+  end
+end

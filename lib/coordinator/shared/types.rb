@@ -194,6 +194,9 @@ module Coordinator::Shared
       observed_input_changed
       semantic_key_match
     ].freeze
+    CANDIDATE_IMPACT_INDEX_ROLES = %w[source target].freeze
+    CANDIDATE_IMPACT_INDEX_KINDS = %w[path semantic].freeze
+    CANDIDATE_IMPACT_INDEX_BUCKETS = ("0".."9").to_a.concat(("a".."f").to_a).freeze
     DECISION_ACTIVATION_INELIGIBILITY_REASONS = %w[
       non_normative_statement_kind
       missing_effect
@@ -340,6 +343,9 @@ module Coordinator::Shared
     CandidateImpactQueryDirection = String.enum(*CANDIDATE_IMPACT_QUERY_DIRECTIONS)
     CandidateImpactRelationshipKind = String.enum(*CANDIDATE_IMPACT_RELATIONSHIP_KINDS)
     CandidateImpactReasonKind = String.enum(*CANDIDATE_IMPACT_REASON_KINDS)
+    CandidateImpactIndexRole = String.enum(*CANDIDATE_IMPACT_INDEX_ROLES)
+    CandidateImpactIndexKind = String.enum(*CANDIDATE_IMPACT_INDEX_KINDS)
+    CandidateImpactIndexBucket = String.enum(*CANDIDATE_IMPACT_INDEX_BUCKETS)
     CandidateEvidenceRevision = Integer.enum(1)
     CandidateManifestSize = Integer.constrained(gteq: 1, lteq: 256)
     CandidateBuildInputCount = Integer.constrained(gteq: 0, lteq: 64)

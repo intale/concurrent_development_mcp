@@ -475,6 +475,7 @@ module Coordinator::Write
           evidence_revision: surface.evidence_revision,
           evidence_status: surface.evidence_status,
           surface_event: event_reference(persisted_events.fetch(0)),
+          registration_event: event_reference(persisted_events.fetch(1)),
           derived_at: surface.derived_at
         ),
         next_actions: [

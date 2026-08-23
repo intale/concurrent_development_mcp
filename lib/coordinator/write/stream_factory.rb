@@ -121,5 +121,13 @@ module Coordinator::Write
         stream_id: registry_id
       )
     end
+
+    def candidate_impact_registry(change_set_id)
+      StreamReference.new(
+        context: "DevelopmentIntegration",
+        stream_name: "CandidateImpactRegistry",
+        stream_id: change_set_id
+      )
+    end
   end
 end

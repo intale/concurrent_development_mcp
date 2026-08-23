@@ -49,6 +49,7 @@ module Coordinator::Write
       [ "CandidateChangeManifestCaptured", 1 ] => Events::CandidateChangeManifestCapturedV1,
       [ "CandidateBuildContextCaptured", 1 ] => Events::CandidateBuildContextCapturedV1,
       [ "CandidateImpactSurfaceDerived", 1 ] => Events::CandidateImpactSurfaceDerivedV1,
+      [ "CandidateImpactSurfaceRegistered", 1 ] => Events::CandidateImpactSurfaceRegisteredV1,
       [ "CandidateHeadRegistered", 1 ] => Events::CandidateHeadRegisteredV1,
       [ "CandidateAttachedToAttempt", 1 ] => Events::CandidateAttachedToAttemptV1,
       [ "CoordinationTaskSubmitted", 1 ] => Events::CoordinationTaskSubmittedV1,

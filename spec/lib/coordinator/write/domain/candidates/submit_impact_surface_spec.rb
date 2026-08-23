@@ -3,12 +3,16 @@
 RSpec.describe Coordinator::Write::Domain::Candidates::SubmitImpactSurface do
   subject(:decider) { described_class.new }
 
-  it "IMP-01-SURFACE-01 produces one exact attributed surface fact" do
+  it "IMP-02-REGISTER-01 produces the exact surface and registry facts" do
     result = decide
 
     expect(result).to be_success
-    expect(result.value!.writes.map(&:stream)).to eq([ streams.candidate("CAN-41") ])
-    expect(result.value!.events.sole).to have_attributes(
+    expect(result.value!.writes.map(&:stream)).to eq([
+      streams.candidate("CAN-41"),
+      streams.candidate_impact_registry("CS-1")
+    ])
+    surface, registration = result.value!.events
+    expect(surface).to have_attributes(
       candidate_id: "CAN-41",
       change_set_id: "CS-1",
       surface_digest: command.surface.digest,
@@ -16,10 +20,19 @@ RSpec.describe Coordinator::Write::Domain::Candidates::SubmitImpactSurface do
       evidence_status: "attributed_unverified",
       derived_at: "2026-08-23T15:00:00.000000Z"
     )
+    expect(registration).to have_attributes(
+      candidate_id: "CAN-41",
+      change_set_id: "CS-1",
+      candidate_event: candidate_event,
+      manifest_event: manifest_event,
+      build_context_event: nil,
+      surface_event: surface_event,
+      index_policy_version: "candidate-impact-bucket-index/v1"
+    )
   end
 
   it "denies absent/mismatched Candidate identity and source evidence" do
-    absent = decide(submission: nil)
+    absent = decide(evidence: nil)
     identity = decide(command: copy_command(repository_id: "other"))
     evidence = decide(command: copy_command(manifest_digest: "sha256:#{"f" * 64}"))
 
@@ -37,20 +50,28 @@ RSpec.describe Coordinator::Write::Domain::Candidates::SubmitImpactSurface do
 
   def decide(
     command: self.command,
-    submission: self.submission,
-    manifest: self.manifest,
-    build_context: nil,
+    evidence: self.evidence,
     existing_surface: nil
   )
     decider.call(
       state: Coordinator::Write::Domain::Candidates::ImpactSurfaceState.new(
-        submission:,
-        manifest:,
-        build_context:,
+        evidence:,
         existing_surface:
       ),
       command:,
+      surface_event:,
       derived_at: "2026-08-23T15:00:00.000000Z"
+    )
+  end
+
+  def evidence
+    Coordinator::Write::Candidates::ImpactSurfaceEvidenceV1.new(
+      submission:,
+      submission_event: candidate_event,
+      manifest:,
+      manifest_event:,
+      build_context: nil,
+      build_context_event: nil
     )
   end
 
@@ -154,6 +175,39 @@ RSpec.describe Coordinator::Write::Domain::Candidates::SubmitImpactSurface do
       stream_name: "Candidate",
       stream_id: "CAN-41",
       stream_revision: 3
+    )
+  end
+
+  def candidate_event
+    Coordinator::Write::EventReference.new(
+      event_id: "01919191-9191-7191-8191-919191919194",
+      type: "CandidateSubmitted",
+      stream_context: "DevelopmentIntegration",
+      stream_name: "Candidate",
+      stream_id: "CAN-41",
+      stream_revision: 0
+    )
+  end
+
+  def manifest_event
+    Coordinator::Write::EventReference.new(
+      event_id: "01919191-9191-7191-8191-919191919195",
+      type: "CandidateChangeManifestCaptured",
+      stream_context: "DevelopmentIntegration",
+      stream_name: "Candidate",
+      stream_id: "CAN-41",
+      stream_revision: 1
+    )
+  end
+
+  def surface_event
+    Coordinator::Write::EventReference.new(
+      event_id: "01919191-9191-7191-8191-919191919196",
+      type: "CandidateImpactSurfaceDerived",
+      stream_context: "DevelopmentIntegration",
+      stream_name: "Candidate",
+      stream_id: "CAN-41",
+      stream_revision: 2
     )
   end
 

@@ -1,0 +1,13 @@
+module Coordinator::Write
+  module Candidates
+    class ImpactSurfaceEvidenceV1 < Coordinator::Shared::Value
+      def submission: () -> Coordinator::Write::Events::CandidateSubmittedV1
+      def submission_event: () -> Coordinator::Write::EventReference
+      def manifest: () -> Coordinator::Write::Events::CandidateChangeManifestCapturedV1
+      def manifest_event: () -> Coordinator::Write::EventReference
+      def build_context: () -> Coordinator::Write::Events::CandidateBuildContextCapturedV1?
+      def build_context_event: () -> Coordinator::Write::EventReference?
+      def next_candidate_revision: () -> Integer
+    end
+  end
+end
