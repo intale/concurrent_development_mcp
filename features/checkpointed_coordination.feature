@@ -199,3 +199,29 @@ Feature: Checkpointed cooperative coordination
       Then the stale correction Task reports a Decision revision conflict without new policy facts
       When the correction fact for Decision "D-CUC-COR-1" reaches the read side
       Then the available Decision "D-CUC-COR-1" exposes correction interpretation "I-CUC-COR-1" without a freshness claim
+
+  Rule: Significant agent choices are authoritative Tasks with available evidence
+
+    Scenario: An accepted testing-framework choice becomes available one observed fact at a time
+      Given agent "agent-a" has active Attempt "A-CUC-CHO-1" for WorkItem "W-CUC-CHO-1" in ChangeSet "CS-CUC-CHO-1" and repository "billing"
+      When the agent resolves the available testing-framework context
+      And the agent records testing-framework choice "rspec" as "CHO-CUC-1" through a Task
+      Then the choice Task succeeds with accepted authoritative facts
+      And AgentChoice "CHO-CUC-1" is honestly not observed before projection
+      When the AgentChoiceRecorded fact for "CHO-CUC-1" reaches the read side
+      Then the available AgentChoice "CHO-CUC-1" is recorded without a freshness claim
+      When the AgentChoiceAccepted fact for "CHO-CUC-1" reaches the read side
+      Then the available AgentChoice "CHO-CUC-1" is accepted without a freshness claim
+
+    Scenario: An older available context is served while authoritative choice recording rejects it
+      Given agent "agent-a" has active Attempt "A-CUC-CHO-STALE" for WorkItem "W-CUC-CHO-STALE" in ChangeSet "CS-CUC-CHO-STALE" and repository "billing"
+      When the agent resolves the available testing-framework context
+      Given these interpretations are accepted for activation:
+        | interpretation_id | message_id        | decision_id        |
+        | I-CUC-CHO-STALE   | M-CUC-CHO-STALE  | D-CUC-CHO-STALE   |
+      When the host activates interpretation "I-CUC-CHO-STALE" as Decision "D-CUC-CHO-STALE" through a Task
+      Then the activation Task succeeds with one complete consistency boundary
+      And the older Decision context remains available without a freshness claim
+      When the agent records testing-framework choice "rspec" as "CHO-CUC-STALE" through a Task
+      Then the choice Task reports stale context and explains how to refresh
+      And the stale choice writes no AgentChoice or command facts

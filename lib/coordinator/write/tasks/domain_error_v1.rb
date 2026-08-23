@@ -222,6 +222,8 @@ module Coordinator::Write
         attribute :changed_partition_ids, Types::Array.of(Types::Identifier).constrained(min_size: 1, max_size: 8)
         attribute :submitted_digest, Types::Sha256Digest
         attribute :current_digest, Types::Sha256Digest
+        attribute :topic_id, Types::AgentChoiceType
+        attribute :context, DecisionContexts::QueryContextV1
       end
 
       class DecisionContextMismatchDetails < Value

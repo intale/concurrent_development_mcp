@@ -57,7 +57,9 @@ module Coordinator::Write
               "Submitted Decision context no longer matches authoritative partitions",
               changed_partition_ids: changed_partitions,
               submitted_digest: submitted.digest,
-              current_digest: current.digest
+              current_digest: current.digest,
+              topic_id: command.choice_type,
+              context: command.context.to_h
             )
           end
           unless submitted.document.to_h == current.document.to_h && submitted.digest == current.digest

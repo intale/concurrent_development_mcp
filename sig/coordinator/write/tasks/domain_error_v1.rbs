@@ -223,6 +223,8 @@ module Coordinator
           def changed_partition_ids: () -> Array[String]
           def submitted_digest: () -> String
           def current_digest: () -> String
+          def topic_id: () -> String
+          def context: () -> DecisionContexts::QueryContextV1
         end
 
         class DecisionContextMismatchDetails < Shared::Value

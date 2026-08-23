@@ -276,6 +276,24 @@ module McpAcceptanceWorld
     decision_projector.call(event)
   end
 
+  def agent_choice_events(choice_id)
+    event_store.read(
+      streams.agent_choice(choice_id),
+      Coordinator::Write::EventQueries::AGENT_CHOICE_EXISTENCE
+    )
+  end
+
+  def agent_choice_view(choice_id)
+    call_tool("agent_choice_get", { choice_id: })
+      .dig("result", "structuredContent")
+  end
+
+  def project_agent_choice_event(choice_id, event_type)
+    event = agent_choice_events(choice_id).find { _1.type == event_type }
+    assert_acceptance(event, "AgentChoice #{choice_id} has no #{event_type} fact")
+    Coordinator::Container["projectors.agent_choices_v1"].call(event)
+  end
+
   def accept_correction_interpretation(decision_id:, interpretation_id:, message_id:, value:, suffix:)
     task_ids = []
     task_ids << submit_and_execute(

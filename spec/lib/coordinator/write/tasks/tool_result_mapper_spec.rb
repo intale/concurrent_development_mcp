@@ -425,7 +425,9 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         {
           changed_partition_ids: [ "repo:billing:testing" ],
           submitted_digest: "sha256:#{'a' * 64}",
-          current_digest: "sha256:#{'b' * 64}"
+          current_digest: "sha256:#{'b' * 64}",
+          topic_id: "testing.framework",
+          context: decision_query_context
         },
         Coordinator::Write::Tasks::DomainErrorV1::StaleDecisionContextError,
         "stale_context"
@@ -522,6 +524,14 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
       expect(result.is_error).to be(true)
       expect(result.structured_content.status).to eq(status)
       expect(result.structured_content.data).to be_a(error_class)
+      expected_actions = code == :stale_decision_context ? [ "decision_resolve" ] : []
+      expect(result.structured_content.next_actions.map(&:tool)).to eq(expected_actions)
+      if code == :stale_decision_context
+        expect(result.structured_content.next_actions.sole.arguments).to have_attributes(
+          topic_id: "testing.framework",
+          context: Coordinator::Write::DecisionContexts::QueryContextV1.new(decision_query_context)
+        )
+      end
       expect(JSON.parse(result.content.sole.text)).to eq(
         JSON.parse(JSON.generate(result.structured_content.to_h))
       )
@@ -587,6 +597,21 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
       selected_option_id: "minitest",
       decision_option_id: "rspec",
       on_violation:
+    }
+  end
+
+  def decision_query_context
+    {
+      workspace_id: nil,
+      repository_id: "billing",
+      change_set_id: "CS-task-result",
+      work_item_id: "W-task-result",
+      attempt_id: "A-task-result",
+      phase: "implementation",
+      language: "ruby",
+      paths: [ "spec/models/order_spec.rb" ],
+      environment: "test",
+      agent_role: "implementer"
     }
   end
 end

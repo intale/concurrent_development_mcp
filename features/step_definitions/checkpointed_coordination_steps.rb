@@ -1952,3 +1952,189 @@ Then(
     "Decision query must not claim freshness"
   )
 end
+
+Given(
+  "agent {string} has active Attempt {string} for WorkItem {string} in ChangeSet {string} and repository {string}"
+) do |agent_id, attempt_id, work_item_id, change_set_id, repository_id|
+  @choice_agent_id = agent_id
+  @choice_context = {
+    workspace_id: nil,
+    repository_id:,
+    change_set_id:,
+    work_item_id:,
+    attempt_id:,
+    phase: "implementation",
+    language: "ruby",
+    paths: [ "spec/models/order_spec.rb" ],
+    environment: "test",
+    agent_role: "implementer"
+  }
+  setup_tasks = []
+  setup_tasks << submit_and_execute(
+    "change_set_create",
+    command_id: "cmd-cuc-choice-create-#{change_set_id}",
+    actor: { kind: "agent", id: "planner-1" },
+    change_set_id:,
+    goal: "Record a significant agent choice",
+    acceptance_criteria: [ "The accepted choice remains attributable" ]
+  )
+  setup_tasks << submit_and_execute(
+    "work_item_create",
+    command_id: "cmd-cuc-choice-create-#{work_item_id}",
+    actor: { kind: "agent", id: "planner-1" },
+    change_set_id:,
+    work_item_id:,
+    repository_id:,
+    goal: "Select the testing framework",
+    acceptance_criteria: [ "The selected framework is coordinated" ]
+  )
+  setup_tasks << submit_and_execute(
+    "change_set_activate",
+    command_id: "cmd-cuc-choice-activate-#{change_set_id}",
+    actor: { kind: "agent", id: "planner-1" },
+    change_set_id:
+  )
+  activation = change_set_events(change_set_id).find { _1.type == "ChangeSetActivated" }
+  assert_acceptance(activation, "ChangeSet #{change_set_id} has no activation fact")
+  Coordinator::Container["process_managers.change_set_readiness"].call(activation)
+  setup_tasks << submit_and_execute(
+    "work_item_acquire",
+    command_id: "cmd-cuc-choice-acquire-#{attempt_id}",
+    actor: { kind: "agent", id: agent_id },
+    change_set_id:,
+    work_item_id:,
+    attempt_id:,
+    base_snapshots: [ { repository_id:, commit_oid: "a" * 40 } ]
+  )
+
+  setup_tasks.each do |task_id|
+    state = task_request("tasks/get", task_id)
+    assert_acceptance_equal("completed", state.dig("result", "status"), "Choice setup Task status")
+    assert_acceptance_equal(false, state.dig("result", "result", "isError"), "Choice setup error")
+  end
+end
+
+When("the agent resolves the available testing-framework context") do
+  payload = call_tool(
+    "decision_resolve",
+    { topic_id: "testing.framework", context: @choice_context }
+  ).dig("result", "structuredContent")
+  assert_acceptance_equal("ok", payload.fetch("status"), "Decision context status")
+  @choice_decision_context = payload.dig("data", "decision_context")
+  assert_acceptance(@choice_decision_context, "decision_resolve returned no decision context")
+end
+
+When(
+  "the agent records testing-framework choice {string} as {string} through a Task"
+) do |option_id, choice_id|
+  @choice_id = choice_id
+  @choice_command_id = "cmd-cuc-choice-record-#{choice_id}"
+  @choice_task_id = submit_and_execute(
+    "agent_choice_record",
+    command_id: @choice_command_id,
+    actor: { kind: "agent", id: @choice_agent_id },
+    choice_id:,
+    choice_type: "testing.framework",
+    selected: { option_id:, summary: option_id.capitalize },
+    alternatives: [ { option_id: "minitest", summary: "Minitest" } ],
+    reason_summary: "Use the framework that fits the available coordination policy.",
+    context: @choice_context,
+    decision_context: @choice_decision_context
+  )
+  @choice_task_state = task_request("tasks/get", @choice_task_id)
+end
+
+Then("the choice Task succeeds with accepted authoritative facts") do
+  result = @choice_task_state.dig("result", "result")
+  content = result.fetch("structuredContent")
+  assert_acceptance_equal("completed", @choice_task_state.dig("result", "status"), "Choice Task status")
+  assert_acceptance_equal(false, result.fetch("isError"), "Choice Task error flag")
+  assert_acceptance_equal("ok", content.fetch("status"), "Choice result status")
+  assert_acceptance_equal("accepted", content.dig("data", "outcome"), "Choice outcome")
+  assert_acceptance_equal(
+    %w[AgentChoiceRecorded AgentChoiceAccepted],
+    agent_choice_events(@choice_id).map(&:type),
+    "AgentChoice event plan"
+  )
+  assert_acceptance_equal(1, command_events(@choice_command_id).length, "Choice command completion")
+end
+
+Then("AgentChoice {string} is honestly not observed before projection") do |choice_id|
+  payload = agent_choice_view(choice_id)
+  assert_acceptance_equal("not_found", payload.fetch("status"), "Unprojected AgentChoice status")
+  assert_acceptance_equal(
+    "agent_choice_not_observed",
+    payload.dig("data", "code"),
+    "Unprojected AgentChoice reason"
+  )
+end
+
+When("the AgentChoiceRecorded fact for {string} reaches the read side") do |choice_id|
+  project_agent_choice_event(choice_id, "AgentChoiceRecorded")
+end
+
+Then("the available AgentChoice {string} is recorded without a freshness claim") do |choice_id|
+  payload = agent_choice_view(choice_id)
+  choice = payload.dig("data", "choice")
+  assert_acceptance_equal("ok", payload.fetch("status"), "Recorded AgentChoice status")
+  assert_acceptance_equal("recorded", choice.fetch("observation_status"), "Choice observation status")
+  assert_acceptance_equal(nil, choice.fetch("accepted"), "Premature acceptance evidence")
+  assert_acceptance_equal("AgentChoiceRecorded", choice.dig("recorded", "event", "type"), "Recorded evidence")
+  assert_acceptance(
+    (choice.keys & %w[active fresh pending projection_status stream_revision]).empty?,
+    "AgentChoice view must not claim freshness"
+  )
+end
+
+When("the AgentChoiceAccepted fact for {string} reaches the read side") do |choice_id|
+  project_agent_choice_event(choice_id, "AgentChoiceAccepted")
+end
+
+Then("the available AgentChoice {string} is accepted without a freshness claim") do |choice_id|
+  payload = agent_choice_view(choice_id)
+  choice = payload.dig("data", "choice")
+  assert_acceptance_equal("ok", payload.fetch("status"), "Accepted AgentChoice status")
+  assert_acceptance_equal("accepted", choice.fetch("observation_status"), "Choice observation status")
+  assert_acceptance_equal("no_policy", choice.dig("assessment", "basis"), "Choice assessment")
+  assert_acceptance_equal("AgentChoiceAccepted", choice.dig("accepted", "event", "type"), "Accepted evidence")
+  assert_acceptance(
+    (choice.keys & %w[active fresh pending projection_status stream_revision]).empty?,
+    "AgentChoice view must not claim freshness"
+  )
+end
+
+Then("the older Decision context remains available without a freshness claim") do
+  payload = call_tool(
+    "decision_resolve",
+    { topic_id: "testing.framework", context: @choice_context }
+  ).dig("result", "structuredContent")
+  available = payload.dig("data", "decision_context")
+  assert_acceptance_equal("ok", payload.fetch("status"), "Lagging Decision context status")
+  assert_acceptance_equal(
+    @choice_decision_context.fetch("digest"),
+    available.fetch("digest"),
+    "Lagging Decision context digest"
+  )
+  assert_acceptance_equal(nil, available.dig("document", "effective_decision"), "Lagging policy evidence")
+  assert_acceptance(
+    (payload.keys & %w[active fresh pending projection_status stream_revision]).empty?,
+    "Decision context must not claim freshness"
+  )
+end
+
+Then("the choice Task reports stale context and explains how to refresh") do
+  result = @choice_task_state.dig("result", "result")
+  content = result.fetch("structuredContent")
+  assert_acceptance_equal("completed", @choice_task_state.dig("result", "status"), "Choice Task status")
+  assert_acceptance_equal(true, result.fetch("isError"), "Stale choice error flag")
+  assert_acceptance_equal("stale_context", content.fetch("status"), "Stale choice status")
+  assert_acceptance_equal("stale_decision_context", content.dig("data", "code"), "Stale choice reason")
+  refresh = content.fetch("next_actions").find { _1.fetch("tool") == "decision_resolve" }
+  assert_acceptance(refresh, "Stale choice result must explain how to refresh Decision context")
+end
+
+Then("the stale choice writes no AgentChoice or command facts") do
+  assert_acceptance_equal([], agent_choice_events(@choice_id), "Denied AgentChoice facts")
+  assert_acceptance_equal([], command_events(@choice_command_id), "Denied choice command facts")
+  assert_acceptance_equal("not_found", agent_choice_view(@choice_id).fetch("status"), "Denied Choice view")
+end

@@ -72,8 +72,22 @@ module Coordinator::Write
           context_token: nil,
           data: domain_error,
           warnings: [],
-          next_actions: []
+          next_actions: failure_next_actions(domain_error)
         )
+      end
+
+      def failure_next_actions(domain_error)
+        return [] unless domain_error.is_a?(DomainErrorV1::StaleDecisionContextError)
+
+        [
+          NextAction.new(
+            tool: "decision_resolve",
+            arguments: NextAction::DecisionResolutionArguments.new(
+              topic_id: domain_error.details.topic_id,
+              context: domain_error.details.context
+            )
+          )
+        ]
       end
     end
   end

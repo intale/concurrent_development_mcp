@@ -131,7 +131,16 @@ RSpec.describe "CHO-01 MCP agent choice recording", :event_store, :read_model do
           "details" => include(
             "changed_partition_ids" => [ "repo:billing:testing" ]
           )
-        )
+        ),
+        "next_actions" => [
+          include(
+            "tool" => "decision_resolve",
+            "arguments" => include(
+              "topic_id" => "testing.framework",
+              "context" => include("attempt_id" => "A-mcp-choice")
+            )
+          )
+        ]
       )
     )
     expect(choice_events("CHO-mcp-choice-stale")).to be_empty

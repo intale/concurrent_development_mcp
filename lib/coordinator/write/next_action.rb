@@ -28,12 +28,18 @@ module Coordinator::Write
       attribute :choice_id, Types::Identifier
     end
 
+    class DecisionResolutionArguments < Value
+      attribute :topic_id, Types::AgentChoiceType
+      attribute :context, DecisionContexts::QueryContextV1
+    end
+
     Arguments = ChangeSetArguments |
                 AttemptArguments |
                 GuidanceArguments |
                 InterpretationListArguments |
                 DecisionArguments |
-                AgentChoiceArguments
+                AgentChoiceArguments |
+                DecisionResolutionArguments
 
     attribute :tool, Types::Identifier
     attribute :arguments, Arguments
