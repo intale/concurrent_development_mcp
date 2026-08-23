@@ -1,0 +1,12 @@
+module Coordinator::Write
+  module CandidateObligations
+    class PolicyObservationV1 < Coordinator::Shared::Value
+      def status: () -> String
+      def evidence: () -> ImpactPolicyEvidenceV1?
+      def self.stale: () -> PolicyObservationV1
+      def self.non_gating: () -> PolicyObservationV1
+      def self.inactive: () -> PolicyObservationV1
+      def self.gating: (ImpactPolicyEvidenceV1 evidence) -> PolicyObservationV1
+    end
+  end
+end

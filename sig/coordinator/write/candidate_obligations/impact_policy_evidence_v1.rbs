@@ -1,0 +1,14 @@
+module Coordinator::Write
+  module CandidateObligations
+    class ImpactPolicyEvidenceV1 < Coordinator::Shared::Value
+      def partition_event: () -> Coordinator::Write::EventReference
+      def partition: () -> Coordinator::Write::Decisions::DecisionPartitionV1
+      def head: () -> Coordinator::Write::Decisions::DecisionHeadV1
+      def definition_digest: () -> String
+      def change_set_id: () -> String
+      def required_evidence: () -> Array[String]
+      def enforcement: () -> String
+      def valid_from: () -> String
+    end
+  end
+end

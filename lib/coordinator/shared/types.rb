@@ -210,6 +210,25 @@ module Coordinator::Shared
       schema_migration_review
       security_review
     ].freeze
+    CANDIDATE_COMPATIBILITY_OBLIGATION_RULE_VERSIONS = %w[
+      candidate-compatibility-obligation/v1
+    ].freeze
+    VERIFICATION_OBLIGATION_KINDS = %w[candidate_compatibility].freeze
+    VERIFICATION_OBLIGATION_STATUSES = %w[open].freeze
+    CANDIDATE_OBLIGATION_POLICY_STATUSES = %w[
+      stale
+      non_gating
+      inactive
+      gating
+    ].freeze
+    CANDIDATE_OBLIGATION_DECISION_OUTCOMES = %w[
+      created
+      replayed
+      stale_policy
+      non_gating_policy
+      inactive_policy
+      no_match
+    ].freeze
     DECISION_ACTIVATION_INELIGIBILITY_REASONS = %w[
       non_normative_statement_kind
       missing_effect
@@ -365,6 +384,13 @@ module Coordinator::Shared
     CandidateImpactRequiredEvidenceKind = String.enum(*CANDIDATE_IMPACT_REQUIRED_EVIDENCE_KINDS)
     CandidateImpactRequiredEvidenceKinds = Array.of(CandidateImpactRequiredEvidenceKind)
       .constrained(min_size: 1, max_size: 8)
+    CandidateCompatibilityObligationRuleVersion = String.enum(*CANDIDATE_COMPATIBILITY_OBLIGATION_RULE_VERSIONS)
+    VerificationObligationKind = String.enum(*VERIFICATION_OBLIGATION_KINDS)
+    VerificationObligationStatus = String.enum(*VERIFICATION_OBLIGATION_STATUSES)
+    CandidateObligationPolicyStatus = String.enum(*CANDIDATE_OBLIGATION_POLICY_STATUSES)
+    CandidateObligationDecisionOutcome = String.enum(*CANDIDATE_OBLIGATION_DECISION_OUTCOMES)
+    CandidateImpactReasonMatches = Array.of(String.constrained(min_size: 1, max_size: 1_024))
+      .constrained(min_size: 1, max_size: 256)
     CandidateEvidenceRevision = Integer.enum(1)
     CandidateManifestSize = Integer.constrained(gteq: 1, lteq: 256)
     CandidateBuildInputCount = Integer.constrained(gteq: 0, lteq: 64)

@@ -1,0 +1,16 @@
+module Coordinator::Write
+  module CandidateObligations
+    class ValidityDocumentV1 < Coordinator::Shared::Value
+      SCHEMA: String
+
+      def schema: () -> String
+      def source_candidate: () -> CandidateSubjectV1
+      def target_candidate: () -> CandidateSubjectV1
+      def reasons: () -> Array[ImpactReasonV1]
+      def required_evidence: () -> Array[String]
+      def enforcement: () -> String
+      def policy: () -> ImpactPolicyEvidenceV1
+      def rule_version: () -> String
+    end
+  end
+end

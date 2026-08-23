@@ -1,0 +1,14 @@
+module Coordinator::Write
+  module CandidateObligations
+    class ValidityBuilder
+      def initialize: (?canonical_json: Coordinator::Shared::CanonicalJson) -> void
+      def call: (
+        source: CandidateEvidenceV1,
+        target: CandidateEvidenceV1,
+        reasons: Array[ImpactReasonV1],
+        policy: ImpactPolicyEvidenceV1,
+        rule_version: String
+      ) -> ValidityV1
+    end
+  end
+end

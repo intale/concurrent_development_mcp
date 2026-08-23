@@ -1,0 +1,13 @@
+module Coordinator::Write
+  module CandidateObligations
+    class CandidateEvidenceV1 < Coordinator::Shared::Value
+      def registration: () -> Coordinator::Write::Events::CandidateImpactSurfaceRegisteredV1
+      def registration_event: () -> Coordinator::Write::EventReference
+      def candidate: () -> Coordinator::Write::Events::CandidateSubmittedV1
+      def manifest: () -> Coordinator::Write::Events::CandidateChangeManifestCapturedV1
+      def build_context: () -> Coordinator::Write::Events::CandidateBuildContextCapturedV1?
+      def surface: () -> Coordinator::Write::Events::CandidateImpactSurfaceDerivedV1
+      def subject: () -> CandidateSubjectV1
+    end
+  end
+end

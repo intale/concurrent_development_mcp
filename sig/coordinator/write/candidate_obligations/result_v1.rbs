@@ -1,0 +1,9 @@
+module Coordinator::Write
+  module CandidateObligations
+    class ResultV1 < Coordinator::Shared::Value
+      def outcome: () -> String
+      def obligation_id: () -> String
+      def event: () -> Coordinator::Write::EventReference?
+    end
+  end
+end

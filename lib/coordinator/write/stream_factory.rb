@@ -129,5 +129,13 @@ module Coordinator::Write
         stream_id: change_set_id
       )
     end
+
+    def verification_obligation(obligation_id)
+      StreamReference.new(
+        context: "DevelopmentIntegration",
+        stream_name: "VerificationObligation",
+        stream_id: obligation_id
+      )
+    end
   end
 end

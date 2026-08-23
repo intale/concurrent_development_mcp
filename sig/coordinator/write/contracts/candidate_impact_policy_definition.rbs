@@ -1,0 +1,8 @@
+module Coordinator::Write
+  module Contracts
+    class CandidateImpactPolicyDefinition < Dry::Validation::Contract
+      TOPIC: Coordinator::Write::Interpretations::TopicDefinitionV1
+      GATE_LEVELS: Array[String]
+    end
+  end
+end

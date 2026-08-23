@@ -1,0 +1,8 @@
+module Coordinator
+  module Write
+    class CandidateCompatibilityObligationPreparationV1 < Shared::Value
+      def created_at: () -> String
+      def obligation_event_id: () -> String
+    end
+  end
+end

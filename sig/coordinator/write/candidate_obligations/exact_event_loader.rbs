@@ -1,0 +1,11 @@
+module Coordinator::Write
+  module CandidateObligations
+    class ExactEventLoader
+      def initialize: (
+        event_store: Coordinator::Write::_EventStore,
+        ?schema_registry: Coordinator::Write::EventSchemaRegistry
+      ) -> void
+      def call: (Coordinator::Write::EventReference reference) -> PersistedEventV1
+    end
+  end
+end

@@ -1,0 +1,12 @@
+module Coordinator::Write
+  module CandidateObligations
+    class CandidateEvidenceLoader
+      def initialize: (
+        event_store: Coordinator::Write::_EventStore,
+        ?exact_loader: ExactEventLoader,
+        ?evidence_contract: Coordinator::Write::Contracts::CandidateObligationEvidence
+      ) -> void
+      def call: (Coordinator::Write::EventReference registration_reference) -> CandidateEvidenceV1
+    end
+  end
+end

@@ -18,6 +18,7 @@ module Coordinator
       def candidate: (String candidate_id) -> StreamReference
       def candidate_head: (String registry_id) -> StreamReference
       def candidate_impact_registry: (String change_set_id) -> StreamReference
+      def verification_obligation: (String obligation_id) -> StreamReference
     end
   end
 end

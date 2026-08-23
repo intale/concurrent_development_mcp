@@ -1,0 +1,20 @@
+module Coordinator::Write
+  module Domain
+    module CandidateObligations
+      class Create
+        POLICY_OUTCOMES: Hash[String, String]
+
+        def initialize: (
+          ?matcher: Coordinator::Write::CandidateObligations::Matcher,
+          ?validity_builder: Coordinator::Write::CandidateObligations::ValidityBuilder,
+          ?stream_factory: Coordinator::Write::StreamFactory
+        ) -> void
+        def call: (
+          state: State,
+          command: Coordinator::Write::Commands::CreateCandidateCompatibilityObligation,
+          created_at: String
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

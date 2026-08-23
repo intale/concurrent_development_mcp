@@ -24,6 +24,7 @@ module Coordinator
       CANDIDATE_EXISTENCE: EventReadCriteria
       CANDIDATE_HEAD_REGISTRATION: EventReadCriteria
       CANDIDATE_FOR_IMPACT_SURFACE: GroupedEventReadCriteria
+      VERIFICATION_OBLIGATION_CREATION: EventReadCriteria
       COORDINATION_TASK_HISTORY: EventReadCriteria
       CHANGE_SET_EXISTENCE: GroupedEventReadCriteria
       WORK_ITEM_EXISTENCE: GroupedEventReadCriteria

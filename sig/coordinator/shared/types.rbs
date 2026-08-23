@@ -58,6 +58,11 @@ module Coordinator
       CANDIDATE_IMPACT_INDEX_BUCKETS: Array[String]
       CANDIDATE_IMPACT_POLICY_ENFORCEMENT_LEVELS: Array[String]
       CANDIDATE_IMPACT_REQUIRED_EVIDENCE_KINDS: Array[String]
+      CANDIDATE_COMPATIBILITY_OBLIGATION_RULE_VERSIONS: Array[String]
+      VERIFICATION_OBLIGATION_KINDS: Array[String]
+      VERIFICATION_OBLIGATION_STATUSES: Array[String]
+      CANDIDATE_OBLIGATION_POLICY_STATUSES: Array[String]
+      CANDIDATE_OBLIGATION_DECISION_OUTCOMES: Array[String]
       DECISION_ACTIVATION_INELIGIBILITY_REASONS: Array[String]
       DECISION_CORRECTION_INELIGIBILITY_REASONS: Array[String]
       SCOPE_PROVENANCE_KINDS: Array[String]
@@ -152,6 +157,12 @@ module Coordinator
       CandidateImpactPolicyEnforcementLevel: untyped
       CandidateImpactRequiredEvidenceKind: untyped
       CandidateImpactRequiredEvidenceKinds: untyped
+      CandidateCompatibilityObligationRuleVersion: untyped
+      VerificationObligationKind: untyped
+      VerificationObligationStatus: untyped
+      CandidateObligationPolicyStatus: untyped
+      CandidateObligationDecisionOutcome: untyped
+      CandidateImpactReasonMatches: untyped
       CandidateEvidenceRevision: untyped
       CandidateManifestSize: untyped
       CandidateBuildInputCount: untyped

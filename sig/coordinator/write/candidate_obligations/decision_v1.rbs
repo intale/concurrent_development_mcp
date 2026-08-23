@@ -1,0 +1,12 @@
+module Coordinator::Write
+  module CandidateObligations
+    class DecisionV1 < Coordinator::Shared::Value
+      def outcome: () -> String
+      def plan: () -> Coordinator::Write::Domain::EventPlan?
+      def obligation: () -> Coordinator::Write::Events::VerificationObligationCreatedV1?
+      def self.created: (Coordinator::Write::Domain::EventPlan plan, Coordinator::Write::Events::VerificationObligationCreatedV1 obligation) -> DecisionV1
+      def self.replayed: (Coordinator::Write::Events::VerificationObligationCreatedV1 obligation) -> DecisionV1
+      def self.no_event: (String outcome) -> DecisionV1
+    end
+  end
+end

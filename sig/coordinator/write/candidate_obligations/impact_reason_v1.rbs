@@ -1,0 +1,10 @@
+module Coordinator::Write
+  module CandidateObligations
+    class ImpactReasonV1 < Coordinator::Shared::Value
+      def kind: () -> String
+      def matches: () -> Array[String]
+      def source_evidence: () -> Coordinator::Write::EventReference
+      def target_evidence: () -> Coordinator::Write::EventReference
+    end
+  end
+end

@@ -1,0 +1,20 @@
+module Coordinator::Write
+  module CandidateObligations
+    class ImpactPolicyLoader
+      GATE_LEVELS: Array[String]
+
+      def initialize: (
+        event_store: Coordinator::Write::_EventStore,
+        ?exact_loader: ExactEventLoader,
+        ?stream_factory: Coordinator::Write::StreamFactory,
+        ?canonical_json: Coordinator::Shared::CanonicalJson,
+        ?definition_contract: Coordinator::Write::Contracts::CandidateImpactPolicyDefinition
+      ) -> void
+      def call: (
+        command: Coordinator::Write::Commands::CreateCandidateCompatibilityObligation,
+        change_set_id: String,
+        observed_at: String
+      ) -> PolicyObservationV1
+    end
+  end
+end

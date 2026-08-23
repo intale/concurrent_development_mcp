@@ -165,6 +165,12 @@ module Coordinator::Write
       direction: :asc
     )
 
+    VERIFICATION_OBLIGATION_CREATION = EventReadCriteria.new(
+      event_types: [ "VerificationObligationCreated" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+
     COORDINATION_TASK_HISTORY = EventReadCriteria.new(
       event_types: [
         "CoordinationTaskSubmitted",

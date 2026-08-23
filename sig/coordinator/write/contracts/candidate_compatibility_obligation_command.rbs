@@ -1,0 +1,7 @@
+module Coordinator::Write
+  module Contracts
+    class CandidateCompatibilityObligationCommand < Dry::Validation::Contract
+      ACTOR_ID: String
+    end
+  end
+end

@@ -1,0 +1,6 @@
+module Coordinator::Write
+  module Contracts
+    class CandidateObligationEvidence < Dry::Validation::Contract
+    end
+  end
+end

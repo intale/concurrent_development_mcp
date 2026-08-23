@@ -1,0 +1,14 @@
+module Coordinator::Write
+  module Commands
+    class CreateCandidateCompatibilityObligation < Coordinator::Shared::Value
+      def command_id: () -> String
+      def actor: () -> Actor
+      def obligation_id: () -> String
+      def source_registration: () -> Coordinator::Write::EventReference
+      def target_registration: () -> Coordinator::Write::EventReference
+      def policy_partition_event: () -> Coordinator::Write::EventReference
+      def policy_head: () -> Coordinator::Write::Decisions::DecisionHeadV1
+      def rule_version: () -> String
+    end
+  end
+end

@@ -1,0 +1,8 @@
+module Coordinator::Write
+  module CandidateObligations
+    class ValidityV1 < Coordinator::Shared::Value
+      def document: () -> ValidityDocumentV1
+      def digest: () -> String
+    end
+  end
+end

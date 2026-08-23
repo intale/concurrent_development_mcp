@@ -1,0 +1,9 @@
+module Coordinator::Write
+  module CandidateObligations
+    class PersistedEventV1 < Coordinator::Shared::Value
+      def event: () -> PgEventstore::Event
+      def payload: () -> Coordinator::Write::Events::Base
+      def reference: () -> Coordinator::Write::EventReference
+    end
+  end
+end

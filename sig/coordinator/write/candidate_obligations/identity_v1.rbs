@@ -1,0 +1,9 @@
+module Coordinator::Write
+  module CandidateObligations
+    class IdentityV1 < Coordinator::Shared::Value
+      def document: () -> IdentityDocumentV1
+      def digest: () -> String
+      def obligation_id: () -> String
+    end
+  end
+end

@@ -1,0 +1,23 @@
+module Coordinator::Write
+  module CandidateObligations
+    class CandidateSubjectV1 < Coordinator::Shared::Value
+      def candidate_id: () -> String
+      def change_set_id: () -> String
+      def work_item_id: () -> String
+      def attempt_id: () -> String
+      def repository_id: () -> String
+      def target_branch: () -> String
+      def object_format: () -> String
+      def base_commit_oid: () -> String
+      def head_commit_oid: () -> String
+      def manifest_digest: () -> String
+      def build_context_digest: () -> String?
+      def surface_digest: () -> String
+      def candidate_event: () -> Coordinator::Write::EventReference
+      def manifest_event: () -> Coordinator::Write::EventReference
+      def build_context_event: () -> Coordinator::Write::EventReference?
+      def surface_event: () -> Coordinator::Write::EventReference
+      def registration_event: () -> Coordinator::Write::EventReference
+    end
+  end
+end

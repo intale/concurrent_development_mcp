@@ -1,0 +1,22 @@
+module Coordinator::Write
+  module Operations
+    class ExecuteCreateCandidateCompatibilityObligation
+      def initialize: (
+        event_store: Coordinator::Write::_EventStore,
+        ?candidate_loader: Coordinator::Write::CandidateObligations::CandidateEvidenceLoader,
+        ?policy_loader: Coordinator::Write::CandidateObligations::ImpactPolicyLoader,
+        ?obligation_loader: Coordinator::Write::CandidateObligations::ObligationLoader,
+        ?identity_builder: Coordinator::Write::CandidateObligations::IdentityBuilder,
+        ?decider: Coordinator::Write::Domain::CandidateObligations::Create,
+        ?clock: Coordinator::Shared::_Clock,
+        ?id_generator: Coordinator::Shared::_IdGenerator,
+        ?event_factory: Coordinator::Write::EventFactory,
+        ?stream_factory: Coordinator::Write::StreamFactory,
+        ?invocation_contract: Coordinator::Write::Contracts::CandidateCompatibilityObligationInvocation,
+        ?command_contract: Coordinator::Write::Contracts::CandidateCompatibilityObligationCommand,
+        ?event_plan_contract: Coordinator::Write::Contracts::CandidateCompatibilityObligationEventPlan
+      ) -> void
+      def call: (Coordinator::Write::CandidateCompatibilityObligationInvocation invocation) -> Dry::Monads::Result
+    end
+  end
+end

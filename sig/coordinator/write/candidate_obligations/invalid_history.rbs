@@ -1,0 +1,10 @@
+module Coordinator::Write
+  module CandidateObligations
+    class InvalidHistory < StandardError
+      attr_reader reason: String
+      attr_reader evidence: Hash[Symbol, untyped]
+
+      def initialize: (reason: String, evidence: Hash[Symbol, untyped]) -> void
+    end
+  end
+end
