@@ -36,6 +36,7 @@ RSpec.describe Coordinator::Container do
     guidance_query = described_class["queries.guidance_get"]
     interpretation_query = described_class["queries.decision_interpretation_list"]
     decision_query = described_class["queries.decision_get"]
+    agent_choice_query = described_class["queries.agent_choice_get"]
     task_submissions = %w[
       operations.submit_create_change_set_task
       operations.submit_create_work_item_task
@@ -94,6 +95,7 @@ RSpec.describe Coordinator::Container do
     expect(read_model_set).to be_a(Coordinator::Read::Subscriptions::ReadModelSet)
     expect(read_model_set.subscription_names).to eq(
       [
+        "agent-choices-v1",
         "command-receipts-v1",
         "coord-context-v1",
         "decision-governance-v1",
@@ -106,6 +108,7 @@ RSpec.describe Coordinator::Container do
     expect(guidance_query).to be_a(Coordinator::Read::Queries::GuidanceGet)
     expect(interpretation_query).to be_a(Coordinator::Read::Queries::DecisionInterpretationList)
     expect(decision_query).to be_a(Coordinator::Read::Queries::DecisionGet)
+    expect(agent_choice_query).to be_a(Coordinator::Read::Queries::AgentChoiceGet)
     expect(task_submissions).to all(
       be_a(Coordinator::Write::Operations::PrepareAndSubmitCoordinationTask)
     )

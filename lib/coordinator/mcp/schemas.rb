@@ -372,6 +372,13 @@ module Coordinator
         )
       end
 
+      def agent_choice_get
+        object_schema(
+          properties: { choice_id: identifier },
+          required: %w[choice_id]
+        )
+      end
+
       def guidance_get
         object_schema(
           properties: { message_id: identifier },

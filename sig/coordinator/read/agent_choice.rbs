@@ -1,0 +1,32 @@
+module Coordinator
+  module Read
+    class AgentChoice < ApplicationRecord
+      def choice_id: () -> String
+      def choice_type: () -> String
+      def observation_status: () -> String
+      def selected: () -> Hash[String, untyped]
+      def alternatives: () -> Array[Hash[String, untyped]]
+      def reason_summary: () -> String
+      def context: () -> Hash[String, untyped]
+      def decision_context: () -> Hash[String, untyped]
+      def context_digest: () -> String
+      def assessment: () -> Hash[String, untyped]?
+      def recorded_event: () -> Hash[String, untyped]
+      def accepted_event: () -> Hash[String, untyped]?
+      def recorded_actor: () -> Hash[String, untyped]
+      def accepted_actor: () -> Hash[String, untyped]?
+      def recorded_markers: () -> Array[String]
+      def accepted_markers: () -> Array[String]?
+      def recorded_metadata: () -> Hash[String, untyped]
+      def accepted_metadata: () -> Hash[String, untyped]?
+      def recorded_causation_id: () -> String?
+      def recorded_correlation_id: () -> String?
+      def accepted_causation_id: () -> String?
+      def accepted_correlation_id: () -> String?
+      def recorded_at_domain: () -> Time
+      def accepted_at_domain: () -> Time?
+      def recorded_at_store: () -> Time
+      def accepted_at_store: () -> Time?
+    end
+  end
+end

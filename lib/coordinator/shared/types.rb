@@ -108,6 +108,7 @@ module Coordinator::Shared
     AGENT_CHOICE_TYPES = %w[testing.framework].freeze
     AGENT_CHOICE_ASSESSMENT_BASES = %w[no_policy compliant advisory_violation].freeze
     AGENT_CHOICE_OUTCOMES = %w[accepted].freeze
+    AGENT_CHOICE_OBSERVATION_STATUSES = %w[recorded accepted].freeze
     DECISION_ACTIVATION_INELIGIBILITY_REASONS = %w[
       non_normative_statement_kind
       missing_effect
@@ -227,6 +228,7 @@ module Coordinator::Shared
     AgentChoiceType = String.enum(*AGENT_CHOICE_TYPES)
     AgentChoiceAssessmentBasis = String.enum(*AGENT_CHOICE_ASSESSMENT_BASES)
     AgentChoiceOutcome = String.enum(*AGENT_CHOICE_OUTCOMES)
+    AgentChoiceObservationStatus = String.enum(*AGENT_CHOICE_OBSERVATION_STATUSES)
     DecisionActivationIneligibilityReason = String.enum(*DECISION_ACTIVATION_INELIGIBILITY_REASONS)
     DecisionActivationIneligibilityReasons = Array.of(DecisionActivationIneligibilityReason).constrained(min_size: 1, max_size: 10)
     DecisionCorrectionIneligibilityReason = String.enum(*DECISION_CORRECTION_INELIGIBILITY_REASONS)

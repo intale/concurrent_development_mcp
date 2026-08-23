@@ -10,9 +10,41 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_22_223000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_23_070000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "agent_choices", primary_key: "choice_id", id: :string, force: :cascade do |t|
+    t.jsonb "accepted_actor"
+    t.datetime "accepted_at_domain"
+    t.datetime "accepted_at_store"
+    t.string "accepted_causation_id"
+    t.string "accepted_correlation_id"
+    t.jsonb "accepted_event"
+    t.jsonb "accepted_markers"
+    t.jsonb "accepted_metadata"
+    t.jsonb "alternatives", default: [], null: false
+    t.jsonb "assessment"
+    t.string "choice_type", null: false
+    t.jsonb "context", null: false
+    t.string "context_digest", null: false
+    t.datetime "created_at", null: false
+    t.jsonb "decision_context", null: false
+    t.string "observation_status", null: false
+    t.text "reason_summary", null: false
+    t.jsonb "recorded_actor", null: false
+    t.datetime "recorded_at_domain", null: false
+    t.datetime "recorded_at_store", null: false
+    t.string "recorded_causation_id"
+    t.string "recorded_correlation_id"
+    t.jsonb "recorded_event", null: false
+    t.jsonb "recorded_markers", default: [], null: false
+    t.jsonb "recorded_metadata", default: {}, null: false
+    t.jsonb "selected", null: false
+    t.datetime "updated_at", null: false
+    t.index ["choice_type"], name: "index_agent_choices_on_choice_type"
+    t.index ["observation_status"], name: "index_agent_choices_on_observation_status"
+  end
 
   create_table "command_receipts", primary_key: "command_id", id: :string, force: :cascade do |t|
     t.string "canonical_input_digest", null: false

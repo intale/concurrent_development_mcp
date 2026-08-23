@@ -34,7 +34,9 @@ module Coordinator
         Before committing to a significant testing-framework selection, call decision_resolve and pass its
         exact decision_context to agent_choice_record. A stale_context result means no choice was recorded;
         refresh decision_resolve and submit a new command. A confirmation_required result has no bypass in
-        this protocol version and must be escalated instead of silently accepted.
+        this protocol version and must be escalated instead of silently accepted. Use agent_choice_get for
+        the latest available evidence: recorded means that fact has been observed, accepted means the next
+        lifecycle fact has also been observed, and neither status is a freshness or write-authorization claim.
         The coordinator records attributed evidence and does not execute Git, CI, or agent work.
       TEXT
 

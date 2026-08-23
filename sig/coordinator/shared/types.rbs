@@ -33,6 +33,7 @@ module Coordinator
       AGENT_CHOICE_TYPES: Array[String]
       AGENT_CHOICE_ASSESSMENT_BASES: Array[String]
       AGENT_CHOICE_OUTCOMES: Array[String]
+      AGENT_CHOICE_OBSERVATION_STATUSES: Array[String]
       DECISION_ACTIVATION_INELIGIBILITY_REASONS: Array[String]
       DECISION_CORRECTION_INELIGIBILITY_REASONS: Array[String]
       SCOPE_PROVENANCE_KINDS: Array[String]
@@ -100,6 +101,7 @@ module Coordinator
       AgentChoiceType: untyped
       AgentChoiceAssessmentBasis: untyped
       AgentChoiceOutcome: untyped
+      AgentChoiceObservationStatus: untyped
       DecisionActivationIneligibilityReason: untyped
       DecisionActivationIneligibilityReasons: untyped
       DecisionCorrectionIneligibilityReason: untyped

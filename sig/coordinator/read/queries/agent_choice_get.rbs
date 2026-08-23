@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    module Queries
+      class AgentChoiceGet
+        def initialize: (?contract: Contracts::AgentChoiceGet, ?choices: Repositories::AgentChoices) -> void
+        %a{rbs:test:skip}
+        def call: (command_input input) -> QueryResultV1
+      end
+    end
+  end
+end

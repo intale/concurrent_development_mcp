@@ -67,6 +67,45 @@ RSpec.describe "CHO-01 MCP agent choice recording", :event_store, :read_model do
     expect([ submitted, started, *choice_facts, completion, task_completed ].map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
     )
+
+    absent = call_tool("agent_choice_get", { choice_id: "CHO-mcp-choice" }, id: 4)
+    expect(absent.dig("result", "structuredContent")).to include(
+      "status" => "not_found",
+      "data" => include("code" => "agent_choice_not_observed")
+    )
+
+    projector = Coordinator::Container["projectors.agent_choices_v1"]
+    projector.call(choice_facts.first)
+    recorded_view = call_tool("agent_choice_get", { choice_id: "CHO-mcp-choice" }, id: 5)
+      .dig("result", "structuredContent", "data", "choice")
+    expect(recorded_view).to include(
+      "choice_id" => "CHO-mcp-choice",
+      "observation_status" => "recorded",
+      "selected" => include("option_id" => "rspec"),
+      "assessment" => nil,
+      "accepted" => nil,
+      "recorded" => include(
+        "event" => include("event_id" => choice_facts.first.id),
+        "markers" => include("choice:CHO-mcp-choice"),
+        "metadata" => include("command_id" => "cmd-mcp-choice"),
+        "causation_id" => choice_facts.first.causation_id,
+        "correlation_id" => choice_facts.first.correlation_id
+      )
+    )
+
+    projector.call(choice_facts.last)
+    accepted_view = call_tool("agent_choice_get", { choice_id: "CHO-mcp-choice" }, id: 6)
+      .dig("result", "structuredContent", "data", "choice")
+    expect(accepted_view).to include(
+      "observation_status" => "accepted",
+      "assessment" => include("basis" => "no_policy"),
+      "accepted" => include(
+        "event" => include("event_id" => choice_facts.last.id),
+        "causation_id" => choice_facts.last.causation_id,
+        "correlation_id" => choice_facts.last.correlation_id
+      )
+    )
+    expect(accepted_view.keys & %w[fresh pending projection_status]).to be_empty
   end
 
   it "serves stale context but rejects its later command without choice facts" do

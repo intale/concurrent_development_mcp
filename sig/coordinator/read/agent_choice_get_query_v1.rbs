@@ -1,0 +1,7 @@
+module Coordinator
+  module Read
+    class AgentChoiceGetQueryV1 < Shared::Value
+      def choice_id: () -> String
+    end
+  end
+end

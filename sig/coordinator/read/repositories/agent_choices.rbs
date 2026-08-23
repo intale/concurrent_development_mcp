@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    module Repositories
+      class AgentChoices
+        def fetch: (String choice_id) -> AgentChoiceViewV1?
+        def store_recorded: (event: PgEventstore::Event, choice: Write::Events::AgentChoiceRecordedV1) -> AgentChoice
+        def accept: (event: PgEventstore::Event, acceptance: Write::Events::AgentChoiceAcceptedV1) -> AgentChoice
+      end
+    end
+  end
+end

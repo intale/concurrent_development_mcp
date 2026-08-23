@@ -1,0 +1,20 @@
+module Coordinator
+  module Read
+    class AgentChoiceViewV1 < Shared::Value
+      Option: singleton(Write::AgentChoices::ChoiceOptionV1)
+
+      def choice_id: () -> String
+      def choice_type: () -> String
+      def observation_status: () -> String
+      def selected: () -> Write::AgentChoices::ChoiceOptionV1
+      def alternatives: () -> Array[Write::AgentChoices::ChoiceOptionV1]
+      def reason_summary: () -> String
+      def context: () -> Write::DecisionContexts::QueryContextV1
+      def decision_context: () -> Write::DecisionContexts::ContextV1
+      def context_digest: () -> String
+      def assessment: () -> Write::AgentChoices::ChoiceAssessmentV1?
+      def recorded: () -> AgentChoiceLifecycleEvidenceV1
+      def accepted: () -> AgentChoiceLifecycleEvidenceV1?
+    end
+  end
+end

@@ -43,7 +43,11 @@ module Coordinator
         def decision_context: () -> DecisionResolution::ContextV1
       end
 
-      type data = EmptyData | DomainError | OperationData | ContextData | NotModifiedData | GuidanceData | InterpretationPageData | DecisionData | DecisionContextData
+      class AgentChoiceData < Shared::Value
+        def choice: () -> AgentChoiceViewV1
+      end
+
+      type data = EmptyData | DomainError | OperationData | ContextData | NotModifiedData | GuidanceData | InterpretationPageData | DecisionData | DecisionContextData | AgentChoiceData
       type action = Write::NextAction | NextAction
 
       def status: () -> String

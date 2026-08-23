@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    module Subscriptions
+      class AgentChoices < Shared::Subscriptions::Registration
+        DEFINITION: ReadModelDefinition
+
+        def initialize: (handler: Projectors::AgentChoicesV1, ?pull_interval: Integer | Float) -> void
+      end
+    end
+  end
+end

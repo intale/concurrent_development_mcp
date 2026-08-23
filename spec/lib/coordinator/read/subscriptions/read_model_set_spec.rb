@@ -32,12 +32,19 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       pull_interval: 0.2
     )
   end
+  let(:agent_choice_registration) do
+    Coordinator::Read::Subscriptions::AgentChoices.new(
+      handler: Coordinator::Read::Projectors::AgentChoicesV1.new,
+      pull_interval: 0.2
+    )
+  end
 
-  it "stacks five unique durable subscriptions on one read-model manager" do
+  it "stacks six unique durable subscriptions on one read-model manager" do
     subscription_set = build_set
 
     expect(subscription_set.subscription_names).to eq(
       [
+        "agent-choices-v1",
         "command-receipts-v1",
         "coord-context-v1",
         "decision-governance-v1",
@@ -64,6 +71,10 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
     expect(decision_registration.definition.identity.to_h).to eq(
       set_name: "coordinator-read-models-v1",
       subscription_name: "decision-governance-v1"
+    )
+    expect(agent_choice_registration.definition.identity.to_h).to eq(
+      set_name: "coordinator-read-models-v1",
+      subscription_name: "agent-choices-v1"
     )
   end
 
@@ -115,12 +126,17 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
           interpretation_id: "I-subscription"
         )
       ).value!
+      AgentChoiceScenario.record_no_policy_choice(
+        prefix: "subscription-choice",
+        repository_id: "choice-subscription"
+      )
 
       wait_for(subscription_set, "coord-context-v1", minimum: 2)
       wait_for(subscription_set, "command-receipts-v1", minimum: 5)
       wait_for(subscription_set, "user-utterances-v1", minimum: 1)
       wait_for(subscription_set, "decision-interpretations-v1", minimum: 2)
       wait_for(subscription_set, "decision-governance-v1", minimum: 5)
+      wait_for(subscription_set, "agent-choices-v1", minimum: 2)
 
       expect(Coordinator::Read::CoordContext.find("CS-SUB-100").document).to include(
         "schema" => "coord-context/v1"
@@ -147,6 +163,10 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         decision_id: "D-subscription",
         partition_revision: 0
       )
+      expect(Coordinator::Read::AgentChoice.find("CHO-subscription-choice")).to have_attributes(
+        choice_type: "testing.framework",
+        observation_status: "accepted"
+      )
     ensure
       subscription_set.stop
     end
@@ -163,7 +183,8 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         receipt_registration,
         utterance_registration,
         interpretation_registration,
-        decision_registration
+        decision_registration,
+        agent_choice_registration
       ]
     )
   end

@@ -34,6 +34,7 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
       "decision_interpretation_list",
       "decision_get",
       "decision_resolve",
+      "agent_choice_get",
       "decision_interpretation_adjudicate",
       "decision_activate",
       "decision_correct",

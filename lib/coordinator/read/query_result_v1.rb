@@ -45,6 +45,10 @@ module Coordinator::Read
       attribute :decision_context, DecisionResolution::ContextV1
     end
 
+    class AgentChoiceData < Value
+      attribute :choice, AgentChoiceViewV1
+    end
+
     Data = EmptyData |
            DomainError |
            OperationData |
@@ -53,7 +57,8 @@ module Coordinator::Read
            GuidanceData |
            InterpretationPageData |
            DecisionData |
-           DecisionContextData
+           DecisionContextData |
+           AgentChoiceData
     Action = Coordinator::Write::NextAction | NextAction
 
     attribute :status, Types::String.enum(
