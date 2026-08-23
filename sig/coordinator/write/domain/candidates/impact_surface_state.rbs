@@ -1,0 +1,12 @@
+module Coordinator::Write
+  module Domain
+    module Candidates
+      class ImpactSurfaceState < Coordinator::Shared::Value
+        def submission: () -> Coordinator::Write::Events::CandidateSubmittedV1?
+        def manifest: () -> Coordinator::Write::Events::CandidateChangeManifestCapturedV1?
+        def build_context: () -> Coordinator::Write::Events::CandidateBuildContextCapturedV1?
+        def existing_surface: () -> Coordinator::Write::EventReference?
+      end
+    end
+  end
+end

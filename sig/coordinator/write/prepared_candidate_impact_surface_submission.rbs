@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    class PreparedCandidateImpactSurfaceSubmission < Coordinator::Shared::Value
+      def derived_at: () -> String
+      def input_digest: () -> String
+      def surface_event_id: () -> String
+      def completion_event_id: () -> String
+    end
+  end
+end

@@ -1,0 +1,27 @@
+module Coordinator::Write
+  module Operations
+    class ExecuteSubmitCandidateImpactSurface < Dry::Operation
+      TOOL_NAME: String
+
+      def initialize: (
+        event_store: _EventStore,
+        ?preparer: Coordinator::Write::Operations::PrepareSubmitCandidateImpactSurface,
+        ?decider: Coordinator::Write::Domain::Candidates::SubmitImpactSurface,
+        ?input_digest: Coordinator::Write::CommandInputDigest,
+        ?clock: Coordinator::Shared::_Clock,
+        ?id_generator: Coordinator::Shared::_IdGenerator,
+        ?event_factory: Coordinator::Write::EventFactory,
+        ?schema_registry: Coordinator::Write::EventSchemaRegistry,
+        ?stream_factory: Coordinator::Write::StreamFactory,
+        ?completion_builder: Coordinator::Write::CommandCompletionBuilder,
+        ?event_plan_contract: Coordinator::Write::Contracts::CandidateImpactSurfaceEventPlan
+      ) -> void
+      %a{rbs:test:skip}
+      def call: (command_input input) -> Dry::Monads::Result
+      def call_command: (
+        Coordinator::Write::Commands::SubmitCandidateImpactSurface command,
+        ?caused_by: PgEventstore::Event?
+      ) -> Dry::Monads::Result
+    end
+  end
+end

@@ -1,0 +1,7 @@
+module Coordinator::Write
+  module Candidates
+    class ImpactKeyV1 < Coordinator::Shared::Value
+      def impact_key: () -> String
+    end
+  end
+end

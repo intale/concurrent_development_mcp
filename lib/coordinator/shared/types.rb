@@ -11,6 +11,7 @@ module Coordinator::Shared
     TIMESTAMP_PATTERN = /\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z\z/
     UUID_V7_PATTERN = /\A[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/
     RESOURCE_PATH_PATTERN = /\A[^\u0000-\u001f\u007f]{1,1024}\z/
+    CANDIDATE_IMPACT_KEY_PATTERN = /\A[a-z][a-z0-9_.-]*(?::[a-z0-9][a-z0-9_.-]*)+\z/
     MARKER_PURPOSE_PATTERN = /\A[a-z][a-z0-9-]{0,63}\z/
     MARKER_COMPONENT_PATTERN = /\A(?!compound:)[^\u0000\r\n]{1,512}\z/
 
@@ -185,6 +186,8 @@ module Coordinator::Shared
       generated_source_origin
     ].freeze
     CANDIDATE_EVIDENCE_STATUSES = %w[attributed_unverified].freeze
+    CANDIDATE_IMPACT_SURFACE_DIRECTIONS = %w[produces consumes may_affect assumes].freeze
+    CANDIDATE_IMPACT_QUERY_DIRECTIONS = %w[incoming outgoing].freeze
     DECISION_ACTIVATION_INELIGIBILITY_REASONS = %w[
       non_normative_statement_kind
       missing_effect
@@ -250,6 +253,7 @@ module Coordinator::Shared
       decision_correct
       agent_choice_record
       candidate_submit
+      candidate_impact_surface_submit
     ].freeze
 
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)
@@ -320,6 +324,14 @@ module Coordinator::Shared
     CandidateGitFileMode = String.enum(*CANDIDATE_GIT_FILE_MODES)
     CandidateBuildInputKind = String.enum(*CANDIDATE_BUILD_INPUT_KINDS)
     CandidateEvidenceStatus = String.enum(*CANDIDATE_EVIDENCE_STATUSES)
+    CandidateImpactKey = String.constrained(
+      format: CANDIDATE_IMPACT_KEY_PATTERN,
+      min_size: 3,
+      max_size: 200
+    )
+    CandidateImpactValue = String.constrained(min_size: 1, max_size: 500)
+    CandidateAnalyzerVersion = String.constrained(min_size: 1, max_size: 100)
+    CandidateImpactQueryDirection = String.enum(*CANDIDATE_IMPACT_QUERY_DIRECTIONS)
     CandidateEvidenceRevision = Integer.enum(1)
     CandidateManifestSize = Integer.constrained(gteq: 1, lteq: 256)
     CandidateBuildInputCount = Integer.constrained(gteq: 0, lteq: 64)

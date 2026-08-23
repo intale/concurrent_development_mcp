@@ -1,0 +1,14 @@
+module Coordinator::Write
+  module Domain
+    module Candidates
+      class SubmitImpactSurface
+        def initialize: (?stream_factory: Coordinator::Write::StreamFactory) -> void
+        def call: (
+          state: ImpactSurfaceState,
+          command: Coordinator::Write::Commands::SubmitCandidateImpactSurface,
+          derived_at: String
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

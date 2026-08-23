@@ -1,0 +1,13 @@
+module Coordinator::Write
+  module Candidates
+    class ImpactSurfaceV1 < Coordinator::Shared::Value
+      def policy_version: () -> String
+      def digest: () -> String
+      def produces: () -> Array[ImpactTransitionV1]
+      def consumes: () -> Array[ImpactObservationV1]
+      def may_affect: () -> Array[ImpactKeyV1]
+      def assumes: () -> Array[ImpactAssumptionV1]
+      def analyzer: () -> ImpactAnalyzerV1
+    end
+  end
+end

@@ -37,6 +37,8 @@ module Coordinator::Write
           build_record_agent_choice(document)
         when CommandInputDocuments::SubmitCandidateV1
           build_submit_candidate(document)
+        when CommandInputDocuments::SubmitCandidateImpactSurfaceV1
+          build_submit_candidate_impact_surface(document)
         end
       end
 
@@ -290,6 +292,20 @@ module Coordinator::Write
           kind: actor.kind,
           id: actor.id,
           collector_version: version
+        )
+      end
+
+      def build_submit_candidate_impact_surface(document)
+        input = document.input
+        Commands::SubmitCandidateImpactSurface.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          candidate_id: input.candidate_id,
+          repository_id: input.repository_id,
+          head_commit_oid: input.head_commit_oid,
+          manifest_digest: input.manifest_digest,
+          build_context_digest: input.build_context_digest,
+          surface: input.surface
         )
       end
 

@@ -354,6 +354,21 @@ module Coordinator::Write
       attribute :input, SubmitCandidateInputV1
     end
 
+    class SubmitCandidateImpactSurfaceInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :candidate_id, Types::Identifier
+      attribute :repository_id, Types::RepositoryId
+      attribute :head_commit_oid, Types::GitOid
+      attribute :manifest_digest, Types::Sha256Digest
+      attribute :build_context_digest, Types::Sha256Digest.optional
+      attribute :surface, Candidates::ImpactSurfaceV1
+    end
+
+    class SubmitCandidateImpactSurfaceV1 < BaseV1
+      attribute :tool_name, Types::String.enum("candidate_impact_surface_submit")
+      attribute :input, SubmitCandidateImpactSurfaceInputV1
+    end
+
     class ExpireResourceLeaseInputV1 < Value
       attribute :actor, ActorV1
       attribute :resource_key_hash, Types::Sha256Digest
@@ -383,7 +398,8 @@ module Coordinator::Write
            ActivateDecisionV1 |
            CorrectDecisionV1 |
            RecordAgentChoiceV1 |
-           SubmitCandidateV1
+           SubmitCandidateV1 |
+           SubmitCandidateImpactSurfaceV1
 
     DigestType = Type | ExpireResourceLeaseV1
   end

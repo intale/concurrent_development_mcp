@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandInputDocuments
-      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1 | SubmitCandidateV1
+      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1 | SubmitCandidateV1 | SubmitCandidateImpactSurfaceV1
       type digest_value = value | ExpireResourceLeaseV1
 
       class ActorV1 < Shared::Value
@@ -336,6 +336,21 @@ module Coordinator
       class SubmitCandidateV1 < BaseV1
         def tool_name: () -> String
         def input: () -> SubmitCandidateInputV1
+      end
+
+      class SubmitCandidateImpactSurfaceInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def candidate_id: () -> String
+        def repository_id: () -> String
+        def head_commit_oid: () -> String
+        def manifest_digest: () -> String
+        def build_context_digest: () -> String?
+        def surface: () -> Candidates::ImpactSurfaceV1
+      end
+
+      class SubmitCandidateImpactSurfaceV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> SubmitCandidateImpactSurfaceInputV1
       end
 
       class ExpireResourceLeaseInputV1 < Shared::Value

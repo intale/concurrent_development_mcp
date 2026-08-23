@@ -155,6 +155,16 @@ module Coordinator::Write
       direction: :asc
     )
 
+    CANDIDATE_FOR_IMPACT_SURFACE = GroupedEventReadCriteria.new(
+      event_types: [
+        "CandidateSubmitted",
+        "CandidateChangeManifestCaptured",
+        "CandidateBuildContextCaptured",
+        "CandidateImpactSurfaceDerived"
+      ],
+      direction: :asc
+    )
+
     COORDINATION_TASK_HISTORY = EventReadCriteria.new(
       event_types: [
         "CoordinationTaskSubmitted",

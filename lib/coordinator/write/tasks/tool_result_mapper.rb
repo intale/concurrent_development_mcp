@@ -22,7 +22,10 @@ module Coordinator::Write
         candidate_id_already_used: "conflict",
         candidate_head_already_registered: "conflict",
         lease_observations_mismatch: "conflict",
-        lease_not_active: "conflict"
+        lease_not_active: "conflict",
+        candidate_impact_identity_mismatch: "conflict",
+        candidate_impact_source_evidence_mismatch: "conflict",
+        candidate_impact_surface_already_recorded: "conflict"
       }.freeze
 
       def call(result, command_id:)

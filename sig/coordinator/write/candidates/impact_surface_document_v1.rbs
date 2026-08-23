@@ -1,0 +1,18 @@
+module Coordinator::Write
+  module Candidates
+    class ImpactSurfaceDocumentV1 < Coordinator::Shared::Value
+      SCHEMA: String
+
+      def schema: () -> String
+      def candidate_id: () -> String
+      def repository_id: () -> String
+      def head_commit_oid: () -> String
+      def manifest_digest: () -> String
+      def build_context_digest: () -> String?
+      def produces: () -> Array[ImpactTransitionV1]
+      def consumes: () -> Array[ImpactObservationV1]
+      def may_affect: () -> Array[ImpactKeyV1]
+      def assumes: () -> Array[ImpactAssumptionV1]
+    end
+  end
+end

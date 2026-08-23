@@ -177,6 +177,15 @@ module Coordinator::Write
       attribute :submitted_at, Types::Timestamp
     end
 
+    class CandidateImpactSurface < Value
+      attribute :candidate_id, Types::Identifier
+      attribute :surface_digest, Types::Sha256Digest
+      attribute :evidence_revision, Types::CandidateEvidenceRevision
+      attribute :evidence_status, Types::CandidateEvidenceStatus
+      attribute :surface_event, EventReference
+      attribute :derived_at, Types::Timestamp
+    end
+
     Type = ChangeSet |
            WorkItem |
            Dependency |
@@ -192,6 +201,7 @@ module Coordinator::Write
            DecisionActivation |
            DecisionCorrection |
            AgentChoice |
-           CandidateSubmission
+           CandidateSubmission |
+           CandidateImpactSurface
   end
 end

@@ -98,6 +98,10 @@ module Coordinator
       Write::Operations::PrepareSubmitCandidate.new
     end
 
+    register("operations.prepare_submit_candidate_impact_surface", memoize: true) do
+      Write::Operations::PrepareSubmitCandidateImpactSurface.new
+    end
+
     register("domain.change_sets.create", memoize: true) do
       Write::Domain::ChangeSets::Create.new(stream_factory: self["stream_factory"])
     end
@@ -231,6 +235,10 @@ module Coordinator
 
     register("domain.candidates.submit", memoize: true) do
       Write::Domain::Candidates::Submit.new(stream_factory: self["stream_factory"])
+    end
+
+    register("domain.candidates.submit_impact_surface", memoize: true) do
+      Write::Domain::Candidates::SubmitImpactSurface.new(stream_factory: self["stream_factory"])
     end
 
     register("change_set_activation_source_builder", memoize: true) do
@@ -752,6 +760,21 @@ module Coordinator
       )
     end
 
+    register("operations.execute_submit_candidate_impact_surface") do
+      Write::Operations::ExecuteSubmitCandidateImpactSurface.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_submit_candidate_impact_surface"],
+        decider: self["domain.candidates.submit_impact_surface"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
     register("operations.execute_start_agent_choice_impact_scan", memoize: true) do
       Write::Operations::ExecuteStartAgentChoiceImpactScan.new(
         event_store: self["event_store"],
@@ -808,7 +831,9 @@ module Coordinator
         activate_decision: self["operations.execute_activate_decision"],
         correct_decision: self["operations.execute_correct_decision"],
         record_agent_choice: self["operations.execute_record_agent_choice"],
-        submit_candidate: self["operations.execute_submit_candidate"]
+        submit_candidate: self["operations.execute_submit_candidate"],
+        submit_candidate_impact_surface:
+          self["operations.execute_submit_candidate_impact_surface"]
       )
     end
 

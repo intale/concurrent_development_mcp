@@ -26,6 +26,8 @@ RSpec.describe Coordinator::Container do
     decision_correction_operation = described_class["operations.execute_correct_decision"]
     agent_choice_operation = described_class["operations.execute_record_agent_choice"]
     candidate_operation = described_class["operations.execute_submit_candidate"]
+    candidate_impact_operation =
+      described_class["operations.execute_submit_candidate_impact_surface"]
     impact_scan_start = described_class["operations.execute_start_agent_choice_impact_scan"]
     impact_scan_progress = described_class["operations.execute_progress_agent_choice_impact_scan"]
     impact_assessment = described_class["operations.execute_assess_agent_choice_decision_impact"]
@@ -94,6 +96,9 @@ RSpec.describe Coordinator::Container do
       Coordinator::Write::Operations::ExecuteRecordAgentChoice
     )
     expect(candidate_operation).to be_a(Coordinator::Write::Operations::ExecuteSubmitCandidate)
+    expect(candidate_impact_operation).to be_a(
+      Coordinator::Write::Operations::ExecuteSubmitCandidateImpactSurface
+    )
     expect(impact_scan_start).to be_a(
       Coordinator::Write::Operations::ExecuteStartAgentChoiceImpactScan
     )

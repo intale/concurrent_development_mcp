@@ -319,6 +319,24 @@ module Coordinator::Write
         attribute :submitted_base_blob_oid, Types::GitOid.optional
       end
 
+      class CandidateImpactDetails < Value
+        attribute :candidate_id, Types::Identifier
+      end
+
+      class CandidateImpactIdentityMismatchDetails < CandidateImpactDetails
+        attribute :expected_repository_id, Types::RepositoryId
+        attribute :expected_head_commit_oid, Types::GitOid
+        attribute :submitted_repository_id, Types::RepositoryId
+        attribute :submitted_head_commit_oid, Types::GitOid
+      end
+
+      class CandidateImpactSourceEvidenceMismatchDetails < CandidateImpactDetails
+        attribute :expected_manifest_digest, Types::Sha256Digest.optional
+        attribute :submitted_manifest_digest, Types::Sha256Digest
+        attribute :expected_build_context_digest, Types::Sha256Digest.optional
+        attribute :submitted_build_context_digest, Types::Sha256Digest.optional
+      end
+
       class ChangeSetError < Value
         attribute :code, Types::String.enum(
           "change_set_already_exists",
@@ -702,6 +720,30 @@ module Coordinator::Write
         attribute :details, CandidateManifestBaseMismatchDetails
       end
 
+      class CandidateNotFoundError < Value
+        attribute :code, Types::String.enum("candidate_not_found")
+        attribute :message, Types::String
+        attribute :details, CandidateImpactDetails
+      end
+
+      class CandidateImpactIdentityMismatchError < Value
+        attribute :code, Types::String.enum("candidate_impact_identity_mismatch")
+        attribute :message, Types::String
+        attribute :details, CandidateImpactIdentityMismatchDetails
+      end
+
+      class CandidateImpactSourceEvidenceMismatchError < Value
+        attribute :code, Types::String.enum("candidate_impact_source_evidence_mismatch")
+        attribute :message, Types::String
+        attribute :details, CandidateImpactSourceEvidenceMismatchDetails
+      end
+
+      class CandidateImpactSurfaceAlreadyRecordedError < Value
+        attribute :code, Types::String.enum("candidate_impact_surface_already_recorded")
+        attribute :message, Types::String
+        attribute :details, CandidateExistingDetails
+      end
+
       Type = ChangeSetError |
              ActivationDependencyError |
              WorkItemError |
@@ -759,7 +801,11 @@ module Coordinator::Write
              CandidateLeaseNotActiveScopeError |
              CandidateLeaseNotActiveError |
              CandidateUnauthorizedResourcesError |
-             CandidateManifestBaseMismatchError
+             CandidateManifestBaseMismatchError |
+             CandidateNotFoundError |
+             CandidateImpactIdentityMismatchError |
+             CandidateImpactSourceEvidenceMismatchError |
+             CandidateImpactSurfaceAlreadyRecordedError
     end
   end
 end

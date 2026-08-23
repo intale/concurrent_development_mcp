@@ -17,7 +17,8 @@ module Coordinator
                                 Commands::ActivateDecision |
                                 Commands::CorrectDecision |
                                 Commands::RecordAgentChoice |
-                                Commands::SubmitCandidate
+                                Commands::SubmitCandidate |
+                                Commands::SubmitCandidateImpactSurface
     type write_command = coordination_command | Commands::ExpireResourceLease
     type lifecycle_command = Commands::StartCoordinationTask |
                              Commands::RecordCoordinationTaskOutcome |

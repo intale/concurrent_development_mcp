@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Tasks
       module DomainErrorV1
-        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError | InterpretationNotAcceptedError | DecisionAlreadyExistsError | InterpretationAlreadyActivatedError | DecisionDefinitionNotActivatableError | DecisionSlotOccupiedError | DecisionPartitionLimitReachedError | DecisionPartitionCapacityReachedError | DecisionPartitionStateInvalidError | DecisionNotFoundError | DecisionNotActiveError | InterpretationNotACorrectionError | DecisionDefinitionNotCorrectableError | DecisionRevisionChangedError | DecisionSlotStateInvalidError | AgentChoiceAlreadyExistsError | StaleDecisionContextError | DecisionContextMismatchError | DecisionContextConflictError | DecisionContextLimitReachedError | UnsupportedDecisionContextError | AgentChoiceBlockedByDecisionError | AgentChoiceConfirmationRequiredError | AgentChoicePartitionSnapshotInvalidError | AgentChoiceDecisionHeadInvalidError | AgentChoiceUnresolvedHeadsError | CandidateAlreadyExistsError | CandidateHeadAlreadyRegisteredError | CandidateLeaseObservationsMismatchError | CandidateLeaseNotActiveScopeError | CandidateLeaseNotActiveError | CandidateUnauthorizedResourcesError | CandidateManifestBaseMismatchError
+        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError | InterpretationNotAcceptedError | DecisionAlreadyExistsError | InterpretationAlreadyActivatedError | DecisionDefinitionNotActivatableError | DecisionSlotOccupiedError | DecisionPartitionLimitReachedError | DecisionPartitionCapacityReachedError | DecisionPartitionStateInvalidError | DecisionNotFoundError | DecisionNotActiveError | InterpretationNotACorrectionError | DecisionDefinitionNotCorrectableError | DecisionRevisionChangedError | DecisionSlotStateInvalidError | AgentChoiceAlreadyExistsError | StaleDecisionContextError | DecisionContextMismatchError | DecisionContextConflictError | DecisionContextLimitReachedError | UnsupportedDecisionContextError | AgentChoiceBlockedByDecisionError | AgentChoiceConfirmationRequiredError | AgentChoicePartitionSnapshotInvalidError | AgentChoiceDecisionHeadInvalidError | AgentChoiceUnresolvedHeadsError | CandidateAlreadyExistsError | CandidateHeadAlreadyRegisteredError | CandidateLeaseObservationsMismatchError | CandidateLeaseNotActiveScopeError | CandidateLeaseNotActiveError | CandidateUnauthorizedResourcesError | CandidateManifestBaseMismatchError | CandidateNotFoundError | CandidateImpactIdentityMismatchError | CandidateImpactSourceEvidenceMismatchError | CandidateImpactSurfaceAlreadyRecordedError
 
         class ChangeSetDetails < Shared::Value
           def change_set_id: () -> String
@@ -314,6 +314,24 @@ module Coordinator
           def path: () -> String
           def expected_base_blob_oid: () -> String?
           def submitted_base_blob_oid: () -> String?
+        end
+
+        class CandidateImpactDetails < Shared::Value
+          def candidate_id: () -> String
+        end
+
+        class CandidateImpactIdentityMismatchDetails < CandidateImpactDetails
+          def expected_repository_id: () -> String
+          def expected_head_commit_oid: () -> String
+          def submitted_repository_id: () -> String
+          def submitted_head_commit_oid: () -> String
+        end
+
+        class CandidateImpactSourceEvidenceMismatchDetails < CandidateImpactDetails
+          def expected_manifest_digest: () -> String?
+          def submitted_manifest_digest: () -> String
+          def expected_build_context_digest: () -> String?
+          def submitted_build_context_digest: () -> String?
         end
 
         class ChangeSetError < Shared::Value
@@ -665,6 +683,30 @@ module Coordinator
           def code: () -> String
           def message: () -> String
           def details: () -> CandidateManifestBaseMismatchDetails
+        end
+
+        class CandidateNotFoundError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> CandidateImpactDetails
+        end
+
+        class CandidateImpactIdentityMismatchError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> CandidateImpactIdentityMismatchDetails
+        end
+
+        class CandidateImpactSourceEvidenceMismatchError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> CandidateImpactSourceEvidenceMismatchDetails
+        end
+
+        class CandidateImpactSurfaceAlreadyRecordedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> CandidateExistingDetails
         end
       end
     end

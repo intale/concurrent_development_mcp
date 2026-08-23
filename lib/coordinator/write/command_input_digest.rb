@@ -28,6 +28,7 @@ module Coordinator::Write
       when Commands::CorrectDecision then decision_correct_document(command)
       when Commands::RecordAgentChoice then agent_choice_record_document(command)
       when Commands::SubmitCandidate then candidate_submit_document(command)
+      when Commands::SubmitCandidateImpactSurface then candidate_impact_surface_submit_document(command)
       when Commands::ExpireResourceLease then lease_expire_policy_document(command)
       else
         raise ArgumentError, "Unsupported coordination command: #{command.class.name}"
@@ -397,6 +398,27 @@ module Coordinator::Write
           actual_resources: command.actual_resources.map do |resource|
             CommandInputDocuments::FileResourceV1.new(resource.to_h)
           end
+        )
+      )
+    end
+
+    def candidate_impact_surface_submit(command)
+      @canonical_json.sha256(candidate_impact_surface_submit_document(command).to_h)
+    end
+
+    def candidate_impact_surface_submit_document(command)
+      CommandInputDocuments::SubmitCandidateImpactSurfaceV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "candidate_impact_surface_submit",
+        input: CommandInputDocuments::SubmitCandidateImpactSurfaceInputV1.new(
+          actor: actor_document(command.actor),
+          candidate_id: command.candidate_id,
+          repository_id: command.repository_id,
+          head_commit_oid: command.head_commit_oid,
+          manifest_digest: command.manifest_digest,
+          build_context_digest: command.build_context_digest,
+          surface: command.surface
         )
       )
     end

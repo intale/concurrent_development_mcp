@@ -8,6 +8,7 @@ module Coordinator
       TIMESTAMP_PATTERN: Regexp
       UUID_V7_PATTERN: Regexp
       RESOURCE_PATH_PATTERN: Regexp
+      CANDIDATE_IMPACT_KEY_PATTERN: Regexp
       MARKER_PURPOSE_PATTERN: Regexp
       MARKER_COMPONENT_PATTERN: Regexp
 
@@ -48,6 +49,8 @@ module Coordinator
       CANDIDATE_GIT_FILE_MODES: Array[String]
       CANDIDATE_BUILD_INPUT_KINDS: Array[String]
       CANDIDATE_EVIDENCE_STATUSES: Array[String]
+      CANDIDATE_IMPACT_SURFACE_DIRECTIONS: Array[String]
+      CANDIDATE_IMPACT_QUERY_DIRECTIONS: Array[String]
       DECISION_ACTIVATION_INELIGIBILITY_REASONS: Array[String]
       DECISION_CORRECTION_INELIGIBILITY_REASONS: Array[String]
       SCOPE_PROVENANCE_KINDS: Array[String]
@@ -130,6 +133,10 @@ module Coordinator
       CandidateGitFileMode: untyped
       CandidateBuildInputKind: untyped
       CandidateEvidenceStatus: untyped
+      CandidateImpactKey: untyped
+      CandidateImpactValue: untyped
+      CandidateAnalyzerVersion: untyped
+      CandidateImpactQueryDirection: untyped
       CandidateEvidenceRevision: untyped
       CandidateManifestSize: untyped
       CandidateBuildInputCount: untyped

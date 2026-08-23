@@ -458,6 +458,37 @@ module Coordinator::Write
       )
     end
 
+    def candidate_impact_surface_submit(
+      command:,
+      surface:,
+      input_digest:,
+      persisted_events:,
+      completed_at:
+    )
+      build_completion(
+        command:,
+        tool_name: "candidate_impact_surface_submit",
+        summary: "Candidate semantic-impact surface recorded as attributed, unverified evidence.",
+        data: CommandReceiptData::CandidateImpactSurface.new(
+          candidate_id: command.candidate_id,
+          surface_digest: surface.surface_digest,
+          evidence_revision: surface.evidence_revision,
+          evidence_status: surface.evidence_status,
+          surface_event: event_reference(persisted_events.fetch(0)),
+          derived_at: surface.derived_at
+        ),
+        next_actions: [
+          NextAction.new(
+            tool: "candidate_impact_get",
+            arguments: NextAction::CandidateArguments.new(candidate_id: command.candidate_id)
+          )
+        ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
 
     def build_completion(command:, tool_name:, summary:, data:, next_actions:, input_digest:, persisted_events:, completed_at:)

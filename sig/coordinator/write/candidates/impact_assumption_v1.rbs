@@ -1,0 +1,8 @@
+module Coordinator::Write
+  module Candidates
+    class ImpactAssumptionV1 < Coordinator::Shared::Value
+      def impact_key: () -> String
+      def predicate: () -> String
+    end
+  end
+end

@@ -171,7 +171,28 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
         reason_summary: "Use the testing framework selected for this Attempt.",
         context: agent_choice_query_context,
         decision_context: empty_decision_context
-      )
+      ),
+      Coordinator::Write::Operations::PrepareSubmitCandidateImpactSurface.new.call(
+        command_id: "cmd-task-build-14",
+        actor: { kind: "agent", id: "analyzer-a" },
+        candidate_id: "CAN-task-build",
+        repository_id: "billing",
+        head_commit_oid: "b" * 40,
+        manifest_digest: "sha256:#{"a" * 64}",
+        analyzer_version: "impact-v1",
+        surface: {
+          produces: [
+            {
+              impact_key: "dependency:rubygems:rails",
+              before: "7.2",
+              after: "8.0"
+            }
+          ],
+          consumes: [],
+          may_affect: [ { impact_key: "framework:rails:controller-lifecycle" } ],
+          assumes: []
+        }
+      ).value!
     ]
 
     rebuilt = commands.map do |command|

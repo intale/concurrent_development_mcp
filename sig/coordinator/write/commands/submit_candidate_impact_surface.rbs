@@ -1,0 +1,14 @@
+module Coordinator::Write
+  module Commands
+    class SubmitCandidateImpactSurface < Coordinator::Shared::Value
+      def command_id: () -> String
+      def actor: () -> Coordinator::Write::Commands::Actor
+      def candidate_id: () -> String
+      def repository_id: () -> String
+      def head_commit_oid: () -> String
+      def manifest_digest: () -> String
+      def build_context_digest: () -> String?
+      def surface: () -> Coordinator::Write::Candidates::ImpactSurfaceV1
+    end
+  end
+end

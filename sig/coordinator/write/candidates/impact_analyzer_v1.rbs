@@ -1,0 +1,9 @@
+module Coordinator::Write
+  module Candidates
+    class ImpactAnalyzerV1 < Coordinator::Shared::Value
+      def kind: () -> String
+      def id: () -> String
+      def analyzer_version: () -> String
+    end
+  end
+end

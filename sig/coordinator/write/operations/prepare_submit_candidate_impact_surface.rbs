@@ -1,0 +1,12 @@
+module Coordinator::Write
+  module Operations
+    class PrepareSubmitCandidateImpactSurface < Dry::Operation
+      def initialize: (
+        ?contract: Coordinator::Write::Contracts::SubmitCandidateImpactSurface,
+        ?surface_builder: Coordinator::Write::Candidates::ImpactSurfaceBuilder
+      ) -> void
+      %a{rbs:test:skip}
+      def call: (command_input input) -> Dry::Monads::Result
+    end
+  end
+end

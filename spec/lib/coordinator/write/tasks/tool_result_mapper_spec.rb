@@ -593,6 +593,52 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         },
         Coordinator::Write::Tasks::DomainErrorV1::CandidateManifestBaseMismatchError,
         "denied"
+      ],
+      [
+        :candidate_not_found,
+        { candidate_id: "CAN-task-result" },
+        Coordinator::Write::Tasks::DomainErrorV1::CandidateNotFoundError,
+        "denied"
+      ],
+      [
+        :candidate_impact_identity_mismatch,
+        {
+          candidate_id: "CAN-task-result",
+          expected_repository_id: "billing",
+          expected_head_commit_oid: "b" * 40,
+          submitted_repository_id: "other",
+          submitted_head_commit_oid: "c" * 40
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::CandidateImpactIdentityMismatchError,
+        "conflict"
+      ],
+      [
+        :candidate_impact_source_evidence_mismatch,
+        {
+          candidate_id: "CAN-task-result",
+          expected_manifest_digest: "sha256:#{"a" * 64}",
+          submitted_manifest_digest: "sha256:#{"b" * 64}",
+          expected_build_context_digest: nil,
+          submitted_build_context_digest: nil
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::CandidateImpactSourceEvidenceMismatchError,
+        "conflict"
+      ],
+      [
+        :candidate_impact_surface_already_recorded,
+        {
+          candidate_id: "CAN-task-result",
+          existing_event: event_reference(
+            event_id: "0198e03a-d112-7000-8000-000000000022",
+            type: "CandidateImpactSurfaceDerived",
+            stream_context: "DevelopmentIntegration",
+            stream_name: "Candidate",
+            stream_id: "CAN-task-result",
+            stream_revision: 3
+          )
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::CandidateImpactSurfaceAlreadyRecordedError,
+        "conflict"
       ]
     ]
 

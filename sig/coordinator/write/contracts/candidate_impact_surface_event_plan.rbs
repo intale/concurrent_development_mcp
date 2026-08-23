@@ -1,0 +1,7 @@
+module Coordinator::Write
+  module Contracts
+    class CandidateImpactSurfaceEventPlan < Dry::Validation::Contract
+      def call: (Hash[Symbol, untyped] input) -> Dry::Validation::Result
+    end
+  end
+end

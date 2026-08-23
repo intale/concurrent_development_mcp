@@ -1,0 +1,6 @@
+module Coordinator
+  module Write
+    class InvalidCandidateImpactSurfaceEventPlan < StandardError
+    end
+  end
+end

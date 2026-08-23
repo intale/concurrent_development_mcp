@@ -1,0 +1,9 @@
+module Coordinator::Write
+  module Candidates
+    class ImpactSurfaceBuilder < Dry::Operation
+      def initialize: (?canonical_json: Coordinator::Shared::CanonicalJson) -> void
+      %a{rbs:test:skip}
+      def call: (Hash[Symbol, untyped] attributes) -> Dry::Monads::Result
+    end
+  end
+end

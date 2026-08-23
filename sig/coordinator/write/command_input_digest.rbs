@@ -38,6 +38,8 @@ module Coordinator
       def agent_choice_record_document: (Commands::RecordAgentChoice command) -> CommandInputDocuments::RecordAgentChoiceV1
       def candidate_submit: (Commands::SubmitCandidate command) -> String
       def candidate_submit_document: (Commands::SubmitCandidate command) -> CommandInputDocuments::SubmitCandidateV1
+      def candidate_impact_surface_submit: (Commands::SubmitCandidateImpactSurface command) -> String
+      def candidate_impact_surface_submit_document: (Commands::SubmitCandidateImpactSurface command) -> CommandInputDocuments::SubmitCandidateImpactSurfaceV1
     end
   end
 end
