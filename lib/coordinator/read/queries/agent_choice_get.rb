@@ -27,11 +27,25 @@ module Coordinator::Read
           context_token: nil,
           data: QueryResultV1::AgentChoiceData.new(choice:),
           warnings: [],
-          next_actions: []
+          next_actions: next_actions(choice)
         )
       end
 
       private
+
+      def next_actions(choice)
+        return [] unless choice.observation_status == "invalidated"
+
+        [
+          Coordinator::Write::NextAction.new(
+            tool: "decision_resolve",
+            arguments: Coordinator::Write::NextAction::DecisionResolutionArguments.new(
+              topic_id: choice.choice_type,
+              context: choice.context
+            )
+          )
+        ]
+      end
 
       def not_found_result(choice_id)
         QueryResultV1.new(

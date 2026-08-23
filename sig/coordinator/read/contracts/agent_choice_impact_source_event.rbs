@@ -1,0 +1,12 @@
+module Coordinator
+  module Read
+    module Contracts
+      class AgentChoiceImpactSourceEvent < Dry::Validation::Contract
+        STREAM_BY_EVENT_TYPE: Hash[String, [String, Integer]]
+        EVENT_TYPES: Array[String]
+
+        def call: (Hash[Symbol, untyped] input) -> Dry::Validation::Result
+      end
+    end
+  end
+end

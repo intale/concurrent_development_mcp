@@ -15,6 +15,7 @@ module Coordinator
       def assessment: () -> Write::AgentChoices::ChoiceAssessmentV1?
       def recorded: () -> AgentChoiceLifecycleEvidenceV1
       def accepted: () -> AgentChoiceLifecycleEvidenceV1?
+      def invalidation: () -> AgentChoiceInvalidationViewV1?
     end
   end
 end

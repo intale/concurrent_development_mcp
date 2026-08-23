@@ -14,6 +14,7 @@ module Coordinator
           Tools::DecisionGet,
           Tools::DecisionResolve,
           Tools::AgentChoiceGet,
+          Tools::AgentChoiceImpactList,
           Tools::ChangeSetCreate,
           Tools::WorkItemCreate,
           Tools::WorkItemDependencyDeclare,

@@ -1,0 +1,10 @@
+module Coordinator
+  module Read
+    module Repositories
+      class AgentChoiceImpacts
+        def store_assessment: (event: PgEventstore::Event, impact: Write::Events::AgentChoiceImpactAssessedV1) -> AgentChoiceImpact
+        def page: (AgentChoiceImpactListQueryV1 query) -> AgentChoiceImpactPageV1
+      end
+    end
+  end
+end

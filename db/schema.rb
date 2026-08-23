@@ -10,9 +10,35 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_23_070000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_23_123000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "agent_choice_impacts", primary_key: "assessment_id", id: :string, force: :cascade do |t|
+    t.jsonb "accepted_choice", null: false
+    t.datetime "assessed_at_domain", null: false
+    t.datetime "assessed_at_store", null: false
+    t.jsonb "assessment", null: false
+    t.jsonb "assessment_actor", null: false
+    t.jsonb "assessment_event", null: false
+    t.string "attempt_id", null: false
+    t.string "causation_id"
+    t.string "choice_id", null: false
+    t.string "correlation_id"
+    t.datetime "created_at", null: false
+    t.jsonb "decision_change", null: false
+    t.bigint "event_global_position", null: false
+    t.jsonb "markers", default: [], null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.string "outcome", null: false
+    t.string "policy_version", null: false
+    t.string "reason", null: false
+    t.jsonb "source_actor", null: false
+    t.datetime "updated_at", null: false
+    t.index ["attempt_id", "event_global_position"], name: "idx_agent_choice_impacts_attempt_position"
+    t.index ["choice_id"], name: "index_agent_choice_impacts_on_choice_id"
+    t.index ["outcome"], name: "index_agent_choice_impacts_on_outcome"
+  end
 
   create_table "agent_choices", primary_key: "choice_id", id: :string, force: :cascade do |t|
     t.jsonb "accepted_actor"
@@ -30,6 +56,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_23_070000) do
     t.string "context_digest", null: false
     t.datetime "created_at", null: false
     t.jsonb "decision_context", null: false
+    t.jsonb "invalidated_actor"
+    t.datetime "invalidated_at_domain"
+    t.datetime "invalidated_at_store"
+    t.string "invalidated_causation_id"
+    t.string "invalidated_correlation_id"
+    t.jsonb "invalidated_event"
+    t.jsonb "invalidated_markers"
+    t.jsonb "invalidated_metadata"
+    t.jsonb "invalidation"
     t.string "observation_status", null: false
     t.text "reason_summary", null: false
     t.jsonb "recorded_actor", null: false

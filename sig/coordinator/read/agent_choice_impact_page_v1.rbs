@@ -1,0 +1,10 @@
+module Coordinator
+  module Read
+    class AgentChoiceImpactPageV1 < Shared::Value
+      def attempt_id: () -> String
+      def items: () -> Array[AgentChoiceImpactViewV1]
+      def next_global_position: () -> Integer?
+      def has_more: () -> bool
+    end
+  end
+end

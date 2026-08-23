@@ -78,6 +78,10 @@ module Coordinator::Write
           source_event: reference(event),
           source_global_position: event.global_position,
           source_command_id: event.metadata.fetch("command_id"),
+          source_actor: Commands::Actor.new(
+            kind: event.metadata.fetch("actor_kind"),
+            id: event.metadata.fetch("actor_id")
+          ),
           decision_id: payload.decision_id,
           change_kind: change_kind(payload),
           definition_digest: definition.digest,

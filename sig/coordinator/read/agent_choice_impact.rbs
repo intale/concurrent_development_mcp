@@ -1,0 +1,25 @@
+module Coordinator
+  module Read
+    class AgentChoiceImpact < ApplicationRecord
+      def assessment_id: () -> String
+      def choice_id: () -> String
+      def attempt_id: () -> String
+      def outcome: () -> String
+      def reason: () -> String
+      def policy_version: () -> String
+      def accepted_choice: () -> Hash[String, untyped]
+      def decision_change: () -> Hash[String, untyped]
+      def assessment: () -> Hash[String, untyped]
+      def assessment_event: () -> Hash[String, untyped]
+      def source_actor: () -> Hash[String, untyped]
+      def assessment_actor: () -> Hash[String, untyped]
+      def markers: () -> Array[String]
+      def metadata: () -> Hash[String, untyped]
+      def causation_id: () -> String?
+      def correlation_id: () -> String?
+      def event_global_position: () -> Integer
+      def assessed_at_domain: () -> Time
+      def assessed_at_store: () -> Time
+    end
+  end
+end

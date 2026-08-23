@@ -59,6 +59,26 @@ module Coordinator::Read
         record
       end
 
+      def invalidate(event:, invalidation:)
+        record = Coordinator::Read::AgentChoice.find_by(choice_id: invalidation.choice_id)
+        raise ProjectionStateError, "AgentChoiceAccepted must be projected before invalidation" unless record&.accepted_event
+
+        verify_invalidation!(record, invalidation)
+        record.update!(
+          observation_status: "invalidated",
+          invalidation: invalidation.to_h,
+          invalidated_event: event_reference(event).to_h,
+          invalidated_actor: actor(event).to_h,
+          invalidated_markers: event.markers,
+          invalidated_metadata: event.metadata,
+          invalidated_causation_id: event.causation_id,
+          invalidated_correlation_id: event.correlation_id,
+          invalidated_at_domain: invalidation.invalidated_at,
+          invalidated_at_store: event.created_at
+        )
+        record
+      end
+
       private
 
       def verify_acceptance!(record, acceptance)
@@ -66,6 +86,13 @@ module Coordinator::Read
         return if recorded_event == acceptance.recorded_event && record.context_digest == acceptance.context_digest
 
         raise ProjectionStateError, "AgentChoiceAccepted does not reference the projected recorded choice"
+      end
+
+      def verify_invalidation!(record, invalidation)
+        accepted_event = Coordinator::Write::EventReference.new(symbolize(record.accepted_event))
+        return if record.observation_status == "accepted" && accepted_event == invalidation.accepted_choice
+
+        raise ProjectionStateError, "AgentChoice invalidation does not close the projected accepted choice"
       end
 
       def build(record)
@@ -85,7 +112,8 @@ module Coordinator::Read
           context_digest: record.context_digest,
           assessment: optional_value(Coordinator::Write::AgentChoices::ChoiceAssessmentV1, record.assessment),
           recorded: recorded_evidence(record),
-          accepted: accepted_evidence(record)
+          accepted: accepted_evidence(record),
+          invalidation: invalidation_view(record)
         )
       end
 
@@ -114,6 +142,35 @@ module Coordinator::Read
           persisted_at: record.accepted_at_store.utc.iso8601(6),
           causation_id: record.accepted_causation_id,
           correlation_id: record.accepted_correlation_id
+        )
+      end
+
+      def invalidation_view(record)
+        return unless record.invalidation && record.invalidated_event
+
+        payload = Coordinator::Write::Events::AgentChoiceInvalidatedByDecisionV1.new(
+          symbolize(record.invalidation)
+        )
+        AgentChoiceInvalidationViewV1.new(
+          assessment_event: payload.assessment_event,
+          decision_change_event: payload.decision_change_event,
+          previous_context_digest: payload.previous_context_digest,
+          resulting_context_digest: payload.resulting_context_digest,
+          reason: payload.reason,
+          evidence: invalidated_evidence(record)
+        )
+      end
+
+      def invalidated_evidence(record)
+        AgentChoiceLifecycleEvidenceV1.new(
+          event: Coordinator::Write::EventReference.new(symbolize(record.invalidated_event)),
+          actor: AttributedActorV1.new(symbolize(record.invalidated_actor)),
+          markers: record.invalidated_markers || [],
+          metadata: record.invalidated_metadata || {},
+          occurred_at: record.invalidated_at_domain.utc.iso8601(6),
+          persisted_at: record.invalidated_at_store.utc.iso8601(6),
+          causation_id: record.invalidated_causation_id,
+          correlation_id: record.invalidated_correlation_id
         )
       end
 

@@ -1,0 +1,12 @@
+module Coordinator
+  module Read
+    class AgentChoiceInvalidationViewV1 < Shared::Value
+      def assessment_event: () -> Write::EventReference
+      def decision_change_event: () -> Write::EventReference
+      def previous_context_digest: () -> String
+      def resulting_context_digest: () -> String
+      def reason: () -> String
+      def evidence: () -> AgentChoiceLifecycleEvidenceV1
+    end
+  end
+end

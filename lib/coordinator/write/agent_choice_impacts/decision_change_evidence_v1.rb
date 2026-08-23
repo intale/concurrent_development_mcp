@@ -8,6 +8,7 @@ module Coordinator::Write
       attribute :source_event, EventReference
       attribute :source_global_position, Types::GlobalPosition
       attribute :source_command_id, Types::Identifier
+      attribute :source_actor, Commands::Actor
       attribute :decision_id, Types::Identifier
       attribute :change_kind, Types::DecisionChangeKind
       attribute :definition_digest, Types::Sha256Digest

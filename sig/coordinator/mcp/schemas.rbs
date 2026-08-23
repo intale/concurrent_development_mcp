@@ -18,6 +18,7 @@ module Coordinator
       def self.decision_correct: () -> json_schema
       def self.agent_choice_record: () -> json_schema
       def self.agent_choice_get: () -> json_schema
+      def self.agent_choice_impact_list: () -> json_schema
       def self.operation_get: () -> json_schema
       def self.guidance_get: () -> json_schema
       def self.decision_interpretation_list: () -> json_schema

@@ -1,0 +1,9 @@
+module Coordinator
+  module Read
+    class AgentChoiceImpactListQueryV1 < Shared::Value
+      def attempt_id: () -> String
+      def after_global_position: () -> Integer?
+      def limit: () -> Integer
+    end
+  end
+end

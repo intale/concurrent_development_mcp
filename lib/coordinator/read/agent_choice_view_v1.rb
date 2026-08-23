@@ -16,5 +16,6 @@ module Coordinator::Read
     attribute :assessment, Coordinator::Write::AgentChoices::ChoiceAssessmentV1.optional
     attribute :recorded, AgentChoiceLifecycleEvidenceV1
     attribute :accepted, AgentChoiceLifecycleEvidenceV1.optional
+    attribute :invalidation, AgentChoiceInvalidationViewV1.optional
   end
 end

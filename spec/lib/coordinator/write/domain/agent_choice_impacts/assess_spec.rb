@@ -235,6 +235,7 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::Assess do
       source_event: decision_source_reference,
       source_global_position: 42,
       source_command_id: "cmd-correct-assess",
+      source_actor: { kind: "orchestrator", id: "guidance-host" },
       decision_id: "D-assess",
       change_kind: "corrected",
       definition_digest: "sha256:#{'d' * 64}",

@@ -1,0 +1,18 @@
+module Coordinator
+  module Read
+    module Projectors
+      class AgentChoiceImpactsV1
+        PROJECTION: ProjectionDefinition
+
+        def initialize: (
+          ?contract: Contracts::AgentChoiceImpactSourceEvent,
+          ?schema_registry: Write::EventSchemaRegistry,
+          ?impacts: Repositories::AgentChoiceImpacts,
+          ?choices: Repositories::AgentChoices,
+          ?processed_events: Repositories::ProcessedProjectionEvents
+        ) -> void
+        def call: (PgEventstore::Event event) -> void
+      end
+    end
+  end
+end

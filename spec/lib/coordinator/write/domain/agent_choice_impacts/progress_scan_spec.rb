@@ -130,6 +130,7 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::ProgressScan do
       source_event:,
       source_global_position: 900,
       source_command_id: "cmd-decision-change",
+      source_actor: { kind: "orchestrator", id: "guidance-host" },
       decision_id: "D-impact",
       change_kind: "corrected",
       definition_digest: "sha256:#{'a' * 64}",

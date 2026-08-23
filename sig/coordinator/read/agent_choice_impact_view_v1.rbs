@@ -1,0 +1,23 @@
+module Coordinator
+  module Read
+    class AgentChoiceImpactViewV1 < Shared::Value
+      Evaluation: singleton(Write::AgentChoices::PolicyEvaluationV1)
+
+      def assessment_id: () -> String
+      def choice_id: () -> String
+      def attempt_id: () -> String
+      def outcome: () -> String
+      def reason: () -> String
+      def policy_version: () -> String
+      def accepted_choice: () -> Write::EventReference
+      def decision_change: () -> Write::AgentChoiceImpacts::DecisionChangeEvidenceV1
+      def before_context_digest: () -> String
+      def after_context_digest: () -> String
+      def before_evaluation: () -> Write::AgentChoices::PolicyEvaluationV1
+      def after_evaluation: () -> Write::AgentChoices::PolicyEvaluationV1
+      def source_advancements: () -> Array[Write::EventReference]
+      def source_actor: () -> AttributedActorV1
+      def assessment_evidence: () -> AgentChoiceImpactAssessmentEvidenceV1
+    end
+  end
+end

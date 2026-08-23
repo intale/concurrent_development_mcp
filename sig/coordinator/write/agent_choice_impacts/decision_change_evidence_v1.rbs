@@ -5,6 +5,7 @@ module Coordinator
         def source_event: () -> EventReference
         def source_global_position: () -> Integer
         def source_command_id: () -> String
+        def source_actor: () -> Commands::Actor
         def decision_id: () -> String
         def change_kind: () -> String
         def definition_digest: () -> String

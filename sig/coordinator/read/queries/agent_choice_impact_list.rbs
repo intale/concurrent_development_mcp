@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    module Queries
+      class AgentChoiceImpactList < Dry::Operation
+        def initialize: (?contract: Contracts::AgentChoiceImpactList, ?impacts: Repositories::AgentChoiceImpacts) -> void
+        %a{rbs:test:skip}
+        def call: (command_input input) -> Dry::Monads::Result
+      end
+    end
+  end
+end

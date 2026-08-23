@@ -14,7 +14,10 @@ module Coordinator::Write
                        source.stream&.stream_id
         valid_position = source.stream_revision && source.stream_revision >= 0 &&
                          source.global_position && source.global_position >= 0
-        valid_schema = source.metadata["schema_version"] == 1 && source.metadata["command_id"]
+        valid_schema = source.metadata["schema_version"] == 1 &&
+                       source.metadata["command_id"] &&
+                       Types::ACTOR_KINDS.include?(source.metadata["actor_kind"]) &&
+                       Types::IDENTIFIER_PATTERN.match?(source.metadata["actor_id"].to_s)
         valid_type = %w[DecisionActivated DecisionDefinitionCorrected].include?(source.type)
 
         key.failure("must be a persisted Decision lifecycle event") unless valid_stream && valid_position && valid_schema && valid_type

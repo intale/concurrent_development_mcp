@@ -308,6 +308,10 @@ module Coordinator
       Read::Repositories::AgentChoices.new
     end
 
+    register("repositories.agent_choice_impacts", memoize: true) do
+      Read::Repositories::AgentChoiceImpacts.new
+    end
+
     register("projectors.coord_context_v1", memoize: true) do
       Read::Projectors::CoordContextV1.new(
         schema_registry: self["event_schema_registry"],
@@ -350,6 +354,15 @@ module Coordinator
     register("projectors.agent_choices_v1", memoize: true) do
       Read::Projectors::AgentChoicesV1.new(
         schema_registry: self["event_schema_registry"],
+        choices: self["repositories.agent_choices"],
+        processed_events: self["repositories.processed_projection_events"]
+      )
+    end
+
+    register("projectors.agent_choice_impacts_v1", memoize: true) do
+      Read::Projectors::AgentChoiceImpactsV1.new(
+        schema_registry: self["event_schema_registry"],
+        impacts: self["repositories.agent_choice_impacts"],
         choices: self["repositories.agent_choices"],
         processed_events: self["repositories.processed_projection_events"]
       )
@@ -403,6 +416,12 @@ module Coordinator
     register("queries.agent_choice_get") do
       Read::Queries::AgentChoiceGet.new(
         choices: self["repositories.agent_choices"]
+      )
+    end
+
+    register("queries.agent_choice_impact_list") do
+      Read::Queries::AgentChoiceImpactList.new(
+        impacts: self["repositories.agent_choice_impacts"]
       )
     end
 
@@ -1006,6 +1025,12 @@ module Coordinator
       )
     end
 
+    register("subscriptions.agent_choice_impacts", memoize: true) do
+      Read::Subscriptions::AgentChoiceImpacts.new(
+        handler: self["projectors.agent_choice_impacts_v1"]
+      )
+    end
+
     register("subscription_managers.process_managers", memoize: true) do
       PgEventstore.subscriptions_manager(
         subscription_set: Processes::Subscriptions::ProcessManagerSet::SET_NAME
@@ -1040,7 +1065,8 @@ module Coordinator
           self["subscriptions.user_utterances"],
           self["subscriptions.decision_governance"],
           self["subscriptions.decision_interpretations"],
-          self["subscriptions.agent_choices"]
+          self["subscriptions.agent_choices"],
+          self["subscriptions.agent_choice_impacts"]
         ]
       )
     end

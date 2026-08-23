@@ -136,7 +136,7 @@ module Coordinator::Shared
       unresolved_decision_head
     ].freeze
     AGENT_CHOICE_OUTCOMES = %w[accepted].freeze
-    AGENT_CHOICE_OBSERVATION_STATUSES = %w[recorded accepted].freeze
+    AGENT_CHOICE_OBSERVATION_STATUSES = %w[recorded accepted invalidated].freeze
     AGENT_CHOICE_IMPACT_POLICY_VERSIONS = %w[agent-choice-decision-impact/v1].freeze
     AGENT_CHOICE_IMPACT_SCAN_STATUSES = %w[absent running skipped completed].freeze
     AGENT_CHOICE_IMPACT_SCAN_SKIP_REASONS = %w[future_only candidate_scope artifact_scope].freeze
@@ -297,6 +297,7 @@ module Coordinator::Shared
     GlobalPosition = Integer.constrained(gteq: 0)
     AgentChoiceImpactPageSize = Integer.enum(50)
     AgentChoiceImpactPageChoiceCount = Integer.constrained(gteq: 0, lteq: 50)
+    AgentChoiceImpactListLimit = Integer.constrained(gteq: 1, lteq: 100)
     DecisionActivationIneligibilityReason = String.enum(*DECISION_ACTIVATION_INELIGIBILITY_REASONS)
     DecisionActivationIneligibilityReasons = Array.of(DecisionActivationIneligibilityReason).constrained(min_size: 1, max_size: 10)
     DecisionCorrectionIneligibilityReason = String.enum(*DECISION_CORRECTION_INELIGIBILITY_REASONS)

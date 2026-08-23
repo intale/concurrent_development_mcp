@@ -49,6 +49,10 @@ module Coordinator::Read
       attribute :choice, AgentChoiceViewV1
     end
 
+    class AgentChoiceImpactPageData < Value
+      attribute :page, AgentChoiceImpactPageV1
+    end
+
     Data = EmptyData |
            DomainError |
            OperationData |
@@ -58,7 +62,8 @@ module Coordinator::Read
            InterpretationPageData |
            DecisionData |
            DecisionContextData |
-           AgentChoiceData
+           AgentChoiceData |
+           AgentChoiceImpactPageData
     Action = Coordinator::Write::NextAction | NextAction
 
     attribute :status, Types::String.enum(

@@ -379,6 +379,21 @@ module Coordinator
         )
       end
 
+      def agent_choice_impact_list
+        object_schema(
+          properties: {
+            attempt_id: identifier,
+            after_global_position: {
+              anyOf: [ { type: "integer", minimum: 0 }, { type: "null" } ]
+            },
+            limit: {
+              anyOf: [ { type: "integer", minimum: 1, maximum: 100 }, { type: "null" } ]
+            }
+          },
+          required: %w[attempt_id]
+        )
+      end
+
       def guidance_get
         object_schema(
           properties: { message_id: identifier },

@@ -27,6 +27,15 @@ module Coordinator
       def accepted_at_domain: () -> Time?
       def recorded_at_store: () -> Time
       def accepted_at_store: () -> Time?
+      def invalidation: () -> Hash[String, untyped]?
+      def invalidated_event: () -> Hash[String, untyped]?
+      def invalidated_actor: () -> Hash[String, untyped]?
+      def invalidated_markers: () -> Array[String]?
+      def invalidated_metadata: () -> Hash[String, untyped]?
+      def invalidated_causation_id: () -> String?
+      def invalidated_correlation_id: () -> String?
+      def invalidated_at_domain: () -> Time?
+      def invalidated_at_store: () -> Time?
     end
   end
 end

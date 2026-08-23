@@ -38,12 +38,19 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       pull_interval: 0.2
     )
   end
+  let(:agent_choice_impact_registration) do
+    Coordinator::Read::Subscriptions::AgentChoiceImpacts.new(
+      handler: Coordinator::Read::Projectors::AgentChoiceImpactsV1.new,
+      pull_interval: 0.2
+    )
+  end
 
-  it "stacks six unique durable subscriptions on one read-model manager" do
+  it "stacks seven unique durable subscriptions on one read-model manager" do
     subscription_set = build_set
 
     expect(subscription_set.subscription_names).to eq(
       [
+        "agent-choice-impacts-v1",
         "agent-choices-v1",
         "command-receipts-v1",
         "coord-context-v1",
@@ -75,6 +82,10 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
     expect(agent_choice_registration.definition.identity.to_h).to eq(
       set_name: "coordinator-read-models-v1",
       subscription_name: "agent-choices-v1"
+    )
+    expect(agent_choice_impact_registration.definition.identity.to_h).to eq(
+      set_name: "coordinator-read-models-v1",
+      subscription_name: "agent-choice-impacts-v1"
     )
   end
 
@@ -184,7 +195,8 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         utterance_registration,
         interpretation_registration,
         decision_registration,
-        agent_choice_registration
+        agent_choice_registration,
+        agent_choice_impact_registration
       ]
     )
   end

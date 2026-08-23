@@ -123,6 +123,7 @@ module Coordinator
       GlobalPosition: untyped
       AgentChoiceImpactPageSize: untyped
       AgentChoiceImpactPageChoiceCount: untyped
+      AgentChoiceImpactListLimit: untyped
       DecisionActivationIneligibilityReason: untyped
       DecisionActivationIneligibilityReasons: untyped
       DecisionCorrectionIneligibilityReason: untyped
