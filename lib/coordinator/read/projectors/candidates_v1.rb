@@ -9,11 +9,13 @@ module Coordinator::Read
         contract: Contracts::CandidateSourceEvent.new,
         schema_registry: Coordinator::Write::EventSchemaRegistry.new,
         candidates: Repositories::Candidates.new,
+        candidate_impacts: Repositories::CandidateImpacts.new(candidates:),
         processed_events: Repositories::ProcessedProjectionEvents.new
       )
         @contract = contract
         @schema_registry = schema_registry
         @candidates = candidates
+        @candidate_impacts = candidate_impacts
         @processed_events = processed_events
       end
 
@@ -73,8 +75,12 @@ module Coordinator::Read
           @candidates.store_submission(event:, candidate: payload)
         when Coordinator::Write::Events::CandidateChangeManifestCapturedV1
           @candidates.store_manifest(event:, manifest: payload)
+          @candidate_impacts.store_manifest(manifest: payload)
         when Coordinator::Write::Events::CandidateBuildContextCapturedV1
           @candidates.store_build_context(event:, build_context: payload)
+          @candidate_impacts.store_build_context(build_context: payload)
+        when Coordinator::Write::Events::CandidateImpactSurfaceDerivedV1
+          @candidate_impacts.store_surface(event:, surface: payload)
         end
       end
     end

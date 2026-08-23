@@ -188,6 +188,12 @@ module Coordinator::Shared
     CANDIDATE_EVIDENCE_STATUSES = %w[attributed_unverified].freeze
     CANDIDATE_IMPACT_SURFACE_DIRECTIONS = %w[produces consumes may_affect assumes].freeze
     CANDIDATE_IMPACT_QUERY_DIRECTIONS = %w[incoming outgoing].freeze
+    CANDIDATE_IMPACT_RELATIONSHIP_KINDS = %w[potentially_affects].freeze
+    CANDIDATE_IMPACT_REASON_KINDS = %w[
+      changed_resource_overlap
+      observed_input_changed
+      semantic_key_match
+    ].freeze
     DECISION_ACTIVATION_INELIGIBILITY_REASONS = %w[
       non_normative_statement_kind
       missing_effect
@@ -332,6 +338,8 @@ module Coordinator::Shared
     CandidateImpactValue = String.constrained(min_size: 1, max_size: 500)
     CandidateAnalyzerVersion = String.constrained(min_size: 1, max_size: 100)
     CandidateImpactQueryDirection = String.enum(*CANDIDATE_IMPACT_QUERY_DIRECTIONS)
+    CandidateImpactRelationshipKind = String.enum(*CANDIDATE_IMPACT_RELATIONSHIP_KINDS)
+    CandidateImpactReasonKind = String.enum(*CANDIDATE_IMPACT_REASON_KINDS)
     CandidateEvidenceRevision = Integer.enum(1)
     CandidateManifestSize = Integer.constrained(gteq: 1, lteq: 256)
     CandidateBuildInputCount = Integer.constrained(gteq: 0, lteq: 64)

@@ -51,6 +51,8 @@ module Coordinator
       CANDIDATE_EVIDENCE_STATUSES: Array[String]
       CANDIDATE_IMPACT_SURFACE_DIRECTIONS: Array[String]
       CANDIDATE_IMPACT_QUERY_DIRECTIONS: Array[String]
+      CANDIDATE_IMPACT_RELATIONSHIP_KINDS: Array[String]
+      CANDIDATE_IMPACT_REASON_KINDS: Array[String]
       DECISION_ACTIVATION_INELIGIBILITY_REASONS: Array[String]
       DECISION_CORRECTION_INELIGIBILITY_REASONS: Array[String]
       SCOPE_PROVENANCE_KINDS: Array[String]
@@ -137,6 +139,8 @@ module Coordinator
       CandidateImpactValue: untyped
       CandidateAnalyzerVersion: untyped
       CandidateImpactQueryDirection: untyped
+      CandidateImpactRelationshipKind: untyped
+      CandidateImpactReasonKind: untyped
       CandidateEvidenceRevision: untyped
       CandidateManifestSize: untyped
       CandidateBuildInputCount: untyped

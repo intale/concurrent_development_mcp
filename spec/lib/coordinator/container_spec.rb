@@ -47,6 +47,7 @@ RSpec.describe Coordinator::Container do
     agent_choice_impact_query = described_class["queries.agent_choice_impact_list"]
     candidate_get_query = described_class["queries.candidate_get"]
     candidate_list_query = described_class["queries.candidate_list"]
+    candidate_impact_query = described_class["queries.candidate_impact_get"]
     task_submissions = %w[
       operations.submit_create_change_set_task
       operations.submit_create_work_item_task
@@ -64,6 +65,7 @@ RSpec.describe Coordinator::Container do
       operations.submit_correct_decision_task
       operations.submit_record_agent_choice_task
       operations.submit_candidate_task
+      operations.submit_candidate_impact_surface_task
     ].map { described_class[_1] }
     tasks_extension = described_class["mcp.tasks.extension"]
     mcp_transport = described_class["mcp.transport"]
@@ -146,6 +148,7 @@ RSpec.describe Coordinator::Container do
     expect(agent_choice_impact_query).to be_a(Coordinator::Read::Queries::AgentChoiceImpactList)
     expect(candidate_get_query).to be_a(Coordinator::Read::Queries::CandidateGet)
     expect(candidate_list_query).to be_a(Coordinator::Read::Queries::CandidateList)
+    expect(candidate_impact_query).to be_a(Coordinator::Read::Queries::CandidateImpactGet)
     expect(task_submissions).to all(
       be_a(Coordinator::Write::Operations::PrepareAndSubmitCoordinationTask)
     )

@@ -1,0 +1,12 @@
+module Coordinator
+  module Read
+    class CandidateImpactPageV1 < Shared::Value
+      def candidate: () -> CandidateSummaryV1
+      def impact_surface: () -> CandidateImpactSurfaceViewV1?
+      def direction: () -> String
+      def relationships: () -> Array[CandidateImpactRelationshipV1]
+      def next_global_position: () -> Integer?
+      def has_more: () -> bool
+    end
+  end
+end

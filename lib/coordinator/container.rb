@@ -332,6 +332,10 @@ module Coordinator
       Read::Repositories::Candidates.new
     end
 
+    register("repositories.candidate_impacts", memoize: true) do
+      Read::Repositories::CandidateImpacts.new(candidates: self["repositories.candidates"])
+    end
+
     register("projectors.coord_context_v1", memoize: true) do
       Read::Projectors::CoordContextV1.new(
         schema_registry: self["event_schema_registry"],
@@ -392,6 +396,7 @@ module Coordinator
       Read::Projectors::CandidatesV1.new(
         schema_registry: self["event_schema_registry"],
         candidates: self["repositories.candidates"],
+        candidate_impacts: self["repositories.candidate_impacts"],
         processed_events: self["repositories.processed_projection_events"]
       )
     end
@@ -459,6 +464,10 @@ module Coordinator
 
     register("queries.candidate_list") do
       Read::Queries::CandidateList.new(candidates: self["repositories.candidates"])
+    end
+
+    register("queries.candidate_impact_get") do
+      Read::Queries::CandidateImpactGet.new(impacts: self["repositories.candidate_impacts"])
     end
 
     register("mcp.settings", memoize: true) { Mcp::SettingsLoader.new.call }
@@ -966,6 +975,13 @@ module Coordinator
     register("operations.submit_candidate_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_submit_candidate"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_candidate_impact_surface_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_submit_candidate_impact_surface"],
         submitter: self["operations.submit_coordination_task"]
       )
     end

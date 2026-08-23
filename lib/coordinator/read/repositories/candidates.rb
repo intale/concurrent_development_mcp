@@ -109,6 +109,12 @@ module Coordinator::Read
         )
       end
 
+      def summaries(candidate_ids)
+        Coordinator::Read::Candidate.where(candidate_id: candidate_ids).to_h do |record|
+          [ record.candidate_id, build_summary(record) ]
+        end
+      end
+
       private
 
       def verify_manifest!(record, manifest)

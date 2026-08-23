@@ -48,6 +48,10 @@ module Coordinator
         every currently observed evidence component, candidate_list retains bounded Attempt checkpoint history,
         and coord_context carries only the latest observed checkpoint per Attempt. These available views may lag
         and never authorize a Candidate submission.
+        Use candidate_impact_surface_submit to attach one attributed semantic-impact surface to the exact Candidate
+        head and source-evidence digests. The mutation is a durable Task and does not claim that an analyzer ran.
+        Use candidate_impact_get with an explicit incoming or outgoing direction to inspect bounded, latest available
+        potential relationships. Path and semantic matches are evidence, not incompatibility or merge authorization.
         The coordinator records attributed evidence and does not execute Git, CI, or agent work.
       TEXT
 

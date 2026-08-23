@@ -8,7 +8,7 @@ module Coordinator::Read
         "CandidateChangeManifestCaptured" => 1,
         "CandidateBuildContextCaptured" => 2
       }.freeze
-      EVENT_TYPES = REVISION_BY_EVENT_TYPE.keys.freeze
+      EVENT_TYPES = [ *REVISION_BY_EVENT_TYPE.keys, "CandidateImpactSurfaceDerived" ].freeze
 
       config.validate_keys = true
 
@@ -24,16 +24,30 @@ module Coordinator::Read
         required(:actor_kind).filled(:string, eql?: "agent")
         required(:actor_id).filled(:string)
         required(:recorded_by).filled(:string, eql?: "coordinator")
-        required(:policy_version).filled(
-          :string,
-          eql?: Coordinator::Write::ResourceKeyDocumentV1::POLICY_VERSION
-        )
+        required(:policy_version).filled(:string)
       end
 
       rule(:event_type, :stream_revision) do
+        if values[:event_type] == "CandidateImpactSurfaceDerived"
+          next if [ 2, 3 ].include?(values[:stream_revision])
+
+          key(:stream_revision).failure("must match the Candidate evidence chronology")
+          next
+        end
         next if values[:stream_revision] == REVISION_BY_EVENT_TYPE.fetch(values[:event_type])
 
         key(:stream_revision).failure("must match the Candidate evidence chronology")
+      end
+
+      rule(:event_type, :policy_version) do
+        expected = if values[:event_type] == "CandidateImpactSurfaceDerived"
+          Coordinator::Write::Candidates::ImpactSurfaceDocumentV1::SCHEMA
+        else
+          Coordinator::Write::ResourceKeyDocumentV1::POLICY_VERSION
+        end
+        unless values[:policy_version] == expected
+          key(:policy_version).failure("must match the projected event policy")
+        end
       end
 
       rule(:stream_id, :command_id, :actor_id) do

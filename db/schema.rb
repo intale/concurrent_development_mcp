@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_23_141500) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_23_162000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -81,6 +81,39 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_23_141500) do
     t.index ["observation_status"], name: "index_agent_choices_on_observation_status"
   end
 
+  create_table "candidate_changed_resources", id: false, force: :cascade do |t|
+    t.string "candidate_id", null: false
+    t.string "change_set_id", null: false
+    t.datetime "created_at", null: false
+    t.string "path", null: false
+    t.string "repository_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["candidate_id", "path"], name: "idx_candidate_changed_resources_identity", unique: true
+    t.index ["change_set_id", "repository_id", "path", "candidate_id"], name: "idx_candidate_changed_resources_lookup"
+  end
+
+  create_table "candidate_impact_keys", id: false, force: :cascade do |t|
+    t.string "candidate_id", null: false
+    t.string "change_set_id", null: false
+    t.datetime "created_at", null: false
+    t.string "direction", null: false
+    t.string "impact_key", null: false
+    t.datetime "updated_at", null: false
+    t.index ["candidate_id", "direction", "impact_key"], name: "idx_candidate_impact_keys_identity", unique: true
+    t.index ["change_set_id", "impact_key", "direction", "candidate_id"], name: "idx_candidate_impact_keys_lookup"
+  end
+
+  create_table "candidate_observed_inputs", id: false, force: :cascade do |t|
+    t.string "candidate_id", null: false
+    t.string "change_set_id", null: false
+    t.datetime "created_at", null: false
+    t.string "path", null: false
+    t.string "repository_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["candidate_id", "path"], name: "idx_candidate_observed_inputs_identity", unique: true
+    t.index ["change_set_id", "repository_id", "path", "candidate_id"], name: "idx_candidate_observed_inputs_lookup"
+  end
+
   create_table "candidates", primary_key: "candidate_id", id: :string, force: :cascade do |t|
     t.string "agent_id", null: false
     t.string "attempt_id", null: false
@@ -101,6 +134,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_23_141500) do
     t.datetime "created_at", null: false
     t.string "evidence_status", null: false
     t.string "head_commit_oid", null: false
+    t.jsonb "impact_actor"
+    t.datetime "impact_at_domain"
+    t.datetime "impact_at_store"
+    t.string "impact_causation_id"
+    t.string "impact_correlation_id"
+    t.jsonb "impact_event"
+    t.bigint "impact_global_position"
+    t.jsonb "impact_markers"
+    t.jsonb "impact_metadata"
+    t.jsonb "impact_surface"
     t.string "lease_policy_version", null: false
     t.jsonb "lease_references", default: [], null: false
     t.string "lease_set_id", null: false

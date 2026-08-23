@@ -47,6 +47,16 @@ module Coordinator
       def build_context_global_position: () -> Integer?
       def build_context_at_domain: () -> Time?
       def build_context_at_store: () -> Time?
+      def impact_surface: () -> Hash[String, untyped]?
+      def impact_event: () -> Hash[String, untyped]?
+      def impact_actor: () -> Hash[String, untyped]?
+      def impact_markers: () -> Array[String]?
+      def impact_metadata: () -> Hash[String, untyped]?
+      def impact_causation_id: () -> String?
+      def impact_correlation_id: () -> String?
+      def impact_global_position: () -> Integer?
+      def impact_at_domain: () -> Time?
+      def impact_at_store: () -> Time?
     end
   end
 end

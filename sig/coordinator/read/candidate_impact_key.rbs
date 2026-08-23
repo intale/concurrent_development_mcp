@@ -1,0 +1,10 @@
+module Coordinator
+  module Read
+    class CandidateImpactKey < ApplicationRecord
+      def candidate_id: () -> String
+      def change_set_id: () -> String
+      def direction: () -> String
+      def impact_key: () -> String
+    end
+  end
+end

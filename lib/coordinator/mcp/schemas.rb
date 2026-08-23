@@ -433,6 +433,43 @@ module Coordinator
         )
       end
 
+      def candidate_impact_get
+        object_schema(
+          properties: {
+            candidate_id: identifier,
+            direction: { type: "string", enum: %w[incoming outgoing] },
+            after_global_position: {
+              anyOf: [ { type: "integer", minimum: 0 }, { type: "null" } ]
+            },
+            limit: {
+              anyOf: [ { type: "integer", minimum: 1, maximum: 100 }, { type: "null" } ]
+            }
+          },
+          required: %w[candidate_id direction]
+        )
+      end
+
+      def candidate_impact_surface_submit
+        object_schema(
+          properties: common_mutation_properties.merge(
+            candidate_id: identifier,
+            repository_id: {
+              type: "string",
+              pattern: "^[a-z0-9][a-z0-9._-]{0,99}$"
+            },
+            head_commit_oid: git_oid,
+            manifest_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
+            build_context_digest: nullable_sha256_digest,
+            analyzer_version: { type: "string", minLength: 1, maxLength: 100 },
+            surface: candidate_impact_surface
+          ),
+          required: %w[
+            command_id actor candidate_id repository_id head_commit_oid manifest_digest
+            analyzer_version surface
+          ]
+        )
+      end
+
       def agent_choice_impact_list
         object_schema(
           properties: {
@@ -835,6 +872,77 @@ module Coordinator
           },
           required: %w[collector_version inputs environment]
         )
+      end
+
+      def candidate_impact_surface
+        object_schema(
+          properties: {
+            produces: {
+              type: "array",
+              maxItems: 64,
+              uniqueItems: true,
+              items: object_schema(
+                properties: {
+                  impact_key: candidate_impact_key,
+                  before: nullable_candidate_impact_value,
+                  after: candidate_impact_value
+                },
+                required: %w[impact_key after]
+              )
+            },
+            consumes: {
+              type: "array",
+              maxItems: 64,
+              uniqueItems: true,
+              items: object_schema(
+                properties: {
+                  impact_key: candidate_impact_key,
+                  value: candidate_impact_value
+                },
+                required: %w[impact_key value]
+              )
+            },
+            may_affect: {
+              type: "array",
+              maxItems: 64,
+              uniqueItems: true,
+              items: object_schema(
+                properties: { impact_key: candidate_impact_key },
+                required: %w[impact_key]
+              )
+            },
+            assumes: {
+              type: "array",
+              maxItems: 64,
+              uniqueItems: true,
+              items: object_schema(
+                properties: {
+                  impact_key: candidate_impact_key,
+                  predicate: candidate_impact_value
+                },
+                required: %w[impact_key predicate]
+              )
+            }
+          },
+          required: %w[produces consumes may_affect assumes]
+        )
+      end
+
+      def candidate_impact_key
+        {
+          type: "string",
+          minLength: 3,
+          maxLength: 200,
+          pattern: "^[a-z][a-z0-9_.-]*(?::[a-z0-9][a-z0-9_.-]*)+$"
+        }
+      end
+
+      def candidate_impact_value
+        { type: "string", minLength: 1, maxLength: 500 }
+      end
+
+      def nullable_candidate_impact_value
+        { anyOf: [ candidate_impact_value, { type: "null" } ] }
       end
 
       def nullable_sha256_digest

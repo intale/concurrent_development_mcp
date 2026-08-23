@@ -8,6 +8,7 @@ module Coordinator
           ?contract: Contracts::CandidateSourceEvent,
           ?schema_registry: Write::EventSchemaRegistry,
           ?candidates: Repositories::Candidates,
+          ?candidate_impacts: Repositories::CandidateImpacts,
           ?processed_events: Repositories::ProcessedProjectionEvents
         ) -> void
         def call: (PgEventstore::Event event) -> void

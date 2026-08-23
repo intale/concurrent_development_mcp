@@ -1,0 +1,18 @@
+module Coordinator
+  module Read
+    class CandidateImpactSurfaceViewV1 < Shared::Value
+      def policy_version: () -> String
+      def surface_digest: () -> String
+      def evidence_revision: () -> Integer
+      def manifest_digest: () -> String
+      def build_context_digest: () -> String?
+      def produces: () -> Array[Write::Candidates::ImpactTransitionV1]
+      def consumes: () -> Array[Write::Candidates::ImpactObservationV1]
+      def may_affect: () -> Array[Write::Candidates::ImpactKeyV1]
+      def assumes: () -> Array[Write::Candidates::ImpactAssumptionV1]
+      def analyzer: () -> Write::Candidates::ImpactAnalyzerV1
+      def evidence_status: () -> String
+      def evidence: () -> CandidateSourceEvidenceV1
+    end
+  end
+end

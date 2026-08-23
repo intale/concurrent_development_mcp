@@ -1,0 +1,9 @@
+module Coordinator
+  module Read
+    class CandidateImpactRelationshipV1 < Shared::Value
+      def counterpart: () -> CandidateSummaryV1
+      def relationship_kind: () -> String
+      def reasons: () -> Array[CandidateImpactReasonV1]
+    end
+  end
+end

@@ -152,7 +152,8 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         prefix: "subscription-choice",
         repository_id: "choice-subscription"
       )
-      CandidateScenario.submit(prefix: "subscription-candidate", build_context: false)
+      candidate = CandidateScenario.submit(prefix: "subscription-candidate", build_context: false)
+      CandidateScenario.submit_impact(candidate)
 
       wait_for(subscription_set, "coord-context-v1", minimum: 2)
       wait_for(subscription_set, "command-receipts-v1", minimum: 5)
@@ -160,7 +161,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       wait_for(subscription_set, "decision-interpretations-v1", minimum: 2)
       wait_for(subscription_set, "decision-governance-v1", minimum: 5)
       wait_for(subscription_set, "agent-choices-v1", minimum: 2)
-      wait_for(subscription_set, "candidates-v1", minimum: 2)
+      wait_for(subscription_set, "candidates-v1", minimum: 3)
 
       expect(Coordinator::Read::CoordContext.find("CS-SUB-100").document).to include(
         "schema" => "coord-context/v1"
@@ -193,8 +194,13 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       )
       expect(Coordinator::Read::Candidate.find("CAN-subscription-candidate")).to have_attributes(
         attempt_id: "A-subscription-candidate",
-        evidence_status: "attributed_unverified"
+        evidence_status: "attributed_unverified",
+        impact_surface: include("evidence_status" => "attributed_unverified")
       )
+      expect(Coordinator::Read::CandidateImpactKey.find_by!(
+        candidate_id: "CAN-subscription-candidate",
+        direction: "produces"
+      ).impact_key).to eq("contract:payments-api:v2")
     ensure
       subscription_set.stop
     end

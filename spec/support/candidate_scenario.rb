@@ -51,6 +51,35 @@ module CandidateScenario
     )
   end
 
+  def impact_input(candidate, command_id: nil, surface: nil, actor_id: "analyzer-7")
+    input = candidate.fetch(:input)
+    manifest = candidate.fetch(:events).find { _1.type == "CandidateChangeManifestCaptured" }
+    context = candidate.fetch(:events).find { _1.type == "CandidateBuildContextCaptured" }
+    {
+      command_id: command_id || "cmd-impact-#{input.fetch(:candidate_id)}",
+      actor: { kind: "agent", id: actor_id },
+      candidate_id: input.fetch(:candidate_id),
+      repository_id: input.fetch(:repository_id),
+      head_commit_oid: input.fetch(:head_commit_oid),
+      manifest_digest: manifest.data.fetch("manifest_digest"),
+      build_context_digest: context&.data&.fetch("build_context_digest"),
+      analyzer_version: "impact-analyzer-v1",
+      surface: surface || {
+        produces: [ { impact_key: "contract:payments-api:v2", after: "available" } ],
+        consumes: [],
+        may_affect: [],
+        assumes: []
+      }
+    }.compact
+  end
+
+  def submit_impact(candidate, command_id: nil, surface: nil, actor_id: "analyzer-7")
+    execute(
+      Coordinator::Write::Operations::ExecuteSubmitCandidateImpactSurface,
+      impact_input(candidate, command_id:, surface:, actor_id:)
+    )
+  end
+
   def input(prefix:, ids:, reservation:, path:, agent_id:, candidate_id:, command_id:, head_commit_oid:)
     {
       command_id:,
@@ -149,8 +178,9 @@ module CandidateScenario
           CandidateSubmitted
           CandidateChangeManifestCaptured
           CandidateBuildContextCaptured
+          CandidateImpactSurfaceDerived
         ],
-        maximum_count: 3,
+        maximum_count: 4,
         direction: :asc
       )
     )

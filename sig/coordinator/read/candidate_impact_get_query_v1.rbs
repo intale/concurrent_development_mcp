@@ -1,0 +1,10 @@
+module Coordinator
+  module Read
+    class CandidateImpactGetQueryV1 < Shared::Value
+      def candidate_id: () -> String
+      def direction: () -> String
+      def after_global_position: () -> Integer?
+      def limit: () -> Integer
+    end
+  end
+end

@@ -16,6 +16,7 @@ module Coordinator::Read
           CandidateSubmitted
           CandidateChangeManifestCaptured
           CandidateBuildContextCaptured
+          CandidateImpactSurfaceDerived
         ]
       )
 
