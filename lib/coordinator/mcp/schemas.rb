@@ -449,6 +449,33 @@ module Coordinator
         )
       end
 
+      def verification_obligations_list
+        filter_keys = %w[
+          change_set_id candidate_id work_item_id repository_id kind enforcement status
+        ]
+        object_schema(
+          properties: {
+            change_set_id: nullable_identifier,
+            candidate_id: nullable_identifier,
+            work_item_id: nullable_identifier,
+            repository_id: {
+              type: [ "string", "null" ],
+              pattern: "^[a-z0-9][a-z0-9._-]{0,99}$"
+            },
+            kind: nullable_enum([ "candidate_compatibility" ]),
+            enforcement: nullable_enum(%w[verification_gate merge_gate]),
+            status: nullable_enum([ "open" ]),
+            after_global_position: {
+              anyOf: [ { type: "integer", minimum: 0 }, { type: "null" } ]
+            },
+            limit: {
+              anyOf: [ { type: "integer", minimum: 1, maximum: 100 }, { type: "null" } ]
+            }
+          },
+          required: []
+        ).merge(anyOf: filter_keys.map { { required: [ _1 ] } })
+      end
+
       def candidate_impact_surface_submit
         object_schema(
           properties: common_mutation_properties.merge(

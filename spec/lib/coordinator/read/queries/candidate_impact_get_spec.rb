@@ -4,6 +4,7 @@ RSpec.describe Coordinator::Read::Queries::CandidateImpactGet, :event_store, :re
   subject(:query) { described_class.new }
 
   let(:projector) { Coordinator::Read::Projectors::CandidatesV1.new }
+  let(:decision_projector) { Coordinator::Read::Projectors::DecisionGovernanceV1.new }
 
   it "serves available partial evidence without a freshness gate" do
     scenario = CandidateScenario.submit(prefix: "impact-query-lag")
@@ -111,6 +112,62 @@ RSpec.describe Coordinator::Read::Queries::CandidateImpactGet, :event_store, :re
     expect(invalid).to have_attributes(status: "invalid")
   end
 
+  it "adds only a coherent latest-available policy summary, warning, and gating next action" do
+    pair = CandidateObligationScenario.submit_pair(prefix: "impact-query-policy")
+    [ pair.fetch(:source), pair.fetch(:target) ].each { project_candidate(_1) }
+    advisory = CandidateObligationScenario.activate_policy(
+      prefix: "impact-query-policy",
+      change_set_id: pair.dig(:ids, :change_set_id),
+      level: "advisory"
+    )
+    project_policy(advisory)
+
+    available = query.call(
+      candidate_id: pair.dig(:source, :candidate_id),
+      direction: "outgoing"
+    ).value!
+    policy = available.data.page.impact_policy
+    expect(policy).to have_attributes(
+      change_set_id: pair.dig(:ids, :change_set_id),
+      head: advisory.fetch(:head),
+      required_evidence: %w[combined_tests contract_compatibility_review],
+      enforcement: "advisory"
+    )
+    expect(policy.evidence.event).to eq(
+      CandidateObligationScenario.reference(advisory.fetch(:partition_event))
+    )
+    expect(available.warnings).to include(
+      "The latest available Candidate-impact policy is advisory; consider external verification."
+    )
+    expect(available.next_actions).to be_empty
+
+    gating = CandidateObligationScenario.correct_policy(
+      policy: advisory,
+      prefix: "impact-query-policy",
+      change_set_id: pair.dig(:ids, :change_set_id),
+      level: "merge_gate"
+    )
+    project_policy(gating)
+    corrected = query.call(
+      candidate_id: pair.dig(:source, :candidate_id),
+      direction: "outgoing"
+    ).value!
+
+    expect(corrected.data.page.impact_policy).to have_attributes(
+      head: gating.fetch(:head),
+      enforcement: "merge_gate"
+    )
+    expect(corrected.warnings).to include(
+      "The latest available Candidate-impact policy is gating; the obligation projection may lag."
+    )
+    expect(corrected.next_actions.map(&:to_h)).to eq([
+      {
+        tool: "verification_obligations_list",
+        arguments: { change_set_id: pair.dig(:ids, :change_set_id) }
+      }
+    ])
+  end
+
   def matching_candidates(prefix: "impact-query-match")
     prepared = CandidateScenario.prepare(prefix:, path: "lib/candidate.rb")
     source = submit_candidate_from(
@@ -145,6 +202,13 @@ RSpec.describe Coordinator::Read::Queries::CandidateImpactGet, :event_store, :re
 
   def project_candidate(scenario)
     CandidateScenario.candidate_events(scenario.dig(:input, :candidate_id)).each { projector.call(_1) }
+  end
+
+  def project_policy(policy)
+    CandidateObligationScenario.decision_events(policy.fetch(:head).decision_id).each do |event|
+      decision_projector.call(event)
+    end
+    decision_projector.call(policy.fetch(:partition_event))
   end
 
   def source_surface

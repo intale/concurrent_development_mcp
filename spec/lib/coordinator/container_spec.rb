@@ -54,6 +54,7 @@ RSpec.describe Coordinator::Container do
     candidate_get_query = described_class["queries.candidate_get"]
     candidate_list_query = described_class["queries.candidate_list"]
     candidate_impact_query = described_class["queries.candidate_impact_get"]
+    verification_obligations_query = described_class["queries.verification_obligations_list"]
     task_submissions = %w[
       operations.submit_create_change_set_task
       operations.submit_create_work_item_task
@@ -161,7 +162,8 @@ RSpec.describe Coordinator::Container do
         "coord-context-v1",
         "decision-governance-v1",
         "decision-interpretations-v1",
-        "user-utterances-v1"
+        "user-utterances-v1",
+        "verification-obligations-v1"
       ]
     )
     expect(operation_query).to be_a(Coordinator::Read::Queries::OperationGet)
@@ -174,6 +176,9 @@ RSpec.describe Coordinator::Container do
     expect(candidate_get_query).to be_a(Coordinator::Read::Queries::CandidateGet)
     expect(candidate_list_query).to be_a(Coordinator::Read::Queries::CandidateList)
     expect(candidate_impact_query).to be_a(Coordinator::Read::Queries::CandidateImpactGet)
+    expect(verification_obligations_query).to be_a(
+      Coordinator::Read::Queries::VerificationObligationsList
+    )
     expect(task_submissions).to all(
       be_a(Coordinator::Write::Operations::PrepareAndSubmitCoordinationTask)
     )

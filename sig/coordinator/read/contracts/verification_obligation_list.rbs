@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    module Contracts
+      class VerificationObligationList < Dry::Validation::Contract
+        FILTER_KEYS: Array[Symbol]
+
+        def call: (command_input input) -> Dry::Validation::Result
+      end
+    end
+  end
+end

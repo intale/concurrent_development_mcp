@@ -32,7 +32,7 @@ module Coordinator::Read
           context_token: nil,
           data: QueryResultV1::CandidateImpactData.new(page:),
           warnings: available_warnings(page),
-          next_actions: []
+          next_actions: available_next_actions(page)
         )
       end
 
@@ -49,7 +49,26 @@ module Coordinator::Read
         unless page.impact_surface
           warnings << "The Candidate impact surface has not yet been observed by this projection."
         end
+        case page.impact_policy&.enforcement
+        when "advisory"
+          warnings << "The latest available Candidate-impact policy is advisory; consider external verification."
+        when "verification_gate", "merge_gate"
+          warnings << "The latest available Candidate-impact policy is gating; the obligation projection may lag."
+        end
         warnings.freeze
+      end
+
+      def available_next_actions(page)
+        return [] unless %w[verification_gate merge_gate].include?(page.impact_policy&.enforcement)
+
+        [
+          NextAction.new(
+            tool: "verification_obligations_list",
+            arguments: NextAction::ChangeSetArguments.new(
+              change_set_id: page.candidate.change_set_id
+            )
+          )
+        ]
       end
 
       def not_found_result(candidate_id)

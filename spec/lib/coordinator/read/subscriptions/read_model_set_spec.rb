@@ -50,8 +50,14 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       pull_interval: 0.2
     )
   end
+  let(:verification_obligation_registration) do
+    Coordinator::Read::Subscriptions::VerificationObligations.new(
+      handler: Coordinator::Read::Projectors::VerificationObligationsV1.new,
+      pull_interval: 0.2
+    )
+  end
 
-  it "stacks eight unique durable subscriptions on one read-model manager" do
+  it "stacks nine unique durable subscriptions on one read-model manager" do
     subscription_set = build_set
 
     expect(subscription_set.subscription_names).to eq(
@@ -63,7 +69,8 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         "coord-context-v1",
         "decision-governance-v1",
         "decision-interpretations-v1",
-        "user-utterances-v1"
+        "user-utterances-v1",
+        "verification-obligations-v1"
       ]
     )
     expect(context_registration.definition.identity.to_h).to eq(
@@ -97,6 +104,10 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
     expect(candidate_registration.definition.identity.to_h).to eq(
       set_name: "coordinator-read-models-v1",
       subscription_name: "candidates-v1"
+    )
+    expect(verification_obligation_registration.definition.identity.to_h).to eq(
+      set_name: "coordinator-read-models-v1",
+      subscription_name: "verification-obligations-v1"
     )
   end
 
@@ -154,6 +165,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       )
       candidate = CandidateScenario.submit(prefix: "subscription-candidate", build_context: false)
       CandidateScenario.submit_impact(candidate)
+      obligation = CandidateObligationScenario.create_obligation(prefix: "read-model-subscription")
 
       wait_for(subscription_set, "coord-context-v1", minimum: 2)
       wait_for(subscription_set, "command-receipts-v1", minimum: 5)
@@ -162,6 +174,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       wait_for(subscription_set, "decision-governance-v1", minimum: 5)
       wait_for(subscription_set, "agent-choices-v1", minimum: 2)
       wait_for(subscription_set, "candidates-v1", minimum: 3)
+      wait_for(subscription_set, "verification-obligations-v1", minimum: 1)
 
       expect(Coordinator::Read::CoordContext.find("CS-SUB-100").document).to include(
         "schema" => "coord-context/v1"
@@ -201,6 +214,12 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         candidate_id: "CAN-subscription-candidate",
         direction: "produces"
       ).impact_key).to eq("contract:payments-api:v2")
+      expect(Coordinator::Read::VerificationObligation.find(
+        obligation.fetch(:result).obligation_id
+      )).to have_attributes(
+        change_set_id: obligation.dig(:pair, :ids, :change_set_id),
+        status: "open"
+      )
     ensure
       subscription_set.stop
     end
@@ -220,7 +239,8 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         decision_registration,
         agent_choice_registration,
         agent_choice_impact_registration,
-        candidate_registration
+        candidate_registration,
+        verification_obligation_registration
       ]
     )
   end

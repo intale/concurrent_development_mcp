@@ -5,6 +5,23 @@ module CandidateObligationScenario
 
   RULE_VERSION = "candidate-compatibility-obligation/v1"
 
+  def create_obligation(prefix:, level: "merge_gate", required_evidence: nil)
+    pair = submit_pair(prefix:)
+    policy_arguments = {
+      prefix:,
+      change_set_id: pair.dig(:ids, :change_set_id),
+      level:
+    }
+    policy_arguments[:required_evidence] = required_evidence if required_evidence
+    policy = activate_policy(**policy_arguments)
+    result = execute(
+      Coordinator::Write::Operations::ExecuteCreateCandidateCompatibilityObligation,
+      invocation(pair:, policy:)
+    )
+    event = obligation_events(result.obligation_id).sole
+    { pair:, policy:, result:, event:, payload: load(event) }
+  end
+
   def submit_pair(
     prefix:,
     source_path: "Gemfile.lock",

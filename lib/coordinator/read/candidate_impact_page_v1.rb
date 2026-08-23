@@ -4,6 +4,7 @@ module Coordinator::Read
   class CandidateImpactPageV1 < Value
     attribute :candidate, CandidateSummaryV1
     attribute :impact_surface, CandidateImpactSurfaceViewV1.optional
+    attribute :impact_policy, CandidateImpactPolicySummaryV1.optional
     attribute :direction, Types::CandidateImpactQueryDirection
     attribute :relationships,
               Types::Array.of(CandidateImpactRelationshipV1).constrained(max_size: 100)

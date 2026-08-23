@@ -1,0 +1,22 @@
+module Coordinator
+  module Read
+    class VerificationObligationViewV1 < Shared::Value
+      Reason: singleton(Write::CandidateObligations::ImpactReasonV1)
+
+      def obligation_id: () -> String
+      def kind: () -> String
+      def status: () -> String
+      def change_set_id: () -> String
+      def source_candidate: () -> Write::CandidateObligations::CandidateSubjectV1
+      def target_candidate: () -> Write::CandidateObligations::CandidateSubjectV1
+      def reasons: () -> Array[Write::CandidateObligations::ImpactReasonV1]
+      def required_evidence: () -> Array[String]
+      def enforcement: () -> String
+      def policy: () -> Write::CandidateObligations::ImpactPolicyEvidenceV1
+      def validity_input_digest: () -> String
+      def rule_version: () -> String
+      def created_at: () -> String
+      def evidence: () -> VerificationObligationEvidenceV1
+    end
+  end
+end

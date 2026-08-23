@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_23_162000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_23_194000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -372,5 +372,41 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_23_162000) do
     t.datetime "updated_at", null: false
     t.index ["conversation_id"], name: "index_user_utterances_on_conversation_id"
     t.index ["event_id"], name: "index_user_utterances_on_event_id", unique: true
+  end
+
+  create_table "verification_obligations", primary_key: "obligation_id", id: :string, force: :cascade do |t|
+    t.jsonb "actor", null: false
+    t.string "causation_id"
+    t.string "change_set_id", null: false
+    t.string "correlation_id"
+    t.datetime "created_at", null: false
+    t.datetime "created_at_domain", null: false
+    t.datetime "created_at_store", null: false
+    t.string "enforcement", null: false
+    t.jsonb "event", null: false
+    t.bigint "event_global_position", null: false
+    t.string "kind", null: false
+    t.jsonb "markers", default: [], null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.jsonb "obligation", null: false
+    t.string "source_candidate_id", null: false
+    t.string "source_repository_id", null: false
+    t.string "source_work_item_id", null: false
+    t.string "status", null: false
+    t.string "target_candidate_id", null: false
+    t.string "target_repository_id", null: false
+    t.string "target_work_item_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["change_set_id", "status", "event_global_position"], name: "idx_verification_obligations_change_set"
+    t.index ["enforcement", "event_global_position"], name: "idx_verification_obligations_enforcement"
+    t.index ["event_global_position"], name: "idx_verification_obligations_position"
+    t.index ["kind", "event_global_position"], name: "idx_verification_obligations_kind"
+    t.index ["source_candidate_id", "event_global_position"], name: "idx_verification_obligations_source_candidate"
+    t.index ["source_repository_id", "event_global_position"], name: "idx_verification_obligations_source_repository"
+    t.index ["source_work_item_id", "event_global_position"], name: "idx_verification_obligations_source_work_item"
+    t.index ["status", "event_global_position"], name: "idx_verification_obligations_status"
+    t.index ["target_candidate_id", "event_global_position"], name: "idx_verification_obligations_target_candidate"
+    t.index ["target_repository_id", "event_global_position"], name: "idx_verification_obligations_target_repository"
+    t.index ["target_work_item_id", "event_global_position"], name: "idx_verification_obligations_target_work_item"
   end
 end

@@ -1,0 +1,27 @@
+module Coordinator
+  module Read
+    class VerificationObligation < ApplicationRecord
+      def obligation_id: () -> String
+      def kind: () -> String
+      def status: () -> String
+      def change_set_id: () -> String
+      def source_candidate_id: () -> String
+      def target_candidate_id: () -> String
+      def source_work_item_id: () -> String
+      def target_work_item_id: () -> String
+      def source_repository_id: () -> String
+      def target_repository_id: () -> String
+      def enforcement: () -> String
+      def obligation: () -> Hash[String, untyped]
+      def event: () -> Hash[String, untyped]
+      def actor: () -> Hash[String, untyped]
+      def markers: () -> Array[String]
+      def metadata: () -> Hash[String, untyped]
+      def causation_id: () -> String?
+      def correlation_id: () -> String?
+      def event_global_position: () -> Integer
+      def created_at_domain: () -> Time
+      def created_at_store: () -> Time
+    end
+  end
+end

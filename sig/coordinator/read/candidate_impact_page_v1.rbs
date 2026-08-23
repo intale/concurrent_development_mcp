@@ -3,6 +3,7 @@ module Coordinator
     class CandidateImpactPageV1 < Shared::Value
       def candidate: () -> CandidateSummaryV1
       def impact_surface: () -> CandidateImpactSurfaceViewV1?
+      def impact_policy: () -> CandidateImpactPolicySummaryV1?
       def direction: () -> String
       def relationships: () -> Array[CandidateImpactRelationshipV1]
       def next_global_position: () -> Integer?

@@ -66,8 +66,12 @@ module Coordinator::Read
       SOURCE_KEY_DIRECTIONS = %w[produces may_affect].freeze
       TARGET_KEY_DIRECTIONS = %w[consumes assumes].freeze
 
-      def initialize(candidates: Candidates.new)
+      def initialize(
+        candidates: Candidates.new,
+        policies: CandidateImpactPolicies.new
+      )
         @candidates = candidates
+        @policies = policies
       end
 
       def store_manifest(manifest:)
@@ -136,6 +140,7 @@ module Coordinator::Read
         CandidateImpactPageV1.new(
           candidate: summaries.fetch(subject.candidate_id),
           impact_surface: impact_surface_view(subject),
+          impact_policy: @policies.fetch(subject.change_set_id),
           direction: query.direction,
           relationships:,
           next_global_position: has_more ? relationships.last.counterpart.submitted.global_position : nil,

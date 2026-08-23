@@ -18,6 +18,7 @@ module Coordinator
           Tools::CandidateGet,
           Tools::CandidateList,
           Tools::CandidateImpactGet,
+          Tools::VerificationObligationsList,
           Tools::ChangeSetCreate,
           Tools::WorkItemCreate,
           Tools::WorkItemDependencyDeclare,

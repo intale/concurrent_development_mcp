@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    module Repositories
+      class CandidateImpactPolicies
+        TOPIC_ID: String
+
+        def fetch: (String change_set_id) -> CandidateImpactPolicySummaryV1?
+      end
+    end
+  end
+end

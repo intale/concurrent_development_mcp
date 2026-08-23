@@ -1,0 +1,13 @@
+module Coordinator
+  module Read
+    module Repositories
+      class VerificationObligations
+        def store_creation: (
+          event: PgEventstore::Event,
+          obligation: Write::Events::VerificationObligationCreatedV1
+        ) -> VerificationObligation
+        def page: (VerificationObligationListQueryV1 query) -> VerificationObligationPageV1
+      end
+    end
+  end
+end

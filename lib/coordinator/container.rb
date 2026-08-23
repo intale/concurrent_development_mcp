@@ -339,7 +339,18 @@ module Coordinator
     end
 
     register("repositories.candidate_impacts", memoize: true) do
-      Read::Repositories::CandidateImpacts.new(candidates: self["repositories.candidates"])
+      Read::Repositories::CandidateImpacts.new(
+        candidates: self["repositories.candidates"],
+        policies: self["repositories.candidate_impact_policies"]
+      )
+    end
+
+    register("repositories.candidate_impact_policies", memoize: true) do
+      Read::Repositories::CandidateImpactPolicies.new
+    end
+
+    register("repositories.verification_obligations", memoize: true) do
+      Read::Repositories::VerificationObligations.new
     end
 
     register("projectors.coord_context_v1", memoize: true) do
@@ -403,6 +414,14 @@ module Coordinator
         schema_registry: self["event_schema_registry"],
         candidates: self["repositories.candidates"],
         candidate_impacts: self["repositories.candidate_impacts"],
+        processed_events: self["repositories.processed_projection_events"]
+      )
+    end
+
+    register("projectors.verification_obligations_v1", memoize: true) do
+      Read::Projectors::VerificationObligationsV1.new(
+        schema_registry: self["event_schema_registry"],
+        obligations: self["repositories.verification_obligations"],
         processed_events: self["repositories.processed_projection_events"]
       )
     end
@@ -474,6 +493,12 @@ module Coordinator
 
     register("queries.candidate_impact_get") do
       Read::Queries::CandidateImpactGet.new(impacts: self["repositories.candidate_impacts"])
+    end
+
+    register("queries.verification_obligations_list") do
+      Read::Queries::VerificationObligationsList.new(
+        obligations: self["repositories.verification_obligations"]
+      )
     end
 
     register("mcp.settings", memoize: true) { Mcp::SettingsLoader.new.call }
@@ -1200,6 +1225,12 @@ module Coordinator
       Read::Subscriptions::Candidates.new(handler: self["projectors.candidates_v1"])
     end
 
+    register("subscriptions.verification_obligations", memoize: true) do
+      Read::Subscriptions::VerificationObligations.new(
+        handler: self["projectors.verification_obligations_v1"]
+      )
+    end
+
     register("subscription_managers.process_managers", memoize: true) do
       PgEventstore.subscriptions_manager(
         subscription_set: Processes::Subscriptions::ProcessManagerSet::SET_NAME
@@ -1237,7 +1268,8 @@ module Coordinator
           self["subscriptions.decision_interpretations"],
           self["subscriptions.agent_choices"],
           self["subscriptions.agent_choice_impacts"],
-          self["subscriptions.candidates"]
+          self["subscriptions.candidates"],
+          self["subscriptions.verification_obligations"]
         ]
       )
     end

@@ -51,7 +51,11 @@ module Coordinator
         Use candidate_impact_surface_submit to attach one attributed semantic-impact surface to the exact Candidate
         head and source-evidence digests. The mutation is a durable Task and does not claim that an analyzer ran.
         Use candidate_impact_get with an explicit incoming or outgoing direction to inspect bounded, latest available
-        potential relationships. Path and semantic matches are evidence, not incompatibility or merge authorization.
+        potential relationships and its optional latest available Candidate-impact policy summary. Advisory warnings
+        recommend external verification without creating a gate. For a gating summary, use
+        verification_obligations_list with at least one filter to inspect available open coordination requirements;
+        an empty page may reflect projection lag and is never merge authorization. Path and semantic matches are
+        evidence, not incompatibility or merge authorization.
         The coordinator records attributed evidence and does not execute Git, CI, or agent work.
       TEXT
 

@@ -1,0 +1,15 @@
+module Coordinator
+  module Read
+    class VerificationObligationListQueryV1 < Shared::Value
+      def change_set_id: () -> String?
+      def candidate_id: () -> String?
+      def work_item_id: () -> String?
+      def repository_id: () -> String?
+      def kind: () -> String?
+      def enforcement: () -> String?
+      def status: () -> String
+      def after_global_position: () -> Integer?
+      def limit: () -> Integer
+    end
+  end
+end

@@ -23,6 +23,7 @@ module Coordinator
       def self.candidate_get: () -> json_schema
       def self.candidate_list: () -> json_schema
       def self.candidate_impact_get: () -> json_schema
+      def self.verification_obligations_list: () -> json_schema
       def self.candidate_impact_surface_submit: () -> json_schema
       def self.operation_get: () -> json_schema
       def self.guidance_get: () -> json_schema

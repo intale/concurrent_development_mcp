@@ -1,0 +1,9 @@
+module Coordinator
+  module Read
+    class VerificationObligationPageV1 < Shared::Value
+      def items: () -> Array[VerificationObligationViewV1]
+      def next_global_position: () -> Integer?
+      def has_more: () -> bool
+    end
+  end
+end

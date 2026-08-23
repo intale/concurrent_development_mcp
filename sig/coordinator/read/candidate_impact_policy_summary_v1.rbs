@@ -1,0 +1,14 @@
+module Coordinator
+  module Read
+    class CandidateImpactPolicySummaryV1 < Shared::Value
+      def change_set_id: () -> String
+      def partition: () -> Write::Decisions::DecisionPartitionV1
+      def head: () -> Write::Decisions::DecisionHeadV1
+      def definition_digest: () -> String
+      def required_evidence: () -> Array[String]
+      def enforcement: () -> String
+      def valid_from: () -> String
+      def evidence: () -> CandidateImpactPolicyEvidenceV1
+    end
+  end
+end
