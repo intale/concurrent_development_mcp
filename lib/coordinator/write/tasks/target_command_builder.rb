@@ -41,6 +41,8 @@ module Coordinator::Write
           build_submit_candidate_impact_surface(document)
         when CommandInputDocuments::ClaimVerificationObligationV1
           build_claim_verification_obligation(document)
+        when CommandInputDocuments::SubmitCompatibilityAssessmentV1
+          build_submit_compatibility_assessment(document)
         end
       end
 
@@ -318,6 +320,18 @@ module Coordinator::Write
           actor: build_actor(input.actor),
           obligation_id: input.obligation_id,
           claim_duration_seconds: input.claim_duration_seconds
+        )
+      end
+
+      def build_submit_compatibility_assessment(document)
+        input = document.input
+        Commands::SubmitCompatibilityAssessment.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          obligation_id: input.obligation_id,
+          claim: input.claim,
+          binding: input.binding,
+          assessment: input.assessment
         )
       end
 

@@ -1,0 +1,6 @@
+module Coordinator
+  module Write
+    class InvalidVerificationEvidenceHistory < StandardError
+    end
+  end
+end

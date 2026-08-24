@@ -380,6 +380,19 @@ module Coordinator::Write
       attribute :input, ClaimVerificationObligationInputV1
     end
 
+    class SubmitCompatibilityAssessmentInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :obligation_id, Types::Identifier
+      attribute :claim, CompatibilityAssessments::ClaimV1
+      attribute :binding, CompatibilityAssessments::BindingV1
+      attribute :assessment, CompatibilityAssessments::AssessmentV1
+    end
+
+    class SubmitCompatibilityAssessmentV1 < BaseV1
+      attribute :tool_name, Types::String.enum("compatibility_assessment_submit")
+      attribute :input, SubmitCompatibilityAssessmentInputV1
+    end
+
     class ExpireResourceLeaseInputV1 < Value
       attribute :actor, ActorV1
       attribute :resource_key_hash, Types::Sha256Digest
@@ -411,7 +424,8 @@ module Coordinator::Write
            RecordAgentChoiceV1 |
            SubmitCandidateV1 |
            SubmitCandidateImpactSurfaceV1 |
-           ClaimVerificationObligationV1
+           ClaimVerificationObligationV1 |
+           SubmitCompatibilityAssessmentV1
 
     DigestType = Type | ExpireResourceLeaseV1
   end

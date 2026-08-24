@@ -111,6 +111,10 @@ module Coordinator
       Write::Operations::PrepareClaimVerificationObligation.new
     end
 
+    register("operations.prepare_submit_compatibility_assessment", memoize: true) do
+      Write::Operations::PrepareSubmitCompatibilityAssessment.new
+    end
+
     register("domain.change_sets.create", memoize: true) do
       Write::Domain::ChangeSets::Create.new(stream_factory: self["stream_factory"])
     end
@@ -157,6 +161,12 @@ module Coordinator
 
     register("domain.verification_obligation_claims.claim", memoize: true) do
       Write::Domain::VerificationObligationClaims::Claim.new(
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("domain.verification_evidence.submit", memoize: true) do
+      Write::Domain::VerificationEvidence::Submit.new(
         stream_factory: self["stream_factory"]
       )
     end
@@ -841,6 +851,24 @@ module Coordinator
       )
     end
 
+    register("operations.execute_submit_compatibility_assessment") do
+      Write::Operations::ExecuteSubmitCompatibilityAssessment.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_submit_compatibility_assessment"],
+        decider: self["domain.verification_evidence.submit"],
+        input_digest: self["command_input_digest"],
+        assessment_input_digest: Write::CompatibilityAssessments::AssessmentInputDigest.new(
+          canonical_json: self["canonical_json"]
+        ),
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
     register("operations.execute_start_agent_choice_impact_scan", memoize: true) do
       Write::Operations::ExecuteStartAgentChoiceImpactScan.new(
         event_store: self["event_store"],
@@ -951,7 +979,9 @@ module Coordinator
         submit_candidate_impact_surface:
           self["operations.execute_submit_candidate_impact_surface"],
         claim_verification_obligation:
-          self["operations.execute_claim_verification_obligation"]
+          self["operations.execute_claim_verification_obligation"],
+        submit_compatibility_assessment:
+          self["operations.execute_submit_compatibility_assessment"]
       )
     end
 
@@ -1098,6 +1128,13 @@ module Coordinator
     register("operations.submit_claim_verification_obligation_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_claim_verification_obligation"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_compatibility_assessment_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_submit_compatibility_assessment"],
         submitter: self["operations.submit_coordination_task"]
       )
     end

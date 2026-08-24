@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module CompatibilityAssessments
+      class AssessmentInputDocumentV1 < Shared::Value
+        def schema: () -> String
+        def obligation_id: () -> String
+        def binding: () -> BindingV1
+        def assessment: () -> AssessmentV1
+      end
+    end
+  end
+end

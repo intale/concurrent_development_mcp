@@ -197,6 +197,18 @@ module Coordinator::Write
       attribute :claim_event, EventReference
     end
 
+    class CompatibilityAssessment < Value
+      attribute :obligation_id, Types::Identifier
+      attribute :evidence_id, Types::UuidV7
+      attribute :evidence_kind, Types::CandidateImpactRequiredEvidenceKind
+      attribute :conclusion, Types::VerificationEvidenceConclusion
+      attribute :status, Types::VerificationObligationStatus
+      attribute :assessment_input_digest, Types::Sha256Digest
+      attribute :evidence_event, EventReference
+      attribute :outcome_event, EventReference.optional
+      attribute :submitted_at, Types::Timestamp
+    end
+
     Type = ChangeSet |
            WorkItem |
            Dependency |
@@ -214,6 +226,7 @@ module Coordinator::Write
            AgentChoice |
            CandidateSubmission |
            CandidateImpactSurface |
-           VerificationObligationClaim
+           VerificationObligationClaim |
+           CompatibilityAssessment
   end
 end

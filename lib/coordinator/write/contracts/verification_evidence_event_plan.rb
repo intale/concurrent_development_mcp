@@ -38,8 +38,7 @@ module Coordinator::Write
         known_revisions = [ state.obligation_event, state.latest_claim_event, *state.evidence.map(&:event) ]
           .compact
           .map(&:stream_revision)
-        reference.event_id == evidence_id &&
-          reference.type == "VerificationEvidenceSubmitted" &&
+        reference.type == "VerificationEvidenceSubmitted" &&
           reference.stream_context == "DevelopmentIntegration" &&
           reference.stream_name == "VerificationObligation" &&
           reference.stream_id == command.obligation_id &&

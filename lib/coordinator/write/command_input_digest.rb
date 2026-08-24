@@ -30,6 +30,7 @@ module Coordinator::Write
       when Commands::SubmitCandidate then candidate_submit_document(command)
       when Commands::SubmitCandidateImpactSurface then candidate_impact_surface_submit_document(command)
       when Commands::ClaimVerificationObligation then verification_obligation_claim_document(command)
+      when Commands::SubmitCompatibilityAssessment then compatibility_assessment_submit_document(command)
       when Commands::ExpireResourceLease then lease_expire_policy_document(command)
       else
         raise ArgumentError, "Unsupported coordination command: #{command.class.name}"
@@ -437,6 +438,25 @@ module Coordinator::Write
           actor: actor_document(command.actor),
           obligation_id: command.obligation_id,
           claim_duration_seconds: command.claim_duration_seconds
+        )
+      )
+    end
+
+    def compatibility_assessment_submit(command)
+      @canonical_json.sha256(compatibility_assessment_submit_document(command).to_h)
+    end
+
+    def compatibility_assessment_submit_document(command)
+      CommandInputDocuments::SubmitCompatibilityAssessmentV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "compatibility_assessment_submit",
+        input: CommandInputDocuments::SubmitCompatibilityAssessmentInputV1.new(
+          actor: actor_document(command.actor),
+          obligation_id: command.obligation_id,
+          claim: command.claim,
+          binding: command.binding,
+          assessment: command.assessment
         )
       )
     end

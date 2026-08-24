@@ -176,6 +176,22 @@ module Coordinator::Write
       direction: :desc
     )
 
+    VERIFICATION_OBLIGATION_FOR_EVIDENCE = GroupedEventReadCriteria.new(
+      event_types: [
+        "VerificationObligationCreated",
+        "VerificationObligationClaimed",
+        "VerificationObligationSatisfied",
+        "VerificationObligationFailed"
+      ],
+      direction: :desc
+    )
+
+    VERIFICATION_EVIDENCE_HISTORY = EventReadCriteria.new(
+      event_types: [ "VerificationEvidenceSubmitted" ],
+      maximum_count: Types::VERIFICATION_EVIDENCE_MAXIMUM_COUNT,
+      direction: :asc
+    )
+
     CANDIDATE_IMPACT_REGISTRY_LATEST = GroupedEventReadCriteria.new(
       event_types: [ "CandidateImpactSurfaceRegistered" ],
       direction: :desc

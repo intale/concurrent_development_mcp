@@ -13,7 +13,8 @@ module Coordinator::Write
         "conflict",
         "busy",
         "stale_context",
-        "confirmation_required"
+        "confirmation_required",
+        "not_found"
       )
       attribute :summary, Types::String
       attribute :command_id, Types::Identifier.optional

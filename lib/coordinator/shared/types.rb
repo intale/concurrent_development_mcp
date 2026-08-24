@@ -329,6 +329,7 @@ module Coordinator::Shared
       candidate_submit
       candidate_impact_surface_submit
       verification_obligation_claim
+      compatibility_assessment_submit
     ].freeze
 
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)

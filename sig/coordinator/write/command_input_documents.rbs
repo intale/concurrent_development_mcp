@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandInputDocuments
-      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1 | SubmitCandidateV1 | SubmitCandidateImpactSurfaceV1 | ClaimVerificationObligationV1
+      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1 | SubmitCandidateV1 | SubmitCandidateImpactSurfaceV1 | ClaimVerificationObligationV1 | SubmitCompatibilityAssessmentV1
       type digest_value = value | ExpireResourceLeaseV1
 
       class ActorV1 < Shared::Value
@@ -362,6 +362,19 @@ module Coordinator
       class ClaimVerificationObligationV1 < BaseV1
         def tool_name: () -> String
         def input: () -> ClaimVerificationObligationInputV1
+      end
+
+      class SubmitCompatibilityAssessmentInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def obligation_id: () -> String
+        def claim: () -> CompatibilityAssessments::ClaimV1
+        def binding: () -> CompatibilityAssessments::BindingV1
+        def assessment: () -> CompatibilityAssessments::AssessmentV1
+      end
+
+      class SubmitCompatibilityAssessmentV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> SubmitCompatibilityAssessmentInputV1
       end
 
       class ExpireResourceLeaseInputV1 < Shared::Value

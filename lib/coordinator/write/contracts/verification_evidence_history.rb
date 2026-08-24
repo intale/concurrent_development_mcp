@@ -69,7 +69,6 @@ module Coordinator::Write
             evidence.source_candidate == state.obligation.source_candidate &&
             evidence.target_candidate == state.obligation.target_candidate &&
             evidence.policy == state.obligation.policy &&
-            reference.event_id == evidence.evidence_id &&
             reference.type == "VerificationEvidenceSubmitted" &&
             same_stream?(reference, obligation_id)
         end

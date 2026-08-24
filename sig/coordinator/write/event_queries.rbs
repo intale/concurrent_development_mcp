@@ -25,6 +25,9 @@ module Coordinator
       CANDIDATE_HEAD_REGISTRATION: EventReadCriteria
       CANDIDATE_FOR_IMPACT_SURFACE: GroupedEventReadCriteria
       VERIFICATION_OBLIGATION_CREATION: EventReadCriteria
+      VERIFICATION_OBLIGATION_FOR_CLAIM: GroupedEventReadCriteria
+      VERIFICATION_OBLIGATION_FOR_EVIDENCE: GroupedEventReadCriteria
+      VERIFICATION_EVIDENCE_HISTORY: EventReadCriteria
       CANDIDATE_IMPACT_REGISTRY_LATEST: GroupedEventReadCriteria
       CANDIDATE_IMPACT_REGISTRY_SWEEP_STATE: GroupedEventReadCriteria
       CANDIDATE_IMPACT_PAIR_SCAN_STATE: GroupedEventReadCriteria

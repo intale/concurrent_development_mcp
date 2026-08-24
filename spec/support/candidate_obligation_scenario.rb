@@ -5,8 +5,14 @@ module CandidateObligationScenario
 
   RULE_VERSION = "candidate-compatibility-obligation/v1"
 
-  def create_obligation(prefix:, level: "merge_gate", required_evidence: nil)
-    pair = submit_pair(prefix:)
+  def create_obligation(
+    prefix:,
+    level: "merge_gate",
+    required_evidence: nil,
+    source_path: "Gemfile.lock",
+    target_path: "app/services/checkout.rb"
+  )
+    pair = submit_pair(prefix:, source_path:, target_path:)
     policy_arguments = {
       prefix:,
       change_set_id: pair.dig(:ids, :change_set_id),
@@ -257,6 +263,73 @@ module CandidateObligationScenario
       streams.verification_obligation(obligation_id),
       Coordinator::Write::EventQueries::VERIFICATION_OBLIGATION_CREATION
     )
+  end
+
+  def claim_obligation(created:, prefix:, agent_id: "agent-blue", duration: 300)
+    execute(Coordinator::Write::Operations::ExecuteClaimVerificationObligation, {
+      command_id: "cmd-claim-#{prefix}",
+      actor: { kind: "agent", id: agent_id },
+      obligation_id: created.fetch(:result).obligation_id,
+      claim_duration_seconds: duration
+    }).data
+  end
+
+  def compatibility_assessment_arguments(
+    created:,
+    claim:,
+    command_id:,
+    evidence_kind: "combined_tests",
+    conclusion: "passed",
+    agent_id: claim.claimant_id,
+    run_id: "run-1",
+    result_salt: command_id
+  )
+    obligation = created.fetch(:payload)
+    {
+      command_id:,
+      actor: { kind: "agent", id: agent_id },
+      obligation_id: obligation.obligation_id,
+      claim: { claim_id: claim.claim_id, fencing_token: claim.fencing_token },
+      binding: {
+        obligation_validity_input_digest: obligation.validity_input_digest,
+        source_candidate: {
+          candidate_id: obligation.source_candidate.candidate_id,
+          head_commit_oid: obligation.source_candidate.head_commit_oid
+        },
+        target_candidate: {
+          candidate_id: obligation.target_candidate.candidate_id,
+          head_commit_oid: obligation.target_candidate.head_commit_oid
+        }
+      },
+      assessment: {
+        evidence_kind:,
+        producer: { name: "coordinator-spec", version: "1.0.0" },
+        run_id:,
+        test_suite_digest: digest("suite", evidence_kind),
+        environment_digest: digest("environment", evidence_kind),
+        dependency_graph_digest: digest("dependencies", evidence_kind),
+        result_digest: digest("result", result_salt),
+        conclusion:,
+        findings: compatibility_findings(conclusion),
+        produced_at: Coordinator::Shared::SystemClock.new.now
+      }
+    }
+  end
+
+  def compatibility_findings(conclusion)
+    return [] if conclusion == "passed"
+
+    [
+      {
+        code: "assessment-#{conclusion}",
+        severity: conclusion == "failed" ? "error" : "warning",
+        summary: "Assessment concluded #{conclusion}"
+      }
+    ]
+  end
+
+  def digest(*parts)
+    Coordinator::Shared::CanonicalJson.new.sha256(parts)
   end
 
   def load(event)

@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Tasks
       module DomainErrorV1
-        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError | InterpretationNotAcceptedError | DecisionAlreadyExistsError | InterpretationAlreadyActivatedError | DecisionDefinitionNotActivatableError | DecisionSlotOccupiedError | DecisionPartitionLimitReachedError | DecisionPartitionCapacityReachedError | DecisionPartitionStateInvalidError | DecisionNotFoundError | DecisionNotActiveError | InterpretationNotACorrectionError | DecisionDefinitionNotCorrectableError | DecisionRevisionChangedError | DecisionSlotStateInvalidError | AgentChoiceAlreadyExistsError | StaleDecisionContextError | DecisionContextMismatchError | DecisionContextConflictError | DecisionContextLimitReachedError | UnsupportedDecisionContextError | AgentChoiceBlockedByDecisionError | AgentChoiceConfirmationRequiredError | AgentChoicePartitionSnapshotInvalidError | AgentChoiceDecisionHeadInvalidError | AgentChoiceUnresolvedHeadsError | CandidateAlreadyExistsError | CandidateHeadAlreadyRegisteredError | CandidateLeaseObservationsMismatchError | CandidateLeaseNotActiveScopeError | CandidateLeaseNotActiveError | CandidateUnauthorizedResourcesError | CandidateManifestBaseMismatchError | CandidateNotFoundError | CandidateImpactIdentityMismatchError | CandidateImpactSourceEvidenceMismatchError | CandidateImpactSurfaceAlreadyRecordedError | VerificationObligationNotFoundError | VerificationObligationAlreadyClaimedError
+        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError | InterpretationNotAcceptedError | DecisionAlreadyExistsError | InterpretationAlreadyActivatedError | DecisionDefinitionNotActivatableError | DecisionSlotOccupiedError | DecisionPartitionLimitReachedError | DecisionPartitionCapacityReachedError | DecisionPartitionStateInvalidError | DecisionNotFoundError | DecisionNotActiveError | InterpretationNotACorrectionError | DecisionDefinitionNotCorrectableError | DecisionRevisionChangedError | DecisionSlotStateInvalidError | AgentChoiceAlreadyExistsError | StaleDecisionContextError | DecisionContextMismatchError | DecisionContextConflictError | DecisionContextLimitReachedError | UnsupportedDecisionContextError | AgentChoiceBlockedByDecisionError | AgentChoiceConfirmationRequiredError | AgentChoicePartitionSnapshotInvalidError | AgentChoiceDecisionHeadInvalidError | AgentChoiceUnresolvedHeadsError | CandidateAlreadyExistsError | CandidateHeadAlreadyRegisteredError | CandidateLeaseObservationsMismatchError | CandidateLeaseNotActiveScopeError | CandidateLeaseNotActiveError | CandidateUnauthorizedResourcesError | CandidateManifestBaseMismatchError | CandidateNotFoundError | CandidateImpactIdentityMismatchError | CandidateImpactSourceEvidenceMismatchError | CandidateImpactSurfaceAlreadyRecordedError | VerificationObligationNotFoundError | VerificationObligationAlreadyClaimedError | VerificationObligationPolicyStaleError | VerificationObligationUnclaimedError | VerificationObligationClaimStaleError | VerificationObligationClaimNotOwnedError | VerificationObligationClaimExpiredError | VerificationObligationBindingStaleError | VerificationEvidenceKindNotRequiredError | VerificationEvidenceDuplicateError | VerificationEvidenceLimitReachedError | VerificationObligationTerminalError
 
         class ChangeSetDetails < Shared::Value
           def change_set_id: () -> String
@@ -343,6 +343,39 @@ module Coordinator
           def claimant_id: () -> String
           def fencing_token: () -> Integer
           def expires_at: () -> String
+        end
+
+        class VerificationObligationClaimFenceDetails < VerificationObligationDetails
+          def current_claim_id: () -> String
+          def current_fencing_token: () -> Integer
+        end
+
+        class VerificationObligationClaimOwnerDetails < VerificationObligationDetails
+          def claimant_id: () -> String
+        end
+
+        class VerificationObligationClaimExpiryDetails < VerificationObligationDetails
+          def expires_at: () -> String
+        end
+
+        class VerificationObligationBindingDetails < VerificationObligationDetails
+          def current_validity_input_digest: () -> String
+        end
+
+        class VerificationEvidenceKindDetails < VerificationObligationDetails
+          def evidence_kind: () -> String
+        end
+
+        class VerificationEvidenceDigestDetails < VerificationObligationDetails
+          def assessment_input_digest: () -> String
+        end
+
+        class VerificationEvidenceLimitDetails < VerificationObligationDetails
+          def maximum_count: () -> Integer
+        end
+
+        class VerificationObligationTerminalDetails < VerificationObligationDetails
+          def status: () -> String
         end
 
         class ChangeSetError < Shared::Value
@@ -730,6 +763,66 @@ module Coordinator
           def code: () -> String
           def message: () -> String
           def details: () -> VerificationObligationActiveClaimDetails
+        end
+
+        class VerificationObligationPolicyStaleError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> VerificationObligationDetails
+        end
+
+        class VerificationObligationUnclaimedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> VerificationObligationDetails
+        end
+
+        class VerificationObligationClaimStaleError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> VerificationObligationClaimFenceDetails
+        end
+
+        class VerificationObligationClaimNotOwnedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> VerificationObligationClaimOwnerDetails
+        end
+
+        class VerificationObligationClaimExpiredError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> VerificationObligationClaimExpiryDetails
+        end
+
+        class VerificationObligationBindingStaleError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> VerificationObligationBindingDetails
+        end
+
+        class VerificationEvidenceKindNotRequiredError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> VerificationEvidenceKindDetails
+        end
+
+        class VerificationEvidenceDuplicateError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> VerificationEvidenceDigestDetails
+        end
+
+        class VerificationEvidenceLimitReachedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> VerificationEvidenceLimitDetails
+        end
+
+        class VerificationObligationTerminalError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> VerificationObligationTerminalDetails
         end
       end
     end

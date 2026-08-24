@@ -518,7 +518,61 @@ module Coordinator::Write
       )
     end
 
+    def compatibility_assessment_submit(
+      command:,
+      evidence:,
+      input_digest:,
+      assessment_input_digest:,
+      persisted_events:,
+      completed_at:
+    )
+      status = verification_status(persisted_events)
+      build_completion(
+        command:,
+        tool_name: "compatibility_assessment_submit",
+        summary: compatibility_assessment_summary(status),
+        data: CommandReceiptData::CompatibilityAssessment.new(
+          obligation_id: command.obligation_id,
+          evidence_id: evidence.evidence_id,
+          evidence_kind: evidence.evidence_kind,
+          conclusion: evidence.assessment.conclusion,
+          status:,
+          assessment_input_digest:,
+          evidence_event: event_reference(persisted_events.fetch(0)),
+          outcome_event: persisted_events[1] ? event_reference(persisted_events.fetch(1)) : nil,
+          submitted_at: evidence.submitted_at
+        ),
+        next_actions: [
+          NextAction.new(
+            tool: "verification_obligations_list",
+            arguments: NextAction::VerificationObligationArguments.new(
+              obligation_id: command.obligation_id
+            )
+          )
+        ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
+
+    def verification_status(persisted_events)
+      case persisted_events[1]&.type
+      when "VerificationObligationSatisfied" then "satisfied"
+      when "VerificationObligationFailed" then "failed"
+      else "open"
+      end
+    end
+
+    def compatibility_assessment_summary(status)
+      case status
+      when "satisfied" then "Compatibility evidence accepted; verification obligation satisfied."
+      when "failed" then "Compatibility evidence accepted; verification obligation failed."
+      else "Compatibility evidence accepted; verification obligation remains open."
+      end
+    end
 
     def build_completion(command:, tool_name:, summary:, data:, next_actions:, input_digest:, persisted_events:, completed_at:)
       events = apply_persisted_events_contract(persisted_events)

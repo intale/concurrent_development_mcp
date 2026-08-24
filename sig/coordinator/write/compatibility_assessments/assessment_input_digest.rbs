@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module CompatibilityAssessments
+      class AssessmentInputDigest
+        def initialize: (?canonical_json: Shared::CanonicalJson) -> void
+        def call: (Commands::SubmitCompatibilityAssessment command) -> String
+        def document: (Commands::SubmitCompatibilityAssessment command) -> AssessmentInputDocumentV1
+      end
+    end
+  end
+end

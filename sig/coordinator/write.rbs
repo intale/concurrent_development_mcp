@@ -19,7 +19,8 @@ module Coordinator
                                 Commands::RecordAgentChoice |
                                 Commands::SubmitCandidate |
                                 Commands::SubmitCandidateImpactSurface |
-                                Commands::ClaimVerificationObligation
+                                Commands::ClaimVerificationObligation |
+                                Commands::SubmitCompatibilityAssessment
     type write_command = coordination_command | Commands::ExpireResourceLease
     type lifecycle_command = Commands::StartCoordinationTask |
                              Commands::RecordCoordinationTaskOutcome |

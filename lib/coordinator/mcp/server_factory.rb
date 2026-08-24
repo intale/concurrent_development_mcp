@@ -58,6 +58,10 @@ module Coordinator
         evidence, not incompatibility or merge authorization. Use verification_obligation_claim to acquire temporary
         exclusive coordination before performing an obligation externally. Persist its Task handle and, after
         completion, retain the returned claim ID and fencing token. A claim does not mean work started or succeeded.
+        Use compatibility_assessment_submit with that exact claim ID/fencing token and the obligation's immutable
+        candidate heads and validity digest. Persist the returned Task handle. Each accepted assessment records exact
+        producer, run, input, result, finding, and timestamp attribution; it may leave the obligation open or immediately
+        satisfy/fail it. Stale projected context, claim fences, candidate bindings, or policy are authoritatively denied.
         The coordinator records attributed evidence and does not execute Git, CI, or agent work.
       TEXT
 

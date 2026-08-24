@@ -40,7 +40,7 @@ RSpec.describe Coordinator::Write::Contracts::VerificationEvidenceHistory do
     expect(contract.call(state: duplicated_state, obligation_id:)).to be_failure
 
     mismatched_reference = observation.new(
-      event: observation.event.new(event_id: "08919191-9191-7191-8191-919191919191")
+      event: observation.event.new(stream_id: "08919191-9191-7191-8191-919191919191")
     )
     expect(
       contract.call(

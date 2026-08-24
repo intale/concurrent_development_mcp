@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    class CompatibilityAssessmentPreparationV1 < Shared::Value
+      def evidence_id: () -> String
+      def submitted_at: () -> String
+      def input_digest: () -> String
+      def assessment_input_digest: () -> String
+      def evidence_event_id: () -> String
+      def terminal_event_id: () -> String
+      def completion_event_id: () -> String
+    end
+  end
+end

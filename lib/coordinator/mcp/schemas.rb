@@ -490,6 +490,79 @@ module Coordinator
         )
       end
 
+      def compatibility_assessment_submit
+        finding = object_schema(
+          properties: {
+            code: { type: "string", minLength: 1, maxLength: 100 },
+            severity: { type: "string", enum: Types::VERIFICATION_EVIDENCE_FINDING_SEVERITIES },
+            summary: { type: "string", minLength: 1, maxLength: 2_000 },
+            path: { type: [ "string", "null" ], minLength: 1, maxLength: 1_024 }
+          },
+          required: %w[code severity summary]
+        )
+        candidate = object_schema(
+          properties: { candidate_id: identifier, head_commit_oid: git_oid },
+          required: %w[candidate_id head_commit_oid]
+        )
+        object_schema(
+          properties: common_mutation_properties.merge(
+            actor: agent_actor,
+            obligation_id: identifier,
+            claim: object_schema(
+              properties: {
+                claim_id: uuid_v7,
+                fencing_token: { type: "integer", minimum: 1 }
+              },
+              required: %w[claim_id fencing_token]
+            ),
+            binding: object_schema(
+              properties: {
+                obligation_validity_input_digest: {
+                  type: "string",
+                  pattern: "^sha256:[0-9a-f]{64}$"
+                },
+                source_candidate: candidate,
+                target_candidate: candidate
+              },
+              required: %w[
+                obligation_validity_input_digest source_candidate target_candidate
+              ]
+            ),
+            assessment: object_schema(
+              properties: {
+                evidence_kind: {
+                  type: "string",
+                  enum: Types::CANDIDATE_IMPACT_REQUIRED_EVIDENCE_KINDS
+                },
+                producer: object_schema(
+                  properties: {
+                    name: { type: "string", minLength: 1, maxLength: 100 },
+                    version: { type: "string", minLength: 1, maxLength: 100 }
+                  },
+                  required: %w[name version]
+                ),
+                run_id: identifier,
+                test_suite_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
+                environment_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
+                dependency_graph_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
+                result_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
+                conclusion: { type: "string", enum: Types::VERIFICATION_EVIDENCE_CONCLUSIONS },
+                findings: { type: "array", items: finding, maxItems: 32 },
+                produced_at: {
+                  type: "string",
+                  pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$"
+                }
+              },
+              required: %w[
+                evidence_kind producer run_id test_suite_digest environment_digest
+                dependency_graph_digest result_digest conclusion findings produced_at
+              ]
+            )
+          ),
+          required: %w[command_id actor obligation_id claim binding assessment]
+        )
+      end
+
       def candidate_impact_surface_submit
         object_schema(
           properties: common_mutation_properties.merge(

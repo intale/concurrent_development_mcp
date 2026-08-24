@@ -27,7 +27,16 @@ module Coordinator::Write
         candidate_impact_source_evidence_mismatch: "conflict",
         candidate_impact_surface_already_recorded: "conflict",
         verification_obligation_already_claimed: "conflict",
-        verification_obligation_not_found: "not_found"
+        verification_obligation_not_found: "not_found",
+        verification_obligation_policy_stale: "stale_context",
+        verification_obligation_unclaimed: "conflict",
+        verification_obligation_claim_stale: "conflict",
+        verification_obligation_claim_not_owned: "conflict",
+        verification_obligation_claim_expired: "conflict",
+        verification_obligation_binding_stale: "stale_context",
+        verification_evidence_duplicate: "conflict",
+        verification_evidence_limit_reached: "conflict",
+        verification_obligation_terminal: "conflict"
       }.freeze
 
       def call(result, command_id:)

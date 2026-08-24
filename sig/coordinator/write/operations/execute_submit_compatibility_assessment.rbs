@@ -1,0 +1,29 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecuteSubmitCompatibilityAssessment < Dry::Operation
+        TOOL_NAME: String
+
+        def initialize: (
+          event_store: _EventStore,
+          ?preparer: PrepareSubmitCompatibilityAssessment,
+          ?decider: Domain::VerificationEvidence::Submit,
+          ?input_digest: CommandInputDigest,
+          ?assessment_input_digest: CompatibilityAssessments::AssessmentInputDigest,
+          ?clock: Shared::_Clock,
+          ?id_generator: Shared::_IdGenerator,
+          ?event_factory: EventFactory,
+          ?schema_registry: EventSchemaRegistry,
+          ?stream_factory: StreamFactory,
+          ?completion_builder: CommandCompletionBuilder,
+          ?policy_loader: CandidateObligations::ImpactPolicyLoader,
+          ?history_contract: Contracts::VerificationEvidenceHistory,
+          ?event_plan_contract: Contracts::VerificationEvidenceEventPlan
+        ) -> void
+        %a{rbs:test:skip}
+        def call: (command_input input) -> Dry::Monads::Result
+        def call_command: (Commands::SubmitCompatibilityAssessment command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
+      end
+    end
+  end
+end

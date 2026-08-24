@@ -348,6 +348,39 @@ module Coordinator::Write
         attribute :expires_at, Types::Timestamp
       end
 
+      class VerificationObligationClaimFenceDetails < VerificationObligationDetails
+        attribute :current_claim_id, Types::UuidV7
+        attribute :current_fencing_token, Types::FencingToken
+      end
+
+      class VerificationObligationClaimOwnerDetails < VerificationObligationDetails
+        attribute :claimant_id, Types::Identifier
+      end
+
+      class VerificationObligationClaimExpiryDetails < VerificationObligationDetails
+        attribute :expires_at, Types::Timestamp
+      end
+
+      class VerificationObligationBindingDetails < VerificationObligationDetails
+        attribute :current_validity_input_digest, Types::Sha256Digest
+      end
+
+      class VerificationEvidenceKindDetails < VerificationObligationDetails
+        attribute :evidence_kind, Types::CandidateImpactRequiredEvidenceKind
+      end
+
+      class VerificationEvidenceDigestDetails < VerificationObligationDetails
+        attribute :assessment_input_digest, Types::Sha256Digest
+      end
+
+      class VerificationEvidenceLimitDetails < VerificationObligationDetails
+        attribute :maximum_count, Types::Integer.enum(Types::VERIFICATION_EVIDENCE_MAXIMUM_COUNT)
+      end
+
+      class VerificationObligationTerminalDetails < VerificationObligationDetails
+        attribute :status, Types::VerificationObligationStatus
+      end
+
       class ChangeSetError < Value
         attribute :code, Types::String.enum(
           "change_set_already_exists",
@@ -767,6 +800,66 @@ module Coordinator::Write
         attribute :details, VerificationObligationActiveClaimDetails
       end
 
+      class VerificationObligationPolicyStaleError < Value
+        attribute :code, Types::String.enum("verification_obligation_policy_stale")
+        attribute :message, Types::String
+        attribute :details, VerificationObligationDetails
+      end
+
+      class VerificationObligationUnclaimedError < Value
+        attribute :code, Types::String.enum("verification_obligation_unclaimed")
+        attribute :message, Types::String
+        attribute :details, VerificationObligationDetails
+      end
+
+      class VerificationObligationClaimStaleError < Value
+        attribute :code, Types::String.enum("verification_obligation_claim_stale")
+        attribute :message, Types::String
+        attribute :details, VerificationObligationClaimFenceDetails
+      end
+
+      class VerificationObligationClaimNotOwnedError < Value
+        attribute :code, Types::String.enum("verification_obligation_claim_not_owned")
+        attribute :message, Types::String
+        attribute :details, VerificationObligationClaimOwnerDetails
+      end
+
+      class VerificationObligationClaimExpiredError < Value
+        attribute :code, Types::String.enum("verification_obligation_claim_expired")
+        attribute :message, Types::String
+        attribute :details, VerificationObligationClaimExpiryDetails
+      end
+
+      class VerificationObligationBindingStaleError < Value
+        attribute :code, Types::String.enum("verification_obligation_binding_stale")
+        attribute :message, Types::String
+        attribute :details, VerificationObligationBindingDetails
+      end
+
+      class VerificationEvidenceKindNotRequiredError < Value
+        attribute :code, Types::String.enum("verification_evidence_kind_not_required")
+        attribute :message, Types::String
+        attribute :details, VerificationEvidenceKindDetails
+      end
+
+      class VerificationEvidenceDuplicateError < Value
+        attribute :code, Types::String.enum("verification_evidence_duplicate")
+        attribute :message, Types::String
+        attribute :details, VerificationEvidenceDigestDetails
+      end
+
+      class VerificationEvidenceLimitReachedError < Value
+        attribute :code, Types::String.enum("verification_evidence_limit_reached")
+        attribute :message, Types::String
+        attribute :details, VerificationEvidenceLimitDetails
+      end
+
+      class VerificationObligationTerminalError < Value
+        attribute :code, Types::String.enum("verification_obligation_terminal")
+        attribute :message, Types::String
+        attribute :details, VerificationObligationTerminalDetails
+      end
+
       Type = ChangeSetError |
              ActivationDependencyError |
              WorkItemError |
@@ -830,7 +923,17 @@ module Coordinator::Write
              CandidateImpactSourceEvidenceMismatchError |
              CandidateImpactSurfaceAlreadyRecordedError |
              VerificationObligationNotFoundError |
-             VerificationObligationAlreadyClaimedError
+             VerificationObligationAlreadyClaimedError |
+             VerificationObligationPolicyStaleError |
+             VerificationObligationUnclaimedError |
+             VerificationObligationClaimStaleError |
+             VerificationObligationClaimNotOwnedError |
+             VerificationObligationClaimExpiredError |
+             VerificationObligationBindingStaleError |
+             VerificationEvidenceKindNotRequiredError |
+             VerificationEvidenceDuplicateError |
+             VerificationEvidenceLimitReachedError |
+             VerificationObligationTerminalError
     end
   end
 end
