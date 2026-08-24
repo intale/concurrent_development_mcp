@@ -507,7 +507,8 @@ module Coordinator
 
     register("queries.verification_obligations_list") do
       Read::Queries::VerificationObligationsList.new(
-        obligations: self["repositories.verification_obligations"]
+        obligations: self["repositories.verification_obligations"],
+        clock: self["clock"]
       )
     end
 

@@ -4,6 +4,7 @@ module Coordinator
       def items: () -> Array[VerificationObligationViewV1]
       def next_global_position: () -> Integer?
       def has_more: () -> bool
+      def observed_at: () -> String
     end
   end
 end

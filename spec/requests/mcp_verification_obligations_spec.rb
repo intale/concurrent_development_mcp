@@ -4,6 +4,8 @@ RSpec.describe "IMP-02 MCP verification obligations", :event_store, :read_model 
   OBLIGATION_PROTOCOL_VERSION = "2026-07-28"
   OBLIGATION_TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
 
+  let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
+  let(:streams) { Coordinator::Write::StreamFactory.new }
   let(:session) do
     ActionDispatch::Integration::Session.new(Rails.application).tap do |integration|
       integration.host! "localhost"
@@ -69,6 +71,52 @@ RSpec.describe "IMP-02 MCP verification obligations", :event_store, :read_model 
     expect(response.dig("result", "content", 0, "text")).to start_with("Invalid arguments:")
   end
 
+  it "exposes the latest available claim and query-time claim state without closing the obligation" do
+    created = CandidateObligationScenario.create_obligation(prefix: "mcp-obligation-claim")
+    obligation_id = created.fetch(:result).obligation_id
+    projector = Coordinator::Read::Projectors::VerificationObligationsV1.new
+    projector.call(created.fetch(:event))
+    claim_event = Timecop.freeze(Time.utc(2026, 8, 24, 7, 0, 0)) do
+      Coordinator::Write::Operations::ExecuteClaimVerificationObligation.new(event_store:).call(
+        command_id: "cmd-mcp-obligation-claim",
+        actor: { kind: "agent", id: "agent-blue" },
+        obligation_id:,
+        claim_duration_seconds: 300
+      ).value!
+      claim_events(obligation_id).sole
+    end
+    projector.call(claim_event)
+
+    available = Timecop.freeze(Time.utc(2026, 8, 24, 7, 1, 0)) do
+      call_tool(
+        {
+          obligation_id:,
+          claimant_id: "agent-blue",
+          claim_state: "active"
+        },
+        id: 3
+      ).dig("result", "structuredContent")
+    end
+
+    page = available.dig("data", "page")
+    expect(page).to include("observed_at" => "2026-08-24T07:01:00.000000Z")
+    expect(page.fetch("items").sole).to include(
+      "obligation_id" => obligation_id,
+      "status" => "open",
+      "claim_state" => "active",
+      "claim" => include(
+        "claim_id" => claim_event.data.fetch("claim_id"),
+        "claimant_id" => "agent-blue",
+        "fencing_token" => 1,
+        "evidence" => include(
+          "global_position" => claim_event.global_position,
+          "causation_id" => claim_event.causation_id,
+          "correlation_id" => claim_event.correlation_id
+        )
+      )
+    )
+  end
+
   private
 
   def call_tool(arguments, id:, expected_status: 200)
@@ -104,5 +152,16 @@ RSpec.describe "IMP-02 MCP verification obligations", :event_store, :read_model 
         "io.modelcontextprotocol/clientInfo" => { name: "rspec", version: "1.0" }
       }
     }
+  end
+
+  def claim_events(obligation_id)
+    event_store.read(
+      streams.verification_obligation(obligation_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: [ "VerificationObligationClaimed" ],
+        maximum_count: 10,
+        direction: :asc
+      )
+    )
   end
 end

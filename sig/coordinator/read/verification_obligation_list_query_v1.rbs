@@ -1,6 +1,7 @@
 module Coordinator
   module Read
     class VerificationObligationListQueryV1 < Shared::Value
+      def obligation_id: () -> String?
       def change_set_id: () -> String?
       def candidate_id: () -> String?
       def work_item_id: () -> String?
@@ -8,8 +9,11 @@ module Coordinator
       def kind: () -> String?
       def enforcement: () -> String?
       def status: () -> String
+      def claimant_id: () -> String?
+      def claim_state: () -> String?
       def after_global_position: () -> Integer?
       def limit: () -> Integer
+      def observed_at: () -> String
     end
   end
 end

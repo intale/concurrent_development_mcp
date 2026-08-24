@@ -166,6 +166,14 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       candidate = CandidateScenario.submit(prefix: "subscription-candidate", build_context: false)
       CandidateScenario.submit_impact(candidate)
       obligation = CandidateObligationScenario.create_obligation(prefix: "read-model-subscription")
+      claim = Coordinator::Write::Operations::ExecuteClaimVerificationObligation.new(
+        event_store:
+      ).call(
+        command_id: "cmd-subscription-obligation-claim",
+        actor: { kind: "agent", id: "agent-subscription" },
+        obligation_id: obligation.fetch(:result).obligation_id,
+        claim_duration_seconds: 300
+      ).value!
 
       wait_for(subscription_set, "coord-context-v1", minimum: 2)
       wait_for(subscription_set, "command-receipts-v1", minimum: 5)
@@ -174,7 +182,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       wait_for(subscription_set, "decision-governance-v1", minimum: 5)
       wait_for(subscription_set, "agent-choices-v1", minimum: 2)
       wait_for(subscription_set, "candidates-v1", minimum: 3)
-      wait_for(subscription_set, "verification-obligations-v1", minimum: 1)
+      wait_for(subscription_set, "verification-obligations-v1", minimum: 2)
 
       expect(Coordinator::Read::CoordContext.find("CS-SUB-100").document).to include(
         "schema" => "coord-context/v1"
@@ -218,7 +226,10 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         obligation.fetch(:result).obligation_id
       )).to have_attributes(
         change_set_id: obligation.dig(:pair, :ids, :change_set_id),
-        status: "open"
+        status: "open",
+        claim_id: claim.data.claim_id,
+        claimant_id: "agent-subscription",
+        claim_fencing_token: 1
       )
     ensure
       subscription_set.stop

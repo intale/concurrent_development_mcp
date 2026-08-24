@@ -18,5 +18,7 @@ module Coordinator::Read
     attribute :rule_version, Types::CandidateCompatibilityObligationRuleVersion
     attribute :created_at, Types::Timestamp
     attribute :evidence, VerificationObligationEvidenceV1
+    attribute :claim_state, Types::VerificationObligationClaimState
+    attribute :claim, VerificationObligationClaimViewV1.optional
   end
 end

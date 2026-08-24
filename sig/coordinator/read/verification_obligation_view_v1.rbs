@@ -17,6 +17,8 @@ module Coordinator
       def rule_version: () -> String
       def created_at: () -> String
       def evidence: () -> VerificationObligationEvidenceV1
+      def claim_state: () -> String
+      def claim: () -> VerificationObligationClaimViewV1?
     end
   end
 end

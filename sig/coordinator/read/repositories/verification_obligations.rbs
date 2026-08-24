@@ -6,6 +6,10 @@ module Coordinator
           event: PgEventstore::Event,
           obligation: Write::Events::VerificationObligationCreatedV1
         ) -> VerificationObligation
+        def store_claim: (
+          event: PgEventstore::Event,
+          claim: Write::Events::VerificationObligationClaimedV1
+        ) -> VerificationObligation
         def page: (VerificationObligationListQueryV1 query) -> VerificationObligationPageV1
       end
     end

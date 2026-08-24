@@ -5,10 +5,12 @@ module Coordinator::Read
     class VerificationObligationsList < Dry::Operation
       def initialize(
         contract: Contracts::VerificationObligationList.new,
-        obligations: Repositories::VerificationObligations.new
+        obligations: Repositories::VerificationObligations.new,
+        clock: Coordinator::Shared::SystemClock.new
       )
         @contract = contract
         @obligations = obligations
+        @clock = clock
       end
 
       def call(input)
@@ -16,6 +18,7 @@ module Coordinator::Read
         return invalid_result(validated.errors.to_h) if validated.failure?
 
         query = VerificationObligationListQueryV1.new(
+          obligation_id: validated[:obligation_id],
           change_set_id: validated[:change_set_id],
           candidate_id: validated[:candidate_id],
           work_item_id: validated[:work_item_id],
@@ -23,8 +26,11 @@ module Coordinator::Read
           kind: validated[:kind],
           enforcement: validated[:enforcement],
           status: validated[:status] || "open",
+          claimant_id: validated[:claimant_id],
+          claim_state: validated[:claim_state],
           after_global_position: validated[:after_global_position],
-          limit: validated[:limit] || 20
+          limit: validated[:limit] || 20,
+          observed_at: @clock.now
         )
         QueryResultV1.new(
           status: "ok",

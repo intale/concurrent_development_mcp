@@ -29,13 +29,22 @@ module Coordinator::Read
             processed_at: Time.now.utc
           )
 
-          @obligations.store_creation(event:, obligation: payload)
+          project(event, payload)
         end
 
         nil
       end
 
       private
+
+      def project(event, payload)
+        case payload
+        when Coordinator::Write::Events::VerificationObligationCreatedV1
+          @obligations.store_creation(event:, obligation: payload)
+        when Coordinator::Write::Events::VerificationObligationClaimedV1
+          @obligations.store_claim(event:, claim: payload)
+        end
+      end
 
       def load_payload(event)
         result = @contract.call(

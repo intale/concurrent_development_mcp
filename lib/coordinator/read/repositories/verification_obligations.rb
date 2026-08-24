@@ -31,32 +31,81 @@ module Coordinator::Read
         )
       end
 
+      def store_claim(event:, claim:)
+        record = Coordinator::Read::VerificationObligation.find_by(
+          obligation_id: claim.obligation_id
+        )
+        unless record
+          raise InvalidProjectionSource,
+                "VerificationObligationClaimed cannot precede VerificationObligationCreated"
+        end
+        return record if record.claim_stream_revision && record.claim_stream_revision >= event.stream_revision
+
+        attributes = {
+          claim: claim.to_h,
+          claim_id: claim.claim_id,
+          claimant_id: claim.claimant_id,
+          claim_fencing_token: claim.fencing_token,
+          claim_claimed_at_domain: claim.claimed_at,
+          claim_expires_at_domain: claim.expires_at,
+          claim_event: event_reference(event).to_h,
+          claim_actor: actor(event).to_h,
+          claim_markers: event.markers,
+          claim_metadata: event.metadata,
+          claim_causation_id: event.causation_id,
+          claim_correlation_id: event.correlation_id,
+          claim_event_global_position: event.global_position,
+          claim_stream_revision: event.stream_revision,
+          claim_created_at_store: event.created_at
+        }
+        record.update!(attributes)
+        record
+      end
+
       def page(query)
-        relation = filtered(Coordinator::Read::VerificationObligation.all, query)
+        observed_at = Time.iso8601(query.observed_at)
+        relation = filtered(Coordinator::Read::VerificationObligation.all, query, observed_at:)
         if query.after_global_position
           relation = relation.where("event_global_position > ?", query.after_global_position)
         end
         rows = relation.order(:event_global_position).page(1).per(query.limit + 1).to_a
         has_more = rows.length > query.limit
-        items = rows.first(query.limit).map { build(_1) }
+        items = rows.first(query.limit).map { build(_1, observed_at:) }
 
         VerificationObligationPageV1.new(
           items:,
           next_global_position: has_more ? items.last.evidence.global_position : nil,
-          has_more:
+          has_more:,
+          observed_at: query.observed_at
         )
       end
 
       private
 
-      def filtered(relation, query)
+      def filtered(relation, query, observed_at:)
+        relation = relation.where(obligation_id: query.obligation_id) if query.obligation_id
         relation = relation.where(change_set_id: query.change_set_id) if query.change_set_id
         relation = either(relation, :candidate_id, query.candidate_id) if query.candidate_id
         relation = either(relation, :work_item_id, query.work_item_id) if query.work_item_id
         relation = either(relation, :repository_id, query.repository_id) if query.repository_id
         relation = relation.where(kind: query.kind) if query.kind
         relation = relation.where(enforcement: query.enforcement) if query.enforcement
+        relation = relation.where(claimant_id: query.claimant_id) if query.claimant_id
+        relation = filter_claim_state(relation, query, observed_at:)
         relation.where(status: query.status)
+      end
+
+      def filter_claim_state(relation, query, observed_at:)
+        case query.claim_state
+        when "unclaimed"
+          relation.where(claim_id: nil)
+        when "active"
+          relation.where.not(claim_id: nil).where("claim_expires_at_domain > ?", observed_at)
+        when "expired"
+          relation.where.not(claim_id: nil).where("claim_expires_at_domain <= ?", observed_at)
+        else
+          relation
+        end
       end
 
       def either(relation, field, value)
@@ -66,23 +115,79 @@ module Coordinator::Read
         )
       end
 
-      def build(record)
+      def build(record, observed_at:)
         obligation = Coordinator::Write::Events::VerificationObligationCreatedV1.new(
           symbolize(record.obligation)
         )
         VerificationObligationViewV1.new(
           **obligation.to_h,
-          evidence: VerificationObligationEvidenceV1.new(
-            event: Coordinator::Write::EventReference.new(symbolize(record.event)),
-            actor: AttributedActorV1.new(symbolize(record.actor)),
-            markers: record.markers,
-            metadata: record.metadata,
-            global_position: record.event_global_position,
-            occurred_at: record.created_at_domain.utc.iso8601(6),
-            persisted_at: record.created_at_store.utc.iso8601(6),
-            causation_id: record.causation_id,
-            correlation_id: record.correlation_id
+          evidence: creation_evidence(record),
+          claim_state: claim_state(record, observed_at:),
+          claim: claim_view(record)
+        )
+      end
+
+      def creation_evidence(record)
+        evidence(
+          event: record.event,
+          actor: record.actor,
+          markers: record.markers,
+          metadata: record.metadata,
+          global_position: record.event_global_position,
+          occurred_at: record.created_at_domain,
+          persisted_at: record.created_at_store,
+          causation_id: record.causation_id,
+          correlation_id: record.correlation_id
+        )
+      end
+
+      def claim_view(record)
+        return unless record.claim
+
+        claim = Coordinator::Write::Events::VerificationObligationClaimedV1.new(symbolize(record.claim))
+        VerificationObligationClaimViewV1.new(
+          **claim.to_h,
+          evidence: evidence(
+            event: record.claim_event,
+            actor: record.claim_actor,
+            markers: record.claim_markers,
+            metadata: record.claim_metadata,
+            global_position: record.claim_event_global_position,
+            occurred_at: record.claim_claimed_at_domain,
+            persisted_at: record.claim_created_at_store,
+            causation_id: record.claim_causation_id,
+            correlation_id: record.claim_correlation_id
           )
+        )
+      end
+
+      def claim_state(record, observed_at:)
+        return "unclaimed" unless record.claim_id
+
+        record.claim_expires_at_domain > observed_at ? "active" : "expired"
+      end
+
+      def evidence(
+        event:,
+        actor:,
+        markers:,
+        metadata:,
+        global_position:,
+        occurred_at:,
+        persisted_at:,
+        causation_id:,
+        correlation_id:
+      )
+        VerificationObligationEvidenceV1.new(
+          event: Coordinator::Write::EventReference.new(symbolize(event)),
+          actor: AttributedActorV1.new(symbolize(actor)),
+          markers:,
+          metadata:,
+          global_position:,
+          occurred_at: occurred_at.utc.iso8601(6),
+          persisted_at: persisted_at.utc.iso8601(6),
+          causation_id:,
+          correlation_id:
         )
       end
 

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_23_194000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_24_080000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -378,6 +378,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_23_194000) do
     t.jsonb "actor", null: false
     t.string "causation_id"
     t.string "change_set_id", null: false
+    t.jsonb "claim"
+    t.jsonb "claim_actor"
+    t.string "claim_causation_id"
+    t.datetime "claim_claimed_at_domain"
+    t.string "claim_correlation_id"
+    t.datetime "claim_created_at_store"
+    t.jsonb "claim_event"
+    t.bigint "claim_event_global_position"
+    t.datetime "claim_expires_at_domain"
+    t.integer "claim_fencing_token"
+    t.string "claim_id"
+    t.jsonb "claim_markers"
+    t.jsonb "claim_metadata"
+    t.integer "claim_stream_revision"
+    t.string "claimant_id"
     t.string "correlation_id"
     t.datetime "created_at", null: false
     t.datetime "created_at_domain", null: false
@@ -398,6 +413,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_23_194000) do
     t.string "target_work_item_id", null: false
     t.datetime "updated_at", null: false
     t.index ["change_set_id", "status", "event_global_position"], name: "idx_verification_obligations_change_set"
+    t.index ["claim_expires_at_domain", "event_global_position"], name: "idx_verification_obligations_claim_expiry"
+    t.index ["claimant_id", "event_global_position"], name: "idx_verification_obligations_claimant"
     t.index ["enforcement", "event_global_position"], name: "idx_verification_obligations_enforcement"
     t.index ["event_global_position"], name: "idx_verification_obligations_position"
     t.index ["kind", "event_global_position"], name: "idx_verification_obligations_kind"

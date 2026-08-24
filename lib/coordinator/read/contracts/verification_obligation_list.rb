@@ -4,6 +4,7 @@ module Coordinator::Read
   module Contracts
     class VerificationObligationList < Dry::Validation::Contract
       FILTER_KEYS = %i[
+        obligation_id
         change_set_id
         candidate_id
         work_item_id
@@ -11,11 +12,14 @@ module Coordinator::Read
         kind
         enforcement
         status
+        claimant_id
+        claim_state
       ].freeze
 
       config.validate_keys = true
 
       params do
+        optional(:obligation_id).maybe(:string)
         optional(:change_set_id).maybe(:string)
         optional(:candidate_id).maybe(:string)
         optional(:work_item_id).maybe(:string)
@@ -26,6 +30,11 @@ module Coordinator::Read
           included_in?: %w[verification_gate merge_gate]
         )
         optional(:status).maybe(:string, included_in?: Types::VERIFICATION_OBLIGATION_STATUSES)
+        optional(:claimant_id).maybe(:string)
+        optional(:claim_state).maybe(
+          :string,
+          included_in?: Types::VERIFICATION_OBLIGATION_CLAIM_STATES
+        )
         optional(:after_global_position).maybe(:integer, gteq?: 0)
         optional(:limit).maybe(:integer, gteq?: 1, lteq?: 100)
       end
@@ -36,8 +45,14 @@ module Coordinator::Read
         end
       end
 
-      rule(:change_set_id, :candidate_id, :work_item_id) do
-        identifiers = values.values_at(:change_set_id, :candidate_id, :work_item_id).compact
+      rule(:obligation_id, :change_set_id, :candidate_id, :work_item_id, :claimant_id) do
+        identifiers = values.values_at(
+          :obligation_id,
+          :change_set_id,
+          :candidate_id,
+          :work_item_id,
+          :claimant_id
+        ).compact
         next if identifiers.all? { Types::IDENTIFIER_PATTERN.match?(_1) }
 
         key.failure("must contain valid identifiers")

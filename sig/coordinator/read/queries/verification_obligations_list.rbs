@@ -4,7 +4,8 @@ module Coordinator
       class VerificationObligationsList
         def initialize: (
           ?contract: Contracts::VerificationObligationList,
-          ?obligations: Repositories::VerificationObligations
+          ?obligations: Repositories::VerificationObligations,
+          ?clock: Shared::_Clock
         ) -> void
         %a{rbs:test:skip}
         def call: (command_input input) -> QueryResultV1

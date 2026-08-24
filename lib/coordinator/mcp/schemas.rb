@@ -451,10 +451,12 @@ module Coordinator
 
       def verification_obligations_list
         filter_keys = %w[
-          change_set_id candidate_id work_item_id repository_id kind enforcement status
+          obligation_id change_set_id candidate_id work_item_id repository_id kind enforcement status
+          claimant_id claim_state
         ]
         object_schema(
           properties: {
+            obligation_id: nullable_identifier,
             change_set_id: nullable_identifier,
             candidate_id: nullable_identifier,
             work_item_id: nullable_identifier,
@@ -465,6 +467,8 @@ module Coordinator
             kind: nullable_enum([ "candidate_compatibility" ]),
             enforcement: nullable_enum(%w[verification_gate merge_gate]),
             status: nullable_enum([ "open" ]),
+            claimant_id: nullable_identifier,
+            claim_state: nullable_enum(Types::VERIFICATION_OBLIGATION_CLAIM_STATES),
             after_global_position: {
               anyOf: [ { type: "integer", minimum: 0 }, { type: "null" } ]
             },

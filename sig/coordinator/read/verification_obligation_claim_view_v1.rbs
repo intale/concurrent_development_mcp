@@ -1,0 +1,14 @@
+module Coordinator
+  module Read
+    class VerificationObligationClaimViewV1 < Shared::Value
+      def obligation_id: () -> String
+      def obligation_event: () -> Write::EventReference
+      def claim_id: () -> String
+      def claimant_id: () -> String
+      def fencing_token: () -> Integer
+      def claimed_at: () -> String
+      def expires_at: () -> String
+      def evidence: () -> VerificationObligationEvidenceV1
+    end
+  end
+end
