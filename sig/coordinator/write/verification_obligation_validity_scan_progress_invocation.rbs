@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    class VerificationObligationValidityScanProgressInvocation < Shared::Value
+      def command: () -> Commands::ProgressVerificationObligationValidityScan
+      def checkpoint_event: () -> PgEventstore::Event
+      def checkpoint_reference: () -> EventReference
+    end
+  end
+end

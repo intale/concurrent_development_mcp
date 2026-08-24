@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module VerificationObligationValidityScans
+      class ScanSnapshot < Shared::Value
+        def state: () -> Domain::VerificationObligationValidityScans::State
+        def latest_revision: () -> Integer?
+        def persisted_events: () -> Array[PgEventstore::Event]
+      end
+    end
+  end
+end

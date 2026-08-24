@@ -23,11 +23,17 @@ module Coordinator::Processes
         partition_event = source.payload
         partition = partition_event.partition
         return unless candidate_partition?(partition)
-        return unless policy_head?(partition_event.decision, partition)
+
+        heads = policy_heads(partition_event)
+        if heads.length > 1
+          raise CandidateObligationProcessRejected,
+                "Candidate partition contains multiple active candidate.impact_policy heads"
+        end
+        return if heads.empty?
 
         observe(
           partition_event: source.reference,
-          head: partition_event.decision,
+          head: heads.sole,
           change_set_id: partition.anchor_id,
           observed_at: partition_event.advanced_at
         )
@@ -46,9 +52,7 @@ module Coordinator::Processes
         partition_event = partition_source.payload
         return unless candidate_partition?(partition_event.partition, change_set_id:)
 
-        heads = partition_event.active_decisions.select do |head|
-          policy_head?(head, partition_event.partition)
-        end
+        heads = policy_heads(partition_event)
         if heads.length > 1
           raise CandidateObligationProcessRejected,
                 "Candidate partition contains multiple active candidate.impact_policy heads"
@@ -77,6 +81,12 @@ module Coordinator::Processes
       def policy_head?(head, partition)
         definition = @definition_loader.call(head:, partition:)
         definition.document.topic.topic_id == TOPIC_ID
+      end
+
+      def policy_heads(partition_event)
+        partition_event.active_decisions.select do |head|
+          policy_head?(head, partition_event.partition)
+        end
       end
 
       def observe(partition_event:, head:, change_set_id:, observed_at:)

@@ -44,6 +44,8 @@ module Coordinator
       def verification_obligation_claim_document: (Commands::ClaimVerificationObligation command) -> CommandInputDocuments::ClaimVerificationObligationV1
       def compatibility_assessment_submit: (Commands::SubmitCompatibilityAssessment command) -> String
       def compatibility_assessment_submit_document: (Commands::SubmitCompatibilityAssessment command) -> CommandInputDocuments::SubmitCompatibilityAssessmentV1
+      def verification_obligation_waive: (Commands::WaiveVerificationObligation command) -> String
+      def verification_obligation_waive_document: (Commands::WaiveVerificationObligation command) -> CommandInputDocuments::WaiveVerificationObligationV1
     end
   end
 end

@@ -63,6 +63,8 @@ module Coordinator
         candidate heads and validity digest. Persist the returned Task handle. Each accepted assessment records exact
         producer, run, input, result, finding, and timestamp attribution; it may leave the obligation open or immediately
         satisfy/fail it. Stale projected context, claim fences, candidate bindings, or policy are authoritatively denied.
+        A user may explicitly waive an exact current open or failed obligation with verification_obligation_waive;
+        the actor label is attribution rather than authentication, and waiver never means verification passed.
         The coordinator records attributed evidence and does not execute Git, CI, or agent work.
       TEXT
 

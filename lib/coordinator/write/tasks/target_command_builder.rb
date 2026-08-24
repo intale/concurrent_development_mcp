@@ -43,6 +43,8 @@ module Coordinator::Write
           build_claim_verification_obligation(document)
         when CommandInputDocuments::SubmitCompatibilityAssessmentV1
           build_submit_compatibility_assessment(document)
+        when CommandInputDocuments::WaiveVerificationObligationV1
+          build_waive_verification_obligation(document)
         end
       end
 
@@ -332,6 +334,17 @@ module Coordinator::Write
           claim: input.claim,
           binding: input.binding,
           assessment: input.assessment
+        )
+      end
+
+      def build_waive_verification_obligation(document)
+        input = document.input
+        Commands::WaiveVerificationObligation.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          obligation_id: input.obligation_id,
+          obligation_validity_input_digest: input.obligation_validity_input_digest,
+          reason: input.reason
         )
       end
 

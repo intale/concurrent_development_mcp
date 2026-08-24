@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module VerificationObligationInvalidations
+      class IdentityBuilder
+        def initialize: (?canonical_json: Shared::CanonicalJson) -> void
+        def call: (obligation_event: EventReference, superseding_partition_event: EventReference, rule_version: String) -> String
+      end
+    end
+  end
+end

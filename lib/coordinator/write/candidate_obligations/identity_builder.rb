@@ -9,12 +9,13 @@ module Coordinator::Write
         @canonical_json = canonical_json
       end
 
-      def call(source:, target:, policy_head:, rule_version:)
+      def call(source:, target:, policy_partition_event:, policy_head:, rule_version:)
         document = IdentityDocumentV1.new(
           schema: IdentityDocumentV1::SCHEMA,
           rule_version:,
           source_surface: source.subject.surface_event,
           target_surface: target.subject.surface_event,
+          policy_partition_event:,
           policy_head:
         )
         digest = @canonical_json.sha256(document.to_h)

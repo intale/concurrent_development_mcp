@@ -37,7 +37,8 @@ module Coordinator
           Tools::CandidateSubmit,
           Tools::CandidateImpactSurfaceSubmit,
           Tools::VerificationObligationClaim,
-          Tools::CompatibilityAssessmentSubmit
+          Tools::CompatibilityAssessmentSubmit,
+          Tools::VerificationObligationWaive
         ].freeze
       end
     end

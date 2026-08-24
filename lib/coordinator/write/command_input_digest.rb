@@ -31,6 +31,7 @@ module Coordinator::Write
       when Commands::SubmitCandidateImpactSurface then candidate_impact_surface_submit_document(command)
       when Commands::ClaimVerificationObligation then verification_obligation_claim_document(command)
       when Commands::SubmitCompatibilityAssessment then compatibility_assessment_submit_document(command)
+      when Commands::WaiveVerificationObligation then verification_obligation_waive_document(command)
       when Commands::ExpireResourceLease then lease_expire_policy_document(command)
       else
         raise ArgumentError, "Unsupported coordination command: #{command.class.name}"
@@ -457,6 +458,24 @@ module Coordinator::Write
           claim: command.claim,
           binding: command.binding,
           assessment: command.assessment
+        )
+      )
+    end
+
+    def verification_obligation_waive(command)
+      @canonical_json.sha256(verification_obligation_waive_document(command).to_h)
+    end
+
+    def verification_obligation_waive_document(command)
+      CommandInputDocuments::WaiveVerificationObligationV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "verification_obligation_waive",
+        input: CommandInputDocuments::WaiveVerificationObligationInputV1.new(
+          actor: actor_document(command.actor),
+          obligation_id: command.obligation_id,
+          obligation_validity_input_digest: command.obligation_validity_input_digest,
+          reason: command.reason
         )
       )
     end

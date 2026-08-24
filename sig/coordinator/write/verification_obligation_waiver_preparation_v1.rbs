@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    class VerificationObligationWaiverPreparationV1 < Shared::Value
+      def waived_at: () -> String
+      def input_digest: () -> String
+      def waiver_event_id: () -> String
+      def completion_event_id: () -> String
+      def correlation_id: () -> String
+    end
+  end
+end

@@ -12,7 +12,7 @@ module Coordinator::Write
         state = values[:state]
         obligation_id = values[:obligation_id]
         if state.absent?
-          valid = state.obligation_event.nil? && state.claim.nil?
+          valid = state.obligation_event.nil? && state.claim.nil? && !state.terminal?
           key(:state).failure("must not contain a claim without an obligation") unless valid
           next
         end
@@ -32,12 +32,20 @@ module Coordinator::Write
         end
 
         claim = state.claim
-        next unless claim
+        if claim
+          valid_claim = claim.obligation_id == obligation_id &&
+            claim.obligation_event == reference &&
+            claim.claimed_at < claim.expires_at
+          key(:state).failure("must contain one coherent latest claim") unless valid_claim
+        end
 
-        valid_claim = claim.obligation_id == obligation_id &&
-          claim.obligation_event == reference &&
-          claim.claimed_at < claim.expires_at
-        key(:state).failure("must contain one coherent latest claim") unless valid_claim
+        if state.terminal?
+          valid_terminal = state.terminal_status != "open" &&
+            state.terminal_event&.stream_context == "DevelopmentIntegration" &&
+            state.terminal_event&.stream_name == "VerificationObligation" &&
+            state.terminal_event&.stream_id == obligation_id
+          key(:state).failure("must contain one coherent terminal lifecycle reference") unless valid_terminal
+        end
       end
     end
   end

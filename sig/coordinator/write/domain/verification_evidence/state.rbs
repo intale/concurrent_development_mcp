@@ -13,6 +13,8 @@ module Coordinator
           def evidence: () -> Array[CompatibilityAssessments::EvidenceObservationV1]
           def satisfied: () -> Events::VerificationObligationSatisfiedV1?
           def failed: () -> Events::VerificationObligationFailedV1?
+          def waived: () -> Events::VerificationObligationWaivedV1?
+          def invalidated: () -> Events::VerificationObligationInvalidatedV1?
           def policy_current: () -> bool
           def absent?: () -> bool
           def terminal?: () -> bool

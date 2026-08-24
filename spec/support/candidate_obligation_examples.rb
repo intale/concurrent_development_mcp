@@ -158,6 +158,7 @@ module CandidateObligationExamples
     identity = Coordinator::Write::CandidateObligations::IdentityBuilder.new.call(
       source:,
       target:,
+      policy_partition_event: partition_reference,
       policy_head: head,
       rule_version: RULE_VERSION
     )

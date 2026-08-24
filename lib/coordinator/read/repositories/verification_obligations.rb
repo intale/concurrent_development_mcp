@@ -5,10 +5,12 @@ module Coordinator::Read
     class VerificationObligations
       def initialize(
         evidence_contract: Contracts::VerificationEvidenceProjection.new,
-        outcome_contract: Contracts::VerificationOutcomeProjection.new
+        outcome_contract: Contracts::VerificationOutcomeProjection.new,
+        lifecycle_contract: Contracts::VerificationLifecycleProjection.new
       )
         @evidence_contract = evidence_contract
         @outcome_contract = outcome_contract
+        @lifecycle_contract = lifecycle_contract
       end
 
       def store_creation(event:, obligation:)
@@ -148,6 +150,22 @@ module Coordinator::Read
         record
       end
 
+      def store_lifecycle(event:, transition:)
+        record = find_obligation!(transition.obligation_id, event.type)
+        validation = @lifecycle_contract.call(
+          obligation: projected_obligation(record),
+          obligation_event: creation_reference(record),
+          transition:,
+          transition_event: event_reference(event),
+          current_status: record.status,
+          current_terminal_event: record.terminal_event && terminal_reference(record)
+        )
+        raise InvalidProjectionSource, validation.errors.to_h.inspect if validation.failure?
+
+        record.update!(terminal_attributes(event, transition))
+        record
+      end
+
       def page(query)
         observed_at = Time.iso8601(query.observed_at)
         relation = filtered(Coordinator::Read::VerificationObligation.all, query, observed_at:)
@@ -238,6 +256,8 @@ module Coordinator::Read
         case outcome
         when Coordinator::Write::Events::VerificationObligationSatisfiedV1 then "satisfied"
         when Coordinator::Write::Events::VerificationObligationFailedV1 then "failed"
+        when Coordinator::Write::Events::VerificationObligationWaivedV1 then "waived"
+        when Coordinator::Write::Events::VerificationObligationInvalidatedV1 then "invalidated"
         end
       end
 
@@ -245,6 +265,8 @@ module Coordinator::Read
         case outcome
         when Coordinator::Write::Events::VerificationObligationSatisfiedV1 then outcome.satisfied_at
         when Coordinator::Write::Events::VerificationObligationFailedV1 then outcome.failed_at
+        when Coordinator::Write::Events::VerificationObligationWaivedV1 then outcome.waived_at
+        when Coordinator::Write::Events::VerificationObligationInvalidatedV1 then outcome.invalidated_at
         end
       end
 
@@ -338,7 +360,34 @@ module Coordinator::Read
         when "failed"
           outcome = Coordinator::Write::Events::VerificationObligationFailedV1.new(payload)
           VerificationObligationFailedViewV1.new(**outcome.to_h, evidence:)
+        when "waived"
+          outcome = Coordinator::Write::Events::VerificationObligationWaivedV1.new(payload)
+          VerificationObligationWaivedViewV1.new(**outcome.to_h, evidence:)
+        when "invalidated"
+          outcome = Coordinator::Write::Events::VerificationObligationInvalidatedV1.new(payload)
+          VerificationObligationInvalidatedViewV1.new(**outcome.to_h, evidence:)
         end
+      end
+
+      def terminal_attributes(event, transition)
+        {
+          status: terminal_status(transition),
+          terminal_outcome: transition.to_h,
+          terminal_event: event_reference(event).to_h,
+          terminal_actor: actor(event).to_h,
+          terminal_markers: event.markers,
+          terminal_metadata: event.metadata,
+          terminal_causation_id: event.causation_id,
+          terminal_correlation_id: event.correlation_id,
+          terminal_event_global_position: event.global_position,
+          terminal_stream_revision: event.stream_revision,
+          terminal_at_domain: terminal_at(transition),
+          terminal_created_at_store: event.created_at
+        }
+      end
+
+      def terminal_reference(record)
+        Coordinator::Write::EventReference.new(symbolize(record.terminal_event))
       end
 
       def terminal_evidence(record)

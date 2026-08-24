@@ -1,0 +1,9 @@
+module Coordinator
+  module Processes
+    module Contracts
+      class VerificationObligationValiditySource < Dry::Validation::Contract
+        ALLOWED_TYPES: Array[String]
+      end
+    end
+  end
+end

@@ -1,0 +1,8 @@
+module Coordinator
+  module Write
+    module Contracts
+      class VerificationObligationValidityScanStart < Dry::Validation::Contract
+      end
+    end
+  end
+end

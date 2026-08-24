@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module Commands
+      class StartVerificationObligationValidityScan < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def scan_id: () -> String
+        def change_set_id: () -> String
+        def superseding_partition_event: () -> EventReference
+        def source_global_position: () -> Integer
+        def rule_version: () -> String
+      end
+    end
+  end
+end

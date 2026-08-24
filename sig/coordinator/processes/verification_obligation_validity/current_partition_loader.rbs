@@ -1,0 +1,14 @@
+module Coordinator
+  module Processes
+    module VerificationObligationValidity
+      class CurrentPartitionLoader
+        def initialize: (
+          event_store: Write::_EventStore,
+          ?stream_factory: Write::StreamFactory,
+          ?source_builder: SourceBuilder
+        ) -> void
+        def call: (String change_set_id) -> SourceV1?
+      end
+    end
+  end
+end

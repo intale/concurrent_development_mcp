@@ -145,6 +145,7 @@ module Coordinator::Processes
         identity = @obligation_identity_builder.call(
           source:,
           target:,
+          policy_partition_event: state.policy_partition_event,
           policy_head: state.policy_head,
           rule_version: OBLIGATION_RULE_VERSION
         )

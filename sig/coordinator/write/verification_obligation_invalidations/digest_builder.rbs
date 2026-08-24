@@ -1,0 +1,17 @@
+module Coordinator
+  module Write
+    module VerificationObligationInvalidations
+      class DigestBuilder
+        def initialize: (?canonical_json: Shared::CanonicalJson) -> void
+        def call: (
+          obligation_event: EventReference,
+          invalidated_policy: CandidateObligations::ImpactPolicyEvidenceV1,
+          superseding_partition_event: EventReference,
+          previous_status: String,
+          previous_terminal_event: EventReference?,
+          rule_version: String
+        ) -> String
+      end
+    end
+  end
+end

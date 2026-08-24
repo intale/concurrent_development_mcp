@@ -21,6 +21,7 @@ module Coordinator
       def candidate_impact_registry_sweep: (String scan_id) -> StreamReference
       def candidate_impact_pair_scan: (String scan_id) -> StreamReference
       def verification_obligation: (String obligation_id) -> StreamReference
+      def verification_obligation_validity_scan: (String scan_id) -> StreamReference
     end
   end
 end

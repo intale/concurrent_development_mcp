@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    class VerificationObligationValidityScanInvocation < Shared::Value
+      def command: () -> Commands::StartVerificationObligationValidityScan
+      def source_event: () -> PgEventstore::Event
+      def source_reference: () -> EventReference
+    end
+  end
+end

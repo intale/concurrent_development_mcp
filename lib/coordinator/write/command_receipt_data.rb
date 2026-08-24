@@ -209,6 +209,15 @@ module Coordinator::Write
       attribute :submitted_at, Types::Timestamp
     end
 
+    class VerificationObligationWaiver < Value
+      attribute :obligation_id, Types::Identifier
+      attribute :previous_status, Types::String.enum("open", "failed")
+      attribute :status, Types::String.enum("waived")
+      attribute :reason, VerificationObligationWaivers::ReasonV1
+      attribute :waiver_event, EventReference
+      attribute :waived_at, Types::Timestamp
+    end
+
     Type = ChangeSet |
            WorkItem |
            Dependency |
@@ -227,6 +236,7 @@ module Coordinator::Write
            CandidateSubmission |
            CandidateImpactSurface |
            VerificationObligationClaim |
-           CompatibilityAssessment
+           CompatibilityAssessment |
+           VerificationObligationWaiver
   end
 end

@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module Domain
+      module VerificationObligationValidityScans
+        class Start
+          PAGE_SIZE: Integer
+          def initialize: (?stream_factory: StreamFactory) -> void
+          def call: (state: State, command: Commands::StartVerificationObligationValidityScan, started_at: String) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

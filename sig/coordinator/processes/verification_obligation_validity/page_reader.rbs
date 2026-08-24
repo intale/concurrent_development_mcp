@@ -1,0 +1,10 @@
+module Coordinator
+  module Processes
+    module VerificationObligationValidity
+      class PageReader
+        def initialize: (event_store: Write::_EventStore, ?contract: Contracts::VerificationObligationValidityPage) -> void
+        def call: (ScanCheckpointV1 checkpoint) -> PageV1
+      end
+    end
+  end
+end

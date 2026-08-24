@@ -171,7 +171,8 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
         "candidate-impact-obligation-policy-v1",
         "change-set-readiness-v1",
         "coordination-task-executor-v1",
-        "lease-expiry-scheduler-v1"
+        "lease-expiry-scheduler-v1",
+        "verification-obligation-validity-v1"
       ]
     )
   end

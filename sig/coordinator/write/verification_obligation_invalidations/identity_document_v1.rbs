@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module VerificationObligationInvalidations
+      class IdentityDocumentV1 < Shared::Value
+        def schema: () -> String
+        def obligation_event: () -> EventReference
+        def superseding_partition_event: () -> EventReference
+        def rule_version: () -> String
+      end
+    end
+  end
+end

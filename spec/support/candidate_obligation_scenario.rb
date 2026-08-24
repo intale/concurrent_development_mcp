@@ -167,6 +167,7 @@ module CandidateObligationScenario
     identity = Coordinator::Write::CandidateObligations::IdentityBuilder.new.call(
       source: source_evidence,
       target: target_evidence,
+      policy_partition_event: reference(policy.fetch(:partition_event)),
       policy_head: policy.fetch(:head),
       rule_version: RULE_VERSION
     )
@@ -308,6 +309,20 @@ module CandidateObligationScenario
         direction: :asc
       )
     )
+  end
+
+  def waiver_arguments(created:, command_id:, actor_kind: "user", actor_id: "user-label", **reason)
+    obligation = created.fetch(:payload)
+    {
+      command_id:,
+      actor: { kind: actor_kind, id: actor_id },
+      obligation_id: obligation.obligation_id,
+      obligation_validity_input_digest: obligation.validity_input_digest,
+      reason: {
+        code: reason.fetch(:code, "accepted_risk"),
+        summary: reason.fetch(:summary, "User accepts the exact recorded verification risk.")
+      }
+    }
   end
 
   def compatibility_assessment_arguments(

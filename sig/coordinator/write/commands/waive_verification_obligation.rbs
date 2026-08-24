@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module Commands
+      class WaiveVerificationObligation < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def obligation_id: () -> String
+        def obligation_validity_input_digest: () -> String
+        def reason: () -> VerificationObligationWaivers::ReasonV1
+      end
+    end
+  end
+end

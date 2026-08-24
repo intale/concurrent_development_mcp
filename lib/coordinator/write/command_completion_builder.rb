@@ -556,6 +556,39 @@ module Coordinator::Write
       )
     end
 
+    def verification_obligation_waive(
+      command:,
+      waiver:,
+      input_digest:,
+      persisted_events:,
+      completed_at:
+    )
+      build_completion(
+        command:,
+        tool_name: "verification_obligation_waive",
+        summary: "Exact verification obligation waived by user-attributed coordination decision.",
+        data: CommandReceiptData::VerificationObligationWaiver.new(
+          obligation_id: command.obligation_id,
+          previous_status: waiver.previous_status,
+          status: "waived",
+          reason: waiver.reason,
+          waiver_event: event_reference(persisted_events.sole),
+          waived_at: waiver.waived_at
+        ),
+        next_actions: [
+          NextAction.new(
+            tool: "verification_obligations_list",
+            arguments: NextAction::VerificationObligationArguments.new(
+              obligation_id: command.obligation_id
+            )
+          )
+        ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
 
     def verification_status(persisted_events)

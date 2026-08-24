@@ -48,6 +48,9 @@ module Coordinator::Read
         when Coordinator::Write::Events::VerificationObligationSatisfiedV1,
              Coordinator::Write::Events::VerificationObligationFailedV1
           @obligations.store_outcome(event:, outcome: payload)
+        when Coordinator::Write::Events::VerificationObligationWaivedV1,
+             Coordinator::Write::Events::VerificationObligationInvalidatedV1
+          @obligations.store_lifecycle(event:, transition: payload)
         end
       end
 

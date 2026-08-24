@@ -393,6 +393,18 @@ module Coordinator::Write
       attribute :input, SubmitCompatibilityAssessmentInputV1
     end
 
+    class WaiveVerificationObligationInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :obligation_id, Types::Identifier
+      attribute :obligation_validity_input_digest, Types::Sha256Digest
+      attribute :reason, VerificationObligationWaivers::ReasonV1
+    end
+
+    class WaiveVerificationObligationV1 < BaseV1
+      attribute :tool_name, Types::String.enum("verification_obligation_waive")
+      attribute :input, WaiveVerificationObligationInputV1
+    end
+
     class ExpireResourceLeaseInputV1 < Value
       attribute :actor, ActorV1
       attribute :resource_key_hash, Types::Sha256Digest
@@ -425,7 +437,8 @@ module Coordinator::Write
            SubmitCandidateV1 |
            SubmitCandidateImpactSurfaceV1 |
            ClaimVerificationObligationV1 |
-           SubmitCompatibilityAssessmentV1
+           SubmitCompatibilityAssessmentV1 |
+           WaiveVerificationObligationV1
 
     DigestType = Type | ExpireResourceLeaseV1
   end

@@ -15,6 +15,8 @@ module Coordinator::Write
         )
         attribute :satisfied, Types.Instance(Events::VerificationObligationSatisfiedV1).optional
         attribute :failed, Types.Instance(Events::VerificationObligationFailedV1).optional
+        attribute? :waived, Types.Instance(Events::VerificationObligationWaivedV1).optional
+        attribute? :invalidated, Types.Instance(Events::VerificationObligationInvalidatedV1).optional
         attribute :policy_current, Types::Bool
 
         def self.initial
@@ -26,6 +28,8 @@ module Coordinator::Write
             evidence: [],
             satisfied: nil,
             failed: nil,
+            waived: nil,
+            invalidated: nil,
             policy_current: false
           )
         end
@@ -35,10 +39,12 @@ module Coordinator::Write
         end
 
         def terminal?
-          !satisfied.nil? || !failed.nil?
+          !satisfied.nil? || !failed.nil? || !waived.nil? || !invalidated.nil?
         end
 
         def status
+          return "invalidated" if invalidated
+          return "waived" if waived
           return "satisfied" if satisfied
           return "failed" if failed
 

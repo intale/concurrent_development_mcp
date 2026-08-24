@@ -7,6 +7,7 @@ module Coordinator::Write
       def call: (
         source: CandidateEvidenceV1,
         target: CandidateEvidenceV1,
+        policy_partition_event: Coordinator::Write::EventReference,
         policy_head: Coordinator::Write::Decisions::DecisionHeadV1,
         rule_version: String
       ) -> IdentityV1

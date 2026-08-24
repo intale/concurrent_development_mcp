@@ -1,0 +1,17 @@
+module Coordinator
+  module Processes
+    module VerificationObligationValidity
+      class ScanCheckpointV1 < Shared::Value
+        def event: () -> PgEventstore::Event
+        def reference: () -> Write::EventReference
+        def scan_id: () -> String
+        def change_set_id: () -> String
+        def superseding_partition_event: () -> Write::EventReference
+        def from_position: () -> Integer
+        def to_position: () -> Integer
+        def page_size: () -> Integer
+        def rule_version: () -> String
+      end
+    end
+  end
+end

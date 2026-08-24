@@ -563,6 +563,38 @@ module Coordinator
         )
       end
 
+      def verification_obligation_waive
+        object_schema(
+          properties: common_mutation_properties.merge(
+            actor: object_schema(
+              properties: {
+                kind: { type: "string", enum: [ "user" ] },
+                id: identifier
+              },
+              required: %w[kind id]
+            ),
+            obligation_id: identifier,
+            obligation_validity_input_digest: {
+              type: "string",
+              pattern: "^sha256:[0-9a-f]{64}$"
+            },
+            reason: object_schema(
+              properties: {
+                code: {
+                  type: "string",
+                  enum: Types::VERIFICATION_OBLIGATION_WAIVER_REASON_CODES
+                },
+                summary: { type: "string", minLength: 1, maxLength: 2_000 }
+              },
+              required: %w[code summary]
+            )
+          ),
+          required: %w[
+            command_id actor obligation_id obligation_validity_input_digest reason
+          ]
+        )
+      end
+
       def candidate_impact_surface_submit
         object_schema(
           properties: common_mutation_properties.merge(

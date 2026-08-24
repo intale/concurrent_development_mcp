@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Commands
+      class InvalidateVerificationObligation < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def obligation_id: () -> String
+        def obligation_event: () -> EventReference
+        def superseding_partition_event: () -> EventReference
+        def rule_version: () -> String
+      end
+    end
+  end
+end

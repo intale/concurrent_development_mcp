@@ -1,0 +1,15 @@
+module Coordinator
+  module Read
+    class VerificationObligationWaivedViewV1 < Shared::Value
+      def obligation_id: () -> String
+      def obligation_event: () -> Write::EventReference
+      def policy: () -> Write::CandidateObligations::ImpactPolicyEvidenceV1
+      def previous_status: () -> String
+      def previous_terminal_event: () -> Write::EventReference?
+      def reason: () -> Write::VerificationObligationWaivers::ReasonV1
+      def waiver_input_digest: () -> String
+      def waived_at: () -> String
+      def evidence: () -> VerificationObligationEvidenceV1
+    end
+  end
+end

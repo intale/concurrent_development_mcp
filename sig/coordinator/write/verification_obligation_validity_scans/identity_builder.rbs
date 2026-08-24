@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module VerificationObligationValidityScans
+      class IdentityBuilder
+        def initialize: (?canonical_json: Shared::CanonicalJson) -> void
+        def scan: (superseding_partition_event: EventReference, rule_version: String) -> String
+        def progress: (checkpoint_event: EventReference, rule_version: String) -> String
+      end
+    end
+  end
+end

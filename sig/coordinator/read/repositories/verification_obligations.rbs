@@ -4,7 +4,8 @@ module Coordinator
       class VerificationObligations
         def initialize: (
           ?evidence_contract: Contracts::VerificationEvidenceProjection,
-          ?outcome_contract: Contracts::VerificationOutcomeProjection
+          ?outcome_contract: Contracts::VerificationOutcomeProjection,
+          ?lifecycle_contract: Contracts::VerificationLifecycleProjection
         ) -> void
         def store_creation: (
           event: PgEventstore::Event,
@@ -21,6 +22,10 @@ module Coordinator
         def store_outcome: (
           event: PgEventstore::Event,
           outcome: Write::Events::VerificationObligationSatisfiedV1 | Write::Events::VerificationObligationFailedV1
+        ) -> VerificationObligation
+        def store_lifecycle: (
+          event: PgEventstore::Event,
+          transition: Write::Events::VerificationObligationWaivedV1 | Write::Events::VerificationObligationInvalidatedV1
         ) -> VerificationObligation
         def page: (VerificationObligationListQueryV1 query) -> VerificationObligationPageV1
       end

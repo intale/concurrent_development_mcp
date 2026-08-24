@@ -1,0 +1,16 @@
+module Coordinator
+  module Write
+    module VerificationObligationInvalidations
+      class DigestDocumentV1 < Shared::Value
+        def schema: () -> String
+        def obligation_event: () -> EventReference
+        def invalidated_policy: () -> CandidateObligations::ImpactPolicyEvidenceV1
+        def superseding_partition_event: () -> EventReference
+        def previous_status: () -> String
+        def previous_terminal_event: () -> EventReference?
+        def reason: () -> String
+        def rule_version: () -> String
+      end
+    end
+  end
+end

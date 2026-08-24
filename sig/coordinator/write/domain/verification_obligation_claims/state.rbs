@@ -7,7 +7,11 @@ module Coordinator
           def obligation: () -> Events::VerificationObligationCreatedV1?
           def obligation_event: () -> EventReference?
           def claim: () -> Events::VerificationObligationClaimedV1?
+          def terminal_status: () -> String?
+          def terminal_event: () -> EventReference?
           def absent?: () -> bool
+          def terminal?: () -> bool
+          def status: () -> String
           def active_at?: (String timestamp) -> bool
           def active_claim_at: (String timestamp) -> Events::VerificationObligationClaimedV1?
           def next_fencing_token: () -> Integer

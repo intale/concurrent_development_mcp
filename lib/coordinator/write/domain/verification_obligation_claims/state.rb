@@ -7,9 +7,17 @@ module Coordinator::Write
         attribute :obligation, Types.Instance(Events::VerificationObligationCreatedV1).optional
         attribute :obligation_event, Types.Instance(EventReference).optional
         attribute :claim, Types.Instance(Events::VerificationObligationClaimedV1).optional
+        attribute? :terminal_status, Types::VerificationObligationStatus.optional
+        attribute? :terminal_event, Types.Instance(EventReference).optional
 
         def self.initial
-          new(obligation: nil, obligation_event: nil, claim: nil)
+          new(
+            obligation: nil,
+            obligation_event: nil,
+            claim: nil,
+            terminal_status: nil,
+            terminal_event: nil
+          )
         end
 
         def absent?
@@ -18,6 +26,14 @@ module Coordinator::Write
 
         def active_at?(timestamp)
           !claim.nil? && claim.expires_at > timestamp
+        end
+
+        def terminal?
+          !terminal_status.nil?
+        end
+
+        def status
+          terminal_status || "open"
         end
 
         def active_claim_at(timestamp)
@@ -38,7 +54,7 @@ module Coordinator::Write
           [
             "verification-obligation:#{obligation.obligation_id}",
             "verification-obligation-kind:#{obligation.kind}",
-            "verification-obligation-status:#{obligation.status}",
+            "verification-obligation-status:#{status}",
             "change-set:#{obligation.change_set_id}",
             "source-candidate:#{source.candidate_id}",
             "target-candidate:#{target.candidate_id}",

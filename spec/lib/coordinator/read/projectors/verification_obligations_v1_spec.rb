@@ -288,6 +288,65 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1,
     expect(failed.outcome.triggering_evidence).to eq(CandidateObligationScenario.load(failure_event).triggering_evidence)
   end
 
+  it "projects a user waiver and a later policy invalidation without a freshness gate" do
+    created = CandidateObligationScenario.create_obligation(prefix: "obligation-lifecycle-projection")
+    obligation_id = created.fetch(:payload).obligation_id
+    Coordinator::Write::Operations::ExecuteWaiveVerificationObligation.new(event_store:).call(
+      CandidateObligationScenario.waiver_arguments(
+        created:,
+        command_id: "cmd-project-obligation-waiver"
+      )
+    ).value!
+    corrected = CandidateObligationScenario.correct_policy(
+      policy: created.fetch(:policy),
+      prefix: "obligation-lifecycle-projection",
+      change_set_id: created.dig(:pair, :ids, :change_set_id)
+    )
+    source = corrected.fetch(:partition_event)
+    invocation = Coordinator::Processes::VerificationObligationValidity::CommandBuilder.new.invalidation(
+      obligation_event: created.fetch(:event),
+      superseding_partition_event: CandidateObligationScenario.reference(source),
+      caused_by_event: source,
+      caused_by_reference: CandidateObligationScenario.reference(source)
+    )
+    Coordinator::Write::Operations::ExecuteInvalidateVerificationObligation.new(event_store:)
+      .call(invocation).value!
+    lifecycle = history(obligation_id)
+
+    projector.call(created.fetch(:event))
+    projector.call(lifecycle.find { _1.type == "VerificationObligationWaived" })
+    waived = page(
+      change_set_id: created.dig(:pair, :ids, :change_set_id),
+      status: "waived"
+    ).items.sole
+    expect(waived.outcome).to be_a(Coordinator::Read::VerificationObligationWaivedViewV1)
+    expect(waived.outcome).to have_attributes(
+      previous_status: "open",
+      reason: have_attributes(code: "accepted_risk")
+    )
+
+    projector.call(lifecycle.find { _1.type == "VerificationObligationInvalidated" })
+    invalidated = page(
+      change_set_id: created.dig(:pair, :ids, :change_set_id),
+      status: "invalidated"
+    ).items.sole
+    expect(invalidated.outcome).to be_a(Coordinator::Read::VerificationObligationInvalidatedViewV1)
+    expect(invalidated.outcome).to have_attributes(
+      previous_status: "waived",
+      superseding_partition_event: CandidateObligationScenario.reference(source)
+    )
+
+    original = invalidated.to_h
+    ReadModelTestSafety.clean!
+    lifecycle.each { projector.call(_1) }
+    expect(
+      page(
+        change_set_id: created.dig(:pair, :ids, :change_set_id),
+        status: "invalidated"
+      ).items.sole.to_h
+    ).to eq(original)
+  end
+
   private
 
   def page(change_set_id:, status: "open", observed_at: "2026-08-24T07:00:00.000000Z")

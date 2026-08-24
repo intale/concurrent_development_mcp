@@ -1,0 +1,20 @@
+module Coordinator
+  module Write
+    module Commands
+      class ProgressVerificationObligationValidityScan < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def scan_id: () -> String
+        def change_set_id: () -> String
+        def superseding_partition_event: () -> EventReference
+        def expected_checkpoint: () -> EventReference
+        def previous_from_position: () -> Integer
+        def last_processed_position: () -> Integer?
+        def page_obligation_count: () -> Integer
+        def has_more: () -> bool
+        def page_size: () -> Integer
+        def rule_version: () -> String
+      end
+    end
+  end
+end

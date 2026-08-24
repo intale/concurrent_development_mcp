@@ -153,5 +153,13 @@ module Coordinator::Write
         stream_id: obligation_id
       )
     end
+
+    def verification_obligation_validity_scan(scan_id)
+      StreamReference.new(
+        context: "DevelopmentIntegration",
+        stream_name: "VerificationObligationValidityScan",
+        stream_id: scan_id
+      )
+    end
   end
 end

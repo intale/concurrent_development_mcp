@@ -9,6 +9,7 @@ module Coordinator::Write
       attribute :rule_version, Types::CandidateCompatibilityObligationRuleVersion
       attribute :source_surface, EventReference
       attribute :target_surface, EventReference
+      attribute :policy_partition_event, EventReference
       attribute :policy_head, Decisions::DecisionHeadV1
     end
   end

@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module VerificationObligationInvalidations
+      class PreparationV1 < Shared::Value
+        def invalidated_at: () -> String
+        def event_id: () -> String
+      end
+    end
+  end
+end

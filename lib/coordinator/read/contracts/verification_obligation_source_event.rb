@@ -8,7 +8,9 @@ module Coordinator::Read
         "VerificationObligationClaimed",
         "VerificationEvidenceSubmitted",
         "VerificationObligationSatisfied",
-        "VerificationObligationFailed"
+        "VerificationObligationFailed",
+        "VerificationObligationWaived",
+        "VerificationObligationInvalidated"
       ].freeze
 
       config.validate_keys = true
@@ -22,7 +24,7 @@ module Coordinator::Read
         required(:stream_revision).filled(:integer, gteq?: 0)
         required(:global_position).filled(:integer, gteq?: 0)
         required(:command_id).filled(:string)
-        required(:actor_kind).filled(:string, included_in?: %w[agent system])
+        required(:actor_kind).filled(:string, included_in?: %w[agent system user])
         required(:actor_id).filled(:string)
         required(:recorded_by).filled(:string, eql?: "coordinator")
         required(:policy_version).filled(:string)
@@ -55,6 +57,15 @@ module Coordinator::Read
           values[:stream_revision] >= 3 &&
             values[:actor_kind] == "agent" &&
             values[:policy_version] == "compatibility-assessment/v1"
+        when "VerificationObligationWaived"
+          values[:stream_revision].positive? &&
+            values[:actor_kind] == "user" &&
+            values[:policy_version] == "verification-obligation-waiver/v1"
+        when "VerificationObligationInvalidated"
+          values[:stream_revision].positive? &&
+            values[:actor_kind] == "system" &&
+            values[:actor_id] == "verification-obligation-validity-policy" &&
+            values[:policy_version] == "verification-obligation-validity/v1"
         else
           false
         end

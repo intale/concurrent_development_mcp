@@ -7,6 +7,7 @@ module Coordinator::Write
       def rule_version: () -> String
       def source_surface: () -> Coordinator::Write::EventReference
       def target_surface: () -> Coordinator::Write::EventReference
+      def policy_partition_event: () -> Coordinator::Write::EventReference
       def policy_head: () -> Coordinator::Write::Decisions::DecisionHeadV1
     end
   end

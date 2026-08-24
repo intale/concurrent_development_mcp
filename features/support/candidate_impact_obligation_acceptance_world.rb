@@ -362,6 +362,9 @@ module CandidateImpactObligationAcceptanceWorld
     identity = Coordinator::Write::CandidateObligations::IdentityBuilder.new.call(
       source: loader.call(source_reference),
       target: loader.call(target_reference),
+      policy_partition_event: candidate_obligation_event_reference(
+        @obligation_policy.fetch(:partition_event)
+      ),
       policy_head: @obligation_policy.fetch(:head),
       rule_version: OBLIGATION_RULE_VERSION
     )

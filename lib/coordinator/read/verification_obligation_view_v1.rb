@@ -3,7 +3,10 @@
 module Coordinator::Read
   class VerificationObligationViewV1 < Value
     Reason = Coordinator::Write::CandidateObligations::ImpactReasonV1
-    Outcome = VerificationObligationSatisfiedViewV1 | VerificationObligationFailedViewV1
+    Outcome = VerificationObligationSatisfiedViewV1 |
+      VerificationObligationFailedViewV1 |
+      VerificationObligationWaivedViewV1 |
+      VerificationObligationInvalidatedViewV1
 
     attribute :obligation_id, Types::Identifier
     attribute :kind, Types::VerificationObligationKind

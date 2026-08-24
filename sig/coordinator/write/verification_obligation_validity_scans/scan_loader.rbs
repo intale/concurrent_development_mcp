@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module VerificationObligationValidityScans
+      class ScanLoader
+        def initialize: (
+          event_store: _EventStore,
+          ?stream_factory: StreamFactory,
+          ?schema_registry: EventSchemaRegistry
+        ) -> void
+        def call: (String scan_id) -> ScanSnapshot
+      end
+    end
+  end
+end

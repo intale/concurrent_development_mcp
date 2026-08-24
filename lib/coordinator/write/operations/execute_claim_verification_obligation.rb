@@ -138,15 +138,32 @@ module Coordinator::Write
         ).to_h { |event| [ event.type, event ] }
         creation_event = events["VerificationObligationCreated"]
         claim_event = events["VerificationObligationClaimed"]
+        terminal_event = latest_terminal_event(events)
+        load_event(terminal_event) if terminal_event
         state = Domain::VerificationObligationClaims::State.new(
           obligation: creation_event ? load_event(creation_event) : nil,
           obligation_event: creation_event ? event_reference(creation_event) : nil,
-          claim: claim_event ? load_event(claim_event) : nil
+          claim: claim_event ? load_event(claim_event) : nil,
+          terminal_status: terminal_event && terminal_status(terminal_event),
+          terminal_event: terminal_event && event_reference(terminal_event)
         )
         validation = @history_contract.call(state:, obligation_id:)
         return state if validation.success?
 
         raise InvalidVerificationObligationClaimHistory, validation.errors.to_h.inspect
+      end
+
+      def latest_terminal_event(events)
+        %w[
+          VerificationObligationSatisfied
+          VerificationObligationFailed
+          VerificationObligationWaived
+          VerificationObligationInvalidated
+        ].filter_map { events[_1] }.max_by(&:stream_revision)
+      end
+
+      def terminal_status(event)
+        event.type.delete_prefix("VerificationObligation").downcase
       end
 
       def load_event(event)

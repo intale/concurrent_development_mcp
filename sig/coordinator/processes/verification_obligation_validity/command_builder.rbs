@@ -1,0 +1,23 @@
+module Coordinator
+  module Processes
+    module VerificationObligationValidity
+      class CommandBuilder
+        ACTOR: Write::Commands::Actor
+        RULE_VERSION: String
+        PAGE_SIZE: Integer
+        def initialize: (
+          ?scan_identity_builder: Write::VerificationObligationValidityScans::IdentityBuilder,
+          ?invalidation_identity_builder: Write::VerificationObligationInvalidations::IdentityBuilder
+        ) -> void
+        def start: (SourceV1 source) -> Write::VerificationObligationValidityScanInvocation
+        def progress: (checkpoint: ScanCheckpointV1, page: PageV1) -> Write::VerificationObligationValidityScanProgressInvocation
+        def invalidation: (
+          obligation_event: PgEventstore::Event,
+          superseding_partition_event: Write::EventReference,
+          caused_by_event: PgEventstore::Event,
+          caused_by_reference: Write::EventReference
+        ) -> Write::VerificationObligationInvalidationInvocation
+      end
+    end
+  end
+end

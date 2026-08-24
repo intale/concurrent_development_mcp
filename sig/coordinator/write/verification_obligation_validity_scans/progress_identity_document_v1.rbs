@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module VerificationObligationValidityScans
+      class ProgressIdentityDocumentV1 < Shared::Value
+        def schema: () -> String
+        def checkpoint_event: () -> EventReference
+        def rule_version: () -> String
+      end
+    end
+  end
+end

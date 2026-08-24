@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module VerificationObligationValidityScans
+      class ProgressPreparationV1 < Shared::Value
+        def progressed_at: () -> String
+        def event_id: () -> String
+      end
+    end
+  end
+end

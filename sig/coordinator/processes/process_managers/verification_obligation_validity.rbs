@@ -1,0 +1,23 @@
+module Coordinator
+  module Processes
+    module ProcessManagers
+      class VerificationObligationValidity
+        HANDLED_START_CODES: Array[Symbol]
+        HANDLED_PROGRESS_CODES: Array[Symbol]
+        HANDLED_INVALIDATION_CODES: Array[Symbol]
+        def initialize: (
+          event_store: Write::_EventStore,
+          ?source_builder: Coordinator::Processes::VerificationObligationValidity::SourceBuilder,
+          ?partition_loader: Coordinator::Processes::VerificationObligationValidity::CurrentPartitionLoader,
+          ?checkpoint_loader: Coordinator::Processes::VerificationObligationValidity::CheckpointLoader,
+          ?page_reader: Coordinator::Processes::VerificationObligationValidity::PageReader,
+          ?command_builder: Coordinator::Processes::VerificationObligationValidity::CommandBuilder,
+          ?start_scan: Write::Operations::ExecuteStartVerificationObligationValidityScan,
+          ?progress_scan: Write::Operations::ExecuteProgressVerificationObligationValidityScan,
+          ?invalidate: Write::Operations::ExecuteInvalidateVerificationObligation
+        ) -> void
+        def call: (PgEventstore::Event event) -> nil
+      end
+    end
+  end
+end

@@ -1,0 +1,23 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecuteProgressVerificationObligationValidityScan
+        def initialize: (
+          event_store: _EventStore,
+          ?exact_loader: CandidateObligations::ExactEventLoader,
+          ?loader: VerificationObligationValidityScans::ScanLoader,
+          ?decider: Domain::VerificationObligationValidityScans::Progress,
+          ?retry_policy: VerificationObligationValidityScans::ExpectedRevisionRetry,
+          ?identity_builder: VerificationObligationValidityScans::IdentityBuilder,
+          ?clock: Shared::_Clock,
+          ?id_generator: Shared::_IdGenerator,
+          ?event_factory: EventFactory,
+          ?stream_factory: StreamFactory,
+          ?input_contract: Contracts::VerificationObligationValidityScanProgress,
+          ?event_plan_contract: Contracts::VerificationObligationValidityScanProgressEventPlan
+        ) -> void
+        def call: (VerificationObligationValidityScanProgressInvocation invocation) -> Dry::Monads::Result
+      end
+    end
+  end
+end

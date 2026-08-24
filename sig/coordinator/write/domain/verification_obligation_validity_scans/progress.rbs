@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Domain
+      module VerificationObligationValidityScans
+        class Progress
+          def initialize: (?stream_factory: StreamFactory) -> void
+          def call: (state: State, command: Commands::ProgressVerificationObligationValidityScan, progressed_at: String) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

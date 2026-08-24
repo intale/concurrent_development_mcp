@@ -148,7 +148,8 @@ RSpec.describe Coordinator::Container do
         "candidate-impact-obligation-policy-v1",
         "change-set-readiness-v1",
         "coordination-task-executor-v1",
-        "lease-expiry-scheduler-v1"
+        "lease-expiry-scheduler-v1",
+        "verification-obligation-validity-v1"
       ]
     )
     expect(read_model_manager).to be_a(PgEventstore::SubscriptionsManager)

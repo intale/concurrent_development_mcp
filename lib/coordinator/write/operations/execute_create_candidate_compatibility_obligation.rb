@@ -56,6 +56,7 @@ module Coordinator::Write
         identity = @identity_builder.call(
           source:,
           target:,
+          policy_partition_event: command.policy_partition_event,
           policy_head: command.policy_head,
           rule_version: command.rule_version
         )

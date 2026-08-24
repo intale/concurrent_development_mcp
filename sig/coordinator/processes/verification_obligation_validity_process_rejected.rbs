@@ -1,0 +1,6 @@
+module Coordinator
+  module Processes
+    class VerificationObligationValidityProcessRejected < StandardError
+    end
+  end
+end

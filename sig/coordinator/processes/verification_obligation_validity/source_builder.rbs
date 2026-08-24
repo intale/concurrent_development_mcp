@@ -1,0 +1,14 @@
+module Coordinator
+  module Processes
+    module VerificationObligationValidity
+      class SourceBuilder
+        def initialize: (
+          event_store: Write::_EventStore,
+          ?exact_loader: Write::CandidateObligations::ExactEventLoader,
+          ?contract: Contracts::VerificationObligationValiditySource
+        ) -> void
+        def call: (PgEventstore::Event event) -> SourceV1
+      end
+    end
+  end
+end

@@ -115,6 +115,10 @@ module Coordinator
       Write::Operations::PrepareSubmitCompatibilityAssessment.new
     end
 
+    register("operations.prepare_waive_verification_obligation", memoize: true) do
+      Write::Operations::PrepareWaiveVerificationObligation.new
+    end
+
     register("domain.change_sets.create", memoize: true) do
       Write::Domain::ChangeSets::Create.new(stream_factory: self["stream_factory"])
     end
@@ -167,6 +171,12 @@ module Coordinator
 
     register("domain.verification_evidence.submit", memoize: true) do
       Write::Domain::VerificationEvidence::Submit.new(
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("domain.verification_obligation_waivers.waive", memoize: true) do
+      Write::Domain::VerificationObligationWaivers::Waive.new(
         stream_factory: self["stream_factory"]
       )
     end
@@ -869,6 +879,22 @@ module Coordinator
       )
     end
 
+
+    register("operations.execute_waive_verification_obligation") do
+      Write::Operations::ExecuteWaiveVerificationObligation.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_waive_verification_obligation"],
+        decider: self["domain.verification_obligation_waivers.waive"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
     register("operations.execute_start_agent_choice_impact_scan", memoize: true) do
       Write::Operations::ExecuteStartAgentChoiceImpactScan.new(
         event_store: self["event_store"],
@@ -949,6 +975,37 @@ module Coordinator
       )
     end
 
+    register("operations.execute_start_verification_obligation_validity_scan", memoize: true) do
+      Write::Operations::ExecuteStartVerificationObligationValidityScan.new(
+        event_store: self["event_store"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("operations.execute_progress_verification_obligation_validity_scan", memoize: true) do
+      Write::Operations::ExecuteProgressVerificationObligationValidityScan.new(
+        event_store: self["event_store"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("operations.execute_invalidate_verification_obligation", memoize: true) do
+      Write::Operations::ExecuteInvalidateVerificationObligation.new(
+        event_store: self["event_store"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
     register("lease_expiry_policy", memoize: true) do
       Processes::LeaseExpiryPolicy.new(
         source_loader: self["lease_expiry_source_loader"],
@@ -981,7 +1038,9 @@ module Coordinator
         claim_verification_obligation:
           self["operations.execute_claim_verification_obligation"],
         submit_compatibility_assessment:
-          self["operations.execute_submit_compatibility_assessment"]
+          self["operations.execute_submit_compatibility_assessment"],
+        waive_verification_obligation:
+          self["operations.execute_waive_verification_obligation"]
       )
     end
 
@@ -1139,6 +1198,14 @@ module Coordinator
       )
     end
 
+
+    register("operations.submit_waive_verification_obligation_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_waive_verification_obligation"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
     register("operations.start_coordination_task", memoize: true) do
       Write::Operations::StartCoordinationTask.new(
         transition: self["operations.apply_coordination_task_transition"],
@@ -1229,6 +1296,15 @@ module Coordinator
       )
     end
 
+    register("process_managers.verification_obligation_validity", memoize: true) do
+      Processes::ProcessManagers::VerificationObligationValidity.new(
+        event_store: self["event_store"],
+        start_scan: self["operations.execute_start_verification_obligation_validity_scan"],
+        progress_scan: self["operations.execute_progress_verification_obligation_validity_scan"],
+        invalidate: self["operations.execute_invalidate_verification_obligation"]
+      )
+    end
+
     register("subscriptions.change_set_readiness", memoize: true) do
       Processes::Subscriptions::ChangeSetReadiness.new(handler: self["process_managers.change_set_readiness"])
     end
@@ -1254,6 +1330,12 @@ module Coordinator
     register("subscriptions.candidate_impact_obligation_policy", memoize: true) do
       Processes::Subscriptions::CandidateImpactObligationPolicy.new(
         handler: self["process_managers.candidate_impact_obligation_policy"]
+      )
+    end
+
+    register("subscriptions.verification_obligation_validity", memoize: true) do
+      Processes::Subscriptions::VerificationObligationValidity.new(
+        handler: self["process_managers.verification_obligation_validity"]
       )
     end
 
@@ -1317,7 +1399,8 @@ module Coordinator
           self["subscriptions.coordination_task_executor"],
           self["subscriptions.lease_expiry_scheduler"],
           self["subscriptions.agent_choice_decision_impact"],
-          self["subscriptions.candidate_impact_obligation_policy"]
+          self["subscriptions.candidate_impact_obligation_policy"],
+          self["subscriptions.verification_obligation_validity"]
         ]
       )
     end

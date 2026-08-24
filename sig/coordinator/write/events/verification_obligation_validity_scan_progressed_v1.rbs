@@ -1,0 +1,21 @@
+module Coordinator
+  module Write
+    module Events
+      class VerificationObligationValidityScanProgressedV1 < Base
+        def scan_id: () -> String
+        def change_set_id: () -> String
+        def superseding_partition_event: () -> EventReference
+        def started_event: () -> EventReference
+        def previous_checkpoint: () -> EventReference
+        def previous_from_position: () -> Integer
+        def next_from_position: () -> Integer
+        def page_size: () -> Integer
+        def page_number: () -> Integer
+        def page_obligation_count: () -> Integer
+        def total_obligation_count: () -> Integer
+        def rule_version: () -> String
+        def progressed_at: () -> String
+      end
+    end
+  end
+end

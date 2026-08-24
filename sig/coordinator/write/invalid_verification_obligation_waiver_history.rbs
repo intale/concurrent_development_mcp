@@ -1,0 +1,6 @@
+module Coordinator
+  module Write
+    class InvalidVerificationObligationWaiverHistory < StandardError
+    end
+  end
+end

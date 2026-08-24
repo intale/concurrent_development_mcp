@@ -170,6 +170,47 @@ module VerificationEvidenceExamples
     )
   end
 
+  def failed
+    failed_command = command(conclusion: "failed")
+    Coordinator::Write::Domain::VerificationEvidence::Submit.new.call(
+      state: state,
+      command: failed_command,
+      evidence_id: "05919191-9191-7191-8191-919191919191",
+      assessment_input_digest: digest("failed-assessment"),
+      evidence_event: evidence_reference(
+        revision: 2,
+        evidence_id: "05919191-9191-7191-8191-919191919191"
+      ),
+      submitted_at: SUBMITTED_AT
+    ).value!.events.last
+  end
+
+  def satisfied
+    existing = observation(evidence_kind: "combined_tests")
+    final_command = command(evidence_kind: "contract_compatibility_review")
+    Coordinator::Write::Domain::VerificationEvidence::Submit.new.call(
+      state: state(evidence: [ existing ]),
+      command: final_command,
+      evidence_id: "06919191-9191-7191-8191-919191919191",
+      assessment_input_digest: digest("satisfied-assessment"),
+      evidence_event: evidence_reference(
+        revision: 3,
+        evidence_id: "06919191-9191-7191-8191-919191919191"
+      ),
+      submitted_at: SUBMITTED_AT
+    ).value!.events.last
+  end
+
+  def outcome_reference(type:, revision: 4)
+    CandidateObligationExamples.reference(
+      id: Coordinator::Shared::IdGenerator.new.uuid_v7,
+      type:,
+      stream_name: "VerificationObligation",
+      stream_id: obligation.obligation_id,
+      revision:
+    )
+  end
+
   def digest(*parts)
     Coordinator::Shared::CanonicalJson.new.sha256(parts)
   end

@@ -14,7 +14,7 @@ module Coordinator::Write
         if state.absent?
           valid = state.obligation_event.nil? && state.latest_claim.nil? &&
             state.latest_claim_event.nil? && state.evidence.empty? && !state.terminal? &&
-            !state.policy_current
+            !state.policy_current && !state.waived && !state.invalidated
           key(:state).failure("must not contain verification history without an obligation") unless valid
           next
         end
@@ -76,18 +76,49 @@ module Coordinator::Write
 
       def coherent_terminal?(state, obligation_id)
         return false if state.satisfied && state.failed
-        return true unless state.terminal?
+        return false if state.satisfied && state.waived
+        return false if state.satisfied && !coherent_common?(state.satisfied, state, obligation_id)
+        return false if state.failed && !coherent_common?(state.failed, state, obligation_id)
+        return false if state.satisfied && !coherent_satisfaction?(state)
+        return false if state.failed && !coherent_failure?(state)
+        return false if state.waived && !coherent_waiver?(state, obligation_id)
+        return false if state.invalidated && !coherent_invalidation?(state, obligation_id)
 
-        terminal = state.satisfied || state.failed
-        common = terminal.obligation_id == obligation_id &&
+        true
+      end
+
+      def coherent_common?(terminal, state, obligation_id)
+        terminal.obligation_id == obligation_id &&
           terminal.obligation_event == state.obligation_event &&
           terminal.policy == state.obligation.policy
-        return false unless common
+      end
 
-        if state.satisfied
-          coherent_satisfaction?(state)
-        else
-          coherent_failure?(state)
+      def coherent_waiver?(state, obligation_id)
+        waiver = state.waived
+        prior_valid =
+          case waiver.previous_status
+          when "open" then state.satisfied.nil? && state.failed.nil?
+          when "failed" then !state.failed.nil?
+          else false
+          end
+        coherent_common?(waiver, state, obligation_id) && prior_valid
+      end
+
+      def coherent_invalidation?(state, obligation_id)
+        invalidation = state.invalidated
+        invalidation.obligation_id == obligation_id &&
+          invalidation.obligation_event == state.obligation_event &&
+          invalidation.invalidated_policy == state.obligation.policy &&
+          invalidation_prior_status?(state, invalidation.previous_status)
+      end
+
+      def invalidation_prior_status?(state, status)
+        case status
+        when "open" then !state.satisfied && !state.failed && !state.waived
+        when "satisfied" then !state.satisfied.nil? && !state.waived
+        when "failed" then !state.failed.nil? && !state.waived
+        when "waived" then !state.waived.nil?
+        else false
         end
       end
 

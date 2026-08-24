@@ -157,6 +157,8 @@ module Coordinator::Write
         claim = grouped["VerificationObligationClaimed"]
         satisfied = grouped["VerificationObligationSatisfied"]
         failed = grouped["VerificationObligationFailed"]
+        waived = grouped["VerificationObligationWaived"]
+        invalidated = grouped["VerificationObligationInvalidated"]
         obligation = creation ? load_event(creation) : nil
         state = Domain::VerificationEvidence::State.new(
           obligation:,
@@ -171,7 +173,13 @@ module Coordinator::Write
           end,
           satisfied: satisfied ? load_event(satisfied) : nil,
           failed: failed ? load_event(failed) : nil,
-          policy_current: current_policy?(obligation, observed_at, terminal: satisfied || failed)
+          waived: waived ? load_event(waived) : nil,
+          invalidated: invalidated ? load_event(invalidated) : nil,
+          policy_current: current_policy?(
+            obligation,
+            observed_at,
+            terminal: satisfied || failed || waived || invalidated
+          )
         )
         verify_history!(state, obligation_id:)
         [ state, (grouped.values + evidence_events).freeze ]

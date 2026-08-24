@@ -1,0 +1,11 @@
+module Coordinator
+  module Processes
+    module VerificationObligationValidity
+      class SourceV1 < Shared::Value
+        def event: () -> PgEventstore::Event
+        def reference: () -> Write::EventReference
+        def payload: () -> Write::Events::Base
+      end
+    end
+  end
+end

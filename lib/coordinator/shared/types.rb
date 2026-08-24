@@ -231,8 +231,19 @@ module Coordinator::Shared
       no_routing_markers
     ].freeze
     VERIFICATION_OBLIGATION_KINDS = %w[candidate_compatibility].freeze
-    VERIFICATION_OBLIGATION_STATUSES = %w[open satisfied failed].freeze
+    VERIFICATION_OBLIGATION_STATUSES = %w[open satisfied failed waived invalidated].freeze
     VERIFICATION_OBLIGATION_CLAIM_STATES = %w[unclaimed active expired].freeze
+    VERIFICATION_OBLIGATION_WAIVER_REASON_CODES = %w[
+      duplicate
+      accepted_risk
+      not_required
+      external_approval
+      other
+    ].freeze
+    VERIFICATION_OBLIGATION_INVALIDATION_RULE_VERSIONS = %w[
+      verification-obligation-validity/v1
+    ].freeze
+    VERIFICATION_OBLIGATION_VALIDITY_SCAN_STATUSES = %w[absent running completed].freeze
     VERIFICATION_EVIDENCE_CONCLUSIONS = %w[
       passed
       failed
@@ -330,6 +341,7 @@ module Coordinator::Shared
       candidate_impact_surface_submit
       verification_obligation_claim
       compatibility_assessment_submit
+      verification_obligation_waive
     ].freeze
 
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)
@@ -434,6 +446,16 @@ module Coordinator::Shared
     VerificationObligationKind = String.enum(*VERIFICATION_OBLIGATION_KINDS)
     VerificationObligationStatus = String.enum(*VERIFICATION_OBLIGATION_STATUSES)
     VerificationObligationClaimState = String.enum(*VERIFICATION_OBLIGATION_CLAIM_STATES)
+    VerificationObligationWaiverReasonCode = String.enum(*VERIFICATION_OBLIGATION_WAIVER_REASON_CODES)
+    VerificationObligationWaiverReasonSummary = String.constrained(min_size: 1, max_size: 2_000)
+    VerificationObligationInvalidationRuleVersion = String.enum(
+      *VERIFICATION_OBLIGATION_INVALIDATION_RULE_VERSIONS
+    )
+    VerificationObligationValidityScanStatus = String.enum(
+      *VERIFICATION_OBLIGATION_VALIDITY_SCAN_STATUSES
+    )
+    VerificationObligationValidityPageSize = Integer.enum(50)
+    VerificationObligationValidityPageCount = Integer.constrained(gteq: 0, lteq: 50)
     VerificationEvidenceConclusion = String.enum(*VERIFICATION_EVIDENCE_CONCLUSIONS)
     VerificationEvidenceFindingSeverity = String.enum(*VERIFICATION_EVIDENCE_FINDING_SEVERITIES)
     VerificationEvidenceProducerName = String.constrained(min_size: 1, max_size: 100)

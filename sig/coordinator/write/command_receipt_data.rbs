@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandReceiptData
-      type value = ChangeSet | WorkItem | Dependency | Attempt | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment
+      type value = ChangeSet | WorkItem | Dependency | Attempt | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver
 
       class ChangeSet < Shared::Value
         def change_set_id: () -> String
@@ -198,6 +198,15 @@ module Coordinator
         def evidence_event: () -> EventReference
         def outcome_event: () -> EventReference?
         def submitted_at: () -> String
+      end
+
+      class VerificationObligationWaiver < Shared::Value
+        def obligation_id: () -> String
+        def previous_status: () -> String
+        def status: () -> String
+        def reason: () -> VerificationObligationWaivers::ReasonV1
+        def waiver_event: () -> EventReference
+        def waived_at: () -> String
       end
     end
   end

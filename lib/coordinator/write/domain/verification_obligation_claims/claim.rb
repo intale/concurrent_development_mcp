@@ -12,6 +12,7 @@ module Coordinator::Write
 
         def call(state:, command:, claim_id:, claimed_at:)
           return not_found(command) if state.absent? || state.obligation_event.nil?
+          return terminal(state, command) if state.terminal?
           active_claim = state.active_claim_at(claimed_at)
           return already_claimed(active_claim, command) if active_claim
 
@@ -62,6 +63,16 @@ module Coordinator::Write
                 fencing_token: claim.fencing_token,
                 expires_at: claim.expires_at
               }
+            )
+          )
+        end
+
+        def terminal(state, command)
+          Failure(
+            OutcomeError.new(
+              code: :verification_obligation_terminal,
+              message: "Verification obligation is already terminal",
+              details: { obligation_id: command.obligation_id, status: state.status }
             )
           )
         end

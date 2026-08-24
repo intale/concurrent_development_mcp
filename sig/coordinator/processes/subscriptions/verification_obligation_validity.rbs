@@ -1,0 +1,10 @@
+module Coordinator
+  module Processes
+    module Subscriptions
+      class VerificationObligationValidity < Coordinator::Shared::Subscriptions::Registration
+        DEFINITION: ProcessDefinition
+        def initialize: (handler: ProcessManagers::VerificationObligationValidity, ?pull_interval: Float) -> void
+      end
+    end
+  end
+end

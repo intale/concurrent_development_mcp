@@ -192,6 +192,16 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
           may_affect: [ { impact_key: "framework:rails:controller-lifecycle" } ],
           assumes: []
         }
+      ).value!,
+      Coordinator::Write::Operations::PrepareWaiveVerificationObligation.new.call(
+        command_id: "cmd-task-build-15",
+        actor: { kind: "user", id: "user-label" },
+        obligation_id: "verification-obligation-v1:task-build",
+        obligation_validity_input_digest: "sha256:#{"d" * 64}",
+        reason: {
+          code: "accepted_risk",
+          summary: "User accepts this exact recorded coordination risk."
+        }
       ).value!
     ]
 

@@ -1,0 +1,26 @@
+module Coordinator
+  module Write
+    module Domain
+      module VerificationObligationValidityScans
+        class State < Shared::Value
+          def self.initial: () -> State
+          def status: () -> String
+          def scan_id: () -> String?
+          def change_set_id: () -> String?
+          def superseding_partition_event: () -> EventReference?
+          def started_event: () -> EventReference?
+          def checkpoint_event: () -> EventReference?
+          def from_position: () -> Integer?
+          def to_position: () -> Integer?
+          def page_size: () -> Integer?
+          def page_count: () -> Integer
+          def total_obligation_count: () -> Integer
+          def rule_version: () -> String?
+          def absent?: () -> bool
+          def running?: () -> bool
+          def terminal?: () -> bool
+        end
+      end
+    end
+  end
+end

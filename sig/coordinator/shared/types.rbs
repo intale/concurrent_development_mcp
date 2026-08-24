@@ -68,6 +68,7 @@ module Coordinator
       VERIFICATION_OBLIGATION_KINDS: Array[String]
       VERIFICATION_OBLIGATION_STATUSES: Array[String]
       VERIFICATION_OBLIGATION_CLAIM_STATES: Array[String]
+      VERIFICATION_OBLIGATION_VALIDITY_SCAN_STATUSES: Array[String]
       VERIFICATION_EVIDENCE_CONCLUSIONS: Array[String]
       VERIFICATION_EVIDENCE_FINDING_SEVERITIES: Array[String]
       VERIFICATION_EVIDENCE_MAXIMUM_COUNT: Integer
@@ -181,6 +182,12 @@ module Coordinator
       VerificationObligationKind: untyped
       VerificationObligationStatus: untyped
       VerificationObligationClaimState: untyped
+      VerificationObligationWaiverReasonCode: untyped
+      VerificationObligationWaiverReasonSummary: untyped
+      VerificationObligationInvalidationRuleVersion: untyped
+      VerificationObligationValidityScanStatus: untyped
+      VerificationObligationValidityPageSize: untyped
+      VerificationObligationValidityPageCount: untyped
       VerificationEvidenceConclusion: untyped
       VerificationEvidenceFindingSeverity: untyped
       VerificationEvidenceProducerName: untyped

@@ -172,7 +172,14 @@ module Coordinator::Write
     )
 
     VERIFICATION_OBLIGATION_FOR_CLAIM = GroupedEventReadCriteria.new(
-      event_types: [ "VerificationObligationCreated", "VerificationObligationClaimed" ],
+      event_types: [
+        "VerificationObligationCreated",
+        "VerificationObligationClaimed",
+        "VerificationObligationSatisfied",
+        "VerificationObligationFailed",
+        "VerificationObligationWaived",
+        "VerificationObligationInvalidated"
+      ],
       direction: :desc
     )
 
@@ -181,7 +188,29 @@ module Coordinator::Write
         "VerificationObligationCreated",
         "VerificationObligationClaimed",
         "VerificationObligationSatisfied",
-        "VerificationObligationFailed"
+        "VerificationObligationFailed",
+        "VerificationObligationWaived",
+        "VerificationObligationInvalidated"
+      ],
+      direction: :desc
+    )
+
+    VERIFICATION_OBLIGATION_LIFECYCLE = GroupedEventReadCriteria.new(
+      event_types: [
+        "VerificationObligationCreated",
+        "VerificationObligationSatisfied",
+        "VerificationObligationFailed",
+        "VerificationObligationWaived",
+        "VerificationObligationInvalidated"
+      ],
+      direction: :desc
+    )
+
+    VERIFICATION_OBLIGATION_VALIDITY_SCAN_STATE = GroupedEventReadCriteria.new(
+      event_types: [
+        "VerificationObligationValidityScanStarted",
+        "VerificationObligationValidityScanProgressed",
+        "VerificationObligationValidityScanCompleted"
       ],
       direction: :desc
     )

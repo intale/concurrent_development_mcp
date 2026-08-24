@@ -36,7 +36,9 @@ module Coordinator::Write
         verification_obligation_binding_stale: "stale_context",
         verification_evidence_already_submitted: "conflict",
         verification_evidence_limit_reached: "conflict",
-        verification_obligation_terminal: "conflict"
+        verification_obligation_terminal: "conflict",
+        verification_obligation_waiver_requires_user: "denied",
+        verification_obligation_already_waived: "conflict"
       }.freeze
 
       def call(result, command_id:)

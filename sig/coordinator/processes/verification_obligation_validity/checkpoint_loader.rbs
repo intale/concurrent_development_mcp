@@ -1,0 +1,14 @@
+module Coordinator
+  module Processes
+    module VerificationObligationValidity
+      class CheckpointLoader
+        def initialize: (
+          event_store: Write::_EventStore,
+          ?loader: Write::VerificationObligationValidityScans::ScanLoader,
+          ?contract: Contracts::VerificationObligationValidityCheckpoint
+        ) -> void
+        def call: (SourceV1 source) -> ScanCheckpointV1?
+      end
+    end
+  end
+end
