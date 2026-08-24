@@ -295,7 +295,7 @@ GEM
     pg (1.6.3-aarch64-linux-musl)
     pg (1.6.3-x86_64-linux)
     pg (1.6.3-x86_64-linux-musl)
-    pg_eventstore (3.0.0)
+    pg_eventstore (3.0.1)
       connection_pool (>= 2.5.4, < 4)
       pg (~> 1)
       sinatra (>= 3, < 5)
@@ -616,7 +616,7 @@ CHECKSUMS
   pg (1.6.3-aarch64-linux-musl) sha256=06a75f4ea04b05140146f2a10550b8e0d9f006a79cdaf8b5b130cde40e3ecc2c
   pg (1.6.3-x86_64-linux) sha256=5d9e188c8f7a0295d162b7b88a768d8452a899977d44f3274d1946d67920ae8d
   pg (1.6.3-x86_64-linux-musl) sha256=9c9c90d98c72f78eb04c0f55e9618fe55d1512128e411035fe229ff427864009
-  pg_eventstore (3.0.0) sha256=7cbed46560952efd36b8f02510d99a55604a3771a4698a697dcdab9930bc08ea
+  pg_eventstore (3.0.1) sha256=54a8ee901f0185726198c63b3ea4bc6cddf8e53e741edf53fa0b9a43fd902b50
   pp (0.6.4) sha256=dfcb0fce700c41456265922884f9fe195d7fbb0674a3578e6c0f69588e82b570
   prettyprint (0.2.0) sha256=2bc9e15581a94742064a3cc8b0fb9d45aae3d03a1baa6ef80922627a0766f193
   prism (1.9.0) sha256=7b530c6a9f92c24300014919c9dcbc055bf4cdf51ec30aed099b06cd6674ef85
