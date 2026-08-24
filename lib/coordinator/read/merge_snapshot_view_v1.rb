@@ -22,5 +22,6 @@ module Coordinator::Read
     attribute :registered, MergeSnapshotSourceEvidenceV1
     attribute :verification, MergeSnapshotVerificationViewV1
     attribute :latest_authorization, MergeAuthorizationViewV1.optional
+    attribute :observation, MergeObservationViewV1.optional
   end
 end

@@ -77,6 +77,31 @@ module Coordinator::Read
         )
       end
 
+      def record_observation(event:, observation:)
+        record = Coordinator::Read::MergeSnapshot.find_by!(
+          merge_snapshot_id: observation.merge_snapshot_id
+        )
+        view = MergeObservationViewV1.new(
+          authorization_event: observation.authorization_event,
+          authorization_decision_digest: observation.authorization_decision_digest,
+          snapshot_binding: observation.snapshot_binding,
+          repository_id: observation.repository_id,
+          target_branch: observation.target_branch,
+          object_format: observation.object_format,
+          target_before_commit_oid: observation.target_before_commit_oid,
+          target_after_commit_oid: observation.target_after_commit_oid,
+          observer: observation.observer,
+          run_id: observation.run_id,
+          observed_at: observation.observed_at,
+          observation_digest: observation.observation_digest,
+          policy_version: observation.policy_version,
+          evidence_status: observation.evidence_status,
+          recorded_at: observation.recorded_at,
+          source: event_source(event, occurred_at: observation.observed_at)
+        )
+        record.update!(observation: view.to_h)
+      end
+
       private
 
       def build_view(record)
@@ -98,7 +123,8 @@ module Coordinator::Read
           evidence_status: record.evidence_status,
           registered: registration_source_evidence(record),
           verification: verification_view(record),
-          latest_authorization: @authorizations.latest_for(record.merge_snapshot_id)
+          latest_authorization: @authorizations.latest_for(record.merge_snapshot_id),
+          observation: observation_view(record.observation)
         )
       end
 
@@ -150,6 +176,36 @@ module Coordinator::Read
             ),
           verification_digest: attributes.fetch(:verification_digest),
           verified_at: attributes.fetch(:verified_at),
+          source: source_from_hash(attributes.fetch(:source))
+        )
+      end
+
+      def observation_view(value)
+        return unless value
+
+        attributes = symbolize(value)
+        MergeObservationViewV1.new(
+          authorization_event: Coordinator::Write::EventReference.new(
+            attributes.fetch(:authorization_event)
+          ),
+          authorization_decision_digest: attributes.fetch(:authorization_decision_digest),
+          snapshot_binding: Coordinator::Write::MergeAuthorizations::SnapshotBindingV1.new(
+            attributes.fetch(:snapshot_binding)
+          ),
+          repository_id: attributes.fetch(:repository_id),
+          target_branch: attributes.fetch(:target_branch),
+          object_format: attributes.fetch(:object_format),
+          target_before_commit_oid: attributes.fetch(:target_before_commit_oid),
+          target_after_commit_oid: attributes.fetch(:target_after_commit_oid),
+          observer: Coordinator::Write::MergeObservations::ObserverV1.new(
+            attributes.fetch(:observer)
+          ),
+          run_id: attributes.fetch(:run_id),
+          observed_at: attributes.fetch(:observed_at),
+          observation_digest: attributes.fetch(:observation_digest),
+          policy_version: attributes.fetch(:policy_version),
+          evidence_status: attributes.fetch(:evidence_status),
+          recorded_at: attributes.fetch(:recorded_at),
           source: source_from_hash(attributes.fetch(:source))
         )
       end

@@ -1,0 +1,9 @@
+module Coordinator::Write::Domain::MergeObservations
+  class HistoryV1 < Coordinator::Shared::Value
+    def authorization: () -> Coordinator::Write::Events::MergeAuthorizationGrantedV1?
+    def authorization_event: () -> Coordinator::Write::EventReference?
+    def current_evaluation: () -> Coordinator::Write::MergeAuthorizations::EvaluationV1?
+    def existing_observation: () -> Coordinator::Write::Events::MergeObservedV1?
+    def existing_observation_event: () -> Coordinator::Write::EventReference?
+  end
+end

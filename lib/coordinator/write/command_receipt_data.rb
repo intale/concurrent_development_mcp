@@ -261,6 +261,22 @@ module Coordinator::Write
       attribute :decided_at, Types::Timestamp
     end
 
+    class MergeObservation < Value
+      attribute :merge_snapshot_id, Types::Identifier
+      attribute :authorization_event, EventReference
+      attribute :authorization_decision_digest, Types::Sha256Digest
+      attribute :repository_id, Types::RepositoryId
+      attribute :target_branch, Types::CandidateTargetBranch
+      attribute :object_format, Types::GitObjectFormat
+      attribute :target_before_commit_oid, Types::GitOid
+      attribute :target_after_commit_oid, Types::GitOid
+      attribute :observation_digest, Types::Sha256Digest
+      attribute :evidence_status, Types::MergeSnapshotEvidenceStatus
+      attribute :observation_event, EventReference
+      attribute :observed_at, Types::Timestamp
+      attribute :recorded_at, Types::Timestamp
+    end
+
     Type = ChangeSet |
            WorkItem |
            Dependency |
@@ -283,6 +299,7 @@ module Coordinator::Write
            VerificationObligationWaiver |
            MergeSnapshotRegistration |
            MergeSnapshotVerification |
-           MergeAuthorization
+           MergeAuthorization |
+           MergeObservation
   end
 end

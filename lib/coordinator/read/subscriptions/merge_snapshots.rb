@@ -21,7 +21,8 @@ module Coordinator::Read
           "MergeSnapshotVerificationSubmitted",
           "MergeSnapshotVerified",
           "MergeAuthorizationGranted",
-          "MergeAuthorizationDenied"
+          "MergeAuthorizationDenied",
+          "MergeObserved"
         ]
       )
 

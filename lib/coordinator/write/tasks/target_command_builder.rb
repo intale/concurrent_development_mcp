@@ -51,6 +51,8 @@ module Coordinator::Write
           build_submit_merge_snapshot_verification(document)
         when CommandInputDocuments::RequestMergeAuthorizationV1
           build_request_merge_authorization(document)
+        when CommandInputDocuments::RecordMergeObservationV1
+          build_record_merge_observation(document)
         end
       end
 
@@ -397,6 +399,26 @@ module Coordinator::Write
           target_base_observation: input.target_base_observation,
           expected_impact_policy: input.expected_impact_policy,
           policy_version: "merge-authorization/v1"
+        )
+      end
+
+      def build_record_merge_observation(document)
+        input = document.input
+        Commands::RecordMergeObservation.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          merge_snapshot_id: input.merge_snapshot_id,
+          authorization_event: EventReference.new(input.authorization_event.to_h),
+          authorization_decision_digest: input.authorization_decision_digest,
+          repository_id: input.repository_id,
+          target_branch: input.target_branch,
+          object_format: input.object_format,
+          target_before_commit_oid: input.target_before_commit_oid,
+          target_after_commit_oid: input.target_after_commit_oid,
+          observer: input.observer,
+          run_id: input.run_id,
+          observed_at: input.observed_at,
+          policy_version: "merge-observation/v1"
         )
       end
 

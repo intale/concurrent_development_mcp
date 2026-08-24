@@ -5,6 +5,7 @@ module Coordinator::Read::Repositories
     def store: (event: PgEventstore::Event, snapshot: Coordinator::Write::Events::MergeSnapshotRegisteredV1) -> Coordinator::Read::MergeSnapshot
     def record_submission: (event: PgEventstore::Event, submission: Coordinator::Write::Events::MergeSnapshotVerificationSubmittedV1) -> bool
     def record_verified: (event: PgEventstore::Event, verified: Coordinator::Write::Events::MergeSnapshotVerifiedV1) -> bool
+    def record_observation: (event: PgEventstore::Event, observation: Coordinator::Write::Events::MergeObservedV1) -> bool
 
     private
 
@@ -12,6 +13,7 @@ module Coordinator::Read::Repositories
     def registration_source_evidence: (Coordinator::Read::MergeSnapshot record) -> Coordinator::Read::MergeSnapshotSourceEvidenceV1
     def verification_view: (Coordinator::Read::MergeSnapshot record) -> Coordinator::Read::MergeSnapshotVerificationViewV1
     def verified_view: (untyped value) -> Coordinator::Read::MergeSnapshotVerifiedViewV1?
+    def observation_view: (untyped value) -> Coordinator::Read::MergeObservationViewV1?
     def event_source: (PgEventstore::Event event, occurred_at: String) -> Coordinator::Read::MergeSnapshotSourceEvidenceV1
     def source_from_hash: (untyped value) -> Coordinator::Read::MergeSnapshotSourceEvidenceV1
     def actor: (PgEventstore::Event event) -> Coordinator::Read::AttributedActorV1

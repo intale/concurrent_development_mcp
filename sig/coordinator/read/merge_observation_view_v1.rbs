@@ -1,0 +1,20 @@
+module Coordinator::Read
+  class MergeObservationViewV1 < Coordinator::Shared::Value
+    def authorization_event: () -> Coordinator::Write::EventReference
+    def authorization_decision_digest: () -> String
+    def snapshot_binding: () -> Coordinator::Write::MergeAuthorizations::SnapshotBindingV1
+    def repository_id: () -> String
+    def target_branch: () -> String
+    def object_format: () -> String
+    def target_before_commit_oid: () -> String
+    def target_after_commit_oid: () -> String
+    def observer: () -> Coordinator::Write::MergeObservations::ObserverV1
+    def run_id: () -> String
+    def observed_at: () -> String
+    def observation_digest: () -> String
+    def policy_version: () -> String
+    def evidence_status: () -> String
+    def recorded_at: () -> String
+    def source: () -> MergeSnapshotSourceEvidenceV1
+  end
+end

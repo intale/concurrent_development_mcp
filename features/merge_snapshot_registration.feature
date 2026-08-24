@@ -86,3 +86,17 @@ Feature: Attributed merge snapshot registration
     When the agent requests merge authorization with command "cmd-cuc-merge-auth-open"
     Then the merge authorization Task completes with durable outcome "denied"
     And the authorization explains "required_obligation_open"
+
+  Scenario: An exact current grant permits one attributed external merge observation
+    Given Candidate coordination "MERGE-OBSERVED" gives agent "agent-a" an active lease on "lib/merge_observed.rb"
+    When the agent submits Candidate "CAN-CUC-MERGE-OBSERVED" with command "cmd-cuc-merge-observed-candidate" at head "b" without build context
+    And the agent registers merge snapshot "MS-CUC-MERGE-OBSERVED" with command "cmd-cuc-merge-observed-snapshot"
+    And merge snapshot "MS-CUC-MERGE-OBSERVED" reaches the read side
+    And the agent submits "passed" merge verification with command "cmd-cuc-merge-observed-verification"
+    And the agent requests merge authorization with command "cmd-cuc-merge-observed-authorization"
+    Then the merge authorization Task completes with durable outcome "granted"
+    When the agent records the exact external merge with command "cmd-cuc-merge-observed"
+    Then the merge observation Task completes with attributed unverified evidence
+    And the available merge snapshot has no observed merge yet
+    When the merge observation reaches the read side twice
+    Then the available merge snapshot reports the exact merge without a freshness gate

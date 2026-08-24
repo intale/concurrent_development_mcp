@@ -53,6 +53,7 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
       "merge_snapshot_register",
       "merge_verification_submit",
       "merge_authorization_request",
+      "merge_observation_record",
       "change_set_create",
       "work_item_create",
       "work_item_dependency_declare",
@@ -243,6 +244,35 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
     expect(result.dig("structuredContent", "data")).to include(
       "merge_snapshot_id" => registration.dig(:input, :merge_snapshot_id),
       "outcome" => "granted"
+    )
+  end
+
+  it "records an exact external merge observation through a durable Task" do
+    registration = MergeSnapshotScenario.register(prefix: "mcp-merge-observation")
+    verification = MergeSnapshotScenario.verify(registration, prefix: "mcp-merge-observation")
+    authorization = MergeSnapshotScenario.authorize(
+      registration,
+      verification,
+      prefix: "mcp-merge-observation"
+    )
+    arguments = MergeSnapshotScenario.observation_input(
+      registration,
+      authorization,
+      prefix: "mcp-merge-observation"
+    )
+
+    submitted = call_tool("merge_observation_record", arguments, id: 1)
+    task_id = submitted.dig("result", "taskId")
+    expect(task_id).to be_present, submitted.inspect
+    execute_task(task_id)
+    completed = task_request("tasks/get", task_id:, id: 2)
+
+    expect(completed.dig("result", "status")).to eq("completed")
+    expect(completed.dig("result", "result", "isError")).to be(false)
+    expect(completed.dig("result", "result", "structuredContent", "data")).to include(
+      "merge_snapshot_id" => registration.dig(:input, :merge_snapshot_id),
+      "target_after_commit_oid" => registration.dig(:input, :merge_commit_oid),
+      "evidence_status" => "attributed_unverified"
     )
   end
 

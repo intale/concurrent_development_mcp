@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_24_175000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -365,6 +365,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_170000) do
     t.string "evidence_status", null: false
     t.string "merge_commit_oid", null: false
     t.string "object_format", null: false
+    t.jsonb "observation"
     t.jsonb "ordered_candidates", null: false
     t.string "policy_version", null: false
     t.datetime "produced_at_domain", null: false

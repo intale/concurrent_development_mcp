@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandInputDocuments
-      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1 | SubmitCandidateV1 | SubmitCandidateImpactSurfaceV1 | ClaimVerificationObligationV1 | SubmitCompatibilityAssessmentV1 | WaiveVerificationObligationV1 | RegisterMergeSnapshotV1 | SubmitMergeSnapshotVerificationV1 | RequestMergeAuthorizationV1
+      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1 | SubmitCandidateV1 | SubmitCandidateImpactSurfaceV1 | ClaimVerificationObligationV1 | SubmitCompatibilityAssessmentV1 | WaiveVerificationObligationV1 | RegisterMergeSnapshotV1 | SubmitMergeSnapshotVerificationV1 | RequestMergeAuthorizationV1 | RecordMergeObservationV1
       type digest_value = value | ExpireResourceLeaseV1
 
       class ActorV1 < Shared::Value
@@ -442,6 +442,26 @@ module Coordinator
       class RequestMergeAuthorizationV1 < BaseV1
         def tool_name: () -> String
         def input: () -> RequestMergeAuthorizationInputV1
+      end
+
+      class RecordMergeObservationInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def merge_snapshot_id: () -> String
+        def authorization_event: () -> EventReferenceV1
+        def authorization_decision_digest: () -> String
+        def repository_id: () -> String
+        def target_branch: () -> String
+        def object_format: () -> String
+        def target_before_commit_oid: () -> String
+        def target_after_commit_oid: () -> String
+        def observer: () -> Coordinator::Write::MergeObservations::ObserverV1
+        def run_id: () -> String
+        def observed_at: () -> String
+      end
+
+      class RecordMergeObservationV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> RecordMergeObservationInputV1
       end
 
       class ExpireResourceLeaseInputV1 < Shared::Value

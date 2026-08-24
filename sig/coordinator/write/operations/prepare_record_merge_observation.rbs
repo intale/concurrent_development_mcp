@@ -1,0 +1,9 @@
+module Coordinator::Write::Operations
+  class PrepareRecordMergeObservation < Dry::Operation
+    POLICY_VERSION: String
+
+    def initialize: (?contract: Coordinator::Write::Contracts::RecordMergeObservation) -> void
+    %a{rbs:test:skip}
+    def call: (Coordinator::Write::command_input input) -> Dry::Monads::Result
+  end
+end

@@ -815,6 +815,51 @@ module Coordinator
         )
       end
 
+      def merge_observation_record
+        authorization_event = merge_authorization_event_reference(
+          type: "MergeAuthorizationGranted",
+          context: "DevelopmentIntegration",
+          stream_name: "MergeAuthorization",
+          minimum_revision: 0,
+          maximum_revision: 0
+        )
+        observer = object_schema(
+          properties: {
+            name: { type: "string", minLength: 1, maxLength: 100 },
+            version: { type: "string", minLength: 1, maxLength: 100 }
+          },
+          required: %w[name version]
+        )
+        object_schema(
+          properties: common_mutation_properties.merge(
+            actor: agent_actor,
+            merge_snapshot_id: identifier,
+            authorization_event:,
+            authorization_decision_digest: {
+              type: "string", pattern: "^sha256:[0-9a-f]{64}$"
+            },
+            repository_id: {
+              type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$"
+            },
+            target_branch: { type: "string", minLength: 1, maxLength: 255 },
+            object_format: { type: "string", enum: Types::GIT_OBJECT_FORMATS },
+            target_before_commit_oid: git_oid,
+            target_after_commit_oid: git_oid,
+            observer:,
+            run_id: identifier,
+            observed_at: {
+              type: "string",
+              pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$"
+            }
+          ),
+          required: %w[
+            command_id actor merge_snapshot_id authorization_event
+            authorization_decision_digest repository_id target_branch object_format
+            target_before_commit_oid target_after_commit_oid observer run_id observed_at
+          ]
+        )
+      end
+
       def candidate_impact_surface_submit
         object_schema(
           properties: common_mutation_properties.merge(

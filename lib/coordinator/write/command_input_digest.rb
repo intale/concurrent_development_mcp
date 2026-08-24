@@ -35,6 +35,7 @@ module Coordinator::Write
       when Commands::RegisterMergeSnapshot then merge_snapshot_register_document(command)
       when Commands::SubmitMergeSnapshotVerification then merge_verification_submit_document(command)
       when Commands::RequestMergeAuthorization then merge_authorization_request_document(command)
+      when Commands::RecordMergeObservation then merge_observation_record_document(command)
       when Commands::ExpireResourceLease then lease_expire_policy_document(command)
       else
         raise ArgumentError, "Unsupported coordination command: #{command.class.name}"
@@ -542,6 +543,34 @@ module Coordinator::Write
           snapshot_binding: command.snapshot_binding,
           target_base_observation: command.target_base_observation,
           expected_impact_policy: command.expected_impact_policy
+        )
+      )
+    end
+
+    def merge_observation_record(command)
+      @canonical_json.sha256(merge_observation_record_document(command).to_h)
+    end
+
+    def merge_observation_record_document(command)
+      CommandInputDocuments::RecordMergeObservationV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "merge_observation_record",
+        input: CommandInputDocuments::RecordMergeObservationInputV1.new(
+          actor: actor_document(command.actor),
+          merge_snapshot_id: command.merge_snapshot_id,
+          authorization_event: CommandInputDocuments::EventReferenceV1.new(
+            command.authorization_event.to_h
+          ),
+          authorization_decision_digest: command.authorization_decision_digest,
+          repository_id: command.repository_id,
+          target_branch: command.target_branch,
+          object_format: command.object_format,
+          target_before_commit_oid: command.target_before_commit_oid,
+          target_after_commit_oid: command.target_after_commit_oid,
+          observer: command.observer,
+          run_id: command.run_id,
+          observed_at: command.observed_at
         )
       )
     end

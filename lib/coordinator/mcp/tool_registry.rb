@@ -42,7 +42,8 @@ module Coordinator
           Tools::VerificationObligationWaive,
           Tools::MergeSnapshotRegister,
           Tools::MergeVerificationSubmit,
-          Tools::MergeAuthorizationRequest
+          Tools::MergeAuthorizationRequest,
+          Tools::MergeObservationRecord
         ].freeze
       end
     end

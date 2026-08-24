@@ -155,6 +155,53 @@ RSpec.describe Coordinator::Read::Projectors::MergeSnapshotsV1, :event_store, :r
     expect(Coordinator::Read::MergeAuthorization.count).to eq(2)
   end
 
+  it "serves the snapshot during observation lag and converges idempotently" do
+    registration = MergeSnapshotScenario.register(prefix: "merge-observation-projection")
+    verification = MergeSnapshotScenario.verify(registration, prefix: "merge-observation-projection")
+    authorization = MergeSnapshotScenario.authorize(
+      registration,
+      verification,
+      prefix: "merge-observation-projection"
+    )
+    input = MergeSnapshotScenario.observation_input(
+      registration,
+      authorization,
+      prefix: "merge-observation-projection"
+    )
+    Coordinator::Write::Operations::ExecuteRecordMergeObservation.new(event_store:).call(input).value!
+
+    projector = described_class.new
+    snapshot_id = input.fetch(:merge_snapshot_id)
+    stream = Coordinator::Write::StreamFactory.new.merge_snapshot(snapshot_id)
+    history = event_store.read_grouped(
+      stream,
+      Coordinator::Write::GroupedEventReadCriteria.new(
+        event_types: %w[
+          MergeSnapshotRegistered
+          MergeSnapshotVerificationSubmitted
+          MergeSnapshotVerified
+          MergeObserved
+        ],
+        direction: :asc
+      )
+    )
+    history.reject { _1.type == "MergeObserved" }.each { projector.call(_1) }
+    query = Coordinator::Read::Queries::MergeSnapshotGet.new
+
+    lagging = query.call(merge_snapshot_id: snapshot_id).value!.data.snapshot
+    expect(lagging.observation).to be_nil
+
+    observed = history.find { _1.type == "MergeObserved" }
+    projector.call(observed)
+    projector.call(observed)
+    converged = query.call(merge_snapshot_id: snapshot_id).value!.data.snapshot
+    expect(converged.observation).to have_attributes(
+      target_after_commit_oid: registration.dig(:input, :merge_commit_oid),
+      evidence_status: "attributed_unverified"
+    )
+    expect(Coordinator::Read::MergeSnapshot.count).to eq(1)
+  end
+
   def authorization_event(authorization_id)
     event_store.read(
       Coordinator::Write::StreamFactory.new.merge_authorization(authorization_id),

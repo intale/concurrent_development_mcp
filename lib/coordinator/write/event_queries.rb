@@ -194,6 +194,12 @@ module Coordinator::Write
       direction: :asc
     )
 
+    MERGE_OBSERVATION = EventReadCriteria.new(
+      event_types: [ "MergeObserved" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+
     CANDIDATE_FOR_IMPACT_SURFACE = GroupedEventReadCriteria.new(
       event_types: [
         "CandidateSubmitted",

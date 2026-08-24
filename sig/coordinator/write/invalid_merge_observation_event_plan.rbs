@@ -1,0 +1,4 @@
+module Coordinator::Write
+  class InvalidMergeObservationEventPlan < StandardError
+  end
+end

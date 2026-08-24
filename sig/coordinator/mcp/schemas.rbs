@@ -31,6 +31,7 @@ module Coordinator
       def self.merge_snapshot_get: () -> json_schema
       def self.merge_verification_submit: () -> json_schema
       def self.merge_authorization_request: () -> json_schema
+      def self.merge_observation_record: () -> json_schema
       def self.candidate_impact_surface_submit: () -> json_schema
       def self.operation_get: () -> json_schema
       def self.guidance_get: () -> json_schema

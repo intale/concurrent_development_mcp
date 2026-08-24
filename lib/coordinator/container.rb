@@ -131,6 +131,10 @@ module Coordinator
       Write::Operations::PrepareRequestMergeAuthorization.new
     end
 
+    register("operations.prepare_record_merge_observation", memoize: true) do
+      Write::Operations::PrepareRecordMergeObservation.new
+    end
+
     register("domain.change_sets.create", memoize: true) do
       Write::Domain::ChangeSets::Create.new(stream_factory: self["stream_factory"])
     end
@@ -349,6 +353,14 @@ module Coordinator
 
     register("domain.merge_authorizations.decide", memoize: true) do
       Write::Domain::MergeAuthorizations::Decide.new
+    end
+
+    register("merge_observations.observation_digest_builder", memoize: true) do
+      Write::MergeObservations::ObservationDigestBuilder.new(canonical_json: self["canonical_json"])
+    end
+
+    register("domain.merge_observations.record", memoize: true) do
+      Write::Domain::MergeObservations::Record.new(stream_factory: self["stream_factory"])
     end
 
     register("change_set_activation_source_builder", memoize: true) do
@@ -995,6 +1007,23 @@ module Coordinator
       )
     end
 
+    register("operations.execute_record_merge_observation") do
+      Write::Operations::ExecuteRecordMergeObservation.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_record_merge_observation"],
+        evaluator: self["merge_authorizations.evaluator"],
+        decider: self["domain.merge_observations.record"],
+        input_digest: self["command_input_digest"],
+        observation_digest_builder: self["merge_observations.observation_digest_builder"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
     register("operations.execute_claim_verification_obligation") do
       Write::Operations::ExecuteClaimVerificationObligation.new(
         event_store: self["event_store"],
@@ -1195,7 +1224,9 @@ module Coordinator
         submit_merge_snapshot_verification:
           self["operations.execute_submit_merge_snapshot_verification"],
         request_merge_authorization:
-          self["operations.execute_request_merge_authorization"]
+          self["operations.execute_request_merge_authorization"],
+        record_merge_observation:
+          self["operations.execute_record_merge_observation"]
       )
     end
 
@@ -1378,6 +1409,13 @@ module Coordinator
     register("operations.submit_request_merge_authorization_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_request_merge_authorization"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_record_merge_observation_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_record_merge_observation"],
         submitter: self["operations.submit_coordination_task"]
       )
     end

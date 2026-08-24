@@ -280,6 +280,67 @@ Then(
   )
 end
 
+When("the agent records the exact external merge with command {string}") do |command_id|
+  authorization = @merge_authorization_state.dig(
+    "result", "result", "structuredContent", "data"
+  )
+  @merge_observation_arguments = {
+    command_id:,
+    actor: { kind: "agent", id: "integrator-1" },
+    merge_snapshot_id: @merge_snapshot_arguments.fetch(:merge_snapshot_id),
+    authorization_event: authorization.fetch("decision_event"),
+    authorization_decision_digest: authorization.fetch("decision_digest"),
+    repository_id: @merge_snapshot_arguments.fetch(:repository_id),
+    target_branch: @merge_snapshot_arguments.fetch(:target_branch),
+    object_format: "sha1",
+    target_before_commit_oid: @merge_snapshot_arguments.fetch(:target_base_commit_oid),
+    target_after_commit_oid: @merge_snapshot_arguments.fetch(:merge_commit_oid),
+    observer: { name: "git-provider-webhook", version: "2026-08" },
+    run_id: "run-#{command_id}",
+    observed_at: "2026-08-24T17:30:00.000001Z"
+  }
+  response = call_tool("merge_observation_record", @merge_observation_arguments)
+  @merge_observation_task_id = response.dig("result", "taskId")
+  assert_acceptance(@merge_observation_task_id, "merge_observation_record did not return a Task")
+  execute_task(@merge_observation_task_id)
+  @merge_observation_state = task_request("tasks/get", @merge_observation_task_id)
+end
+
+Then("the merge observation Task completes with attributed unverified evidence") do
+  assert_acceptance_equal("completed", @merge_observation_state.dig("result", "status"), "Task")
+  result = @merge_observation_state.dig("result", "result")
+  assert_acceptance_equal(false, result.fetch("isError"), "Merge observation")
+  assert_acceptance_equal(
+    "attributed_unverified",
+    result.dig("structuredContent", "data", "evidence_status"),
+    "Observation evidence"
+  )
+  assert_acceptance_equal(1, merge_observation_events.length, "Merge observations")
+end
+
+Then("the available merge snapshot has no observed merge yet") do
+  assert_acceptance_equal(nil, merge_snapshot_payload.fetch("observation"), "Lagging observation")
+end
+
+When("the merge observation reaches the read side twice") do
+  event = merge_observation_events.sole
+  2.times { Coordinator::Container["projectors.merge_snapshots_v1"].call(event) }
+end
+
+Then("the available merge snapshot reports the exact merge without a freshness gate") do
+  observation = merge_snapshot_payload.fetch("observation")
+  assert_acceptance_equal(
+    @merge_snapshot_arguments.fetch(:merge_commit_oid),
+    observation.fetch("target_after_commit_oid"),
+    "Observed merge OID"
+  )
+  assert_acceptance_equal("attributed_unverified", observation.fetch("evidence_status"), "Evidence")
+  assert_acceptance(
+    (observation.keys & %w[fresh pending projection_status stream_revision]).empty?,
+    "Merge observation must not expose a freshness gate"
+  )
+end
+
 def merge_verification_arguments(command_id:, conclusion:)
   receipt = @merge_snapshot_task_state.dig("result", "result", "structuredContent", "data")
   findings = if conclusion == "passed"
@@ -399,6 +460,13 @@ def merge_authorization_events
       maximum_count: 1,
       direction: :asc
     )
+  )
+end
+
+def merge_observation_events
+  event_store.read(
+    streams.merge_snapshot(@merge_observation_arguments.fetch(:merge_snapshot_id)),
+    Coordinator::Write::EventQueries::MERGE_OBSERVATION
   )
 end
 

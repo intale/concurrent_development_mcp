@@ -80,6 +80,10 @@ module Coordinator
         or null when no policy is active. The durable Task recomputes all merge-gating obligations directly from
         authoritative event facts. Both grants and structured denials are durable decisions; retry with a new
         command only after correcting the denied evidence. Projected state may lag and is never authorization.
+        After an external system completes the exact authorized transition, use merge_observation_record with
+        the grant event/digest and exact target before/after OIDs. The durable Task re-evaluates grant currentness
+        from authoritative events and rejects changed policy or obligation evidence. A recorded observation is
+        caller-attributed and unverified; the coordinator did not perform the merge or inspect Git.
         The coordinator records attributed evidence and does not execute Git, CI, or agent work.
       TEXT
 

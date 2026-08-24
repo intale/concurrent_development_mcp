@@ -462,6 +462,26 @@ module Coordinator::Write
       attribute :input, RequestMergeAuthorizationInputV1
     end
 
+    class RecordMergeObservationInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :merge_snapshot_id, Types::Identifier
+      attribute :authorization_event, EventReferenceV1
+      attribute :authorization_decision_digest, Types::Sha256Digest
+      attribute :repository_id, Types::RepositoryId
+      attribute :target_branch, Types::CandidateTargetBranch
+      attribute :object_format, Types::GitObjectFormat
+      attribute :target_before_commit_oid, Types::GitOid
+      attribute :target_after_commit_oid, Types::GitOid
+      attribute :observer, MergeObservations::ObserverV1
+      attribute :run_id, Types::Identifier
+      attribute :observed_at, Types::Timestamp
+    end
+
+    class RecordMergeObservationV1 < BaseV1
+      attribute :tool_name, Types::String.enum("merge_observation_record")
+      attribute :input, RecordMergeObservationInputV1
+    end
+
     class ExpireResourceLeaseInputV1 < Value
       attribute :actor, ActorV1
       attribute :resource_key_hash, Types::Sha256Digest
@@ -498,7 +518,8 @@ module Coordinator::Write
            WaiveVerificationObligationV1 |
            RegisterMergeSnapshotV1 |
            SubmitMergeSnapshotVerificationV1 |
-           RequestMergeAuthorizationV1
+           RequestMergeAuthorizationV1 |
+           RecordMergeObservationV1
 
     DigestType = Type | ExpireResourceLeaseV1
   end

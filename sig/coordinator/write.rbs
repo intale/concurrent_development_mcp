@@ -24,7 +24,8 @@ module Coordinator
                                 Commands::WaiveVerificationObligation |
                                 Commands::RegisterMergeSnapshot |
                                 Commands::SubmitMergeSnapshotVerification |
-                                Commands::RequestMergeAuthorization
+                                Commands::RequestMergeAuthorization |
+                                Commands::RecordMergeObservation
     type write_command = coordination_command | Commands::ExpireResourceLease
     type lifecycle_command = Commands::StartCoordinationTask |
                              Commands::RecordCoordinationTaskOutcome |

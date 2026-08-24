@@ -304,6 +304,7 @@ module Coordinator::Shared
     MERGE_AUTHORIZATION_MAXIMUM_OBLIGATIONS =
       MERGE_SNAPSHOT_MAXIMUM_CANDIDATES * (MERGE_SNAPSHOT_MAXIMUM_CANDIDATES - 1)
     MERGE_AUTHORIZATION_MAXIMUM_REASONS = 1_024
+    MERGE_OBSERVATION_POLICY_VERSIONS = %w[merge-observation/v1].freeze
     CANDIDATE_OBLIGATION_POLICY_STATUSES = %w[
       stale
       non_gating
@@ -392,6 +393,7 @@ module Coordinator::Shared
       merge_snapshot_register
       merge_verification_submit
       merge_authorization_request
+      merge_observation_record
     ].freeze
 
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)
@@ -536,6 +538,7 @@ module Coordinator::Shared
     MergeAuthorizationReasonCode = String.enum(*MERGE_AUTHORIZATION_REASON_CODES)
     MergeAuthorizationRequiredEvidenceKinds = Array.of(CandidateImpactRequiredEvidenceKind)
       .constrained(max_size: 8)
+    MergeObservationPolicyVersion = String.enum(*MERGE_OBSERVATION_POLICY_VERSIONS)
     CandidateObligationPolicyStatus = String.enum(*CANDIDATE_OBLIGATION_POLICY_STATUSES)
     CandidateObligationDecisionOutcome = String.enum(*CANDIDATE_OBLIGATION_DECISION_OUTCOMES)
     CandidateImpactReasonMatches = Array.of(String.constrained(min_size: 1, max_size: 1_024))

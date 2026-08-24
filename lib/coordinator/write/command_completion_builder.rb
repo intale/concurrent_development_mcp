@@ -689,6 +689,40 @@ module Coordinator::Write
       )
     end
 
+    def merge_observation_record(command:, observation:, input_digest:, persisted_events:, completed_at:)
+      build_completion(
+        command:,
+        tool_name: "merge_observation_record",
+        summary: "Attributed external merge transition recorded; the coordinator did not perform or verify it.",
+        data: CommandReceiptData::MergeObservation.new(
+          merge_snapshot_id: command.merge_snapshot_id,
+          authorization_event: command.authorization_event,
+          authorization_decision_digest: command.authorization_decision_digest,
+          repository_id: command.repository_id,
+          target_branch: command.target_branch,
+          object_format: command.object_format,
+          target_before_commit_oid: command.target_before_commit_oid,
+          target_after_commit_oid: command.target_after_commit_oid,
+          observation_digest: observation.observation_digest,
+          evidence_status: observation.evidence_status,
+          observation_event: event_reference(persisted_events.sole),
+          observed_at: command.observed_at,
+          recorded_at: observation.recorded_at
+        ),
+        next_actions: [
+          NextAction.new(
+            tool: "merge_snapshot_get",
+            arguments: NextAction::MergeSnapshotArguments.new(
+              merge_snapshot_id: command.merge_snapshot_id
+            )
+          )
+        ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
 
     def verification_status(persisted_events)

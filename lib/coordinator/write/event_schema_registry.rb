@@ -76,6 +76,7 @@ module Coordinator::Write
         [ "MergeSnapshotVerified", 1 ] => Events::MergeSnapshotVerifiedV1,
         [ "MergeAuthorizationGranted", 1 ] => Events::MergeAuthorizationGrantedV1,
         [ "MergeAuthorizationDenied", 1 ] => Events::MergeAuthorizationDeniedV1,
+        [ "MergeObserved", 1 ] => Events::MergeObservedV1,
       [ "CoordinationTaskSubmitted", 1 ] => Events::CoordinationTaskSubmittedV1,
       [ "CoordinationTaskExecutionStarted", 1 ] => Events::CoordinationTaskExecutionStartedV1,
       [ "CoordinationTaskCompleted", 1 ] => Events::CoordinationTaskCompletedV1,

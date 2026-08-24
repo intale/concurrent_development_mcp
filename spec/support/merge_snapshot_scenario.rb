@@ -134,6 +134,45 @@ module MergeSnapshotScenario
     }
   end
 
+  def authorize(registration, verification, prefix:, expected_impact_policy: nil)
+    input = authorization_input(
+      registration,
+      verification,
+      prefix:,
+      expected_impact_policy:
+    )
+    completion = execute(Coordinator::Write::Operations::ExecuteRequestMergeAuthorization, input)
+    event = event_store.read(
+      streams.merge_authorization(completion.data.authorization_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[MergeAuthorizationGranted MergeAuthorizationDenied],
+        maximum_count: 1,
+        direction: :asc
+      )
+    ).sole
+    { input:, completion:, event:, payload: load(event) }
+  end
+
+  def observation_input(registration, authorization, prefix:)
+    snapshot = registration.fetch(:input)
+    decision = authorization.fetch(:completion).data
+    {
+      command_id: "cmd-observe-#{prefix}",
+      actor: { kind: "agent", id: "integrator-1" },
+      merge_snapshot_id: snapshot.fetch(:merge_snapshot_id),
+      authorization_event: decision.decision_event.to_h,
+      authorization_decision_digest: decision.decision_digest,
+      repository_id: snapshot.fetch(:repository_id),
+      target_branch: snapshot.fetch(:target_branch),
+      object_format: "sha1",
+      target_before_commit_oid: snapshot.fetch(:target_base_commit_oid),
+      target_after_commit_oid: snapshot.fetch(:merge_commit_oid),
+      observer: { name: "git-provider-webhook", version: "2026-08" },
+      run_id: "merge-observation-#{prefix}",
+      observed_at: "2026-08-24T17:30:00.000001Z"
+    }
+  end
+
   def expected_policy(policy)
     payload = load(policy.fetch(:decision))
     {

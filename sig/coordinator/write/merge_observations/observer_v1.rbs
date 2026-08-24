@@ -1,0 +1,6 @@
+module Coordinator::Write::MergeObservations
+  class ObserverV1 < Coordinator::Shared::Value
+    def name: () -> String
+    def version: () -> String
+  end
+end

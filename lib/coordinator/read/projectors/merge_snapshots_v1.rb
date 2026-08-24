@@ -9,6 +9,7 @@ module Coordinator::Read
         registration_contract: Contracts::MergeSnapshotSourceEvent.new,
         verification_contract: Contracts::MergeSnapshotVerificationSourceEvent.new,
         authorization_contract: Contracts::MergeAuthorizationSourceEvent.new,
+        observation_contract: Contracts::MergeObservationSourceEvent.new,
         schema_registry: Coordinator::Write::EventSchemaRegistry.new,
         snapshots: Repositories::MergeSnapshots.new,
         authorizations: Repositories::MergeAuthorizations.new,
@@ -17,6 +18,7 @@ module Coordinator::Read
         @registration_contract = registration_contract
         @verification_contract = verification_contract
         @authorization_contract = authorization_contract
+        @observation_contract = observation_contract
         @schema_registry = schema_registry
         @snapshots = snapshots
         @authorizations = authorizations
@@ -69,6 +71,7 @@ module Coordinator::Read
       def contract_for(event)
         return @registration_contract if event.type == "MergeSnapshotRegistered"
         return @authorization_contract if event.type.start_with?("MergeAuthorization")
+        return @observation_contract if event.type == "MergeObserved"
 
         @verification_contract
       end
@@ -96,6 +99,8 @@ module Coordinator::Read
         when Coordinator::Write::Events::MergeAuthorizationGrantedV1,
              Coordinator::Write::Events::MergeAuthorizationDeniedV1
           @authorizations.store(event:, decision: payload)
+        when Coordinator::Write::Events::MergeObservedV1
+          @snapshots.record_observation(event:, observation: payload)
         end
       end
     end

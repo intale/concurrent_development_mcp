@@ -222,6 +222,7 @@ module Coordinator
       MergeAuthorizationObligationStatus: untyped
       MergeAuthorizationReasonCode: untyped
       MergeAuthorizationRequiredEvidenceKinds: untyped
+      MergeObservationPolicyVersion: untyped
       CandidateObligationPolicyStatus: untyped
       CandidateObligationDecisionOutcome: untyped
       CandidateImpactReasonMatches: untyped

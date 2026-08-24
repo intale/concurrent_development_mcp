@@ -1,0 +1,18 @@
+module Coordinator::Write::Commands
+  class RecordMergeObservation < Coordinator::Shared::Value
+    def command_id: () -> String
+    def actor: () -> Actor
+    def merge_snapshot_id: () -> String
+    def authorization_event: () -> Coordinator::Write::EventReference
+    def authorization_decision_digest: () -> String
+    def repository_id: () -> String
+    def target_branch: () -> String
+    def object_format: () -> String
+    def target_before_commit_oid: () -> String
+    def target_after_commit_oid: () -> String
+    def observer: () -> Coordinator::Write::MergeObservations::ObserverV1
+    def run_id: () -> String
+    def observed_at: () -> String
+    def policy_version: () -> String
+  end
+end

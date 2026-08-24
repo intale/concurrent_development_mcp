@@ -1,0 +1,4 @@
+module Coordinator::Read::Contracts
+  class MergeObservationSourceEvent < Dry::Validation::Contract
+  end
+end

@@ -1,0 +1,6 @@
+module Coordinator::Write::MergeObservations
+  class ObservationDigestBuilder
+    def initialize: (?canonical_json: Coordinator::Shared::CanonicalJson) -> void
+    def call: (command: Coordinator::Write::Commands::RecordMergeObservation, authorization: Coordinator::Write::Events::MergeAuthorizationGrantedV1) -> String
+  end
+end
