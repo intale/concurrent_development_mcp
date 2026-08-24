@@ -58,6 +58,57 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordReleaseSetVerificati
     expect(passed.data).to have_attributes(outcome: "passed", attempt_number: 2)
   end
 
+  it "closes composite verification after activation" do
+    prepared = ReleaseSetScenario.prepare(prefix: "verification-after-activation")
+    integrations = ReleaseSetScenario.integrate_all(
+      prepared, prefix: "verification-after-activation"
+    )
+    verification = ReleaseSetScenario.record_verification(
+      prepared, integrations:, prefix: "verification-after-activation"
+    )
+    ReleaseSetScenario.record_activation(
+      prepared, verification:, prefix: "verification-after-activation"
+    )
+    input = verification_input(
+      prepared, integrations, prefix: "verification-after-activation-retry"
+    )
+
+    result = operation.call(input)
+
+    expect(result.failure.code).to eq(:release_set_already_activated)
+  end
+
+  it "closes composite verification after compensation is requested" do
+    prepared = ReleaseSetScenario.prepare(prefix: "verification-after-compensation")
+    integrations = ReleaseSetScenario.integrate_all(
+      prepared, prefix: "verification-after-compensation"
+    )
+    failed = ReleaseSetScenario.record_verification(
+      prepared,
+      integrations:,
+      prefix: "verification-after-compensation-failed",
+      outcome: "failed",
+      findings: [
+        {
+          code: "cross_repo_failure",
+          severity: "error",
+          summary: "The composite suite failed.",
+          repository_id: nil
+        }
+      ]
+    )
+    Coordinator::Processes::ProcessManagers::ReleaseSetLifecycle.new(event_store:).call(
+      failed.fetch(:event)
+    )
+    input = verification_input(
+      prepared, integrations, prefix: "verification-after-compensation-retry"
+    )
+
+    result = operation.call(input)
+
+    expect(result.failure.code).to eq(:release_set_compensation_requested)
+  end
+
   def verification_input(prepared, integrations, prefix:, outcome: "passed", findings: [])
     {
       command_id: "cmd-release-verify-#{prefix}",

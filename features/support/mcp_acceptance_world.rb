@@ -55,8 +55,9 @@ module McpAcceptanceWorld
   end
 
   def submit_and_execute(tool, **arguments)
-    task_id = call_tool(tool, arguments).dig("result", "taskId")
-    assert_acceptance(task_id, "#{tool} did not return a Task handle")
+    response = call_tool(tool, arguments)
+    task_id = response.dig("result", "taskId")
+    assert_acceptance(task_id, "#{tool} did not return a Task handle: #{response.inspect}")
     execute_task(task_id)
     task_id
   end

@@ -18,6 +18,9 @@ module Coordinator::Read
           verification_status: "unverified",
           integrations: [],
           verifications: [],
+          activation: nil,
+          compensation_request: nil,
+          completion: nil,
           preparation_policy_version: release_set.policy_version,
           prepared_at_domain: release_set.prepared_at,
           prepared_event: event_reference(event).to_h,
@@ -49,6 +52,24 @@ module Coordinator::Read
         )
       end
 
+      def record_activation(event:, activation:)
+        record = Coordinator::Read::ReleaseSet.find_by!(release_set_id: activation.release_set_id)
+        record.update!(activation: activation_view(event:, activation:).to_h, status: "activated")
+      end
+
+      def record_compensation_request(event:, request:)
+        record = Coordinator::Read::ReleaseSet.find_by!(release_set_id: request.release_set_id)
+        record.update!(
+          compensation_request: compensation_request_view(event:, request:).to_h,
+          status: "compensation_requested"
+        )
+      end
+
+      def record_completion(event:, completion:)
+        record = Coordinator::Read::ReleaseSet.find_by!(release_set_id: completion.release_set_id)
+        record.update!(completion: completion_view(event:, completion:).to_h, status: "completed")
+      end
+
       private
 
       def build_view(record)
@@ -63,6 +84,10 @@ module Coordinator::Read
           verification_status: record.verification_status,
           integrations: record.integrations.map { build_integration(_1) },
           verifications: record.verifications.map { build_verification(_1) },
+          activation: record.activation && build_activation(record.activation),
+          compensation_request: record.compensation_request &&
+            build_compensation_request(record.compensation_request),
+          completion: record.completion && build_completion(record.completion),
           preparation_policy_version: record.preparation_policy_version,
           prepared_at: record.prepared_at_domain.utc.iso8601(6),
           prepared: source_evidence(record)
@@ -100,6 +125,43 @@ module Coordinator::Read
         )
       end
 
+      def activation_view(event:, activation:)
+        ReleaseSetActivationViewV1.new(
+          verification_event: activation.verification_event,
+          verification_digest: activation.verification_digest,
+          activation_point: activation.activation_point,
+          activation_digest: activation.activation_digest,
+          policy_version: activation.policy_version,
+          evidence_status: activation.evidence_status,
+          recorded_at: activation.recorded_at,
+          source: source_evidence_from_event(event, occurred_at: activation.recorded_at)
+        )
+      end
+
+      def compensation_request_view(event:, request:)
+        ReleaseSetCompensationRequestViewV1.new(
+          trigger_event: request.trigger_event,
+          trigger_kind: request.trigger_kind,
+          successful_integrations: request.successful_integrations,
+          reason: request.reason,
+          rule_version: request.rule_version,
+          requested_at: request.requested_at,
+          source: source_evidence_from_event(event, occurred_at: request.requested_at)
+        )
+      end
+
+      def completion_view(event:, completion:)
+        ReleaseSetCompletionViewV1.new(
+          outcome: completion.outcome,
+          source_event: completion.source_event,
+          compensation_evidence: completion.compensation_evidence,
+          completion_digest: completion.completion_digest,
+          rule_version: completion.rule_version,
+          completed_at: completion.completed_at,
+          source: source_evidence_from_event(event, occurred_at: completion.completed_at)
+        )
+      end
+
       def build_integration(attributes)
         values = symbolize(attributes)
         ReleaseSetIntegrationViewV1.new(
@@ -117,6 +179,44 @@ module Coordinator::Read
           **values,
           integration_events: values.fetch(:integration_events).map { Coordinator::Write::EventReference.new(_1) },
           evidence: verification_evidence_value(evidence),
+          source: source_evidence_value(values.fetch(:source))
+        )
+      end
+
+      def build_activation(attributes)
+        values = symbolize(attributes)
+        point = values.fetch(:activation_point)
+        ReleaseSetActivationViewV1.new(
+          **values,
+          verification_event: Coordinator::Write::EventReference.new(values.fetch(:verification_event)),
+          activation_point: Coordinator::Write::ReleaseSets::ActivationPointV1.new(
+            **point,
+            producer: Coordinator::Write::ReleaseSets::EvidenceProducerV1.new(point.fetch(:producer))
+          ),
+          source: source_evidence_value(values.fetch(:source))
+        )
+      end
+
+      def build_compensation_request(attributes)
+        values = symbolize(attributes)
+        ReleaseSetCompensationRequestViewV1.new(
+          **values,
+          trigger_event: Coordinator::Write::EventReference.new(values.fetch(:trigger_event)),
+          successful_integrations: values.fetch(:successful_integrations).map do |reference|
+            Coordinator::Write::EventReference.new(reference)
+          end,
+          source: source_evidence_value(values.fetch(:source))
+        )
+      end
+
+      def build_completion(attributes)
+        values = symbolize(attributes)
+        ReleaseSetCompletionViewV1.new(
+          **values,
+          source_event: Coordinator::Write::EventReference.new(values.fetch(:source_event)),
+          compensation_evidence: values.fetch(:compensation_evidence).map do |item|
+            compensation_evidence_value(item)
+          end,
           source: source_evidence_value(values.fetch(:source))
         )
       end
@@ -141,6 +241,14 @@ module Coordinator::Read
           findings: attributes.fetch(:findings).map do |finding|
             Coordinator::Write::ReleaseSets::VerificationFindingV1.new(finding)
           end
+        )
+      end
+
+      def compensation_evidence_value(attributes)
+        Coordinator::Write::ReleaseSets::CompensationEvidenceV1.new(
+          **attributes,
+          integration_event: Coordinator::Write::EventReference.new(attributes.fetch(:integration_event)),
+          producer: Coordinator::Write::ReleaseSets::EvidenceProducerV1.new(attributes.fetch(:producer))
         )
       end
 

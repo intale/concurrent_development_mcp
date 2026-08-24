@@ -9,7 +9,10 @@ module Coordinator::Write
 
       def call(command)
         case command
-        when Commands::RecordRepositoryIntegration, Commands::RecordReleaseSetVerification
+        when Commands::RecordRepositoryIntegration,
+             Commands::RecordReleaseSetVerification,
+             Commands::RecordReleaseSetActivation,
+             Commands::CompleteCompensatedReleaseSet
           @release_set_correlation_loader.call(command.release_set_id)
         end
       end

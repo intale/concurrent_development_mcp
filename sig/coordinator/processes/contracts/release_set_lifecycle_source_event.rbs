@@ -1,0 +1,5 @@
+module Coordinator::Processes::Contracts
+  class ReleaseSetLifecycleSourceEvent < Dry::Validation::Contract
+    EVENT_TYPES: Array[String]
+  end
+end

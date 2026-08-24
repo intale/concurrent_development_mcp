@@ -1,0 +1,11 @@
+module Coordinator::Read
+  class ReleaseSetCompensationRequestViewV1 < Coordinator::Shared::Value
+    def trigger_event: () -> Coordinator::Write::EventReference
+    def trigger_kind: () -> String
+    def successful_integrations: () -> Array[Coordinator::Write::EventReference]
+    def reason: () -> String
+    def rule_version: () -> String
+    def requested_at: () -> String
+    def source: () -> ReleaseSetSourceEvidenceV1
+  end
+end

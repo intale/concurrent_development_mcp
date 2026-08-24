@@ -51,6 +51,9 @@ module Coordinator::Write
 
         def denied(state:, command:)
           return failure(:release_set_not_found, "ReleaseSet has not been prepared") unless state.preparation
+          return failure(:release_set_already_completed, "ReleaseSet is already completed") if state.completed?
+          return failure(:release_set_compensation_requested, "ReleaseSet compensation has been requested") if state.compensation_requested?
+          return failure(:release_set_already_activated, "ReleaseSet is already activated") if state.activated?
           return failure(:release_set_integrations_incomplete, "Every ReleaseSet member must be integrated") unless state.all_integrated?
           return failure(:release_set_already_verified, "ReleaseSet already has a passing composite verification") if state.verified?
           if state.verifications.length >= Types::RELEASE_SET_VERIFICATION_MAXIMUM_ATTEMPTS

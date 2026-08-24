@@ -57,6 +57,9 @@ module Coordinator::Write
 
         def denied(state:, command:, observation:)
           return failure(:release_set_not_found, "ReleaseSet has not been prepared") unless state.preparation
+          return failure(:release_set_already_completed, "ReleaseSet is already completed") if state.completed?
+          return failure(:release_set_compensation_requested, "ReleaseSet compensation has been requested") if state.compensation_requested?
+          return failure(:release_set_already_activated, "ReleaseSet is already activated") if state.activated?
 
           member = state.member(command.repository_id)
           return failure(:release_member_not_found, "Repository is not a member of this ReleaseSet") unless member

@@ -60,6 +60,14 @@ module Coordinator
       def release_repository_integration_record_document: (Commands::RecordRepositoryIntegration command) -> CommandInputDocuments::RecordRepositoryIntegrationV1
       def release_verification_record: (Commands::RecordReleaseSetVerification command) -> String
       def release_verification_record_document: (Commands::RecordReleaseSetVerification command) -> CommandInputDocuments::RecordReleaseSetVerificationV1
+      def release_activation_record: (Commands::RecordReleaseSetActivation command) -> String
+      def release_activation_record_document: (Commands::RecordReleaseSetActivation command) -> CommandInputDocuments::RecordReleaseSetActivationV1
+      def release_compensation_request: (Commands::RequestReleaseSetCompensation command) -> String
+      def release_compensation_request_document: (Commands::RequestReleaseSetCompensation command) -> CommandInputDocuments::RequestReleaseSetCompensationV1
+      def release_activated_complete: (Commands::CompleteActivatedReleaseSet command) -> String
+      def release_activated_complete_document: (Commands::CompleteActivatedReleaseSet command) -> CommandInputDocuments::CompleteActivatedReleaseSetV1
+      def release_compensation_complete: (Commands::CompleteCompensatedReleaseSet command) -> String
+      def release_compensation_complete_document: (Commands::CompleteCompensatedReleaseSet command) -> CommandInputDocuments::CompleteCompensatedReleaseSetV1
     end
   end
 end

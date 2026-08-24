@@ -182,3 +182,202 @@ Then("the verified ReleaseSet is available with exact ordered evidence") do
   )
   assert_acceptance_equal(1, release_set.fetch("verifications").length, "Verification history")
 end
+
+When("the agent records external ReleaseSet activation through MCP") do
+  release_set_id = @release_set_arguments.fetch(:release_set_id)
+  verification = release_set_lifecycle_events(release_set_id).find do |event|
+    event.type == "ReleaseSetVerificationRecorded"
+  end
+  payload = release_set_payload(verification)
+  @release_activation_task_id = submit_and_execute(
+    "release_activation_record",
+    command_id: "cmd-cuc-release-activation",
+    actor: { kind: "agent", id: "release-operator-1" },
+    release_set_id:,
+    verification_event: release_event_reference(verification).to_h,
+    verification_digest: payload.verification_digest,
+    activation_point: {
+      kind: "deployment_manifest",
+      environment: "production",
+      external_reference: "deployments/cuc-release-activation",
+      state_digest: "sha256:#{'a' * 64}",
+      producer: { name: "deployment-controller", version: "1.0.0" },
+      run_id: "cuc-release-activation-run",
+      activated_at: "2026-08-24T22:00:00.000000Z"
+    }
+  )
+end
+
+When("the ReleaseSet lifecycle Saga processes activation twice") do
+  activation = release_set_lifecycle_events(
+    @release_set_arguments.fetch(:release_set_id)
+  ).find { _1.type == "ReleaseSetActivated" }
+  2.times { Coordinator::Container["process_managers.release_set_lifecycle"].call(activation) }
+end
+
+Then("the activation Task and Saga completion preserve the ReleaseSet trace") do
+  lifecycle = release_set_lifecycle_events(@release_set_arguments.fetch(:release_set_id))
+  activation = lifecycle.find { _1.type == "ReleaseSetActivated" }
+  completion = lifecycle.select { _1.type == "ReleaseSetCompleted" }.sole
+  started = task_events(@release_activation_task_id).find do |event|
+    event.type == "CoordinationTaskExecutionStarted"
+  end
+  state = task_request("tasks/get", @release_activation_task_id)
+  assert_acceptance_equal("completed", state.dig("result", "status"), "Activation Task")
+  assert_acceptance_equal(started.id, activation.causation_id, "Activation causation")
+  assert_acceptance_equal(activation.id, completion.causation_id, "Completion causation")
+  assert_acceptance_equal(
+    [ lifecycle.first.correlation_id ],
+    lifecycle.map(&:correlation_id).uniq,
+    "Activated lifecycle correlation"
+  )
+  assert_acceptance_equal("activated", release_set_payload(completion).outcome, "Completion outcome")
+end
+
+Then("the completed activated ReleaseSet is available without a freshness gate") do
+  content = release_set_view(@release_set_arguments.fetch(:release_set_id))
+  release_set = content.dig("data", "release_set")
+  assert_acceptance_equal("completed", release_set.fetch("status"), "ReleaseSet status")
+  assert_acceptance_equal("activated", release_set.dig("completion", "outcome"), "Completion outcome")
+  assert_acceptance_equal("production", release_set.dig("activation", "activation_point", "environment"), "Activation environment")
+  assert_acceptance(
+    (release_set.keys & %w[fresh pending projection_status stream_revision]).empty?,
+    "Completed ReleaseSet must not expose a freshness gate"
+  )
+end
+
+When("the first repository integrates while the second records failure through MCP") do
+  release_set_id = @release_set_arguments.fetch(:release_set_id)
+  prepared = release_set_payload(release_set_lifecycle_events(release_set_id).first)
+  first = prepared.ordered_members.first
+  submit_and_execute(
+    "merge_observation_record",
+    command_id: "cmd-cuc-compensation-observe",
+    actor: { kind: "agent", id: "release-integrator-1" },
+    merge_snapshot_id: first.merge_snapshot_id,
+    authorization_event: first.authorization_event.to_h,
+    authorization_decision_digest: first.authorization_decision_digest,
+    repository_id: first.repository_id,
+    target_branch: first.target_branch,
+    object_format: first.object_format,
+    target_before_commit_oid: first.target_base_commit_oid,
+    target_after_commit_oid: first.merge_commit_oid,
+    observer: { name: "release-adapter", version: "1.0.0" },
+    run_id: "cuc-compensation-observation",
+    observed_at: "2026-08-24T21:00:00.000000Z"
+  )
+  observation = event_store.read(
+    streams.merge_snapshot(first.merge_snapshot_id),
+    Coordinator::Write::EventQueries::MERGE_OBSERVATION
+  ).sole
+  observation_payload = release_set_payload(observation)
+  @release_success_task_id = submit_and_execute(
+    "release_repository_integration_record",
+    command_id: "cmd-cuc-compensation-integrate-1",
+    actor: { kind: "agent", id: "release-integrator-1" },
+    release_set_id:,
+    repository_id: first.repository_id,
+    attempt_id: "cuc-compensation-attempt-1",
+    outcome: "integrated",
+    merge_observation_event: release_event_reference(observation).to_h,
+    observation_digest: observation_payload.observation_digest,
+    failure: nil
+  )
+  second = prepared.ordered_members.fetch(1)
+  @release_failure_task_id = submit_and_execute(
+    "release_repository_integration_record",
+    command_id: "cmd-cuc-compensation-integrate-2",
+    actor: { kind: "agent", id: "release-integrator-1" },
+    release_set_id:,
+    repository_id: second.repository_id,
+    attempt_id: "cuc-compensation-attempt-2",
+    outcome: "failed",
+    merge_observation_event: nil,
+    observation_digest: nil,
+    failure: {
+      code: "deployment-failed",
+      summary: "Ledger deployment failed",
+      producer: { name: "release-adapter", version: "1.0.0" },
+      run_id: "cuc-compensation-failure",
+      result_digest: "sha256:#{'d' * 64}",
+      occurred_at: "2026-08-24T21:30:00.000000Z"
+    }
+  )
+end
+
+When("the ReleaseSet lifecycle Saga processes the failed integration twice") do
+  failure = release_set_lifecycle_events(
+    @release_set_arguments.fetch(:release_set_id)
+  ).select { _1.type == "RepositoryIntegrationRecorded" }.last
+  2.times { Coordinator::Container["process_managers.release_set_lifecycle"].call(failure) }
+  @release_compensation_request_event = release_set_lifecycle_events(
+    @release_set_arguments.fetch(:release_set_id)
+  ).select { _1.type == "ReleaseSetCompensationRequested" }.sole
+end
+
+Then("one exact compensation request is durable with Saga tracing") do
+  lifecycle = release_set_lifecycle_events(@release_set_arguments.fetch(:release_set_id))
+  request = release_set_payload(@release_compensation_request_event)
+  failure = lifecycle.select { _1.type == "RepositoryIntegrationRecorded" }.last
+  assert_acceptance_equal(1, request.successful_integrations.length, "Compensation members")
+  assert_acceptance_equal(release_event_reference(failure), request.trigger_event, "Compensation trigger")
+  assert_acceptance_equal(failure.id, @release_compensation_request_event.causation_id, "Saga causation")
+  assert_acceptance_equal(lifecycle.first.correlation_id, @release_compensation_request_event.correlation_id, "Saga correlation")
+end
+
+When("the agent records exact external compensation through MCP") do
+  release_set_id = @release_set_arguments.fetch(:release_set_id)
+  request = release_set_payload(@release_compensation_request_event)
+  lifecycle = release_set_lifecycle_events(release_set_id)
+  evidence = request.successful_integrations.map.with_index do |reference, index|
+    integration = lifecycle.find { _1.id == reference.event_id }
+    integration_payload = release_set_payload(integration)
+    {
+      repository_id: integration_payload.repository_id,
+      integration_event: reference.to_h,
+      action: "revert",
+      external_reference: "reverts/cuc-compensation/#{index + 1}",
+      result_digest: "sha256:#{'e' * 64}",
+      producer: { name: "release-reverter", version: "1.0.0" },
+      run_id: "cuc-compensation-run-#{index + 1}",
+      compensated_at: "2026-08-24T22:30:0#{index}.000000Z"
+    }
+  end
+  @release_compensation_task_id = submit_and_execute(
+    "release_compensation_complete",
+    command_id: "cmd-cuc-compensation-complete",
+    actor: { kind: "agent", id: "release-operator-1" },
+    release_set_id:,
+    compensation_request_event: release_event_reference(@release_compensation_request_event).to_h,
+    evidence:
+  )
+end
+
+Then("the compensation Task completes the ReleaseSet with one physical correlation") do
+  lifecycle = release_set_lifecycle_events(@release_set_arguments.fetch(:release_set_id))
+  completion = lifecycle.select { _1.type == "ReleaseSetCompleted" }.sole
+  started = task_events(@release_compensation_task_id).find do |event|
+    event.type == "CoordinationTaskExecutionStarted"
+  end
+  state = task_request("tasks/get", @release_compensation_task_id)
+  assert_acceptance_equal("completed", state.dig("result", "status"), "Compensation Task")
+  assert_acceptance_equal(started.id, completion.causation_id, "Compensation completion causation")
+  assert_acceptance_equal(
+    [ lifecycle.first.correlation_id ],
+    lifecycle.map(&:correlation_id).uniq,
+    "Compensated lifecycle correlation"
+  )
+  assert_acceptance_equal("compensated", release_set_payload(completion).outcome, "Completion outcome")
+end
+
+Then("the completed compensated ReleaseSet is available without a freshness gate") do
+  content = release_set_view(@release_set_arguments.fetch(:release_set_id))
+  release_set = content.dig("data", "release_set")
+  assert_acceptance_equal("completed", release_set.fetch("status"), "ReleaseSet status")
+  assert_acceptance_equal("compensated", release_set.dig("completion", "outcome"), "Completion outcome")
+  assert_acceptance_equal(1, release_set.dig("completion", "compensation_evidence").length, "Evidence count")
+  assert_acceptance(
+    (release_set.keys & %w[fresh pending projection_status stream_revision]).empty?,
+    "Completed ReleaseSet must not expose a freshness gate"
+  )
+end

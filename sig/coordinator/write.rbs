@@ -28,8 +28,13 @@ module Coordinator
                                 Commands::RecordMergeObservation |
                                 Commands::PrepareReleaseSet |
                                 Commands::RecordRepositoryIntegration |
-                                Commands::RecordReleaseSetVerification
-    type write_command = coordination_command | Commands::ExpireResourceLease
+                                Commands::RecordReleaseSetVerification |
+                                Commands::RecordReleaseSetActivation |
+                                Commands::CompleteCompensatedReleaseSet
+    type write_command = coordination_command |
+                         Commands::ExpireResourceLease |
+                         Commands::RequestReleaseSetCompensation |
+                         Commands::CompleteActivatedReleaseSet
     type lifecycle_command = Commands::StartCoordinationTask |
                              Commands::RecordCoordinationTaskOutcome |
                              Commands::CancelCoordinationTask

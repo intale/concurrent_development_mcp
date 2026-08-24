@@ -1,0 +1,4 @@
+module Coordinator::Mcp::Tools
+  class ReleaseActivationRecord < Coordinator::Mcp::MutationTool
+  end
+end

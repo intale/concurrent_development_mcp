@@ -1,0 +1,11 @@
+module Coordinator::Write::ReleaseSets
+  class ActivationPointV1 < Coordinator::Shared::Value
+    def kind: () -> String
+    def environment: () -> String
+    def external_reference: () -> String
+    def state_digest: () -> String
+    def producer: () -> EvidenceProducerV1
+    def run_id: () -> String
+    def activated_at: () -> String
+  end
+end

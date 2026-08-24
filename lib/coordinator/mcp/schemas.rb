@@ -817,6 +817,109 @@ module Coordinator
         )
       end
 
+      def release_activation_record
+        verification_event = merge_authorization_event_reference(
+          type: "ReleaseSetVerificationRecorded",
+          context: "DevelopmentIntegration",
+          stream_name: "ReleaseSet",
+          minimum_revision: 1
+        )
+        producer = object_schema(
+          properties: {
+            name: { type: "string", minLength: 1, maxLength: 100 },
+            version: { type: "string", minLength: 1, maxLength: 100 }
+          },
+          required: %w[name version]
+        )
+        activation_point = object_schema(
+          properties: {
+            kind: { type: "string", enum: Types::RELEASE_SET_ACTIVATION_POINT_KINDS },
+            environment: identifier,
+            external_reference: { type: "string", minLength: 1, maxLength: 1_000 },
+            state_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
+            producer:,
+            run_id: identifier,
+            activated_at: {
+              type: "string",
+              pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$"
+            }
+          },
+          required: %w[
+            kind environment external_reference state_digest producer run_id activated_at
+          ]
+        )
+        object_schema(
+          properties: common_mutation_properties.merge(
+            actor: agent_actor,
+            release_set_id: identifier,
+            verification_event:,
+            verification_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
+            activation_point:
+          ),
+          required: %w[
+            command_id actor release_set_id verification_event verification_digest activation_point
+          ]
+        )
+      end
+
+      def release_compensation_complete
+        request_event = merge_authorization_event_reference(
+          type: "ReleaseSetCompensationRequested",
+          context: "DevelopmentIntegration",
+          stream_name: "ReleaseSet",
+          minimum_revision: 2
+        )
+        integration_event = merge_authorization_event_reference(
+          type: "RepositoryIntegrationRecorded",
+          context: "DevelopmentIntegration",
+          stream_name: "ReleaseSet",
+          minimum_revision: 1
+        )
+        producer = object_schema(
+          properties: {
+            name: { type: "string", minLength: 1, maxLength: 100 },
+            version: { type: "string", minLength: 1, maxLength: 100 }
+          },
+          required: %w[name version]
+        )
+        evidence = object_schema(
+          properties: {
+            repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+            integration_event:,
+            action: { type: "string", enum: Types::RELEASE_SET_COMPENSATION_ACTIONS },
+            external_reference: { type: "string", minLength: 1, maxLength: 1_000 },
+            result_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
+            producer:,
+            run_id: identifier,
+            compensated_at: {
+              type: "string",
+              pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$"
+            }
+          },
+          required: %w[
+            repository_id integration_event action external_reference result_digest producer
+            run_id compensated_at
+          ]
+        )
+        object_schema(
+          properties: common_mutation_properties.merge(
+            actor: agent_actor,
+            release_set_id: identifier,
+            compensation_request_event: request_event,
+            evidence: {
+              type: "array",
+              minItems: 1,
+              maxItems: Types::RELEASE_SET_MAXIMUM_MEMBERS,
+              uniqueItems: true,
+              items: evidence
+            }
+          ),
+          required: %w[
+            command_id actor release_set_id compensation_request_event evidence
+          ]
+        )
+      end
+
       def merge_verification_submit
         candidate = object_schema(
           properties: { candidate_id: identifier, head_commit_oid: git_oid },

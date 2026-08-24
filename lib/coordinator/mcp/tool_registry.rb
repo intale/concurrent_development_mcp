@@ -47,7 +47,9 @@ module Coordinator
           Tools::ReleaseSetGet,
           Tools::ReleaseSetPrepare,
           Tools::ReleaseRepositoryIntegrationRecord,
-          Tools::ReleaseVerificationRecord
+          Tools::ReleaseVerificationRecord,
+          Tools::ReleaseActivationRecord,
+          Tools::ReleaseCompensationComplete
         ].freeze
       end
     end

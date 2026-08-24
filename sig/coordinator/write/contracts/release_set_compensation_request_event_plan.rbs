@@ -1,0 +1,4 @@
+module Coordinator::Write::Contracts
+  class ReleaseSetCompensationRequestEventPlan < Dry::Validation::Contract
+  end
+end

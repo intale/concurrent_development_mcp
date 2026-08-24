@@ -535,6 +535,57 @@ module Coordinator::Write
       attribute :input, RecordReleaseSetVerificationInputV1
     end
 
+    class RecordReleaseSetActivationInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :release_set_id, Types::Identifier
+      attribute :verification_event, EventReferenceV1
+      attribute :verification_digest, Types::Sha256Digest
+      attribute :activation_point, ReleaseSets::ActivationPointV1
+    end
+
+    class RecordReleaseSetActivationV1 < BaseV1
+      attribute :tool_name, Types::String.enum("release_activation_record")
+      attribute :input, RecordReleaseSetActivationInputV1
+    end
+
+    class RequestReleaseSetCompensationInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :release_set_id, Types::Identifier
+      attribute :trigger_event, EventReferenceV1
+    end
+
+    class RequestReleaseSetCompensationV1 < BaseV1
+      attribute :tool_name, Types::String.enum("release_compensation_request_policy")
+      attribute :input, RequestReleaseSetCompensationInputV1
+    end
+
+    class CompleteActivatedReleaseSetInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :release_set_id, Types::Identifier
+      attribute :activation_event, EventReferenceV1
+    end
+
+    class CompleteActivatedReleaseSetV1 < BaseV1
+      attribute :tool_name, Types::String.enum("release_activated_complete_policy")
+      attribute :input, CompleteActivatedReleaseSetInputV1
+    end
+
+    class CompleteCompensatedReleaseSetInputV1 < Value
+      Evidence = ReleaseSets::CompensationEvidenceV1
+
+      attribute :actor, ActorV1
+      attribute :release_set_id, Types::Identifier
+      attribute :compensation_request_event, EventReferenceV1
+      attribute :evidence,
+                Types::Array.of(Evidence)
+                  .constrained(min_size: 1, max_size: Types::RELEASE_SET_MAXIMUM_MEMBERS)
+    end
+
+    class CompleteCompensatedReleaseSetV1 < BaseV1
+      attribute :tool_name, Types::String.enum("release_compensation_complete")
+      attribute :input, CompleteCompensatedReleaseSetInputV1
+    end
+
     class ExpireResourceLeaseInputV1 < Value
       attribute :actor, ActorV1
       attribute :resource_key_hash, Types::Sha256Digest
@@ -575,8 +626,13 @@ module Coordinator::Write
            RecordMergeObservationV1 |
            PrepareReleaseSetV1 |
            RecordRepositoryIntegrationV1 |
-           RecordReleaseSetVerificationV1
+           RecordReleaseSetVerificationV1 |
+           RecordReleaseSetActivationV1 |
+           CompleteCompensatedReleaseSetV1
 
-    DigestType = Type | ExpireResourceLeaseV1
+    DigestType = Type |
+                 ExpireResourceLeaseV1 |
+                 RequestReleaseSetCompensationV1 |
+                 CompleteActivatedReleaseSetV1
   end
 end

@@ -26,3 +26,27 @@ Feature: Immutable multi-repository ReleaseSet preparation
       And the older ReleaseSet view remains available while lifecycle projection lags
       When the complete ReleaseSet lifecycle reaches the read side twice
       Then the verified ReleaseSet is available with exact ordered evidence
+
+    Scenario: Exact activation completes asynchronously through the ReleaseSet Saga
+      Given ReleaseSet "ACTIVATED" has two exact current repository grants for one ChangeSet
+      When the agent prepares the ordered ReleaseSet through MCP
+      And the agent records both repository integrations through MCP in order
+      And the agent records passing composite verification through MCP
+      And the agent records external ReleaseSet activation through MCP
+      And the ReleaseSet lifecycle Saga processes activation twice
+      Then the activation Task and Saga completion preserve the ReleaseSet trace
+      And the older ReleaseSet view remains available while lifecycle projection lags
+      When the complete ReleaseSet lifecycle reaches the read side twice
+      Then the completed activated ReleaseSet is available without a freshness gate
+
+    Scenario: Partial integration failure requests and completes exact external compensation
+      Given ReleaseSet "COMPENSATED" has two exact current repository grants for one ChangeSet
+      When the agent prepares the ordered ReleaseSet through MCP
+      And the first repository integrates while the second records failure through MCP
+      And the ReleaseSet lifecycle Saga processes the failed integration twice
+      Then one exact compensation request is durable with Saga tracing
+      When the agent records exact external compensation through MCP
+      Then the compensation Task completes the ReleaseSet with one physical correlation
+      And the older ReleaseSet view remains available while lifecycle projection lags
+      When the complete ReleaseSet lifecycle reaches the read side twice
+      Then the completed compensated ReleaseSet is available without a freshness gate

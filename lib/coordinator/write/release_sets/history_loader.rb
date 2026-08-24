@@ -17,6 +17,9 @@ module Coordinator::Write
         preparation = nil
         integrations = []
         verifications = []
+        activation = nil
+        compensation_request = nil
+        completion = nil
         events = @event_store.read(
           @stream_factory.release_set(release_set_id),
           EventQueries::RELEASE_SET_LIFECYCLE
@@ -37,12 +40,29 @@ module Coordinator::Write
             integrations << IntegrationFactV1.new(payload:, event: event_reference(event))
           when Events::ReleaseSetVerificationRecordedV1
             verifications << VerificationFactV1.new(payload:, event: event_reference(event))
+          when Events::ReleaseSetActivatedV1
+            raise InvalidReleaseSetHistory, "ReleaseSet contains duplicate activation facts" if activation
+
+            activation = ActivationFactV1.new(payload:, event: event_reference(event))
+          when Events::ReleaseSetCompensationRequestedV1
+            if compensation_request
+              raise InvalidReleaseSetHistory, "ReleaseSet contains duplicate compensation requests"
+            end
+
+            compensation_request = CompensationRequestFactV1.new(payload:, event: event_reference(event))
+          when Events::ReleaseSetCompletedV1
+            raise InvalidReleaseSetHistory, "ReleaseSet contains duplicate completion facts" if completion
+
+            completion = CompletionFactV1.new(payload:, event: event_reference(event))
           end
         end
         Domain::ReleaseSets::LifecycleStateV1.new(
           preparation:,
           integrations: integrations.freeze,
-          verifications: verifications.freeze
+          verifications: verifications.freeze,
+          activation:,
+          compensation_request:,
+          completion:
         )
       rescue Dry::Struct::Error => error
         raise InvalidReleaseSetHistory, error.message

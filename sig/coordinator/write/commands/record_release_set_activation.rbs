@@ -1,0 +1,11 @@
+module Coordinator::Write::Commands
+  class RecordReleaseSetActivation < Coordinator::Shared::Value
+    def command_id: () -> String
+    def actor: () -> Actor
+    def release_set_id: () -> String
+    def verification_event: () -> Coordinator::Write::EventReference
+    def verification_digest: () -> String
+    def activation_point: () -> Coordinator::Write::ReleaseSets::ActivationPointV1
+    def policy_version: () -> String
+  end
+end

@@ -39,6 +39,10 @@ module Coordinator::Write
       when Commands::PrepareReleaseSet then release_set_prepare_document(command)
       when Commands::RecordRepositoryIntegration then release_repository_integration_record_document(command)
       when Commands::RecordReleaseSetVerification then release_verification_record_document(command)
+      when Commands::RecordReleaseSetActivation then release_activation_record_document(command)
+      when Commands::RequestReleaseSetCompensation then release_compensation_request_document(command)
+      when Commands::CompleteActivatedReleaseSet then release_activated_complete_document(command)
+      when Commands::CompleteCompensatedReleaseSet then release_compensation_complete_document(command)
       when Commands::ExpireResourceLease then lease_expire_policy_document(command)
       else
         raise ArgumentError, "Unsupported coordination command: #{command.class.name}"
@@ -633,6 +637,79 @@ module Coordinator::Write
           integration_events: command.integration_events.map do |reference|
             CommandInputDocuments::EventReferenceV1.new(reference.to_h)
           end,
+          evidence: command.evidence
+        )
+      )
+    end
+
+    def release_activation_record(command)
+      @canonical_json.sha256(release_activation_record_document(command).to_h)
+    end
+
+    def release_activation_record_document(command)
+      CommandInputDocuments::RecordReleaseSetActivationV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "release_activation_record",
+        input: CommandInputDocuments::RecordReleaseSetActivationInputV1.new(
+          actor: actor_document(command.actor),
+          release_set_id: command.release_set_id,
+          verification_event: CommandInputDocuments::EventReferenceV1.new(command.verification_event.to_h),
+          verification_digest: command.verification_digest,
+          activation_point: command.activation_point
+        )
+      )
+    end
+
+    def release_compensation_request(command)
+      @canonical_json.sha256(release_compensation_request_document(command).to_h)
+    end
+
+    def release_compensation_request_document(command)
+      CommandInputDocuments::RequestReleaseSetCompensationV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "release_compensation_request_policy",
+        input: CommandInputDocuments::RequestReleaseSetCompensationInputV1.new(
+          actor: actor_document(command.actor),
+          release_set_id: command.release_set_id,
+          trigger_event: CommandInputDocuments::EventReferenceV1.new(command.trigger_event.to_h)
+        )
+      )
+    end
+
+    def release_activated_complete(command)
+      @canonical_json.sha256(release_activated_complete_document(command).to_h)
+    end
+
+    def release_activated_complete_document(command)
+      CommandInputDocuments::CompleteActivatedReleaseSetV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "release_activated_complete_policy",
+        input: CommandInputDocuments::CompleteActivatedReleaseSetInputV1.new(
+          actor: actor_document(command.actor),
+          release_set_id: command.release_set_id,
+          activation_event: CommandInputDocuments::EventReferenceV1.new(command.activation_event.to_h)
+        )
+      )
+    end
+
+    def release_compensation_complete(command)
+      @canonical_json.sha256(release_compensation_complete_document(command).to_h)
+    end
+
+    def release_compensation_complete_document(command)
+      CommandInputDocuments::CompleteCompensatedReleaseSetV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "release_compensation_complete",
+        input: CommandInputDocuments::CompleteCompensatedReleaseSetInputV1.new(
+          actor: actor_document(command.actor),
+          release_set_id: command.release_set_id,
+          compensation_request_event: CommandInputDocuments::EventReferenceV1.new(
+            command.compensation_request_event.to_h
+          ),
           evidence: command.evidence
         )
       )

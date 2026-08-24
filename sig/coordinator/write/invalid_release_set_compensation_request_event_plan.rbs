@@ -1,0 +1,4 @@
+module Coordinator::Write
+  class InvalidReleaseSetCompensationRequestEventPlan < StandardError
+  end
+end

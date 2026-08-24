@@ -9,6 +9,11 @@ module Dry
       def bind: (*untyped, **untyped) { (*untyped) -> untyped } -> untyped
       def fmap: (*untyped, **untyped) { (*untyped) -> untyped } -> untyped
       def or: (*untyped, **untyped) { (*untyped) -> untyped } -> untyped
+
+      module Mixin
+        def Success: (untyped value) -> Dry::Monads::Result
+        def Failure: (untyped value) -> Dry::Monads::Result
+      end
     end
   end
 end

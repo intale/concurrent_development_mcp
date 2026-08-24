@@ -45,6 +45,12 @@ module Coordinator::Read
           @release_sets.record_integration(event:, integration: payload)
         when Coordinator::Write::Events::ReleaseSetVerificationRecordedV1
           @release_sets.record_verification(event:, verification: payload)
+        when Coordinator::Write::Events::ReleaseSetActivatedV1
+          @release_sets.record_activation(event:, activation: payload)
+        when Coordinator::Write::Events::ReleaseSetCompensationRequestedV1
+          @release_sets.record_compensation_request(event:, request: payload)
+        when Coordinator::Write::Events::ReleaseSetCompletedV1
+          @release_sets.record_completion(event:, completion: payload)
         else
           raise UnknownProjectionEvent, payload.class.name
         end

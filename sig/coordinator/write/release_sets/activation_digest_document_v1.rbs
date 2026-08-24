@@ -1,0 +1,11 @@
+module Coordinator::Write::ReleaseSets
+  class ActivationDigestDocumentV1 < Coordinator::Shared::Value
+    def schema: () -> String
+    def release_set_id: () -> String
+    def release_digest: () -> String
+    def verification_event: () -> Coordinator::Write::EventReference
+    def verification_digest: () -> String
+    def activation_point: () -> ActivationPointV1
+    def policy_version: () -> String
+  end
+end

@@ -30,6 +30,10 @@ module Coordinator
       def release_set_prepare: (command: Commands::PrepareReleaseSet, preparation: Events::ReleaseSetPreparedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
       def release_repository_integration_record: (command: Commands::RecordRepositoryIntegration, integration: Events::RepositoryIntegrationRecordedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
       def release_verification_record: (command: Commands::RecordReleaseSetVerification, verification: Events::ReleaseSetVerificationRecordedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
+      def release_activation_record: (command: Commands::RecordReleaseSetActivation, activation: Events::ReleaseSetActivatedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
+      def release_compensation_request: (command: Commands::RequestReleaseSetCompensation, request: Events::ReleaseSetCompensationRequestedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
+      def release_activated_complete: (command: Commands::CompleteActivatedReleaseSet, completion: Events::ReleaseSetCompletedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
+      def release_compensation_complete: (command: Commands::CompleteCompensatedReleaseSet, completion: Events::ReleaseSetCompletedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
     end
   end
 end

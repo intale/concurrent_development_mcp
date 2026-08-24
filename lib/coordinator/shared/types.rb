@@ -313,8 +313,15 @@ module Coordinator::Shared
     RELEASE_SET_LIFECYCLE_MAXIMUM_EVENTS = 140
     RELEASE_SET_INTEGRATION_POLICY_VERSIONS = %w[release-set-integration/v1].freeze
     RELEASE_SET_VERIFICATION_POLICY_VERSIONS = %w[release-set-verification/v1].freeze
+    RELEASE_SET_ACTIVATION_POLICY_VERSIONS = %w[release-set-activation/v1].freeze
+    RELEASE_SET_COMPENSATION_RULE_VERSIONS = %w[release-set-compensation/v1].freeze
+    RELEASE_SET_COMPLETION_RULE_VERSIONS = %w[release-set-completion/v1].freeze
     RELEASE_SET_INTEGRATION_OUTCOMES = %w[integrated failed].freeze
     RELEASE_SET_VERIFICATION_OUTCOMES = %w[passed failed].freeze
+    RELEASE_SET_ACTIVATION_POINT_KINDS = %w[deployment_manifest configuration feature_flag].freeze
+    RELEASE_SET_COMPENSATION_ACTIONS = %w[rollback revert feature_flag_disable].freeze
+    RELEASE_SET_COMPENSATION_TRIGGER_KINDS = %w[repository_integration_failed release_verification_failed].freeze
+    RELEASE_SET_COMPLETION_OUTCOMES = %w[activated compensated].freeze
     CANDIDATE_OBLIGATION_POLICY_STATUSES = %w[
       stale
       non_gating
@@ -407,6 +414,8 @@ module Coordinator::Shared
       release_set_prepare
       release_repository_integration_record
       release_verification_record
+      release_activation_record
+      release_compensation_complete
     ].freeze
 
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)
@@ -556,8 +565,16 @@ module Coordinator::Shared
     ReleaseSetMemberPosition = Integer.constrained(gteq: 1, lteq: RELEASE_SET_MAXIMUM_MEMBERS)
     ReleaseSetIntegrationPolicyVersion = String.enum(*RELEASE_SET_INTEGRATION_POLICY_VERSIONS)
     ReleaseSetVerificationPolicyVersion = String.enum(*RELEASE_SET_VERIFICATION_POLICY_VERSIONS)
+    ReleaseSetActivationPolicyVersion = String.enum(*RELEASE_SET_ACTIVATION_POLICY_VERSIONS)
+    ReleaseSetCompensationRuleVersion = String.enum(*RELEASE_SET_COMPENSATION_RULE_VERSIONS)
+    ReleaseSetCompletionRuleVersion = String.enum(*RELEASE_SET_COMPLETION_RULE_VERSIONS)
     ReleaseSetIntegrationOutcome = String.enum(*RELEASE_SET_INTEGRATION_OUTCOMES)
     ReleaseSetVerificationOutcome = String.enum(*RELEASE_SET_VERIFICATION_OUTCOMES)
+    ReleaseSetActivationPointKind = String.enum(*RELEASE_SET_ACTIVATION_POINT_KINDS)
+    ReleaseSetCompensationAction = String.enum(*RELEASE_SET_COMPENSATION_ACTIONS)
+    ReleaseSetCompensationTriggerKind = String.enum(*RELEASE_SET_COMPENSATION_TRIGGER_KINDS)
+    ReleaseSetCompletionOutcome = String.enum(*RELEASE_SET_COMPLETION_OUTCOMES)
+    ReleaseSetExternalReference = String.constrained(min_size: 1, max_size: 1_000)
     ReleaseSetIntegrationAttemptNumber = Integer.constrained(
       gteq: 1,
       lteq: RELEASE_SET_INTEGRATION_MAXIMUM_ATTEMPTS

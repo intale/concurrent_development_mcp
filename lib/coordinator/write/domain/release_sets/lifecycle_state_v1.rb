@@ -6,6 +6,9 @@ module Coordinator::Write
       class LifecycleStateV1 < Value
         Integration = Coordinator::Write::ReleaseSets::IntegrationFactV1
         Verification = Coordinator::Write::ReleaseSets::VerificationFactV1
+        Activation = Coordinator::Write::ReleaseSets::ActivationFactV1
+        CompensationRequest = Coordinator::Write::ReleaseSets::CompensationRequestFactV1
+        Completion = Coordinator::Write::ReleaseSets::CompletionFactV1
 
         attribute :preparation, Coordinator::Write::ReleaseSets::PreparationFactV1.optional
         attribute :integrations,
@@ -17,6 +20,9 @@ module Coordinator::Write
         attribute :verifications,
                   Types::Array.of(Verification)
                     .constrained(max_size: Types::RELEASE_SET_VERIFICATION_MAXIMUM_ATTEMPTS)
+        attribute? :activation, Activation.optional
+        attribute? :compensation_request, CompensationRequest.optional
+        attribute? :completion, Completion.optional
 
         def member(repository_id)
           preparation&.payload&.ordered_members&.find { _1.repository_id == repository_id }
@@ -53,6 +59,18 @@ module Coordinator::Write
 
         def verified?
           latest_verification&.payload&.evidence&.outcome == "passed"
+        end
+
+        def activated?
+          !activation.nil?
+        end
+
+        def compensation_requested?
+          !compensation_request.nil?
+        end
+
+        def completed?
+          !completion.nil?
         end
       end
     end

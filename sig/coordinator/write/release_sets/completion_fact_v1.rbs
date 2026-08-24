@@ -1,0 +1,6 @@
+module Coordinator::Write::ReleaseSets
+  class CompletionFactV1 < Coordinator::Shared::Value
+    def payload: () -> Coordinator::Write::Events::ReleaseSetCompletedV1
+    def event: () -> Coordinator::Write::EventReference
+  end
+end

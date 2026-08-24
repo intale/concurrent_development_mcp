@@ -59,6 +59,10 @@ module Coordinator::Write
           build_record_repository_integration(document)
         when CommandInputDocuments::RecordReleaseSetVerificationV1
           build_record_release_set_verification(document)
+        when CommandInputDocuments::RecordReleaseSetActivationV1
+          build_record_release_set_activation(document)
+        when CommandInputDocuments::CompleteCompensatedReleaseSetV1
+          build_complete_compensated_release_set(document)
         end
       end
 
@@ -465,6 +469,31 @@ module Coordinator::Write
           integration_events: input.integration_events.map { EventReference.new(_1.to_h) },
           evidence: input.evidence,
           policy_version: "release-set-verification/v1"
+        )
+      end
+
+      def build_record_release_set_activation(document)
+        input = document.input
+        Commands::RecordReleaseSetActivation.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          release_set_id: input.release_set_id,
+          verification_event: EventReference.new(input.verification_event.to_h),
+          verification_digest: input.verification_digest,
+          activation_point: input.activation_point,
+          policy_version: "release-set-activation/v1"
+        )
+      end
+
+      def build_complete_compensated_release_set(document)
+        input = document.input
+        Commands::CompleteCompensatedReleaseSet.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          release_set_id: input.release_set_id,
+          compensation_request_event: EventReference.new(input.compensation_request_event.to_h),
+          evidence: input.evidence,
+          rule_version: "release-set-completion/v1"
         )
       end
 

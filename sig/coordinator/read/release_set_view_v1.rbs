@@ -3,6 +3,9 @@ module Coordinator::Read
     Member: singleton(Coordinator::Write::ReleaseSets::MemberEvidenceV1)
     Integration: singleton(ReleaseSetIntegrationViewV1)
     Verification: singleton(ReleaseSetVerificationViewV1)
+    Activation: singleton(ReleaseSetActivationViewV1)
+    CompensationRequest: singleton(ReleaseSetCompensationRequestViewV1)
+    Completion: singleton(ReleaseSetCompletionViewV1)
 
     def release_set_id: () -> String
     def change_set_id: () -> String
@@ -12,6 +15,9 @@ module Coordinator::Read
     def verification_status: () -> String
     def integrations: () -> Array[ReleaseSetIntegrationViewV1]
     def verifications: () -> Array[ReleaseSetVerificationViewV1]
+    def activation: () -> ReleaseSetActivationViewV1?
+    def compensation_request: () -> ReleaseSetCompensationRequestViewV1?
+    def completion: () -> ReleaseSetCompletionViewV1?
     def preparation_policy_version: () -> String
     def prepared_at: () -> String
     def prepared: () -> ReleaseSetSourceEvidenceV1

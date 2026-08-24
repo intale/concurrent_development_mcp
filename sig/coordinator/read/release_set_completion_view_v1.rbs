@@ -1,0 +1,12 @@
+module Coordinator::Read
+  class ReleaseSetCompletionViewV1 < Coordinator::Shared::Value
+    Evidence: singleton(Coordinator::Write::ReleaseSets::CompensationEvidenceV1)
+    def outcome: () -> String
+    def source_event: () -> Coordinator::Write::EventReference
+    def compensation_evidence: () -> Array[Coordinator::Write::ReleaseSets::CompensationEvidenceV1]
+    def completion_digest: () -> String
+    def rule_version: () -> String
+    def completed_at: () -> String
+    def source: () -> ReleaseSetSourceEvidenceV1
+  end
+end

@@ -4,17 +4,27 @@ module Coordinator::Read::Repositories
     def store: (event: PgEventstore::Event, release_set: Coordinator::Write::Events::ReleaseSetPreparedV1) -> Coordinator::Read::ReleaseSet
     def record_integration: (event: PgEventstore::Event, integration: Coordinator::Write::Events::RepositoryIntegrationRecordedV1) -> bool
     def record_verification: (event: PgEventstore::Event, verification: Coordinator::Write::Events::ReleaseSetVerificationRecordedV1) -> bool
+    def record_activation: (event: PgEventstore::Event, activation: Coordinator::Write::Events::ReleaseSetActivatedV1) -> bool
+    def record_compensation_request: (event: PgEventstore::Event, request: Coordinator::Write::Events::ReleaseSetCompensationRequestedV1) -> bool
+    def record_completion: (event: PgEventstore::Event, completion: Coordinator::Write::Events::ReleaseSetCompletedV1) -> bool
 
     private
 
     def build_view: (Coordinator::Read::ReleaseSet record) -> Coordinator::Read::ReleaseSetViewV1
     def integration_view: (event: PgEventstore::Event, integration: Coordinator::Write::Events::RepositoryIntegrationRecordedV1) -> Coordinator::Read::ReleaseSetIntegrationViewV1
     def verification_view: (event: PgEventstore::Event, verification: Coordinator::Write::Events::ReleaseSetVerificationRecordedV1) -> Coordinator::Read::ReleaseSetVerificationViewV1
+    def activation_view: (event: PgEventstore::Event, activation: Coordinator::Write::Events::ReleaseSetActivatedV1) -> Coordinator::Read::ReleaseSetActivationViewV1
+    def compensation_request_view: (event: PgEventstore::Event, request: Coordinator::Write::Events::ReleaseSetCompensationRequestedV1) -> Coordinator::Read::ReleaseSetCompensationRequestViewV1
+    def completion_view: (event: PgEventstore::Event, completion: Coordinator::Write::Events::ReleaseSetCompletedV1) -> Coordinator::Read::ReleaseSetCompletionViewV1
     def build_integration: (Hash[String | Symbol, untyped] attributes) -> Coordinator::Read::ReleaseSetIntegrationViewV1
     def build_verification: (Hash[String | Symbol, untyped] attributes) -> Coordinator::Read::ReleaseSetVerificationViewV1
+    def build_activation: (Hash[String | Symbol, untyped] attributes) -> Coordinator::Read::ReleaseSetActivationViewV1
+    def build_compensation_request: (Hash[String | Symbol, untyped] attributes) -> Coordinator::Read::ReleaseSetCompensationRequestViewV1
+    def build_completion: (Hash[String | Symbol, untyped] attributes) -> Coordinator::Read::ReleaseSetCompletionViewV1
     def event_reference_value: (Hash[String | Symbol, untyped]? attributes) -> Coordinator::Write::EventReference?
     def integration_failure_value: (Hash[String | Symbol, untyped]? attributes) -> Coordinator::Write::ReleaseSets::IntegrationFailureV1?
     def verification_evidence_value: (Hash[String | Symbol, untyped] attributes) -> Coordinator::Write::ReleaseSets::VerificationEvidenceV1
+    def compensation_evidence_value: (Hash[String | Symbol, untyped] attributes) -> Coordinator::Write::ReleaseSets::CompensationEvidenceV1
     def every_member_integrated?: (Array[Hash[String | Symbol, untyped]] members, Array[Hash[String | Symbol, untyped]] integrations) -> bool
     def source_evidence: (Coordinator::Read::ReleaseSet record) -> Coordinator::Read::ReleaseSetSourceEvidenceV1
     def source_evidence_from_event: (PgEventstore::Event event, occurred_at: String) -> Coordinator::Read::ReleaseSetSourceEvidenceV1

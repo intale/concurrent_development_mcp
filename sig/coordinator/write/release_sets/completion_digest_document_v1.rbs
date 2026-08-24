@@ -1,0 +1,13 @@
+module Coordinator::Write::ReleaseSets
+  class CompletionDigestDocumentV1 < Coordinator::Shared::Value
+    Evidence: singleton(CompensationEvidenceV1)
+
+    def schema: () -> String
+    def release_set_id: () -> String
+    def release_digest: () -> String
+    def outcome: () -> String
+    def source_event: () -> Coordinator::Write::EventReference
+    def compensation_evidence: () -> Array[CompensationEvidenceV1]
+    def rule_version: () -> String
+  end
+end

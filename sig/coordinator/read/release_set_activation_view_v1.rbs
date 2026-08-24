@@ -1,0 +1,12 @@
+module Coordinator::Read
+  class ReleaseSetActivationViewV1 < Coordinator::Shared::Value
+    def verification_event: () -> Coordinator::Write::EventReference
+    def verification_digest: () -> String
+    def activation_point: () -> Coordinator::Write::ReleaseSets::ActivationPointV1
+    def activation_digest: () -> String
+    def policy_version: () -> String
+    def evidence_status: () -> String
+    def recorded_at: () -> String
+    def source: () -> ReleaseSetSourceEvidenceV1
+  end
+end

@@ -15,7 +15,10 @@ module Coordinator::Read
         event_types: [
           "ReleaseSetPrepared",
           "RepositoryIntegrationRecorded",
-          "ReleaseSetVerificationRecorded"
+          "ReleaseSetVerificationRecorded",
+          "ReleaseSetActivated",
+          "ReleaseSetCompensationRequested",
+          "ReleaseSetCompleted"
         ]
       )
 

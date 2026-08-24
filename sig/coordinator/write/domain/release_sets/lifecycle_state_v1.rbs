@@ -2,10 +2,16 @@ module Coordinator::Write::Domain::ReleaseSets
   class LifecycleStateV1 < Coordinator::Shared::Value
     Integration: singleton(Coordinator::Write::ReleaseSets::IntegrationFactV1)
     Verification: singleton(Coordinator::Write::ReleaseSets::VerificationFactV1)
+    Activation: singleton(Coordinator::Write::ReleaseSets::ActivationFactV1)
+    CompensationRequest: singleton(Coordinator::Write::ReleaseSets::CompensationRequestFactV1)
+    Completion: singleton(Coordinator::Write::ReleaseSets::CompletionFactV1)
 
     def preparation: () -> Coordinator::Write::ReleaseSets::PreparationFactV1?
     def integrations: () -> Array[Coordinator::Write::ReleaseSets::IntegrationFactV1]
     def verifications: () -> Array[Coordinator::Write::ReleaseSets::VerificationFactV1]
+    def activation: () -> Coordinator::Write::ReleaseSets::ActivationFactV1?
+    def compensation_request: () -> Coordinator::Write::ReleaseSets::CompensationRequestFactV1?
+    def completion: () -> Coordinator::Write::ReleaseSets::CompletionFactV1?
     def member: (String repository_id) -> Coordinator::Write::ReleaseSets::MemberEvidenceV1?
     def integrations_for: (String repository_id) -> Array[Coordinator::Write::ReleaseSets::IntegrationFactV1]
     def latest_integration: (String repository_id) -> Coordinator::Write::ReleaseSets::IntegrationFactV1?
@@ -14,5 +20,8 @@ module Coordinator::Write::Domain::ReleaseSets
     def successful_integrations: () -> Array[Coordinator::Write::ReleaseSets::IntegrationFactV1]
     def latest_verification: () -> Coordinator::Write::ReleaseSets::VerificationFactV1?
     def verified?: () -> bool
+    def activated?: () -> bool
+    def compensation_requested?: () -> bool
+    def completed?: () -> bool
   end
 end

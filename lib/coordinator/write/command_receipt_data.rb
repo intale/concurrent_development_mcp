@@ -325,6 +325,39 @@ module Coordinator::Write
       attribute :recorded_at, Types::Timestamp
     end
 
+    class ReleaseSetActivation < Value
+      attribute :release_set_id, Types::Identifier
+      attribute :change_set_id, Types::Identifier
+      attribute :verification_event, EventReference
+      attribute :verification_digest, Types::Sha256Digest
+      attribute :activation_digest, Types::Sha256Digest
+      attribute :evidence_status, Types::MergeSnapshotEvidenceStatus
+      attribute :activation_event, EventReference
+      attribute :recorded_at, Types::Timestamp
+    end
+
+    class ReleaseSetCompensationRequest < Value
+      attribute :release_set_id, Types::Identifier
+      attribute :change_set_id, Types::Identifier
+      attribute :trigger_event, EventReference
+      attribute :trigger_kind, Types::ReleaseSetCompensationTriggerKind
+      attribute :successful_integrations,
+                Types::Array.of(EventReference)
+                  .constrained(min_size: 1, max_size: Types::RELEASE_SET_MAXIMUM_MEMBERS)
+      attribute :compensation_request_event, EventReference
+      attribute :requested_at, Types::Timestamp
+    end
+
+    class ReleaseSetCompletion < Value
+      attribute :release_set_id, Types::Identifier
+      attribute :change_set_id, Types::Identifier
+      attribute :outcome, Types::ReleaseSetCompletionOutcome
+      attribute :source_event, EventReference
+      attribute :completion_digest, Types::Sha256Digest
+      attribute :completion_event, EventReference
+      attribute :completed_at, Types::Timestamp
+    end
+
     Type = ChangeSet |
            WorkItem |
            Dependency |
@@ -351,6 +384,9 @@ module Coordinator::Write
            MergeObservation |
            ReleaseSetPreparation |
            RepositoryIntegration |
-           ReleaseSetVerification
+           ReleaseSetVerification |
+           ReleaseSetActivation |
+           ReleaseSetCompensationRequest |
+           ReleaseSetCompletion
   end
 end

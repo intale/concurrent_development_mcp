@@ -797,7 +797,95 @@ module Coordinator::Write
       )
     end
 
+    def release_activation_record(command:, activation:, input_digest:, persisted_events:, completed_at:)
+      build_completion(
+        command:,
+        tool_name: "release_activation_record",
+        summary: "Attributed external ReleaseSet activation recorded; lifecycle completion is asynchronous.",
+        data: CommandReceiptData::ReleaseSetActivation.new(
+          release_set_id: activation.release_set_id,
+          change_set_id: activation.change_set_id,
+          verification_event: activation.verification_event,
+          verification_digest: activation.verification_digest,
+          activation_digest: activation.activation_digest,
+          evidence_status: activation.evidence_status,
+          activation_event: event_reference(persisted_events.sole),
+          recorded_at: activation.recorded_at
+        ),
+        next_actions: [ release_set_next_action(command.release_set_id) ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
+    def release_compensation_request(command:, request:, input_digest:, persisted_events:, completed_at:)
+      build_completion(
+        command:,
+        tool_name: "release_compensation_request_policy",
+        summary: "ReleaseSet compensation requested for the exact successful integrations.",
+        data: CommandReceiptData::ReleaseSetCompensationRequest.new(
+          release_set_id: request.release_set_id,
+          change_set_id: request.change_set_id,
+          trigger_event: request.trigger_event,
+          trigger_kind: request.trigger_kind,
+          successful_integrations: request.successful_integrations,
+          compensation_request_event: event_reference(persisted_events.sole),
+          requested_at: request.requested_at
+        ),
+        next_actions: [ release_set_next_action(command.release_set_id) ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
+    def release_activated_complete(command:, completion:, input_digest:, persisted_events:, completed_at:)
+      release_set_completion(
+        command:,
+        completion:,
+        tool_name: "release_activated_complete_policy",
+        summary: "Activated ReleaseSet lifecycle completed.",
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
+    def release_compensation_complete(command:, completion:, input_digest:, persisted_events:, completed_at:)
+      release_set_completion(
+        command:,
+        completion:,
+        tool_name: "release_compensation_complete",
+        summary: "Attributed external compensation evidence completed the ReleaseSet lifecycle.",
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
+
+    def release_set_completion(command:, completion:, tool_name:, summary:, input_digest:, persisted_events:, completed_at:)
+      build_completion(
+        command:,
+        tool_name:,
+        summary:,
+        data: CommandReceiptData::ReleaseSetCompletion.new(
+          release_set_id: completion.release_set_id,
+          change_set_id: completion.change_set_id,
+          outcome: completion.outcome,
+          source_event: completion.source_event,
+          completion_digest: completion.completion_digest,
+          completion_event: event_reference(persisted_events.sole),
+          completed_at: completion.completed_at
+        ),
+        next_actions: [ release_set_next_action(command.release_set_id) ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
 
     def verification_status(persisted_events)
       case persisted_events[1]&.type

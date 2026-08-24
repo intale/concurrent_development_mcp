@@ -58,6 +58,8 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
       "release_set_prepare",
       "release_repository_integration_record",
       "release_verification_record",
+      "release_activation_record",
+      "release_compensation_complete",
       "change_set_create",
       "work_item_create",
       "work_item_dependency_declare",

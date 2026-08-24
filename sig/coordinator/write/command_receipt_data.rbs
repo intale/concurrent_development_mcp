@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandReceiptData
-      type value = ChangeSet | WorkItem | Dependency | Attempt | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver | MergeSnapshotRegistration | MergeSnapshotVerification | MergeAuthorization | MergeObservation | ReleaseSetPreparation | RepositoryIntegration | ReleaseSetVerification
+      type value = ChangeSet | WorkItem | Dependency | Attempt | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver | MergeSnapshotRegistration | MergeSnapshotVerification | MergeAuthorization | MergeObservation | ReleaseSetPreparation | RepositoryIntegration | ReleaseSetVerification | ReleaseSetActivation | ReleaseSetCompensationRequest | ReleaseSetCompletion
 
       class ChangeSet < Shared::Value
         def change_set_id: () -> String
@@ -299,6 +299,37 @@ module Coordinator
         def evidence_status: () -> String
         def verification_event: () -> EventReference
         def recorded_at: () -> String
+      end
+
+      class ReleaseSetActivation < Shared::Value
+        def release_set_id: () -> String
+        def change_set_id: () -> String
+        def verification_event: () -> EventReference
+        def verification_digest: () -> String
+        def activation_digest: () -> String
+        def evidence_status: () -> String
+        def activation_event: () -> EventReference
+        def recorded_at: () -> String
+      end
+
+      class ReleaseSetCompensationRequest < Shared::Value
+        def release_set_id: () -> String
+        def change_set_id: () -> String
+        def trigger_event: () -> EventReference
+        def trigger_kind: () -> String
+        def successful_integrations: () -> Array[EventReference]
+        def compensation_request_event: () -> EventReference
+        def requested_at: () -> String
+      end
+
+      class ReleaseSetCompletion < Shared::Value
+        def release_set_id: () -> String
+        def change_set_id: () -> String
+        def outcome: () -> String
+        def source_event: () -> EventReference
+        def completion_digest: () -> String
+        def completion_event: () -> EventReference
+        def completed_at: () -> String
       end
     end
   end

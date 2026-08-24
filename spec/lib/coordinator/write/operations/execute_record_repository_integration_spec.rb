@@ -75,6 +75,62 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordRepositoryIntegratio
     expect(lifecycle_events(prepared).count { _1.type == "RepositoryIntegrationRecorded" }).to eq(0)
   end
 
+  it "closes repository integration after activation" do
+    prepared = ReleaseSetScenario.prepare(prefix: "integration-after-activation")
+    integrations = ReleaseSetScenario.integrate_all(
+      prepared, prefix: "integration-after-activation"
+    )
+    verification = ReleaseSetScenario.record_verification(
+      prepared, integrations:, prefix: "integration-after-activation"
+    )
+    ReleaseSetScenario.record_activation(
+      prepared, verification:, prefix: "integration-after-activation"
+    )
+    integration = integrations.first.fetch(:payload)
+    input = {
+      command_id: "cmd-release-integrate-after-activation",
+      actor: { kind: "agent", id: "release-integrator-1" },
+      release_set_id: prepared.dig(:input, :release_set_id),
+      repository_id: integration.repository_id,
+      attempt_id: "release-attempt-after-activation",
+      outcome: "integrated",
+      merge_observation_event: integration.merge_observation_event.to_h,
+      observation_digest: integration.observation_digest,
+      failure: nil
+    }
+
+    result = operation.call(input)
+
+    expect(result.failure.code).to eq(:release_set_already_activated)
+  end
+
+  it "closes repository integration after compensation is requested" do
+    prepared = ReleaseSetScenario.prepare(prefix: "integration-after-compensation")
+    observation = ReleaseSetScenario.observe_member(
+      prepared, index: 0, prefix: "integration-after-compensation"
+    )
+    ReleaseSetScenario.record_integration(
+      prepared, index: 0, prefix: "integration-after-compensation", observation:
+    )
+    failure = ReleaseSetScenario.record_integration(
+      prepared,
+      index: 1,
+      prefix: "integration-after-compensation-failed",
+      failure: failure_evidence
+    )
+    Coordinator::Processes::ProcessManagers::ReleaseSetLifecycle.new(event_store:).call(
+      failure.fetch(:event)
+    )
+    input = failure.fetch(:input).merge(
+      command_id: "cmd-release-integrate-after-compensation",
+      attempt_id: "release-attempt-after-compensation"
+    )
+
+    result = operation.call(input)
+
+    expect(result.failure.code).to eq(:release_set_compensation_requested)
+  end
+
   def successful_input(prepared, observation, index:, prefix:)
     member = prepared.fetch(:payload).ordered_members.fetch(index)
     {

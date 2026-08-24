@@ -147,6 +147,14 @@ module Coordinator
       Write::Operations::PrepareRecordReleaseSetVerification.new
     end
 
+    register("operations.prepare_record_release_set_activation", memoize: true) do
+      Write::Operations::PrepareRecordReleaseSetActivation.new
+    end
+
+    register("operations.prepare_complete_compensated_release_set", memoize: true) do
+      Write::Operations::PrepareCompleteCompensatedReleaseSet.new
+    end
+
     register("domain.change_sets.create", memoize: true) do
       Write::Domain::ChangeSets::Create.new(stream_factory: self["stream_factory"])
     end
@@ -428,6 +436,37 @@ module Coordinator
       Write::Domain::ReleaseSets::RecordVerification.new(
         stream_factory: self["stream_factory"],
         digest_builder: Write::ReleaseSets::VerificationDigestBuilder.new(
+          canonical_json: self["canonical_json"]
+        )
+      )
+    end
+
+    register("domain.release_sets.record_activation", memoize: true) do
+      Write::Domain::ReleaseSets::RecordActivation.new(
+        stream_factory: self["stream_factory"],
+        digest_builder: Write::ReleaseSets::ActivationDigestBuilder.new(
+          canonical_json: self["canonical_json"]
+        )
+      )
+    end
+
+    register("domain.release_sets.request_compensation", memoize: true) do
+      Write::Domain::ReleaseSets::RequestCompensation.new(stream_factory: self["stream_factory"])
+    end
+
+    register("domain.release_sets.complete_activated", memoize: true) do
+      Write::Domain::ReleaseSets::CompleteActivated.new(
+        stream_factory: self["stream_factory"],
+        digest_builder: Write::ReleaseSets::CompletionDigestBuilder.new(
+          canonical_json: self["canonical_json"]
+        )
+      )
+    end
+
+    register("domain.release_sets.complete_compensated", memoize: true) do
+      Write::Domain::ReleaseSets::CompleteCompensated.new(
+        stream_factory: self["stream_factory"],
+        digest_builder: Write::ReleaseSets::CompletionDigestBuilder.new(
           canonical_json: self["canonical_json"]
         )
       )
@@ -1160,6 +1199,68 @@ module Coordinator
       )
     end
 
+    register("operations.execute_record_release_set_activation") do
+      Write::Operations::ExecuteRecordReleaseSetActivation.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_record_release_set_activation"],
+        history_loader: self["release_sets.history_loader"],
+        decider: self["domain.release_sets.record_activation"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
+    register("operations.execute_request_release_set_compensation") do
+      Write::Operations::ExecuteRequestReleaseSetCompensation.new(
+        event_store: self["event_store"],
+        history_loader: self["release_sets.history_loader"],
+        decider: self["domain.release_sets.request_compensation"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
+    register("operations.execute_complete_activated_release_set") do
+      Write::Operations::ExecuteCompleteActivatedReleaseSet.new(
+        event_store: self["event_store"],
+        history_loader: self["release_sets.history_loader"],
+        decider: self["domain.release_sets.complete_activated"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
+    register("operations.execute_complete_compensated_release_set") do
+      Write::Operations::ExecuteCompleteCompensatedReleaseSet.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_complete_compensated_release_set"],
+        history_loader: self["release_sets.history_loader"],
+        decider: self["domain.release_sets.complete_compensated"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
     register("operations.execute_claim_verification_obligation") do
       Write::Operations::ExecuteClaimVerificationObligation.new(
         event_store: self["event_store"],
@@ -1368,7 +1469,11 @@ module Coordinator
         record_repository_integration:
           self["operations.execute_record_repository_integration"],
         record_release_set_verification:
-          self["operations.execute_record_release_set_verification"]
+          self["operations.execute_record_release_set_verification"],
+        record_release_set_activation:
+          self["operations.execute_record_release_set_activation"],
+        complete_compensated_release_set:
+          self["operations.execute_complete_compensated_release_set"]
       )
     end
 
@@ -1584,6 +1689,20 @@ module Coordinator
       )
     end
 
+    register("operations.submit_record_release_set_activation_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_record_release_set_activation"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_complete_compensated_release_set_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_complete_compensated_release_set"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
     register("operations.start_coordination_task", memoize: true) do
       Write::Operations::StartCoordinationTask.new(
         transition: self["operations.apply_coordination_task_transition"],
@@ -1683,6 +1802,14 @@ module Coordinator
       )
     end
 
+    register("process_managers.release_set_lifecycle", memoize: true) do
+      Processes::ProcessManagers::ReleaseSetLifecycle.new(
+        event_store: self["event_store"],
+        request_compensation: self["operations.execute_request_release_set_compensation"],
+        complete_activated: self["operations.execute_complete_activated_release_set"]
+      )
+    end
+
     register("subscriptions.change_set_readiness", memoize: true) do
       Processes::Subscriptions::ChangeSetReadiness.new(handler: self["process_managers.change_set_readiness"])
     end
@@ -1714,6 +1841,12 @@ module Coordinator
     register("subscriptions.verification_obligation_validity", memoize: true) do
       Processes::Subscriptions::VerificationObligationValidity.new(
         handler: self["process_managers.verification_obligation_validity"]
+      )
+    end
+
+    register("subscriptions.release_set_lifecycle", memoize: true) do
+      Processes::Subscriptions::ReleaseSetLifecycle.new(
+        handler: self["process_managers.release_set_lifecycle"]
       )
     end
 
@@ -1790,7 +1923,8 @@ module Coordinator
           self["subscriptions.lease_expiry_scheduler"],
           self["subscriptions.agent_choice_decision_impact"],
           self["subscriptions.candidate_impact_obligation_policy"],
-          self["subscriptions.verification_obligation_validity"]
+          self["subscriptions.verification_obligation_validity"],
+          self["subscriptions.release_set_lifecycle"]
         ]
       )
     end

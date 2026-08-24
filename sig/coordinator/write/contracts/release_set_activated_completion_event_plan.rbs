@@ -1,0 +1,4 @@
+module Coordinator::Write::Contracts
+  class ReleaseSetActivatedCompletionEventPlan < Dry::Validation::Contract
+  end
+end

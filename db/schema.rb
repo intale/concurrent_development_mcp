@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_210000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_24_220000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -410,7 +410,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_210000) do
   end
 
   create_table "release_sets", primary_key: "release_set_id", id: :string, force: :cascade do |t|
+    t.jsonb "activation"
     t.string "change_set_id", null: false
+    t.jsonb "compensation_request"
+    t.jsonb "completion"
     t.datetime "created_at", null: false
     t.jsonb "integrations", default: [], null: false
     t.jsonb "ordered_members", null: false

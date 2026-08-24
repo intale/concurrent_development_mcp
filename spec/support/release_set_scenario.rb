@@ -110,6 +110,57 @@ module ReleaseSetScenario
     { input:, completion:, event:, payload: load(event) }
   end
 
+  def record_activation(prepared, verification:, prefix:)
+    input = {
+      command_id: "cmd-release-activate-set-#{prefix}",
+      actor: { kind: "agent", id: "release-operator-1" },
+      release_set_id: prepared.dig(:input, :release_set_id),
+      verification_event: verification.fetch(:completion).data.verification_event.to_h,
+      verification_digest: verification.fetch(:payload).verification_digest,
+      activation_point: {
+        kind: "deployment_manifest",
+        environment: "production",
+        external_reference: "deployments/#{prefix}",
+        state_digest: "sha256:#{'a' * 64}",
+        producer: { name: "deployment-controller", version: "1.0.0" },
+        run_id: "release-activation-#{prefix}",
+        activated_at: "2026-08-24T21:00:00.000000Z"
+      }
+    }
+    completion = execute(Coordinator::Write::Operations::ExecuteRecordReleaseSetActivation, input)
+    event = release_lifecycle_events(prepared.dig(:input, :release_set_id)).last
+    { input:, completion:, event:, payload: load(event) }
+  end
+
+  def complete_compensation(prepared, request:, prefix:)
+    state = Coordinator::Write::ReleaseSets::HistoryLoader.new(event_store:).call(
+      prepared.dig(:input, :release_set_id)
+    )
+    evidence = request.fetch(:payload).successful_integrations.map.with_index do |reference, index|
+      integration = state.integrations.find { _1.event == reference }
+      {
+        repository_id: integration.payload.repository_id,
+        integration_event: reference.to_h,
+        action: "revert",
+        external_reference: "reverts/#{prefix}/#{index + 1}",
+        result_digest: "sha256:#{(index + 5).to_s * 64}",
+        producer: { name: "release-reverter", version: "1.0.0" },
+        run_id: "release-compensation-#{prefix}-#{index + 1}",
+        compensated_at: "2026-08-24T22:00:0#{index}.000000Z"
+      }
+    end
+    input = {
+      command_id: "cmd-release-compensation-complete-#{prefix}",
+      actor: { kind: "agent", id: "release-operator-1" },
+      release_set_id: prepared.dig(:input, :release_set_id),
+      compensation_request_event: request.fetch(:event).then { reference(_1).to_h },
+      evidence:
+    }
+    completion = execute(Coordinator::Write::Operations::ExecuteCompleteCompensatedReleaseSet, input)
+    event = release_lifecycle_events(prepared.dig(:input, :release_set_id)).last
+    { input:, completion:, event:, payload: load(event) }
+  end
+
   def authorized_members(prefix:)
     candidates = candidates(prefix:)
     candidates.each_with_index.map do |candidate, index|
@@ -257,6 +308,17 @@ module ReleaseSetScenario
       type: event.type,
       schema_version: event.metadata.fetch("schema_version"),
       data: event.data
+    )
+  end
+
+  def reference(event)
+    Coordinator::Write::EventReference.new(
+      event_id: event.id,
+      type: event.type,
+      stream_context: event.stream.context,
+      stream_name: event.stream.stream_name,
+      stream_id: event.stream.stream_id,
+      stream_revision: event.stream_revision
     )
   end
 end

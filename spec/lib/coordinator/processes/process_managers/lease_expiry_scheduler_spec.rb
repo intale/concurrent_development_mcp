@@ -172,6 +172,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
         "change-set-readiness-v1",
         "coordination-task-executor-v1",
         "lease-expiry-scheduler-v1",
+        "release-set-lifecycle-v1",
         "verification-obligation-validity-v1"
       ]
     )

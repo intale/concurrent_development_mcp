@@ -1,0 +1,9 @@
+module Coordinator::Write::Commands
+  class RequestReleaseSetCompensation < Coordinator::Shared::Value
+    def command_id: () -> String
+    def actor: () -> Actor
+    def release_set_id: () -> String
+    def trigger_event: () -> Coordinator::Write::EventReference
+    def rule_version: () -> String
+  end
+end

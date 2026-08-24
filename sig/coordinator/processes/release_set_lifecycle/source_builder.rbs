@@ -1,0 +1,6 @@
+module Coordinator::Processes::ReleaseSetLifecycle
+  class SourceBuilder
+    def initialize: (?contract: Coordinator::Processes::Contracts::ReleaseSetLifecycleSourceEvent, ?schema_registry: Coordinator::Write::EventSchemaRegistry) -> void
+    def call: (PgEventstore::Event event) -> SourceV1
+  end
+end

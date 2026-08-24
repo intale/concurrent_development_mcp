@@ -1,0 +1,4 @@
+module Coordinator::Mcp::Tools
+  class ReleaseCompensationComplete < Coordinator::Mcp::MutationTool
+  end
+end

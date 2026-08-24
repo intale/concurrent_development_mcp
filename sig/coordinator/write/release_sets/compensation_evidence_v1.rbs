@@ -1,0 +1,12 @@
+module Coordinator::Write::ReleaseSets
+  class CompensationEvidenceV1 < Coordinator::Shared::Value
+    def repository_id: () -> String
+    def integration_event: () -> Coordinator::Write::EventReference
+    def action: () -> String
+    def external_reference: () -> String
+    def result_digest: () -> String
+    def producer: () -> EvidenceProducerV1
+    def run_id: () -> String
+    def compensated_at: () -> String
+  end
+end

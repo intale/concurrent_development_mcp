@@ -36,6 +36,8 @@ module Coordinator
       def self.release_set_prepare: () -> json_schema
       def self.release_repository_integration_record: () -> json_schema
       def self.release_verification_record: () -> json_schema
+      def self.release_activation_record: () -> json_schema
+      def self.release_compensation_complete: () -> json_schema
       def self.candidate_impact_surface_submit: () -> json_schema
       def self.operation_get: () -> json_schema
       def self.guidance_get: () -> json_schema

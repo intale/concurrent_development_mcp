@@ -1,0 +1,4 @@
+module Coordinator::Processes
+  class ReleaseSetLifecycleProcessRejected < StandardError
+  end
+end

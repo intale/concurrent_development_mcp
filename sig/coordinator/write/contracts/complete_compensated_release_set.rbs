@@ -1,0 +1,4 @@
+module Coordinator::Write::Contracts
+  class CompleteCompensatedReleaseSet < Dry::Validation::Contract
+  end
+end

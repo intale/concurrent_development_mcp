@@ -1,0 +1,6 @@
+module Coordinator::Processes::Subscriptions
+  class ReleaseSetLifecycle < Coordinator::Shared::Subscriptions::Registration
+    DEFINITION: ProcessDefinition
+    def initialize: (handler: Coordinator::Processes::ProcessManagers::ReleaseSetLifecycle, ?pull_interval: Float) -> void
+  end
+end

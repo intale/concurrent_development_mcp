@@ -93,6 +93,11 @@ module Coordinator
         successful integration makes compensation necessary. After every member succeeds, use
         release_verification_record with the exact ordered integration event references and attributed
         composite evidence. These durable Tasks recheck ReleaseSet history without consulting projections.
+        After the exact latest composite verification passes, use release_activation_record to record one
+        attributed external activation point. The ReleaseSet lifecycle Saga completes activated releases and
+        requests compensation after partial integration or composite-verification failure. If compensation is
+        requested, external systems perform it and release_compensation_complete records evidence covering every
+        exact integrated member. All release mutations remain correlated to physical ReleaseSet preparation.
         The coordinator records attributed evidence and does not execute Git, CI, or agent work.
       TEXT
 
