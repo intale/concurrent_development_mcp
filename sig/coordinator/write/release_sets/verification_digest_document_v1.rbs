@@ -1,0 +1,11 @@
+module Coordinator::Write::ReleaseSets
+  class VerificationDigestDocumentV1 < Coordinator::Shared::Value
+    def schema: () -> String
+    def release_set_id: () -> String
+    def release_digest: () -> String
+    def attempt_number: () -> Integer
+    def integration_events: () -> Array[Coordinator::Write::EventReference]
+    def evidence: () -> VerificationEvidenceV1
+    def policy_version: () -> String
+  end
+end

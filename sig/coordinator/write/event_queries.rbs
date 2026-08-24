@@ -31,6 +31,7 @@ module Coordinator
       MERGE_SNAPSHOT_VERIFIED: EventReadCriteria
       MERGE_OBSERVATION: EventReadCriteria
       RELEASE_SET_PREPARATION: EventReadCriteria
+      RELEASE_SET_LIFECYCLE: EventReadCriteria
       CANDIDATE_FOR_IMPACT_SURFACE: GroupedEventReadCriteria
       VERIFICATION_OBLIGATION_CREATION: EventReadCriteria
       VERIFICATION_OBLIGATION_FOR_CLAIM: GroupedEventReadCriteria

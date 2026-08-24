@@ -1,0 +1,8 @@
+module Coordinator::Write::ReleaseSets
+  class VerificationFindingV1 < Coordinator::Shared::Value
+    def code: () -> String
+    def severity: () -> String
+    def summary: () -> String
+    def repository_id: () -> String?
+  end
+end

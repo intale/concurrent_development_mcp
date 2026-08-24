@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandReceiptData
-      type value = ChangeSet | WorkItem | Dependency | Attempt | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver | MergeSnapshotRegistration | MergeSnapshotVerification | MergeAuthorization | MergeObservation | ReleaseSetPreparation
+      type value = ChangeSet | WorkItem | Dependency | Attempt | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver | MergeSnapshotRegistration | MergeSnapshotVerification | MergeAuthorization | MergeObservation | ReleaseSetPreparation | RepositoryIntegration | ReleaseSetVerification
 
       class ChangeSet < Shared::Value
         def change_set_id: () -> String
@@ -273,6 +273,32 @@ module Coordinator
         def policy_version: () -> String
         def prepared_event: () -> EventReference
         def prepared_at: () -> String
+      end
+
+      class RepositoryIntegration < Shared::Value
+        def release_set_id: () -> String
+        def change_set_id: () -> String
+        def repository_id: () -> String
+        def member_position: () -> Integer
+        def attempt_id: () -> String
+        def attempt_number: () -> Integer
+        def outcome: () -> String
+        def integration_digest: () -> String
+        def evidence_status: () -> String
+        def integration_event: () -> EventReference
+        def recorded_at: () -> String
+      end
+
+      class ReleaseSetVerification < Shared::Value
+        def release_set_id: () -> String
+        def change_set_id: () -> String
+        def attempt_number: () -> Integer
+        def outcome: () -> String
+        def integration_events: () -> Array[EventReference]
+        def verification_digest: () -> String
+        def evidence_status: () -> String
+        def verification_event: () -> EventReference
+        def recorded_at: () -> String
       end
     end
   end

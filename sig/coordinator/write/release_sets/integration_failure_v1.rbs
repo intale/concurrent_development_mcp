@@ -1,0 +1,10 @@
+module Coordinator::Write::ReleaseSets
+  class IntegrationFailureV1 < Coordinator::Shared::Value
+    def code: () -> String
+    def summary: () -> String
+    def producer: () -> EvidenceProducerV1
+    def run_id: () -> String
+    def result_digest: () -> String
+    def occurred_at: () -> String
+  end
+end

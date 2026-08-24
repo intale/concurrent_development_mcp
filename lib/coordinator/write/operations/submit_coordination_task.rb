@@ -16,6 +16,9 @@ module Coordinator::Write
         id_generator: IdGenerator.new,
         event_factory: EventFactory.new,
         stream_factory: StreamFactory.new,
+        correlation_resolver: Tasks::CorrelationResolver.new(
+          release_set_correlation_loader: ReleaseSets::CorrelationLoader.new(event_store:)
+        ),
         maximum_attempts: MAX_ATTEMPTS
       )
         @event_store = event_store
@@ -25,6 +28,7 @@ module Coordinator::Write
         @id_generator = id_generator
         @event_factory = event_factory
         @stream_factory = stream_factory
+        @correlation_resolver = correlation_resolver
         @maximum_attempts = maximum_attempts
       end
 
@@ -32,6 +36,7 @@ module Coordinator::Write
         command_input = @input_digest.document(target_command)
         canonical_input_digest = @input_digest.call(target_command)
         submitted_at = @clock.now
+        correlation_id = @correlation_resolver.call(target_command)
         last_task_id = nil
 
         @maximum_attempts.times do
@@ -53,7 +58,7 @@ module Coordinator::Write
           ).value!
 
           begin
-            append(event:, target_command:)
+            append(event:, target_command:, correlation_id:)
             return Success(Domain::CoordinationTasks::State.reduce([ event ]))
           rescue PgEventstore::WrongExpectedRevisionError
             next
@@ -65,7 +70,7 @@ module Coordinator::Write
 
       private
 
-      def append(event:, target_command:)
+      def append(event:, target_command:, correlation_id:)
         persisted = @event_factory.build!(
           event:,
           event_id: @id_generator.uuid_v7,
@@ -80,7 +85,8 @@ module Coordinator::Write
             "task:#{event.task_id}",
             "command:#{target_command.command_id}",
             "tool:#{event.tool_name}"
-          ]
+          ],
+          correlation_id:
         )
 
         @event_store.append(

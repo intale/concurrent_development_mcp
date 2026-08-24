@@ -1,0 +1,18 @@
+module Coordinator::Write::Domain::ReleaseSets
+  class LifecycleStateV1 < Coordinator::Shared::Value
+    Integration: singleton(Coordinator::Write::ReleaseSets::IntegrationFactV1)
+    Verification: singleton(Coordinator::Write::ReleaseSets::VerificationFactV1)
+
+    def preparation: () -> Coordinator::Write::ReleaseSets::PreparationFactV1?
+    def integrations: () -> Array[Coordinator::Write::ReleaseSets::IntegrationFactV1]
+    def verifications: () -> Array[Coordinator::Write::ReleaseSets::VerificationFactV1]
+    def member: (String repository_id) -> Coordinator::Write::ReleaseSets::MemberEvidenceV1?
+    def integrations_for: (String repository_id) -> Array[Coordinator::Write::ReleaseSets::IntegrationFactV1]
+    def latest_integration: (String repository_id) -> Coordinator::Write::ReleaseSets::IntegrationFactV1?
+    def integrated?: (String repository_id) -> bool
+    def all_integrated?: () -> bool
+    def successful_integrations: () -> Array[Coordinator::Write::ReleaseSets::IntegrationFactV1]
+    def latest_verification: () -> Coordinator::Write::ReleaseSets::VerificationFactV1?
+    def verified?: () -> bool
+  end
+end

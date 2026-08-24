@@ -294,6 +294,37 @@ module Coordinator::Write
       attribute :prepared_at, Types::Timestamp
     end
 
+    class RepositoryIntegration < Value
+      attribute :release_set_id, Types::Identifier
+      attribute :change_set_id, Types::Identifier
+      attribute :repository_id, Types::RepositoryId
+      attribute :member_position, Types::ReleaseSetMemberPosition
+      attribute :attempt_id, Types::Identifier
+      attribute :attempt_number, Types::ReleaseSetIntegrationAttemptNumber
+      attribute :outcome, Types::ReleaseSetIntegrationOutcome
+      attribute :integration_digest, Types::Sha256Digest
+      attribute :evidence_status, Types::MergeSnapshotEvidenceStatus
+      attribute :integration_event, EventReference
+      attribute :recorded_at, Types::Timestamp
+    end
+
+    class ReleaseSetVerification < Value
+      attribute :release_set_id, Types::Identifier
+      attribute :change_set_id, Types::Identifier
+      attribute :attempt_number, Types::ReleaseSetVerificationAttemptNumber
+      attribute :outcome, Types::ReleaseSetVerificationOutcome
+      attribute :integration_events,
+                Types::Array.of(EventReference)
+                  .constrained(
+                    min_size: Types::RELEASE_SET_MINIMUM_MEMBERS,
+                    max_size: Types::RELEASE_SET_MAXIMUM_MEMBERS
+                  )
+      attribute :verification_digest, Types::Sha256Digest
+      attribute :evidence_status, Types::MergeSnapshotEvidenceStatus
+      attribute :verification_event, EventReference
+      attribute :recorded_at, Types::Timestamp
+    end
+
     Type = ChangeSet |
            WorkItem |
            Dependency |
@@ -318,6 +349,8 @@ module Coordinator::Write
            MergeSnapshotVerification |
            MergeAuthorization |
            MergeObservation |
-           ReleaseSetPreparation
+           ReleaseSetPreparation |
+           RepositoryIntegration |
+           ReleaseSetVerification
   end
 end

@@ -45,7 +45,9 @@ module Coordinator
           Tools::MergeAuthorizationRequest,
           Tools::MergeObservationRecord,
           Tools::ReleaseSetGet,
-          Tools::ReleaseSetPrepare
+          Tools::ReleaseSetPrepare,
+          Tools::ReleaseRepositoryIntegrationRecord,
+          Tools::ReleaseVerificationRecord
         ].freeze
       end
     end

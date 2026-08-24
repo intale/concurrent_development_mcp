@@ -78,6 +78,8 @@ module Coordinator::Write
       [ "MergeAuthorizationDenied", 1 ] => Events::MergeAuthorizationDeniedV1,
       [ "MergeObserved", 1 ] => Events::MergeObservedV1,
       [ "ReleaseSetPrepared", 1 ] => Events::ReleaseSetPreparedV1,
+      [ "RepositoryIntegrationRecorded", 1 ] => Events::RepositoryIntegrationRecordedV1,
+      [ "ReleaseSetVerificationRecorded", 1 ] => Events::ReleaseSetVerificationRecordedV1,
       [ "CoordinationTaskSubmitted", 1 ] => Events::CoordinationTaskSubmittedV1,
       [ "CoordinationTaskExecutionStarted", 1 ] => Events::CoordinationTaskExecutionStartedV1,
       [ "CoordinationTaskCompleted", 1 ] => Events::CoordinationTaskCompletedV1,

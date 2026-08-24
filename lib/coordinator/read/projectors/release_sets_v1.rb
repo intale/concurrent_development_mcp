@@ -30,12 +30,25 @@ module Coordinator::Read
             processed_at: Time.now.utc
           )
 
-          @release_sets.store(event:, release_set: payload)
+          project(event:, payload:)
         end
         nil
       end
 
       private
+
+      def project(event:, payload:)
+        case payload
+        when Coordinator::Write::Events::ReleaseSetPreparedV1
+          @release_sets.store(event:, release_set: payload)
+        when Coordinator::Write::Events::RepositoryIntegrationRecordedV1
+          @release_sets.record_integration(event:, integration: payload)
+        when Coordinator::Write::Events::ReleaseSetVerificationRecordedV1
+          @release_sets.record_verification(event:, verification: payload)
+        else
+          raise UnknownProjectionEvent, payload.class.name
+        end
+      end
 
       def load_payload(event)
         result = @contract.call(

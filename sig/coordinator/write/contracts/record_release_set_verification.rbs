@@ -1,0 +1,4 @@
+module Coordinator::Write::Contracts
+  class RecordReleaseSetVerification < Dry::Validation::Contract
+  end
+end

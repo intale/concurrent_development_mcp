@@ -12,7 +12,11 @@ module Coordinator::Read
             stream_name: "ReleaseSet"
           )
         ],
-        event_types: [ "ReleaseSetPrepared" ]
+        event_types: [
+          "ReleaseSetPrepared",
+          "RepositoryIntegrationRecorded",
+          "ReleaseSetVerificationRecorded"
+        ]
       )
 
       def initialize(handler:, pull_interval: 1.0)

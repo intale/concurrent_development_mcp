@@ -7,6 +7,7 @@ module Coordinator::Read::Projectors
 
     private
 
-    def load_payload: (PgEventstore::Event event) -> Coordinator::Write::Events::ReleaseSetPreparedV1
+    def project: (event: PgEventstore::Event, payload: Coordinator::Write::Events::ReleaseSetPreparedV1 | Coordinator::Write::Events::RepositoryIntegrationRecordedV1 | Coordinator::Write::Events::ReleaseSetVerificationRecordedV1) -> (Coordinator::Read::ReleaseSet | bool)
+    def load_payload: (PgEventstore::Event event) -> (Coordinator::Write::Events::ReleaseSetPreparedV1 | Coordinator::Write::Events::RepositoryIntegrationRecordedV1 | Coordinator::Write::Events::ReleaseSetVerificationRecordedV1)
   end
 end

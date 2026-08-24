@@ -1,0 +1,8 @@
+module Coordinator::Write::Domain::ReleaseSets
+  class RecordRepositoryIntegration
+    include Dry::Monads::Result::Mixin
+
+    def initialize: (?stream_factory: Coordinator::Write::StreamFactory, ?digest_builder: Coordinator::Write::ReleaseSets::IntegrationDigestBuilder) -> void
+    def call: (state: LifecycleStateV1, command: Coordinator::Write::Commands::RecordRepositoryIntegration, observation: Coordinator::Write::Events::MergeObservedV1?, recorded_at: String) -> Dry::Monads::Result
+  end
+end

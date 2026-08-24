@@ -1,0 +1,19 @@
+module Coordinator::Write::Events
+  class RepositoryIntegrationRecordedV1 < Base
+    def release_set_id: () -> String
+    def change_set_id: () -> String
+    def release_digest: () -> String
+    def repository_id: () -> String
+    def member_position: () -> Integer
+    def attempt_id: () -> String
+    def attempt_number: () -> Integer
+    def outcome: () -> String
+    def merge_observation_event: () -> Coordinator::Write::EventReference?
+    def observation_digest: () -> String?
+    def failure: () -> Coordinator::Write::ReleaseSets::IntegrationFailureV1?
+    def integration_digest: () -> String
+    def policy_version: () -> String
+    def evidence_status: () -> String
+    def recorded_at: () -> String
+  end
+end

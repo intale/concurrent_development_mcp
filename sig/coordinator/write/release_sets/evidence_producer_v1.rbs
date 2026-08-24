@@ -1,0 +1,6 @@
+module Coordinator::Write::ReleaseSets
+  class EvidenceProducerV1 < Coordinator::Shared::Value
+    def name: () -> String
+    def version: () -> String
+  end
+end

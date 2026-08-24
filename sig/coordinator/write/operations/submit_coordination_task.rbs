@@ -13,6 +13,7 @@ module Coordinator
           ?id_generator: Shared::IdGenerator,
           ?event_factory: EventFactory,
           ?stream_factory: StreamFactory,
+          ?correlation_resolver: Tasks::CorrelationResolver,
           ?maximum_attempts: Integer
         ) -> void
 

@@ -37,6 +37,8 @@ module Coordinator::Write
       when Commands::RequestMergeAuthorization then merge_authorization_request_document(command)
       when Commands::RecordMergeObservation then merge_observation_record_document(command)
       when Commands::PrepareReleaseSet then release_set_prepare_document(command)
+      when Commands::RecordRepositoryIntegration then release_repository_integration_record_document(command)
+      when Commands::RecordReleaseSetVerification then release_verification_record_document(command)
       when Commands::ExpireResourceLease then lease_expire_policy_document(command)
       else
         raise ArgumentError, "Unsupported coordination command: #{command.class.name}"
@@ -589,6 +591,49 @@ module Coordinator::Write
           actor: actor_document(command.actor),
           release_set_id: command.release_set_id,
           ordered_members: command.ordered_members
+        )
+      )
+    end
+
+    def release_repository_integration_record(command)
+      @canonical_json.sha256(release_repository_integration_record_document(command).to_h)
+    end
+
+    def release_repository_integration_record_document(command)
+      CommandInputDocuments::RecordRepositoryIntegrationV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "release_repository_integration_record",
+        input: CommandInputDocuments::RecordRepositoryIntegrationInputV1.new(
+          actor: actor_document(command.actor),
+          release_set_id: command.release_set_id,
+          repository_id: command.repository_id,
+          attempt_id: command.attempt_id,
+          outcome: command.outcome,
+          merge_observation_event: command.merge_observation_event &&
+            CommandInputDocuments::EventReferenceV1.new(command.merge_observation_event.to_h),
+          observation_digest: command.observation_digest,
+          failure: command.failure
+        )
+      )
+    end
+
+    def release_verification_record(command)
+      @canonical_json.sha256(release_verification_record_document(command).to_h)
+    end
+
+    def release_verification_record_document(command)
+      CommandInputDocuments::RecordReleaseSetVerificationV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "release_verification_record",
+        input: CommandInputDocuments::RecordReleaseSetVerificationInputV1.new(
+          actor: actor_document(command.actor),
+          release_set_id: command.release_set_id,
+          integration_events: command.integration_events.map do |reference|
+            CommandInputDocuments::EventReferenceV1.new(reference.to_h)
+          end,
+          evidence: command.evidence
         )
       )
     end

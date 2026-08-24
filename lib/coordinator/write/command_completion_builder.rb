@@ -749,6 +749,54 @@ module Coordinator::Write
       )
     end
 
+    def release_repository_integration_record(command:, integration:, input_digest:, persisted_events:, completed_at:)
+      build_completion(
+        command:,
+        tool_name: "release_repository_integration_record",
+        summary: repository_integration_summary(integration.outcome),
+        data: CommandReceiptData::RepositoryIntegration.new(
+          release_set_id: integration.release_set_id,
+          change_set_id: integration.change_set_id,
+          repository_id: integration.repository_id,
+          member_position: integration.member_position,
+          attempt_id: integration.attempt_id,
+          attempt_number: integration.attempt_number,
+          outcome: integration.outcome,
+          integration_digest: integration.integration_digest,
+          evidence_status: integration.evidence_status,
+          integration_event: event_reference(persisted_events.sole),
+          recorded_at: integration.recorded_at
+        ),
+        next_actions: [ release_set_next_action(command.release_set_id) ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
+    def release_verification_record(command:, verification:, input_digest:, persisted_events:, completed_at:)
+      build_completion(
+        command:,
+        tool_name: "release_verification_record",
+        summary: release_verification_summary(verification.evidence.outcome),
+        data: CommandReceiptData::ReleaseSetVerification.new(
+          release_set_id: verification.release_set_id,
+          change_set_id: verification.change_set_id,
+          attempt_number: verification.attempt_number,
+          outcome: verification.evidence.outcome,
+          integration_events: verification.integration_events,
+          verification_digest: verification.verification_digest,
+          evidence_status: verification.evidence_status,
+          verification_event: event_reference(persisted_events.sole),
+          recorded_at: verification.recorded_at
+        ),
+        next_actions: [ release_set_next_action(command.release_set_id) ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
 
     def verification_status(persisted_events)
@@ -763,6 +811,25 @@ module Coordinator::Write
       return "Recorded evidence satisfies merge-authorization policy; the external merge has not been performed." if outcome == "granted"
 
       "Merge authorization was denied from the exact recorded evidence; the external merge was not performed."
+    end
+
+    def repository_integration_summary(outcome)
+      return "Attributed external repository integration recorded for the immutable ReleaseSet member." if outcome == "integrated"
+
+      "Attributed external repository integration failure recorded; the ReleaseSet may require retry or compensation."
+    end
+
+    def release_verification_summary(outcome)
+      return "Attributed composite verification passed for the exact integrated ReleaseSet." if outcome == "passed"
+
+      "Attributed composite verification failure recorded for the exact integrated ReleaseSet."
+    end
+
+    def release_set_next_action(release_set_id)
+      NextAction.new(
+        tool: "release_set_get",
+        arguments: NextAction::ReleaseSetArguments.new(release_set_id:)
+      )
     end
 
     def compatibility_assessment_summary(status)

@@ -500,6 +500,41 @@ module Coordinator::Write
       attribute :input, PrepareReleaseSetInputV1
     end
 
+    class RecordRepositoryIntegrationInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :release_set_id, Types::Identifier
+      attribute :repository_id, Types::RepositoryId
+      attribute :attempt_id, Types::Identifier
+      attribute :outcome, Types::ReleaseSetIntegrationOutcome
+      attribute :merge_observation_event, EventReferenceV1.optional
+      attribute :observation_digest, Types::Sha256Digest.optional
+      attribute :failure, ReleaseSets::IntegrationFailureV1.optional
+    end
+
+    class RecordRepositoryIntegrationV1 < BaseV1
+      attribute :tool_name, Types::String.enum("release_repository_integration_record")
+      attribute :input, RecordRepositoryIntegrationInputV1
+    end
+
+    class RecordReleaseSetVerificationInputV1 < Value
+      Reference = EventReferenceV1
+
+      attribute :actor, ActorV1
+      attribute :release_set_id, Types::Identifier
+      attribute :integration_events,
+                Types::Array.of(Reference)
+                  .constrained(
+                    min_size: Types::RELEASE_SET_MINIMUM_MEMBERS,
+                    max_size: Types::RELEASE_SET_MAXIMUM_MEMBERS
+                  )
+      attribute :evidence, ReleaseSets::VerificationEvidenceV1
+    end
+
+    class RecordReleaseSetVerificationV1 < BaseV1
+      attribute :tool_name, Types::String.enum("release_verification_record")
+      attribute :input, RecordReleaseSetVerificationInputV1
+    end
+
     class ExpireResourceLeaseInputV1 < Value
       attribute :actor, ActorV1
       attribute :resource_key_hash, Types::Sha256Digest
@@ -538,7 +573,9 @@ module Coordinator::Write
            SubmitMergeSnapshotVerificationV1 |
            RequestMergeAuthorizationV1 |
            RecordMergeObservationV1 |
-           PrepareReleaseSetV1
+           PrepareReleaseSetV1 |
+           RecordRepositoryIntegrationV1 |
+           RecordReleaseSetVerificationV1
 
     DigestType = Type | ExpireResourceLeaseV1
   end

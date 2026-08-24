@@ -1,0 +1,13 @@
+module Coordinator::Write::ReleaseSets
+  class VerificationEvidenceV1 < Coordinator::Shared::Value
+    Finding: singleton(VerificationFindingV1)
+
+    def producer: () -> EvidenceProducerV1
+    def run_id: () -> String
+    def environment_digest: () -> String
+    def result_digest: () -> String
+    def outcome: () -> String
+    def findings: () -> Array[VerificationFindingV1]
+    def produced_at: () -> String
+  end
+end

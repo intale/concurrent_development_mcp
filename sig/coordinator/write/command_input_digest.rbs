@@ -56,6 +56,10 @@ module Coordinator
       def merge_observation_record_document: (Commands::RecordMergeObservation command) -> CommandInputDocuments::RecordMergeObservationV1
       def release_set_prepare: (Commands::PrepareReleaseSet command) -> String
       def release_set_prepare_document: (Commands::PrepareReleaseSet command) -> CommandInputDocuments::PrepareReleaseSetV1
+      def release_repository_integration_record: (Commands::RecordRepositoryIntegration command) -> String
+      def release_repository_integration_record_document: (Commands::RecordRepositoryIntegration command) -> CommandInputDocuments::RecordRepositoryIntegrationV1
+      def release_verification_record: (Commands::RecordReleaseSetVerification command) -> String
+      def release_verification_record_document: (Commands::RecordReleaseSetVerification command) -> CommandInputDocuments::RecordReleaseSetVerificationV1
     end
   end
 end

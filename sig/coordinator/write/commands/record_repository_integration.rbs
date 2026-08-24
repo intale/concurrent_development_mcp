@@ -1,0 +1,14 @@
+module Coordinator::Write::Commands
+  class RecordRepositoryIntegration < Coordinator::Shared::Value
+    def command_id: () -> String
+    def actor: () -> Actor
+    def release_set_id: () -> String
+    def repository_id: () -> String
+    def attempt_id: () -> String
+    def outcome: () -> String
+    def merge_observation_event: () -> Coordinator::Write::EventReference?
+    def observation_digest: () -> String?
+    def failure: () -> Coordinator::Write::ReleaseSets::IntegrationFailureV1?
+    def policy_version: () -> String
+  end
+end

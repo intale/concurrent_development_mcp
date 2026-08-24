@@ -1,0 +1,7 @@
+module Coordinator::Write::ReleaseSets
+  class PreparationFactV1 < Coordinator::Shared::Value
+    def payload: () -> Coordinator::Write::Events::ReleaseSetPreparedV1
+    def event: () -> Coordinator::Write::EventReference
+    def correlation_id: () -> String
+  end
+end

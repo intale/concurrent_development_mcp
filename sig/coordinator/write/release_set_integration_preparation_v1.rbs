@@ -1,0 +1,8 @@
+module Coordinator::Write
+  class ReleaseSetIntegrationPreparationV1 < Coordinator::Shared::Value
+    def recorded_at: () -> String
+    def input_digest: () -> String
+    def integration_event_id: () -> String
+    def completion_event_id: () -> String
+  end
+end

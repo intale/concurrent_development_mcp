@@ -139,6 +139,14 @@ module Coordinator
       Write::Operations::PrepareReleaseSet.new
     end
 
+    register("operations.prepare_record_repository_integration", memoize: true) do
+      Write::Operations::PrepareRecordRepositoryIntegration.new
+    end
+
+    register("operations.prepare_record_release_set_verification", memoize: true) do
+      Write::Operations::PrepareRecordReleaseSetVerification.new
+    end
+
     register("domain.change_sets.create", memoize: true) do
       Write::Domain::ChangeSets::Create.new(stream_factory: self["stream_factory"])
     end
@@ -376,10 +384,50 @@ module Coordinator
       )
     end
 
+    register("release_sets.history_loader", memoize: true) do
+      Write::ReleaseSets::HistoryLoader.new(
+        event_store: self["event_store"],
+        stream_factory: self["stream_factory"],
+        schema_registry: self["event_schema_registry"]
+      )
+    end
+
+    register("release_sets.correlation_loader", memoize: true) do
+      Write::ReleaseSets::CorrelationLoader.new(
+        event_store: self["event_store"],
+        stream_factory: self["stream_factory"],
+        schema_registry: self["event_schema_registry"]
+      )
+    end
+
+    register("tasks.correlation_resolver", memoize: true) do
+      Write::Tasks::CorrelationResolver.new(
+        release_set_correlation_loader: self["release_sets.correlation_loader"]
+      )
+    end
+
     register("domain.release_sets.prepare", memoize: true) do
       Write::Domain::ReleaseSets::Prepare.new(
         stream_factory: self["stream_factory"],
         digest_builder: Write::ReleaseSets::ReleaseDigestBuilder.new(
+          canonical_json: self["canonical_json"]
+        )
+      )
+    end
+
+    register("domain.release_sets.record_repository_integration", memoize: true) do
+      Write::Domain::ReleaseSets::RecordRepositoryIntegration.new(
+        stream_factory: self["stream_factory"],
+        digest_builder: Write::ReleaseSets::IntegrationDigestBuilder.new(
+          canonical_json: self["canonical_json"]
+        )
+      )
+    end
+
+    register("domain.release_sets.record_verification", memoize: true) do
+      Write::Domain::ReleaseSets::RecordVerification.new(
+        stream_factory: self["stream_factory"],
+        digest_builder: Write::ReleaseSets::VerificationDigestBuilder.new(
           canonical_json: self["canonical_json"]
         )
       )
@@ -1080,6 +1128,38 @@ module Coordinator
       )
     end
 
+    register("operations.execute_record_repository_integration") do
+      Write::Operations::ExecuteRecordRepositoryIntegration.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_record_repository_integration"],
+        history_loader: self["release_sets.history_loader"],
+        decider: self["domain.release_sets.record_repository_integration"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
+    register("operations.execute_record_release_set_verification") do
+      Write::Operations::ExecuteRecordReleaseSetVerification.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_record_release_set_verification"],
+        history_loader: self["release_sets.history_loader"],
+        decider: self["domain.release_sets.record_verification"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
     register("operations.execute_claim_verification_obligation") do
       Write::Operations::ExecuteClaimVerificationObligation.new(
         event_store: self["event_store"],
@@ -1284,7 +1364,11 @@ module Coordinator
         record_merge_observation:
           self["operations.execute_record_merge_observation"],
         prepare_release_set:
-          self["operations.execute_prepare_release_set"]
+          self["operations.execute_prepare_release_set"],
+        record_repository_integration:
+          self["operations.execute_record_repository_integration"],
+        record_release_set_verification:
+          self["operations.execute_record_release_set_verification"]
       )
     end
 
@@ -1305,7 +1389,8 @@ module Coordinator
         clock: self["clock"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
-        stream_factory: self["stream_factory"]
+        stream_factory: self["stream_factory"],
+        correlation_resolver: self["tasks.correlation_resolver"]
       )
     end
 
@@ -1481,6 +1566,20 @@ module Coordinator
     register("operations.submit_prepare_release_set_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_release_set"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_record_repository_integration_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_record_repository_integration"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_record_release_set_verification_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_record_release_set_verification"],
         submitter: self["operations.submit_coordination_task"]
       )
     end

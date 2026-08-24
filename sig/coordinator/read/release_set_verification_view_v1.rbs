@@ -1,0 +1,12 @@
+module Coordinator::Read
+  class ReleaseSetVerificationViewV1 < Coordinator::Shared::Value
+    def attempt_number: () -> Integer
+    def integration_events: () -> Array[Coordinator::Write::EventReference]
+    def evidence: () -> Coordinator::Write::ReleaseSets::VerificationEvidenceV1
+    def verification_digest: () -> String
+    def policy_version: () -> String
+    def evidence_status: () -> String
+    def recorded_at: () -> String
+    def source: () -> ReleaseSetSourceEvidenceV1
+  end
+end

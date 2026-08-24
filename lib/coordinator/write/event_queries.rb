@@ -206,6 +206,19 @@ module Coordinator::Write
       direction: :asc
     )
 
+    RELEASE_SET_LIFECYCLE = EventReadCriteria.new(
+      event_types: [
+        "ReleaseSetPrepared",
+        "RepositoryIntegrationRecorded",
+        "ReleaseSetVerificationRecorded",
+        "ReleaseSetActivated",
+        "ReleaseSetCompensationRequested",
+        "ReleaseSetCompleted"
+      ],
+      maximum_count: Types::RELEASE_SET_LIFECYCLE_MAXIMUM_EVENTS,
+      direction: :asc
+    )
+
     CANDIDATE_FOR_IMPACT_SURFACE = GroupedEventReadCriteria.new(
       event_types: [
         "CandidateSubmitted",

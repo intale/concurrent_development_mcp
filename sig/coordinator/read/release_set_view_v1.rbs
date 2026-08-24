@@ -1,12 +1,17 @@
 module Coordinator::Read
   class ReleaseSetViewV1 < Coordinator::Shared::Value
     Member: singleton(Coordinator::Write::ReleaseSets::MemberEvidenceV1)
+    Integration: singleton(ReleaseSetIntegrationViewV1)
+    Verification: singleton(ReleaseSetVerificationViewV1)
 
     def release_set_id: () -> String
     def change_set_id: () -> String
     def ordered_members: () -> Array[Coordinator::Write::ReleaseSets::MemberEvidenceV1]
     def release_digest: () -> String
     def status: () -> String
+    def verification_status: () -> String
+    def integrations: () -> Array[ReleaseSetIntegrationViewV1]
+    def verifications: () -> Array[ReleaseSetVerificationViewV1]
     def preparation_policy_version: () -> String
     def prepared_at: () -> String
     def prepared: () -> ReleaseSetSourceEvidenceV1

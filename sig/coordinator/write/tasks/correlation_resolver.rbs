@@ -1,0 +1,6 @@
+module Coordinator::Write::Tasks
+  class CorrelationResolver
+    def initialize: (release_set_correlation_loader: Coordinator::Write::ReleaseSets::CorrelationLoader) -> void
+    def call: (Coordinator::Write::coordination_command command) -> String?
+  end
+end

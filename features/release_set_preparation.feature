@@ -16,3 +16,13 @@ Feature: Immutable multi-repository ReleaseSet preparation
       And the ReleaseSet remains available as not observed before projection
       When the ReleaseSet preparation reaches the read side twice
       Then the ordered ReleaseSet is available without a freshness gate
+
+    Scenario: Ordered external integrations and exact composite verification remain durable Tasks
+      Given ReleaseSet "LIFECYCLE" has two exact current repository grants for one ChangeSet
+      When the agent prepares the ordered ReleaseSet through MCP
+      And the agent records both repository integrations through MCP in order
+      And the agent records passing composite verification through MCP
+      Then the integration and verification Tasks preserve one ReleaseSet trace
+      And the older ReleaseSet view remains available while lifecycle projection lags
+      When the complete ReleaseSet lifecycle reaches the read side twice
+      Then the verified ReleaseSet is available with exact ordered evidence

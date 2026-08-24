@@ -1,0 +1,10 @@
+module Coordinator::Write::Commands
+  class RecordReleaseSetVerification < Coordinator::Shared::Value
+    def command_id: () -> String
+    def actor: () -> Actor
+    def release_set_id: () -> String
+    def integration_events: () -> Array[Coordinator::Write::EventReference]
+    def evidence: () -> Coordinator::Write::ReleaseSets::VerificationEvidenceV1
+    def policy_version: () -> String
+  end
+end

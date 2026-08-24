@@ -709,6 +709,114 @@ module Coordinator
         )
       end
 
+      def release_repository_integration_record
+        observation_event = merge_authorization_event_reference(
+          type: "MergeObserved",
+          context: "DevelopmentIntegration",
+          stream_name: "MergeSnapshot",
+          minimum_revision: 3
+        )
+        producer = object_schema(
+          properties: {
+            name: { type: "string", minLength: 1, maxLength: 100 },
+            version: { type: "string", minLength: 1, maxLength: 100 }
+          },
+          required: %w[name version]
+        )
+        failure = object_schema(
+          properties: {
+            code: identifier,
+            summary: { type: "string", minLength: 1, maxLength: 2_000 },
+            producer:,
+            run_id: identifier,
+            result_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
+            occurred_at: {
+              type: "string",
+              pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$"
+            }
+          },
+          required: %w[code summary producer run_id result_digest occurred_at]
+        )
+        object_schema(
+          properties: common_mutation_properties.merge(
+            actor: agent_actor,
+            release_set_id: identifier,
+            repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+            attempt_id: identifier,
+            outcome: { type: "string", enum: Types::RELEASE_SET_INTEGRATION_OUTCOMES },
+            merge_observation_event: { anyOf: [ observation_event, { type: "null" } ] },
+            observation_digest: nullable_sha256_digest,
+            failure: { anyOf: [ failure, { type: "null" } ] }
+          ),
+          required: %w[
+            command_id actor release_set_id repository_id attempt_id outcome
+            merge_observation_event observation_digest failure
+          ]
+        )
+      end
+
+      def release_verification_record
+        integration_event = merge_authorization_event_reference(
+          type: "RepositoryIntegrationRecorded",
+          context: "DevelopmentIntegration",
+          stream_name: "ReleaseSet",
+          minimum_revision: 1
+        )
+        producer = object_schema(
+          properties: {
+            name: { type: "string", minLength: 1, maxLength: 100 },
+            version: { type: "string", minLength: 1, maxLength: 100 }
+          },
+          required: %w[name version]
+        )
+        finding = object_schema(
+          properties: {
+            code: identifier,
+            severity: { type: "string", enum: %w[info warning error critical] },
+            summary: { type: "string", minLength: 1, maxLength: 2_000 },
+            repository_id: {
+              anyOf: [
+                { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+                { type: "null" }
+              ]
+            }
+          },
+          required: %w[code severity summary repository_id]
+        )
+        evidence = object_schema(
+          properties: {
+            producer:,
+            run_id: identifier,
+            environment_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
+            result_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
+            outcome: { type: "string", enum: Types::RELEASE_SET_VERIFICATION_OUTCOMES },
+            findings: { type: "array", maxItems: 32, items: finding },
+            produced_at: {
+              type: "string",
+              pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$"
+            }
+          },
+          required: %w[
+            producer run_id environment_digest result_digest outcome findings produced_at
+          ]
+        )
+        object_schema(
+          properties: common_mutation_properties.merge(
+            actor: agent_actor,
+            release_set_id: identifier,
+            integration_events: {
+              type: "array",
+              minItems: Types::RELEASE_SET_MINIMUM_MEMBERS,
+              maxItems: Types::RELEASE_SET_MAXIMUM_MEMBERS,
+              uniqueItems: true,
+              items: integration_event
+            },
+            evidence:
+          ),
+          required: %w[command_id actor release_set_id integration_events evidence]
+        )
+      end
+
       def merge_verification_submit
         candidate = object_schema(
           properties: { candidate_id: identifier, head_commit_oid: git_oid },

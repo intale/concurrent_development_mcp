@@ -26,7 +26,9 @@ module Coordinator
                                 Commands::SubmitMergeSnapshotVerification |
                                 Commands::RequestMergeAuthorization |
                                 Commands::RecordMergeObservation |
-                                Commands::PrepareReleaseSet
+                                Commands::PrepareReleaseSet |
+                                Commands::RecordRepositoryIntegration |
+                                Commands::RecordReleaseSetVerification
     type write_command = coordination_command | Commands::ExpireResourceLease
     type lifecycle_command = Commands::StartCoordinationTask |
                              Commands::RecordCoordinationTaskOutcome |

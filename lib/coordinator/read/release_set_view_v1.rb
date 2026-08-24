@@ -3,6 +3,8 @@
 module Coordinator::Read
   class ReleaseSetViewV1 < Value
     Member = Coordinator::Write::ReleaseSets::MemberEvidenceV1
+    Integration = ReleaseSetIntegrationViewV1
+    Verification = ReleaseSetVerificationViewV1
 
     attribute :release_set_id, Types::Identifier
     attribute :change_set_id, Types::Identifier
@@ -13,7 +15,17 @@ module Coordinator::Read
                   max_size: Types::RELEASE_SET_MAXIMUM_MEMBERS
                 )
     attribute :release_digest, Types::Sha256Digest
-    attribute :status, Types::String.enum("prepared")
+    attribute :status, Types::String.enum("prepared", "integrating", "verifying", "verified")
+    attribute :verification_status, Types::String.enum("unverified", "failed", "passed")
+    attribute :integrations,
+              Types::Array.of(Integration)
+                .constrained(
+                  max_size: Types::RELEASE_SET_MAXIMUM_MEMBERS *
+                    Types::RELEASE_SET_INTEGRATION_MAXIMUM_ATTEMPTS
+                )
+    attribute :verifications,
+              Types::Array.of(Verification)
+                .constrained(max_size: Types::RELEASE_SET_VERIFICATION_MAXIMUM_ATTEMPTS)
     attribute :preparation_policy_version, Types::ReleaseSetPreparationPolicyVersion
     attribute :prepared_at, Types::Timestamp
     attribute :prepared, ReleaseSetSourceEvidenceV1

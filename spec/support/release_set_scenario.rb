@@ -39,6 +39,77 @@ module ReleaseSetScenario
     { input:, completion:, event:, payload: load(event) }
   end
 
+  def observe_member(prepared, index:, prefix:)
+    member = prepared.fetch(:payload).ordered_members.fetch(index)
+    input = {
+      command_id: "cmd-release-observe-#{prefix}-#{index + 1}",
+      actor: { kind: "agent", id: "release-integrator-1" },
+      merge_snapshot_id: member.merge_snapshot_id,
+      authorization_event: member.authorization_event.to_h,
+      authorization_decision_digest: member.authorization_decision_digest,
+      repository_id: member.repository_id,
+      target_branch: member.target_branch,
+      object_format: member.object_format,
+      target_before_commit_oid: member.target_base_commit_oid,
+      target_after_commit_oid: member.merge_commit_oid,
+      observer: { name: "release-adapter", version: "1.0.0" },
+      run_id: "release-observation-#{prefix}-#{index + 1}",
+      observed_at: "2026-08-24T19:00:0#{index}.000000Z"
+    }
+    completion = execute(Coordinator::Write::Operations::ExecuteRecordMergeObservation, input)
+    event = event_store.read(
+      streams.merge_snapshot(member.merge_snapshot_id),
+      Coordinator::Write::EventQueries::MERGE_OBSERVATION
+    ).sole
+    { input:, completion:, event:, payload: load(event) }
+  end
+
+  def record_integration(prepared, index:, prefix:, observation: nil, failure: nil)
+    member = prepared.fetch(:payload).ordered_members.fetch(index)
+    input = {
+      command_id: "cmd-release-integrate-#{prefix}-#{index + 1}",
+      actor: { kind: "agent", id: "release-integrator-1" },
+      release_set_id: prepared.dig(:input, :release_set_id),
+      repository_id: member.repository_id,
+      attempt_id: "release-attempt-#{prefix}-#{index + 1}",
+      outcome: observation ? "integrated" : "failed",
+      merge_observation_event: observation&.dig(:completion)&.data&.observation_event&.to_h,
+      observation_digest: observation&.dig(:payload)&.observation_digest,
+      failure: failure
+    }
+    completion = execute(Coordinator::Write::Operations::ExecuteRecordRepositoryIntegration, input)
+    event = release_lifecycle_events(prepared.dig(:input, :release_set_id)).last
+    { input:, completion:, event:, payload: load(event) }
+  end
+
+  def integrate_all(prepared, prefix:)
+    prepared.fetch(:payload).ordered_members.each_index.map do |index|
+      observation = observe_member(prepared, index:, prefix:)
+      record_integration(prepared, index:, prefix:, observation:)
+    end
+  end
+
+  def record_verification(prepared, integrations:, prefix:, outcome: "passed", findings: [])
+    input = {
+      command_id: "cmd-release-verify-#{prefix}",
+      actor: { kind: "agent", id: "release-verifier-1" },
+      release_set_id: prepared.dig(:input, :release_set_id),
+      integration_events: integrations.map { _1.fetch(:completion).data.integration_event.to_h },
+      evidence: {
+        producer: { name: "release-suite", version: "1.0.0" },
+        run_id: "release-verification-#{prefix}",
+        environment_digest: "sha256:#{'e' * 64}",
+        result_digest: "sha256:#{outcome == 'passed' ? 'f' * 64 : 'd' * 64}",
+        outcome:,
+        findings:,
+        produced_at: "2026-08-24T20:00:00.000000Z"
+      }
+    }
+    completion = execute(Coordinator::Write::Operations::ExecuteRecordReleaseSetVerification, input)
+    event = release_lifecycle_events(prepared.dig(:input, :release_set_id)).last
+    { input:, completion:, event:, payload: load(event) }
+  end
+
   def authorized_members(prefix:)
     candidates = candidates(prefix:)
     candidates.each_with_index.map do |candidate, index|
@@ -171,6 +242,10 @@ module ReleaseSetScenario
 
   def event_store
     Coordinator::Write::EventStore.new(client: PgEventstore.client)
+  end
+
+  def release_lifecycle_events(release_set_id)
+    event_store.read(streams.release_set(release_set_id), Coordinator::Write::EventQueries::RELEASE_SET_LIFECYCLE)
   end
 
   def streams

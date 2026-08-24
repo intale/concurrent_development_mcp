@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandInputDocuments
-      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1 | SubmitCandidateV1 | SubmitCandidateImpactSurfaceV1 | ClaimVerificationObligationV1 | SubmitCompatibilityAssessmentV1 | WaiveVerificationObligationV1 | RegisterMergeSnapshotV1 | SubmitMergeSnapshotVerificationV1 | RequestMergeAuthorizationV1 | RecordMergeObservationV1 | PrepareReleaseSetV1
+      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1 | SubmitCandidateV1 | SubmitCandidateImpactSurfaceV1 | ClaimVerificationObligationV1 | SubmitCompatibilityAssessmentV1 | WaiveVerificationObligationV1 | RegisterMergeSnapshotV1 | SubmitMergeSnapshotVerificationV1 | RequestMergeAuthorizationV1 | RecordMergeObservationV1 | PrepareReleaseSetV1 | RecordRepositoryIntegrationV1 | RecordReleaseSetVerificationV1
       type digest_value = value | ExpireResourceLeaseV1
 
       class ActorV1 < Shared::Value
@@ -475,6 +475,36 @@ module Coordinator
       class PrepareReleaseSetV1 < BaseV1
         def tool_name: () -> String
         def input: () -> PrepareReleaseSetInputV1
+      end
+
+      class RecordRepositoryIntegrationInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def release_set_id: () -> String
+        def repository_id: () -> String
+        def attempt_id: () -> String
+        def outcome: () -> String
+        def merge_observation_event: () -> EventReferenceV1?
+        def observation_digest: () -> String?
+        def failure: () -> ReleaseSets::IntegrationFailureV1?
+      end
+
+      class RecordRepositoryIntegrationV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> RecordRepositoryIntegrationInputV1
+      end
+
+      class RecordReleaseSetVerificationInputV1 < Shared::Value
+        Reference: singleton(EventReferenceV1)
+
+        def actor: () -> ActorV1
+        def release_set_id: () -> String
+        def integration_events: () -> Array[EventReferenceV1]
+        def evidence: () -> ReleaseSets::VerificationEvidenceV1
+      end
+
+      class RecordReleaseSetVerificationV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> RecordReleaseSetVerificationInputV1
       end
 
       class ExpireResourceLeaseInputV1 < Shared::Value

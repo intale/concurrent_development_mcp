@@ -88,6 +88,11 @@ module Coordinator
         integration order after exact snapshot grants are current. The durable Task re-evaluates every
         authorization from authoritative events in one transaction. release_set_get serves the latest
         available projection and may lag without becoming unavailable or authorizing later commands.
+        Use release_repository_integration_record in the frozen member order. A success must bind the
+        member's exact MergeObserved fact; a bounded attributed failure remains retryable until any prior
+        successful integration makes compensation necessary. After every member succeeds, use
+        release_verification_record with the exact ordered integration event references and attributed
+        composite evidence. These durable Tasks recheck ReleaseSet history without consulting projections.
         The coordinator records attributed evidence and does not execute Git, CI, or agent work.
       TEXT
 

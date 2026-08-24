@@ -55,6 +55,10 @@ module Coordinator::Write
           build_record_merge_observation(document)
         when CommandInputDocuments::PrepareReleaseSetV1
           build_prepare_release_set(document)
+        when CommandInputDocuments::RecordRepositoryIntegrationV1
+          build_record_repository_integration(document)
+        when CommandInputDocuments::RecordReleaseSetVerificationV1
+          build_record_release_set_verification(document)
         end
       end
 
@@ -432,6 +436,35 @@ module Coordinator::Write
           release_set_id: input.release_set_id,
           ordered_members: input.ordered_members,
           policy_version: "release-set-preparation/v1"
+        )
+      end
+
+      def build_record_repository_integration(document)
+        input = document.input
+        Commands::RecordRepositoryIntegration.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          release_set_id: input.release_set_id,
+          repository_id: input.repository_id,
+          attempt_id: input.attempt_id,
+          outcome: input.outcome,
+          merge_observation_event: input.merge_observation_event &&
+            EventReference.new(input.merge_observation_event.to_h),
+          observation_digest: input.observation_digest,
+          failure: input.failure,
+          policy_version: "release-set-integration/v1"
+        )
+      end
+
+      def build_record_release_set_verification(document)
+        input = document.input
+        Commands::RecordReleaseSetVerification.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          release_set_id: input.release_set_id,
+          integration_events: input.integration_events.map { EventReference.new(_1.to_h) },
+          evidence: input.evidence,
+          policy_version: "release-set-verification/v1"
         )
       end
 

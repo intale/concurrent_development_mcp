@@ -89,6 +89,13 @@ module Coordinator
       RELEASE_SET_PREPARATION_POLICY_VERSIONS: Array[String]
       RELEASE_SET_MINIMUM_MEMBERS: Integer
       RELEASE_SET_MAXIMUM_MEMBERS: Integer
+      RELEASE_SET_INTEGRATION_MAXIMUM_ATTEMPTS: Integer
+      RELEASE_SET_VERIFICATION_MAXIMUM_ATTEMPTS: Integer
+      RELEASE_SET_LIFECYCLE_MAXIMUM_EVENTS: Integer
+      RELEASE_SET_INTEGRATION_POLICY_VERSIONS: Array[String]
+      RELEASE_SET_VERIFICATION_POLICY_VERSIONS: Array[String]
+      RELEASE_SET_INTEGRATION_OUTCOMES: Array[String]
+      RELEASE_SET_VERIFICATION_OUTCOMES: Array[String]
       CANDIDATE_OBLIGATION_POLICY_STATUSES: Array[String]
       CANDIDATE_OBLIGATION_DECISION_OUTCOMES: Array[String]
       DECISION_ACTIVATION_INELIGIBILITY_REASONS: Array[String]
@@ -228,6 +235,15 @@ module Coordinator
       MergeObservationPolicyVersion: untyped
       ReleaseSetPreparationPolicyVersion: untyped
       ReleaseSetMemberPosition: untyped
+      ReleaseSetIntegrationPolicyVersion: untyped
+      ReleaseSetVerificationPolicyVersion: untyped
+      ReleaseSetIntegrationOutcome: untyped
+      ReleaseSetVerificationOutcome: untyped
+      ReleaseSetIntegrationAttemptNumber: untyped
+      ReleaseSetVerificationAttemptNumber: untyped
+      ReleaseSetFailureCode: untyped
+      ReleaseSetEvidenceSummary: untyped
+      ReleaseSetFindingSeverity: untyped
       CandidateObligationPolicyStatus: untyped
       CandidateObligationDecisionOutcome: untyped
       CandidateImpactReasonMatches: untyped

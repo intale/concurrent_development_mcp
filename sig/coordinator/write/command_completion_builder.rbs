@@ -28,6 +28,8 @@ module Coordinator
       def merge_authorization_request: (command: Commands::RequestMergeAuthorization, decision: Events::MergeAuthorizationGrantedV1 | Events::MergeAuthorizationDeniedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
       def merge_observation_record: (command: Commands::RecordMergeObservation, observation: Events::MergeObservedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
       def release_set_prepare: (command: Commands::PrepareReleaseSet, preparation: Events::ReleaseSetPreparedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
+      def release_repository_integration_record: (command: Commands::RecordRepositoryIntegration, integration: Events::RepositoryIntegrationRecordedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
+      def release_verification_record: (command: Commands::RecordReleaseSetVerification, verification: Events::ReleaseSetVerificationRecordedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
     end
   end
 end

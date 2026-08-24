@@ -308,6 +308,13 @@ module Coordinator::Shared
     RELEASE_SET_PREPARATION_POLICY_VERSIONS = %w[release-set-preparation/v1].freeze
     RELEASE_SET_MINIMUM_MEMBERS = 2
     RELEASE_SET_MAXIMUM_MEMBERS = 16
+    RELEASE_SET_INTEGRATION_MAXIMUM_ATTEMPTS = 8
+    RELEASE_SET_VERIFICATION_MAXIMUM_ATTEMPTS = 8
+    RELEASE_SET_LIFECYCLE_MAXIMUM_EVENTS = 140
+    RELEASE_SET_INTEGRATION_POLICY_VERSIONS = %w[release-set-integration/v1].freeze
+    RELEASE_SET_VERIFICATION_POLICY_VERSIONS = %w[release-set-verification/v1].freeze
+    RELEASE_SET_INTEGRATION_OUTCOMES = %w[integrated failed].freeze
+    RELEASE_SET_VERIFICATION_OUTCOMES = %w[passed failed].freeze
     CANDIDATE_OBLIGATION_POLICY_STATUSES = %w[
       stale
       non_gating
@@ -398,6 +405,8 @@ module Coordinator::Shared
       merge_authorization_request
       merge_observation_record
       release_set_prepare
+      release_repository_integration_record
+      release_verification_record
     ].freeze
 
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)
@@ -545,6 +554,21 @@ module Coordinator::Shared
     MergeObservationPolicyVersion = String.enum(*MERGE_OBSERVATION_POLICY_VERSIONS)
     ReleaseSetPreparationPolicyVersion = String.enum(*RELEASE_SET_PREPARATION_POLICY_VERSIONS)
     ReleaseSetMemberPosition = Integer.constrained(gteq: 1, lteq: RELEASE_SET_MAXIMUM_MEMBERS)
+    ReleaseSetIntegrationPolicyVersion = String.enum(*RELEASE_SET_INTEGRATION_POLICY_VERSIONS)
+    ReleaseSetVerificationPolicyVersion = String.enum(*RELEASE_SET_VERIFICATION_POLICY_VERSIONS)
+    ReleaseSetIntegrationOutcome = String.enum(*RELEASE_SET_INTEGRATION_OUTCOMES)
+    ReleaseSetVerificationOutcome = String.enum(*RELEASE_SET_VERIFICATION_OUTCOMES)
+    ReleaseSetIntegrationAttemptNumber = Integer.constrained(
+      gteq: 1,
+      lteq: RELEASE_SET_INTEGRATION_MAXIMUM_ATTEMPTS
+    )
+    ReleaseSetVerificationAttemptNumber = Integer.constrained(
+      gteq: 1,
+      lteq: RELEASE_SET_VERIFICATION_MAXIMUM_ATTEMPTS
+    )
+    ReleaseSetFailureCode = String.constrained(min_size: 1, max_size: 100)
+    ReleaseSetEvidenceSummary = String.constrained(min_size: 1, max_size: 2_000)
+    ReleaseSetFindingSeverity = String.enum("info", "warning", "error", "critical")
     CandidateObligationPolicyStatus = String.enum(*CANDIDATE_OBLIGATION_POLICY_STATUSES)
     CandidateObligationDecisionOutcome = String.enum(*CANDIDATE_OBLIGATION_DECISION_OUTCOMES)
     CandidateImpactReasonMatches = Array.of(String.constrained(min_size: 1, max_size: 1_024))

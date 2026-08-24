@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_182500) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_24_210000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -412,6 +412,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_182500) do
   create_table "release_sets", primary_key: "release_set_id", id: :string, force: :cascade do |t|
     t.string "change_set_id", null: false
     t.datetime "created_at", null: false
+    t.jsonb "integrations", default: [], null: false
     t.jsonb "ordered_members", null: false
     t.string "preparation_policy_version", null: false
     t.jsonb "prepared_actor", null: false
@@ -426,9 +427,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_182500) do
     t.string "release_digest", null: false
     t.string "status", default: "prepared", null: false
     t.datetime "updated_at", null: false
+    t.string "verification_status", default: "unverified", null: false
+    t.jsonb "verifications", default: [], null: false
     t.index ["change_set_id"], name: "index_release_sets_on_change_set_id"
     t.index ["prepared_global_position"], name: "index_release_sets_on_prepared_global_position", unique: true
     t.index ["status"], name: "index_release_sets_on_status"
+    t.index ["verification_status"], name: "index_release_sets_on_verification_status"
   end
 
   create_table "user_utterances", primary_key: "message_id", id: :string, force: :cascade do |t|
