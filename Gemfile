@@ -67,6 +67,8 @@ group :development, :test do
   gem "rbs", ">= 4.2", require: false
 
   gem "cucumber-rails", ">= 4.1", require: false
+
+  gem "parallel_tests", ">= 5.7"
 end
 
 group :test do

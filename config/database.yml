@@ -61,7 +61,7 @@ development:
 # Do not set this db to the same as development or production.
 test:
   <<: *default
-  database: concurrent_development_mcp_test
+  database: concurrent_development_mcp<%= ENV.fetch("TEST_ENV_NUMBER", "") %>_test
   port: 5532
 
 # As with config/credentials.yml, you never want to store sensitive information,

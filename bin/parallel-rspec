@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+
+set -eu
+
+parallel_rbs_processes="${PARALLEL_TEST_PROCESSORS:-10}"
+
+case "$parallel_rbs_processes" in
+  ""|*[!0-9]*|0)
+    echo "PARALLEL_TEST_PROCESSORS must be a positive integer" >&2
+    exit 64
+    ;;
+esac
+
+export PARALLEL_TEST_PROCESSORS="$parallel_rbs_processes"
+export PARALLEL_TEST_FIRST_IS_1=true
+export PARALLEL_TESTS_EXECUTABLE=bin/rspec
+
+exec bundle exec parallel_rspec "$@"

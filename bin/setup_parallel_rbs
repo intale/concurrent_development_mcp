@@ -1,0 +1,25 @@
+#!/usr/bin/env sh
+
+set -eu
+
+parallel_rbs_processes="${PARALLEL_TEST_PROCESSORS:-10}"
+
+case "$parallel_rbs_processes" in
+  ""|*[!0-9]*|0)
+    echo "PARALLEL_TEST_PROCESSORS must be a positive integer" >&2
+    exit 64
+    ;;
+esac
+
+export PARALLEL_TEST_PROCESSORS="$parallel_rbs_processes"
+export PARALLEL_TEST_FIRST_IS_1=true
+
+bundle exec rake "parallel:create[$parallel_rbs_processes]"
+bundle exec rake "parallel:prepare[$parallel_rbs_processes]"
+
+parallel_rbs_worker=1
+while [ "$parallel_rbs_worker" -le "$parallel_rbs_processes" ]; do
+  PG_EVENTSTORE_URI="postgresql://postgres:postgres@localhost:5532/eventstore${parallel_rbs_worker}_test" \
+    bundle exec rake pg_eventstore:create pg_eventstore:migrate
+  parallel_rbs_worker=$((parallel_rbs_worker + 1))
+done
