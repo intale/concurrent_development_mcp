@@ -91,4 +91,78 @@ RSpec.describe Coordinator::Read::Projectors::MergeSnapshotsV1, :event_store, :r
     )
     expect(Coordinator::Read::MergeSnapshot.count).to eq(1)
   end
+
+  it "serves the latest observed authorization without making freshness an availability gate" do
+    registration = MergeSnapshotScenario.register(prefix: "merge-authorization-projection")
+    verification = MergeSnapshotScenario.verify(
+      registration,
+      prefix: "merge-authorization-projection"
+    )
+    input = MergeSnapshotScenario.authorization_input(
+      registration,
+      verification,
+      prefix: "merge-authorization-projection"
+    )
+    operation = Coordinator::Write::Operations::ExecuteRequestMergeAuthorization.new(
+      event_store:
+    )
+    granted = operation.call(input).value!
+    projector = described_class.new
+    snapshot_stream = Coordinator::Write::StreamFactory.new.merge_snapshot(
+      input.fetch(:merge_snapshot_id)
+    )
+    event_store.read(
+      snapshot_stream,
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[
+          MergeSnapshotRegistered
+          MergeSnapshotVerificationSubmitted
+          MergeSnapshotVerified
+        ],
+        maximum_count: 3,
+        direction: :asc
+      )
+    ).each { projector.call(_1) }
+    query = Coordinator::Read::Queries::MergeSnapshotGet.new
+
+    before_authorization = query.call(merge_snapshot_id: input.fetch(:merge_snapshot_id)).value!
+    expect(before_authorization.data.snapshot.latest_authorization).to be_nil
+
+    granted_event = authorization_event(granted.data.authorization_id)
+    projector.call(granted_event)
+    projector.call(granted_event)
+    observed_grant = query.call(merge_snapshot_id: input.fetch(:merge_snapshot_id)).value!
+    expect(observed_grant.data.snapshot.latest_authorization).to have_attributes(
+      authorization_id: granted.data.authorization_id,
+      outcome: "granted"
+    )
+
+    denied_input = input.merge(
+      command_id: "cmd-authorize-merge-authorization-projection-denied",
+      target_base_observation: input.fetch(:target_base_observation).merge(commit_oid: "c" * 40)
+    )
+    denied = operation.call(denied_input).value!
+    projector.call(authorization_event(denied.data.authorization_id))
+    observed_denial = query.call(merge_snapshot_id: input.fetch(:merge_snapshot_id)).value!
+
+    expect(observed_denial.data.snapshot.latest_authorization).to have_attributes(
+      authorization_id: denied.data.authorization_id,
+      outcome: "denied"
+    )
+    expect(observed_denial.data.snapshot.latest_authorization.evaluation.reasons.map(&:code)).to include(
+      "target_base_binding_stale"
+    )
+    expect(Coordinator::Read::MergeAuthorization.count).to eq(2)
+  end
+
+  def authorization_event(authorization_id)
+    event_store.read(
+      Coordinator::Write::StreamFactory.new.merge_authorization(authorization_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[MergeAuthorizationGranted MergeAuthorizationDenied],
+        maximum_count: 1,
+        direction: :asc
+      )
+    ).sole
+  end
 end

@@ -1,0 +1,16 @@
+module Coordinator
+  module Write
+    module MergeAuthorizations
+      class EvaluationV1 < Shared::Value
+        def merge_snapshot_id: () -> String
+        def snapshot: () -> SnapshotEvidenceV1?
+        def target_base_observation: () -> TargetBaseObservationV1
+        def current_policy: () -> CurrentImpactPolicyV1?
+        def candidates: () -> Array[CandidateEvidenceReferenceV1]
+        def obligations: () -> Array[ObligationCheckV1]
+        def reasons: () -> Array[ReasonV1]
+        def granted?: () -> bool
+      end
+    end
+  end
+end

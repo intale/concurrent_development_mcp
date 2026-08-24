@@ -52,6 +52,7 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
       "compatibility_assessment_submit",
       "merge_snapshot_register",
       "merge_verification_submit",
+      "merge_authorization_request",
       "change_set_create",
       "work_item_create",
       "work_item_dependency_declare",
@@ -214,6 +215,34 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
     expect(available.dig("result", "structuredContent", "data", "snapshot")).to include(
       "merge_snapshot_id" => arguments.fetch(:merge_snapshot_id),
       "evidence_status" => "attributed_unverified"
+    )
+  end
+
+  it "requests merge authorization as a durable Task against authoritative event facts" do
+    registration = MergeSnapshotScenario.register(prefix: "mcp-merge-authorization")
+    verification = MergeSnapshotScenario.verify(
+      registration,
+      prefix: "mcp-merge-authorization"
+    )
+    arguments = MergeSnapshotScenario.authorization_input(
+      registration,
+      verification,
+      prefix: "mcp-merge-authorization"
+    )
+
+    submitted = call_tool("merge_authorization_request", arguments, id: 1)
+    task_id = submitted.dig("result", "taskId")
+    expect(task_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
+
+    execute_task(task_id)
+    completed = task_request("tasks/get", task_id:, id: 2)
+    result = completed.dig("result", "result")
+
+    expect(completed.dig("result", "status")).to eq("completed")
+    expect(result.fetch("isError")).to be(false)
+    expect(result.dig("structuredContent", "data")).to include(
+      "merge_snapshot_id" => registration.dig(:input, :merge_snapshot_id),
+      "outcome" => "granted"
     )
   end
 

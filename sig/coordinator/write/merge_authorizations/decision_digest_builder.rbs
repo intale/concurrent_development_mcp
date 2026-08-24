@@ -1,0 +1,17 @@
+module Coordinator
+  module Write
+    module MergeAuthorizations
+      class DecisionDigestBuilder
+        def initialize: (?canonical_json: Shared::CanonicalJson) -> void
+        def call: (
+          policy_version: String,
+          input_digest: String,
+          snapshot_binding: SnapshotBindingV1,
+          expected_impact_policy: ExpectedImpactPolicyV1?,
+          evaluation: EvaluationV1,
+          outcome: String
+        ) -> String
+      end
+    end
+  end
+end

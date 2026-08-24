@@ -34,6 +34,7 @@ module Coordinator::Write
       when Commands::WaiveVerificationObligation then verification_obligation_waive_document(command)
       when Commands::RegisterMergeSnapshot then merge_snapshot_register_document(command)
       when Commands::SubmitMergeSnapshotVerification then merge_verification_submit_document(command)
+      when Commands::RequestMergeAuthorization then merge_authorization_request_document(command)
       when Commands::ExpireResourceLease then lease_expire_policy_document(command)
       else
         raise ArgumentError, "Unsupported coordination command: #{command.class.name}"
@@ -522,6 +523,25 @@ module Coordinator::Write
           merge_snapshot_id: command.merge_snapshot_id,
           binding: command.binding,
           assessment: command.assessment
+        )
+      )
+    end
+
+    def merge_authorization_request(command)
+      @canonical_json.sha256(merge_authorization_request_document(command).to_h)
+    end
+
+    def merge_authorization_request_document(command)
+      CommandInputDocuments::RequestMergeAuthorizationV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "merge_authorization_request",
+        input: CommandInputDocuments::RequestMergeAuthorizationInputV1.new(
+          actor: actor_document(command.actor),
+          merge_snapshot_id: command.merge_snapshot_id,
+          snapshot_binding: command.snapshot_binding,
+          target_base_observation: command.target_base_observation,
+          expected_impact_policy: command.expected_impact_policy
         )
       )
     end

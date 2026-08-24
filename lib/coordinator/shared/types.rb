@@ -270,6 +270,40 @@ module Coordinator::Shared
       verified
     ].freeze
     MERGE_SNAPSHOT_VERIFICATION_MAXIMUM_COUNT = 32
+    MERGE_AUTHORIZATION_POLICY_VERSIONS = %w[merge-authorization/v1].freeze
+    MERGE_AUTHORIZATION_OUTCOMES = %w[granted denied].freeze
+    MERGE_AUTHORIZATION_POLICY_STATUSES = %w[
+      absent
+      disabled
+      advisory
+      verification_gate
+      merge_gate
+    ].freeze
+    MERGE_AUTHORIZATION_OBLIGATION_STATUSES = %w[
+      missing
+      open
+      satisfied
+      failed
+      waived
+      invalidated
+    ].freeze
+    MERGE_AUTHORIZATION_REASON_CODES = %w[
+      merge_snapshot_not_found
+      merge_snapshot_binding_stale
+      merge_snapshot_not_verified
+      target_base_binding_stale
+      mixed_change_set_snapshot
+      impact_policy_context_stale
+      candidate_impact_surface_missing
+      required_obligation_missing
+      required_obligation_open
+      required_obligation_failed
+      required_obligation_invalidated
+      authorization_history_invalid
+    ].freeze
+    MERGE_AUTHORIZATION_MAXIMUM_OBLIGATIONS =
+      MERGE_SNAPSHOT_MAXIMUM_CANDIDATES * (MERGE_SNAPSHOT_MAXIMUM_CANDIDATES - 1)
+    MERGE_AUTHORIZATION_MAXIMUM_REASONS = 1_024
     CANDIDATE_OBLIGATION_POLICY_STATUSES = %w[
       stale
       non_gating
@@ -357,6 +391,7 @@ module Coordinator::Shared
       verification_obligation_waive
       merge_snapshot_register
       merge_verification_submit
+      merge_authorization_request
     ].freeze
 
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)
@@ -494,6 +529,13 @@ module Coordinator::Shared
       *MERGE_SNAPSHOT_VERIFICATION_POLICY_VERSIONS
     )
     MergeSnapshotVerificationStatus = String.enum(*MERGE_SNAPSHOT_VERIFICATION_STATUSES)
+    MergeAuthorizationPolicyVersion = String.enum(*MERGE_AUTHORIZATION_POLICY_VERSIONS)
+    MergeAuthorizationOutcome = String.enum(*MERGE_AUTHORIZATION_OUTCOMES)
+    MergeAuthorizationPolicyStatus = String.enum(*MERGE_AUTHORIZATION_POLICY_STATUSES)
+    MergeAuthorizationObligationStatus = String.enum(*MERGE_AUTHORIZATION_OBLIGATION_STATUSES)
+    MergeAuthorizationReasonCode = String.enum(*MERGE_AUTHORIZATION_REASON_CODES)
+    MergeAuthorizationRequiredEvidenceKinds = Array.of(CandidateImpactRequiredEvidenceKind)
+      .constrained(max_size: 8)
     CandidateObligationPolicyStatus = String.enum(*CANDIDATE_OBLIGATION_POLICY_STATUSES)
     CandidateObligationDecisionOutcome = String.enum(*CANDIDATE_OBLIGATION_DECISION_OUTCOMES)
     CandidateImpactReasonMatches = Array.of(String.constrained(min_size: 1, max_size: 1_024))

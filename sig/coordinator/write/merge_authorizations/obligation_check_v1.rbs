@@ -1,0 +1,18 @@
+module Coordinator
+  module Write
+    module MergeAuthorizations
+      class ObligationCheckV1 < Shared::Value
+        def obligation_id: () -> String
+        def source_candidate_id: () -> String
+        def target_candidate_id: () -> String
+        def enforcement: () -> String
+        def required_evidence: () -> Array[String]
+        def identity_digest: () -> String
+        def status: () -> String
+        def validity_input_digest: () -> String?
+        def creation_event: () -> EventReference?
+        def terminal_event: () -> EventReference?
+      end
+    end
+  end
+end

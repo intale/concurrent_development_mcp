@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandInputDocuments
-      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1 | SubmitCandidateV1 | SubmitCandidateImpactSurfaceV1 | ClaimVerificationObligationV1 | SubmitCompatibilityAssessmentV1 | WaiveVerificationObligationV1 | RegisterMergeSnapshotV1 | SubmitMergeSnapshotVerificationV1
+      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1 | SubmitCandidateV1 | SubmitCandidateImpactSurfaceV1 | ClaimVerificationObligationV1 | SubmitCompatibilityAssessmentV1 | WaiveVerificationObligationV1 | RegisterMergeSnapshotV1 | SubmitMergeSnapshotVerificationV1 | RequestMergeAuthorizationV1
       type digest_value = value | ExpireResourceLeaseV1
 
       class ActorV1 < Shared::Value
@@ -429,6 +429,19 @@ module Coordinator
       class SubmitMergeSnapshotVerificationV1 < BaseV1
         def tool_name: () -> String
         def input: () -> SubmitMergeSnapshotVerificationInputV1
+      end
+
+      class RequestMergeAuthorizationInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def merge_snapshot_id: () -> String
+        def snapshot_binding: () -> MergeAuthorizations::SnapshotBindingV1
+        def target_base_observation: () -> MergeAuthorizations::TargetBaseObservationV1
+        def expected_impact_policy: () -> MergeAuthorizations::ExpectedImpactPolicyV1?
+      end
+
+      class RequestMergeAuthorizationV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> RequestMergeAuthorizationInputV1
       end
 
       class ExpireResourceLeaseInputV1 < Shared::Value

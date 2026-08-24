@@ -191,6 +191,95 @@ Then(
   )
 end
 
+When("the agent requests merge authorization with command {string}") do |command_id|
+  submit_merge_authorization(merge_authorization_arguments(command_id:))
+end
+
+When("the integrator registers exact Rails pair snapshot {string}") do |snapshot_id|
+  candidates = %w[source target].map do |role|
+    candidate = @obligation_candidates.fetch(role).fetch(:arguments)
+    {
+      candidate_id: candidate.fetch(:candidate_id),
+      head_commit_oid: candidate.fetch(:head_commit_oid)
+    }
+  end
+  source = @obligation_candidates.fetch("source").fetch(:arguments)
+  @merge_snapshot_arguments = {
+    command_id: "cmd-cuc-merge-auth-open-snapshot",
+    actor: { kind: "agent", id: "integrator-1" },
+    merge_snapshot_id: snapshot_id,
+    repository_id: source.fetch(:repository_id),
+    target_branch: source.fetch(:target_branch),
+    target_base_commit_oid: source.fetch(:base_commit_oid),
+    ordered_candidates: candidates,
+    merge_commit_oid: "8" * 40,
+    producer: { name: "git-merge", version: "2.47.0" },
+    run_id: "run-cuc-merge-auth-open",
+    produced_at: "2026-08-24T15:30:00.000001Z"
+  }
+  @merge_snapshot_task_id = call_tool(
+    "merge_snapshot_register",
+    @merge_snapshot_arguments
+  ).dig("result", "taskId")
+  assert_acceptance(@merge_snapshot_task_id, "merge_snapshot_register did not return a Task")
+  execute_task(@merge_snapshot_task_id)
+  @merge_snapshot_task_state = task_request("tasks/get", @merge_snapshot_task_id)
+end
+
+When(
+  "the agent requests merge authorization against a changed target base with command {string}"
+) do |command_id|
+  arguments = merge_authorization_arguments(command_id:)
+  submit_merge_authorization(
+    arguments.merge(
+      target_base_observation: arguments.fetch(:target_base_observation).merge(
+        commit_oid: "c" * 40
+      )
+    )
+  )
+end
+
+Then("the merge authorization Task completes with durable outcome {string}") do |outcome|
+  assert_acceptance_equal("completed", @merge_authorization_state.dig("result", "status"), "Task")
+  result = @merge_authorization_state.dig("result", "result")
+  assert_acceptance_equal(false, result.fetch("isError"), "Authorization decision")
+  assert_acceptance_equal(
+    outcome,
+    result.dig("structuredContent", "data", "outcome"),
+    "Authorization outcome"
+  )
+  assert_acceptance_equal(1, merge_authorization_events.length, "Authorization decisions")
+  assert_acceptance_equal(1, command_events(@merge_authorization_arguments.fetch(:command_id)).length, "Receipt")
+end
+
+Then("the authorization explains {string}") do |code|
+  reasons = @merge_authorization_state.dig(
+    "result", "result", "structuredContent", "data", "reasons"
+  )
+  assert_acceptance(reasons.any? { _1.fetch("code") == code }, "Missing authorization reason #{code}")
+end
+
+Then("the available merge snapshot has no observed authorization yet") do
+  snapshot = merge_snapshot_payload
+  assert_acceptance_equal(nil, snapshot.fetch("latest_authorization"), "Lagging authorization")
+end
+
+When("the merge authorization reaches the read side twice") do
+  event = merge_authorization_events.sole
+  2.times { Coordinator::Container["projectors.merge_snapshots_v1"].call(event) }
+end
+
+Then(
+  "the available merge snapshot reports authorization {string} without a freshness gate"
+) do |outcome|
+  authorization = merge_snapshot_payload.fetch("latest_authorization")
+  assert_acceptance_equal(outcome, authorization.fetch("outcome"), "Authorization outcome")
+  assert_acceptance(
+    (authorization.keys & %w[fresh pending projection_status stream_revision]).empty?,
+    "Merge authorization must not expose a freshness gate"
+  )
+end
+
 def merge_verification_arguments(command_id:, conclusion:)
   receipt = @merge_snapshot_task_state.dig("result", "result", "structuredContent", "data")
   findings = if conclusion == "passed"
@@ -232,6 +321,54 @@ def merge_verification_arguments(command_id:, conclusion:)
   }
 end
 
+def merge_authorization_arguments(command_id:)
+  registration = @merge_snapshot_task_state.dig("result", "result", "structuredContent", "data")
+  verified_event = merge_verification_events.find { _1.type == "MergeSnapshotVerified" }
+  assert_acceptance(verified_event, "Exact merge verification is missing")
+  {
+    command_id:,
+    actor: { kind: "agent", id: "integrator-1" },
+    merge_snapshot_id: @merge_snapshot_arguments.fetch(:merge_snapshot_id),
+    snapshot_binding: {
+      registration_event: registration.fetch("snapshot_event"),
+      snapshot_digest: registration.fetch("snapshot_digest"),
+      verification_event: merge_event_reference(verified_event),
+      verification_digest: verified_event.data.fetch("verification_digest")
+    },
+    target_base_observation: {
+      repository_id: @merge_snapshot_arguments.fetch(:repository_id),
+      target_branch: @merge_snapshot_arguments.fetch(:target_branch),
+      object_format: "sha1",
+      commit_oid: @merge_snapshot_arguments.fetch(:target_base_commit_oid),
+      observer: { name: "git-fetch", version: "2.47.0" },
+      run_id: "base-#{command_id}",
+      observed_at: "2026-08-24T16:45:00.000001Z"
+    },
+    expected_impact_policy: merge_authorization_expected_policy
+  }
+end
+
+def merge_authorization_expected_policy
+  return unless @obligation_policy
+
+  {
+    partition_event: candidate_obligation_event_reference(
+      @obligation_policy.fetch(:partition_event)
+    ).to_h,
+    head: @obligation_policy.fetch(:head).to_h,
+    definition_digest: @obligation_policy.fetch(:decision_event).data.fetch("definition_digest")
+  }
+end
+
+def submit_merge_authorization(arguments)
+  @merge_authorization_arguments = arguments
+  response = call_tool("merge_authorization_request", arguments)
+  @merge_authorization_task_id = response.dig("result", "taskId")
+  assert_acceptance(@merge_authorization_task_id, "merge_authorization_request did not return a Task")
+  execute_task(@merge_authorization_task_id)
+  @merge_authorization_state = task_request("tasks/get", @merge_authorization_task_id)
+end
+
 def submit_merge_verification(arguments)
   response = call_tool("merge_verification_submit", arguments)
   @merge_verification_task_id = response.dig("result", "taskId")
@@ -249,6 +386,31 @@ def merge_verification_events
       direction: :asc
     )
   )
+end
+
+def merge_authorization_events
+  authorization_id = @merge_authorization_state.dig(
+    "result", "result", "structuredContent", "data", "authorization_id"
+  )
+  event_store.read(
+    streams.merge_authorization(authorization_id),
+    Coordinator::Write::EventReadCriteria.new(
+      event_types: %w[MergeAuthorizationGranted MergeAuthorizationDenied],
+      maximum_count: 1,
+      direction: :asc
+    )
+  )
+end
+
+def merge_event_reference(event)
+  {
+    event_id: event.id,
+    type: event.type,
+    stream_context: event.stream.context,
+    stream_name: event.stream.stream_name,
+    stream_id: event.stream.stream_id,
+    stream_revision: event.stream_revision
+  }
 end
 
 def merge_snapshot_payload

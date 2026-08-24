@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandReceiptData
-      type value = ChangeSet | WorkItem | Dependency | Attempt | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver | MergeSnapshotRegistration | MergeSnapshotVerification
+      type value = ChangeSet | WorkItem | Dependency | Attempt | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver | MergeSnapshotRegistration | MergeSnapshotVerification | MergeAuthorization
 
       class ChangeSet < Shared::Value
         def change_set_id: () -> String
@@ -234,6 +234,17 @@ module Coordinator
         def submitted_event: () -> EventReference
         def verified_event: () -> EventReference?
         def submitted_at: () -> String
+      end
+
+      class MergeAuthorization < Shared::Value
+        def authorization_id: () -> String
+        def merge_snapshot_id: () -> String
+        def outcome: () -> String
+        def decision_digest: () -> String
+        def decision_event: () -> EventReference
+        def reasons: () -> Array[MergeAuthorizations::ReasonV1]
+        def obligations: () -> Array[MergeAuthorizations::ObligationCheckV1]
+        def decided_at: () -> String
       end
     end
   end

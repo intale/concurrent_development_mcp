@@ -3,6 +3,10 @@
 module Coordinator::Read
   module Repositories
     class MergeSnapshots
+      def initialize(authorizations: MergeAuthorizations.new)
+        @authorizations = authorizations
+      end
+
       def fetch(merge_snapshot_id)
         record = Coordinator::Read::MergeSnapshot.find_by(merge_snapshot_id:)
         record && build_view(record)
@@ -93,7 +97,8 @@ module Coordinator::Read
           policy_version: record.policy_version,
           evidence_status: record.evidence_status,
           registered: registration_source_evidence(record),
-          verification: verification_view(record)
+          verification: verification_view(record),
+          latest_authorization: @authorizations.latest_for(record.merge_snapshot_id)
         )
       end
 

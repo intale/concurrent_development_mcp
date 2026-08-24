@@ -1,0 +1,21 @@
+module Coordinator
+  module Write
+    module MergeAuthorizations
+      class ReasonV1 < Shared::Value
+        def code: () -> String
+        def message: () -> String
+        def candidate_id: () -> String?
+        def source_candidate_id: () -> String?
+        def target_candidate_id: () -> String?
+        def obligation_id: () -> String?
+        def obligation_status: () -> String?
+        def expected_reference: () -> EventReference?
+        def observed_reference: () -> EventReference?
+        def expected_digest: () -> String?
+        def observed_digest: () -> String?
+        def expected_oid: () -> String?
+        def observed_oid: () -> String?
+      end
+    end
+  end
+end

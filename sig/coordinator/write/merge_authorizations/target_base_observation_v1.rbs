@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module MergeAuthorizations
+      class TargetBaseObservationV1 < Shared::Value
+        def repository_id: () -> String
+        def target_branch: () -> String
+        def object_format: () -> String
+        def commit_oid: () -> String
+        def observer: () -> MergeSnapshotVerifications::ProducerV1
+        def run_id: () -> String
+        def observed_at: () -> String
+      end
+    end
+  end
+end

@@ -18,6 +18,7 @@ module Coordinator
       def candidate: (String candidate_id) -> StreamReference
       def candidate_head: (String registry_id) -> StreamReference
       def merge_snapshot: (String merge_snapshot_id) -> StreamReference
+      def merge_authorization: (String authorization_id) -> StreamReference
       def merge_snapshot_commit: (String registry_id) -> StreamReference
       def candidate_impact_registry: (String change_set_id) -> StreamReference
       def candidate_impact_registry_sweep: (String scan_id) -> StreamReference

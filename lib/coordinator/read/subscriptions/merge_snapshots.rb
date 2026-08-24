@@ -10,12 +10,18 @@ module Coordinator::Read
           Coordinator::Shared::Subscriptions::StreamFilter.new(
             context: "DevelopmentIntegration",
             stream_name: "MergeSnapshot"
+          ),
+          Coordinator::Shared::Subscriptions::StreamFilter.new(
+            context: "DevelopmentIntegration",
+            stream_name: "MergeAuthorization"
           )
         ],
         event_types: [
           "MergeSnapshotRegistered",
           "MergeSnapshotVerificationSubmitted",
-          "MergeSnapshotVerified"
+          "MergeSnapshotVerified",
+          "MergeAuthorizationGranted",
+          "MergeAuthorizationDenied"
         ]
       )
 

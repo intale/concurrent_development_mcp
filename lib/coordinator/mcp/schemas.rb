@@ -722,6 +722,99 @@ module Coordinator
         )
       end
 
+      def merge_authorization_request
+        registration_event = merge_authorization_event_reference(
+          type: "MergeSnapshotRegistered",
+          context: "DevelopmentIntegration",
+          stream_name: "MergeSnapshot",
+          minimum_revision: 0,
+          maximum_revision: 0
+        )
+        verification_event = merge_authorization_event_reference(
+          type: "MergeSnapshotVerified",
+          context: "DevelopmentIntegration",
+          stream_name: "MergeSnapshot",
+          minimum_revision: 2
+        )
+        decision_event = {
+          anyOf: %w[DecisionActivated DecisionDefinitionCorrected].map do |type|
+            merge_authorization_event_reference(
+              type:,
+              context: "HumanGuidance",
+              stream_name: "Decision",
+              minimum_revision: 1
+            )
+          end
+        }
+        partition_event = merge_authorization_event_reference(
+          type: "DecisionPartitionAdvanced",
+          context: "HumanGuidance",
+          stream_name: "DecisionPartition",
+          minimum_revision: 0
+        )
+        expected_policy = object_schema(
+          properties: {
+            partition_event:,
+            head: object_schema(
+              properties: {
+                decision_id: identifier,
+                decision_revision: { type: "integer", minimum: 1 },
+                event: decision_event
+              },
+              required: %w[decision_id decision_revision event]
+            ),
+            definition_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" }
+          },
+          required: %w[partition_event head definition_digest]
+        )
+        producer = object_schema(
+          properties: {
+            name: { type: "string", minLength: 1, maxLength: 100 },
+            version: { type: "string", minLength: 1, maxLength: 100 }
+          },
+          required: %w[name version]
+        )
+        object_schema(
+          properties: common_mutation_properties.merge(
+            actor: agent_actor,
+            merge_snapshot_id: identifier,
+            snapshot_binding: object_schema(
+              properties: {
+                registration_event:,
+                snapshot_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
+                verification_event:,
+                verification_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" }
+              },
+              required: %w[
+                registration_event snapshot_digest verification_event verification_digest
+              ]
+            ),
+            target_base_observation: object_schema(
+              properties: {
+                repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+                target_branch: { type: "string", minLength: 1, maxLength: 255 },
+                object_format: { type: "string", enum: Types::GIT_OBJECT_FORMATS },
+                commit_oid: git_oid,
+                observer: producer,
+                run_id: identifier,
+                observed_at: {
+                  type: "string",
+                  pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$"
+                }
+              },
+              required: %w[
+                repository_id target_branch object_format commit_oid observer run_id observed_at
+              ]
+            ),
+            expected_impact_policy: { anyOf: [ expected_policy, { type: "null" } ] }
+          ),
+          required: %w[
+            command_id actor merge_snapshot_id snapshot_binding target_base_observation
+            expected_impact_policy
+          ]
+        )
+      end
+
       def candidate_impact_surface_submit
         object_schema(
           properties: common_mutation_properties.merge(
@@ -740,6 +833,22 @@ module Coordinator
             command_id actor candidate_id repository_id head_commit_oid manifest_digest
             analyzer_version surface
           ]
+        )
+      end
+
+      def merge_authorization_event_reference(type:, context:, stream_name:, minimum_revision:, maximum_revision: nil)
+        revision = { type: "integer", minimum: minimum_revision }
+        revision[:maximum] = maximum_revision if maximum_revision
+        object_schema(
+          properties: {
+            event_id: uuid_v7,
+            type: { type: "string", const: type },
+            stream_context: { type: "string", const: context },
+            stream_name: { type: "string", const: stream_name },
+            stream_id: identifier,
+            stream_revision: revision
+          },
+          required: %w[event_id type stream_context stream_name stream_id stream_revision]
         )
       end
 

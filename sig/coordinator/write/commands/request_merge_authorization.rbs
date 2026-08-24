@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module Commands
+      class RequestMergeAuthorization < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def merge_snapshot_id: () -> String
+        def snapshot_binding: () -> MergeAuthorizations::SnapshotBindingV1
+        def target_base_observation: () -> MergeAuthorizations::TargetBaseObservationV1
+        def expected_impact_policy: () -> MergeAuthorizations::ExpectedImpactPolicyV1?
+        def policy_version: () -> String
+      end
+    end
+  end
+end

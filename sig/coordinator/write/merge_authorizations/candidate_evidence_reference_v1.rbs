@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module MergeAuthorizations
+      class CandidateEvidenceReferenceV1 < Shared::Value
+        def candidate_id: () -> String
+        def candidate_event: () -> EventReference
+        def manifest_event: () -> EventReference
+        def surface_event: () -> EventReference
+        def surface_registration_event: () -> EventReference
+        def surface_digest: () -> String
+      end
+    end
+  end
+end

@@ -246,6 +246,21 @@ module Coordinator::Write
       attribute :submitted_at, Types::Timestamp
     end
 
+    class MergeAuthorization < Value
+      attribute :authorization_id, Types::UuidV7
+      attribute :merge_snapshot_id, Types::Identifier
+      attribute :outcome, Types::MergeAuthorizationOutcome
+      attribute :decision_digest, Types::Sha256Digest
+      attribute :decision_event, EventReference
+      attribute :reasons,
+                Types::Array.of(MergeAuthorizations::ReasonV1)
+                  .constrained(max_size: Types::MERGE_AUTHORIZATION_MAXIMUM_REASONS)
+      attribute :obligations,
+                Types::Array.of(MergeAuthorizations::ObligationCheckV1)
+                  .constrained(max_size: Types::MERGE_AUTHORIZATION_MAXIMUM_OBLIGATIONS)
+      attribute :decided_at, Types::Timestamp
+    end
+
     Type = ChangeSet |
            WorkItem |
            Dependency |
@@ -267,6 +282,7 @@ module Coordinator::Write
            CompatibilityAssessment |
            VerificationObligationWaiver |
            MergeSnapshotRegistration |
-           MergeSnapshotVerification
+           MergeSnapshotVerification |
+           MergeAuthorization
   end
 end

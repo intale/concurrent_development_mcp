@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module MergeAuthorizations
+      class SnapshotBindingV1 < Shared::Value
+        def registration_event: () -> EventReference
+        def snapshot_digest: () -> String
+        def verification_event: () -> EventReference
+        def verification_digest: () -> String
+      end
+    end
+  end
+end

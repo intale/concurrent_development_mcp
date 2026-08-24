@@ -1,0 +1,24 @@
+module Coordinator
+  module Write
+    module MergeAuthorizations
+      class Evaluator
+        RULE_VERSION: String
+
+        def initialize: (
+          event_store: _EventStore,
+          ?stream_factory: StreamFactory,
+          ?schema_registry: EventSchemaRegistry,
+          ?candidate_loader: CandidateObligations::CandidateEvidenceLoader,
+          ?definition_loader: CandidateObligations::DecisionDefinitionLoader,
+          ?matcher: CandidateObligations::Matcher,
+          ?identity_builder: CandidateObligations::IdentityBuilder,
+          ?validity_builder: CandidateObligations::ValidityBuilder,
+          ?canonical_json: Shared::CanonicalJson,
+          ?policy_contract: Contracts::CandidateImpactPolicyDefinition
+        ) -> void
+
+        def call: (Commands::RequestMergeAuthorization command, decided_at: String) -> EvaluationV1
+      end
+    end
+  end
+end

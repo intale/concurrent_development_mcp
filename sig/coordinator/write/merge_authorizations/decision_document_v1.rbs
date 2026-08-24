@@ -1,0 +1,17 @@
+module Coordinator
+  module Write
+    module MergeAuthorizations
+      class DecisionDocumentV1 < Shared::Value
+        SCHEMA: String
+
+        def schema: () -> String
+        def policy_version: () -> String
+        def input_digest: () -> String
+        def snapshot_binding: () -> SnapshotBindingV1
+        def expected_impact_policy: () -> ExpectedImpactPolicyV1?
+        def evaluation: () -> EvaluationV1
+        def outcome: () -> String
+      end
+    end
+  end
+end

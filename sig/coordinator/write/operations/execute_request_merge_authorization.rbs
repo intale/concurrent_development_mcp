@@ -1,0 +1,30 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecuteRequestMergeAuthorization < Dry::Operation
+        TOOL_NAME: String
+
+        def initialize: (
+          event_store: _EventStore,
+          ?preparer: PrepareRequestMergeAuthorization,
+          ?evaluator: MergeAuthorizations::Evaluator,
+          ?decider: Domain::MergeAuthorizations::Decide,
+          ?input_digest: CommandInputDigest,
+          ?decision_digest_builder: MergeAuthorizations::DecisionDigestBuilder,
+          ?clock: Shared::_Clock,
+          ?id_generator: Shared::_IdGenerator,
+          ?event_factory: EventFactory,
+          ?schema_registry: EventSchemaRegistry,
+          ?stream_factory: StreamFactory,
+          ?completion_builder: CommandCompletionBuilder,
+          ?evaluation_contract: Contracts::MergeAuthorizationEvaluation,
+          ?event_plan_contract: Contracts::MergeAuthorizationEventPlan
+        ) -> void
+
+        %a{rbs:test:skip}
+        def call: (Coordinator::Write::command_input input) -> Dry::Monads::Result
+        def call_command: (Commands::RequestMergeAuthorization command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
+      end
+    end
+  end
+end

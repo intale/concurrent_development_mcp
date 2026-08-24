@@ -49,6 +49,8 @@ module Coordinator::Write
           build_register_merge_snapshot(document)
         when CommandInputDocuments::SubmitMergeSnapshotVerificationV1
           build_submit_merge_snapshot_verification(document)
+        when CommandInputDocuments::RequestMergeAuthorizationV1
+          build_request_merge_authorization(document)
         end
       end
 
@@ -382,6 +384,19 @@ module Coordinator::Write
           binding: input.binding,
           assessment: input.assessment,
           policy_version: "merge-snapshot-verification/v1"
+        )
+      end
+
+      def build_request_merge_authorization(document)
+        input = document.input
+        Commands::RequestMergeAuthorization.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          merge_snapshot_id: input.merge_snapshot_id,
+          snapshot_binding: input.snapshot_binding,
+          target_base_observation: input.target_base_observation,
+          expected_impact_policy: input.expected_impact_policy,
+          policy_version: "merge-authorization/v1"
         )
       end
 

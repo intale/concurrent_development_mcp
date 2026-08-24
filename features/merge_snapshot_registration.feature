@@ -50,3 +50,39 @@ Feature: Attributed merge snapshot registration
     When the agent registers merge snapshot "MS-CUC-MERGE-STALE" with command "cmd-cuc-merge-stale-snapshot"
     And the agent submits merge verification with a stale digest as command "cmd-cuc-merge-stale-verification"
     Then the merge verification Task reports "merge_snapshot_verification_binding_stale" without verification facts
+
+  Scenario: Exact verified evidence grants authorization while its available view catches up
+    Given Candidate coordination "MERGE-AUTH-GRANT" gives agent "agent-a" an active lease on "lib/merge_auth_grant.rb"
+    When the agent submits Candidate "CAN-CUC-MERGE-AUTH-GRANT" with command "cmd-cuc-merge-auth-grant-candidate" at head "b" without build context
+    And the agent registers merge snapshot "MS-CUC-MERGE-AUTH-GRANT" with command "cmd-cuc-merge-auth-grant-snapshot"
+    And merge snapshot "MS-CUC-MERGE-AUTH-GRANT" reaches the read side
+    And the agent submits "passed" merge verification with command "cmd-cuc-merge-auth-grant-verification"
+    Then the merge verification Task completes with status "verified"
+    When the agent requests merge authorization with command "cmd-cuc-merge-auth-grant"
+    Then the merge authorization Task completes with durable outcome "granted"
+    And the available merge snapshot has no observed authorization yet
+    When the merge authorization reaches the read side twice
+    Then the available merge snapshot reports authorization "granted" without a freshness gate
+
+  Scenario: A changed target base is a durable authorization denial, not a Task failure
+    Given Candidate coordination "MERGE-AUTH-STALE" gives agent "agent-a" an active lease on "lib/merge_auth_stale.rb"
+    When the agent submits Candidate "CAN-CUC-MERGE-AUTH-STALE" with command "cmd-cuc-merge-auth-stale-candidate" at head "b" without build context
+    And the agent registers merge snapshot "MS-CUC-MERGE-AUTH-STALE" with command "cmd-cuc-merge-auth-stale-snapshot"
+    And merge snapshot "MS-CUC-MERGE-AUTH-STALE" reaches the read side
+    And the agent submits "passed" merge verification with command "cmd-cuc-merge-auth-stale-verification"
+    Then the merge verification Task completes with status "verified"
+    When the agent requests merge authorization against a changed target base with command "cmd-cuc-merge-auth-stale"
+    Then the merge authorization Task completes with durable outcome "denied"
+    And the authorization explains "target_base_binding_stale"
+
+  Scenario: An exact open merge-gate obligation blocks authorization from authoritative facts
+    Given Rails 4 to Rails 5 Candidate pair "MERGE-AUTH-OPEN" has registered attributed impact surfaces
+    When the user activates "merge_gate" Candidate impact policy through guidance Tasks
+    And the policy reaction is delivered twice
+    Then one exact open Rails obligation is durable under "merge_gate"
+    When the integrator registers exact Rails pair snapshot "MS-CUC-MERGE-AUTH-OPEN"
+    And the agent submits "passed" merge verification with command "cmd-cuc-merge-auth-open-verification"
+    Then the merge verification Task completes with status "verified"
+    When the agent requests merge authorization with command "cmd-cuc-merge-auth-open"
+    Then the merge authorization Task completes with durable outcome "denied"
+    And the authorization explains "required_obligation_open"

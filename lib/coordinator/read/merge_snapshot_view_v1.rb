@@ -21,5 +21,6 @@ module Coordinator::Read
     attribute :evidence_status, Types::MergeSnapshotEvidenceStatus
     attribute :registered, MergeSnapshotSourceEvidenceV1
     attribute :verification, MergeSnapshotVerificationViewV1
+    attribute :latest_authorization, MergeAuthorizationViewV1.optional
   end
 end

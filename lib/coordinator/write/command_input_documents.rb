@@ -449,6 +449,19 @@ module Coordinator::Write
       attribute :input, SubmitMergeSnapshotVerificationInputV1
     end
 
+    class RequestMergeAuthorizationInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :merge_snapshot_id, Types::Identifier
+      attribute :snapshot_binding, MergeAuthorizations::SnapshotBindingV1
+      attribute :target_base_observation, MergeAuthorizations::TargetBaseObservationV1
+      attribute :expected_impact_policy, MergeAuthorizations::ExpectedImpactPolicyV1.optional
+    end
+
+    class RequestMergeAuthorizationV1 < BaseV1
+      attribute :tool_name, Types::String.enum("merge_authorization_request")
+      attribute :input, RequestMergeAuthorizationInputV1
+    end
+
     class ExpireResourceLeaseInputV1 < Value
       attribute :actor, ActorV1
       attribute :resource_key_hash, Types::Sha256Digest
@@ -484,7 +497,8 @@ module Coordinator::Write
            SubmitCompatibilityAssessmentV1 |
            WaiveVerificationObligationV1 |
            RegisterMergeSnapshotV1 |
-           SubmitMergeSnapshotVerificationV1
+           SubmitMergeSnapshotVerificationV1 |
+           RequestMergeAuthorizationV1
 
     DigestType = Type | ExpireResourceLeaseV1
   end

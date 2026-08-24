@@ -1,0 +1,16 @@
+module Coordinator
+  module Write
+    module MergeAuthorizations
+      class CurrentImpactPolicyV1 < Shared::Value
+        def partition: () -> Decisions::DecisionPartitionV1
+        def partition_event: () -> EventReference?
+        def head: () -> Decisions::DecisionHeadV1?
+        def definition_digest: () -> String?
+        def status: () -> String
+        def required_evidence: () -> Array[String]
+        def valid_from: () -> String?
+        def gating?: () -> bool
+      end
+    end
+  end
+end

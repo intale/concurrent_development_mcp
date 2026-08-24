@@ -73,6 +73,15 @@ module Coordinator::Write
       )
     end
 
+    def self.candidate_impact_surface_registration(marker)
+      MarkedEventReadCriteria.new(
+        event_type: "CandidateImpactSurfaceRegistered",
+        marker:,
+        maximum_count: 1,
+        direction: :asc
+      )
+    end
+
     COMMAND_COMPLETION = EventReadCriteria.new(
       event_types: [ "CommandCompleted" ],
       maximum_count: 1,

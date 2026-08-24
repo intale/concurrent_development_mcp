@@ -75,6 +75,11 @@ module Coordinator
         not-applicable assessments remain durable facts and may be followed by a new assessment; an exact pass
         without error or critical findings verifies that immutable snapshot in the same authoritative command.
         The projected verification history may lag and never authorizes the command.
+        Use merge_authorization_request only after observing the exact registered and verified snapshot evidence.
+        Include an attributed fresh target-base observation and the exact current Candidate-impact policy context,
+        or null when no policy is active. The durable Task recomputes all merge-gating obligations directly from
+        authoritative event facts. Both grants and structured denials are durable decisions; retry with a new
+        command only after correcting the denied evidence. Projected state may lag and is never authorization.
         The coordinator records attributed evidence and does not execute Git, CI, or agent work.
       TEXT
 

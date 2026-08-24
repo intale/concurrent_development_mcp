@@ -50,6 +50,8 @@ module Coordinator
       def merge_snapshot_register_document: (Commands::RegisterMergeSnapshot command) -> CommandInputDocuments::RegisterMergeSnapshotV1
       def merge_verification_submit: (Commands::SubmitMergeSnapshotVerification command) -> String
       def merge_verification_submit_document: (Commands::SubmitMergeSnapshotVerification command) -> CommandInputDocuments::SubmitMergeSnapshotVerificationV1
+      def merge_authorization_request: (Commands::RequestMergeAuthorization command) -> String
+      def merge_authorization_request_document: (Commands::RequestMergeAuthorization command) -> CommandInputDocuments::RequestMergeAuthorizationV1
     end
   end
 end

@@ -659,6 +659,36 @@ module Coordinator::Write
       )
     end
 
+    def merge_authorization_request(command:, decision:, input_digest:, persisted_events:, completed_at:)
+      outcome = decision.is_a?(Events::MergeAuthorizationGrantedV1) ? "granted" : "denied"
+      build_completion(
+        command:,
+        tool_name: "merge_authorization_request",
+        summary: merge_authorization_summary(outcome),
+        data: CommandReceiptData::MergeAuthorization.new(
+          authorization_id: decision.authorization_id,
+          merge_snapshot_id: command.merge_snapshot_id,
+          outcome:,
+          decision_digest: decision.decision_digest,
+          decision_event: event_reference(persisted_events.sole),
+          reasons: decision.evaluation.reasons,
+          obligations: decision.evaluation.obligations,
+          decided_at: decision.decided_at
+        ),
+        next_actions: [
+          NextAction.new(
+            tool: "merge_snapshot_get",
+            arguments: NextAction::MergeSnapshotArguments.new(
+              merge_snapshot_id: command.merge_snapshot_id
+            )
+          )
+        ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
 
     def verification_status(persisted_events)
@@ -667,6 +697,12 @@ module Coordinator::Write
       when "VerificationObligationFailed" then "failed"
       else "open"
       end
+    end
+
+    def merge_authorization_summary(outcome)
+      return "Recorded evidence satisfies merge-authorization policy; the external merge has not been performed." if outcome == "granted"
+
+      "Merge authorization was denied from the exact recorded evidence; the external merge was not performed."
     end
 
     def compatibility_assessment_summary(status)

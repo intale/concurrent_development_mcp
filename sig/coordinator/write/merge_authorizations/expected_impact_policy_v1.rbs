@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module MergeAuthorizations
+      class ExpectedImpactPolicyV1 < Shared::Value
+        def partition_event: () -> EventReference
+        def head: () -> Decisions::DecisionHeadV1
+        def definition_digest: () -> String
+      end
+    end
+  end
+end

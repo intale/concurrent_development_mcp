@@ -9,6 +9,7 @@ module Coordinator
       def self.interpretation_slot_acceptance: (String marker) -> GlobalMarkedEventReadCriteria
       def self.interpretation_acceptance: (String marker) -> GlobalMarkedEventReadCriteria
       def self.decision_activation: (String marker) -> GlobalMarkedEventReadCriteria
+      def self.candidate_impact_surface_registration: (String marker) -> MarkedEventReadCriteria
 
       COMMAND_COMPLETION: EventReadCriteria
       DECISION_EXISTENCE: EventReadCriteria

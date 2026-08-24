@@ -30,6 +30,7 @@ module Coordinator
       def self.merge_snapshot_register: () -> json_schema
       def self.merge_snapshot_get: () -> json_schema
       def self.merge_verification_submit: () -> json_schema
+      def self.merge_authorization_request: () -> json_schema
       def self.candidate_impact_surface_submit: () -> json_schema
       def self.operation_get: () -> json_schema
       def self.guidance_get: () -> json_schema
@@ -60,6 +61,7 @@ module Coordinator
       def self.candidate_manifest_file: () -> json_schema
       def self.candidate_build_context: () -> json_schema
       def self.candidate_impact_surface: () -> json_schema
+      def self.merge_authorization_event_reference: (type: String, context: String, stream_name: String, minimum_revision: Integer, ?maximum_revision: Integer?) -> json_schema
       def self.candidate_impact_key: () -> json_schema
       def self.candidate_impact_value: () -> json_schema
       def self.nullable_candidate_impact_value: () -> json_schema

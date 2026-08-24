@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module MergeAuthorizations
+      class SnapshotEvidenceV1 < Shared::Value
+        def registration: () -> Events::MergeSnapshotRegisteredV1
+        def registration_event: () -> EventReference
+        def verification: () -> Events::MergeSnapshotVerifiedV1?
+        def verification_event: () -> EventReference?
+      end
+    end
+  end
+end

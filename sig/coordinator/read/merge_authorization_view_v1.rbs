@@ -1,0 +1,15 @@
+module Coordinator::Read
+  class MergeAuthorizationViewV1 < Coordinator::Shared::Value
+    attr_reader authorization_id: String
+    attr_reader merge_snapshot_id: String
+    attr_reader outcome: String
+    attr_reader policy_version: String
+    attr_reader snapshot_binding: Coordinator::Write::MergeAuthorizations::SnapshotBindingV1
+    attr_reader expected_impact_policy: Coordinator::Write::MergeAuthorizations::ExpectedImpactPolicyV1?
+    attr_reader evaluation: Coordinator::Write::MergeAuthorizations::EvaluationV1
+    attr_reader input_digest: String
+    attr_reader decision_digest: String
+    attr_reader decided_at: String
+    attr_reader source: MergeSnapshotSourceEvidenceV1
+  end
+end

@@ -130,6 +130,14 @@ module Coordinator::Write
       )
     end
 
+    def merge_authorization(authorization_id)
+      StreamReference.new(
+        context: "DevelopmentIntegration",
+        stream_name: "MergeAuthorization",
+        stream_id: authorization_id
+      )
+    end
+
     def merge_snapshot_commit(registry_id)
       StreamReference.new(
         context: "DevelopmentIntegration",

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_161000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_24_170000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -334,6 +334,30 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_161000) do
     t.jsonb "slot", null: false
     t.datetime "updated_at", null: false
     t.index ["decision_id"], name: "index_decision_slot_heads_on_decision_id"
+  end
+
+  create_table "merge_authorizations", primary_key: "authorization_id", id: :string, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.datetime "decided_at_domain", null: false
+    t.string "decision_digest", null: false
+    t.jsonb "evaluation", null: false
+    t.jsonb "expected_impact_policy"
+    t.string "input_digest", null: false
+    t.string "merge_snapshot_id", null: false
+    t.string "outcome", null: false
+    t.string "policy_version", null: false
+    t.jsonb "snapshot_binding", null: false
+    t.jsonb "source_actor", null: false
+    t.string "source_causation_id"
+    t.string "source_correlation_id"
+    t.jsonb "source_event", null: false
+    t.bigint "source_global_position", null: false
+    t.jsonb "source_markers", default: [], null: false
+    t.jsonb "source_metadata", default: {}, null: false
+    t.datetime "source_persisted_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["merge_snapshot_id", "source_global_position"], name: "idx_merge_authorizations_snapshot_position"
+    t.index ["source_global_position"], name: "index_merge_authorizations_on_source_global_position", unique: true
   end
 
   create_table "merge_snapshots", primary_key: "merge_snapshot_id", id: :string, force: :cascade do |t|

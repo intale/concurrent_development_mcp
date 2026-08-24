@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module Operations
+      class PrepareRequestMergeAuthorization < Dry::Operation
+        POLICY_VERSION: String
+
+        def initialize: (?contract: Contracts::RequestMergeAuthorization) -> void
+        %a{rbs:test:skip}
+        def call: (Coordinator::Write::command_input input) -> Dry::Monads::Result
+      end
+    end
+  end
+end

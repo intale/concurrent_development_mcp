@@ -127,6 +127,10 @@ module Coordinator
       Write::Operations::PrepareSubmitMergeSnapshotVerification.new
     end
 
+    register("operations.prepare_request_merge_authorization", memoize: true) do
+      Write::Operations::PrepareRequestMergeAuthorization.new
+    end
+
     register("domain.change_sets.create", memoize: true) do
       Write::Domain::ChangeSets::Create.new(stream_factory: self["stream_factory"])
     end
@@ -330,6 +334,23 @@ module Coordinator
       )
     end
 
+    register("merge_authorizations.evaluator") do
+      Write::MergeAuthorizations::Evaluator.new(
+        event_store: self["event_store"],
+        stream_factory: self["stream_factory"],
+        schema_registry: self["event_schema_registry"],
+        canonical_json: self["canonical_json"]
+      )
+    end
+
+    register("merge_authorizations.decision_digest_builder", memoize: true) do
+      Write::MergeAuthorizations::DecisionDigestBuilder.new(canonical_json: self["canonical_json"])
+    end
+
+    register("domain.merge_authorizations.decide", memoize: true) do
+      Write::Domain::MergeAuthorizations::Decide.new
+    end
+
     register("change_set_activation_source_builder", memoize: true) do
       Processes::ChangeSetActivationSourceBuilder.new(schema_registry: self["event_schema_registry"])
     end
@@ -437,7 +458,13 @@ module Coordinator
     end
 
     register("repositories.merge_snapshots", memoize: true) do
-      Read::Repositories::MergeSnapshots.new
+      Read::Repositories::MergeSnapshots.new(
+        authorizations: self["repositories.merge_authorizations"]
+      )
+    end
+
+    register("repositories.merge_authorizations", memoize: true) do
+      Read::Repositories::MergeAuthorizations.new
     end
 
     register("projectors.coord_context_v1", memoize: true) do
@@ -517,6 +544,7 @@ module Coordinator
       Read::Projectors::MergeSnapshotsV1.new(
         schema_registry: self["event_schema_registry"],
         snapshots: self["repositories.merge_snapshots"],
+        authorizations: self["repositories.merge_authorizations"],
         processed_events: self["repositories.processed_projection_events"]
       )
     end
@@ -950,6 +978,23 @@ module Coordinator
       )
     end
 
+    register("operations.execute_request_merge_authorization") do
+      Write::Operations::ExecuteRequestMergeAuthorization.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_request_merge_authorization"],
+        evaluator: self["merge_authorizations.evaluator"],
+        decider: self["domain.merge_authorizations.decide"],
+        input_digest: self["command_input_digest"],
+        decision_digest_builder: self["merge_authorizations.decision_digest_builder"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
     register("operations.execute_claim_verification_obligation") do
       Write::Operations::ExecuteClaimVerificationObligation.new(
         event_store: self["event_store"],
@@ -1148,7 +1193,9 @@ module Coordinator
         register_merge_snapshot:
           self["operations.execute_register_merge_snapshot"],
         submit_merge_snapshot_verification:
-          self["operations.execute_submit_merge_snapshot_verification"]
+          self["operations.execute_submit_merge_snapshot_verification"],
+        request_merge_authorization:
+          self["operations.execute_request_merge_authorization"]
       )
     end
 
@@ -1324,6 +1371,13 @@ module Coordinator
     register("operations.submit_merge_snapshot_verification_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_submit_merge_snapshot_verification"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_request_merge_authorization_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_request_merge_authorization"],
         submitter: self["operations.submit_coordination_task"]
       )
     end

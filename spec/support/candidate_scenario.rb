@@ -3,7 +3,7 @@
 module CandidateScenario
   module_function
 
-  def prepare(prefix:, path: "lib/candidate.rb", agent_id: "agent-a")
+  def prepare(prefix:, path: "lib/candidate.rb", agent_id: "agent-a", head_commit_oid: "b" * 40)
     ids = {
       change_set_id: "CS-#{prefix}",
       work_item_id: "W-#{prefix}",
@@ -33,15 +33,15 @@ module CandidateScenario
         agent_id:,
         candidate_id: "CAN-#{prefix}",
         command_id: "cmd-#{prefix}",
-        head_commit_oid: "b" * 40
+        head_commit_oid:
       )
     }
   end
 
-  def submit(prefix:, build_context: true)
-    prepared = prepare(prefix:)
+  def submit(prefix:, build_context: true, path: "lib/candidate.rb", head_commit_oid: "b" * 40)
+    prepared = prepare(prefix:, path:, head_commit_oid:)
     input = prepared.fetch(:input)
-    input = input.merge(build_context: build_context_for("lib/candidate.rb")) if build_context
+    input = input.merge(build_context: build_context_for(path)) if build_context
     completion = execute(Coordinator::Write::Operations::ExecuteSubmitCandidate, input)
     prepared.merge(
       input:,

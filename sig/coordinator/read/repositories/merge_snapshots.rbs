@@ -1,5 +1,6 @@
 module Coordinator::Read::Repositories
-  class MergeSnapshots
+    class MergeSnapshots
+    def initialize: (?authorizations: MergeAuthorizations) -> void
     def fetch: (String merge_snapshot_id) -> Coordinator::Read::MergeSnapshotViewV1?
     def store: (event: PgEventstore::Event, snapshot: Coordinator::Write::Events::MergeSnapshotRegisteredV1) -> Coordinator::Read::MergeSnapshot
     def record_submission: (event: PgEventstore::Event, submission: Coordinator::Write::Events::MergeSnapshotVerificationSubmittedV1) -> bool

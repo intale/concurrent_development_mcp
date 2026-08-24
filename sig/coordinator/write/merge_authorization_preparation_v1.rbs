@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    class MergeAuthorizationPreparationV1 < Shared::Value
+      def authorization_id: () -> String
+      def decided_at: () -> String
+      def input_digest: () -> String
+      def decision_event_id: () -> String
+      def completion_event_id: () -> String
+      def correlation_id: () -> String
+    end
+  end
+end

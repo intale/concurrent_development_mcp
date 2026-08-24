@@ -32,7 +32,9 @@ module Coordinator::Write
         register_merge_snapshot:
           Operations::ExecuteRegisterMergeSnapshot.new(event_store:),
         submit_merge_snapshot_verification:
-          Operations::ExecuteSubmitMergeSnapshotVerification.new(event_store:)
+          Operations::ExecuteSubmitMergeSnapshotVerification.new(event_store:),
+        request_merge_authorization:
+          Operations::ExecuteRequestMergeAuthorization.new(event_store:)
       )
         @create_change_set = create_change_set
         @create_work_item = create_work_item
@@ -56,6 +58,7 @@ module Coordinator::Write
         @waive_verification_obligation = waive_verification_obligation
         @register_merge_snapshot = register_merge_snapshot
         @submit_merge_snapshot_verification = submit_merge_snapshot_verification
+        @request_merge_authorization = request_merge_authorization
       end
 
       def call(command, caused_by:)
@@ -104,6 +107,8 @@ module Coordinator::Write
           @register_merge_snapshot.call_command(command, caused_by:)
         when Commands::SubmitMergeSnapshotVerification
           @submit_merge_snapshot_verification.call_command(command, caused_by:)
+        when Commands::RequestMergeAuthorization
+          @request_merge_authorization.call_command(command, caused_by:)
         end
       end
     end
