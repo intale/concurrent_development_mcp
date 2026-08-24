@@ -595,6 +595,50 @@ module Coordinator
         )
       end
 
+      def merge_snapshot_register
+        candidate = object_schema(
+          properties: { candidate_id: identifier, head_commit_oid: git_oid },
+          required: %w[candidate_id head_commit_oid]
+        )
+        producer = object_schema(
+          properties: {
+            name: { type: "string", minLength: 1, maxLength: 100 },
+            version: { type: "string", minLength: 1, maxLength: 100 }
+          },
+          required: %w[name version]
+        )
+        object_schema(
+          properties: common_mutation_properties.merge(
+            actor: agent_actor,
+            merge_snapshot_id: identifier,
+            repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+            target_branch: { type: "string", minLength: 1, maxLength: 255 },
+            target_base_commit_oid: git_oid,
+            ordered_candidates: {
+              type: "array", items: candidate, minItems: 1, maxItems: 32, uniqueItems: true
+            },
+            merge_commit_oid: git_oid,
+            producer:,
+            run_id: identifier,
+            produced_at: {
+              type: "string",
+              pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$"
+            }
+          ),
+          required: %w[
+            command_id actor merge_snapshot_id repository_id target_branch
+            target_base_commit_oid ordered_candidates merge_commit_oid producer run_id produced_at
+          ]
+        )
+      end
+
+      def merge_snapshot_get
+        object_schema(
+          properties: { merge_snapshot_id: identifier },
+          required: %w[merge_snapshot_id]
+        )
+      end
+
       def candidate_impact_surface_submit
         object_schema(
           properties: common_mutation_properties.merge(

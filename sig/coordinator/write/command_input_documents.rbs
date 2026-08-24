@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandInputDocuments
-      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1 | SubmitCandidateV1 | SubmitCandidateImpactSurfaceV1 | ClaimVerificationObligationV1 | SubmitCompatibilityAssessmentV1 | WaiveVerificationObligationV1
+      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1 | SubmitCandidateV1 | SubmitCandidateImpactSurfaceV1 | ClaimVerificationObligationV1 | SubmitCompatibilityAssessmentV1 | WaiveVerificationObligationV1 | RegisterMergeSnapshotV1
       type digest_value = value | ExpireResourceLeaseV1
 
       class ActorV1 < Shared::Value
@@ -387,6 +387,36 @@ module Coordinator
       class WaiveVerificationObligationV1 < BaseV1
         def tool_name: () -> String
         def input: () -> WaiveVerificationObligationInputV1
+      end
+
+      class MergeSnapshotCandidateV1 < Shared::Value
+        def candidate_id: () -> String
+        def head_commit_oid: () -> String
+      end
+
+      class MergeSnapshotProducerV1 < Shared::Value
+        def name: () -> String
+        def version: () -> String
+      end
+
+      class RegisterMergeSnapshotInputV1 < Shared::Value
+        Candidate: singleton(MergeSnapshotCandidateV1)
+
+        def actor: () -> ActorV1
+        def merge_snapshot_id: () -> String
+        def repository_id: () -> String
+        def target_branch: () -> String
+        def target_base_commit_oid: () -> String
+        def ordered_candidates: () -> Array[MergeSnapshotCandidateV1]
+        def merge_commit_oid: () -> String
+        def producer: () -> MergeSnapshotProducerV1
+        def run_id: () -> String
+        def produced_at: () -> String
+      end
+
+      class RegisterMergeSnapshotV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> RegisterMergeSnapshotInputV1
       end
 
       class ExpireResourceLeaseInputV1 < Shared::Value

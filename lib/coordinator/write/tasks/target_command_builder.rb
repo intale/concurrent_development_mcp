@@ -45,6 +45,8 @@ module Coordinator::Write
           build_submit_compatibility_assessment(document)
         when CommandInputDocuments::WaiveVerificationObligationV1
           build_waive_verification_obligation(document)
+        when CommandInputDocuments::RegisterMergeSnapshotV1
+          build_register_merge_snapshot(document)
         end
       end
 
@@ -345,6 +347,27 @@ module Coordinator::Write
           obligation_id: input.obligation_id,
           obligation_validity_input_digest: input.obligation_validity_input_digest,
           reason: input.reason
+        )
+      end
+
+      def build_register_merge_snapshot(document)
+        input = document.input
+        Commands::RegisterMergeSnapshot.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          merge_snapshot_id: input.merge_snapshot_id,
+          repository_id: input.repository_id,
+          target_branch: input.target_branch,
+          object_format: input.target_base_commit_oid.length == 40 ? "sha1" : "sha256",
+          target_base_commit_oid: input.target_base_commit_oid,
+          ordered_candidates: input.ordered_candidates.map do |candidate|
+            MergeSnapshots::RequestedCandidateV1.new(candidate.to_h)
+          end,
+          merge_commit_oid: input.merge_commit_oid,
+          producer: MergeSnapshots::ProducerV1.new(input.producer.to_h),
+          run_id: input.run_id,
+          produced_at: input.produced_at,
+          policy_version: "merge-snapshot-registration/v1"
         )
       end
 

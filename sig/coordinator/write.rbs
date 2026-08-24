@@ -21,7 +21,8 @@ module Coordinator
                                 Commands::SubmitCandidateImpactSurface |
                                 Commands::ClaimVerificationObligation |
                                 Commands::SubmitCompatibilityAssessment |
-                                Commands::WaiveVerificationObligation
+                                Commands::WaiveVerificationObligation |
+                                Commands::RegisterMergeSnapshot
     type write_command = coordination_command | Commands::ExpireResourceLease
     type lifecycle_command = Commands::StartCoordinationTask |
                              Commands::RecordCoordinationTaskOutcome |

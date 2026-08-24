@@ -70,6 +70,8 @@ module Coordinator::Write
       [ "VerificationObligationValidityScanCompleted", 1 ] => Events::VerificationObligationValidityScanCompletedV1,
       [ "CandidateHeadRegistered", 1 ] => Events::CandidateHeadRegisteredV1,
       [ "CandidateAttachedToAttempt", 1 ] => Events::CandidateAttachedToAttemptV1,
+      [ "MergeSnapshotRegistered", 1 ] => Events::MergeSnapshotRegisteredV1,
+      [ "MergeSnapshotCommitRegistered", 1 ] => Events::MergeSnapshotCommitRegisteredV1,
       [ "CoordinationTaskSubmitted", 1 ] => Events::CoordinationTaskSubmittedV1,
       [ "CoordinationTaskExecutionStarted", 1 ] => Events::CoordinationTaskExecutionStartedV1,
       [ "CoordinationTaskCompleted", 1 ] => Events::CoordinationTaskCompletedV1,

@@ -163,6 +163,7 @@ RSpec.describe Coordinator::Container do
         "coord-context-v1",
         "decision-governance-v1",
         "decision-interpretations-v1",
+        "merge-snapshots-v1",
         "user-utterances-v1",
         "verification-obligations-v1"
       ]

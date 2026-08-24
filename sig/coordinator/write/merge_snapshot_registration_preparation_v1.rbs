@@ -1,0 +1,11 @@
+module Coordinator::Write
+  class MergeSnapshotRegistrationPreparationV1 < Coordinator::Shared::Value
+    attr_reader registered_at: String
+    attr_reader input_digest: String
+    attr_reader commit_identity: MergeSnapshots::CommitIdentityV1
+    attr_reader snapshot_event_id: String
+    attr_reader commit_registration_event_id: String
+    attr_reader completion_event_id: String
+    attr_reader correlation_id: String
+  end
+end

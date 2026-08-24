@@ -1,0 +1,7 @@
+module Coordinator::Write::Contracts
+  class RegisterMergeSnapshot < Dry::Validation::Contract
+    private
+
+    def valid_branch?: (String value) -> bool
+  end
+end

@@ -1,0 +1,8 @@
+module Coordinator::Write
+  module MergeSnapshots
+    class RequestedCandidateV1 < Coordinator::Shared::Value
+      attr_reader candidate_id: String
+      attr_reader head_commit_oid: String
+    end
+  end
+end

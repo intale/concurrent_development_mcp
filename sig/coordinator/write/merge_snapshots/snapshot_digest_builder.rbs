@@ -1,0 +1,8 @@
+module Coordinator::Write
+  module MergeSnapshots
+    class SnapshotDigestBuilder
+      def initialize: (?canonical_json: Coordinator::Shared::CanonicalJson) -> void
+      def call: (command: Coordinator::Write::Commands::RegisterMergeSnapshot, members: Array[CandidateMemberV1]) -> String
+    end
+  end
+end

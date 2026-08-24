@@ -1,0 +1,8 @@
+module Coordinator::Write
+  module MergeSnapshots
+    class CommitIdentityBuilder
+      def initialize: (?canonical_json: Coordinator::Shared::CanonicalJson, ?compound_marker_builder: Coordinator::Shared::CompoundMarkerBuilder) -> void
+      def call: (repository_id: String, object_format: String, merge_commit_oid: String) -> CommitIdentityV1
+    end
+  end
+end

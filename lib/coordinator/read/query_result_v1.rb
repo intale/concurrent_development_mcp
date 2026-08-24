@@ -69,6 +69,10 @@ module Coordinator::Read
       attribute :page, VerificationObligationPageV1
     end
 
+    class MergeSnapshotData < Value
+      attribute :snapshot, MergeSnapshotViewV1
+    end
+
     Data = EmptyData |
            DomainError |
            OperationData |
@@ -83,7 +87,8 @@ module Coordinator::Read
            CandidateData |
            CandidatePageData |
            CandidateImpactData |
-           VerificationObligationPageData
+           VerificationObligationPageData |
+           MergeSnapshotData
     Action = Coordinator::Write::NextAction | NextAction
 
     attribute :status, Types::String.enum(

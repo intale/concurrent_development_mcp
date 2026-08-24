@@ -1,0 +1,4 @@
+module Coordinator::Mcp::Tools
+  class MergeSnapshotRegister < Coordinator::Mcp::MutationTool
+  end
+end

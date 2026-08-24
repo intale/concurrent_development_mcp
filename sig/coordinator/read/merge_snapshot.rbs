@@ -1,0 +1,4 @@
+module Coordinator::Read
+  class MergeSnapshot < ApplicationRecord
+  end
+end

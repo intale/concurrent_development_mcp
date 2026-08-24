@@ -1,0 +1,4 @@
+module Coordinator::Read::Contracts
+  class MergeSnapshotSourceEvent < Dry::Validation::Contract
+  end
+end

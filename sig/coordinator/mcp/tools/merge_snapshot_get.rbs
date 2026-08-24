@@ -1,0 +1,4 @@
+module Coordinator::Mcp::Tools
+  class MergeSnapshotGet < Coordinator::Mcp::QueryTool
+  end
+end

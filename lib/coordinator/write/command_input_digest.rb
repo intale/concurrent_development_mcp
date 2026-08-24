@@ -32,6 +32,7 @@ module Coordinator::Write
       when Commands::ClaimVerificationObligation then verification_obligation_claim_document(command)
       when Commands::SubmitCompatibilityAssessment then compatibility_assessment_submit_document(command)
       when Commands::WaiveVerificationObligation then verification_obligation_waive_document(command)
+      when Commands::RegisterMergeSnapshot then merge_snapshot_register_document(command)
       when Commands::ExpireResourceLease then lease_expire_policy_document(command)
       else
         raise ArgumentError, "Unsupported coordination command: #{command.class.name}"
@@ -476,6 +477,32 @@ module Coordinator::Write
           obligation_id: command.obligation_id,
           obligation_validity_input_digest: command.obligation_validity_input_digest,
           reason: command.reason
+        )
+      )
+    end
+
+    def merge_snapshot_register(command)
+      @canonical_json.sha256(merge_snapshot_register_document(command).to_h)
+    end
+
+    def merge_snapshot_register_document(command)
+      CommandInputDocuments::RegisterMergeSnapshotV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "merge_snapshot_register",
+        input: CommandInputDocuments::RegisterMergeSnapshotInputV1.new(
+          actor: actor_document(command.actor),
+          merge_snapshot_id: command.merge_snapshot_id,
+          repository_id: command.repository_id,
+          target_branch: command.target_branch,
+          target_base_commit_oid: command.target_base_commit_oid,
+          ordered_candidates: command.ordered_candidates.map do |candidate|
+            CommandInputDocuments::MergeSnapshotCandidateV1.new(candidate.to_h)
+          end,
+          merge_commit_oid: command.merge_commit_oid,
+          producer: CommandInputDocuments::MergeSnapshotProducerV1.new(command.producer.to_h),
+          run_id: command.run_id,
+          produced_at: command.produced_at
         )
       )
     end

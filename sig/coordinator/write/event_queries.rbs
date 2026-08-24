@@ -23,6 +23,9 @@ module Coordinator
       ATTEMPT_FOR_AGENT_CHOICE: EventReadCriteria
       CANDIDATE_EXISTENCE: EventReadCriteria
       CANDIDATE_HEAD_REGISTRATION: EventReadCriteria
+      CANDIDATE_FOR_MERGE_SNAPSHOT: EventReadCriteria
+      MERGE_SNAPSHOT_REGISTRATION: EventReadCriteria
+      MERGE_SNAPSHOT_COMMIT_REGISTRATION: EventReadCriteria
       CANDIDATE_FOR_IMPACT_SURFACE: GroupedEventReadCriteria
       VERIFICATION_OBLIGATION_CREATION: EventReadCriteria
       VERIFICATION_OBLIGATION_FOR_CLAIM: GroupedEventReadCriteria

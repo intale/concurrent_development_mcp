@@ -1,0 +1,9 @@
+module Coordinator::Write::Domain::MergeSnapshots
+  class RegistrationState < Coordinator::Shared::Value
+    History: Dry::Types::Type
+
+    attr_reader existing_snapshot: Coordinator::Write::EventReference?
+    attr_reader existing_commit: Coordinator::Write::EventReference?
+    attr_reader candidates: Array[Coordinator::Write::MergeSnapshots::CandidateHistoryV1]
+  end
+end

@@ -1,0 +1,8 @@
+module Coordinator::Write
+  module MergeSnapshots
+    class ProducerV1 < Coordinator::Shared::Value
+      attr_reader name: String
+      attr_reader version: String
+    end
+  end
+end

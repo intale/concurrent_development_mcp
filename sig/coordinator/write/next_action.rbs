@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     class NextAction < Shared::Value
-      type arguments = ChangeSetArguments | AttemptArguments | GuidanceArguments | InterpretationListArguments | DecisionArguments | AgentChoiceArguments | CandidateArguments | VerificationObligationArguments | DecisionResolutionArguments
+      type arguments = ChangeSetArguments | AttemptArguments | GuidanceArguments | InterpretationListArguments | DecisionArguments | AgentChoiceArguments | CandidateArguments | VerificationObligationArguments | MergeSnapshotArguments | DecisionResolutionArguments
 
       class ChangeSetArguments < Shared::Value
         def change_set_id: () -> String
@@ -35,6 +35,10 @@ module Coordinator
 
       class VerificationObligationArguments < Shared::Value
         def obligation_id: () -> String
+      end
+
+      class MergeSnapshotArguments < Shared::Value
+        def merge_snapshot_id: () -> String
       end
 
       class DecisionResolutionArguments < Shared::Value

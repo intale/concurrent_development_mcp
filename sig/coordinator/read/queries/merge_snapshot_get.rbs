@@ -1,0 +1,7 @@
+module Coordinator::Read::Queries
+  class MergeSnapshotGet < Dry::Operation
+    def initialize: (?contract: Coordinator::Read::Contracts::MergeSnapshotGet, ?snapshots: Coordinator::Read::Repositories::MergeSnapshots) -> void
+    %a{rbs:test:skip}
+    def call: (Coordinator::Write::command_input input) -> Dry::Monads::Result
+  end
+end

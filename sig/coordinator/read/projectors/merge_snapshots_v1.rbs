@@ -1,0 +1,12 @@
+module Coordinator::Read::Projectors
+  class MergeSnapshotsV1
+    PROJECTION: Coordinator::Read::ProjectionDefinition
+
+    def initialize: (?contract: Coordinator::Read::Contracts::MergeSnapshotSourceEvent, ?schema_registry: Coordinator::Write::EventSchemaRegistry, ?snapshots: Coordinator::Read::Repositories::MergeSnapshots, ?processed_events: Coordinator::Read::Repositories::ProcessedProjectionEvents) -> void
+    def call: (PgEventstore::Event event) -> nil
+
+    private
+
+    def load_payload: (PgEventstore::Event event) -> Coordinator::Write::Events::MergeSnapshotRegisteredV1
+  end
+end

@@ -1,0 +1,12 @@
+module Coordinator::Write
+  module MergeSnapshots
+    class CommitIdentityDocumentV1 < Coordinator::Shared::Value
+      SCHEMA: String
+
+      attr_reader schema: String
+      attr_reader repository_id: String
+      attr_reader object_format: String
+      attr_reader merge_commit_oid: String
+    end
+  end
+end

@@ -119,6 +119,10 @@ module Coordinator
       Write::Operations::PrepareWaiveVerificationObligation.new
     end
 
+    register("operations.prepare_register_merge_snapshot", memoize: true) do
+      Write::Operations::PrepareRegisterMergeSnapshot.new
+    end
+
     register("domain.change_sets.create", memoize: true) do
       Write::Domain::ChangeSets::Create.new(stream_factory: self["stream_factory"])
     end
@@ -277,6 +281,32 @@ module Coordinator
       Write::Domain::Candidates::SubmitImpactSurface.new(stream_factory: self["stream_factory"])
     end
 
+    register("merge_snapshots.snapshot_digest_builder", memoize: true) do
+      Write::MergeSnapshots::SnapshotDigestBuilder.new(canonical_json: self["canonical_json"])
+    end
+
+    register("merge_snapshots.commit_identity_builder", memoize: true) do
+      Write::MergeSnapshots::CommitIdentityBuilder.new(
+        canonical_json: self["canonical_json"],
+        compound_marker_builder: self["compound_marker_builder"]
+      )
+    end
+
+    register("merge_snapshots.candidate_loader") do
+      Write::MergeSnapshots::CandidateLoader.new(
+        event_store: self["event_store"],
+        stream_factory: self["stream_factory"],
+        schema_registry: self["event_schema_registry"]
+      )
+    end
+
+    register("domain.merge_snapshots.register", memoize: true) do
+      Write::Domain::MergeSnapshots::Register.new(
+        stream_factory: self["stream_factory"],
+        snapshot_digest_builder: self["merge_snapshots.snapshot_digest_builder"]
+      )
+    end
+
     register("change_set_activation_source_builder", memoize: true) do
       Processes::ChangeSetActivationSourceBuilder.new(schema_registry: self["event_schema_registry"])
     end
@@ -383,6 +413,10 @@ module Coordinator
       Read::Repositories::VerificationObligations.new
     end
 
+    register("repositories.merge_snapshots", memoize: true) do
+      Read::Repositories::MergeSnapshots.new
+    end
+
     register("projectors.coord_context_v1", memoize: true) do
       Read::Projectors::CoordContextV1.new(
         schema_registry: self["event_schema_registry"],
@@ -452,6 +486,14 @@ module Coordinator
       Read::Projectors::VerificationObligationsV1.new(
         schema_registry: self["event_schema_registry"],
         obligations: self["repositories.verification_obligations"],
+        processed_events: self["repositories.processed_projection_events"]
+      )
+    end
+
+    register("projectors.merge_snapshots_v1", memoize: true) do
+      Read::Projectors::MergeSnapshotsV1.new(
+        schema_registry: self["event_schema_registry"],
+        snapshots: self["repositories.merge_snapshots"],
         processed_events: self["repositories.processed_projection_events"]
       )
     end
@@ -529,6 +571,12 @@ module Coordinator
       Read::Queries::VerificationObligationsList.new(
         obligations: self["repositories.verification_obligations"],
         clock: self["clock"]
+      )
+    end
+
+    register("queries.merge_snapshot_get") do
+      Read::Queries::MergeSnapshotGet.new(
+        snapshots: self["repositories.merge_snapshots"]
       )
     end
 
@@ -846,6 +894,23 @@ module Coordinator
       )
     end
 
+    register("operations.execute_register_merge_snapshot") do
+      Write::Operations::ExecuteRegisterMergeSnapshot.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_register_merge_snapshot"],
+        decider: self["domain.merge_snapshots.register"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        commit_identity_builder: self["merge_snapshots.commit_identity_builder"],
+        candidate_loader: self["merge_snapshots.candidate_loader"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
     register("operations.execute_claim_verification_obligation") do
       Write::Operations::ExecuteClaimVerificationObligation.new(
         event_store: self["event_store"],
@@ -1040,7 +1105,9 @@ module Coordinator
         submit_compatibility_assessment:
           self["operations.execute_submit_compatibility_assessment"],
         waive_verification_obligation:
-          self["operations.execute_waive_verification_obligation"]
+          self["operations.execute_waive_verification_obligation"],
+        register_merge_snapshot:
+          self["operations.execute_register_merge_snapshot"]
       )
     end
 
@@ -1202,6 +1269,13 @@ module Coordinator
     register("operations.submit_waive_verification_obligation_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_waive_verification_obligation"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_register_merge_snapshot_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_register_merge_snapshot"],
         submitter: self["operations.submit_coordination_task"]
       )
     end
@@ -1385,6 +1459,12 @@ module Coordinator
       )
     end
 
+    register("subscriptions.merge_snapshots", memoize: true) do
+      Read::Subscriptions::MergeSnapshots.new(
+        handler: self["projectors.merge_snapshots_v1"]
+      )
+    end
+
     register("subscription_managers.process_managers", memoize: true) do
       PgEventstore.subscriptions_manager(
         subscription_set: Processes::Subscriptions::ProcessManagerSet::SET_NAME
@@ -1424,7 +1504,8 @@ module Coordinator
           self["subscriptions.agent_choices"],
           self["subscriptions.agent_choice_impacts"],
           self["subscriptions.candidates"],
-          self["subscriptions.verification_obligations"]
+          self["subscriptions.verification_obligations"],
+          self["subscriptions.merge_snapshots"]
         ]
       )
     end

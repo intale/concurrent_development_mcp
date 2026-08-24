@@ -1,0 +1,13 @@
+module Coordinator::Write
+  module Events
+    class MergeSnapshotCommitRegisteredV1 < Base
+      attr_reader registry_id: String
+      attr_reader merge_snapshot_id: String
+      attr_reader repository_id: String
+      attr_reader object_format: String
+      attr_reader merge_commit_oid: String
+      attr_reader snapshot_event: Coordinator::Write::EventReference
+      attr_reader registered_at: String
+    end
+  end
+end

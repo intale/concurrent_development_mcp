@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandReceiptData
-      type value = ChangeSet | WorkItem | Dependency | Attempt | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver
+      type value = ChangeSet | WorkItem | Dependency | Attempt | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver | MergeSnapshotRegistration
 
       class ChangeSet < Shared::Value
         def change_set_id: () -> String
@@ -207,6 +207,18 @@ module Coordinator
         def reason: () -> VerificationObligationWaivers::ReasonV1
         def waiver_event: () -> EventReference
         def waived_at: () -> String
+      end
+
+      class MergeSnapshotRegistration < Shared::Value
+        def merge_snapshot_id: () -> String
+        def repository_id: () -> String
+        def target_branch: () -> String
+        def target_base_commit_oid: () -> String
+        def merge_commit_oid: () -> String
+        def snapshot_digest: () -> String
+        def evidence_status: () -> String
+        def snapshot_event: () -> EventReference
+        def registered_at: () -> String
       end
     end
   end

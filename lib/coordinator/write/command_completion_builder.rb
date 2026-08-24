@@ -589,6 +589,36 @@ module Coordinator::Write
       )
     end
 
+    def merge_snapshot_register(command:, snapshot:, input_digest:, persisted_events:, completed_at:)
+      build_completion(
+        command:,
+        tool_name: "merge_snapshot_register",
+        summary: "Attributed external merge snapshot registered.",
+        data: CommandReceiptData::MergeSnapshotRegistration.new(
+          merge_snapshot_id: command.merge_snapshot_id,
+          repository_id: command.repository_id,
+          target_branch: command.target_branch,
+          target_base_commit_oid: command.target_base_commit_oid,
+          merge_commit_oid: command.merge_commit_oid,
+          snapshot_digest: snapshot.snapshot_digest,
+          evidence_status: snapshot.evidence_status,
+          snapshot_event: event_reference(persisted_events.fetch(0)),
+          registered_at: snapshot.registered_at
+        ),
+        next_actions: [
+          NextAction.new(
+            tool: "merge_snapshot_get",
+            arguments: NextAction::MergeSnapshotArguments.new(
+              merge_snapshot_id: command.merge_snapshot_id
+            )
+          )
+        ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
 
     def verification_status(persisted_events)

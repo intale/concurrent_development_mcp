@@ -19,6 +19,7 @@ module Coordinator
           Tools::CandidateList,
           Tools::CandidateImpactGet,
           Tools::VerificationObligationsList,
+          Tools::MergeSnapshotGet,
           Tools::ChangeSetCreate,
           Tools::WorkItemCreate,
           Tools::WorkItemDependencyDeclare,
@@ -38,7 +39,8 @@ module Coordinator
           Tools::CandidateImpactSurfaceSubmit,
           Tools::VerificationObligationClaim,
           Tools::CompatibilityAssessmentSubmit,
-          Tools::VerificationObligationWaive
+          Tools::VerificationObligationWaive,
+          Tools::MergeSnapshotRegister
         ].freeze
       end
     end

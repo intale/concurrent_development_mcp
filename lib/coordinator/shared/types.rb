@@ -257,6 +257,9 @@ module Coordinator::Shared
       critical
     ].freeze
     VERIFICATION_EVIDENCE_MAXIMUM_COUNT = 32
+    MERGE_SNAPSHOT_EVIDENCE_STATUSES = %w[attributed_unverified].freeze
+    MERGE_SNAPSHOT_REGISTRATION_POLICY_VERSIONS = %w[merge-snapshot-registration/v1].freeze
+    MERGE_SNAPSHOT_MAXIMUM_CANDIDATES = 32
     CANDIDATE_OBLIGATION_POLICY_STATUSES = %w[
       stale
       non_gating
@@ -342,6 +345,7 @@ module Coordinator::Shared
       verification_obligation_claim
       compatibility_assessment_submit
       verification_obligation_waive
+      merge_snapshot_register
     ].freeze
 
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)
@@ -462,6 +466,16 @@ module Coordinator::Shared
     VerificationEvidenceProducerVersion = String.constrained(min_size: 1, max_size: 100)
     VerificationEvidenceFindingCode = String.constrained(min_size: 1, max_size: 100)
     VerificationEvidenceFindingSummary = String.constrained(min_size: 1, max_size: 2_000)
+    MergeSnapshotEvidenceStatus = String.enum(*MERGE_SNAPSHOT_EVIDENCE_STATUSES)
+    MergeSnapshotRegistrationPolicyVersion = String.enum(
+      *MERGE_SNAPSHOT_REGISTRATION_POLICY_VERSIONS
+    )
+    MergeSnapshotCandidateCount = Integer.constrained(
+      gteq: 1,
+      lteq: MERGE_SNAPSHOT_MAXIMUM_CANDIDATES
+    )
+    MergeSnapshotProducerName = String.constrained(min_size: 1, max_size: 100)
+    MergeSnapshotProducerVersion = String.constrained(min_size: 1, max_size: 100)
     CandidateObligationPolicyStatus = String.enum(*CANDIDATE_OBLIGATION_POLICY_STATUSES)
     CandidateObligationDecisionOutcome = String.enum(*CANDIDATE_OBLIGATION_DECISION_OUTCOMES)
     CandidateImpactReasonMatches = Array.of(String.constrained(min_size: 1, max_size: 1_024))

@@ -46,6 +46,8 @@ module Coordinator
       def compatibility_assessment_submit_document: (Commands::SubmitCompatibilityAssessment command) -> CommandInputDocuments::SubmitCompatibilityAssessmentV1
       def verification_obligation_waive: (Commands::WaiveVerificationObligation command) -> String
       def verification_obligation_waive_document: (Commands::WaiveVerificationObligation command) -> CommandInputDocuments::WaiveVerificationObligationV1
+      def merge_snapshot_register: (Commands::RegisterMergeSnapshot command) -> String
+      def merge_snapshot_register_document: (Commands::RegisterMergeSnapshot command) -> CommandInputDocuments::RegisterMergeSnapshotV1
     end
   end
 end

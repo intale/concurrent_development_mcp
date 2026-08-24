@@ -218,6 +218,18 @@ module Coordinator::Write
       attribute :waived_at, Types::Timestamp
     end
 
+    class MergeSnapshotRegistration < Value
+      attribute :merge_snapshot_id, Types::Identifier
+      attribute :repository_id, Types::RepositoryId
+      attribute :target_branch, Types::CandidateTargetBranch
+      attribute :target_base_commit_oid, Types::GitOid
+      attribute :merge_commit_oid, Types::GitOid
+      attribute :snapshot_digest, Types::Sha256Digest
+      attribute :evidence_status, Types::MergeSnapshotEvidenceStatus
+      attribute :snapshot_event, EventReference
+      attribute :registered_at, Types::Timestamp
+    end
+
     Type = ChangeSet |
            WorkItem |
            Dependency |
@@ -237,6 +249,7 @@ module Coordinator::Write
            CandidateImpactSurface |
            VerificationObligationClaim |
            CompatibilityAssessment |
-           VerificationObligationWaiver
+           VerificationObligationWaiver |
+           MergeSnapshotRegistration
   end
 end

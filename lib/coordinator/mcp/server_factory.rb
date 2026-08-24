@@ -65,6 +65,11 @@ module Coordinator
         satisfy/fail it. Stale projected context, claim fences, candidate bindings, or policy are authoritatively denied.
         A user may explicitly waive an exact current open or failed obligation with verification_obligation_waive;
         the actor label is attribution rather than authentication, and waiver never means verification passed.
+        Use merge_snapshot_register to bind an external producer's exact ordered Candidate composition to one
+        repository target/base and merge commit. The durable Task rechecks immutable Candidate and manifest facts
+        directly in the event store and rejects mismatches or reused identities atomically. Registration remains
+        attributed_unverified: the coordinator does not inspect Git or prove that the composition exists.
+        merge_snapshot_get serves the latest available projection and may temporarily report not observed.
         The coordinator records attributed evidence and does not execute Git, CI, or agent work.
       TEXT
 

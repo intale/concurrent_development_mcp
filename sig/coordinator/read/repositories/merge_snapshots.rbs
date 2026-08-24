@@ -1,0 +1,14 @@
+module Coordinator::Read::Repositories
+  class MergeSnapshots
+    def fetch: (String merge_snapshot_id) -> Coordinator::Read::MergeSnapshotViewV1?
+    def store: (event: PgEventstore::Event, snapshot: Coordinator::Write::Events::MergeSnapshotRegisteredV1) -> Coordinator::Read::MergeSnapshot
+
+    private
+
+    def build_view: (Coordinator::Read::MergeSnapshot record) -> Coordinator::Read::MergeSnapshotViewV1
+    def source_evidence: (Coordinator::Read::MergeSnapshot record) -> Coordinator::Read::MergeSnapshotSourceEvidenceV1
+    def actor: (PgEventstore::Event event) -> Coordinator::Read::AttributedActorV1
+    def event_reference: (PgEventstore::Event event) -> Coordinator::Write::EventReference
+    def symbolize: (untyped value) -> untyped
+  end
+end

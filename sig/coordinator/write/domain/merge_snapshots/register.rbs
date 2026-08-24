@@ -1,0 +1,13 @@
+module Coordinator::Write::Domain::MergeSnapshots
+  class Register
+    def initialize: (?stream_factory: Coordinator::Write::StreamFactory, ?snapshot_digest_builder: Coordinator::Write::MergeSnapshots::SnapshotDigestBuilder) -> void
+    def call: (state: RegistrationState, command: Coordinator::Write::Commands::RegisterMergeSnapshot, commit_identity: Coordinator::Write::MergeSnapshots::CommitIdentityV1, snapshot_event: Coordinator::Write::EventReference, registered_at: String) -> Dry::Monads::Result
+
+    private
+
+    def denied: (state: RegistrationState, command: Coordinator::Write::Commands::RegisterMergeSnapshot) -> Dry::Monads::Result?
+    def conflict: (Symbol code, String message, Coordinator::Write::EventReference reference) -> Dry::Monads::Result
+    def candidate_failure: (Symbol code, String message, Coordinator::Write::MergeSnapshots::CandidateHistoryV1 history) -> Dry::Monads::Result
+    def member: (Coordinator::Write::MergeSnapshots::CandidateHistoryV1 history) -> Coordinator::Write::MergeSnapshots::CandidateMemberV1
+  end
+end

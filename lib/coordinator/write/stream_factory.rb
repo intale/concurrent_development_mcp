@@ -122,6 +122,22 @@ module Coordinator::Write
       )
     end
 
+    def merge_snapshot(merge_snapshot_id)
+      StreamReference.new(
+        context: "DevelopmentIntegration",
+        stream_name: "MergeSnapshot",
+        stream_id: merge_snapshot_id
+      )
+    end
+
+    def merge_snapshot_commit(registry_id)
+      StreamReference.new(
+        context: "DevelopmentIntegration",
+        stream_name: "MergeSnapshotCommit",
+        stream_id: registry_id
+      )
+    end
+
     def candidate_impact_registry(change_set_id)
       StreamReference.new(
         context: "DevelopmentIntegration",

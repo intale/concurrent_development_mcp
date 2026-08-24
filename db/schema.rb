@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_083500) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_24_152000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -334,6 +334,34 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_083500) do
     t.jsonb "slot", null: false
     t.datetime "updated_at", null: false
     t.index ["decision_id"], name: "index_decision_slot_heads_on_decision_id"
+  end
+
+  create_table "merge_snapshots", primary_key: "merge_snapshot_id", id: :string, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "evidence_status", null: false
+    t.string "merge_commit_oid", null: false
+    t.string "object_format", null: false
+    t.jsonb "ordered_candidates", null: false
+    t.string "policy_version", null: false
+    t.datetime "produced_at_domain", null: false
+    t.jsonb "producer", null: false
+    t.jsonb "registered_actor", null: false
+    t.datetime "registered_at_domain", null: false
+    t.datetime "registered_at_store", null: false
+    t.string "registered_causation_id"
+    t.string "registered_correlation_id"
+    t.jsonb "registered_event", null: false
+    t.bigint "registered_global_position", null: false
+    t.jsonb "registered_markers", default: [], null: false
+    t.jsonb "registered_metadata", default: {}, null: false
+    t.string "repository_id", null: false
+    t.string "run_id", null: false
+    t.string "snapshot_digest", null: false
+    t.string "target_base_commit_oid", null: false
+    t.string "target_branch", null: false
+    t.datetime "updated_at", null: false
+    t.index ["registered_global_position"], name: "index_merge_snapshots_on_registered_global_position", unique: true
+    t.index ["repository_id", "object_format", "merge_commit_oid"], name: "idx_merge_snapshots_commit_identity", unique: true
   end
 
   create_table "processed_projection_events", id: false, force: :cascade do |t|

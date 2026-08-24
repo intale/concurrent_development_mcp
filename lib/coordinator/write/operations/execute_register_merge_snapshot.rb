@@ -1,0 +1,252 @@
+# frozen_string_literal: true
+
+module Coordinator::Write
+  module Operations
+    class ExecuteRegisterMergeSnapshot < Dry::Operation
+      TOOL_NAME = "merge_snapshot_register"
+
+      def initialize(
+        event_store:,
+        preparer: PrepareRegisterMergeSnapshot.new,
+        decider: Domain::MergeSnapshots::Register.new,
+        input_digest: CommandInputDigest.new,
+        clock: SystemClock.new,
+        id_generator: IdGenerator.new,
+        commit_identity_builder: MergeSnapshots::CommitIdentityBuilder.new,
+        candidate_loader: MergeSnapshots::CandidateLoader.new(event_store:),
+        event_factory: EventFactory.new,
+        schema_registry: EventSchemaRegistry.new,
+        stream_factory: StreamFactory.new,
+        completion_builder: CommandCompletionBuilder.new,
+        event_plan_contract: Contracts::MergeSnapshotRegistrationEventPlan.new
+      )
+        @event_store = event_store
+        @preparer = preparer
+        @decider = decider
+        @input_digest = input_digest
+        @clock = clock
+        @id_generator = id_generator
+        @commit_identity_builder = commit_identity_builder
+        @candidate_loader = candidate_loader
+        @event_factory = event_factory
+        @schema_registry = schema_registry
+        @stream_factory = stream_factory
+        @completion_builder = completion_builder
+        @event_plan_contract = event_plan_contract
+      end
+
+      def call(input)
+        command = step @preparer.call(input)
+        step call_command(command)
+      end
+
+      def call_command(command, caused_by: nil)
+        steps do
+          preparation = prepare_logical_values(command)
+          step @event_store.multiple { execute_attempt(command:, preparation:, caused_by:) }
+        end
+      end
+
+      private
+
+      def prepare_logical_values(command)
+        MergeSnapshotRegistrationPreparationV1.new(
+          registered_at: @clock.now,
+          input_digest: @input_digest.merge_snapshot_register(command),
+          commit_identity: @commit_identity_builder.call(
+            repository_id: command.repository_id,
+            object_format: command.object_format,
+            merge_commit_oid: command.merge_commit_oid
+          ),
+          snapshot_event_id: @id_generator.uuid_v7,
+          commit_registration_event_id: @id_generator.uuid_v7,
+          completion_event_id: @id_generator.uuid_v7,
+          correlation_id: @id_generator.uuid_v7
+        )
+      end
+
+      def execute_attempt(command:, preparation:, caused_by:)
+        replay = replay_result(command:, input_digest: preparation.input_digest)
+        return replay if replay
+
+        state = load_state(command, preparation.commit_identity)
+        snapshot_event = future_snapshot_reference(command, preparation.snapshot_event_id)
+        decision = @decider.call(
+          state:,
+          command:,
+          commit_identity: preparation.commit_identity,
+          snapshot_event:,
+          registered_at: preparation.registered_at
+        )
+        return decision if decision.failure?
+
+        plan = decision.value!
+        verify_plan!(plan, state:, command:, preparation:, snapshot_event:)
+        persisted = persist_plan(plan, command:, preparation:, caused_by:)
+        completion = @completion_builder.merge_snapshot_register(
+          command:,
+          snapshot: plan.events.fetch(0),
+          input_digest: preparation.input_digest,
+          persisted_events: persisted,
+          completed_at: preparation.registered_at
+        )
+        persist_completion(completion, command:, preparation:, caused_by:)
+        Success(completion)
+      end
+
+      def load_state(command, commit_identity)
+        Domain::MergeSnapshots::RegistrationState.new(
+          existing_snapshot: existing_reference(
+            @stream_factory.merge_snapshot(command.merge_snapshot_id),
+            EventQueries::MERGE_SNAPSHOT_REGISTRATION
+          ),
+          existing_commit: existing_reference(
+            @stream_factory.merge_snapshot_commit(commit_identity.registry_id),
+            EventQueries::MERGE_SNAPSHOT_COMMIT_REGISTRATION
+          ),
+          candidates: command.ordered_candidates.map { @candidate_loader.call(_1) }
+        )
+      end
+
+      def existing_reference(stream, criteria)
+        event = @event_store.read(stream, criteria).first
+        event && event_reference(event)
+      end
+
+      def future_snapshot_reference(command, event_id)
+        stream = @stream_factory.merge_snapshot(command.merge_snapshot_id)
+        EventReference.new(
+          event_id:,
+          type: "MergeSnapshotRegistered",
+          stream_context: stream.context,
+          stream_name: stream.stream_name,
+          stream_id: stream.stream_id,
+          stream_revision: 0
+        )
+      end
+
+      def verify_plan!(plan, state:, command:, preparation:, snapshot_event:)
+        result = @event_plan_contract.call(
+          plan:,
+          command:,
+          state:,
+          commit_identity: preparation.commit_identity,
+          snapshot_event:,
+          registered_at: preparation.registered_at
+        )
+        return if result.success?
+
+        raise InvalidMergeSnapshotRegistrationEventPlan, result.errors.to_h.inspect
+      end
+
+      def persist_plan(plan, command:, preparation:, caused_by:)
+        ids = [ preparation.snapshot_event_id, preparation.commit_registration_event_id ]
+        plan.writes.zip(ids).map do |write, event_id|
+          physical = @event_factory.build!(
+            event: write.event,
+            event_id:,
+            metadata: command_metadata(command),
+            markers: event_markers(command, preparation.commit_identity, plan.events.fetch(0)),
+            caused_by:,
+            correlation_id: root_correlation_id(preparation, caused_by)
+          )
+          @event_store.append(write.stream, [ physical ]).sole
+        end
+      end
+
+      def persist_completion(completion, command:, preparation:, caused_by:)
+        physical = @event_factory.build!(
+          event: completion,
+          event_id: preparation.completion_event_id,
+          metadata: command_metadata(command),
+          markers: [ "command:#{command.command_id}" ],
+          caused_by:,
+          correlation_id: root_correlation_id(preparation, caused_by)
+        )
+        @event_store.append(@stream_factory.command(command.command_id), [ physical ])
+      end
+
+      def event_markers(command, identity, snapshot)
+        markers = [
+          "merge-snapshot:#{command.merge_snapshot_id}",
+          "repository:#{command.repository_id}",
+          "target-branch:#{command.target_branch}",
+          "target-base-commit-oid:#{command.target_base_commit_oid}",
+          "merge-commit-oid:#{command.merge_commit_oid}",
+          "command:#{command.command_id}",
+          identity.marker
+        ]
+        snapshot.ordered_candidates.each do |candidate|
+          markers.concat([
+            "candidate:#{candidate.candidate_id}",
+            "change-set:#{candidate.change_set_id}",
+            "work-item:#{candidate.work_item_id}",
+            "attempt:#{candidate.attempt_id}"
+          ])
+        end
+        markers
+      end
+
+      def replay_result(command:, input_digest:)
+        completion = load_completion(command.command_id)
+        return unless completion
+
+        if completion.tool_name == TOOL_NAME && completion.canonical_input_digest == input_digest
+          Success(completion)
+        else
+          Failure(
+            OutcomeError.new(
+              code: :command_id_reused,
+              message: "Command ID is already bound to another tool or input",
+              details: {
+                command_id: command.command_id,
+                existing_tool_name: completion.tool_name,
+                existing_input_digest: completion.canonical_input_digest,
+                requested_tool_name: TOOL_NAME,
+                requested_input_digest: input_digest
+              }
+            )
+          )
+        end
+      end
+
+      def load_completion(command_id)
+        event = @event_store.read(@stream_factory.command(command_id), EventQueries::COMMAND_COMPLETION).first
+        event && load_event(event)
+      end
+
+      def load_event(event)
+        @schema_registry.load(
+          type: event.type,
+          schema_version: event.metadata.fetch("schema_version"),
+          data: event.data
+        )
+      end
+
+      def event_reference(event)
+        EventReference.new(
+          event_id: event.id,
+          type: event.type,
+          stream_context: event.stream.context,
+          stream_name: event.stream.stream_name,
+          stream_id: event.stream.stream_id,
+          stream_revision: event.stream_revision
+        )
+      end
+
+      def root_correlation_id(preparation, caused_by)
+        preparation.correlation_id unless caused_by
+      end
+
+      def command_metadata(command)
+        EventMetadata.new(
+          command_id: command.command_id,
+          actor_kind: command.actor.kind,
+          actor_id: command.actor.id,
+          recorded_by: "coordinator",
+          policy_version: command.policy_version
+        )
+      end
+    end
+  end
+end

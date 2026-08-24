@@ -1,0 +1,18 @@
+module Coordinator::Write
+  module MergeSnapshots
+    class CandidateMemberV1 < Coordinator::Shared::Value
+      attr_reader candidate_id: String
+      attr_reader change_set_id: String
+      attr_reader work_item_id: String
+      attr_reader attempt_id: String
+      attr_reader repository_id: String
+      attr_reader target_branch: String
+      attr_reader object_format: String
+      attr_reader base_commit_oid: String
+      attr_reader head_commit_oid: String
+      attr_reader manifest_digest: String
+      attr_reader candidate_event: Coordinator::Write::EventReference
+      attr_reader manifest_event: Coordinator::Write::EventReference
+    end
+  end
+end

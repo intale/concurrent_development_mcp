@@ -155,6 +155,24 @@ module Coordinator::Write
       direction: :asc
     )
 
+    CANDIDATE_FOR_MERGE_SNAPSHOT = EventReadCriteria.new(
+      event_types: [ "CandidateSubmitted", "CandidateChangeManifestCaptured" ],
+      maximum_count: 2,
+      direction: :asc
+    )
+
+    MERGE_SNAPSHOT_REGISTRATION = EventReadCriteria.new(
+      event_types: [ "MergeSnapshotRegistered" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+
+    MERGE_SNAPSHOT_COMMIT_REGISTRATION = EventReadCriteria.new(
+      event_types: [ "MergeSnapshotCommitRegistered" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+
     CANDIDATE_FOR_IMPACT_SURFACE = GroupedEventReadCriteria.new(
       event_types: [
         "CandidateSubmitted",

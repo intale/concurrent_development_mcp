@@ -1,0 +1,10 @@
+module Coordinator::Read::Subscriptions
+  class MergeSnapshots < Coordinator::Shared::Subscriptions::Registration
+    DEFINITION: ReadModelDefinition
+
+    def initialize: (
+      handler: Coordinator::Read::Projectors::MergeSnapshotsV1,
+      ?pull_interval: Integer | Float
+    ) -> void
+  end
+end

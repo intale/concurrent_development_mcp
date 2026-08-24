@@ -1,0 +1,4 @@
+module Coordinator::Write
+  class InvalidMergeSnapshotRegistrationEventPlan < StandardError
+  end
+end

@@ -1,0 +1,11 @@
+module Coordinator::Write::MergeSnapshots
+  class CandidateLoader
+    def initialize: (event_store: Coordinator::Write::_EventStore, ?stream_factory: Coordinator::Write::StreamFactory, ?schema_registry: Coordinator::Write::EventSchemaRegistry, ?contract: Coordinator::Write::Contracts::MergeSnapshotCandidateHistory) -> void
+    def call: (RequestedCandidateV1 requested) -> CandidateHistoryV1
+
+    private
+
+    def load_event: (PgEventstore::Event event) -> Coordinator::Write::Events::Base
+    def event_reference: (PgEventstore::Event event) -> Coordinator::Write::EventReference
+  end
+end

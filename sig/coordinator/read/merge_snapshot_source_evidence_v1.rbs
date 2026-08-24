@@ -1,0 +1,13 @@
+module Coordinator::Read
+  class MergeSnapshotSourceEvidenceV1 < Coordinator::Shared::Value
+    attr_reader event: Coordinator::Write::EventReference
+    attr_reader actor: AttributedActorV1
+    attr_reader markers: Array[String]
+    attr_reader metadata: Hash[untyped, untyped]
+    attr_reader global_position: Integer
+    attr_reader occurred_at: String
+    attr_reader persisted_at: String
+    attr_reader causation_id: String?
+    attr_reader correlation_id: String?
+  end
+end

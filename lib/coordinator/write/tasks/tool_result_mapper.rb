@@ -38,7 +38,13 @@ module Coordinator::Write
         verification_evidence_limit_reached: "conflict",
         verification_obligation_terminal: "conflict",
         verification_obligation_waiver_requires_user: "denied",
-        verification_obligation_already_waived: "conflict"
+        verification_obligation_already_waived: "conflict",
+        merge_snapshot_id_already_used: "conflict",
+        merge_commit_already_registered: "conflict",
+        candidate_head_mismatch: "conflict",
+        candidate_repository_mismatch: "conflict",
+        candidate_target_branch_mismatch: "conflict",
+        candidate_object_format_mismatch: "conflict"
       }.freeze
 
       def call(result, command_id:)

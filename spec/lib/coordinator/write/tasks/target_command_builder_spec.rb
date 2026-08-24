@@ -202,6 +202,21 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
           code: "accepted_risk",
           summary: "User accepts this exact recorded coordination risk."
         }
+      ).value!,
+      Coordinator::Write::Operations::PrepareRegisterMergeSnapshot.new.call(
+        command_id: "cmd-task-build-16",
+        actor: { kind: "agent", id: "integrator-a" },
+        merge_snapshot_id: "MS-task-build",
+        repository_id: "billing",
+        target_branch: "main",
+        target_base_commit_oid: "a" * 40,
+        ordered_candidates: [
+          { candidate_id: "CAN-task-build", head_commit_oid: "b" * 40 }
+        ],
+        merge_commit_oid: "9" * 40,
+        producer: { name: "git-merge", version: "2.47.0" },
+        run_id: "run-task-build",
+        produced_at: "2026-08-24T15:30:00.000001Z"
       ).value!
     ]
 

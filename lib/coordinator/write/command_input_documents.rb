@@ -405,6 +405,38 @@ module Coordinator::Write
       attribute :input, WaiveVerificationObligationInputV1
     end
 
+    class MergeSnapshotCandidateV1 < Value
+      attribute :candidate_id, Types::Identifier
+      attribute :head_commit_oid, Types::GitOid
+    end
+
+    class MergeSnapshotProducerV1 < Value
+      attribute :name, Types::MergeSnapshotProducerName
+      attribute :version, Types::MergeSnapshotProducerVersion
+    end
+
+    class RegisterMergeSnapshotInputV1 < Value
+      Candidate = MergeSnapshotCandidateV1
+
+      attribute :actor, ActorV1
+      attribute :merge_snapshot_id, Types::Identifier
+      attribute :repository_id, Types::RepositoryId
+      attribute :target_branch, Types::CandidateTargetBranch
+      attribute :target_base_commit_oid, Types::GitOid
+      attribute :ordered_candidates,
+                Types::Array.of(Candidate)
+                  .constrained(min_size: 1, max_size: Types::MERGE_SNAPSHOT_MAXIMUM_CANDIDATES)
+      attribute :merge_commit_oid, Types::GitOid
+      attribute :producer, MergeSnapshotProducerV1
+      attribute :run_id, Types::Identifier
+      attribute :produced_at, Types::Timestamp
+    end
+
+    class RegisterMergeSnapshotV1 < BaseV1
+      attribute :tool_name, Types::String.enum("merge_snapshot_register")
+      attribute :input, RegisterMergeSnapshotInputV1
+    end
+
     class ExpireResourceLeaseInputV1 < Value
       attribute :actor, ActorV1
       attribute :resource_key_hash, Types::Sha256Digest
@@ -438,7 +470,8 @@ module Coordinator::Write
            SubmitCandidateImpactSurfaceV1 |
            ClaimVerificationObligationV1 |
            SubmitCompatibilityAssessmentV1 |
-           WaiveVerificationObligationV1
+           WaiveVerificationObligationV1 |
+           RegisterMergeSnapshotV1
 
     DigestType = Type | ExpireResourceLeaseV1
   end

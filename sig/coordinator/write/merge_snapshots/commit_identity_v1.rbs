@@ -1,0 +1,9 @@
+module Coordinator::Write
+  module MergeSnapshots
+    class CommitIdentityV1 < Coordinator::Shared::Value
+      attr_reader document: CommitIdentityDocumentV1
+      attr_reader registry_id: String
+      attr_reader marker: String
+    end
+  end
+end

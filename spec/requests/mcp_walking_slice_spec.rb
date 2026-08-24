@@ -40,6 +40,7 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
       "candidate_list",
       "candidate_impact_get",
       "verification_obligations_list",
+      "merge_snapshot_get",
       "decision_interpretation_adjudicate",
       "decision_activate",
       "decision_correct",
@@ -49,6 +50,7 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
       "verification_obligation_claim",
       "verification_obligation_waive",
       "compatibility_assessment_submit",
+      "merge_snapshot_register",
       "change_set_create",
       "work_item_create",
       "work_item_dependency_declare",
@@ -155,6 +157,62 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
     expect(context_payload).not_to have_key("projection_status")
     expect(context_payload.dig("data", "context", "change_set", "goal")).to eq(
       "Coordinate repositories"
+    )
+  end
+
+  it "runs merge snapshot registration as a durable Task and serves its lagging projection" do
+    candidate = CandidateScenario.submit(prefix: "mcp-merge-snapshot", build_context: false)
+    arguments = {
+      command_id: "cmd-mcp-merge-snapshot-register",
+      actor: { kind: "agent", id: "integrator-1" },
+      merge_snapshot_id: "MS-mcp-merge-snapshot",
+      repository_id: "billing",
+      target_branch: "main",
+      target_base_commit_oid: "a" * 40,
+      ordered_candidates: [
+        {
+          candidate_id: candidate.dig(:input, :candidate_id),
+          head_commit_oid: candidate.dig(:input, :head_commit_oid)
+        }
+      ],
+      merge_commit_oid: "9" * 40,
+      producer: { name: "git-merge", version: "2.47.0" },
+      run_id: "run-mcp-merge-snapshot",
+      produced_at: "2026-08-24T15:30:00.000001Z"
+    }
+
+    submitted = call_tool("merge_snapshot_register", arguments, id: 1)
+    task_id = submitted.dig("result", "taskId")
+    expect(task_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
+    execute_task(task_id)
+    state = task_request("tasks/get", task_id:, id: 2)
+    expect(state.dig("result", "status")).to eq("completed")
+    expect(state.dig("result", "result", "isError")).to be(false)
+    expect(state.dig("result", "result", "structuredContent", "data")).to include(
+      "merge_snapshot_id" => arguments.fetch(:merge_snapshot_id),
+      "evidence_status" => "attributed_unverified"
+    )
+
+    unavailable = call_tool(
+      "merge_snapshot_get",
+      { merge_snapshot_id: arguments.fetch(:merge_snapshot_id) },
+      id: 3
+    )
+    expect(unavailable.dig("result", "structuredContent", "status")).to eq("not_found")
+
+    snapshot = event_store.read(
+      streams.merge_snapshot(arguments.fetch(:merge_snapshot_id)),
+      Coordinator::Write::EventQueries::MERGE_SNAPSHOT_REGISTRATION
+    ).sole
+    Coordinator::Container["projectors.merge_snapshots_v1"].call(snapshot)
+    available = call_tool(
+      "merge_snapshot_get",
+      { merge_snapshot_id: arguments.fetch(:merge_snapshot_id) },
+      id: 4
+    )
+    expect(available.dig("result", "structuredContent", "data", "snapshot")).to include(
+      "merge_snapshot_id" => arguments.fetch(:merge_snapshot_id),
+      "evidence_status" => "attributed_unverified"
     )
   end
 

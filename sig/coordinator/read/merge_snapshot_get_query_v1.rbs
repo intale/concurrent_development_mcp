@@ -1,0 +1,5 @@
+module Coordinator::Read
+  class MergeSnapshotGetQueryV1 < Coordinator::Shared::Value
+    attr_reader merge_snapshot_id: String
+  end
+end

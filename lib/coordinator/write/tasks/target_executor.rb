@@ -28,7 +28,9 @@ module Coordinator::Write
         submit_compatibility_assessment:
           Operations::ExecuteSubmitCompatibilityAssessment.new(event_store:),
         waive_verification_obligation:
-          Operations::ExecuteWaiveVerificationObligation.new(event_store:)
+          Operations::ExecuteWaiveVerificationObligation.new(event_store:),
+        register_merge_snapshot:
+          Operations::ExecuteRegisterMergeSnapshot.new(event_store:)
       )
         @create_change_set = create_change_set
         @create_work_item = create_work_item
@@ -50,6 +52,7 @@ module Coordinator::Write
         @claim_verification_obligation = claim_verification_obligation
         @submit_compatibility_assessment = submit_compatibility_assessment
         @waive_verification_obligation = waive_verification_obligation
+        @register_merge_snapshot = register_merge_snapshot
       end
 
       def call(command, caused_by:)
@@ -94,6 +97,8 @@ module Coordinator::Write
           @submit_compatibility_assessment.call_command(command, caused_by:)
         when Commands::WaiveVerificationObligation
           @waive_verification_obligation.call_command(command, caused_by:)
+        when Commands::RegisterMergeSnapshot
+          @register_merge_snapshot.call_command(command, caused_by:)
         end
       end
     end
