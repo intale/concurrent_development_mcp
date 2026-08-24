@@ -5,12 +5,7 @@ PgEventstore.configure do |config|
   config.pg_uri = ENV.fetch("PG_EVENTSTORE_URI", "postgresql://postgres:postgres@localhost:6432/#{database}")
   config.connection_pool_size = 20
   config.eventstore_role = PgEventstore::Config::NodeRole::PRIMARY
-end
-
-Rails.application.config.to_prepare do
-  PgEventstore.configure do |config|
-    config.middlewares = {
-      event_trace: Coordinator::Write::Middlewares::RootCorrelationEventTracing.new
-    }
-  end
+  config.middlewares = {
+    event_trace: PgEventstore::Middleware::EventTracing.new
+  }
 end

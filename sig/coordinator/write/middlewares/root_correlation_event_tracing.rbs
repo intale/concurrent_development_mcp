@@ -1,9 +1,0 @@
-module Coordinator
-  module Write
-    module Middlewares
-      class RootCorrelationEventTracing < PgEventstore::Middleware::EventTracing
-        def serialize: (PgEventstore::Event event) -> void
-      end
-    end
-  end
-end
