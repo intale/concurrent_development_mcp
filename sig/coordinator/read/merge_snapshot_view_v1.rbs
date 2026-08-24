@@ -16,5 +16,6 @@ module Coordinator::Read
     attr_reader policy_version: String
     attr_reader evidence_status: String
     attr_reader registered: MergeSnapshotSourceEvidenceV1
+    attr_reader verification: MergeSnapshotVerificationViewV1
   end
 end

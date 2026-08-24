@@ -860,6 +860,82 @@ module Coordinator::Write
         attribute :details, VerificationObligationTerminalDetails
       end
 
+      class MergeSnapshotExistingDetails < Value
+        attribute :existing_event, EventReference
+      end
+
+      class MergeSnapshotCandidateDetails < Value
+        attribute :candidate_id, Types::Identifier
+        attribute :requested_head_commit_oid, Types::GitOid
+      end
+
+      class MergeSnapshotDetails < Value
+        attribute :merge_snapshot_id, Types::Identifier
+      end
+
+      class MergeSnapshotBindingDetails < MergeSnapshotDetails
+        attribute :current_snapshot_event, EventReference
+        attribute :current_snapshot_digest, Types::Sha256Digest
+      end
+
+      class MergeSnapshotVerificationDigestDetails < MergeSnapshotDetails
+        attribute :verification_input_digest, Types::Sha256Digest
+      end
+
+      class MergeSnapshotVerificationLimitDetails < MergeSnapshotDetails
+        attribute :maximum_count,
+                  Types::Integer.enum(Types::MERGE_SNAPSHOT_VERIFICATION_MAXIMUM_COUNT)
+      end
+
+      class MergeSnapshotExistingError < Value
+        attribute :code, Types::String.enum(
+          "merge_snapshot_id_already_used",
+          "merge_commit_already_registered"
+        )
+        attribute :message, Types::String
+        attribute :details, MergeSnapshotExistingDetails
+      end
+
+      class MergeSnapshotCandidateError < Value
+        attribute :code, Types::String.enum(
+          "candidate_not_found",
+          "candidate_manifest_not_found",
+          "candidate_head_mismatch",
+          "candidate_repository_mismatch",
+          "candidate_target_branch_mismatch",
+          "candidate_object_format_mismatch"
+        )
+        attribute :message, Types::String
+        attribute :details, MergeSnapshotCandidateDetails
+      end
+
+      class MergeSnapshotStateError < Value
+        attribute :code, Types::String.enum(
+          "merge_snapshot_not_found",
+          "merge_snapshot_already_verified"
+        )
+        attribute :message, Types::String
+        attribute :details, MergeSnapshotDetails
+      end
+
+      class MergeSnapshotVerificationBindingStaleError < Value
+        attribute :code, Types::String.enum("merge_snapshot_verification_binding_stale")
+        attribute :message, Types::String
+        attribute :details, MergeSnapshotBindingDetails
+      end
+
+      class MergeSnapshotVerificationAlreadySubmittedError < Value
+        attribute :code, Types::String.enum("merge_snapshot_verification_already_submitted")
+        attribute :message, Types::String
+        attribute :details, MergeSnapshotVerificationDigestDetails
+      end
+
+      class MergeSnapshotVerificationLimitReachedError < Value
+        attribute :code, Types::String.enum("merge_snapshot_verification_limit_reached")
+        attribute :message, Types::String
+        attribute :details, MergeSnapshotVerificationLimitDetails
+      end
+
       Type = ChangeSetError |
              ActivationDependencyError |
              WorkItemError |
@@ -933,7 +1009,13 @@ module Coordinator::Write
              VerificationEvidenceKindNotRequiredError |
              VerificationEvidenceAlreadySubmittedError |
              VerificationEvidenceLimitReachedError |
-             VerificationObligationTerminalError
+             VerificationObligationTerminalError |
+             MergeSnapshotExistingError |
+             MergeSnapshotCandidateError |
+             MergeSnapshotStateError |
+             MergeSnapshotVerificationBindingStaleError |
+             MergeSnapshotVerificationAlreadySubmittedError |
+             MergeSnapshotVerificationLimitReachedError
     end
   end
 end

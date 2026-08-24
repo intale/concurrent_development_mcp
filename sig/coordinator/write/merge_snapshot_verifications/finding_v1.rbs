@@ -1,0 +1,8 @@
+module Coordinator::Write::MergeSnapshotVerifications
+  class FindingV1 < Coordinator::Shared::Value
+    attr_reader code: String
+    attr_reader severity: String
+    attr_reader summary: String
+    attr_reader path: String?
+  end
+end

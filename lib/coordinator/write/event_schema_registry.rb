@@ -72,6 +72,8 @@ module Coordinator::Write
       [ "CandidateAttachedToAttempt", 1 ] => Events::CandidateAttachedToAttemptV1,
       [ "MergeSnapshotRegistered", 1 ] => Events::MergeSnapshotRegisteredV1,
       [ "MergeSnapshotCommitRegistered", 1 ] => Events::MergeSnapshotCommitRegisteredV1,
+      [ "MergeSnapshotVerificationSubmitted", 1 ] => Events::MergeSnapshotVerificationSubmittedV1,
+      [ "MergeSnapshotVerified", 1 ] => Events::MergeSnapshotVerifiedV1,
       [ "CoordinationTaskSubmitted", 1 ] => Events::CoordinationTaskSubmittedV1,
       [ "CoordinationTaskExecutionStarted", 1 ] => Events::CoordinationTaskExecutionStartedV1,
       [ "CoordinationTaskCompleted", 1 ] => Events::CoordinationTaskCompletedV1,

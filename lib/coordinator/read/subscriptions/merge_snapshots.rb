@@ -12,7 +12,11 @@ module Coordinator::Read
             stream_name: "MergeSnapshot"
           )
         ],
-        event_types: [ "MergeSnapshotRegistered" ]
+        event_types: [
+          "MergeSnapshotRegistered",
+          "MergeSnapshotVerificationSubmitted",
+          "MergeSnapshotVerified"
+        ]
       )
 
       def initialize(handler:, pull_interval: 1.0)

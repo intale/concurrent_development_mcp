@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_152000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_24_161000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -360,8 +360,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_152000) do
     t.string "target_base_commit_oid", null: false
     t.string "target_branch", null: false
     t.datetime "updated_at", null: false
+    t.string "verification_policy_version", default: "merge-snapshot-verification/v1", null: false
+    t.string "verification_status", default: "unverified", null: false
+    t.jsonb "verification_submissions", default: [], null: false
+    t.jsonb "verified_decision"
     t.index ["registered_global_position"], name: "index_merge_snapshots_on_registered_global_position", unique: true
     t.index ["repository_id", "object_format", "merge_commit_oid"], name: "idx_merge_snapshots_commit_identity", unique: true
+    t.index ["verification_status"], name: "index_merge_snapshots_on_verification_status"
   end
 
   create_table "processed_projection_events", id: false, force: :cascade do |t|

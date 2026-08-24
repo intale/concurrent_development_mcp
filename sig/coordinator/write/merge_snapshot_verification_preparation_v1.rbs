@@ -1,0 +1,11 @@
+module Coordinator::Write
+  class MergeSnapshotVerificationPreparationV1 < Coordinator::Shared::Value
+    attr_reader verification_id: String
+    attr_reader submitted_at: String
+    attr_reader input_digest: String
+    attr_reader submission_event_id: String
+    attr_reader verified_event_id: String
+    attr_reader completion_event_id: String
+    attr_reader correlation_id: String
+  end
+end

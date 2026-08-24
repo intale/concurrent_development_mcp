@@ -1,0 +1,8 @@
+module Coordinator::Write::MergeSnapshotVerifications
+  class VerificationInputDocumentV1 < Coordinator::Shared::Value
+    attr_reader schema: String
+    attr_reader policy_version: String
+    attr_reader snapshot: SnapshotEvidenceV1
+    attr_reader assessment: AssessmentV1
+  end
+end

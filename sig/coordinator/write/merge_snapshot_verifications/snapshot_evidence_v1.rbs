@@ -1,0 +1,6 @@
+module Coordinator::Write::MergeSnapshotVerifications
+  class SnapshotEvidenceV1 < Coordinator::Shared::Value
+    attr_reader snapshot: Coordinator::Write::Events::MergeSnapshotRegisteredV1
+    attr_reader event: Coordinator::Write::EventReference
+  end
+end

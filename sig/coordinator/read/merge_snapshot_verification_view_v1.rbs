@@ -1,0 +1,10 @@
+module Coordinator::Read
+  class MergeSnapshotVerificationViewV1 < Coordinator::Shared::Value
+    Submission: singleton(MergeSnapshotVerificationSubmissionViewV1)
+
+    attr_reader status: String
+    attr_reader policy_version: String
+    attr_reader submissions: Array[MergeSnapshotVerificationSubmissionViewV1]
+    attr_reader verified: MergeSnapshotVerifiedViewV1?
+  end
+end

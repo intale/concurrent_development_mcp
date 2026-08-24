@@ -123,6 +123,10 @@ module Coordinator
       Write::Operations::PrepareRegisterMergeSnapshot.new
     end
 
+    register("operations.prepare_submit_merge_snapshot_verification", memoize: true) do
+      Write::Operations::PrepareSubmitMergeSnapshotVerification.new
+    end
+
     register("domain.change_sets.create", memoize: true) do
       Write::Domain::ChangeSets::Create.new(stream_factory: self["stream_factory"])
     end
@@ -304,6 +308,25 @@ module Coordinator
       Write::Domain::MergeSnapshots::Register.new(
         stream_factory: self["stream_factory"],
         snapshot_digest_builder: self["merge_snapshots.snapshot_digest_builder"]
+      )
+    end
+
+    register("merge_snapshot_verifications.input_digest", memoize: true) do
+      Write::MergeSnapshotVerifications::VerificationInputDigest.new(
+        canonical_json: self["canonical_json"]
+      )
+    end
+
+    register("merge_snapshot_verifications.verified_digest_builder", memoize: true) do
+      Write::MergeSnapshotVerifications::VerifiedDigestBuilder.new(
+        canonical_json: self["canonical_json"]
+      )
+    end
+
+    register("domain.merge_snapshot_verifications.submit", memoize: true) do
+      Write::Domain::MergeSnapshotVerifications::Submit.new(
+        stream_factory: self["stream_factory"],
+        verified_digest_builder: self["merge_snapshot_verifications.verified_digest_builder"]
       )
     end
 
@@ -911,6 +934,22 @@ module Coordinator
       )
     end
 
+    register("operations.execute_submit_merge_snapshot_verification") do
+      Write::Operations::ExecuteSubmitMergeSnapshotVerification.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_submit_merge_snapshot_verification"],
+        decider: self["domain.merge_snapshot_verifications.submit"],
+        input_digest: self["command_input_digest"],
+        verification_input_digest: self["merge_snapshot_verifications.input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
     register("operations.execute_claim_verification_obligation") do
       Write::Operations::ExecuteClaimVerificationObligation.new(
         event_store: self["event_store"],
@@ -1107,7 +1146,9 @@ module Coordinator
         waive_verification_obligation:
           self["operations.execute_waive_verification_obligation"],
         register_merge_snapshot:
-          self["operations.execute_register_merge_snapshot"]
+          self["operations.execute_register_merge_snapshot"],
+        submit_merge_snapshot_verification:
+          self["operations.execute_submit_merge_snapshot_verification"]
       )
     end
 
@@ -1276,6 +1317,13 @@ module Coordinator
     register("operations.submit_register_merge_snapshot_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_register_merge_snapshot"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_merge_snapshot_verification_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_submit_merge_snapshot_verification"],
         submitter: self["operations.submit_coordination_task"]
       )
     end

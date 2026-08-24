@@ -639,6 +639,89 @@ module Coordinator
         )
       end
 
+      def merge_verification_submit
+        candidate = object_schema(
+          properties: { candidate_id: identifier, head_commit_oid: git_oid },
+          required: %w[candidate_id head_commit_oid]
+        )
+        snapshot_event = object_schema(
+          properties: {
+            event_id: uuid_v7,
+            type: { type: "string", const: "MergeSnapshotRegistered" },
+            stream_context: { type: "string", const: "DevelopmentIntegration" },
+            stream_name: { type: "string", const: "MergeSnapshot" },
+            stream_id: identifier,
+            stream_revision: { type: "integer", const: 0 }
+          },
+          required: %w[event_id type stream_context stream_name stream_id stream_revision]
+        )
+        binding = object_schema(
+          properties: {
+            snapshot_event:,
+            snapshot_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
+            repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+            target_branch: { type: "string", minLength: 1, maxLength: 255 },
+            object_format: { type: "string", enum: Types::GIT_OBJECT_FORMATS },
+            target_base_commit_oid: git_oid,
+            ordered_candidates: {
+              type: "array", items: candidate, minItems: 1, maxItems: 32, uniqueItems: true
+            },
+            merge_commit_oid: git_oid
+          },
+          required: %w[
+            snapshot_event snapshot_digest repository_id target_branch object_format
+            target_base_commit_oid ordered_candidates merge_commit_oid
+          ]
+        )
+        finding = object_schema(
+          properties: {
+            code: { type: "string", minLength: 1, maxLength: 100 },
+            severity: { type: "string", enum: Types::VERIFICATION_EVIDENCE_FINDING_SEVERITIES },
+            summary: { type: "string", minLength: 1, maxLength: 2_000 },
+            path: { anyOf: [ { type: "string", minLength: 1, maxLength: 1_024 }, { type: "null" } ] }
+          },
+          required: %w[code severity summary]
+        )
+        producer = object_schema(
+          properties: {
+            name: { type: "string", minLength: 1, maxLength: 100 },
+            version: { type: "string", minLength: 1, maxLength: 100 }
+          },
+          required: %w[name version]
+        )
+        assessment = object_schema(
+          properties: {
+            evidence_kind: {
+              type: "string", enum: Types::MERGE_SNAPSHOT_VERIFICATION_EVIDENCE_KINDS
+            },
+            producer:,
+            run_id: identifier,
+            test_suite_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
+            environment_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
+            result_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
+            conclusion: { type: "string", enum: Types::VERIFICATION_EVIDENCE_CONCLUSIONS },
+            findings: { type: "array", items: finding, maxItems: 32 },
+            produced_at: {
+              type: "string",
+              pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$"
+            }
+          },
+          required: %w[
+            evidence_kind producer run_id test_suite_digest environment_digest result_digest
+            conclusion findings produced_at
+          ]
+        )
+        object_schema(
+          properties: common_mutation_properties.merge(
+            actor: agent_actor,
+            merge_snapshot_id: identifier,
+            binding:,
+            assessment:
+          ),
+          required: %w[command_id actor merge_snapshot_id binding assessment]
+        )
+      end
+
       def candidate_impact_surface_submit
         object_schema(
           properties: common_mutation_properties.merge(

@@ -1,0 +1,10 @@
+module Coordinator::Write::Commands
+  class SubmitMergeSnapshotVerification < Coordinator::Shared::Value
+    attr_reader command_id: String
+    attr_reader actor: Actor
+    attr_reader merge_snapshot_id: String
+    attr_reader binding: Coordinator::Write::MergeSnapshotVerifications::BindingV1
+    attr_reader assessment: Coordinator::Write::MergeSnapshotVerifications::AssessmentV1
+    attr_reader policy_version: String
+  end
+end

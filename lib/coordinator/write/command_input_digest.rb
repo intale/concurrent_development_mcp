@@ -33,6 +33,7 @@ module Coordinator::Write
       when Commands::SubmitCompatibilityAssessment then compatibility_assessment_submit_document(command)
       when Commands::WaiveVerificationObligation then verification_obligation_waive_document(command)
       when Commands::RegisterMergeSnapshot then merge_snapshot_register_document(command)
+      when Commands::SubmitMergeSnapshotVerification then merge_verification_submit_document(command)
       when Commands::ExpireResourceLease then lease_expire_policy_document(command)
       else
         raise ArgumentError, "Unsupported coordination command: #{command.class.name}"
@@ -503,6 +504,24 @@ module Coordinator::Write
           producer: CommandInputDocuments::MergeSnapshotProducerV1.new(command.producer.to_h),
           run_id: command.run_id,
           produced_at: command.produced_at
+        )
+      )
+    end
+
+    def merge_verification_submit(command)
+      @canonical_json.sha256(merge_verification_submit_document(command).to_h)
+    end
+
+    def merge_verification_submit_document(command)
+      CommandInputDocuments::SubmitMergeSnapshotVerificationV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "merge_verification_submit",
+        input: CommandInputDocuments::SubmitMergeSnapshotVerificationInputV1.new(
+          actor: actor_document(command.actor),
+          merge_snapshot_id: command.merge_snapshot_id,
+          binding: command.binding,
+          assessment: command.assessment
         )
       )
     end

@@ -598,12 +598,52 @@ module Coordinator::Write
           merge_snapshot_id: command.merge_snapshot_id,
           repository_id: command.repository_id,
           target_branch: command.target_branch,
+          object_format: command.object_format,
           target_base_commit_oid: command.target_base_commit_oid,
+          ordered_candidates: command.ordered_candidates,
           merge_commit_oid: command.merge_commit_oid,
           snapshot_digest: snapshot.snapshot_digest,
           evidence_status: snapshot.evidence_status,
           snapshot_event: event_reference(persisted_events.fetch(0)),
           registered_at: snapshot.registered_at
+        ),
+        next_actions: [
+          NextAction.new(
+            tool: "merge_snapshot_get",
+            arguments: NextAction::MergeSnapshotArguments.new(
+              merge_snapshot_id: command.merge_snapshot_id
+            )
+          )
+        ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
+    def merge_verification_submit(command:, submission:, input_digest:, persisted_events:, completed_at:)
+      verified_event = persisted_events.fetch(1, nil)
+      status = if verified_event
+                 "verified"
+      elsif submission.assessment.conclusion == "passed"
+                 "unverified"
+      else
+                 submission.assessment.conclusion
+      end
+      build_completion(
+        command:,
+        tool_name: "merge_verification_submit",
+        summary: merge_verification_summary(status),
+        data: CommandReceiptData::MergeSnapshotVerification.new(
+          merge_snapshot_id: command.merge_snapshot_id,
+          verification_id: submission.verification_id,
+          evidence_kind: submission.assessment.evidence_kind,
+          conclusion: submission.assessment.conclusion,
+          status:,
+          verification_input_digest: submission.verification_input_digest,
+          submitted_event: event_reference(persisted_events.fetch(0)),
+          verified_event: verified_event && event_reference(verified_event),
+          submitted_at: submission.submitted_at
         ),
         next_actions: [
           NextAction.new(
@@ -635,6 +675,12 @@ module Coordinator::Write
       when "failed" then "Compatibility evidence accepted; verification obligation failed."
       else "Compatibility evidence accepted; verification obligation remains open."
       end
+    end
+
+    def merge_verification_summary(status)
+      return "Combined-test evidence accepted; exact merge snapshot verified." if status == "verified"
+
+      "Combined-test evidence accepted; exact merge snapshot remains unverified."
     end
 
     def build_completion(command:, tool_name:, summary:, data:, next_actions:, input_digest:, persisted_events:, completed_at:)

@@ -1,0 +1,15 @@
+module Coordinator::Write::MergeSnapshotVerifications
+  class AssessmentV1 < Coordinator::Shared::Value
+    Finding: singleton(FindingV1)
+
+    attr_reader evidence_kind: String
+    attr_reader producer: ProducerV1
+    attr_reader run_id: String
+    attr_reader test_suite_digest: String
+    attr_reader environment_digest: String
+    attr_reader result_digest: String
+    attr_reader conclusion: String
+    attr_reader findings: Array[FindingV1]
+    attr_reader produced_at: String
+  end
+end

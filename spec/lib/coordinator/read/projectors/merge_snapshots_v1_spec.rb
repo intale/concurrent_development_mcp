@@ -46,4 +46,49 @@ RSpec.describe Coordinator::Read::Projectors::MergeSnapshotsV1, :event_store, :r
     )
     expect(Coordinator::Read::MergeSnapshot.count).to eq(1)
   end
+
+  it "serves each available verification observation and converges to verified" do
+    registration = MergeSnapshotScenario.register(prefix: "merge-verification-projection")
+    input = MergeSnapshotScenario.verification_input(
+      registration,
+      prefix: "merge-verification-projection"
+    )
+    result = Coordinator::Write::Operations::ExecuteSubmitMergeSnapshotVerification.new(
+      event_store:
+    ).call(input)
+    expect(result).to be_success
+
+    stream = Coordinator::Write::StreamFactory.new.merge_snapshot(input.fetch(:merge_snapshot_id))
+    events = event_store.read(
+      stream,
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[
+          MergeSnapshotRegistered
+          MergeSnapshotVerificationSubmitted
+          MergeSnapshotVerified
+        ],
+        maximum_count: 3,
+        direction: :asc
+      )
+    )
+    projector = described_class.new
+    query = Coordinator::Read::Queries::MergeSnapshotGet.new
+
+    projector.call(events.fetch(0))
+    expect(query.call(merge_snapshot_id: input.fetch(:merge_snapshot_id)).value!.data.snapshot.verification.status).to eq("unverified")
+
+    projector.call(events.fetch(1))
+    observed = query.call(merge_snapshot_id: input.fetch(:merge_snapshot_id)).value!.data.snapshot
+    expect(observed.verification).to have_attributes(status: "unverified")
+    expect(observed.verification.submissions.sole.assessment.conclusion).to eq("passed")
+
+    projector.call(events.fetch(2))
+    projector.call(events.fetch(2))
+    converged = query.call(merge_snapshot_id: input.fetch(:merge_snapshot_id)).value!.data.snapshot
+    expect(converged.verification).to have_attributes(status: "verified")
+    expect(converged.verification.verified.selected_verification.verification_id).to eq(
+      converged.verification.submissions.sole.verification_id
+    )
+    expect(Coordinator::Read::MergeSnapshot.count).to eq(1)
+  end
 end

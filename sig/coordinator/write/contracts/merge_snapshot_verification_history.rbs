@@ -1,0 +1,4 @@
+module Coordinator::Write::Contracts
+  class MergeSnapshotVerificationHistory < Dry::Validation::Contract
+  end
+end

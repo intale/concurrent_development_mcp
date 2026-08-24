@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Tasks
       module DomainErrorV1
-        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError | InterpretationNotAcceptedError | DecisionAlreadyExistsError | InterpretationAlreadyActivatedError | DecisionDefinitionNotActivatableError | DecisionSlotOccupiedError | DecisionPartitionLimitReachedError | DecisionPartitionCapacityReachedError | DecisionPartitionStateInvalidError | DecisionNotFoundError | DecisionNotActiveError | InterpretationNotACorrectionError | DecisionDefinitionNotCorrectableError | DecisionRevisionChangedError | DecisionSlotStateInvalidError | AgentChoiceAlreadyExistsError | StaleDecisionContextError | DecisionContextMismatchError | DecisionContextConflictError | DecisionContextLimitReachedError | UnsupportedDecisionContextError | AgentChoiceBlockedByDecisionError | AgentChoiceConfirmationRequiredError | AgentChoicePartitionSnapshotInvalidError | AgentChoiceDecisionHeadInvalidError | AgentChoiceUnresolvedHeadsError | CandidateAlreadyExistsError | CandidateHeadAlreadyRegisteredError | CandidateLeaseObservationsMismatchError | CandidateLeaseNotActiveScopeError | CandidateLeaseNotActiveError | CandidateUnauthorizedResourcesError | CandidateManifestBaseMismatchError | CandidateNotFoundError | CandidateImpactIdentityMismatchError | CandidateImpactSourceEvidenceMismatchError | CandidateImpactSurfaceAlreadyRecordedError | VerificationObligationNotFoundError | VerificationObligationAlreadyClaimedError | VerificationObligationPolicyStaleError | VerificationObligationUnclaimedError | VerificationObligationClaimStaleError | VerificationObligationClaimNotOwnedError | VerificationObligationClaimExpiredError | VerificationObligationBindingStaleError | VerificationEvidenceKindNotRequiredError | VerificationEvidenceAlreadySubmittedError | VerificationEvidenceLimitReachedError | VerificationObligationTerminalError
+        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError | InterpretationNotAcceptedError | DecisionAlreadyExistsError | InterpretationAlreadyActivatedError | DecisionDefinitionNotActivatableError | DecisionSlotOccupiedError | DecisionPartitionLimitReachedError | DecisionPartitionCapacityReachedError | DecisionPartitionStateInvalidError | DecisionNotFoundError | DecisionNotActiveError | InterpretationNotACorrectionError | DecisionDefinitionNotCorrectableError | DecisionRevisionChangedError | DecisionSlotStateInvalidError | AgentChoiceAlreadyExistsError | StaleDecisionContextError | DecisionContextMismatchError | DecisionContextConflictError | DecisionContextLimitReachedError | UnsupportedDecisionContextError | AgentChoiceBlockedByDecisionError | AgentChoiceConfirmationRequiredError | AgentChoicePartitionSnapshotInvalidError | AgentChoiceDecisionHeadInvalidError | AgentChoiceUnresolvedHeadsError | CandidateAlreadyExistsError | CandidateHeadAlreadyRegisteredError | CandidateLeaseObservationsMismatchError | CandidateLeaseNotActiveScopeError | CandidateLeaseNotActiveError | CandidateUnauthorizedResourcesError | CandidateManifestBaseMismatchError | CandidateNotFoundError | CandidateImpactIdentityMismatchError | CandidateImpactSourceEvidenceMismatchError | CandidateImpactSurfaceAlreadyRecordedError | VerificationObligationNotFoundError | VerificationObligationAlreadyClaimedError | VerificationObligationPolicyStaleError | VerificationObligationUnclaimedError | VerificationObligationClaimStaleError | VerificationObligationClaimNotOwnedError | VerificationObligationClaimExpiredError | VerificationObligationBindingStaleError | VerificationEvidenceKindNotRequiredError | VerificationEvidenceAlreadySubmittedError | VerificationEvidenceLimitReachedError | VerificationObligationTerminalError | MergeSnapshotExistingError | MergeSnapshotCandidateError | MergeSnapshotStateError | MergeSnapshotVerificationBindingStaleError | MergeSnapshotVerificationAlreadySubmittedError | MergeSnapshotVerificationLimitReachedError
 
         class ChangeSetDetails < Shared::Value
           def change_set_id: () -> String
@@ -823,6 +823,69 @@ module Coordinator
           def code: () -> String
           def message: () -> String
           def details: () -> VerificationObligationTerminalDetails
+        end
+
+
+        class MergeSnapshotExistingDetails < Shared::Value
+          def existing_event: () -> EventReference
+        end
+
+        class MergeSnapshotCandidateDetails < Shared::Value
+          def candidate_id: () -> String
+          def requested_head_commit_oid: () -> String
+        end
+
+        class MergeSnapshotDetails < Shared::Value
+          def merge_snapshot_id: () -> String
+        end
+
+        class MergeSnapshotBindingDetails < MergeSnapshotDetails
+          def current_snapshot_event: () -> EventReference
+          def current_snapshot_digest: () -> String
+        end
+
+        class MergeSnapshotVerificationDigestDetails < MergeSnapshotDetails
+          def verification_input_digest: () -> String
+        end
+
+        class MergeSnapshotVerificationLimitDetails < MergeSnapshotDetails
+          def maximum_count: () -> Integer
+        end
+
+        class MergeSnapshotExistingError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> MergeSnapshotExistingDetails
+        end
+
+        class MergeSnapshotCandidateError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> MergeSnapshotCandidateDetails
+        end
+
+        class MergeSnapshotStateError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> MergeSnapshotDetails
+        end
+
+        class MergeSnapshotVerificationBindingStaleError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> MergeSnapshotBindingDetails
+        end
+
+        class MergeSnapshotVerificationAlreadySubmittedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> MergeSnapshotVerificationDigestDetails
+        end
+
+        class MergeSnapshotVerificationLimitReachedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> MergeSnapshotVerificationLimitDetails
         end
       end
     end

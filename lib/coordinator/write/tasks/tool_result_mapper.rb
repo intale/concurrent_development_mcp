@@ -44,7 +44,12 @@ module Coordinator::Write
         candidate_head_mismatch: "conflict",
         candidate_repository_mismatch: "conflict",
         candidate_target_branch_mismatch: "conflict",
-        candidate_object_format_mismatch: "conflict"
+        candidate_object_format_mismatch: "conflict",
+        merge_snapshot_not_found: "not_found",
+        merge_snapshot_verification_binding_stale: "stale_context",
+        merge_snapshot_verification_already_submitted: "conflict",
+        merge_snapshot_already_verified: "conflict",
+        merge_snapshot_verification_limit_reached: "conflict"
       }.freeze
 
       def call(result, command_id:)

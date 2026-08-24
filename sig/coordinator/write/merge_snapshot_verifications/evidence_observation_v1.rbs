@@ -1,0 +1,6 @@
+module Coordinator::Write::MergeSnapshotVerifications
+  class EvidenceObservationV1 < Coordinator::Shared::Value
+    attr_reader submission: Coordinator::Write::Events::MergeSnapshotVerificationSubmittedV1
+    attr_reader event: Coordinator::Write::EventReference
+  end
+end

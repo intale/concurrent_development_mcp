@@ -1,0 +1,4 @@
+module Coordinator::Mcp::Tools
+  class MergeVerificationSubmit < Coordinator::Mcp::MutationTool
+  end
+end

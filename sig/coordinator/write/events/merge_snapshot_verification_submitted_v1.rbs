@@ -1,0 +1,11 @@
+module Coordinator::Write::Events
+  class MergeSnapshotVerificationSubmittedV1 < Base
+    attr_reader merge_snapshot_id: String
+    attr_reader snapshot: Coordinator::Write::MergeSnapshotVerifications::SnapshotEvidenceV1
+    attr_reader verification_id: String
+    attr_reader policy_version: String
+    attr_reader assessment: Coordinator::Write::MergeSnapshotVerifications::AssessmentV1
+    attr_reader verification_input_digest: String
+    attr_reader submitted_at: String
+  end
+end

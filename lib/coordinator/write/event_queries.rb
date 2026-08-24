@@ -173,6 +173,18 @@ module Coordinator::Write
       direction: :asc
     )
 
+    MERGE_SNAPSHOT_VERIFICATION_HISTORY = EventReadCriteria.new(
+      event_types: [ "MergeSnapshotVerificationSubmitted" ],
+      maximum_count: Types::MERGE_SNAPSHOT_VERIFICATION_MAXIMUM_COUNT + 1,
+      direction: :asc
+    )
+
+    MERGE_SNAPSHOT_VERIFIED = EventReadCriteria.new(
+      event_types: [ "MergeSnapshotVerified" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+
     CANDIDATE_FOR_IMPACT_SURFACE = GroupedEventReadCriteria.new(
       event_types: [
         "CandidateSubmitted",

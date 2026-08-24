@@ -1,0 +1,9 @@
+module Coordinator::Write::MergeSnapshotVerifications
+  class VerifiedDigestDocumentV1 < Coordinator::Shared::Value
+    attr_reader schema: String
+    attr_reader merge_snapshot_id: String
+    attr_reader snapshot_digest: String
+    attr_reader policy_version: String
+    attr_reader selected_verification: VerificationDecisionReferenceV1
+  end
+end

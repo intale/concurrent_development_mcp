@@ -2,11 +2,13 @@ module Coordinator::Read::Projectors
   class MergeSnapshotsV1
     PROJECTION: Coordinator::Read::ProjectionDefinition
 
-    def initialize: (?contract: Coordinator::Read::Contracts::MergeSnapshotSourceEvent, ?schema_registry: Coordinator::Write::EventSchemaRegistry, ?snapshots: Coordinator::Read::Repositories::MergeSnapshots, ?processed_events: Coordinator::Read::Repositories::ProcessedProjectionEvents) -> void
+    def initialize: (?registration_contract: Coordinator::Read::Contracts::MergeSnapshotSourceEvent, ?verification_contract: Coordinator::Read::Contracts::MergeSnapshotVerificationSourceEvent, ?schema_registry: Coordinator::Write::EventSchemaRegistry, ?snapshots: Coordinator::Read::Repositories::MergeSnapshots, ?processed_events: Coordinator::Read::Repositories::ProcessedProjectionEvents) -> void
     def call: (PgEventstore::Event event) -> nil
 
     private
 
-    def load_payload: (PgEventstore::Event event) -> Coordinator::Write::Events::MergeSnapshotRegisteredV1
+    def load_payload: (PgEventstore::Event event) -> (Coordinator::Write::Events::MergeSnapshotRegisteredV1 | Coordinator::Write::Events::MergeSnapshotVerificationSubmittedV1 | Coordinator::Write::Events::MergeSnapshotVerifiedV1)
+    def contract_for: (PgEventstore::Event event) -> (Coordinator::Read::Contracts::MergeSnapshotSourceEvent | Coordinator::Read::Contracts::MergeSnapshotVerificationSourceEvent)
+    def project: (PgEventstore::Event event, (Coordinator::Write::Events::MergeSnapshotRegisteredV1 | Coordinator::Write::Events::MergeSnapshotVerificationSubmittedV1 | Coordinator::Write::Events::MergeSnapshotVerifiedV1) payload) -> untyped
   end
 end

@@ -1,0 +1,10 @@
+module Coordinator::Write::MergeSnapshotVerifications
+  class VerificationDecisionReferenceV1 < Coordinator::Shared::Value
+    attr_reader verification_id: String
+    attr_reader evidence_kind: String
+    attr_reader conclusion: String
+    attr_reader result_digest: String
+    attr_reader verification_input_digest: String
+    attr_reader event: Coordinator::Write::EventReference
+  end
+end

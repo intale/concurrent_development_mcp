@@ -75,6 +75,10 @@ module Coordinator
       MERGE_SNAPSHOT_EVIDENCE_STATUSES: Array[String]
       MERGE_SNAPSHOT_REGISTRATION_POLICY_VERSIONS: Array[String]
       MERGE_SNAPSHOT_MAXIMUM_CANDIDATES: Integer
+      MERGE_SNAPSHOT_VERIFICATION_EVIDENCE_KINDS: Array[String]
+      MERGE_SNAPSHOT_VERIFICATION_POLICY_VERSIONS: Array[String]
+      MERGE_SNAPSHOT_VERIFICATION_STATUSES: Array[String]
+      MERGE_SNAPSHOT_VERIFICATION_MAXIMUM_COUNT: Integer
       CANDIDATE_OBLIGATION_POLICY_STATUSES: Array[String]
       CANDIDATE_OBLIGATION_DECISION_OUTCOMES: Array[String]
       DECISION_ACTIVATION_INELIGIBILITY_REASONS: Array[String]
@@ -202,6 +206,9 @@ module Coordinator
       MergeSnapshotCandidateCount: untyped
       MergeSnapshotProducerName: untyped
       MergeSnapshotProducerVersion: untyped
+      MergeSnapshotVerificationEvidenceKind: untyped
+      MergeSnapshotVerificationPolicyVersion: untyped
+      MergeSnapshotVerificationStatus: untyped
       CandidateObligationPolicyStatus: untyped
       CandidateObligationDecisionOutcome: untyped
       CandidateImpactReasonMatches: untyped

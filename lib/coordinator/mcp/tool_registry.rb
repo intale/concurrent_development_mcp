@@ -40,7 +40,8 @@ module Coordinator
           Tools::VerificationObligationClaim,
           Tools::CompatibilityAssessmentSubmit,
           Tools::VerificationObligationWaive,
-          Tools::MergeSnapshotRegister
+          Tools::MergeSnapshotRegister,
+          Tools::MergeVerificationSubmit
         ].freeze
       end
     end

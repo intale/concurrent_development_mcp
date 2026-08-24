@@ -1,0 +1,9 @@
+module Coordinator::Read
+  class MergeSnapshotVerifiedViewV1 < Coordinator::Shared::Value
+    attr_reader policy_version: String
+    attr_reader selected_verification: Coordinator::Write::MergeSnapshotVerifications::VerificationDecisionReferenceV1
+    attr_reader verification_digest: String
+    attr_reader verified_at: String
+    attr_reader source: MergeSnapshotSourceEvidenceV1
+  end
+end

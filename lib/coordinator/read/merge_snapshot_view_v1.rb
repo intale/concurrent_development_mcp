@@ -20,5 +20,6 @@ module Coordinator::Read
     attribute :policy_version, Types::MergeSnapshotRegistrationPolicyVersion
     attribute :evidence_status, Types::MergeSnapshotEvidenceStatus
     attribute :registered, MergeSnapshotSourceEvidenceV1
+    attribute :verification, MergeSnapshotVerificationViewV1
   end
 end

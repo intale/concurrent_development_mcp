@@ -70,6 +70,11 @@ module Coordinator
         directly in the event store and rejects mismatches or reused identities atomically. Registration remains
         attributed_unverified: the coordinator does not inspect Git or prove that the composition exists.
         merge_snapshot_get serves the latest available projection and may temporarily report not observed.
+        Use merge_verification_submit with the exact complete binding returned by merge_snapshot_register or
+        merge_snapshot_get. It accepts only attributed combined-test evidence. Failed, inconclusive, and
+        not-applicable assessments remain durable facts and may be followed by a new assessment; an exact pass
+        without error or critical findings verifies that immutable snapshot in the same authoritative command.
+        The projected verification history may lag and never authorizes the command.
         The coordinator records attributed evidence and does not execute Git, CI, or agent work.
       TEXT
 

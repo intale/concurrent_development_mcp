@@ -1,0 +1,11 @@
+module Coordinator::Write::MergeSnapshotVerifications
+  class VerifiedDigestBuilder
+    def initialize: (?canonical_json: Coordinator::Shared::CanonicalJson) -> void
+    def call: (
+      merge_snapshot_id: String,
+      snapshot_digest: String,
+      policy_version: String,
+      selected_verification: VerificationDecisionReferenceV1
+    ) -> String
+  end
+end

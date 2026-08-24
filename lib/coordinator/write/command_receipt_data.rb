@@ -222,12 +222,28 @@ module Coordinator::Write
       attribute :merge_snapshot_id, Types::Identifier
       attribute :repository_id, Types::RepositoryId
       attribute :target_branch, Types::CandidateTargetBranch
+      attribute :object_format, Types::GitObjectFormat
       attribute :target_base_commit_oid, Types::GitOid
+      attribute :ordered_candidates,
+                Types::Array.of(MergeSnapshots::RequestedCandidateV1)
+                  .constrained(min_size: 1, max_size: Types::MERGE_SNAPSHOT_MAXIMUM_CANDIDATES)
       attribute :merge_commit_oid, Types::GitOid
       attribute :snapshot_digest, Types::Sha256Digest
       attribute :evidence_status, Types::MergeSnapshotEvidenceStatus
       attribute :snapshot_event, EventReference
       attribute :registered_at, Types::Timestamp
+    end
+
+    class MergeSnapshotVerification < Value
+      attribute :merge_snapshot_id, Types::Identifier
+      attribute :verification_id, Types::UuidV7
+      attribute :evidence_kind, Types::MergeSnapshotVerificationEvidenceKind
+      attribute :conclusion, Types::VerificationEvidenceConclusion
+      attribute :status, Types::MergeSnapshotVerificationStatus
+      attribute :verification_input_digest, Types::Sha256Digest
+      attribute :submitted_event, EventReference
+      attribute :verified_event, EventReference.optional
+      attribute :submitted_at, Types::Timestamp
     end
 
     Type = ChangeSet |
@@ -250,6 +266,7 @@ module Coordinator::Write
            VerificationObligationClaim |
            CompatibilityAssessment |
            VerificationObligationWaiver |
-           MergeSnapshotRegistration
+           MergeSnapshotRegistration |
+           MergeSnapshotVerification
   end
 end

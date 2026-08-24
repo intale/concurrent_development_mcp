@@ -1,0 +1,6 @@
+module Coordinator::Write::MergeSnapshotVerifications
+  class BindingCandidateV1 < Coordinator::Shared::Value
+    attr_reader candidate_id: String
+    attr_reader head_commit_oid: String
+  end
+end

@@ -24,6 +24,7 @@ module Coordinator
       def compatibility_assessment_submit: (command: Commands::SubmitCompatibilityAssessment, evidence: Events::VerificationEvidenceSubmittedV1, input_digest: String, assessment_input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
       def verification_obligation_waive: (command: Commands::WaiveVerificationObligation, waiver: Events::VerificationObligationWaivedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
       def merge_snapshot_register: (command: Commands::RegisterMergeSnapshot, snapshot: Events::MergeSnapshotRegisteredV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
+      def merge_verification_submit: (command: Commands::SubmitMergeSnapshotVerification, submission: Events::MergeSnapshotVerificationSubmittedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
     end
   end
 end

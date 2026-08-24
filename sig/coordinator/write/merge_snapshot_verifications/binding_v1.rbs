@@ -1,0 +1,14 @@
+module Coordinator::Write::MergeSnapshotVerifications
+  class BindingV1 < Coordinator::Shared::Value
+    Candidate: singleton(BindingCandidateV1)
+
+    attr_reader snapshot_event: Coordinator::Write::EventReference
+    attr_reader snapshot_digest: String
+    attr_reader repository_id: String
+    attr_reader target_branch: String
+    attr_reader object_format: String
+    attr_reader target_base_commit_oid: String
+    attr_reader ordered_candidates: Array[BindingCandidateV1]
+    attr_reader merge_commit_oid: String
+  end
+end

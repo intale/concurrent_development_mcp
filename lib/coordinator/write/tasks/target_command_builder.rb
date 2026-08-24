@@ -47,6 +47,8 @@ module Coordinator::Write
           build_waive_verification_obligation(document)
         when CommandInputDocuments::RegisterMergeSnapshotV1
           build_register_merge_snapshot(document)
+        when CommandInputDocuments::SubmitMergeSnapshotVerificationV1
+          build_submit_merge_snapshot_verification(document)
         end
       end
 
@@ -368,6 +370,18 @@ module Coordinator::Write
           run_id: input.run_id,
           produced_at: input.produced_at,
           policy_version: "merge-snapshot-registration/v1"
+        )
+      end
+
+      def build_submit_merge_snapshot_verification(document)
+        input = document.input
+        Commands::SubmitMergeSnapshotVerification.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          merge_snapshot_id: input.merge_snapshot_id,
+          binding: input.binding,
+          assessment: input.assessment,
+          policy_version: "merge-snapshot-verification/v1"
         )
       end
 

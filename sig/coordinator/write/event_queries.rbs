@@ -26,6 +26,8 @@ module Coordinator
       CANDIDATE_FOR_MERGE_SNAPSHOT: EventReadCriteria
       MERGE_SNAPSHOT_REGISTRATION: EventReadCriteria
       MERGE_SNAPSHOT_COMMIT_REGISTRATION: EventReadCriteria
+      MERGE_SNAPSHOT_VERIFICATION_HISTORY: EventReadCriteria
+      MERGE_SNAPSHOT_VERIFIED: EventReadCriteria
       CANDIDATE_FOR_IMPACT_SURFACE: GroupedEventReadCriteria
       VERIFICATION_OBLIGATION_CREATION: EventReadCriteria
       VERIFICATION_OBLIGATION_FOR_CLAIM: GroupedEventReadCriteria

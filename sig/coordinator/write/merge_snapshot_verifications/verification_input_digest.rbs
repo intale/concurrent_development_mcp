@@ -1,0 +1,7 @@
+module Coordinator::Write::MergeSnapshotVerifications
+  class VerificationInputDigest
+    def initialize: (?canonical_json: Coordinator::Shared::CanonicalJson) -> void
+    def call: (policy_version: String, snapshot: SnapshotEvidenceV1, assessment: AssessmentV1) -> String
+    def document: (policy_version: String, snapshot: SnapshotEvidenceV1, assessment: AssessmentV1) -> VerificationInputDocumentV1
+  end
+end
