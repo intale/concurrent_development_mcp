@@ -99,7 +99,7 @@ RSpec.describe Coordinator::Write::Domain::VerificationEvidence::Submit do
     result = decide(state: VerificationEvidenceExamples.state(evidence: [ existing ]), revision: 3)
 
     expect(result.failure.to_h).to include(
-      code: :verification_evidence_duplicate,
+      code: :verification_evidence_already_submitted,
       details: include(assessment_input_digest:)
     )
   end

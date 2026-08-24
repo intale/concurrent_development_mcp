@@ -118,7 +118,7 @@ module Coordinator::Write
           end
           if state.duplicate_assessment?(assessment_input_digest)
             return error(
-              :verification_evidence_duplicate,
+              :verification_evidence_already_submitted,
               "This compatibility assessment was already accepted",
               command,
               assessment_input_digest:

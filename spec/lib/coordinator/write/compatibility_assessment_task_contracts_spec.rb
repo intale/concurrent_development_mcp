@@ -89,7 +89,7 @@ RSpec.describe "compatibility assessment Task contracts" do
         "denied"
       ],
       [
-        :verification_evidence_duplicate,
+        :verification_evidence_already_submitted,
         { obligation_id: "obl-1", assessment_input_digest: "sha256:#{"b" * 64}" },
         "conflict"
       ],

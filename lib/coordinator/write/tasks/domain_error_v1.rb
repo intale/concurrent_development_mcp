@@ -842,8 +842,8 @@ module Coordinator::Write
         attribute :details, VerificationEvidenceKindDetails
       end
 
-      class VerificationEvidenceDuplicateError < Value
-        attribute :code, Types::String.enum("verification_evidence_duplicate")
+      class VerificationEvidenceAlreadySubmittedError < Value
+        attribute :code, Types::String.enum("verification_evidence_already_submitted")
         attribute :message, Types::String
         attribute :details, VerificationEvidenceDigestDetails
       end
@@ -931,7 +931,7 @@ module Coordinator::Write
              VerificationObligationClaimExpiredError |
              VerificationObligationBindingStaleError |
              VerificationEvidenceKindNotRequiredError |
-             VerificationEvidenceDuplicateError |
+             VerificationEvidenceAlreadySubmittedError |
              VerificationEvidenceLimitReachedError |
              VerificationObligationTerminalError
     end

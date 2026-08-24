@@ -34,7 +34,7 @@ module Coordinator::Write
         verification_obligation_claim_not_owned: "conflict",
         verification_obligation_claim_expired: "conflict",
         verification_obligation_binding_stale: "stale_context",
-        verification_evidence_duplicate: "conflict",
+        verification_evidence_already_submitted: "conflict",
         verification_evidence_limit_reached: "conflict",
         verification_obligation_terminal: "conflict"
       }.freeze

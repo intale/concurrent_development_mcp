@@ -97,7 +97,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCompatibilityAssessm
 
     expect(replay).to eq(first)
     expect(changed.failure.code).to eq(:command_id_reused)
-    expect(duplicate.failure.code).to eq(:verification_evidence_duplicate)
+    expect(duplicate.failure.code).to eq(:verification_evidence_already_submitted)
     expect(evidence_events(created).map(&:type)).to eq([ "VerificationEvidenceSubmitted" ])
   end
 
