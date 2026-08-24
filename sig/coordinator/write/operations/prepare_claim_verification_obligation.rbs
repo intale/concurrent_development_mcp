@@ -1,8 +1,9 @@
 module Coordinator
   module Write
     module Operations
-      class PrepareClaimVerificationObligation
+      class PrepareClaimVerificationObligation < Dry::Operation
         def initialize: (?contract: Contracts::ClaimVerificationObligation) -> void
+        %a{rbs:test:skip}
         def call: (command_input input) -> Dry::Monads::Result
       end
     end

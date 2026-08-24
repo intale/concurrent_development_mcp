@@ -1,14 +1,16 @@
 module Coordinator
   module Write
     module Operations
-      class ExecuteClaimVerificationObligation
+      class ExecuteClaimVerificationObligation < Dry::Operation
+        TOOL_NAME: String
+
         def initialize: (
           event_store: _EventStore,
           ?preparer: PrepareClaimVerificationObligation,
           ?decider: Domain::VerificationObligationClaims::Claim,
           ?input_digest: CommandInputDigest,
-          ?clock: Shared::SystemClock,
-          ?id_generator: Shared::IdGenerator,
+          ?clock: Shared::_Clock,
+          ?id_generator: Shared::_IdGenerator,
           ?event_factory: EventFactory,
           ?schema_registry: EventSchemaRegistry,
           ?stream_factory: StreamFactory,
@@ -16,6 +18,7 @@ module Coordinator
           ?history_contract: Contracts::VerificationObligationClaimHistory,
           ?event_plan_contract: Contracts::VerificationObligationClaimEventPlan
         ) -> void
+        %a{rbs:test:skip}
         def call: (command_input input) -> Dry::Monads::Result
         def call_command: (Commands::ClaimVerificationObligation command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
       end
