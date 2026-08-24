@@ -3,7 +3,13 @@
 module Coordinator::Read
   module Contracts
     class VerificationObligationSourceEvent < Dry::Validation::Contract
-      EVENT_TYPES = [ "VerificationObligationCreated", "VerificationObligationClaimed" ].freeze
+      EVENT_TYPES = [
+        "VerificationObligationCreated",
+        "VerificationObligationClaimed",
+        "VerificationEvidenceSubmitted",
+        "VerificationObligationSatisfied",
+        "VerificationObligationFailed"
+      ].freeze
 
       config.validate_keys = true
 
@@ -41,6 +47,14 @@ module Coordinator::Read
           values[:stream_revision].positive? &&
             values[:actor_kind] == "agent" &&
             values[:policy_version] == "verification-obligation-claim/v1"
+        when "VerificationEvidenceSubmitted"
+          values[:stream_revision] >= 2 &&
+            values[:actor_kind] == "agent" &&
+            values[:policy_version] == "compatibility-assessment/v1"
+        when "VerificationObligationSatisfied", "VerificationObligationFailed"
+          values[:stream_revision] >= 3 &&
+            values[:actor_kind] == "agent" &&
+            values[:policy_version] == "compatibility-assessment/v1"
         else
           false
         end

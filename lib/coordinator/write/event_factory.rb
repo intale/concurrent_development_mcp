@@ -6,7 +6,7 @@ module Coordinator::Write
       @registry = registry
     end
 
-    def build!(event:, event_id:, metadata:, markers:, caused_by: nil)
+    def build!(event:, event_id:, metadata:, markers:, caused_by: nil, correlation_id: nil)
       @registry.verify!(event)
       Types::UuidV7[event_id]
 
@@ -18,7 +18,8 @@ module Coordinator::Write
           "schema_version" => event.class.schema_version
         ),
         markers: normalize_markers(markers),
-        caused_by:
+        caused_by:,
+        correlation_id:
       )
     end
 

@@ -1,0 +1,19 @@
+module Coordinator
+  module Read
+    class VerificationEvidenceViewV1 < Shared::Value
+      def obligation_id: () -> String
+      def obligation_event: () -> Write::EventReference
+      def evidence_id: () -> String
+      def evidence_kind: () -> String
+      def claim: () -> Write::CompatibilityAssessments::ClaimEvidenceV1
+      def source_candidate: () -> Write::CandidateObligations::CandidateSubjectV1
+      def target_candidate: () -> Write::CandidateObligations::CandidateSubjectV1
+      def policy: () -> Write::CandidateObligations::ImpactPolicyEvidenceV1
+      def obligation_validity_input_digest: () -> String
+      def assessment: () -> Write::CompatibilityAssessments::AssessmentV1
+      def assessment_input_digest: () -> String
+      def submitted_at: () -> String
+      def evidence: () -> VerificationObligationEvidenceV1
+    end
+  end
+end

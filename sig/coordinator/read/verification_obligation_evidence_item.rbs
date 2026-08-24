@@ -1,0 +1,25 @@
+module Coordinator
+  module Read
+    class VerificationObligationEvidenceItem < ApplicationRecord
+      def evidence_id: () -> String
+      def obligation_id: () -> String
+      def evidence_kind: () -> String
+      def conclusion: () -> String
+      def assessment_input_digest: () -> String
+      def result_digest: () -> String
+      def submission: () -> Hash[String, untyped]
+      def event_id: () -> String
+      def event: () -> Hash[String, untyped]
+      def actor: () -> Hash[String, untyped]
+      def markers: () -> Array[String]
+      def metadata: () -> Hash[String, untyped]
+      def causation_id: () -> String?
+      def correlation_id: () -> String?
+      def event_global_position: () -> Integer
+      def stream_revision: () -> Integer
+      def produced_at_domain: () -> Time
+      def submitted_at_domain: () -> Time
+      def created_at_store: () -> Time
+    end
+  end
+end

@@ -117,6 +117,68 @@ RSpec.describe "IMP-02 MCP verification obligations", :event_store, :read_model 
     )
   end
 
+  it "filters terminal status and exposes ordered evidence, progress, and outcome provenance" do
+    created = CandidateObligationScenario.create_obligation(
+      prefix: "mcp-obligation-evidence",
+      required_evidence: [ "combined_tests" ]
+    )
+    claim = CandidateObligationScenario.claim_obligation(
+      created:,
+      prefix: "mcp-obligation-evidence"
+    )
+    receipt = CandidateObligationScenario.submit_compatibility_assessment(
+      created:,
+      claim:,
+      command_id: "cmd-mcp-obligation-evidence"
+    )
+    history = CandidateObligationScenario.verification_history(receipt.obligation_id)
+    projector = Coordinator::Read::Projectors::VerificationObligationsV1.new
+    history.each { projector.call(_1) }
+
+    available = call_tool(
+      { obligation_id: receipt.obligation_id, status: "satisfied" },
+      id: 4
+    ).dig("result", "structuredContent")
+    item = available.dig("data", "page", "items").sole
+    submitted = item.fetch("submitted_evidence").sole
+    outcome_event = history.find { _1.type == "VerificationObligationSatisfied" }
+    expect(item).to include(
+      "status" => "satisfied",
+      "progress" => {
+        "required_evidence_kinds" => [ "combined_tests" ],
+        "passed_evidence_kinds" => [ "combined_tests" ],
+        "missing_evidence_kinds" => [],
+        "evidence_count" => 1
+      },
+      "outcome" => include(
+        "satisfied_at" => receipt.submitted_at,
+        "evidence" => include(
+          "event" => include("event_id" => outcome_event.id),
+          "causation_id" => outcome_event.causation_id,
+          "correlation_id" => outcome_event.correlation_id
+        )
+      )
+    )
+    expect(submitted).to include(
+      "evidence_id" => receipt.evidence_id,
+      "evidence_kind" => "combined_tests",
+      "assessment" => include("conclusion" => "passed"),
+      "evidence" => include(
+        "event" => include("event_id" => receipt.evidence_event.event_id),
+        "causation_id" => outcome_event.causation_id,
+        "correlation_id" => outcome_event.correlation_id
+      )
+    )
+    expect(item.dig("evidence", "global_position")).to eq(created.fetch(:event).global_position)
+
+    expect(
+      call_tool(
+        { obligation_id: receipt.obligation_id, status: "open" },
+        id: 5
+      ).dig("result", "structuredContent", "data", "page", "items")
+    ).to be_empty
+  end
+
   private
 
   def call_tool(arguments, id:, expected_status: 200)

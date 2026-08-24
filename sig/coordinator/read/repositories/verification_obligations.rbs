@@ -2,6 +2,10 @@ module Coordinator
   module Read
     module Repositories
       class VerificationObligations
+        def initialize: (
+          ?evidence_contract: Contracts::VerificationEvidenceProjection,
+          ?outcome_contract: Contracts::VerificationOutcomeProjection
+        ) -> void
         def store_creation: (
           event: PgEventstore::Event,
           obligation: Write::Events::VerificationObligationCreatedV1
@@ -9,6 +13,14 @@ module Coordinator
         def store_claim: (
           event: PgEventstore::Event,
           claim: Write::Events::VerificationObligationClaimedV1
+        ) -> VerificationObligation
+        def store_evidence: (
+          event: PgEventstore::Event,
+          submission: Write::Events::VerificationEvidenceSubmittedV1
+        ) -> VerificationObligation
+        def store_outcome: (
+          event: PgEventstore::Event,
+          outcome: Write::Events::VerificationObligationSatisfiedV1 | Write::Events::VerificationObligationFailedV1
         ) -> VerificationObligation
         def page: (VerificationObligationListQueryV1 query) -> VerificationObligationPageV1
       end

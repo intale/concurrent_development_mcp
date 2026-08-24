@@ -2,6 +2,7 @@ module Coordinator
   module Read
     class VerificationObligationViewV1 < Shared::Value
       Reason: singleton(Write::CandidateObligations::ImpactReasonV1)
+      type outcome = VerificationObligationSatisfiedViewV1 | VerificationObligationFailedViewV1
 
       def obligation_id: () -> String
       def kind: () -> String
@@ -19,6 +20,9 @@ module Coordinator
       def evidence: () -> VerificationObligationEvidenceV1
       def claim_state: () -> String
       def claim: () -> VerificationObligationClaimViewV1?
+      def progress: () -> VerificationObligationProgressV1
+      def submitted_evidence: () -> Array[VerificationEvidenceViewV1]
+      def outcome: () -> outcome?
     end
   end
 end

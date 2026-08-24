@@ -165,7 +165,10 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       )
       candidate = CandidateScenario.submit(prefix: "subscription-candidate", build_context: false)
       CandidateScenario.submit_impact(candidate)
-      obligation = CandidateObligationScenario.create_obligation(prefix: "read-model-subscription")
+      obligation = CandidateObligationScenario.create_obligation(
+        prefix: "read-model-subscription",
+        required_evidence: [ "combined_tests" ]
+      )
       claim = Coordinator::Write::Operations::ExecuteClaimVerificationObligation.new(
         event_store:
       ).call(
@@ -174,6 +177,11 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         obligation_id: obligation.fetch(:result).obligation_id,
         claim_duration_seconds: 300
       ).value!
+      assessment = CandidateObligationScenario.submit_compatibility_assessment(
+        created: obligation,
+        claim: claim.data,
+        command_id: "cmd-subscription-obligation-evidence"
+      )
 
       wait_for(subscription_set, "coord-context-v1", minimum: 2)
       wait_for(subscription_set, "command-receipts-v1", minimum: 5)
@@ -182,7 +190,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       wait_for(subscription_set, "decision-governance-v1", minimum: 5)
       wait_for(subscription_set, "agent-choices-v1", minimum: 2)
       wait_for(subscription_set, "candidates-v1", minimum: 3)
-      wait_for(subscription_set, "verification-obligations-v1", minimum: 2)
+      wait_for(subscription_set, "verification-obligations-v1", minimum: 4)
 
       expect(Coordinator::Read::CoordContext.find("CS-SUB-100").document).to include(
         "schema" => "coord-context/v1"
@@ -226,10 +234,24 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         obligation.fetch(:result).obligation_id
       )).to have_attributes(
         change_set_id: obligation.dig(:pair, :ids, :change_set_id),
-        status: "open",
+        status: "satisfied",
         claim_id: claim.data.claim_id,
         claimant_id: "agent-subscription",
-        claim_fencing_token: 1
+        claim_fencing_token: 1,
+        evidence_count: 1,
+        passed_evidence_kinds: [ "combined_tests" ],
+        missing_evidence_kinds: [],
+        terminal_outcome: include(
+          "obligation_id" => assessment.obligation_id,
+          "outcome_digest" => a_string_starting_with("sha256:")
+        )
+      )
+      expect(Coordinator::Read::VerificationObligationEvidenceItem.find(
+        assessment.evidence_id
+      )).to have_attributes(
+        evidence_kind: "combined_tests",
+        conclusion: "passed",
+        event_id: assessment.evidence_event.event_id
       )
     ensure
       subscription_set.stop

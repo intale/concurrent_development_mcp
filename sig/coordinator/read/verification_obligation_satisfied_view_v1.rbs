@@ -1,0 +1,15 @@
+module Coordinator
+  module Read
+    class VerificationObligationSatisfiedViewV1 < Shared::Value
+      Evidence: singleton(Write::CompatibilityAssessments::EvidenceDecisionReferenceV1)
+
+      def obligation_id: () -> String
+      def obligation_event: () -> Write::EventReference
+      def policy: () -> Write::CandidateObligations::ImpactPolicyEvidenceV1
+      def selected_evidence: () -> Array[Write::CompatibilityAssessments::EvidenceDecisionReferenceV1]
+      def outcome_digest: () -> String
+      def satisfied_at: () -> String
+      def evidence: () -> VerificationObligationEvidenceV1
+    end
+  end
+end

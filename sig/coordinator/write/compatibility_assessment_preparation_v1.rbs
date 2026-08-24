@@ -8,6 +8,7 @@ module Coordinator
       def evidence_event_id: () -> String
       def terminal_event_id: () -> String
       def completion_event_id: () -> String
+      def correlation_id: () -> String
     end
   end
 end

@@ -51,11 +51,15 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCompatibilityAssessm
     satisfied_completion = execute(second).value!
 
     expect(satisfied_completion.data.status).to eq("satisfied")
-    expect(evidence_events(satisfied).map(&:type)).to eq([
+    satisfied_events = evidence_events(satisfied)
+    expect(satisfied_events.map(&:type)).to eq([
       "VerificationEvidenceSubmitted",
       "VerificationEvidenceSubmitted",
       "VerificationObligationSatisfied"
     ])
+    root_outputs = satisfied_events.last(2) + command_events(second.fetch(:command_id))
+    expect(root_outputs.map(&:correlation_id).uniq.length).to eq(1)
+    expect(root_outputs.map(&:causation_id).uniq).to eq([ nil ])
 
     failed, failed_claim = claimed_obligation(
       "evidence-failed",

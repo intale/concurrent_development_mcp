@@ -1,0 +1,10 @@
+module Coordinator
+  module Read
+    class VerificationObligationProgressV1 < Shared::Value
+      def required_evidence_kinds: () -> Array[String]
+      def passed_evidence_kinds: () -> Array[String]
+      def missing_evidence_kinds: () -> Array[String]
+      def evidence_count: () -> Integer
+    end
+  end
+end

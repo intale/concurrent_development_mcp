@@ -466,7 +466,7 @@ module Coordinator
             },
             kind: nullable_enum([ "candidate_compatibility" ]),
             enforcement: nullable_enum(%w[verification_gate merge_gate]),
-            status: nullable_enum([ "open" ]),
+            status: nullable_enum(Types::VERIFICATION_OBLIGATION_STATUSES),
             claimant_id: nullable_identifier,
             claim_state: nullable_enum(Types::VERIFICATION_OBLIGATION_CLAIM_STATES),
             after_global_position: {

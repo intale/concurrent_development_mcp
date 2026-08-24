@@ -115,6 +115,56 @@ RSpec.describe Coordinator::Read::Queries::VerificationObligationsList,
     expect(active_at_expiry.items).to be_empty
   end
 
+  it "serves an available open view during terminal lag and converges under an explicit status filter" do
+    created = CandidateObligationScenario.create_obligation(
+      prefix: "obligation-query-convergence",
+      required_evidence: [ "combined_tests" ]
+    )
+    obligation_id = created.fetch(:result).obligation_id
+    projector.call(created.fetch(:event))
+    claim = CandidateObligationScenario.claim_obligation(
+      created:,
+      prefix: "obligation-query-convergence"
+    )
+    claim_event = verification_history(obligation_id).find do |event|
+      event.type == "VerificationObligationClaimed"
+    end
+    projector.call(claim_event)
+    receipt = CandidateObligationScenario.submit_compatibility_assessment(
+      created:,
+      claim:,
+      command_id: "cmd-query-converged-tests"
+    )
+
+    lagging_open = query.call(obligation_id:).value!.data.page
+    lagging_terminal = query.call(obligation_id:, status: "satisfied").value!.data.page
+    expect(lagging_open.items.sole).to have_attributes(status: "open", outcome: nil)
+    expect(lagging_open.items.sole.progress).to have_attributes(
+      evidence_count: 0,
+      passed_evidence_kinds: [],
+      missing_evidence_kinds: [ "combined_tests" ]
+    )
+    expect(lagging_terminal.items).to be_empty
+
+    verification_history(obligation_id)
+      .select { _1.type.in?(%w[VerificationEvidenceSubmitted VerificationObligationSatisfied]) }
+      .each { projector.call(_1) }
+
+    converged_open = query.call(obligation_id:).value!.data.page
+    converged = query.call(obligation_id:, status: "satisfied").value!.data.page
+    expect(converged_open.items).to be_empty
+    expect(converged.items.sole).to have_attributes(
+      status: "satisfied",
+      outcome: have_attributes(satisfied_at: receipt.submitted_at)
+    )
+    expect(converged.items.sole.progress).to have_attributes(
+      evidence_count: 1,
+      passed_evidence_kinds: [ "combined_tests" ],
+      missing_evidence_kinds: []
+    )
+    expect(converged.items.sole.evidence.global_position).to eq(created.fetch(:event).global_position)
+  end
+
   def claim_events(obligation_id)
     event_store.read(
       streams.verification_obligation(obligation_id),
@@ -124,5 +174,10 @@ RSpec.describe Coordinator::Read::Queries::VerificationObligationsList,
         direction: :asc
       )
     )
+  end
+
+
+  def verification_history(obligation_id)
+    CandidateObligationScenario.verification_history(obligation_id)
   end
 end

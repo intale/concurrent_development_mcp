@@ -1,0 +1,13 @@
+module Coordinator
+  module Read
+    class VerificationObligationFailedViewV1 < Shared::Value
+      def obligation_id: () -> String
+      def obligation_event: () -> Write::EventReference
+      def policy: () -> Write::CandidateObligations::ImpactPolicyEvidenceV1
+      def triggering_evidence: () -> Write::CompatibilityAssessments::EvidenceDecisionReferenceV1
+      def outcome_digest: () -> String
+      def failed_at: () -> String
+      def evidence: () -> VerificationObligationEvidenceV1
+    end
+  end
+end

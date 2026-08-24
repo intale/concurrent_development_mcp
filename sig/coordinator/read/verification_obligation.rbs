@@ -22,6 +22,20 @@ module Coordinator
       def event_global_position: () -> Integer
       def created_at_domain: () -> Time
       def created_at_store: () -> Time
+      def evidence_count: () -> Integer
+      def passed_evidence_kinds: () -> Array[String]
+      def missing_evidence_kinds: () -> Array[String]
+      def terminal_outcome: () -> Hash[String, untyped]?
+      def terminal_event: () -> Hash[String, untyped]?
+      def terminal_actor: () -> Hash[String, untyped]?
+      def terminal_markers: () -> Array[String]?
+      def terminal_metadata: () -> Hash[String, untyped]?
+      def terminal_causation_id: () -> String?
+      def terminal_correlation_id: () -> String?
+      def terminal_event_global_position: () -> Integer?
+      def terminal_stream_revision: () -> Integer?
+      def terminal_at_domain: () -> Time?
+      def terminal_created_at_store: () -> Time?
     end
   end
 end

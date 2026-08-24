@@ -53,8 +53,9 @@ module Coordinator
         Use candidate_impact_get with an explicit incoming or outgoing direction to inspect bounded, latest available
         potential relationships and its optional latest available Candidate-impact policy summary. Advisory warnings
         recommend external verification without creating a gate. For a gating summary, use
-        verification_obligations_list with at least one filter to inspect available open coordination requirements;
-        an empty page may reflect projection lag and is never merge authorization. Path and semantic matches are
+        verification_obligations_list with at least one filter to inspect latest available coordination requirements,
+        evidence progress, and attributed outcomes. It defaults to open; request satisfied or failed explicitly.
+        Empty or older content may reflect projection lag and is never merge authorization. Path and semantic matches are
         evidence, not incompatibility or merge authorization. Use verification_obligation_claim to acquire temporary
         exclusive coordination before performing an obligation externally. Persist its Task handle and, after
         completion, retain the returned claim ID and fencing token. A claim does not mean work started or succeeded.

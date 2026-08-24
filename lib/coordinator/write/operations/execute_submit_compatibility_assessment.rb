@@ -60,7 +60,8 @@ module Coordinator::Write
           assessment_input_digest: @assessment_input_digest.call(command),
           evidence_event_id: @id_generator.uuid_v7,
           terminal_event_id: @id_generator.uuid_v7,
-          completion_event_id: @id_generator.uuid_v7
+          completion_event_id: @id_generator.uuid_v7,
+          correlation_id: @id_generator.uuid_v7
         )
       end
 
@@ -105,7 +106,8 @@ module Coordinator::Write
           completion,
           command:,
           event_id: preparation.completion_event_id,
-          caused_by:
+          caused_by:,
+          correlation_id: root_correlation_id(preparation, caused_by)
         )
 
         Success(completion)
@@ -230,21 +232,27 @@ module Coordinator::Write
             event_id: event_ids.fetch(index),
             metadata: command_metadata(command),
             markers: event_markers(state, command, event),
-            caused_by:
+            caused_by:,
+            correlation_id: root_correlation_id(preparation, caused_by)
           )
         end
         @event_store.append(plan.writes.first.stream, physical)
       end
 
-      def persist_completion(completion, command:, event_id:, caused_by:)
+      def persist_completion(completion, command:, event_id:, caused_by:, correlation_id:)
         event = @event_factory.build!(
           event: completion,
           event_id:,
           metadata: command_metadata(command),
           markers: [ "command:#{command.command_id}" ],
-          caused_by:
+          caused_by:,
+          correlation_id:
         )
         @event_store.append(@stream_factory.command(command.command_id), [ event ])
+      end
+
+      def root_correlation_id(preparation, caused_by)
+        preparation.correlation_id unless caused_by
       end
 
       def event_markers(state, command, event)

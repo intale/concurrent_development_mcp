@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_080000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_24_083500) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -374,6 +374,33 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_080000) do
     t.index ["event_id"], name: "index_user_utterances_on_event_id", unique: true
   end
 
+  create_table "verification_obligation_evidence_items", primary_key: "evidence_id", id: :string, force: :cascade do |t|
+    t.jsonb "actor", null: false
+    t.string "assessment_input_digest", null: false
+    t.string "causation_id"
+    t.string "conclusion", null: false
+    t.string "correlation_id"
+    t.datetime "created_at", null: false
+    t.datetime "created_at_store", null: false
+    t.jsonb "event", null: false
+    t.bigint "event_global_position", null: false
+    t.string "event_id", null: false
+    t.string "evidence_kind", null: false
+    t.jsonb "markers", default: [], null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.string "obligation_id", null: false
+    t.datetime "produced_at_domain", null: false
+    t.string "result_digest", null: false
+    t.integer "stream_revision", null: false
+    t.jsonb "submission", null: false
+    t.datetime "submitted_at_domain", null: false
+    t.datetime "updated_at", null: false
+    t.index ["event_id"], name: "idx_verification_evidence_event", unique: true
+    t.index ["obligation_id", "assessment_input_digest"], name: "idx_verification_evidence_obligation_digest", unique: true
+    t.index ["obligation_id", "evidence_kind", "conclusion"], name: "idx_verification_evidence_progress"
+    t.index ["obligation_id", "stream_revision"], name: "idx_verification_evidence_obligation_revision", unique: true
+  end
+
   create_table "verification_obligations", primary_key: "obligation_id", id: :string, force: :cascade do |t|
     t.jsonb "actor", null: false
     t.string "causation_id"
@@ -400,10 +427,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_080000) do
     t.string "enforcement", null: false
     t.jsonb "event", null: false
     t.bigint "event_global_position", null: false
+    t.integer "evidence_count", default: 0, null: false
     t.string "kind", null: false
     t.jsonb "markers", default: [], null: false
     t.jsonb "metadata", default: {}, null: false
+    t.jsonb "missing_evidence_kinds", default: [], null: false
     t.jsonb "obligation", null: false
+    t.jsonb "passed_evidence_kinds", default: [], null: false
     t.string "source_candidate_id", null: false
     t.string "source_repository_id", null: false
     t.string "source_work_item_id", null: false
@@ -411,6 +441,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_080000) do
     t.string "target_candidate_id", null: false
     t.string "target_repository_id", null: false
     t.string "target_work_item_id", null: false
+    t.jsonb "terminal_actor"
+    t.datetime "terminal_at_domain"
+    t.string "terminal_causation_id"
+    t.string "terminal_correlation_id"
+    t.datetime "terminal_created_at_store"
+    t.jsonb "terminal_event"
+    t.bigint "terminal_event_global_position"
+    t.jsonb "terminal_markers"
+    t.jsonb "terminal_metadata"
+    t.jsonb "terminal_outcome"
+    t.integer "terminal_stream_revision"
     t.datetime "updated_at", null: false
     t.index ["change_set_id", "status", "event_global_position"], name: "idx_verification_obligations_change_set"
     t.index ["claim_expires_at_domain", "event_global_position"], name: "idx_verification_obligations_claim_expiry"

@@ -77,6 +77,20 @@ RSpec.describe Coordinator::Write::EventFactory do
     expect(event.caused_by).to equal(source)
   end
 
+  it "passes an explicit root correlation through the pg_eventstore event API" do
+    correlation_id = "018fd0f0-0000-7000-8000-000000000002"
+    event = factory.build!(
+      event: domain_event,
+      event_id:,
+      metadata:,
+      markers: [],
+      correlation_id:
+    )
+
+    expect(event.correlation_id).to eq(correlation_id)
+    expect(event.metadata).not_to have_key("correlation_id")
+  end
+
   it "rejects an invalid event ID value" do
     expect do
       factory.build!(event: domain_event, event_id: "not-a-uuid", metadata:, markers: [])

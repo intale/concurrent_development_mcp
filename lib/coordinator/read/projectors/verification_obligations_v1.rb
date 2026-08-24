@@ -43,6 +43,11 @@ module Coordinator::Read
           @obligations.store_creation(event:, obligation: payload)
         when Coordinator::Write::Events::VerificationObligationClaimedV1
           @obligations.store_claim(event:, claim: payload)
+        when Coordinator::Write::Events::VerificationEvidenceSubmittedV1
+          @obligations.store_evidence(event:, submission: payload)
+        when Coordinator::Write::Events::VerificationObligationSatisfiedV1,
+             Coordinator::Write::Events::VerificationObligationFailedV1
+          @obligations.store_outcome(event:, outcome: payload)
         end
       end
 

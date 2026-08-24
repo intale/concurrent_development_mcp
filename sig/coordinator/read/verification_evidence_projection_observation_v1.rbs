@@ -1,0 +1,8 @@
+module Coordinator
+  module Read
+    class VerificationEvidenceProjectionObservationV1 < Shared::Value
+      def submission: () -> Write::Events::VerificationEvidenceSubmittedV1
+      def event: () -> Write::EventReference
+    end
+  end
+end

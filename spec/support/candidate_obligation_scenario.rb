@@ -274,6 +274,42 @@ module CandidateObligationScenario
     }).data
   end
 
+  def submit_compatibility_assessment(
+    created:,
+    claim:,
+    command_id:,
+    evidence_kind: "combined_tests",
+    conclusion: "passed",
+    agent_id: claim.claimant_id,
+    run_id: "run-1",
+    result_salt: command_id
+  )
+    execute(
+      Coordinator::Write::Operations::ExecuteSubmitCompatibilityAssessment,
+      compatibility_assessment_arguments(
+        created:,
+        claim:,
+        command_id:,
+        evidence_kind:,
+        conclusion:,
+        agent_id:,
+        run_id:,
+        result_salt:
+      )
+    ).data
+  end
+
+  def verification_history(obligation_id)
+    event_store.read(
+      streams.verification_obligation(obligation_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: Coordinator::Read::Contracts::VerificationObligationSourceEvent::EVENT_TYPES,
+        maximum_count: 40,
+        direction: :asc
+      )
+    )
+  end
+
   def compatibility_assessment_arguments(
     created:,
     claim:,

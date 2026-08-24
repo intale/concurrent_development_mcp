@@ -46,11 +46,7 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1,
     )
 
     original = first.to_h
-    Coordinator::Read::VerificationObligation.delete_all
-    Coordinator::Read::ProcessedProjectionEvent.where(
-      projection_name: "verification_obligations",
-      projection_version: 1
-    ).delete_all
+    ReadModelTestSafety.clean!
     projector.call(event)
 
     expect(page(change_set_id: payload.change_set_id).items.sole.to_h).to eq(original)
@@ -145,9 +141,156 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1,
     expect(projected.claim).to have_attributes(claimant_id: "agent-blue", fencing_token: 1)
   end
 
+  it "projects ordered normalized evidence, progress, satisfaction, and a complete rebuild" do
+    created = CandidateObligationScenario.create_obligation(prefix: "obligation-evidence-projection")
+    obligation_id = created.fetch(:result).obligation_id
+    projector.call(created.fetch(:event))
+    claim_data = CandidateObligationScenario.claim_obligation(
+      created:,
+      prefix: "obligation-evidence-projection"
+    )
+    claim_event = history(obligation_id).find { _1.type == "VerificationObligationClaimed" }
+    projector.call(claim_event)
+
+    first = CandidateObligationScenario.submit_compatibility_assessment(
+      created:,
+      claim: claim_data,
+      command_id: "cmd-project-combined-tests"
+    )
+    first_event = history(obligation_id).find do |event|
+      event.type == "VerificationEvidenceSubmitted" && event.data.fetch("evidence_id") == first.evidence_id
+    end
+    projector.call(first_event)
+    projector.call(first_event)
+
+    partial = page(
+      change_set_id: created.dig(:pair, :ids, :change_set_id),
+      observed_at: first.submitted_at
+    ).items.sole
+    expect(partial).to have_attributes(status: "open", outcome: nil)
+    expect(partial.progress).to have_attributes(
+      required_evidence_kinds: %w[combined_tests contract_compatibility_review],
+      passed_evidence_kinds: [ "combined_tests" ],
+      missing_evidence_kinds: [ "contract_compatibility_review" ],
+      evidence_count: 1
+    )
+    expect(partial.submitted_evidence.sole).to have_attributes(
+      evidence_id: first.evidence_id,
+      evidence_kind: "combined_tests",
+      assessment_input_digest: first.assessment_input_digest,
+      assessment: have_attributes(conclusion: "passed")
+    )
+    expect(partial.submitted_evidence.sole.evidence.event.event_id).to eq(first_event.id)
+    expect(first.evidence_id).not_to eq(first_event.id)
+
+    final = CandidateObligationScenario.submit_compatibility_assessment(
+      created:,
+      claim: claim_data,
+      command_id: "cmd-project-contract-review",
+      evidence_kind: "contract_compatibility_review"
+    )
+    final_events = history(obligation_id).select { _1.stream_revision > first_event.stream_revision }
+    outcome_payload = CandidateObligationScenario.load(
+      final_events.find { _1.type == "VerificationObligationSatisfied" }
+    )
+    final_events.each do |event|
+      projector.call(event)
+      projector.call(event)
+    end
+
+    satisfied = page(
+      change_set_id: created.dig(:pair, :ids, :change_set_id),
+      status: "satisfied",
+      observed_at: final.submitted_at
+    ).items.sole
+    expect(satisfied.evidence.global_position).to eq(created.fetch(:event).global_position)
+    expect(satisfied.progress).to have_attributes(
+      passed_evidence_kinds: %w[combined_tests contract_compatibility_review],
+      missing_evidence_kinds: [],
+      evidence_count: 2
+    )
+    expect(satisfied.submitted_evidence.map(&:evidence_kind)).to eq(
+      %w[combined_tests contract_compatibility_review]
+    )
+    expect(satisfied.outcome).to be_a(Coordinator::Read::VerificationObligationSatisfiedViewV1)
+    expect(satisfied.outcome).to have_attributes(
+      selected_evidence: outcome_payload.selected_evidence,
+      outcome_digest: outcome_payload.outcome_digest,
+      satisfied_at: outcome_payload.satisfied_at
+    )
+    expect(satisfied.outcome.evidence).to have_attributes(
+      event: final.outcome_event,
+      causation_id: final_events.last.causation_id,
+      correlation_id: final_events.last.correlation_id
+    )
+    expect(Coordinator::Read::VerificationObligationEvidenceItem.count).to eq(2)
+
+    original = satisfied.to_h
+    complete_history = history(obligation_id)
+    ReadModelTestSafety.clean!
+    complete_history.each { projector.call(_1) }
+
+    expect(
+      page(
+        change_set_id: created.dig(:pair, :ids, :change_set_id),
+        status: "satisfied",
+        observed_at: final.submitted_at
+      ).items.sole.to_h
+    ).to eq(original)
+    expect(Coordinator::Read::VerificationObligationEvidenceItem.count).to eq(2)
+  end
+
+  it "rolls back evidence and terminal facts until their projected predecessors arrive" do
+    created = CandidateObligationScenario.create_obligation(
+      prefix: "obligation-failure-order",
+      required_evidence: [ "combined_tests" ]
+    )
+    obligation_id = created.fetch(:result).obligation_id
+    claim_data = CandidateObligationScenario.claim_obligation(
+      created:,
+      prefix: "obligation-failure-order"
+    )
+    receipt = CandidateObligationScenario.submit_compatibility_assessment(
+      created:,
+      claim: claim_data,
+      command_id: "cmd-project-failed-tests",
+      conclusion: "failed"
+    )
+    events = history(obligation_id)
+    claim_event = events.find { _1.type == "VerificationObligationClaimed" }
+    evidence_event = events.find { _1.type == "VerificationEvidenceSubmitted" }
+    failure_event = events.find { _1.type == "VerificationObligationFailed" }
+
+    projector.call(created.fetch(:event))
+    expect { projector.call(evidence_event) }
+      .to raise_error(Coordinator::Read::InvalidProjectionSource, /VerificationObligationClaimed/)
+    expect(Coordinator::Read::ProcessedProjectionEvent.where(event_id: evidence_event.id)).not_to exist
+
+    projector.call(claim_event)
+    expect { projector.call(failure_event) }
+      .to raise_error(Coordinator::Read::InvalidProjectionSource, /projected evidence/)
+    expect(Coordinator::Read::ProcessedProjectionEvent.where(event_id: failure_event.id)).not_to exist
+
+    projector.call(evidence_event)
+    projector.call(failure_event)
+    failed = page(
+      change_set_id: created.dig(:pair, :ids, :change_set_id),
+      status: "failed",
+      observed_at: receipt.submitted_at
+    ).items.sole
+    expect(failed).to have_attributes(status: "failed")
+    expect(failed.progress).to have_attributes(
+      passed_evidence_kinds: [],
+      missing_evidence_kinds: [ "combined_tests" ],
+      evidence_count: 1
+    )
+    expect(failed.outcome).to be_a(Coordinator::Read::VerificationObligationFailedViewV1)
+    expect(failed.outcome.triggering_evidence).to eq(CandidateObligationScenario.load(failure_event).triggering_evidence)
+  end
+
   private
 
-  def page(change_set_id:, observed_at: "2026-08-24T07:00:00.000000Z")
+  def page(change_set_id:, status: "open", observed_at: "2026-08-24T07:00:00.000000Z")
     repository.page(
       Coordinator::Read::VerificationObligationListQueryV1.new(
         obligation_id: nil,
@@ -157,7 +300,7 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1,
         repository_id: nil,
         kind: nil,
         enforcement: nil,
-        status: "open",
+        status:,
         claimant_id: nil,
         claim_state: nil,
         after_global_position: nil,
@@ -188,5 +331,9 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1,
         direction: :asc
       )
     )
+  end
+
+  def history(obligation_id)
+    CandidateObligationScenario.verification_history(obligation_id)
   end
 end

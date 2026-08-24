@@ -9,5 +9,6 @@ module Coordinator::Write
     attribute :evidence_event_id, Types::UuidV7
     attribute :terminal_event_id, Types::UuidV7
     attribute :completion_event_id, Types::UuidV7
+    attribute :correlation_id, Types::UuidV7
   end
 end

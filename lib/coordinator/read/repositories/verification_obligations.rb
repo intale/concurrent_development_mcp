@@ -3,6 +3,14 @@
 module Coordinator::Read
   module Repositories
     class VerificationObligations
+      def initialize(
+        evidence_contract: Contracts::VerificationEvidenceProjection.new,
+        outcome_contract: Contracts::VerificationOutcomeProjection.new
+      )
+        @evidence_contract = evidence_contract
+        @outcome_contract = outcome_contract
+      end
+
       def store_creation(event:, obligation:)
         source = obligation.source_candidate
         target = obligation.target_candidate
@@ -27,7 +35,10 @@ module Coordinator::Read
           correlation_id: event.correlation_id,
           event_global_position: event.global_position,
           created_at_domain: obligation.created_at,
-          created_at_store: event.created_at
+          created_at_store: event.created_at,
+          evidence_count: 0,
+          passed_evidence_kinds: [],
+          missing_evidence_kinds: obligation.required_evidence
         )
       end
 
@@ -62,6 +73,81 @@ module Coordinator::Read
         record
       end
 
+      def store_evidence(event:, submission:)
+        record = find_obligation!(
+          submission.obligation_id,
+          "VerificationEvidenceSubmitted"
+        )
+        claim = projected_claim!(record)
+        reference = event_reference(event)
+        validation = @evidence_contract.call(
+          obligation: projected_obligation(record),
+          obligation_event: creation_reference(record),
+          claim:,
+          claim_event: claim_reference(record),
+          submission:,
+          submission_event: reference,
+          actor_id: event.metadata.fetch("actor_id"),
+          current_status: record.status,
+          evidence_count: record.evidence_count
+        )
+        raise InvalidProjectionSource, validation.errors.to_h.inspect if validation.failure?
+
+        assessment = submission.assessment
+        Coordinator::Read::VerificationObligationEvidenceItem.create!(
+          evidence_id: submission.evidence_id,
+          obligation_id: submission.obligation_id,
+          evidence_kind: submission.evidence_kind,
+          conclusion: assessment.conclusion,
+          assessment_input_digest: submission.assessment_input_digest,
+          result_digest: assessment.result_digest,
+          submission: submission.to_h,
+          event_id: event.id,
+          event: reference.to_h,
+          actor: actor(event).to_h,
+          markers: event.markers,
+          metadata: event.metadata,
+          causation_id: event.causation_id,
+          correlation_id: event.correlation_id,
+          event_global_position: event.global_position,
+          stream_revision: event.stream_revision,
+          produced_at_domain: assessment.produced_at,
+          submitted_at_domain: submission.submitted_at,
+          created_at_store: event.created_at
+        )
+        update_progress(record)
+      end
+
+      def store_outcome(event:, outcome:)
+        record = find_obligation!(outcome.obligation_id, event.type)
+        observations = projected_evidence(record.obligation_id)
+        validation = @outcome_contract.call(
+          obligation: projected_obligation(record),
+          obligation_event: creation_reference(record),
+          evidence: observations,
+          outcome:,
+          outcome_event: event_reference(event),
+          current_status: record.status
+        )
+        raise InvalidProjectionSource, validation.errors.to_h.inspect if validation.failure?
+
+        record.update!(
+          status: terminal_status(outcome),
+          terminal_outcome: outcome.to_h,
+          terminal_event: event_reference(event).to_h,
+          terminal_actor: actor(event).to_h,
+          terminal_markers: event.markers,
+          terminal_metadata: event.metadata,
+          terminal_causation_id: event.causation_id,
+          terminal_correlation_id: event.correlation_id,
+          terminal_event_global_position: event.global_position,
+          terminal_stream_revision: event.stream_revision,
+          terminal_at_domain: terminal_at(outcome),
+          terminal_created_at_store: event.created_at
+        )
+        record
+      end
+
       def page(query)
         observed_at = Time.iso8601(query.observed_at)
         relation = filtered(Coordinator::Read::VerificationObligation.all, query, observed_at:)
@@ -70,7 +156,15 @@ module Coordinator::Read
         end
         rows = relation.order(:event_global_position).page(1).per(query.limit + 1).to_a
         has_more = rows.length > query.limit
-        items = rows.first(query.limit).map { build(_1, observed_at:) }
+        selected = rows.first(query.limit)
+        evidence_by_obligation = evidence_by_obligation(selected.map(&:obligation_id))
+        items = selected.map do |record|
+          build(
+            record,
+            observed_at:,
+            evidence_records: evidence_by_obligation.fetch(record.obligation_id, [])
+          )
+        end
 
         VerificationObligationPageV1.new(
           items:,
@@ -81,6 +175,86 @@ module Coordinator::Read
       end
 
       private
+
+      def find_obligation!(obligation_id, event_type)
+        record = Coordinator::Read::VerificationObligation.find_by(obligation_id:)
+        return record if record
+
+        raise InvalidProjectionSource,
+              "#{event_type} cannot precede VerificationObligationCreated"
+      end
+
+      def projected_obligation(record)
+        Coordinator::Write::Events::VerificationObligationCreatedV1.new(symbolize(record.obligation))
+      end
+
+      def projected_claim!(record)
+        return Coordinator::Write::Events::VerificationObligationClaimedV1.new(symbolize(record.claim)) if record.claim
+
+        raise InvalidProjectionSource,
+              "VerificationEvidenceSubmitted cannot precede VerificationObligationClaimed"
+      end
+
+      def creation_reference(record)
+        Coordinator::Write::EventReference.new(symbolize(record.event))
+      end
+
+      def claim_reference(record)
+        Coordinator::Write::EventReference.new(symbolize(record.claim_event))
+      end
+
+      def update_progress(record)
+        relation = Coordinator::Read::VerificationObligationEvidenceItem.where(
+          obligation_id: record.obligation_id
+        )
+        required = projected_obligation(record).required_evidence
+        passed_set = relation.where(conclusion: "passed").distinct.pluck(:evidence_kind)
+        passed = required.select { passed_set.include?(_1) }
+        record.update!(
+          evidence_count: relation.count,
+          passed_evidence_kinds: passed,
+          missing_evidence_kinds: required - passed
+        )
+        record
+      end
+
+      def projected_evidence(obligation_id)
+        Coordinator::Read::VerificationObligationEvidenceItem
+          .where(obligation_id:)
+          .order(:stream_revision)
+          .map do |record|
+            VerificationEvidenceProjectionObservationV1.new(
+              submission: projected_submission(record),
+              event: Coordinator::Write::EventReference.new(symbolize(record.event))
+            )
+          end
+      end
+
+      def projected_submission(record)
+        Coordinator::Write::Events::VerificationEvidenceSubmittedV1.new(symbolize(record.submission))
+      end
+
+      def terminal_status(outcome)
+        case outcome
+        when Coordinator::Write::Events::VerificationObligationSatisfiedV1 then "satisfied"
+        when Coordinator::Write::Events::VerificationObligationFailedV1 then "failed"
+        end
+      end
+
+      def terminal_at(outcome)
+        case outcome
+        when Coordinator::Write::Events::VerificationObligationSatisfiedV1 then outcome.satisfied_at
+        when Coordinator::Write::Events::VerificationObligationFailedV1 then outcome.failed_at
+        end
+      end
+
+      def evidence_by_obligation(obligation_ids)
+        Coordinator::Read::VerificationObligationEvidenceItem
+          .where(obligation_id: obligation_ids)
+          .order(:obligation_id, :stream_revision)
+          .to_a
+          .group_by(&:obligation_id)
+      end
 
       def filtered(relation, query, observed_at:)
         relation = relation.where(obligation_id: query.obligation_id) if query.obligation_id
@@ -115,15 +289,69 @@ module Coordinator::Read
         )
       end
 
-      def build(record, observed_at:)
-        obligation = Coordinator::Write::Events::VerificationObligationCreatedV1.new(
-          symbolize(record.obligation)
-        )
+      def build(record, observed_at:, evidence_records:)
+        obligation = projected_obligation(record)
         VerificationObligationViewV1.new(
           **obligation.to_h,
+          status: record.status,
           evidence: creation_evidence(record),
           claim_state: claim_state(record, observed_at:),
-          claim: claim_view(record)
+          claim: claim_view(record),
+          progress: VerificationObligationProgressV1.new(
+            required_evidence_kinds: obligation.required_evidence,
+            passed_evidence_kinds: record.passed_evidence_kinds,
+            missing_evidence_kinds: record.missing_evidence_kinds,
+            evidence_count: record.evidence_count
+          ),
+          submitted_evidence: evidence_records.map { evidence_view(_1) },
+          outcome: outcome_view(record)
+        )
+      end
+
+      def evidence_view(record)
+        submission = projected_submission(record)
+        VerificationEvidenceViewV1.new(
+          **submission.to_h,
+          evidence: evidence(
+            event: record.event,
+            actor: record.actor,
+            markers: record.markers,
+            metadata: record.metadata,
+            global_position: record.event_global_position,
+            occurred_at: record.submitted_at_domain,
+            persisted_at: record.created_at_store,
+            causation_id: record.causation_id,
+            correlation_id: record.correlation_id
+          )
+        )
+      end
+
+      def outcome_view(record)
+        return unless record.terminal_outcome
+
+        payload = symbolize(record.terminal_outcome)
+        evidence = terminal_evidence(record)
+        case record.status
+        when "satisfied"
+          outcome = Coordinator::Write::Events::VerificationObligationSatisfiedV1.new(payload)
+          VerificationObligationSatisfiedViewV1.new(**outcome.to_h, evidence:)
+        when "failed"
+          outcome = Coordinator::Write::Events::VerificationObligationFailedV1.new(payload)
+          VerificationObligationFailedViewV1.new(**outcome.to_h, evidence:)
+        end
+      end
+
+      def terminal_evidence(record)
+        evidence(
+          event: record.terminal_event,
+          actor: record.terminal_actor,
+          markers: record.terminal_markers,
+          metadata: record.terminal_metadata,
+          global_position: record.terminal_event_global_position,
+          occurred_at: record.terminal_at_domain,
+          persisted_at: record.terminal_created_at_store,
+          causation_id: record.terminal_causation_id,
+          correlation_id: record.terminal_correlation_id
         )
       end
 

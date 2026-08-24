@@ -3,6 +3,7 @@
 module Coordinator::Read
   class VerificationObligationViewV1 < Value
     Reason = Coordinator::Write::CandidateObligations::ImpactReasonV1
+    Outcome = VerificationObligationSatisfiedViewV1 | VerificationObligationFailedViewV1
 
     attribute :obligation_id, Types::Identifier
     attribute :kind, Types::VerificationObligationKind
@@ -20,5 +21,9 @@ module Coordinator::Read
     attribute :evidence, VerificationObligationEvidenceV1
     attribute :claim_state, Types::VerificationObligationClaimState
     attribute :claim, VerificationObligationClaimViewV1.optional
+    attribute :progress, VerificationObligationProgressV1
+    attribute :submitted_evidence, Types::Array.of(VerificationEvidenceViewV1)
+      .constrained(max_size: Types::VERIFICATION_EVIDENCE_MAXIMUM_COUNT)
+    attribute :outcome, Outcome.optional
   end
 end
