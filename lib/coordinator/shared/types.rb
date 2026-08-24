@@ -232,6 +232,7 @@ module Coordinator::Shared
     ].freeze
     VERIFICATION_OBLIGATION_KINDS = %w[candidate_compatibility].freeze
     VERIFICATION_OBLIGATION_STATUSES = %w[open].freeze
+    VERIFICATION_OBLIGATION_CLAIM_STATES = %w[unclaimed active expired].freeze
     CANDIDATE_OBLIGATION_POLICY_STATUSES = %w[
       stale
       non_gating
@@ -314,6 +315,7 @@ module Coordinator::Shared
       agent_choice_record
       candidate_submit
       candidate_impact_surface_submit
+      verification_obligation_claim
     ].freeze
 
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)
@@ -417,6 +419,7 @@ module Coordinator::Shared
     CandidateImpactPairScanMarkers = Array.of(Marker).constrained(max_size: 32)
     VerificationObligationKind = String.enum(*VERIFICATION_OBLIGATION_KINDS)
     VerificationObligationStatus = String.enum(*VERIFICATION_OBLIGATION_STATUSES)
+    VerificationObligationClaimState = String.enum(*VERIFICATION_OBLIGATION_CLAIM_STATES)
     CandidateObligationPolicyStatus = String.enum(*CANDIDATE_OBLIGATION_POLICY_STATUSES)
     CandidateObligationDecisionOutcome = String.enum(*CANDIDATE_OBLIGATION_DECISION_OUTCOMES)
     CandidateImpactReasonMatches = Array.of(String.constrained(min_size: 1, max_size: 1_024))

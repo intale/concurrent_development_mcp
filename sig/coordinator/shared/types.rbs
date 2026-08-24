@@ -176,6 +176,7 @@ module Coordinator
       CandidateImpactPairScanMarkers: untyped
       VerificationObligationKind: untyped
       VerificationObligationStatus: untyped
+      VerificationObligationClaimState: untyped
       CandidateObligationPolicyStatus: untyped
       CandidateObligationDecisionOutcome: untyped
       CandidateImpactReasonMatches: untyped

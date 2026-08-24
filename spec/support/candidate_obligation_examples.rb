@@ -173,6 +173,35 @@ module CandidateObligationExamples
     )
   end
 
+  def obligation
+    source = evidence(
+      candidate_id: "CAN-source",
+      registry_revision: 0,
+      path: "Gemfile.lock",
+      produces: [ "dependency:rubygems:rails" ]
+    )
+    target = evidence(
+      candidate_id: "CAN-target",
+      registry_revision: 1,
+      path: "app/services/checkout.rb",
+      observed_paths: [ "Gemfile.lock" ],
+      assumes: [ "dependency:rubygems:rails" ]
+    )
+    command = command(source:, target:)
+    state = Coordinator::Write::Domain::CandidateObligations::State.new(
+      source:,
+      target:,
+      policy: policy,
+      existing: nil
+    )
+
+    Coordinator::Write::Domain::CandidateObligations::Create.new.call(
+      state:,
+      command:,
+      created_at: TIMESTAMP
+    ).value!.obligation
+  end
+
   def decision_head
     @decision_head ||= begin
       event = reference(

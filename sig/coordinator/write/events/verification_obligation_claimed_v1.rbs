@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module Events
+      class VerificationObligationClaimedV1 < Base
+        def obligation_id: () -> String
+        def obligation_event: () -> EventReference
+        def claim_id: () -> String
+        def claimant_id: () -> String
+        def fencing_token: () -> Integer
+        def claimed_at: () -> String
+        def expires_at: () -> String
+      end
+    end
+  end
+end

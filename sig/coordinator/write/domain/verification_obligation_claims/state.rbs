@@ -1,0 +1,17 @@
+module Coordinator
+  module Write
+    module Domain
+      module VerificationObligationClaims
+        class State < Shared::Value
+          def self.initial: () -> State
+          def obligation: () -> Events::VerificationObligationCreatedV1?
+          def obligation_event: () -> EventReference?
+          def claim: () -> Events::VerificationObligationClaimedV1?
+          def absent?: () -> bool
+          def active_at?: (String timestamp) -> bool
+          def next_fencing_token: () -> Integer
+        end
+      end
+    end
+  end
+end

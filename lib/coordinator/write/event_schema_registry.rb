@@ -59,6 +59,7 @@ module Coordinator::Write
       [ "CandidateImpactPairScanProgressed", 1 ] => Events::CandidateImpactPairScanProgressedV1,
       [ "CandidateImpactPairScanCompleted", 1 ] => Events::CandidateImpactPairScanCompletedV1,
       [ "VerificationObligationCreated", 1 ] => Events::VerificationObligationCreatedV1,
+      [ "VerificationObligationClaimed", 1 ] => Events::VerificationObligationClaimedV1,
       [ "CandidateHeadRegistered", 1 ] => Events::CandidateHeadRegisteredV1,
       [ "CandidateAttachedToAttempt", 1 ] => Events::CandidateAttachedToAttemptV1,
       [ "CoordinationTaskSubmitted", 1 ] => Events::CoordinationTaskSubmittedV1,

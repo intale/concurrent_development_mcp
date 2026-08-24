@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Commands
+      class ClaimVerificationObligation < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def obligation_id: () -> String
+        def claim_duration_seconds: () -> Integer
+      end
+    end
+  end
+end
