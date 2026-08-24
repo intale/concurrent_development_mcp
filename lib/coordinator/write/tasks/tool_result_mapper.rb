@@ -25,7 +25,9 @@ module Coordinator::Write
         lease_not_active: "conflict",
         candidate_impact_identity_mismatch: "conflict",
         candidate_impact_source_evidence_mismatch: "conflict",
-        candidate_impact_surface_already_recorded: "conflict"
+        candidate_impact_surface_already_recorded: "conflict",
+        verification_obligation_already_claimed: "conflict",
+        verification_obligation_not_found: "not_found"
       }.freeze
 
       def call(result, command_id:)

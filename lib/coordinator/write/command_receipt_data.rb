@@ -187,6 +187,16 @@ module Coordinator::Write
       attribute :derived_at, Types::Timestamp
     end
 
+    class VerificationObligationClaim < Value
+      attribute :obligation_id, Types::Identifier
+      attribute :claim_id, Types::UuidV7
+      attribute :claimant_id, Types::Identifier
+      attribute :fencing_token, Types::FencingToken
+      attribute :claimed_at, Types::Timestamp
+      attribute :expires_at, Types::Timestamp
+      attribute :claim_event, EventReference
+    end
+
     Type = ChangeSet |
            WorkItem |
            Dependency |
@@ -203,6 +213,7 @@ module Coordinator::Write
            DecisionCorrection |
            AgentChoice |
            CandidateSubmission |
-           CandidateImpactSurface
+           CandidateImpactSurface |
+           VerificationObligationClaim
   end
 end

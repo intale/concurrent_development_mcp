@@ -476,6 +476,16 @@ module Coordinator
         ).merge(anyOf: filter_keys.map { { required: [ _1 ] } })
       end
 
+      def verification_obligation_claim
+        object_schema(
+          properties: common_mutation_properties.merge(
+            obligation_id: identifier,
+            claim_duration_seconds: { type: "integer", minimum: 30, maximum: 3_600 }
+          ),
+          required: %w[command_id actor obligation_id claim_duration_seconds]
+        )
+      end
+
       def candidate_impact_surface_submit
         object_schema(
           properties: common_mutation_properties.merge(

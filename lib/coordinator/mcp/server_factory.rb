@@ -55,7 +55,9 @@ module Coordinator
         recommend external verification without creating a gate. For a gating summary, use
         verification_obligations_list with at least one filter to inspect available open coordination requirements;
         an empty page may reflect projection lag and is never merge authorization. Path and semantic matches are
-        evidence, not incompatibility or merge authorization.
+        evidence, not incompatibility or merge authorization. Use verification_obligation_claim to acquire temporary
+        exclusive coordination before performing an obligation externally. Persist its Task handle and, after
+        completion, retain the returned claim ID and fencing token. A claim does not mean work started or succeeded.
         The coordinator records attributed evidence and does not execute Git, CI, or agent work.
       TEXT
 

@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Operations
+      class PrepareClaimVerificationObligation
+        def initialize: (?contract: Contracts::ClaimVerificationObligation) -> void
+        def call: (command_input input) -> Dry::Monads::Result
+      end
+    end
+  end
+end

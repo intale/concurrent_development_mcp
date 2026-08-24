@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Tasks
       module DomainErrorV1
-        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError | InterpretationNotAcceptedError | DecisionAlreadyExistsError | InterpretationAlreadyActivatedError | DecisionDefinitionNotActivatableError | DecisionSlotOccupiedError | DecisionPartitionLimitReachedError | DecisionPartitionCapacityReachedError | DecisionPartitionStateInvalidError | DecisionNotFoundError | DecisionNotActiveError | InterpretationNotACorrectionError | DecisionDefinitionNotCorrectableError | DecisionRevisionChangedError | DecisionSlotStateInvalidError | AgentChoiceAlreadyExistsError | StaleDecisionContextError | DecisionContextMismatchError | DecisionContextConflictError | DecisionContextLimitReachedError | UnsupportedDecisionContextError | AgentChoiceBlockedByDecisionError | AgentChoiceConfirmationRequiredError | AgentChoicePartitionSnapshotInvalidError | AgentChoiceDecisionHeadInvalidError | AgentChoiceUnresolvedHeadsError | CandidateAlreadyExistsError | CandidateHeadAlreadyRegisteredError | CandidateLeaseObservationsMismatchError | CandidateLeaseNotActiveScopeError | CandidateLeaseNotActiveError | CandidateUnauthorizedResourcesError | CandidateManifestBaseMismatchError | CandidateNotFoundError | CandidateImpactIdentityMismatchError | CandidateImpactSourceEvidenceMismatchError | CandidateImpactSurfaceAlreadyRecordedError
+        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | WriteSetLimitError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError | InterpretationNotAcceptedError | DecisionAlreadyExistsError | InterpretationAlreadyActivatedError | DecisionDefinitionNotActivatableError | DecisionSlotOccupiedError | DecisionPartitionLimitReachedError | DecisionPartitionCapacityReachedError | DecisionPartitionStateInvalidError | DecisionNotFoundError | DecisionNotActiveError | InterpretationNotACorrectionError | DecisionDefinitionNotCorrectableError | DecisionRevisionChangedError | DecisionSlotStateInvalidError | AgentChoiceAlreadyExistsError | StaleDecisionContextError | DecisionContextMismatchError | DecisionContextConflictError | DecisionContextLimitReachedError | UnsupportedDecisionContextError | AgentChoiceBlockedByDecisionError | AgentChoiceConfirmationRequiredError | AgentChoicePartitionSnapshotInvalidError | AgentChoiceDecisionHeadInvalidError | AgentChoiceUnresolvedHeadsError | CandidateAlreadyExistsError | CandidateHeadAlreadyRegisteredError | CandidateLeaseObservationsMismatchError | CandidateLeaseNotActiveScopeError | CandidateLeaseNotActiveError | CandidateUnauthorizedResourcesError | CandidateManifestBaseMismatchError | CandidateNotFoundError | CandidateImpactIdentityMismatchError | CandidateImpactSourceEvidenceMismatchError | CandidateImpactSurfaceAlreadyRecordedError | VerificationObligationNotFoundError | VerificationObligationAlreadyClaimedError
 
         class ChangeSetDetails < Shared::Value
           def change_set_id: () -> String
@@ -332,6 +332,17 @@ module Coordinator
           def submitted_manifest_digest: () -> String
           def expected_build_context_digest: () -> String?
           def submitted_build_context_digest: () -> String?
+        end
+
+        class VerificationObligationDetails < Shared::Value
+          def obligation_id: () -> String
+        end
+
+        class VerificationObligationActiveClaimDetails < VerificationObligationDetails
+          def claim_id: () -> String
+          def claimant_id: () -> String
+          def fencing_token: () -> Integer
+          def expires_at: () -> String
         end
 
         class ChangeSetError < Shared::Value
@@ -707,6 +718,18 @@ module Coordinator
           def code: () -> String
           def message: () -> String
           def details: () -> CandidateExistingDetails
+        end
+
+        class VerificationObligationNotFoundError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> VerificationObligationDetails
+        end
+
+        class VerificationObligationAlreadyClaimedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> VerificationObligationActiveClaimDetails
         end
       end
     end

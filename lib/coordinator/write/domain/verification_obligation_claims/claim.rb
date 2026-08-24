@@ -12,7 +12,8 @@ module Coordinator::Write
 
         def call(state:, command:, claim_id:, claimed_at:)
           return not_found(command) if state.absent? || state.obligation_event.nil?
-          return already_claimed(state, command) if state.active_at?(claimed_at)
+          active_claim = state.active_claim_at(claimed_at)
+          return already_claimed(active_claim, command) if active_claim
 
           expires_at = (Time.iso8601(claimed_at) + command.claim_duration_seconds).utc.iso8601(6)
           event = Events::VerificationObligationClaimedV1.new(
@@ -49,8 +50,7 @@ module Coordinator::Write
           )
         end
 
-        def already_claimed(state, command)
-          claim = state.claim
+        def already_claimed(claim, command)
           Failure(
             OutcomeError.new(
               code: :verification_obligation_already_claimed,

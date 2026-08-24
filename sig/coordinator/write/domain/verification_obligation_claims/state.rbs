@@ -9,7 +9,9 @@ module Coordinator
           def claim: () -> Events::VerificationObligationClaimedV1?
           def absent?: () -> bool
           def active_at?: (String timestamp) -> bool
+          def active_claim_at: (String timestamp) -> Events::VerificationObligationClaimedV1?
           def next_fencing_token: () -> Integer
+          def scope_markers: () -> Array[String]
         end
       end
     end

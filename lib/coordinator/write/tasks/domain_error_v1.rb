@@ -337,6 +337,17 @@ module Coordinator::Write
         attribute :submitted_build_context_digest, Types::Sha256Digest.optional
       end
 
+      class VerificationObligationDetails < Value
+        attribute :obligation_id, Types::Identifier
+      end
+
+      class VerificationObligationActiveClaimDetails < VerificationObligationDetails
+        attribute :claim_id, Types::UuidV7
+        attribute :claimant_id, Types::Identifier
+        attribute :fencing_token, Types::FencingToken
+        attribute :expires_at, Types::Timestamp
+      end
+
       class ChangeSetError < Value
         attribute :code, Types::String.enum(
           "change_set_already_exists",
@@ -744,6 +755,18 @@ module Coordinator::Write
         attribute :details, CandidateExistingDetails
       end
 
+      class VerificationObligationNotFoundError < Value
+        attribute :code, Types::String.enum("verification_obligation_not_found")
+        attribute :message, Types::String
+        attribute :details, VerificationObligationDetails
+      end
+
+      class VerificationObligationAlreadyClaimedError < Value
+        attribute :code, Types::String.enum("verification_obligation_already_claimed")
+        attribute :message, Types::String
+        attribute :details, VerificationObligationActiveClaimDetails
+      end
+
       Type = ChangeSetError |
              ActivationDependencyError |
              WorkItemError |
@@ -805,7 +828,9 @@ module Coordinator::Write
              CandidateNotFoundError |
              CandidateImpactIdentityMismatchError |
              CandidateImpactSourceEvidenceMismatchError |
-             CandidateImpactSurfaceAlreadyRecordedError
+             CandidateImpactSurfaceAlreadyRecordedError |
+             VerificationObligationNotFoundError |
+             VerificationObligationAlreadyClaimedError
     end
   end
 end

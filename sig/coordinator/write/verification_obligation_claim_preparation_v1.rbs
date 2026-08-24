@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    class VerificationObligationClaimPreparationV1 < Shared::Value
+      def claim_id: () -> String
+      def claimed_at: () -> String
+      def input_digest: () -> String
+      def claim_event_id: () -> String
+      def completion_event_id: () -> String
+    end
+  end
+end

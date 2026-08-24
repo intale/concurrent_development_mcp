@@ -32,6 +32,10 @@ module Coordinator::Write
       attribute :candidate_id, Types::Identifier
     end
 
+    class VerificationObligationArguments < Value
+      attribute :obligation_id, Types::Identifier
+    end
+
     class DecisionResolutionArguments < Value
       attribute :topic_id, Types::AgentChoiceType
       attribute :context, DecisionContexts::QueryContextV1
@@ -44,6 +48,7 @@ module Coordinator::Write
                 DecisionArguments |
                 AgentChoiceArguments |
                 CandidateArguments |
+                VerificationObligationArguments |
                 DecisionResolutionArguments
 
     attribute :tool, Types::Identifier

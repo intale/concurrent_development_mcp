@@ -171,6 +171,11 @@ module Coordinator::Write
       direction: :asc
     )
 
+    VERIFICATION_OBLIGATION_FOR_CLAIM = GroupedEventReadCriteria.new(
+      event_types: [ "VerificationObligationCreated", "VerificationObligationClaimed" ],
+      direction: :desc
+    )
+
     CANDIDATE_IMPACT_REGISTRY_LATEST = GroupedEventReadCriteria.new(
       event_types: [ "CandidateImpactSurfaceRegistered" ],
       direction: :desc

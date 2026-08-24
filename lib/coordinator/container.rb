@@ -107,6 +107,10 @@ module Coordinator
       Write::Operations::PrepareSubmitCandidateImpactSurface.new
     end
 
+    register("operations.prepare_claim_verification_obligation", memoize: true) do
+      Write::Operations::PrepareClaimVerificationObligation.new
+    end
+
     register("domain.change_sets.create", memoize: true) do
       Write::Domain::ChangeSets::Create.new(stream_factory: self["stream_factory"])
     end
@@ -149,6 +153,12 @@ module Coordinator
 
     register("domain.resource_leases.expire", memoize: true) do
       Write::Domain::ResourceLeases::Expire.new(stream_factory: self["stream_factory"])
+    end
+
+    register("domain.verification_obligation_claims.claim", memoize: true) do
+      Write::Domain::VerificationObligationClaims::Claim.new(
+        stream_factory: self["stream_factory"]
+      )
     end
 
     register("domain.guidance.record", memoize: true) do
@@ -815,6 +825,21 @@ module Coordinator
       )
     end
 
+    register("operations.execute_claim_verification_obligation") do
+      Write::Operations::ExecuteClaimVerificationObligation.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_claim_verification_obligation"],
+        decider: self["domain.verification_obligation_claims.claim"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
     register("operations.execute_start_agent_choice_impact_scan", memoize: true) do
       Write::Operations::ExecuteStartAgentChoiceImpactScan.new(
         event_store: self["event_store"],
@@ -923,7 +948,9 @@ module Coordinator
         record_agent_choice: self["operations.execute_record_agent_choice"],
         submit_candidate: self["operations.execute_submit_candidate"],
         submit_candidate_impact_surface:
-          self["operations.execute_submit_candidate_impact_surface"]
+          self["operations.execute_submit_candidate_impact_surface"],
+        claim_verification_obligation:
+          self["operations.execute_claim_verification_obligation"]
       )
     end
 
@@ -1063,6 +1090,13 @@ module Coordinator
     register("operations.submit_candidate_impact_surface_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_submit_candidate_impact_surface"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_claim_verification_obligation_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_claim_verification_obligation"],
         submitter: self["operations.submit_coordination_task"]
       )
     end

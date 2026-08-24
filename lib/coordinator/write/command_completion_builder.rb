@@ -490,6 +490,34 @@ module Coordinator::Write
       )
     end
 
+    def verification_obligation_claim(command:, claim:, input_digest:, persisted_events:, completed_at:)
+      build_completion(
+        command:,
+        tool_name: "verification_obligation_claim",
+        summary: "Verification obligation claimed for temporary exclusive coordination.",
+        data: CommandReceiptData::VerificationObligationClaim.new(
+          obligation_id: command.obligation_id,
+          claim_id: claim.claim_id,
+          claimant_id: claim.claimant_id,
+          fencing_token: claim.fencing_token,
+          claimed_at: claim.claimed_at,
+          expires_at: claim.expires_at,
+          claim_event: event_reference(persisted_events.fetch(0))
+        ),
+        next_actions: [
+          NextAction.new(
+            tool: "verification_obligations_list",
+            arguments: NextAction::VerificationObligationArguments.new(
+              obligation_id: command.obligation_id
+            )
+          )
+        ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
 
     def build_completion(command:, tool_name:, summary:, data:, next_actions:, input_digest:, persisted_events:, completed_at:)

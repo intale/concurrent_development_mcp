@@ -29,6 +29,7 @@ module Coordinator::Write
       when Commands::RecordAgentChoice then agent_choice_record_document(command)
       when Commands::SubmitCandidate then candidate_submit_document(command)
       when Commands::SubmitCandidateImpactSurface then candidate_impact_surface_submit_document(command)
+      when Commands::ClaimVerificationObligation then verification_obligation_claim_document(command)
       when Commands::ExpireResourceLease then lease_expire_policy_document(command)
       else
         raise ArgumentError, "Unsupported coordination command: #{command.class.name}"
@@ -419,6 +420,23 @@ module Coordinator::Write
           manifest_digest: command.manifest_digest,
           build_context_digest: command.build_context_digest,
           surface: command.surface
+        )
+      )
+    end
+
+    def verification_obligation_claim(command)
+      @canonical_json.sha256(verification_obligation_claim_document(command).to_h)
+    end
+
+    def verification_obligation_claim_document(command)
+      CommandInputDocuments::ClaimVerificationObligationV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "verification_obligation_claim",
+        input: CommandInputDocuments::ClaimVerificationObligationInputV1.new(
+          actor: actor_document(command.actor),
+          obligation_id: command.obligation_id,
+          claim_duration_seconds: command.claim_duration_seconds
         )
       )
     end

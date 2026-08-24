@@ -35,7 +35,8 @@ module Coordinator
           Tools::DecisionCorrect,
           Tools::AgentChoiceRecord,
           Tools::CandidateSubmit,
-          Tools::CandidateImpactSurfaceSubmit
+          Tools::CandidateImpactSurfaceSubmit,
+          Tools::VerificationObligationClaim
         ].freeze
       end
     end

@@ -1,0 +1,24 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecuteClaimVerificationObligation
+        def initialize: (
+          event_store: _EventStore,
+          ?preparer: PrepareClaimVerificationObligation,
+          ?decider: Domain::VerificationObligationClaims::Claim,
+          ?input_digest: CommandInputDigest,
+          ?clock: Shared::SystemClock,
+          ?id_generator: Shared::IdGenerator,
+          ?event_factory: EventFactory,
+          ?schema_registry: EventSchemaRegistry,
+          ?stream_factory: StreamFactory,
+          ?completion_builder: CommandCompletionBuilder,
+          ?history_contract: Contracts::VerificationObligationClaimHistory,
+          ?event_plan_contract: Contracts::VerificationObligationClaimEventPlan
+        ) -> void
+        def call: (command_input input) -> Dry::Monads::Result
+        def call_command: (Commands::ClaimVerificationObligation command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
+      end
+    end
+  end
+end

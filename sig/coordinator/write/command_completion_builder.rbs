@@ -20,6 +20,7 @@ module Coordinator
       def agent_choice_record: (command: Commands::RecordAgentChoice, acceptance: Events::AgentChoiceAcceptedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
       def candidate_submit: (command: Commands::SubmitCandidate, submission: Events::CandidateSubmittedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
       def candidate_impact_surface_submit: (command: Commands::SubmitCandidateImpactSurface, surface: Events::CandidateImpactSurfaceDerivedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
+      def verification_obligation_claim: (command: Commands::ClaimVerificationObligation, claim: Events::VerificationObligationClaimedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
     end
   end
 end

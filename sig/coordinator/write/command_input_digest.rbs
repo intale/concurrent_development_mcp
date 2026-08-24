@@ -40,6 +40,8 @@ module Coordinator
       def candidate_submit_document: (Commands::SubmitCandidate command) -> CommandInputDocuments::SubmitCandidateV1
       def candidate_impact_surface_submit: (Commands::SubmitCandidateImpactSurface command) -> String
       def candidate_impact_surface_submit_document: (Commands::SubmitCandidateImpactSurface command) -> CommandInputDocuments::SubmitCandidateImpactSurfaceV1
+      def verification_obligation_claim: (Commands::ClaimVerificationObligation command) -> String
+      def verification_obligation_claim_document: (Commands::ClaimVerificationObligation command) -> CommandInputDocuments::ClaimVerificationObligationV1
     end
   end
 end

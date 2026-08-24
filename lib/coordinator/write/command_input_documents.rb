@@ -369,6 +369,17 @@ module Coordinator::Write
       attribute :input, SubmitCandidateImpactSurfaceInputV1
     end
 
+    class ClaimVerificationObligationInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :obligation_id, Types::Identifier
+      attribute :claim_duration_seconds, Types::LeaseDurationSeconds
+    end
+
+    class ClaimVerificationObligationV1 < BaseV1
+      attribute :tool_name, Types::String.enum("verification_obligation_claim")
+      attribute :input, ClaimVerificationObligationInputV1
+    end
+
     class ExpireResourceLeaseInputV1 < Value
       attribute :actor, ActorV1
       attribute :resource_key_hash, Types::Sha256Digest
@@ -399,7 +410,8 @@ module Coordinator::Write
            CorrectDecisionV1 |
            RecordAgentChoiceV1 |
            SubmitCandidateV1 |
-           SubmitCandidateImpactSurfaceV1
+           SubmitCandidateImpactSurfaceV1 |
+           ClaimVerificationObligationV1
 
     DigestType = Type | ExpireResourceLeaseV1
   end

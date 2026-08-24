@@ -22,7 +22,9 @@ module Coordinator::Write
         record_agent_choice: Operations::ExecuteRecordAgentChoice.new(event_store:),
         submit_candidate: Operations::ExecuteSubmitCandidate.new(event_store:),
         submit_candidate_impact_surface:
-          Operations::ExecuteSubmitCandidateImpactSurface.new(event_store:)
+          Operations::ExecuteSubmitCandidateImpactSurface.new(event_store:),
+        claim_verification_obligation:
+          Operations::ExecuteClaimVerificationObligation.new(event_store:)
       )
         @create_change_set = create_change_set
         @create_work_item = create_work_item
@@ -41,6 +43,7 @@ module Coordinator::Write
         @record_agent_choice = record_agent_choice
         @submit_candidate = submit_candidate
         @submit_candidate_impact_surface = submit_candidate_impact_surface
+        @claim_verification_obligation = claim_verification_obligation
       end
 
       def call(command, caused_by:)
@@ -79,6 +82,8 @@ module Coordinator::Write
           @submit_candidate.call_command(command, caused_by:)
         when Commands::SubmitCandidateImpactSurface
           @submit_candidate_impact_surface.call_command(command, caused_by:)
+        when Commands::ClaimVerificationObligation
+          @claim_verification_obligation.call_command(command, caused_by:)
         end
       end
     end

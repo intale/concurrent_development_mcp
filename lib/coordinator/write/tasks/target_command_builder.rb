@@ -39,6 +39,8 @@ module Coordinator::Write
           build_submit_candidate(document)
         when CommandInputDocuments::SubmitCandidateImpactSurfaceV1
           build_submit_candidate_impact_surface(document)
+        when CommandInputDocuments::ClaimVerificationObligationV1
+          build_claim_verification_obligation(document)
         end
       end
 
@@ -306,6 +308,16 @@ module Coordinator::Write
           manifest_digest: input.manifest_digest,
           build_context_digest: input.build_context_digest,
           surface: input.surface
+        )
+      end
+
+      def build_claim_verification_obligation(document)
+        input = document.input
+        Commands::ClaimVerificationObligation.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          obligation_id: input.obligation_id,
+          claim_duration_seconds: input.claim_duration_seconds
         )
       end
 

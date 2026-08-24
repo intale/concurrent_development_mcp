@@ -1,0 +1,6 @@
+module Coordinator
+  module Write
+    class InvalidVerificationObligationClaimEventPlan < StandardError
+    end
+  end
+end
