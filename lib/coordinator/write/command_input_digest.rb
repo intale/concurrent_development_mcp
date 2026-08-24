@@ -36,6 +36,7 @@ module Coordinator::Write
       when Commands::SubmitMergeSnapshotVerification then merge_verification_submit_document(command)
       when Commands::RequestMergeAuthorization then merge_authorization_request_document(command)
       when Commands::RecordMergeObservation then merge_observation_record_document(command)
+      when Commands::PrepareReleaseSet then release_set_prepare_document(command)
       when Commands::ExpireResourceLease then lease_expire_policy_document(command)
       else
         raise ArgumentError, "Unsupported coordination command: #{command.class.name}"
@@ -571,6 +572,23 @@ module Coordinator::Write
           observer: command.observer,
           run_id: command.run_id,
           observed_at: command.observed_at
+        )
+      )
+    end
+
+    def release_set_prepare(command)
+      @canonical_json.sha256(release_set_prepare_document(command).to_h)
+    end
+
+    def release_set_prepare_document(command)
+      CommandInputDocuments::PrepareReleaseSetV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "release_set_prepare",
+        input: CommandInputDocuments::PrepareReleaseSetInputV1.new(
+          actor: actor_document(command.actor),
+          release_set_id: command.release_set_id,
+          ordered_members: command.ordered_members
         )
       )
     end

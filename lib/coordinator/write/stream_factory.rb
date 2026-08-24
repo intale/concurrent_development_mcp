@@ -146,6 +146,14 @@ module Coordinator::Write
       )
     end
 
+    def release_set(release_set_id)
+      StreamReference.new(
+        context: "DevelopmentIntegration",
+        stream_name: "ReleaseSet",
+        stream_id: release_set_id
+      )
+    end
+
     def candidate_impact_registry(change_set_id)
       StreamReference.new(
         context: "DevelopmentIntegration",

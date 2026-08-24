@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_175000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_24_182500) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -407,6 +407,28 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_175000) do
     t.bigint "stream_revision", null: false
     t.index ["projection_name", "projection_version", "command_id"], name: "idx_processed_projection_events_command"
     t.index ["projection_name", "projection_version", "stream_context", "stream_name", "stream_id", "stream_revision"], name: "idx_processed_projection_events_identity", unique: true
+  end
+
+  create_table "release_sets", primary_key: "release_set_id", id: :string, force: :cascade do |t|
+    t.string "change_set_id", null: false
+    t.datetime "created_at", null: false
+    t.jsonb "ordered_members", null: false
+    t.string "preparation_policy_version", null: false
+    t.jsonb "prepared_actor", null: false
+    t.datetime "prepared_at_domain", null: false
+    t.datetime "prepared_at_store", null: false
+    t.string "prepared_causation_id"
+    t.string "prepared_correlation_id"
+    t.jsonb "prepared_event", null: false
+    t.bigint "prepared_global_position", null: false
+    t.jsonb "prepared_markers", default: [], null: false
+    t.jsonb "prepared_metadata", default: {}, null: false
+    t.string "release_digest", null: false
+    t.string "status", default: "prepared", null: false
+    t.datetime "updated_at", null: false
+    t.index ["change_set_id"], name: "index_release_sets_on_change_set_id"
+    t.index ["prepared_global_position"], name: "index_release_sets_on_prepared_global_position", unique: true
+    t.index ["status"], name: "index_release_sets_on_status"
   end
 
   create_table "user_utterances", primary_key: "message_id", id: :string, force: :cascade do |t|

@@ -277,6 +277,23 @@ module Coordinator::Write
       attribute :recorded_at, Types::Timestamp
     end
 
+    class ReleaseSetPreparation < Value
+      Member = ReleaseSets::MemberEvidenceV1
+
+      attribute :release_set_id, Types::Identifier
+      attribute :change_set_id, Types::Identifier
+      attribute :ordered_members,
+                Types::Array.of(Member)
+                  .constrained(
+                    min_size: Types::RELEASE_SET_MINIMUM_MEMBERS,
+                    max_size: Types::RELEASE_SET_MAXIMUM_MEMBERS
+                  )
+      attribute :release_digest, Types::Sha256Digest
+      attribute :policy_version, Types::ReleaseSetPreparationPolicyVersion
+      attribute :prepared_event, EventReference
+      attribute :prepared_at, Types::Timestamp
+    end
+
     Type = ChangeSet |
            WorkItem |
            Dependency |
@@ -300,6 +317,7 @@ module Coordinator::Write
            MergeSnapshotRegistration |
            MergeSnapshotVerification |
            MergeAuthorization |
-           MergeObservation
+           MergeObservation |
+           ReleaseSetPreparation
   end
 end

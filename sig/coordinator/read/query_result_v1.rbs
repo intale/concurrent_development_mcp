@@ -71,7 +71,11 @@ module Coordinator
         def snapshot: () -> MergeSnapshotViewV1
       end
 
-      type data = EmptyData | DomainError | OperationData | ContextData | NotModifiedData | GuidanceData | InterpretationPageData | DecisionData | DecisionContextData | AgentChoiceData | AgentChoiceImpactPageData | CandidateData | CandidatePageData | CandidateImpactData | VerificationObligationPageData | MergeSnapshotData
+      class ReleaseSetData < Shared::Value
+        def release_set: () -> ReleaseSetViewV1
+      end
+
+      type data = EmptyData | DomainError | OperationData | ContextData | NotModifiedData | GuidanceData | InterpretationPageData | DecisionData | DecisionContextData | AgentChoiceData | AgentChoiceImpactPageData | CandidateData | CandidatePageData | CandidateImpactData | VerificationObligationPageData | MergeSnapshotData | ReleaseSetData
       type action = Write::NextAction | NextAction
 
       def status: () -> String

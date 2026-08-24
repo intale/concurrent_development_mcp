@@ -1,0 +1,5 @@
+module Coordinator::Read
+  class ReleaseSetGetQueryV1 < Coordinator::Shared::Value
+    def release_set_id: () -> String
+  end
+end

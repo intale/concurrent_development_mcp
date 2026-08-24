@@ -1,0 +1,4 @@
+module Coordinator::Read
+  class ReleaseSet < ApplicationRecord
+  end
+end

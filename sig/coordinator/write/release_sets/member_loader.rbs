@@ -1,0 +1,8 @@
+module Coordinator::Write::ReleaseSets
+  class MemberLoader
+    include Dry::Monads::Result::Mixin
+
+    def initialize: (event_store: Coordinator::Write::_EventStore, ?stream_factory: Coordinator::Write::StreamFactory, ?schema_registry: Coordinator::Write::EventSchemaRegistry, ?evaluator: Coordinator::Write::MergeAuthorizations::Evaluator) -> void
+    def call: (RequestedMemberV1 requested, position: Integer, actor: Coordinator::Write::Commands::Actor, command_id: String, evaluated_at: String) -> Dry::Monads::Result
+  end
+end

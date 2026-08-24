@@ -135,6 +135,10 @@ module Coordinator
       Write::Operations::PrepareRecordMergeObservation.new
     end
 
+    register("operations.prepare_release_set", memoize: true) do
+      Write::Operations::PrepareReleaseSet.new
+    end
+
     register("domain.change_sets.create", memoize: true) do
       Write::Domain::ChangeSets::Create.new(stream_factory: self["stream_factory"])
     end
@@ -363,6 +367,24 @@ module Coordinator
       Write::Domain::MergeObservations::Record.new(stream_factory: self["stream_factory"])
     end
 
+    register("release_sets.member_loader") do
+      Write::ReleaseSets::MemberLoader.new(
+        event_store: self["event_store"],
+        stream_factory: self["stream_factory"],
+        schema_registry: self["event_schema_registry"],
+        evaluator: self["merge_authorizations.evaluator"]
+      )
+    end
+
+    register("domain.release_sets.prepare", memoize: true) do
+      Write::Domain::ReleaseSets::Prepare.new(
+        stream_factory: self["stream_factory"],
+        digest_builder: Write::ReleaseSets::ReleaseDigestBuilder.new(
+          canonical_json: self["canonical_json"]
+        )
+      )
+    end
+
     register("change_set_activation_source_builder", memoize: true) do
       Processes::ChangeSetActivationSourceBuilder.new(schema_registry: self["event_schema_registry"])
     end
@@ -479,6 +501,10 @@ module Coordinator
       Read::Repositories::MergeAuthorizations.new
     end
 
+    register("repositories.release_sets", memoize: true) do
+      Read::Repositories::ReleaseSets.new
+    end
+
     register("projectors.coord_context_v1", memoize: true) do
       Read::Projectors::CoordContextV1.new(
         schema_registry: self["event_schema_registry"],
@@ -557,6 +583,14 @@ module Coordinator
         schema_registry: self["event_schema_registry"],
         snapshots: self["repositories.merge_snapshots"],
         authorizations: self["repositories.merge_authorizations"],
+        processed_events: self["repositories.processed_projection_events"]
+      )
+    end
+
+    register("projectors.release_sets_v1", memoize: true) do
+      Read::Projectors::ReleaseSetsV1.new(
+        schema_registry: self["event_schema_registry"],
+        release_sets: self["repositories.release_sets"],
         processed_events: self["repositories.processed_projection_events"]
       )
     end
@@ -640,6 +674,12 @@ module Coordinator
     register("queries.merge_snapshot_get") do
       Read::Queries::MergeSnapshotGet.new(
         snapshots: self["repositories.merge_snapshots"]
+      )
+    end
+
+    register("queries.release_set_get") do
+      Read::Queries::ReleaseSetGet.new(
+        release_sets: self["repositories.release_sets"]
       )
     end
 
@@ -1024,6 +1064,22 @@ module Coordinator
       )
     end
 
+    register("operations.execute_prepare_release_set") do
+      Write::Operations::ExecutePrepareReleaseSet.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_release_set"],
+        member_loader: self["release_sets.member_loader"],
+        decider: self["domain.release_sets.prepare"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
     register("operations.execute_claim_verification_obligation") do
       Write::Operations::ExecuteClaimVerificationObligation.new(
         event_store: self["event_store"],
@@ -1226,7 +1282,9 @@ module Coordinator
         request_merge_authorization:
           self["operations.execute_request_merge_authorization"],
         record_merge_observation:
-          self["operations.execute_record_merge_observation"]
+          self["operations.execute_record_merge_observation"],
+        prepare_release_set:
+          self["operations.execute_prepare_release_set"]
       )
     end
 
@@ -1420,6 +1478,13 @@ module Coordinator
       )
     end
 
+    register("operations.submit_prepare_release_set_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_release_set"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
     register("operations.start_coordination_task", memoize: true) do
       Write::Operations::StartCoordinationTask.new(
         transition: self["operations.apply_coordination_task_transition"],
@@ -1605,6 +1670,12 @@ module Coordinator
       )
     end
 
+    register("subscriptions.release_sets", memoize: true) do
+      Read::Subscriptions::ReleaseSets.new(
+        handler: self["projectors.release_sets_v1"]
+      )
+    end
+
     register("subscription_managers.process_managers", memoize: true) do
       PgEventstore.subscriptions_manager(
         subscription_set: Processes::Subscriptions::ProcessManagerSet::SET_NAME
@@ -1645,7 +1716,8 @@ module Coordinator
           self["subscriptions.agent_choice_impacts"],
           self["subscriptions.candidates"],
           self["subscriptions.verification_obligations"],
-          self["subscriptions.merge_snapshots"]
+          self["subscriptions.merge_snapshots"],
+          self["subscriptions.release_sets"]
         ]
       )
     end

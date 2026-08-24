@@ -84,6 +84,10 @@ module Coordinator
         the grant event/digest and exact target before/after OIDs. The durable Task re-evaluates grant currentness
         from authoritative events and rejects changed policy or obligation evidence. A recorded observation is
         caller-attributed and unverified; the coordinator did not perform the merge or inspect Git.
+        Use release_set_prepare to freeze 2..16 uniquely identified repositories into one semantic
+        integration order after exact snapshot grants are current. The durable Task re-evaluates every
+        authorization from authoritative events in one transaction. release_set_get serves the latest
+        available projection and may lag without becoming unavailable or authorizing later commands.
         The coordinator records attributed evidence and does not execute Git, CI, or agent work.
       TEXT
 

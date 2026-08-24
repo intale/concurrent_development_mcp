@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandReceiptData
-      type value = ChangeSet | WorkItem | Dependency | Attempt | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver | MergeSnapshotRegistration | MergeSnapshotVerification | MergeAuthorization | MergeObservation
+      type value = ChangeSet | WorkItem | Dependency | Attempt | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver | MergeSnapshotRegistration | MergeSnapshotVerification | MergeAuthorization | MergeObservation | ReleaseSetPreparation
 
       class ChangeSet < Shared::Value
         def change_set_id: () -> String
@@ -261,6 +261,18 @@ module Coordinator
         def observation_event: () -> EventReference
         def observed_at: () -> String
         def recorded_at: () -> String
+      end
+
+      class ReleaseSetPreparation < Shared::Value
+        Member: singleton(ReleaseSets::MemberEvidenceV1)
+
+        def release_set_id: () -> String
+        def change_set_id: () -> String
+        def ordered_members: () -> Array[ReleaseSets::MemberEvidenceV1]
+        def release_digest: () -> String
+        def policy_version: () -> String
+        def prepared_event: () -> EventReference
+        def prepared_at: () -> String
       end
     end
   end

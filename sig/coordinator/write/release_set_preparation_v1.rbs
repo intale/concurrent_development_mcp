@@ -1,0 +1,9 @@
+module Coordinator::Write
+  class ReleaseSetPreparationV1 < Coordinator::Shared::Value
+    def prepared_at: () -> String
+    def input_digest: () -> String
+    def prepared_event_id: () -> String
+    def completion_event_id: () -> String
+    def correlation_id: () -> String
+  end
+end

@@ -53,6 +53,8 @@ module Coordinator::Write
           build_request_merge_authorization(document)
         when CommandInputDocuments::RecordMergeObservationV1
           build_record_merge_observation(document)
+        when CommandInputDocuments::PrepareReleaseSetV1
+          build_prepare_release_set(document)
         end
       end
 
@@ -419,6 +421,17 @@ module Coordinator::Write
           run_id: input.run_id,
           observed_at: input.observed_at,
           policy_version: "merge-observation/v1"
+        )
+      end
+
+      def build_prepare_release_set(document)
+        input = document.input
+        Commands::PrepareReleaseSet.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          release_set_id: input.release_set_id,
+          ordered_members: input.ordered_members,
+          policy_version: "release-set-preparation/v1"
         )
       end
 

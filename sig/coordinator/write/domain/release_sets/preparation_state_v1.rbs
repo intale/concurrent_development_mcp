@@ -1,0 +1,8 @@
+module Coordinator::Write::Domain::ReleaseSets
+  class PreparationStateV1 < Coordinator::Shared::Value
+    Member: untyped
+
+    def existing_preparation: () -> Coordinator::Write::EventReference?
+    def ordered_members: () -> Array[Coordinator::Write::ReleaseSets::MemberEvidenceV1]
+  end
+end

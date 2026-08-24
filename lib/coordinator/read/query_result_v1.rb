@@ -73,6 +73,10 @@ module Coordinator::Read
       attribute :snapshot, MergeSnapshotViewV1
     end
 
+    class ReleaseSetData < Value
+      attribute :release_set, ReleaseSetViewV1
+    end
+
     Data = EmptyData |
            DomainError |
            OperationData |
@@ -88,7 +92,8 @@ module Coordinator::Read
            CandidatePageData |
            CandidateImpactData |
            VerificationObligationPageData |
-           MergeSnapshotData
+           MergeSnapshotData |
+           ReleaseSetData
     Action = Coordinator::Write::NextAction | NextAction
 
     attribute :status, Types::String.enum(

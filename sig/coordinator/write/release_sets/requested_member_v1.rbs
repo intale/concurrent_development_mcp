@@ -1,0 +1,11 @@
+module Coordinator::Write::ReleaseSets
+  class RequestedMemberV1 < Coordinator::Shared::Value
+    def repository_id: () -> String
+    def target_branch: () -> String
+    def object_format: () -> String
+    def merge_snapshot_id: () -> String
+    def snapshot_binding: () -> Coordinator::Write::MergeAuthorizations::SnapshotBindingV1
+    def authorization_event: () -> Coordinator::Write::EventReference
+    def authorization_decision_digest: () -> String
+  end
+end

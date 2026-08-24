@@ -40,6 +40,10 @@ module Coordinator::Write
       attribute :merge_snapshot_id, Types::Identifier
     end
 
+    class ReleaseSetArguments < Value
+      attribute :release_set_id, Types::Identifier
+    end
+
     class DecisionResolutionArguments < Value
       attribute :topic_id, Types::AgentChoiceType
       attribute :context, DecisionContexts::QueryContextV1
@@ -54,6 +58,7 @@ module Coordinator::Write
                 CandidateArguments |
                 VerificationObligationArguments |
                 MergeSnapshotArguments |
+                ReleaseSetArguments |
                 DecisionResolutionArguments
 
     attribute :tool, Types::Identifier

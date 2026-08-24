@@ -200,6 +200,12 @@ module Coordinator::Write
       direction: :asc
     )
 
+    RELEASE_SET_PREPARATION = EventReadCriteria.new(
+      event_types: [ "ReleaseSetPrepared" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+
     CANDIDATE_FOR_IMPACT_SURFACE = GroupedEventReadCriteria.new(
       event_types: [
         "CandidateSubmitted",

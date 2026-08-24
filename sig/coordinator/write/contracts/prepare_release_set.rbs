@@ -1,0 +1,4 @@
+module Coordinator::Write::Contracts
+  class PrepareReleaseSet < Dry::Validation::Contract
+  end
+end

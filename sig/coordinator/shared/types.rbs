@@ -86,6 +86,9 @@ module Coordinator
       MERGE_AUTHORIZATION_REASON_CODES: Array[String]
       MERGE_AUTHORIZATION_MAXIMUM_OBLIGATIONS: Integer
       MERGE_AUTHORIZATION_MAXIMUM_REASONS: Integer
+      RELEASE_SET_PREPARATION_POLICY_VERSIONS: Array[String]
+      RELEASE_SET_MINIMUM_MEMBERS: Integer
+      RELEASE_SET_MAXIMUM_MEMBERS: Integer
       CANDIDATE_OBLIGATION_POLICY_STATUSES: Array[String]
       CANDIDATE_OBLIGATION_DECISION_OUTCOMES: Array[String]
       DECISION_ACTIVATION_INELIGIBILITY_REASONS: Array[String]
@@ -223,6 +226,8 @@ module Coordinator
       MergeAuthorizationReasonCode: untyped
       MergeAuthorizationRequiredEvidenceKinds: untyped
       MergeObservationPolicyVersion: untyped
+      ReleaseSetPreparationPolicyVersion: untyped
+      ReleaseSetMemberPosition: untyped
       CandidateObligationPolicyStatus: untyped
       CandidateObligationDecisionOutcome: untyped
       CandidateImpactReasonMatches: untyped

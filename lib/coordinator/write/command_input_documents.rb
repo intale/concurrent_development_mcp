@@ -482,6 +482,24 @@ module Coordinator::Write
       attribute :input, RecordMergeObservationInputV1
     end
 
+    class PrepareReleaseSetInputV1 < Value
+      Member = ReleaseSets::RequestedMemberV1
+
+      attribute :actor, ActorV1
+      attribute :release_set_id, Types::Identifier
+      attribute :ordered_members,
+                Types::Array.of(Member)
+                  .constrained(
+                    min_size: Types::RELEASE_SET_MINIMUM_MEMBERS,
+                    max_size: Types::RELEASE_SET_MAXIMUM_MEMBERS
+                  )
+    end
+
+    class PrepareReleaseSetV1 < BaseV1
+      attribute :tool_name, Types::String.enum("release_set_prepare")
+      attribute :input, PrepareReleaseSetInputV1
+    end
+
     class ExpireResourceLeaseInputV1 < Value
       attribute :actor, ActorV1
       attribute :resource_key_hash, Types::Sha256Digest
@@ -519,7 +537,8 @@ module Coordinator::Write
            RegisterMergeSnapshotV1 |
            SubmitMergeSnapshotVerificationV1 |
            RequestMergeAuthorizationV1 |
-           RecordMergeObservationV1
+           RecordMergeObservationV1 |
+           PrepareReleaseSetV1
 
     DigestType = Type | ExpireResourceLeaseV1
   end

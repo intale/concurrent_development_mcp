@@ -54,6 +54,8 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
       "merge_verification_submit",
       "merge_authorization_request",
       "merge_observation_record",
+      "release_set_get",
+      "release_set_prepare",
       "change_set_create",
       "work_item_create",
       "work_item_dependency_declare",

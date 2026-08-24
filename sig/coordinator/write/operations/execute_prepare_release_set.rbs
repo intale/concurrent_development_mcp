@@ -1,0 +1,10 @@
+module Coordinator::Write::Operations
+  class ExecutePrepareReleaseSet < Dry::Operation
+    TOOL_NAME: String
+
+    def initialize: (event_store: Coordinator::Write::_EventStore, ?preparer: PrepareReleaseSet, ?member_loader: Coordinator::Write::ReleaseSets::MemberLoader, ?decider: Coordinator::Write::Domain::ReleaseSets::Prepare, ?input_digest: Coordinator::Write::CommandInputDigest, ?clock: Coordinator::Shared::_Clock, ?id_generator: Coordinator::Shared::_IdGenerator, ?event_factory: Coordinator::Write::EventFactory, ?schema_registry: Coordinator::Write::EventSchemaRegistry, ?stream_factory: Coordinator::Write::StreamFactory, ?completion_builder: Coordinator::Write::CommandCompletionBuilder, ?event_plan_contract: Coordinator::Write::Contracts::ReleaseSetPreparationEventPlan) -> void
+    %a{rbs:test:skip}
+    def call: (Coordinator::Write::command_input input) -> Dry::Monads::Result
+    def call_command: (Coordinator::Write::Commands::PrepareReleaseSet command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
+  end
+end

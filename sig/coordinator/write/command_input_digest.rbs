@@ -54,6 +54,8 @@ module Coordinator
       def merge_authorization_request_document: (Commands::RequestMergeAuthorization command) -> CommandInputDocuments::RequestMergeAuthorizationV1
       def merge_observation_record: (Commands::RecordMergeObservation command) -> String
       def merge_observation_record_document: (Commands::RecordMergeObservation command) -> CommandInputDocuments::RecordMergeObservationV1
+      def release_set_prepare: (Commands::PrepareReleaseSet command) -> String
+      def release_set_prepare_document: (Commands::PrepareReleaseSet command) -> CommandInputDocuments::PrepareReleaseSetV1
     end
   end
 end

@@ -1,0 +1,6 @@
+module Coordinator::Write::ReleaseSets
+  class ReleaseDigestBuilder
+    def initialize: (?canonical_json: Coordinator::Shared::CanonicalJson) -> void
+    def call: (release_set_id: String, change_set_id: String, ordered_members: Array[MemberEvidenceV1], policy_version: String) -> String
+  end
+end

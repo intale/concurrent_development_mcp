@@ -723,6 +723,32 @@ module Coordinator::Write
       )
     end
 
+    def release_set_prepare(command:, preparation:, input_digest:, persisted_events:, completed_at:)
+      build_completion(
+        command:,
+        tool_name: "release_set_prepare",
+        summary: "Immutable ordered ReleaseSet prepared from exact current authorization evidence.",
+        data: CommandReceiptData::ReleaseSetPreparation.new(
+          release_set_id: preparation.release_set_id,
+          change_set_id: preparation.change_set_id,
+          ordered_members: preparation.ordered_members,
+          release_digest: preparation.release_digest,
+          policy_version: preparation.policy_version,
+          prepared_event: event_reference(persisted_events.sole),
+          prepared_at: preparation.prepared_at
+        ),
+        next_actions: [
+          NextAction.new(
+            tool: "release_set_get",
+            arguments: NextAction::ReleaseSetArguments.new(release_set_id: command.release_set_id)
+          )
+        ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
 
     def verification_status(persisted_events)

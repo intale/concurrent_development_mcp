@@ -1,0 +1,4 @@
+module Coordinator::Mcp::Tools
+  class ReleaseSetGet < Coordinator::Mcp::QueryTool
+  end
+end

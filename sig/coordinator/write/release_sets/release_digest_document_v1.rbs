@@ -1,0 +1,11 @@
+module Coordinator::Write::ReleaseSets
+  class ReleaseDigestDocumentV1 < Coordinator::Shared::Value
+    Member: singleton(MemberEvidenceV1)
+
+    def schema: () -> String
+    def release_set_id: () -> String
+    def change_set_id: () -> String
+    def ordered_members: () -> Array[MemberEvidenceV1]
+    def policy_version: () -> String
+  end
+end

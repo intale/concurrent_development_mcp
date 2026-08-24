@@ -1,0 +1,12 @@
+module Coordinator::Write::Events
+  class ReleaseSetPreparedV1 < Base
+    Member: singleton(Coordinator::Write::ReleaseSets::MemberEvidenceV1)
+
+    def release_set_id: () -> String
+    def change_set_id: () -> String
+    def ordered_members: () -> Array[Coordinator::Write::ReleaseSets::MemberEvidenceV1]
+    def release_digest: () -> String
+    def policy_version: () -> String
+    def prepared_at: () -> String
+  end
+end

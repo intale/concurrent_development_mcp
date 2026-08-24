@@ -639,6 +639,76 @@ module Coordinator
         )
       end
 
+      def release_set_get
+        object_schema(
+          properties: { release_set_id: identifier },
+          required: %w[release_set_id]
+        )
+      end
+
+      def release_set_prepare
+        registration_event = merge_authorization_event_reference(
+          type: "MergeSnapshotRegistered",
+          context: "DevelopmentIntegration",
+          stream_name: "MergeSnapshot",
+          minimum_revision: 0,
+          maximum_revision: 0
+        )
+        verification_event = merge_authorization_event_reference(
+          type: "MergeSnapshotVerified",
+          context: "DevelopmentIntegration",
+          stream_name: "MergeSnapshot",
+          minimum_revision: 2
+        )
+        authorization_event = merge_authorization_event_reference(
+          type: "MergeAuthorizationGranted",
+          context: "DevelopmentIntegration",
+          stream_name: "MergeAuthorization",
+          minimum_revision: 0,
+          maximum_revision: 0
+        )
+        member = object_schema(
+          properties: {
+            repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+            target_branch: { type: "string", minLength: 1, maxLength: 255 },
+            object_format: { type: "string", enum: Types::GIT_OBJECT_FORMATS },
+            merge_snapshot_id: identifier,
+            snapshot_binding: object_schema(
+              properties: {
+                registration_event:,
+                snapshot_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
+                verification_event:,
+                verification_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" }
+              },
+              required: %w[
+                registration_event snapshot_digest verification_event verification_digest
+              ]
+            ),
+            authorization_event:,
+            authorization_decision_digest: {
+              type: "string", pattern: "^sha256:[0-9a-f]{64}$"
+            }
+          },
+          required: %w[
+            repository_id target_branch object_format merge_snapshot_id snapshot_binding
+            authorization_event authorization_decision_digest
+          ]
+        )
+        object_schema(
+          properties: common_mutation_properties.merge(
+            actor: agent_actor,
+            release_set_id: identifier,
+            ordered_members: {
+              type: "array",
+              items: member,
+              minItems: Types::RELEASE_SET_MINIMUM_MEMBERS,
+              maxItems: Types::RELEASE_SET_MAXIMUM_MEMBERS
+            }
+          ),
+          required: %w[command_id actor release_set_id ordered_members]
+        )
+      end
+
       def merge_verification_submit
         candidate = object_schema(
           properties: { candidate_id: identifier, head_commit_oid: git_oid },

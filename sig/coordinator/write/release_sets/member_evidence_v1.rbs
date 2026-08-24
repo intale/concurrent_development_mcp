@@ -1,0 +1,18 @@
+module Coordinator::Write::ReleaseSets
+  class MemberEvidenceV1 < Coordinator::Shared::Value
+    Candidate: singleton(Coordinator::Write::MergeSnapshots::CandidateMemberV1)
+
+    def position: () -> Integer
+    def repository_id: () -> String
+    def target_branch: () -> String
+    def object_format: () -> String
+    def merge_snapshot_id: () -> String
+    def change_set_id: () -> String
+    def target_base_commit_oid: () -> String
+    def merge_commit_oid: () -> String
+    def snapshot_binding: () -> Coordinator::Write::MergeAuthorizations::SnapshotBindingV1
+    def authorization_event: () -> Coordinator::Write::EventReference
+    def authorization_decision_digest: () -> String
+    def ordered_candidates: () -> Array[Coordinator::Write::MergeSnapshots::CandidateMemberV1]
+  end
+end

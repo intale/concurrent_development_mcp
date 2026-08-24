@@ -1,0 +1,14 @@
+module Coordinator::Read::Repositories
+  class ReleaseSets
+    def fetch: (String release_set_id) -> Coordinator::Read::ReleaseSetViewV1?
+    def store: (event: PgEventstore::Event, release_set: Coordinator::Write::Events::ReleaseSetPreparedV1) -> Coordinator::Read::ReleaseSet
+
+    private
+
+    def build_view: (Coordinator::Read::ReleaseSet record) -> Coordinator::Read::ReleaseSetViewV1
+    def source_evidence: (Coordinator::Read::ReleaseSet record) -> Coordinator::Read::ReleaseSetSourceEvidenceV1
+    def actor: (PgEventstore::Event event) -> Coordinator::Read::AttributedActorV1
+    def event_reference: (PgEventstore::Event event) -> Coordinator::Write::EventReference
+    def symbolize: (untyped value) -> untyped
+  end
+end

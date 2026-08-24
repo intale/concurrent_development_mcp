@@ -1,0 +1,4 @@
+module Coordinator::Read::Contracts
+  class ReleaseSetSourceEvent < Dry::Validation::Contract
+  end
+end

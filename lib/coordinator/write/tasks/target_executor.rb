@@ -36,7 +36,9 @@ module Coordinator::Write
         request_merge_authorization:
           Operations::ExecuteRequestMergeAuthorization.new(event_store:),
         record_merge_observation:
-          Operations::ExecuteRecordMergeObservation.new(event_store:)
+          Operations::ExecuteRecordMergeObservation.new(event_store:),
+        prepare_release_set:
+          Operations::ExecutePrepareReleaseSet.new(event_store:)
       )
         @create_change_set = create_change_set
         @create_work_item = create_work_item
@@ -62,6 +64,7 @@ module Coordinator::Write
         @submit_merge_snapshot_verification = submit_merge_snapshot_verification
         @request_merge_authorization = request_merge_authorization
         @record_merge_observation = record_merge_observation
+        @prepare_release_set = prepare_release_set
       end
 
       def call(command, caused_by:)
@@ -114,6 +117,8 @@ module Coordinator::Write
           @request_merge_authorization.call_command(command, caused_by:)
         when Commands::RecordMergeObservation
           @record_merge_observation.call_command(command, caused_by:)
+        when Commands::PrepareReleaseSet
+          @prepare_release_set.call_command(command, caused_by:)
         end
       end
     end
