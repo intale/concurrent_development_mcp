@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module CompatibilityAssessments
+      class ProducerV1 < Shared::Value
+        def name: () -> String
+        def version: () -> String
+      end
+    end
+  end
+end

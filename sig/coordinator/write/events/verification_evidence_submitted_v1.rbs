@@ -1,0 +1,20 @@
+module Coordinator
+  module Write
+    module Events
+      class VerificationEvidenceSubmittedV1 < Base
+        def obligation_id: () -> String
+        def obligation_event: () -> EventReference
+        def evidence_id: () -> String
+        def evidence_kind: () -> String
+        def claim: () -> CompatibilityAssessments::ClaimEvidenceV1
+        def source_candidate: () -> CandidateObligations::CandidateSubjectV1
+        def target_candidate: () -> CandidateObligations::CandidateSubjectV1
+        def policy: () -> CandidateObligations::ImpactPolicyEvidenceV1
+        def obligation_validity_input_digest: () -> String
+        def assessment: () -> CompatibilityAssessments::AssessmentV1
+        def assessment_input_digest: () -> String
+        def submitted_at: () -> String
+      end
+    end
+  end
+end

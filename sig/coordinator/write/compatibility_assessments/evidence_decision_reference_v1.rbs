@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module CompatibilityAssessments
+      class EvidenceDecisionReferenceV1 < Shared::Value
+        def evidence_kind: () -> String
+        def evidence_id: () -> String
+        def conclusion: () -> String
+        def result_digest: () -> String
+        def assessment_input_digest: () -> String
+        def event: () -> EventReference
+      end
+    end
+  end
+end

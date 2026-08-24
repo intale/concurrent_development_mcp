@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module CompatibilityAssessments
+      class BindingV1 < Shared::Value
+        def obligation_validity_input_digest: () -> String
+        def source_candidate: () -> CandidateBindingV1
+        def target_candidate: () -> CandidateBindingV1
+      end
+    end
+  end
+end

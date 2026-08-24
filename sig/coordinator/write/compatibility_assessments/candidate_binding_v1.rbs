@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module CompatibilityAssessments
+      class CandidateBindingV1 < Shared::Value
+        def candidate_id: () -> String
+        def head_commit_oid: () -> String
+      end
+    end
+  end
+end

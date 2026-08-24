@@ -231,8 +231,21 @@ module Coordinator::Shared
       no_routing_markers
     ].freeze
     VERIFICATION_OBLIGATION_KINDS = %w[candidate_compatibility].freeze
-    VERIFICATION_OBLIGATION_STATUSES = %w[open].freeze
+    VERIFICATION_OBLIGATION_STATUSES = %w[open satisfied failed].freeze
     VERIFICATION_OBLIGATION_CLAIM_STATES = %w[unclaimed active expired].freeze
+    VERIFICATION_EVIDENCE_CONCLUSIONS = %w[
+      passed
+      failed
+      inconclusive
+      not_applicable
+    ].freeze
+    VERIFICATION_EVIDENCE_FINDING_SEVERITIES = %w[
+      info
+      warning
+      error
+      critical
+    ].freeze
+    VERIFICATION_EVIDENCE_MAXIMUM_COUNT = 32
     CANDIDATE_OBLIGATION_POLICY_STATUSES = %w[
       stale
       non_gating
@@ -420,6 +433,12 @@ module Coordinator::Shared
     VerificationObligationKind = String.enum(*VERIFICATION_OBLIGATION_KINDS)
     VerificationObligationStatus = String.enum(*VERIFICATION_OBLIGATION_STATUSES)
     VerificationObligationClaimState = String.enum(*VERIFICATION_OBLIGATION_CLAIM_STATES)
+    VerificationEvidenceConclusion = String.enum(*VERIFICATION_EVIDENCE_CONCLUSIONS)
+    VerificationEvidenceFindingSeverity = String.enum(*VERIFICATION_EVIDENCE_FINDING_SEVERITIES)
+    VerificationEvidenceProducerName = String.constrained(min_size: 1, max_size: 100)
+    VerificationEvidenceProducerVersion = String.constrained(min_size: 1, max_size: 100)
+    VerificationEvidenceFindingCode = String.constrained(min_size: 1, max_size: 100)
+    VerificationEvidenceFindingSummary = String.constrained(min_size: 1, max_size: 2_000)
     CandidateObligationPolicyStatus = String.enum(*CANDIDATE_OBLIGATION_POLICY_STATUSES)
     CandidateObligationDecisionOutcome = String.enum(*CANDIDATE_OBLIGATION_DECISION_OUTCOMES)
     CandidateImpactReasonMatches = Array.of(String.constrained(min_size: 1, max_size: 1_024))

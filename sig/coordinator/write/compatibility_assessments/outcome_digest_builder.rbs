@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module CompatibilityAssessments
+      class OutcomeDigestBuilder
+        def initialize: (?canonical_json: Shared::CanonicalJson) -> void
+        def satisfied: (obligation: Events::VerificationObligationCreatedV1, selected_evidence: Array[EvidenceDecisionReferenceV1]) -> String
+        def failed: (obligation: Events::VerificationObligationCreatedV1, triggering_evidence: EvidenceDecisionReferenceV1) -> String
+      end
+    end
+  end
+end

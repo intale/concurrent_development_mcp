@@ -1,0 +1,28 @@
+module Coordinator
+  module Write
+    module Domain
+      module VerificationEvidence
+        class State < Shared::Value
+          Observation: untyped
+
+          def self.initial: () -> State
+          def obligation: () -> Events::VerificationObligationCreatedV1?
+          def obligation_event: () -> EventReference?
+          def latest_claim: () -> Events::VerificationObligationClaimedV1?
+          def latest_claim_event: () -> EventReference?
+          def evidence: () -> Array[CompatibilityAssessments::EvidenceObservationV1]
+          def satisfied: () -> Events::VerificationObligationSatisfiedV1?
+          def failed: () -> Events::VerificationObligationFailedV1?
+          def policy_current: () -> bool
+          def absent?: () -> bool
+          def terminal?: () -> bool
+          def status: () -> String
+          def active_claim_at: (String timestamp) -> Events::VerificationObligationClaimedV1?
+          def duplicate_assessment?: (String assessment_input_digest) -> bool
+          def evidence_limit_reached?: () -> bool
+          def passed_evidence_by_kind: () -> Hash[String, CompatibilityAssessments::EvidenceDecisionReferenceV1]
+        end
+      end
+    end
+  end
+end

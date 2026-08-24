@@ -1,0 +1,20 @@
+module Coordinator
+  module Write
+    module CompatibilityAssessments
+      class AssessmentV1 < Shared::Value
+        Finding: untyped
+
+        def evidence_kind: () -> String
+        def producer: () -> ProducerV1
+        def run_id: () -> String
+        def test_suite_digest: () -> String
+        def environment_digest: () -> String
+        def dependency_graph_digest: () -> String
+        def result_digest: () -> String
+        def conclusion: () -> String
+        def findings: () -> Array[FindingV1]
+        def produced_at: () -> String
+      end
+    end
+  end
+end

@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module CompatibilityAssessments
+      class ClaimV1 < Shared::Value
+        def claim_id: () -> String
+        def fencing_token: () -> Integer
+      end
+    end
+  end
+end

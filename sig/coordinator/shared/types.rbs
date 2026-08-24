@@ -67,6 +67,10 @@ module Coordinator
       CANDIDATE_IMPACT_PAIR_SCAN_SKIP_REASONS: Array[String]
       VERIFICATION_OBLIGATION_KINDS: Array[String]
       VERIFICATION_OBLIGATION_STATUSES: Array[String]
+      VERIFICATION_OBLIGATION_CLAIM_STATES: Array[String]
+      VERIFICATION_EVIDENCE_CONCLUSIONS: Array[String]
+      VERIFICATION_EVIDENCE_FINDING_SEVERITIES: Array[String]
+      VERIFICATION_EVIDENCE_MAXIMUM_COUNT: Integer
       CANDIDATE_OBLIGATION_POLICY_STATUSES: Array[String]
       CANDIDATE_OBLIGATION_DECISION_OUTCOMES: Array[String]
       DECISION_ACTIVATION_INELIGIBILITY_REASONS: Array[String]
@@ -177,6 +181,12 @@ module Coordinator
       VerificationObligationKind: untyped
       VerificationObligationStatus: untyped
       VerificationObligationClaimState: untyped
+      VerificationEvidenceConclusion: untyped
+      VerificationEvidenceFindingSeverity: untyped
+      VerificationEvidenceProducerName: untyped
+      VerificationEvidenceProducerVersion: untyped
+      VerificationEvidenceFindingCode: untyped
+      VerificationEvidenceFindingSummary: untyped
       CandidateObligationPolicyStatus: untyped
       CandidateObligationDecisionOutcome: untyped
       CandidateImpactReasonMatches: untyped

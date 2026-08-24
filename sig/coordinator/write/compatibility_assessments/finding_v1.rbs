@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module CompatibilityAssessments
+      class FindingV1 < Shared::Value
+        def code: () -> String
+        def severity: () -> String
+        def summary: () -> String
+        def path: () -> String?
+      end
+    end
+  end
+end
