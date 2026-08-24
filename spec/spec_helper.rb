@@ -18,6 +18,13 @@ ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
 require "pg_eventstore/rspec/test_helpers"
 
+if ENV["TEST_PROF"] == "1"
+  require "test_prof"
+  TestProf.configure do |config|
+    config.output_dir = ENV.fetch("TEST_PROF_OUTPUT_DIR", "tmp/test_prof")
+  end
+end
+
 abort("The Rails environment is running in production mode!") if Rails.env.production?
 
 Dir[Rails.root.join("spec/support/**/*.rb")].sort.each { require(_1) }

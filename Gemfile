@@ -74,3 +74,8 @@ group :test do
   gem "rack-test", ">= 2.2"
   gem "database_cleaner", ">= 2.1"
 end
+
+group :development do
+  gem "stackprof", ">= 0.2.28", require: false
+  gem "test-prof", ">= 1.6", require: false
+end
