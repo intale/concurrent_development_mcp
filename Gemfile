@@ -64,7 +64,7 @@ group :development, :test do
 
   gem "rspec-rails", ">= 8.0.4"
 
-  gem "rbs", "~> 3.5", ">= 3.5.2", require: false
+  gem "rbs", ">= 4.2", require: false
 
   gem "cucumber-rails", ">= 4.1", require: false
 end
