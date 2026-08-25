@@ -53,6 +53,10 @@ module Coordinator::Write
       attribute :batch_id, Types::OperationBatchId
     end
 
+    class DevelopmentArtifactArguments < Value
+      attribute :artifact_id, Types::DevelopmentArtifactId
+    end
+
     class DecisionResolutionArguments < Value
       attribute :topic_id, Types::AgentChoiceType
       attribute :context, DecisionContexts::QueryContextV1
@@ -70,6 +74,7 @@ module Coordinator::Write
                 ReleaseSetArguments |
                 SkillArguments |
                 OperationBatchArguments |
+                DevelopmentArtifactArguments |
                 DecisionResolutionArguments
 
     attribute :tool, Types::Identifier

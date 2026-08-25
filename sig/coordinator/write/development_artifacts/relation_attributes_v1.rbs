@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module DevelopmentArtifacts
+      class RelationAttributesV1 < Shared::Value
+        def path: () -> String?
+      end
+    end
+  end
+end

@@ -4,7 +4,7 @@ module Coordinator::Write
   module Contracts
     class PersistedEvents < Dry::Validation::Contract
       params do
-        required(:events).filled(:array).each(Types.Instance(PgEventstore::Event))
+        required(:events).array(Types.Instance(PgEventstore::Event))
       end
 
       rule(:events).each do

@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module DevelopmentArtifacts
+      class RelationTargetV1 < Shared::Value
+        def kind: () -> String
+        def id: () -> String
+      end
+    end
+  end
+end

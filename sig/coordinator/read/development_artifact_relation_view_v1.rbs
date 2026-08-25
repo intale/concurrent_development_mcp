@@ -1,0 +1,13 @@
+module Coordinator
+  module Read
+    class DevelopmentArtifactRelationViewV1 < Shared::Value
+      def relation_id: () -> String
+      def source_artifact_id: () -> String
+      def relation: () -> String
+      def target: () -> Write::DevelopmentArtifacts::RelationTargetV1
+      def attributes: () -> Hash[Symbol, untyped]
+      def relation_attributes: () -> Write::DevelopmentArtifacts::RelationAttributesV1
+      def declared: () -> DevelopmentArtifactEventEvidenceV1
+    end
+  end
+end

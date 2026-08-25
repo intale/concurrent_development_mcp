@@ -410,6 +410,25 @@ module Coordinator::Write
       attribute :published_at, Types::Timestamp
     end
 
+    class DevelopmentArtifactCapture < Value
+      attribute :artifact_id, Types::DevelopmentArtifactId
+      attribute :scope, Types::DevelopmentArtifactScope
+      attribute :kind, Types::DevelopmentArtifactKind
+      attribute :content_sha256, Types::Sha256Digest
+      attribute :byte_size, Types::DevelopmentArtifactByteSize
+      attribute :outcome, Types::String.enum("captured", "existing")
+      attribute :captured_at, Types::Timestamp
+    end
+
+    class DevelopmentArtifactRelation < Value
+      attribute :relation_id, Types::DevelopmentArtifactRelationId
+      attribute :source_artifact_id, Types::DevelopmentArtifactId
+      attribute :relation, Types::DevelopmentArtifactRelationKind
+      attribute :target, DevelopmentArtifacts::RelationTargetV1
+      attribute :outcome, Types::String.enum("declared", "existing")
+      attribute :declared_at, Types::Timestamp
+    end
+
     class OperationBatchAcceptance < Value
       attribute :batch_id, Types::OperationBatchId
       attribute :target_tool, Types::OperationBatchTargetTool
@@ -468,6 +487,8 @@ module Coordinator::Write
            DependencySatisfaction |
            ChangeSetCompletion |
            SkillPublication |
+           DevelopmentArtifactCapture |
+           DevelopmentArtifactRelation |
            OperationBatchAcceptance |
            OperationBatchCancellation |
            OperationBatchTransition

@@ -3,7 +3,7 @@ module Coordinator
     module OperationBatches
       class ItemV1 < Shared::Value
         def index: () -> Integer
-        def command_input: () -> CommandInputDocuments::PublishSkillRevisionV1
+        def command_input: () -> (CommandInputDocuments::PublishSkillRevisionV1 | CommandInputDocuments::CaptureDevelopmentArtifactV1 | CommandInputDocuments::DeclareDevelopmentArtifactRelationV1)
         def canonical_input_digest: () -> String
       end
     end

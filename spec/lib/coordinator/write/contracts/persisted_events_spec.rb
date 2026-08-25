@@ -21,12 +21,12 @@ RSpec.describe Coordinator::Write::Contracts::PersistedEvents do
     expect(result.to_h.fetch(:events)).to eq([ persisted_event ])
   end
 
-  it "rejects empty and not-yet-persisted event collections" do
+  it "accepts an empty no-op collection and rejects not-yet-persisted events" do
     empty = contract.call(events: [])
     transient = contract.call(events: [ PgEventstore::Event.new ])
 
-    expect(empty).to be_failure
-    expect(empty.errors.to_h).to have_key(:events)
+    expect(empty).to be_success
+    expect(empty.to_h.fetch(:events)).to eq([])
     expect(transient).to be_failure
     expect(transient.errors.to_h).to have_key(:events)
   end

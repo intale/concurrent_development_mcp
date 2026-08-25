@@ -33,6 +33,8 @@ module Coordinator
                                 Commands::RecordReleaseSetActivation |
                                 Commands::CompleteCompensatedReleaseSet |
                                 Commands::PublishSkillRevision |
+                                Commands::CaptureDevelopmentArtifact |
+                                Commands::DeclareDevelopmentArtifactRelation |
                                 Commands::CreateOperationBatch |
                                 Commands::CancelOperationBatch
     type write_command = coordination_command |

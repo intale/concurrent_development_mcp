@@ -515,10 +515,69 @@ module Coordinator::Write
       )
     end
 
+    def development_artifact_capture(command:, decision:, input_digest:, persisted_events:, completed_at:)
+      artifact = decision.capture.artifact
+      build_completion(
+        command:,
+        tool_name: "development_artifact_capture",
+        summary: decision.outcome == "captured" ?
+          "Development Artifact captured." : "Development Artifact already exists.",
+        data: CommandReceiptData::DevelopmentArtifactCapture.new(
+          artifact_id: artifact.artifact_id,
+          scope: artifact.scope,
+          kind: artifact.kind,
+          content_sha256: artifact.content.content_sha256,
+          byte_size: artifact.content.byte_size,
+          outcome: decision.outcome,
+          captured_at: decision.capture.captured_at
+        ),
+        next_actions: [
+          NextAction.new(
+            tool: "development_artifact_get",
+            arguments: NextAction::DevelopmentArtifactArguments.new(
+              artifact_id: artifact.artifact_id
+            )
+          )
+        ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
+    def development_artifact_relation_declare(command:, decision:, input_digest:, persisted_events:, completed_at:)
+      artifact_relation = decision.declaration.artifact_relation
+      build_completion(
+        command:,
+        tool_name: "development_artifact_relation_declare",
+        summary: decision.outcome == "declared" ?
+          "Development Artifact relation declared." : "Development Artifact relation already exists.",
+        data: CommandReceiptData::DevelopmentArtifactRelation.new(
+          relation_id: artifact_relation.relation_id,
+          source_artifact_id: artifact_relation.source_artifact_id,
+          relation: artifact_relation.relation,
+          target: artifact_relation.target,
+          outcome: decision.outcome,
+          declared_at: decision.declaration.declared_at
+        ),
+        next_actions: [
+          NextAction.new(
+            tool: "development_artifact_get",
+            arguments: NextAction::DevelopmentArtifactArguments.new(
+              artifact_id: artifact_relation.source_artifact_id
+            )
+          )
+        ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     def operation_batch_create(command:, input_digest:, persisted_events:, completed_at:)
       build_completion(
         command:,
-        tool_name: "skill_publish_batch",
+        tool_name: "#{command.target_tool}_batch",
         summary: "Operation Batch accepted for asynchronous processing.",
         data: CommandReceiptData::OperationBatchAcceptance.new(
           batch_id: command.batch_id,

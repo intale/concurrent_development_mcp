@@ -50,6 +50,10 @@ module Coordinator::Write
           Operations::ExecuteCompleteCompensatedReleaseSet.new(event_store:),
         publish_skill_revision:
           Operations::ExecutePublishSkillRevision.new(event_store:),
+        capture_development_artifact:
+          Operations::ExecuteCaptureDevelopmentArtifact.new(event_store:),
+        declare_development_artifact_relation:
+          Operations::ExecuteDeclareDevelopmentArtifactRelation.new(event_store:),
         operation_batch_command:
           Operations::ExecuteOperationBatchCommand.new(event_store:)
       )
@@ -84,6 +88,8 @@ module Coordinator::Write
         @record_release_set_activation = record_release_set_activation
         @complete_compensated_release_set = complete_compensated_release_set
         @publish_skill_revision = publish_skill_revision
+        @capture_development_artifact = capture_development_artifact
+        @declare_development_artifact_relation = declare_development_artifact_relation
         @operation_batch_command = operation_batch_command
       end
 
@@ -151,6 +157,10 @@ module Coordinator::Write
           @complete_compensated_release_set.call_command(command, caused_by:)
         when Commands::PublishSkillRevision
           @publish_skill_revision.call_command(command, caused_by:)
+        when Commands::CaptureDevelopmentArtifact
+          @capture_development_artifact.call_command(command, caused_by:)
+        when Commands::DeclareDevelopmentArtifactRelation
+          @declare_development_artifact_relation.call_command(command, caused_by:)
         when Commands::CreateOperationBatch, Commands::CancelOperationBatch
           @operation_batch_command.call_command(command, caused_by:)
         end

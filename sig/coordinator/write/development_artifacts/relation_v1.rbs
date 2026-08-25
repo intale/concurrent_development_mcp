@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module DevelopmentArtifacts
+      class RelationV1 < Shared::Value
+        def relation_id: () -> String
+        def source_artifact_id: () -> String
+        def relation: () -> String
+        def target: () -> RelationTargetV1
+        def attributes: () -> Hash[Symbol, untyped]
+        def relation_attributes: () -> RelationAttributesV1
+      end
+    end
+  end
+end

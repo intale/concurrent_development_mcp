@@ -26,6 +26,13 @@ module Coordinator
       def self.skill_get: () -> json_schema
       def self.skill_list: () -> json_schema
       def self.skill_asset_get: () -> json_schema
+      def self.development_artifact_capture: () -> json_schema
+      def self.development_artifact_capture_batch: () -> json_schema
+      def self.development_artifact_relation_declare: () -> json_schema
+      def self.development_artifact_relation_declare_batch: () -> json_schema
+      def self.development_artifact_get: () -> json_schema
+      def self.development_artifact_content_get: () -> json_schema
+      def self.development_artifact_list: () -> json_schema
       def self.agent_choice_get: () -> json_schema
       def self.agent_choice_impact_list: () -> json_schema
       def self.candidate_get: () -> json_schema
@@ -54,6 +61,7 @@ module Coordinator
       def self.decision_resolve: () -> json_schema
       def self.coord_context: () -> json_schema
       def self.common_mutation_properties: () -> json_schema
+      def self.operation_batch_schema: (json_schema item_schema) -> json_schema
       def self.agent_actor: () -> json_schema
       def self.decision_query_context: (?require_nullable_fields: bool) -> json_schema
       def self.decision_context_v1: () -> json_schema

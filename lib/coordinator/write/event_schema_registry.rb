@@ -10,6 +10,8 @@ module Coordinator::Write
       [ "ChangeSetAcceptanceCriteriaDefined", 1 ] => Events::ChangeSetAcceptanceCriteriaDefinedV1,
       [ "CommandCompleted", 1 ] => Events::CommandCompletedV1,
       [ "SkillRevisionPublished", 1 ] => Events::SkillRevisionPublishedV1,
+      [ "DevelopmentArtifactCaptured", 1 ] => Events::DevelopmentArtifactCapturedV1,
+      [ "DevelopmentArtifactRelationDeclared", 1 ] => Events::DevelopmentArtifactRelationDeclaredV1,
       [ "OperationBatchCreated", 1 ] => Events::OperationBatchCreatedV1,
       [ "OperationBatchItemSucceeded", 1 ] => Events::OperationBatchItemSucceededV1,
       [ "OperationBatchItemRejected", 1 ] => Events::OperationBatchItemRejectedV1,

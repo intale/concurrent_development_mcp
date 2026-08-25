@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Operations
+      class PrepareCreateOperationBatch
+        def initialize: (contract: untyped, item_preparer: untyped, target_tool: String, error_label: String, ?input_digest: CommandInputDigest, ?manifest_builder: OperationBatches::ManifestBuilder) -> void
+        %a{rbs:test:skip}
+        def call: (command_input input) -> Dry::Monads::Result
+      end
+    end
+  end
+end

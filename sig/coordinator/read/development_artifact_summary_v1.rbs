@@ -1,0 +1,18 @@
+module Coordinator
+  module Read
+    class DevelopmentArtifactSummaryV1 < Shared::Value
+      def artifact_id: () -> String
+      def scope: () -> String
+      def title: () -> String
+      def kind: () -> String
+      def labels: () -> Array[String]
+      def media_type: () -> String
+      def encoding: () -> String
+      def content_sha256: () -> String
+      def byte_size: () -> Integer
+      def source: () -> DevelopmentArtifactProvenanceV1
+      def relationship_count: () -> Integer
+      def captured: () -> DevelopmentArtifactEventEvidenceV1
+    end
+  end
+end

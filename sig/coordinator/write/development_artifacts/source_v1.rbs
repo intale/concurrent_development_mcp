@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module DevelopmentArtifacts
+      class SourceV1 < Shared::Value
+        def kind: () -> String
+        def locator: () -> String
+        def revision: () -> String?
+        def observed_at: () -> String
+        def collector: () -> String
+      end
+    end
+  end
+end

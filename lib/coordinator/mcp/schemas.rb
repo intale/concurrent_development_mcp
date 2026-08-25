@@ -578,6 +578,209 @@ module Coordinator
         )
       end
 
+      def development_artifact_capture
+        content = object_schema(
+          properties: {
+            encoding: { type: "string", enum: %w[utf-8 binary] },
+            media_type: {
+              type: "string",
+              minLength: 1,
+              maxLength: 255,
+              pattern: "^[\\x21-\\x7e]+$"
+            },
+            text: { type: "string", maxLength: Types::DEVELOPMENT_ARTIFACT_CONTENT_MAXIMUM_BYTES },
+            base64: {
+              type: "string",
+              maxLength: Types::DEVELOPMENT_ARTIFACT_CONTENT_BASE64_MAXIMUM_BYTES,
+              pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+            }
+          },
+          required: %w[encoding media_type],
+          one_of: [
+            { properties: { encoding: { const: "utf-8" } }, required: %w[encoding text] },
+            { properties: { encoding: { const: "binary" } }, required: %w[encoding base64] }
+          ]
+        )
+        source = object_schema(
+          properties: {
+            kind: { type: "string", enum: Types::DEVELOPMENT_ARTIFACT_SOURCE_KINDS },
+            locator: {
+              type: "string",
+              minLength: 1,
+              maxLength: Types::DEVELOPMENT_ARTIFACT_SOURCE_LOCATOR_MAXIMUM_BYTES
+            },
+            revision: {
+              type: [ "string", "null" ],
+              maxLength: Types::DEVELOPMENT_ARTIFACT_SOURCE_REVISION_MAXIMUM_BYTES
+            },
+            observed_at: {
+              type: "string",
+              pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$"
+            },
+            collector: {
+              type: "string",
+              minLength: 1,
+              maxLength: Types::DEVELOPMENT_ARTIFACT_COLLECTOR_MAXIMUM_BYTES
+            }
+          },
+          required: %w[kind locator revision observed_at collector]
+        )
+        object_schema(
+          properties: common_mutation_properties.merge(
+            actor: object_schema(
+              properties: {
+                kind: { type: "string", enum: %w[agent user] },
+                id: identifier
+              },
+              required: %w[kind id]
+            ),
+            scope: {
+              type: "string",
+              minLength: 1,
+              maxLength: Types::DEVELOPMENT_ARTIFACT_SCOPE_MAXIMUM_BYTES
+            },
+            title: {
+              type: "string",
+              minLength: 1,
+              maxLength: Types::DEVELOPMENT_ARTIFACT_TITLE_MAXIMUM_BYTES
+            },
+            kind: { type: "string", enum: Types::DEVELOPMENT_ARTIFACT_KINDS },
+            labels: {
+              type: "array",
+              maxItems: Types::DEVELOPMENT_ARTIFACT_LABEL_MAXIMUM_COUNT,
+              uniqueItems: true,
+              items: {
+                type: "string",
+                minLength: 1,
+                maxLength: Types::DEVELOPMENT_ARTIFACT_LABEL_MAXIMUM_BYTES
+              }
+            },
+            content:,
+            source:
+          ),
+          required: %w[command_id actor scope title kind labels content source]
+        )
+      end
+
+      def development_artifact_capture_batch
+        operation_batch_schema(development_artifact_capture)
+      end
+
+      def development_artifact_relation_declare
+        target = object_schema(
+          properties: {
+            kind: { type: "string", enum: Types::DEVELOPMENT_ARTIFACT_TARGET_KINDS },
+            id: {
+              type: "string",
+              minLength: 1,
+              maxLength: Types::DEVELOPMENT_ARTIFACT_TARGET_ID_MAXIMUM_BYTES
+            }
+          },
+          required: %w[kind id]
+        )
+        attributes = object_schema(
+          properties: {
+            path: {
+              type: "string",
+              minLength: 1,
+              maxLength: Types::DEVELOPMENT_ARTIFACT_RELATION_PATH_MAXIMUM_BYTES
+            }
+          },
+          required: []
+        )
+        object_schema(
+          properties: common_mutation_properties.merge(
+            actor: object_schema(
+              properties: {
+                kind: { type: "string", enum: %w[agent user] },
+                id: identifier
+              },
+              required: %w[kind id]
+            ),
+            source_artifact_id: {
+              type: "string",
+              pattern: "^artifact:v1:[0-9a-f]{64}$"
+            },
+            relation: { type: "string", enum: Types::DEVELOPMENT_ARTIFACT_RELATION_KINDS },
+            target:,
+            attributes:
+          ),
+          required: %w[command_id actor source_artifact_id relation target attributes]
+        )
+      end
+
+      def development_artifact_relation_declare_batch
+        operation_batch_schema(development_artifact_relation_declare)
+      end
+
+      def development_artifact_get
+        object_schema(
+          properties: {
+            artifact_id: { type: "string", pattern: "^artifact:v1:[0-9a-f]{64}$" }
+          },
+          required: %w[artifact_id]
+        )
+      end
+
+      def development_artifact_content_get
+        development_artifact_get
+      end
+
+      def development_artifact_list
+        relation_target = object_schema(
+          properties: {
+            kind: { type: "string", enum: Types::DEVELOPMENT_ARTIFACT_TARGET_KINDS },
+            id: {
+              type: "string",
+              minLength: 1,
+              maxLength: Types::DEVELOPMENT_ARTIFACT_TARGET_ID_MAXIMUM_BYTES
+            }
+          },
+          required: %w[kind id]
+        )
+        object_schema(
+          properties: {
+            scope: {
+              type: [ "string", "null" ],
+              minLength: 1,
+              maxLength: Types::DEVELOPMENT_ARTIFACT_SCOPE_MAXIMUM_BYTES
+            },
+            kind: { anyOf: [ { type: "string", enum: Types::DEVELOPMENT_ARTIFACT_KINDS }, { type: "null" } ] },
+            labels: {
+              type: "array",
+              maxItems: Types::DEVELOPMENT_ARTIFACT_LABEL_MAXIMUM_COUNT,
+              uniqueItems: true,
+              items: {
+                type: "string",
+                minLength: 1,
+                maxLength: Types::DEVELOPMENT_ARTIFACT_LABEL_MAXIMUM_BYTES
+              }
+            },
+            source_kind: {
+              anyOf: [
+                { type: "string", enum: Types::DEVELOPMENT_ARTIFACT_SOURCE_KINDS },
+                { type: "null" }
+              ]
+            },
+            relation_target: { anyOf: [ relation_target, { type: "null" } ] },
+            after_global_position: {
+              anyOf: [ { type: "integer", minimum: 0 }, { type: "null" } ]
+            },
+            limit: {
+              anyOf: [
+                {
+                  type: "integer",
+                  minimum: 1,
+                  maximum: Types::DEVELOPMENT_ARTIFACT_QUERY_MAXIMUM_ITEMS
+                },
+                { type: "null" }
+              ]
+            }
+          },
+          required: []
+        )
+      end
+
       def operation_get
         object_schema(
           properties: {
@@ -1443,6 +1646,28 @@ module Coordinator
             required: %w[kind id]
           )
         }
+      end
+
+      def operation_batch_schema(item_schema)
+        object_schema(
+          properties: common_mutation_properties.merge(
+            actor: object_schema(
+              properties: {
+                kind: { type: "string", enum: %w[agent user] },
+                id: identifier
+              },
+              required: %w[kind id]
+            ),
+            batch_id: uuid_v7,
+            items: {
+              type: "array",
+              minItems: 1,
+              maxItems: Types::OPERATION_BATCH_MAXIMUM_ITEMS,
+              items: item_schema
+            }
+          ),
+          required: %w[command_id actor batch_id items]
+        )
       end
 
       def agent_actor

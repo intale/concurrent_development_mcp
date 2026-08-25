@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module DevelopmentArtifacts
+      class MarkerBuilder
+        def capture: (artifact_id: String, command_id: String) -> Array[String]
+        def relation: (artifact_relation: RelationV1, command_id: String) -> Array[String]
+      end
+    end
+  end
+end

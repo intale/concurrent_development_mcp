@@ -67,6 +67,10 @@ module Coordinator::Write
           build_complete_compensated_release_set(document)
         when CommandInputDocuments::PublishSkillRevisionV1
           build_publish_skill_revision(document)
+        when CommandInputDocuments::CaptureDevelopmentArtifactV1
+          build_capture_development_artifact(document)
+        when CommandInputDocuments::DeclareDevelopmentArtifactRelationV1
+          build_declare_development_artifact_relation(document)
         when CommandInputDocuments::CreateOperationBatchV1
           build_create_operation_batch(document)
         when CommandInputDocuments::CancelOperationBatchV1
@@ -531,6 +535,57 @@ module Coordinator::Write
           instructions: input.instructions,
           assets: input.assets.map { Skills::AssetV1.new(_1.to_h) },
           content_digest: input.content_digest
+        )
+      end
+
+      def build_capture_development_artifact(document)
+        input = document.input
+        artifact = input.artifact
+        Commands::CaptureDevelopmentArtifact.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          artifact: DevelopmentArtifacts::ArtifactV1.new(
+            artifact_id: artifact.artifact_id,
+            scope: artifact.scope,
+            title: artifact.title,
+            kind: artifact.kind,
+            labels: artifact.labels,
+            content: DevelopmentArtifacts::ContentV1.new(
+              encoding: artifact.content.encoding,
+              media_type: artifact.content.media_type,
+              content_base64: artifact.content.content_base64,
+              content_sha256: artifact.content.content_sha256,
+              byte_size: artifact.content.byte_size
+            ),
+            source: DevelopmentArtifacts::SourceV1.new(
+              kind: artifact.source.kind,
+              locator: artifact.source.locator,
+              revision: artifact.source.revision,
+              observed_at: artifact.source.observed_at,
+              collector: artifact.source.collector
+            )
+          )
+        )
+      end
+
+      def build_declare_development_artifact_relation(document)
+        input = document.input
+        artifact_relation = input.artifact_relation
+        Commands::DeclareDevelopmentArtifactRelation.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          artifact_relation: DevelopmentArtifacts::RelationV1.new(
+            relation_id: artifact_relation.relation_id,
+            source_artifact_id: artifact_relation.source_artifact_id,
+            relation: artifact_relation.relation,
+            target: DevelopmentArtifacts::RelationTargetV1.new(
+              kind: artifact_relation.target.kind,
+              id: artifact_relation.target.id
+            ),
+            attributes: DevelopmentArtifacts::RelationAttributesV1.new(
+              path: artifact_relation.relation_attributes.path
+            )
+          )
         )
       end
 

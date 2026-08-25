@@ -45,6 +45,8 @@ module Coordinator::Write
       when Commands::CompleteActivatedReleaseSet then release_activated_complete_document(command)
       when Commands::CompleteCompensatedReleaseSet then release_compensation_complete_document(command)
       when Commands::PublishSkillRevision then skill_publish_document(command)
+      when Commands::CaptureDevelopmentArtifact then development_artifact_capture_document(command)
+      when Commands::DeclareDevelopmentArtifactRelation then development_artifact_relation_declare_document(command)
       when Commands::CreateOperationBatch then operation_batch_create_document(command)
       when Commands::CancelOperationBatch then operation_batch_cancel_document(command)
       when Commands::RecordOperationBatchItemOutcome then operation_batch_item_outcome_document(command)
@@ -768,6 +770,71 @@ module Coordinator::Write
       )
     end
 
+    def development_artifact_capture(command)
+      @canonical_json.sha256(development_artifact_capture_document(command).to_h)
+    end
+
+    def development_artifact_capture_document(command)
+      artifact = command.artifact
+      CommandInputDocuments::CaptureDevelopmentArtifactV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "development_artifact_capture",
+        input: CommandInputDocuments::CaptureDevelopmentArtifactInputV1.new(
+          actor: actor_document(command.actor),
+          artifact: CommandInputDocuments::DevelopmentArtifactV1.new(
+            artifact_id: artifact.artifact_id,
+            scope: artifact.scope,
+            title: artifact.title,
+            kind: artifact.kind,
+            labels: artifact.labels,
+            content: CommandInputDocuments::DevelopmentArtifactContentV1.new(
+              encoding: artifact.content.encoding,
+              media_type: artifact.content.media_type,
+              content_base64: artifact.content.content_base64,
+              content_sha256: artifact.content.content_sha256,
+              byte_size: artifact.content.byte_size
+            ),
+            source: CommandInputDocuments::DevelopmentArtifactSourceV1.new(
+              kind: artifact.source.kind,
+              locator: artifact.source.locator,
+              revision: artifact.source.revision,
+              observed_at: artifact.source.observed_at,
+              collector: artifact.source.collector
+            )
+          )
+        )
+      )
+    end
+
+    def development_artifact_relation_declare(command)
+      @canonical_json.sha256(development_artifact_relation_declare_document(command).to_h)
+    end
+
+    def development_artifact_relation_declare_document(command)
+      artifact_relation = command.artifact_relation
+      CommandInputDocuments::DeclareDevelopmentArtifactRelationV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "development_artifact_relation_declare",
+        input: CommandInputDocuments::DeclareDevelopmentArtifactRelationInputV1.new(
+          actor: actor_document(command.actor),
+          artifact_relation: CommandInputDocuments::DevelopmentArtifactRelationV1.new(
+            relation_id: artifact_relation.relation_id,
+            source_artifact_id: artifact_relation.source_artifact_id,
+            relation: artifact_relation.relation,
+            target: CommandInputDocuments::DevelopmentArtifactRelationTargetV1.new(
+              kind: artifact_relation.target.kind,
+              id: artifact_relation.target.id
+            ),
+            attributes: CommandInputDocuments::DevelopmentArtifactRelationAttributesV1.new(
+              path: artifact_relation.relation_attributes.path
+            )
+          )
+        )
+      )
+    end
+
     def operation_batch_create(command)
       @canonical_json.sha256(operation_batch_create_document(command).to_h)
     end
@@ -776,7 +843,7 @@ module Coordinator::Write
       CommandInputDocuments::CreateOperationBatchV1.new(
         schema: "command-input/v1",
         command_id: command.command_id,
-        tool_name: "skill_publish_batch",
+        tool_name: "#{command.target_tool}_batch",
         input: CommandInputDocuments::CreateOperationBatchInputV1.new(
           actor: actor_document(command.actor),
           batch_id: command.batch_id,

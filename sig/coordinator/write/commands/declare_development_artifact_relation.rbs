@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Commands
+      class DeclareDevelopmentArtifactRelation < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def artifact_relation: () -> DevelopmentArtifacts::RelationV1
+      end
+    end
+  end
+end

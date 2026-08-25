@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Operations
+      class PrepareCaptureDevelopmentArtifact
+        def initialize: (?contract: Contracts::CaptureDevelopmentArtifact, ?content_builder: DevelopmentArtifacts::ContentBuilder, ?artifact_builder: DevelopmentArtifacts::ArtifactBuilder) -> void
+        %a{rbs:test:skip}
+        def call: (command_input input) -> Dry::Monads::Result
+      end
+    end
+  end
+end

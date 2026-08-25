@@ -1,0 +1,14 @@
+module Coordinator
+  module Read
+    class DevelopmentArtifactListQueryV1 < Shared::Value
+      def scope: () -> String?
+      def kind: () -> String?
+      def labels: () -> Array[String]
+      def source_kind: () -> String?
+      def relation_target_kind: () -> String?
+      def relation_target_id: () -> String?
+      def after_global_position: () -> Integer?
+      def limit: () -> Integer
+    end
+  end
+end

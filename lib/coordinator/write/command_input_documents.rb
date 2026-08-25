@@ -632,6 +632,73 @@ module Coordinator::Write
       attribute :input, PublishSkillRevisionInputV1
     end
 
+    class DevelopmentArtifactContentV1 < Value
+      attribute :encoding, Types::DevelopmentArtifactEncoding
+      attribute :media_type, Types::DevelopmentArtifactMediaType
+      attribute :content_base64, Types::DevelopmentArtifactContentBase64
+      attribute :content_sha256, Types::Sha256Digest
+      attribute :byte_size, Types::DevelopmentArtifactByteSize
+    end
+
+    class DevelopmentArtifactSourceV1 < Value
+      attribute :kind, Types::DevelopmentArtifactSourceKind
+      attribute :locator, Types::DevelopmentArtifactSourceLocator
+      attribute :revision, Types::DevelopmentArtifactSourceRevision.optional
+      attribute :observed_at, Types::Timestamp
+      attribute :collector, Types::DevelopmentArtifactCollector
+    end
+
+    class DevelopmentArtifactV1 < Value
+      attribute :artifact_id, Types::DevelopmentArtifactId
+      attribute :scope, Types::DevelopmentArtifactScope
+      attribute :title, Types::DevelopmentArtifactTitle
+      attribute :kind, Types::DevelopmentArtifactKind
+      attribute :labels, Types::DevelopmentArtifactLabels
+      attribute :content, DevelopmentArtifactContentV1
+      attribute :source, DevelopmentArtifactSourceV1
+    end
+
+    class CaptureDevelopmentArtifactInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :artifact, DevelopmentArtifactV1
+    end
+
+    class CaptureDevelopmentArtifactV1 < BaseV1
+      attribute :tool_name, Types::String.enum("development_artifact_capture")
+      attribute :input, CaptureDevelopmentArtifactInputV1
+    end
+
+    class DevelopmentArtifactRelationTargetV1 < Value
+      attribute :kind, Types::DevelopmentArtifactTargetKind
+      attribute :id, Types::DevelopmentArtifactTargetId
+    end
+
+    class DevelopmentArtifactRelationAttributesV1 < Value
+      attribute :path, Types::DevelopmentArtifactRelationPath.optional
+    end
+
+    class DevelopmentArtifactRelationV1 < Value
+      attribute :relation_id, Types::DevelopmentArtifactRelationId
+      attribute :source_artifact_id, Types::DevelopmentArtifactId
+      attribute :relation, Types::DevelopmentArtifactRelationKind
+      attribute :target, DevelopmentArtifactRelationTargetV1
+      attribute :attributes, DevelopmentArtifactRelationAttributesV1
+
+      def relation_attributes
+        self[:attributes]
+      end
+    end
+
+    class DeclareDevelopmentArtifactRelationInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :artifact_relation, DevelopmentArtifactRelationV1
+    end
+
+    class DeclareDevelopmentArtifactRelationV1 < BaseV1
+      attribute :tool_name, Types::String.enum("development_artifact_relation_declare")
+      attribute :input, DeclareDevelopmentArtifactRelationInputV1
+    end
+
     class CreateOperationBatchInputV1 < Value
       Item = OperationBatches::ItemV1
 
@@ -648,7 +715,11 @@ module Coordinator::Write
     end
 
     class CreateOperationBatchV1 < BaseV1
-      attribute :tool_name, Types::String.enum("skill_publish_batch")
+      attribute :tool_name, Types::String.enum(
+        "skill_publish_batch",
+        "development_artifact_capture_batch",
+        "development_artifact_relation_declare_batch"
+      )
       attribute :input, CreateOperationBatchInputV1
     end
 
@@ -787,6 +858,8 @@ module Coordinator::Write
            RecordReleaseSetActivationV1 |
            CompleteCompensatedReleaseSetV1 |
            PublishSkillRevisionV1 |
+           CaptureDevelopmentArtifactV1 |
+           DeclareDevelopmentArtifactRelationV1 |
            CreateOperationBatchV1 |
            CancelOperationBatchV1
 

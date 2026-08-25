@@ -1,0 +1,13 @@
+module Coordinator
+  module Read
+    module Repositories
+      class DevelopmentArtifacts
+        def fetch: (String artifact_id) -> DevelopmentArtifactViewV1?
+        def fetch_content: (String artifact_id) -> DevelopmentArtifactContentViewV1?
+        def page: (DevelopmentArtifactListQueryV1 query) -> DevelopmentArtifactPageV1
+        def store_capture: (event: PgEventstore::Event, capture: Write::Events::DevelopmentArtifactCapturedV1) -> DevelopmentArtifact
+        def store_relation: (event: PgEventstore::Event, declaration: Write::Events::DevelopmentArtifactRelationDeclaredV1) -> DevelopmentArtifactRelation
+      end
+    end
+  end
+end

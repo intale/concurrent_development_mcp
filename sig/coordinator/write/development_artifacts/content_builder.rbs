@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module DevelopmentArtifacts
+      class ContentBuilder
+        def call: (Hash[Symbol, untyped] attributes) -> ContentV1
+      end
+    end
+  end
+end

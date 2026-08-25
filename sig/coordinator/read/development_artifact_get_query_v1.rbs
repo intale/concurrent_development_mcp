@@ -1,0 +1,7 @@
+module Coordinator
+  module Read
+    class DevelopmentArtifactGetQueryV1 < Shared::Value
+      def artifact_id: () -> String
+    end
+  end
+end

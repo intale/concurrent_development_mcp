@@ -14,7 +14,7 @@ module Coordinator::Read
     class OperationData < Value
       attribute :result, Coordinator::Write::CommandReceiptData::Type
       attribute :emitted_events,
-                Types::Array.of(Coordinator::Write::EventReference).constrained(min_size: 1)
+                Types::Array.of(Coordinator::Write::EventReference)
     end
 
     class ContextData < Value
@@ -89,6 +89,18 @@ module Coordinator::Read
       attribute :asset, SkillAssetViewV1
     end
 
+    class DevelopmentArtifactData < Value
+      attribute :artifact, DevelopmentArtifactViewV1
+    end
+
+    class DevelopmentArtifactContentData < Value
+      attribute :content, DevelopmentArtifactContentViewV1
+    end
+
+    class DevelopmentArtifactPageData < Value
+      attribute :page, DevelopmentArtifactPageV1
+    end
+
     class OperationBatchData < Value
       attribute :batch, OperationBatchViewV1
     end
@@ -113,6 +125,9 @@ module Coordinator::Read
            SkillData |
            SkillPageData |
            SkillAssetData |
+           DevelopmentArtifactData |
+           DevelopmentArtifactContentData |
+           DevelopmentArtifactPageData |
            OperationBatchData
     Action = Coordinator::Write::NextAction | NextAction
 

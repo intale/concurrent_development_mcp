@@ -811,6 +811,46 @@ module Coordinator::Write
         attribute :details, SkillRevisionDetails
       end
 
+      class DevelopmentArtifactDetails < Value
+        attribute :artifact_id, Types::DevelopmentArtifactId
+      end
+
+      class DevelopmentArtifactTargetDetails < DevelopmentArtifactDetails
+        attribute :target_artifact_id, Types::DevelopmentArtifactId
+      end
+
+      class DevelopmentArtifactRelationLimitDetails < DevelopmentArtifactDetails
+        attribute :relation_count, Types::Integer.constrained(gteq: 0)
+        attribute :maximum_relation_count,
+                  Types::Integer.constrained(
+                    eql: Types::DEVELOPMENT_ARTIFACT_RELATION_MAXIMUM_COUNT
+                  )
+      end
+
+      class DevelopmentArtifactIdentityConflictError < Value
+        attribute :code, Types::String.enum("development_artifact_identity_conflict")
+        attribute :message, Types::String
+        attribute :details, DevelopmentArtifactDetails
+      end
+
+      class DevelopmentArtifactNotFoundError < Value
+        attribute :code, Types::String.enum("development_artifact_not_found")
+        attribute :message, Types::String
+        attribute :details, DevelopmentArtifactDetails
+      end
+
+      class DevelopmentArtifactTargetNotFoundError < Value
+        attribute :code, Types::String.enum("development_artifact_target_not_found")
+        attribute :message, Types::String
+        attribute :details, DevelopmentArtifactTargetDetails
+      end
+
+      class DevelopmentArtifactRelationLimitReachedError < Value
+        attribute :code, Types::String.enum("development_artifact_relation_limit_reached")
+        attribute :message, Types::String
+        attribute :details, DevelopmentArtifactRelationLimitDetails
+      end
+
       class VerificationObligationNotFoundError < Value
         attribute :code, Types::String.enum("verification_obligation_not_found")
         attribute :message, Types::String
@@ -1023,6 +1063,10 @@ module Coordinator::Write
              CandidateImpactSurfaceAlreadyRecordedError |
              SkillIdentityConflictError |
              SkillRevisionConflictError |
+             DevelopmentArtifactIdentityConflictError |
+             DevelopmentArtifactNotFoundError |
+             DevelopmentArtifactTargetNotFoundError |
+             DevelopmentArtifactRelationLimitReachedError |
              VerificationObligationNotFoundError |
              VerificationObligationAlreadyClaimedError |
              VerificationObligationPolicyStaleError |

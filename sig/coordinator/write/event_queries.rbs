@@ -13,6 +13,8 @@ module Coordinator
 
       COMMAND_COMPLETION: EventReadCriteria
       SKILL_LATEST_REVISION: GroupedEventReadCriteria
+      DEVELOPMENT_ARTIFACT_HISTORY: EventReadCriteria
+      DEVELOPMENT_ARTIFACT_CAPTURE: EventReadCriteria
       OPERATION_BATCH_HISTORY: EventReadCriteria
       DECISION_EXISTENCE: EventReadCriteria
       DECISION_CORRECTION_STATE: GroupedEventReadCriteria

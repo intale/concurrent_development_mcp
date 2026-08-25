@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandReceiptData
-      type value = ChangeSet | WorkItem | Dependency | Attempt | WorkItemCompletion | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver | MergeSnapshotRegistration | MergeSnapshotVerification | MergeAuthorization | MergeObservation | ReleaseSetPreparation | RepositoryIntegration | ReleaseSetVerification | ReleaseSetActivation | ReleaseSetCompensationRequest | ReleaseSetCompletion | DependencySatisfaction | ChangeSetCompletion | SkillPublication | OperationBatchAcceptance | OperationBatchCancellation | OperationBatchTransition
+      type value = ChangeSet | WorkItem | Dependency | Attempt | WorkItemCompletion | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver | MergeSnapshotRegistration | MergeSnapshotVerification | MergeAuthorization | MergeObservation | ReleaseSetPreparation | RepositoryIntegration | ReleaseSetVerification | ReleaseSetActivation | ReleaseSetCompensationRequest | ReleaseSetCompletion | DependencySatisfaction | ChangeSetCompletion | SkillPublication | DevelopmentArtifactCapture | DevelopmentArtifactRelation | OperationBatchAcceptance | OperationBatchCancellation | OperationBatchTransition
 
       class ChangeSet < Shared::Value
         def change_set_id: () -> String
@@ -375,6 +375,25 @@ module Coordinator
         def asset_count: () -> Integer
         def publication_event: () -> EventReference
         def published_at: () -> String
+      end
+
+      class DevelopmentArtifactCapture < Shared::Value
+        def artifact_id: () -> String
+        def scope: () -> String
+        def kind: () -> String
+        def content_sha256: () -> String
+        def byte_size: () -> Integer
+        def outcome: () -> String
+        def captured_at: () -> String
+      end
+
+      class DevelopmentArtifactRelation < Shared::Value
+        def relation_id: () -> String
+        def source_artifact_id: () -> String
+        def relation: () -> String
+        def target: () -> DevelopmentArtifacts::RelationTargetV1
+        def outcome: () -> String
+        def declared_at: () -> String
       end
 
       class OperationBatchAcceptance < Shared::Value

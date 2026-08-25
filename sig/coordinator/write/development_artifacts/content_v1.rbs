@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module DevelopmentArtifacts
+      class ContentV1 < Shared::Value
+        def encoding: () -> String
+        def media_type: () -> String
+        def content_base64: () -> String
+        def content_sha256: () -> String
+        def byte_size: () -> Integer
+      end
+    end
+  end
+end

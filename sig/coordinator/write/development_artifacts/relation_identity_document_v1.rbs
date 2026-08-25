@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module DevelopmentArtifacts
+      class RelationIdentityDocumentV1 < Shared::Value
+        SCHEMA: String
+        def schema: () -> String
+        def source_artifact_id: () -> String
+        def relation: () -> String
+        def target: () -> RelationTargetV1
+        def attributes: () -> Hash[Symbol, untyped]
+      end
+    end
+  end
+end

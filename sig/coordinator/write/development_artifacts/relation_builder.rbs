@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module DevelopmentArtifacts
+      class RelationBuilder
+        def initialize: (?identity_builder: RelationIdentityBuilder) -> void
+        def call: (source_artifact_id: String, relation: String, target: RelationTargetV1, attributes: RelationAttributesV1) -> RelationV1
+      end
+    end
+  end
+end

@@ -87,11 +87,23 @@ module Coordinator
         def asset: () -> SkillAssetViewV1
       end
 
+      class DevelopmentArtifactData < Shared::Value
+        def artifact: () -> DevelopmentArtifactViewV1
+      end
+
+      class DevelopmentArtifactContentData < Shared::Value
+        def content: () -> DevelopmentArtifactContentViewV1
+      end
+
+      class DevelopmentArtifactPageData < Shared::Value
+        def page: () -> DevelopmentArtifactPageV1
+      end
+
       class OperationBatchData < Shared::Value
         def batch: () -> OperationBatchViewV1
       end
 
-      type data = EmptyData | DomainError | OperationData | ContextData | NotModifiedData | GuidanceData | InterpretationPageData | DecisionData | DecisionContextData | AgentChoiceData | AgentChoiceImpactPageData | CandidateData | CandidatePageData | CandidateImpactData | VerificationObligationPageData | MergeSnapshotData | ReleaseSetData | SkillData | SkillPageData | SkillAssetData | OperationBatchData
+      type data = EmptyData | DomainError | OperationData | ContextData | NotModifiedData | GuidanceData | InterpretationPageData | DecisionData | DecisionContextData | AgentChoiceData | AgentChoiceImpactPageData | CandidateData | CandidatePageData | CandidateImpactData | VerificationObligationPageData | MergeSnapshotData | ReleaseSetData | SkillData | SkillPageData | SkillAssetData | DevelopmentArtifactData | DevelopmentArtifactContentData | DevelopmentArtifactPageData | OperationBatchData
       type action = Write::NextAction | NextAction
 
       def status: () -> String

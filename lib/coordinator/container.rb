@@ -19,6 +19,30 @@ module Coordinator
     register("skills.marker_builder", memoize: true) do
       Write::Skills::MarkerBuilder.new(canonical_json: self["canonical_json"])
     end
+    register("development_artifacts.content_builder", memoize: true) do
+      Write::DevelopmentArtifacts::ContentBuilder.new
+    end
+    register("development_artifacts.identity_builder", memoize: true) do
+      Write::DevelopmentArtifacts::IdentityBuilder.new(canonical_json: self["canonical_json"])
+    end
+    register("development_artifacts.artifact_builder", memoize: true) do
+      Write::DevelopmentArtifacts::ArtifactBuilder.new(
+        identity_builder: self["development_artifacts.identity_builder"]
+      )
+    end
+    register("development_artifacts.relation_identity_builder", memoize: true) do
+      Write::DevelopmentArtifacts::RelationIdentityBuilder.new(
+        canonical_json: self["canonical_json"]
+      )
+    end
+    register("development_artifacts.relation_builder", memoize: true) do
+      Write::DevelopmentArtifacts::RelationBuilder.new(
+        identity_builder: self["development_artifacts.relation_identity_builder"]
+      )
+    end
+    register("development_artifacts.marker_builder", memoize: true) do
+      Write::DevelopmentArtifacts::MarkerBuilder.new
+    end
     register("interpretations.topic_registry", memoize: true) do
       Write::Interpretations::TopicRegistry.new
     end
@@ -178,6 +202,33 @@ module Coordinator
     register("operations.prepare_create_skill_publish_batch", memoize: true) do
       Write::Operations::PrepareCreateSkillPublishBatch.new(
         item_preparer: self["operations.prepare_publish_skill_revision"],
+        input_digest: self["command_input_digest"]
+      )
+    end
+
+    register("operations.prepare_capture_development_artifact", memoize: true) do
+      Write::Operations::PrepareCaptureDevelopmentArtifact.new(
+        content_builder: self["development_artifacts.content_builder"],
+        artifact_builder: self["development_artifacts.artifact_builder"]
+      )
+    end
+
+    register("operations.prepare_declare_development_artifact_relation", memoize: true) do
+      Write::Operations::PrepareDeclareDevelopmentArtifactRelation.new(
+        relation_builder: self["development_artifacts.relation_builder"]
+      )
+    end
+
+    register("operations.prepare_create_development_artifact_capture_batch", memoize: true) do
+      Write::Operations::PrepareCreateDevelopmentArtifactCaptureBatch.new(
+        item_preparer: self["operations.prepare_capture_development_artifact"],
+        input_digest: self["command_input_digest"]
+      )
+    end
+
+    register("operations.prepare_create_development_artifact_relation_declare_batch", memoize: true) do
+      Write::Operations::PrepareCreateDevelopmentArtifactRelationDeclareBatch.new(
+        item_preparer: self["operations.prepare_declare_development_artifact_relation"],
         input_digest: self["command_input_digest"]
       )
     end
@@ -354,6 +405,16 @@ module Coordinator
 
     register("domain.skills.publish", memoize: true) do
       Write::Domain::Skills::Publish.new(stream_factory: self["stream_factory"])
+    end
+
+    register("domain.development_artifacts.capture", memoize: true) do
+      Write::Domain::DevelopmentArtifacts::Capture.new(stream_factory: self["stream_factory"])
+    end
+
+    register("domain.development_artifacts.declare_relation", memoize: true) do
+      Write::Domain::DevelopmentArtifacts::DeclareRelation.new(
+        stream_factory: self["stream_factory"]
+      )
     end
 
     register("domain.candidates.submit_impact_surface", memoize: true) do
@@ -647,6 +708,10 @@ module Coordinator
       Read::Repositories::Skills.new
     end
 
+    register("repositories.development_artifacts", memoize: true) do
+      Read::Repositories::DevelopmentArtifacts.new
+    end
+
     register("repositories.operation_batches", memoize: true) do
       Read::Repositories::OperationBatches.new
     end
@@ -750,6 +815,14 @@ module Coordinator
         schema_registry: self["event_schema_registry"],
         identity_builder: self["skills.identity_builder"],
         skills: self["repositories.skills"],
+        processed_events: self["repositories.processed_projection_events"]
+      )
+    end
+
+    register("projectors.development_artifacts_v1", memoize: true) do
+      Read::Projectors::DevelopmentArtifactsV1.new(
+        schema_registry: self["event_schema_registry"],
+        artifacts: self["repositories.development_artifacts"],
         processed_events: self["repositories.processed_projection_events"]
       )
     end
@@ -866,6 +939,24 @@ module Coordinator
 
     register("queries.skill_asset_get") do
       Read::Queries::SkillAssetGet.new(skills: self["repositories.skills"])
+    end
+
+    register("queries.development_artifact_get") do
+      Read::Queries::DevelopmentArtifactGet.new(
+        artifacts: self["repositories.development_artifacts"]
+      )
+    end
+
+    register("queries.development_artifact_content_get") do
+      Read::Queries::DevelopmentArtifactContentGet.new(
+        artifacts: self["repositories.development_artifacts"]
+      )
+    end
+
+    register("queries.development_artifact_list") do
+      Read::Queries::DevelopmentArtifactList.new(
+        artifacts: self["repositories.development_artifacts"]
+      )
     end
 
     register("queries.operation_batch_get") do
@@ -1249,6 +1340,48 @@ module Coordinator
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
         marker_builder: self["skills.marker_builder"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
+    register("development_artifacts.loader", memoize: true) do
+      Write::DevelopmentArtifacts::Loader.new(
+        event_store: self["event_store"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("operations.execute_capture_development_artifact") do
+      Write::Operations::ExecuteCaptureDevelopmentArtifact.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_capture_development_artifact"],
+        loader: self["development_artifacts.loader"],
+        decider: self["domain.development_artifacts.capture"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        marker_builder: self["development_artifacts.marker_builder"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
+    register("operations.execute_declare_development_artifact_relation") do
+      Write::Operations::ExecuteDeclareDevelopmentArtifactRelation.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_declare_development_artifact_relation"],
+        loader: self["development_artifacts.loader"],
+        decider: self["domain.development_artifacts.declare_relation"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        marker_builder: self["development_artifacts.marker_builder"],
         completion_builder: self["command_completion_builder"]
       )
     end
@@ -1683,6 +1816,10 @@ module Coordinator
           self["operations.execute_complete_compensated_release_set"],
         publish_skill_revision:
           self["operations.execute_publish_skill_revision"],
+        capture_development_artifact:
+          self["operations.execute_capture_development_artifact"],
+        declare_development_artifact_relation:
+          self["operations.execute_declare_development_artifact_relation"],
         operation_batch_command:
           self["operations.execute_operation_batch_command"]
       )
@@ -1839,6 +1976,34 @@ module Coordinator
     register("operations.submit_create_skill_publish_batch_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_create_skill_publish_batch"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_capture_development_artifact_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_capture_development_artifact"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_declare_development_artifact_relation_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_declare_development_artifact_relation"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_create_development_artifact_capture_batch_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_create_development_artifact_capture_batch"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_create_development_artifact_relation_declare_batch_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_create_development_artifact_relation_declare_batch"],
         submitter: self["operations.submit_coordination_task"]
       )
     end
@@ -2184,6 +2349,12 @@ module Coordinator
       Read::Subscriptions::Skills.new(handler: self["projectors.skills_v1"])
     end
 
+    register("subscriptions.development_artifacts", memoize: true) do
+      Read::Subscriptions::DevelopmentArtifacts.new(
+        handler: self["projectors.development_artifacts_v1"]
+      )
+    end
+
     register("subscriptions.operation_batches", memoize: true) do
       Read::Subscriptions::OperationBatches.new(handler: self["projectors.operation_batches_v1"])
     end
@@ -2249,6 +2420,7 @@ module Coordinator
           self["subscriptions.agent_choice_impacts"],
           self["subscriptions.candidates"],
           self["subscriptions.skills"],
+          self["subscriptions.development_artifacts"],
           self["subscriptions.operation_batches"],
           self["subscriptions.verification_obligations"],
           self["subscriptions.merge_snapshots"],

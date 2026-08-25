@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Operations
+      class PrepareCreateDevelopmentArtifactCaptureBatch < PrepareCreateOperationBatch
+        def initialize: (?contract: Contracts::DevelopmentArtifactCaptureBatch, ?item_preparer: PrepareCaptureDevelopmentArtifact, ?input_digest: CommandInputDigest, ?manifest_builder: OperationBatches::ManifestBuilder) -> void
+      end
+    end
+  end
+end

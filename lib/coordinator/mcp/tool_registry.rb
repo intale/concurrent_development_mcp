@@ -21,6 +21,9 @@ module Coordinator
           Tools::SkillGet,
           Tools::SkillList,
           Tools::SkillAssetGet,
+          Tools::DevelopmentArtifactGet,
+          Tools::DevelopmentArtifactContentGet,
+          Tools::DevelopmentArtifactList,
           Tools::OperationBatchGet,
           Tools::VerificationObligationsList,
           Tools::MergeSnapshotGet,
@@ -57,6 +60,10 @@ module Coordinator
           Tools::ReleaseCompensationComplete,
           Tools::SkillPublish,
           Tools::SkillPublishBatch,
+          Tools::DevelopmentArtifactCapture,
+          Tools::DevelopmentArtifactCaptureBatch,
+          Tools::DevelopmentArtifactRelationDeclare,
+          Tools::DevelopmentArtifactRelationDeclareBatch,
           Tools::OperationBatchCancel
         ].freeze
       end

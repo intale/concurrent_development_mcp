@@ -16,6 +16,8 @@ module Coordinator::Shared
     MARKER_COMPONENT_PATTERN = /\A(?!compound:)[^\u0000\r\n]{1,512}\z/
     SKILL_ID_PATTERN = /\Askill:v1:[0-9a-f]{64}\z/
     SKILL_MEDIA_TYPE_PATTERN = /\A[\x21-\x7e]{1,255}\z/
+    DEVELOPMENT_ARTIFACT_ID_PATTERN = /\Aartifact:v1:[0-9a-f]{64}\z/
+    DEVELOPMENT_ARTIFACT_RELATION_ID_PATTERN = /\Aartifact-relation:v1:[0-9a-f]{64}\z/
 
     SKILL_NAME_MAXIMUM_BYTES = 128
     SKILL_SCOPE_MAXIMUM_BYTES = 256
@@ -26,6 +28,64 @@ module Coordinator::Shared
     SKILL_ASSET_MAXIMUM_BYTES = 1_048_576
     SKILL_ASSETS_TOTAL_MAXIMUM_BYTES = 4_194_304
     SKILL_ASSET_BASE64_MAXIMUM_BYTES = 1_398_104
+    DEVELOPMENT_ARTIFACT_SCOPE_MAXIMUM_BYTES = 256
+    DEVELOPMENT_ARTIFACT_TITLE_MAXIMUM_BYTES = 512
+    DEVELOPMENT_ARTIFACT_LABEL_MAXIMUM_BYTES = 128
+    DEVELOPMENT_ARTIFACT_LABEL_MAXIMUM_COUNT = 32
+    DEVELOPMENT_ARTIFACT_SOURCE_LOCATOR_MAXIMUM_BYTES = 2_048
+    DEVELOPMENT_ARTIFACT_SOURCE_REVISION_MAXIMUM_BYTES = 512
+    DEVELOPMENT_ARTIFACT_COLLECTOR_MAXIMUM_BYTES = 256
+    DEVELOPMENT_ARTIFACT_CONTENT_MAXIMUM_BYTES = 2_097_152
+    DEVELOPMENT_ARTIFACT_CONTENT_BASE64_MAXIMUM_BYTES = 2_796_204
+    DEVELOPMENT_ARTIFACT_RELATION_MAXIMUM_COUNT = 128
+    DEVELOPMENT_ARTIFACT_RELATION_PATH_MAXIMUM_BYTES = 2_048
+    DEVELOPMENT_ARTIFACT_TARGET_ID_MAXIMUM_BYTES = 2_048
+    DEVELOPMENT_ARTIFACT_QUERY_MAXIMUM_ITEMS = 100
+    DEVELOPMENT_ARTIFACT_KINDS = %w[
+      build_manifest
+      build_plan
+      event_model
+      contract
+      implementation_record
+      verification_evidence
+      decision_log
+      decision_record
+      governance
+      documentation
+      web_research
+      repository_checkpoint
+      performance_profile
+      import_manifest
+      external_reference
+      other
+    ].freeze
+    DEVELOPMENT_ARTIFACT_SOURCE_KINDS = %w[
+      local_file
+      generated
+      git_commit
+      downloaded_document
+      web_page
+      web_search
+      other
+    ].freeze
+    DEVELOPMENT_ARTIFACT_RELATION_KINDS = %w[
+      documents
+      evidences
+      derived_from
+      supersedes
+      references
+      contains
+      produced_by_import
+    ].freeze
+    DEVELOPMENT_ARTIFACT_TARGET_KINDS = %w[
+      artifact
+      build
+      decision
+      skill
+      repository
+      checkpoint
+      external
+    ].freeze
     OPERATION_BATCH_MAXIMUM_ITEMS = 1_000
     OPERATION_BATCH_PAGE_SIZE = 50
     OPERATION_BATCH_QUERY_MAXIMUM_ITEMS = 100
@@ -446,6 +506,10 @@ module Coordinator::Shared
       release_compensation_complete
       skill_publish
       skill_publish_batch
+      development_artifact_capture
+      development_artifact_capture_batch
+      development_artifact_relation_declare
+      development_artifact_relation_declare_batch
       operation_batch_cancel
     ].freeze
 
@@ -477,6 +541,55 @@ module Coordinator::Shared
     SkillAssetMediaType = String.constrained(format: SKILL_MEDIA_TYPE_PATTERN)
     SkillAssetContentBase64 = String.constrained(max_size: SKILL_ASSET_BASE64_MAXIMUM_BYTES)
     SkillAssetByteSize = Integer.constrained(gteq: 0, lteq: SKILL_ASSET_MAXIMUM_BYTES)
+    DevelopmentArtifactId = String.constrained(format: DEVELOPMENT_ARTIFACT_ID_PATTERN)
+    DevelopmentArtifactRelationId = String.constrained(format: DEVELOPMENT_ARTIFACT_RELATION_ID_PATTERN)
+    DevelopmentArtifactScope = String.constrained(
+      min_size: 1,
+      max_size: DEVELOPMENT_ARTIFACT_SCOPE_MAXIMUM_BYTES
+    )
+    DevelopmentArtifactTitle = String.constrained(
+      min_size: 1,
+      max_size: DEVELOPMENT_ARTIFACT_TITLE_MAXIMUM_BYTES
+    )
+    DevelopmentArtifactKind = String.enum(*DEVELOPMENT_ARTIFACT_KINDS)
+    DevelopmentArtifactLabel = String.constrained(
+      min_size: 1,
+      max_size: DEVELOPMENT_ARTIFACT_LABEL_MAXIMUM_BYTES
+    )
+    DevelopmentArtifactLabels = Array.of(DevelopmentArtifactLabel).constrained(
+      max_size: DEVELOPMENT_ARTIFACT_LABEL_MAXIMUM_COUNT
+    )
+    DevelopmentArtifactEncoding = String.enum("utf-8", "binary")
+    DevelopmentArtifactMediaType = String.constrained(format: SKILL_MEDIA_TYPE_PATTERN)
+    DevelopmentArtifactContentBase64 = String.constrained(
+      max_size: DEVELOPMENT_ARTIFACT_CONTENT_BASE64_MAXIMUM_BYTES
+    )
+    DevelopmentArtifactByteSize = Integer.constrained(
+      gteq: 0,
+      lteq: DEVELOPMENT_ARTIFACT_CONTENT_MAXIMUM_BYTES
+    )
+    DevelopmentArtifactSourceKind = String.enum(*DEVELOPMENT_ARTIFACT_SOURCE_KINDS)
+    DevelopmentArtifactSourceLocator = String.constrained(
+      min_size: 1,
+      max_size: DEVELOPMENT_ARTIFACT_SOURCE_LOCATOR_MAXIMUM_BYTES
+    )
+    DevelopmentArtifactSourceRevision = String.constrained(
+      max_size: DEVELOPMENT_ARTIFACT_SOURCE_REVISION_MAXIMUM_BYTES
+    )
+    DevelopmentArtifactCollector = String.constrained(
+      min_size: 1,
+      max_size: DEVELOPMENT_ARTIFACT_COLLECTOR_MAXIMUM_BYTES
+    )
+    DevelopmentArtifactRelationKind = String.enum(*DEVELOPMENT_ARTIFACT_RELATION_KINDS)
+    DevelopmentArtifactTargetKind = String.enum(*DEVELOPMENT_ARTIFACT_TARGET_KINDS)
+    DevelopmentArtifactTargetId = String.constrained(
+      min_size: 1,
+      max_size: DEVELOPMENT_ARTIFACT_TARGET_ID_MAXIMUM_BYTES
+    )
+    DevelopmentArtifactRelationPath = String.constrained(
+      min_size: 1,
+      max_size: DEVELOPMENT_ARTIFACT_RELATION_PATH_MAXIMUM_BYTES
+    )
     OperationBatchId = UuidV7
     OperationBatchItemIndex = Integer.constrained(gteq: 0, lt: OPERATION_BATCH_MAXIMUM_ITEMS)
     OperationBatchTotal = Integer.constrained(gteq: 1, lteq: OPERATION_BATCH_MAXIMUM_ITEMS)
@@ -485,7 +598,11 @@ module Coordinator::Shared
       gteq: 1,
       lteq: OPERATION_BATCH_MAXIMUM_ENCODED_BYTES
     )
-    OperationBatchTargetTool = String.enum("skill_publish")
+    OperationBatchTargetTool = String.enum(
+      "skill_publish",
+      "development_artifact_capture",
+      "development_artifact_relation_declare"
+    )
     OperationBatchOutcomeStatus = String.enum("succeeded", "rejected")
     OperationBatchStatus = String.enum("running", "completed", "completed_with_errors", "cancelled")
     Marker = String.constrained(min_size: 1, max_size: 512)

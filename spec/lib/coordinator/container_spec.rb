@@ -31,6 +31,8 @@ RSpec.describe Coordinator::Container do
     candidate_impact_operation =
       described_class["operations.execute_submit_candidate_impact_surface"]
     skill_publish_operation = described_class["operations.execute_publish_skill_revision"]
+    artifact_capture_operation = described_class["operations.execute_capture_development_artifact"]
+    artifact_relation_operation = described_class["operations.execute_declare_development_artifact_relation"]
     operation_batch_operation = described_class["operations.execute_operation_batch_command"]
     operation_batch_process_manager = described_class["process_managers.operation_batch_runner"]
     impact_scan_start = described_class["operations.execute_start_agent_choice_impact_scan"]
@@ -63,6 +65,9 @@ RSpec.describe Coordinator::Container do
     skill_get_query = described_class["queries.skill_get"]
     skill_list_query = described_class["queries.skill_list"]
     skill_asset_get_query = described_class["queries.skill_asset_get"]
+    artifact_get_query = described_class["queries.development_artifact_get"]
+    artifact_content_get_query = described_class["queries.development_artifact_content_get"]
+    artifact_list_query = described_class["queries.development_artifact_list"]
     operation_batch_query = described_class["queries.operation_batch_get"]
     verification_obligations_query = described_class["queries.verification_obligations_list"]
     task_submissions = %w[
@@ -85,6 +90,10 @@ RSpec.describe Coordinator::Container do
       operations.submit_candidate_impact_surface_task
       operations.submit_publish_skill_revision_task
       operations.submit_create_skill_publish_batch_task
+      operations.submit_capture_development_artifact_task
+      operations.submit_declare_development_artifact_relation_task
+      operations.submit_create_development_artifact_capture_batch_task
+      operations.submit_create_development_artifact_relation_declare_batch_task
       operations.submit_cancel_operation_batch_task
     ].map { described_class[_1] }
     tasks_extension = described_class["mcp.tasks.extension"]
@@ -129,6 +138,12 @@ RSpec.describe Coordinator::Container do
     )
     expect(skill_publish_operation).to be_a(
       Coordinator::Write::Operations::ExecutePublishSkillRevision
+    )
+    expect(artifact_capture_operation).to be_a(
+      Coordinator::Write::Operations::ExecuteCaptureDevelopmentArtifact
+    )
+    expect(artifact_relation_operation).to be_a(
+      Coordinator::Write::Operations::ExecuteDeclareDevelopmentArtifactRelation
     )
     expect(operation_batch_operation).to be_a(
       Coordinator::Write::Operations::ExecuteOperationBatchCommand
@@ -197,6 +212,7 @@ RSpec.describe Coordinator::Container do
         "coord-context-v1",
         "decision-governance-v1",
         "decision-interpretations-v1",
+        "development-artifacts-v1",
         "merge-snapshots-v1",
         "operation-batches-v1",
         "release-sets-v1",
@@ -218,6 +234,11 @@ RSpec.describe Coordinator::Container do
     expect(skill_get_query).to be_a(Coordinator::Read::Queries::SkillGet)
     expect(skill_list_query).to be_a(Coordinator::Read::Queries::SkillList)
     expect(skill_asset_get_query).to be_a(Coordinator::Read::Queries::SkillAssetGet)
+    expect(artifact_get_query).to be_a(Coordinator::Read::Queries::DevelopmentArtifactGet)
+    expect(artifact_content_get_query).to be_a(
+      Coordinator::Read::Queries::DevelopmentArtifactContentGet
+    )
+    expect(artifact_list_query).to be_a(Coordinator::Read::Queries::DevelopmentArtifactList)
     expect(operation_batch_query).to be_a(Coordinator::Read::Queries::OperationBatchGet)
     expect(verification_obligations_query).to be_a(
       Coordinator::Read::Queries::VerificationObligationsList

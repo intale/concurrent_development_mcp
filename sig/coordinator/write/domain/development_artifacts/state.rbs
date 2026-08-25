@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Domain
+      module DevelopmentArtifacts
+        class State < Shared::Value
+          def self.initial: () -> State
+          def self.reduce: (Array[Events::DevelopmentArtifactCapturedV1 | Events::DevelopmentArtifactRelationDeclaredV1] events) -> State
+          def capture: () -> Events::DevelopmentArtifactCapturedV1?
+          def relations: () -> Array[Events::DevelopmentArtifactRelationDeclaredV1]
+        end
+      end
+    end
+  end
+end

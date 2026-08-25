@@ -1,0 +1,31 @@
+module Coordinator
+  module Read
+    class DevelopmentArtifact < ApplicationRecord
+      def artifact_id: () -> String
+      def scope: () -> String
+      def title: () -> String
+      def kind: () -> String
+      def labels: () -> Array[String]
+      def content_encoding: () -> String
+      def content_media_type: () -> String
+      def content_base64: () -> String
+      def content_sha256: () -> String
+      def content_byte_size: () -> Integer
+      def source_kind: () -> String
+      def source_locator: () -> String
+      def source_revision: () -> String?
+      def source_observed_at: () -> Time
+      def source_collector: () -> String
+      def captured_event: () -> Hash[String, untyped]
+      def captured_actor: () -> Hash[String, untyped]
+      def captured_markers: () -> Array[String]
+      def captured_metadata: () -> Hash[String, untyped]
+      def captured_causation_id: () -> String?
+      def captured_correlation_id: () -> String?
+      def captured_global_position: () -> Integer
+      def captured_at_domain: () -> Time
+      def captured_at_store: () -> Time
+      def relations: () -> untyped
+    end
+  end
+end

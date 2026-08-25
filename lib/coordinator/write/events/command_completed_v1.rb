@@ -14,7 +14,7 @@ module Coordinator::Write
       attribute :data, CommandReceiptData::Type
       attribute :warnings, Types::Array.of(Types::String).constrained(max_size: 100)
       attribute :next_actions, Types::Array.of(NextAction).constrained(max_size: 100)
-      attribute :emitted_events, Types::Array.of(EventReference).constrained(min_size: 1)
+      attribute :emitted_events, Types::Array.of(EventReference)
       attribute :completed_at, Types::Timestamp
     end
   end

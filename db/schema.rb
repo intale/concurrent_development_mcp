@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_25_143000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_25_160000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -334,6 +334,61 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_143000) do
     t.jsonb "slot", null: false
     t.datetime "updated_at", null: false
     t.index ["decision_id"], name: "index_decision_slot_heads_on_decision_id"
+  end
+
+  create_table "development_artifact_relations", primary_key: "relation_id", id: :string, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.jsonb "declared_actor", null: false
+    t.datetime "declared_at_domain", null: false
+    t.datetime "declared_at_store", null: false
+    t.string "declared_causation_id"
+    t.string "declared_correlation_id"
+    t.jsonb "declared_event", null: false
+    t.bigint "declared_global_position", null: false
+    t.jsonb "declared_markers", default: [], null: false
+    t.jsonb "declared_metadata", default: {}, null: false
+    t.text "path"
+    t.string "relation", null: false
+    t.string "source_artifact_id", null: false
+    t.text "target_id", null: false
+    t.string "target_kind", null: false
+    t.datetime "updated_at", null: false
+    t.index ["declared_global_position"], name: "idx_on_declared_global_position_66c5eb75e9"
+    t.index ["source_artifact_id"], name: "index_development_artifact_relations_on_source_artifact_id"
+    t.index ["target_kind", "target_id"], name: "idx_on_target_kind_target_id_389d0c51da"
+  end
+
+  create_table "development_artifacts", primary_key: "artifact_id", id: :string, force: :cascade do |t|
+    t.jsonb "captured_actor", null: false
+    t.datetime "captured_at_domain", null: false
+    t.datetime "captured_at_store", null: false
+    t.string "captured_causation_id"
+    t.string "captured_correlation_id"
+    t.jsonb "captured_event", null: false
+    t.bigint "captured_global_position", null: false
+    t.jsonb "captured_markers", default: [], null: false
+    t.jsonb "captured_metadata", default: {}, null: false
+    t.text "content_base64", null: false
+    t.bigint "content_byte_size", null: false
+    t.string "content_encoding", null: false
+    t.string "content_media_type", null: false
+    t.string "content_sha256", null: false
+    t.datetime "created_at", null: false
+    t.string "kind", null: false
+    t.jsonb "labels", default: [], null: false
+    t.text "scope", null: false
+    t.string "source_collector", null: false
+    t.string "source_kind", null: false
+    t.text "source_locator", null: false
+    t.datetime "source_observed_at", null: false
+    t.text "source_revision"
+    t.text "title", null: false
+    t.datetime "updated_at", null: false
+    t.index ["captured_global_position"], name: "index_development_artifacts_on_captured_global_position"
+    t.index ["kind"], name: "index_development_artifacts_on_kind"
+    t.index ["labels"], name: "index_development_artifacts_on_labels", using: :gin
+    t.index ["scope"], name: "index_development_artifacts_on_scope"
+    t.index ["source_kind"], name: "index_development_artifacts_on_source_kind"
   end
 
   create_table "merge_authorizations", primary_key: "authorization_id", id: :string, force: :cascade do |t|

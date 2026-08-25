@@ -93,6 +93,18 @@ module Coordinator::Write
       direction: :desc
     )
 
+    DEVELOPMENT_ARTIFACT_HISTORY = EventReadCriteria.new(
+      event_types: [ "DevelopmentArtifactCaptured", "DevelopmentArtifactRelationDeclared" ],
+      maximum_count: Types::DEVELOPMENT_ARTIFACT_RELATION_MAXIMUM_COUNT + 1,
+      direction: :asc
+    )
+
+    DEVELOPMENT_ARTIFACT_CAPTURE = EventReadCriteria.new(
+      event_types: [ "DevelopmentArtifactCaptured" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+
     OPERATION_BATCH_HISTORY = EventReadCriteria.new(
       event_types: [
         "OperationBatchCreated",

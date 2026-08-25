@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module DevelopmentArtifacts
+      class IdentityBuilder
+        def initialize: (?canonical_json: Shared::CanonicalJson) -> void
+        def call: (scope: String, source: SourceV1, content: ContentV1) -> String
+      end
+    end
+  end
+end

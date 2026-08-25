@@ -22,6 +22,14 @@ module Coordinator::Write
       )
     end
 
+    def development_artifact(artifact_id)
+      StreamReference.new(
+        context: "DevelopmentMemory",
+        stream_name: "DevelopmentArtifact",
+        stream_id: artifact_id
+      )
+    end
+
     def change_set(change_set_id)
       StreamReference.new(
         context: "DevelopmentPlanning",

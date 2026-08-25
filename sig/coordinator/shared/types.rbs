@@ -13,6 +13,8 @@ module Coordinator
       MARKER_COMPONENT_PATTERN: Regexp
       SKILL_ID_PATTERN: Regexp
       SKILL_MEDIA_TYPE_PATTERN: Regexp
+      DEVELOPMENT_ARTIFACT_ID_PATTERN: Regexp
+      DEVELOPMENT_ARTIFACT_RELATION_ID_PATTERN: Regexp
 
       SKILL_NAME_MAXIMUM_BYTES: Integer
       SKILL_SCOPE_MAXIMUM_BYTES: Integer
@@ -23,6 +25,19 @@ module Coordinator
       SKILL_ASSET_MAXIMUM_BYTES: Integer
       SKILL_ASSETS_TOTAL_MAXIMUM_BYTES: Integer
       SKILL_ASSET_BASE64_MAXIMUM_BYTES: Integer
+      DEVELOPMENT_ARTIFACT_SCOPE_MAXIMUM_BYTES: Integer
+      DEVELOPMENT_ARTIFACT_TITLE_MAXIMUM_BYTES: Integer
+      DEVELOPMENT_ARTIFACT_LABEL_MAXIMUM_BYTES: Integer
+      DEVELOPMENT_ARTIFACT_LABEL_MAXIMUM_COUNT: Integer
+      DEVELOPMENT_ARTIFACT_SOURCE_LOCATOR_MAXIMUM_BYTES: Integer
+      DEVELOPMENT_ARTIFACT_SOURCE_REVISION_MAXIMUM_BYTES: Integer
+      DEVELOPMENT_ARTIFACT_COLLECTOR_MAXIMUM_BYTES: Integer
+      DEVELOPMENT_ARTIFACT_CONTENT_MAXIMUM_BYTES: Integer
+      DEVELOPMENT_ARTIFACT_CONTENT_BASE64_MAXIMUM_BYTES: Integer
+      DEVELOPMENT_ARTIFACT_RELATION_MAXIMUM_COUNT: Integer
+      DEVELOPMENT_ARTIFACT_RELATION_PATH_MAXIMUM_BYTES: Integer
+      DEVELOPMENT_ARTIFACT_TARGET_ID_MAXIMUM_BYTES: Integer
+      DEVELOPMENT_ARTIFACT_QUERY_MAXIMUM_ITEMS: Integer
       OPERATION_BATCH_MAXIMUM_ITEMS: Integer
       OPERATION_BATCH_PAGE_SIZE: Integer
       OPERATION_BATCH_QUERY_MAXIMUM_ITEMS: Integer
@@ -138,6 +153,10 @@ module Coordinator
       MERGE_ACTIONS: Array[String]
       SUPPORTED_INTERPRETATION_TOPICS: Array[String]
       COORDINATION_TOOL_NAMES: Array[String]
+      DEVELOPMENT_ARTIFACT_KINDS: Array[String]
+      DEVELOPMENT_ARTIFACT_SOURCE_KINDS: Array[String]
+      DEVELOPMENT_ARTIFACT_RELATION_KINDS: Array[String]
+      DEVELOPMENT_ARTIFACT_TARGET_KINDS: Array[String]
 
       Identifier: untyped
       RepositoryId: untyped
@@ -167,6 +186,25 @@ module Coordinator
       SkillAssetMediaType: untyped
       SkillAssetContentBase64: untyped
       SkillAssetByteSize: untyped
+      DevelopmentArtifactId: untyped
+      DevelopmentArtifactRelationId: untyped
+      DevelopmentArtifactScope: untyped
+      DevelopmentArtifactTitle: untyped
+      DevelopmentArtifactKind: untyped
+      DevelopmentArtifactLabel: untyped
+      DevelopmentArtifactLabels: untyped
+      DevelopmentArtifactEncoding: untyped
+      DevelopmentArtifactMediaType: untyped
+      DevelopmentArtifactContentBase64: untyped
+      DevelopmentArtifactByteSize: untyped
+      DevelopmentArtifactSourceKind: untyped
+      DevelopmentArtifactSourceLocator: untyped
+      DevelopmentArtifactSourceRevision: untyped
+      DevelopmentArtifactCollector: untyped
+      DevelopmentArtifactRelationKind: untyped
+      DevelopmentArtifactTargetKind: untyped
+      DevelopmentArtifactTargetId: untyped
+      DevelopmentArtifactRelationPath: untyped
       OperationBatchId: untyped
       OperationBatchItemIndex: untyped
       OperationBatchTotal: untyped

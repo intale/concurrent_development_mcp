@@ -1,0 +1,8 @@
+module Coordinator
+  module Read
+    class DevelopmentArtifactViewV1 < Shared::Value
+      def artifact: () -> DevelopmentArtifactSummaryV1
+      def relationships: () -> Array[DevelopmentArtifactRelationViewV1]
+    end
+  end
+end

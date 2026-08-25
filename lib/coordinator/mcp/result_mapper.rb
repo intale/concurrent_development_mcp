@@ -13,7 +13,11 @@ module Coordinator
         duplicate_dependency_id: "conflict",
         attempt_already_exists: "conflict",
         skill_identity_conflict: "conflict",
-        skill_revision_conflict: "conflict"
+        skill_revision_conflict: "conflict",
+        development_artifact_identity_conflict: "conflict",
+        development_artifact_not_found: "not_found",
+        development_artifact_target_not_found: "not_found",
+        development_artifact_relation_limit_reached: "limit_reached"
       }.freeze
 
       def call(result, command_id: nil)
