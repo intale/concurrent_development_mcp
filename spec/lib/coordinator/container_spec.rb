@@ -14,6 +14,7 @@ RSpec.describe Coordinator::Container do
     activation_operation = described_class["operations.execute_activate_change_set"]
     readiness_operation = described_class["operations.execute_evaluate_work_item_readiness"]
     dependency_satisfaction_operation = described_class["operations.execute_satisfy_work_item_dependency"]
+    change_set_completion_operation = described_class["operations.execute_complete_change_set"]
     acquisition_operation = described_class["operations.execute_acquire_work_item"]
     reservation_operation = described_class["operations.execute_reserve_write_set"]
     expansion_operation = described_class["operations.execute_expand_write_set"]
@@ -86,6 +87,9 @@ RSpec.describe Coordinator::Container do
     expect(readiness_operation).to be_a(Coordinator::Write::Operations::ExecuteEvaluateWorkItemReadiness)
     expect(dependency_satisfaction_operation).to be_a(
       Coordinator::Write::Operations::ExecuteSatisfyWorkItemDependency
+    )
+    expect(change_set_completion_operation).to be_a(
+      Coordinator::Write::Operations::ExecuteCompleteChangeSet
     )
     expect(acquisition_operation).to be_a(Coordinator::Write::Operations::ExecuteAcquireWorkItem)
     expect(reservation_operation).to be_a(Coordinator::Write::Operations::ExecuteReserveWriteSet)

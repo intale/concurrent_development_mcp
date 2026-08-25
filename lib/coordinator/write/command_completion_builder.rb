@@ -703,6 +703,7 @@ module Coordinator::Write
           decision_event: event_reference(persisted_events.sole),
           reasons: decision.evaluation.reasons,
           obligations: decision.evaluation.obligations,
+          work_item_progress: decision.evaluation.work_item_progress,
           decided_at: decision.decided_at
         ),
         next_actions: [
@@ -907,6 +908,25 @@ module Coordinator::Write
           satisfaction_event: event_reference(persisted_events.fetch(0)),
           readiness_event: persisted_events[1] && event_reference(persisted_events.fetch(1)),
           satisfied_at: satisfaction.satisfied_at
+        ),
+        next_actions: [],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
+    def change_set_completion_policy(command:, completion:, input_digest:, persisted_events:, completed_at:)
+      build_completion(
+        command:,
+        tool_name: "change_set_completion_policy",
+        summary: "ChangeSet completed from exact WorkItem and release evidence.",
+        data: CommandReceiptData::ChangeSetCompletion.new(
+          change_set_id: completion.change_set_id,
+          work_item_completions: completion.work_item_completions,
+          release_set_completion_event: completion.release_set_completion_event,
+          completion_event: event_reference(persisted_events.sole),
+          completed_at: completion.completed_at
         ),
         next_actions: [],
         input_digest:,

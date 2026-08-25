@@ -1,0 +1,15 @@
+module Coordinator::Write::MergeAuthorizations
+  class WorkItemProgressV1 < Coordinator::Shared::Value
+    Dependency: singleton(DependencyProgressV1)
+
+    def change_set_id: () -> String
+    def work_item_id: () -> String
+    def repository_id: () -> String
+    def attempt_id: () -> String
+    def candidate_id: () -> String
+    def candidate_event: () -> Coordinator::Write::EventReference
+    def selected_event: () -> Coordinator::Write::EventReference
+    def completed_event: () -> Coordinator::Write::EventReference
+    def incoming_dependencies: () -> Array[DependencyProgressV1]
+  end
+end

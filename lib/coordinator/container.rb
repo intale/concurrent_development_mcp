@@ -179,6 +179,10 @@ module Coordinator
       Write::Domain::ChangeSets::SatisfyWorkItemDependency.new(stream_factory: self["stream_factory"])
     end
 
+    register("domain.change_sets.complete", memoize: true) do
+      Write::Domain::ChangeSets::Complete.new(stream_factory: self["stream_factory"])
+    end
+
     register("domain.work_items.evaluate_readiness", memoize: true) do
       Write::Domain::WorkItems::EvaluateReadiness.new(stream_factory: self["stream_factory"])
     end
@@ -525,6 +529,22 @@ module Coordinator
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
         release_history_loader: self["release_sets.history_loader"]
+      )
+    end
+
+    register("change_set_completions.source_loader", memoize: true) do
+      Write::ChangeSetCompletions::SourceLoader.new(
+        event_store: self["event_store"],
+        stream_factory: self["stream_factory"],
+        schema_registry: self["event_schema_registry"]
+      )
+    end
+
+    register("change_set_completions.work_item_loader", memoize: true) do
+      Write::ChangeSetCompletions::WorkItemLoader.new(
+        event_store: self["event_store"],
+        stream_factory: self["stream_factory"],
+        schema_registry: self["event_schema_registry"]
       )
     end
 
@@ -898,6 +918,23 @@ module Coordinator
         event_store: self["event_store"],
         source_loader: self["dependency_satisfactions.source_loader"],
         decider: self["domain.change_sets.satisfy_work_item_dependency"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
+    register("operations.execute_complete_change_set") do
+      Write::Operations::ExecuteCompleteChangeSet.new(
+        event_store: self["event_store"],
+        source_loader: self["change_set_completions.source_loader"],
+        work_item_loader: self["change_set_completions.work_item_loader"],
+        release_history_loader: self["release_sets.history_loader"],
+        decider: self["domain.change_sets.complete"],
         input_digest: self["command_input_digest"],
         clock: self["clock"],
         id_generator: self["id_generator"],
@@ -1883,6 +1920,7 @@ module Coordinator
         source_builder: self["build_progress.source_builder"],
         command_builder: self["build_progress.command_builder"],
         satisfy_dependency: self["operations.execute_satisfy_work_item_dependency"],
+        complete_change_set: self["operations.execute_complete_change_set"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"]
       )

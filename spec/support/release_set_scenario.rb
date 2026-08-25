@@ -5,8 +5,8 @@ module ReleaseSetScenario
 
   REPOSITORIES = %w[billing ledger].freeze
 
-  def prepare_input(prefix:, dependency: nil)
-    authorizations = authorized_members(prefix:, dependency:)
+  def prepare_input(prefix:, dependency: nil, omit_completed_member: false)
+    authorizations = authorized_members(prefix:, dependency:, omit_completed_member:)
     {
       command_id: "cmd-release-prepare-#{prefix}",
       actor: { kind: "agent", id: "release-coordinator-1" },
@@ -29,8 +29,8 @@ module ReleaseSetScenario
     }
   end
 
-  def prepare(prefix:, dependency: nil)
-    input = prepare_input(prefix:, dependency:)
+  def prepare(prefix:, dependency: nil, omit_completed_member: false)
+    input = prepare_input(prefix:, dependency:, omit_completed_member:)
     completion = execute(Coordinator::Write::Operations::ExecutePrepareReleaseSet, input)
     event = event_store.read(
       streams.release_set(input.fetch(:release_set_id)),
@@ -161,8 +161,9 @@ module ReleaseSetScenario
     { input:, completion:, event:, payload: load(event) }
   end
 
-  def authorized_members(prefix:, dependency: nil)
-    candidates = candidates(prefix:, dependency:)
+  def authorized_members(prefix:, dependency: nil, omit_completed_member: false)
+    candidates = candidates(prefix:, dependency:, extra_completed_member: omit_completed_member)
+    candidates = candidates.first(REPOSITORIES.length) if omit_completed_member
     candidates.each_with_index.map do |candidate, index|
       member_prefix = "#{prefix}-#{index + 1}"
       registration = MergeSnapshotScenario.register_candidates(
@@ -179,10 +180,11 @@ module ReleaseSetScenario
     end
   end
 
-  def candidates(prefix:, dependency: nil)
+  def candidates(prefix:, dependency: nil, extra_completed_member: false)
     change_set_id = "CS-release-#{prefix}"
     create_change_set(prefix:, change_set_id:)
-    work = REPOSITORIES.each_with_index.map do |repository_id, index|
+    repositories = extra_completed_member ? REPOSITORIES + [ "audit" ] : REPOSITORIES
+    work = repositories.each_with_index.map do |repository_id, index|
       create_work_item(prefix:, change_set_id:, repository_id:, index: index + 1)
     end
     create_release_dependency(prefix:, change_set_id:, producer: work.fetch(0), dependency:) if dependency

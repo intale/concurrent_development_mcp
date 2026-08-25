@@ -10,9 +10,10 @@ module CandidateObligationScenario
     level: "merge_gate",
     required_evidence: nil,
     source_path: "Gemfile.lock",
-    target_path: "app/services/checkout.rb"
+    target_path: "app/services/checkout.rb",
+    separate_work_items: false
   )
-    pair = submit_pair(prefix:, source_path:, target_path:)
+    pair = submit_pair(prefix:, source_path:, target_path:, separate_work_items:)
     policy_arguments = {
       prefix:,
       change_set_id: pair.dig(:ids, :change_set_id),
@@ -34,8 +35,20 @@ module CandidateObligationScenario
     target_path: "app/services/checkout.rb",
     observed_source: true,
     source_key: "dependency:rubygems:rails",
-    target_key: "dependency:rubygems:rails"
+    target_key: "dependency:rubygems:rails",
+    separate_work_items: false
   )
+    if separate_work_items
+      return submit_separate_pair(
+        prefix:,
+        source_path:,
+        target_path:,
+        observed_source:,
+        source_key:,
+        target_key:
+      )
+    end
+
     ids = {
       change_set_id: "CS-#{prefix}",
       work_item_id: "W-#{prefix}",
@@ -92,6 +105,120 @@ module CandidateObligationScenario
       source: source.merge(registration: registration_for(registrations, source.fetch(:candidate_id))),
       target: target.merge(registration: registration_for(registrations, target.fetch(:candidate_id)))
     }
+  end
+
+  def submit_separate_pair(prefix:, source_path:, target_path:, observed_source:, source_key:, target_key:)
+    change_set_id = "CS-#{prefix}"
+    execute(Coordinator::Write::Operations::ExecuteCreateChangeSet, {
+      command_id: "seed-create-#{change_set_id}",
+      actor: { kind: "agent", id: "planner-1" },
+      change_set_id:,
+      goal: "Coordinate Candidate compatibility",
+      acceptance_criteria: [ "Both Candidate results are attributable" ]
+    })
+    source_ids = seed_pair_attempt(
+      prefix:,
+      role: "source",
+      change_set_id:,
+      path: source_path
+    )
+    target_ids = seed_pair_attempt(
+      prefix:,
+      role: "target",
+      change_set_id:,
+      path: target_path
+    )
+    activate_pair(change_set_id, prefix:)
+    source_reservation = acquire_pair_attempt(source_ids, path: source_path, prefix:, role: "source")
+    target_reservation = acquire_pair_attempt(target_ids, path: target_path, prefix:, role: "target")
+    source = submit_candidate(
+      prefix:,
+      role: "source",
+      ids: source_ids,
+      reservation: source_reservation,
+      path: source_path,
+      head_commit_oid: head_oid(prefix, "source"),
+      build_context_path: nil,
+      surface: {
+        produces: [ { impact_key: source_key, before: "4.2", after: "5.0" } ],
+        consumes: [],
+        may_affect: [],
+        assumes: []
+      }
+    )
+    target = submit_candidate(
+      prefix:,
+      role: "target",
+      ids: target_ids,
+      reservation: target_reservation,
+      path: target_path,
+      head_commit_oid: head_oid(prefix, "target"),
+      build_context_path: observed_source ? source_path : nil,
+      surface: {
+        produces: [],
+        consumes: [],
+        may_affect: [],
+        assumes: [ { impact_key: target_key, predicate: "4.2 remains compatible" } ]
+      }
+    )
+    source = CandidateScenario.complete(source)
+    target = CandidateScenario.complete(target)
+    registrations = registry_events(change_set_id)
+    {
+      ids: { change_set_id: },
+      source: source.merge(registration: registration_for(registrations, source.fetch(:candidate_id))),
+      target: target.merge(registration: registration_for(registrations, target.fetch(:candidate_id)))
+    }
+  end
+
+  def seed_pair_attempt(prefix:, role:, change_set_id:, path:)
+    work_item_id = "W-#{role}-#{prefix}"
+    attempt_id = "A-#{role}-#{prefix}"
+    execute(Coordinator::Write::Operations::ExecuteCreateWorkItem, {
+      command_id: "seed-create-#{work_item_id}",
+      actor: { kind: "agent", id: "planner-1" },
+      change_set_id:,
+      work_item_id:,
+      repository_id: "billing",
+      goal: "Produce #{role} Candidate",
+      acceptance_criteria: [ "#{path} is checkpointed" ]
+    })
+    { change_set_id:, work_item_id:, attempt_id: }
+  end
+
+  def activate_pair(change_set_id, prefix:)
+    execute(Coordinator::Write::Operations::ExecuteActivateChangeSet, {
+      command_id: "seed-activate-#{prefix}",
+      actor: { kind: "agent", id: "planner-1" },
+      change_set_id:
+    })
+    activation = event_store.read(
+      streams.change_set(change_set_id),
+      Coordinator::Write::EventQueries::CHANGE_SET_FOR_ACQUISITION
+    ).find { _1.type == "ChangeSetActivated" }
+    Coordinator::Processes::ProcessManagers::ChangeSetReadiness.new(event_store:).call(activation)
+  end
+
+  def acquire_pair_attempt(ids, path:, prefix:, role:)
+    execute(Coordinator::Write::Operations::ExecuteAcquireWorkItem, {
+      command_id: "seed-acquire-#{role}-#{prefix}",
+      actor: { kind: "agent", id: "agent-a" },
+      change_set_id: ids.fetch(:change_set_id),
+      work_item_id: ids.fetch(:work_item_id),
+      attempt_id: ids.fetch(:attempt_id),
+      base_snapshots: [ { repository_id: "billing", commit_oid: "a" * 40 } ]
+    })
+    execute(Coordinator::Write::Operations::ExecuteReserveWriteSet, {
+      command_id: "seed-reserve-#{role}-#{prefix}",
+      actor: { kind: "agent", id: "agent-a" },
+      change_set_id: ids.fetch(:change_set_id),
+      work_item_id: ids.fetch(:work_item_id),
+      attempt_id: ids.fetch(:attempt_id),
+      repository_id: "billing",
+      base_commit_oid: "a" * 40,
+      resources: [ { kind: "file", path:, base_blob_oid: "c" * 40 } ],
+      lease_duration_seconds: 900
+    }).data
   end
 
   def activate_policy(
@@ -421,7 +548,8 @@ module CandidateObligationScenario
     candidate = {
       candidate_id:,
       input:,
-      events: CandidateScenario.candidate_events(candidate_id)
+      events: CandidateScenario.candidate_events(candidate_id),
+      reservation:
     }
     CandidateScenario.submit_impact(
       candidate,

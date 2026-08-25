@@ -32,12 +32,14 @@ module Coordinator::Write
       def call(command, decided_at:)
         reasons = []
         snapshot = load_snapshot(command, reasons)
-        return evaluation(command, snapshot:, current_policy: nil, candidates: [], obligations: [], reasons:) unless snapshot
+        return evaluation(command, snapshot:, current_policy: nil, candidates: [], work_item_progress: [], obligations: [], reasons:) unless snapshot
 
         validate_snapshot_binding(command, snapshot, reasons)
         validate_target_base(command, snapshot.registration, reasons)
         change_set_id = change_set_id(snapshot.registration, reasons)
-        return evaluation(command, snapshot:, current_policy: nil, candidates: [], obligations: [], reasons:) unless change_set_id
+        return evaluation(command, snapshot:, current_policy: nil, candidates: [], work_item_progress: [], obligations: [], reasons:) unless change_set_id
+
+        work_item_progress = load_work_item_progress(snapshot.registration, change_set_id, reasons)
 
         current_policy = load_current_policy(change_set_id, decided_at:)
         unless expected_policy_matches?(command.expected_impact_policy, current_policy)
@@ -50,8 +52,12 @@ module Coordinator::Write
             observed_digest: current_policy.definition_digest
           )
         end
-        return evaluation(command, snapshot:, current_policy:, candidates: [], obligations: [], reasons:) unless reasons.empty?
-        return evaluation(command, snapshot:, current_policy:, candidates: [], obligations: [], reasons:) unless current_policy.gating?
+        unless reasons.empty?
+          return evaluation(command, snapshot:, current_policy:, candidates: [], work_item_progress:, obligations: [], reasons:)
+        end
+        unless current_policy.gating?
+          return evaluation(command, snapshot:, current_policy:, candidates: [], work_item_progress:, obligations: [], reasons:)
+        end
 
         candidate_evidence, candidate_references = load_candidate_surfaces(
           snapshot.registration,
@@ -68,6 +74,7 @@ module Coordinator::Write
           snapshot:,
           current_policy:,
           candidates: candidate_references,
+          work_item_progress:,
           obligations:,
           reasons:
         )
@@ -155,6 +162,159 @@ module Coordinator::Write
           message: "Version 1 authorizes Candidates from exactly one ChangeSet"
         )
         nil
+      end
+
+      def load_work_item_progress(registration, change_set_id, reasons)
+        change_set_events = @event_store.read(
+          @stream_factory.change_set(change_set_id),
+          EventQueries::CHANGE_SET_FOR_MERGE_AUTHORIZATION
+        )
+        change_set_state = Domain::ChangeSets::State.reduce(change_set_events.map { load_event(_1) })
+        satisfactions = change_set_events.filter_map do |event|
+          next unless event.type == "WorkItemDependencySatisfied"
+
+          payload = load_event(event)
+          [ payload.dependency_id, [ payload, event_reference(event) ] ]
+        end.to_h
+
+        registration.ordered_candidates.filter_map do |candidate|
+          reason_count = reasons.length
+          unless change_set_state.work_item_ids.include?(candidate.work_item_id)
+            reasons << reason(
+              code: "candidate_work_item_not_member",
+              message: "Snapshot Candidate WorkItem is not a frozen ChangeSet member",
+              candidate_id: candidate.candidate_id,
+              work_item_id: candidate.work_item_id
+            )
+            next
+          end
+
+          events = @event_store.read(
+            @stream_factory.work_item(candidate.work_item_id),
+            EventQueries::WORK_ITEM_FOR_MERGE_AUTHORIZATION
+          ).to_h { [ _1.type, _1 ] }
+          created_event = events["WorkItemCreated"]
+          selected_event = events["WorkItemCandidateSelected"]
+          completed_event = events["WorkItemCompleted"]
+          created = created_event && load_event(created_event)
+          selected = selected_event && load_event(selected_event)
+          completed = completed_event && load_event(completed_event)
+
+          validate_work_item_scope(created, candidate, change_set_id, reasons)
+          validate_selection(selected, selected_event, candidate, reasons)
+          validate_completion(completed, completed_event, candidate, reasons)
+          incoming = dependency_progress(
+            change_set_state,
+            satisfactions,
+            candidate,
+            reasons
+          )
+          next unless reasons.length == reason_count
+
+          WorkItemProgressV1.new(
+            change_set_id:,
+            work_item_id: candidate.work_item_id,
+            repository_id: candidate.repository_id,
+            attempt_id: candidate.attempt_id,
+            candidate_id: candidate.candidate_id,
+            candidate_event: candidate.candidate_event,
+            selected_event: event_reference(selected_event),
+            completed_event: event_reference(completed_event),
+            incoming_dependencies: incoming
+          )
+        end.freeze
+      end
+
+      def validate_work_item_scope(created, candidate, change_set_id, reasons)
+        return if created.is_a?(Events::WorkItemCreatedV1) &&
+                  created.change_set_id == change_set_id &&
+                  created.work_item_id == candidate.work_item_id &&
+                  created.repository_id == candidate.repository_id
+
+        reasons << reason(
+          code: "candidate_work_item_scope_invalid",
+          message: "Snapshot Candidate WorkItem scope does not match authoritative history",
+          candidate_id: candidate.candidate_id,
+          work_item_id: candidate.work_item_id
+        )
+      end
+
+      def validate_selection(selected, selected_event, candidate, reasons)
+        unless selected
+          reasons << reason(
+            code: "candidate_not_selected",
+            message: "Snapshot Candidate has not been selected by its WorkItem",
+            candidate_id: candidate.candidate_id,
+            work_item_id: candidate.work_item_id,
+            expected_reference: candidate.candidate_event
+          )
+          return
+        end
+        return if selected.is_a?(Events::WorkItemCandidateSelectedV1) &&
+                  selected.change_set_id == candidate.change_set_id &&
+                  selected.work_item_id == candidate.work_item_id &&
+                  selected.attempt_id == candidate.attempt_id &&
+                  selected.candidate_id == candidate.candidate_id &&
+                  selected.candidate_event == candidate.candidate_event
+
+        reasons << reason(
+          code: "candidate_selection_mismatch",
+          message: "WorkItem selected a different Candidate or Attempt",
+          candidate_id: candidate.candidate_id,
+          work_item_id: candidate.work_item_id,
+          expected_reference: candidate.candidate_event,
+          observed_reference: selected_event && event_reference(selected_event)
+        )
+      end
+
+      def validate_completion(completed, completed_event, candidate, reasons)
+        unless completed
+          reasons << reason(
+            code: "candidate_work_item_not_completed",
+            message: "Snapshot Candidate WorkItem has not completed",
+            candidate_id: candidate.candidate_id,
+            work_item_id: candidate.work_item_id
+          )
+          return
+        end
+        return if completed.is_a?(Events::WorkItemCompletedV1) &&
+                  completed.change_set_id == candidate.change_set_id &&
+                  completed.work_item_id == candidate.work_item_id &&
+                  completed.attempt_id == candidate.attempt_id &&
+                  completed.candidate_id == candidate.candidate_id &&
+                  completed.candidate_event == candidate.candidate_event
+
+        reasons << reason(
+          code: "candidate_completion_mismatch",
+          message: "WorkItem completed with a different Candidate or Attempt",
+          candidate_id: candidate.candidate_id,
+          work_item_id: candidate.work_item_id,
+          observed_reference: completed_event && event_reference(completed_event)
+        )
+      end
+
+      def dependency_progress(change_set_state, satisfactions, candidate, reasons)
+        change_set_state.dependencies.filter_map do |dependency|
+          next unless dependency.consumer_work_item_id == candidate.work_item_id
+
+          satisfaction = satisfactions[dependency.dependency_id]
+          unless satisfaction
+            reasons << reason(
+              code: "candidate_dependency_unsatisfied",
+              message: "Snapshot Candidate WorkItem has an unsatisfied incoming dependency",
+              candidate_id: candidate.candidate_id,
+              work_item_id: candidate.work_item_id,
+              dependency_id: dependency.dependency_id
+            )
+            next
+          end
+          payload, reference = satisfaction
+          DependencyProgressV1.new(
+            dependency_id: dependency.dependency_id,
+            satisfaction_event: reference,
+            source_event: payload.source_event
+          )
+        end.freeze
       end
 
       def load_current_policy(change_set_id, decided_at:)
@@ -442,13 +602,14 @@ module Coordinator::Write
         )
       end
 
-      def evaluation(command, snapshot:, current_policy:, candidates:, obligations:, reasons:)
+      def evaluation(command, snapshot:, current_policy:, candidates:, work_item_progress:, obligations:, reasons:)
         EvaluationV1.new(
           merge_snapshot_id: command.merge_snapshot_id,
           snapshot:,
           target_base_observation: command.target_base_observation,
           current_policy:,
           candidates:,
+          work_item_progress:,
           obligations:,
           reasons: reasons.freeze
         )
@@ -457,6 +618,8 @@ module Coordinator::Write
       def reason(code:, message:, **attributes)
         defaults = {
           candidate_id: nil,
+          work_item_id: nil,
+          dependency_id: nil,
           source_candidate_id: nil,
           target_candidate_id: nil,
           obligation_id: nil,

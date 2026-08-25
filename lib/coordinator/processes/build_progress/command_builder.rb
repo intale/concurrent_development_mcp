@@ -43,6 +43,42 @@ module Coordinator::Processes
           decision_identity: identity
         )
       end
+
+      def completion(source:)
+        release_set_id = source.payload.release_set_id if
+          source.payload.is_a?(Coordinator::Write::Events::ReleaseSetCompletedV1)
+        document = Coordinator::Write::ProcessDecisions::ChangeSetCompletionV1.new(
+          schema: "process-decision/change-set-completion/v1",
+          process_manager: "build-progress",
+          policy_version: "change-set-completion/v1",
+          source_event: source.reference,
+          change_set_id: source.change_set_id,
+          release_set_id:,
+          process_step: "complete-change-set"
+        )
+        compound_marker = @compound_marker_builder.call(
+          CompoundMarkerDefinitionV1.new(
+            purpose: "process-decision",
+            components: document.component_markers
+          )
+        )
+        command_id = "change-set-completion:v1:#{compound_marker.digest.delete_prefix("sha256:")}"
+        identity = Coordinator::Write::ChangeSetCompletionDecisionIdentity.new(
+          document:,
+          compound_marker:,
+          command_id:
+        )
+
+        Coordinator::Write::Commands::CompleteChangeSet.new(
+          command_id:,
+          actor: ACTOR,
+          change_set_id: source.change_set_id,
+          source_event: source.reference,
+          release_set_id:,
+          rule_version: "change-set-completion/v1",
+          decision_identity: identity
+        )
+      end
     end
   end
 end

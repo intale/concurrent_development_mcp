@@ -274,6 +274,9 @@ module Coordinator::Write
       attribute :obligations,
                 Types::Array.of(MergeAuthorizations::ObligationCheckV1)
                   .constrained(max_size: Types::MERGE_AUTHORIZATION_MAXIMUM_OBLIGATIONS)
+      attribute :work_item_progress,
+                Types::Array.of(MergeAuthorizations::WorkItemProgressV1)
+                  .constrained(max_size: Types::MERGE_SNAPSHOT_MAXIMUM_CANDIDATES)
       attribute :decided_at, Types::Timestamp
     end
 
@@ -384,6 +387,17 @@ module Coordinator::Write
       attribute :satisfied_at, Types::Timestamp
     end
 
+    class ChangeSetCompletion < Value
+      Evidence = ChangeSetCompletions::WorkItemEvidenceV1
+
+      attribute :change_set_id, Types::Identifier
+      attribute :work_item_completions,
+                Types::Array.of(Evidence).constrained(min_size: 1, max_size: 100)
+      attribute :release_set_completion_event, EventReference.optional
+      attribute :completion_event, EventReference
+      attribute :completed_at, Types::Timestamp
+    end
+
     Type = ChangeSet |
            WorkItem |
            Dependency |
@@ -415,6 +429,7 @@ module Coordinator::Write
            ReleaseSetActivation |
            ReleaseSetCompensationRequest |
            ReleaseSetCompletion |
-           DependencySatisfaction
+           DependencySatisfaction |
+           ChangeSetCompletion
   end
 end

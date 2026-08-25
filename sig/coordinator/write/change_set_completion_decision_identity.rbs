@@ -1,0 +1,7 @@
+module Coordinator::Write
+  class ChangeSetCompletionDecisionIdentity < Coordinator::Shared::Value
+    def document: () -> ProcessDecisions::ChangeSetCompletionV1
+    def compound_marker: () -> Coordinator::Shared::CompoundMarker
+    def command_id: () -> String
+  end
+end

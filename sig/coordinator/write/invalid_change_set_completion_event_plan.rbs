@@ -1,0 +1,4 @@
+module Coordinator::Write
+  class InvalidChangeSetCompletionEventPlan < StandardError
+  end
+end

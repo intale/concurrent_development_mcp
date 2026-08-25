@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandReceiptData
-      type value = ChangeSet | WorkItem | Dependency | Attempt | WorkItemCompletion | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver | MergeSnapshotRegistration | MergeSnapshotVerification | MergeAuthorization | MergeObservation | ReleaseSetPreparation | RepositoryIntegration | ReleaseSetVerification | ReleaseSetActivation | ReleaseSetCompensationRequest | ReleaseSetCompletion | DependencySatisfaction
+      type value = ChangeSet | WorkItem | Dependency | Attempt | WorkItemCompletion | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver | MergeSnapshotRegistration | MergeSnapshotVerification | MergeAuthorization | MergeObservation | ReleaseSetPreparation | RepositoryIntegration | ReleaseSetVerification | ReleaseSetActivation | ReleaseSetCompensationRequest | ReleaseSetCompletion | DependencySatisfaction | ChangeSetCompletion
 
       class ChangeSet < Shared::Value
         def change_set_id: () -> String
@@ -44,6 +44,16 @@ module Coordinator
         def satisfaction_event: () -> EventReference
         def readiness_event: () -> EventReference?
         def satisfied_at: () -> String
+      end
+
+      class ChangeSetCompletion < Shared::Value
+        Evidence: singleton(ChangeSetCompletions::WorkItemEvidenceV1)
+
+        def change_set_id: () -> String
+        def work_item_completions: () -> Array[ChangeSetCompletions::WorkItemEvidenceV1]
+        def release_set_completion_event: () -> EventReference?
+        def completion_event: () -> EventReference
+        def completed_at: () -> String
       end
 
 
@@ -267,6 +277,7 @@ module Coordinator
         def decision_event: () -> EventReference
         def reasons: () -> Array[MergeAuthorizations::ReasonV1]
         def obligations: () -> Array[MergeAuthorizations::ObligationCheckV1]
+        def work_item_progress: () -> Array[MergeAuthorizations::WorkItemProgressV1]
         def decided_at: () -> String
       end
 

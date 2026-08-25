@@ -1,0 +1,6 @@
+module Coordinator::Write::Domain::ChangeSets
+  class Complete
+    def initialize: (?stream_factory: Coordinator::Write::StreamFactory) -> void
+    def call: (state: State, work_items: Array[Coordinator::Write::ChangeSetCompletions::WorkItemEvidenceV1], release_state: Coordinator::Write::Domain::ReleaseSets::LifecycleStateV1?, command: Coordinator::Write::Commands::CompleteChangeSet, completed_at: String) -> Dry::Monads::Result
+  end
+end

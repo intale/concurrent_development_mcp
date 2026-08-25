@@ -1,0 +1,11 @@
+module Coordinator::Write::Events
+  class ChangeSetCompletedV1 < Base
+    Evidence: singleton(Coordinator::Write::ChangeSetCompletions::WorkItemEvidenceV1)
+
+    def change_set_id: () -> String
+    def work_item_completions: () -> Array[Coordinator::Write::ChangeSetCompletions::WorkItemEvidenceV1]
+    def release_set_completion_event: () -> Coordinator::Write::EventReference?
+    def rule_version: () -> String
+    def completed_at: () -> String
+  end
+end

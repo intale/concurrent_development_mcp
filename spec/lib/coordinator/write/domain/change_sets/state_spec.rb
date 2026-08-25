@@ -81,4 +81,51 @@ RSpec.describe Coordinator::Write::Domain::ChangeSets::State do
 
     expect(state.status).to eq("active")
   end
+
+  it "folds terminal completion without discarding the frozen graph" do
+    reference = Coordinator::Write::EventReference.new(
+      event_id: "0198c000-0000-7000-8000-000000000009",
+      type: "WorkItemCompleted",
+      stream_context: "DevelopmentExecution",
+      stream_name: "WorkItem",
+      stream_id: "W-100",
+      stream_revision: 4
+    )
+    completion = Coordinator::Write::ChangeSetCompletions::WorkItemEvidenceV1.new(
+      change_set_id: "CS-100",
+      work_item_id: "W-100",
+      repository_id: "billing",
+      attempt_id: "A-100",
+      candidate_id: "CAN-100",
+      candidate_event: reference,
+      selected_event: reference,
+      completed_event: reference,
+      completed_at: "2026-08-25T08:00:00.000000Z"
+    )
+    state = described_class.reduce([
+      Coordinator::Write::Events::ChangeSetCreatedV1.new(
+        change_set_id: "CS-100",
+        goal: "Coordinate billing changes",
+        created_at: "2026-08-20T14:10:00.000000Z"
+      ),
+      Coordinator::Write::Events::ChangeSetActivatedV1.new(
+        change_set_id: "CS-100",
+        work_item_count: 1,
+        dependency_count: 0,
+        activated_at: "2026-08-20T14:15:00.000000Z"
+      ),
+      Coordinator::Write::Events::ChangeSetCompletedV1.new(
+        change_set_id: "CS-100",
+        work_item_completions: [ completion ],
+        release_set_completion_event: nil,
+        rule_version: "change-set-completion/v1",
+        completed_at: "2026-08-25T08:00:00.000000Z"
+      )
+    ])
+
+    expect(state).to have_attributes(
+      status: "completed",
+      completed_at: "2026-08-25T08:00:00.000000Z"
+    )
+  end
 end

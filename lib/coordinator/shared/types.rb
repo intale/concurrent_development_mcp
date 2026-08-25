@@ -296,6 +296,13 @@ module Coordinator::Shared
       merge_snapshot_not_verified
       target_base_binding_stale
       mixed_change_set_snapshot
+      candidate_work_item_not_member
+      candidate_work_item_scope_invalid
+      candidate_not_selected
+      candidate_selection_mismatch
+      candidate_work_item_not_completed
+      candidate_completion_mismatch
+      candidate_dependency_unsatisfied
       impact_policy_context_stale
       candidate_impact_surface_missing
       required_obligation_missing

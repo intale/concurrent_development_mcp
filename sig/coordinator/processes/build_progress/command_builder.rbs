@@ -4,5 +4,6 @@ module Coordinator::Processes::BuildProgress
     RULE_VERSION: String
     def initialize: (?compound_marker_builder: Coordinator::Shared::CompoundMarkerBuilder) -> void
     def call: (source: SourceV1, dependency: Coordinator::Write::Domain::ChangeSets::Dependency) -> Coordinator::Write::Commands::SatisfyWorkItemDependency
+    def completion: (source: SourceV1) -> Coordinator::Write::Commands::CompleteChangeSet
   end
 end

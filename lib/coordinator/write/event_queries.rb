@@ -402,11 +402,34 @@ module Coordinator::Write
       direction: :asc
     )
 
+    CHANGE_SET_FOR_COMPLETION = EventReadCriteria.new(
+      event_types: [
+        "ChangeSetCreated",
+        "WorkItemAddedToChangeSet",
+        "WorkItemDependencyDeclared",
+        "WorkItemDependencySatisfied",
+        "ChangeSetActivated",
+        "ChangeSetCompleted"
+      ],
+      maximum_count: 1_103,
+      direction: :asc
+    )
+
+    CHANGE_SET_FOR_MERGE_AUTHORIZATION = CHANGE_SET_FOR_COMPLETION
+
     WORK_ITEM_FOR_READINESS_EVALUATION = EventReadCriteria.new(
       event_types: [ "WorkItemCreated", "WorkItemMadeReady", "WorkItemAcquired", "WorkItemCompleted" ],
       maximum_count: 4,
       direction: :asc
     )
+
+    WORK_ITEM_FOR_CHANGE_SET_COMPLETION = EventReadCriteria.new(
+      event_types: [ "WorkItemCreated", "WorkItemCandidateSelected", "WorkItemCompleted" ],
+      maximum_count: 3,
+      direction: :asc
+    )
+
+    WORK_ITEM_FOR_MERGE_AUTHORIZATION = WORK_ITEM_FOR_CHANGE_SET_COMPLETION
 
     CHANGE_SET_FOR_ACQUISITION = EventReadCriteria.new(
       event_types: [

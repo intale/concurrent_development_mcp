@@ -1,0 +1,13 @@
+module Coordinator::Write::ChangeSetCompletions
+  class WorkItemEvidenceV1 < Coordinator::Shared::Value
+    def change_set_id: () -> String
+    def work_item_id: () -> String
+    def repository_id: () -> String
+    def attempt_id: () -> String
+    def candidate_id: () -> String
+    def candidate_event: () -> Coordinator::Write::EventReference
+    def selected_event: () -> Coordinator::Write::EventReference
+    def completed_event: () -> Coordinator::Write::EventReference
+    def completed_at: () -> String
+  end
+end

@@ -158,6 +158,125 @@ RSpec.describe Coordinator::Processes::ProcessManagers::BuildProgress, :event_st
     expect(release_dependency_events(deployment).length).to eq(1)
   end
 
+  it "completes a single-repository ChangeSet from exact WorkItem evidence once" do
+    candidate = CandidateScenario.submit(prefix: "change-set-single")
+    completed = CandidateScenario.complete(candidate)
+    source = event_store.read(
+      streams.work_item(completed.dig(:input, :work_item_id)),
+      Coordinator::Write::EventQueries::WORK_ITEM_FOR_CHANGE_SET_COMPLETION
+    ).find { _1.type == "WorkItemCompleted" }
+
+    expect(process_manager.call(source)).to be_nil
+    expect(process_manager.call(source)).to be_nil
+
+    completion = change_set_completion(completed.dig(:input, :change_set_id))
+    payload = ReleaseSetScenario.load(completion)
+    expect(payload.work_item_completions.map(&:work_item_id)).to eq([
+      completed.dig(:input, :work_item_id)
+    ])
+    expect(payload.release_set_completion_event).to be_nil
+    expect(completion.causation_id).to eq(source.id)
+    expect(completion.correlation_id).to eq(source.correlation_id)
+  end
+
+  it "waits for an exact activated ReleaseSet before completing a multi-repository ChangeSet" do
+    prepared = ReleaseSetScenario.prepare(prefix: "change-set-multi")
+    work_item_sources(prepared).each { process_manager.call(_1) }
+    expect(change_set_completions(prepared.fetch(:payload).change_set_id)).to be_empty
+
+    integrations = ReleaseSetScenario.integrate_all(prepared, prefix: "change-set-multi")
+    verification = ReleaseSetScenario.record_verification(
+      prepared,
+      integrations:,
+      prefix: "change-set-multi"
+    )
+    activation = ReleaseSetScenario.record_activation(
+      prepared,
+      verification:,
+      prefix: "change-set-multi"
+    )
+    Coordinator::Processes::ProcessManagers::ReleaseSetLifecycle.new(event_store:).call(
+      activation.fetch(:event)
+    )
+    release_completion = ReleaseSetScenario.release_lifecycle_events(
+      prepared.dig(:input, :release_set_id)
+    ).find { _1.type == "ReleaseSetCompleted" }
+
+    expect(process_manager.call(release_completion)).to be_nil
+
+    completion = change_set_completion(prepared.fetch(:payload).change_set_id)
+    payload = ReleaseSetScenario.load(completion)
+    expect(payload.work_item_completions.map(&:candidate_id).sort).to eq(
+      prepared.fetch(:payload).ordered_members.flat_map do |member|
+        member.ordered_candidates.map(&:candidate_id)
+      end.sort
+    )
+    expect(payload.release_set_completion_event).to eq(
+      ReleaseSetScenario.reference(release_completion)
+    )
+  end
+
+  it "does not complete from a compensated ReleaseSet" do
+    prepared = ReleaseSetScenario.prepare(prefix: "change-set-compensated")
+    observation = ReleaseSetScenario.observe_member(
+      prepared,
+      index: 0,
+      prefix: "change-set-compensated"
+    )
+    ReleaseSetScenario.record_integration(
+      prepared,
+      index: 0,
+      prefix: "change-set-compensated",
+      observation:
+    )
+    failure = ReleaseSetScenario.record_integration(
+      prepared,
+      index: 1,
+      prefix: "change-set-compensated",
+      failure: release_failure("change-set-compensated")
+    )
+    lifecycle = Coordinator::Processes::ProcessManagers::ReleaseSetLifecycle.new(event_store:)
+    lifecycle.call(failure.fetch(:event))
+    request = ReleaseSetScenario.release_lifecycle_events(
+      prepared.dig(:input, :release_set_id)
+    ).find { _1.type == "ReleaseSetCompensationRequested" }
+    completion = ReleaseSetScenario.complete_compensation(
+      prepared,
+      request: { event: request, payload: ReleaseSetScenario.load(request) },
+      prefix: "change-set-compensated"
+    )
+
+    expect(process_manager.call(completion.fetch(:event))).to be_nil
+    expect(change_set_completions(prepared.fetch(:payload).change_set_id)).to be_empty
+  end
+
+  it "does not complete when an activated ReleaseSet omits a completed WorkItem result" do
+    prepared = ReleaseSetScenario.prepare(
+      prefix: "change-set-coverage",
+      omit_completed_member: true
+    )
+    integrations = ReleaseSetScenario.integrate_all(prepared, prefix: "change-set-coverage")
+    verification = ReleaseSetScenario.record_verification(
+      prepared,
+      integrations:,
+      prefix: "change-set-coverage"
+    )
+    activation = ReleaseSetScenario.record_activation(
+      prepared,
+      verification:,
+      prefix: "change-set-coverage"
+    )
+    Coordinator::Processes::ProcessManagers::ReleaseSetLifecycle.new(event_store:).call(
+      activation.fetch(:event)
+    )
+    completion = ReleaseSetScenario.release_lifecycle_events(
+      prepared.dig(:input, :release_set_id)
+    ).find { _1.type == "ReleaseSetCompleted" }
+
+    expect(process_manager.call(completion)).to be_nil
+    expect(change_set_completions(prepared.fetch(:payload).change_set_id)).to be_empty
+  end
+
   it "publishes one unique multi-stream subscription definition" do
     definition = Coordinator::Processes::Subscriptions::BuildProgress::DEFINITION
 
@@ -191,5 +310,36 @@ RSpec.describe Coordinator::Processes::ProcessManagers::BuildProgress, :event_st
       streams.change_set(prepared.fetch(:payload).change_set_id),
       Coordinator::Write::EventQueries::CHANGE_SET_FOR_DEPENDENCY_SATISFACTION
     ).select { _1.type == "WorkItemDependencySatisfied" }
+  end
+
+  def work_item_sources(prepared)
+    prepared.fetch(:payload).ordered_members.flat_map(&:ordered_candidates).map do |candidate|
+      event_store.read(
+        streams.work_item(candidate.work_item_id),
+        Coordinator::Write::EventQueries::WORK_ITEM_FOR_CHANGE_SET_COMPLETION
+      ).find { _1.type == "WorkItemCompleted" }
+    end
+  end
+
+  def change_set_completion(change_set_id)
+    change_set_completions(change_set_id).sole
+  end
+
+  def change_set_completions(change_set_id)
+    event_store.read(
+      streams.change_set(change_set_id),
+      Coordinator::Write::EventQueries::CHANGE_SET_FOR_COMPLETION
+    ).select { _1.type == "ChangeSetCompleted" }
+  end
+
+  def release_failure(prefix)
+    {
+      code: "deployment-failed",
+      summary: "Repository integration failed",
+      producer: { name: "release-adapter", version: "1.0.0" },
+      run_id: "release-failure-#{prefix}",
+      result_digest: "sha256:#{'d' * 64}",
+      occurred_at: "2026-08-25T08:30:00.000000Z"
+    }
   end
 end

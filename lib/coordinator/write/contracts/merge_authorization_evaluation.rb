@@ -32,6 +32,9 @@ module Coordinator::Write
           unless evaluation.obligations.all? { %w[satisfied waived].include?(_1.status) }
             key(:evaluation).failure("must grant only when every required obligation permits integration")
           end
+          unless exact_work_item_progress?(evaluation)
+            key(:evaluation).failure("must grant only with exact selected, completed, dependency-satisfied WorkItem evidence")
+          end
         elsif evaluation.reasons.empty?
           key(:evaluation).failure("must explain a denied authorization")
         end
@@ -40,6 +43,11 @@ module Coordinator::Write
         key(:evaluation).failure("must not repeat Candidate evidence") unless candidate_ids.uniq.length == candidate_ids.length
         obligation_ids = evaluation.obligations.map(&:obligation_id)
         key(:evaluation).failure("must not repeat obligation checks") unless obligation_ids.uniq.length == obligation_ids.length
+        progress_ids = evaluation.work_item_progress.map { [ _1.work_item_id, _1.candidate_id ] }
+        key(:evaluation).failure("must not repeat WorkItem progress evidence") unless progress_ids.uniq.length == progress_ids.length
+        unless evaluation.work_item_progress.all? { unique_dependencies?(_1) }
+          key(:evaluation).failure("must not repeat dependency progress evidence")
+        end
       end
 
       private
@@ -68,6 +76,35 @@ module Coordinator::Write
           expected && expected.partition_event == current.partition_event &&
             expected.head == current.head && expected.definition_digest == current.definition_digest
         end
+      end
+
+      def exact_work_item_progress?(evaluation)
+        expected = evaluation.snapshot.registration.ordered_candidates.map do |candidate|
+          [
+            candidate.change_set_id,
+            candidate.work_item_id,
+            candidate.repository_id,
+            candidate.attempt_id,
+            candidate.candidate_id,
+            candidate.candidate_event
+          ]
+        end
+        observed = evaluation.work_item_progress.map do |progress|
+          [
+            progress.change_set_id,
+            progress.work_item_id,
+            progress.repository_id,
+            progress.attempt_id,
+            progress.candidate_id,
+            progress.candidate_event
+          ]
+        end
+        expected == observed
+      end
+
+      def unique_dependencies?(progress)
+        ids = progress.incoming_dependencies.map(&:dependency_id)
+        ids.uniq.length == ids.length
       end
     end
   end

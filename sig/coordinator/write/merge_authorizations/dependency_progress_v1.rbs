@@ -1,0 +1,7 @@
+module Coordinator::Write::MergeAuthorizations
+  class DependencyProgressV1 < Coordinator::Shared::Value
+    def dependency_id: () -> String
+    def satisfaction_event: () -> Coordinator::Write::EventReference
+    def source_event: () -> Coordinator::Write::EventReference
+  end
+end

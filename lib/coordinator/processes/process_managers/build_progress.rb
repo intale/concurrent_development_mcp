@@ -12,8 +12,17 @@ module Coordinator::Processes
       }.freeze
       HANDLED_OUTCOME_CODES = %i[
         change_set_not_active
+        change_set_already_completed
+        change_set_completion_source_mismatch
         dependency_already_satisfied
         dependency_source_mismatch
+        dependency_unsatisfied
+        release_change_set_mismatch
+        release_coverage_mismatch
+        release_not_activated
+        release_required
+        work_item_completion_invalid
+        work_item_incomplete
       ].freeze
 
       def initialize(
@@ -21,6 +30,7 @@ module Coordinator::Processes
         source_builder: Coordinator::Processes::BuildProgress::SourceBuilder.new,
         command_builder: Coordinator::Processes::BuildProgress::CommandBuilder.new,
         satisfy_dependency: Coordinator::Write::Operations::ExecuteSatisfyWorkItemDependency.new(event_store:),
+        complete_change_set: Coordinator::Write::Operations::ExecuteCompleteChangeSet.new(event_store:),
         schema_registry: Coordinator::Write::EventSchemaRegistry.new,
         stream_factory: Coordinator::Write::StreamFactory.new
       )
@@ -28,6 +38,7 @@ module Coordinator::Processes
         @source_builder = source_builder
         @command_builder = command_builder
         @satisfy_dependency = satisfy_dependency
+        @complete_change_set = complete_change_set
         @schema_registry = schema_registry
         @stream_factory = stream_factory
       end
@@ -37,12 +48,24 @@ module Coordinator::Processes
         dependencies_for(source).each do |dependency|
           command = @command_builder.call(source:, dependency:)
           result = @satisfy_dependency.call_command(command)
-          handle_result!(result, command:)
+          handle_result!(result, identifier: command.dependency_id)
         end
+        complete(source) if completion_source?(source)
         nil
       end
 
       private
+
+      def completion_source?(source)
+        source.payload.is_a?(Coordinator::Write::Events::WorkItemCompletedV1) ||
+          source.payload.is_a?(Coordinator::Write::Events::ReleaseSetCompletedV1)
+      end
+
+      def complete(source)
+        command = @command_builder.completion(source:)
+        result = @complete_change_set.call_command(command)
+        handle_result!(result, identifier: command.change_set_id)
+      end
 
       def dependencies_for(source)
         kinds = SOURCE_DEPENDENCY_KINDS.fetch(source.payload.class)
@@ -65,13 +88,13 @@ module Coordinator::Processes
         Coordinator::Write::Domain::ChangeSets::State.reduce(events)
       end
 
-      def handle_result!(result, command:)
+      def handle_result!(result, identifier:)
         return if result.success?
         return if HANDLED_OUTCOME_CODES.include?(result.failure.code)
 
         failure = result.failure
         raise BuildProgressProcessRejected,
-              "#{command.dependency_id}: #{failure.code} - #{failure.message}"
+              "#{identifier}: #{failure.code} - #{failure.message}"
       end
     end
   end

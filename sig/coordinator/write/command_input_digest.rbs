@@ -72,6 +72,8 @@ module Coordinator
       def release_compensation_complete_document: (Commands::CompleteCompensatedReleaseSet command) -> CommandInputDocuments::CompleteCompensatedReleaseSetV1
       def dependency_satisfaction_policy: (Commands::SatisfyWorkItemDependency command) -> String
       def dependency_satisfaction_policy_document: (Commands::SatisfyWorkItemDependency command) -> CommandInputDocuments::SatisfyWorkItemDependencyV1
+      def change_set_completion_policy: (Commands::CompleteChangeSet command) -> String
+      def change_set_completion_policy_document: (Commands::CompleteChangeSet command) -> CommandInputDocuments::CompleteChangeSetV1
     end
   end
 end

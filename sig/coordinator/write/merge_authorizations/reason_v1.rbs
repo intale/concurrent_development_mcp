@@ -5,6 +5,8 @@ module Coordinator
         def code: () -> String
         def message: () -> String
         def candidate_id: () -> String?
+        def work_item_id: () -> String?
+        def dependency_id: () -> String?
         def source_candidate_id: () -> String?
         def target_candidate_id: () -> String?
         def obligation_id: () -> String?

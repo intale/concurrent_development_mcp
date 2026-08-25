@@ -6,6 +6,8 @@ module Coordinator::Write
       attribute :code, Types::MergeAuthorizationReasonCode
       attribute :message, Types::String.constrained(min_size: 1, max_size: 500)
       attribute :candidate_id, Types::Identifier.optional
+      attribute :work_item_id, Types::Identifier.optional
+      attribute :dependency_id, Types::Identifier.optional
       attribute :source_candidate_id, Types::Identifier.optional
       attribute :target_candidate_id, Types::Identifier.optional
       attribute :obligation_id, Types::Identifier.optional

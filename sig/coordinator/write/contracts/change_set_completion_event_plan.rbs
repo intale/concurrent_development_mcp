@@ -1,0 +1,4 @@
+module Coordinator::Write::Contracts
+  class ChangeSetCompletionEventPlan < Dry::Validation::Contract
+  end
+end

@@ -6,6 +6,7 @@ module Coordinator::Write
       Candidate = CandidateEvidenceReferenceV1
       Obligation = ObligationCheckV1
       Reason = ReasonV1
+      Progress = WorkItemProgressV1
 
       attribute :merge_snapshot_id, Types::Identifier
       attribute :snapshot, SnapshotEvidenceV1.optional
@@ -13,6 +14,8 @@ module Coordinator::Write
       attribute :current_policy, CurrentImpactPolicyV1.optional
       attribute :candidates,
                 Types::Array.of(Candidate).constrained(max_size: Types::MERGE_SNAPSHOT_MAXIMUM_CANDIDATES)
+      attribute :work_item_progress,
+                Types::Array.of(Progress).constrained(max_size: Types::MERGE_SNAPSHOT_MAXIMUM_CANDIDATES)
       attribute :obligations,
                 Types::Array.of(Obligation).constrained(max_size: Types::MERGE_AUTHORIZATION_MAXIMUM_OBLIGATIONS)
       attribute :reasons,

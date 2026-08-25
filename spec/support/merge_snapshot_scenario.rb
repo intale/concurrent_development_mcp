@@ -3,13 +3,14 @@
 module MergeSnapshotScenario
   module_function
 
-  def register(prefix:, path: "lib/candidate.rb", head_commit_oid: "b" * 40)
+  def register(prefix:, path: "lib/candidate.rb", head_commit_oid: "b" * 40, complete_work_item: true)
     candidate = CandidateScenario.submit(
       prefix: "#{prefix}-candidate",
       build_context: false,
       path:,
       head_commit_oid:
     )
+    candidate = CandidateScenario.complete(candidate) if complete_work_item
     candidate_input = candidate.fetch(:input)
     input = {
       command_id: "cmd-register-#{prefix}",

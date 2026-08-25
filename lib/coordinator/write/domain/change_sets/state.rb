@@ -6,7 +6,7 @@ module Coordinator::Write
       class State < Value
         attribute :change_set_id, Types::Identifier.optional
         attribute :goal, Types::Goal.optional
-        attribute :status, Types::String.enum("absent", "draft", "active")
+        attribute :status, Types::String.enum("absent", "draft", "active", "completed")
         attribute :acceptance_criteria, Types::StateAcceptanceCriteria
         attribute :work_item_ids, Types::WorkItemIds
         attribute :dependencies, Types::Array.of(Dependency).constrained(max_size: 500)
@@ -14,6 +14,7 @@ module Coordinator::Write
                   Types::Array.of(DependencySatisfaction)
                     .constrained(max_size: 500)
                     .default([].freeze)
+        attribute :completed_at, Types::Timestamp.optional.default(nil)
 
         def self.initial
           new(
@@ -23,7 +24,8 @@ module Coordinator::Write
             acceptance_criteria: [],
             work_item_ids: [],
             dependencies: [],
-            dependency_satisfactions: []
+            dependency_satisfactions: [],
+            completed_at: nil
           )
         end
 
@@ -45,7 +47,8 @@ module Coordinator::Write
               acceptance_criteria:,
               work_item_ids:,
               dependencies:,
-              dependency_satisfactions:
+              dependency_satisfactions:,
+              completed_at:
             )
           when Events::ChangeSetAcceptanceCriteriaDefinedV1
             self.class.new(
@@ -55,7 +58,8 @@ module Coordinator::Write
               acceptance_criteria: event.acceptance_criteria,
               work_item_ids:,
               dependencies:,
-              dependency_satisfactions:
+              dependency_satisfactions:,
+              completed_at:
             )
           when Events::WorkItemAddedToChangeSetV1
             self.class.new(
@@ -65,7 +69,8 @@ module Coordinator::Write
               acceptance_criteria:,
               work_item_ids: work_item_ids + [ event.work_item_id ],
               dependencies:,
-              dependency_satisfactions:
+              dependency_satisfactions:,
+              completed_at:
             )
           when Events::WorkItemDependencyDeclaredV1
             self.class.new(
@@ -83,7 +88,8 @@ module Coordinator::Write
                   required_output: event.required_output
                 )
               ],
-              dependency_satisfactions:
+              dependency_satisfactions:,
+              completed_at:
             )
           when Events::WorkItemDependencySatisfiedV1
             self.class.new(
@@ -99,7 +105,8 @@ module Coordinator::Write
                   source_event: event.source_event,
                   satisfied_at: event.satisfied_at
                 )
-              ]
+              ],
+              completed_at:
             )
           when Events::ChangeSetActivatedV1
             self.class.new(
@@ -109,7 +116,19 @@ module Coordinator::Write
               acceptance_criteria:,
               work_item_ids:,
               dependencies:,
-              dependency_satisfactions:
+              dependency_satisfactions:,
+              completed_at:
+            )
+          when Events::ChangeSetCompletedV1
+            self.class.new(
+              change_set_id:,
+              goal:,
+              status: "completed",
+              acceptance_criteria:,
+              work_item_ids:,
+              dependencies:,
+              dependency_satisfactions:,
+              completed_at: event.completed_at
             )
           else
             self

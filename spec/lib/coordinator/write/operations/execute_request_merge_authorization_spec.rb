@@ -23,7 +23,32 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRequestMergeAuthorization,
     expect(payload.evaluation).to be_granted
     expect(payload.evaluation.current_policy.status).to eq("absent")
     expect(payload.evaluation.obligations).to be_empty
+    expect(payload.evaluation.work_item_progress.map(&:candidate_id)).to eq([
+      registration.dig(:input, :ordered_candidates, 0, :candidate_id)
+    ])
     expect(command_events(input.fetch(:command_id)).map(&:type)).to eq([ "CommandCompleted" ])
+  end
+
+  it "durably denies a verified Candidate whose WorkItem has not selected or completed it" do
+    registration = MergeSnapshotScenario.register(
+      prefix: "auth-incomplete-progress",
+      complete_work_item: false
+    )
+    verification = MergeSnapshotScenario.verify(registration, prefix: "auth-incomplete-progress")
+    input = MergeSnapshotScenario.authorization_input(
+      registration,
+      verification,
+      prefix: "auth-incomplete-progress"
+    )
+
+    result = operation.call(input).value!
+
+    expect(result.data.outcome).to eq("denied")
+    expect(result.data.reasons.map(&:code)).to include(
+      "candidate_not_selected",
+      "candidate_work_item_not_completed"
+    )
+    expect(result.data.work_item_progress).to be_empty
   end
 
   it "durably denies an unverified snapshot and a stale target-base observation" do
@@ -69,7 +94,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRequestMergeAuthorization,
   end
 
   it "denies a missing gating obligation derived independently of Saga progress" do
-    pair = CandidateObligationScenario.submit_pair(prefix: "auth-missing-obligation")
+    pair = CandidateObligationScenario.submit_pair(
+      prefix: "auth-missing-obligation",
+      separate_work_items: true
+    )
     policy = CandidateObligationScenario.activate_policy(
       prefix: "auth-missing-obligation",
       change_set_id: pair.dig(:ids, :change_set_id),
@@ -95,7 +123,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRequestMergeAuthorization,
   end
 
   it "denies an open exact obligation and grants once its required evidence is satisfied" do
-    created = CandidateObligationScenario.create_obligation(prefix: "auth-obligation")
+    created = CandidateObligationScenario.create_obligation(
+      prefix: "auth-obligation",
+      separate_work_items: true
+    )
     pair = created.fetch(:pair)
     registration = MergeSnapshotScenario.register_candidates(
       prefix: "auth-obligation",

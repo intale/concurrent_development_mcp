@@ -630,6 +630,19 @@ module Coordinator::Write
       attribute :input, SatisfyWorkItemDependencyInputV1
     end
 
+    class CompleteChangeSetInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :change_set_id, Types::Identifier
+      attribute :source_event, EventReferenceV1
+      attribute :release_set_id, Types::Identifier.optional
+      attribute :rule_version, Types::String.enum("change-set-completion/v1")
+    end
+
+    class CompleteChangeSetV1 < BaseV1
+      attribute :tool_name, Types::String.enum("change_set_completion_policy")
+      attribute :input, CompleteChangeSetInputV1
+    end
+
     Type = CreateChangeSetV1 |
            CreateWorkItemV1 |
            DeclareWorkItemDependencyV1 |
@@ -665,6 +678,7 @@ module Coordinator::Write
                  ExpireResourceLeaseV1 |
                  RequestReleaseSetCompensationV1 |
                  CompleteActivatedReleaseSetV1 |
-                 SatisfyWorkItemDependencyV1
+                 SatisfyWorkItemDependencyV1 |
+                 CompleteChangeSetV1
   end
 end

@@ -14,6 +14,7 @@ module Coordinator::Write
       [ "WorkItemDependencyDeclared", 1 ] => Events::WorkItemDependencyDeclaredV1,
       [ "WorkItemDependencySatisfied", 1 ] => Events::WorkItemDependencySatisfiedV1,
       [ "ChangeSetActivated", 1 ] => Events::ChangeSetActivatedV1,
+      [ "ChangeSetCompleted", 1 ] => Events::ChangeSetCompletedV1,
       [ "WorkItemMadeReady", 1 ] => Events::WorkItemMadeReadyV1,
       [ "WorkItemAcquired", 1 ] => Events::WorkItemAcquiredV1,
       [ "WorkItemCandidateSelected", 1 ] => Events::WorkItemCandidateSelectedV1,

@@ -7,6 +7,7 @@ module Coordinator
         def target_base_observation: () -> TargetBaseObservationV1
         def current_policy: () -> CurrentImpactPolicyV1?
         def candidates: () -> Array[CandidateEvidenceReferenceV1]
+        def work_item_progress: () -> Array[WorkItemProgressV1]
         def obligations: () -> Array[ObligationCheckV1]
         def reasons: () -> Array[ReasonV1]
         def granted?: () -> bool

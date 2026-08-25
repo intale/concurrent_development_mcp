@@ -755,6 +755,25 @@ module Coordinator::Write
       )
     end
 
+    def change_set_completion_policy(command)
+      @canonical_json.sha256(change_set_completion_policy_document(command).to_h)
+    end
+
+    def change_set_completion_policy_document(command)
+      CommandInputDocuments::CompleteChangeSetV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "change_set_completion_policy",
+        input: CommandInputDocuments::CompleteChangeSetInputV1.new(
+          actor: actor_document(command.actor),
+          change_set_id: command.change_set_id,
+          source_event: CommandInputDocuments::EventReferenceV1.new(command.source_event.to_h),
+          release_set_id: command.release_set_id,
+          rule_version: command.rule_version
+        )
+      )
+    end
+
     private
 
     def candidate_manifest_document(manifest)
