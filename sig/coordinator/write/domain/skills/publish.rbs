@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Domain
+      module Skills
+        class Publish
+          def initialize: (?stream_factory: Coordinator::Write::StreamFactory) -> void
+          def call: (state: State, command: Commands::PublishSkillRevision, published_at: String) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

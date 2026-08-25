@@ -10,6 +10,15 @@ module Coordinator
     register("id_generator", memoize: true) { Shared::IdGenerator.new }
     register("stream_factory", memoize: true) { Write::StreamFactory.new }
     register("event_schema_registry", memoize: true) { Write::EventSchemaRegistry.new }
+    register("skills.identity_builder", memoize: true) do
+      Write::Skills::IdentityBuilder.new(canonical_json: self["canonical_json"])
+    end
+    register("skills.revision_builder", memoize: true) do
+      Write::Skills::RevisionBuilder.new(canonical_json: self["canonical_json"])
+    end
+    register("skills.marker_builder", memoize: true) do
+      Write::Skills::MarkerBuilder.new(canonical_json: self["canonical_json"])
+    end
     register("interpretations.topic_registry", memoize: true) do
       Write::Interpretations::TopicRegistry.new
     end
@@ -157,6 +166,13 @@ module Coordinator
 
     register("operations.prepare_complete_compensated_release_set", memoize: true) do
       Write::Operations::PrepareCompleteCompensatedReleaseSet.new
+    end
+
+    register("operations.prepare_publish_skill_revision", memoize: true) do
+      Write::Operations::PreparePublishSkillRevision.new(
+        identity_builder: self["skills.identity_builder"],
+        revision_builder: self["skills.revision_builder"]
+      )
     end
 
     register("domain.change_sets.create", memoize: true) do
@@ -323,6 +339,10 @@ module Coordinator
 
     register("domain.candidates.submit", memoize: true) do
       Write::Domain::Candidates::Submit.new(stream_factory: self["stream_factory"])
+    end
+
+    register("domain.skills.publish", memoize: true) do
+      Write::Domain::Skills::Publish.new(stream_factory: self["stream_factory"])
     end
 
     register("domain.candidates.submit_impact_surface", memoize: true) do
@@ -612,6 +632,10 @@ module Coordinator
       Read::Repositories::Candidates.new
     end
 
+    register("repositories.skills", memoize: true) do
+      Read::Repositories::Skills.new
+    end
+
     register("repositories.candidate_impacts", memoize: true) do
       Read::Repositories::CandidateImpacts.new(
         candidates: self["repositories.candidates"],
@@ -702,6 +726,15 @@ module Coordinator
         schema_registry: self["event_schema_registry"],
         candidates: self["repositories.candidates"],
         candidate_impacts: self["repositories.candidate_impacts"],
+        processed_events: self["repositories.processed_projection_events"]
+      )
+    end
+
+    register("projectors.skills_v1", memoize: true) do
+      Read::Projectors::SkillsV1.new(
+        schema_registry: self["event_schema_registry"],
+        identity_builder: self["skills.identity_builder"],
+        skills: self["repositories.skills"],
         processed_events: self["repositories.processed_projection_events"]
       )
     end
@@ -798,6 +831,18 @@ module Coordinator
 
     register("queries.candidate_impact_get") do
       Read::Queries::CandidateImpactGet.new(impacts: self["repositories.candidate_impacts"])
+    end
+
+    register("queries.skill_get") do
+      Read::Queries::SkillGet.new(skills: self["repositories.skills"])
+    end
+
+    register("queries.skill_list") do
+      Read::Queries::SkillList.new(skills: self["repositories.skills"])
+    end
+
+    register("queries.skill_asset_get") do
+      Read::Queries::SkillAssetGet.new(skills: self["repositories.skills"])
     end
 
     register("queries.verification_obligations_list") do
@@ -1161,6 +1206,22 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
+    register("operations.execute_publish_skill_revision") do
+      Write::Operations::ExecutePublishSkillRevision.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_publish_skill_revision"],
+        decider: self["domain.skills.publish"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        marker_builder: self["skills.marker_builder"],
         completion_builder: self["command_completion_builder"]
       )
     end
@@ -1570,7 +1631,9 @@ module Coordinator
         record_release_set_activation:
           self["operations.execute_record_release_set_activation"],
         complete_compensated_release_set:
-          self["operations.execute_complete_compensated_release_set"]
+          self["operations.execute_complete_compensated_release_set"],
+        publish_skill_revision:
+          self["operations.execute_publish_skill_revision"]
       )
     end
 
@@ -1711,6 +1774,13 @@ module Coordinator
     register("operations.submit_candidate_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_submit_candidate"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_publish_skill_revision_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_publish_skill_revision"],
         submitter: self["operations.submit_coordination_task"]
       )
     end
@@ -2012,6 +2082,10 @@ module Coordinator
       Read::Subscriptions::Candidates.new(handler: self["projectors.candidates_v1"])
     end
 
+    register("subscriptions.skills", memoize: true) do
+      Read::Subscriptions::Skills.new(handler: self["projectors.skills_v1"])
+    end
+
     register("subscriptions.verification_obligations", memoize: true) do
       Read::Subscriptions::VerificationObligations.new(
         handler: self["projectors.verification_obligations_v1"]
@@ -2071,6 +2145,7 @@ module Coordinator
           self["subscriptions.agent_choices"],
           self["subscriptions.agent_choice_impacts"],
           self["subscriptions.candidates"],
+          self["subscriptions.skills"],
           self["subscriptions.verification_obligations"],
           self["subscriptions.merge_snapshots"],
           self["subscriptions.release_sets"]

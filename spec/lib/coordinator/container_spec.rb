@@ -30,6 +30,7 @@ RSpec.describe Coordinator::Container do
     candidate_operation = described_class["operations.execute_submit_candidate"]
     candidate_impact_operation =
       described_class["operations.execute_submit_candidate_impact_surface"]
+    skill_publish_operation = described_class["operations.execute_publish_skill_revision"]
     impact_scan_start = described_class["operations.execute_start_agent_choice_impact_scan"]
     impact_scan_progress = described_class["operations.execute_progress_agent_choice_impact_scan"]
     impact_assessment = described_class["operations.execute_assess_agent_choice_decision_impact"]
@@ -57,6 +58,9 @@ RSpec.describe Coordinator::Container do
     candidate_get_query = described_class["queries.candidate_get"]
     candidate_list_query = described_class["queries.candidate_list"]
     candidate_impact_query = described_class["queries.candidate_impact_get"]
+    skill_get_query = described_class["queries.skill_get"]
+    skill_list_query = described_class["queries.skill_list"]
+    skill_asset_get_query = described_class["queries.skill_asset_get"]
     verification_obligations_query = described_class["queries.verification_obligations_list"]
     task_submissions = %w[
       operations.submit_create_change_set_task
@@ -76,6 +80,7 @@ RSpec.describe Coordinator::Container do
       operations.submit_record_agent_choice_task
       operations.submit_candidate_task
       operations.submit_candidate_impact_surface_task
+      operations.submit_publish_skill_revision_task
     ].map { described_class[_1] }
     tasks_extension = described_class["mcp.tasks.extension"]
     mcp_transport = described_class["mcp.transport"]
@@ -116,6 +121,9 @@ RSpec.describe Coordinator::Container do
     expect(candidate_operation).to be_a(Coordinator::Write::Operations::ExecuteSubmitCandidate)
     expect(candidate_impact_operation).to be_a(
       Coordinator::Write::Operations::ExecuteSubmitCandidateImpactSurface
+    )
+    expect(skill_publish_operation).to be_a(
+      Coordinator::Write::Operations::ExecutePublishSkillRevision
     )
     expect(impact_scan_start).to be_a(
       Coordinator::Write::Operations::ExecuteStartAgentChoiceImpactScan
@@ -179,6 +187,7 @@ RSpec.describe Coordinator::Container do
         "decision-interpretations-v1",
         "merge-snapshots-v1",
         "release-sets-v1",
+        "skills-v1",
         "user-utterances-v1",
         "verification-obligations-v1"
       ]
@@ -193,6 +202,9 @@ RSpec.describe Coordinator::Container do
     expect(candidate_get_query).to be_a(Coordinator::Read::Queries::CandidateGet)
     expect(candidate_list_query).to be_a(Coordinator::Read::Queries::CandidateList)
     expect(candidate_impact_query).to be_a(Coordinator::Read::Queries::CandidateImpactGet)
+    expect(skill_get_query).to be_a(Coordinator::Read::Queries::SkillGet)
+    expect(skill_list_query).to be_a(Coordinator::Read::Queries::SkillList)
+    expect(skill_asset_get_query).to be_a(Coordinator::Read::Queries::SkillAssetGet)
     expect(verification_obligations_query).to be_a(
       Coordinator::Read::Queries::VerificationObligationsList
     )

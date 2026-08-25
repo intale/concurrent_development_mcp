@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module Skills
+      class IdentityDocumentV1 < Shared::Value
+        SCHEMA: String
+
+        def schema: () -> String
+        def name: () -> String
+        def scope: () -> String
+      end
+    end
+  end
+end

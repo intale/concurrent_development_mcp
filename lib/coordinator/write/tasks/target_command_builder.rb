@@ -65,6 +65,8 @@ module Coordinator::Write
           build_record_release_set_activation(document)
         when CommandInputDocuments::CompleteCompensatedReleaseSetV1
           build_complete_compensated_release_set(document)
+        when CommandInputDocuments::PublishSkillRevisionV1
+          build_publish_skill_revision(document)
         end
       end
 
@@ -509,6 +511,22 @@ module Coordinator::Write
           compensation_request_event: EventReference.new(input.compensation_request_event.to_h),
           evidence: input.evidence,
           rule_version: "release-set-completion/v1"
+        )
+      end
+
+      def build_publish_skill_revision(document)
+        input = document.input
+        Commands::PublishSkillRevision.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          skill_id: input.skill_id,
+          name: input.name,
+          scope: input.scope,
+          expected_revision: input.expected_revision,
+          description: input.description,
+          instructions: input.instructions,
+          assets: input.assets.map { Skills::AssetV1.new(_1.to_h) },
+          content_digest: input.content_digest
         )
       end
 

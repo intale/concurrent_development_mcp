@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecutePublishSkillRevision
+        TOOL_NAME: String
+
+        def initialize: (event_store: _EventStore, ?preparer: PreparePublishSkillRevision, ?decider: Domain::Skills::Publish, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?marker_builder: Skills::MarkerBuilder, ?completion_builder: CommandCompletionBuilder) -> void
+        %a{rbs:test:skip}
+        def call: (command_input input) -> Dry::Monads::Result
+        def call_command: (Commands::PublishSkillRevision command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
+      end
+    end
+  end
+end

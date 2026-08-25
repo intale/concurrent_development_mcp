@@ -788,6 +788,29 @@ module Coordinator::Write
         attribute :details, CandidateExistingDetails
       end
 
+      class SkillIdentityDetails < Value
+        attribute :skill_id, Types::SkillId
+        attribute :name, Types::SkillName
+        attribute :scope, Types::SkillScope
+      end
+
+      class SkillRevisionDetails < SkillIdentityDetails
+        attribute :expected_revision, Types::SkillExpectedRevision
+        attribute :current_revision, Types::Integer.constrained(gteq: 0)
+      end
+
+      class SkillIdentityConflictError < Value
+        attribute :code, Types::String.enum("skill_identity_conflict")
+        attribute :message, Types::String
+        attribute :details, SkillIdentityDetails
+      end
+
+      class SkillRevisionConflictError < Value
+        attribute :code, Types::String.enum("skill_revision_conflict")
+        attribute :message, Types::String
+        attribute :details, SkillRevisionDetails
+      end
+
       class VerificationObligationNotFoundError < Value
         attribute :code, Types::String.enum("verification_obligation_not_found")
         attribute :message, Types::String
@@ -998,6 +1021,8 @@ module Coordinator::Write
              CandidateImpactIdentityMismatchError |
              CandidateImpactSourceEvidenceMismatchError |
              CandidateImpactSurfaceAlreadyRecordedError |
+             SkillIdentityConflictError |
+             SkillRevisionConflictError |
              VerificationObligationNotFoundError |
              VerificationObligationAlreadyClaimedError |
              VerificationObligationPolicyStaleError |

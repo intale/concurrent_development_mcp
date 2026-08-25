@@ -1,0 +1,18 @@
+module Coordinator
+  module Write
+    module Commands
+      class PublishSkillRevision < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def skill_id: () -> String
+        def name: () -> String
+        def scope: () -> String
+        def expected_revision: () -> Integer
+        def description: () -> String
+        def instructions: () -> String
+        def assets: () -> Array[Skills::AssetV1]
+        def content_digest: () -> String
+      end
+    end
+  end
+end

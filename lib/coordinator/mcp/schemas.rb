@@ -425,6 +425,105 @@ module Coordinator
         )
       end
 
+      def skill_publish
+        asset = object_schema(
+          properties: {
+            path: { type: "string", minLength: 1, maxLength: Types::SKILL_ASSET_PATH_MAXIMUM_BYTES },
+            media_type: {
+              type: "string",
+              minLength: 1,
+              maxLength: 255,
+              pattern: "^[\\x21-\\x7e]+$"
+            },
+            executable: { type: "boolean" },
+            content_base64: {
+              type: "string",
+              maxLength: Types::SKILL_ASSET_BASE64_MAXIMUM_BYTES,
+              pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+            }
+          },
+          required: %w[path media_type executable content_base64]
+        )
+        object_schema(
+          properties: common_mutation_properties.merge(
+            actor: object_schema(
+              properties: {
+                kind: { type: "string", enum: %w[agent user] },
+                id: identifier
+              },
+              required: %w[kind id]
+            ),
+            name: { type: "string", minLength: 1, maxLength: Types::SKILL_NAME_MAXIMUM_BYTES },
+            scope: { type: "string", minLength: 1, maxLength: Types::SKILL_SCOPE_MAXIMUM_BYTES },
+            expected_revision: { type: "integer", minimum: 0 },
+            description: { type: "string", maxLength: Types::SKILL_DESCRIPTION_MAXIMUM_BYTES },
+            instructions: {
+              type: "string",
+              minLength: 1,
+              maxLength: Types::SKILL_INSTRUCTIONS_MAXIMUM_BYTES
+            },
+            assets: {
+              type: "array",
+              maxItems: Types::SKILL_ASSET_MAXIMUM_COUNT,
+              items: asset
+            }
+          ),
+          required: %w[
+            command_id actor name scope expected_revision description instructions assets
+          ]
+        )
+      end
+
+      def skill_get
+        object_schema(
+          properties: {
+            name: { type: "string", minLength: 1, maxLength: Types::SKILL_NAME_MAXIMUM_BYTES },
+            scope: { type: "string", minLength: 1, maxLength: Types::SKILL_SCOPE_MAXIMUM_BYTES }
+          },
+          required: %w[name scope]
+        )
+      end
+
+      def skill_list
+        object_schema(
+          properties: {
+            name: {
+              anyOf: [
+                { type: "string", minLength: 1, maxLength: Types::SKILL_NAME_MAXIMUM_BYTES },
+                { type: "null" }
+              ]
+            },
+            scope: {
+              anyOf: [
+                { type: "string", minLength: 1, maxLength: Types::SKILL_SCOPE_MAXIMUM_BYTES },
+                { type: "null" }
+              ]
+            },
+            after_skill_id: {
+              anyOf: [
+                { type: "string", pattern: "^skill:v1:[0-9a-f]{64}$" },
+                { type: "null" }
+              ]
+            },
+            limit: {
+              anyOf: [ { type: "integer", minimum: 1, maximum: 100 }, { type: "null" } ]
+            }
+          },
+          required: []
+        )
+      end
+
+      def skill_asset_get
+        object_schema(
+          properties: {
+            name: { type: "string", minLength: 1, maxLength: Types::SKILL_NAME_MAXIMUM_BYTES },
+            scope: { type: "string", minLength: 1, maxLength: Types::SKILL_SCOPE_MAXIMUM_BYTES },
+            path: { type: "string", minLength: 1, maxLength: Types::SKILL_ASSET_PATH_MAXIMUM_BYTES }
+          },
+          required: %w[name scope path]
+        )
+      end
+
       def operation_get
         object_schema(
           properties: {

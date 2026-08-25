@@ -11,7 +11,9 @@ module Coordinator
         duplicate_change_set_id: "conflict",
         duplicate_work_item_id: "conflict",
         duplicate_dependency_id: "conflict",
-        attempt_already_exists: "conflict"
+        attempt_already_exists: "conflict",
+        skill_identity_conflict: "conflict",
+        skill_revision_conflict: "conflict"
       }.freeze
 
       def call(result, command_id: nil)

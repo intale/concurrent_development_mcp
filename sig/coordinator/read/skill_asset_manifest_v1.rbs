@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    class SkillAssetManifestV1 < Shared::Value
+      def path: () -> String
+      def media_type: () -> String
+      def executable: () -> bool
+      def content_sha256: () -> String
+      def byte_size: () -> Integer
+    end
+  end
+end

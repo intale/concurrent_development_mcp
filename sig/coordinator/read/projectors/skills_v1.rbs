@@ -1,0 +1,12 @@
+module Coordinator
+  module Read
+    module Projectors
+      class SkillsV1
+        PROJECTION: ProjectionDefinition
+
+        def initialize: (?contract: Contracts::SkillSourceEvent, ?schema_registry: Write::EventSchemaRegistry, ?identity_builder: Write::Skills::IdentityBuilder, ?skills: Repositories::Skills, ?processed_events: Repositories::ProcessedProjectionEvents) -> void
+        def call: (PgEventstore::Event event) -> void
+      end
+    end
+  end
+end

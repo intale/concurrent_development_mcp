@@ -14,6 +14,18 @@ module Coordinator::Shared
     CANDIDATE_IMPACT_KEY_PATTERN = /\A[a-z][a-z0-9_.-]*(?::[a-z0-9][a-z0-9_.-]*)+\z/
     MARKER_PURPOSE_PATTERN = /\A[a-z][a-z0-9-]{0,63}\z/
     MARKER_COMPONENT_PATTERN = /\A(?!compound:)[^\u0000\r\n]{1,512}\z/
+    SKILL_ID_PATTERN = /\Askill:v1:[0-9a-f]{64}\z/
+    SKILL_MEDIA_TYPE_PATTERN = /\A[\x21-\x7e]{1,255}\z/
+
+    SKILL_NAME_MAXIMUM_BYTES = 128
+    SKILL_SCOPE_MAXIMUM_BYTES = 256
+    SKILL_DESCRIPTION_MAXIMUM_BYTES = 2_048
+    SKILL_INSTRUCTIONS_MAXIMUM_BYTES = 262_144
+    SKILL_ASSET_MAXIMUM_COUNT = 64
+    SKILL_ASSET_PATH_MAXIMUM_BYTES = 512
+    SKILL_ASSET_MAXIMUM_BYTES = 1_048_576
+    SKILL_ASSETS_TOTAL_MAXIMUM_BYTES = 4_194_304
+    SKILL_ASSET_BASE64_MAXIMUM_BYTES = 1_398_104
 
     ACTOR_KINDS = %w[
       agent
@@ -427,6 +439,7 @@ module Coordinator::Shared
       release_verification_record
       release_activation_record
       release_compensation_complete
+      skill_publish
     ].freeze
 
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)
@@ -446,6 +459,17 @@ module Coordinator::Shared
     ExpandedWriteSetSize = Integer.constrained(gteq: 2, lteq: 32)
     FencingToken = Integer.constrained(gteq: 1)
     CoordinationToolName = String.enum(*COORDINATION_TOOL_NAMES)
+    SkillId = String.constrained(format: SKILL_ID_PATTERN)
+    SkillName = String.constrained(min_size: 1, max_size: SKILL_NAME_MAXIMUM_BYTES)
+    SkillScope = String.constrained(min_size: 1, max_size: SKILL_SCOPE_MAXIMUM_BYTES)
+    SkillDescription = String.constrained(max_size: SKILL_DESCRIPTION_MAXIMUM_BYTES)
+    SkillInstructions = String.constrained(min_size: 1, max_size: SKILL_INSTRUCTIONS_MAXIMUM_BYTES)
+    SkillRevision = Integer.constrained(gteq: 1)
+    SkillExpectedRevision = Integer.constrained(gteq: 0)
+    SkillAssetPath = String.constrained(min_size: 1, max_size: SKILL_ASSET_PATH_MAXIMUM_BYTES)
+    SkillAssetMediaType = String.constrained(format: SKILL_MEDIA_TYPE_PATTERN)
+    SkillAssetContentBase64 = String.constrained(max_size: SKILL_ASSET_BASE64_MAXIMUM_BYTES)
+    SkillAssetByteSize = Integer.constrained(gteq: 0, lteq: SKILL_ASSET_MAXIMUM_BYTES)
     Marker = String.constrained(min_size: 1, max_size: 512)
     MarkerPurpose = String.constrained(format: MARKER_PURPOSE_PATTERN)
     MarkerComponent = String.constrained(format: MARKER_COMPONENT_PATTERN)

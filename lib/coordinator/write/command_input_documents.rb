@@ -603,6 +603,35 @@ module Coordinator::Write
       attribute :input, CompleteCompensatedReleaseSetInputV1
     end
 
+    class SkillAssetV1 < Value
+      attribute :path, Types::SkillAssetPath
+      attribute :media_type, Types::SkillAssetMediaType
+      attribute :executable, Types::Bool
+      attribute :content_base64, Types::SkillAssetContentBase64
+      attribute :content_sha256, Types::Sha256Digest
+      attribute :byte_size, Types::SkillAssetByteSize
+    end
+
+    class PublishSkillRevisionInputV1 < Value
+      Asset = SkillAssetV1
+
+      attribute :actor, ActorV1
+      attribute :skill_id, Types::SkillId
+      attribute :name, Types::SkillName
+      attribute :scope, Types::SkillScope
+      attribute :expected_revision, Types::SkillExpectedRevision
+      attribute :description, Types::SkillDescription
+      attribute :instructions, Types::SkillInstructions
+      attribute :assets,
+                Types::Array.of(Asset).constrained(max_size: Types::SKILL_ASSET_MAXIMUM_COUNT)
+      attribute :content_digest, Types::Sha256Digest
+    end
+
+    class PublishSkillRevisionV1 < BaseV1
+      attribute :tool_name, Types::String.enum("skill_publish")
+      attribute :input, PublishSkillRevisionInputV1
+    end
+
     class ExpireResourceLeaseInputV1 < Value
       attribute :actor, ActorV1
       attribute :resource_key_hash, Types::Sha256Digest
@@ -672,7 +701,8 @@ module Coordinator::Write
            RecordRepositoryIntegrationV1 |
            RecordReleaseSetVerificationV1 |
            RecordReleaseSetActivationV1 |
-           CompleteCompensatedReleaseSetV1
+           CompleteCompensatedReleaseSetV1 |
+           PublishSkillRevisionV1
 
     DigestType = Type |
                  ExpireResourceLeaseV1 |

@@ -1,0 +1,15 @@
+module Coordinator
+  module Read
+    class SkillAsset < ApplicationRecord
+      def skill_id: () -> String
+      def revision: () -> Integer
+      def path: () -> String
+      def media_type: () -> String
+      def executable: () -> bool
+      def content_base64: () -> String
+      def content_sha256: () -> String
+      def byte_size: () -> Integer
+      def skill: () -> Skill
+    end
+  end
+end

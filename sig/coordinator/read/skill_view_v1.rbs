@@ -1,0 +1,15 @@
+module Coordinator
+  module Read
+    class SkillViewV1 < Shared::Value
+      def skill_id: () -> String
+      def name: () -> String
+      def scope: () -> String
+      def revision: () -> Integer
+      def description: () -> String
+      def instructions: () -> String
+      def assets: () -> Array[SkillAssetManifestV1]
+      def content_digest: () -> String
+      def published: () -> SkillSourceEvidenceV1
+    end
+  end
+end

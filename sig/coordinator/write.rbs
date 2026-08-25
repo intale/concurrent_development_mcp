@@ -31,7 +31,8 @@ module Coordinator
                                 Commands::RecordRepositoryIntegration |
                                 Commands::RecordReleaseSetVerification |
                                 Commands::RecordReleaseSetActivation |
-                                Commands::CompleteCompensatedReleaseSet
+                                Commands::CompleteCompensatedReleaseSet |
+                                Commands::PublishSkillRevision
     type write_command = coordination_command |
                          Commands::ExpireResourceLease |
                          Commands::RequestReleaseSetCompensation |

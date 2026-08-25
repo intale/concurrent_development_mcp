@@ -44,6 +44,7 @@ module Coordinator::Write
       when Commands::RequestReleaseSetCompensation then release_compensation_request_document(command)
       when Commands::CompleteActivatedReleaseSet then release_activated_complete_document(command)
       when Commands::CompleteCompensatedReleaseSet then release_compensation_complete_document(command)
+      when Commands::PublishSkillRevision then skill_publish_document(command)
       when Commands::ExpireResourceLease then lease_expire_policy_document(command)
       else
         raise ArgumentError, "Unsupported coordination command: #{command.class.name}"
@@ -732,6 +733,31 @@ module Coordinator::Write
             command.compensation_request_event.to_h
           ),
           evidence: command.evidence
+        )
+      )
+    end
+
+    def skill_publish(command)
+      @canonical_json.sha256(skill_publish_document(command).to_h)
+    end
+
+    def skill_publish_document(command)
+      CommandInputDocuments::PublishSkillRevisionV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "skill_publish",
+        input: CommandInputDocuments::PublishSkillRevisionInputV1.new(
+          actor: actor_document(command.actor),
+          skill_id: command.skill_id,
+          name: command.name,
+          scope: command.scope,
+          expected_revision: command.expected_revision,
+          description: command.description,
+          instructions: command.instructions,
+          assets: command.assets.map do |asset|
+            CommandInputDocuments::SkillAssetV1.new(asset.to_h)
+          end,
+          content_digest: command.content_digest
         )
       )
     end

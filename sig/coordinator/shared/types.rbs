@@ -11,6 +11,18 @@ module Coordinator
       CANDIDATE_IMPACT_KEY_PATTERN: Regexp
       MARKER_PURPOSE_PATTERN: Regexp
       MARKER_COMPONENT_PATTERN: Regexp
+      SKILL_ID_PATTERN: Regexp
+      SKILL_MEDIA_TYPE_PATTERN: Regexp
+
+      SKILL_NAME_MAXIMUM_BYTES: Integer
+      SKILL_SCOPE_MAXIMUM_BYTES: Integer
+      SKILL_DESCRIPTION_MAXIMUM_BYTES: Integer
+      SKILL_INSTRUCTIONS_MAXIMUM_BYTES: Integer
+      SKILL_ASSET_MAXIMUM_COUNT: Integer
+      SKILL_ASSET_PATH_MAXIMUM_BYTES: Integer
+      SKILL_ASSET_MAXIMUM_BYTES: Integer
+      SKILL_ASSETS_TOTAL_MAXIMUM_BYTES: Integer
+      SKILL_ASSET_BASE64_MAXIMUM_BYTES: Integer
 
       ACTOR_KINDS: Array[String]
       DEPENDENCY_KINDS: Array[String]
@@ -139,6 +151,17 @@ module Coordinator
       ExpandedWriteSetSize: untyped
       FencingToken: untyped
       CoordinationToolName: untyped
+      SkillId: untyped
+      SkillName: untyped
+      SkillScope: untyped
+      SkillDescription: untyped
+      SkillInstructions: untyped
+      SkillRevision: untyped
+      SkillExpectedRevision: untyped
+      SkillAssetPath: untyped
+      SkillAssetMediaType: untyped
+      SkillAssetContentBase64: untyped
+      SkillAssetByteSize: untyped
       Marker: untyped
       MarkerPurpose: untyped
       MarkerComponent: untyped

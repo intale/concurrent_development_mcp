@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Skills
+      class RevisionBuilder
+        def initialize: (?asset_builder: AssetBuilder, ?canonical_json: Shared::CanonicalJson) -> void
+        def call: (identity: IdentityV1, description: String, instructions: String, assets: Array[Hash[Symbol, untyped]]) -> RevisionContentV1
+      end
+    end
+  end
+end

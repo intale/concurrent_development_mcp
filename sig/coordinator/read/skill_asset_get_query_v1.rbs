@@ -1,0 +1,9 @@
+module Coordinator
+  module Read
+    class SkillAssetGetQueryV1 < Shared::Value
+      def name: () -> String
+      def scope: () -> String
+      def path: () -> String
+    end
+  end
+end

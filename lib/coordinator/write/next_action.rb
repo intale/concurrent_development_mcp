@@ -44,6 +44,11 @@ module Coordinator::Write
       attribute :release_set_id, Types::Identifier
     end
 
+    class SkillArguments < Value
+      attribute :name, Types::SkillName
+      attribute :scope, Types::SkillScope
+    end
+
     class DecisionResolutionArguments < Value
       attribute :topic_id, Types::AgentChoiceType
       attribute :context, DecisionContexts::QueryContextV1
@@ -59,6 +64,7 @@ module Coordinator::Write
                 VerificationObligationArguments |
                 MergeSnapshotArguments |
                 ReleaseSetArguments |
+                SkillArguments |
                 DecisionResolutionArguments
 
     attribute :tool, Types::Identifier

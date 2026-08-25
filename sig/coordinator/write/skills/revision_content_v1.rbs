@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Skills
+      class RevisionContentV1 < Shared::Value
+        def description: () -> String
+        def instructions: () -> String
+        def assets: () -> Array[AssetV1]
+        def content_digest: () -> String
+      end
+    end
+  end
+end

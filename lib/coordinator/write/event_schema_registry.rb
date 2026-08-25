@@ -9,6 +9,7 @@ module Coordinator::Write
       [ "ChangeSetCreated", 1 ] => Events::ChangeSetCreatedV1,
       [ "ChangeSetAcceptanceCriteriaDefined", 1 ] => Events::ChangeSetAcceptanceCriteriaDefinedV1,
       [ "CommandCompleted", 1 ] => Events::CommandCompletedV1,
+      [ "SkillRevisionPublished", 1 ] => Events::SkillRevisionPublishedV1,
       [ "WorkItemCreated", 1 ] => Events::WorkItemCreatedV1,
       [ "WorkItemAddedToChangeSet", 1 ] => Events::WorkItemAddedToChangeSetV1,
       [ "WorkItemDependencyDeclared", 1 ] => Events::WorkItemDependencyDeclaredV1,

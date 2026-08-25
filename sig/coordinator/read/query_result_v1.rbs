@@ -75,7 +75,19 @@ module Coordinator
         def release_set: () -> ReleaseSetViewV1
       end
 
-      type data = EmptyData | DomainError | OperationData | ContextData | NotModifiedData | GuidanceData | InterpretationPageData | DecisionData | DecisionContextData | AgentChoiceData | AgentChoiceImpactPageData | CandidateData | CandidatePageData | CandidateImpactData | VerificationObligationPageData | MergeSnapshotData | ReleaseSetData
+      class SkillData < Shared::Value
+        def skill: () -> SkillViewV1
+      end
+
+      class SkillPageData < Shared::Value
+        def page: () -> SkillPageV1
+      end
+
+      class SkillAssetData < Shared::Value
+        def asset: () -> SkillAssetViewV1
+      end
+
+      type data = EmptyData | DomainError | OperationData | ContextData | NotModifiedData | GuidanceData | InterpretationPageData | DecisionData | DecisionContextData | AgentChoiceData | AgentChoiceImpactPageData | CandidateData | CandidatePageData | CandidateImpactData | VerificationObligationPageData | MergeSnapshotData | ReleaseSetData | SkillData | SkillPageData | SkillAssetData
       type action = Write::NextAction | NextAction
 
       def status: () -> String

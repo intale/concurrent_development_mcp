@@ -1,0 +1,10 @@
+module Coordinator
+  module Read
+    class SkillListQueryV1 < Shared::Value
+      def name: () -> String?
+      def scope: () -> String?
+      def after_skill_id: () -> String?
+      def limit: () -> Integer
+    end
+  end
+end

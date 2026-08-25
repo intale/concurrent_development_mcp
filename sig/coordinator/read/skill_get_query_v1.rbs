@@ -1,0 +1,8 @@
+module Coordinator
+  module Read
+    class SkillGetQueryV1 < Shared::Value
+      def name: () -> String
+      def scope: () -> String
+    end
+  end
+end

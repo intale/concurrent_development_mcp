@@ -488,6 +488,33 @@ module Coordinator::Write
       )
     end
 
+    def skill_publish(command:, publication:, input_digest:, persisted_events:, completed_at:)
+      build_completion(
+        command:,
+        tool_name: "skill_publish",
+        summary: "Skill revision published with an immutable asset snapshot.",
+        data: CommandReceiptData::SkillPublication.new(
+          skill_id: command.skill_id,
+          name: command.name,
+          scope: command.scope,
+          revision: publication.revision,
+          content_digest: command.content_digest,
+          asset_count: command.assets.length,
+          publication_event: event_reference(persisted_events.sole),
+          published_at: publication.published_at
+        ),
+        next_actions: [
+          NextAction.new(
+            tool: "skill_get",
+            arguments: NextAction::SkillArguments.new(name: command.name, scope: command.scope)
+          )
+        ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     def candidate_impact_surface_submit(
       command:,
       surface:,

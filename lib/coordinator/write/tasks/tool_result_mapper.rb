@@ -32,6 +32,8 @@ module Coordinator::Write
         candidate_impact_identity_mismatch: "conflict",
         candidate_impact_source_evidence_mismatch: "conflict",
         candidate_impact_surface_already_recorded: "conflict",
+        skill_identity_conflict: "conflict",
+        skill_revision_conflict: "conflict",
         verification_obligation_already_claimed: "conflict",
         verification_obligation_not_found: "not_found",
         verification_obligation_policy_stale: "stale_context",
@@ -114,6 +116,18 @@ module Coordinator::Write
       end
 
       def failure_next_actions(domain_error)
+        if domain_error.is_a?(DomainErrorV1::SkillRevisionConflictError)
+          return [
+            NextAction.new(
+              tool: "skill_get",
+              arguments: NextAction::SkillArguments.new(
+                name: domain_error.details.name,
+                scope: domain_error.details.scope
+              )
+            )
+          ]
+        end
+
         return [] unless domain_error.is_a?(DomainErrorV1::StaleDecisionContextError)
 
         [

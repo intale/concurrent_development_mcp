@@ -77,6 +77,18 @@ module Coordinator::Read
       attribute :release_set, ReleaseSetViewV1
     end
 
+    class SkillData < Value
+      attribute :skill, SkillViewV1
+    end
+
+    class SkillPageData < Value
+      attribute :page, SkillPageV1
+    end
+
+    class SkillAssetData < Value
+      attribute :asset, SkillAssetViewV1
+    end
+
     Data = EmptyData |
            DomainError |
            OperationData |
@@ -93,7 +105,10 @@ module Coordinator::Read
            CandidateImpactData |
            VerificationObligationPageData |
            MergeSnapshotData |
-           ReleaseSetData
+           ReleaseSetData |
+           SkillData |
+           SkillPageData |
+           SkillAssetData
     Action = Coordinator::Write::NextAction | NextAction
 
     attribute :status, Types::String.enum(

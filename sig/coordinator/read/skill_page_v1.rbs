@@ -1,0 +1,9 @@
+module Coordinator
+  module Read
+    class SkillPageV1 < Shared::Value
+      def items: () -> Array[SkillSummaryV1]
+      def next_skill_id: () -> String?
+      def has_more: () -> bool
+    end
+  end
+end

@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Skills
+      class MarkerBuilder
+        def initialize: (?canonical_json: Shared::CanonicalJson) -> void
+        def call: (identity: IdentityV1, command_id: String) -> Array[String]
+      end
+    end
+  end
+end

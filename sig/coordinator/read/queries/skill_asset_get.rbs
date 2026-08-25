@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    module Queries
+      class SkillAssetGet
+        def initialize: (?contract: Contracts::SkillAssetGet, ?skills: Repositories::Skills) -> void
+        %a{rbs:test:skip}
+        def call: (command_input input) -> QueryResultV1
+      end
+    end
+  end
+end

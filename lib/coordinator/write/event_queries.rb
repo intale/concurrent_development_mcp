@@ -88,6 +88,11 @@ module Coordinator::Write
       direction: :desc
     )
 
+    SKILL_LATEST_REVISION = GroupedEventReadCriteria.new(
+      event_types: [ "SkillRevisionPublished" ],
+      direction: :desc
+    )
+
     DECISION_EXISTENCE = EventReadCriteria.new(
       event_types: [ "DecisionRecorded", "DecisionActivated" ],
       maximum_count: 2,

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_24_220000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_25_094500) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -438,6 +438,43 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_220000) do
     t.index ["verification_status"], name: "index_release_sets_on_verification_status"
   end
 
+  create_table "skill_assets", force: :cascade do |t|
+    t.bigint "byte_size", null: false
+    t.text "content_base64", null: false
+    t.string "content_sha256", null: false
+    t.datetime "created_at", null: false
+    t.boolean "executable", null: false
+    t.string "media_type", null: false
+    t.text "path", null: false
+    t.bigint "revision", null: false
+    t.string "skill_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["skill_id", "path"], name: "index_skill_assets_on_skill_id_and_path", unique: true
+  end
+
+  create_table "skills", primary_key: "skill_id", id: :string, force: :cascade do |t|
+    t.integer "asset_count", null: false
+    t.string "content_digest", null: false
+    t.datetime "created_at", null: false
+    t.text "description", null: false
+    t.text "instructions", null: false
+    t.string "name", null: false
+    t.jsonb "published_actor", null: false
+    t.datetime "published_at_domain", null: false
+    t.datetime "published_at_store", null: false
+    t.string "published_causation_id"
+    t.string "published_correlation_id"
+    t.jsonb "published_event", null: false
+    t.bigint "published_global_position", null: false
+    t.jsonb "published_markers", default: [], null: false
+    t.jsonb "published_metadata", default: {}, null: false
+    t.bigint "revision", null: false
+    t.text "scope", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name", "scope"], name: "index_skills_on_name_and_scope", unique: true
+    t.index ["published_global_position"], name: "index_skills_on_published_global_position"
+  end
+
   create_table "user_utterances", primary_key: "message_id", id: :string, force: :cascade do |t|
     t.string "actor_id", null: false
     t.string "actor_kind", null: false
@@ -554,4 +591,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_24_220000) do
     t.index ["target_repository_id", "event_global_position"], name: "idx_verification_obligations_target_repository"
     t.index ["target_work_item_id", "event_global_position"], name: "idx_verification_obligations_target_work_item"
   end
+
+  add_foreign_key "skill_assets", "skills", primary_key: "skill_id", on_delete: :cascade
 end

@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Skills
+      class AssetBuilder
+        def call: (Hash[Symbol, untyped] attributes) -> AssetV1
+      end
+    end
+  end
+end

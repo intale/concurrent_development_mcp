@@ -18,6 +18,9 @@ module Coordinator
           Tools::CandidateGet,
           Tools::CandidateList,
           Tools::CandidateImpactGet,
+          Tools::SkillGet,
+          Tools::SkillList,
+          Tools::SkillAssetGet,
           Tools::VerificationObligationsList,
           Tools::MergeSnapshotGet,
           Tools::ChangeSetCreate,
@@ -50,7 +53,8 @@ module Coordinator
           Tools::ReleaseRepositoryIntegrationRecord,
           Tools::ReleaseVerificationRecord,
           Tools::ReleaseActivationRecord,
-          Tools::ReleaseCompensationComplete
+          Tools::ReleaseCompensationComplete,
+          Tools::SkillPublish
         ].freeze
       end
     end

@@ -19,6 +19,13 @@ module Coordinator
         pollIntervalMs, and use tasks/cancel for cooperative cancellation. Reuse command_id
         after an unknown mutation result. Read tools return the latest available projection,
         which may be stale; command decisions recheck authoritative event-store facts.
+        Use skill_list to discover persisted AI Skills and select an exact, case-sensitive name and scope;
+        the server does not infer scope precedence. Use skill_get before updating and pass its revision as
+        skill_publish expected_revision (zero creates a new tuple). A skill_revision_conflict writes no Skill
+        or Command fact; refresh skill_get and retry with a new command when appropriate. Each publication is
+        one complete immutable instructions-and-assets snapshot. skill_asset_get returns passive Base64 content;
+        the coordinator never inspects or executes stored assets, so inspect and authorize them externally.
+        Skill reads are available projections and may keep serving an older revision while projection catches up.
         After acquiring a WorkItem, reserve its complete initial file write set before editing,
         and expand that same set before editing any additional file. Expansion never renews expiry.
         Renew the entire exact observed lease set before its deadline when more work time is needed;

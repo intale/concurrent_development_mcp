@@ -398,6 +398,18 @@ module Coordinator::Write
       attribute :completed_at, Types::Timestamp
     end
 
+    class SkillPublication < Value
+      attribute :skill_id, Types::SkillId
+      attribute :name, Types::SkillName
+      attribute :scope, Types::SkillScope
+      attribute :revision, Types::SkillRevision
+      attribute :content_digest, Types::Sha256Digest
+      attribute :asset_count,
+                Types::Integer.constrained(gteq: 0, lteq: Types::SKILL_ASSET_MAXIMUM_COUNT)
+      attribute :publication_event, EventReference
+      attribute :published_at, Types::Timestamp
+    end
+
     Type = ChangeSet |
            WorkItem |
            Dependency |
@@ -430,6 +442,7 @@ module Coordinator::Write
            ReleaseSetCompensationRequest |
            ReleaseSetCompletion |
            DependencySatisfaction |
-           ChangeSetCompletion
+           ChangeSetCompletion |
+           SkillPublication
   end
 end

@@ -19,6 +19,10 @@ module Coordinator
       def self.decision_correct: () -> json_schema
       def self.agent_choice_record: () -> json_schema
       def self.candidate_submit: () -> json_schema
+      def self.skill_publish: () -> json_schema
+      def self.skill_get: () -> json_schema
+      def self.skill_list: () -> json_schema
+      def self.skill_asset_get: () -> json_schema
       def self.agent_choice_get: () -> json_schema
       def self.agent_choice_impact_list: () -> json_schema
       def self.candidate_get: () -> json_schema
