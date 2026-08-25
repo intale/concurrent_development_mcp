@@ -17,6 +17,7 @@ module Coordinator::Write
       when Commands::DeclareWorkItemDependency then work_item_dependency_declare_document(command)
       when Commands::ActivateChangeSet then change_set_activate_document(command)
       when Commands::AcquireWorkItem then work_item_acquire_document(command)
+      when Commands::CompleteWorkItem then work_item_complete_document(command)
       when Commands::ReserveWriteSet then write_set_reserve_document(command)
       when Commands::ExpandWriteSet then write_set_expand_document(command)
       when Commands::RenewLeaseSet then lease_renew_document(command)
@@ -141,6 +142,26 @@ module Coordinator::Write
           base_snapshots: command.base_snapshots.map do |snapshot|
             CommandInputDocuments::RepositorySnapshotV1.new(snapshot.to_h)
           end
+        )
+      )
+    end
+
+    def work_item_complete(command)
+      @canonical_json.sha256(work_item_complete_document(command).to_h)
+    end
+
+    def work_item_complete_document(command)
+      CommandInputDocuments::CompleteWorkItemV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "work_item_complete",
+        input: CommandInputDocuments::CompleteWorkItemInputV1.new(
+          actor: actor_document(command.actor),
+          change_set_id: command.change_set_id,
+          work_item_id: command.work_item_id,
+          attempt_id: command.attempt_id,
+          candidate_id: command.candidate_id,
+          produced_outputs: command.produced_outputs
         )
       )
     end

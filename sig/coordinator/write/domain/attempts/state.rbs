@@ -19,6 +19,9 @@ module Coordinator
           def lease_expires_at: () -> String?
           def lease_released_at: () -> String?
           def status: () -> String
+          def selected_candidate_id: () -> String?
+          def selected_candidate_event: () -> EventReference?
+          def completed_at: () -> String?
           def absent?: () -> bool
           def apply: (Events::Base event) -> State
         end

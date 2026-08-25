@@ -1,0 +1,6 @@
+module Coordinator
+  module Write
+    class InvalidWorkItemCompletionEventPlan < StandardError
+    end
+  end
+end

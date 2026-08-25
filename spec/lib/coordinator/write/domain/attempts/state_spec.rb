@@ -44,8 +44,39 @@ RSpec.describe Coordinator::Write::Domain::Attempts::State do
       lease_renewed_at: nil,
       lease_expires_at: nil,
       lease_released_at: nil,
-      status: "active"
+      status: "active",
+      selected_candidate_id: nil,
+      selected_candidate_event: nil,
+      completed_at: nil
     )
     expect(state).to be_frozen
+  end
+
+  it "folds AttemptCompleted into terminal Candidate attribution" do
+    candidate_event = Coordinator::Write::EventReference.new(
+      event_id: "01919191-9191-7191-8191-919191919191",
+      type: "CandidateSubmitted",
+      stream_context: "DevelopmentIntegration",
+      stream_name: "Candidate",
+      stream_id: "CAN-400",
+      stream_revision: 0
+    )
+    completed = Coordinator::Write::Events::AttemptCompletedV1.new(
+      attempt_id: "A-300",
+      change_set_id: "CS-100",
+      work_item_id: "W-200",
+      candidate_id: "CAN-400",
+      candidate_event:,
+      completed_at: "2026-08-20T14:30:00.000000Z"
+    )
+
+    state = described_class.reduce([ authorized, started, completed ])
+
+    expect(state).to have_attributes(
+      status: "completed",
+      selected_candidate_id: "CAN-400",
+      selected_candidate_event: candidate_event,
+      completed_at: "2026-08-20T14:30:00.000000Z"
+    )
   end
 end

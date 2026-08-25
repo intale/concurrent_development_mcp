@@ -84,6 +84,23 @@ module Coordinator::Write
       attribute :input, AcquireWorkItemInputV1
     end
 
+    class CompleteWorkItemInputV1 < Value
+      Output = WorkItemOutputV1
+
+      attribute :actor, ActorV1
+      attribute :change_set_id, Types::Identifier
+      attribute :work_item_id, Types::Identifier
+      attribute :attempt_id, Types::Identifier
+      attribute :candidate_id, Types::Identifier
+      attribute :produced_outputs,
+                Types::Array.of(Output).constrained(max_size: Types::WORK_ITEM_OUTPUT_MAXIMUM_COUNT)
+    end
+
+    class CompleteWorkItemV1 < BaseV1
+      attribute :tool_name, Types::String.enum("work_item_complete")
+      attribute :input, CompleteWorkItemInputV1
+    end
+
     class FileResourceV1 < Value
       attribute :kind, Types::ResourceKind
       attribute :path, Types::ResourcePath
@@ -605,6 +622,7 @@ module Coordinator::Write
            DeclareWorkItemDependencyV1 |
            ActivateChangeSetV1 |
            AcquireWorkItemV1 |
+           CompleteWorkItemV1 |
            ReserveWriteSetV1 |
            ExpandWriteSetV1 |
            RenewLeaseSetV1 |

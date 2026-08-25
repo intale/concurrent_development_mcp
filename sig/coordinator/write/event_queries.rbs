@@ -23,6 +23,7 @@ module Coordinator
       AGENT_CHOICE_IMPACT_ASSESSMENT: EventReadCriteria
       ATTEMPT_FOR_AGENT_CHOICE: EventReadCriteria
       CANDIDATE_EXISTENCE: EventReadCriteria
+      CANDIDATE_FOR_WORK_ITEM_COMPLETION: EventReadCriteria
       CANDIDATE_HEAD_REGISTRATION: EventReadCriteria
       CANDIDATE_FOR_MERGE_SNAPSHOT: EventReadCriteria
       MERGE_SNAPSHOT_REGISTRATION: EventReadCriteria
@@ -53,6 +54,9 @@ module Coordinator
       WORK_ITEM_FOR_READINESS_EVALUATION: EventReadCriteria
       CHANGE_SET_FOR_ACQUISITION: EventReadCriteria
       WORK_ITEM_FOR_ACQUISITION: EventReadCriteria
+      CHANGE_SET_FOR_WORK_ITEM_COMPLETION: EventReadCriteria
+      WORK_ITEM_FOR_COMPLETION: EventReadCriteria
+      ATTEMPT_FOR_WORK_ITEM_COMPLETION: EventReadCriteria
       ATTEMPT_FOR_ACQUISITION: EventReadCriteria
       ATTEMPT_FOR_WRITE_SET_RESERVATION: EventReadCriteria
       ATTEMPT_FOR_WRITE_SET_EXPANSION: EventReadCriteria

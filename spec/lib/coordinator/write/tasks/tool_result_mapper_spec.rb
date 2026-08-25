@@ -598,7 +598,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         :candidate_not_found,
         { candidate_id: "CAN-task-result" },
         Coordinator::Write::Tasks::DomainErrorV1::CandidateNotFoundError,
-        "denied"
+        "not_found"
       ],
       [
         :candidate_impact_identity_mismatch,

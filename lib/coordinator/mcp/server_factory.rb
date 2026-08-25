@@ -24,6 +24,10 @@ module Coordinator
         Renew the entire exact observed lease set before its deadline when more work time is needed;
         a stale set, lease ID, or fencing token is safely rejected by authoritative event facts.
         Release the entire exact observed lease set when editing is finished; partial release is not available.
+        After submitting the final Candidate and releasing the write set, use work_item_complete to select that
+        exact Candidate and finish the active Attempt/WorkItem. Produced artifact/contract labels are attributed
+        coordination facts. Dependency and ChangeSet progress then converge through idempotent process commands;
+        coord_context may continue serving an older available view while they catch up.
         Accepted interpretations are still non-normative: use decision_activate to establish policy,
         persist its Task handle, and use decision_get only as latest available projected evidence.
         To correct active policy, first accept a correction interpretation, then call decision_correct

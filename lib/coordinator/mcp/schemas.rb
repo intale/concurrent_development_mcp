@@ -107,6 +107,33 @@ module Coordinator
         )
       end
 
+      def work_item_complete
+        output = object_schema(
+          properties: {
+            kind: { type: "string", enum: Types::WORK_ITEM_OUTPUT_KINDS },
+            key: identifier
+          },
+          required: %w[kind key]
+        )
+        object_schema(
+          properties: common_mutation_properties.merge(
+            change_set_id: identifier,
+            work_item_id: identifier,
+            attempt_id: identifier,
+            candidate_id: identifier,
+            produced_outputs: {
+              type: "array",
+              items: output,
+              maxItems: Types::WORK_ITEM_OUTPUT_MAXIMUM_COUNT,
+              uniqueItems: true
+            }
+          ),
+          required: %w[
+            command_id actor change_set_id work_item_id attempt_id candidate_id produced_outputs
+          ]
+        )
+      end
+
       def write_set_reserve
         object_schema(
           properties: common_mutation_properties.merge(

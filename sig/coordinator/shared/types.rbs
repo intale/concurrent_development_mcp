@@ -15,6 +15,9 @@ module Coordinator
       ACTOR_KINDS: Array[String]
       DEPENDENCY_KINDS: Array[String]
       OUTPUT_REQUIRED_DEPENDENCY_KINDS: Array[String]
+      WORK_ITEM_OUTPUT_KINDS: Array[String]
+      DEPENDENCY_REQUIRED_OUTPUT_KINDS: Array[String]
+      WORK_ITEM_OUTPUT_MAXIMUM_COUNT: Integer
       GIT_OBJECT_FORMATS: Array[String]
       GUIDANCE_SOURCES: Array[String]
       STATEMENT_KINDS: Array[String]
@@ -142,6 +145,8 @@ module Coordinator
       MarkerComponents: untyped
       ActorKind: untyped
       DependencyKind: untyped
+      WorkItemOutputKind: untyped
+      DependencyRequiredOutputKind: untyped
       Goal: untyped
       GuidanceText: untyped
       Criterion: untyped

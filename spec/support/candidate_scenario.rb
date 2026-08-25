@@ -80,6 +80,46 @@ module CandidateScenario
     )
   end
 
+  def release(candidate, command_id: nil)
+    input = candidate.fetch(:input)
+    reservation = candidate.fetch(:reservation)
+    execute(Coordinator::Write::Operations::ExecuteReleaseLeaseSet, {
+      command_id: command_id || "cmd-release-#{input.fetch(:candidate_id)}",
+      actor: input.fetch(:actor),
+      change_set_id: input.fetch(:change_set_id),
+      work_item_id: input.fetch(:work_item_id),
+      attempt_id: input.fetch(:attempt_id),
+      lease_set_id: reservation.lease_set_id,
+      leases: reservation.resources.map do |reference|
+        {
+          resource_key_hash: reference.resource_key_hash,
+          lease_id: reference.lease_id,
+          fencing_token: reference.fencing_token
+        }
+      end
+    })
+  end
+
+  def completion_input(candidate, command_id: nil, produced_outputs: [])
+    input = candidate.fetch(:input)
+    {
+      command_id: command_id || "cmd-complete-#{input.fetch(:candidate_id)}",
+      actor: input.fetch(:actor),
+      change_set_id: input.fetch(:change_set_id),
+      work_item_id: input.fetch(:work_item_id),
+      attempt_id: input.fetch(:attempt_id),
+      candidate_id: input.fetch(:candidate_id),
+      produced_outputs:
+    }
+  end
+
+  def complete(candidate, command_id: nil, produced_outputs: [], release: true)
+    release(candidate) if release
+    input = completion_input(candidate, command_id:, produced_outputs:)
+    completion = execute(Coordinator::Write::Operations::ExecuteCompleteWorkItem, input)
+    candidate.merge(completion_input: input, work_item_completion: completion)
+  end
+
   def input(prefix:, ids:, reservation:, path:, agent_id:, candidate_id:, command_id:, head_commit_oid:)
     {
       command_id:,

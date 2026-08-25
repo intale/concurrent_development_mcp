@@ -22,6 +22,22 @@ module Coordinator::Write
       attribute :attempt_id, Types::Identifier
     end
 
+    class WorkItemCompletion < Value
+      Output = WorkItemOutputV1
+
+      attribute :change_set_id, Types::Identifier
+      attribute :work_item_id, Types::Identifier
+      attribute :attempt_id, Types::Identifier
+      attribute :candidate_id, Types::Identifier
+      attribute :candidate_event, EventReference
+      attribute :selected_event, EventReference
+      attribute :attempt_completed_event, EventReference
+      attribute :work_item_completed_event, EventReference
+      attribute :produced_outputs,
+                Types::Array.of(Output).constrained(max_size: Types::WORK_ITEM_OUTPUT_MAXIMUM_COUNT)
+      attribute :completed_at, Types::Timestamp
+    end
+
     class LeaseSet < Value
       Reference = LeaseReferenceV1
 
@@ -362,6 +378,7 @@ module Coordinator::Write
            WorkItem |
            Dependency |
            Attempt |
+           WorkItemCompletion |
            LeaseSet |
            LeaseSetExpansion |
            LeaseSetRenewal |

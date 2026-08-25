@@ -25,6 +25,7 @@ module Coordinator
           Tools::WorkItemDependencyDeclare,
           Tools::ChangeSetActivate,
           Tools::WorkItemAcquire,
+          Tools::WorkItemComplete,
           Tools::WriteSetReserve,
           Tools::WriteSetExpand,
           Tools::LeaseRenew,

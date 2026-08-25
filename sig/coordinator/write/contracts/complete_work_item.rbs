@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Contracts
+      class CompleteWorkItem < Dry::Validation::Contract
+        def call: (untyped input) -> Dry::Validation::Result
+      end
+    end
+  end
+end

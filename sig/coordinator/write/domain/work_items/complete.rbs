@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Domain
+      module WorkItems
+        class Complete
+          RULE_VERSION: String
+
+          def initialize: (?stream_factory: StreamFactory) -> void
+          def call: (change_set_state: ChangeSets::State, work_item_state: State, attempt_state: Attempts::State, candidate: Events::CandidateSubmittedV1?, candidate_event: EventReference?, command: Commands::CompleteWorkItem, completed_at: String) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

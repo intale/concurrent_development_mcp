@@ -109,6 +109,36 @@ module Coordinator::Write
       )
     end
 
+    def work_item_complete(command:, completion:, input_digest:, persisted_events:, completed_at:)
+      attempt_arguments = NextAction::AttemptArguments.new(
+        change_set_id: command.change_set_id,
+        work_item_id: command.work_item_id,
+        attempt_id: command.attempt_id
+      )
+
+      build_completion(
+        command:,
+        tool_name: "work_item_complete",
+        summary: "Final Candidate selected; WorkItem and Attempt completed.",
+        data: CommandReceiptData::WorkItemCompletion.new(
+          change_set_id: command.change_set_id,
+          work_item_id: command.work_item_id,
+          attempt_id: command.attempt_id,
+          candidate_id: command.candidate_id,
+          candidate_event: completion.candidate_event,
+          selected_event: event_reference(persisted_events.fetch(0)),
+          attempt_completed_event: event_reference(persisted_events.fetch(1)),
+          work_item_completed_event: event_reference(persisted_events.fetch(2)),
+          produced_outputs: completion.produced_outputs,
+          completed_at: completion.completed_at
+        ),
+        next_actions: [ NextAction.new(tool: "coord_context", arguments: attempt_arguments) ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     def write_set_reserve(command:, reservation:, input_digest:, persisted_events:, completed_at:)
       attempt_arguments = NextAction::AttemptArguments.new(
         change_set_id: command.change_set_id,

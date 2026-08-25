@@ -15,6 +15,8 @@ module Coordinator::Write
           build_activate_change_set(document)
         when CommandInputDocuments::AcquireWorkItemV1
           build_acquire_work_item(document)
+        when CommandInputDocuments::CompleteWorkItemV1
+          build_complete_work_item(document)
         when CommandInputDocuments::ReserveWriteSetV1
           build_reserve_write_set(document)
         when CommandInputDocuments::ExpandWriteSetV1
@@ -126,6 +128,19 @@ module Coordinator::Write
           base_snapshots: input.base_snapshots.map do |snapshot|
             RepositorySnapshotV1.new(snapshot.to_h)
           end
+        )
+      end
+
+      def build_complete_work_item(document)
+        input = document.input
+        Commands::CompleteWorkItem.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          change_set_id: input.change_set_id,
+          work_item_id: input.work_item_id,
+          attempt_id: input.attempt_id,
+          candidate_id: input.candidate_id,
+          produced_outputs: input.produced_outputs
         )
       end
 

@@ -20,7 +20,10 @@ module Coordinator::Write
         attribute :lease_renewed_at, Types::Timestamp.optional
         attribute :lease_expires_at, Types::Timestamp.optional
         attribute :lease_released_at, Types::Timestamp.optional
-        attribute :status, Types::String.enum("absent", "authorized", "active")
+        attribute :status, Types::String.enum("absent", "authorized", "active", "completed")
+        attribute :selected_candidate_id, Types::Identifier.optional.default(nil)
+        attribute :selected_candidate_event, EventReference.optional.default(nil)
+        attribute :completed_at, Types::Timestamp.optional.default(nil)
 
         def self.initial
           new(
@@ -37,7 +40,10 @@ module Coordinator::Write
             lease_renewed_at: nil,
             lease_expires_at: nil,
             lease_released_at: nil,
-            status: "absent"
+            status: "absent",
+            selected_candidate_id: nil,
+            selected_candidate_event: nil,
+            completed_at: nil
           )
         end
 
@@ -66,7 +72,10 @@ module Coordinator::Write
               lease_renewed_at: nil,
               lease_expires_at: nil,
               lease_released_at: nil,
-              status: "authorized"
+              status: "authorized",
+              selected_candidate_id: nil,
+              selected_candidate_event: nil,
+              completed_at: nil
             )
           when Events::AttemptStartedV1
             self.class.new(
@@ -83,7 +92,10 @@ module Coordinator::Write
               lease_renewed_at:,
               lease_expires_at:,
               lease_released_at:,
-              status: "active"
+              status: "active",
+              selected_candidate_id:,
+              selected_candidate_event:,
+              completed_at:
             )
           when Events::WriteSetReservedV1
             self.class.new(
@@ -100,7 +112,10 @@ module Coordinator::Write
               lease_renewed_at: nil,
               lease_expires_at: event.expires_at,
               lease_released_at: nil,
-              status:
+              status:,
+              selected_candidate_id:,
+              selected_candidate_event:,
+              completed_at:
             )
           when Events::WriteSetExpandedV1
             self.class.new(
@@ -117,7 +132,10 @@ module Coordinator::Write
               lease_renewed_at:,
               lease_expires_at: event.expires_at,
               lease_released_at:,
-              status:
+              status:,
+              selected_candidate_id:,
+              selected_candidate_event:,
+              completed_at:
             )
           when Events::WriteSetRenewedV1
             self.class.new(
@@ -134,7 +152,10 @@ module Coordinator::Write
               lease_renewed_at: event.renewed_at,
               lease_expires_at: event.expires_at,
               lease_released_at:,
-              status:
+              status:,
+              selected_candidate_id:,
+              selected_candidate_event:,
+              completed_at:
             )
           when Events::WriteSetReleasedV1
             self.class.new(
@@ -151,7 +172,30 @@ module Coordinator::Write
               lease_renewed_at:,
               lease_expires_at: event.previous_expires_at,
               lease_released_at: event.released_at,
-              status:
+              status:,
+              selected_candidate_id:,
+              selected_candidate_event:,
+              completed_at:
+            )
+          when Events::AttemptCompletedV1
+            self.class.new(
+              attempt_id:,
+              change_set_id:,
+              work_item_id:,
+              agent_id:,
+              base_snapshots:,
+              lease_set_id:,
+              lease_repository_id:,
+              lease_policy_version:,
+              lease_resources:,
+              lease_reserved_at:,
+              lease_renewed_at:,
+              lease_expires_at:,
+              lease_released_at:,
+              status: "completed",
+              selected_candidate_id: event.candidate_id,
+              selected_candidate_event: event.candidate_event,
+              completed_at: event.completed_at
             )
           else
             self

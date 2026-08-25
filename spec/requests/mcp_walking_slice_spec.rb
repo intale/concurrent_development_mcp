@@ -65,6 +65,7 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
       "work_item_dependency_declare",
       "change_set_activate",
       "work_item_acquire",
+      "work_item_complete",
       "write_set_reserve",
       "write_set_expand",
       "lease_renew",
@@ -103,7 +104,7 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
       "ttlMs" => nil,
       "pollIntervalMs" => 500
     )
-    expect(task_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
+    expect(task_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN), created.inspect
     expect(task_events(task_id).map(&:type)).to eq([ "CoordinationTaskSubmitted" ])
     expect(command_events(arguments.fetch(:command_id))).to be_empty
     expect(change_set_events(arguments.fetch(:change_set_id))).to be_empty
@@ -167,6 +168,38 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
     expect(context_payload.dig("data", "context", "change_set", "goal")).to eq(
       "Coordinate repositories"
     )
+  end
+
+  it "completes a WorkItem through a durable Task after its final Candidate relinquishes leases" do
+    collector = ReportedErrorCollector.new
+    Rails.error.subscribe(collector)
+    candidate = CandidateScenario.submit(prefix: "mcp-complete")
+    CandidateScenario.release(candidate)
+    arguments = CandidateScenario.completion_input(
+      candidate,
+      command_id: "cmd-mcp-work-item-complete",
+      produced_outputs: [ { kind: "contract", key: "payments-v2" } ]
+    )
+
+    submitted = call_tool("work_item_complete", arguments, id: 1)
+    raise collector.errors.first if collector.errors.any?
+    task_id = submitted.dig("result", "taskId")
+    expect(task_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN), submitted.inspect
+
+    execute_task(task_id)
+    completed = task_request("tasks/get", task_id:, id: 2)
+
+    expect(completed.dig("result", "status")).to eq("completed")
+    expect(completed.dig("result", "result", "isError")).to be(false), completed.inspect
+    expect(completed.dig("result", "result", "structuredContent", "data")).to include(
+      "work_item_id" => candidate.dig(:ids, :work_item_id),
+      "attempt_id" => candidate.dig(:ids, :attempt_id),
+      "candidate_id" => candidate.dig(:input, :candidate_id),
+      "produced_outputs" => [ { "kind" => "contract", "key" => "payments-v2" } ]
+    )
+    expect(command_events(arguments.fetch(:command_id)).map(&:type)).to eq([ "CommandCompleted" ])
+  ensure
+    Rails.error.unsubscribe(collector) if collector
   end
 
   it "runs merge snapshot registration as a durable Task and serves its lagging projection" do

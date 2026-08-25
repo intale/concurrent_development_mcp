@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    class PreparedWorkItemCompletionV1 < Shared::Value
+      def completed_at: () -> String
+      def input_digest: () -> String
+      def domain_event_ids: () -> Array[String]
+      def completion_event_id: () -> String
+    end
+  end
+end

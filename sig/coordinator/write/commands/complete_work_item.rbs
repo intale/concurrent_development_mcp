@@ -1,0 +1,17 @@
+module Coordinator
+  module Write
+    module Commands
+      class CompleteWorkItem < Shared::Value
+        Output: singleton(WorkItemOutputV1)
+
+        def command_id: () -> String
+        def actor: () -> Actor
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def attempt_id: () -> String
+        def candidate_id: () -> String
+        def produced_outputs: () -> Array[WorkItemOutputV1]
+      end
+    end
+  end
+end

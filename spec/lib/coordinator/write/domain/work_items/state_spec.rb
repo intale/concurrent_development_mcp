@@ -24,7 +24,11 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::State do
       acceptance_criteria: [ "Reject duplicate ownership" ],
       status: "planned",
       active_attempt_id: nil,
-      active_agent_id: nil
+      active_agent_id: nil,
+      selected_candidate_id: nil,
+      selected_candidate_event: nil,
+      produced_outputs: [],
+      completed_at: nil
     )
     expect(state).to be_frozen
   end
@@ -69,5 +73,64 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::State do
     expect(acquired.status).to eq("active")
     expect(acquired.active_attempt_id).to eq("A-300")
     expect(acquired.active_agent_id).to eq("agent-a")
+  end
+
+  it "folds Candidate selection and completion into terminal state" do
+    candidate_event = Coordinator::Write::EventReference.new(
+      event_id: "01919191-9191-7191-8191-919191919191",
+      type: "CandidateSubmitted",
+      stream_context: "DevelopmentIntegration",
+      stream_name: "Candidate",
+      stream_id: "CAN-400",
+      stream_revision: 0
+    )
+    outputs = [
+      Coordinator::Write::WorkItemOutputV1.new(kind: "artifact", key: "billing-gem")
+    ]
+    events = [
+      work_item_created,
+      Coordinator::Write::Events::WorkItemMadeReadyV1.new(
+        change_set_id: "CS-100",
+        work_item_id: "W-200",
+        readiness_decision_id: "readiness-v1:#{"a" * 64}",
+        reason: "change_set_activated",
+        made_ready_at: "2026-08-20T14:15:01.000000Z"
+      ),
+      Coordinator::Write::Events::WorkItemAcquiredV1.new(
+        change_set_id: "CS-100",
+        work_item_id: "W-200",
+        attempt_id: "A-300",
+        agent_id: "agent-a",
+        acquired_at: "2026-08-20T14:20:00.000000Z"
+      ),
+      Coordinator::Write::Events::WorkItemCandidateSelectedV1.new(
+        change_set_id: "CS-100",
+        work_item_id: "W-200",
+        attempt_id: "A-300",
+        candidate_id: "CAN-400",
+        candidate_event:,
+        selected_at: "2026-08-20T14:30:00.000000Z"
+      ),
+      Coordinator::Write::Events::WorkItemCompletedV1.new(
+        change_set_id: "CS-100",
+        work_item_id: "W-200",
+        attempt_id: "A-300",
+        candidate_id: "CAN-400",
+        candidate_event:,
+        produced_outputs: outputs,
+        rule_version: "work-item-completion/v1",
+        completed_at: "2026-08-20T14:30:00.000000Z"
+      )
+    ]
+
+    state = described_class.reduce(events)
+
+    expect(state).to have_attributes(
+      status: "completed",
+      selected_candidate_id: "CAN-400",
+      selected_candidate_event: candidate_event,
+      produced_outputs: outputs,
+      completed_at: "2026-08-20T14:30:00.000000Z"
+    )
   end
 end

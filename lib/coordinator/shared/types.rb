@@ -37,6 +37,9 @@ module Coordinator::Shared
       requires_contract
       requires_composite_verification
     ].freeze
+    WORK_ITEM_OUTPUT_KINDS = %w[artifact contract].freeze
+    DEPENDENCY_REQUIRED_OUTPUT_KINDS = %w[artifact contract verification_run].freeze
+    WORK_ITEM_OUTPUT_MAXIMUM_COUNT = 32
     GIT_OBJECT_FORMATS = %w[sha1 sha256].freeze
     GUIDANCE_SOURCES = %w[mcp_client agent_forwarded].freeze
     STATEMENT_KINDS = %w[
@@ -392,6 +395,7 @@ module Coordinator::Shared
       work_item_dependency_declare
       change_set_activate
       work_item_acquire
+      work_item_complete
       write_set_reserve
       write_set_expand
       lease_renew
@@ -441,6 +445,8 @@ module Coordinator::Shared
     MarkerComponents = Array.of(MarkerComponent).constrained(min_size: 2, max_size: 32)
     ActorKind = String.enum(*ACTOR_KINDS)
     DependencyKind = String.enum(*DEPENDENCY_KINDS)
+    WorkItemOutputKind = String.enum(*WORK_ITEM_OUTPUT_KINDS)
+    DependencyRequiredOutputKind = String.enum(*DEPENDENCY_REQUIRED_OUTPUT_KINDS)
     Goal = String.constrained(min_size: 1, max_size: 4_000)
     GuidanceText = String.constrained(min_size: 1, max_size: 16_000)
     Criterion = String.constrained(min_size: 1, max_size: 2_000)

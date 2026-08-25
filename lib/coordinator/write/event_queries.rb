@@ -158,6 +158,12 @@ module Coordinator::Write
       direction: :asc
     )
 
+    CANDIDATE_FOR_WORK_ITEM_COMPLETION = EventReadCriteria.new(
+      event_types: [ "CandidateSubmitted" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+
     CANDIDATE_HEAD_REGISTRATION = EventReadCriteria.new(
       event_types: [ "CandidateHeadRegistered" ],
       maximum_count: 1,
@@ -402,6 +408,41 @@ module Coordinator::Write
     WORK_ITEM_FOR_ACQUISITION = EventReadCriteria.new(
       event_types: [ "WorkItemCreated", "WorkItemMadeReady", "WorkItemAcquired" ],
       maximum_count: 3,
+      direction: :asc
+    )
+
+    CHANGE_SET_FOR_WORK_ITEM_COMPLETION = EventReadCriteria.new(
+      event_types: [
+        "ChangeSetCreated",
+        "WorkItemAddedToChangeSet",
+        "ChangeSetActivated",
+        "ChangeSetCompleted"
+      ],
+      maximum_count: 103,
+      direction: :asc
+    )
+
+    WORK_ITEM_FOR_COMPLETION = EventReadCriteria.new(
+      event_types: [
+        "WorkItemCreated",
+        "WorkItemMadeReady",
+        "WorkItemAcquired",
+        "WorkItemCandidateSelected",
+        "WorkItemCompleted"
+      ],
+      maximum_count: 5,
+      direction: :asc
+    )
+
+    ATTEMPT_FOR_WORK_ITEM_COMPLETION = EventReadCriteria.new(
+      event_types: [
+        "AttemptAuthorized",
+        "AttemptStarted",
+        "WriteSetReserved",
+        "WriteSetExpanded",
+        "AttemptCompleted"
+      ],
+      maximum_count: 35,
       direction: :asc
     )
 
