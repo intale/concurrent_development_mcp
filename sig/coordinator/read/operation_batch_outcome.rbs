@@ -1,0 +1,22 @@
+module Coordinator
+  module Read
+    class OperationBatchOutcome < ApplicationRecord
+      def batch_id: () -> String
+      def item_index: () -> Integer
+      def command_id: () -> String
+      def canonical_input_digest: () -> String
+      def status: () -> String
+      def result: () -> Hash[String, untyped]
+      def outcome_event: () -> Hash[String, untyped]
+      def outcome_actor: () -> Hash[String, untyped]
+      def outcome_markers: () -> Array[String]
+      def outcome_metadata: () -> Hash[String, untyped]
+      def outcome_causation_id: () -> String?
+      def outcome_correlation_id: () -> String?
+      def outcome_global_position: () -> Integer
+      def finished_at_domain: () -> Time
+      def finished_at_store: () -> Time
+      def operation_batch: () -> OperationBatch
+    end
+  end
+end

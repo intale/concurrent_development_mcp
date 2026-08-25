@@ -474,6 +474,60 @@ module Coordinator
         )
       end
 
+      def skill_publish_batch
+        object_schema(
+          properties: common_mutation_properties.merge(
+            actor: object_schema(
+              properties: {
+                kind: { type: "string", enum: %w[agent user] },
+                id: identifier
+              },
+              required: %w[kind id]
+            ),
+            batch_id: uuid_v7,
+            items: {
+              type: "array",
+              minItems: 1,
+              maxItems: Types::OPERATION_BATCH_MAXIMUM_ITEMS,
+              items: skill_publish
+            }
+          ),
+          required: %w[command_id actor batch_id items]
+        )
+      end
+
+      def operation_batch_cancel
+        object_schema(
+          properties: common_mutation_properties.merge(batch_id: uuid_v7),
+          required: %w[command_id actor batch_id]
+        )
+      end
+
+      def operation_batch_get
+        object_schema(
+          properties: {
+            batch_id: uuid_v7,
+            after_index: {
+              anyOf: [
+                { type: "integer", minimum: 0, maximum: Types::OPERATION_BATCH_MAXIMUM_ITEMS - 1 },
+                { type: "null" }
+              ]
+            },
+            limit: {
+              anyOf: [
+                {
+                  type: "integer",
+                  minimum: 1,
+                  maximum: Types::OPERATION_BATCH_QUERY_MAXIMUM_ITEMS
+                },
+                { type: "null" }
+              ]
+            }
+          },
+          required: %w[batch_id]
+        )
+      end
+
       def skill_get
         object_schema(
           properties: {

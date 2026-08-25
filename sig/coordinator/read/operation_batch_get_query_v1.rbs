@@ -1,0 +1,9 @@
+module Coordinator
+  module Read
+    class OperationBatchGetQueryV1 < Shared::Value
+      def batch_id: () -> String
+      def after_index: () -> Integer?
+      def limit: () -> Integer
+    end
+  end
+end

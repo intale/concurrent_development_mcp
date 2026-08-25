@@ -49,7 +49,9 @@ module Coordinator::Write
         complete_compensated_release_set:
           Operations::ExecuteCompleteCompensatedReleaseSet.new(event_store:),
         publish_skill_revision:
-          Operations::ExecutePublishSkillRevision.new(event_store:)
+          Operations::ExecutePublishSkillRevision.new(event_store:),
+        operation_batch_command:
+          Operations::ExecuteOperationBatchCommand.new(event_store:)
       )
         @create_change_set = create_change_set
         @create_work_item = create_work_item
@@ -82,6 +84,7 @@ module Coordinator::Write
         @record_release_set_activation = record_release_set_activation
         @complete_compensated_release_set = complete_compensated_release_set
         @publish_skill_revision = publish_skill_revision
+        @operation_batch_command = operation_batch_command
       end
 
       def call(command, caused_by:)
@@ -148,6 +151,8 @@ module Coordinator::Write
           @complete_compensated_release_set.call_command(command, caused_by:)
         when Commands::PublishSkillRevision
           @publish_skill_revision.call_command(command, caused_by:)
+        when Commands::CreateOperationBatch, Commands::CancelOperationBatch
+          @operation_batch_command.call_command(command, caused_by:)
         end
       end
     end

@@ -32,11 +32,19 @@ module Coordinator
                                 Commands::RecordReleaseSetVerification |
                                 Commands::RecordReleaseSetActivation |
                                 Commands::CompleteCompensatedReleaseSet |
-                                Commands::PublishSkillRevision
+                                Commands::PublishSkillRevision |
+                                Commands::CreateOperationBatch |
+                                Commands::CancelOperationBatch
     type write_command = coordination_command |
                          Commands::ExpireResourceLease |
                          Commands::RequestReleaseSetCompensation |
-                         Commands::CompleteActivatedReleaseSet
+                         Commands::CompleteActivatedReleaseSet |
+                         Commands::SatisfyWorkItemDependency |
+                         Commands::CompleteChangeSet |
+                         Commands::RecordOperationBatchItemOutcome |
+                         Commands::RequestOperationBatchContinuation |
+                         Commands::CompleteOperationBatch |
+                         Commands::CompleteOperationBatchCancellation
     type lifecycle_command = Commands::StartCoordinationTask |
                              Commands::RecordCoordinationTaskOutcome |
                              Commands::CancelCoordinationTask

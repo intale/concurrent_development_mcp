@@ -632,6 +632,90 @@ module Coordinator::Write
       attribute :input, PublishSkillRevisionInputV1
     end
 
+    class CreateOperationBatchInputV1 < Value
+      Item = OperationBatches::ItemV1
+
+      attribute :actor, ActorV1
+      attribute :batch_id, Types::OperationBatchId
+      attribute :target_tool, Types::OperationBatchTargetTool
+      attribute :items, Types::Array.of(Item).constrained(
+        min_size: 1,
+        max_size: Types::OPERATION_BATCH_MAXIMUM_ITEMS
+      )
+      attribute :manifest_digest, Types::Sha256Digest
+      attribute :encoded_byte_size, Types::OperationBatchEncodedByteSize
+      attribute :page_size, Types::OperationBatchPageSize
+    end
+
+    class CreateOperationBatchV1 < BaseV1
+      attribute :tool_name, Types::String.enum("skill_publish_batch")
+      attribute :input, CreateOperationBatchInputV1
+    end
+
+    class CancelOperationBatchInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :batch_id, Types::OperationBatchId
+    end
+
+    class CancelOperationBatchV1 < BaseV1
+      attribute :tool_name, Types::String.enum("operation_batch_cancel")
+      attribute :input, CancelOperationBatchInputV1
+    end
+
+    class RecordOperationBatchItemOutcomeInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :batch_id, Types::OperationBatchId
+      attribute :index, Types::OperationBatchItemIndex
+      attribute :item_command_id, Types::Identifier
+      attribute :canonical_input_digest, Types::Sha256Digest
+      attribute :result, Tasks::ToolResultV1
+      attribute :target_completion, EventReferenceV1.optional
+      attribute :finished_at, Types::Timestamp
+    end
+
+    class RecordOperationBatchItemOutcomeV1 < BaseV1
+      attribute :tool_name, Types::String.enum("operation_batch_item_outcome_policy")
+      attribute :input, RecordOperationBatchItemOutcomeInputV1
+    end
+
+    class RequestOperationBatchContinuationInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :batch_id, Types::OperationBatchId
+      attribute :page_start, Types::OperationBatchItemIndex
+      attribute :page_end, Types::OperationBatchItemIndex
+      attribute :source_event, EventReferenceV1
+      attribute :requested_at, Types::Timestamp
+    end
+
+    class RequestOperationBatchContinuationV1 < BaseV1
+      attribute :tool_name, Types::String.enum("operation_batch_continuation_policy")
+      attribute :input, RequestOperationBatchContinuationInputV1
+    end
+
+    class CompleteOperationBatchInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :batch_id, Types::OperationBatchId
+      attribute :source_event, EventReferenceV1
+      attribute :completed_at, Types::Timestamp
+    end
+
+    class CompleteOperationBatchV1 < BaseV1
+      attribute :tool_name, Types::String.enum("operation_batch_completion_policy")
+      attribute :input, CompleteOperationBatchInputV1
+    end
+
+    class CompleteOperationBatchCancellationInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :batch_id, Types::OperationBatchId
+      attribute :source_event, EventReferenceV1
+      attribute :cancelled_at, Types::Timestamp
+    end
+
+    class CompleteOperationBatchCancellationV1 < BaseV1
+      attribute :tool_name, Types::String.enum("operation_batch_cancellation_completion_policy")
+      attribute :input, CompleteOperationBatchCancellationInputV1
+    end
+
     class ExpireResourceLeaseInputV1 < Value
       attribute :actor, ActorV1
       attribute :resource_key_hash, Types::Sha256Digest
@@ -702,13 +786,19 @@ module Coordinator::Write
            RecordReleaseSetVerificationV1 |
            RecordReleaseSetActivationV1 |
            CompleteCompensatedReleaseSetV1 |
-           PublishSkillRevisionV1
+           PublishSkillRevisionV1 |
+           CreateOperationBatchV1 |
+           CancelOperationBatchV1
 
     DigestType = Type |
                  ExpireResourceLeaseV1 |
                  RequestReleaseSetCompensationV1 |
                  CompleteActivatedReleaseSetV1 |
                  SatisfyWorkItemDependencyV1 |
-                 CompleteChangeSetV1
+                 CompleteChangeSetV1 |
+                 RecordOperationBatchItemOutcomeV1 |
+                 RequestOperationBatchContinuationV1 |
+                 CompleteOperationBatchV1 |
+                 CompleteOperationBatchCancellationV1
   end
 end

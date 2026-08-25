@@ -410,6 +410,30 @@ module Coordinator::Write
       attribute :published_at, Types::Timestamp
     end
 
+    class OperationBatchAcceptance < Value
+      attribute :batch_id, Types::OperationBatchId
+      attribute :target_tool, Types::OperationBatchTargetTool
+      attribute :total, Types::OperationBatchTotal
+      attribute :status, Types::String.enum("accepted")
+    end
+
+    class OperationBatchCancellation < Value
+      attribute :batch_id, Types::OperationBatchId
+      attribute :status, Types::String.enum("cancellation_requested")
+    end
+
+    class OperationBatchTransition < Value
+      attribute :batch_id, Types::OperationBatchId
+      attribute :transition, Types::String.enum(
+        "item_succeeded",
+        "item_rejected",
+        "continuation_requested",
+        "completed",
+        "cancelled"
+      )
+      attribute :index, Types::OperationBatchItemIndex.optional
+    end
+
     Type = ChangeSet |
            WorkItem |
            Dependency |
@@ -443,6 +467,9 @@ module Coordinator::Write
            ReleaseSetCompletion |
            DependencySatisfaction |
            ChangeSetCompletion |
-           SkillPublication
+           SkillPublication |
+           OperationBatchAcceptance |
+           OperationBatchCancellation |
+           OperationBatchTransition
   end
 end

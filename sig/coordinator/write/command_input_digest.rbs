@@ -42,6 +42,18 @@ module Coordinator
       def candidate_submit_document: (Commands::SubmitCandidate command) -> CommandInputDocuments::SubmitCandidateV1
       def skill_publish: (Commands::PublishSkillRevision command) -> String
       def skill_publish_document: (Commands::PublishSkillRevision command) -> CommandInputDocuments::PublishSkillRevisionV1
+      def operation_batch_create: (Commands::CreateOperationBatch command) -> String
+      def operation_batch_create_document: (Commands::CreateOperationBatch command) -> CommandInputDocuments::CreateOperationBatchV1
+      def operation_batch_cancel: (Commands::CancelOperationBatch command) -> String
+      def operation_batch_cancel_document: (Commands::CancelOperationBatch command) -> CommandInputDocuments::CancelOperationBatchV1
+      def operation_batch_item_outcome: (Commands::RecordOperationBatchItemOutcome command) -> String
+      def operation_batch_item_outcome_document: (Commands::RecordOperationBatchItemOutcome command) -> CommandInputDocuments::RecordOperationBatchItemOutcomeV1
+      def operation_batch_continuation: (Commands::RequestOperationBatchContinuation command) -> String
+      def operation_batch_continuation_document: (Commands::RequestOperationBatchContinuation command) -> CommandInputDocuments::RequestOperationBatchContinuationV1
+      def operation_batch_completion: (Commands::CompleteOperationBatch command) -> String
+      def operation_batch_completion_document: (Commands::CompleteOperationBatch command) -> CommandInputDocuments::CompleteOperationBatchV1
+      def operation_batch_cancellation_completion: (Commands::CompleteOperationBatchCancellation command) -> String
+      def operation_batch_cancellation_completion_document: (Commands::CompleteOperationBatchCancellation command) -> CommandInputDocuments::CompleteOperationBatchCancellationV1
       def candidate_impact_surface_submit: (Commands::SubmitCandidateImpactSurface command) -> String
       def candidate_impact_surface_submit_document: (Commands::SubmitCandidateImpactSurface command) -> CommandInputDocuments::SubmitCandidateImpactSurfaceV1
       def verification_obligation_claim: (Commands::ClaimVerificationObligation command) -> String

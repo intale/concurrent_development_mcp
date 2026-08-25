@@ -1,0 +1,8 @@
+module Coordinator
+  module Mcp
+    module Tools
+      class SkillPublishBatch < MutationTool
+      end
+    end
+  end
+end

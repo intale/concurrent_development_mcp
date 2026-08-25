@@ -26,6 +26,11 @@ module Coordinator::Shared
     SKILL_ASSET_MAXIMUM_BYTES = 1_048_576
     SKILL_ASSETS_TOTAL_MAXIMUM_BYTES = 4_194_304
     SKILL_ASSET_BASE64_MAXIMUM_BYTES = 1_398_104
+    OPERATION_BATCH_MAXIMUM_ITEMS = 1_000
+    OPERATION_BATCH_PAGE_SIZE = 50
+    OPERATION_BATCH_QUERY_MAXIMUM_ITEMS = 100
+    OPERATION_BATCH_MAXIMUM_ENCODED_BYTES = 3_145_728
+    OPERATION_BATCH_MAXIMUM_HISTORY_EVENTS = 1_024
 
     ACTOR_KINDS = %w[
       agent
@@ -440,6 +445,8 @@ module Coordinator::Shared
       release_activation_record
       release_compensation_complete
       skill_publish
+      skill_publish_batch
+      operation_batch_cancel
     ].freeze
 
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)
@@ -470,6 +477,17 @@ module Coordinator::Shared
     SkillAssetMediaType = String.constrained(format: SKILL_MEDIA_TYPE_PATTERN)
     SkillAssetContentBase64 = String.constrained(max_size: SKILL_ASSET_BASE64_MAXIMUM_BYTES)
     SkillAssetByteSize = Integer.constrained(gteq: 0, lteq: SKILL_ASSET_MAXIMUM_BYTES)
+    OperationBatchId = UuidV7
+    OperationBatchItemIndex = Integer.constrained(gteq: 0, lt: OPERATION_BATCH_MAXIMUM_ITEMS)
+    OperationBatchTotal = Integer.constrained(gteq: 1, lteq: OPERATION_BATCH_MAXIMUM_ITEMS)
+    OperationBatchPageSize = Integer.constrained(eql: OPERATION_BATCH_PAGE_SIZE)
+    OperationBatchEncodedByteSize = Integer.constrained(
+      gteq: 1,
+      lteq: OPERATION_BATCH_MAXIMUM_ENCODED_BYTES
+    )
+    OperationBatchTargetTool = String.enum("skill_publish")
+    OperationBatchOutcomeStatus = String.enum("succeeded", "rejected")
+    OperationBatchStatus = String.enum("running", "completed", "completed_with_errors", "cancelled")
     Marker = String.constrained(min_size: 1, max_size: 512)
     MarkerPurpose = String.constrained(format: MARKER_PURPOSE_PATTERN)
     MarkerComponent = String.constrained(format: MARKER_COMPONENT_PATTERN)

@@ -1,0 +1,37 @@
+module Coordinator
+  module Read
+    class OperationBatch < ApplicationRecord
+      def batch_id: () -> String
+      def target_tool: () -> String?
+      def total: () -> Integer?
+      def page_size: () -> Integer?
+      def manifest_digest: () -> String?
+      def encoded_byte_size: () -> Integer?
+      def status: () -> String
+      def succeeded_count: () -> Integer
+      def rejected_count: () -> Integer
+      def cancellation_requested: () -> bool
+      def terminal_kind: () -> String?
+      def created_event: () -> Hash[String, untyped]?
+      def created_actor: () -> Hash[String, untyped]?
+      def created_markers: () -> Array[String]
+      def created_metadata: () -> Hash[String, untyped]
+      def created_causation_id: () -> String?
+      def created_correlation_id: () -> String?
+      def created_global_position: () -> Integer?
+      def created_at_domain: () -> Time?
+      def created_at_store: () -> Time?
+      def cancellation_event: () -> Hash[String, untyped]?
+      def terminal_event: () -> Hash[String, untyped]?
+      def terminal_actor: () -> Hash[String, untyped]?
+      def terminal_markers: () -> Array[String]
+      def terminal_metadata: () -> Hash[String, untyped]
+      def terminal_causation_id: () -> String?
+      def terminal_correlation_id: () -> String?
+      def terminal_global_position: () -> Integer?
+      def terminal_at_domain: () -> Time?
+      def terminal_at_store: () -> Time?
+      def outcomes: () -> untyped
+    end
+  end
+end

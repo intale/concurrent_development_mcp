@@ -21,6 +21,7 @@ module Coordinator
           Tools::SkillGet,
           Tools::SkillList,
           Tools::SkillAssetGet,
+          Tools::OperationBatchGet,
           Tools::VerificationObligationsList,
           Tools::MergeSnapshotGet,
           Tools::ChangeSetCreate,
@@ -54,7 +55,9 @@ module Coordinator
           Tools::ReleaseVerificationRecord,
           Tools::ReleaseActivationRecord,
           Tools::ReleaseCompensationComplete,
-          Tools::SkillPublish
+          Tools::SkillPublish,
+          Tools::SkillPublishBatch,
+          Tools::OperationBatchCancel
         ].freeze
       end
     end

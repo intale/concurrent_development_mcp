@@ -175,6 +175,17 @@ module Coordinator
       )
     end
 
+    register("operations.prepare_create_skill_publish_batch", memoize: true) do
+      Write::Operations::PrepareCreateSkillPublishBatch.new(
+        item_preparer: self["operations.prepare_publish_skill_revision"],
+        input_digest: self["command_input_digest"]
+      )
+    end
+
+    register("operations.prepare_cancel_operation_batch", memoize: true) do
+      Write::Operations::PrepareCancelOperationBatch.new
+    end
+
     register("domain.change_sets.create", memoize: true) do
       Write::Domain::ChangeSets::Create.new(stream_factory: self["stream_factory"])
     end
@@ -636,6 +647,10 @@ module Coordinator
       Read::Repositories::Skills.new
     end
 
+    register("repositories.operation_batches", memoize: true) do
+      Read::Repositories::OperationBatches.new
+    end
+
     register("repositories.candidate_impacts", memoize: true) do
       Read::Repositories::CandidateImpacts.new(
         candidates: self["repositories.candidates"],
@@ -735,6 +750,14 @@ module Coordinator
         schema_registry: self["event_schema_registry"],
         identity_builder: self["skills.identity_builder"],
         skills: self["repositories.skills"],
+        processed_events: self["repositories.processed_projection_events"]
+      )
+    end
+
+    register("projectors.operation_batches_v1", memoize: true) do
+      Read::Projectors::OperationBatchesV1.new(
+        schema_registry: self["event_schema_registry"],
+        batches: self["repositories.operation_batches"],
         processed_events: self["repositories.processed_projection_events"]
       )
     end
@@ -843,6 +866,10 @@ module Coordinator
 
     register("queries.skill_asset_get") do
       Read::Queries::SkillAssetGet.new(skills: self["repositories.skills"])
+    end
+
+    register("queries.operation_batch_get") do
+      Read::Queries::OperationBatchGet.new(batches: self["repositories.operation_batches"])
     end
 
     register("queries.verification_obligations_list") do
@@ -1222,6 +1249,28 @@ module Coordinator
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
         marker_builder: self["skills.marker_builder"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
+    register("operation_batches.loader", memoize: true) do
+      Write::OperationBatches::Loader.new(
+        event_store: self["event_store"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("operations.execute_operation_batch_command", memoize: true) do
+      Write::Operations::ExecuteOperationBatchCommand.new(
+        event_store: self["event_store"],
+        loader: self["operation_batches.loader"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
         completion_builder: self["command_completion_builder"]
       )
     end
@@ -1633,7 +1682,9 @@ module Coordinator
         complete_compensated_release_set:
           self["operations.execute_complete_compensated_release_set"],
         publish_skill_revision:
-          self["operations.execute_publish_skill_revision"]
+          self["operations.execute_publish_skill_revision"],
+        operation_batch_command:
+          self["operations.execute_operation_batch_command"]
       )
     end
 
@@ -1781,6 +1832,20 @@ module Coordinator
     register("operations.submit_publish_skill_revision_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_publish_skill_revision"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_create_skill_publish_batch_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_create_skill_publish_batch"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_cancel_operation_batch_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_cancel_operation_batch"],
         submitter: self["operations.submit_coordination_task"]
       )
     end
@@ -1940,6 +2005,33 @@ module Coordinator
       )
     end
 
+    register("operation_batches.source_builder", memoize: true) do
+      Processes::OperationBatches::SourceBuilder.new(
+        schema_registry: self["event_schema_registry"]
+      )
+    end
+
+    register("operation_batches.target_completion_loader", memoize: true) do
+      Processes::OperationBatches::TargetCompletionLoader.new(
+        event_store: self["event_store"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("process_managers.operation_batch_runner", memoize: true) do
+      Processes::ProcessManagers::OperationBatchRunner.new(
+        event_store: self["event_store"],
+        source_builder: self["operation_batches.source_builder"],
+        loader: self["operation_batches.loader"],
+        target_builder: self["tasks.target_command_builder"],
+        target_executor: self["tasks.target_executor"],
+        result_mapper: self["tasks.tool_result_mapper"],
+        completion_loader: self["operation_batches.target_completion_loader"],
+        batch_executor: self["operations.execute_operation_batch_command"]
+      )
+    end
+
     register("process_managers.lease_expiry_scheduler", memoize: true) do
       Processes::ProcessManagers::LeaseExpiryScheduler.new(
         source_builder: self["lease_expiry_source_builder"],
@@ -2003,6 +2095,12 @@ module Coordinator
     register("subscriptions.coordination_task_executor", memoize: true) do
       Processes::Subscriptions::CoordinationTaskExecutor.new(
         handler: self["process_managers.coordination_task_executor"]
+      )
+    end
+
+    register("subscriptions.operation_batch_runner", memoize: true) do
+      Processes::Subscriptions::OperationBatchRunner.new(
+        handler: self["process_managers.operation_batch_runner"]
       )
     end
 
@@ -2086,6 +2184,10 @@ module Coordinator
       Read::Subscriptions::Skills.new(handler: self["projectors.skills_v1"])
     end
 
+    register("subscriptions.operation_batches", memoize: true) do
+      Read::Subscriptions::OperationBatches.new(handler: self["projectors.operation_batches_v1"])
+    end
+
     register("subscriptions.verification_obligations", memoize: true) do
       Read::Subscriptions::VerificationObligations.new(
         handler: self["projectors.verification_obligations_v1"]
@@ -2116,6 +2218,7 @@ module Coordinator
         registrations: [
           self["subscriptions.change_set_readiness"],
           self["subscriptions.coordination_task_executor"],
+          self["subscriptions.operation_batch_runner"],
           self["subscriptions.lease_expiry_scheduler"],
           self["subscriptions.agent_choice_decision_impact"],
           self["subscriptions.candidate_impact_obligation_policy"],
@@ -2146,6 +2249,7 @@ module Coordinator
           self["subscriptions.agent_choice_impacts"],
           self["subscriptions.candidates"],
           self["subscriptions.skills"],
+          self["subscriptions.operation_batches"],
           self["subscriptions.verification_obligations"],
           self["subscriptions.merge_snapshots"],
           self["subscriptions.release_sets"]

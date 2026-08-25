@@ -20,6 +20,9 @@ module Coordinator
       def self.agent_choice_record: () -> json_schema
       def self.candidate_submit: () -> json_schema
       def self.skill_publish: () -> json_schema
+      def self.skill_publish_batch: () -> json_schema
+      def self.operation_batch_cancel: () -> json_schema
+      def self.operation_batch_get: () -> json_schema
       def self.skill_get: () -> json_schema
       def self.skill_list: () -> json_schema
       def self.skill_asset_get: () -> json_schema

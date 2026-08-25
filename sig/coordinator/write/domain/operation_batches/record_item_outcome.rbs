@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Domain
+      module OperationBatches
+        class RecordItemOutcome
+          def initialize: (?stream_factory: StreamFactory) -> void
+          def call: (state: Write::OperationBatches::State, command: Commands::RecordOperationBatchItemOutcome) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

@@ -1,0 +1,6 @@
+module Coordinator
+  module Write
+    class InvalidOperationBatchEventPlan < StandardError
+    end
+  end
+end

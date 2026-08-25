@@ -1,0 +1,11 @@
+module Coordinator
+  module Processes
+    module Subscriptions
+      class OperationBatchRunner < Shared::Subscriptions::Registration
+        DEFINITION: ProcessDefinition
+
+        def initialize: (handler: ProcessManagers::OperationBatchRunner, ?pull_interval: Integer | Float) -> void
+      end
+    end
+  end
+end

@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module OperationBatches
+      class ManifestBuilder
+        def initialize: (?canonical_json: Shared::CanonicalJson) -> void
+        def digest: (Array[ItemV1] items) -> String
+        def encoded_byte_size: (command_id: String, actor: Commands::Actor, batch_id: String, target_tool: String, items: Array[ItemV1]) -> Integer
+      end
+    end
+  end
+end

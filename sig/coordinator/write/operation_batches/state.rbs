@@ -1,0 +1,23 @@
+module Coordinator
+  module Write
+    module OperationBatches
+      type outcome = Events::OperationBatchItemSucceededV1 | Events::OperationBatchItemRejectedV1
+      type terminal = Events::OperationBatchCompletedV1 | Events::OperationBatchCancelledV1
+
+      class State < Shared::Value
+        def self.initial: () -> State
+        def self.reduce: (Array[Events::Base] events) -> State
+        def creation: () -> Events::OperationBatchCreatedV1?
+        def outcomes: () -> Array[outcome]
+        def cancellation: () -> Events::OperationBatchCancellationRequestedV1?
+        def terminal: () -> terminal?
+        def item: (Integer index) -> ItemV1?
+        def outcome: (Integer index) -> outcome?
+        def pending_indexes: () -> Array[Integer]
+        def succeeded_count: () -> Integer
+        def rejected_count: () -> Integer
+        def running?: () -> bool
+      end
+    end
+  end
+end

@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Events
+      class OperationBatchCancelledV1 < Base
+        def batch_id: () -> String
+        def succeeded: () -> Integer
+        def rejected: () -> Integer
+        def not_run: () -> Integer
+        def cancellation_event: () -> EventReference
+        def cancelled_at: () -> String
+      end
+    end
+  end
+end

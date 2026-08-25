@@ -14,6 +14,14 @@ module Coordinator::Write
       StreamReference.new(context: "AgentKnowledge", stream_name: "Skill", stream_id: skill_id)
     end
 
+    def operation_batch(batch_id)
+      StreamReference.new(
+        context: "DevelopmentCoordination",
+        stream_name: "OperationBatch",
+        stream_id: batch_id
+      )
+    end
+
     def change_set(change_set_id)
       StreamReference.new(
         context: "DevelopmentPlanning",

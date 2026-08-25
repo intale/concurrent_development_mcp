@@ -49,6 +49,10 @@ module Coordinator::Write
       attribute :scope, Types::SkillScope
     end
 
+    class OperationBatchArguments < Value
+      attribute :batch_id, Types::OperationBatchId
+    end
+
     class DecisionResolutionArguments < Value
       attribute :topic_id, Types::AgentChoiceType
       attribute :context, DecisionContexts::QueryContextV1
@@ -65,6 +69,7 @@ module Coordinator::Write
                 MergeSnapshotArguments |
                 ReleaseSetArguments |
                 SkillArguments |
+                OperationBatchArguments |
                 DecisionResolutionArguments
 
     attribute :tool, Types::Identifier

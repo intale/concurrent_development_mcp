@@ -1,0 +1,10 @@
+module Coordinator
+  module Processes
+    module OperationBatches
+      class TargetCompletionLoader
+        def initialize: (event_store: Write::_EventStore, ?schema_registry: Write::EventSchemaRegistry, ?stream_factory: Write::StreamFactory) -> void
+        def call: (String command_id) -> TargetCompletionV1
+      end
+    end
+  end
+end

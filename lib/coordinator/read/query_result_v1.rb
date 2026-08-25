@@ -89,6 +89,10 @@ module Coordinator::Read
       attribute :asset, SkillAssetViewV1
     end
 
+    class OperationBatchData < Value
+      attribute :batch, OperationBatchViewV1
+    end
+
     Data = EmptyData |
            DomainError |
            OperationData |
@@ -108,7 +112,8 @@ module Coordinator::Read
            ReleaseSetData |
            SkillData |
            SkillPageData |
-           SkillAssetData
+           SkillAssetData |
+           OperationBatchData
     Action = Coordinator::Write::NextAction | NextAction
 
     attribute :status, Types::String.enum(

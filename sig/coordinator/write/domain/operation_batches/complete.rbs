@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Domain
+      module OperationBatches
+        class Complete
+          def initialize: (?stream_factory: StreamFactory, ?canonical_json: Shared::CanonicalJson) -> void
+          def call: (state: Write::OperationBatches::State, command: Commands::CompleteOperationBatch) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

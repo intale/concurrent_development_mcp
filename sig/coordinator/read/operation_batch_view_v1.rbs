@@ -1,0 +1,20 @@
+module Coordinator
+  module Read
+    class OperationBatchViewV1 < Shared::Value
+      def batch_id: () -> String
+      def target_tool: () -> String
+      def status: () -> String
+      def total: () -> Integer
+      def succeeded: () -> Integer
+      def rejected: () -> Integer
+      def not_run: () -> Integer
+      def manifest_digest: () -> String
+      def encoded_byte_size: () -> Integer
+      def outcomes: () -> Array[OperationBatchOutcomeViewV1]
+      def next_after_index: () -> Integer?
+      def has_more: () -> bool
+      def created: () -> OperationBatchSourceEvidenceV1
+      def terminal: () -> OperationBatchSourceEvidenceV1?
+    end
+  end
+end

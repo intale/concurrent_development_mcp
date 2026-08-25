@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandReceiptData
-      type value = ChangeSet | WorkItem | Dependency | Attempt | WorkItemCompletion | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver | MergeSnapshotRegistration | MergeSnapshotVerification | MergeAuthorization | MergeObservation | ReleaseSetPreparation | RepositoryIntegration | ReleaseSetVerification | ReleaseSetActivation | ReleaseSetCompensationRequest | ReleaseSetCompletion | DependencySatisfaction | ChangeSetCompletion | SkillPublication
+      type value = ChangeSet | WorkItem | Dependency | Attempt | WorkItemCompletion | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver | MergeSnapshotRegistration | MergeSnapshotVerification | MergeAuthorization | MergeObservation | ReleaseSetPreparation | RepositoryIntegration | ReleaseSetVerification | ReleaseSetActivation | ReleaseSetCompensationRequest | ReleaseSetCompletion | DependencySatisfaction | ChangeSetCompletion | SkillPublication | OperationBatchAcceptance | OperationBatchCancellation | OperationBatchTransition
 
       class ChangeSet < Shared::Value
         def change_set_id: () -> String
@@ -375,6 +375,24 @@ module Coordinator
         def asset_count: () -> Integer
         def publication_event: () -> EventReference
         def published_at: () -> String
+      end
+
+      class OperationBatchAcceptance < Shared::Value
+        def batch_id: () -> String
+        def target_tool: () -> String
+        def total: () -> Integer
+        def status: () -> String
+      end
+
+      class OperationBatchCancellation < Shared::Value
+        def batch_id: () -> String
+        def status: () -> String
+      end
+
+      class OperationBatchTransition < Shared::Value
+        def batch_id: () -> String
+        def transition: () -> String
+        def index: () -> Integer?
       end
     end
   end

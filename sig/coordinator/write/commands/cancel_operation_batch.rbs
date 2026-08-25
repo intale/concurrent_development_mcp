@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Commands
+      class CancelOperationBatch < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def batch_id: () -> String
+      end
+    end
+  end
+end

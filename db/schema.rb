@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_25_094500) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_25_143000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -394,6 +394,64 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_094500) do
     t.index ["verification_status"], name: "index_merge_snapshots_on_verification_status"
   end
 
+  create_table "operation_batch_outcomes", force: :cascade do |t|
+    t.string "batch_id", null: false
+    t.string "canonical_input_digest", null: false
+    t.string "command_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "finished_at_domain", null: false
+    t.datetime "finished_at_store", null: false
+    t.integer "item_index", null: false
+    t.jsonb "outcome_actor", null: false
+    t.string "outcome_causation_id"
+    t.string "outcome_correlation_id"
+    t.jsonb "outcome_event", null: false
+    t.bigint "outcome_global_position", null: false
+    t.jsonb "outcome_markers", default: [], null: false
+    t.jsonb "outcome_metadata", default: {}, null: false
+    t.jsonb "result", null: false
+    t.string "status", null: false
+    t.datetime "updated_at", null: false
+    t.index ["batch_id", "item_index"], name: "index_operation_batch_outcomes_on_batch_id_and_item_index", unique: true
+    t.index ["outcome_global_position"], name: "index_operation_batch_outcomes_on_outcome_global_position"
+  end
+
+  create_table "operation_batches", primary_key: "batch_id", id: :string, force: :cascade do |t|
+    t.jsonb "cancellation_event"
+    t.boolean "cancellation_requested", default: false, null: false
+    t.jsonb "created_actor"
+    t.datetime "created_at", null: false
+    t.datetime "created_at_domain"
+    t.datetime "created_at_store"
+    t.string "created_causation_id"
+    t.string "created_correlation_id"
+    t.jsonb "created_event"
+    t.bigint "created_global_position"
+    t.jsonb "created_markers", default: [], null: false
+    t.jsonb "created_metadata", default: {}, null: false
+    t.bigint "encoded_byte_size"
+    t.string "manifest_digest"
+    t.integer "page_size"
+    t.integer "rejected_count", default: 0, null: false
+    t.string "status", default: "running", null: false
+    t.integer "succeeded_count", default: 0, null: false
+    t.string "target_tool"
+    t.jsonb "terminal_actor"
+    t.datetime "terminal_at_domain"
+    t.datetime "terminal_at_store"
+    t.string "terminal_causation_id"
+    t.string "terminal_correlation_id"
+    t.jsonb "terminal_event"
+    t.bigint "terminal_global_position"
+    t.string "terminal_kind"
+    t.jsonb "terminal_markers", default: [], null: false
+    t.jsonb "terminal_metadata", default: {}, null: false
+    t.integer "total"
+    t.datetime "updated_at", null: false
+    t.index ["created_global_position"], name: "index_operation_batches_on_created_global_position"
+    t.index ["status"], name: "index_operation_batches_on_status"
+  end
+
   create_table "processed_projection_events", id: false, force: :cascade do |t|
     t.string "command_id"
     t.string "event_id", null: false
@@ -592,5 +650,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_094500) do
     t.index ["target_work_item_id", "event_global_position"], name: "idx_verification_obligations_target_work_item"
   end
 
+  add_foreign_key "operation_batch_outcomes", "operation_batches", column: "batch_id", primary_key: "batch_id", on_delete: :cascade
   add_foreign_key "skill_assets", "skills", primary_key: "skill_id", on_delete: :cascade
 end

@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module OperationBatches
+      class SnapshotV1 < Shared::Value
+        def state: () -> State
+        def physical_events: () -> Array[PgEventstore::Event]
+        def physical_event: (String event_id) -> PgEventstore::Event?
+      end
+    end
+  end
+end

@@ -1,0 +1,17 @@
+module Coordinator
+  module Write
+    module Commands
+      class RecordOperationBatchItemOutcome < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def batch_id: () -> String
+        def index: () -> Integer
+        def item_command_id: () -> String
+        def canonical_input_digest: () -> String
+        def result: () -> Tasks::ToolResultV1
+        def target_completion: () -> EventReference?
+        def finished_at: () -> String
+      end
+    end
+  end
+end

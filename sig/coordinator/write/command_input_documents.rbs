@@ -1,8 +1,8 @@
 module Coordinator
   module Write
     module CommandInputDocuments
-      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | CompleteWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1 | SubmitCandidateV1 | SubmitCandidateImpactSurfaceV1 | ClaimVerificationObligationV1 | SubmitCompatibilityAssessmentV1 | WaiveVerificationObligationV1 | RegisterMergeSnapshotV1 | SubmitMergeSnapshotVerificationV1 | RequestMergeAuthorizationV1 | RecordMergeObservationV1 | PrepareReleaseSetV1 | RecordRepositoryIntegrationV1 | RecordReleaseSetVerificationV1 | RecordReleaseSetActivationV1 | CompleteCompensatedReleaseSetV1 | PublishSkillRevisionV1
-      type digest_value = value | ExpireResourceLeaseV1 | RequestReleaseSetCompensationV1 | CompleteActivatedReleaseSetV1 | SatisfyWorkItemDependencyV1 | CompleteChangeSetV1
+      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | CompleteWorkItemV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1 | SubmitCandidateV1 | SubmitCandidateImpactSurfaceV1 | ClaimVerificationObligationV1 | SubmitCompatibilityAssessmentV1 | WaiveVerificationObligationV1 | RegisterMergeSnapshotV1 | SubmitMergeSnapshotVerificationV1 | RequestMergeAuthorizationV1 | RecordMergeObservationV1 | PrepareReleaseSetV1 | RecordRepositoryIntegrationV1 | RecordReleaseSetVerificationV1 | RecordReleaseSetActivationV1 | CompleteCompensatedReleaseSetV1 | PublishSkillRevisionV1 | CreateOperationBatchV1 | CancelOperationBatchV1
+      type digest_value = value | ExpireResourceLeaseV1 | RequestReleaseSetCompensationV1 | CompleteActivatedReleaseSetV1 | SatisfyWorkItemDependencyV1 | CompleteChangeSetV1 | RecordOperationBatchItemOutcomeV1 | RequestOperationBatchContinuationV1 | CompleteOperationBatchV1 | CompleteOperationBatchCancellationV1
 
       class ActorV1 < Shared::Value
         def actor_kind: () -> String
@@ -595,6 +595,85 @@ module Coordinator
       class PublishSkillRevisionV1 < BaseV1
         def tool_name: () -> String
         def input: () -> PublishSkillRevisionInputV1
+      end
+
+      class CreateOperationBatchInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def batch_id: () -> String
+        def target_tool: () -> String
+        def items: () -> Array[OperationBatches::ItemV1]
+        def manifest_digest: () -> String
+        def encoded_byte_size: () -> Integer
+        def page_size: () -> Integer
+      end
+
+      class CreateOperationBatchV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> CreateOperationBatchInputV1
+      end
+
+      class CancelOperationBatchInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def batch_id: () -> String
+      end
+
+      class CancelOperationBatchV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> CancelOperationBatchInputV1
+      end
+
+      class RecordOperationBatchItemOutcomeInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def batch_id: () -> String
+        def index: () -> Integer
+        def item_command_id: () -> String
+        def canonical_input_digest: () -> String
+        def result: () -> Tasks::ToolResultV1
+        def target_completion: () -> EventReferenceV1?
+        def finished_at: () -> String
+      end
+
+      class RecordOperationBatchItemOutcomeV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> RecordOperationBatchItemOutcomeInputV1
+      end
+
+      class RequestOperationBatchContinuationInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def batch_id: () -> String
+        def page_start: () -> Integer
+        def page_end: () -> Integer
+        def source_event: () -> EventReferenceV1
+        def requested_at: () -> String
+      end
+
+      class RequestOperationBatchContinuationV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> RequestOperationBatchContinuationInputV1
+      end
+
+      class CompleteOperationBatchInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def batch_id: () -> String
+        def source_event: () -> EventReferenceV1
+        def completed_at: () -> String
+      end
+
+      class CompleteOperationBatchV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> CompleteOperationBatchInputV1
+      end
+
+      class CompleteOperationBatchCancellationInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def batch_id: () -> String
+        def source_event: () -> EventReferenceV1
+        def cancelled_at: () -> String
+      end
+
+      class CompleteOperationBatchCancellationV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> CompleteOperationBatchCancellationInputV1
       end
 
       class ExpireResourceLeaseInputV1 < Shared::Value

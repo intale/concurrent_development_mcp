@@ -93,6 +93,20 @@ module Coordinator::Write
       direction: :desc
     )
 
+    OPERATION_BATCH_HISTORY = EventReadCriteria.new(
+      event_types: [
+        "OperationBatchCreated",
+        "OperationBatchItemSucceeded",
+        "OperationBatchItemRejected",
+        "OperationBatchContinuationRequested",
+        "OperationBatchCancellationRequested",
+        "OperationBatchCancelled",
+        "OperationBatchCompleted"
+      ],
+      maximum_count: Types::OPERATION_BATCH_MAXIMUM_HISTORY_EVENTS,
+      direction: :asc
+    )
+
     DECISION_EXISTENCE = EventReadCriteria.new(
       event_types: [ "DecisionRecorded", "DecisionActivated" ],
       maximum_count: 2,

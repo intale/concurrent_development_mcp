@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Events
+      class OperationBatchItemRejectedV1 < Base
+        def batch_id: () -> String
+        def index: () -> Integer
+        def command_id: () -> String
+        def canonical_input_digest: () -> String
+        def result: () -> Tasks::StructuredContentV1
+        def finished_at: () -> String
+      end
+    end
+  end
+end

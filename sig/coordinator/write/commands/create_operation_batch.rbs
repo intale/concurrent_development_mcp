@@ -1,0 +1,16 @@
+module Coordinator
+  module Write
+    module Commands
+      class CreateOperationBatch < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def batch_id: () -> String
+        def target_tool: () -> String
+        def items: () -> Array[OperationBatches::ItemV1]
+        def manifest_digest: () -> String
+        def encoded_byte_size: () -> Integer
+        def page_size: () -> Integer
+      end
+    end
+  end
+end

@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module Commands
+      class RequestOperationBatchContinuation < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def batch_id: () -> String
+        def page_start: () -> Integer
+        def page_end: () -> Integer
+        def source_event: () -> EventReference
+        def requested_at: () -> String
+      end
+    end
+  end
+end

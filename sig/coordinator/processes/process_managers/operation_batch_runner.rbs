@@ -1,0 +1,12 @@
+module Coordinator
+  module Processes
+    module ProcessManagers
+      class OperationBatchRunner
+        HANDLED_CODES: Array[Symbol]
+
+        def initialize: (event_store: Write::_EventStore, ?source_builder: OperationBatches::SourceBuilder, ?loader: Write::OperationBatches::Loader, ?target_builder: Write::Tasks::TargetCommandBuilder, ?target_executor: Write::Tasks::TargetExecutor, ?result_mapper: Write::Tasks::ToolResultMapper, ?completion_loader: OperationBatches::TargetCompletionLoader, ?command_builder: OperationBatches::CommandBuilder, ?batch_executor: Write::Operations::ExecuteOperationBatchCommand) -> void
+        def call: (PgEventstore::Event event) -> nil
+      end
+    end
+  end
+end

@@ -1,0 +1,15 @@
+module Coordinator
+  module Read
+    class OperationBatchSourceEvidenceV1 < Shared::Value
+      def event: () -> Write::EventReference
+      def actor: () -> AttributedActorV1
+      def markers: () -> Array[String]
+      def metadata: () -> Hash[String, untyped]
+      def global_position: () -> Integer
+      def occurred_at: () -> String
+      def persisted_at: () -> String
+      def causation_id: () -> String?
+      def correlation_id: () -> String?
+    end
+  end
+end

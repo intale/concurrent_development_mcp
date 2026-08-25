@@ -45,6 +45,12 @@ module Coordinator::Write
       when Commands::CompleteActivatedReleaseSet then release_activated_complete_document(command)
       when Commands::CompleteCompensatedReleaseSet then release_compensation_complete_document(command)
       when Commands::PublishSkillRevision then skill_publish_document(command)
+      when Commands::CreateOperationBatch then operation_batch_create_document(command)
+      when Commands::CancelOperationBatch then operation_batch_cancel_document(command)
+      when Commands::RecordOperationBatchItemOutcome then operation_batch_item_outcome_document(command)
+      when Commands::RequestOperationBatchContinuation then operation_batch_continuation_document(command)
+      when Commands::CompleteOperationBatch then operation_batch_completion_document(command)
+      when Commands::CompleteOperationBatchCancellation then operation_batch_cancellation_completion_document(command)
       when Commands::ExpireResourceLease then lease_expire_policy_document(command)
       else
         raise ArgumentError, "Unsupported coordination command: #{command.class.name}"
@@ -758,6 +764,122 @@ module Coordinator::Write
             CommandInputDocuments::SkillAssetV1.new(asset.to_h)
           end,
           content_digest: command.content_digest
+        )
+      )
+    end
+
+    def operation_batch_create(command)
+      @canonical_json.sha256(operation_batch_create_document(command).to_h)
+    end
+
+    def operation_batch_create_document(command)
+      CommandInputDocuments::CreateOperationBatchV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "skill_publish_batch",
+        input: CommandInputDocuments::CreateOperationBatchInputV1.new(
+          actor: actor_document(command.actor),
+          batch_id: command.batch_id,
+          target_tool: command.target_tool,
+          items: command.items,
+          manifest_digest: command.manifest_digest,
+          encoded_byte_size: command.encoded_byte_size,
+          page_size: command.page_size
+        )
+      )
+    end
+
+    def operation_batch_cancel(command)
+      @canonical_json.sha256(operation_batch_cancel_document(command).to_h)
+    end
+
+    def operation_batch_cancel_document(command)
+      CommandInputDocuments::CancelOperationBatchV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "operation_batch_cancel",
+        input: CommandInputDocuments::CancelOperationBatchInputV1.new(
+          actor: actor_document(command.actor),
+          batch_id: command.batch_id
+        )
+      )
+    end
+
+    def operation_batch_item_outcome(command)
+      @canonical_json.sha256(operation_batch_item_outcome_document(command).to_h)
+    end
+
+    def operation_batch_item_outcome_document(command)
+      CommandInputDocuments::RecordOperationBatchItemOutcomeV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "operation_batch_item_outcome_policy",
+        input: CommandInputDocuments::RecordOperationBatchItemOutcomeInputV1.new(
+          actor: actor_document(command.actor),
+          batch_id: command.batch_id,
+          index: command.index,
+          item_command_id: command.item_command_id,
+          canonical_input_digest: command.canonical_input_digest,
+          result: command.result,
+          target_completion: command.target_completion &&
+            CommandInputDocuments::EventReferenceV1.new(command.target_completion.to_h),
+          finished_at: command.finished_at
+        )
+      )
+    end
+
+    def operation_batch_continuation(command)
+      @canonical_json.sha256(operation_batch_continuation_document(command).to_h)
+    end
+
+    def operation_batch_continuation_document(command)
+      CommandInputDocuments::RequestOperationBatchContinuationV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "operation_batch_continuation_policy",
+        input: CommandInputDocuments::RequestOperationBatchContinuationInputV1.new(
+          actor: actor_document(command.actor),
+          batch_id: command.batch_id,
+          page_start: command.page_start,
+          page_end: command.page_end,
+          source_event: CommandInputDocuments::EventReferenceV1.new(command.source_event.to_h),
+          requested_at: command.requested_at
+        )
+      )
+    end
+
+    def operation_batch_completion(command)
+      @canonical_json.sha256(operation_batch_completion_document(command).to_h)
+    end
+
+    def operation_batch_completion_document(command)
+      CommandInputDocuments::CompleteOperationBatchV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "operation_batch_completion_policy",
+        input: CommandInputDocuments::CompleteOperationBatchInputV1.new(
+          actor: actor_document(command.actor),
+          batch_id: command.batch_id,
+          source_event: CommandInputDocuments::EventReferenceV1.new(command.source_event.to_h),
+          completed_at: command.completed_at
+        )
+      )
+    end
+
+    def operation_batch_cancellation_completion(command)
+      @canonical_json.sha256(operation_batch_cancellation_completion_document(command).to_h)
+    end
+
+    def operation_batch_cancellation_completion_document(command)
+      CommandInputDocuments::CompleteOperationBatchCancellationV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "operation_batch_cancellation_completion_policy",
+        input: CommandInputDocuments::CompleteOperationBatchCancellationInputV1.new(
+          actor: actor_document(command.actor),
+          batch_id: command.batch_id,
+          source_event: CommandInputDocuments::EventReferenceV1.new(command.source_event.to_h),
+          cancelled_at: command.cancelled_at
         )
       )
     end

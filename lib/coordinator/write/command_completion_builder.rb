@@ -515,6 +515,57 @@ module Coordinator::Write
       )
     end
 
+    def operation_batch_create(command:, input_digest:, persisted_events:, completed_at:)
+      build_completion(
+        command:,
+        tool_name: "skill_publish_batch",
+        summary: "Operation Batch accepted for asynchronous processing.",
+        data: CommandReceiptData::OperationBatchAcceptance.new(
+          batch_id: command.batch_id,
+          target_tool: command.target_tool,
+          total: command.items.length,
+          status: "accepted"
+        ),
+        next_actions: [ operation_batch_next_action(command.batch_id) ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
+    def operation_batch_cancel(command:, input_digest:, persisted_events:, completed_at:)
+      build_completion(
+        command:,
+        tool_name: "operation_batch_cancel",
+        summary: "Operation Batch cancellation requested; completed items remain committed.",
+        data: CommandReceiptData::OperationBatchCancellation.new(
+          batch_id: command.batch_id,
+          status: "cancellation_requested"
+        ),
+        next_actions: [ operation_batch_next_action(command.batch_id) ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
+    def operation_batch_transition(command:, event:, input_digest:, persisted_events:, completed_at:)
+      build_completion(
+        command:,
+        tool_name: operation_batch_transition_tool(event),
+        summary: operation_batch_transition_summary(event),
+        data: CommandReceiptData::OperationBatchTransition.new(
+          batch_id: command.batch_id,
+          transition: operation_batch_transition_name(event),
+          index: event.respond_to?(:index) ? event.index : nil
+        ),
+        next_actions: [],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     def candidate_impact_surface_submit(
       command:,
       surface:,
@@ -963,6 +1014,43 @@ module Coordinator::Write
     end
 
     private
+
+    def operation_batch_next_action(batch_id)
+      NextAction.new(
+        tool: "operation_batch_get",
+        arguments: NextAction::OperationBatchArguments.new(batch_id:)
+      )
+    end
+
+    def operation_batch_transition_name(event)
+      case event
+      when Events::OperationBatchItemSucceededV1 then "item_succeeded"
+      when Events::OperationBatchItemRejectedV1 then "item_rejected"
+      when Events::OperationBatchContinuationRequestedV1 then "continuation_requested"
+      when Events::OperationBatchCompletedV1 then "completed"
+      when Events::OperationBatchCancelledV1 then "cancelled"
+      end
+    end
+
+    def operation_batch_transition_tool(event)
+      {
+        "item_succeeded" => "operation_batch_item_outcome_policy",
+        "item_rejected" => "operation_batch_item_outcome_policy",
+        "continuation_requested" => "operation_batch_continuation_policy",
+        "completed" => "operation_batch_completion_policy",
+        "cancelled" => "operation_batch_cancellation_completion_policy"
+      }.fetch(operation_batch_transition_name(event))
+    end
+
+    def operation_batch_transition_summary(event)
+      {
+        "item_succeeded" => "Operation Batch item succeeded.",
+        "item_rejected" => "Operation Batch item was rejected by its target command.",
+        "continuation_requested" => "Operation Batch continuation requested.",
+        "completed" => "Operation Batch completed.",
+        "cancelled" => "Operation Batch cancelled at an item boundary."
+      }.fetch(operation_batch_transition_name(event))
+    end
 
     def release_set_completion(command:, completion:, tool_name:, summary:, input_digest:, persisted_events:, completed_at:)
       build_completion(

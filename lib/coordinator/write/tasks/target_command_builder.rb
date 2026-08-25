@@ -67,6 +67,10 @@ module Coordinator::Write
           build_complete_compensated_release_set(document)
         when CommandInputDocuments::PublishSkillRevisionV1
           build_publish_skill_revision(document)
+        when CommandInputDocuments::CreateOperationBatchV1
+          build_create_operation_batch(document)
+        when CommandInputDocuments::CancelOperationBatchV1
+          build_cancel_operation_batch(document)
         end
       end
 
@@ -527,6 +531,29 @@ module Coordinator::Write
           instructions: input.instructions,
           assets: input.assets.map { Skills::AssetV1.new(_1.to_h) },
           content_digest: input.content_digest
+        )
+      end
+
+      def build_create_operation_batch(document)
+        input = document.input
+        Commands::CreateOperationBatch.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          batch_id: input.batch_id,
+          target_tool: input.target_tool,
+          items: input.items,
+          manifest_digest: input.manifest_digest,
+          encoded_byte_size: input.encoded_byte_size,
+          page_size: input.page_size
+        )
+      end
+
+      def build_cancel_operation_batch(document)
+        input = document.input
+        Commands::CancelOperationBatch.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          batch_id: input.batch_id
         )
       end
 

@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Operations
+      class PrepareCreateSkillPublishBatch
+        def initialize: (?contract: Contracts::SkillPublishBatch, ?item_preparer: PreparePublishSkillRevision, ?input_digest: CommandInputDigest, ?manifest_builder: OperationBatches::ManifestBuilder) -> void
+        %a{rbs:test:skip}
+        def call: (command_input input) -> Dry::Monads::Result
+      end
+    end
+  end
+end

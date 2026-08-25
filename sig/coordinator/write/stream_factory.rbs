@@ -4,6 +4,7 @@ module Coordinator
       def command: (String command_id) -> StreamReference
       def coordination_task: (String task_id) -> StreamReference
       def skill: (String skill_id) -> StreamReference
+      def operation_batch: (String batch_id) -> StreamReference
       def change_set: (String change_set_id) -> StreamReference
       def work_item: (String work_item_id) -> StreamReference
       def attempt: (String attempt_id) -> StreamReference

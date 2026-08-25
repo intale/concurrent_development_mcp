@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Domain
+      module OperationBatches
+        class RequestContinuation
+          def initialize: (?stream_factory: StreamFactory) -> void
+          def call: (state: Write::OperationBatches::State, command: Commands::RequestOperationBatchContinuation) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

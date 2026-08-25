@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module OperationBatches
+      class Loader
+        def initialize: (event_store: _EventStore, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory) -> void
+        def call: (String batch_id) -> SnapshotV1
+      end
+    end
+  end
+end

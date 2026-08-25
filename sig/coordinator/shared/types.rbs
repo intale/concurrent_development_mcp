@@ -23,6 +23,11 @@ module Coordinator
       SKILL_ASSET_MAXIMUM_BYTES: Integer
       SKILL_ASSETS_TOTAL_MAXIMUM_BYTES: Integer
       SKILL_ASSET_BASE64_MAXIMUM_BYTES: Integer
+      OPERATION_BATCH_MAXIMUM_ITEMS: Integer
+      OPERATION_BATCH_PAGE_SIZE: Integer
+      OPERATION_BATCH_QUERY_MAXIMUM_ITEMS: Integer
+      OPERATION_BATCH_MAXIMUM_ENCODED_BYTES: Integer
+      OPERATION_BATCH_MAXIMUM_HISTORY_EVENTS: Integer
 
       ACTOR_KINDS: Array[String]
       DEPENDENCY_KINDS: Array[String]
@@ -162,6 +167,14 @@ module Coordinator
       SkillAssetMediaType: untyped
       SkillAssetContentBase64: untyped
       SkillAssetByteSize: untyped
+      OperationBatchId: untyped
+      OperationBatchItemIndex: untyped
+      OperationBatchTotal: untyped
+      OperationBatchPageSize: untyped
+      OperationBatchEncodedByteSize: untyped
+      OperationBatchTargetTool: untyped
+      OperationBatchOutcomeStatus: untyped
+      OperationBatchStatus: untyped
       Marker: untyped
       MarkerPurpose: untyped
       MarkerComponent: untyped

@@ -1,0 +1,10 @@
+module Coordinator
+  module Processes
+    module OperationBatches
+      class SourceBuilder
+        def initialize: (?schema_registry: Write::EventSchemaRegistry) -> void
+        def call: (PgEventstore::Event event) -> SourceV1
+      end
+    end
+  end
+end
