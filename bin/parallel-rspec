@@ -15,4 +15,4 @@ export PARALLEL_TEST_PROCESSORS="$parallel_rbs_processes"
 export PARALLEL_TEST_FIRST_IS_1=true
 export PARALLEL_TESTS_EXECUTABLE=bin/rspec
 
-exec bundle exec parallel_rspec "$@"
+exec bundle exec parallel_rspec --runtime-log tmp/parallel_runtime_rspec.log "$@"
