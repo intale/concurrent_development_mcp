@@ -1,7 +1,7 @@
 module Coordinator
   module Read
     class NextAction < Shared::Value
-      type arguments = ChangeSetArguments | WorkItemArguments | AttemptArguments
+      type arguments = ChangeSetArguments | WorkItemArguments | AttemptArguments | WorkItemCompletionArguments
 
       class ChangeSetArguments < Shared::Value
         def change_set_id: () -> String
@@ -16,6 +16,12 @@ module Coordinator
         def change_set_id: () -> String
         def work_item_id: () -> String
         def attempt_id: () -> String
+      end
+      class WorkItemCompletionArguments < Shared::Value
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def attempt_id: () -> String
+        def candidate_id: () -> String
       end
 
       def tool: () -> String

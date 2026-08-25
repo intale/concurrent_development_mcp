@@ -77,6 +77,13 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       set_name: "coordinator-read-models-v1",
       subscription_name: "coord-context-v1"
     )
+    expect(context_registration.definition.event_types).to include(
+      "WorkItemCandidateSelected",
+      "AttemptCompleted",
+      "WorkItemCompleted",
+      "WorkItemDependencySatisfied",
+      "ChangeSetCompleted"
+    )
     expect(receipt_registration.definition.identity.to_h).to eq(
       set_name: "coordinator-read-models-v1",
       subscription_name: "command-receipts-v1"

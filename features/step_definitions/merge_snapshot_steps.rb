@@ -195,6 +195,18 @@ When("the agent requests merge authorization with command {string}") do |command
   submit_merge_authorization(merge_authorization_arguments(command_id:))
 end
 
+When("the merge snapshot Candidates complete their WorkItems") do
+  candidates =
+    if @obligation_candidates
+      @obligation_candidates.values
+    else
+      [ { arguments: @candidate_arguments, coordination: @candidate_coordination } ]
+    end
+  candidates.each do |candidate|
+    complete_merge_candidate_work_item(candidate)
+  end
+end
+
 When("the integrator registers exact Rails pair snapshot {string}") do |snapshot_id|
   candidates = %w[source target].map do |role|
     candidate = @obligation_candidates.fetch(role).fetch(:arguments)
@@ -436,6 +448,41 @@ def submit_merge_verification(arguments)
   assert_acceptance(@merge_verification_task_id, "merge_verification_submit did not return a Task")
   execute_task(@merge_verification_task_id)
   @merge_verification_state = task_request("tasks/get", @merge_verification_task_id)
+end
+
+def complete_merge_candidate_work_item(candidate)
+  arguments = candidate.fetch(:arguments)
+  coordination = candidate.fetch(:coordination)
+  reservation = coordination.fetch(:reservation)
+  suffix = arguments.fetch(:candidate_id).downcase
+  release_task_id = submit_and_execute(
+    "lease_release",
+    command_id: "cmd-cuc-merge-release-#{suffix}",
+    actor: arguments.fetch(:actor),
+    change_set_id: arguments.fetch(:change_set_id),
+    work_item_id: arguments.fetch(:work_item_id),
+    attempt_id: arguments.fetch(:attempt_id),
+    lease_set_id: reservation.fetch("lease_set_id"),
+    leases: reservation.fetch("resources").map do |reference|
+      {
+        resource_key_hash: reference.fetch("resource_key_hash"),
+        lease_id: reference.fetch("lease_id"),
+        fencing_token: reference.fetch("fencing_token")
+      }
+    end
+  )
+  assert_successful_task(release_task_id, "Merge Candidate write-set release")
+  completion_task_id = submit_and_execute(
+    "work_item_complete",
+    command_id: "cmd-cuc-merge-complete-#{suffix}",
+    actor: arguments.fetch(:actor),
+    change_set_id: arguments.fetch(:change_set_id),
+    work_item_id: arguments.fetch(:work_item_id),
+    attempt_id: arguments.fetch(:attempt_id),
+    candidate_id: arguments.fetch(:candidate_id),
+    produced_outputs: []
+  )
+  assert_successful_task(completion_task_id, "Merge Candidate WorkItem completion")
 end
 
 def merge_verification_events

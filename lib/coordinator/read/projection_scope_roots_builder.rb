@@ -22,7 +22,10 @@ module Coordinator::Read
            Coordinator::Write::Events::WriteSetExpandedV1,
            Coordinator::Write::Events::WriteSetRenewedV1,
            Coordinator::Write::Events::WriteSetReleasedV1,
-           Coordinator::Write::Events::CandidateAttachedToAttemptV1
+           Coordinator::Write::Events::CandidateAttachedToAttemptV1,
+           Coordinator::Write::Events::WorkItemCandidateSelectedV1,
+           Coordinator::Write::Events::WorkItemCompletedV1,
+           Coordinator::Write::Events::AttemptCompletedV1
         roots << ProjectionScopeRoot.new(
           scope_kind: "work_item",
           scope_id: event.work_item_id,
@@ -37,7 +40,8 @@ module Coordinator::Read
            Coordinator::Write::Events::WriteSetExpandedV1,
            Coordinator::Write::Events::WriteSetRenewedV1,
            Coordinator::Write::Events::WriteSetReleasedV1,
-           Coordinator::Write::Events::CandidateAttachedToAttemptV1
+           Coordinator::Write::Events::CandidateAttachedToAttemptV1,
+           Coordinator::Write::Events::AttemptCompletedV1
         roots << ProjectionScopeRoot.new(
           scope_kind: "attempt",
           scope_id: event.attempt_id,

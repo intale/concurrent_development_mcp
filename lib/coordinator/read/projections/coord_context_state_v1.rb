@@ -7,9 +7,10 @@ module Coordinator::Read
         attribute :change_set_id, Types::Identifier
         attribute :goal, Types::Goal
         attribute :acceptance_criteria, Types::StateAcceptanceCriteria
-        attribute :status, Types::String.enum("planning", "active")
+        attribute :status, Types::String.enum("planning", "active", "completed")
         attribute :created_at, Types::Timestamp
         attribute :activated_at, Types::Timestamp.optional
+        attribute :completed_at, Types::Timestamp.optional
       end
 
       class WorkItem < Value
@@ -19,12 +20,18 @@ module Coordinator::Read
         attribute :goal, Types::Goal
         attribute :acceptance_criteria, Types::WorkItemStateAcceptanceCriteria
         attribute :competitive_mode, Types::Strict::Bool
-        attribute :status, Types::String.enum("planned", "ready", "acquired")
+        attribute :status, Types::String.enum("planned", "ready", "acquired", "completed")
         attribute :active_attempt_id, Types::Identifier.optional
         attribute :active_agent_id, Types::Identifier.optional
+        attribute :selected_candidate_id, Types::Identifier.optional
+        attribute :selected_candidate_event, Coordinator::Write::EventReference.optional
+        attribute :produced_outputs,
+                  Types::Array.of(Coordinator::Write::WorkItemOutputV1)
         attribute :created_at, Types::Timestamp
         attribute :made_ready_at, Types::Timestamp.optional
         attribute :acquired_at, Types::Timestamp.optional
+        attribute :selected_at, Types::Timestamp.optional
+        attribute :completed_at, Types::Timestamp.optional
       end
 
       class Dependency < Value
@@ -33,7 +40,9 @@ module Coordinator::Read
         attribute :consumer_work_item_id, Types::Identifier
         attribute :dependency_kind, Types::DependencyKind
         attribute :required_output, Coordinator::Write::RequiredOutput.optional
+        attribute :source_event, Coordinator::Write::EventReference.optional
         attribute :declared_at, Types::Timestamp
+        attribute :satisfied_at, Types::Timestamp.optional
       end
 
       class WriteSetResource < Value
@@ -67,10 +76,13 @@ module Coordinator::Read
         attribute :work_item_id, Types::Identifier
         attribute :agent_id, Types::Identifier
         attribute :base_snapshots, Types::Array.of(Coordinator::Write::RepositorySnapshotV1).constrained(size: 1)
-        attribute :status, Types::String.enum("authorized", "started")
+        attribute :status, Types::String.enum("authorized", "started", "completed")
         attribute :authorized_at, Types::Timestamp
         attribute :started_at, Types::Timestamp.optional
         attribute :write_set, WriteSet.optional
+        attribute :selected_candidate_id, Types::Identifier.optional
+        attribute :selected_candidate_event, Coordinator::Write::EventReference.optional
+        attribute :completed_at, Types::Timestamp.optional
       end
 
       class CandidateCheckpoint < Value

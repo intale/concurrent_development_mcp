@@ -9,6 +9,7 @@ module Coordinator
           def status: () -> String
           def created_at: () -> String
           def activated_at: () -> String?
+          def completed_at: () -> String?
         end
 
         class WorkItem < Shared::Value
@@ -21,9 +22,14 @@ module Coordinator
           def status: () -> String
           def active_attempt_id: () -> String?
           def active_agent_id: () -> String?
+          def selected_candidate_id: () -> String?
+          def selected_candidate_event: () -> Write::EventReference?
+          def produced_outputs: () -> Array[Write::WorkItemOutputV1]
           def created_at: () -> String
           def made_ready_at: () -> String?
           def acquired_at: () -> String?
+          def selected_at: () -> String?
+          def completed_at: () -> String?
         end
 
         class Dependency < Shared::Value
@@ -32,7 +38,9 @@ module Coordinator
           def consumer_work_item_id: () -> String
           def dependency_kind: () -> String
           def required_output: () -> Write::RequiredOutput?
+          def source_event: () -> Write::EventReference?
           def declared_at: () -> String
+          def satisfied_at: () -> String?
         end
 
         class WriteSetResource < Shared::Value
@@ -68,6 +76,9 @@ module Coordinator
           def authorized_at: () -> String
           def started_at: () -> String?
           def write_set: () -> WriteSet?
+          def selected_candidate_id: () -> String?
+          def selected_candidate_event: () -> Write::EventReference?
+          def completed_at: () -> String?
         end
 
         class CandidateCheckpoint < Shared::Value

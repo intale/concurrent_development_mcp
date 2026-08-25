@@ -9,6 +9,8 @@ module Coordinator::Read
         "WorkItemAddedToChangeSet" => [ "DevelopmentPlanning", "ChangeSet" ],
         "WorkItemDependencyDeclared" => [ "DevelopmentPlanning", "ChangeSet" ],
         "ChangeSetActivated" => [ "DevelopmentPlanning", "ChangeSet" ],
+        "WorkItemDependencySatisfied" => [ "DevelopmentPlanning", "ChangeSet" ],
+        "ChangeSetCompleted" => [ "DevelopmentPlanning", "ChangeSet" ],
         "WorkItemCreated" => [ "DevelopmentExecution", "WorkItem" ],
         "WorkItemMadeReady" => [ "DevelopmentExecution", "WorkItem" ],
         "WorkItemAcquired" => [ "DevelopmentExecution", "WorkItem" ],
@@ -18,7 +20,10 @@ module Coordinator::Read
         "WriteSetExpanded" => [ "DevelopmentExecution", "Attempt" ],
         "WriteSetRenewed" => [ "DevelopmentExecution", "Attempt" ],
         "WriteSetReleased" => [ "DevelopmentExecution", "Attempt" ],
-        "CandidateAttachedToAttempt" => [ "DevelopmentExecution", "Attempt" ]
+        "CandidateAttachedToAttempt" => [ "DevelopmentExecution", "Attempt" ],
+        "WorkItemCandidateSelected" => [ "DevelopmentExecution", "WorkItem" ],
+        "WorkItemCompleted" => [ "DevelopmentExecution", "WorkItem" ],
+        "AttemptCompleted" => [ "DevelopmentExecution", "Attempt" ]
       }.freeze
 
       config.validate_keys = true

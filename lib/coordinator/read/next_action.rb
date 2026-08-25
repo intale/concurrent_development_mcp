@@ -17,7 +17,14 @@ module Coordinator::Read
       attribute :attempt_id, Types::Identifier
     end
 
-    Arguments = ChangeSetArguments | WorkItemArguments | AttemptArguments
+    class WorkItemCompletionArguments < Value
+      attribute :change_set_id, Types::Identifier
+      attribute :work_item_id, Types::Identifier
+      attribute :attempt_id, Types::Identifier
+      attribute :candidate_id, Types::Identifier
+    end
+
+    Arguments = ChangeSetArguments | WorkItemArguments | AttemptArguments | WorkItemCompletionArguments
 
     attribute :tool, Types::Identifier
     attribute :arguments, Arguments

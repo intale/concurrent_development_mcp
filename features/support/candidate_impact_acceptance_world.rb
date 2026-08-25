@@ -64,7 +64,21 @@ module CandidateImpactAcceptanceWorld
       candidate_events(arguments.fetch(:candidate_id)).each do |event|
         Coordinator::Container["projectors.candidates_v1"].call(event)
       end
-      [ role, { arguments:, task_id:, baseline: candidate_impact_view(arguments.fetch(:candidate_id)) } ]
+      [
+        role,
+        {
+          arguments:,
+          coordination: coordination.merge(
+            ids: {
+              change_set_id:,
+              work_item_id: coordination.fetch(:work_item_id),
+              attempt_id: coordination.fetch(:attempt_id)
+            }
+          ),
+          task_id:,
+          baseline: candidate_impact_view(arguments.fetch(:candidate_id))
+        }
+      ]
     end
   end
 

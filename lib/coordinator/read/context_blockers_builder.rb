@@ -9,7 +9,7 @@ module Coordinator::Read
         state.dependencies.select { _1.consumer_work_item_id == scope.work_item_id }
       end
 
-      dependencies.map do |dependency|
+      dependencies.reject { _1.satisfied_at }.map do |dependency|
         ContextBlockerV1.new(
           code: "dependency_unmet",
           dependency_id: dependency.dependency_id,

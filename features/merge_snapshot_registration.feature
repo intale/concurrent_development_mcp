@@ -58,7 +58,8 @@ Feature: Attributed merge snapshot registration
     And merge snapshot "MS-CUC-MERGE-AUTH-GRANT" reaches the read side
     And the agent submits "passed" merge verification with command "cmd-cuc-merge-auth-grant-verification"
     Then the merge verification Task completes with status "verified"
-    When the agent requests merge authorization with command "cmd-cuc-merge-auth-grant"
+    When the merge snapshot Candidates complete their WorkItems
+    And the agent requests merge authorization with command "cmd-cuc-merge-auth-grant"
     Then the merge authorization Task completes with durable outcome "granted"
     And the available merge snapshot has no observed authorization yet
     When the merge authorization reaches the read side twice
@@ -71,7 +72,8 @@ Feature: Attributed merge snapshot registration
     And merge snapshot "MS-CUC-MERGE-AUTH-STALE" reaches the read side
     And the agent submits "passed" merge verification with command "cmd-cuc-merge-auth-stale-verification"
     Then the merge verification Task completes with status "verified"
-    When the agent requests merge authorization against a changed target base with command "cmd-cuc-merge-auth-stale"
+    When the merge snapshot Candidates complete their WorkItems
+    And the agent requests merge authorization against a changed target base with command "cmd-cuc-merge-auth-stale"
     Then the merge authorization Task completes with durable outcome "denied"
     And the authorization explains "target_base_binding_stale"
 
@@ -83,7 +85,8 @@ Feature: Attributed merge snapshot registration
     When the integrator registers exact Rails pair snapshot "MS-CUC-MERGE-AUTH-OPEN"
     And the agent submits "passed" merge verification with command "cmd-cuc-merge-auth-open-verification"
     Then the merge verification Task completes with status "verified"
-    When the agent requests merge authorization with command "cmd-cuc-merge-auth-open"
+    When the merge snapshot Candidates complete their WorkItems
+    And the agent requests merge authorization with command "cmd-cuc-merge-auth-open"
     Then the merge authorization Task completes with durable outcome "denied"
     And the authorization explains "required_obligation_open"
 
@@ -93,6 +96,7 @@ Feature: Attributed merge snapshot registration
     And the agent registers merge snapshot "MS-CUC-MERGE-OBSERVED" with command "cmd-cuc-merge-observed-snapshot"
     And merge snapshot "MS-CUC-MERGE-OBSERVED" reaches the read side
     And the agent submits "passed" merge verification with command "cmd-cuc-merge-observed-verification"
+    And the merge snapshot Candidates complete their WorkItems
     And the agent requests merge authorization with command "cmd-cuc-merge-observed-authorization"
     Then the merge authorization Task completes with durable outcome "granted"
     When the agent records the exact external merge with command "cmd-cuc-merge-observed"
