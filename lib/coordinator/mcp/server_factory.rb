@@ -19,6 +19,20 @@ module Coordinator
         pollIntervalMs, and use tasks/cancel for cooperative cancellation. Reuse command_id
         after an unknown mutation result. Read tools return the latest available projection,
         which may be stale; command decisions recheck authoritative event-store facts.
+        When asked to migrate a project's development memory, inspect that project with the
+        client's own available capabilities and choose sources by their semantic role and the
+        user's requested scope, never by a server-prescribed directory layout. The coordinator
+        cannot read caller paths, inspect Git, fetch URLs, or execute imported content. Publish
+        reusable instructions and passive support assets through skill_publish or
+        skill_publish_batch. Capture exact passive plans, decisions, requirements, documentation,
+        evidence, profiles, caller-constructed checkpoint metadata, and import audits through
+        development_artifact_capture or its Batch companion, then declare typed relationships.
+        Preserve a cited URL without saved response bytes only as an external_reference whose
+        exact content is the URL plus one newline. First form a dry-run inventory; use stable
+        command and Batch identities for resumption; poll both Tasks and Operation Batches; verify
+        projected bytes, digests, assets, relations, outcomes, counts, and exact replay; capture an
+        import_manifest last. Do not fabricate live coordination facts from historical material or
+        retire local sources before successful verification and explicit user authorization.
         Use skill_list to discover persisted AI Skills and select an exact, case-sensitive name and scope;
         the server does not infer scope precedence. Use skill_get before updating and pass its revision as
         skill_publish expected_revision (zero creates a new tuple). A skill_revision_conflict writes no Skill

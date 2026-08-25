@@ -428,18 +428,28 @@ module Coordinator
       def skill_publish
         asset = object_schema(
           properties: {
-            path: { type: "string", minLength: 1, maxLength: Types::SKILL_ASSET_PATH_MAXIMUM_BYTES },
+            path: {
+              type: "string",
+              minLength: 1,
+              maxLength: Types::SKILL_ASSET_PATH_MAXIMUM_BYTES,
+              description: "Caller-chosen relative POSIX path inside this complete Skill revision."
+            },
             media_type: {
               type: "string",
               minLength: 1,
               maxLength: 255,
-              pattern: "^[\\x21-\\x7e]+$"
+              pattern: "^[\\x21-\\x7e]+$",
+              description: "Media type observed by the caller; the server does not infer content type."
             },
-            executable: { type: "boolean" },
+            executable: {
+              type: "boolean",
+              description: "Whether a retrieving client should treat the passive asset as executable after authorization."
+            },
             content_base64: {
               type: "string",
               maxLength: Types::SKILL_ASSET_BASE64_MAXIMUM_BYTES,
-              pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+              pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+              description: "Canonical unwrapped Base64 for the exact asset bytes."
             }
           },
           required: %w[path media_type executable content_base64]
@@ -453,19 +463,39 @@ module Coordinator
               },
               required: %w[kind id]
             ),
-            name: { type: "string", minLength: 1, maxLength: Types::SKILL_NAME_MAXIMUM_BYTES },
-            scope: { type: "string", minLength: 1, maxLength: Types::SKILL_SCOPE_MAXIMUM_BYTES },
-            expected_revision: { type: "integer", minimum: 0 },
-            description: { type: "string", maxLength: Types::SKILL_DESCRIPTION_MAXIMUM_BYTES },
+            name: {
+              type: "string",
+              minLength: 1,
+              maxLength: Types::SKILL_NAME_MAXIMUM_BYTES,
+              description: "Exact caller-chosen Skill name; the same name in another scope is a different Skill."
+            },
+            scope: {
+              type: "string",
+              minLength: 1,
+              maxLength: Types::SKILL_SCOPE_MAXIMUM_BYTES,
+              description: "Exact caller/user-chosen applicability scope; the server infers no scope hierarchy."
+            },
+            expected_revision: {
+              type: "integer",
+              minimum: 0,
+              description: "Zero creates the name/scope tuple; otherwise use the revision returned by skill_get."
+            },
+            description: {
+              type: "string",
+              maxLength: Types::SKILL_DESCRIPTION_MAXIMUM_BYTES,
+              description: "Discovery summary explaining what the instructions do and when an agent should use them."
+            },
             instructions: {
               type: "string",
               minLength: 1,
-              maxLength: Types::SKILL_INSTRUCTIONS_MAXIMUM_BYTES
+              maxLength: Types::SKILL_INSTRUCTIONS_MAXIMUM_BYTES,
+              description: "Complete reusable instructions selected and normalized by the caller."
             },
             assets: {
               type: "array",
               maxItems: Types::SKILL_ASSET_MAXIMUM_COUNT,
-              items: asset
+              items: asset,
+              description: "Complete passive asset snapshot for this revision, not a partial patch."
             }
           ),
           required: %w[
@@ -484,12 +514,15 @@ module Coordinator
               },
               required: %w[kind id]
             ),
-            batch_id: uuid_v7,
+            batch_id: uuid_v7.merge(
+              description: "Stable caller-generated UUIDv7 used to resume or inspect this asynchronous Batch Saga."
+            ),
             items: {
               type: "array",
               minItems: 1,
               maxItems: Types::OPERATION_BATCH_MAXIMUM_ITEMS,
-              items: skill_publish
+              items: skill_publish,
+              description: "Complete ordinary skill_publish requests selected by the caller; outcomes are independent."
             }
           ),
           required: %w[command_id actor batch_id items]
@@ -581,18 +614,28 @@ module Coordinator
       def development_artifact_capture
         content = object_schema(
           properties: {
-            encoding: { type: "string", enum: %w[utf-8 binary] },
+            encoding: {
+              type: "string",
+              enum: %w[utf-8 binary],
+              description: "Use utf-8 with text for valid UTF-8 bytes; otherwise use binary with base64."
+            },
             media_type: {
               type: "string",
               minLength: 1,
               maxLength: 255,
-              pattern: "^[\\x21-\\x7e]+$"
+              pattern: "^[\\x21-\\x7e]+$",
+              description: "Media type observed by the caller; the server does not inspect or infer it."
             },
-            text: { type: "string", maxLength: Types::DEVELOPMENT_ARTIFACT_CONTENT_MAXIMUM_BYTES },
+            text: {
+              type: "string",
+              maxLength: Types::DEVELOPMENT_ARTIFACT_CONTENT_MAXIMUM_BYTES,
+              description: "Exact UTF-8 content bytes represented as text; do not send a filesystem path in place of content."
+            },
             base64: {
               type: "string",
               maxLength: Types::DEVELOPMENT_ARTIFACT_CONTENT_BASE64_MAXIMUM_BYTES,
-              pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+              pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+              description: "Canonical unwrapped Base64 for exact non-UTF-8 or binary bytes."
             }
           },
           required: %w[encoding media_type],
@@ -603,24 +646,32 @@ module Coordinator
         )
         source = object_schema(
           properties: {
-            kind: { type: "string", enum: Types::DEVELOPMENT_ARTIFACT_SOURCE_KINDS },
+            kind: {
+              type: "string",
+              enum: Types::DEVELOPMENT_ARTIFACT_SOURCE_KINDS,
+              description: "How the caller obtained the bytes or reference; this is provenance, not Artifact classification."
+            },
             locator: {
               type: "string",
               minLength: 1,
-              maxLength: Types::DEVELOPMENT_ARTIFACT_SOURCE_LOCATOR_MAXIMUM_BYTES
+              maxLength: Types::DEVELOPMENT_ARTIFACT_SOURCE_LOCATOR_MAXIMUM_BYTES,
+              description: "Stable caller-owned logical locator used as provenance and identity only; the server never dereferences it."
             },
             revision: {
               type: [ "string", "null" ],
-              maxLength: Types::DEVELOPMENT_ARTIFACT_SOURCE_REVISION_MAXIMUM_BYTES
+              maxLength: Types::DEVELOPMENT_ARTIFACT_SOURCE_REVISION_MAXIMUM_BYTES,
+              description: "Optional caller-observed immutable source revision, such as a commit OID or document version."
             },
             observed_at: {
               type: "string",
-              pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$"
+              pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$",
+              description: "Canonical UTC time at which the caller observed these exact source bytes."
             },
             collector: {
               type: "string",
               minLength: 1,
-              maxLength: Types::DEVELOPMENT_ARTIFACT_COLLECTOR_MAXIMUM_BYTES
+              maxLength: Types::DEVELOPMENT_ARTIFACT_COLLECTOR_MAXIMUM_BYTES,
+              description: "Caller-chosen identifier for the agent, tool, or procedure that observed the source."
             }
           },
           required: %w[kind locator revision observed_at collector]
@@ -637,18 +688,25 @@ module Coordinator
             scope: {
               type: "string",
               minLength: 1,
-              maxLength: Types::DEVELOPMENT_ARTIFACT_SCOPE_MAXIMUM_BYTES
+              maxLength: Types::DEVELOPMENT_ARTIFACT_SCOPE_MAXIMUM_BYTES,
+              description: "Exact caller/user-chosen project or context scope used to retrieve this Artifact."
             },
             title: {
               type: "string",
               minLength: 1,
-              maxLength: Types::DEVELOPMENT_ARTIFACT_TITLE_MAXIMUM_BYTES
+              maxLength: Types::DEVELOPMENT_ARTIFACT_TITLE_MAXIMUM_BYTES,
+              description: "Concise human-readable title for the selected development-memory item."
             },
-            kind: { type: "string", enum: Types::DEVELOPMENT_ARTIFACT_KINDS },
+            kind: {
+              type: "string",
+              enum: Types::DEVELOPMENT_ARTIFACT_KINDS,
+              description: "Semantic role of the content in development; choose from meaning, not filename or directory alone."
+            },
             labels: {
               type: "array",
               maxItems: Types::DEVELOPMENT_ARTIFACT_LABEL_MAXIMUM_COUNT,
               uniqueItems: true,
+              description: "Caller-chosen exact facets used for retrieval; labels do not replace the broad kind.",
               items: {
                 type: "string",
                 minLength: 1,
@@ -669,11 +727,16 @@ module Coordinator
       def development_artifact_relation_declare
         target = object_schema(
           properties: {
-            kind: { type: "string", enum: Types::DEVELOPMENT_ARTIFACT_TARGET_KINDS },
+            kind: {
+              type: "string",
+              enum: Types::DEVELOPMENT_ARTIFACT_TARGET_KINDS,
+              description: "Ontology of the target identity; use artifact only for a captured Artifact ID."
+            },
             id: {
               type: "string",
               minLength: 1,
-              maxLength: Types::DEVELOPMENT_ARTIFACT_TARGET_ID_MAXIMUM_BYTES
+              maxLength: Types::DEVELOPMENT_ARTIFACT_TARGET_ID_MAXIMUM_BYTES,
+              description: "Exact target identity already known to the caller; the server does not resolve a path or URL."
             }
           },
           required: %w[kind id]
@@ -683,7 +746,8 @@ module Coordinator
             path: {
               type: "string",
               minLength: 1,
-              maxLength: Types::DEVELOPMENT_ARTIFACT_RELATION_PATH_MAXIMUM_BYTES
+              maxLength: Types::DEVELOPMENT_ARTIFACT_RELATION_PATH_MAXIMUM_BYTES,
+              description: "Optional safe relative POSIX path, allowed only when relation is documents."
             }
           },
           required: []
@@ -699,9 +763,14 @@ module Coordinator
             ),
             source_artifact_id: {
               type: "string",
-              pattern: "^artifact:v1:[0-9a-f]{64}$"
+              pattern: "^artifact:v1:[0-9a-f]{64}$",
+              description: "Captured Artifact from which the directed relationship originates."
             },
-            relation: { type: "string", enum: Types::DEVELOPMENT_ARTIFACT_RELATION_KINDS },
+            relation: {
+              type: "string",
+              enum: Types::DEVELOPMENT_ARTIFACT_RELATION_KINDS,
+              description: "Caller-observed semantic relationship; documents may additionally carry attributes.path."
+            },
             target:,
             attributes:
           ),
@@ -1658,12 +1727,15 @@ module Coordinator
               },
               required: %w[kind id]
             ),
-            batch_id: uuid_v7,
+            batch_id: uuid_v7.merge(
+              description: "Stable caller-generated UUIDv7 used to resume or inspect this asynchronous Batch Saga."
+            ),
             items: {
               type: "array",
               minItems: 1,
               maxItems: Types::OPERATION_BATCH_MAXIMUM_ITEMS,
-              items: item_schema
+              items: item_schema,
+              description: "Complete ordinary target-tool requests selected by the caller; each has an independent outcome."
             }
           ),
           required: %w[command_id actor batch_id items]

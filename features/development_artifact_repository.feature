@@ -5,6 +5,13 @@ Feature: Development Artifact repository
   Background:
     Given an MCP agent supports checkpointed Tasks
 
+  Rule: A clean agent discovers migration from MCP without a prescribed project layout
+
+    Scenario: Endpoint instructions and schemas teach semantic client-side import
+      When a clean agent asks the MCP endpoint how to migrate development memory
+      Then the endpoint assigns project discovery to the agent without assuming paths or runtimes
+      And the import-capable schemas require exact content and caller-owned provenance
+
   Rule: Evidence is classified, attributed, and retrieved without executing content
 
     Scenario: Documentation and web-search evidence are discoverable through exact filters

@@ -1,5 +1,56 @@
 # frozen_string_literal: true
 
+When("a clean agent asks the MCP endpoint how to migrate development memory") do
+  @migration_discovery = mcp_request(method: "server/discover", params: {})
+  @migration_tools = mcp_request(method: "tools/list", params: {})
+    .dig("result", "tools")
+end
+
+Then("the endpoint assigns project discovery to the agent without assuming paths or runtimes") do
+  instructions = @migration_discovery.dig("result", "instructions").squish
+  assert_acceptance(instructions.include?("client's own available capabilities"), "Client discovery guidance")
+  assert_acceptance(instructions.include?("never by a server-prescribed directory layout"), "Layout guidance")
+  assert_acceptance(instructions.include?("The coordinator cannot read caller paths"), "Server boundary guidance")
+
+  surface = JSON.generate(
+    @migration_tools.select do |tool|
+      %w[
+        skill_publish skill_publish_batch development_artifact_capture
+        development_artifact_capture_batch development_artifact_relation_declare
+        development_artifact_relation_declare_batch
+      ].include?(tool.fetch("name"))
+    end
+  )
+  %w[.build .to_review source_root Rails.root python ruby node].each do |assumption|
+    assert_acceptance(!surface.include?(assumption), "Migration surface prescribes #{assumption}")
+  end
+end
+
+Then("the import-capable schemas require exact content and caller-owned provenance") do
+  artifact = @migration_tools.find { _1.fetch("name") == "development_artifact_capture" }
+  skill = @migration_tools.find { _1.fetch("name") == "skill_publish" }
+  artifact_schema = artifact.fetch("inputSchema")
+
+  assert_acceptance(
+    artifact_schema.dig("properties", "kind", "description").include?("choose from meaning"),
+    "Semantic Artifact classification"
+  )
+  assert_acceptance(
+    artifact_schema.dig("properties", "content", "properties", "text", "description").include?("Exact UTF-8"),
+    "Exact Artifact content"
+  )
+  assert_acceptance(
+    artifact_schema.dig("properties", "source", "properties", "locator", "description").include?(
+      "server never dereferences it"
+    ),
+    "Caller-owned locator"
+  )
+  assert_acceptance(
+    skill.dig("inputSchema", "properties", "assets", "description").include?("Complete passive asset snapshot"),
+    "Complete Skill asset snapshot"
+  )
+end
+
 When("the agent captures documentation and web-search Development Artifacts") do
   @documentation_text = "Artifact repository contract\n"
   @artifact_outcomes = [

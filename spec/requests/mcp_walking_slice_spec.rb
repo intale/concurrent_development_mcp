@@ -99,6 +99,59 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
     )
   end
 
+  it "teaches a clean agent to migrate client-visible development memory semantically" do
+    discovered = mcp_request(
+      id: 1,
+      method: "server/discover",
+      params: {},
+      capable: false
+    )
+    instructions = discovered.dig("result", "instructions").squish
+
+    expect(instructions).to include(
+      "inspect that project with the client's own available capabilities",
+      "never by a server-prescribed directory layout",
+      "The coordinator cannot read caller paths",
+      "capture an import_manifest last"
+    )
+
+    tools = mcp_request(id: 2, method: "tools/list", params: {}).dig("result", "tools")
+    artifact = tools.find { _1.fetch("name") == "development_artifact_capture" }
+    artifact_batch = tools.find { _1.fetch("name") == "development_artifact_capture_batch" }
+    skill = tools.find { _1.fetch("name") == "skill_publish" }
+    relation = tools.find { _1.fetch("name") == "development_artifact_relation_declare" }
+
+    expect(artifact.fetch("description")).to include("project it can inspect", "exact bytes")
+    expect(artifact_batch.fetch("description")).to include("server assumes no project path layout")
+    expect(skill.fetch("description")).to include("caller-discovered reusable instruction set")
+    expect(relation.fetch("description")).to include("caller")
+
+    artifact_schema = artifact.fetch("inputSchema")
+    expect(artifact_schema.dig("properties", "kind", "description")).to include(
+      "choose from meaning, not filename or directory alone"
+    )
+    expect(artifact_schema.dig("properties", "content", "properties", "text", "description")).to include(
+      "do not send a filesystem path"
+    )
+    expect(artifact_schema.dig("properties", "source", "properties", "locator", "description")).to include(
+      "server never dereferences it"
+    )
+    expect(skill.dig("inputSchema", "properties", "scope", "description")).to include(
+      "server infers no scope hierarchy"
+    )
+
+    reusable_surface = JSON.generate(
+      tools.select do |tool|
+        %w[
+          skill_publish skill_publish_batch development_artifact_capture
+          development_artifact_capture_batch development_artifact_relation_declare
+          development_artifact_relation_declare_batch
+        ].include?(tool.fetch("name"))
+      end
+    )
+    expect(reusable_surface).not_to include(".build", ".to_review", "source_root", "Rails.root")
+  end
+
   it "submits, polls, executes, replays, and independently projects one mutation" do
     arguments = {
       command_id: "cmd-mcp-task-100",
