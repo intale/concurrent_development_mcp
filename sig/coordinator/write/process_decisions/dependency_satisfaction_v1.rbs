@@ -1,0 +1,12 @@
+module Coordinator::Write::ProcessDecisions
+  class DependencySatisfactionV1 < Coordinator::Shared::Value
+    def schema: () -> String
+    def process_manager: () -> String
+    def policy_version: () -> String
+    def source_event: () -> Coordinator::Write::EventReference
+    def change_set_id: () -> String
+    def dependency_id: () -> String
+    def process_step: () -> String
+    def component_markers: () -> Array[String]
+  end
+end

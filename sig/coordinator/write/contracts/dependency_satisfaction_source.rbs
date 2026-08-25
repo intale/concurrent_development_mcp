@@ -1,0 +1,6 @@
+module Coordinator::Write::Contracts
+  class DependencySatisfactionSource < Dry::Validation::Contract
+    WORK_ITEM_SOURCES: Array[singleton(Coordinator::Write::Events::Base)]
+    RELEASE_SET_SOURCES: Array[singleton(Coordinator::Write::Events::Base)]
+  end
+end

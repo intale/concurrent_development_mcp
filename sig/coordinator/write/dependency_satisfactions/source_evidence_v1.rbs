@@ -1,0 +1,9 @@
+module Coordinator::Write::DependencySatisfactions
+  class SourceEvidenceV1 < Coordinator::Shared::Value
+    def event: () -> PgEventstore::Event
+    def reference: () -> Coordinator::Write::EventReference
+    def payload: () -> Coordinator::Write::Events::Base
+    def producer_state: () -> Coordinator::Write::Domain::WorkItems::State
+    def release_state: () -> Coordinator::Write::Domain::ReleaseSets::LifecycleStateV1?
+  end
+end

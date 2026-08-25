@@ -5,8 +5,8 @@ module ReleaseSetScenario
 
   REPOSITORIES = %w[billing ledger].freeze
 
-  def prepare_input(prefix:)
-    authorizations = authorized_members(prefix:)
+  def prepare_input(prefix:, dependency: nil)
+    authorizations = authorized_members(prefix:, dependency:)
     {
       command_id: "cmd-release-prepare-#{prefix}",
       actor: { kind: "agent", id: "release-coordinator-1" },
@@ -29,14 +29,14 @@ module ReleaseSetScenario
     }
   end
 
-  def prepare(prefix:)
-    input = prepare_input(prefix:)
+  def prepare(prefix:, dependency: nil)
+    input = prepare_input(prefix:, dependency:)
     completion = execute(Coordinator::Write::Operations::ExecutePrepareReleaseSet, input)
     event = event_store.read(
       streams.release_set(input.fetch(:release_set_id)),
       Coordinator::Write::EventQueries::RELEASE_SET_PREPARATION
     ).sole
-    { input:, completion:, event:, payload: load(event) }
+    { input:, completion:, event:, payload: load(event), dependency: }
   end
 
   def observe_member(prepared, index:, prefix:)
@@ -161,8 +161,8 @@ module ReleaseSetScenario
     { input:, completion:, event:, payload: load(event) }
   end
 
-  def authorized_members(prefix:)
-    candidates = candidates(prefix:)
+  def authorized_members(prefix:, dependency: nil)
+    candidates = candidates(prefix:, dependency:)
     candidates.each_with_index.map do |candidate, index|
       member_prefix = "#{prefix}-#{index + 1}"
       registration = MergeSnapshotScenario.register_candidates(
@@ -179,14 +179,37 @@ module ReleaseSetScenario
     end
   end
 
-  def candidates(prefix:)
+  def candidates(prefix:, dependency: nil)
     change_set_id = "CS-release-#{prefix}"
     create_change_set(prefix:, change_set_id:)
     work = REPOSITORIES.each_with_index.map do |repository_id, index|
       create_work_item(prefix:, change_set_id:, repository_id:, index: index + 1)
     end
+    create_release_dependency(prefix:, change_set_id:, producer: work.fetch(0), dependency:) if dependency
     activate(change_set_id:, prefix:)
-    work.map { submit_candidate(prefix:, change_set_id:, **_1) }
+    work.map do |member|
+      candidate = submit_candidate(prefix:, change_set_id:, **member)
+      complete_candidate(candidate, prefix:, index: member.fetch(:index))
+    end
+  end
+
+  def create_release_dependency(prefix:, change_set_id:, producer:, dependency:)
+    consumer = create_work_item(
+      prefix:,
+      change_set_id:,
+      repository_id: "billing",
+      index: "consumer"
+    )
+    execute(Coordinator::Write::Operations::ExecuteDeclareWorkItemDependency, {
+      command_id: "seed-release-dependency-#{prefix}",
+      actor: { kind: "agent", id: "planner-1" },
+      change_set_id:,
+      dependency_id: "DEP-release-#{prefix}",
+      producer_work_item_id: producer.fetch(:work_item_id),
+      consumer_work_item_id: consumer.fetch(:work_item_id),
+      dependency_kind: dependency.fetch(:kind),
+      required_output: dependency[:required_output]
+    })
   end
 
   def create_change_set(prefix:, change_set_id:)
@@ -228,8 +251,9 @@ module ReleaseSetScenario
 
   def submit_candidate(prefix:, change_set_id:, repository_id:, work_item_id:, index:)
     attempt_id = "A-release-#{prefix}-#{index}"
-    base_oid = index.to_s * 40
-    head_oid = (index + 2).to_s * 40
+    identity_seed = prefix.bytes.sum * 100 + index
+    base_oid = format("%040x", identity_seed)
+    head_oid = format("%040x", identity_seed + 10_000)
     path = "lib/#{repository_id}.rb"
     execute(Coordinator::Write::Operations::ExecuteAcquireWorkItem, {
       command_id: "seed-release-acquire-#{prefix}-#{index}",
@@ -281,7 +305,37 @@ module ReleaseSetScenario
       }
     }
     completion = execute(Coordinator::Write::Operations::ExecuteSubmitCandidate, input)
-    { input:, completion: }
+    { input:, completion:, reservation: }
+  end
+
+  def complete_candidate(candidate, prefix:, index:)
+    input = candidate.fetch(:input)
+    reservation = candidate.fetch(:reservation)
+    execute(Coordinator::Write::Operations::ExecuteReleaseLeaseSet, {
+      command_id: "seed-release-lease-release-#{prefix}-#{index}",
+      actor: input.fetch(:actor),
+      change_set_id: input.fetch(:change_set_id),
+      work_item_id: input.fetch(:work_item_id),
+      attempt_id: input.fetch(:attempt_id),
+      lease_set_id: reservation.lease_set_id,
+      leases: reservation.resources.map do |lease|
+        {
+          resource_key_hash: lease.resource_key_hash,
+          lease_id: lease.lease_id,
+          fencing_token: lease.fencing_token
+        }
+      end
+    })
+    work_item_completion = execute(Coordinator::Write::Operations::ExecuteCompleteWorkItem, {
+      command_id: "seed-release-work-complete-#{prefix}-#{index}",
+      actor: input.fetch(:actor),
+      change_set_id: input.fetch(:change_set_id),
+      work_item_id: input.fetch(:work_item_id),
+      attempt_id: input.fetch(:attempt_id),
+      candidate_id: input.fetch(:candidate_id),
+      produced_outputs: []
+    })
+    candidate.merge(work_item_completion:)
   end
 
   def execute(operation_class, input)

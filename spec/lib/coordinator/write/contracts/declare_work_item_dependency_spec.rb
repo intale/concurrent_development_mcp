@@ -55,4 +55,26 @@ RSpec.describe Coordinator::Write::Contracts::DeclareWorkItemDependency do
     expect(result).to be_failure
     expect(result.errors.to_h.keys).to include(:dependency_id, :producer_work_item_id, :dependency_kind)
   end
+
+  it "enforces the exact required-output shape for every dependency family" do
+    missing = contract.call(
+      valid_input.merge("dependency_kind" => "requires_contract")
+    )
+    wrong_kind = contract.call(
+      valid_input.merge(
+        "dependency_kind" => "requires_composite_verification",
+        "required_output" => { "kind" => "artifact", "key" => "run-7" }
+      )
+    )
+    extraneous = contract.call(
+      valid_input.merge(
+        "dependency_kind" => "must_integrate_after",
+        "required_output" => { "kind" => "artifact", "key" => "billing" }
+      )
+    )
+
+    expect(missing.errors.to_h).to have_key(:required_output)
+    expect(wrong_kind.errors.to_h).to have_key(:required_output)
+    expect(extraneous.errors.to_h).to have_key(:required_output)
+  end
 end

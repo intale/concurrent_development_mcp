@@ -62,7 +62,10 @@ module Coordinator
 
       def work_item_dependency_declare
         required_output = object_schema(
-          properties: { kind: identifier, key: identifier },
+          properties: {
+            kind: { type: "string", enum: Types::DEPENDENCY_REQUIRED_OUTPUT_KINDS },
+            key: identifier
+          },
           required: %w[kind key]
         )
         object_schema(

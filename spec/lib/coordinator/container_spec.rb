@@ -13,6 +13,7 @@ RSpec.describe Coordinator::Container do
     dependency_operation = described_class["operations.execute_declare_work_item_dependency"]
     activation_operation = described_class["operations.execute_activate_change_set"]
     readiness_operation = described_class["operations.execute_evaluate_work_item_readiness"]
+    dependency_satisfaction_operation = described_class["operations.execute_satisfy_work_item_dependency"]
     acquisition_operation = described_class["operations.execute_acquire_work_item"]
     reservation_operation = described_class["operations.execute_reserve_write_set"]
     expansion_operation = described_class["operations.execute_expand_write_set"]
@@ -37,6 +38,7 @@ RSpec.describe Coordinator::Container do
     obligation_pair_progress = described_class["operations.execute_progress_candidate_impact_pair_scan"]
     obligation_create = described_class["operations.execute_create_candidate_compatibility_obligation"]
     readiness_process_manager = described_class["process_managers.change_set_readiness"]
+    build_progress_process_manager = described_class["process_managers.build_progress"]
     task_executor = described_class["process_managers.coordination_task_executor"]
     impact_process_manager = described_class["process_managers.agent_choice_decision_impact"]
     obligation_process_manager = described_class["process_managers.candidate_impact_obligation_policy"]
@@ -82,6 +84,9 @@ RSpec.describe Coordinator::Container do
     expect(dependency_operation).to be_a(Coordinator::Write::Operations::ExecuteDeclareWorkItemDependency)
     expect(activation_operation).to be_a(Coordinator::Write::Operations::ExecuteActivateChangeSet)
     expect(readiness_operation).to be_a(Coordinator::Write::Operations::ExecuteEvaluateWorkItemReadiness)
+    expect(dependency_satisfaction_operation).to be_a(
+      Coordinator::Write::Operations::ExecuteSatisfyWorkItemDependency
+    )
     expect(acquisition_operation).to be_a(Coordinator::Write::Operations::ExecuteAcquireWorkItem)
     expect(reservation_operation).to be_a(Coordinator::Write::Operations::ExecuteReserveWriteSet)
     expect(expansion_operation).to be_a(Coordinator::Write::Operations::ExecuteExpandWriteSet)
@@ -133,6 +138,9 @@ RSpec.describe Coordinator::Container do
       Coordinator::Write::Operations::ExecuteCreateCandidateCompatibilityObligation
     )
     expect(readiness_process_manager).to be_a(Coordinator::Processes::ProcessManagers::ChangeSetReadiness)
+    expect(build_progress_process_manager).to be_a(
+      Coordinator::Processes::ProcessManagers::BuildProgress
+    )
     expect(task_executor).to be_a(Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor)
     expect(impact_process_manager).to be_a(
       Coordinator::Processes::ProcessManagers::AgentChoiceDecisionImpact
@@ -145,6 +153,7 @@ RSpec.describe Coordinator::Container do
     expect(subscription_set.subscription_names).to eq(
       [
         "agent-choice-decision-impact-v1",
+        "build-progress-v1",
         "candidate-impact-obligation-policy-v1",
         "change-set-readiness-v1",
         "coordination-task-executor-v1",

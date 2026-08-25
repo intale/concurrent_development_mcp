@@ -168,6 +168,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
     expect(Coordinator::Container["subscription_sets.process_managers"].subscription_names).to eq(
       [
         "agent-choice-decision-impact-v1",
+        "build-progress-v1",
         "candidate-impact-obligation-policy-v1",
         "change-set-readiness-v1",
         "coordination-task-executor-v1",

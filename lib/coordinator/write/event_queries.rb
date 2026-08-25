@@ -383,15 +383,28 @@ module Coordinator::Write
         "ChangeSetCreated",
         "WorkItemAddedToChangeSet",
         "WorkItemDependencyDeclared",
+        "WorkItemDependencySatisfied",
         "ChangeSetActivated"
       ],
-      maximum_count: 602,
+      maximum_count: 1_102,
+      direction: :asc
+    )
+
+    CHANGE_SET_FOR_DEPENDENCY_SATISFACTION = EventReadCriteria.new(
+      event_types: [
+        "ChangeSetCreated",
+        "WorkItemAddedToChangeSet",
+        "WorkItemDependencyDeclared",
+        "WorkItemDependencySatisfied",
+        "ChangeSetActivated"
+      ],
+      maximum_count: 1_102,
       direction: :asc
     )
 
     WORK_ITEM_FOR_READINESS_EVALUATION = EventReadCriteria.new(
-      event_types: [ "WorkItemCreated", "WorkItemMadeReady" ],
-      maximum_count: 2,
+      event_types: [ "WorkItemCreated", "WorkItemMadeReady", "WorkItemAcquired", "WorkItemCompleted" ],
+      maximum_count: 4,
       direction: :asc
     )
 

@@ -51,9 +51,15 @@ module Coordinator::Write
         end
 
         def required_output_matches?(command)
-          output_required = Types::OUTPUT_REQUIRED_DEPENDENCY_KINDS.include?(command.dependency_kind)
+          expected_kind = {
+            "requires_artifact" => "artifact",
+            "requires_contract" => "contract",
+            "requires_composite_verification" => "verification_run"
+          }[command.dependency_kind]
 
-          output_required == !command.required_output.nil?
+          return command.required_output.nil? unless expected_kind
+
+          command.required_output&.kind == expected_kind
         end
 
         def creates_cycle?(state, command)

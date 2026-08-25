@@ -96,6 +96,37 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::EvaluateReadiness do
     end
   end
 
+  it "allows activation evaluation when every incoming edge already has a satisfaction fact" do
+    dependency = Coordinator::Write::Domain::ChangeSets::Dependency.new(
+      dependency_id: "DEP-1",
+      producer_work_item_id: "W-200",
+      consumer_work_item_id: "W-100",
+      dependency_kind: "requires_candidate",
+      required_output: nil
+    )
+    satisfaction = Coordinator::Write::Domain::ChangeSets::DependencySatisfaction.new(
+      dependency_id: "DEP-1",
+      source_event: command.decision_identity.document.source_event,
+      satisfied_at: occurred_at
+    )
+    satisfied = Coordinator::Write::Domain::ChangeSets::State.new(
+      change_set_state.to_h.merge(
+        dependencies: [ dependency ],
+        dependency_satisfactions: [ satisfaction ]
+      )
+    )
+
+    result = decider.call(
+      change_set_state: satisfied,
+      work_item_state:,
+      command:,
+      occurred_at:,
+      decision_recorded: false
+    )
+
+    expect(result).to be_success
+  end
+
   def readiness_command(work_item_id)
     source_reference = Coordinator::Write::EventReference.new(
       event_id: "0198c000-0000-7000-8000-000000000001",

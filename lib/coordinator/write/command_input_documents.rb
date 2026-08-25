@@ -617,6 +617,19 @@ module Coordinator::Write
       attribute :input, ExpireResourceLeaseInputV1
     end
 
+    class SatisfyWorkItemDependencyInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :change_set_id, Types::Identifier
+      attribute :dependency_id, Types::Identifier
+      attribute :source_event, EventReferenceV1
+      attribute :rule_version, Types::String.enum("dependency-satisfaction/v1")
+    end
+
+    class SatisfyWorkItemDependencyV1 < BaseV1
+      attribute :tool_name, Types::String.enum("dependency_satisfaction_policy")
+      attribute :input, SatisfyWorkItemDependencyInputV1
+    end
+
     Type = CreateChangeSetV1 |
            CreateWorkItemV1 |
            DeclareWorkItemDependencyV1 |
@@ -651,6 +664,7 @@ module Coordinator::Write
     DigestType = Type |
                  ExpireResourceLeaseV1 |
                  RequestReleaseSetCompensationV1 |
-                 CompleteActivatedReleaseSetV1
+                 CompleteActivatedReleaseSetV1 |
+                 SatisfyWorkItemDependencyV1
   end
 end

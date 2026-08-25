@@ -894,6 +894,27 @@ module Coordinator::Write
       )
     end
 
+    def dependency_satisfaction_policy(command:, satisfaction:, input_digest:, persisted_events:, completed_at:)
+      build_completion(
+        command:,
+        tool_name: "dependency_satisfaction_policy",
+        summary: "WorkItem dependency satisfied from exact coordination evidence.",
+        data: CommandReceiptData::DependencySatisfaction.new(
+          change_set_id: satisfaction.change_set_id,
+          dependency_id: satisfaction.dependency_id,
+          consumer_work_item_id: satisfaction.consumer_work_item_id,
+          source_event: satisfaction.source_event,
+          satisfaction_event: event_reference(persisted_events.fetch(0)),
+          readiness_event: persisted_events[1] && event_reference(persisted_events.fetch(1)),
+          satisfied_at: satisfaction.satisfied_at
+        ),
+        next_actions: [],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     private
 
     def release_set_completion(command:, completion:, tool_name:, summary:, input_digest:, persisted_events:, completed_at:)

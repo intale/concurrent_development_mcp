@@ -175,6 +175,10 @@ module Coordinator
       Write::Domain::ChangeSets::Activate.new(stream_factory: self["stream_factory"])
     end
 
+    register("domain.change_sets.satisfy_work_item_dependency", memoize: true) do
+      Write::Domain::ChangeSets::SatisfyWorkItemDependency.new(stream_factory: self["stream_factory"])
+    end
+
     register("domain.work_items.evaluate_readiness", memoize: true) do
       Write::Domain::WorkItems::EvaluateReadiness.new(stream_factory: self["stream_factory"])
     end
@@ -501,10 +505,27 @@ module Coordinator
       Processes::ReadinessCommandBuilder.new(compound_marker_builder: self["compound_marker_builder"])
     end
 
+    register("build_progress.source_builder", memoize: true) do
+      Processes::BuildProgress::SourceBuilder.new(schema_registry: self["event_schema_registry"])
+    end
+
+    register("build_progress.command_builder", memoize: true) do
+      Processes::BuildProgress::CommandBuilder.new(compound_marker_builder: self["compound_marker_builder"])
+    end
+
     register("readiness_targets_builder", memoize: true) { Processes::ReadinessTargetsBuilder.new }
 
     register("event_store", memoize: true) do
       Write::EventStore.new(client: PgEventstore.client)
+    end
+
+    register("dependency_satisfactions.source_loader", memoize: true) do
+      Write::DependencySatisfactions::SourceLoader.new(
+        event_store: self["event_store"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        release_history_loader: self["release_sets.history_loader"]
+      )
     end
 
     register("lease_expiry_source_loader", memoize: true) do
@@ -869,6 +890,21 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("operations.execute_satisfy_work_item_dependency") do
+      Write::Operations::ExecuteSatisfyWorkItemDependency.new(
+        event_store: self["event_store"],
+        source_loader: self["dependency_satisfactions.source_loader"],
+        decider: self["domain.change_sets.satisfy_work_item_dependency"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_completion_builder"]
       )
     end
 
@@ -1841,6 +1877,17 @@ module Coordinator
       )
     end
 
+    register("process_managers.build_progress", memoize: true) do
+      Processes::ProcessManagers::BuildProgress.new(
+        event_store: self["event_store"],
+        source_builder: self["build_progress.source_builder"],
+        command_builder: self["build_progress.command_builder"],
+        satisfy_dependency: self["operations.execute_satisfy_work_item_dependency"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
     register("subscriptions.change_set_readiness", memoize: true) do
       Processes::Subscriptions::ChangeSetReadiness.new(handler: self["process_managers.change_set_readiness"])
     end
@@ -1878,6 +1925,12 @@ module Coordinator
     register("subscriptions.release_set_lifecycle", memoize: true) do
       Processes::Subscriptions::ReleaseSetLifecycle.new(
         handler: self["process_managers.release_set_lifecycle"]
+      )
+    end
+
+    register("subscriptions.build_progress", memoize: true) do
+      Processes::Subscriptions::BuildProgress.new(
+        handler: self["process_managers.build_progress"]
       )
     end
 
@@ -1955,7 +2008,8 @@ module Coordinator
           self["subscriptions.agent_choice_decision_impact"],
           self["subscriptions.candidate_impact_obligation_policy"],
           self["subscriptions.verification_obligation_validity"],
-          self["subscriptions.release_set_lifecycle"]
+          self["subscriptions.release_set_lifecycle"],
+          self["subscriptions.build_progress"]
         ]
       )
     end

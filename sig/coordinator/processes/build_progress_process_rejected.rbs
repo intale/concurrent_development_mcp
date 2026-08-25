@@ -1,0 +1,4 @@
+module Coordinator::Processes
+  class BuildProgressProcessRejected < StandardError
+  end
+end

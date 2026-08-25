@@ -1,0 +1,7 @@
+module Coordinator::Write::Domain::ChangeSets
+  class DependencySatisfaction < Coordinator::Shared::Value
+    def dependency_id: () -> String
+    def source_event: () -> Coordinator::Write::EventReference
+    def satisfied_at: () -> String
+  end
+end

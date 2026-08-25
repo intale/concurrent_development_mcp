@@ -1,0 +1,5 @@
+module Coordinator::Processes::Contracts
+  class BuildProgressSourceEvent < Dry::Validation::Contract
+    EVENT_STREAMS: Hash[String, Array[String]]
+  end
+end

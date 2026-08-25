@@ -26,6 +26,24 @@ RSpec.describe Coordinator::Write::Domain::ChangeSets::State do
         dependency_kind: "requires_candidate",
         required_output: nil,
         declared_at: "2026-08-20T14:14:00.000000Z"
+      ),
+      Coordinator::Write::Events::WorkItemDependencySatisfiedV1.new(
+        change_set_id: "CS-100",
+        dependency_id: "DEP-1",
+        producer_work_item_id: "W-100",
+        consumer_work_item_id: "W-200",
+        dependency_kind: "requires_candidate",
+        required_output: nil,
+        source_event: Coordinator::Write::EventReference.new(
+          event_id: "0198c000-0000-7000-8000-000000000001",
+          type: "WorkItemCandidateSelected",
+          stream_context: "DevelopmentExecution",
+          stream_name: "WorkItem",
+          stream_id: "W-100",
+          stream_revision: 3
+        ),
+        rule_version: "dependency-satisfaction/v1",
+        satisfied_at: "2026-08-20T14:20:00.000000Z"
       )
     ]
 
@@ -41,6 +59,7 @@ RSpec.describe Coordinator::Write::Domain::ChangeSets::State do
         required_output: nil
       )
     )
+    expect(state).to be_dependency_satisfied("DEP-1")
   end
 
   it "folds activation as the boundary that closes structural planning" do

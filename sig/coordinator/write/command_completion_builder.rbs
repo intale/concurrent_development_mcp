@@ -35,6 +35,7 @@ module Coordinator
       def release_compensation_request: (command: Commands::RequestReleaseSetCompensation, request: Events::ReleaseSetCompensationRequestedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
       def release_activated_complete: (command: Commands::CompleteActivatedReleaseSet, completion: Events::ReleaseSetCompletedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
       def release_compensation_complete: (command: Commands::CompleteCompensatedReleaseSet, completion: Events::ReleaseSetCompletedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
+      def dependency_satisfaction_policy: (command: Commands::SatisfyWorkItemDependency, satisfaction: Events::WorkItemDependencySatisfiedV1, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> Events::CommandCompletedV1
     end
   end
 end

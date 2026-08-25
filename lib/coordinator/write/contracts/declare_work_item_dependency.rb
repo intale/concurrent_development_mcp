@@ -18,7 +18,7 @@ module Coordinator::Write
         required(:dependency_kind).filled(:string, included_in?: Types::DEPENDENCY_KINDS)
         required(:required_output).maybe do
           hash do
-            required(:kind).filled(:string)
+            required(:kind).filled(:string, included_in?: Types::DEPENDENCY_REQUIRED_OUTPUT_KINDS)
             required(:key).filled(:string)
           end
         end
@@ -56,6 +56,24 @@ module Coordinator::Write
 
         value.each do |name, identifier|
           key([ :required_output, name ]).failure("must be a valid identifier") unless valid_identifier?(identifier)
+        end
+      end
+
+      rule(:dependency_kind, :required_output) do
+        dependency_kind = values[:dependency_kind]
+        required_output = values[:required_output]
+        output_kind = {
+          "requires_artifact" => "artifact",
+          "requires_contract" => "contract",
+          "requires_composite_verification" => "verification_run"
+        }.fetch(dependency_kind, nil)
+
+        if output_kind && required_output.nil?
+          key(:required_output).failure("is required for #{dependency_kind}")
+        elsif output_kind && required_output[:kind] != output_kind
+          key([ :required_output, :kind ]).failure("must be #{output_kind} for #{dependency_kind}")
+        elsif !output_kind && required_output
+          key(:required_output).failure("must be absent for #{dependency_kind}")
         end
       end
 

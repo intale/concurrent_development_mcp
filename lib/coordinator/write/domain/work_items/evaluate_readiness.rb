@@ -62,13 +62,14 @@ module Coordinator::Write
           incoming = change_set_state.dependencies.select do |dependency|
             dependency.consumer_work_item_id == command.work_item_id
           end
-          return unless incoming.any?
+          unsatisfied = incoming.reject { change_set_state.dependency_satisfied?(_1.dependency_id) }
+          return if unsatisfied.empty?
 
           failure(
             :incoming_dependency_unsatisfied,
             "WorkItem has an incoming dependency without a satisfaction fact",
             command,
-            dependency_ids: incoming.map(&:dependency_id)
+            dependency_ids: unsatisfied.map(&:dependency_id)
           )
         end
 

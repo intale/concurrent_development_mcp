@@ -11,8 +11,10 @@ module Coordinator
           def acceptance_criteria: () -> Array[String]
           def work_item_ids: () -> Array[String]
           def dependencies: () -> Array[Dependency]
+          def dependency_satisfactions: () -> Array[DependencySatisfaction]
           def absent?: () -> bool
           def apply: (Events::Base event) -> State
+          def dependency_satisfied?: (String dependency_id) -> bool
         end
       end
     end

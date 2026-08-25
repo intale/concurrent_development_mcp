@@ -736,6 +736,25 @@ module Coordinator::Write
       )
     end
 
+    def dependency_satisfaction_policy(command)
+      @canonical_json.sha256(dependency_satisfaction_policy_document(command).to_h)
+    end
+
+    def dependency_satisfaction_policy_document(command)
+      CommandInputDocuments::SatisfyWorkItemDependencyV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "dependency_satisfaction_policy",
+        input: CommandInputDocuments::SatisfyWorkItemDependencyInputV1.new(
+          actor: actor_document(command.actor),
+          change_set_id: command.change_set_id,
+          dependency_id: command.dependency_id,
+          source_event: CommandInputDocuments::EventReferenceV1.new(command.source_event.to_h),
+          rule_version: command.rule_version
+        )
+      )
+    end
+
     private
 
     def candidate_manifest_document(manifest)

@@ -8,7 +8,7 @@ module Coordinator::Write
       attribute :change_set_id, Types::Identifier
       attribute :work_item_id, Types::Identifier
       attribute :readiness_decision_id, Types::Identifier
-      attribute :reason, Types::String.enum("change_set_activated")
+      attribute :reason, Types::String.enum("change_set_activated", "dependencies_satisfied")
       attribute :made_ready_at, Types::Timestamp
     end
   end

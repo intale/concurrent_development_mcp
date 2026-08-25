@@ -1,0 +1,6 @@
+module Coordinator::Write::DependencySatisfactions
+  class SourceLoader
+    def initialize: (event_store: Coordinator::Write::_EventStore, ?schema_registry: Coordinator::Write::EventSchemaRegistry, ?stream_factory: Coordinator::Write::StreamFactory, ?release_history_loader: Coordinator::Write::ReleaseSets::HistoryLoader, ?contract: Coordinator::Write::Contracts::DependencySatisfactionSource) -> void
+    def call: (command: Coordinator::Write::Commands::SatisfyWorkItemDependency, dependency: Coordinator::Write::Domain::ChangeSets::Dependency) -> Dry::Monads::Result
+  end
+end

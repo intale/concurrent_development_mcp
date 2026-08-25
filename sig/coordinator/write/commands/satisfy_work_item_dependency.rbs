@@ -1,0 +1,13 @@
+module Coordinator::Write::Commands
+  class SatisfyWorkItemDependency < Coordinator::Shared::Value
+    def command_id: () -> String
+    def actor: () -> Actor
+    def change_set_id: () -> String
+    def dependency_id: () -> String
+    def source_event: () -> Coordinator::Write::EventReference
+    def rule_version: () -> String
+    def decision_identity: () -> Coordinator::Write::DependencySatisfactionDecisionIdentity
+    def process_decision_marker: () -> String
+    def process_decision_components: () -> Array[String]
+  end
+end

@@ -2,7 +2,7 @@
 
 module Coordinator::Write
   class RequiredOutput < Value
-    attribute :kind, Types::Identifier
+    attribute :kind, Types::DependencyRequiredOutputKind
     attribute :key, Types::Identifier
   end
 end

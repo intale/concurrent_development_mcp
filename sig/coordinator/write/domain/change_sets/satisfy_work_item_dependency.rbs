@@ -1,0 +1,6 @@
+module Coordinator::Write::Domain::ChangeSets
+  class SatisfyWorkItemDependency
+    def initialize: (?stream_factory: Coordinator::Write::StreamFactory) -> void
+    def call: (change_set_state: State, consumer_state: Coordinator::Write::Domain::WorkItems::State, command: Coordinator::Write::Commands::SatisfyWorkItemDependency, evidence: Coordinator::Write::DependencySatisfactions::SourceEvidenceV1, satisfied_at: String) -> Dry::Monads::Result
+  end
+end

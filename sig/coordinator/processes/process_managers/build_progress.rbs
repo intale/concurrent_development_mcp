@@ -1,0 +1,8 @@
+module Coordinator::Processes::ProcessManagers
+  class BuildProgress
+    SOURCE_DEPENDENCY_KINDS: Hash[untyped, Array[String]]
+    HANDLED_OUTCOME_CODES: Array[Symbol]
+    def initialize: (event_store: Coordinator::Write::_EventStore, ?source_builder: Coordinator::Processes::BuildProgress::SourceBuilder, ?command_builder: Coordinator::Processes::BuildProgress::CommandBuilder, ?satisfy_dependency: Coordinator::Write::Operations::ExecuteSatisfyWorkItemDependency, ?schema_registry: Coordinator::Write::EventSchemaRegistry, ?stream_factory: Coordinator::Write::StreamFactory) -> void
+    def call: (PgEventstore::Event event) -> nil
+  end
+end

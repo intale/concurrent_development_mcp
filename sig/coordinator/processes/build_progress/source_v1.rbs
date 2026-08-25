@@ -1,0 +1,8 @@
+module Coordinator::Processes::BuildProgress
+  class SourceV1 < Coordinator::Shared::Value
+    def event: () -> PgEventstore::Event
+    def reference: () -> Coordinator::Write::EventReference
+    def payload: () -> Coordinator::Write::Events::Base
+    def change_set_id: () -> String
+  end
+end

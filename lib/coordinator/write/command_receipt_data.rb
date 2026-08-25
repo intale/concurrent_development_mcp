@@ -374,6 +374,16 @@ module Coordinator::Write
       attribute :completed_at, Types::Timestamp
     end
 
+    class DependencySatisfaction < Value
+      attribute :change_set_id, Types::Identifier
+      attribute :dependency_id, Types::Identifier
+      attribute :consumer_work_item_id, Types::Identifier
+      attribute :source_event, EventReference
+      attribute :satisfaction_event, EventReference
+      attribute :readiness_event, EventReference.optional
+      attribute :satisfied_at, Types::Timestamp
+    end
+
     Type = ChangeSet |
            WorkItem |
            Dependency |
@@ -404,6 +414,7 @@ module Coordinator::Write
            ReleaseSetVerification |
            ReleaseSetActivation |
            ReleaseSetCompensationRequest |
-           ReleaseSetCompletion
+           ReleaseSetCompletion |
+           DependencySatisfaction
   end
 end

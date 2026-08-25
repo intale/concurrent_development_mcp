@@ -1,0 +1,8 @@
+module Coordinator::Processes::BuildProgress
+  class CommandBuilder
+    ACTOR: Coordinator::Write::Commands::Actor
+    RULE_VERSION: String
+    def initialize: (?compound_marker_builder: Coordinator::Shared::CompoundMarkerBuilder) -> void
+    def call: (source: SourceV1, dependency: Coordinator::Write::Domain::ChangeSets::Dependency) -> Coordinator::Write::Commands::SatisfyWorkItemDependency
+  end
+end
