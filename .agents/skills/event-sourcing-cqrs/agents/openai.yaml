@@ -1,4 +1,0 @@
-interface:
-  display_name: "Event Sourcing CQRS"
-  short_description: "Implement strict event-sourced CQRS boundaries"
-  default_prompt: "Use $event-sourcing-cqrs to implement this Event Model with strict write/read separation."

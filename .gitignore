@@ -39,3 +39,4 @@
 /dev_scripts/
 tmp/
 .build/
+.mcp-fallback/
