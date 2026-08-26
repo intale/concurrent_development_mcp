@@ -8,13 +8,13 @@ Feature: Durable MCP Task protocol
 
   Rule: Retrying a lost request cannot duplicate coordination facts
 
-    @CDM-TASK-001
+    @CDM-TASK-001 @live-subscriptions
     Scenario: An agent retries a completed ChangeSet command through a new Task
       When agent "planner-1" submits ChangeSet "CS-CUC-RETRY" with command "cmd-cuc-retry"
       Then the Task is durable before coordination begins
-      When the Task executor processes the current Task
+      When the current Task completes through live subscriptions
       Then the current Task completes successfully
-      When the same command is retried and processed through another Task
+      When the same command is retried through another live Task
       Then both Task handles expose the same result
       And the command and ChangeSet facts exist only once
 

@@ -39,6 +39,11 @@ When("the Task executor processes the current Task") do
   execute_task(@current_task_id)
 end
 
+When("the current Task completes through live subscriptions") do
+  start_live_subscriptions
+  await_task_terminal(@current_task_id)
+end
+
 Then("the current Task completes successfully") do
   @current_task_state = task_request("tasks/get", @current_task_id)
   assert_acceptance_equal("completed", @current_task_state.dig("result", "status"), "Task status")
@@ -52,6 +57,11 @@ When("the same command is retried and processed through another Task") do
   @retry_task_id = @retry_response.dig("result", "taskId")
   assert_acceptance(@retry_task_id != @first_task_id, "A retry should receive a new Task handle")
   execute_task(@retry_task_id)
+end
+
+When("the same command is retried through another live Task") do
+  @retry_task_id = submit_and_await(@current_tool, **@current_arguments)
+  assert_acceptance(@retry_task_id != @first_task_id, "A retry should receive a new Task handle")
 end
 
 Then("both Task handles expose the same result") do

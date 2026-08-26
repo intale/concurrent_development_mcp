@@ -62,6 +62,14 @@ module McpAcceptanceWorld
     task_id
   end
 
+  def submit_and_await(tool, **arguments)
+    response = call_tool(tool, arguments)
+    task_id = response.dig("result", "taskId")
+    assert_acceptance(task_id, "#{tool} did not return a Task handle: #{response.inspect}")
+    await_task_terminal(task_id)
+    task_id
+  end
+
   def project_change_set(change_set_id)
     projector = Coordinator::Container["projectors.coord_context_v1"]
     change_set_events(change_set_id).each { projector.call(_1) }
