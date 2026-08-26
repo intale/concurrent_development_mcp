@@ -3,6 +3,7 @@
 RSpec.describe "Development Artifact contracts" do
   let(:capture) { Coordinator::Write::Contracts::CaptureDevelopmentArtifact.new }
   let(:relation) { Coordinator::Write::Contracts::DeclareDevelopmentArtifactRelation.new }
+  let(:relation_batch) { Coordinator::Write::Contracts::DevelopmentArtifactRelationDeclareBatch.new }
 
   it "accepts canonical UTF-8 and binary content while rejecting unknown keys and noncanonical Base64" do
     expect(capture.call(capture_input)).to be_success
@@ -59,6 +60,32 @@ RSpec.describe "Development Artifact contracts" do
     ).to be_failure
     expect(relation.call(valid.merge(target: { kind: "artifact", id: source_id }))).to be_failure
     expect(relation.call(valid.merge(target: valid.fetch(:target).merge(extra: true)))).to be_failure
+  end
+
+  it "accepts the complete single-relation contract in each batch item" do
+    item = relation_input(
+      source_id: "artifact:v1:#{'a' * 64}",
+      target_id: "artifact:v1:#{'b' * 64}"
+    ).merge(
+      attributes: {
+        path: "../guide.md",
+        fragment: "install",
+        normalized_locator: "guide.md"
+      },
+      supersedes: {
+        relation_id: "artifact-relation:v1:#{'c' * 64}",
+        reason: "wrong target"
+      }
+    )
+    input = {
+      command_id: "cmd-contract-relation-batch",
+      actor: { kind: "agent", id: "agent-1" },
+      batch_id: SecureRandom.uuid_v7,
+      items: [ item ]
+    }
+
+    expect(relation_batch.call(input)).to be_success
+    expect(relation_batch.call(input.merge(items: [ item.merge(extra: true) ]))).to be_failure
   end
 
   def capture_input(**overrides)

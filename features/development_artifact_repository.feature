@@ -31,3 +31,47 @@ Feature: Development Artifact repository
       And the binary Artifact facts reach the read side
       Then the changed profile exposes the supersession relationship
       And its exact Base64 content is available but never executed
+
+  Rule: Linked documentation is a directed graph that a clean agent can walk both ways
+
+    @linked-artifacts @stale-view
+    Scenario: A clean agent walks from a README to two children and back from a shared child
+      Given a README, two linked documents, and another parent are captured and mapped
+      And the caller declares README links with parent-segment and fragment evidence
+      And the other parent contains the shared API document
+      When the linked Artifact facts reach the read side
+      And the clean agent walks outgoing relationships from the README
+      Then it discovers both exact child Artifacts and fetches their passive content
+      When the clean agent walks incoming relationships from the shared API document
+      Then it sees both exact parents with mixed relationship kinds and peer summaries
+      And the README edge preserves its literal parent-segment, fragment, and normalized locator
+
+    @linked-artifacts @stale-view
+    Scenario: Locator resolution reports lag and immutable revision ambiguity without choosing latest
+      Given two immutable revisions at one exact locator are captured but not projected
+      When the clean agent resolves that locator before projection
+      Then the locator is absent with a bounded projection-lag retry action
+      When both locator revisions reach the read side
+      Then the locator is ambiguous and offers both exact revisions without choosing latest
+      When the clean agent follows one exact revision action
+      Then exactly that immutable Artifact and its content action are returned
+      And an unknown exact locator remains honestly absent
+
+  Rule: Replay and convergence cannot hide or duplicate graph edges
+
+    @linked-artifacts @event-contract
+    Scenario: Exact relationship replay produces one durable and projected edge
+      Given a captured parent and child are available for relationship replay
+      When the same relationship command is executed through two Tasks
+      And its relation fact reaches the read side twice
+      Then both Tasks expose one logical relation result
+      And one relation fact, command receipt, and projected edge exist
+
+    @linked-artifacts @stale-view
+    Scenario: A late older declaration is found beyond the previous observation window
+      Given an earlier-captured parent has two committed relationships but only the later declaration is projected
+      When the clean agent reads one outgoing relationship page
+      Then the available page contains the later declaration and a completed observation window
+      When the older declaration reaches the read side after that cursor
+      And the clean agent resumes from the returned relationship cursor
+      Then the older declaration is returned despite its earlier event position

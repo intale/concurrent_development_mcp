@@ -231,9 +231,13 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
             command_id: "cmd-artifact-batch-relation-1",
             actor: { kind: "agent", id: "agent-mcp-artifact" },
             source_artifact_id: artifact_ids.first,
-            relation: "derived_from",
+            relation: "references",
             target: { kind: "artifact", id: artifact_ids.last },
-            attributes: {}
+            attributes: {
+              path: "../two.md",
+              fragment: "usage",
+              normalized_locator: "two.md"
+            }
           }
         ]
       },
@@ -248,6 +252,11 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
     )
     expect(artifact_events(artifact_ids.first).map(&:type)).to eq(
       [ "DevelopmentArtifactCaptured", "DevelopmentArtifactRelationDeclared" ]
+    )
+    expect(artifact_events(artifact_ids.first).last.data.dig("artifact_relation", "attributes")).to include(
+      "path" => "../two.md",
+      "fragment" => "usage",
+      "normalized_locator" => "two.md"
     )
   end
 

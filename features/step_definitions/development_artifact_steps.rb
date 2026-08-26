@@ -173,3 +173,407 @@ Then("its exact Base64 content is available but never executed") do
   )
   assert_acceptance(payload.fetch("warnings").sole.include?("passive data"), "Passive warning")
 end
+
+Given("a README, two linked documents, and another parent are captured and mapped") do
+  definitions = {
+    readme: {
+      command_id: "cmd-cuc-linked-readme",
+      title: "Project README",
+      locator: "README.md",
+      text: "[Guide](docs/guide.md#install) [API](guide/../docs/api.md#v1)\n"
+    },
+    guide: {
+      command_id: "cmd-cuc-linked-guide",
+      title: "Guide",
+      locator: "docs/guide.md",
+      text: "Guide body\n"
+    },
+    api: {
+      command_id: "cmd-cuc-linked-api",
+      title: "API",
+      locator: "docs/api.md",
+      text: "API body\n"
+    },
+    index: {
+      command_id: "cmd-cuc-linked-index",
+      title: "Documentation index",
+      locator: "docs/index.md",
+      text: "Index body\n"
+    }
+  }
+  @linked_artifacts = definitions.to_h do |name, definition|
+    outcome = capture_artifact_task(
+      command_id: definition.fetch(:command_id),
+      title: definition.fetch(:title),
+      kind: "documentation",
+      labels: %w[linked navigation],
+      locator: definition.fetch(:locator),
+      source_kind: "local_file",
+      content: {
+        encoding: "utf-8",
+        media_type: "text/markdown",
+        text: definition.fetch(:text)
+      }
+    )
+    [
+      name,
+      {
+        artifact_id: outcome.dig("data", "artifact_id"),
+        text: definition.fetch(:text)
+      }
+    ]
+  end
+end
+
+Given("the caller declares README links with parent-segment and fragment evidence") do
+  readme = @linked_artifacts.fetch(:readme).fetch(:artifact_id)
+  guide = @linked_artifacts.fetch(:guide).fetch(:artifact_id)
+  api = @linked_artifacts.fetch(:api).fetch(:artifact_id)
+  @linked_relations = {}
+  @linked_relations[:guide] = declare_artifact_relation_task(
+    command_id: "cmd-cuc-linked-readme-guide",
+    source_artifact_id: readme,
+    relation: "references",
+    target: { kind: "artifact", id: guide },
+    attributes: {
+      path: "docs/guide.md",
+      fragment: "install",
+      normalized_locator: "docs/guide.md"
+    }
+  )
+  @linked_relations[:api] = declare_artifact_relation_task(
+    command_id: "cmd-cuc-linked-readme-api",
+    source_artifact_id: readme,
+    relation: "references",
+    target: { kind: "artifact", id: api },
+    attributes: {
+      path: "guide/../docs/api.md",
+      fragment: "v1",
+      normalized_locator: "docs/api.md"
+    }
+  )
+end
+
+Given("the other parent contains the shared API document") do
+  @linked_relations[:index] = declare_artifact_relation_task(
+    command_id: "cmd-cuc-linked-index-api",
+    source_artifact_id: @linked_artifacts.fetch(:index).fetch(:artifact_id),
+    relation: "contains",
+    target: {
+      kind: "artifact",
+      id: @linked_artifacts.fetch(:api).fetch(:artifact_id)
+    }
+  )
+end
+
+When("the linked Artifact facts reach the read side") do
+  @linked_artifacts.each_value { project_artifact(_1.fetch(:artifact_id)) }
+end
+
+When("the clean agent walks outgoing relationships from the README") do
+  @readme_outgoing = artifact_relation_page(
+    @linked_artifacts.fetch(:readme).fetch(:artifact_id),
+    direction: "outgoing"
+  )
+end
+
+Then("it discovers both exact child Artifacts and fetches their passive content") do
+  expected = %i[guide api].map { @linked_artifacts.fetch(_1).fetch(:artifact_id) }.sort
+  items = @readme_outgoing.fetch("items")
+  assert_acceptance_equal(expected, items.map { _1.fetch("peer_id") }.sort, "README children")
+  assert_acceptance(items.all? { _1.fetch("peer_artifact") }, "Available peer summaries")
+
+  actual_content = items.to_h do |item|
+    artifact_id = item.fetch("peer_id")
+    payload = artifact_content(artifact_id)
+    assert_acceptance(payload.fetch("warnings").sole.include?("passive data"), "Passive child content")
+    [ artifact_id, payload.dig("data", "content", "text") ]
+  end
+  expected_content = %i[guide api].to_h do |name|
+    artifact = @linked_artifacts.fetch(name)
+    [ artifact.fetch(:artifact_id), artifact.fetch(:text) ]
+  end
+  assert_acceptance_equal(expected_content, actual_content, "Child content by exact ID")
+end
+
+When("the clean agent walks incoming relationships from the shared API document") do
+  @api_incoming = artifact_relation_page(
+    @linked_artifacts.fetch(:api).fetch(:artifact_id),
+    direction: "incoming"
+  )
+end
+
+Then("it sees both exact parents with mixed relationship kinds and peer summaries") do
+  expected_parents = %i[readme index].map { @linked_artifacts.fetch(_1).fetch(:artifact_id) }.sort
+  items = @api_incoming.fetch("items")
+  assert_acceptance_equal(expected_parents, items.map { _1.fetch("peer_id") }.sort, "API parents")
+  assert_acceptance_equal(%w[contains references], items.map { _1.fetch("relation") }.sort, "Relation kinds")
+  assert_acceptance(
+    items.all? { _1.dig("peer_artifact", "artifact_id") == _1.fetch("peer_id") },
+    "Incoming peer summaries"
+  )
+end
+
+Then("the README edge preserves its literal parent-segment, fragment, and normalized locator") do
+  readme = @linked_artifacts.fetch(:readme).fetch(:artifact_id)
+  edge = @api_incoming.fetch("items").find { _1.fetch("source_artifact_id") == readme }
+  assert_acceptance(edge, "README to API edge")
+  assert_acceptance_equal(
+    {
+      "path" => "guide/../docs/api.md",
+      "fragment" => "v1",
+      "normalized_locator" => "docs/api.md"
+    },
+    edge.fetch("attributes"),
+    "Literal and normalized link evidence"
+  )
+end
+
+Given("two immutable revisions at one exact locator are captured but not projected") do
+  @locator_artifacts = %w[commit-a commit-b].to_h do |revision|
+    outcome = capture_artifact_task(
+      command_id: "cmd-cuc-locator-#{revision}",
+      title: "Version #{revision}",
+      kind: "documentation",
+      labels: %w[linked versioned],
+      locator: "docs/versioned.md",
+      source_kind: "local_file",
+      revision:,
+      content: {
+        encoding: "utf-8",
+        media_type: "text/markdown",
+        text: "#{revision}\n"
+      }
+    )
+    [ revision, outcome.dig("data", "artifact_id") ]
+  end
+end
+
+When("the clean agent resolves that locator before projection") do
+  @locator_before_projection = artifact_locator_page("docs/versioned.md")
+end
+
+Then("the locator is absent with a bounded projection-lag retry action") do
+  page = @locator_before_projection.dig("data", "page")
+  assert_acceptance_equal("absent", page.fetch("resolution"), "Unprojected locator resolution")
+  assert_acceptance_equal([], page.fetch("items"), "Unprojected locator items")
+  action = @locator_before_projection.fetch("next_actions").sole
+  assert_acceptance_equal("development_artifact_locator_resolve", action.fetch("tool"), "Lag retry tool")
+  assert_acceptance(
+    action.dig("arguments", "cursor", "after_observed_sequence") >= 0,
+    "Bounded lag retry cursor"
+  )
+end
+
+When("both locator revisions reach the read side") do
+  @locator_artifacts.each_value { project_artifact(_1) }
+  @ambiguous_locator = artifact_locator_page("docs/versioned.md")
+end
+
+Then("the locator is ambiguous and offers both exact revisions without choosing latest") do
+  page = @ambiguous_locator.dig("data", "page")
+  assert_acceptance_equal("ambiguous", page.fetch("resolution"), "Version ambiguity")
+  assert_acceptance_equal(
+    @locator_artifacts.values.sort,
+    page.fetch("items").map { _1.fetch("artifact_id") }.sort,
+    "Ambiguous immutable Artifacts"
+  )
+  revisions = @ambiguous_locator.fetch("next_actions").map do |action|
+    action.dig("arguments", "source_revision")
+  end
+  assert_acceptance_equal(%w[commit-a commit-b], revisions.sort, "Exact revision actions")
+  assert_acceptance(
+    @ambiguous_locator.fetch("next_actions").none? do |action|
+      action.fetch("tool") == "development_artifact_content_get"
+    end,
+    "No implicit content selection"
+  )
+end
+
+When("the clean agent follows one exact revision action") do
+  @exact_locator = artifact_locator_page("docs/versioned.md", source_revision: "commit-b")
+end
+
+Then("exactly that immutable Artifact and its content action are returned") do
+  page = @exact_locator.dig("data", "page")
+  assert_acceptance_equal("unique", page.fetch("resolution"), "Exact revision resolution")
+  assert_acceptance_equal(
+    @locator_artifacts.fetch("commit-b"),
+    page.fetch("items").sole.fetch("artifact_id"),
+    "Exact revision Artifact"
+  )
+  action = @exact_locator.fetch("next_actions").sole
+  assert_acceptance_equal("development_artifact_content_get", action.fetch("tool"), "Content action")
+end
+
+Then("an unknown exact locator remains honestly absent") do
+  missing = artifact_locator_page("docs/not-captured.md")
+  assert_acceptance_equal("absent", missing.dig("data", "page", "resolution"), "Missing locator")
+end
+
+Given("a captured parent and child are available for relationship replay") do
+  @replay_parent = capture_artifact_task(
+    command_id: "cmd-cuc-relation-replay-parent",
+    title: "Replay parent",
+    kind: "documentation",
+    labels: %w[linked replay],
+    locator: "replay/README.md",
+    source_kind: "local_file",
+    content: { encoding: "utf-8", media_type: "text/markdown", text: "Parent\n" }
+  ).dig("data", "artifact_id")
+  @replay_child = capture_artifact_task(
+    command_id: "cmd-cuc-relation-replay-child",
+    title: "Replay child",
+    kind: "documentation",
+    labels: %w[linked replay],
+    locator: "replay/child.md",
+    source_kind: "local_file",
+    content: { encoding: "utf-8", media_type: "text/markdown", text: "Child\n" }
+  ).dig("data", "artifact_id")
+  project_artifact(@replay_parent)
+  project_artifact(@replay_child)
+end
+
+When("the same relationship command is executed through two Tasks") do
+  arguments = {
+    command_id: "cmd-cuc-relation-exact-replay",
+    actor: { kind: "agent", id: "artifact-agent" },
+    source_artifact_id: @replay_parent,
+    relation: "references",
+    target: { kind: "artifact", id: @replay_child },
+    attributes: { path: "child.md", normalized_locator: "replay/child.md" }
+  }
+  @relation_replay_task_ids = 2.times.map do
+    submit_and_execute("development_artifact_relation_declare", **arguments)
+  end
+  @relation_replay_results = @relation_replay_task_ids.map do |task_id|
+    task_request("tasks/get", task_id).dig("result", "result", "structuredContent")
+  end
+end
+
+When("its relation fact reaches the read side twice") do
+  event = artifact_events(@replay_parent).find { _1.type == "DevelopmentArtifactRelationDeclared" }
+  assert_acceptance(event, "Replay relation fact")
+  2.times { project_artifact_event(event) }
+end
+
+Then("both Tasks expose one logical relation result") do
+  assert_acceptance_equal(
+    1,
+    @relation_replay_results.map { _1.fetch("data") }.uniq.length,
+    "Replay Task relation result"
+  )
+end
+
+Then("one relation fact, command receipt, and projected edge exist") do
+  relations = artifact_events(@replay_parent).count do |event|
+    event.type == "DevelopmentArtifactRelationDeclared"
+  end
+  assert_acceptance_equal(1, relations, "Durable replay relation facts")
+  assert_acceptance_equal(
+    1,
+    command_events("cmd-cuc-relation-exact-replay").length,
+    "Replay command receipts"
+  )
+  page = artifact_relation_page(@replay_parent, direction: "outgoing")
+  assert_acceptance_equal(1, page.fetch("items").length, "Projected replay relationships")
+end
+
+Given("an earlier-captured parent has two committed relationships but only the later declaration is projected") do
+  definitions = {
+    parent: [ "cmd-cuc-late-parent", "late/README.md", "Parent\n" ],
+    older: [ "cmd-cuc-late-older", "late/older.md", "Older\n" ],
+    later: [ "cmd-cuc-late-later", "late/later.md", "Later\n" ]
+  }
+  @late_artifacts = definitions.to_h do |name, (command_id, locator, text)|
+    outcome = capture_artifact_task(
+      command_id:,
+      title: name.to_s.capitalize,
+      kind: "documentation",
+      labels: %w[linked late],
+      locator:,
+      source_kind: "local_file",
+      content: { encoding: "utf-8", media_type: "text/markdown", text: }
+    )
+    [ name, outcome.dig("data", "artifact_id") ]
+  end
+  @late_artifacts.each_value { project_artifact(_1) }
+
+  older = declare_artifact_relation_task(
+    command_id: "cmd-cuc-late-edge-older",
+    source_artifact_id: @late_artifacts.fetch(:parent),
+    relation: "references",
+    target: { kind: "artifact", id: @late_artifacts.fetch(:older) },
+    attributes: { path: "older.md", normalized_locator: "late/older.md" }
+  )
+  later = declare_artifact_relation_task(
+    command_id: "cmd-cuc-late-edge-later",
+    source_artifact_id: @late_artifacts.fetch(:parent),
+    relation: "contains",
+    target: { kind: "artifact", id: @late_artifacts.fetch(:later) }
+  )
+  @late_relation_ids = {
+    older: older.dig(:result, "data", "relation_id"),
+    later: later.dig(:result, "data", "relation_id")
+  }
+  declarations = artifact_events(@late_artifacts.fetch(:parent)).select do |event|
+    event.type == "DevelopmentArtifactRelationDeclared"
+  end
+  @late_declarations = declarations.index_by do |event|
+    event.data.dig("artifact_relation", "relation_id")
+  end
+  project_artifact_event(@late_declarations.fetch(@late_relation_ids.fetch(:later)))
+end
+
+When("the clean agent reads one outgoing relationship page") do
+  @late_first_page = artifact_relation_page(
+    @late_artifacts.fetch(:parent),
+    direction: "outgoing",
+    limit: 1
+  )
+end
+
+Then("the available page contains the later declaration and a completed observation window") do
+  assert_acceptance_equal(
+    @late_relation_ids.fetch(:later),
+    @late_first_page.fetch("items").sole.fetch("relation_id"),
+    "Initially projected relation"
+  )
+  assert_acceptance_equal(false, @late_first_page.fetch("has_more"), "Initial observation window")
+  assert_acceptance(
+    @late_first_page.dig("continuation_cursor", "after_observed_sequence").positive?,
+    "Observation continuation"
+  )
+  assert_acceptance_equal(
+    nil,
+    @late_first_page.dig("continuation_cursor", "through_observed_sequence"),
+    "Completed fixed window"
+  )
+end
+
+When("the older declaration reaches the read side after that cursor") do
+  project_artifact_event(@late_declarations.fetch(@late_relation_ids.fetch(:older)))
+end
+
+When("the clean agent resumes from the returned relationship cursor") do
+  @late_resumed_page = artifact_relation_page(
+    @late_artifacts.fetch(:parent),
+    direction: "outgoing",
+    limit: 1,
+    cursor: @late_first_page.fetch("continuation_cursor")
+  )
+end
+
+Then("the older declaration is returned despite its earlier event position") do
+  resumed = @late_resumed_page.fetch("items").sole
+  initial = @late_first_page.fetch("items").sole
+  assert_acceptance_equal(
+    @late_relation_ids.fetch(:older),
+    resumed.fetch("relation_id"),
+    "Late older relation"
+  )
+  assert_acceptance(
+    resumed.dig("declared", "global_position") < initial.dig("declared", "global_position"),
+    "Late relation event position"
+  )
+end

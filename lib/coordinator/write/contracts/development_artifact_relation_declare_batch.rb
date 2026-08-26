@@ -26,6 +26,12 @@ module Coordinator::Write
           end
           required(:attributes).hash do
             optional(:path).filled(:string)
+            optional(:fragment).filled(:string)
+            optional(:normalized_locator).filled(:string)
+          end
+          optional(:supersedes).hash do
+            required(:relation_id).filled(:string)
+            required(:reason).filled(:string)
           end
         end
       end
