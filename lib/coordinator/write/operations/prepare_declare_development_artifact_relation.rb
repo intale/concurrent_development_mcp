@@ -18,9 +18,13 @@ module Coordinator::Write
           kind: target_attributes.fetch(:kind),
           id: target_attributes.fetch(:id)
         )
-        relation_attributes = DevelopmentArtifacts::RelationAttributesV1.new(
-          path: attributes.fetch(:attributes).fetch(:path, nil)
-        )
+        relation_input = attributes.fetch(:attributes)
+        relation_attribute_values = { path: relation_input.fetch(:path, nil) }
+        relation_attribute_values[:fragment] = relation_input[:fragment] if relation_input.key?(:fragment)
+        if relation_input.key?(:normalized_locator)
+          relation_attribute_values[:normalized_locator] = relation_input[:normalized_locator]
+        end
+        relation_attributes = DevelopmentArtifacts::RelationAttributesV1.new(**relation_attribute_values)
         artifact_relation = @relation_builder.call(
           source_artifact_id: attributes.fetch(:source_artifact_id),
           relation: attributes.fetch(:relation),
@@ -29,11 +33,17 @@ module Coordinator::Write
         )
         actor = attributes.fetch(:actor)
 
-        Commands::DeclareDevelopmentArtifactRelation.new(
+        command_values = {
           command_id: attributes.fetch(:command_id),
           actor: Commands::Actor.new(kind: actor.fetch(:kind), id: actor.fetch(:id)),
           artifact_relation:
-        )
+        }
+        if (supersedes = attributes[:supersedes])
+          command_values[:supersedes_relation_id] = supersedes.fetch(:relation_id)
+          command_values[:supersession_reason] = supersedes.fetch(:reason)
+        end
+
+        Commands::DeclareDevelopmentArtifactRelation.new(**command_values)
       end
 
       private

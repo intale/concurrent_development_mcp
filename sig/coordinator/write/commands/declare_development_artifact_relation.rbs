@@ -5,6 +5,8 @@ module Coordinator
         def command_id: () -> String
         def actor: () -> Actor
         def artifact_relation: () -> DevelopmentArtifacts::RelationV1
+        def supersedes_relation_id: () -> String?
+        def supersession_reason: () -> String?
       end
     end
   end

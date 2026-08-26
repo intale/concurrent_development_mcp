@@ -436,8 +436,10 @@ module Coordinator::Write
       attribute :source_artifact_id, Types::DevelopmentArtifactId
       attribute :relation, Types::DevelopmentArtifactRelationKind
       attribute :target, DevelopmentArtifacts::RelationTargetV1
-      attribute :outcome, Types::String.enum("declared", "existing")
+      attribute :superseded_relation_id, Types::DevelopmentArtifactRelationId.optional
+      attribute :outcome, Types::String.enum("declared", "existing", "superseded")
       attribute :declared_at, Types::Timestamp
+      attribute :superseded_at, Types::Timestamp.optional
     end
 
     class OperationBatchAcceptance < Value

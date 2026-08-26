@@ -4,9 +4,15 @@ module Coordinator
       module DevelopmentArtifacts
         class State < Shared::Value
           def self.initial: () -> State
-          def self.reduce: (Array[Events::DevelopmentArtifactCapturedV1 | Events::DevelopmentArtifactRelationDeclaredV1] events) -> State
+          type history_event = Events::DevelopmentArtifactCapturedV1 | Events::DevelopmentArtifactRelationDeclaredV1 | Events::DevelopmentArtifactRelationSupersededV1
+
+          def self.reduce: (Array[history_event] events) -> State
           def capture: () -> Events::DevelopmentArtifactCapturedV1?
           def relations: () -> Array[Events::DevelopmentArtifactRelationDeclaredV1]
+          def supersessions: () -> Array[Events::DevelopmentArtifactRelationSupersededV1]
+          def relation: (String relation_id) -> Events::DevelopmentArtifactRelationDeclaredV1?
+          def supersession_for: (String relation_id) -> Events::DevelopmentArtifactRelationSupersededV1?
+          def active_relation: (String relation_id) -> Events::DevelopmentArtifactRelationDeclaredV1?
         end
       end
     end

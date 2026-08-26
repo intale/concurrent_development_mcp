@@ -100,8 +100,12 @@ module Coordinator::Write
     )
 
     DEVELOPMENT_ARTIFACT_HISTORY = EventReadCriteria.new(
-      event_types: [ "DevelopmentArtifactCaptured", "DevelopmentArtifactRelationDeclared" ],
-      maximum_count: Types::DEVELOPMENT_ARTIFACT_RELATION_MAXIMUM_COUNT + 1,
+      event_types: [
+        "DevelopmentArtifactCaptured",
+        "DevelopmentArtifactRelationDeclared",
+        "DevelopmentArtifactRelationSuperseded"
+      ],
+      maximum_count: Types::DEVELOPMENT_ARTIFACT_HISTORY_MAXIMUM_COUNT,
       direction: :asc
     )
 

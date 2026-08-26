@@ -708,6 +708,8 @@ module Coordinator::Write
 
     class DevelopmentArtifactRelationAttributesV1 < Value
       attribute :path, Types::DevelopmentArtifactRelationPath.optional
+      attribute? :fragment, Types::DevelopmentArtifactRelationFragment.optional
+      attribute? :normalized_locator, Types::DevelopmentArtifactSourceLocator.optional
     end
 
     class DevelopmentArtifactRelationV1 < Value
@@ -725,6 +727,8 @@ module Coordinator::Write
     class DeclareDevelopmentArtifactRelationInputV1 < Value
       attribute :actor, ActorV1
       attribute :artifact_relation, DevelopmentArtifactRelationV1
+      attribute? :supersedes_relation_id, Types::DevelopmentArtifactRelationId.optional
+      attribute? :supersession_reason, Types::DevelopmentArtifactRelationSupersessionReason.optional
     end
 
     class DeclareDevelopmentArtifactRelationV1 < BaseV1

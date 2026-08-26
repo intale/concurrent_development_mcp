@@ -667,6 +667,8 @@ module Coordinator
 
       class DevelopmentArtifactRelationAttributesV1 < Shared::Value
         def path: () -> String?
+        def fragment: () -> String?
+        def normalized_locator: () -> String?
       end
 
       class DevelopmentArtifactRelationV1 < Shared::Value
@@ -681,6 +683,8 @@ module Coordinator
       class DeclareDevelopmentArtifactRelationInputV1 < Shared::Value
         def actor: () -> ActorV1
         def artifact_relation: () -> DevelopmentArtifactRelationV1
+        def supersedes_relation_id: () -> String?
+        def supersession_reason: () -> String?
       end
 
       class DeclareDevelopmentArtifactRelationV1 < BaseV1

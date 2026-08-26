@@ -5,8 +5,9 @@ module Coordinator::Write
     module DevelopmentArtifacts
       class RelationDecisionV1 < Value
         attribute :declaration, Events::DevelopmentArtifactRelationDeclaredV1
+        attribute :supersession, Types.Instance(Events::DevelopmentArtifactRelationSupersededV1).optional
         attribute :event_plan, EventPlan.optional
-        attribute :outcome, Types::String.enum("declared", "existing")
+        attribute :outcome, Types::String.enum("declared", "existing", "superseded")
       end
     end
   end

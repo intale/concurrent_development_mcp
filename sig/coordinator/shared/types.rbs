@@ -36,6 +36,9 @@ module Coordinator
       DEVELOPMENT_ARTIFACT_CONTENT_BASE64_MAXIMUM_BYTES: Integer
       DEVELOPMENT_ARTIFACT_RELATION_MAXIMUM_COUNT: Integer
       DEVELOPMENT_ARTIFACT_RELATION_PATH_MAXIMUM_BYTES: Integer
+      DEVELOPMENT_ARTIFACT_RELATION_FRAGMENT_MAXIMUM_BYTES: Integer
+      DEVELOPMENT_ARTIFACT_RELATION_SUPERSESSION_REASON_MAXIMUM_BYTES: Integer
+      DEVELOPMENT_ARTIFACT_HISTORY_MAXIMUM_COUNT: Integer
       DEVELOPMENT_ARTIFACT_TARGET_ID_MAXIMUM_BYTES: Integer
       DEVELOPMENT_ARTIFACT_QUERY_MAXIMUM_ITEMS: Integer
       OPERATION_BATCH_MAXIMUM_ITEMS: Integer
@@ -205,6 +208,8 @@ module Coordinator
       DevelopmentArtifactTargetKind: untyped
       DevelopmentArtifactTargetId: untyped
       DevelopmentArtifactRelationPath: untyped
+      DevelopmentArtifactRelationFragment: untyped
+      DevelopmentArtifactRelationSupersessionReason: untyped
       OperationBatchId: untyped
       OperationBatchItemIndex: untyped
       OperationBatchTotal: untyped

@@ -840,25 +840,36 @@ module Coordinator::Write
 
     def development_artifact_relation_declare_document(command)
       artifact_relation = command.artifact_relation
+      relation_attributes = artifact_relation.relation_attributes
+      attribute_values = { path: relation_attributes.path }
+      attribute_values[:fragment] = relation_attributes.fragment if relation_attributes.fragment
+      if relation_attributes.normalized_locator
+        attribute_values[:normalized_locator] = relation_attributes.normalized_locator
+      end
+      input_values = {
+        actor: actor_document(command.actor),
+        artifact_relation: CommandInputDocuments::DevelopmentArtifactRelationV1.new(
+          relation_id: artifact_relation.relation_id,
+          source_artifact_id: artifact_relation.source_artifact_id,
+          relation: artifact_relation.relation,
+          target: CommandInputDocuments::DevelopmentArtifactRelationTargetV1.new(
+            kind: artifact_relation.target.kind,
+            id: artifact_relation.target.id
+          ),
+          attributes: CommandInputDocuments::DevelopmentArtifactRelationAttributesV1.new(
+            **attribute_values
+          )
+        )
+      }
+      if command.supersedes_relation_id
+        input_values[:supersedes_relation_id] = command.supersedes_relation_id
+        input_values[:supersession_reason] = command.supersession_reason
+      end
       CommandInputDocuments::DeclareDevelopmentArtifactRelationV1.new(
         schema: "command-input/v1",
         command_id: command.command_id,
         tool_name: "development_artifact_relation_declare",
-        input: CommandInputDocuments::DeclareDevelopmentArtifactRelationInputV1.new(
-          actor: actor_document(command.actor),
-          artifact_relation: CommandInputDocuments::DevelopmentArtifactRelationV1.new(
-            relation_id: artifact_relation.relation_id,
-            source_artifact_id: artifact_relation.source_artifact_id,
-            relation: artifact_relation.relation,
-            target: CommandInputDocuments::DevelopmentArtifactRelationTargetV1.new(
-              kind: artifact_relation.target.kind,
-              id: artifact_relation.target.id
-            ),
-            attributes: CommandInputDocuments::DevelopmentArtifactRelationAttributesV1.new(
-              path: artifact_relation.relation_attributes.path
-            )
-          )
-        )
+        input: CommandInputDocuments::DeclareDevelopmentArtifactRelationInputV1.new(**input_values)
       )
     end
 

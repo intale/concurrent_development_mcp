@@ -51,7 +51,7 @@ module Coordinator::Write
         DevelopmentArtifactRelationPreparationV1.new(
           declared_at: @clock.now,
           input_digest: @input_digest.development_artifact_relation_declare(command),
-          domain_event_id: @id_generator.uuid_v7,
+          domain_event_ids: [ @id_generator.uuid_v7, @id_generator.uuid_v7 ],
           completion_event_id: @id_generator.uuid_v7
         )
       end
@@ -75,7 +75,7 @@ module Coordinator::Write
         persisted_events = persist_domain_plan(
           decision.event_plan,
           command:,
-          event_id: preparation.domain_event_id,
+          event_ids: preparation.domain_event_ids,
           caused_by:
         )
         completion = @completion_builder.development_artifact_relation_declare(
@@ -136,26 +136,37 @@ module Coordinator::Write
         )
       end
 
-      def persist_domain_plan(plan, command:, event_id:, caused_by:)
+      def persist_domain_plan(plan, command:, event_ids:, caused_by:)
         return [] unless plan
 
         artifact_relation = command.artifact_relation
         stream = @stream_factory.development_artifact(artifact_relation.source_artifact_id)
-        unless plan.writes.length == 1 && plan.writes.first.stream == stream
-          raise "DeclareDevelopmentArtifactRelation domain plan must write once to its source Artifact stream"
+        unless plan.writes.length.between?(1, 2) && plan.writes.all? { _1.stream == stream }
+          raise "DeclareDevelopmentArtifactRelation domain plan must write one or two events to its source Artifact stream"
         end
 
-        persisted = @event_factory.build!(
-          event: plan.writes.first.event,
-          event_id:,
-          metadata: command_metadata(command),
-          markers: @marker_builder.relation(
-            artifact_relation:,
-            command_id: command.command_id
-          ),
-          caused_by:
-        )
-        @event_store.append(stream, [ persisted ])
+        persisted = plan.writes.zip(event_ids).map do |write, event_id|
+          event = write.event
+          @event_factory.build!(
+            event:,
+            event_id:,
+            metadata: command_metadata(command),
+            markers: event_markers(event, artifact_relation:, command_id: command.command_id),
+            caused_by:
+          )
+        end
+        @event_store.append(stream, persisted)
+      end
+
+      def event_markers(event, artifact_relation:, command_id:)
+        case event
+        when Events::DevelopmentArtifactRelationDeclaredV1
+          @marker_builder.relation(artifact_relation:, command_id:)
+        when Events::DevelopmentArtifactRelationSupersededV1
+          @marker_builder.supersession(event:, command_id:)
+        else
+          raise "Unexpected Development Artifact relation event #{event.class.name}"
+        end
       end
 
       def persist_completion(completion, command:, event_id:, caused_by:)

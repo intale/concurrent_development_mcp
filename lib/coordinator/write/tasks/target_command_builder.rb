@@ -596,7 +596,13 @@ module Coordinator::Write
       def build_declare_development_artifact_relation(document)
         input = document.input
         artifact_relation = input.artifact_relation
-        Commands::DeclareDevelopmentArtifactRelation.new(
+        relation_attributes = artifact_relation.relation_attributes
+        attribute_values = { path: relation_attributes.path }
+        attribute_values[:fragment] = relation_attributes.fragment if relation_attributes.fragment
+        if relation_attributes.normalized_locator
+          attribute_values[:normalized_locator] = relation_attributes.normalized_locator
+        end
+        command_values = {
           command_id: document.command_id,
           actor: build_actor(input.actor),
           artifact_relation: DevelopmentArtifacts::RelationV1.new(
@@ -607,11 +613,15 @@ module Coordinator::Write
               kind: artifact_relation.target.kind,
               id: artifact_relation.target.id
             ),
-            attributes: DevelopmentArtifacts::RelationAttributesV1.new(
-              path: artifact_relation.relation_attributes.path
-            )
+            attributes: DevelopmentArtifacts::RelationAttributesV1.new(**attribute_values)
           )
-        )
+        }
+        if input.supersedes_relation_id
+          command_values[:supersedes_relation_id] = input.supersedes_relation_id
+          command_values[:supersession_reason] = input.supersession_reason
+        end
+
+        Commands::DeclareDevelopmentArtifactRelation.new(**command_values)
       end
 
       def build_create_operation_batch(document)

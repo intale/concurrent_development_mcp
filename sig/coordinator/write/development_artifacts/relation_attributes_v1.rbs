@@ -3,6 +3,8 @@ module Coordinator
     module DevelopmentArtifacts
       class RelationAttributesV1 < Shared::Value
         def path: () -> String?
+        def fragment: () -> String?
+        def normalized_locator: () -> String?
       end
     end
   end

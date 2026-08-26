@@ -13,6 +13,7 @@ module Coordinator::Write
       [ "SkillRevisionPublished", 1 ] => Events::SkillRevisionPublishedV1,
       [ "DevelopmentArtifactCaptured", 1 ] => Events::DevelopmentArtifactCapturedV1,
       [ "DevelopmentArtifactRelationDeclared", 1 ] => Events::DevelopmentArtifactRelationDeclaredV1,
+      [ "DevelopmentArtifactRelationSuperseded", 1 ] => Events::DevelopmentArtifactRelationSupersededV1,
       [ "OperationBatchCreated", 1 ] => Events::OperationBatchCreatedV1,
       [ "OperationBatchItemSucceeded", 1 ] => Events::OperationBatchItemSucceededV1,
       [ "OperationBatchItemRejected", 1 ] => Events::OperationBatchItemRejectedV1,

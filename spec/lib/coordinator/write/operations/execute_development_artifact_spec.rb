@@ -81,6 +81,161 @@ RSpec.describe "Development Artifact write operations", :event_store do
     )
   end
 
+  it "atomically supersedes an incorrect relation while preserving immutable history" do
+    source = capture.call(capture_input).value!.data.artifact_id
+    old_target = capture.call(
+      capture_input(command_id: "cmd-artifact-old", locator: "docs/old.md", text: "old")
+    ).value!.data.artifact_id
+    replacement_target = capture.call(
+      capture_input(command_id: "cmd-artifact-new", locator: "docs/new.md", text: "new")
+    ).value!.data.artifact_id
+    old = declare_relation.call(relation_input(source:, target: old_target)).value!.data
+
+    correction_input = relation_input(
+      command_id: "cmd-relation-correct",
+      source:,
+      target: replacement_target,
+      supersedes: { relation_id: old.relation_id, reason: "wrong target" }
+    )
+    correction = declare_relation.call(correction_input)
+    replay = declare_relation.call(correction_input)
+    semantic_retry = declare_relation.call(
+      correction_input.merge(command_id: "cmd-relation-correct-retry")
+    )
+
+    expect(correction).to be_success
+    expect(correction.value!.data).to have_attributes(
+      outcome: "superseded",
+      superseded_relation_id: old.relation_id,
+      superseded_at: a_string_matching(/Z\z/)
+    )
+    expect(correction.value!.emitted_events.map(&:type)).to eq(
+      %w[DevelopmentArtifactRelationDeclared DevelopmentArtifactRelationSuperseded]
+    )
+    expect(replay.value!.data).to eq(correction.value!.data)
+    expect(semantic_retry.value!.data.outcome).to eq("existing")
+    expect(semantic_retry.value!.emitted_events).to be_empty
+    expect(artifact_events(source).map(&:type)).to eq(
+      %w[
+        DevelopmentArtifactCaptured
+        DevelopmentArtifactRelationDeclared
+        DevelopmentArtifactRelationDeclared
+        DevelopmentArtifactRelationSuperseded
+      ]
+    )
+
+    dead_replacement = declare_relation.call(
+      relation_input(command_id: "cmd-relation-dead", source:, target: old_target)
+    )
+    expect(dead_replacement.failure.code).to eq(:development_artifact_relation_superseded)
+  end
+
+  it "denies unknown or redirected supersessions without partial writes" do
+    source = capture.call(capture_input).value!.data.artifact_id
+    first_target = capture.call(
+      capture_input(command_id: "cmd-artifact-first", locator: "docs/first.md", text: "first")
+    ).value!.data.artifact_id
+    second_target = capture.call(
+      capture_input(command_id: "cmd-artifact-second", locator: "docs/second.md", text: "second")
+    ).value!.data.artifact_id
+    third_target = capture.call(
+      capture_input(command_id: "cmd-artifact-third", locator: "docs/third.md", text: "third")
+    ).value!.data.artifact_id
+    old = declare_relation.call(relation_input(source:, target: first_target)).value!.data
+    declare_relation.call(
+      relation_input(
+        command_id: "cmd-relation-first-correction",
+        source:,
+        target: second_target,
+        supersedes: { relation_id: old.relation_id, reason: "first correction" }
+      )
+    )
+
+    redirected = declare_relation.call(
+      relation_input(
+        command_id: "cmd-relation-redirect",
+        source:,
+        target: third_target,
+        supersedes: { relation_id: old.relation_id, reason: "redirect" }
+      )
+    )
+    unknown = declare_relation.call(
+      relation_input(
+        command_id: "cmd-relation-unknown",
+        source:,
+        target: third_target,
+        supersedes: {
+          relation_id: "artifact-relation:v1:#{'f' * 64}",
+          reason: "unknown"
+        }
+      )
+    )
+
+    expect(redirected.failure.code).to eq(:development_artifact_relation_already_superseded)
+    expect(unknown.failure.code).to eq(:development_artifact_relation_not_found)
+    expect(command_events("cmd-relation-redirect")).to be_empty
+    expect(command_events("cmd-relation-unknown")).to be_empty
+    expect(artifact_events(source).map(&:type).count("DevelopmentArtifactRelationDeclared")).to eq(2)
+  end
+
+  it "permits bounded cycles and converges concurrent duplicate declarations" do
+    first = capture.call(capture_input).value!.data.artifact_id
+    second = capture.call(
+      capture_input(command_id: "cmd-cycle-second", locator: "docs/second.md", text: "second")
+    ).value!.data.artifact_id
+
+    forward = declare_relation.call(
+      relation_input(command_id: "cmd-cycle-forward", source: first, target: second, relation: "contains")
+    )
+    reverse = declare_relation.call(
+      relation_input(command_id: "cmd-cycle-reverse", source: second, target: first, relation: "contains")
+    )
+    concurrent = 2.times.map do |index|
+      Thread.new do
+        declare_relation.call(
+          relation_input(command_id: "cmd-race-#{index}", source: first, target: second)
+        )
+      end
+    end.map(&:value)
+
+    expect([ forward, reverse ]).to all(be_success)
+    expect(concurrent).to all(be_success)
+    expect(concurrent.map { _1.value!.data.outcome }).to contain_exactly("declared", "existing")
+    relation_ids = artifact_events(first).filter_map do |event|
+      event.data.dig("artifact_relation", "relation_id") if event.type == "DevelopmentArtifactRelationDeclared"
+    end
+    expect(relation_ids.uniq).to eq(relation_ids)
+  end
+
+  it "enforces the lifetime declaration bound from authoritative history" do
+    source = capture.call(capture_input).value!.data.artifact_id
+    Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_RELATION_MAXIMUM_COUNT.times do |index|
+      result = declare_relation.call(
+        relation_input(
+          command_id: "cmd-limit-#{index}",
+          source:,
+          target: "https://example.test/#{index}",
+          relation: "references",
+          target_kind: "external"
+        )
+      )
+      expect(result).to be_success
+    end
+
+    overflow = declare_relation.call(
+      relation_input(
+        command_id: "cmd-limit-overflow",
+        source:,
+        target: "https://example.test/overflow",
+        relation: "references",
+        target_kind: "external"
+      )
+    )
+
+    expect(overflow.failure.code).to eq(:development_artifact_relation_limit_reached)
+    expect(command_events("cmd-limit-overflow")).to be_empty
+  end
+
   def capture_input(command_id: "cmd-artifact-capture", locator: "docs/readme.md", text: "hello\n", **overrides)
     {
       command_id:,
@@ -104,15 +259,25 @@ RSpec.describe "Development Artifact write operations", :event_store do
     }.merge(overrides)
   end
 
-  def relation_input(command_id: "cmd-relation", source:, target:)
-    {
+  def relation_input(
+    command_id: "cmd-relation",
+    source:,
+    target:,
+    relation: "derived_from",
+    target_kind: "artifact",
+    attributes: {},
+    supersedes: nil
+  )
+    input = {
       command_id:,
       actor: { kind: "agent", id: "agent-1" },
       source_artifact_id: source,
-      relation: "derived_from",
-      target: { kind: "artifact", id: target },
-      attributes: {}
+      relation:,
+      target: { kind: target_kind, id: target },
+      attributes:
     }
+    input[:supersedes] = supersedes if supersedes
+    input
   end
 
   def artifact_events(artifact_id)

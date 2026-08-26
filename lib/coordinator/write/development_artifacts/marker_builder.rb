@@ -14,6 +14,15 @@ module Coordinator::Write
           "command:#{command_id}"
         ].freeze
       end
+
+      def supersession(event:, command_id:)
+        [
+          "development-artifact:#{event.source_artifact_id}",
+          "development-artifact-relation:#{event.superseded_relation_id}",
+          "development-artifact-relation:#{event.replacement_relation_id}",
+          "command:#{command_id}"
+        ].freeze
+      end
     end
   end
 end

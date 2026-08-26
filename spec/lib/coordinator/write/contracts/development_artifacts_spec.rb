@@ -24,17 +24,40 @@ RSpec.describe "Development Artifact contracts" do
     expect(capture.call(valid.merge(content: valid.fetch(:content).merge(text: "other\n")))).to be_failure
   end
 
-  it "enforces typed relation attributes, Artifact target IDs, and safe document paths" do
+  it "enforces graph semantics, link evidence, target compatibility, and supersession input" do
     source_id = "artifact:v1:#{'a' * 64}"
     target_id = "artifact:v1:#{'b' * 64}"
     valid = relation_input(source_id:, target_id:)
 
     expect(relation.call(valid)).to be_success
-    expect(relation.call(valid.merge(relation: "references", attributes: { path: "a.md" }))).to be_failure
-    expect(relation.call(valid.merge(attributes: { path: "../a.md" }))).to be_failure
+    expect(
+      relation.call(
+        valid.merge(
+          attributes: {
+            path: "../guide.md",
+            fragment: "install",
+            normalized_locator: "guide.md"
+          },
+          supersedes: {
+            relation_id: "artifact-relation:v1:#{'c' * 64}",
+            reason: "wrong target"
+          }
+        )
+      )
+    ).to be_success
+    expect(
+      relation.call(valid.merge(relation: "documents", attributes: { path: "a.md", fragment: "part" }))
+    ).to be_failure
+    expect(relation.call(valid.merge(attributes: { fragment: "install" }))).to be_failure
+    expect(relation.call(valid.merge(attributes: { path: "/a.md" }))).to be_failure
+    expect(relation.call(valid.merge(attributes: { path: "a.md#part" }))).to be_failure
+    expect(
+      relation.call(valid.merge(relation: "contains", target: { kind: "repository", id: "repo-1" }, attributes: {}))
+    ).to be_failure
     expect(
       relation.call(valid.merge(target: { kind: "artifact", id: "not-an-artifact" }))
     ).to be_failure
+    expect(relation.call(valid.merge(target: { kind: "artifact", id: source_id }))).to be_failure
     expect(relation.call(valid.merge(target: valid.fetch(:target).merge(extra: true)))).to be_failure
   end
 
@@ -74,7 +97,7 @@ RSpec.describe "Development Artifact contracts" do
       command_id: "cmd-contract-relation",
       actor: { kind: "agent", id: "agent-1" },
       source_artifact_id: source_id,
-      relation: "documents",
+      relation: "references",
       target: { kind: "artifact", id: target_id },
       attributes: { path: "docs/a.md" }
     }

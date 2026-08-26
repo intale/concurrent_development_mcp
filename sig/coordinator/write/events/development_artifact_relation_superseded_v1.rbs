@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module Events
+      class DevelopmentArtifactRelationSupersededV1 < Base
+        def source_artifact_id: () -> String
+        def superseded_relation_id: () -> String
+        def replacement_relation_id: () -> String
+        def reason: () -> String
+        def superseded_at: () -> String
+      end
+    end
+  end
+end

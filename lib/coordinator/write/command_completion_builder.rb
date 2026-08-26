@@ -547,18 +547,24 @@ module Coordinator::Write
 
     def development_artifact_relation_declare(command:, decision:, input_digest:, persisted_events:, completed_at:)
       artifact_relation = decision.declaration.artifact_relation
+      supersession = decision.supersession
       build_completion(
         command:,
         tool_name: "development_artifact_relation_declare",
-        summary: decision.outcome == "declared" ?
-          "Development Artifact relation declared." : "Development Artifact relation already exists.",
+        summary: case decision.outcome
+                 when "declared" then "Development Artifact relation declared."
+                 when "superseded" then "Development Artifact relation superseded."
+                 when "existing" then "Development Artifact relation already exists."
+                 end,
         data: CommandReceiptData::DevelopmentArtifactRelation.new(
           relation_id: artifact_relation.relation_id,
           source_artifact_id: artifact_relation.source_artifact_id,
           relation: artifact_relation.relation,
           target: artifact_relation.target,
+          superseded_relation_id: supersession&.superseded_relation_id,
           outcome: decision.outcome,
-          declared_at: decision.declaration.declared_at
+          declared_at: decision.declaration.declared_at,
+          superseded_at: supersession&.superseded_at
         ),
         next_actions: [
           NextAction.new(

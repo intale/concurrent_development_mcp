@@ -401,8 +401,10 @@ module Coordinator
         def source_artifact_id: () -> String
         def relation: () -> String
         def target: () -> DevelopmentArtifacts::RelationTargetV1
+        def superseded_relation_id: () -> String?
         def outcome: () -> String
         def declared_at: () -> String
+        def superseded_at: () -> String?
       end
 
       class OperationBatchAcceptance < Shared::Value
