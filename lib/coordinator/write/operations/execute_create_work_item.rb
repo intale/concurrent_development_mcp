@@ -15,7 +15,9 @@ module Coordinator::Write
         event_factory: EventFactory.new,
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
-        completion_builder: CommandCompletionBuilder.new
+        completion_builder: CommandCompletionBuilder.new,
+        repository_registration_loader: RepositoryRegistrationLoader.new(event_store:),
+        repository_marker_builder: RepositoryMarkerBuilder.new
       )
         @event_store = event_store
         @preparer = preparer
@@ -27,6 +29,8 @@ module Coordinator::Write
         @schema_registry = schema_registry
         @stream_factory = stream_factory
         @completion_builder = completion_builder
+        @repository_registration_loader = repository_registration_loader
+        @repository_marker_builder = repository_marker_builder
       end
 
       def call(input)
@@ -57,9 +61,11 @@ module Coordinator::Write
         replay = replay_result(command:, input_digest: prepared.fetch(:input_digest))
         return replay if replay
 
+        repository_registration = load_repository_registration(command.repository_id)
         decision = @decider.call(
           change_set_state: load_change_set_state(command.change_set_id),
           work_item_state: load_work_item_state(command.work_item_id),
+          repository_registration:,
           command:,
           occurred_at: prepared.fetch(:occurred_at)
         )
@@ -68,6 +74,7 @@ module Coordinator::Write
         persisted_domain_events = persist_domain_plan(
           decision.value!,
           command:,
+          repository_registration:,
           event_ids: prepared.fetch(:domain_event_ids),
           caused_by:
         )
@@ -138,6 +145,10 @@ module Coordinator::Write
         Domain::WorkItems::State.reduce(events)
       end
 
+      def load_repository_registration(repository_id)
+        @repository_registration_loader.call(repository_id)
+      end
+
       def load_event(event)
         @schema_registry.load(
           type: event.type,
@@ -146,7 +157,7 @@ module Coordinator::Write
         )
       end
 
-      def persist_domain_plan(plan, command:, event_ids:, caused_by:)
+      def persist_domain_plan(plan, command:, repository_registration:, event_ids:, caused_by:)
         validate_domain_plan!(plan, command:, event_ids:)
         metadata = command_metadata(command)
 
@@ -155,7 +166,7 @@ module Coordinator::Write
             event: write.event,
             event_id:,
             metadata:,
-            markers: markers_for(write.event, command),
+            markers: markers_for(command, repository_registration:),
             caused_by:
           )
 
@@ -182,14 +193,12 @@ module Coordinator::Write
         end
       end
 
-      def markers_for(event, command)
-        markers = [
+      def markers_for(command, repository_registration:)
+        [
           "change-set:#{command.change_set_id}",
           "work-item:#{command.work_item_id}",
           "command:#{command.command_id}"
-        ]
-        markers << "repository:#{command.repository_id}" if event.is_a?(Events::WorkItemCreatedV1)
-        markers
+        ] + @repository_marker_builder.call(repository_registration)
       end
 
       def persist_completion(completion, command:, event_id:, caused_by:)

@@ -12,6 +12,7 @@ module Coordinator
       def self.candidate_impact_surface_registration: (String marker) -> MarkedEventReadCriteria
 
       COMMAND_COMPLETION: EventReadCriteria
+      REPOSITORY_REGISTRATION: EventReadCriteria
       SKILL_LATEST_REVISION: GroupedEventReadCriteria
       DEVELOPMENT_ARTIFACT_HISTORY: EventReadCriteria
       DEVELOPMENT_ARTIFACT_CAPTURE: EventReadCriteria

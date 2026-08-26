@@ -839,6 +839,16 @@ module Coordinator::Write
         attribute :details, RepositoryIdentityDetails
       end
 
+      class RepositoryNotRegisteredDetails < Value
+        attribute :repository_id, Types::UuidV7
+      end
+
+      class RepositoryNotRegisteredError < Value
+        attribute :code, Types::String.enum("repository_not_registered")
+        attribute :message, Types::String
+        attribute :details, RepositoryNotRegisteredDetails
+      end
+
       class SkillIdentityDetails < Value
         attribute :skill_id, Types::SkillId
         attribute :name, Types::SkillName
@@ -1115,6 +1125,7 @@ module Coordinator::Write
              CandidateImpactSourceEvidenceMismatchError |
              CandidateImpactSurfaceAlreadyRecordedError |
              RepositoryRegistrationError |
+             RepositoryNotRegisteredError |
              SkillIdentityConflictError |
              SkillRevisionConflictError |
              DevelopmentArtifactIdentityConflictError |

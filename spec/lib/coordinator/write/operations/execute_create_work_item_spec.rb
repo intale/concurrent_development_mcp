@@ -5,19 +5,22 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateWorkItem, :event_sto
   let(:streams) { Coordinator::Write::StreamFactory.new }
   subject(:operation) { described_class.new(event_store:) }
 
+  let(:repository_id) { "018f22a2-7b9c-7def-8abc-1234567890ab" }
+  let(:repository_scope) { "project:billing" }
   let(:input) do
     {
       command_id: "cmd-200",
       actor: { kind: "agent", id: "planner-1" },
       change_set_id: "CS-100",
       work_item_id: "W-200",
-      repository_id: "billing",
+      repository_id:,
       goal: "Implement capture validation",
       acceptance_criteria: [ "Reject duplicate ownership" ]
     }
   end
 
   before do
+    register_repository(repository_id, scope: repository_scope)
     create_change_set("CS-100")
   end
 
@@ -47,12 +50,12 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateWorkItem, :event_sto
 
     created = work_item_events("W-200").sole
     membership = change_set_events("CS-100").last
-    expect(created.markers).to eq(
-      [ "change-set:CS-100", "command:cmd-200", "repository:billing", "work-item:W-200" ]
+    repository_markers = Coordinator::Write::RepositoryMarkerBuilder.new.call(
+      Coordinator::Write::RepositoryRegistrationLoader.new(event_store:).call(repository_id)
     )
-    expect(membership.markers).to eq(
-      [ "change-set:CS-100", "command:cmd-200", "work-item:W-200" ]
-    )
+    common = [ "change-set:CS-100", "command:cmd-200", "work-item:W-200" ] + repository_markers
+    expect(created.markers).to contain_exactly(*common)
+    expect(membership.markers).to contain_exactly(*common)
   end
 
   it "replays the exact persisted result without another real append" do
@@ -102,6 +105,25 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateWorkItem, :event_sto
     expect(command_events("cmd-missing")).to be_empty
   end
 
+  it "rejects a well-formed but unregistered repository without writing coordination facts" do
+    unregistered_id = "018f22a2-7b9c-7def-9abc-1234567890ab"
+    missing_input = input.merge(
+      command_id: "cmd-unregistered",
+      work_item_id: "W-unregistered",
+      repository_id: unregistered_id
+    )
+
+    result = operation.call(missing_input)
+
+    expect(result).to be_failure
+    expect(result.failure).to have_attributes(
+      code: :repository_not_registered,
+      details: { repository_id: unregistered_id }
+    )
+    expect(work_item_events("W-unregistered")).to be_empty
+    expect(command_events("cmd-unregistered")).to be_empty
+  end
+
   it "serializes concurrent real commands so exactly one creates the WorkItem" do
     competing_inputs = [
       input.merge(command_id: "cmd-concurrent-1"),
@@ -127,6 +149,18 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateWorkItem, :event_sto
       change_set_id:,
       goal: "Coordinate billing changes",
       acceptance_criteria: [ "Agents do not overlap" ]
+    ).value!
+  end
+
+  def register_repository(repository_id, scope:)
+    Coordinator::Write::Operations::ExecuteRegisterRepository.new(event_store:).call(
+      command_id: "seed-register-#{repository_id}",
+      actor: { kind: "agent", id: "planner-1" },
+      repository_id:,
+      scope:,
+      display_name: "Billing",
+      paths: [ "/workspace/billing" ],
+      remotes: [ "https://example.test/billing.git" ]
     ).value!
   end
 

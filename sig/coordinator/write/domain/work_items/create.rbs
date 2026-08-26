@@ -4,7 +4,7 @@ module Coordinator
       module WorkItems
         class Create
           def initialize: (?stream_factory: StreamFactory) -> void
-          def call: (change_set_state: ChangeSets::State, work_item_state: State, command: Commands::CreateWorkItem, occurred_at: String) -> Dry::Monads::Result
+          def call: (change_set_state: ChangeSets::State, work_item_state: State, repository_registration: Events::RepositoryRegisteredV1?, command: Commands::CreateWorkItem, occurred_at: String) -> Dry::Monads::Result
         end
       end
     end

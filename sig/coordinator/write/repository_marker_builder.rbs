@@ -1,0 +1,8 @@
+module Coordinator
+  module Write
+    class RepositoryMarkerBuilder
+      def initialize: (?compound_marker_builder: Shared::CompoundMarkerBuilder) -> void
+      def call: (Events::RepositoryRegisteredV1 registration) -> Array[String]
+    end
+  end
+end

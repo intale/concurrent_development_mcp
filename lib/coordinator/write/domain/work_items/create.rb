@@ -10,8 +10,8 @@ module Coordinator::Write
           @stream_factory = stream_factory
         end
 
-        def call(change_set_state:, work_item_state:, command:, occurred_at:)
-          denial = denied(change_set_state:, work_item_state:, command:)
+        def call(change_set_state:, work_item_state:, repository_registration:, command:, occurred_at:)
+          denial = denied(change_set_state:, work_item_state:, repository_registration:, command:)
           return denial if denial
 
           Success(build_plan(command:, occurred_at:))
@@ -19,10 +19,19 @@ module Coordinator::Write
 
         private
 
-        def denied(change_set_state:, work_item_state:, command:)
+        def denied(change_set_state:, work_item_state:, repository_registration:, command:)
           return failure(:change_set_not_found, "ChangeSet does not exist", command) if change_set_state.absent?
           return failure(:change_set_not_draft, "ChangeSet no longer accepts planning", command) unless change_set_state.status == "draft"
           return failure(:work_item_already_exists, "WorkItem already exists", command) unless work_item_state.absent?
+          unless repository_registration&.repository_id == command.repository_id
+            return Failure(
+              OutcomeError.new(
+                code: :repository_not_registered,
+                message: "Repository is not registered",
+                details: { repository_id: command.repository_id }
+              )
+            )
+          end
 
           if change_set_state.work_item_ids.length >= 100
             return failure(:work_item_limit_reached, "ChangeSet WorkItem limit reached", command)

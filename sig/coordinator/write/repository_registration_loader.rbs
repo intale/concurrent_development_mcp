@@ -1,0 +1,8 @@
+module Coordinator
+  module Write
+    class RepositoryRegistrationLoader
+      def initialize: (event_store: _EventStore, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory) -> void
+      def call: (String repository_id) -> Events::RepositoryRegisteredV1?
+    end
+  end
+end

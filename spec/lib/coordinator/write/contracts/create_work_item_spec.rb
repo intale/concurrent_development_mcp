@@ -3,13 +3,14 @@
 RSpec.describe Coordinator::Write::Contracts::CreateWorkItem do
   subject(:contract) { described_class.new }
 
+  let(:repository_id) { "018f22a2-7b9c-7def-8abc-1234567890ab" }
   let(:valid_input) do
     {
       "command_id" => "cmd-200",
       "actor" => { "kind" => "agent", "id" => "planner-1" },
       "change_set_id" => "CS-100",
       "work_item_id" => "W-200",
-      "repository_id" => "billing",
+      "repository_id" => repository_id,
       "goal" => "Implement capture validation",
       "acceptance_criteria" => [ "Reject duplicate ownership" ]
     }
@@ -24,7 +25,7 @@ RSpec.describe Coordinator::Write::Contracts::CreateWorkItem do
       actor: { kind: "agent", id: "planner-1" },
       change_set_id: "CS-100",
       work_item_id: "W-200",
-      repository_id: "billing",
+      repository_id:,
       goal: "Implement capture validation",
       acceptance_criteria: [ "Reject duplicate ownership" ]
     )
@@ -37,13 +38,13 @@ RSpec.describe Coordinator::Write::Contracts::CreateWorkItem do
     expect(result.errors.to_h).to have_key(:competitive_mode)
   end
 
-  it "rejects invalid identifiers and repository slugs" do
+  it "rejects invalid identifiers and repository aliases" do
     result = contract.call(
       valid_input.merge(
         "command_id" => " invalid",
         "change_set_id" => "?",
         "work_item_id" => "W 200",
-        "repository_id" => "Billing/API"
+        "repository_id" => "billing"
       )
     )
 

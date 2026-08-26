@@ -38,7 +38,7 @@ module Coordinator::Write
       end
 
       rule(:repository_id) do
-        key.failure("must be a valid repository identifier") unless Types::REPOSITORY_ID_PATTERN.match?(value)
+        key.failure("must be a registered repository UUIDv7") unless Types::UUID_V7_PATTERN.match?(value)
       end
 
       rule(:goal) do

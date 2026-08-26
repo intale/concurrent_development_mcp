@@ -88,6 +88,12 @@ module Coordinator::Write
       direction: :desc
     )
 
+    REPOSITORY_REGISTRATION = EventReadCriteria.new(
+      event_types: [ "RepositoryRegistered" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+
     SKILL_LATEST_REVISION = GroupedEventReadCriteria.new(
       event_types: [ "SkillRevisionPublished" ],
       direction: :desc

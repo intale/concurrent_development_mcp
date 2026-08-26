@@ -3,13 +3,24 @@
 RSpec.describe Coordinator::Write::Domain::WorkItems::Create do
   subject(:decider) { described_class.new }
 
+  let(:repository_id) { "018f22a2-7b9c-7def-8abc-1234567890ab" }
+  let(:repository_registration) do
+    Coordinator::Write::Events::RepositoryRegisteredV1.new(
+      repository_id:,
+      scope: "project:billing",
+      display_name: "Billing",
+      paths: [ "/workspace/billing" ],
+      remotes: [ "https://example.test/billing.git" ],
+      registered_at: "2026-08-20T14:11:00.000000Z"
+    )
+  end
   let(:command) do
     Coordinator::Write::Commands::CreateWorkItem.new(
       command_id: "cmd-200",
       actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "planner-1"),
       change_set_id: "CS-100",
       work_item_id: "W-200",
-      repository_id: "billing",
+      repository_id:,
       goal: "Implement capture validation",
       acceptance_criteria: [ "Reject duplicate ownership" ]
     )
@@ -30,6 +41,7 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Create do
     result = decider.call(
       change_set_state: draft_change_set,
       work_item_state: Coordinator::Write::Domain::WorkItems::State.initial,
+      repository_registration:,
       command:,
       occurred_at:
     )
@@ -46,7 +58,7 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Create do
       Coordinator::Write::Events::WorkItemCreatedV1.new(
         work_item_id: "W-200",
         change_set_id: "CS-100",
-        repository_id: "billing",
+        repository_id:,
         goal: "Implement capture validation",
         acceptance_criteria: [ "Reject duplicate ownership" ],
         competitive_mode: false,
@@ -68,22 +80,29 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Create do
     existing_work_item = Coordinator::Write::Domain::WorkItems::State.new(
       work_item_id: "W-200",
       change_set_id: "CS-100",
-      repository_id: "billing",
+      repository_id:,
       goal: "Existing work",
       acceptance_criteria: [ "Already planned" ],
       status: "planned"
     )
 
     scenarios = [
-      [ Coordinator::Write::Domain::ChangeSets::State.initial, Coordinator::Write::Domain::WorkItems::State.initial, :change_set_not_found ],
-      [ active_change_set, Coordinator::Write::Domain::WorkItems::State.initial, :change_set_not_draft ],
-      [ draft_change_set, existing_work_item, :work_item_already_exists ],
-      [ full_change_set, Coordinator::Write::Domain::WorkItems::State.initial, :work_item_limit_reached ]
+      [ Coordinator::Write::Domain::ChangeSets::State.initial, Coordinator::Write::Domain::WorkItems::State.initial, repository_registration, :change_set_not_found ],
+      [ active_change_set, Coordinator::Write::Domain::WorkItems::State.initial, repository_registration, :change_set_not_draft ],
+      [ draft_change_set, existing_work_item, repository_registration, :work_item_already_exists ],
+      [ draft_change_set, Coordinator::Write::Domain::WorkItems::State.initial, nil, :repository_not_registered ],
+      [ full_change_set, Coordinator::Write::Domain::WorkItems::State.initial, repository_registration, :work_item_limit_reached ]
     ]
 
     aggregate_failures do
-      scenarios.each do |change_set_state, work_item_state, expected_code|
-        result = decider.call(change_set_state:, work_item_state:, command:, occurred_at:)
+      scenarios.each do |change_set_state, work_item_state, registration, expected_code|
+        result = decider.call(
+          change_set_state:,
+          work_item_state:,
+          repository_registration: registration,
+          command:,
+          occurred_at:
+        )
 
         expect(result).to be_failure
         expect(result.failure.code).to eq(expected_code)
