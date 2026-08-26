@@ -32,7 +32,7 @@ Given(
       actor: { kind: "agent", id: "planner-1" },
       change_set_id:,
       work_item_id: participant.fetch(:work_item_id),
-      repository_id: "billing",
+      repository_id: acceptance_repository_id,
       goal: "Implement #{participant.fetch(:work_item_id)}",
       acceptance_criteria: [ "The work is verifiable" ]
     )
@@ -55,7 +55,7 @@ Given(
       work_item_id: participant.fetch(:work_item_id),
       attempt_id: participant.fetch(:attempt_id),
       base_snapshots: [
-        { repository_id: "billing", commit_oid: "a" * 40 }
+        { repository_id: acceptance_repository_id, commit_oid: "a" * 40 }
       ]
     )
   end
@@ -72,7 +72,7 @@ When(
       change_set_id: @lease_change_set_id,
       work_item_id: participant.fetch(:work_item_id),
       attempt_id: participant.fetch(:attempt_id),
-      repository_id: "billing",
+      repository_id: acceptance_repository_id,
       base_commit_oid: "a" * 40,
       resources: [
         { kind: "file", path: participant.fetch(:unique_path) },
@@ -199,7 +199,7 @@ Given(
     actor: { kind: "agent", id: "planner-1" },
     change_set_id:,
     work_item_id: @expansion_work_item_id,
-    repository_id: "billing",
+    repository_id: acceptance_repository_id,
     goal: "Implement the expanded change",
     acceptance_criteria: [ "Both files are coordinated" ]
   )
@@ -218,7 +218,7 @@ Given(
     change_set_id:,
     work_item_id: @expansion_work_item_id,
     attempt_id:,
-    base_snapshots: [ { repository_id: "billing", commit_oid: "a" * 40 } ]
+    base_snapshots: [ { repository_id: acceptance_repository_id, commit_oid: "a" * 40 } ]
   )
   reservation_task_id = submit_and_execute(
     "write_set_reserve",
@@ -227,7 +227,7 @@ Given(
     change_set_id:,
     work_item_id: @expansion_work_item_id,
     attempt_id:,
-    repository_id: "billing",
+    repository_id: acceptance_repository_id,
     base_commit_oid: "a" * 40,
     resources: [ { kind: "file", path: initial_path } ],
     lease_duration_seconds: 300
@@ -256,7 +256,7 @@ When("the agent expands the current write set with {string}") do |additional_pat
       work_item_id: @expansion_work_item_id,
       attempt_id: @expansion_attempt_id,
       lease_set_id: @expansion_reservation.fetch("lease_set_id"),
-      repository_id: "billing",
+      repository_id: acceptance_repository_id,
       base_commit_oid: "a" * 40,
       resources: [ { kind: "file", path: additional_path } ]
     }
@@ -358,7 +358,7 @@ Given(
     actor: { kind: "agent", id: "planner-1" },
     change_set_id:,
     work_item_id: @renewal_work_item_id,
-    repository_id: "billing",
+    repository_id: acceptance_repository_id,
     goal: "Implement the renewable change",
     acceptance_criteria: [ "Both files remain owned together" ]
   )
@@ -377,7 +377,7 @@ Given(
     change_set_id:,
     work_item_id: @renewal_work_item_id,
     attempt_id:,
-    base_snapshots: [ { repository_id: "billing", commit_oid: "a" * 40 } ]
+    base_snapshots: [ { repository_id: acceptance_repository_id, commit_oid: "a" * 40 } ]
   )
   reservation_task_id = submit_and_execute(
     "write_set_reserve",
@@ -386,7 +386,7 @@ Given(
     change_set_id:,
     work_item_id: @renewal_work_item_id,
     attempt_id:,
-    repository_id: "billing",
+    repository_id: acceptance_repository_id,
     base_commit_oid: "a" * 40,
     resources: @renewal_paths.map { { kind: "file", path: _1 } },
     lease_duration_seconds: 300
@@ -519,7 +519,7 @@ Given(
     actor: { kind: "agent", id: "planner-1" },
     change_set_id:,
     work_item_id: @release_work_item_id,
-    repository_id: "billing",
+    repository_id: acceptance_repository_id,
     goal: "Implement the releasable change",
     acceptance_criteria: [ "Both files are released together" ]
   )
@@ -538,7 +538,7 @@ Given(
     change_set_id:,
     work_item_id: @release_work_item_id,
     attempt_id:,
-    base_snapshots: [ { repository_id: "billing", commit_oid: "a" * 40 } ]
+    base_snapshots: [ { repository_id: acceptance_repository_id, commit_oid: "a" * 40 } ]
   )
   reservation_task_id = submit_and_execute(
     "write_set_reserve",
@@ -547,7 +547,7 @@ Given(
     change_set_id:,
     work_item_id: @release_work_item_id,
     attempt_id:,
-    repository_id: "billing",
+    repository_id: acceptance_repository_id,
     base_commit_oid: "a" * 40,
     resources: @release_paths.map { { kind: "file", path: _1 } },
     lease_duration_seconds: 300
@@ -677,7 +677,7 @@ When(
         change_set_id: @lease_change_set_id,
         work_item_id: @expiry_predecessor.fetch(:work_item_id),
         attempt_id: @expiry_predecessor.fetch(:attempt_id),
-        repository_id: "billing",
+        repository_id: acceptance_repository_id,
         base_commit_oid: "a" * 40,
         resources: [ { kind: "file", path: } ],
         lease_duration_seconds: duration
@@ -720,7 +720,7 @@ When(
         change_set_id: @lease_change_set_id,
         work_item_id: @expiry_successor.fetch(:work_item_id),
         attempt_id: @expiry_successor.fetch(:attempt_id),
-        repository_id: "billing",
+        repository_id: acceptance_repository_id,
         base_commit_oid: "a" * 40,
         resources: [ { kind: "file", path: @expiry_path } ],
         lease_duration_seconds: 300
@@ -815,7 +815,7 @@ When("both agents concurrently reserve their disjoint files") do
       change_set_id: @lease_change_set_id,
       work_item_id: participant.fetch(:work_item_id),
       attempt_id: participant.fetch(:attempt_id),
-      repository_id: "billing",
+      repository_id: acceptance_repository_id,
       base_commit_oid: "a" * 40,
       resources: [ { kind: "file", path: participant.fetch(:unique_path) } ],
       lease_duration_seconds: 300
@@ -861,7 +861,7 @@ When(
       change_set_id: @lease_change_set_id,
       work_item_id: participant.fetch(:work_item_id),
       attempt_id: participant.fetch(:attempt_id),
-      repository_id: "billing",
+      repository_id: acceptance_repository_id,
       base_commit_oid: "a" * 40,
       resources: [ { kind: "file", path: } ],
       lease_duration_seconds: 300
@@ -910,7 +910,7 @@ When(
     change_set_id: @lease_change_set_id,
     work_item_id: @cancelled_reservation_owner.fetch(:work_item_id),
     attempt_id: @cancelled_reservation_owner.fetch(:attempt_id),
-    repository_id: "billing",
+    repository_id: acceptance_repository_id,
     base_commit_oid: "a" * 40,
     resources: [ { kind: "file", path: } ],
     lease_duration_seconds: 300
@@ -941,7 +941,7 @@ When("agent {string} deliberately reserves {string}") do |agent_id, path|
     change_set_id: @lease_change_set_id,
     work_item_id: participant.fetch(:work_item_id),
     attempt_id: participant.fetch(:attempt_id),
-    repository_id: "billing",
+    repository_id: acceptance_repository_id,
     base_commit_oid: "a" * 40,
     resources: [ { kind: "file", path: } ],
     lease_duration_seconds: 300
@@ -1007,7 +1007,7 @@ When(
         change_set_id: @lease_change_set_id,
         work_item_id: participant.fetch(:work_item_id),
         attempt_id: participant.fetch(:attempt_id),
-        repository_id: "billing",
+        repository_id: acceptance_repository_id,
         base_commit_oid: "a" * 40,
         resources: [ { kind: "file", path: @expiry_path } ],
         lease_duration_seconds: 300
@@ -1101,7 +1101,7 @@ When("agent {string} deliberately reserves after the release") do |agent_id|
       change_set_id: @lease_change_set_id,
       work_item_id: participant.fetch(:work_item_id),
       attempt_id: participant.fetch(:attempt_id),
-      repository_id: "billing",
+      repository_id: acceptance_repository_id,
       base_commit_oid: "a" * 40,
       resources: [ { kind: "file", path: @expiry_path } ],
       lease_duration_seconds: 300
@@ -1290,7 +1290,7 @@ When("the agent reacquires the requeued WorkItem as fresh Attempt {string}") do 
     work_item_id: @release_work_item_id,
     attempt_id:,
     base_snapshots: [
-      { repository_id: "billing", commit_oid: @fresh_base_commit_oid }
+      { repository_id: acceptance_repository_id, commit_oid: @fresh_base_commit_oid }
     ]
   )
   @fresh_acquisition_state = task_request("tasks/get", @fresh_acquisition_task_id)

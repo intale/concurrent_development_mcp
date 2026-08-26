@@ -14,7 +14,7 @@ Given("these interpretations are accepted for activation:") do |table|
       source: "mcp_client",
       text: "Use RSpec.",
       anchors: {
-        repository_ids: [ "billing" ],
+        repository_ids: [ acceptance_repository_id ],
         change_set_id: nil,
         work_item_id: nil,
         attempt_id: nil
@@ -191,7 +191,7 @@ Then("the available Decision {string} is active without a freshness claim") do |
   assert_acceptance_equal("active", decision.fetch("policy_status"), "Decision policy status")
   assert_acceptance(decision.fetch("activated"), "Activation evidence is missing")
   assert_acceptance_equal(
-    [ "repo:billing:testing" ],
+    [ "repo:#{acceptance_repository_id}:testing" ],
     decision.fetch("partitions").map { _1.fetch("partition_id") },
     "Decision partitions"
   )

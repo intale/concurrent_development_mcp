@@ -21,7 +21,7 @@ Then("the ReleaseSet Task completes with the exact repository order") do
   assert_acceptance_equal(false, result.fetch("isError"), "ReleaseSet error")
   assert_acceptance_equal("ok", content.fetch("status"), "ReleaseSet result")
   assert_acceptance_equal(
-    %w[billing ledger],
+    expected_release_repository_ids,
     content.dig("data", "ordered_members").map { _1.fetch("repository_id") },
     "Repository order"
   )
@@ -62,7 +62,7 @@ Then("the ordered ReleaseSet is available without a freshness gate") do
   release_set = content.dig("data", "release_set")
   assert_acceptance_equal("ok", content.fetch("status"), "ReleaseSet view")
   assert_acceptance_equal(
-    %w[billing ledger],
+    expected_release_repository_ids,
     release_set.fetch("ordered_members").map { _1.fetch("repository_id") },
     "Projected repository order"
   )
@@ -176,7 +176,7 @@ Then("the verified ReleaseSet is available with exact ordered evidence") do
   assert_acceptance_equal("verified", release_set.fetch("status"), "Verified ReleaseSet status")
   assert_acceptance_equal("passed", release_set.fetch("verification_status"), "Verification status")
   assert_acceptance_equal(
-    %w[billing ledger],
+    expected_release_repository_ids,
     release_set.fetch("integrations").map { _1.fetch("repository_id") },
     "Integration order"
   )

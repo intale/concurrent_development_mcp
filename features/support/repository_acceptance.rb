@@ -30,10 +30,10 @@ module RepositoryAcceptance
       event_store: Coordinator::Write::EventStore.new(client: PgEventstore.client)
     ).call(
       command_id: "seed-register-#{repository_id}",
-      actor: { kind: "agent", id: "acceptance-repository-registrar" },
+      actor: { kind: "agent", id: "test-repository-registrar" },
       repository_id:,
       scope: acceptance_repository_scope(key),
-      display_name: "#{key.to_s.capitalize} acceptance repository",
+      display_name: "#{key.to_s.capitalize} test repository",
       paths: [],
       remotes: []
     )

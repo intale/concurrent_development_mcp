@@ -14,7 +14,7 @@ When(
     source: "mcp_client",
     text: guidance_text,
     anchors: {
-      repository_ids: [ "billing" ],
+      repository_ids: [ acceptance_repository_id ],
       change_set_id: nil,
       work_item_id: nil,
       attempt_id: nil
@@ -164,7 +164,7 @@ Given(
     source: "mcp_client",
     text:,
     anchors: {
-      repository_ids: [ "billing" ],
+      repository_ids: [ acceptance_repository_id ],
       change_set_id: "CS-CUC-GDN-3",
       work_item_id: nil,
       attempt_id: nil

@@ -704,7 +704,8 @@ module McpAcceptanceWorld
       repository_id: acceptance_repository_id,
       kind: "file",
       path:,
-      base_blob_oid: nil
+      base_blob_oid: nil,
+      scope: acceptance_repository_scope
     ).value!
     event_store.read(
       streams.resource_lease(resource.resource_key_hash),

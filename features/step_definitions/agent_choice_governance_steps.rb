@@ -1,6 +1,7 @@
 Given(
   "agent {string} has active Attempt {string} for WorkItem {string} in ChangeSet {string} and repository {string}"
-) do |agent_id, attempt_id, work_item_id, change_set_id, repository_id|
+) do |agent_id, attempt_id, work_item_id, change_set_id, repository_label|
+  repository_id = register_acceptance_repository(repository_label)
   @choice_agent_id = agent_id
   @choice_context = {
     workspace_id: nil,
