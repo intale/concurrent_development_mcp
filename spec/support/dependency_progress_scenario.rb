@@ -56,10 +56,10 @@ module DependencyProgressScenario
   end
 
   def work_item_event(scenario, type)
-    events = event_store.read(
+    events = event_store.read_grouped(
       streams.work_item(scenario.dig(:ids, :producer_work_item_id)),
       Coordinator::Write::EventQueries::WORK_ITEM_FOR_COMPLETION
-    )
+    ).reverse
     events.find { _1.type == type }
   end
 

@@ -5,6 +5,17 @@ Given("terminal Candidate coordination {string} is ready for agent {string}") do
   @terminal_coordination = prepare_terminal_candidate(prefix:, agent_id:)
 end
 
+When(
+  "the terminal agent is interrupted {int} times and reacquires the WorkItem through MCP Tasks"
+) do |interruption_count|
+  @terminal_interruption_count = interruption_count
+  @terminal_coordination = recover_terminal_attempts(
+    @terminal_coordination,
+    prefix: @terminal_prefix,
+    interruption_count:
+  )
+end
+
 When("the agent submits the final terminal Candidate and releases its write set") do
   @terminal_candidate = submit_terminal_candidate(@terminal_coordination, prefix: @terminal_prefix)
   release_terminal_write_set(@terminal_coordination, prefix: @terminal_prefix)
@@ -52,6 +63,21 @@ Then("the terminal Task records one selected Candidate, completed Attempt, and c
     terminal_attempt_events(ids.fetch(:attempt_id)).select { _1.type == "AttemptCompleted" }.map(&:type),
     "Terminal Attempt facts"
   )
+end
+
+Then("the recovered WorkItem preserves each interruption before its terminal facts") do
+  events = terminal_full_work_item_lifecycle(@terminal_coordination.dig(:ids, :work_item_id))
+  assert_acceptance_equal(
+    @terminal_interruption_count + 1,
+    events.count { _1.type == "WorkItemAcquired" },
+    "Recovered WorkItem acquisitions"
+  )
+  assert_acceptance_equal(
+    @terminal_interruption_count,
+    events.count { _1.type == "WorkItemRequeued" },
+    "Recovered WorkItem requeues"
+  )
+  assert_acceptance_equal("WorkItemCompleted", events.last.type, "Recovered WorkItem terminal fact")
 end
 
 Then("the older acquired context remains available before terminal projection") do

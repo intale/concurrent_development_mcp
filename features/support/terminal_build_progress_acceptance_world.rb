@@ -106,6 +106,58 @@ module TerminalBuildProgressAcceptanceWorld
     { ids:, candidate_coordination:, reservation:, agent_id: }
   end
 
+  def recover_terminal_attempts(coordination, prefix:, interruption_count:)
+    recovered = coordination
+    interruption_count.times do |index|
+      ids = recovered.fetch(:ids)
+      complete_terminal_task(
+        "attempt_abandon",
+        command_id: "cmd-cuc-terminal-#{prefix}-abandon-#{index}",
+        actor: { kind: "agent", id: recovered.fetch(:agent_id) },
+        change_set_id: ids.fetch(:change_set_id),
+        work_item_id: ids.fetch(:work_item_id),
+        attempt_id: ids.fetch(:attempt_id),
+        reason: "The terminal agent was interrupted before producing a Candidate."
+      )
+
+      next_attempt_id = "A-CUC-TERMINAL-#{prefix}-RECOVERY-#{index + 1}"
+      complete_terminal_task(
+        "work_item_acquire",
+        command_id: "cmd-cuc-terminal-#{prefix}-reacquire-#{index}",
+        actor: { kind: "agent", id: recovered.fetch(:agent_id) },
+        change_set_id: ids.fetch(:change_set_id),
+        work_item_id: ids.fetch(:work_item_id),
+        attempt_id: next_attempt_id,
+        base_snapshots: [ { repository_id: "billing", commit_oid: "a" * 40 } ]
+      )
+      reservation_task_id = complete_terminal_task(
+        "write_set_reserve",
+        command_id: "cmd-cuc-terminal-#{prefix}-reserve-recovery-#{index}",
+        actor: { kind: "agent", id: recovered.fetch(:agent_id) },
+        change_set_id: ids.fetch(:change_set_id),
+        work_item_id: ids.fetch(:work_item_id),
+        attempt_id: next_attempt_id,
+        repository_id: "billing",
+        base_commit_oid: "a" * 40,
+        resources: [
+          {
+            kind: "file",
+            path: recovered.fetch(:path),
+            base_blob_oid: CandidateAcceptanceWorld::BASE_BLOB_OID
+          }
+        ],
+        lease_duration_seconds: 900
+      )
+      recovered = recovered.merge(
+        ids: ids.merge(attempt_id: next_attempt_id),
+        reservation: terminal_task_data(reservation_task_id)
+      )
+    end
+
+    project_terminal_reacquisition(recovered.fetch(:ids))
+    recovered
+  end
+
   def submit_terminal_candidate(coordination, prefix:)
     arguments = candidate_arguments(
       coordination,
@@ -201,6 +253,40 @@ module TerminalBuildProgressAcceptanceWorld
         direction: :asc
       )
     )
+  end
+
+  def terminal_full_work_item_lifecycle(work_item_id)
+    event_store.read(
+      streams.work_item(work_item_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[
+          WorkItemCreated
+          WorkItemMadeReady
+          WorkItemAcquired
+          WorkItemRequeued
+          WorkItemCandidateSelected
+          WorkItemCompleted
+        ],
+        maximum_count: 20,
+        direction: :asc
+      )
+    )
+  end
+
+  def project_terminal_reacquisition(ids)
+    acquisition = event_store.read_grouped(
+      streams.work_item(ids.fetch(:work_item_id)),
+      Coordinator::Write::GroupedEventReadCriteria.new(
+        event_types: [ "WorkItemAcquired" ],
+        direction: :desc
+      )
+    ).sole
+    attempt_events = event_store.read(
+      streams.attempt(ids.fetch(:attempt_id)),
+      Coordinator::Write::EventQueries::ATTEMPT_FOR_WRITE_SET_RESERVATION
+    )
+    projector = Coordinator::Container["projectors.coord_context_v1"]
+    ([ acquisition ] + attempt_events).each { projector.call(_1) }
   end
 
   def terminal_attempt_events(attempt_id)

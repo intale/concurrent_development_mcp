@@ -18,6 +18,14 @@ Feature: Available terminal build progress
       When terminal facts and build progress reach the read side
       Then available context exposes the completed WorkItem, Attempt, and ChangeSet without a freshness gate
 
+    Scenario: Final completion survives repeated interrupted Attempts
+      Given terminal Candidate coordination "RECOVERED" is ready for agent "agent-terminal"
+      When the terminal agent is interrupted 2 times and reacquires the WorkItem through MCP Tasks
+      And the agent submits the final terminal Candidate and releases its write set
+      And the agent completes the WorkItem through an MCP Task
+      Then the terminal Task records one selected Candidate, completed Attempt, and completed WorkItem
+      And the recovered WorkItem preserves each interruption before its terminal facts
+
   Rule: Dependency progress converges one independent observed fact at a time
 
     Scenario: Completion unlocks a dependent WorkItem without withholding an older view

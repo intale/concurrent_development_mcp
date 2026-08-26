@@ -489,16 +489,16 @@ module Coordinator::Write
       direction: :asc
     )
 
-    WORK_ITEM_FOR_COMPLETION = EventReadCriteria.new(
+    WORK_ITEM_FOR_COMPLETION = GroupedEventReadCriteria.new(
       event_types: [
         "WorkItemCreated",
         "WorkItemMadeReady",
         "WorkItemAcquired",
+        "WorkItemRequeued",
         "WorkItemCandidateSelected",
         "WorkItemCompleted"
       ],
-      maximum_count: 5,
-      direction: :asc
+      direction: :desc
     )
 
     ATTEMPT_FOR_WORK_ITEM_COMPLETION = EventReadCriteria.new(

@@ -64,7 +64,7 @@ module Coordinator
       CHANGE_SET_FOR_ACQUISITION: EventReadCriteria
       WORK_ITEM_FOR_ACQUISITION: EventReadCriteria
       CHANGE_SET_FOR_WORK_ITEM_COMPLETION: EventReadCriteria
-      WORK_ITEM_FOR_COMPLETION: EventReadCriteria
+      WORK_ITEM_FOR_COMPLETION: GroupedEventReadCriteria
       ATTEMPT_FOR_WORK_ITEM_COMPLETION: EventReadCriteria
       ATTEMPT_FOR_ACQUISITION: EventReadCriteria
       ATTEMPT_FOR_WRITE_SET_RESERVATION: EventReadCriteria

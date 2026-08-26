@@ -77,6 +77,20 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCompleteWorkItem, :event_s
     expect(command_events(input.fetch(:command_id))).to be_empty
   end
 
+  it "folds the bounded latest lifecycle after repeated interrupted Attempts" do
+    candidate = recovered_candidate(prefix: "complete-recovered", interruption_count: 2)
+    CandidateScenario.release(candidate)
+    input = CandidateScenario.completion_input(candidate)
+
+    result = operation.call(input)
+
+    expect(result).to be_success
+    lifecycle = work_item_lifecycle_events(candidate.dig(:ids, :work_item_id))
+    expect(lifecycle.count { _1.type == "WorkItemAcquired" }).to eq(3)
+    expect(lifecycle.count { _1.type == "WorkItemRequeued" }).to eq(2)
+    expect(lifecycle.last.type).to eq("WorkItemCompleted")
+  end
+
   it "serializes competing terminal commands so exactly one Candidate selection commits" do
     candidate = CandidateScenario.submit(prefix: "complete-race")
     CandidateScenario.release(candidate)
@@ -123,6 +137,87 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCompleteWorkItem, :event_s
 
   def command_events(command_id)
     event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+  end
+
+  def recovered_candidate(prefix:, interruption_count:)
+    path = "lib/candidate.rb"
+    prepared = CandidateScenario.prepare(prefix:, path:)
+    interruption_count.times do |index|
+      abandon_attempt(prepared, prefix:, index:)
+      prepared = reacquire(prepared, prefix:, path:, index:)
+    end
+
+    input = CandidateScenario.input(
+      prefix:,
+      ids: prepared.fetch(:ids),
+      reservation: prepared.fetch(:reservation),
+      path:,
+      agent_id: "agent-a",
+      candidate_id: "CAN-#{prefix}",
+      command_id: "cmd-#{prefix}",
+      head_commit_oid: "b" * 40
+    )
+    execute!(Coordinator::Write::Operations::ExecuteSubmitCandidate, input)
+    prepared.merge(input:)
+  end
+
+  def abandon_attempt(candidate, prefix:, index:)
+    ids = candidate.fetch(:ids)
+    execute!(Coordinator::Write::Operations::ExecuteAbandonAttempt, {
+      command_id: "cmd-#{prefix}-abandon-#{index}",
+      actor: { kind: "agent", id: "agent-a" },
+      change_set_id: ids.fetch(:change_set_id),
+      work_item_id: ids.fetch(:work_item_id),
+      attempt_id: ids.fetch(:attempt_id),
+      reason: "The test agent was interrupted before producing a Candidate."
+    })
+  end
+
+  def reacquire(candidate, prefix:, path:, index:)
+    ids = candidate.fetch(:ids).merge(attempt_id: "A-#{prefix}-recovery-#{index}")
+    execute!(Coordinator::Write::Operations::ExecuteAcquireWorkItem, {
+      command_id: "cmd-#{prefix}-acquire-#{index}",
+      actor: { kind: "agent", id: "agent-a" },
+      change_set_id: ids.fetch(:change_set_id),
+      work_item_id: ids.fetch(:work_item_id),
+      attempt_id: ids.fetch(:attempt_id),
+      base_snapshots: [ { repository_id: "billing", commit_oid: "a" * 40 } ]
+    })
+    reservation = execute!(Coordinator::Write::Operations::ExecuteReserveWriteSet, {
+      command_id: "cmd-#{prefix}-reserve-#{index}",
+      actor: { kind: "agent", id: "agent-a" },
+      change_set_id: ids.fetch(:change_set_id),
+      work_item_id: ids.fetch(:work_item_id),
+      attempt_id: ids.fetch(:attempt_id),
+      repository_id: "billing",
+      base_commit_oid: "a" * 40,
+      resources: [ { kind: "file", path:, base_blob_oid: "c" * 40 } ],
+      lease_duration_seconds: 900
+    }).data
+
+    candidate.merge(ids:, reservation:)
+  end
+
+  def execute!(operation_class, input)
+    operation_class.new(event_store:).call(input).value!
+  end
+
+  def work_item_lifecycle_events(work_item_id)
+    event_store.read(
+      streams.work_item(work_item_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[
+          WorkItemCreated
+          WorkItemMadeReady
+          WorkItemAcquired
+          WorkItemRequeued
+          WorkItemCandidateSelected
+          WorkItemCompleted
+        ],
+        maximum_count: 10,
+        direction: :asc
+      )
+    )
   end
 
   def terminal_event_ids(candidate, input)

@@ -685,6 +685,69 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
     end
   end
 
+  it "maps every WorkItem completion denial without turning a public conflict into an execution fault" do
+    common_details = {
+      change_set_id: "CS-task-completion",
+      work_item_id: "W-task-completion",
+      attempt_id: "ATT-task-completion",
+      candidate_id: "CAN-task-completion"
+    }
+    common_codes = %i[
+      change_set_not_active
+      work_item_not_found
+      work_item_scope_mismatch
+      work_item_already_completed
+      work_item_not_active
+      attempt_owner_mismatch
+      attempt_not_found
+      attempt_already_completed
+      attempt_scope_mismatch
+      candidate_not_found
+      candidate_scope_mismatch
+      candidate_actor_mismatch
+      candidate_not_final
+      write_set_not_reserved
+    ]
+
+    common_codes.each do |code|
+      result = mapper.call(
+        Failure(
+          Coordinator::Write::OutcomeError.new(
+            code:,
+            message: "WorkItem completion was denied",
+            details: common_details
+          )
+        ),
+        command_id: "cmd-task-completion-#{code}"
+      )
+
+      expect(result.structured_content.data).to be_a(
+        Coordinator::Write::Tasks::DomainErrorV1::WorkItemCompletionError
+      )
+      expect(result.is_error).to be(true)
+    end
+
+    active = mapper.call(
+      Failure(
+        Coordinator::Write::OutcomeError.new(
+          code: :write_set_still_active,
+          message: "Release the write set before completion",
+          details: common_details.merge(
+            lease_set_id: "0198e03a-d112-7000-8000-000000000001",
+            expires_at: "2026-08-22T10:30:00.000000Z"
+          )
+        )
+      ),
+      command_id: "cmd-task-completion-active-write-set"
+    )
+
+    expect(active.structured_content).to have_attributes(status: "conflict")
+    expect(active.structured_content.data).to be_a(
+      Coordinator::Write::Tasks::DomainErrorV1::WorkItemCompletionActiveWriteSetError
+    )
+    expect(active.is_error).to be(true)
+  end
+
   def event_reference(event_id:, type:, stream_context:, stream_name:, stream_id:, stream_revision:)
     {
       event_id:,

@@ -30,6 +30,15 @@ module Coordinator::Write
         attribute :attempt_id, Types::Identifier
       end
 
+      class WorkItemCompletionDetails < AttemptDetails
+        attribute :candidate_id, Types::Identifier
+      end
+
+      class WorkItemCompletionActiveWriteSetDetails < WorkItemCompletionDetails
+        attribute :lease_set_id, Types::UuidV7
+        attribute :expires_at, Types::Timestamp
+      end
+
       class CommandIdReusedDetails < Value
         attribute :command_id, Types::Identifier
         attribute :existing_tool_name, Types::Identifier
@@ -444,6 +453,33 @@ module Coordinator::Write
         )
         attribute :message, Types::String
         attribute :details, AttemptDetails
+      end
+
+      class WorkItemCompletionError < Value
+        attribute :code, Types::String.enum(
+          "change_set_not_active",
+          "work_item_not_found",
+          "work_item_scope_mismatch",
+          "work_item_already_completed",
+          "work_item_not_active",
+          "attempt_owner_mismatch",
+          "attempt_not_found",
+          "attempt_already_completed",
+          "attempt_scope_mismatch",
+          "candidate_not_found",
+          "candidate_scope_mismatch",
+          "candidate_actor_mismatch",
+          "candidate_not_final",
+          "write_set_not_reserved"
+        )
+        attribute :message, Types::String
+        attribute :details, WorkItemCompletionDetails
+      end
+
+      class WorkItemCompletionActiveWriteSetError < Value
+        attribute :code, Types::String.enum("write_set_still_active")
+        attribute :message, Types::String
+        attribute :details, WorkItemCompletionActiveWriteSetDetails
       end
 
       class CommandIdReusedError < Value
@@ -1019,6 +1055,8 @@ module Coordinator::Write
              WorkItemError |
              DependencyError |
              AttemptError |
+             WorkItemCompletionError |
+             WorkItemCompletionActiveWriteSetError |
              CommandIdReusedError |
              LeaseBusyError |
              LeaseSetMismatchError |
