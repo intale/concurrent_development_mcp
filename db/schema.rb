@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_26_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_26_144500) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -336,6 +336,28 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_26_120000) do
     t.index ["decision_id"], name: "index_decision_slot_heads_on_decision_id"
   end
 
+  create_table "development_artifact_relation_supersessions", primary_key: "superseded_relation_id", id: :string, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigserial "observed_sequence", null: false
+    t.text "reason", null: false
+    t.string "replacement_relation_id", null: false
+    t.string "source_artifact_id", null: false
+    t.jsonb "superseded_actor", null: false
+    t.datetime "superseded_at_domain", null: false
+    t.datetime "superseded_at_store", null: false
+    t.string "superseded_causation_id"
+    t.string "superseded_correlation_id"
+    t.jsonb "superseded_event", null: false
+    t.bigint "superseded_global_position", null: false
+    t.jsonb "superseded_markers", default: [], null: false
+    t.jsonb "superseded_metadata", default: {}, null: false
+    t.datetime "updated_at", null: false
+    t.index ["observed_sequence"], name: "idx_on_observed_sequence_9f24f34c1e", unique: true
+    t.index ["replacement_relation_id"], name: "idx_on_replacement_relation_id_79c802b934"
+    t.index ["source_artifact_id"], name: "idx_on_source_artifact_id_87bf754702"
+    t.index ["superseded_global_position"], name: "idx_on_superseded_global_position_379153d0e9"
+  end
+
   create_table "development_artifact_relations", primary_key: "relation_id", id: :string, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.jsonb "declared_actor", null: false
@@ -347,6 +369,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_26_120000) do
     t.bigint "declared_global_position", null: false
     t.jsonb "declared_markers", default: [], null: false
     t.jsonb "declared_metadata", default: {}, null: false
+    t.text "fragment"
+    t.text "normalized_locator"
+    t.bigserial "observed_sequence", null: false
     t.text "path"
     t.string "relation", null: false
     t.string "source_artifact_id", null: false
@@ -354,6 +379,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_26_120000) do
     t.string "target_kind", null: false
     t.datetime "updated_at", null: false
     t.index ["declared_global_position"], name: "idx_on_declared_global_position_66c5eb75e9"
+    t.index ["observed_sequence"], name: "index_development_artifact_relations_on_observed_sequence", unique: true
     t.index ["source_artifact_id"], name: "index_development_artifact_relations_on_source_artifact_id"
     t.index ["target_kind", "target_id"], name: "idx_on_target_kind_target_id_389d0c51da"
   end

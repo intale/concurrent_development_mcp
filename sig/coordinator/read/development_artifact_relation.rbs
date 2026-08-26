@@ -7,6 +7,9 @@ module Coordinator
       def target_kind: () -> String
       def target_id: () -> String
       def path: () -> String?
+      def fragment: () -> String?
+      def normalized_locator: () -> String?
+      def observed_sequence: () -> Integer
       def declared_event: () -> Hash[String, untyped]
       def declared_actor: () -> Hash[String, untyped]
       def declared_markers: () -> Array[String]
@@ -17,6 +20,7 @@ module Coordinator
       def declared_at_domain: () -> Time
       def declared_at_store: () -> Time
       def source_artifact: () -> DevelopmentArtifact?
+      def supersession: () -> DevelopmentArtifactRelationSupersession?
     end
   end
 end

@@ -83,12 +83,141 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
     expect(page_two.data.page.items.map(&:artifact_id)).to include(second)
   end
 
+  it "traverses directed mixed relationships with multiple parents and available peer summaries" do
+    first_parent = capture_and_project(capture_input(command_id: "cmd-parent-1", locator: "p1.md"))
+    second_parent = capture_and_project(capture_input(command_id: "cmd-parent-2", locator: "p2.md"))
+    child = capture_and_project(capture_input(command_id: "cmd-child", locator: "child.md"))
+    first = declare_and_project(
+      command_id: "cmd-edge-1",
+      source: first_parent,
+      target: child,
+      relation: "references",
+      attributes: { path: "child.md", normalized_locator: "child.md" }
+    )
+    second = declare_and_project(
+      command_id: "cmd-edge-2",
+      source: second_parent,
+      target: child,
+      relation: "contains"
+    )
+
+    incoming = relation_query.call(
+      artifact_id: child,
+      direction: "incoming",
+      limit: 10
+    ).value!.data.page
+    filtered = relation_query.call(
+      artifact_id: child,
+      direction: "incoming",
+      relation: "references",
+      limit: 10
+    ).value!.data.page
+    outgoing = relation_query.call(
+      artifact_id: first_parent,
+      direction: "outgoing",
+      limit: 10
+    ).value!.data.page
+    first_page = relation_query.call(
+      artifact_id: child,
+      direction: "incoming",
+      limit: 1
+    ).value!.data.page
+    second_page = relation_query.call(
+      artifact_id: child,
+      direction: "incoming",
+      cursor: first_page.continuation_cursor.to_h,
+      limit: 1
+    ).value!.data.page
+
+    expect(incoming.items.map(&:relation_id)).to contain_exactly(first, second)
+    expect(incoming.items).to all(have_attributes(direction: "incoming", peer_kind: "artifact"))
+    expect(incoming.items.map { _1.peer_artifact.artifact_id }).to contain_exactly(
+      first_parent,
+      second_parent
+    )
+    expect(filtered.items.map(&:relation_id)).to eq([ first ])
+    expect(first_page).to have_attributes(has_more: true)
+    expect(
+      first_page.items.map(&:relation_id) + second_page.items.map(&:relation_id)
+    ).to eq([ first, second ])
+    expect(second_page.continuation_cursor).to have_attributes(
+      after_observed_sequence: be_positive,
+      through_observed_sequence: nil
+    )
+    expect(outgoing.items.sole).to have_attributes(
+      direction: "outgoing",
+      peer_id: child,
+      peer_artifact: have_attributes(artifact_id: child),
+      relation_attributes: have_attributes(path: "child.md", normalized_locator: "child.md")
+    )
+  end
+
+  it "continues across projection convergence when an older declaration arrives late" do
+    parent = capture_and_project(capture_input(command_id: "cmd-late-parent", locator: "parent.md"))
+    child = capture_and_project(capture_input(command_id: "cmd-late-child", locator: "child.md"))
+    first_id = declare_relation.call(
+      relation_input(command_id: "cmd-late-edge-1", source: parent, target: child)
+    ).value!.data.relation_id
+    second_id = declare_relation.call(
+      relation_input(command_id: "cmd-late-edge-2", source: parent, target: child, relation: "contains")
+    ).value!.data.relation_id
+    declarations = artifact_events(parent).select do |event|
+      event.type == "DevelopmentArtifactRelationDeclared"
+    end
+    projector.call(declarations.last)
+
+    first_page = relation_query.call(
+      artifact_id: parent,
+      direction: "outgoing",
+      limit: 1
+    ).value!.data.page
+    expect(first_page.items.map(&:relation_id)).to eq([ second_id ])
+    expect(first_page).to have_attributes(has_more: false)
+
+    projector.call(declarations.first)
+    converged = relation_query.call(
+      artifact_id: parent,
+      direction: "outgoing",
+      cursor: first_page.continuation_cursor.to_h,
+      limit: 1
+    ).value!.data.page
+    expect(converged.items.map(&:relation_id)).to eq([ first_id ])
+    expect(converged.items.sole.declared.global_position).to be < first_page.items.sole.declared.global_position
+  end
+
   def capture_and_project(input)
     result = capture.call(input)
     expect(result).to be_success
     artifact_id = result.value!.data.artifact_id
     artifact_events(artifact_id).each { projector.call(_1) }
     artifact_id
+  end
+
+  def declare_and_project(command_id:, source:, target:, relation:, attributes: {})
+    result = declare_relation.call(
+      relation_input(command_id:, source:, target:, relation:, attributes:)
+    )
+    expect(result).to be_success
+    event = artifact_events(source).find do |candidate|
+      candidate.data.dig("artifact_relation", "relation_id") == result.value!.data.relation_id
+    end
+    projector.call(event)
+    result.value!.data.relation_id
+  end
+
+  def relation_input(command_id:, source:, target:, relation: "derived_from", attributes: {})
+    {
+      command_id:,
+      actor: { kind: "agent", id: "agent-query" },
+      source_artifact_id: source,
+      relation:,
+      target: { kind: "artifact", id: target },
+      attributes:
+    }
+  end
+
+  def relation_query
+    Coordinator::Read::Queries::DevelopmentArtifactRelationList.new
   end
 
   def capture_input(

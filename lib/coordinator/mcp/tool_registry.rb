@@ -24,6 +24,7 @@ module Coordinator
           Tools::SkillAssetGet,
           Tools::DevelopmentArtifactGet,
           Tools::DevelopmentArtifactContentGet,
+          Tools::DevelopmentArtifactRelationList,
           Tools::DevelopmentArtifactList,
           Tools::OperationBatchGet,
           Tools::VerificationObligationsList,

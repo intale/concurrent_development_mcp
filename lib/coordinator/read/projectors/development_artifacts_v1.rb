@@ -3,7 +3,7 @@
 module Coordinator::Read
   module Projectors
     class DevelopmentArtifactsV1
-      PROJECTION = ProjectionDefinition.new(name: "development-artifacts", version: 1)
+      PROJECTION = ProjectionDefinition.new(name: "development-artifacts", version: 2)
 
       def initialize(
         contract: Contracts::DevelopmentArtifactSourceEvent.new,
@@ -68,6 +68,8 @@ module Coordinator::Read
             domain_event.artifact.artifact_id
           when Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV1
             domain_event.artifact_relation.source_artifact_id
+          when Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV1
+            domain_event.source_artifact_id
           end
         return if event.stream.stream_id == artifact_id
 
@@ -80,6 +82,8 @@ module Coordinator::Read
           @artifacts.store_capture(event:, capture: domain_event)
         when Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV1
           @artifacts.store_relation(event:, declaration: domain_event)
+        when Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV1
+          @artifacts.store_supersession(event:, supersession: domain_event)
         else
           raise InvalidProjectionSource, "Unsupported Artifact event #{domain_event.class.name}"
         end

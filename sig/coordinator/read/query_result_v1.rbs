@@ -103,11 +103,15 @@ module Coordinator
         def page: () -> DevelopmentArtifactPageV1
       end
 
+      class DevelopmentArtifactRelationPageData < Shared::Value
+        def page: () -> DevelopmentArtifactRelationPageV1
+      end
+
       class OperationBatchData < Shared::Value
         def batch: () -> OperationBatchViewV1
       end
 
-      type data = EmptyData | DomainError | OperationData | ContextData | NotModifiedData | GuidanceData | InterpretationPageData | DecisionData | DecisionContextData | AgentChoiceData | AgentChoiceImpactPageData | CandidateData | CandidatePageData | CandidateImpactData | VerificationObligationPageData | MergeSnapshotData | ReleaseSetData | SkillData | RepositoryPageData | SkillPageData | SkillAssetData | DevelopmentArtifactData | DevelopmentArtifactContentData | DevelopmentArtifactPageData | OperationBatchData
+      type data = EmptyData | DomainError | OperationData | ContextData | NotModifiedData | GuidanceData | InterpretationPageData | DecisionData | DecisionContextData | AgentChoiceData | AgentChoiceImpactPageData | CandidateData | CandidatePageData | CandidateImpactData | VerificationObligationPageData | MergeSnapshotData | ReleaseSetData | SkillData | RepositoryPageData | SkillPageData | SkillAssetData | DevelopmentArtifactData | DevelopmentArtifactContentData | DevelopmentArtifactPageData | DevelopmentArtifactRelationPageData | OperationBatchData
       type action = Write::NextAction | NextAction
 
       def status: () -> String

@@ -8,7 +8,11 @@ module Coordinator::Read
       params do
         required(:event_type).filled(
           :string,
-          included_in?: %w[DevelopmentArtifactCaptured DevelopmentArtifactRelationDeclared]
+          included_in?: %w[
+            DevelopmentArtifactCaptured
+            DevelopmentArtifactRelationDeclared
+            DevelopmentArtifactRelationSuperseded
+          ]
         )
         required(:schema_version).filled(:integer, eql?: 1)
         required(:stream_context).filled(:string, eql?: "DevelopmentMemory")

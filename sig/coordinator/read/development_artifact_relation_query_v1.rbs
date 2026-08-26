@@ -1,0 +1,12 @@
+module Coordinator
+  module Read
+    class DevelopmentArtifactRelationQueryV1 < Shared::Value
+      def artifact_id: () -> String
+      def direction: () -> String
+      def relation: () -> String?
+      def include_superseded: () -> bool
+      def cursor: () -> DevelopmentArtifactRelationPageV1::Cursor
+      def limit: () -> Integer
+    end
+  end
+end

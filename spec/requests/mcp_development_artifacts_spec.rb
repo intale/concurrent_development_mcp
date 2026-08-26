@@ -100,6 +100,56 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
     )
   end
 
+  it "exposes bounded forward and reverse relationship traversal through MCP" do
+    parent = capture_through_task(capture_input(command_id: "cmd-mcp-parent"), id: 1)
+    child = capture_through_task(
+      capture_input(command_id: "cmd-mcp-child", locator: "docs/child.md", text: "child\n"),
+      id: 2
+    )
+    relation_task = call_tool(
+      "development_artifact_relation_declare",
+      {
+        command_id: "cmd-mcp-edge",
+        actor: { kind: "agent", id: "agent-mcp-artifact" },
+        source_artifact_id: parent,
+        relation: "references",
+        target: { kind: "artifact", id: child },
+        attributes: { path: "child.md" }
+      },
+      id: 3
+    ).dig("result", "taskId")
+    execute_task(relation_task)
+    [ parent, child ].each do |artifact_id|
+      artifact_events(artifact_id).each do |event|
+        Coordinator::Container["projectors.development_artifacts_v1"].call(event)
+      end
+    end
+
+    outgoing = call_tool(
+      "development_artifact_relation_list",
+      { artifact_id: parent, direction: "outgoing", limit: 10 },
+      id: 4
+    ).dig("result", "structuredContent", "data", "page")
+    incoming = call_tool(
+      "development_artifact_relation_list",
+      { artifact_id: child, direction: "incoming", limit: 10 },
+      id: 5
+    ).dig("result", "structuredContent", "data", "page")
+
+    expect(outgoing.fetch("items").sole).to include(
+      "direction" => "outgoing",
+      "peer_id" => child,
+      "status" => "active"
+    )
+    expect(incoming.fetch("items").sole).to include(
+      "direction" => "incoming",
+      "peer_id" => parent
+    )
+    expect(outgoing.fetch("continuation_cursor")).to include(
+      "after_observed_sequence" => be_positive
+    )
+  end
+
   def capture_input(
     command_id: "cmd-mcp-artifact",
     locator: "docs/mcp.md",
@@ -125,6 +175,13 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
 
   def call_tool(name, arguments, id:)
     mcp_request(id:, method: "tools/call", name:, params: { name:, arguments: })
+  end
+
+  def capture_through_task(input, id:)
+    task_id = call_tool("development_artifact_capture", input, id:).dig("result", "taskId")
+    execute_task(task_id)
+    task_request("tasks/get", task_id, id: id + 10)
+      .dig("result", "result", "structuredContent", "data", "artifact_id")
   end
 
   def task_request(method, task_id, id:)

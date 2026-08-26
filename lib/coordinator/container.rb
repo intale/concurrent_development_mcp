@@ -985,6 +985,12 @@ module Coordinator
       )
     end
 
+    register("queries.development_artifact_relation_list") do
+      Read::Queries::DevelopmentArtifactRelationList.new(
+        artifacts: self["repositories.development_artifacts"]
+      )
+    end
+
     register("queries.development_artifact_list") do
       Read::Queries::DevelopmentArtifactList.new(
         artifacts: self["repositories.development_artifacts"]

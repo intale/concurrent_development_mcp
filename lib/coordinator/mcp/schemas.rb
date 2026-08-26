@@ -857,6 +857,59 @@ module Coordinator
         development_artifact_get
       end
 
+      def development_artifact_relation_list
+        cursor = object_schema(
+          properties: {
+            after_observed_sequence: { type: "integer", minimum: 0 },
+            through_observed_sequence: {
+              anyOf: [ { type: "integer", minimum: 0 }, { type: "null" } ]
+            },
+            after_declared_global_position: {
+              anyOf: [ { type: "integer", minimum: 0 }, { type: "null" } ]
+            },
+            after_relation_id: {
+              anyOf: [
+                { type: "string", pattern: "^artifact-relation:v1:[0-9a-f]{64}$" },
+                { type: "null" }
+              ]
+            }
+          },
+          required: %w[
+            after_observed_sequence
+            through_observed_sequence
+            after_declared_global_position
+            after_relation_id
+          ]
+        )
+        object_schema(
+          properties: {
+            artifact_id: { type: "string", pattern: "^artifact:v1:[0-9a-f]{64}$" },
+            direction: {
+              anyOf: [ { type: "string", enum: %w[incoming outgoing both] }, { type: "null" } ]
+            },
+            relation: {
+              anyOf: [
+                { type: "string", enum: Types::DEVELOPMENT_ARTIFACT_RELATION_KINDS },
+                { type: "null" }
+              ]
+            },
+            include_superseded: { anyOf: [ { type: "boolean" }, { type: "null" } ] },
+            cursor: { anyOf: [ cursor, { type: "null" } ] },
+            limit: {
+              anyOf: [
+                {
+                  type: "integer",
+                  minimum: 1,
+                  maximum: Types::DEVELOPMENT_ARTIFACT_QUERY_MAXIMUM_ITEMS
+                },
+                { type: "null" }
+              ]
+            }
+          },
+          required: %w[artifact_id]
+        )
+      end
+
       def development_artifact_list
         relation_target = object_schema(
           properties: {

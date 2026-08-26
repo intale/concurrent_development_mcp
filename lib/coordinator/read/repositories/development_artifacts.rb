@@ -3,6 +3,8 @@
 module Coordinator::Read
   module Repositories
     class DevelopmentArtifacts
+      OBSERVED_SEQUENCE_SQL = "development_artifact_relations.observed_sequence"
+
       def fetch(artifact_id)
         record = Coordinator::Read::DevelopmentArtifact.find_by(artifact_id:)
         record && build_view(record)
@@ -36,6 +38,45 @@ module Coordinator::Read
         )
       end
 
+      def relation_page(query)
+        cursor = query.cursor
+        base = navigation_scope(query)
+        upper = cursor.through_observed_sequence || maximum_observed_sequence(base)
+        window = base.where(
+          "#{OBSERVED_SEQUENCE_SQL} > ? AND #{OBSERVED_SEQUENCE_SQL} <= ?",
+          cursor.after_observed_sequence,
+          upper
+        )
+        window = after_declaration(window, cursor)
+        rows = window
+          .select(
+            "development_artifact_relations.*",
+            "#{OBSERVED_SEQUENCE_SQL} AS navigation_sequence"
+          )
+          .includes(:supersession)
+          .order(:declared_global_position, :relation_id)
+          .limit(query.limit + 1)
+          .to_a
+        window_has_more = rows.length > query.limit
+        visible_rows = rows.first(query.limit)
+        summaries = summaries_for(query.artifact_id, visible_rows)
+        items = visible_rows.map { build_navigation_relation(_1, query.artifact_id, summaries) }
+        continuation = continuation_cursor(
+          cursor:,
+          upper:,
+          items: visible_rows,
+          window_has_more:
+        )
+        has_more = window_has_more || maximum_observed_sequence(base) > upper
+
+        DevelopmentArtifactRelationPageV1.new(
+          artifact: summaries[query.artifact_id],
+          items:,
+          continuation_cursor: continuation,
+          has_more:
+        )
+      end
+
       def store_capture(event:, capture:)
         artifact = capture.artifact
         record = Coordinator::Read::DevelopmentArtifact.find_by(artifact_id: artifact.artifact_id)
@@ -60,12 +101,85 @@ module Coordinator::Read
         record
       end
 
+      def store_supersession(event:, supersession:)
+        record = Coordinator::Read::DevelopmentArtifactRelationSupersession.find_by(
+          superseded_relation_id: supersession.superseded_relation_id
+        )
+        verify_supersession!(record, supersession) if record
+        record ||= Coordinator::Read::DevelopmentArtifactRelationSupersession.new(
+          superseded_relation_id: supersession.superseded_relation_id
+        )
+        record.assign_attributes(supersession_attributes(event, supersession))
+        record.save!
+        record
+      end
+
       private
 
+      def navigation_scope(query)
+        relation = Coordinator::Read::DevelopmentArtifactRelation.left_outer_joins(:supersession)
+        relation = direction_scope(relation, query)
+        relation = relation.where(relation: query.relation) if query.relation
+        unless query.include_superseded
+          relation = relation.where(
+            development_artifact_relation_supersessions: { superseded_relation_id: nil }
+          )
+        end
+        relation
+      end
+
+      def direction_scope(relation, query)
+        table = Coordinator::Read::DevelopmentArtifactRelation.table_name
+        outgoing = "#{table}.source_artifact_id = :artifact_id"
+        incoming = "#{table}.target_kind = 'artifact' AND #{table}.target_id = :artifact_id"
+        predicate =
+          case query.direction
+          when "outgoing" then outgoing
+          when "incoming" then incoming
+          else "(#{outgoing}) OR (#{incoming})"
+          end
+        relation.where(predicate, artifact_id: query.artifact_id)
+      end
+
+      def maximum_observed_sequence(relation)
+        relation.maximum(Arel.sql(OBSERVED_SEQUENCE_SQL)) || 0
+      end
+
+      def after_declaration(relation, cursor)
+        return relation unless cursor.after_declared_global_position
+
+        relation.where(
+          "(development_artifact_relations.declared_global_position, " \
+          "development_artifact_relations.relation_id) > (?, ?)",
+          cursor.after_declared_global_position,
+          cursor.after_relation_id
+        )
+      end
+
+      def continuation_cursor(cursor:, upper:, items:, window_has_more:)
+        if window_has_more
+          last = items.last
+          return DevelopmentArtifactRelationPageV1::Cursor.new(
+            after_observed_sequence: cursor.after_observed_sequence,
+            through_observed_sequence: upper,
+            after_declared_global_position: last.declared_global_position,
+            after_relation_id: last.relation_id
+          )
+        end
+
+        DevelopmentArtifactRelationPageV1::Cursor.new(
+          after_observed_sequence: upper,
+          through_observed_sequence: nil,
+          after_declared_global_position: nil,
+          after_relation_id: nil
+        )
+      end
+
       def relation_target_source_ids(query)
-        Coordinator::Read::DevelopmentArtifactRelation
-          .where(target_kind: query.relation_target_kind, target_id: query.relation_target_id)
-          .select(:source_artifact_id)
+        active_relations.where(
+          target_kind: query.relation_target_kind,
+          target_id: query.relation_target_id
+        ).select(:source_artifact_id)
       end
 
       def capture_attributes(event, capture)
@@ -105,6 +219,8 @@ module Coordinator::Read
           target_kind: relation.target.kind,
           target_id: relation.target.id,
           path: relation.relation_attributes.path,
+          fragment: relation.relation_attributes.fragment,
+          normalized_locator: relation.relation_attributes.normalized_locator,
           declared_event: event_reference(event).to_h,
           declared_actor: actor(event).to_h,
           declared_markers: event.markers,
@@ -114,6 +230,23 @@ module Coordinator::Read
           declared_global_position: event.global_position,
           declared_at_domain: declaration.declared_at,
           declared_at_store: event.created_at
+        }
+      end
+
+      def supersession_attributes(event, supersession)
+        {
+          source_artifact_id: supersession.source_artifact_id,
+          replacement_relation_id: supersession.replacement_relation_id,
+          reason: supersession.reason,
+          superseded_event: event_reference(event).to_h,
+          superseded_actor: actor(event).to_h,
+          superseded_markers: event.markers,
+          superseded_metadata: event.metadata,
+          superseded_causation_id: event.causation_id,
+          superseded_correlation_id: event.correlation_id,
+          superseded_global_position: event.global_position,
+          superseded_at_domain: supersession.superseded_at,
+          superseded_at_store: event.created_at
         }
       end
 
@@ -128,27 +261,44 @@ module Coordinator::Read
       end
 
       def verify_relation!(record, relation)
+        attributes = relation.relation_attributes
         matches = record.source_artifact_id == relation.source_artifact_id &&
                   record.relation == relation.relation &&
                   record.target_kind == relation.target.kind &&
                   record.target_id == relation.target.id &&
-                  record.path == relation.relation_attributes.path
+                  record.path == attributes.path &&
+                  record.fragment == attributes.fragment &&
+                  record.normalized_locator == attributes.normalized_locator
         return if matches
 
         raise ProjectionStateError, "Artifact relation identity changed across declaration events"
       end
 
+      def verify_supersession!(record, supersession)
+        matches = record.source_artifact_id == supersession.source_artifact_id &&
+                  record.replacement_relation_id == supersession.replacement_relation_id &&
+                  record.reason == supersession.reason
+        return if matches
+
+        raise ProjectionStateError, "Artifact relation supersession changed across events"
+      end
+
       def build_view(record)
+        relations = Coordinator::Read::DevelopmentArtifactRelation
+          .where(source_artifact_id: record.artifact_id)
+          .includes(:supersession)
+          .order(:declared_global_position, :relation_id)
+          .to_a
+        summaries = summaries_for(record.artifact_id, relations)
         DevelopmentArtifactViewV1.new(
-          artifact: build_summary(record),
-          relationships: Coordinator::Read::DevelopmentArtifactRelation
-            .where(source_artifact_id: record.artifact_id)
-            .order(:declared_global_position)
-            .map { build_relation(_1) }
+          artifact: summaries.fetch(record.artifact_id),
+          relationships: relations.map do |relation|
+            build_navigation_relation(relation, record.artifact_id, summaries)
+          end
         )
       end
 
-      def build_summary(record)
+      def build_summary(record, relationship_count: nil)
         DevelopmentArtifactSummaryV1.new(
           artifact_id: record.artifact_id,
           scope: record.scope,
@@ -160,7 +310,7 @@ module Coordinator::Read
           content_sha256: record.content_sha256,
           byte_size: record.content_byte_size,
           source: provenance(record),
-          relationship_count: Coordinator::Read::DevelopmentArtifactRelation.where(
+          relationship_count: relationship_count || active_relations.where(
             source_artifact_id: record.artifact_id
           ).count,
           captured: evidence(record, "captured")
@@ -168,9 +318,10 @@ module Coordinator::Read
       end
 
       def build_content(record)
-        text = if record.content_encoding == "utf-8"
-                 record.content_base64.unpack1("m0").force_encoding(Encoding::UTF_8)
-        end
+        text =
+          if record.content_encoding == "utf-8"
+            record.content_base64.unpack1("m0").force_encoding(Encoding::UTF_8)
+          end
         DevelopmentArtifactContentViewV1.new(
           artifact_id: record.artifact_id,
           encoding: record.content_encoding,
@@ -182,7 +333,11 @@ module Coordinator::Read
         )
       end
 
-      def build_relation(record)
+      def build_navigation_relation(record, artifact_id, summaries)
+        direction = record.source_artifact_id == artifact_id ? "outgoing" : "incoming"
+        peer_kind = direction == "outgoing" ? record.target_kind : "artifact"
+        peer_id = direction == "outgoing" ? record.target_id : record.source_artifact_id
+        supersession = record.supersession
         DevelopmentArtifactRelationViewV1.new(
           relation_id: record.relation_id,
           source_artifact_id: record.source_artifact_id,
@@ -192,9 +347,47 @@ module Coordinator::Read
             id: record.target_id
           ),
           attributes: Coordinator::Write::DevelopmentArtifacts::RelationAttributesV1.new(
-            path: record.path
+            path: record.path,
+            fragment: record.fragment,
+            normalized_locator: record.normalized_locator
           ),
-          declared: evidence(record, "declared")
+          direction:,
+          peer_kind:,
+          peer_id:,
+          peer_artifact: peer_kind == "artifact" ? summaries[peer_id] : nil,
+          status: supersession ? "superseded" : "active",
+          observed_sequence: record[:navigation_sequence] || effective_sequence(record),
+          declared: evidence(record, "declared"),
+          replacement_relation_id: supersession&.replacement_relation_id,
+          supersession_reason: supersession&.reason,
+          superseded: supersession && evidence(supersession, "superseded")
+        )
+      end
+
+      def effective_sequence(record)
+        record.observed_sequence
+      end
+
+      def summaries_for(artifact_id, relations)
+        peer_ids = relations.filter_map do |relation|
+          if relation.source_artifact_id == artifact_id
+            relation.target_id if relation.target_kind == "artifact"
+          else
+            relation.source_artifact_id
+          end
+        end
+        ids = ([ artifact_id ] + peer_ids).uniq
+        records = Coordinator::Read::DevelopmentArtifact.where(artifact_id: ids).index_by(&:artifact_id)
+        counts = active_relations.where(source_artifact_id: ids).group(:source_artifact_id).count
+        records.transform_values do |record|
+          build_summary(record, relationship_count: counts.fetch(record.artifact_id, 0))
+        end
+      end
+
+      def active_relations
+        Coordinator::Read::DevelopmentArtifactRelation.where.not(
+          relation_id: Coordinator::Read::DevelopmentArtifactRelationSupersession
+            .select(:superseded_relation_id)
         )
       end
 

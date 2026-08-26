@@ -7,7 +7,16 @@ module Coordinator
       def target: () -> Write::DevelopmentArtifacts::RelationTargetV1
       def attributes: () -> Hash[Symbol, untyped]
       def relation_attributes: () -> Write::DevelopmentArtifacts::RelationAttributesV1
+      def direction: () -> String
+      def peer_kind: () -> String
+      def peer_id: () -> String
+      def peer_artifact: () -> DevelopmentArtifactSummaryV1?
+      def status: () -> String
+      def observed_sequence: () -> Integer
       def declared: () -> DevelopmentArtifactEventEvidenceV1
+      def replacement_relation_id: () -> String?
+      def supersession_reason: () -> String?
+      def superseded: () -> DevelopmentArtifactEventEvidenceV1?
     end
   end
 end

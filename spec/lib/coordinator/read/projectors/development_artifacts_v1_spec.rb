@@ -25,6 +25,14 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
     projector.call(relation)
     expect(repository.fetch(source)).to be_nil
     expect(Coordinator::Read::DevelopmentArtifactRelation.count).to eq(1)
+    lagging = relation_query.call(
+      artifact_id: source,
+      direction: "outgoing",
+      limit: 10
+    ).value!
+    expect(lagging.data.page).to have_attributes(artifact: nil)
+    expect(lagging.data.page.items.sole).to have_attributes(peer_artifact: nil)
+    expect(lagging.warnings.sole).to include("not yet observed")
 
     projector.call(source_capture)
     projector.call(source_capture)
@@ -42,7 +50,8 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
     )
     expect(view.relationships.sole).to have_attributes(
       relation_id: relation.data.fetch("artifact_relation").fetch("relation_id"),
-      target: have_attributes(kind: "artifact", id: target)
+      target: have_attributes(kind: "artifact", id: target),
+      peer_artifact: nil
     )
     expect(processed_events.count).to eq(2)
     expect(view.to_h.keys & %i[fresh pending projection_status]).to be_empty
@@ -66,6 +75,55 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
       encoding: "binary"
     )
     expect(repository.fetch(text_id).to_h.to_s).not_to include("evidence\\n")
+  end
+
+  it "projects an out-of-order supersession without hiding its immutable declaration history" do
+    source = capture.call(capture_input).value!.data.artifact_id
+    old_target = capture.call(
+      capture_input(command_id: "cmd-project-old", locator: "old.md")
+    ).value!.data.artifact_id
+    new_target = capture.call(
+      capture_input(command_id: "cmd-project-new", locator: "new.md")
+    ).value!.data.artifact_id
+    old = declare_relation.call(relation_input(source:, target: old_target)).value!.data
+    declare_relation.call(
+      relation_input(
+        command_id: "cmd-project-correct",
+        source:,
+        target: new_target,
+        supersedes: { relation_id: old.relation_id, reason: "wrong target" }
+      )
+    )
+    events = artifact_events(source)
+    declarations = events.select { _1.type == "DevelopmentArtifactRelationDeclared" }
+    supersession = events.find { _1.type == "DevelopmentArtifactRelationSuperseded" }
+
+    projector.call(supersession)
+    projector.call(supersession)
+    expect(Coordinator::Read::DevelopmentArtifactRelationSupersession.count).to eq(1)
+    declarations.reverse_each { projector.call(_1) }
+    projector.call(events.first)
+
+    page = relation_query.call(
+      artifact_id: source,
+      direction: "outgoing",
+      include_superseded: true,
+      limit: 10
+    ).value!.data.page
+    expect(page.items.map(&:status)).to contain_exactly("active", "superseded")
+    superseded = page.items.find { _1.status == "superseded" }
+    expect(superseded).to have_attributes(
+      relation_id: old.relation_id,
+      replacement_relation_id: a_string_matching(/\Aartifact-relation:v1:/),
+      supersession_reason: "wrong target",
+      superseded: have_attributes(event: have_attributes(type: "DevelopmentArtifactRelationSuperseded"))
+    )
+    active = relation_query.call(
+      artifact_id: source,
+      direction: "outgoing",
+      limit: 10
+    ).value!.data.page
+    expect(active.items.map(&:status)).to eq([ "active" ])
   end
 
   def capture_input(command_id: "cmd-project-source", locator: "evidence.md", binary: false)
@@ -97,15 +155,17 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
     }
   end
 
-  def relation_input(source:, target:)
-    {
-      command_id: "cmd-project-relation",
+  def relation_input(source:, target:, command_id: "cmd-project-relation", supersedes: nil)
+    input = {
+      command_id:,
       actor: { kind: "agent", id: "agent-projector" },
       source_artifact_id: source,
       relation: "derived_from",
       target: { kind: "artifact", id: target },
       attributes: {}
     }
+    input[:supersedes] = supersedes if supersedes
+    input
   end
 
   def artifact_events(artifact_id)
@@ -118,7 +178,11 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
   def processed_events
     Coordinator::Read::ProcessedProjectionEvent.where(
       projection_name: "development-artifacts",
-      projection_version: 1
+      projection_version: 2
     )
+  end
+
+  def relation_query
+    Coordinator::Read::Queries::DevelopmentArtifactRelationList.new
   end
 end

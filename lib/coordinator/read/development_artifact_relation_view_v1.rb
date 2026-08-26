@@ -7,7 +7,17 @@ module Coordinator::Read
     attribute :relation, Types::DevelopmentArtifactRelationKind
     attribute :target, Coordinator::Write::DevelopmentArtifacts::RelationTargetV1
     attribute :attributes, Coordinator::Write::DevelopmentArtifacts::RelationAttributesV1
+    attribute :direction, Types::String.enum("incoming", "outgoing")
+    attribute :peer_kind, Types::DevelopmentArtifactTargetKind
+    attribute :peer_id, Types::DevelopmentArtifactTargetId
+    attribute :peer_artifact, DevelopmentArtifactSummaryV1.optional
+    attribute :status, Types::String.enum("active", "superseded")
+    attribute :observed_sequence, Types::Integer.constrained(gteq: 1)
     attribute :declared, DevelopmentArtifactEventEvidenceV1
+    attribute :replacement_relation_id, Types::DevelopmentArtifactRelationId.optional
+    attribute :supersession_reason,
+              Types::DevelopmentArtifactRelationSupersessionReason.optional
+    attribute :superseded, DevelopmentArtifactEventEvidenceV1.optional
 
     def relation_attributes
       self[:attributes]

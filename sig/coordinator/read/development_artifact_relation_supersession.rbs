@@ -1,0 +1,21 @@
+module Coordinator
+  module Read
+    class DevelopmentArtifactRelationSupersession < ApplicationRecord
+      def superseded_relation_id: () -> String
+      def source_artifact_id: () -> String
+      def replacement_relation_id: () -> String
+      def reason: () -> String
+      def superseded_event: () -> Hash[String, untyped]
+      def superseded_actor: () -> Hash[String, untyped]
+      def superseded_markers: () -> Array[String]
+      def superseded_metadata: () -> Hash[String, untyped]
+      def superseded_causation_id: () -> String?
+      def superseded_correlation_id: () -> String?
+      def superseded_global_position: () -> Integer
+      def superseded_at_domain: () -> Time
+      def superseded_at_store: () -> Time
+      def observed_sequence: () -> Integer
+      def relation: () -> DevelopmentArtifactRelation?
+    end
+  end
+end

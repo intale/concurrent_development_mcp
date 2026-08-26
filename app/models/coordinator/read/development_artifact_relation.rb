@@ -9,5 +9,11 @@ module Coordinator::Read
                foreign_key: "source_artifact_id",
                inverse_of: :relations,
                optional: true
+
+    has_one :supersession,
+            class_name: "Coordinator::Read::DevelopmentArtifactRelationSupersession",
+            foreign_key: "superseded_relation_id",
+            inverse_of: :relation,
+            dependent: :delete
   end
 end
