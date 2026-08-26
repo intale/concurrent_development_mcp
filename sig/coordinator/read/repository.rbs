@@ -1,0 +1,20 @@
+module Coordinator
+  module Read
+    class Repository < ApplicationRecord
+      def repository_id: () -> String
+      def scope: () -> String
+      def display_name: () -> String?
+      def paths: () -> Array[String]
+      def remotes: () -> Array[String]
+      def registered_event: () -> Hash[String, untyped]
+      def registered_actor: () -> Hash[String, untyped]
+      def registered_markers: () -> Array[String]
+      def registered_metadata: () -> Hash[String, untyped]
+      def registered_causation_id: () -> String?
+      def registered_correlation_id: () -> String?
+      def registered_global_position: () -> Integer
+      def registered_at_domain: () -> Time
+      def registered_at_store: () -> Time
+    end
+  end
+end

@@ -1,0 +1,10 @@
+module Coordinator
+  module Read
+    module Repositories
+      class RepositoryCatalog
+        def page: (RepositoryListQueryV1 query) -> RepositoryPageV1
+        def store: (event: PgEventstore::Event, registration: Write::Events::RepositoryRegisteredV1) -> Repository
+      end
+    end
+  end
+end

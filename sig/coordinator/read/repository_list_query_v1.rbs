@@ -1,0 +1,9 @@
+module Coordinator
+  module Read
+    class RepositoryListQueryV1 < Shared::Value
+      def scope: () -> String
+      def after_repository_id: () -> String?
+      def limit: () -> Integer
+    end
+  end
+end

@@ -720,6 +720,10 @@ module Coordinator
       Read::Repositories::Candidates.new
     end
 
+    register("repositories.repository_catalog", memoize: true) do
+      Read::Repositories::RepositoryCatalog.new
+    end
+
     register("repositories.skills", memoize: true) do
       Read::Repositories::Skills.new
     end
@@ -822,6 +826,14 @@ module Coordinator
         schema_registry: self["event_schema_registry"],
         candidates: self["repositories.candidates"],
         candidate_impacts: self["repositories.candidate_impacts"],
+        processed_events: self["repositories.processed_projection_events"]
+      )
+    end
+
+    register("projectors.repositories_v1", memoize: true) do
+      Read::Projectors::RepositoriesV1.new(
+        schema_registry: self["event_schema_registry"],
+        catalog: self["repositories.repository_catalog"],
         processed_events: self["repositories.processed_projection_events"]
       )
     end
@@ -943,6 +955,10 @@ module Coordinator
 
     register("queries.candidate_impact_get") do
       Read::Queries::CandidateImpactGet.new(impacts: self["repositories.candidate_impacts"])
+    end
+
+    register("queries.repository_list") do
+      Read::Queries::RepositoryList.new(catalog: self["repositories.repository_catalog"])
     end
 
     register("queries.skill_get") do
@@ -2405,6 +2421,10 @@ module Coordinator
       Read::Subscriptions::Candidates.new(handler: self["projectors.candidates_v1"])
     end
 
+    register("subscriptions.repositories", memoize: true) do
+      Read::Subscriptions::Repositories.new(handler: self["projectors.repositories_v1"])
+    end
+
     register("subscriptions.skills", memoize: true) do
       Read::Subscriptions::Skills.new(handler: self["projectors.skills_v1"])
     end
@@ -2479,6 +2499,7 @@ module Coordinator
           self["subscriptions.agent_choices"],
           self["subscriptions.agent_choice_impacts"],
           self["subscriptions.candidates"],
+          self["subscriptions.repositories"],
           self["subscriptions.skills"],
           self["subscriptions.development_artifacts"],
           self["subscriptions.operation_batches"],

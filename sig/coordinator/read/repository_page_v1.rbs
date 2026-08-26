@@ -1,0 +1,9 @@
+module Coordinator
+  module Read
+    class RepositoryPageV1 < Shared::Value
+      def items: () -> Array[RepositorySummaryV1]
+      def next_repository_id: () -> String?
+      def has_more: () -> bool
+    end
+  end
+end

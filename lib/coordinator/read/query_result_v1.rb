@@ -81,6 +81,10 @@ module Coordinator::Read
       attribute :skill, SkillViewV1
     end
 
+    class RepositoryPageData < Value
+      attribute :page, RepositoryPageV1
+    end
+
     class SkillPageData < Value
       attribute :page, SkillPageV1
     end
@@ -123,6 +127,7 @@ module Coordinator::Read
            MergeSnapshotData |
            ReleaseSetData |
            SkillData |
+           RepositoryPageData |
            SkillPageData |
            SkillAssetData |
            DevelopmentArtifactData |

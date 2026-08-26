@@ -1,0 +1,12 @@
+module Coordinator
+  module Read
+    module Projectors
+      class RepositoriesV1
+        PROJECTION: ProjectionDefinition
+
+        def initialize: (?contract: Contracts::RepositorySourceEvent, ?schema_registry: Write::EventSchemaRegistry, ?catalog: Repositories::RepositoryCatalog, ?processed_events: Repositories::ProcessedProjectionEvents) -> void
+        def call: (PgEventstore::Event event) -> void
+      end
+    end
+  end
+end

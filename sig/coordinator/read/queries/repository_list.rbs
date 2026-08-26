@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    module Queries
+      class RepositoryList
+        def initialize: (?contract: Contracts::RepositoryList, ?catalog: Repositories::RepositoryCatalog) -> void
+        %a{rbs:test:skip}
+        def call: (command_input input) -> QueryResultV1
+      end
+    end
+  end
+end

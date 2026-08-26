@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_25_160000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_26_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -549,6 +549,26 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_25_160000) do
     t.index ["prepared_global_position"], name: "index_release_sets_on_prepared_global_position", unique: true
     t.index ["status"], name: "index_release_sets_on_status"
     t.index ["verification_status"], name: "index_release_sets_on_verification_status"
+  end
+
+  create_table "repositories", primary_key: "repository_id", id: :string, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "display_name"
+    t.jsonb "paths", default: [], null: false
+    t.jsonb "registered_actor", null: false
+    t.datetime "registered_at_domain", null: false
+    t.datetime "registered_at_store", null: false
+    t.string "registered_causation_id"
+    t.string "registered_correlation_id"
+    t.jsonb "registered_event", null: false
+    t.bigint "registered_global_position", null: false
+    t.jsonb "registered_markers", default: [], null: false
+    t.jsonb "registered_metadata", default: {}, null: false
+    t.jsonb "remotes", default: [], null: false
+    t.text "scope", null: false
+    t.datetime "updated_at", null: false
+    t.index ["registered_global_position"], name: "index_repositories_on_registered_global_position"
+    t.index ["scope", "repository_id"], name: "index_repositories_on_scope_and_repository_id"
   end
 
   create_table "skill_assets", force: :cascade do |t|

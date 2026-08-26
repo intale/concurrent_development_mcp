@@ -4,6 +4,7 @@ module Coordinator
       def self.envelope: () -> json_schema
       def self.change_set_create: () -> json_schema
       def self.repository_register: () -> json_schema
+      def self.repository_list: () -> json_schema
       def self.work_item_create: () -> json_schema
       def self.work_item_dependency_declare: () -> json_schema
       def self.change_set_activate: () -> json_schema

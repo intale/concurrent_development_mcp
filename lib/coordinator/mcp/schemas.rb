@@ -61,6 +61,27 @@ module Coordinator
         )
       end
 
+      def repository_list
+        object_schema(
+          properties: {
+            scope: {
+              type: "string",
+              minLength: 1,
+              maxLength: 500,
+              description: "Exact caller/user-chosen coordination scope; no hierarchy or fallback is inferred."
+            },
+            after_repository_id: {
+              anyOf: [ uuid_v7, { type: "null" } ],
+              description: "Exclusive canonical Repository-ID cursor returned by the previous page."
+            },
+            limit: {
+              anyOf: [ { type: "integer", minimum: 1, maximum: 100 }, { type: "null" } ]
+            }
+          },
+          required: %w[scope]
+        )
+      end
+
       def change_set_create
         object_schema(
           properties: common_mutation_properties.merge(

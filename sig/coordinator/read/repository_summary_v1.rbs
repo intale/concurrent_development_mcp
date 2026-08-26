@@ -1,0 +1,12 @@
+module Coordinator
+  module Read
+    class RepositorySummaryV1 < Shared::Value
+      def repository_id: () -> String
+      def scope: () -> String
+      def display_name: () -> String?
+      def paths: () -> Array[String]
+      def remotes: () -> Array[String]
+      def registered: () -> RepositorySourceEvidenceV1
+    end
+  end
+end
