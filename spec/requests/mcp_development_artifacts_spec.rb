@@ -45,6 +45,11 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
       },
       id: 5
     ).dig("result", "structuredContent")
+    listed = call_tool(
+      "development_artifact_list",
+      { scope: "project:alpha", limit: 10 },
+      id: 6
+    ).dig("result", "structuredContent")
     expect(metadata.dig("data", "artifact", "artifact")).to include(
       "artifact_id" => artifact_id,
       "scope" => "project:alpha"
@@ -62,6 +67,134 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
     expect(resolved.fetch("next_actions").sole).to include(
       "tool" => "development_artifact_content_get",
       "arguments" => { "artifact_id" => artifact_id }
+    )
+    expect(listed.dig("data", "page", "items")).to include(
+      include("artifact_id" => artifact_id)
+    )
+  end
+
+  it "teaches a clean client the complete two-pass linked-document workflow in tools/list" do
+    response = mcp_request(id: 1, method: "tools/list", params: {}, name: "tools")
+    tools = response.dig("result", "tools").index_by { _1.fetch("name") }
+    capture = tools.fetch("development_artifact_capture")
+    capture_batch = tools.fetch("development_artifact_capture_batch")
+    declare = tools.fetch("development_artifact_relation_declare")
+    declare_batch = tools.fetch("development_artifact_relation_declare_batch")
+    traverse = tools.fetch("development_artifact_relation_list")
+    resolve = tools.fetch("development_artifact_locator_resolve")
+
+    expect(capture.fetch("description")).to include(
+      "Import pass 1",
+      "poll tasks/get",
+      "result is unknown",
+      "same command_id",
+      "known terminal result",
+      "new command_id"
+    )
+    expect(capture_batch.fetch("description")).to include(
+      "1..1,000",
+      "3-MiB",
+      "operation_batch_get",
+      "project path layout",
+      "filesystem",
+      "Git",
+      "URL fetching"
+    )
+    expect(declare.fetch("description")).to include(
+      "Import pass 2",
+      "parent/index Artifact",
+      "literal path",
+      "fragment",
+      "normalized_locator"
+    )
+    expect(declare_batch.fetch("description")).to include(
+      "parse links client-side",
+      "relative POSIX",
+      "never guess unresolved or ambiguous targets",
+      "import_manifest Artifact",
+      "per-item Saga outcome"
+    )
+    expect(traverse.fetch("description")).to include(
+      "outgoing from a parent/index",
+      "incoming from a child",
+      "peer summaries",
+      "projection-observation continuation cursor"
+    )
+    expect(resolve.fetch("description")).to include(
+      "splits its fragment",
+      "POSIX semantics",
+      "absent, unique, or ambiguous",
+      "never",
+      "latest",
+      "projection lag"
+    )
+
+    relation_properties = declare.dig("inputSchema", "properties")
+    expect(relation_properties.fetch("attributes").fetch("properties")).to include(
+      "path",
+      "fragment",
+      "normalized_locator"
+    )
+    expect(relation_properties.fetch("supersedes").fetch("properties")).to include(
+      "relation_id",
+      "reason"
+    )
+
+    get_data = tools.fetch("development_artifact_get")
+      .dig("outputSchema", "properties", "data", "oneOf", 0, "properties")
+    relation_page = traverse
+      .dig("outputSchema", "properties", "data", "oneOf", 0, "properties", "page")
+    locator_page = resolve
+      .dig("outputSchema", "properties", "data", "oneOf", 0, "properties", "page")
+    content = tools.fetch("development_artifact_content_get")
+      .dig("outputSchema", "properties", "data", "oneOf", 0, "properties", "content")
+    relation_item = relation_page.dig("properties", "items", "items", "properties")
+    locator_actions = resolve
+      .dig("outputSchema", "properties", "next_actions", "items", "oneOf")
+    capture_data = capture
+      .dig("outputSchema", "properties", "data", "oneOf", 0, "properties")
+    declare_data = declare
+      .dig("outputSchema", "properties", "data", "oneOf", 0, "properties")
+    expect(get_data).to include("artifact")
+    expect(content.fetch("properties")).to include(
+      "encoding",
+      "media_type",
+      "text",
+      "base64",
+      "content_sha256"
+    )
+    expect(relation_page.fetch("properties")).to include(
+      "artifact",
+      "items",
+      "continuation_cursor",
+      "has_more"
+    )
+    expect(relation_item).to include(
+      "direction",
+      "peer_id",
+      "peer_artifact",
+      "attributes",
+      "declared",
+      "superseded"
+    )
+    expect(
+      locator_page.dig("properties", "resolution", "enum")
+    ).to eq(%w[absent unique ambiguous])
+    expect(locator_actions.map { _1.dig("properties", "tool", "const") }).to include(
+      "development_artifact_content_get",
+      "development_artifact_locator_resolve"
+    )
+    expect(capture_data).to include(
+      "artifact_id",
+      "content_sha256",
+      "outcome",
+      "captured_at"
+    )
+    expect(declare_data).to include(
+      "relation_id",
+      "target",
+      "superseded_relation_id",
+      "outcome"
     )
   end
 
@@ -165,6 +298,94 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
     )
     expect(outgoing.fetch("continuation_cursor")).to include(
       "after_observed_sequence" => be_positive
+    )
+  end
+
+  it "exposes literal link evidence and immutable relation correction through MCP" do
+    parent = capture_through_task(capture_input(command_id: "cmd-mcp-correction-parent"), id: 1)
+    original_child = capture_through_task(
+      capture_input(command_id: "cmd-mcp-correction-original", locator: "docs/original.md"),
+      id: 2
+    )
+    replacement_child = capture_through_task(
+      capture_input(command_id: "cmd-mcp-correction-replacement", locator: "docs/replacement.md"),
+      id: 3
+    )
+    original_task = call_tool(
+      "development_artifact_relation_declare",
+      {
+        command_id: "cmd-mcp-correction-edge-original",
+        actor: { kind: "agent", id: "agent-mcp-artifact" },
+        source_artifact_id: parent,
+        relation: "references",
+        target: { kind: "artifact", id: original_child },
+        attributes: {
+          path: "guide/../docs/original.md",
+          fragment: "usage",
+          normalized_locator: "docs/original.md"
+        }
+      },
+      id: 4
+    ).dig("result", "taskId")
+    execute_task(original_task)
+    original = task_request("tasks/get", original_task, id: 14)
+      .dig("result", "result", "structuredContent", "data")
+
+    replacement_task = call_tool(
+      "development_artifact_relation_declare",
+      {
+        command_id: "cmd-mcp-correction-edge-replacement",
+        actor: { kind: "agent", id: "agent-mcp-artifact" },
+        source_artifact_id: parent,
+        relation: "references",
+        target: { kind: "artifact", id: replacement_child },
+        attributes: {
+          path: "guide/../docs/replacement.md",
+          fragment: "usage",
+          normalized_locator: "docs/replacement.md"
+        },
+        supersedes: {
+          relation_id: original.fetch("relation_id"),
+          reason: "The parent link now names the replacement document."
+        }
+      },
+      id: 5
+    ).dig("result", "taskId")
+    execute_task(replacement_task)
+    replacement = task_request("tasks/get", replacement_task, id: 15)
+      .dig("result", "result", "structuredContent", "data")
+    artifact_events(parent).each do |event|
+      Coordinator::Container["projectors.development_artifacts_v1"].call(event)
+    end
+
+    page = call_tool(
+      "development_artifact_relation_list",
+      {
+        artifact_id: parent,
+        direction: "outgoing",
+        include_superseded: true,
+        limit: 10
+      },
+      id: 6
+    ).dig("result", "structuredContent", "data", "page")
+    by_id = page.fetch("items").index_by { _1.fetch("relation_id") }
+
+    expect(replacement).to include(
+      "outcome" => "superseded",
+      "superseded_relation_id" => original.fetch("relation_id")
+    )
+    expect(by_id.fetch(original.fetch("relation_id"))).to include(
+      "status" => "superseded",
+      "replacement_relation_id" => replacement.fetch("relation_id"),
+      "supersession_reason" => "The parent link now names the replacement document."
+    )
+    expect(by_id.fetch(replacement.fetch("relation_id"))).to include(
+      "status" => "active",
+      "attributes" => include(
+        "path" => "guide/../docs/replacement.md",
+        "fragment" => "usage",
+        "normalized_locator" => "docs/replacement.md"
+      )
     )
   end
 

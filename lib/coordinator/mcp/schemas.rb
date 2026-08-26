@@ -809,10 +809,37 @@ module Coordinator
               type: "string",
               minLength: 1,
               maxLength: Types::DEVELOPMENT_ARTIFACT_RELATION_PATH_MAXIMUM_BYTES,
-              description: "Optional safe relative POSIX path, allowed only when relation is documents."
+              description: "Literal relative POSIX link path observed by the caller. Allowed for references; documents may use it only as a document-slot label. Parent and current-directory segments are preserved."
+            },
+            fragment: {
+              type: "string",
+              minLength: 1,
+              maxLength: Types::DEVELOPMENT_ARTIFACT_RELATION_FRAGMENT_MAXIMUM_BYTES,
+              description: "Optional literal link fragment without #, allowed only for references with path."
+            },
+            normalized_locator: {
+              type: "string",
+              minLength: 1,
+              maxLength: Types::DEVELOPMENT_ARTIFACT_SOURCE_LOCATOR_MAXIMUM_BYTES,
+              description: "Optional source-relative locator normalized client-side for exact lookup, allowed only for references with path; the server neither computes nor dereferences it."
             }
           },
           required: []
+        )
+        supersedes = object_schema(
+          properties: {
+            relation_id: {
+              type: "string",
+              pattern: "^artifact-relation:v1:[0-9a-f]{64}$",
+              description: "Exact active relation being immutably corrected by this replacement."
+            },
+            reason: {
+              type: "string",
+              minLength: 1,
+              maxLength: Types::DEVELOPMENT_ARTIFACT_RELATION_SUPERSESSION_REASON_MAXIMUM_BYTES
+            }
+          },
+          required: %w[relation_id reason]
         )
         object_schema(
           properties: common_mutation_properties.merge(
@@ -831,10 +858,13 @@ module Coordinator
             relation: {
               type: "string",
               enum: Types::DEVELOPMENT_ARTIFACT_RELATION_KINDS,
-              description: "Caller-observed semantic relationship; documents may additionally carry attributes.path."
+              description: "Directed caller-observed edge. For references and contains, use the parent or index Artifact as source and the linked child as target. Documents means the source describes the target and is not embedded-link evidence."
             },
             target:,
-            attributes:
+            attributes:,
+            supersedes: supersedes.merge(
+              description: "Optional immutable correction; omit for an ordinary declaration."
+            )
           ),
           required: %w[command_id actor source_artifact_id relation target attributes]
         )

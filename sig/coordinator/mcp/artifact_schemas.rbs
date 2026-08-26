@@ -1,0 +1,47 @@
+module Coordinator
+  module Mcp
+    module ArtifactSchemas
+      def self.capture_result: () -> json_schema
+      def self.operation_batch_acceptance_result: () -> json_schema
+      def self.relation_declare_result: () -> json_schema
+      def self.get_result: () -> json_schema
+      def self.content_get_result: () -> json_schema
+      def self.list_result: () -> json_schema
+      def self.relation_list_result: () -> json_schema
+      def self.locator_resolve_result: () -> json_schema
+      def self.result: (json_schema success_data) -> json_schema
+      def self.domain_error: () -> json_schema
+      def self.artifact_capture_data: () -> json_schema
+      def self.operation_batch_acceptance_data: () -> json_schema
+      def self.relation_declare_data: () -> json_schema
+      def self.artifact_view: () -> json_schema
+      def self.artifact_summary: () -> json_schema
+      def self.provenance: () -> json_schema
+      def self.artifact_content: () -> json_schema
+      def self.artifact_page: () -> json_schema
+      def self.relation: () -> json_schema
+      def self.relation_target: () -> json_schema
+      def self.relation_attributes: () -> json_schema
+      def self.relation_page: () -> json_schema
+      def self.relation_cursor: () -> json_schema
+      def self.locator_page: () -> json_schema
+      def self.locator_cursor: () -> json_schema
+      def self.event_evidence: () -> json_schema
+      def self.event_reference: () -> json_schema
+      def self.actor: () -> json_schema
+      def self.next_action: () -> json_schema
+      def self.action: (String tool, json_schema arguments) -> json_schema
+      def self.artifact_arguments: () -> json_schema
+      def self.operation_batch_arguments: () -> json_schema
+      def self.locator_arguments: () -> json_schema
+      def self.artifact_id: () -> json_schema
+      def self.relation_id: () -> json_schema
+      def self.artifact_byte_size: () -> json_schema
+      def self.text: (maximum: Integer) -> json_schema
+      def self.sha256: () -> json_schema
+      def self.timestamp: () -> json_schema
+      def self.uuid_v7: () -> json_schema
+      def self.nullable: (json_schema schema) -> json_schema
+    end
+  end
+end
