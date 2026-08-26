@@ -40,6 +40,13 @@ Feature: Attributed Candidate checkpoints
       Then the Candidate request is rejected before Task allocation
       And invalid Candidate "CAN-CUC-INVALID" writes no target facts
 
+    @CDM-BOUND-001 @event-contract
+    Scenario: A Candidate cannot exceed its bounded write-set resources
+      Given Candidate coordination "BOUND" gives agent "agent-a" an active lease on "lib/bound.rb"
+      When the agent attempts Candidate "CAN-CUC-BOUND" with 33 changed files
+      Then the Candidate request is rejected and its schema directs the agent to split WorkItems
+      And invalid Candidate "CAN-CUC-BOUND" writes no target facts
+
   Rule: Available history may lag while the write side protects head ownership
 
     Scenario: An older checkpoint remains available while a newer Candidate is still projecting

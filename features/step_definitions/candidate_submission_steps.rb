@@ -257,6 +257,43 @@ Then("invalid Candidate {string} writes no target facts") do |candidate_id|
   assert_candidate_target_absent(candidate_id, @candidate_arguments)
 end
 
+When("the agent attempts Candidate {string} with {int} changed files") do |candidate_id, count|
+  @candidate_arguments = candidate_arguments(
+    @candidate_coordination,
+    candidate_id:,
+    command_id: "cmd-cuc-can-bound",
+    head_character: "b"
+  )
+  @candidate_arguments[:change_manifest][:files] = count.times.map do |index|
+    candidate_manifest_file("lib/bound_#{index}.rb")
+  end
+  @candidate_invalid_response = call_tool("candidate_submit", @candidate_arguments)
+end
+
+Then("the Candidate request is rejected and its schema directs the agent to split WorkItems") do
+  result = @candidate_invalid_response.fetch("result")
+  assert_acceptance_equal(true, result.fetch("isError"), "Invalid Candidate error flag")
+  assert_acceptance_equal(nil, result["taskId"], "Invalid Candidate Task handle")
+  assert_acceptance_equal(
+    [],
+    task_events_for_command(@candidate_arguments.fetch(:command_id)),
+    "Invalid Candidate Task submissions"
+  )
+
+  catalog = mcp_request(method: "tools/list", params: {})
+  tool = catalog.dig("result", "tools").find { _1.fetch("name") == "candidate_submit" }
+  files = tool.dig("inputSchema", "properties", "change_manifest", "properties", "files")
+  assert_acceptance_equal(
+    Coordinator::Shared::Types::CANDIDATE_MANIFEST_MAXIMUM_FILE_COUNT,
+    files.fetch("maxItems"),
+    "Candidate manifest maximum"
+  )
+  assert_acceptance(
+    files.fetch("description").include?("Split larger work into separate WorkItems"),
+    "Candidate schema must explain how to replan larger work"
+  )
+end
+
 When("Candidate {string} at head {string} is submitted and fully projected") do |candidate_id, head_character|
   @lag_old_arguments = candidate_arguments(
     @candidate_coordination,

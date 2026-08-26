@@ -2001,8 +2001,9 @@ module Coordinator
             files: {
               type: "array",
               minItems: 1,
-              maxItems: 256,
+              maxItems: Types::CANDIDATE_MANIFEST_MAXIMUM_FILE_COUNT,
               uniqueItems: true,
+              description: "A Candidate covers at most 32 leased resources. Split larger work into separate WorkItems.",
               items: candidate_manifest_file
             }
           },

@@ -74,3 +74,55 @@ Then("the available Batch completes with one success and one rejection") do
   assert_acceptance_equal(1, view.fetch("rejected"), "Terminal rejections")
   assert_acceptance_equal(0, view.fetch("not_run"), "Terminal unprocessed count")
 end
+
+When("the first Batch process page completes") do
+  creation = operation_batch_events.find { _1.type == "OperationBatchCreated" }
+  Coordinator::Container["process_managers.operation_batch_runner"].call(creation)
+end
+
+Then("{int} item successes and one continuation are durable") do |count|
+  events = operation_batch_events
+  assert_acceptance_equal(count, events.count { _1.type == "OperationBatchItemSucceeded" }, "Item successes")
+  assert_acceptance_equal(1, events.count { _1.type == "OperationBatchContinuationRequested" }, "Continuations")
+  assert_acceptance_equal(0, events.count { _1.type == "OperationBatchCompleted" }, "Premature completion")
+end
+
+When("the agent requests cooperative Batch cancellation") do
+  @operation_batch_cancel_task_id = submit_and_execute(
+    "operation_batch_cancel",
+    command_id: "cmd-cuc-batch-cancel-#{@operation_batch_id}",
+    actor: { kind: "agent", id: "import-agent" },
+    batch_id: @operation_batch_id
+  )
+  @operation_batch_cancel_task = task_request("tasks/get", @operation_batch_cancel_task_id)
+end
+
+Then("the cancellation Task succeeds without undoing completed items") do
+  result = @operation_batch_cancel_task.dig("result", "result")
+  assert_acceptance_equal("completed", @operation_batch_cancel_task.dig("result", "status"), "Cancel Task")
+  assert_acceptance_equal(false, result.fetch("isError"), "Cancel tool error")
+  assert_acceptance_equal(
+    50,
+    operation_batch_events.count { _1.type == "OperationBatchItemSucceeded" },
+    "Retained successes"
+  )
+end
+
+When("the pending Batch continuation observes cancellation") do
+  continuation = operation_batch_events.find { _1.type == "OperationBatchContinuationRequested" }
+  Coordinator::Container["process_managers.operation_batch_runner"].call(continuation)
+end
+
+Then("the Batch is cancelled with {int} successes and one item not run") do |count|
+  events = operation_batch_events
+  cancelled = events.find { _1.type == "OperationBatchCancelled" }
+  assert_acceptance(cancelled, "The Batch has no terminal cancellation fact")
+  assert_acceptance_equal(count, cancelled.data.fetch("succeeded"), "Cancelled successes")
+  assert_acceptance_equal(0, cancelled.data.fetch("rejected"), "Cancelled rejections")
+  assert_acceptance_equal(1, cancelled.data.fetch("not_run"), "Cancelled remainder")
+  project_operation_batch(events)
+  view = operation_batch_view
+  assert_acceptance_equal("cancelled", view.fetch("status"), "Available cancelled status")
+  assert_acceptance_equal(count, view.fetch("succeeded"), "Available successes")
+  assert_acceptance_equal(1, view.fetch("not_run"), "Available unprocessed count")
+end

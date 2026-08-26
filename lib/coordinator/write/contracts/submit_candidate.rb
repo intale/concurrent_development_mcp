@@ -101,7 +101,12 @@ module Coordinator::Write
 
       rule(:change_manifest) do
         files = value.fetch(:files)
-        key([ :change_manifest, :files ]).failure("must contain between 1 and 256 entries") unless (1..256).cover?(files.length)
+        maximum = Types::CANDIDATE_MANIFEST_MAXIMUM_FILE_COUNT
+        unless (1..maximum).cover?(files.length)
+          key([ :change_manifest, :files ]).failure(
+            "must contain between 1 and #{maximum} entries; split larger work into separate WorkItems"
+          )
+        end
         unless valid_collector_version?(value.fetch(:collector_version))
           key([ :change_manifest, :collector_version ]).failure("must contain 1 to 100 characters")
         end

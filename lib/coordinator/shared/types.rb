@@ -91,6 +91,8 @@ module Coordinator::Shared
     OPERATION_BATCH_QUERY_MAXIMUM_ITEMS = 100
     OPERATION_BATCH_MAXIMUM_ENCODED_BYTES = 3_145_728
     OPERATION_BATCH_MAXIMUM_HISTORY_EVENTS = 1_024
+    WRITE_SET_RESOURCE_MAXIMUM_COUNT = 32
+    CANDIDATE_MANIFEST_MAXIMUM_FILE_COUNT = WRITE_SET_RESOURCE_MAXIMUM_COUNT
 
     ACTOR_KINDS = %w[
       agent
@@ -763,7 +765,10 @@ module Coordinator::Shared
     CandidateImpactReasonMatches = Array.of(String.constrained(min_size: 1, max_size: 1_024))
       .constrained(min_size: 1, max_size: 256)
     CandidateEvidenceRevision = Integer.enum(1)
-    CandidateManifestSize = Integer.constrained(gteq: 1, lteq: 256)
+    CandidateManifestSize = Integer.constrained(
+      gteq: 1,
+      lteq: CANDIDATE_MANIFEST_MAXIMUM_FILE_COUNT
+    )
     CandidateBuildInputCount = Integer.constrained(gteq: 0, lteq: 64)
     CandidateEnvironmentCount = Integer.constrained(gteq: 0, lteq: 32)
     CandidateCollectorVersion = String.constrained(min_size: 1, max_size: 100)

@@ -55,6 +55,20 @@ RSpec.describe Coordinator::Write::Contracts::SubmitCandidate do
     expect(contract.call(foreign_oid)).to be_failure
   end
 
+  it "keeps Candidate manifests within the 32-resource write-set boundary" do
+    maximum = Coordinator::Shared::Types::CANDIDATE_MANIFEST_MAXIMUM_FILE_COUNT
+    files = Array.new(maximum + 1) do |index|
+      file(old_path: "lib/example_#{index}.rb")
+    end
+
+    result = contract.call(valid_input(change_manifest: manifest(files:)))
+
+    expect(result).to be_failure
+    expect(result.errors.to_h.dig(:change_manifest, :files).join).to include(
+      "split larger work into separate WorkItems"
+    )
+  end
+
   def valid_input(**overrides)
     {
       command_id: "cmd-candidate-1",

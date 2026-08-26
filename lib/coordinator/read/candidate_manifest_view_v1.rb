@@ -7,7 +7,11 @@ module Coordinator::Read
     attribute :policy_version,
               Types::String.enum(Coordinator::Write::Candidates::ChangeManifestDocumentV1::SCHEMA)
     attribute :digest, Types::Sha256Digest
-    attribute :files, Types::Array.of(File).constrained(min_size: 1, max_size: 256)
+    attribute :files,
+              Types::Array.of(File).constrained(
+                min_size: 1,
+                max_size: Types::CANDIDATE_MANIFEST_MAXIMUM_FILE_COUNT
+              )
     attribute :collector, Coordinator::Write::Candidates::EvidenceCollectorV1
     attribute :evidence, CandidateSourceEvidenceV1
   end

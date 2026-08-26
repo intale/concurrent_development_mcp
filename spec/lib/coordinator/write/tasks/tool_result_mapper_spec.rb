@@ -5,6 +5,23 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
 
   subject(:mapper) { described_class.new }
 
+  it "preserves a modeled relation-capacity denial as limit_reached" do
+    error = Coordinator::Write::OutcomeError.new(
+      code: :development_artifact_relation_limit_reached,
+      message: "Development Artifact relation limit reached",
+      details: {
+        artifact_id: "artifact:v1:#{'a' * 64}",
+        relation_count: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_RELATION_MAXIMUM_COUNT,
+        maximum_relation_count: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_RELATION_MAXIMUM_COUNT
+      }
+    )
+
+    result = mapper.call(Failure(error), command_id: "cmd-task-result-limit")
+
+    expect(result.structured_content.status).to eq("limit_reached")
+    expect(result.is_error).to be(true)
+  end
+
   it "maps every modeled target denial into a strict persisted domain-error shape" do
     examples = [
       [

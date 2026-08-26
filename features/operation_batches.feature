@@ -8,6 +8,7 @@ Feature: Bounded command batches for checkpointed agent imports
 
   Rule: A Batch Saga resumes from durable facts and crosses bounded process pages
 
+    @CDM-BATCH-001 @event-contract
     Scenario: An import-sized Skill batch resumes after duplicate delivery
       When the agent submits a batch of 51 independent Skill publications
       Then the Batch Task accepts all 51 items before target execution
@@ -16,6 +17,7 @@ Feature: Bounded command batches for checkpointed agent imports
 
   Rule: Per-item denial does not roll back successes or make available reads wait for convergence
 
+    @CDM-BATCH-002 @event-contract @stale-view
     Scenario: One stale Skill revision is isolated inside an accepted Batch
       When the agent submits two competing initial revisions in one Skill batch
       Then the Batch Task accepts both items before target execution
@@ -24,3 +26,16 @@ Feature: Bounded command batches for checkpointed agent imports
       Then the available Batch remains running with one observed success
       When the remaining Batch facts reach the read side
       Then the available Batch completes with one success and one rejection
+
+  Rule: Cooperative cancellation preserves committed item outcomes
+
+    @CDM-BATCH-003 @event-contract
+    Scenario: A bounded remainder is not run after cancellation at a page boundary
+      When the agent submits a batch of 51 independent Skill publications
+      Then the Batch Task accepts all 51 items before target execution
+      When the first Batch process page completes
+      Then 50 item successes and one continuation are durable
+      When the agent requests cooperative Batch cancellation
+      Then the cancellation Task succeeds without undoing completed items
+      When the pending Batch continuation observes cancellation
+      Then the Batch is cancelled with 50 successes and one item not run

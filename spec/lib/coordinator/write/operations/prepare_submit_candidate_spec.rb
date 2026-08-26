@@ -46,7 +46,7 @@ RSpec.describe Coordinator::Write::Operations::PrepareSubmitCandidate do
     expect(changed.build_context.digest).to eq(original.build_context.digest)
   end
 
-  it "expands rename old and new resources and rejects more than 32 actual resources" do
+  it "expands rename resources and rejects manifests above the public write-set boundary" do
     renamed = valid_input
     renamed[:change_manifest][:files] = [
       file(status: "renamed", old_path: "lib/old.rb", new_path: "lib/new.rb")
@@ -63,7 +63,10 @@ RSpec.describe Coordinator::Write::Operations::PrepareSubmitCandidate do
     end
     result = prepare.call(oversized)
 
-    expect(result.failure).to have_attributes(code: :invalid_candidate_evidence)
+    expect(result.failure).to have_attributes(code: :invalid_input)
+    expect(result.failure.details.dig(:change_manifest, :files).join).to include(
+      "split larger work into separate WorkItems"
+    )
   end
 
   it "rejects normalized duplicate entries and conflicting base evidence" do

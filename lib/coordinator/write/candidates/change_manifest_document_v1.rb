@@ -13,7 +13,11 @@ module Coordinator::Write
       attribute :object_format, Types::GitObjectFormat
       attribute :base_commit_oid, Types::GitOid
       attribute :head_commit_oid, Types::GitOid
-      attribute :files, Types::Array.of(File).constrained(min_size: 1, max_size: 256)
+      attribute :files,
+                Types::Array.of(File).constrained(
+                  min_size: 1,
+                  max_size: Types::CANDIDATE_MANIFEST_MAXIMUM_FILE_COUNT
+                )
     end
   end
 end
