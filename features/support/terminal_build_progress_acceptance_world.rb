@@ -7,10 +7,11 @@ module TerminalBuildProgressAcceptanceWorld
       agent_id:,
       path: "lib/terminal_#{prefix.downcase}.rb"
     )
-    coordination.merge(repository_id: "billing")
+    coordination
   end
 
   def prepare_terminal_dependency(prefix:)
+    repository_id = register_acceptance_repository
     ids = {
       change_set_id: "CS-CUC-TERMINAL-#{prefix}",
       producer_work_item_id: "W-CUC-TERMINAL-#{prefix}-PRODUCER",
@@ -36,7 +37,7 @@ module TerminalBuildProgressAcceptanceWorld
         actor: { kind: "agent", id: "planner-terminal" },
         change_set_id: ids.fetch(:change_set_id),
         work_item_id:,
-        repository_id: "billing",
+        repository_id:,
         goal:,
         acceptance_criteria: [ "Progress remains attributable" ]
       )
@@ -68,7 +69,7 @@ module TerminalBuildProgressAcceptanceWorld
       change_set_id: ids.fetch(:change_set_id),
       work_item_id: ids.fetch(:producer_work_item_id),
       attempt_id: ids.fetch(:attempt_id),
-      base_snapshots: [ { repository_id: "billing", commit_oid: "a" * 40 } ]
+      base_snapshots: [ { repository_id:, commit_oid: "a" * 40 } ]
     )
     reservation_task_id = complete_terminal_task(
       "write_set_reserve",
@@ -77,7 +78,7 @@ module TerminalBuildProgressAcceptanceWorld
       change_set_id: ids.fetch(:change_set_id),
       work_item_id: ids.fetch(:producer_work_item_id),
       attempt_id: ids.fetch(:attempt_id),
-      repository_id: "billing",
+      repository_id:,
       base_commit_oid: "a" * 40,
       resources: [
         {
@@ -93,7 +94,7 @@ module TerminalBuildProgressAcceptanceWorld
       prefix:,
       agent_id:,
       path: "lib/terminal_dependency.rb",
-      repository_id: "billing",
+      repository_id:,
       ids: {
         change_set_id: ids.fetch(:change_set_id),
         work_item_id: ids.fetch(:producer_work_item_id),
@@ -108,6 +109,7 @@ module TerminalBuildProgressAcceptanceWorld
 
   def recover_terminal_attempts(coordination, prefix:, interruption_count:)
     recovered = coordination
+    repository_id = recovered.fetch(:repository_id)
     interruption_count.times do |index|
       ids = recovered.fetch(:ids)
       complete_terminal_task(
@@ -128,7 +130,7 @@ module TerminalBuildProgressAcceptanceWorld
         change_set_id: ids.fetch(:change_set_id),
         work_item_id: ids.fetch(:work_item_id),
         attempt_id: next_attempt_id,
-        base_snapshots: [ { repository_id: "billing", commit_oid: "a" * 40 } ]
+        base_snapshots: [ { repository_id:, commit_oid: "a" * 40 } ]
       )
       reservation_task_id = complete_terminal_task(
         "write_set_reserve",
@@ -137,7 +139,7 @@ module TerminalBuildProgressAcceptanceWorld
         change_set_id: ids.fetch(:change_set_id),
         work_item_id: ids.fetch(:work_item_id),
         attempt_id: next_attempt_id,
-        repository_id: "billing",
+        repository_id:,
         base_commit_oid: "a" * 40,
         resources: [
           {

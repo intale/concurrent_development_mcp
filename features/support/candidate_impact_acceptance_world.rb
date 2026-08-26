@@ -13,11 +13,12 @@ module CandidateImpactAcceptanceWorld
     )
 
     grouped = rows.group_by { [ _1.fetch("repository"), _1.fetch("path") ] }
-    coordinations = grouped.keys.each_with_index.to_h do |(repository_id, path), index|
+    coordinations = grouped.keys.each_with_index.to_h do |(repository_label, path), index|
       sequence = index + 1
       work_item_id = "W-CUC-IMP-#{prefix}-#{sequence}"
       attempt_id = "A-CUC-IMP-#{prefix}-#{sequence}"
       agent_id = "impact-agent-#{sequence}"
+      repository_id = register_acceptance_repository(repository_label)
       complete_candidate_setup_task(
         "work_item_create",
         command_id: "cmd-cuc-imp-#{prefix.downcase}-work-#{sequence}",
@@ -25,10 +26,10 @@ module CandidateImpactAcceptanceWorld
         change_set_id:,
         work_item_id:,
         repository_id:,
-        goal: "Produce #{repository_id} Candidate evidence",
+        goal: "Produce #{repository_label} Candidate evidence",
         acceptance_criteria: [ "The Candidate can publish impact evidence" ]
       )
-      [ [ repository_id, path ], { work_item_id:, attempt_id:, agent_id:, repository_id:, path: } ]
+      [ [ repository_label, path ], { work_item_id:, attempt_id:, agent_id:, repository_id:, path: } ]
     end
 
     complete_candidate_setup_task(

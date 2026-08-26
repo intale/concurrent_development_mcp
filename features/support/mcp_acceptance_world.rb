@@ -242,7 +242,7 @@ module McpAcceptanceWorld
     )
   end
 
-  def decision_partition_events(partition_id = "repo:billing:testing")
+  def decision_partition_events(partition_id = "repo:#{acceptance_repository_id}:testing")
     event_store.read(
       streams.decision_partition(partition_id),
       Coordinator::Write::EventReadCriteria.new(
@@ -333,7 +333,7 @@ module McpAcceptanceWorld
       source: "mcp_client",
       text: "Use #{option_id}.",
       anchors: {
-        repository_ids: [ "billing" ],
+        repository_ids: [ acceptance_repository_id ],
         change_set_id: nil,
         work_item_id: nil,
         attempt_id: nil
@@ -571,7 +571,7 @@ module McpAcceptanceWorld
   def impact_repository_scope
     {
       workspace_id: nil,
-      repository_ids: [ "billing" ],
+      repository_ids: [ acceptance_repository_id ],
       branch_selectors: [],
       change_set_id: nil,
       work_item_id: nil,
@@ -613,7 +613,7 @@ module McpAcceptanceWorld
       source: "mcp_client",
       text: "Use #{value} as the test framework.",
       anchors: {
-        repository_ids: [ "billing" ],
+        repository_ids: [ acceptance_repository_id ],
         change_set_id: nil,
         work_item_id: nil,
         attempt_id: nil
@@ -701,7 +701,7 @@ module McpAcceptanceWorld
 
   def lease_events(path)
     resource = Coordinator::Write::FileResourceNormalizer.new.call(
-      repository_id: "billing",
+      repository_id: acceptance_repository_id,
       kind: "file",
       path:,
       base_blob_oid: nil
@@ -727,7 +727,7 @@ module McpAcceptanceWorld
       actor: { kind: "agent", id: agent_id },
       change_set_id:,
       work_item_id:,
-      repository_id: "billing",
+      repository_id: acceptance_repository_id,
       goal: "Implement #{work_item_id}",
       acceptance_criteria: [ "The work is verifiable" ]
     }

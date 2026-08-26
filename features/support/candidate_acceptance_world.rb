@@ -6,6 +6,7 @@ module CandidateAcceptanceWorld
   NEW_BLOB_OID = "d" * 40
 
   def prepare_candidate_coordination(prefix:, agent_id:, path:, project_context: true)
+    repository_id = register_acceptance_repository
     ids = {
       change_set_id: "CS-CUC-CAN-#{prefix}",
       work_item_id: "W-CUC-CAN-#{prefix}",
@@ -26,7 +27,7 @@ module CandidateAcceptanceWorld
       actor: { kind: "agent", id: "planner-1" },
       change_set_id: ids.fetch(:change_set_id),
       work_item_id: ids.fetch(:work_item_id),
-      repository_id: "billing",
+      repository_id:,
       goal: "Produce Candidate checkpoint #{prefix}",
       acceptance_criteria: [ "The Candidate is durably checkpointed" ]
     )
@@ -49,7 +50,7 @@ module CandidateAcceptanceWorld
       change_set_id: ids.fetch(:change_set_id),
       work_item_id: ids.fetch(:work_item_id),
       attempt_id: ids.fetch(:attempt_id),
-      base_snapshots: [ { repository_id: "billing", commit_oid: BASE_COMMIT_OID } ]
+      base_snapshots: [ { repository_id:, commit_oid: BASE_COMMIT_OID } ]
     )
     reservation_task_id = complete_candidate_setup_task(
       "write_set_reserve",
@@ -58,7 +59,7 @@ module CandidateAcceptanceWorld
       change_set_id: ids.fetch(:change_set_id),
       work_item_id: ids.fetch(:work_item_id),
       attempt_id: ids.fetch(:attempt_id),
-      repository_id: "billing",
+      repository_id:,
       base_commit_oid: BASE_COMMIT_OID,
       resources: [ { kind: "file", path:, base_blob_oid: BASE_BLOB_OID } ],
       lease_duration_seconds: 900
@@ -73,6 +74,7 @@ module CandidateAcceptanceWorld
       prefix:,
       agent_id:,
       path:,
+      repository_id:,
       ids:,
       reservation:
     }
@@ -88,7 +90,7 @@ module CandidateAcceptanceWorld
     ids = coordination.fetch(:ids)
     reservation = coordination.fetch(:reservation)
     path = coordination.fetch(:path)
-    repository_id = coordination.fetch(:repository_id, "billing")
+    repository_id = coordination.fetch(:repository_id, acceptance_repository_id)
     arguments = {
       command_id:,
       actor: { kind: "agent", id: coordination.fetch(:agent_id) },

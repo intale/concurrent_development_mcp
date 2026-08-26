@@ -8,4 +8,6 @@ Before do
   ReadModelTestSafety.clean!
   EventStoreTestSafety.verify!
   PgEventstore::TestHelpers.clean_up_db
+  reset_acceptance_repositories!
+  register_acceptance_repository
 end
