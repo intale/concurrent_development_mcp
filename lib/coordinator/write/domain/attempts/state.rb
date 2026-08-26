@@ -23,6 +23,7 @@ module Coordinator::Write
         attribute :status, Types::String.enum("absent", "authorized", "active", "abandoned", "completed")
         attribute :selected_candidate_id, Types::Identifier.optional.default(nil)
         attribute :selected_candidate_event, EventReference.optional.default(nil)
+        attribute :selected_candidate_checkpoint_kind, Types::CandidateCheckpointKind.optional.default(nil)
         attribute :completed_at, Types::Timestamp.optional.default(nil)
 
         def self.initial
@@ -43,6 +44,7 @@ module Coordinator::Write
             status: "absent",
             selected_candidate_id: nil,
             selected_candidate_event: nil,
+            selected_candidate_checkpoint_kind: nil,
             completed_at: nil
           )
         end
@@ -75,6 +77,7 @@ module Coordinator::Write
               status: "authorized",
               selected_candidate_id: nil,
               selected_candidate_event: nil,
+              selected_candidate_checkpoint_kind: nil,
               completed_at: nil
             )
           when Events::AttemptStartedV1
@@ -95,6 +98,7 @@ module Coordinator::Write
               status: "active",
               selected_candidate_id:,
               selected_candidate_event:,
+              selected_candidate_checkpoint_kind:,
               completed_at:
             )
           when Events::WriteSetReservedV1
@@ -115,6 +119,7 @@ module Coordinator::Write
               status:,
               selected_candidate_id:,
               selected_candidate_event:,
+              selected_candidate_checkpoint_kind:,
               completed_at:
             )
           when Events::WriteSetExpandedV1
@@ -135,6 +140,7 @@ module Coordinator::Write
               status:,
               selected_candidate_id:,
               selected_candidate_event:,
+              selected_candidate_checkpoint_kind:,
               completed_at:
             )
           when Events::WriteSetRenewedV1
@@ -155,6 +161,7 @@ module Coordinator::Write
               status:,
               selected_candidate_id:,
               selected_candidate_event:,
+              selected_candidate_checkpoint_kind:,
               completed_at:
             )
           when Events::WriteSetReleasedV1
@@ -175,6 +182,7 @@ module Coordinator::Write
               status:,
               selected_candidate_id:,
               selected_candidate_event:,
+              selected_candidate_checkpoint_kind:,
               completed_at:
             )
           when Events::CandidateAttachedToAttemptV1
@@ -195,6 +203,7 @@ module Coordinator::Write
               status:,
               selected_candidate_id: event.candidate_id,
               selected_candidate_event: event.candidate_event,
+              selected_candidate_checkpoint_kind: event.checkpoint_kind,
               completed_at:
             )
           when Events::AttemptAbandonedV1
@@ -215,6 +224,7 @@ module Coordinator::Write
               status: "abandoned",
               selected_candidate_id:,
               selected_candidate_event:,
+              selected_candidate_checkpoint_kind:,
               completed_at:
             )
           when Events::AttemptCompletedV1
@@ -235,6 +245,7 @@ module Coordinator::Write
               status: "completed",
               selected_candidate_id: event.candidate_id,
               selected_candidate_event: event.candidate_event,
+              selected_candidate_checkpoint_kind:,
               completed_at: event.completed_at
             )
           else

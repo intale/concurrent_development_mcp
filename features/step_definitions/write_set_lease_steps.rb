@@ -1393,8 +1393,8 @@ Then("the abandonment requeues the predecessor and leaves the successor fence un
 end
 
 Given(
-  "agent {string} has attached Candidate {string} to active Attempt {string}"
-) do |agent_id, candidate_id, attempt_id|
+  "agent {string} has attached {string} Candidate {string} to active Attempt {string}"
+) do |agent_id, checkpoint_kind, candidate_id, attempt_id|
   @candidate_abandonment_coordination = prepare_candidate_coordination(
     prefix: "ABANDON",
     agent_id:,
@@ -1410,6 +1410,7 @@ Given(
     command_id: "cmd-cuc-candidate-abandon-submit",
     head_character: "e"
   )
+  arguments[:checkpoint_kind] = checkpoint_kind
   task_id = submit_candidate_task(arguments)
   state = candidate_task_state(task_id)
   assert_acceptance_equal(false, state.dig("result", "result", "isError"), "Candidate setup")
@@ -1473,4 +1474,43 @@ Then("abandonment is denied without releasing leases or requeueing the WorkItem"
     "Candidate lease lifecycle"
   )
   assert_acceptance_equal([], command_events(@candidate_abandonment_command_id), "Denied command receipt")
+end
+
+Then("the checkpoint remains recorded while the Attempt is abandoned and requeued") do
+  coordination = @candidate_abandonment_coordination
+  ids = coordination.fetch(:ids)
+  result = @candidate_abandonment_state.dig("result", "result")
+  payload = result.fetch("structuredContent")
+  attempt_terminal_events = event_store.read(
+    streams.attempt(ids.fetch(:attempt_id)),
+    Coordinator::Write::EventReadCriteria.new(
+      event_types: [ "CandidateAttachedToAttempt", "AttemptAbandoned" ],
+      maximum_count: 2,
+      direction: :asc
+    )
+  )
+  requeue_events = event_store.read(
+    streams.work_item(ids.fetch(:work_item_id)),
+    Coordinator::Write::EventReadCriteria.new(
+      event_types: [ "WorkItemRequeued" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+  )
+
+  assert_acceptance_equal("completed", @candidate_abandonment_state.dig("result", "status"), "Task status")
+  assert_acceptance_equal(false, result.fetch("isError"), "Intermediate abandonment error flag")
+  assert_acceptance_equal("ok", payload.fetch("status"), "Intermediate abandonment outcome")
+  assert_acceptance_equal(
+    [ "CandidateAttachedToAttempt", "AttemptAbandoned" ],
+    attempt_terminal_events.map(&:type),
+    "Attempt facts"
+  )
+  assert_acceptance_equal([ "WorkItemRequeued" ], requeue_events.map(&:type), "WorkItem requeue facts")
+  assert_acceptance_equal(
+    [ "ResourceLeaseAcquired", "ResourceLeaseReleased" ],
+    lease_events(coordination.fetch(:path)).map(&:type),
+    "Intermediate Candidate lease lifecycle"
+  )
+  assert_acceptance_equal(1, command_events(@candidate_abandonment_command_id).length, "Command receipt")
 end

@@ -42,10 +42,10 @@ module Coordinator::Write
           unless attempt_state.status == "active"
             return failure(:attempt_not_active, "Attempt is not active and cannot be abandoned", command)
           end
-          if attempt_state.selected_candidate_id
+          if attempt_state.selected_candidate_checkpoint_kind == "final"
             return failure(
               :attempt_not_active,
-              "Attempt has a Candidate checkpoint and cannot be abandoned",
+              "Attempt has a final Candidate and must be completed instead of abandoned",
               command
             )
           end

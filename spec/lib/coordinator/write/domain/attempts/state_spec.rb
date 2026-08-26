@@ -47,6 +47,7 @@ RSpec.describe Coordinator::Write::Domain::Attempts::State do
       status: "active",
       selected_candidate_id: nil,
       selected_candidate_event: nil,
+      selected_candidate_checkpoint_kind: nil,
       completed_at: nil
     )
     expect(state).to be_frozen

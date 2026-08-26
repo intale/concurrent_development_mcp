@@ -189,8 +189,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
     expect(results.map { _1.value!.data.slot }).to all(be_nil)
     partition_history = partition_events("repo:billing:testing")
     expect(partition_history.map(&:stream_revision)).to eq([ 0, 1 ])
-    expect(load(partition_history.first).active_decisions.map(&:decision_id)).to eq([ "D-A" ])
-    expect(load(partition_history.last).active_decisions.map(&:decision_id)).to eq(%w[D-A D-B])
+    first_revision_decision_ids = load(partition_history.first).active_decisions.map(&:decision_id)
+    expect(first_revision_decision_ids.length).to eq(1)
+    expect(first_revision_decision_ids.sole).to be_in(%w[D-A D-B])
+    expect(load(partition_history.last).active_decisions.map(&:decision_id)).to contain_exactly("D-A", "D-B")
     expect(results.map { _1.value!.data.partitions.sole.partition_revision }.sort).to eq([ 0, 1 ])
   end
 

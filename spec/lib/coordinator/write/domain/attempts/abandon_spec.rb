@@ -216,7 +216,7 @@ RSpec.describe Coordinator::Write::Domain::Attempts::Abandon do
     expect(result.value!.events.first.untouched_resource_key_hashes).to eq([ reference.resource_key_hash ])
   end
 
-  it "denies abandonment after a Candidate has been attached" do
+  it "denies abandonment after a final Candidate has been attached" do
     candidate_event = Coordinator::Write::EventReference.new(
       event_id: id_generator.uuid_v7,
       type: "CandidateSubmitted",
@@ -227,7 +227,8 @@ RSpec.describe Coordinator::Write::Domain::Attempts::Abandon do
     )
     attempt_state = build_attempt_state(
       selected_candidate_id: "CAN-abandon",
-      selected_candidate_event: candidate_event
+      selected_candidate_event: candidate_event,
+      selected_candidate_checkpoint_kind: "final"
     )
 
     result = decide(attempt_state:)
@@ -235,7 +236,33 @@ RSpec.describe Coordinator::Write::Domain::Attempts::Abandon do
     expect(result).to be_failure
     expect(result.failure).to have_attributes(
       code: :attempt_not_active,
-      message: "Attempt has a Candidate checkpoint and cannot be abandoned"
+      message: "Attempt has a final Candidate and must be completed instead of abandoned"
+    )
+  end
+
+  it "preserves an intermediate Candidate as history while abandoning its Attempt" do
+    candidate_event = Coordinator::Write::EventReference.new(
+      event_id: id_generator.uuid_v7,
+      type: "CandidateSubmitted",
+      stream_context: "DevelopmentIntegration",
+      stream_name: "Candidate",
+      stream_id: "CAN-intermediate",
+      stream_revision: 0
+    )
+    attempt_state = build_attempt_state(
+      selected_candidate_id: "CAN-intermediate",
+      selected_candidate_event: candidate_event,
+      selected_candidate_checkpoint_kind: "intermediate"
+    )
+
+    result = decide(attempt_state:)
+
+    expect(result).to be_success
+    expect(result.value!.events.map(&:class)).to eq(
+      [
+        Coordinator::Write::Events::AttemptAbandonedV1,
+        Coordinator::Write::Events::WorkItemRequeuedV1
+      ]
     )
   end
 
