@@ -1,27 +1,15 @@
 # README
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+## Development
 
-Things you may want to cover:
+Steps to setup development environment:
 
-* Ruby version
-
-* System dependencies
-
-* Configuration
-
-* Database creation
-
-* Database initialization
-
-* How to run the test suite
-
-* Services (job queues, cache servers, search engines, etc.)
-
-* Deployment instructions
-
-* ...
+- start docker compose first via `docker compose up`
+- run `./bin/setup_db` to create rails and pg_eventstore databases if this is your initial run
+- run `rails s` to start rails server
+- run
+  `bundle exec pg-eventstore subscriptions start -r ./config/environment.rb -r ./config/pg_eventstore_subscriptions.rb`
+  to start pg_eventstore subscriptions
 
 ## Runtime-RBS test gate
 

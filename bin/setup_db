@@ -4,6 +4,8 @@
 # re-creation. Thus, we have to close all active connections first before dropping dev and test databases.
 PG_EVENTSTORE_URI="postgresql://postgres:postgres@localhost:5532/postgres" ./bin/shut_down_all_connections
 
+bundle exec rails db:create db:migrate
+
 PG_EVENTSTORE_URI="postgresql://postgres:postgres@localhost:5532/eventstore" bundle exec rake pg_eventstore:drop
 PG_EVENTSTORE_URI="postgresql://postgres:postgres@localhost:5532/eventstore" bundle exec rake pg_eventstore:create
 PG_EVENTSTORE_URI="postgresql://postgres:postgres@localhost:5532/eventstore" bundle exec rake pg_eventstore:migrate
