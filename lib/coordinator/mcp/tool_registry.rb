@@ -27,6 +27,7 @@ module Coordinator
           Tools::OperationBatchGet,
           Tools::VerificationObligationsList,
           Tools::MergeSnapshotGet,
+          Tools::RepositoryRegister,
           Tools::ChangeSetCreate,
           Tools::WorkItemCreate,
           Tools::WorkItemDependencyDeclare,

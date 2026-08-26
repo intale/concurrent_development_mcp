@@ -12,6 +12,20 @@ module Coordinator::Write
 
     def document(command)
       case command
+      when Commands::RegisterRepository
+        CommandInputDocuments::RegisterRepositoryV1.new(
+          schema: "command-input/v1",
+          command_id: command.command_id,
+          tool_name: "repository_register",
+          input: CommandInputDocuments::RegisterRepositoryInputV1.new(
+            actor: actor_document(command.actor),
+            repository_id: command.repository_id,
+            scope: command.scope,
+            display_name: command.display_name,
+            paths: command.paths,
+            remotes: command.remotes
+          )
+        )
       when Commands::CreateChangeSet then create_change_set_document(command)
       when Commands::CreateWorkItem then work_item_create_document(command)
       when Commands::DeclareWorkItemDependency then work_item_dependency_declare_document(command)

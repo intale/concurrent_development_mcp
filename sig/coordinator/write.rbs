@@ -2,7 +2,8 @@ module Coordinator
   module Write
     type command_input = Hash[String | Symbol, untyped]
     type event_data = Hash[String | Symbol, untyped]
-    type coordination_command = Commands::CreateChangeSet |
+    type coordination_command = Commands::RegisterRepository |
+                                Commands::CreateChangeSet |
                                 Commands::CreateWorkItem |
                                 Commands::DeclareWorkItemDependency |
                                 Commands::ActivateChangeSet |

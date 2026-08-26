@@ -2,6 +2,17 @@
 
 module Coordinator::Write
   module CommandReceiptData
+    class RepositoryRegistration < Value
+      attribute :repository_id, Types::UuidV7
+      attribute :scope, Types::String.constrained(min_size: 1, max_size: 500)
+      attribute :display_name, Types::String.constrained(min_size: 1, max_size: 255).optional
+      attribute :paths,
+                Types::Array.of(Types::String.constrained(min_size: 1, max_size: 1_024)).constrained(max_size: 20)
+      attribute :remotes,
+                Types::Array.of(Types::String.constrained(min_size: 1, max_size: 2_048)).constrained(max_size: 20)
+      attribute :registered_at, Types::Timestamp
+    end
+
     class ChangeSet < Value
       attribute :change_set_id, Types::Identifier
     end
@@ -453,7 +464,8 @@ module Coordinator::Write
       attribute :index, Types::OperationBatchItemIndex.optional
     end
 
-    Type = ChangeSet |
+    Type = RepositoryRegistration |
+           ChangeSet |
            WorkItem |
            Dependency |
            Attempt |

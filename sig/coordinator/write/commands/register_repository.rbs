@@ -1,0 +1,20 @@
+module Coordinator
+  module Write
+    module Commands
+      class RegisterRepository < Shared::Value
+        Scope: untyped
+        DisplayName: untyped
+        Path: untyped
+        Remote: untyped
+
+        def command_id: () -> String
+        def actor: () -> Actor
+        def repository_id: () -> String
+        def scope: () -> String
+        def display_name: () -> String?
+        def paths: () -> Array[String]
+        def remotes: () -> Array[String]
+      end
+    end
+  end
+end

@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandInputDocuments
-      type value = CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | CompleteWorkItemV1 | AbandonAttemptV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1 | SubmitCandidateV1 | SubmitCandidateImpactSurfaceV1 | ClaimVerificationObligationV1 | SubmitCompatibilityAssessmentV1 | WaiveVerificationObligationV1 | RegisterMergeSnapshotV1 | SubmitMergeSnapshotVerificationV1 | RequestMergeAuthorizationV1 | RecordMergeObservationV1 | PrepareReleaseSetV1 | RecordRepositoryIntegrationV1 | RecordReleaseSetVerificationV1 | RecordReleaseSetActivationV1 | CompleteCompensatedReleaseSetV1 | PublishSkillRevisionV1 | CaptureDevelopmentArtifactV1 | DeclareDevelopmentArtifactRelationV1 | CreateOperationBatchV1 | CancelOperationBatchV1
+      type value = RegisterRepositoryV1 | CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | CompleteWorkItemV1 | AbandonAttemptV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1 | SubmitCandidateV1 | SubmitCandidateImpactSurfaceV1 | ClaimVerificationObligationV1 | SubmitCompatibilityAssessmentV1 | WaiveVerificationObligationV1 | RegisterMergeSnapshotV1 | SubmitMergeSnapshotVerificationV1 | RequestMergeAuthorizationV1 | RecordMergeObservationV1 | PrepareReleaseSetV1 | RecordRepositoryIntegrationV1 | RecordReleaseSetVerificationV1 | RecordReleaseSetActivationV1 | CompleteCompensatedReleaseSetV1 | PublishSkillRevisionV1 | CaptureDevelopmentArtifactV1 | DeclareDevelopmentArtifactRelationV1 | CreateOperationBatchV1 | CancelOperationBatchV1
       type digest_value = value | ExpireResourceLeaseV1 | RequestReleaseSetCompensationV1 | CompleteActivatedReleaseSetV1 | SatisfyWorkItemDependencyV1 | CompleteChangeSetV1 | RecordOperationBatchItemOutcomeV1 | RequestOperationBatchContinuationV1 | CompleteOperationBatchV1 | CompleteOperationBatchCancellationV1
 
       class ActorV1 < Shared::Value
@@ -12,6 +12,20 @@ module Coordinator
       class BaseV1 < Shared::Value
         def schema: () -> String
         def command_id: () -> String
+      end
+
+      class RegisterRepositoryInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def repository_id: () -> String
+        def scope: () -> String
+        def display_name: () -> String?
+        def paths: () -> Array[String]
+        def remotes: () -> Array[String]
+      end
+
+      class RegisterRepositoryV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> RegisterRepositoryInputV1
       end
 
       class CreateChangeSetInputV1 < Shared::Value

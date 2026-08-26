@@ -70,6 +70,10 @@ module Coordinator
       Write::CommandCompletionBuilder.new
     end
 
+    register("operations.prepare_register_repository", memoize: true) do
+      self["operations.execute_register_repository"].method(:prepare)
+    end
+
     register("operations.prepare_create_change_set", memoize: true) do
       Write::Operations::PrepareCreateChangeSet.new
     end
@@ -239,6 +243,10 @@ module Coordinator
 
     register("operations.prepare_cancel_operation_batch", memoize: true) do
       Write::Operations::PrepareCancelOperationBatch.new
+    end
+
+    register("domain.repositories.register", memoize: true) do
+      Write::Domain::Repositories::Register.new(stream_factory: self["stream_factory"])
     end
 
     register("domain.change_sets.create", memoize: true) do
@@ -1007,6 +1015,20 @@ module Coordinator
       Mcp::TransportFactory.new.call(
         server: self["mcp.server"],
         settings: self["mcp.settings"]
+      )
+    end
+
+    register("operations.execute_register_repository") do
+      Write::Operations::ExecuteRegisterRepository.new(
+        event_store: self["event_store"],
+        decider: self["domain.repositories.register"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        compound_marker_builder: self["compound_marker_builder"]
       )
     end
 
@@ -1868,6 +1890,13 @@ module Coordinator
         event_factory: self["event_factory"],
         stream_factory: self["stream_factory"],
         correlation_resolver: self["tasks.correlation_resolver"]
+      )
+    end
+
+    register("operations.submit_register_repository_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_register_repository"],
+        submitter: self["operations.submit_coordination_task"]
       )
     end
 

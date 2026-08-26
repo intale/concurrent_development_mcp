@@ -5,6 +5,8 @@ module Coordinator::Write
     class ToolResultMapper
       STATUS_BY_CODE = {
         command_id_reused: "command_id_reused",
+        repository_already_registered: "conflict",
+        repository_identity_conflict: "conflict",
         work_item_unavailable: "conflict",
         attempt_already_exists: "conflict",
         lease_busy: "busy",

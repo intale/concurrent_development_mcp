@@ -30,6 +30,14 @@ module Coordinator::Write
       )
     end
 
+    def repository(repository_id)
+      StreamReference.new(
+        context: "DevelopmentPlanning",
+        stream_name: "Repository",
+        stream_id: repository_id
+      )
+    end
+
     def change_set(change_set_id)
       StreamReference.new(
         context: "DevelopmentPlanning",

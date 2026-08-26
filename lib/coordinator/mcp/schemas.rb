@@ -36,6 +36,31 @@ module Coordinator
         }
       end
 
+      def repository_register
+        object_schema(
+          properties: common_mutation_properties.merge(
+            actor: agent_actor,
+            repository_id: uuid_v7.merge(
+              description: "Caller-created canonical Repository identity; names, paths, and remotes are metadata."
+            ),
+            scope: {
+              type: "string",
+              minLength: 1,
+              maxLength: 500,
+              description: "Exact project/workspace coordination scope; the server infers no hierarchy."
+            },
+            display_name: {
+              type: [ "string", "null" ],
+              minLength: 1,
+              maxLength: 255
+            },
+            paths: string_array(min_items: 0, max_items: 20, max_length: 1_024),
+            remotes: string_array(min_items: 0, max_items: 20, max_length: 2_048)
+          ),
+          required: %w[command_id actor repository_id scope display_name paths remotes]
+        )
+      end
+
       def change_set_create
         object_schema(
           properties: common_mutation_properties.merge(

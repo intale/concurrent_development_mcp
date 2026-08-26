@@ -57,6 +57,7 @@ module Coordinator::Write
         operation_batch_command:
           Operations::ExecuteOperationBatchCommand.new(event_store:)
       )
+        @register_repository = Operations::ExecuteRegisterRepository.new(event_store:)
         @create_change_set = create_change_set
         @create_work_item = create_work_item
         @declare_work_item_dependency = declare_work_item_dependency
@@ -96,6 +97,8 @@ module Coordinator::Write
 
       def call(command, caused_by:)
         case command
+        when Commands::RegisterRepository
+          @register_repository.call_command(command, caused_by:)
         when Commands::CreateChangeSet
           @create_change_set.call_command(command, caused_by:)
         when Commands::CreateWorkItem

@@ -476,6 +476,7 @@ module Coordinator::Shared
       delivery.merge
     ].freeze
     COORDINATION_TOOL_NAMES = %w[
+      repository_register
       change_set_create
       work_item_create
       work_item_dependency_declare

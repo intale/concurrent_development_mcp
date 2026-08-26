@@ -49,6 +49,7 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
       "operation_batch_get",
       "verification_obligations_list",
       "merge_snapshot_get",
+      "repository_register",
       "decision_interpretation_adjudicate",
       "decision_activate",
       "decision_correct",
@@ -103,6 +104,79 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
       "idempotentHint" => true,
       "destructiveHint" => false
     )
+  end
+
+  it "registers one exact scoped UUIDv7 repository through a replayable durable Task" do
+    repository_id = SecureRandom.uuid_v7
+    arguments = {
+      command_id: "cmd-mcp-repository-register",
+      actor: { kind: "agent", id: "planner-repository" },
+      repository_id:,
+      scope: "project:payments/workspace:primary",
+      display_name: "Payments API",
+      paths: [ "/client-visible/payments", "/other-container/payments" ],
+      remotes: [ "https://example.test/payments.git" ]
+    }
+
+    submitted = call_tool("repository_register", arguments, id: 1)
+    task_id = submitted.dig("result", "taskId")
+    expect(task_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN), submitted.inspect
+    execute_task(task_id)
+    completed = task_request("tasks/get", task_id:, id: 2)
+    result = completed.dig("result", "result")
+
+    expect(completed.dig("result", "status")).to eq("completed"), completed.inspect
+    expect(result).to include(
+      "isError" => false,
+      "structuredContent" => include(
+        "status" => "ok",
+        "data" => include(
+          "repository_id" => repository_id,
+          "scope" => "project:payments/workspace:primary",
+          "paths" => arguments.fetch(:paths),
+          "remotes" => arguments.fetch(:remotes)
+        )
+      )
+    )
+    registration = repository_events(repository_id).sole
+    expect(registration.type).to eq("RepositoryRegistered")
+    expect(registration.markers).to include("repository:#{repository_id}")
+    expect(registration.markers.grep(/\Acompound:(?:repository-scope|scoped-repository):v1:/).length).to eq(2)
+    expect(registration.metadata).not_to have_key("correlation_id")
+
+    replay_task_id = call_tool("repository_register", arguments, id: 3).dig("result", "taskId")
+    execute_task(replay_task_id)
+    replay = task_request("tasks/get", task_id: replay_task_id, id: 4)
+    expect(replay.dig("result", "result")).to eq(result)
+    expect(repository_events(repository_id).length).to eq(1)
+    expect(command_events(arguments.fetch(:command_id)).length).to eq(1)
+
+    conflict_task_id = call_tool(
+      "repository_register",
+      arguments.merge(command_id: "cmd-mcp-repository-conflict", scope: "project:other"),
+      id: 5
+    ).dig("result", "taskId")
+    execute_task(conflict_task_id)
+    denied = task_request("tasks/get", task_id: conflict_task_id, id: 6)
+    expect(denied.dig("result", "status")).to eq("completed"), denied.inspect
+    expect(denied.dig("result", "result")).to include(
+      "isError" => true,
+      "structuredContent" => include(
+        "status" => "conflict",
+        "data" => include("code" => "repository_identity_conflict")
+      )
+    )
+    expect(repository_events(repository_id).length).to eq(1)
+    expect(command_events("cmd-mcp-repository-conflict")).to be_empty
+
+    invalid = call_tool(
+      "repository_register",
+      arguments.merge(command_id: "cmd-mcp-repository-invalid", repository_id: "payments"),
+      id: 7
+    )
+    expect(invalid.dig("result", "resultType")).to eq("complete")
+    expect(invalid.dig("result", "isError")).to be(true)
+    expect(task_events_for_command("cmd-mcp-repository-invalid")).to be_empty
   end
 
   it "teaches a clean agent to migrate client-visible development memory semantically" do
@@ -634,6 +708,17 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
     event_store.read(
       streams.change_set(change_set_id),
       Coordinator::Write::EventQueries::CHANGE_SET_FOR_ACTIVATION
+    )
+  end
+
+  def repository_events(repository_id)
+    event_store.read(
+      streams.repository(repository_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: [ "RepositoryRegistered" ],
+        maximum_count: 2,
+        direction: :asc
+      )
     )
   end
 end

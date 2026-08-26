@@ -6,6 +6,7 @@ module Coordinator::Write
     class SchemaMismatch < ArgumentError; end
 
     DEFAULT_DEFINITIONS = {
+      [ "RepositoryRegistered", 1 ] => Events::RepositoryRegisteredV1,
       [ "ChangeSetCreated", 1 ] => Events::ChangeSetCreatedV1,
       [ "ChangeSetAcceptanceCriteriaDefined", 1 ] => Events::ChangeSetAcceptanceCriteriaDefinedV1,
       [ "CommandCompleted", 1 ] => Events::CommandCompletedV1,

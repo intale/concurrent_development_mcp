@@ -5,6 +5,17 @@ module Coordinator::Write
     class TargetCommandBuilder
       def call(document)
         case document
+        when CommandInputDocuments::RegisterRepositoryV1
+          input = document.input
+          Commands::RegisterRepository.new(
+            command_id: document.command_id,
+            actor: build_actor(input.actor),
+            repository_id: input.repository_id,
+            scope: input.scope,
+            display_name: input.display_name,
+            paths: input.paths,
+            remotes: input.remotes
+          )
         when CommandInputDocuments::CreateChangeSetV1
           build_create_change_set(document)
         when CommandInputDocuments::CreateWorkItemV1

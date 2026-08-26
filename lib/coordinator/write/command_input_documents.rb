@@ -12,6 +12,22 @@ module Coordinator::Write
       attribute :command_id, Types::Identifier
     end
 
+    class RegisterRepositoryInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :repository_id, Types::UuidV7
+      attribute :scope, Types::String.constrained(min_size: 1, max_size: 500)
+      attribute :display_name, Types::String.constrained(min_size: 1, max_size: 255).optional
+      attribute :paths,
+                Types::Array.of(Types::String.constrained(min_size: 1, max_size: 1_024)).constrained(max_size: 20)
+      attribute :remotes,
+                Types::Array.of(Types::String.constrained(min_size: 1, max_size: 2_048)).constrained(max_size: 20)
+    end
+
+    class RegisterRepositoryV1 < BaseV1
+      attribute :tool_name, Types::String.enum("repository_register")
+      attribute :input, RegisterRepositoryInputV1
+    end
+
     class CreateChangeSetInputV1 < Value
       attribute :actor, ActorV1
       attribute :change_set_id, Types::Identifier
@@ -844,7 +860,8 @@ module Coordinator::Write
       attribute :input, CompleteChangeSetInputV1
     end
 
-    Type = CreateChangeSetV1 |
+    Type = RegisterRepositoryV1 |
+           CreateChangeSetV1 |
            CreateWorkItemV1 |
            DeclareWorkItemDependencyV1 |
            ActivateChangeSetV1 |

@@ -788,6 +788,21 @@ module Coordinator::Write
         attribute :details, CandidateExistingDetails
       end
 
+      class RepositoryIdentityDetails < Value
+        attribute :repository_id, Types::UuidV7
+        attribute :requested_scope, Types::String.constrained(min_size: 1, max_size: 500)
+        attribute :registered_scope, Types::String.constrained(min_size: 1, max_size: 500)
+      end
+
+      class RepositoryRegistrationError < Value
+        attribute :code, Types::String.enum(
+          "repository_already_registered",
+          "repository_identity_conflict"
+        )
+        attribute :message, Types::String
+        attribute :details, RepositoryIdentityDetails
+      end
+
       class SkillIdentityDetails < Value
         attribute :skill_id, Types::SkillId
         attribute :name, Types::SkillName
@@ -1061,6 +1076,7 @@ module Coordinator::Write
              CandidateImpactIdentityMismatchError |
              CandidateImpactSourceEvidenceMismatchError |
              CandidateImpactSurfaceAlreadyRecordedError |
+             RepositoryRegistrationError |
              SkillIdentityConflictError |
              SkillRevisionConflictError |
              DevelopmentArtifactIdentityConflictError |
