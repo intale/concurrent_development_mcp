@@ -18,6 +18,36 @@ module Coordinator::Write
         build_command(attributes, evidence:)
       end
 
+      def scope_for_repository(command, repository_registration:)
+        resources = @evidence_builder.scope_resources(
+          command.actual_resources,
+          repository_registration:
+        )
+        return resources if resources.failure?
+
+        Success(
+          Commands::SubmitCandidate.new(
+            command_id: command.command_id,
+            actor: command.actor,
+            candidate_id: command.candidate_id,
+            change_set_id: command.change_set_id,
+            work_item_id: command.work_item_id,
+            attempt_id: command.attempt_id,
+            repository_id: command.repository_id,
+            target_branch: command.target_branch,
+            object_format: command.object_format,
+            base_commit_oid: command.base_commit_oid,
+            head_commit_oid: command.head_commit_oid,
+            checkpoint_kind: command.checkpoint_kind,
+            lease_set_id: command.lease_set_id,
+            leases: command.leases,
+            manifest: command.manifest,
+            build_context: command.build_context,
+            actual_resources: resources.value!
+          )
+        )
+      end
+
       private
 
       def validate(input)

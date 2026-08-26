@@ -21,7 +21,43 @@ module Coordinator::Write
         step build_command(attributes, resources:)
       end
 
+      def scope_for_repository(command, repository_registration:)
+        resources = rekey_resources(command.resources, repository_registration:)
+        return resources if resources.failure?
+
+        Success(
+          Commands::ReserveWriteSet.new(
+            command_id: command.command_id,
+            actor: command.actor,
+            change_set_id: command.change_set_id,
+            work_item_id: command.work_item_id,
+            attempt_id: command.attempt_id,
+            repository_id: command.repository_id,
+            base_commit_oid: command.base_commit_oid,
+            resources: resources.value!,
+            lease_duration_seconds: command.lease_duration_seconds
+          )
+        )
+      end
+
       private
+
+      def rekey_resources(resources, repository_registration:)
+        scoped = resources.map do |resource|
+          result = @resource_normalizer.call(
+            repository_id: repository_registration.repository_id,
+            kind: resource.kind,
+            path: resource.path,
+            base_blob_oid: resource.base_blob_oid,
+            scope: repository_registration.scope
+          )
+          return result if result.failure?
+
+          result.value!
+        end
+
+        Success(scoped)
+      end
 
       def validate(input)
         result = @contract.call(input)

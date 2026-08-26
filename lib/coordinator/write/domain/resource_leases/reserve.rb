@@ -110,7 +110,7 @@ module Coordinator::Write
                   work_item_id: command.work_item_id,
                   attempt_id: command.attempt_id,
                   repository_id: command.repository_id,
-                  policy_version: ResourceKeyDocumentV1::POLICY_VERSION,
+                  policy_version: command.resources.first.policy_version,
                   resources: references,
                   reserved_at: acquired_at,
                   expires_at:

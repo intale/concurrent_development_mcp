@@ -5,6 +5,7 @@ module Coordinator
         def initialize: (?resource_normalizer: Coordinator::Write::FileResourceNormalizer, ?canonical_json: Coordinator::Shared::CanonicalJson, ?uniqueness_contract: Coordinator::Write::Contracts::CandidateEvidenceUniqueness) -> void
         %a{rbs:test:skip}
         def call: (Hash[Symbol, untyped] attributes) -> Dry::Monads::Result
+        def scope_resources: (Array[Coordinator::Write::FileResourceV1] resources, repository_registration: Coordinator::Write::Events::RepositoryRegisteredV1) -> Dry::Monads::Result
       end
     end
   end

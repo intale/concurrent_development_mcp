@@ -83,9 +83,10 @@ module Coordinator::Write
               released_at: attempt.lease_released_at
             )
           end
+          resource_policy_versions = command.actual_resources.map(&:policy_version).uniq
           unless attempt.lease_set_id == command.lease_set_id &&
                  attempt.lease_repository_id == command.repository_id &&
-                 attempt.lease_policy_version == ResourceKeyDocumentV1::POLICY_VERSION
+                 resource_policy_versions == [ attempt.lease_policy_version ]
             return failure(
               :lease_set_mismatch,
               "Lease set does not match the Attempt",

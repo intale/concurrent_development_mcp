@@ -106,6 +106,19 @@ module Coordinator::Write
         end
 
         def evidence_denied(attempt_state:, requested_observations:, command:)
+          policy_conflict = requested_observations.find do |observation|
+            observation.prepared_resource.resource.policy_version != attempt_state.lease_policy_version
+          end
+          if policy_conflict
+            return failure(
+              :resource_identity_policy_mismatch,
+              "Requested resource identity policy differs from the current write set",
+              command,
+              current_policy_version: attempt_state.lease_policy_version,
+              requested_policy_version: policy_conflict.prepared_resource.resource.policy_version
+            )
+          end
+
           current_by_hash = attempt_state.lease_resources.to_h { [ _1.resource_key_hash, _1 ] }
           conflict = requested_observations.find do |observation|
             resource = observation.prepared_resource.resource

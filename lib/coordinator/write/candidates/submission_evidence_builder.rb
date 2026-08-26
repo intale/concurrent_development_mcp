@@ -39,6 +39,23 @@ module Coordinator::Write
         )
       end
 
+      def scope_resources(resources, repository_registration:)
+        scoped = resources.map do |resource|
+          result = @resource_normalizer.call(
+            repository_id: repository_registration.repository_id,
+            kind: resource.kind,
+            path: resource.path,
+            base_blob_oid: resource.base_blob_oid,
+            scope: repository_registration.scope
+          )
+          return result if result.failure?
+
+          result.value!
+        end
+
+        Success(collapse_resources(scoped))
+      end
+
       private
 
       def collector(actor, collector_version)

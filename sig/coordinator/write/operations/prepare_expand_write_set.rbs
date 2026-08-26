@@ -5,6 +5,7 @@ module Coordinator
         def initialize: (?contract: Contracts::ExpandWriteSet, ?git_object_ids_contract: Contracts::GitObjectIds, ?resource_normalizer: FileResourceNormalizer) -> void
         %a{rbs:test:skip}
         def call: (command_input input) -> Dry::Monads::Result
+        def scope_for_repository: (Commands::ExpandWriteSet command, repository_registration: Events::RepositoryRegisteredV1) -> Dry::Monads::Result
       end
     end
   end
