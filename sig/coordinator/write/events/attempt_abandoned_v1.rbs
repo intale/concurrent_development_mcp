@@ -1,0 +1,17 @@
+module Coordinator
+  module Write
+    module Events
+      class AttemptAbandonedV1 < Base
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def attempt_id: () -> String
+        def agent_id: () -> String
+        def reason: () -> String
+        def lease_set_id: () -> String?
+        def released_leases: () -> Array[LeaseReferenceV1]
+        def untouched_resource_key_hashes: () -> Array[String]
+        def abandoned_at: () -> String
+      end
+    end
+  end
+end

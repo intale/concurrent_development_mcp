@@ -482,6 +482,7 @@ module Coordinator::Shared
       change_set_activate
       work_item_acquire
       work_item_complete
+      attempt_abandon
       write_set_reserve
       write_set_expand
       lease_renew

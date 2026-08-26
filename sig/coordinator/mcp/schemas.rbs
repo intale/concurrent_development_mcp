@@ -8,6 +8,7 @@ module Coordinator
       def self.change_set_activate: () -> json_schema
       def self.work_item_acquire: () -> json_schema
       def self.work_item_complete: () -> json_schema
+      def self.attempt_abandon: () -> json_schema
       def self.write_set_reserve: () -> json_schema
       def self.write_set_expand: () -> json_schema
       def self.lease_renew: () -> json_schema

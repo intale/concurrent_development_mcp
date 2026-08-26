@@ -8,6 +8,7 @@ module Coordinator
                                 Commands::ActivateChangeSet |
                                 Commands::AcquireWorkItem |
                                 Commands::CompleteWorkItem |
+                                Commands::AbandonAttempt |
                                 Commands::ReserveWriteSet |
                                 Commands::ExpandWriteSet |
                                 Commands::RenewLeaseSet |

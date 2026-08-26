@@ -101,6 +101,19 @@ module Coordinator::Write
       attribute :input, CompleteWorkItemInputV1
     end
 
+    class AbandonAttemptInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :change_set_id, Types::Identifier
+      attribute :work_item_id, Types::Identifier
+      attribute :attempt_id, Types::Identifier
+      attribute :reason, Types::String.constrained(min_size: 1, max_size: 2_000)
+    end
+
+    class AbandonAttemptV1 < BaseV1
+      attribute :tool_name, Types::String.enum("attempt_abandon")
+      attribute :input, AbandonAttemptInputV1
+    end
+
     class FileResourceV1 < Value
       attribute :kind, Types::ResourceKind
       attribute :path, Types::ResourcePath
@@ -837,6 +850,7 @@ module Coordinator::Write
            ActivateChangeSetV1 |
            AcquireWorkItemV1 |
            CompleteWorkItemV1 |
+           AbandonAttemptV1 |
            ReserveWriteSetV1 |
            ExpandWriteSetV1 |
            RenewLeaseSetV1 |

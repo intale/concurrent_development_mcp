@@ -33,6 +33,7 @@ module Coordinator
           Tools::ChangeSetActivate,
           Tools::WorkItemAcquire,
           Tools::WorkItemComplete,
+          Tools::AttemptAbandon,
           Tools::WriteSetReserve,
           Tools::WriteSetExpand,
           Tools::LeaseRenew,

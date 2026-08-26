@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Commands
+      class AbandonAttempt < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def attempt_id: () -> String
+        def reason: () -> String
+      end
+    end
+  end
+end

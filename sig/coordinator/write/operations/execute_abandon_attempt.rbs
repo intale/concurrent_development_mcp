@@ -1,0 +1,25 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecuteAbandonAttempt < Dry::Operation
+        class PreparedV1 < Shared::Value
+          def abandoned_at: () -> String
+          def input_digest: () -> String
+          def resource_event_ids: () -> Array[String]
+          def attempt_event_id: () -> String
+          def work_item_event_id: () -> String
+          def completion_event_id: () -> String
+        end
+
+        class InvalidEventPlan < StandardError
+        end
+
+        def initialize: (event_store: _EventStore, ?contract: Contracts::AbandonAttempt, ?decider: Domain::Attempts::Abandon, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?compound_marker_builder: Shared::CompoundMarkerBuilder, ?event_plan_contract: Contracts::AttemptAbandonmentEventPlan) -> void
+        %a{rbs:test:skip}
+        def call: (command_input input) -> Dry::Monads::Result
+        def prepare: (command_input input) -> Dry::Monads::Result
+        def call_command: (Commands::AbandonAttempt command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
+      end
+    end
+  end
+end

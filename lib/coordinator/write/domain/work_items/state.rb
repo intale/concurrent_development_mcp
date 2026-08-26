@@ -92,6 +92,21 @@ module Coordinator::Write
               produced_outputs:,
               completed_at:
             )
+          when Events::WorkItemRequeuedV1
+            self.class.new(
+              work_item_id:,
+              change_set_id:,
+              repository_id:,
+              goal:,
+              acceptance_criteria:,
+              status: "ready",
+              active_attempt_id: nil,
+              active_agent_id: nil,
+              selected_candidate_id: nil,
+              selected_candidate_event: nil,
+              produced_outputs: [],
+              completed_at: nil
+            )
           when Events::WorkItemCandidateSelectedV1
             self.class.new(
               change_set_id:,

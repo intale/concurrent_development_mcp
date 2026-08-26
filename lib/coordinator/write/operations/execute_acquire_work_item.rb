@@ -133,10 +133,19 @@ module Coordinator::Write
       end
 
       def load_work_item_state(work_item_id)
-        events = @event_store.read(
+        events = @event_store.read_grouped(
           @stream_factory.work_item(work_item_id),
-          EventQueries::WORK_ITEM_FOR_ACQUISITION
-        ).map { load_event(_1) }
+          GroupedEventReadCriteria.new(
+            event_types: [
+              "WorkItemCreated",
+              "WorkItemMadeReady",
+              "WorkItemAcquired",
+              "WorkItemRequeued",
+              "WorkItemCompleted"
+            ],
+            direction: :desc
+          )
+        ).reverse.map { load_event(_1) }
 
         Domain::WorkItems::State.reduce(events)
       end

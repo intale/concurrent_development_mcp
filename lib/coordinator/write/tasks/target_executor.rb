@@ -63,6 +63,7 @@ module Coordinator::Write
         @activate_change_set = activate_change_set
         @acquire_work_item = acquire_work_item
         @complete_work_item = complete_work_item
+        @abandon_attempt = Operations::ExecuteAbandonAttempt.new(event_store:)
         @reserve_write_set = reserve_write_set
         @expand_write_set = expand_write_set
         @renew_lease_set = renew_lease_set
@@ -107,6 +108,8 @@ module Coordinator::Write
           @acquire_work_item.call_command(command, caused_by:)
         when Commands::CompleteWorkItem
           @complete_work_item.call_command(command, caused_by:)
+        when Commands::AbandonAttempt
+          @abandon_attempt.call_command(command, caused_by:)
         when Commands::ReserveWriteSet
           @reserve_write_set.call_command(command, caused_by:)
         when Commands::ExpandWriteSet

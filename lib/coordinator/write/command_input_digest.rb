@@ -18,6 +18,19 @@ module Coordinator::Write
       when Commands::ActivateChangeSet then change_set_activate_document(command)
       when Commands::AcquireWorkItem then work_item_acquire_document(command)
       when Commands::CompleteWorkItem then work_item_complete_document(command)
+      when Commands::AbandonAttempt
+        CommandInputDocuments::AbandonAttemptV1.new(
+          schema: "command-input/v1",
+          command_id: command.command_id,
+          tool_name: "attempt_abandon",
+          input: CommandInputDocuments::AbandonAttemptInputV1.new(
+            actor: actor_document(command.actor),
+            change_set_id: command.change_set_id,
+            work_item_id: command.work_item_id,
+            attempt_id: command.attempt_id,
+            reason: command.reason
+          )
+        )
       when Commands::ReserveWriteSet then write_set_reserve_document(command)
       when Commands::ExpandWriteSet then write_set_expand_document(command)
       when Commands::RenewLeaseSet then lease_renew_document(command)

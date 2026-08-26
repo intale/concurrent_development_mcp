@@ -97,6 +97,32 @@ Feature: Dynamic write-set leases
       When agent "agent-b" deliberately reserves after the release
       Then the successor obtains fencing token 2
 
+  Rule: Interrupted work is abandoned without disturbing successor ownership
+
+    @CDM-ATTEMPT-001 @event-contract
+    Scenario: An agent abandons current work and reacquires it through a fresh Attempt
+      Given agent "agent-a" has reserved "app/a.rb" and "app/b.rb" for releasable Attempt "A-CUC-ABANDON" in ChangeSet "CS-CUC-ABANDON"
+      When the agent abandons the Attempt because its execution was interrupted
+      Then the abandonment Task releases current fences and requeues the WorkItem
+      When the exact abandonment command is retried through another Task
+      Then both abandonment Task handles expose one logical result
+      When the agent reacquires the requeued WorkItem as fresh Attempt "A-CUC-ABANDON-NEXT"
+      Then the fresh Attempt starts from a new base declaration while the old Attempt remains terminal
+
+    @CDM-ATTEMPT-002 @concurrency
+    Scenario: Abandonment never releases a fence acquired by a successor
+      Given agents "agent-a" and "agent-b" have active Attempts in ChangeSet "CS-CUC-ABANDON-SUPERSEDED"
+      And agent "agent-a" reserves "app/shared.rb" for 30 seconds at "2026-08-22T10:00:00Z"
+      And after its deadline agent "agent-b" reserves the same file before the expiry policy runs
+      When the expired predecessor abandons its Attempt
+      Then the abandonment requeues the predecessor and leaves the successor fence untouched
+
+    @CDM-ATTEMPT-003 @event-contract
+    Scenario: A Candidate checkpoint prevents Attempt abandonment
+      Given agent "agent-a" has attached Candidate "CAN-CUC-ABANDON" to active Attempt "A-CUC-CAN-ABANDON"
+      When the agent tries to abandon the Candidate-bearing Attempt
+      Then abandonment is denied without releasing leases or requeueing the WorkItem
+
   Rule: Elapsed lease availability does not wait for expiry audit
 
     @CDM-LEASE-009 @stale-view

@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Domain
+      module Attempts
+        class Abandon
+          def initialize: (?stream_factory: StreamFactory) -> void
+          def call: (attempt_state: State, work_item_state: Domain::WorkItems::State, current_observations: Array[CurrentLeaseObservationV1], command: Commands::AbandonAttempt, abandoned_at: String) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

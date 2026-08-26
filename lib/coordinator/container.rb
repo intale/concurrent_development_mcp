@@ -94,6 +94,10 @@ module Coordinator
       Write::Operations::PrepareCompleteWorkItem.new
     end
 
+    register("operations.prepare_abandon_attempt", memoize: true) do
+      self["operations.execute_abandon_attempt"].method(:prepare)
+    end
+
     register("operations.prepare_reserve_write_set", memoize: true) do
       Write::Operations::PrepareReserveWriteSet.new
     end
@@ -271,6 +275,10 @@ module Coordinator
 
     register("domain.work_items.complete", memoize: true) do
       Write::Domain::WorkItems::Complete.new(stream_factory: self["stream_factory"])
+    end
+
+    register("domain.attempts.abandon", memoize: true) do
+      Write::Domain::Attempts::Abandon.new(stream_factory: self["stream_factory"])
     end
 
     register("domain.resource_leases.reserve", memoize: true) do
@@ -1138,6 +1146,22 @@ module Coordinator
       )
     end
 
+    register("operations.execute_abandon_attempt", memoize: true) do
+      Write::Operations::ExecuteAbandonAttempt.new(
+        event_store: self["event_store"],
+        contract: Write::Contracts::AbandonAttempt.new,
+        decider: self["domain.attempts.abandon"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        compound_marker_builder: self["compound_marker_builder"],
+        event_plan_contract: Write::Contracts::AttemptAbandonmentEventPlan.new
+      )
+    end
+
     register("operations.execute_reserve_write_set") do
       Write::Operations::ExecuteReserveWriteSet.new(
         event_store: self["event_store"],
@@ -1885,6 +1909,13 @@ module Coordinator
     register("operations.submit_complete_work_item_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_complete_work_item"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_abandon_attempt_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_abandon_attempt"],
         submitter: self["operations.submit_coordination_task"]
       )
     end

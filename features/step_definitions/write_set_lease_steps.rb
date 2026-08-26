@@ -1176,3 +1176,301 @@ Then("the predecessor release is denied without affecting the successor") do
     "Successor lifecycle"
   )
 end
+
+When("the agent abandons the Attempt because its execution was interrupted") do
+  @abandonment_arguments = {
+    command_id: "cmd-cuc-attempt-abandon",
+    actor: { kind: "agent", id: @release_agent_id },
+    change_set_id: @release_change_set_id,
+    work_item_id: @release_work_item_id,
+    attempt_id: @release_attempt_id,
+    reason: "The agent process was interrupted before a Candidate was produced."
+  }
+  response = call_tool(
+    "attempt_abandon",
+    @abandonment_arguments
+  )
+  @abandonment_task_id = response.dig("result", "taskId")
+  assert_acceptance(
+    @abandonment_task_id,
+    "attempt_abandon did not return a Task handle: #{response.inspect}"
+  )
+  execute_task(@abandonment_task_id)
+  @abandonment_task_state = task_request("tasks/get", @abandonment_task_id)
+end
+
+Then("the abandonment Task releases current fences and requeues the WorkItem") do
+  result = @abandonment_task_state.dig("result", "result")
+  payload = result.fetch("structuredContent")
+  abandonment_events = event_store.read(
+    streams.attempt(@release_attempt_id),
+    Coordinator::Write::EventReadCriteria.new(
+      event_types: [ "AttemptAbandoned" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+  )
+  requeue_events = event_store.read(
+    streams.work_item(@release_work_item_id),
+    Coordinator::Write::EventReadCriteria.new(
+      event_types: [ "WorkItemRequeued" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+  )
+
+  assert_acceptance_equal("completed", @abandonment_task_state.dig("result", "status"), "Task status")
+  assert_acceptance_equal(false, result.fetch("isError"), "Abandonment error flag")
+  assert_acceptance_equal("ok", payload.fetch("status"), "Abandonment outcome")
+  assert_acceptance_equal(@release_attempt_id, payload.dig("data", "attempt_id"), "Receipt Attempt")
+  assert_acceptance_equal(1, abandonment_events.length, "Attempt abandonment facts")
+  assert_acceptance_equal(1, requeue_events.length, "WorkItem requeue facts")
+  assert_acceptance_equal(
+    @release_reservation.fetch("resources").map { _1.fetch("resource_key_hash") }.sort,
+    abandonment_events.sole.data.fetch("released_leases").map { _1.fetch("resource_key_hash") }.sort,
+    "Released abandonment fences"
+  )
+  assert_acceptance_equal(
+    [],
+    abandonment_events.sole.data.fetch("untouched_resource_key_hashes"),
+    "Untouched abandonment fences"
+  )
+  @release_paths.each do |path|
+    assert_acceptance_equal(
+      [ "ResourceLeaseAcquired", "ResourceLeaseReleased" ],
+      lease_events(path).map(&:type),
+      "Abandoned lease lifecycle for #{path}"
+    )
+  end
+  assert_acceptance_equal(1, command_events(@abandonment_arguments.fetch(:command_id)).length, "Command receipt")
+end
+
+When("the exact abandonment command is retried through another Task") do
+  @abandonment_retry_task_id = call_tool(
+    "attempt_abandon",
+    @abandonment_arguments
+  ).dig("result", "taskId")
+  execute_task(@abandonment_retry_task_id)
+  @abandonment_retry_task_state = task_request("tasks/get", @abandonment_retry_task_id)
+end
+
+Then("both abandonment Task handles expose one logical result") do
+  assert_acceptance_equal(
+    @abandonment_task_state.dig("result", "result"),
+    @abandonment_retry_task_state.dig("result", "result"),
+    "Abandonment replay result"
+  )
+  assert_acceptance_equal(
+    1,
+    command_events(@abandonment_arguments.fetch(:command_id)).length,
+    "Abandonment command completions"
+  )
+  assert_acceptance_equal(
+    1,
+    event_store.read(
+      streams.attempt(@release_attempt_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: [ "AttemptAbandoned" ],
+        maximum_count: 1,
+        direction: :asc
+      )
+    ).length,
+    "Attempt abandonment lifecycle"
+  )
+end
+
+When("the agent reacquires the requeued WorkItem as fresh Attempt {string}") do |attempt_id|
+  @fresh_attempt_id = attempt_id
+  @fresh_base_commit_oid = "b" * 40
+  @fresh_acquisition_task_id = submit_and_execute(
+    "work_item_acquire",
+    command_id: "cmd-cuc-attempt-reacquire",
+    actor: { kind: "agent", id: @release_agent_id },
+    change_set_id: @release_change_set_id,
+    work_item_id: @release_work_item_id,
+    attempt_id:,
+    base_snapshots: [
+      { repository_id: "billing", commit_oid: @fresh_base_commit_oid }
+    ]
+  )
+  @fresh_acquisition_state = task_request("tasks/get", @fresh_acquisition_task_id)
+end
+
+Then("the fresh Attempt starts from a new base declaration while the old Attempt remains terminal") do
+  result = @fresh_acquisition_state.dig("result", "result")
+  fresh_events = attempt_events(@fresh_attempt_id)
+  abandonment = event_store.read(
+    streams.attempt(@release_attempt_id),
+    Coordinator::Write::EventReadCriteria.new(
+      event_types: [ "AttemptAbandoned" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+  ).sole
+  current_work_item = event_store.read_grouped(
+    streams.work_item(@release_work_item_id),
+    Coordinator::Write::GroupedEventReadCriteria.new(
+      event_types: [ "WorkItemAcquired", "WorkItemRequeued" ],
+      direction: :desc
+    )
+  ).reverse.last
+
+  assert_acceptance_equal(false, result.fetch("isError"), "Fresh acquisition error flag")
+  assert_acceptance_equal(
+    [ "AttemptAuthorized", "AttemptStarted" ],
+    fresh_events.map(&:type),
+    "Fresh Attempt lifecycle"
+  )
+  assert_acceptance_equal(
+    @fresh_base_commit_oid,
+    fresh_events.first.data.fetch("base_snapshots").sole.fetch("commit_oid"),
+    "Fresh base snapshot"
+  )
+  assert_acceptance_equal(@release_attempt_id, abandonment.data.fetch("attempt_id"), "Terminal old Attempt")
+  assert_acceptance_equal(@fresh_attempt_id, current_work_item.data.fetch("attempt_id"), "Current WorkItem Attempt")
+end
+
+When("the expired predecessor abandons its Attempt") do
+  @superseded_abandonment_task_id = Timecop.freeze(@expiry_started_at + 32) do
+    response = call_tool(
+      "attempt_abandon",
+      {
+        command_id: "cmd-cuc-attempt-abandon-superseded",
+        actor: { kind: "agent", id: @expiry_predecessor.fetch(:agent_id) },
+        change_set_id: @lease_change_set_id,
+        work_item_id: @expiry_predecessor.fetch(:work_item_id),
+        attempt_id: @expiry_predecessor.fetch(:attempt_id),
+        reason: "The predecessor lost its lease fence and is yielding the WorkItem."
+      }
+    )
+    task_id = response.dig("result", "taskId")
+    assert_acceptance(task_id, "attempt_abandon did not return a Task handle: #{response.inspect}")
+    execute_task(task_id)
+    task_id
+  end
+  @superseded_abandonment_state = task_request("tasks/get", @superseded_abandonment_task_id)
+end
+
+Then("the abandonment requeues the predecessor and leaves the successor fence untouched") do
+  result = @superseded_abandonment_state.dig("result", "result")
+  abandonment = event_store.read(
+    streams.attempt(@expiry_predecessor.fetch(:attempt_id)),
+    Coordinator::Write::EventReadCriteria.new(
+      event_types: [ "AttemptAbandoned" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+  ).sole
+  requeue = event_store.read(
+    streams.work_item(@expiry_predecessor.fetch(:work_item_id)),
+    Coordinator::Write::EventReadCriteria.new(
+      event_types: [ "WorkItemRequeued" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+  ).sole
+  lifecycle = lease_events(@expiry_path)
+
+  assert_acceptance_equal(false, result.fetch("isError"), "Superseded abandonment error flag")
+  assert_acceptance_equal([], abandonment.data.fetch("released_leases"), "Released predecessor fences")
+  assert_acceptance_equal(
+    [ @expiry_predecessor_result.fetch("resources").sole.fetch("resource_key_hash") ],
+    abandonment.data.fetch("untouched_resource_key_hashes"),
+    "Untouched predecessor fences"
+  )
+  assert_acceptance_equal(@expiry_predecessor.fetch(:attempt_id), requeue.data.fetch("attempt_id"), "Requeued Attempt")
+  assert_acceptance_equal(
+    [ "ResourceLeaseAcquired", "ResourceLeaseAcquired" ],
+    lifecycle.map(&:type),
+    "Successor lifecycle"
+  )
+  assert_acceptance_equal(
+    @expiry_successor.fetch(:attempt_id),
+    lifecycle.last.data.fetch("attempt_id"),
+    "Successor ownership"
+  )
+  assert_acceptance_equal(2, lifecycle.last.data.fetch("fencing_token"), "Successor fence")
+end
+
+Given(
+  "agent {string} has attached Candidate {string} to active Attempt {string}"
+) do |agent_id, candidate_id, attempt_id|
+  @candidate_abandonment_coordination = prepare_candidate_coordination(
+    prefix: "ABANDON",
+    agent_id:,
+    path: "app/candidate_abandon.rb",
+    project_context: false
+  )
+  ids = @candidate_abandonment_coordination.fetch(:ids)
+  assert_acceptance_equal(attempt_id, ids.fetch(:attempt_id), "Candidate-bearing Attempt")
+  @candidate_abandonment_candidate_id = candidate_id
+  arguments = candidate_arguments(
+    @candidate_abandonment_coordination,
+    candidate_id:,
+    command_id: "cmd-cuc-candidate-abandon-submit",
+    head_character: "e"
+  )
+  task_id = submit_candidate_task(arguments)
+  state = candidate_task_state(task_id)
+  assert_acceptance_equal(false, state.dig("result", "result", "isError"), "Candidate setup")
+end
+
+When("the agent tries to abandon the Candidate-bearing Attempt") do
+  coordination = @candidate_abandonment_coordination
+  ids = coordination.fetch(:ids)
+  @candidate_abandonment_command_id = "cmd-cuc-candidate-attempt-abandon"
+  response = call_tool(
+    "attempt_abandon",
+    {
+      command_id: @candidate_abandonment_command_id,
+      actor: { kind: "agent", id: coordination.fetch(:agent_id) },
+      change_set_id: ids.fetch(:change_set_id),
+      work_item_id: ids.fetch(:work_item_id),
+      attempt_id: ids.fetch(:attempt_id),
+      reason: "The agent wants to discard work after checkpointing it."
+    }
+  )
+  @candidate_abandonment_task_id = response.dig("result", "taskId")
+  assert_acceptance(
+    @candidate_abandonment_task_id,
+    "attempt_abandon did not return a Task handle: #{response.inspect}"
+  )
+  execute_task(@candidate_abandonment_task_id)
+  @candidate_abandonment_state = task_request("tasks/get", @candidate_abandonment_task_id)
+end
+
+Then("abandonment is denied without releasing leases or requeueing the WorkItem") do
+  coordination = @candidate_abandonment_coordination
+  ids = coordination.fetch(:ids)
+  result = @candidate_abandonment_state.dig("result", "result")
+  payload = result.fetch("structuredContent")
+  attempt_terminal_events = event_store.read(
+    streams.attempt(ids.fetch(:attempt_id)),
+    Coordinator::Write::EventReadCriteria.new(
+      event_types: [ "CandidateAttachedToAttempt", "AttemptAbandoned" ],
+      maximum_count: 2,
+      direction: :asc
+    )
+  )
+  requeue_events = event_store.read(
+    streams.work_item(ids.fetch(:work_item_id)),
+    Coordinator::Write::EventReadCriteria.new(
+      event_types: [ "WorkItemRequeued" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+  )
+
+  assert_acceptance_equal("completed", @candidate_abandonment_state.dig("result", "status"), "Task status")
+  assert_acceptance_equal(true, result.fetch("isError"), "Candidate abandonment error flag")
+  assert_acceptance_equal("denied", payload.fetch("status"), "Candidate abandonment outcome")
+  assert_acceptance_equal("attempt_not_active", payload.dig("data", "code"), "Candidate denial code")
+  assert_acceptance_equal([ "CandidateAttachedToAttempt" ], attempt_terminal_events.map(&:type), "Attempt facts")
+  assert_acceptance_equal([], requeue_events, "WorkItem requeue facts")
+  assert_acceptance_equal(
+    [ "ResourceLeaseAcquired" ],
+    lease_events(coordination.fetch(:path)).map(&:type),
+    "Candidate lease lifecycle"
+  )
+  assert_acceptance_equal([], command_events(@candidate_abandonment_command_id), "Denied command receipt")
+end

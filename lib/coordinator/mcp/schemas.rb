@@ -137,6 +137,22 @@ module Coordinator
         )
       end
 
+      def attempt_abandon
+        object_schema(
+          properties: common_mutation_properties.merge(
+            change_set_id: identifier,
+            work_item_id: identifier,
+            attempt_id: identifier,
+            reason: {
+              type: "string",
+              minLength: 1,
+              maxLength: 2_000
+            }
+          ),
+          required: %w[command_id actor change_set_id work_item_id attempt_id reason]
+        )
+      end
+
       def write_set_reserve
         object_schema(
           properties: common_mutation_properties.merge(
