@@ -71,10 +71,36 @@ module DependencyProgressScenario
   end
 
   def readiness_events(scenario)
-    event_store.read(
+    event_store.read_grouped(
       streams.work_item(scenario.dig(:ids, :consumer_work_item_id)),
       Coordinator::Write::EventQueries::WORK_ITEM_FOR_READINESS_EVALUATION
-    ).select { _1.type == "WorkItemMadeReady" }
+    ).reverse.select { _1.type == "WorkItemMadeReady" }
+  end
+
+  def requeue_consumer(scenario, count:)
+    ids = scenario.fetch(:ids)
+
+    count.times do |index|
+      attempt_id = "A-progress-#{ids.fetch(:candidate_id)}-consumer-#{index}"
+      execute(Coordinator::Write::Operations::ExecuteAcquireWorkItem, {
+        command_id: "acquire-#{attempt_id}",
+        actor: { kind: "agent", id: "agent-b" },
+        change_set_id: ids.fetch(:change_set_id),
+        work_item_id: ids.fetch(:consumer_work_item_id),
+        attempt_id:,
+        base_snapshots: [ { repository_id: "billing", commit_oid: "d" * 40 } ]
+      })
+      execute(Coordinator::Write::Operations::ExecuteAbandonAttempt, {
+        command_id: "abandon-#{attempt_id}",
+        actor: { kind: "agent", id: "agent-b" },
+        change_set_id: ids.fetch(:change_set_id),
+        work_item_id: ids.fetch(:consumer_work_item_id),
+        attempt_id:,
+        reason: "Checkpoint elsewhere"
+      })
+    end
+
+    scenario
   end
 
   def create_change_set(ids)

@@ -448,10 +448,16 @@ module Coordinator::Write
 
     CHANGE_SET_FOR_MERGE_AUTHORIZATION = CHANGE_SET_FOR_COMPLETION
 
-    WORK_ITEM_FOR_READINESS_EVALUATION = EventReadCriteria.new(
-      event_types: [ "WorkItemCreated", "WorkItemMadeReady", "WorkItemAcquired", "WorkItemCompleted" ],
-      maximum_count: 4,
-      direction: :asc
+    WORK_ITEM_FOR_READINESS_EVALUATION = GroupedEventReadCriteria.new(
+      event_types: [
+        "WorkItemCreated",
+        "WorkItemMadeReady",
+        "WorkItemAcquired",
+        "WorkItemRequeued",
+        "WorkItemCandidateSelected",
+        "WorkItemCompleted"
+      ],
+      direction: :desc
     )
 
     WORK_ITEM_FOR_CHANGE_SET_COMPLETION = EventReadCriteria.new(

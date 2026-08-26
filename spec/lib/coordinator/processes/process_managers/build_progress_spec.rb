@@ -75,6 +75,22 @@ RSpec.describe Coordinator::Processes::ProcessManagers::BuildProgress, :event_st
     expect(DependencyProgressScenario.readiness_events(completed).length).to eq(1)
   end
 
+  it "redrives a satisfied dependency after repeated consumer requeues without scanning its history" do
+    scenario = DependencyProgressScenario.prepare(
+      prefix: "requeued-redelivery",
+      dependency_kind: "requires_completion"
+    )
+    completed = DependencyProgressScenario.complete(scenario)
+    source = DependencyProgressScenario.work_item_event(completed, "WorkItemCompleted")
+
+    expect(process_manager.call(source)).to be_nil
+    DependencyProgressScenario.requeue_consumer(completed, count: 3)
+
+    expect { process_manager.call(source) }.not_to raise_error
+    expect(DependencyProgressScenario.dependency_events(completed).length).to eq(1)
+    expect(DependencyProgressScenario.readiness_events(completed).length).to eq(1)
+  end
+
   it "processes terminal WorkItem facts through the real shared subscription set" do
     scenario = DependencyProgressScenario.prepare(
       prefix: "live-subscription",

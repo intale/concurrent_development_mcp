@@ -144,10 +144,10 @@ RSpec.describe Coordinator::Processes::ProcessManagers::ChangeSetReadiness, :eve
   end
 
   def readiness_events(work_item_id)
-    event_store.read(
+    event_store.read_grouped(
       streams.work_item(work_item_id),
       Coordinator::Write::EventQueries::WORK_ITEM_FOR_READINESS_EVALUATION
-    ).select { _1.type == "WorkItemMadeReady" }
+    ).reverse.select { _1.type == "WorkItemMadeReady" }
   end
 
   def build_subscription_set(registrations)
