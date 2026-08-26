@@ -30,4 +30,14 @@ RSpec.describe Coordinator::Mcp::Schemas do
       maximum: 100
     )
   end
+
+  it "lets Skill and Skill-asset reads pin one immutable projected revision" do
+    [ described_class.skill_get, described_class.skill_asset_get ].each do |schema|
+      expect(schema.dig(:properties, :revision, :anyOf).first).to include(
+        type: "integer",
+        minimum: 1
+      )
+      expect(schema.fetch(:required)).not_to include("revision")
+    end
+  end
 end

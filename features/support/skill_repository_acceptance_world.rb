@@ -45,12 +45,12 @@ module SkillRepositoryAcceptanceWorld
     Coordinator::Container["projectors.skills_v1"].call(event)
   end
 
-  def skill_view(name:, scope:)
-    call_tool("skill_get", { name:, scope: }).dig("result", "structuredContent")
+  def skill_view(name:, scope:, revision: nil)
+    call_tool("skill_get", { name:, scope:, revision: }.compact).dig("result", "structuredContent")
   end
 
-  def skill_asset(name:, scope:, path:)
-    call_tool("skill_asset_get", { name:, scope:, path: }).dig("result", "structuredContent")
+  def skill_asset(name:, scope:, path:, revision: nil)
+    call_tool("skill_asset_get", { name:, scope:, path:, revision: }.compact).dig("result", "structuredContent")
   end
 
   def script_asset(path, content)

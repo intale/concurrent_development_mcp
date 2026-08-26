@@ -4,5 +4,6 @@ module Coordinator::Read
   class SkillGetQueryV1 < Value
     attribute :name, Types::SkillName
     attribute :scope, Types::SkillScope
+    attribute :revision, Types::SkillRevision.optional
   end
 end

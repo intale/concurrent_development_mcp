@@ -2,8 +2,8 @@ module Coordinator
   module Read
     module Repositories
       class Skills
-        def fetch: (name: String, scope: String) -> SkillViewV1?
-        def fetch_asset: (name: String, scope: String, path: String) -> SkillAssetViewV1?
+        def fetch: (name: String, scope: String, ?revision: Integer?) -> SkillViewV1?
+        def fetch_asset: (name: String, scope: String, path: String, ?revision: Integer?) -> SkillAssetViewV1?
         def page: (SkillListQueryV1 query) -> SkillPageV1
         def store_revision: (event: PgEventstore::Event, publication: Write::Events::SkillRevisionPublishedV1) -> Skill
       end

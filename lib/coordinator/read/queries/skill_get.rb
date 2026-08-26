@@ -12,13 +12,19 @@ module Coordinator::Read
         validated = @contract.call(input)
         return invalid_result(validated.errors.to_h) if validated.failure?
 
-        query = SkillGetQueryV1.new(name: validated[:name], scope: validated[:scope])
-        skill = @skills.fetch(name: query.name, scope: query.scope)
+        query = SkillGetQueryV1.new(
+          name: validated[:name],
+          scope: validated[:scope],
+          revision: validated[:revision]
+        )
+        skill = @skills.fetch(name: query.name, scope: query.scope, revision: query.revision)
         return not_found_result(query) unless skill
 
         QueryResultV1.new(
           status: "ok",
-          summary: "Latest available projected revision for the exact Skill name and scope.",
+          summary: query.revision ?
+            "Requested projected Skill revision for the exact name and scope." :
+            "Latest available projected revision for the exact Skill name and scope.",
           command_id: nil,
           receipt: nil,
           context_token: nil,
@@ -40,7 +46,7 @@ module Coordinator::Read
           data: QueryResultV1::DomainError.new(
             code: "skill_not_observed",
             message: "The read side has not observed this Skill",
-            details: { name: query.name, scope: query.scope }
+            details: { name: query.name, scope: query.scope, revision: query.revision }.compact
           ),
           warnings: [],
           next_actions: []

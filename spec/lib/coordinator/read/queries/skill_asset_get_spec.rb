@@ -54,4 +54,51 @@ RSpec.describe Coordinator::Read::Queries::SkillAssetGet, :event_store, :read_mo
     expect(available.warnings).to include(a_string_matching(/does not inspect or execute/))
     expect(missing).to have_attributes(status: "not_found")
   end
+
+  it "pins asset content to the requested historical revision" do
+    first = publish_asset(command_id: "cmd-asset-history-1", expected_revision: 0, content: "one")
+    second = publish_asset(command_id: "cmd-asset-history-2", expected_revision: 1, content: "two")
+    projector = Coordinator::Read::Projectors::SkillsV1.new
+    projector.call(first)
+    projector.call(second)
+
+    historical = query.call(
+      name: "binary-helper",
+      scope: "project:alpha",
+      path: "fixtures/input.bin",
+      revision: 1
+    ).value!
+
+    expect(historical).to have_attributes(status: "ok")
+    expect(historical.data.asset).to have_attributes(
+      revision: 1,
+      content_base64: [ "one" ].pack("m0")
+    )
+  end
+
+  def publish_asset(command_id:, expected_revision:, content:)
+    result = publisher.call(
+      command_id:,
+      actor: { kind: "user", id: "user-1" },
+      name: "binary-helper",
+      scope: "project:alpha",
+      expected_revision:,
+      description: "Carries a binary fixture",
+      instructions: "Fetch the fixture when it is needed.",
+      assets: [
+        {
+          path: "fixtures/input.bin",
+          media_type: "application/octet-stream",
+          executable: false,
+          content_base64: [ content ].pack("m0")
+        }
+      ]
+    )
+    expect(result).to be_success
+    reference = result.value!.data.publication_event
+    event_store.read_at(
+      Coordinator::Write::StreamFactory.new.skill(result.value!.data.skill_id),
+      reference.stream_revision
+    )
+  end
 end

@@ -3,7 +3,7 @@
 module Coordinator::Read
   module Projectors
     class SkillsV1
-      PROJECTION = ProjectionDefinition.new(name: "skills", version: 1)
+      PROJECTION = ProjectionDefinition.new(name: "skills", version: 2)
 
       def initialize(
         contract: Contracts::SkillSourceEvent.new,

@@ -5,5 +5,6 @@ module Coordinator::Read
     attribute :name, Types::SkillName
     attribute :scope, Types::SkillScope
     attribute :path, Types::SkillAssetPath
+    attribute :revision, Types::SkillRevision.optional
   end
 end

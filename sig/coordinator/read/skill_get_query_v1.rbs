@@ -3,6 +3,7 @@ module Coordinator
     class SkillGetQueryV1 < Shared::Value
       def name: () -> String
       def scope: () -> String
+      def revision: () -> Integer?
     end
   end
 end

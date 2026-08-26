@@ -4,6 +4,7 @@ module Coordinator
       def name: () -> String
       def scope: () -> String
       def path: () -> String
+      def revision: () -> Integer?
     end
   end
 end

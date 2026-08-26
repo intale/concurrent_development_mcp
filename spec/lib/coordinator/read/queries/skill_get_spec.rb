@@ -39,6 +39,28 @@ RSpec.describe Coordinator::Read::Queries::SkillGet, :event_store, :read_model d
     expect(invalid).to have_attributes(status: "invalid")
   end
 
+  it "retrieves an immutable historical revision after the projected head advances" do
+    first_event = publish_and_fetch_event(command_id: "cmd-skill-history-1", expected_revision: 0)
+    second_event = publish_and_fetch_event(
+      command_id: "cmd-skill-history-2",
+      expected_revision: 1,
+      instructions: "Revision two."
+    )
+    projector.call(first_event)
+    projector.call(second_event)
+
+    historical = query.call(name: "review", scope: "project:alpha", revision: 1).value!
+    absent = query.call(name: "review", scope: "project:alpha", revision: 3).value!
+
+    expect(historical).to have_attributes(status: "ok")
+    expect(historical.data.skill).to have_attributes(
+      revision: 1,
+      instructions: "Inspect the complete diff."
+    )
+    expect(absent).to have_attributes(status: "not_found")
+    expect(absent.data.details).to include(revision: 3)
+  end
+
   def publish_and_fetch_event(**overrides)
     input = {
       command_id: "cmd-skill-get-1",

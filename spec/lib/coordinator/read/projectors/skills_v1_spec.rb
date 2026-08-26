@@ -7,7 +7,7 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :event_store, :read_mode
   let(:publisher) { Coordinator::Write::Operations::ExecutePublishSkillRevision.new(event_store:) }
   let(:repository) { Coordinator::Read::Repositories::Skills.new }
 
-  it "projects revisions idempotently with exact source evidence and a replaceable asset snapshot" do
+  it "projects immutable revisions idempotently with exact source evidence" do
     publish(input)
     first_event = skill_events.sole
     projector.call(first_event)
@@ -42,10 +42,14 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :event_store, :read_mode
     projector.call(second_event)
     projector.call(second_event)
     current = repository.fetch(name: "review", scope: "project:alpha")
+    historical = repository.fetch(name: "review", scope: "project:alpha", revision: 1)
     expect(current).to have_attributes(revision: 2, instructions: "Inspect behavior and contracts.")
     expect(current.assets.map(&:path)).to eq([ "fixtures/example.json" ])
+    expect(historical).to have_attributes(revision: 1, instructions: "Inspect the complete diff.")
+    expect(historical.assets.map(&:path)).to eq([ "scripts/check.sh" ])
     expect(Coordinator::Read::Skill.count).to eq(1)
-    expect(Coordinator::Read::SkillAsset.count).to eq(1)
+    expect(Coordinator::Read::SkillRevision.count).to eq(2)
+    expect(Coordinator::Read::SkillAsset.count).to eq(2)
     expect(processed_events.count).to eq(2)
     expect(current.to_h.keys & %i[fresh pending projection_status]).to be_empty
   end
@@ -59,7 +63,9 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :event_store, :read_mode
     projector.call(first_event)
 
     current = repository.fetch(name: "review", scope: "project:alpha")
+    historical = repository.fetch(name: "review", scope: "project:alpha", revision: 1)
     expect(current).to have_attributes(revision: 2, instructions: "Newest.")
+    expect(historical).to have_attributes(revision: 1, instructions: "Inspect the complete diff.")
     expect(processed_events.count).to eq(2)
   end
 
@@ -109,7 +115,7 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :event_store, :read_mode
   def processed_events
     Coordinator::Read::ProcessedProjectionEvent.where(
       projection_name: "skills",
-      projection_version: 1
+      projection_version: 2
     )
   end
 end

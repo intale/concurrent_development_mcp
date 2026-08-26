@@ -9,5 +9,11 @@ module Coordinator::Read
              foreign_key: "skill_id",
              inverse_of: :skill,
              dependent: :delete_all
+
+    has_many :revisions,
+             class_name: "Coordinator::Read::SkillRevision",
+             foreign_key: "skill_id",
+             inverse_of: :skill,
+             dependent: :delete_all
   end
 end

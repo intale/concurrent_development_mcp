@@ -157,3 +157,100 @@ Then("the Skill view exposes the asset manifest without embedding its content") 
   assert_acceptance_equal(@asset_path, manifest.fetch("path"), "Manifest path")
   assert_acceptance(!manifest.key?("content_base64"), "Skill manifest must not embed asset content")
 end
+
+Given("Skill {string} in scope {string} has projected revisions 1 and 2 with different assets") do |name, scope|
+  @historical_skill_name = name
+  @historical_skill_scope = scope
+  @historical_asset_path = "references/policy.txt"
+  @historical_asset_content = "revision one policy\n"
+
+  publish_skill_task(
+    name:,
+    scope:,
+    command_id: "cmd-cuc-skill-history-1",
+    expected_revision: 0,
+    instructions: "Historical revision one.",
+    assets: [ script_asset(@historical_asset_path, @historical_asset_content) ]
+  )
+  publish_skill_task(
+    name:,
+    scope:,
+    command_id: "cmd-cuc-skill-history-2",
+    expected_revision: 1,
+    instructions: "Current revision two.",
+    assets: [ script_asset("references/current.txt", "revision two policy\n") ]
+  )
+  skill_events(name:, scope:).each { project_skill_event(_1) }
+end
+
+When("the agent retrieves Skill {string} revision 1 and follows its asset manifest") do |name|
+  @historical_skill_view = skill_view(
+    name:,
+    scope: @historical_skill_scope,
+    revision: 1
+  )
+  manifest = @historical_skill_view.dig("data", "skill", "assets").sole
+  @historical_skill_asset = skill_asset(
+    name:,
+    scope: @historical_skill_scope,
+    revision: 1,
+    path: manifest.fetch("path")
+  )
+end
+
+Then("the Skill metadata, manifest, and asset content all describe revision 1") do
+  skill = @historical_skill_view.dig("data", "skill")
+  manifest = skill.fetch("assets").sole
+  asset = @historical_skill_asset.dig("data", "asset")
+
+  assert_acceptance_equal("ok", @historical_skill_view.fetch("status"), "Historical Skill status")
+  assert_acceptance_equal("ok", @historical_skill_asset.fetch("status"), "Historical asset status")
+  assert_acceptance_equal(1, skill.fetch("revision"), "Historical Skill revision")
+  assert_acceptance_equal(1, asset.fetch("revision"), "Historical asset revision")
+  assert_acceptance_equal(manifest.fetch("content_sha256"), asset.fetch("content_sha256"), "Pinned digest")
+  assert_acceptance_equal(
+    [ @historical_asset_content ].pack("m0"),
+    asset.fetch("content_base64"),
+    "Pinned asset content"
+  )
+end
+
+Then("retrieving Skill {string} without a revision returns revision 2") do |name|
+  payload = skill_view(name:, scope: @historical_skill_scope || @replayed_skill_scope)
+  assert_acceptance_equal("ok", payload.fetch("status"), "Current Skill status")
+  assert_acceptance_equal(2, payload.dig("data", "skill", "revision"), "Current Skill revision")
+end
+
+Given("Skill {string} in scope {string} has published revisions 1 and 2") do |name, scope|
+  @replayed_skill_name = name
+  @replayed_skill_scope = scope
+  publish_skill_task(
+    name:,
+    scope:,
+    command_id: "cmd-cuc-skill-replay-1",
+    expected_revision: 0,
+    instructions: "Replay revision one.",
+    assets: [ script_asset("references/one.txt", "one\n") ]
+  )
+  publish_skill_task(
+    name:,
+    scope:,
+    command_id: "cmd-cuc-skill-replay-2",
+    expected_revision: 1,
+    instructions: "Replay revision two.",
+    assets: [ script_asset("references/two.txt", "two\n") ]
+  )
+end
+
+When("Skill revision 2 reaches the read side before revision 1 and both deliveries are repeated") do
+  first_event, second_event = skill_events(name: @replayed_skill_name, scope: @replayed_skill_scope)
+  [ second_event, second_event, first_event, first_event ].each { project_skill_event(_1) }
+end
+
+Then("both historical Skill revisions remain retrievable") do
+  revisions = [ 1, 2 ].map do |revision|
+    skill_view(name: @replayed_skill_name, scope: @replayed_skill_scope, revision:)
+      .dig("data", "skill", "revision")
+  end
+  assert_acceptance_equal([ 1, 2 ], revisions, "Historical Skill revisions")
+end

@@ -15,14 +15,22 @@ module Coordinator::Read
         query = SkillAssetGetQueryV1.new(
           name: validated[:name],
           scope: validated[:scope],
-          path: validated[:path]
+          path: validated[:path],
+          revision: validated[:revision]
         )
-        asset = @skills.fetch_asset(name: query.name, scope: query.scope, path: query.path)
+        asset = @skills.fetch_asset(
+          name: query.name,
+          scope: query.scope,
+          path: query.path,
+          revision: query.revision
+        )
         return not_found_result(query) unless asset
 
         QueryResultV1.new(
           status: "ok",
-          summary: "Latest available projected content for this exact Skill asset path.",
+          summary: query.revision ?
+            "Requested projected Skill revision content for this exact asset path." :
+            "Latest available projected content for this exact Skill asset path.",
           command_id: nil,
           receipt: nil,
           context_token: nil,
@@ -44,7 +52,12 @@ module Coordinator::Read
           data: QueryResultV1::DomainError.new(
             code: "skill_asset_not_observed",
             message: "The read side has not observed this current Skill asset",
-            details: { name: query.name, scope: query.scope, path: query.path }
+            details: {
+              name: query.name,
+              scope: query.scope,
+              path: query.path,
+              revision: query.revision
+            }.compact
           ),
           warnings: [],
           next_actions: []

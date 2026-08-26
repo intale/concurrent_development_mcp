@@ -1,0 +1,22 @@
+module Coordinator
+  module Read
+    class SkillRevision < ApplicationRecord
+      def skill_id: () -> String
+      def revision: () -> Integer
+      def description: () -> String
+      def instructions: () -> String
+      def content_digest: () -> String
+      def asset_count: () -> Integer
+      def published_event: () -> Hash[String, untyped]
+      def published_actor: () -> Hash[String, untyped]
+      def published_markers: () -> Array[String]
+      def published_metadata: () -> Hash[String, untyped]
+      def published_causation_id: () -> String?
+      def published_correlation_id: () -> String?
+      def published_global_position: () -> Integer
+      def published_at_domain: () -> Time
+      def published_at_store: () -> Time
+      def skill: () -> Skill
+    end
+  end
+end

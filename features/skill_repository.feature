@@ -27,6 +27,20 @@ Feature: Scoped AI Skill repository
 
   Rule: Assets are passive content tied to one complete revision
 
+    @AUD-SKILL-SNAPSHOT-01 @AUD-SKILL-HISTORY-02 @AUD-SKILL-CONCURRENT-PUBLISH-03
+    Scenario: An agent pins a complete historical Skill snapshot while a newer revision is available
+      Given Skill "review-history" in scope "project:alpha" has projected revisions 1 and 2 with different assets
+      When the agent retrieves Skill "review-history" revision 1 and follows its asset manifest
+      Then the Skill metadata, manifest, and asset content all describe revision 1
+      And retrieving Skill "review-history" without a revision returns revision 2
+
+    @AUD-SKILL-PROJECTION-REPLAY-04
+    Scenario: Delayed and duplicate Skill projections preserve history without regressing the current revision
+      Given Skill "replayed-skill" in scope "project:alpha" has published revisions 1 and 2
+      When Skill revision 2 reaches the read side before revision 1 and both deliveries are repeated
+      Then retrieving Skill "replayed-skill" without a revision returns revision 2
+      And both historical Skill revisions remain retrievable
+
     Scenario: A script asset round-trips through publication and retrieval
       When the agent publishes Skill "release-check" with script asset "scripts/check.sh"
       And the Skill publication reaches the read side

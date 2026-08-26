@@ -8,6 +8,7 @@ module Coordinator::Read
       params do
         required(:name).filled(:string)
         required(:scope).filled(:string)
+        optional(:revision).maybe(:integer, gteq?: 1)
       end
 
       rule(:name) do

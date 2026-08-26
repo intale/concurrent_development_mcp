@@ -3,17 +3,28 @@
 module Coordinator::Read
   module Repositories
     class Skills
-      def fetch(name:, scope:)
-        record = Coordinator::Read::Skill.find_by(name:, scope:)
-        record && build_view(record)
-      end
-
-      def fetch_asset(name:, scope:, path:)
+      def fetch(name:, scope:, revision: nil)
         record = Coordinator::Read::Skill.find_by(name:, scope:)
         return unless record
 
-        asset = Coordinator::Read::SkillAsset.find_by(skill_id: record.skill_id, path:)
-        asset && build_asset_view(record, asset)
+        snapshot = revision_for(record, revision || record.revision)
+        snapshot && build_view(record, snapshot)
+      end
+
+      def fetch_asset(name:, scope:, path:, revision: nil)
+        record = Coordinator::Read::Skill.find_by(name:, scope:)
+        return unless record
+
+        selected_revision = revision || record.revision
+        snapshot = revision_for(record, selected_revision)
+        return unless snapshot
+
+        asset = Coordinator::Read::SkillAsset.find_by(
+          skill_id: record.skill_id,
+          revision: selected_revision,
+          path:
+        )
+        asset && build_asset_view(record, snapshot, asset)
       end
 
       def page(query)
@@ -23,7 +34,12 @@ module Coordinator::Read
         relation = relation.where("skill_id > ?", query.after_skill_id) if query.after_skill_id
         rows = relation.order(:skill_id).page(1).per(query.limit + 1).to_a
         has_more = rows.length > query.limit
-        items = rows.first(query.limit).map { build_summary(_1) }
+        selected_rows = rows.first(query.limit)
+        snapshots = revisions_for(selected_rows)
+        items = selected_rows.filter_map do |record|
+          snapshot = snapshots[[ record.skill_id, record.revision ]]
+          build_summary(record, snapshot) if snapshot
+        end
 
         SkillPageV1.new(
           items:,
@@ -34,23 +50,39 @@ module Coordinator::Read
 
       def store_revision(event:, publication:)
         record = Coordinator::Read::Skill.lock.find_by(skill_id: publication.skill_id)
-        return record if record && record.revision >= publication.revision
-
         verify_identity!(record, publication) if record
         verify_tuple_owner!(publication)
-        record ||= Coordinator::Read::Skill.new(skill_id: publication.skill_id)
-        record.assign_attributes(revision_attributes(event, publication))
-        record.save!
-        replace_assets(publication)
+        record ||= create_head(publication)
+        store_snapshot(event, publication)
+        record.update!(revision: publication.revision) if publication.revision > record.revision
         record
       end
 
       private
 
-      def revision_attributes(event, publication)
-        {
+      def create_head(publication)
+        Coordinator::Read::Skill.create!(
+          skill_id: publication.skill_id,
           name: publication.name,
           scope: publication.scope,
+          revision: publication.revision
+        )
+      end
+
+      def store_snapshot(event, publication)
+        snapshot = revision_for(publication, publication.revision)
+        return snapshot if snapshot
+
+        snapshot = Coordinator::Read::SkillRevision.create!(
+          revision_attributes(event, publication)
+        )
+        store_assets(publication)
+        snapshot
+      end
+
+      def revision_attributes(event, publication)
+        {
+          skill_id: publication.skill_id,
           revision: publication.revision,
           description: publication.description,
           instructions: publication.instructions,
@@ -68,8 +100,7 @@ module Coordinator::Read
         }
       end
 
-      def replace_assets(publication)
-        Coordinator::Read::SkillAsset.where(skill_id: publication.skill_id).delete_all
+      def store_assets(publication)
         return if publication.assets.empty?
 
         Coordinator::Read::SkillAsset.insert_all!(
@@ -93,48 +124,62 @@ module Coordinator::Read
         raise ProjectionStateError, "Skill name and scope tuple belongs to another source stream"
       end
 
-      def build_view(record)
+      def revision_for(record, revision)
+        Coordinator::Read::SkillRevision.find_by(skill_id: record.skill_id, revision:)
+      end
+
+      def revisions_for(records)
+        skill_ids = records.map(&:skill_id)
+        revisions = records.map(&:revision)
+        Coordinator::Read::SkillRevision.where(skill_id: skill_ids, revision: revisions)
+          .index_by { [ _1.skill_id, _1.revision ] }
+      end
+
+      def build_view(record, snapshot)
         SkillViewV1.new(
           skill_id: record.skill_id,
           name: record.name,
           scope: record.scope,
-          revision: record.revision,
-          description: record.description,
-          instructions: record.instructions,
-          assets: Coordinator::Read::SkillAsset.where(skill_id: record.skill_id).order(:path).map do |asset|
+          revision: snapshot.revision,
+          description: snapshot.description,
+          instructions: snapshot.instructions,
+          assets: Coordinator::Read::SkillAsset.where(
+            skill_id: record.skill_id,
+            revision: snapshot.revision
+          ).order(:path).map do |asset|
             manifest(asset)
           end,
-          content_digest: record.content_digest,
-          published: source_evidence(record)
+          content_digest: snapshot.content_digest,
+          published: source_evidence(snapshot)
         )
       end
 
-      def build_summary(record)
+      def build_summary(record, snapshot)
         SkillSummaryV1.new(
           skill_id: record.skill_id,
           name: record.name,
           scope: record.scope,
           revision: record.revision,
-          description: record.description,
-          content_digest: record.content_digest,
-          asset_count: record.asset_count,
-          published: source_evidence(record)
+          description: snapshot.description,
+          content_digest: snapshot.content_digest,
+          asset_count: snapshot.asset_count,
+          published: source_evidence(snapshot)
         )
       end
 
-      def build_asset_view(record, asset)
+      def build_asset_view(record, snapshot, asset)
         SkillAssetViewV1.new(
           skill_id: record.skill_id,
           name: record.name,
           scope: record.scope,
-          revision: record.revision,
+          revision: snapshot.revision,
           path: asset.path,
           media_type: asset.media_type,
           executable: asset.executable,
           content_base64: asset.content_base64,
           content_sha256: asset.content_sha256,
           byte_size: asset.byte_size,
-          published: source_evidence(record)
+          published: source_evidence(snapshot)
         )
       end
 

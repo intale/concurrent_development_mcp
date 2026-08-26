@@ -627,7 +627,11 @@ module Coordinator
         object_schema(
           properties: {
             name: { type: "string", minLength: 1, maxLength: Types::SKILL_NAME_MAXIMUM_BYTES },
-            scope: { type: "string", minLength: 1, maxLength: Types::SKILL_SCOPE_MAXIMUM_BYTES }
+            scope: { type: "string", minLength: 1, maxLength: Types::SKILL_SCOPE_MAXIMUM_BYTES },
+            revision: {
+              anyOf: [ { type: "integer", minimum: 1 }, { type: "null" } ],
+              description: "Omit for the latest available projected revision; provide a revision to pin one immutable snapshot."
+            }
           },
           required: %w[name scope]
         )
@@ -667,7 +671,11 @@ module Coordinator
           properties: {
             name: { type: "string", minLength: 1, maxLength: Types::SKILL_NAME_MAXIMUM_BYTES },
             scope: { type: "string", minLength: 1, maxLength: Types::SKILL_SCOPE_MAXIMUM_BYTES },
-            path: { type: "string", minLength: 1, maxLength: Types::SKILL_ASSET_PATH_MAXIMUM_BYTES }
+            path: { type: "string", minLength: 1, maxLength: Types::SKILL_ASSET_PATH_MAXIMUM_BYTES },
+            revision: {
+              anyOf: [ { type: "integer", minimum: 1 }, { type: "null" } ],
+              description: "Pass the revision returned by skill_get to fetch content from the same immutable snapshot."
+            }
           },
           required: %w[name scope path]
         )

@@ -5,7 +5,7 @@ module Coordinator::Read
     class Skills < Coordinator::Shared::Subscriptions::Registration
       DEFINITION = ReadModelDefinition.new(
         set_name: ReadModelSet::SET_NAME,
-        subscription_name: "skills-v1",
+        subscription_name: "skills-v2",
         streams: [
           Coordinator::Shared::Subscriptions::StreamFilter.new(
             context: "AgentKnowledge",
