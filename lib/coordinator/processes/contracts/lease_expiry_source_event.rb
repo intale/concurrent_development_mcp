@@ -48,7 +48,7 @@ module Coordinator::Processes
         command_id = event.metadata["command_id"]
 
         Types::IDENTIFIER_PATTERN.match?(command_id.to_s) &&
-          event.metadata["policy_version"] == Coordinator::Write::ResourceKeyDocumentV1::POLICY_VERSION
+          Types::RESOURCE_KEY_POLICY_VERSIONS.include?(event.metadata["policy_version"])
       end
 
       def matching_markers?(event)

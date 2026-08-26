@@ -57,7 +57,7 @@ module Coordinator::Write
       attribute :attempt_id, Types::Identifier
       attribute :repository_id, Types::RepositoryId
       attribute :lease_set_id, Types::UuidV7
-      attribute :policy_version, Types::String.enum(ResourceKeyDocumentV1::POLICY_VERSION)
+      attribute :policy_version, Types::ResourceKeyPolicyVersion
       attribute :acquired_at, Types::Timestamp
       attribute :expires_at, Types::Timestamp
       attribute :resources, Types::Array.of(Reference).constrained(min_size: 1, max_size: 32)
@@ -71,7 +71,7 @@ module Coordinator::Write
       attribute :attempt_id, Types::Identifier
       attribute :repository_id, Types::RepositoryId
       attribute :lease_set_id, Types::UuidV7
-      attribute :policy_version, Types::String.enum(ResourceKeyDocumentV1::POLICY_VERSION)
+      attribute :policy_version, Types::ResourceKeyPolicyVersion
       attribute :expanded_at, Types::Timestamp
       attribute :expires_at, Types::Timestamp
       attribute :added_resources, Types::Array.of(Reference).constrained(min_size: 1, max_size: 31)
@@ -86,7 +86,7 @@ module Coordinator::Write
       attribute :attempt_id, Types::Identifier
       attribute :repository_id, Types::RepositoryId
       attribute :lease_set_id, Types::UuidV7
-      attribute :policy_version, Types::String.enum(ResourceKeyDocumentV1::POLICY_VERSION)
+      attribute :policy_version, Types::ResourceKeyPolicyVersion
       attribute :resources, Types::Array.of(Reference).constrained(min_size: 1, max_size: 32)
       attribute :resource_count, Types::WriteSetSize
       attribute :renewed_at, Types::Timestamp
@@ -102,7 +102,7 @@ module Coordinator::Write
       attribute :attempt_id, Types::Identifier
       attribute :repository_id, Types::RepositoryId
       attribute :lease_set_id, Types::UuidV7
-      attribute :policy_version, Types::String.enum(ResourceKeyDocumentV1::POLICY_VERSION)
+      attribute :policy_version, Types::ResourceKeyPolicyVersion
       attribute :resources, Types::Array.of(Reference).constrained(min_size: 1, max_size: 32)
       attribute :resource_count, Types::WriteSetSize
       attribute :previous_expires_at, Types::Timestamp

@@ -16,8 +16,7 @@ module Coordinator::Read
     attribute :head_commit_oid, Types::GitOid
     attribute :checkpoint_kind, Types::CandidateCheckpointKind
     attribute :lease_set_id, Types::UuidV7
-    attribute :lease_policy_version,
-              Types::String.enum(Coordinator::Write::ResourceKeyDocumentV1::POLICY_VERSION)
+    attribute :lease_policy_version, Types::ResourceKeyPolicyVersion
     attribute :lease_references, Types::Array.of(Lease).constrained(min_size: 1, max_size: 32)
     attribute :manifest_digest, Types::Sha256Digest
     attribute :build_context_digest, Types::Sha256Digest.optional

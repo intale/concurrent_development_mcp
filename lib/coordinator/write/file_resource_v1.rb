@@ -7,6 +7,6 @@ module Coordinator::Write
     attribute :base_blob_oid, Types::GitOid.optional
     attribute :resource_key, Types::String
     attribute :resource_key_hash, Types::Sha256Digest
-    attribute :policy_version, Types::String.enum(ResourceKeyDocumentV1::POLICY_VERSION)
+    attribute :policy_version, Types::ResourceKeyPolicyVersion
   end
 end

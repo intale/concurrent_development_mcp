@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    class ResourceKeyDocumentV2 < Shared::Value
+      POLICY_VERSION: String
+
+      def schema: () -> String
+      def policy_version: () -> String
+      def scope: () -> String
+      def repository_id: () -> String
+      def kind: () -> String
+      def path: () -> String
+    end
+  end
+end

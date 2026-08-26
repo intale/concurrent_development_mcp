@@ -11,7 +11,7 @@ module Coordinator::Write
       attribute :resource_key_hash, Types::Sha256Digest
       attribute :resource_kind, Types::ResourceKind
       attribute :resource_path, Types::ResourcePath
-      attribute :policy_version, Types::String.enum(ResourceKeyDocumentV1::POLICY_VERSION)
+      attribute :policy_version, Types::ResourceKeyPolicyVersion
       attribute :mode, Types::LeaseMode
       attribute :change_set_id, Types::Identifier
       attribute :work_item_id, Types::Identifier

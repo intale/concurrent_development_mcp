@@ -93,6 +93,10 @@ module Coordinator::Shared
     OPERATION_BATCH_MAXIMUM_HISTORY_EVENTS = 1_024
     WRITE_SET_RESOURCE_MAXIMUM_COUNT = 32
     CANDIDATE_MANIFEST_MAXIMUM_FILE_COUNT = WRITE_SET_RESOURCE_MAXIMUM_COUNT
+    RESOURCE_KEY_POLICY_VERSIONS = %w[
+      coordinator-resource-key/v1
+      coordinator-resource-key/v2
+    ].freeze
 
     ACTOR_KINDS = %w[
       agent
@@ -528,6 +532,7 @@ module Coordinator::Shared
     TaskId = UuidV7
     ResourcePath = String.constrained(format: RESOURCE_PATH_PATTERN)
     ResourceKind = String.enum("file")
+    ResourceKeyPolicyVersion = String.enum(*RESOURCE_KEY_POLICY_VERSIONS)
     LeaseMode = String.enum("exclusive")
     LeaseDurationSeconds = Integer.constrained(gteq: 30, lteq: 3_600)
     WriteSetSize = Integer.constrained(gteq: 1, lteq: 32)

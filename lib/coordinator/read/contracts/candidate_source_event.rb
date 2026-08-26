@@ -41,11 +41,11 @@ module Coordinator::Read
 
       rule(:event_type, :policy_version) do
         expected = if values[:event_type] == "CandidateImpactSurfaceDerived"
-          Coordinator::Write::Candidates::ImpactSurfaceDocumentV1::SCHEMA
+          [ Coordinator::Write::Candidates::ImpactSurfaceDocumentV1::SCHEMA ]
         else
-          Coordinator::Write::ResourceKeyDocumentV1::POLICY_VERSION
+          Types::RESOURCE_KEY_POLICY_VERSIONS
         end
-        unless values[:policy_version] == expected
+        unless expected.include?(values[:policy_version])
           key(:policy_version).failure("must match the projected event policy")
         end
       end
