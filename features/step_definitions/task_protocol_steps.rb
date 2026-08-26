@@ -64,6 +64,78 @@ When("the same command is retried through another live Task") do
   assert_acceptance(@retry_task_id != @first_task_id, "A retry should receive a new Task handle")
 end
 
+Given(
+  "agent {string} completed ChangeSet {string} with command {string} through live subscriptions"
+) do |agent_id, change_set_id, command_id|
+  @current_tool = "change_set_create"
+  @current_arguments = {
+    command_id:,
+    actor: { kind: "agent", id: agent_id },
+    change_set_id:,
+    goal: "Coordinate #{change_set_id}",
+    acceptance_criteria: [ "Recover the durable Task result" ]
+  }
+  start_live_subscriptions
+  @original_task_id = submit_and_await(@current_tool, **@current_arguments)
+  @original_task_state = task_request("tasks/get", @original_task_id)
+end
+
+Given("the Task workers are interrupted") do
+  start_live_subscriptions unless @live_subscription_sets
+  stop_live_subscriptions
+end
+
+When("the exact completed command is submitted through a new Task") do
+  response = call_tool(@current_tool, @current_arguments)
+  @replacement_task_id = response.dig("result", "taskId")
+  @current_task_id = @replacement_task_id
+end
+
+Then("the replacement Task remains working without duplicate coordination facts") do
+  state = task_request("tasks/get", @replacement_task_id)
+  assert_acceptance_equal("working", state.dig("result", "status"), "Replacement Task status")
+  assert_acceptance_equal(1, command_events(@current_arguments.fetch(:command_id)).length, "Command facts")
+  assert_acceptance_equal(
+    2,
+    change_set_events(@current_arguments.fetch(:change_set_id)).length,
+    "ChangeSet facts"
+  )
+end
+
+When("the Task workers restart") do
+  start_live_subscriptions
+end
+
+Then("the replacement Task exposes the original completed result") do
+  replacement = await_task_terminal(@replacement_task_id)
+  assert_acceptance_equal("completed", replacement.dig("result", "status"), "Replacement status")
+  assert_acceptance_equal(
+    @original_task_state.dig("result", "result"),
+    replacement.dig("result", "result"),
+    "Recovered Task result"
+  )
+end
+
+Then("the recovered command and ChangeSet facts exist only once") do
+  assert_acceptance_equal(1, command_events(@current_arguments.fetch(:command_id)).length, "Command facts")
+  assert_acceptance_equal(
+    2,
+    change_set_events(@current_arguments.fetch(:change_set_id)).length,
+    "ChangeSet facts"
+  )
+end
+
+Then("the current Task remains working before the worker restarts") do
+  state = task_request("tasks/get", @current_task_id)
+  assert_acceptance_equal("working", state.dig("result", "status"), "Interrupted Task status")
+end
+
+Then("the current Task eventually completes successfully") do
+  state = await_task_terminal(@current_task_id)
+  assert_acceptance_equal("completed", state.dig("result", "status"), "Restarted Task status")
+  assert_acceptance_equal(false, state.dig("result", "result", "isError"), "Tool error flag")
+end
+
 Then("both Task handles expose the same result") do
   retry_state = task_request("tasks/get", @retry_task_id)
   assert_acceptance_equal("completed", retry_state.dig("result", "status"), "Retry Task status")
@@ -135,6 +207,26 @@ Then("the current Task completes with coordination denial {string}") do |code|
   )
 end
 
+When("agent {string} submits the same ChangeSet with command {string}") do |agent_id, command_id|
+  @current_arguments = @current_arguments.merge(
+    command_id:,
+    actor: { kind: "agent", id: agent_id }
+  )
+  @current_response = call_tool(@current_tool, @current_arguments)
+  @current_task_id = @current_response.dig("result", "taskId")
+end
+
+Then("the current Task eventually completes with coordination denial {string}") do |code|
+  state = await_task_terminal(@current_task_id)
+  assert_acceptance_equal("completed", state.dig("result", "status"), "Denied Task status")
+  assert_acceptance_equal(true, state.dig("result", "result", "isError"), "Denied result error flag")
+  assert_acceptance_equal(
+    code,
+    state.dig("result", "result", "structuredContent", "data", "code"),
+    "Denial code"
+  )
+end
+
 Then("the denied command writes no coordination facts") do
   assert_no_current_coordination_facts
 end
@@ -155,6 +247,25 @@ end
 
 Then("the cancelled command writes no coordination facts") do
   assert_no_current_coordination_facts
+end
+
+When("the agent requests cancellation as the Task workers restart") do
+  start_live_subscriptions
+  @cancel_response = task_request("tasks/cancel", @current_task_id)
+end
+
+Then("the Task eventually has exactly one terminal state") do
+  state = await_task_terminal(@current_task_id)
+  terminal_events = task_events(@current_task_id).select do |event|
+    %w[CoordinationTaskCompleted CoordinationTaskFailed CoordinationTaskCancelled].include?(event.type)
+  end
+
+  assert_acceptance_equal(1, terminal_events.length, "Terminal Task facts")
+  assert_acceptance_equal(
+    terminal_events.sole.type.delete_prefix("CoordinationTask").downcase,
+    state.dig("result", "status"),
+    "Persisted and public terminal state"
+  )
 end
 
 Given("the read side has projected ChangeSet {string}") do |change_set_id|

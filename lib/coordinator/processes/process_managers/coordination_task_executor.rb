@@ -3,6 +3,8 @@
 module Coordinator::Processes
   module ProcessManagers
     class CoordinationTaskExecutor
+      include Dry::Monads[:result]
+
       INTERNAL_ERROR = Coordinator::Write::Tasks::JsonRpcErrorV1.new(
         code: -32_603,
         message: "Internal error"
@@ -20,18 +22,17 @@ module Coordinator::Processes
         record_outcome: Coordinator::Write::Operations::RecordCoordinationTaskOutcome.new(transition:),
         target_command_builder: Coordinator::Write::Tasks::TargetCommandBuilder.new,
         target_executor: Coordinator::Write::Tasks::TargetExecutor.new(event_store:),
-        tool_result_mapper: Coordinator::Write::Tasks::ToolResultMapper.new,
-        stream_factory: Coordinator::Write::StreamFactory.new
+        target_completion_loader: Coordinator::Write::Tasks::TargetCompletionLoader.new(event_store:),
+        tool_result_mapper: Coordinator::Write::Tasks::ToolResultMapper.new
       )
-        @event_store = event_store
         @source_builder = source_builder
         @task_loader = task_loader
         @start_task = start_task
         @record_outcome = record_outcome
         @target_command_builder = target_command_builder
         @target_executor = target_executor
+        @target_completion_loader = target_completion_loader
         @tool_result_mapper = tool_result_mapper
-        @stream_factory = stream_factory
       end
 
       def call(event)
@@ -70,32 +71,48 @@ module Coordinator::Processes
       end
 
       def execute_target(command, started_event:)
-        result = @target_executor.call(command, caused_by: started_event)
+        resolution = resolve_target(command, started_event:)
+        if resolution.failure?
+          return [ Coordinator::Write::Tasks::OutcomeV1::Failed.new(error: resolution.failure), started_event ]
+        end
+
+        result, completion = resolution.value!
         tool_result = @tool_result_mapper.call(result, command_id: command.command_id)
-        parent_event = outcome_parent_event(result, command:, started_event:)
+        parent_event = outcome_parent_event(result, completion:, started_event:)
 
         [ Coordinator::Write::Tasks::OutcomeV1::Completed.new(result: tool_result), parent_event ]
+      end
+
+      def resolve_target(command, started_event:)
+        result = @target_executor.call(command, caused_by: started_event)
+        resolved_target(result, command_id: command.command_id)
       rescue StandardError => error
+        recover_target(error, command:, started_event:)
+      end
+
+      def recover_target(error, command:, started_event:)
         Rails.error.report(error, handled: true)
-        [ Coordinator::Write::Tasks::OutcomeV1::Failed.new(error: INTERNAL_ERROR), started_event ]
+        result = @target_executor.call(command, caused_by: started_event)
+        resolved_target(result, command_id: command.command_id)
+      rescue StandardError => retry_error
+        completion = @target_completion_loader.call(command.command_id)
+        raise retry_error if completion
+
+        Rails.error.report(retry_error, handled: true)
+        Failure(INTERNAL_ERROR)
       end
 
-      def command_completion_event(command_id)
-        @event_store.read(
-          @stream_factory.command(command_id),
-          Coordinator::Write::EventQueries::COMMAND_COMPLETION
-        ).sole
+      def resolved_target(result, command_id:)
+        completion = @target_completion_loader.call(command_id) if result.success?
+        raise CoordinationTaskExecutionRejected, "Successful target has no durable completion" if
+          result.success? && !completion
+
+        Success([ result, completion ])
       end
 
-      def outcome_parent_event(result, command:, started_event:)
-        return started_event if result.failure?
-
-        completion_parent_event(command.command_id, started_event:)
-      end
-
-      def completion_parent_event(command_id, started_event:)
-        completion = command_completion_event(command_id)
-        return completion if completion.causation_id == started_event.id
+      def outcome_parent_event(result, completion:, started_event:)
+        return started_event if result.failure? || !completion
+        return completion.event if completion.event.causation_id == started_event.id
 
         started_event
       end

@@ -82,7 +82,11 @@ RSpec.describe "Coordination Task lifecycle operations", :event_store do
       end
     end.map(&:value)
 
-    expect(results).to all(be_success)
+    expect(results).to all(
+      satisfy do |result|
+        result.success? || result.failure.code == :concurrency_conflict
+      end
+    )
     expect(task_events(task_id).map(&:type)).to eq(
       [ "CoordinationTaskSubmitted", "CoordinationTaskExecutionStarted" ]
     )

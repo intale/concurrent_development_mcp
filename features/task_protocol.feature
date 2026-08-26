@@ -18,6 +18,24 @@ Feature: Durable MCP Task protocol
       Then both Task handles expose the same result
       And the command and ChangeSet facts exist only once
 
+    @AUD-TASK-POST-COMMIT-01 @live-subscriptions
+    Scenario: A working Task recovers the result of an already committed target command
+      Given agent "planner-1" completed ChangeSet "CS-AUD-TASK-RECOVERY" with command "cmd-aud-task-recovery" through live subscriptions
+      And the Task workers are interrupted
+      When the exact completed command is submitted through a new Task
+      Then the replacement Task remains working without duplicate coordination facts
+      When the Task workers restart
+      Then the replacement Task exposes the original completed result
+      And the recovered command and ChangeSet facts exist only once
+
+    @AUD-TASK-WORKER-RESTART-02 @live-subscriptions
+    Scenario: A Task submitted while its worker is interrupted completes after restart
+      Given the Task workers are interrupted
+      When agent "planner-1" submits ChangeSet "CS-AUD-TASK-RESTART" with command "cmd-aud-task-restart"
+      Then the current Task remains working before the worker restarts
+      When the Task workers restart
+      Then the current Task eventually completes successfully
+
     @CDM-TASK-002
     Scenario: Changed input cannot reuse a completed command identity
       When agent "planner-1" submits ChangeSet "CS-CUC-REUSE" with command "cmd-cuc-reuse"
@@ -45,6 +63,12 @@ Feature: Durable MCP Task protocol
       Then the current Task completes with coordination denial "change_set_not_found"
       And the denied command writes no coordination facts
 
+    @AUD-TASK-DOMAIN-DENIAL-03 @live-subscriptions
+    Scenario: A live Task represents a domain denial as a completed tool error
+      Given agent "planner-1" completed ChangeSet "CS-AUD-TASK-DENIAL" with command "cmd-aud-task-denial-seed" through live subscriptions
+      When agent "planner-2" submits the same ChangeSet with command "cmd-aud-task-denial"
+      Then the current Task eventually completes with coordination denial "change_set_already_exists"
+
   Rule: Queued work can be cancelled cooperatively
 
     @CDM-TASK-004
@@ -54,6 +78,13 @@ Feature: Durable MCP Task protocol
       And the Task executor later receives the cancelled Task
       Then the current Task is cancelled
       And the cancelled command writes no coordination facts
+
+    @AUD-TASK-CANCEL-RACE-04 @live-subscriptions
+    Scenario: Cancellation racing execution preserves one terminal Task state
+      Given the Task workers are interrupted
+      When agent "planner-1" submits ChangeSet "CS-AUD-TASK-CANCEL-RACE" with command "cmd-aud-task-cancel-race"
+      And the agent requests cancellation as the Task workers restart
+      Then the Task eventually has exactly one terminal state
 
   Rule: Read availability does not depend on projection freshness
 

@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Tasks
+      class TargetCompletion < Shared::Value
+        def event: () -> PgEventstore::Event
+        def payload: () -> Events::CommandCompletedV1
+      end
+    end
+  end
+end

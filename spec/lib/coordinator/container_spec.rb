@@ -46,6 +46,7 @@ RSpec.describe Coordinator::Container do
     readiness_process_manager = described_class["process_managers.change_set_readiness"]
     build_progress_process_manager = described_class["process_managers.build_progress"]
     task_executor = described_class["process_managers.coordination_task_executor"]
+    target_completion_loader = described_class["tasks.target_completion_loader"]
     impact_process_manager = described_class["process_managers.agent_choice_decision_impact"]
     obligation_process_manager = described_class["process_managers.candidate_impact_obligation_policy"]
     subscription_manager = described_class["subscription_managers.process_managers"]
@@ -181,6 +182,7 @@ RSpec.describe Coordinator::Container do
       Coordinator::Processes::ProcessManagers::BuildProgress
     )
     expect(task_executor).to be_a(Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor)
+    expect(target_completion_loader).to be_a(Coordinator::Write::Tasks::TargetCompletionLoader)
     expect(operation_batch_process_manager).to be_a(
       Coordinator::Processes::ProcessManagers::OperationBatchRunner
     )

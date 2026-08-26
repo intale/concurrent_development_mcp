@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe Coordinator::Write::Operations::ExpectedRevisionRetry, :event_store do
+RSpec.describe Coordinator::Write::Operations::ExpectedRevisionGuard, :event_store do
   include Dry::Monads[:result]
 
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
@@ -33,26 +33,12 @@ RSpec.describe Coordinator::Write::Operations::ExpectedRevisionRetry, :event_sto
   let(:cancel) { Coordinator::Write::Operations::CancelCoordinationTask.new(transition:) }
   let(:reported_task_id) { "01919191-9191-7191-8191-919191919191" }
 
-  it "retries after a real wrong-revision race and returns the later result" do
+  it "returns an actionable conflict without retrying a real wrong-revision append" do
     attempts = 0
 
     result = described_class.new.call(task_id: reported_task_id) do
       attempts += 1
-      force_real_wrong_revision(attempts) if attempts == 1
-      Success(:retried)
-    end
-
-    expect(result).to be_success
-    expect(result.value!).to eq(:retried)
-    expect(attempts).to eq(2)
-  end
-
-  it "returns an actionable failure after three real wrong-revision races" do
-    attempts = 0
-
-    result = described_class.new.call(task_id: reported_task_id) do
-      attempts += 1
-      force_real_wrong_revision(attempts)
+      force_real_wrong_revision
     end
 
     expect(result).to be_failure
@@ -63,11 +49,11 @@ RSpec.describe Coordinator::Write::Operations::ExpectedRevisionRetry, :event_sto
         task_id: reported_task_id
       )
     )
-    expect(attempts).to eq(3)
+    expect(attempts).to eq(1)
   end
 
-  def force_real_wrong_revision(sequence)
-    task_state = submit.call(target_command(sequence)).value!
+  def force_real_wrong_revision
+    task_state = submit.call(target_command).value!
     task_id = task_state.task_id
     snapshot = loader.call(task_id)
     command = Coordinator::Write::Commands::StartCoordinationTask.new(
@@ -101,15 +87,15 @@ RSpec.describe Coordinator::Write::Operations::ExpectedRevisionRetry, :event_sto
     )
   end
 
-  def target_command(sequence)
+  def target_command
     suffix = id_generator.uuid_v7
 
     Coordinator::Write::Commands::CreateChangeSet.new(
-      command_id: "retry-#{suffix}",
+      command_id: "guard-#{suffix}",
       actor: Coordinator::Write::Commands::Actor.new(kind: "system", id: "coordinator"),
-      change_set_id: "CS-retry-#{sequence}-#{suffix}",
-      goal: "Prove bounded expected-revision retry",
-      acceptance_criteria: [ "The real stale append is rejected" ]
+      change_set_id: "CS-guard-#{suffix}",
+      goal: "Expose a wrong expected revision as a public conflict",
+      acceptance_criteria: [ "The stale append is not retried internally" ]
     )
   end
 end

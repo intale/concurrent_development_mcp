@@ -680,6 +680,14 @@ module Coordinator
       Write::Tasks::TargetCommandBuilder.new
     end
 
+    register("tasks.target_completion_loader", memoize: true) do
+      Write::Tasks::TargetCompletionLoader.new(
+        event_store: self["event_store"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
     register("tasks.tool_result_mapper", memoize: true) do
       Write::Tasks::ToolResultMapper.new
     end
@@ -2253,8 +2261,8 @@ module Coordinator
         record_outcome: self["operations.record_coordination_task_outcome"],
         target_command_builder: self["tasks.target_command_builder"],
         target_executor: self["tasks.target_executor"],
-        tool_result_mapper: self["tasks.tool_result_mapper"],
-        stream_factory: self["stream_factory"]
+        target_completion_loader: self["tasks.target_completion_loader"],
+        tool_result_mapper: self["tasks.tool_result_mapper"]
       )
     end
 

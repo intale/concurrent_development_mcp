@@ -11,20 +11,20 @@ module Coordinator::Write
         stream_factory: StreamFactory.new,
         event_factory: EventFactory.new,
         id_generator: IdGenerator.new,
-        retry_policy: ExpectedRevisionRetry.new
+        revision_guard: ExpectedRevisionGuard.new
       )
         @event_store = event_store
         @loader = loader
         @stream_factory = stream_factory
         @event_factory = event_factory
         @id_generator = id_generator
-        @retry_policy = retry_policy
+        @revision_guard = revision_guard
       end
 
       def call(command:, decider:, transition_name:, caused_by: nil)
         event_id = @id_generator.uuid_v7
 
-        @retry_policy.call(task_id: command.task_id) do
+        @revision_guard.call(task_id: command.task_id) do
           snapshot = @loader.call(command.task_id)
           decision = decider.call(state: snapshot.state, command:)
           next decision if decision.failure?

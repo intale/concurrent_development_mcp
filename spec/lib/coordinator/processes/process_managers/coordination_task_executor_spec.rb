@@ -64,6 +64,42 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
     expect(state.result.structured_content.command_id).to eq("cmd-task-executor")
   end
 
+  it "reconciles a working Task from its already committed target outcome" do
+    command = create_change_set_command
+    task_id, source = submit_task(command)
+    Coordinator::Write::Operations::StartCoordinationTask.new(transition:).call(
+      task_id:,
+      caused_by: source
+    ).value!
+    started = task_events(task_id).last
+    committed = Coordinator::Write::Operations::ExecuteCreateChangeSet.new(
+      event_store:,
+      schema_registry: schemas,
+      stream_factory: streams,
+      event_factory: Coordinator::Write::EventFactory.new(registry: schemas)
+    ).call_command(command, caused_by: started).value!
+
+    expect(loader.call(task_id).state.status).to eq("working")
+
+    process_manager.call(source)
+
+    state = loader.call(task_id).state
+    completed = task_events(task_id).last
+    target_completion = command_events.sole
+    expect(state.status).to eq("completed")
+    expect(state.result.structured_content.to_h).to eq(
+      Coordinator::Write::Tasks::ToolResultMapper.new
+        .call(Dry::Monads::Success(committed), command_id: command.command_id)
+        .structured_content
+        .to_h
+    )
+    expect(completed.causation_id).to eq(target_completion.id)
+    expect(change_set_events.map(&:type)).to eq(
+      [ "ChangeSetCreated", "ChangeSetAcceptanceCriteriaDefined" ]
+    )
+    expect(command_events.map(&:type)).to eq([ "CommandCompleted" ])
+  end
+
   it "persists immediate causation and one correlation ID across the Saga" do
     task_id, source = submit_task(create_change_set_command)
 

@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Tasks
+      class TargetCompletionLoader
+        def initialize: (event_store: _EventStore, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory) -> void
+        def call: (String command_id) -> TargetCompletion?
+      end
+    end
+  end
+end

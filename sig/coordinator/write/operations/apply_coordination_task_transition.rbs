@@ -8,7 +8,7 @@ module Coordinator
           ?stream_factory: StreamFactory,
           ?event_factory: EventFactory,
           ?id_generator: Shared::IdGenerator,
-          ?retry_policy: ExpectedRevisionRetry
+          ?revision_guard: ExpectedRevisionGuard
         ) -> void
 
         def call: (
