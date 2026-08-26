@@ -40,6 +40,7 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
       "candidate_get",
       "candidate_list",
       "candidate_impact_get",
+      "repository_list",
       "skill_get",
       "skill_list",
       "skill_asset_get",
@@ -143,6 +144,21 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
     expect(registration.markers).to include("repository:#{repository_id}")
     expect(registration.markers.grep(/\Acompound:(?:repository-scope|scoped-repository):v1:/).length).to eq(2)
     expect(registration.metadata).not_to have_key("correlation_id")
+
+    Coordinator::Container["projectors.repositories_v1"].call(registration)
+    projected = call_tool(
+      "repository_list",
+      { scope: arguments.fetch(:scope), limit: 20 },
+      id: 8
+    ).dig("result", "structuredContent")
+    expect(projected).to include("status" => "ok")
+    expect(projected.dig("data", "page", "items").sole).to include(
+      "repository_id" => repository_id,
+      "scope" => arguments.fetch(:scope),
+      "paths" => arguments.fetch(:paths),
+      "remotes" => arguments.fetch(:remotes)
+    )
+    expect(JSON.generate(projected)).not_to include("projection_status", "pending")
 
     replay_task_id = call_tool("repository_register", arguments, id: 3).dig("result", "taskId")
     execute_task(replay_task_id)

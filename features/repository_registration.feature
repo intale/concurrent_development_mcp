@@ -25,3 +25,12 @@ Feature: Scoped repository registration
       When the agent tries to bind that Repository identity to scope "project:other/workspace:primary"
       Then the conflicting Task completes with Repository identity conflict
       And the rejected command writes no command fact
+
+  Rule: Exact scope is sufficient for clean agents to discover coordination identity
+
+    Scenario: Two clean agents discover the same canonical Repository without host paths
+      Given a caller-created Repository is registered for scope "project:payments/workspace:primary"
+      And the Repository registration reaches scoped discovery
+      When two clean agents independently list Repositories using only that scope
+      Then both agents discover the same canonical Repository and attributed metadata
+      And Repository discovery stays available without a freshness contract

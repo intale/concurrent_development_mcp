@@ -118,3 +118,45 @@ end
 Then("the rejected command writes no command fact") do
   assert_acceptance_equal([], command_events(@repository_conflict_command_id), "Rejected command facts")
 end
+
+Given("the Repository registration reaches scoped discovery") do
+  event = event_store.read(
+    streams.repository(@repository_id),
+    Coordinator::Write::EventReadCriteria.new(
+      event_types: [ "RepositoryRegistered" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+  ).sole
+  Coordinator::Container["projectors.repositories_v1"].call(event)
+end
+
+When("two clean agents independently list Repositories using only that scope") do
+  @repository_discovery_responses = 2.times.map do
+    @mcp_session = nil
+    @request_id = 0
+    call_tool("repository_list", { scope: @repository_arguments.fetch(:scope) })
+      .dig("result", "structuredContent")
+  end
+end
+
+Then("both agents discover the same canonical Repository and attributed metadata") do
+  first, second = @repository_discovery_responses
+  assert_acceptance_equal(first, second, "Independent Repository discovery")
+  item = first.dig("data", "page", "items").sole
+  assert_acceptance_equal(@repository_id, item.fetch("repository_id"), "Canonical Repository identity")
+  assert_acceptance_equal(@repository_arguments.fetch(:scope), item.fetch("scope"), "Exact scope")
+  assert_acceptance_equal(@repository_arguments.fetch(:paths), item.fetch("paths"), "Attributed paths")
+  assert_acceptance_equal(@repository_arguments.fetch(:remotes), item.fetch("remotes"), "Attributed remotes")
+end
+
+Then("Repository discovery stays available without a freshness contract") do
+  @repository_discovery_responses.each do |payload|
+    serialized = JSON.generate(payload)
+    assert_acceptance_equal("ok", payload.fetch("status"), "Repository discovery status")
+    assert_acceptance(
+      %w[fresh pending projection_status].none? { serialized.include?(_1) },
+      "Repository discovery must not expose a freshness gate"
+    )
+  end
+end

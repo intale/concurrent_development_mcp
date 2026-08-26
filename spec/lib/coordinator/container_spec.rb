@@ -62,6 +62,7 @@ RSpec.describe Coordinator::Container do
     candidate_get_query = described_class["queries.candidate_get"]
     candidate_list_query = described_class["queries.candidate_list"]
     candidate_impact_query = described_class["queries.candidate_impact_get"]
+    repository_list_query = described_class["queries.repository_list"]
     skill_get_query = described_class["queries.skill_get"]
     skill_list_query = described_class["queries.skill_list"]
     skill_asset_get_query = described_class["queries.skill_asset_get"]
@@ -216,6 +217,7 @@ RSpec.describe Coordinator::Container do
         "merge-snapshots-v1",
         "operation-batches-v1",
         "release-sets-v1",
+        "repositories-v1",
         "skills-v1",
         "user-utterances-v1",
         "verification-obligations-v1"
@@ -231,6 +233,7 @@ RSpec.describe Coordinator::Container do
     expect(candidate_get_query).to be_a(Coordinator::Read::Queries::CandidateGet)
     expect(candidate_list_query).to be_a(Coordinator::Read::Queries::CandidateList)
     expect(candidate_impact_query).to be_a(Coordinator::Read::Queries::CandidateImpactGet)
+    expect(repository_list_query).to be_a(Coordinator::Read::Queries::RepositoryList)
     expect(skill_get_query).to be_a(Coordinator::Read::Queries::SkillGet)
     expect(skill_list_query).to be_a(Coordinator::Read::Queries::SkillList)
     expect(skill_asset_get_query).to be_a(Coordinator::Read::Queries::SkillAssetGet)
