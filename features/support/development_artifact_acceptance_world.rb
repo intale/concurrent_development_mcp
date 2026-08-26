@@ -86,22 +86,34 @@ module DevelopmentArtifactAcceptanceWorld
   end
 
 
-  def artifact_relation_page(artifact_id, direction:, limit: 20, cursor: nil)
-    arguments = { artifact_id:, direction:, limit: }
+  def artifact_relation_page(
+    artifact_id,
+    direction:,
+    limit: 20,
+    cursor: nil,
+    include_superseded: false
+  )
+    arguments = { artifact_id:, direction:, limit:, include_superseded: }
     arguments[:cursor] = cursor if cursor
     call_tool("development_artifact_relation_list", arguments)
       .dig("result", "structuredContent", "data", "page")
   end
 
-  def artifact_locator_page(locator, source_revision: :unspecified)
+  def artifact_locator_page(locator, source_revision: :unspecified, cursor: nil, limit: 20)
     arguments = {
       scope: "project:acceptance",
       source_kind: "local_file",
       locator:,
-      limit: 20
+      limit:
     }
     arguments[:source_revision] = source_revision unless source_revision == :unspecified
+    arguments[:cursor] = cursor if cursor
     call_tool("development_artifact_locator_resolve", arguments)
+      .dig("result", "structuredContent")
+  end
+
+  def follow_artifact_action(action)
+    call_tool(action.fetch("tool"), action.fetch("arguments"))
       .dig("result", "structuredContent")
   end
 end

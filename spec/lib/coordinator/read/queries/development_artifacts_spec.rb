@@ -185,6 +185,79 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
     expect(converged.items.sole.declared.global_position).to be < first_page.items.sole.declared.global_position
   end
 
+  it "observes a later supersession from a completed cursor under replay and out-of-order projection" do
+    parent = capture_and_project(capture_input(command_id: "cmd-sup-parent", locator: "sup/parent.md"))
+    original_child = capture_and_project(
+      capture_input(command_id: "cmd-sup-original", locator: "sup/original.md")
+    )
+    replacement_child = capture_and_project(
+      capture_input(command_id: "cmd-sup-replacement", locator: "sup/replacement.md")
+    )
+    original_id = declare_and_project(
+      command_id: "cmd-sup-edge-original",
+      source: parent,
+      target: original_child,
+      relation: "references"
+    )
+    initial = relation_query.call(
+      artifact_id: parent,
+      direction: "outgoing",
+      include_superseded: true,
+      limit: 10
+    ).value!.data.page
+    expect(initial).to have_attributes(
+      items: [ have_attributes(relation_id: original_id, status: "active") ],
+      has_more: false
+    )
+
+    replacement = declare_relation.call(
+      relation_input(
+        command_id: "cmd-sup-edge-replacement",
+        source: parent,
+        target: replacement_child,
+        relation: "references",
+        supersedes: {
+          relation_id: original_id,
+          reason: "The parent now references the replacement."
+        }
+      )
+    ).value!.data
+    events = artifact_events(parent)
+    supersession = events.find { _1.type == "DevelopmentArtifactRelationSuperseded" }
+    replacement_declaration = events.find do |event|
+      event.data.dig("artifact_relation", "relation_id") == replacement.relation_id
+    end
+
+    projector.call(supersession)
+    updated = relation_query.call(
+      artifact_id: parent,
+      direction: "outgoing",
+      include_superseded: true,
+      cursor: initial.continuation_cursor.to_h,
+      limit: 10
+    ).value!.data.page
+    expect(updated.items).to contain_exactly(
+      have_attributes(
+        relation_id: original_id,
+        status: "superseded",
+        replacement_relation_id: replacement.relation_id
+      )
+    )
+
+    projector.call(supersession)
+    projector.call(replacement_declaration)
+    converged = relation_query.call(
+      artifact_id: parent,
+      direction: "outgoing",
+      include_superseded: true,
+      cursor: updated.continuation_cursor.to_h,
+      limit: 10
+    ).value!.data.page
+    expect(converged.items).to contain_exactly(
+      have_attributes(relation_id: replacement.relation_id, status: "active")
+    )
+  end
+
   it "reports zero, one, or multiple exact locator matches without selecting a revision" do
     first = capture_and_project(
       capture_input(
@@ -248,6 +321,52 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
     expect(absent.next_actions.sole).to have_attributes(
       tool: "development_artifact_locator_resolve"
     )
+  end
+
+  it "builds followable exact-revision actions on every locator page" do
+    revisions = %w[commit-a commit-b commit-c]
+    expected = revisions.to_h do |revision|
+      artifact_id = capture_and_project(
+        capture_input(
+          command_id: "cmd-locator-action-#{revision}",
+          locator: "docs/paged.md",
+          revision:,
+          text: "#{revision}\n"
+        )
+      )
+      [ revision, artifact_id ]
+    end
+
+    cursor = nil
+    observed = {}
+    loop do
+      input = {
+        scope: "project:alpha",
+        source_kind: "local_file",
+        locator: "docs/paged.md",
+        limit: 1
+      }
+      input[:cursor] = cursor if cursor
+      result = locator_query.call(input).value!
+      exact_action = result.next_actions.find { _1.arguments.to_h.key?(:source_revision) }
+      expect(exact_action).to be_a(Coordinator::Read::NextAction)
+
+      exact = locator_query.call(exact_action.arguments.to_h).value!
+      revision = exact_action.arguments.source_revision
+      expect(exact.data.page).to have_attributes(
+        resolution: "unique",
+        items: [ have_attributes(artifact_id: expected.fetch(revision)) ]
+      )
+      observed[revision] = exact.data.page.items.sole.artifact_id
+
+      break unless result.data.page.has_more
+
+      continuation = result.next_actions.find { !_1.arguments.to_h.key?(:source_revision) }
+      expect(continuation).to be_a(Coordinator::Read::NextAction)
+      cursor = continuation.arguments.cursor.to_h
+    end
+
+    expect(observed).to eq(expected)
   end
 
   it "keeps scopes, explicit null revisions, normalized paths, and URLs caller-owned" do
@@ -364,8 +483,8 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
     result.value!.data.relation_id
   end
 
-  def relation_input(command_id:, source:, target:, relation: "derived_from", attributes: {})
-    {
+  def relation_input(command_id:, source:, target:, relation: "derived_from", attributes: {}, supersedes: nil)
+    input = {
       command_id:,
       actor: { kind: "agent", id: "agent-query" },
       source_artifact_id: source,
@@ -373,6 +492,8 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
       target: { kind: "artifact", id: target },
       attributes:
     }
+    input[:supersedes] = supersedes if supersedes
+    input
   end
 
   def relation_query

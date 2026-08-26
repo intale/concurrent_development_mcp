@@ -46,7 +46,7 @@ Feature: Development Artifact repository
       Then it sees both exact parents with mixed relationship kinds and peer summaries
       And the README edge preserves its literal parent-segment, fragment, and normalized locator
 
-    @linked-artifacts @stale-view
+    @linked-artifacts @stale-view @AUD-ART-LOCATOR-ACTION-01 @AUD-ART-LOCATOR-PAGE-02
     Scenario: Locator resolution reports lag and immutable revision ambiguity without choosing latest
       Given two immutable revisions at one exact locator are captured but not projected
       When the clean agent resolves that locator before projection
@@ -75,3 +75,12 @@ Feature: Development Artifact repository
       When the older declaration reaches the read side after that cursor
       And the clean agent resumes from the returned relationship cursor
       Then the older declaration is returned despite its earlier event position
+
+    @linked-artifacts @stale-view @AUD-ART-RELATION-SUPERSESSION-01 @AUD-ART-RELATION-REPLAY-02
+    Scenario: A completed relationship cursor observes a later supersession exactly once
+      Given a projected Artifact relationship and an unprojected replacement are available
+      When the clean agent completes the initial relationship observation window
+      And the supersession reaches the read side before its replacement declaration
+      Then resuming the completed cursor exposes the original relationship as superseded
+      When the supersession is replayed and its older replacement declaration arrives
+      Then the next cursor exposes the active replacement once without regressing the original edge

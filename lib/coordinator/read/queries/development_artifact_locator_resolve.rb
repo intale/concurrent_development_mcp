@@ -32,12 +32,7 @@ module Coordinator::Read
       private
 
       def build_query(validated)
-        cursor = validated[:cursor] || {
-          after_observed_sequence: 0,
-          through_observed_sequence: nil,
-          after_captured_global_position: nil,
-          after_artifact_id: nil
-        }
+        cursor = validated[:cursor] || initial_cursor
         DevelopmentArtifactLocatorQueryV1.new(
           scope: validated[:scope],
           source_kind: validated[:source_kind],
@@ -81,7 +76,7 @@ module Coordinator::Read
           page.items.map { _1.source.revision }.uniq.first(10).each do |revision|
             actions << locator_action(
               query,
-              page.continuation_cursor,
+              DevelopmentArtifactLocatorPageV1::Cursor.new(initial_cursor),
               source_revision: revision,
               revision_specified: true
             )
@@ -111,6 +106,15 @@ module Coordinator::Read
           tool: "development_artifact_locator_resolve",
           arguments: NextAction::DevelopmentArtifactLocatorArguments.new(attributes)
         )
+      end
+
+      def initial_cursor
+        {
+          after_observed_sequence: 0,
+          through_observed_sequence: nil,
+          after_captured_global_position: nil,
+          after_artifact_id: nil
+        }
       end
 
       def invalid_result(details)

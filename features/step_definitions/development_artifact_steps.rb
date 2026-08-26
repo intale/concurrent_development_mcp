@@ -367,23 +367,39 @@ end
 
 When("both locator revisions reach the read side") do
   @locator_artifacts.each_value { project_artifact(_1) }
-  @ambiguous_locator = artifact_locator_page("docs/versioned.md")
+  @ambiguous_locator_pages = []
+  response = artifact_locator_page("docs/versioned.md", limit: 1)
+  loop do
+    @ambiguous_locator_pages << response
+    break unless response.dig("data", "page", "has_more")
+
+    continuation = response.fetch("next_actions").find do |action|
+      !action.fetch("arguments").key?("source_revision")
+    end
+    assert_acceptance(continuation, "Locator page omitted its continuation action")
+    response = follow_artifact_action(continuation)
+  end
 end
 
 Then("the locator is ambiguous and offers both exact revisions without choosing latest") do
-  page = @ambiguous_locator.dig("data", "page")
-  assert_acceptance_equal("ambiguous", page.fetch("resolution"), "Version ambiguity")
+  pages = @ambiguous_locator_pages.map { _1.dig("data", "page") }
+  assert_acceptance(pages.all? { _1.fetch("resolution") == "ambiguous" }, "Version ambiguity")
   assert_acceptance_equal(
     @locator_artifacts.values.sort,
-    page.fetch("items").map { _1.fetch("artifact_id") }.sort,
+    pages.flat_map { _1.fetch("items") }.map { _1.fetch("artifact_id") }.sort,
     "Ambiguous immutable Artifacts"
   )
-  revisions = @ambiguous_locator.fetch("next_actions").map do |action|
+  @locator_revision_actions = @ambiguous_locator_pages.flat_map do |response|
+    response.fetch("next_actions").select do |action|
+      action.fetch("arguments").key?("source_revision")
+    end
+  end
+  revisions = @locator_revision_actions.map do |action|
     action.dig("arguments", "source_revision")
   end
   assert_acceptance_equal(%w[commit-a commit-b], revisions.sort, "Exact revision actions")
   assert_acceptance(
-    @ambiguous_locator.fetch("next_actions").none? do |action|
+    @ambiguous_locator_pages.flat_map { _1.fetch("next_actions") }.none? do |action|
       action.fetch("tool") == "development_artifact_content_get"
     end,
     "No implicit content selection"
@@ -391,7 +407,11 @@ Then("the locator is ambiguous and offers both exact revisions without choosing 
 end
 
 When("the clean agent follows one exact revision action") do
-  @exact_locator = artifact_locator_page("docs/versioned.md", source_revision: "commit-b")
+  action = @locator_revision_actions.find do |candidate|
+    candidate.dig("arguments", "source_revision") == "commit-b"
+  end
+  assert_acceptance(action, "Exact commit-b locator action")
+  @exact_locator = follow_artifact_action(action)
 end
 
 Then("exactly that immutable Artifact and its content action are returned") do
@@ -576,4 +596,104 @@ Then("the older declaration is returned despite its earlier event position") do
     resumed.dig("declared", "global_position") < initial.dig("declared", "global_position"),
     "Late relation event position"
   )
+end
+
+Given("a projected Artifact relationship and an unprojected replacement are available") do
+  definitions = {
+    parent: [ "cmd-cuc-supersession-parent", "supersession/README.md" ],
+    original: [ "cmd-cuc-supersession-original", "supersession/original.md" ],
+    replacement: [ "cmd-cuc-supersession-replacement", "supersession/replacement.md" ]
+  }
+  @supersession_artifacts = definitions.to_h do |name, (command_id, locator)|
+    outcome = capture_artifact_task(
+      command_id:,
+      title: name.to_s.capitalize,
+      kind: "documentation",
+      labels: %w[linked supersession],
+      locator:,
+      source_kind: "local_file",
+      content: { encoding: "utf-8", media_type: "text/markdown", text: "#{name}\n" }
+    )
+    [ name, outcome.dig("data", "artifact_id") ]
+  end
+  @supersession_artifacts.each_value { project_artifact(_1) }
+
+  original = declare_artifact_relation_task(
+    command_id: "cmd-cuc-supersession-edge-original",
+    source_artifact_id: @supersession_artifacts.fetch(:parent),
+    relation: "references",
+    target: { kind: "artifact", id: @supersession_artifacts.fetch(:original) },
+    attributes: { path: "original.md" }
+  )
+  @supersession_relation_ids = { original: original.dig(:result, "data", "relation_id") }
+  original_event = artifact_events(@supersession_artifacts.fetch(:parent)).find do |event|
+    event.data.dig("artifact_relation", "relation_id") == @supersession_relation_ids.fetch(:original)
+  end
+  project_artifact_event(original_event)
+
+  replacement = declare_artifact_relation_task(
+    command_id: "cmd-cuc-supersession-edge-replacement",
+    source_artifact_id: @supersession_artifacts.fetch(:parent),
+    relation: "references",
+    target: { kind: "artifact", id: @supersession_artifacts.fetch(:replacement) },
+    attributes: { path: "replacement.md" },
+    supersedes: {
+      relation_id: @supersession_relation_ids.fetch(:original),
+      reason: "README now references the replacement."
+    }
+  )
+  @supersession_relation_ids[:replacement] = replacement.dig(:result, "data", "relation_id")
+  events = artifact_events(@supersession_artifacts.fetch(:parent))
+  @supersession_event = events.find { _1.type == "DevelopmentArtifactRelationSuperseded" }
+  @replacement_declaration = events.find do |event|
+    event.data.dig("artifact_relation", "relation_id") == @supersession_relation_ids.fetch(:replacement)
+  end
+end
+
+When("the clean agent completes the initial relationship observation window") do
+  @supersession_initial_page = artifact_relation_page(
+    @supersession_artifacts.fetch(:parent),
+    direction: "outgoing",
+    limit: 10,
+    include_superseded: true
+  )
+  assert_acceptance_equal(false, @supersession_initial_page.fetch("has_more"), "Initial relation window")
+end
+
+When("the supersession reaches the read side before its replacement declaration") do
+  project_artifact_event(@supersession_event)
+end
+
+Then("resuming the completed cursor exposes the original relationship as superseded") do
+  @supersession_resumed_page = artifact_relation_page(
+    @supersession_artifacts.fetch(:parent),
+    direction: "outgoing",
+    limit: 10,
+    cursor: @supersession_initial_page.fetch("continuation_cursor"),
+    include_superseded: true
+  )
+  item = @supersession_resumed_page.fetch("items").sole
+  assert_acceptance_equal(@supersession_relation_ids.fetch(:original), item.fetch("relation_id"), "Updated edge")
+  assert_acceptance_equal("superseded", item.fetch("status"), "Updated edge status")
+end
+
+When("the supersession is replayed and its older replacement declaration arrives") do
+  project_artifact_event(@supersession_event)
+  project_artifact_event(@replacement_declaration)
+end
+
+Then("the next cursor exposes the active replacement once without regressing the original edge") do
+  page = artifact_relation_page(
+    @supersession_artifacts.fetch(:parent),
+    direction: "outgoing",
+    limit: 10,
+    cursor: @supersession_resumed_page.fetch("continuation_cursor"),
+    include_superseded: true
+  )
+  assert_acceptance_equal(
+    [ @supersession_relation_ids.fetch(:replacement) ],
+    page.fetch("items").map { _1.fetch("relation_id") },
+    "Replacement observation"
+  )
+  assert_acceptance_equal("active", page.fetch("items").sole.fetch("status"), "Replacement status")
 end

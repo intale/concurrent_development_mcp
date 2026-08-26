@@ -3,7 +3,12 @@
 module Coordinator::Read
   module Repositories
     class DevelopmentArtifacts
-      OBSERVED_SEQUENCE_SQL = "development_artifact_relations.observed_sequence"
+      RELATION_OBSERVED_SEQUENCE_SQL = "development_artifact_relations.observed_sequence"
+      SUPERSESSION_OBSERVED_SEQUENCE_SQL =
+        "development_artifact_relation_supersessions.observed_sequence"
+      CURRENT_OBSERVED_SEQUENCE_SQL =
+        "GREATEST(#{RELATION_OBSERVED_SEQUENCE_SQL}, " \
+        "COALESCE(#{SUPERSESSION_OBSERVED_SEQUENCE_SQL}, 0))"
 
       def fetch(artifact_id)
         record = Coordinator::Read::DevelopmentArtifact.find_by(artifact_id:)
@@ -41,17 +46,23 @@ module Coordinator::Read
       def relation_page(query)
         cursor = query.cursor
         base = navigation_scope(query)
-        upper = cursor.through_observed_sequence || maximum_observed_sequence(base)
+        upper = cursor.through_observed_sequence || maximum_observed_sequence(
+          base,
+          include_superseded: query.include_superseded
+        )
+        observed_sequence_sql = observed_sequence_at(upper)
         window = base.where(
-          "#{OBSERVED_SEQUENCE_SQL} > ? AND #{OBSERVED_SEQUENCE_SQL} <= ?",
+          "#{observed_sequence_sql} > ? AND #{observed_sequence_sql} <= ?",
           cursor.after_observed_sequence,
           upper
         )
+        window = active_at(window, upper) unless query.include_superseded
         window = after_declaration(window, cursor)
         rows = window
           .select(
             "development_artifact_relations.*",
-            "#{OBSERVED_SEQUENCE_SQL} AS navigation_sequence"
+            "#{observed_sequence_sql} AS navigation_sequence",
+            "#{superseded_at(upper)} AS navigation_superseded"
           )
           .includes(:supersession)
           .order(:declared_global_position, :relation_id)
@@ -67,7 +78,10 @@ module Coordinator::Read
           items: visible_rows,
           window_has_more:
         )
-        has_more = window_has_more || maximum_observed_sequence(base) > upper
+        has_more = window_has_more || maximum_observed_sequence(
+          base,
+          include_superseded: query.include_superseded
+        ) > upper
 
         DevelopmentArtifactRelationPageV1.new(
           artifact: summaries[query.artifact_id],
@@ -145,11 +159,19 @@ module Coordinator::Read
         record = Coordinator::Read::DevelopmentArtifactRelationSupersession.find_by(
           superseded_relation_id: supersession.superseded_relation_id
         )
-        verify_supersession!(record, supersession) if record
-        record ||= Coordinator::Read::DevelopmentArtifactRelationSupersession.new(
+        if record
+          verify_supersession!(record, supersession)
+          return record
+        end
+
+        record = Coordinator::Read::DevelopmentArtifactRelationSupersession.new(
           superseded_relation_id: supersession.superseded_relation_id
         )
-        record.assign_attributes(supersession_attributes(event, supersession))
+        record.assign_attributes(
+          supersession_attributes(event, supersession).merge(
+            observed_sequence: next_relation_observed_sequence
+          )
+        )
         record.save!
         record
       end
@@ -212,11 +234,6 @@ module Coordinator::Read
         relation = Coordinator::Read::DevelopmentArtifactRelation.left_outer_joins(:supersession)
         relation = direction_scope(relation, query)
         relation = relation.where(relation: query.relation) if query.relation
-        unless query.include_superseded
-          relation = relation.where(
-            development_artifact_relation_supersessions: { superseded_relation_id: nil }
-          )
-        end
         relation
       end
 
@@ -233,8 +250,26 @@ module Coordinator::Read
         relation.where(predicate, artifact_id: query.artifact_id)
       end
 
-      def maximum_observed_sequence(relation)
-        relation.maximum(Arel.sql(OBSERVED_SEQUENCE_SQL)) || 0
+      def maximum_observed_sequence(relation, include_superseded:)
+        relation = active_at(relation, nil) unless include_superseded
+        relation.maximum(Arel.sql(CURRENT_OBSERVED_SEQUENCE_SQL)) || 0
+      end
+
+      def observed_sequence_at(upper)
+        "CASE WHEN #{superseded_at(upper)} " \
+          "THEN #{SUPERSESSION_OBSERVED_SEQUENCE_SQL} " \
+          "ELSE #{RELATION_OBSERVED_SEQUENCE_SQL} END"
+      end
+
+      def superseded_at(upper)
+        return "#{SUPERSESSION_OBSERVED_SEQUENCE_SQL} IS NOT NULL" unless upper
+
+        "#{SUPERSESSION_OBSERVED_SEQUENCE_SQL} IS NOT NULL AND " \
+          "#{SUPERSESSION_OBSERVED_SEQUENCE_SQL} <= #{Integer(upper)}"
+      end
+
+      def active_at(relation, upper)
+        relation.where("NOT (#{superseded_at(upper)})")
       end
 
       def after_declaration(relation, cursor)
@@ -429,7 +464,7 @@ module Coordinator::Read
         direction = record.source_artifact_id == artifact_id ? "outgoing" : "incoming"
         peer_kind = direction == "outgoing" ? record.target_kind : "artifact"
         peer_id = direction == "outgoing" ? record.target_id : record.source_artifact_id
-        supersession = record.supersession
+        supersession = visible_supersession(record)
         DevelopmentArtifactRelationViewV1.new(
           relation_id: record.relation_id,
           source_artifact_id: record.source_artifact_id,
@@ -457,7 +492,22 @@ module Coordinator::Read
       end
 
       def effective_sequence(record)
-        record.observed_sequence
+        record.supersession&.observed_sequence || record.observed_sequence
+      end
+
+      def visible_supersession(record)
+        return record.supersession unless record.has_attribute?("navigation_superseded")
+
+        record[:navigation_superseded] ? record.supersession : nil
+      end
+
+      def next_relation_observed_sequence
+        connection = Coordinator::Read::DevelopmentArtifactRelation.connection
+        table = connection.quote(Coordinator::Read::DevelopmentArtifactRelation.table_name)
+        column = connection.quote("observed_sequence")
+        connection.select_value(
+          "SELECT nextval(pg_get_serial_sequence(#{table}, #{column}))"
+        ).to_i
       end
 
       def summaries_for(artifact_id, relations)
