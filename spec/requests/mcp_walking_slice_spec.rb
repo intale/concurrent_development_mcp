@@ -98,6 +98,11 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
       "idempotentHint" => true,
       "destructiveHint" => false
     )
+    expect(tools.find { _1.fetch("name") == "attempt_abandon" }.fetch("annotations")).to include(
+      "readOnlyHint" => false,
+      "idempotentHint" => true,
+      "destructiveHint" => false
+    )
   end
 
   it "teaches a clean agent to migrate client-visible development memory semantically" do
