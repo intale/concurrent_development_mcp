@@ -36,6 +36,7 @@ module Coordinator
       def self.development_artifact_get: () -> json_schema
       def self.development_artifact_content_get: () -> json_schema
       def self.development_artifact_relation_list: () -> json_schema
+      def self.development_artifact_locator_resolve: () -> json_schema
       def self.development_artifact_list: () -> json_schema
       def self.agent_choice_get: () -> json_schema
       def self.agent_choice_impact_list: () -> json_schema

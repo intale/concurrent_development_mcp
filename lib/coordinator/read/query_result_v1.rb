@@ -109,6 +109,10 @@ module Coordinator::Read
       attribute :page, DevelopmentArtifactRelationPageV1
     end
 
+    class DevelopmentArtifactLocatorPageData < Value
+      attribute :page, DevelopmentArtifactLocatorPageV1
+    end
+
     class OperationBatchData < Value
       attribute :batch, OperationBatchViewV1
     end
@@ -138,6 +142,7 @@ module Coordinator::Read
            DevelopmentArtifactContentData |
            DevelopmentArtifactPageData |
            DevelopmentArtifactRelationPageData |
+           DevelopmentArtifactLocatorPageData |
            OperationBatchData
     Action = Coordinator::Write::NextAction | NextAction
 

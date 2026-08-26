@@ -185,6 +185,165 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
     expect(converged.items.sole.declared.global_position).to be < first_page.items.sole.declared.global_position
   end
 
+  it "reports zero, one, or multiple exact locator matches without selecting a revision" do
+    first = capture_and_project(
+      capture_input(
+        command_id: "cmd-locator-v1",
+        locator: "docs/api.md",
+        revision: "commit-a",
+        text: "api v1\n"
+      )
+    )
+    second = capture_and_project(
+      capture_input(
+        command_id: "cmd-locator-v2",
+        locator: "docs/api.md",
+        revision: "commit-b",
+        text: "api v2\n"
+      )
+    )
+
+    ambiguous = locator_query.call(
+      scope: "project:alpha",
+      source_kind: "local_file",
+      locator: "docs/api.md",
+      limit: 10
+    ).value!
+    exact = locator_query.call(
+      scope: "project:alpha",
+      source_kind: "local_file",
+      locator: "docs/api.md",
+      source_revision: "commit-a",
+      limit: 10
+    ).value!
+    absent = locator_query.call(
+      scope: "project:alpha",
+      source_kind: "local_file",
+      locator: "docs/missing.md",
+      limit: 10
+    ).value!
+
+    expect(ambiguous.data.page).to have_attributes(
+      resolution: "ambiguous",
+      items: contain_exactly(
+        have_attributes(artifact_id: first),
+        have_attributes(artifact_id: second)
+      )
+    )
+    expect(ambiguous.next_actions.map(&:tool)).to all(eq("development_artifact_locator_resolve"))
+    expect(ambiguous.next_actions.map { _1.arguments.source_revision }).to contain_exactly(
+      "commit-a",
+      "commit-b"
+    )
+    expect(exact.data.page).to have_attributes(
+      resolution: "unique",
+      items: [ have_attributes(artifact_id: first) ]
+    )
+    expect(exact.next_actions.sole).to have_attributes(
+      tool: "development_artifact_content_get",
+      arguments: have_attributes(artifact_id: first)
+    )
+    expect(absent.data.page).to have_attributes(resolution: "absent", items: [])
+    expect(absent.warnings.sole).to include("Projection lag")
+    expect(absent.next_actions.sole).to have_attributes(
+      tool: "development_artifact_locator_resolve"
+    )
+  end
+
+  it "keeps scopes, explicit null revisions, normalized paths, and URLs caller-owned" do
+    unversioned = capture_and_project(
+      capture_input(command_id: "cmd-locator-unversioned", locator: "docs/api.md")
+    )
+    other_scope = capture_and_project(
+      capture_input(
+        command_id: "cmd-locator-other-scope",
+        locator: "docs/api.md",
+        scope: "project:beta"
+      )
+    )
+    url = "https://example.test/reference?page=1"
+    web = capture_and_project(
+      capture_input(
+        command_id: "cmd-locator-web",
+        locator: url,
+        source_kind: "web_page"
+      )
+    )
+
+    explicit_nil = locator_query.call(
+      scope: "project:alpha",
+      source_kind: "local_file",
+      locator: "docs/api.md",
+      source_revision: nil
+    ).value!.data.page
+    beta = locator_query.call(
+      scope: "project:beta",
+      source_kind: "local_file",
+      locator: "docs/api.md"
+    ).value!.data.page
+    unresolved_parent_segment = locator_query.call(
+      scope: "project:alpha",
+      source_kind: "local_file",
+      locator: "guide/../docs/api.md"
+    ).value!.data.page
+    exact_url = locator_query.call(
+      scope: "project:alpha",
+      source_kind: "web_page",
+      locator: url
+    ).value!.data.page
+
+    expect(explicit_nil).to have_attributes(
+      resolution: "unique",
+      items: [ have_attributes(artifact_id: unversioned) ]
+    )
+    expect(beta.items.sole).to have_attributes(artifact_id: other_scope)
+    expect(unresolved_parent_segment).to have_attributes(resolution: "absent", items: [])
+    expect(exact_url.items.sole).to have_attributes(artifact_id: web)
+  end
+
+  it "continues locator resolution when an older capture is projected late" do
+    older = capture.call(
+      capture_input(
+        command_id: "cmd-locator-late-older",
+        locator: "docs/versioned.md",
+        revision: "older",
+        text: "older\n"
+      )
+    ).value!.data.artifact_id
+    newer = capture.call(
+      capture_input(
+        command_id: "cmd-locator-late-newer",
+        locator: "docs/versioned.md",
+        revision: "newer",
+        text: "newer\n"
+      )
+    ).value!.data.artifact_id
+    projector.call(artifact_events(newer).sole)
+
+    first_page = locator_query.call(
+      scope: "project:alpha",
+      source_kind: "local_file",
+      locator: "docs/versioned.md",
+      limit: 1
+    ).value!.data.page
+    expect(first_page).to have_attributes(resolution: "unique", has_more: false)
+    expect(first_page.items.sole).to have_attributes(artifact_id: newer)
+
+    projector.call(artifact_events(older).sole)
+    converged = locator_query.call(
+      scope: "project:alpha",
+      source_kind: "local_file",
+      locator: "docs/versioned.md",
+      cursor: first_page.continuation_cursor.to_h,
+      limit: 1
+    ).value!.data.page
+
+    expect(converged).to have_attributes(resolution: "ambiguous")
+    expect(converged.items.sole).to have_attributes(artifact_id: older)
+    expect(converged.items.sole.captured.global_position).to be <
+      first_page.items.sole.captured.global_position
+  end
+
   def capture_and_project(input)
     result = capture.call(input)
     expect(result).to be_success
@@ -220,29 +379,37 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
     Coordinator::Read::Queries::DevelopmentArtifactRelationList.new
   end
 
+  def locator_query
+    Coordinator::Read::Queries::DevelopmentArtifactLocatorResolve.new
+  end
+
   def capture_input(
     command_id: "cmd-query-first",
     locator: "first.md",
     title: "First",
     kind: "documentation",
-    labels: %w[docs review imported]
+    labels: %w[docs review imported],
+    scope: "project:alpha",
+    source_kind: "local_file",
+    revision: nil,
+    text: "first document\n"
   )
     {
       command_id:,
       actor: { kind: "agent", id: "agent-query" },
-      scope: "project:alpha",
+      scope:,
       title:,
       kind:,
       labels:,
       content: {
         encoding: "utf-8",
         media_type: "text/markdown",
-        text: "first document\n"
+        text:
       },
       source: {
-        kind: "local_file",
+        kind: source_kind,
         locator:,
-        revision: nil,
+        revision:,
         observed_at: "2026-08-25T16:00:00.000000Z",
         collector: "spec/v1"
       }

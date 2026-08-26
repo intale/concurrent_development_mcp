@@ -69,6 +69,8 @@ RSpec.describe Coordinator::Container do
     artifact_get_query = described_class["queries.development_artifact_get"]
     artifact_content_get_query = described_class["queries.development_artifact_content_get"]
     artifact_relation_list_query = described_class["queries.development_artifact_relation_list"]
+    artifact_locator_resolve_query =
+      described_class["queries.development_artifact_locator_resolve"]
     artifact_list_query = described_class["queries.development_artifact_list"]
     operation_batch_query = described_class["queries.operation_batch_get"]
     verification_obligations_query = described_class["queries.verification_obligations_list"]
@@ -244,6 +246,9 @@ RSpec.describe Coordinator::Container do
     )
     expect(artifact_relation_list_query).to be_a(
       Coordinator::Read::Queries::DevelopmentArtifactRelationList
+    )
+    expect(artifact_locator_resolve_query).to be_a(
+      Coordinator::Read::Queries::DevelopmentArtifactLocatorResolve
     )
     expect(artifact_list_query).to be_a(Coordinator::Read::Queries::DevelopmentArtifactList)
     expect(operation_batch_query).to be_a(Coordinator::Read::Queries::OperationBatchGet)

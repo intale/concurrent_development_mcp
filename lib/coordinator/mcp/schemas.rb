@@ -910,6 +910,82 @@ module Coordinator
         )
       end
 
+      def development_artifact_locator_resolve
+        cursor = object_schema(
+          properties: {
+            after_observed_sequence: {
+              type: "integer",
+              minimum: 0,
+              description: "Projection-observation lower bound returned by the previous page."
+            },
+            through_observed_sequence: {
+              anyOf: [ { type: "integer", minimum: 0 }, { type: "null" } ],
+              description: "Fixed projection-observation upper bound, or null to open a new window."
+            },
+            after_captured_global_position: {
+              anyOf: [ { type: "integer", minimum: 0 }, { type: "null" } ],
+              description: "Capture-order position inside a fixed observation window."
+            },
+            after_artifact_id: {
+              anyOf: [
+                { type: "string", pattern: "^artifact:v1:[0-9a-f]{64}$" },
+                { type: "null" }
+              ],
+              description: "Artifact tie-breaker inside a fixed observation window."
+            }
+          },
+          required: %w[
+            after_observed_sequence
+            through_observed_sequence
+            after_captured_global_position
+            after_artifact_id
+          ]
+        )
+        object_schema(
+          properties: {
+            scope: {
+              type: "string",
+              minLength: 1,
+              maxLength: Types::DEVELOPMENT_ARTIFACT_SCOPE_MAXIMUM_BYTES,
+              description: "Exact caller-owned Artifact scope."
+            },
+            source_kind: {
+              type: "string",
+              enum: Types::DEVELOPMENT_ARTIFACT_SOURCE_KINDS,
+              description: "Exact source-kind discriminator."
+            },
+            locator: {
+              type: "string",
+              minLength: 1,
+              maxLength: Types::DEVELOPMENT_ARTIFACT_SOURCE_LOCATOR_MAXIMUM_BYTES,
+              description: "Exact caller-normalized logical locator; the server does not resolve paths, fetch URLs, or select a latest version."
+            },
+            source_revision: {
+              anyOf: [
+                {
+                  type: "string",
+                  maxLength: Types::DEVELOPMENT_ARTIFACT_SOURCE_REVISION_MAXIMUM_BYTES
+                },
+                { type: "null" }
+              ],
+              description: "Optional exact revision. Omit to match every revision; null matches only artifacts captured without a revision."
+            },
+            cursor: { anyOf: [ cursor, { type: "null" } ] },
+            limit: {
+              anyOf: [
+                {
+                  type: "integer",
+                  minimum: 1,
+                  maximum: Types::DEVELOPMENT_ARTIFACT_QUERY_MAXIMUM_ITEMS
+                },
+                { type: "null" }
+              ]
+            }
+          },
+          required: %w[scope source_kind locator]
+        )
+      end
+
       def development_artifact_list
         relation_target = object_schema(
           properties: {

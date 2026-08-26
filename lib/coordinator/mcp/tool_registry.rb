@@ -25,6 +25,7 @@ module Coordinator
           Tools::DevelopmentArtifactGet,
           Tools::DevelopmentArtifactContentGet,
           Tools::DevelopmentArtifactRelationList,
+          Tools::DevelopmentArtifactLocatorResolve,
           Tools::DevelopmentArtifactList,
           Tools::OperationBatchGet,
           Tools::VerificationObligationsList,

@@ -1,0 +1,13 @@
+module Coordinator
+  module Read
+    class DevelopmentArtifactLocatorQueryV1 < Shared::Value
+      def scope: () -> String
+      def source_kind: () -> String
+      def locator: () -> String
+      def source_revision: () -> String?
+      def revision_specified: () -> bool
+      def cursor: () -> DevelopmentArtifactLocatorPageV1::Cursor
+      def limit: () -> Integer
+    end
+  end
+end

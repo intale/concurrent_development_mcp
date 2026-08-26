@@ -991,6 +991,12 @@ module Coordinator
       )
     end
 
+    register("queries.development_artifact_locator_resolve") do
+      Read::Queries::DevelopmentArtifactLocatorResolve.new(
+        artifacts: self["repositories.development_artifacts"]
+      )
+    end
+
     register("queries.development_artifact_list") do
       Read::Queries::DevelopmentArtifactList.new(
         artifacts: self["repositories.development_artifacts"]

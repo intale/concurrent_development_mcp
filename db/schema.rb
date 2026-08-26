@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_26_144500) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_26_151500) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -402,6 +402,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_26_144500) do
     t.datetime "created_at", null: false
     t.string "kind", null: false
     t.jsonb "labels", default: [], null: false
+    t.bigserial "observed_sequence", null: false
     t.text "scope", null: false
     t.string "source_collector", null: false
     t.string "source_kind", null: false
@@ -413,8 +414,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_26_144500) do
     t.index ["captured_global_position"], name: "index_development_artifacts_on_captured_global_position"
     t.index ["kind"], name: "index_development_artifacts_on_kind"
     t.index ["labels"], name: "index_development_artifacts_on_labels", using: :gin
+    t.index ["observed_sequence"], name: "index_development_artifacts_on_observed_sequence", unique: true
+    t.index ["scope", "source_kind", "source_revision", "observed_sequence"], name: "index_development_artifacts_on_exact_locator_context"
     t.index ["scope"], name: "index_development_artifacts_on_scope"
     t.index ["source_kind"], name: "index_development_artifacts_on_source_kind"
+    t.index ["source_locator"], name: "index_development_artifacts_on_source_locator_hash", using: :hash
   end
 
   create_table "merge_authorizations", primary_key: "authorization_id", id: :string, force: :cascade do |t|

@@ -35,6 +35,16 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
       .dig("result", "structuredContent")
     content = call_tool("development_artifact_content_get", { artifact_id: }, id: 4)
       .dig("result", "structuredContent")
+    resolved = call_tool(
+      "development_artifact_locator_resolve",
+      {
+        scope: "project:alpha",
+        source_kind: "local_file",
+        locator: "docs/mcp.md",
+        source_revision: nil
+      },
+      id: 5
+    ).dig("result", "structuredContent")
     expect(metadata.dig("data", "artifact", "artifact")).to include(
       "artifact_id" => artifact_id,
       "scope" => "project:alpha"
@@ -45,6 +55,14 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
       "base64" => nil
     )
     expect(content.fetch("warnings").sole).to include("passive data")
+    expect(resolved.dig("data", "page")).to include(
+      "resolution" => "unique",
+      "items" => [ include("artifact_id" => artifact_id) ]
+    )
+    expect(resolved.fetch("next_actions").sole).to include(
+      "tool" => "development_artifact_content_get",
+      "arguments" => { "artifact_id" => artifact_id }
+    )
   end
 
   it "runs capture and relation batches as idempotent Operation Batch Sagas" do

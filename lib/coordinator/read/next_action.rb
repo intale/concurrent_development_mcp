@@ -24,7 +24,24 @@ module Coordinator::Read
       attribute :candidate_id, Types::Identifier
     end
 
-    Arguments = ChangeSetArguments | WorkItemArguments | AttemptArguments | WorkItemCompletionArguments
+    class DevelopmentArtifactLocatorArguments < Value
+      attribute :scope, Types::DevelopmentArtifactScope
+      attribute :source_kind, Types::DevelopmentArtifactSourceKind
+      attribute :locator, Types::DevelopmentArtifactSourceLocator
+      attribute? :source_revision, Types::DevelopmentArtifactSourceRevision.optional
+      attribute :cursor, DevelopmentArtifactLocatorPageV1::Cursor
+      attribute :limit,
+                Types::Integer.constrained(
+                  gteq: 1,
+                  lteq: Types::DEVELOPMENT_ARTIFACT_QUERY_MAXIMUM_ITEMS
+                )
+    end
+
+    Arguments = ChangeSetArguments |
+                WorkItemArguments |
+                AttemptArguments |
+                WorkItemCompletionArguments |
+                DevelopmentArtifactLocatorArguments
 
     attribute :tool, Types::Identifier
     attribute :arguments, Arguments

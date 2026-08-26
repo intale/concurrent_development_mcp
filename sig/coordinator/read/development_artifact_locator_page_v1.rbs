@@ -1,0 +1,17 @@
+module Coordinator
+  module Read
+    class DevelopmentArtifactLocatorPageV1 < Shared::Value
+      class Cursor < Shared::Value
+        def after_observed_sequence: () -> Integer
+        def through_observed_sequence: () -> Integer?
+        def after_captured_global_position: () -> Integer?
+        def after_artifact_id: () -> String?
+      end
+
+      def resolution: () -> String
+      def items: () -> Array[DevelopmentArtifactSummaryV1]
+      def continuation_cursor: () -> Cursor
+      def has_more: () -> bool
+    end
+  end
+end

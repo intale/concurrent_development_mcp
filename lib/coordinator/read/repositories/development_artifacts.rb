@@ -77,6 +77,46 @@ module Coordinator::Read
         )
       end
 
+      def locator_page(query)
+        cursor = query.cursor
+        base = exact_locator_scope(query)
+        resolution = locator_resolution(base)
+        upper = cursor.through_observed_sequence || maximum_artifact_observed_sequence(base)
+        window = base.where(
+          "observed_sequence > ? AND observed_sequence <= ?",
+          cursor.after_observed_sequence,
+          upper
+        )
+        window = after_capture(window, cursor)
+        rows = window
+          .order(:captured_global_position, :artifact_id)
+          .limit(query.limit + 1)
+          .to_a
+        window_has_more = rows.length > query.limit
+        visible_rows = rows.first(query.limit)
+        counts = active_relations
+          .where(source_artifact_id: visible_rows.map(&:artifact_id))
+          .group(:source_artifact_id)
+          .count
+        items = visible_rows.map do |record|
+          build_summary(record, relationship_count: counts.fetch(record.artifact_id, 0))
+        end
+        continuation = locator_continuation_cursor(
+          cursor:,
+          upper:,
+          items: visible_rows,
+          window_has_more:
+        )
+        has_more = window_has_more || maximum_artifact_observed_sequence(base) > upper
+
+        DevelopmentArtifactLocatorPageV1.new(
+          resolution:,
+          items:,
+          continuation_cursor: continuation,
+          has_more:
+        )
+      end
+
       def store_capture(event:, capture:)
         artifact = capture.artifact
         record = Coordinator::Read::DevelopmentArtifact.find_by(artifact_id: artifact.artifact_id)
@@ -115,6 +155,58 @@ module Coordinator::Read
       end
 
       private
+
+      def exact_locator_scope(query)
+        relation = Coordinator::Read::DevelopmentArtifact.where(
+          scope: query.scope,
+          source_kind: query.source_kind,
+          source_locator: query.locator
+        )
+        return relation unless query.revision_specified
+
+        relation.where(source_revision: query.source_revision)
+      end
+
+      def locator_resolution(relation)
+        case relation.limit(2).pluck(:artifact_id).length
+        when 0 then "absent"
+        when 1 then "unique"
+        else "ambiguous"
+        end
+      end
+
+      def maximum_artifact_observed_sequence(relation)
+        relation.maximum(:observed_sequence) || 0
+      end
+
+      def after_capture(relation, cursor)
+        return relation unless cursor.after_captured_global_position
+
+        relation.where(
+          "(captured_global_position, artifact_id) > (?, ?)",
+          cursor.after_captured_global_position,
+          cursor.after_artifact_id
+        )
+      end
+
+      def locator_continuation_cursor(cursor:, upper:, items:, window_has_more:)
+        if window_has_more
+          last = items.last
+          return DevelopmentArtifactLocatorPageV1::Cursor.new(
+            after_observed_sequence: cursor.after_observed_sequence,
+            through_observed_sequence: upper,
+            after_captured_global_position: last.captured_global_position,
+            after_artifact_id: last.artifact_id
+          )
+        end
+
+        DevelopmentArtifactLocatorPageV1::Cursor.new(
+          after_observed_sequence: upper,
+          through_observed_sequence: nil,
+          after_captured_global_position: nil,
+          after_artifact_id: nil
+        )
+      end
 
       def navigation_scope(query)
         relation = Coordinator::Read::DevelopmentArtifactRelation.left_outer_joins(:supersession)
