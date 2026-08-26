@@ -28,7 +28,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
     expect(snapshot.state.work_item_ids).to eq([ "W-100" ])
     expect(snapshot.state.work_items.sole.to_h).to include(
       work_item_id: "W-100",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       status: "planned"
     )
     expect(snapshot.source_positions.length).to eq(2)
@@ -71,7 +71,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
       work_item_id: "W-100",
       attempt_id: "A-100",
       base_snapshots: [
-        { repository_id: "billing", commit_oid: "a" * 40 }
+        { repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID, commit_oid: "a" * 40 }
       ]
     ).value!
     reservation = Coordinator::Write::Operations::ExecuteReserveWriteSet.new(event_store:).call(
@@ -80,7 +80,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
       change_set_id: "CS-100",
       work_item_id: "W-100",
       attempt_id: "A-100",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: [
         { kind: "file", path: "app/models/invoice.rb", base_blob_oid: "b" * 40 },
@@ -95,7 +95,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
       work_item_id: "W-100",
       attempt_id: "A-100",
       lease_set_id: reservation.lease_set_id,
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: [
         { kind: "file", path: "app/models/invoice.rb", base_blob_oid: "b" * 40 },
@@ -165,13 +165,17 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
       attempt_id: "A-100",
       status: "started",
       base_snapshots: [
-        { repository_id: "billing", object_format: "sha1", commit_oid: "a" * 40 }
+        {
+          repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+          object_format: "sha1",
+          commit_oid: "a" * 40
+        }
       ]
     )
     write_set = snapshot.state.attempts.sole.write_set
     expect(write_set.to_h).to include(
-      repository_id: "billing",
-      policy_version: "coordinator-resource-key/v1"
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      policy_version: "coordinator-resource-key/v2"
     )
     expect(write_set.lease_set_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
     expect(write_set.resources).to eq(write_set.resources.sort_by { _1.resource_key_hash.b })
@@ -344,12 +348,13 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
   end
 
   def create_work_item(change_set_id, work_item_id)
+    RepositoryScenario.register(event_store:)
     Coordinator::Write::Operations::ExecuteCreateWorkItem.new(event_store:).call(
       command_id: "create-#{work_item_id}",
       actor: { kind: "agent", id: "planner-1" },
       change_set_id:,
       work_item_id:,
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       goal: "Implement #{work_item_id}",
       acceptance_criteria: [ "The work is verifiable" ]
     ).value!

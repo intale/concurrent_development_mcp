@@ -89,6 +89,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::ChangeSetReadiness, :eve
   end
 
   def seed_activated_change_set(change_set_id:, work_item_ids:, dependency: nil)
+    RepositoryScenario.register(event_store:)
     create_change_set(change_set_id)
     work_item_ids.each { create_work_item(change_set_id, _1) }
     declare_dependency(change_set_id, *dependency) if dependency
@@ -106,12 +107,13 @@ RSpec.describe Coordinator::Processes::ProcessManagers::ChangeSetReadiness, :eve
   end
 
   def create_work_item(change_set_id, work_item_id)
+    RepositoryScenario.register(event_store:)
     Coordinator::Write::Operations::ExecuteCreateWorkItem.new(event_store:).call(
       command_id: "seed-create-#{work_item_id}",
       actor: { kind: "agent", id: "planner-1" },
       change_set_id:,
       work_item_id:,
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       goal: "Implement #{work_item_id}",
       acceptance_criteria: [ "The work is verifiable" ]
     ).value!

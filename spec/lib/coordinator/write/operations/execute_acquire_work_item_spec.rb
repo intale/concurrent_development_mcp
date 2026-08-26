@@ -3,6 +3,7 @@
 RSpec.describe Coordinator::Write::Operations::ExecuteAcquireWorkItem, :event_store do
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
+  let(:repository_id) { RepositoryScenario::DEFAULT_REPOSITORY_ID }
   subject(:operation) { described_class.new(event_store:) }
 
   let(:input) do
@@ -14,7 +15,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAcquireWorkItem, :event_st
       attempt_id: "A-300",
       base_snapshots: [
         {
-          repository_id: "billing",
+          repository_id:,
           commit_oid: "0123456789abcdef0123456789abcdef01234567"
         }
       ]
@@ -22,7 +23,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAcquireWorkItem, :event_st
   end
 
   it "atomically persists acquisition, authorization, start, and the durable receipt" do
-    seed_ready_work_items("CS-100", [ [ "W-200", "billing" ] ])
+    seed_ready_work_items("CS-100", [ [ "W-200", repository_id ] ])
 
     result = operation.call(input)
 
@@ -45,7 +46,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAcquireWorkItem, :event_st
     expect(authorized.data.fetch("base_snapshots")).to eq(
       [
         {
-          "repository_id" => "billing",
+          "repository_id" => repository_id,
           "object_format" => "sha1",
           "commit_oid" => "0123456789abcdef0123456789abcdef01234567"
         }
@@ -64,7 +65,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAcquireWorkItem, :event_st
   end
 
   it "writes the complete stable routing markers to every domain fact" do
-    seed_ready_work_items("CS-100", [ [ "W-200", "billing" ] ])
+    seed_ready_work_items("CS-100", [ [ "W-200", repository_id ] ])
 
     operation.call(input)
 
@@ -72,7 +73,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAcquireWorkItem, :event_st
       "attempt:A-300",
       "change-set:CS-100",
       "command:cmd-300",
-      "repository:billing",
+      "repository:#{repository_id}",
       "work-item:W-200"
     ]
     expect(work_item_events("W-200").last.markers).to eq(expected_markers)
@@ -80,7 +81,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAcquireWorkItem, :event_st
   end
 
   it "replays the exact persisted completion without another append" do
-    seed_ready_work_items("CS-100", [ [ "W-200", "billing" ] ])
+    seed_ready_work_items("CS-100", [ [ "W-200", repository_id ] ])
     original = operation.call(input)
     original_ids = acquisition_event_ids
 
@@ -92,7 +93,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAcquireWorkItem, :event_st
   end
 
   it "rejects changed-input reuse of an accepted command ID" do
-    seed_ready_work_items("CS-100", [ [ "W-200", "billing" ] ])
+    seed_ready_work_items("CS-100", [ [ "W-200", repository_id ] ])
     operation.call(input)
 
     result = operation.call(input.merge(actor: { kind: "agent", id: "agent-b" }))
@@ -106,7 +107,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAcquireWorkItem, :event_st
   it "returns invalid_git_oid before opening a domain decision or receipt" do
     result = operation.call(
       input.merge(
-        base_snapshots: [ { repository_id: "billing", commit_oid: "ABC" } ]
+        base_snapshots: [ { repository_id:, commit_oid: "ABC" } ]
       )
     )
 
@@ -117,7 +118,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAcquireWorkItem, :event_st
   end
 
   it "returns zero-event state and repository denials" do
-    create_plan("CS-100", [ [ "W-200", "billing" ] ])
+    create_plan("CS-100", [ [ "W-200", repository_id ] ])
     inactive = operation.call(input.merge(command_id: "cmd-inactive", attempt_id: "A-inactive"))
     activate_change_set("CS-100")
     not_ready = operation.call(input.merge(command_id: "cmd-not-ready", attempt_id: "A-not-ready"))
@@ -127,7 +128,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAcquireWorkItem, :event_st
         command_id: "cmd-wrong-base",
         attempt_id: "A-wrong-base",
         base_snapshots: [
-          { repository_id: "ledger", commit_oid: "0123456789abcdef0123456789abcdef01234567" }
+          {
+            repository_id: RepositoryScenario.repository_id("ledger"),
+            commit_oid: "0123456789abcdef0123456789abcdef01234567"
+          }
         ]
       )
     )
@@ -143,8 +147,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAcquireWorkItem, :event_st
     seed_ready_work_items(
       "CS-100",
       [
-        [ "W-100", "billing" ],
-        [ "W-200", "billing" ]
+        [ "W-100", repository_id ],
+        [ "W-200", repository_id ]
       ]
     )
     operation.call(input.merge(command_id: "cmd-first", work_item_id: "W-100"))
@@ -158,7 +162,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAcquireWorkItem, :event_st
   end
 
   it "serializes simultaneous acquisitions so one WorkItem has exactly one active Attempt" do
-    seed_ready_work_items("CS-100", [ [ "W-200", "billing" ] ])
+    seed_ready_work_items("CS-100", [ [ "W-200", repository_id ] ])
     competing_inputs = [
       input.merge(command_id: "cmd-race-a", attempt_id: "A-race-a"),
       input.merge(
@@ -187,6 +191,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAcquireWorkItem, :event_st
   end
 
   def create_plan(change_set_id, work_items)
+    RepositoryScenario.register(event_store:)
     Coordinator::Write::Operations::ExecuteCreateChangeSet.new(event_store:).call(
       command_id: "seed-create-#{change_set_id}",
       actor: { kind: "agent", id: "planner-1" },

@@ -32,9 +32,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordAgentChoice, :event_
           "choice:CHO-1",
           "choice-type:testing.framework",
           "attempt:A-CHO",
-          "repository:billing",
+          "repository:#{repository_id}",
           "command:cmd-choice-1",
-          "decision-partition:repo:billing:testing",
+          "decision-partition:repo:#{repository_id}:testing",
           "decision-partition:changeset:CS-CHO:testing",
           "decision-partition:workitem:W-CHO:testing",
           "decision-partition:attempt:A-CHO:testing"
@@ -103,7 +103,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordAgentChoice, :event_
 
     expect(result.failure).to have_attributes(
       code: :stale_decision_context,
-      details: include(changed_partition_ids: [ "repo:billing:testing" ])
+      details: include(changed_partition_ids: [ "repo:#{repository_id}:testing" ])
     )
     expect(choice_events).to be_empty
     expect(command_events("cmd-choice-stale")).to be_empty
@@ -163,7 +163,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordAgentChoice, :event_
   def query_context
     Coordinator::Write::DecisionContexts::QueryContextV1.new(
       workspace_id: nil,
-      repository_id: "billing",
+      repository_id:,
       change_set_id: "CS-CHO",
       work_item_id: "W-CHO",
       attempt_id: "A-CHO",
@@ -230,6 +230,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordAgentChoice, :event_
   end
 
   def seed_active_attempt
+    RepositoryScenario.register(event_store:)
     execute(Coordinator::Write::Operations::ExecuteCreateChangeSet, {
       command_id: "seed-choice-change-set",
       actor: { kind: "agent", id: "planner-1" },
@@ -242,7 +243,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordAgentChoice, :event_
       actor: { kind: "agent", id: "planner-1" },
       change_set_id: "CS-CHO",
       work_item_id: "W-CHO",
-      repository_id: "billing",
+      repository_id:,
       goal: "Implement the selected testing framework",
       acceptance_criteria: [ "The selected framework is recorded" ]
     })
@@ -262,7 +263,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordAgentChoice, :event_
       change_set_id: "CS-CHO",
       work_item_id: "W-CHO",
       attempt_id: "A-CHO",
-      base_snapshots: [ { repository_id: "billing", commit_oid: "a" * 40 } ]
+      base_snapshots: [ { repository_id:, commit_oid: "a" * 40 } ]
     })
   end
 
@@ -275,7 +276,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordAgentChoice, :event_
       source: "mcp_client",
       text: "Use RSpec.",
       anchors: {
-        repository_ids: [ "billing" ],
+        repository_ids: [ repository_id ],
         change_set_id: nil,
         work_item_id: nil,
         attempt_id: nil
@@ -313,6 +314,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordAgentChoice, :event_
     raise result.failure.inspect if result.failure?
 
     result.value!
+  end
+
+  def repository_id
+    RepositoryScenario::DEFAULT_REPOSITORY_ID
   end
 
   def choice_events

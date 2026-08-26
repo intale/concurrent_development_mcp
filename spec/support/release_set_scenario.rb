@@ -184,8 +184,16 @@ module ReleaseSetScenario
     change_set_id = "CS-release-#{prefix}"
     create_change_set(prefix:, change_set_id:)
     repositories = extra_completed_member ? REPOSITORIES + [ "audit" ] : REPOSITORIES
-    work = repositories.each_with_index.map do |repository_id, index|
-      create_work_item(prefix:, change_set_id:, repository_id:, index: index + 1)
+    work = repositories.each_with_index.map do |repository_name, index|
+      repository_id = RepositoryScenario.repository_id(repository_name)
+      RepositoryScenario.register(event_store:, key: repository_name, repository_id:)
+      create_work_item(
+        prefix:,
+        change_set_id:,
+        repository_id:,
+        repository_name:,
+        index: index + 1
+      )
     end
     create_release_dependency(prefix:, change_set_id:, producer: work.fetch(0), dependency:) if dependency
     activate(change_set_id:, prefix:)
@@ -199,7 +207,8 @@ module ReleaseSetScenario
     consumer = create_work_item(
       prefix:,
       change_set_id:,
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      repository_name: "billing",
       index: "consumer"
     )
     execute(Coordinator::Write::Operations::ExecuteDeclareWorkItemDependency, {
@@ -224,7 +233,7 @@ module ReleaseSetScenario
     })
   end
 
-  def create_work_item(prefix:, change_set_id:, repository_id:, index:)
+  def create_work_item(prefix:, change_set_id:, repository_id:, repository_name:, index:)
     work_item_id = "W-release-#{prefix}-#{index}"
     execute(Coordinator::Write::Operations::ExecuteCreateWorkItem, {
       command_id: "seed-release-work-#{prefix}-#{index}",
@@ -232,10 +241,10 @@ module ReleaseSetScenario
       change_set_id:,
       work_item_id:,
       repository_id:,
-      goal: "Produce #{repository_id} release Candidate",
+      goal: "Produce #{repository_name} release Candidate",
       acceptance_criteria: [ "Candidate is checkpointed" ]
     })
-    { repository_id:, work_item_id:, index: }
+    { repository_id:, repository_name:, work_item_id:, index: }
   end
 
   def activate(change_set_id:, prefix:)
@@ -251,12 +260,12 @@ module ReleaseSetScenario
     Coordinator::Processes::ProcessManagers::ChangeSetReadiness.new(event_store:).call(activation)
   end
 
-  def submit_candidate(prefix:, change_set_id:, repository_id:, work_item_id:, index:)
+  def submit_candidate(prefix:, change_set_id:, repository_id:, repository_name:, work_item_id:, index:)
     attempt_id = "A-release-#{prefix}-#{index}"
     identity_seed = prefix.bytes.sum * 100 + index
     base_oid = format("%040x", identity_seed)
     head_oid = format("%040x", identity_seed + 10_000)
-    path = "lib/#{repository_id}.rb"
+    path = "lib/#{repository_name}.rb"
     execute(Coordinator::Write::Operations::ExecuteAcquireWorkItem, {
       command_id: "seed-release-acquire-#{prefix}-#{index}",
       actor: { kind: "agent", id: "agent-#{index}" },

@@ -126,7 +126,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
       change_set_id: "CS-1",
       work_item_id: "W-1",
       attempt_id: "A-18",
-      repository_id: "billing",
+      repository_id:,
       target_branch: "main",
       base_commit_oid: "a" * 40,
       head_commit_oid: "b" * 40,
@@ -165,13 +165,13 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
       agent_id:,
       base_snapshots: [
         Coordinator::Write::RepositorySnapshotV1.new(
-          repository_id: "billing",
+          repository_id:,
           object_format: "sha1",
           commit_oid: "a" * 40
         )
       ],
       lease_set_id: uuid("1"),
-      lease_repository_id: "billing",
+      lease_repository_id: repository_id,
       lease_policy_version: "coordinator-resource-key/v1",
       lease_resources: [ reference ],
       lease_reserved_at: "2026-08-23T11:00:00.000000Z",
@@ -212,7 +212,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
       work_item_id: "W-1",
       attempt_id: "A-18",
       agent_id: "agent-7",
-      repository_id: "billing",
+      repository_id:,
       object_format: "sha1",
       base_commit_oid: "a" * 40,
       base_blob_oid:,
@@ -229,7 +229,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
   def lease_reference
     @lease_reference ||= begin
       resource = Coordinator::Write::FileResourceNormalizer.new.call(
-        repository_id: "billing",
+        repository_id:,
         kind: "file",
         path: "lib/example.rb",
         base_blob_oid: "c" * 40
@@ -248,7 +248,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
 
   def head_identity
     @head_identity ||= Coordinator::Write::Candidates::HeadIdentityBuilder.new.call(
-      repository_id: "billing",
+      repository_id:,
       object_format: "sha1",
       head_commit_oid: "b" * 40
     )
@@ -302,5 +302,9 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
 
   def uuid(suffix)
     "01919191-9191-7191-8191-91919191919#{suffix}"
+  end
+
+  def repository_id
+    RepositoryScenario::DEFAULT_REPOSITORY_ID
   end
 end

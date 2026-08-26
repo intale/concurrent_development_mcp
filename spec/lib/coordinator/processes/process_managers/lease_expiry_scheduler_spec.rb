@@ -4,6 +4,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
   let(:normalizer) { Coordinator::Write::FileResourceNormalizer.new }
+  let(:repository_id) { RepositoryScenario::DEFAULT_REPOSITORY_ID }
   let(:source_builder) { Coordinator::Processes::LeaseExpirySourceBuilder.new }
   let(:source_loader) do
     Coordinator::Processes::LeaseExpirySourceLoader.new(event_store:, source_builder:)
@@ -189,7 +190,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
       change_set_id: "CS-LSE",
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
-      repository_id: "billing",
+      repository_id:,
       base_commit_oid: "a" * 40,
       resources: [ { kind: "file", path: "app/a.rb" } ],
       lease_duration_seconds: duration
@@ -216,6 +217,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
   end
 
   def seed_active_attempt
+    RepositoryScenario.register(event_store:)
     Coordinator::Write::Operations::ExecuteCreateChangeSet.new(event_store:).call(
       command_id: "seed-create-CS-LSE",
       actor: { kind: "agent", id: "planner-1" },
@@ -228,7 +230,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
       actor: { kind: "agent", id: "planner-1" },
       change_set_id: "CS-LSE",
       work_item_id: "W-LSE-A",
-      repository_id: "billing",
+      repository_id:,
       goal: "Implement the lease holder",
       acceptance_criteria: [ "The work is verifiable" ]
     ).value!
@@ -248,16 +250,17 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
       change_set_id: "CS-LSE",
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
-      base_snapshots: [ { repository_id: "billing", commit_oid: "a" * 40 } ]
+      base_snapshots: [ { repository_id:, commit_oid: "a" * 40 } ]
     ).value!
   end
 
   def lease_events
     resource = normalizer.call(
-      repository_id: "billing",
+      repository_id:,
       kind: "file",
       path: "app/a.rb",
-      base_blob_oid: nil
+      base_blob_oid: nil,
+      scope: RepositoryScenario::DEFAULT_SCOPE
     ).value!
     event_store.read(
       streams.resource_lease(resource.resource_key_hash),

@@ -11,6 +11,7 @@ RSpec.describe "MCP lease_renew Task boundary", :event_store do
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
   let(:normalizer) { Coordinator::Write::FileResourceNormalizer.new }
+  let(:repository_id) { RepositoryScenario::DEFAULT_REPOSITORY_ID }
   let(:session) do
     ActionDispatch::Integration::Session.new(Rails.application).tap do |integration|
       integration.host! "localhost"
@@ -193,7 +194,7 @@ RSpec.describe "MCP lease_renew Task boundary", :event_store do
       change_set_id: RENEW_CHANGE_SET_ID,
       work_item_id: RENEW_WORK_ITEM_ID,
       attempt_id: RENEW_ATTEMPT_ID,
-      repository_id: "billing",
+      repository_id:,
       base_commit_oid: RENEW_BASE_COMMIT_OID,
       resources: %w[app/a.rb app/b.rb].map { { kind: "file", path: _1 } },
       lease_duration_seconds: 600
@@ -201,6 +202,7 @@ RSpec.describe "MCP lease_renew Task boundary", :event_store do
   end
 
   def seed_active_attempt
+    RepositoryScenario.register(event_store:)
     Coordinator::Write::Operations::ExecuteCreateChangeSet.new(event_store:).call(
       command_id: "seed-create-#{RENEW_CHANGE_SET_ID}",
       actor: { kind: "agent", id: "planner-1" },
@@ -213,7 +215,7 @@ RSpec.describe "MCP lease_renew Task boundary", :event_store do
       actor: { kind: "agent", id: "planner-1" },
       change_set_id: RENEW_CHANGE_SET_ID,
       work_item_id: RENEW_WORK_ITEM_ID,
-      repository_id: "billing",
+      repository_id:,
       goal: "Implement the coordinated change",
       acceptance_criteria: [ "Renewal retains every fencing identity" ]
     ).value!
@@ -233,7 +235,7 @@ RSpec.describe "MCP lease_renew Task boundary", :event_store do
       change_set_id: RENEW_CHANGE_SET_ID,
       work_item_id: RENEW_WORK_ITEM_ID,
       attempt_id: RENEW_ATTEMPT_ID,
-      base_snapshots: [ { repository_id: "billing", commit_oid: RENEW_BASE_COMMIT_OID } ]
+      base_snapshots: [ { repository_id:, commit_oid: RENEW_BASE_COMMIT_OID } ]
     ).value!
   end
 
@@ -276,7 +278,13 @@ RSpec.describe "MCP lease_renew Task boundary", :event_store do
 
   def resource_renewal_events
     %w[app/a.rb app/b.rb].flat_map do |path|
-      resource = normalizer.call(repository_id: "billing", kind: "file", path:, base_blob_oid: nil).value!
+      resource = normalizer.call(
+        repository_id:,
+        kind: "file",
+        path:,
+        base_blob_oid: nil,
+        scope: RepositoryScenario::DEFAULT_SCOPE
+      ).value!
       event_store.read(
         streams.resource_lease(resource.resource_key_hash),
         Coordinator::Write::EventReadCriteria.new(

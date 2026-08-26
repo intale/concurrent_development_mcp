@@ -4,6 +4,7 @@ module DependencyProgressScenario
   module_function
 
   def prepare(prefix:, dependency_kind:, required_output: nil)
+    RepositoryScenario.register(event_store:)
     ids = {
       change_set_id: "CS-progress-#{prefix}",
       producer_work_item_id: "W-progress-#{prefix}-producer",
@@ -88,7 +89,9 @@ module DependencyProgressScenario
         change_set_id: ids.fetch(:change_set_id),
         work_item_id: ids.fetch(:consumer_work_item_id),
         attempt_id:,
-        base_snapshots: [ { repository_id: "billing", commit_oid: "d" * 40 } ]
+        base_snapshots: [
+          { repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID, commit_oid: "d" * 40 }
+        ]
       })
       execute(Coordinator::Write::Operations::ExecuteAbandonAttempt, {
         command_id: "abandon-#{attempt_id}",
@@ -119,7 +122,7 @@ module DependencyProgressScenario
       actor: { kind: "agent", id: "planner-1" },
       change_set_id: ids.fetch(:change_set_id),
       work_item_id:,
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       goal:,
       acceptance_criteria: [ "Progress is attributable" ]
     })
@@ -157,7 +160,9 @@ module DependencyProgressScenario
       change_set_id: ids.fetch(:change_set_id),
       work_item_id: ids.fetch(:producer_work_item_id),
       attempt_id: ids.fetch(:attempt_id),
-      base_snapshots: [ { repository_id: "billing", commit_oid: "a" * 40 } ]
+      base_snapshots: [
+        { repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID, commit_oid: "a" * 40 }
+      ]
     })
   end
 
@@ -168,7 +173,7 @@ module DependencyProgressScenario
       change_set_id: ids.fetch(:change_set_id),
       work_item_id: ids.fetch(:producer_work_item_id),
       attempt_id: ids.fetch(:attempt_id),
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: [ { kind: "file", path: "lib/progress.rb", base_blob_oid: "c" * 40 } ],
       lease_duration_seconds: 900
@@ -183,7 +188,7 @@ module DependencyProgressScenario
       change_set_id: ids.fetch(:change_set_id),
       work_item_id: ids.fetch(:producer_work_item_id),
       attempt_id: ids.fetch(:attempt_id),
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       target_branch: "main",
       base_commit_oid: "a" * 40,
       head_commit_oid: "b" * 40,

@@ -4,6 +4,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReleaseLeaseSet, :event_st
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
   let(:normalizer) { Coordinator::Write::FileResourceNormalizer.new }
+  let(:repository_id) { RepositoryScenario::DEFAULT_REPOSITORY_ID }
   subject(:operation) { described_class.new(event_store:) }
 
   it "atomically releases an exact elapsed set while preserving membership, lease IDs, and fencing tokens" do
@@ -174,7 +175,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReleaseLeaseSet, :event_st
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
       lease_set_id: reservation.lease_set_id,
-      repository_id: "billing",
+      repository_id:,
       base_commit_oid: "a" * 40,
       resources: [ { kind: "file", path: "b.rb" } ]
     )
@@ -240,7 +241,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReleaseLeaseSet, :event_st
       change_set_id: "CS-LSE",
       work_item_id:,
       attempt_id:,
-      repository_id: "billing",
+      repository_id:,
       base_commit_oid: "a" * 40,
       resources: paths.map { { kind: "file", path: _1 } },
       lease_duration_seconds: duration
@@ -248,6 +249,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReleaseLeaseSet, :event_st
   end
 
   def seed_active_attempts(attempts)
+    RepositoryScenario.register(event_store:)
     Coordinator::Write::Operations::ExecuteCreateChangeSet.new(event_store:).call(
       command_id: "seed-create-CS-LSE",
       actor: { kind: "agent", id: "planner-1" },
@@ -261,7 +263,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReleaseLeaseSet, :event_st
         actor: { kind: "agent", id: "planner-1" },
         change_set_id: "CS-LSE",
         work_item_id:,
-        repository_id: "billing",
+        repository_id:,
         goal: "Implement #{work_item_id}",
         acceptance_criteria: [ "The work is verifiable" ]
       ).value!
@@ -283,13 +285,19 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReleaseLeaseSet, :event_st
         change_set_id: "CS-LSE",
         work_item_id:,
         attempt_id:,
-        base_snapshots: [ { repository_id: "billing", commit_oid: "a" * 40 } ]
+        base_snapshots: [ { repository_id:, commit_oid: "a" * 40 } ]
       ).value!
     end
   end
 
   def lease_events(path)
-    resource = normalizer.call(repository_id: "billing", kind: "file", path:, base_blob_oid: nil).value!
+    resource = normalizer.call(
+      repository_id:,
+      kind: "file",
+      path:,
+      base_blob_oid: nil,
+      scope: RepositoryScenario::DEFAULT_SCOPE
+    ).value!
     event_store.read(
       streams.resource_lease(resource.resource_key_hash),
       Coordinator::Write::EventReadCriteria.new(

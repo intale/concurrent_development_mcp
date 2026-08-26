@@ -11,7 +11,7 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::Reserve do
       change_set_id: "CS-LSE",
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
-      repository_id: "billing",
+      repository_id:,
       base_commit_oid: "a" * 40,
       resources: [
         { kind: "file", path: "app/models/user.rb" },
@@ -30,7 +30,7 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::Reserve do
           agent_id: "agent-a",
           base_snapshots: [
             Coordinator::Write::RepositorySnapshotV1.new(
-              repository_id: "billing",
+              repository_id:,
               object_format: "sha1",
               commit_oid: "a" * 40
             )
@@ -88,7 +88,7 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::Reserve do
       repository_base_mismatch: attempt_state.new(
         base_snapshots: [
           Coordinator::Write::RepositorySnapshotV1.new(
-            repository_id: "billing",
+            repository_id:,
             object_format: "sha1",
             commit_oid: "c" * 40
           )
@@ -141,5 +141,9 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::Reserve do
       owner_attempt_id: "A-LSE-A",
       fencing_token: 1
     )
+  end
+
+  def repository_id
+    RepositoryScenario::DEFAULT_REPOSITORY_ID
   end
 end

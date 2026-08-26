@@ -4,6 +4,7 @@ module AgentChoiceScenario
   module_function
 
   def record_no_policy_choice(prefix:, repository_id: "billing", actor_id: "agent-a")
+    repository_id = RepositoryScenario.repository_id(repository_id)
     identifiers = identifiers(prefix)
     context = context(identifiers:, repository_id:)
     seed_active_attempt(identifiers:, repository_id:, actor_id:)
@@ -57,6 +58,12 @@ module AgentChoiceScenario
   end
 
   def seed_active_attempt(identifiers:, repository_id:, actor_id:)
+    RepositoryScenario.register(
+      event_store:,
+      key: repository_id,
+      repository_id: RepositoryScenario.repository_id(repository_id)
+    )
+    repository_id = RepositoryScenario.repository_id(repository_id)
     execute(Coordinator::Write::Operations::ExecuteCreateChangeSet, {
       command_id: "seed-#{identifiers.fetch(:change_set_id)}",
       actor: { kind: "agent", id: "planner-1" },

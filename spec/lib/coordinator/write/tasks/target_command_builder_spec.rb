@@ -8,6 +8,7 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
   end
   let(:digest) { Coordinator::Write::CommandInputDigest.new }
   let(:schemas) { Coordinator::Write::EventSchemaRegistry.new }
+  let(:repository_id) { RepositoryScenario::DEFAULT_REPOSITORY_ID }
 
   it "round-trips every persisted command document into its exact typed command" do
     commands = [
@@ -23,7 +24,7 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
         actor:,
         change_set_id: "CS-task-build",
         work_item_id: "W-task-build",
-        repository_id: "billing",
+        repository_id:,
         goal: "Build the persisted command",
         acceptance_criteria: [ "The command remains typed" ]
       ),
@@ -53,7 +54,7 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
         attempt_id: "ATT-task-build",
         base_snapshots: [
           Coordinator::Write::RepositorySnapshotV1.new(
-            repository_id: "billing",
+            repository_id:,
             object_format: "sha1",
             commit_oid: "a" * 40
           )
@@ -65,14 +66,14 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
         change_set_id: "CS-task-build",
         work_item_id: "W-task-build",
         attempt_id: "ATT-task-build",
-        repository_id: "billing",
+        repository_id:,
         base_commit_oid: "a" * 40,
         resources: [
           Coordinator::Write::FileResourceV1.new(
             kind: "file",
             path: "app/models/invoice.rb",
             base_blob_oid: "b" * 40,
-            resource_key: "repo:billing:file:app/models/invoice.rb",
+            resource_key: "repo:#{repository_id}:file:app/models/invoice.rb",
             resource_key_hash: "sha256:4ef29088b0a3df37b0bdf49785a9dce3dad97985b7f22d5ab5d86e04cdc4049a",
             policy_version: "coordinator-resource-key/v1"
           )
@@ -86,14 +87,14 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
         work_item_id: "W-task-build",
         attempt_id: "ATT-task-build",
         lease_set_id: "0198e03a-d112-7000-8000-000000000007",
-        repository_id: "billing",
+        repository_id:,
         base_commit_oid: "a" * 40,
         resources: [
           Coordinator::Write::FileResourceV1.new(
             kind: "file",
             path: "app/services/tax.rb",
             base_blob_oid: "c" * 40,
-            resource_key: "repo:billing:file:app/services/tax.rb",
+            resource_key: "repo:#{repository_id}:file:app/services/tax.rb",
             resource_key_hash: "sha256:f42d279fef1baf9ea3a532d1a89b57de451648cab46bba073a397a509382c67b",
             policy_version: "coordinator-resource-key/v1"
           )
@@ -176,7 +177,7 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
         command_id: "cmd-task-build-14",
         actor: { kind: "agent", id: "analyzer-a" },
         candidate_id: "CAN-task-build",
-        repository_id: "billing",
+        repository_id:,
         head_commit_oid: "b" * 40,
         manifest_digest: "sha256:#{"a" * 64}",
         analyzer_version: "impact-v1",
@@ -207,7 +208,7 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
         command_id: "cmd-task-build-16",
         actor: { kind: "agent", id: "integrator-a" },
         merge_snapshot_id: "MS-task-build",
-        repository_id: "billing",
+        repository_id:,
         target_branch: "main",
         target_base_commit_oid: "a" * 40,
         ordered_candidates: [
@@ -245,7 +246,7 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
   def agent_choice_query_context
     Coordinator::Write::DecisionContexts::QueryContextV1.new(
       workspace_id: nil,
-      repository_id: "billing",
+      repository_id:,
       change_set_id: "CS-task-build",
       work_item_id: "W-task-build",
       attempt_id: "ATT-task-build",

@@ -6,6 +6,7 @@ RSpec.describe "CHO-01 MCP agent choice recording", :event_store, :read_model do
 
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
+  let(:repository_id) { RepositoryScenario::DEFAULT_REPOSITORY_ID }
   let(:session) do
     ActionDispatch::Integration::Session.new(Rails.application).tap do |integration|
       integration.host! "localhost"
@@ -13,7 +14,7 @@ RSpec.describe "CHO-01 MCP agent choice recording", :event_store, :read_model do
   end
   let(:context) do
     {
-      repository_id: "billing",
+      repository_id:,
       change_set_id: "CS-mcp-choice",
       work_item_id: "W-mcp-choice",
       attempt_id: "A-mcp-choice",
@@ -129,7 +130,7 @@ RSpec.describe "CHO-01 MCP agent choice recording", :event_store, :read_model do
         "data" => include(
           "code" => "stale_decision_context",
           "details" => include(
-            "changed_partition_ids" => [ "repo:billing:testing" ]
+            "changed_partition_ids" => [ "repo:#{repository_id}:testing" ]
           )
         ),
         "next_actions" => [
@@ -166,6 +167,7 @@ RSpec.describe "CHO-01 MCP agent choice recording", :event_store, :read_model do
   end
 
   def seed_active_attempt
+    RepositoryScenario.register(event_store:)
     execute(Coordinator::Write::Operations::ExecuteCreateChangeSet, {
       command_id: "seed-mcp-choice-change-set",
       actor: { kind: "agent", id: "planner-1" },
@@ -178,7 +180,7 @@ RSpec.describe "CHO-01 MCP agent choice recording", :event_store, :read_model do
       actor: { kind: "agent", id: "planner-1" },
       change_set_id: "CS-mcp-choice",
       work_item_id: "W-mcp-choice",
-      repository_id: "billing",
+      repository_id:,
       goal: "Select a testing framework",
       acceptance_criteria: [ "The selected framework is recorded" ]
     })
@@ -198,7 +200,7 @@ RSpec.describe "CHO-01 MCP agent choice recording", :event_store, :read_model do
       change_set_id: "CS-mcp-choice",
       work_item_id: "W-mcp-choice",
       attempt_id: "A-mcp-choice",
-      base_snapshots: [ { repository_id: "billing", commit_oid: "a" * 40 } ]
+      base_snapshots: [ { repository_id:, commit_oid: "a" * 40 } ]
     })
   end
 
@@ -211,7 +213,7 @@ RSpec.describe "CHO-01 MCP agent choice recording", :event_store, :read_model do
       source: "mcp_client",
       text: "Use RSpec.",
       anchors: {
-        repository_ids: [ "billing" ],
+        repository_ids: [ repository_id ],
         change_set_id: nil,
         work_item_id: nil,
         attempt_id: nil

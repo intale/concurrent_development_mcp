@@ -181,7 +181,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCompleteWorkItem, :event_s
       change_set_id: ids.fetch(:change_set_id),
       work_item_id: ids.fetch(:work_item_id),
       attempt_id: ids.fetch(:attempt_id),
-      base_snapshots: [ { repository_id: "billing", commit_oid: "a" * 40 } ]
+      base_snapshots: [
+        { repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID, commit_oid: "a" * 40 }
+      ]
     })
     reservation = execute!(Coordinator::Write::Operations::ExecuteReserveWriteSet, {
       command_id: "cmd-#{prefix}-reserve-#{index}",
@@ -189,7 +191,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCompleteWorkItem, :event_s
       change_set_id: ids.fetch(:change_set_id),
       work_item_id: ids.fetch(:work_item_id),
       attempt_id: ids.fetch(:attempt_id),
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: [ { kind: "file", path:, base_blob_oid: "c" * 40 } ],
       lease_duration_seconds: 900

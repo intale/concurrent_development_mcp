@@ -12,7 +12,7 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::Expand do
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
       lease_set_id: lease_set_id,
-      repository_id: "billing",
+      repository_id:,
       base_commit_oid: "a" * 40,
       resources: requested_resources
     ).value!
@@ -41,7 +41,7 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::Expand do
   let(:attempt_state) do
     active_attempt_state.new(
       lease_set_id:,
-      lease_repository_id: "billing",
+      lease_repository_id: repository_id,
       lease_policy_version: "coordinator-resource-key/v1",
       lease_resources: [ existing_reference ],
       lease_reserved_at: "2026-08-22T10:00:00.000000Z",
@@ -185,7 +185,7 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::Expand do
           agent_id: "agent-a",
           base_snapshots: [
             Coordinator::Write::RepositorySnapshotV1.new(
-              repository_id: "billing",
+              repository_id:,
               object_format: "sha1",
               commit_oid: "a" * 40
             )
@@ -204,7 +204,7 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::Expand do
 
   def normalized_resource(path, base_blob_oid: nil)
     Coordinator::Write::FileResourceNormalizer.new.call(
-      repository_id: "billing",
+      repository_id:,
       kind: "file",
       path:,
       base_blob_oid:
@@ -228,7 +228,7 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::Expand do
           work_item_id: "W-LSE-A",
           attempt_id: "A-LSE-A",
           agent_id: "agent-a",
-          repository_id: "billing",
+          repository_id:,
           object_format: "sha1",
           base_commit_oid: "a" * 40,
           base_blob_oid: resource.base_blob_oid,
@@ -250,5 +250,9 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::Expand do
       base_blob_oid: event.base_blob_oid,
       fencing_token: event.fencing_token
     )
+  end
+
+  def repository_id
+    RepositoryScenario::DEFAULT_REPOSITORY_ID
   end
 end

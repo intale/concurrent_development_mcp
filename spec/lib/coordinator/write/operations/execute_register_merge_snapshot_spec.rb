@@ -90,7 +90,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRegisterMergeSnapshot, :ev
       command_id: "cmd-#{prefix}",
       actor: { kind: "agent", id: "integrator-1" },
       merge_snapshot_id: "MS-#{prefix}",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       target_branch: "main",
       target_base_commit_oid: "a" * 40,
       ordered_candidates: candidates,
@@ -107,7 +107,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRegisterMergeSnapshot, :ev
 
   def commit_events(oid)
     identity = Coordinator::Write::MergeSnapshots::CommitIdentityBuilder.new.call(
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       object_format: "sha1",
       merge_commit_oid: oid
     )

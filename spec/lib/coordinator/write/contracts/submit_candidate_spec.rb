@@ -77,7 +77,7 @@ RSpec.describe Coordinator::Write::Contracts::SubmitCandidate do
       change_set_id: "CS-1",
       work_item_id: "W-1",
       attempt_id: "A-18",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       target_branch: "main",
       base_commit_oid: "a" * 40,
       head_commit_oid: "b" * 40,

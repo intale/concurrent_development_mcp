@@ -6,6 +6,7 @@ module AgentChoiceImpactScenario
   POLICY_VERSION = "agent-choice-decision-impact/v1"
 
   def prepare_attempt(prefix:, repository_id: "billing")
+    repository_id = RepositoryScenario.repository_id(repository_id)
     identifiers = AgentChoiceScenario.identifiers(prefix)
     AgentChoiceScenario.seed_active_attempt(
       identifiers:,

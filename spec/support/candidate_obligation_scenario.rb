@@ -61,7 +61,7 @@ module CandidateObligationScenario
       change_set_id: ids.fetch(:change_set_id),
       work_item_id: ids.fetch(:work_item_id),
       attempt_id: ids.fetch(:attempt_id),
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: [ source_path, target_path ].uniq.map do |path|
         { kind: "file", path:, base_blob_oid: "c" * 40 }
@@ -109,6 +109,7 @@ module CandidateObligationScenario
 
   def submit_separate_pair(prefix:, source_path:, target_path:, observed_source:, source_key:, target_key:)
     change_set_id = "CS-#{prefix}"
+    RepositoryScenario.register(event_store:)
     execute(Coordinator::Write::Operations::ExecuteCreateChangeSet, {
       command_id: "seed-create-#{change_set_id}",
       actor: { kind: "agent", id: "planner-1" },
@@ -179,7 +180,7 @@ module CandidateObligationScenario
       actor: { kind: "agent", id: "planner-1" },
       change_set_id:,
       work_item_id:,
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       goal: "Produce #{role} Candidate",
       acceptance_criteria: [ "#{path} is checkpointed" ]
     })
@@ -206,7 +207,9 @@ module CandidateObligationScenario
       change_set_id: ids.fetch(:change_set_id),
       work_item_id: ids.fetch(:work_item_id),
       attempt_id: ids.fetch(:attempt_id),
-      base_snapshots: [ { repository_id: "billing", commit_oid: "a" * 40 } ]
+      base_snapshots: [
+        { repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID, commit_oid: "a" * 40 }
+      ]
     })
     execute(Coordinator::Write::Operations::ExecuteReserveWriteSet, {
       command_id: "seed-reserve-#{role}-#{prefix}",
@@ -214,7 +217,7 @@ module CandidateObligationScenario
       change_set_id: ids.fetch(:change_set_id),
       work_item_id: ids.fetch(:work_item_id),
       attempt_id: ids.fetch(:attempt_id),
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: [ { kind: "file", path:, base_blob_oid: "c" * 40 } ],
       lease_duration_seconds: 900

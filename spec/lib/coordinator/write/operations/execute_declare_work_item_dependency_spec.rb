@@ -125,6 +125,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteDeclareWorkItemDependency,
   end
 
   def create_work_item(work_item_id, repository_id)
+    repository_key = repository_id
+    repository_id = RepositoryScenario.repository_id(repository_key)
+    RepositoryScenario.register(event_store:, key: repository_key, repository_id:)
     Coordinator::Write::Operations::ExecuteCreateWorkItem.new(event_store:).call(
       command_id: "seed-create-#{work_item_id}",
       actor: { kind: "agent", id: "planner-1" },

@@ -371,7 +371,7 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
       command_id: "cmd-mcp-merge-snapshot-register",
       actor: { kind: "agent", id: "integrator-1" },
       merge_snapshot_id: "MS-mcp-merge-snapshot",
-      repository_id: "billing",
+      repository_id: candidate.dig(:input, :repository_id),
       target_branch: "main",
       target_base_commit_oid: "a" * 40,
       ordered_candidates: [
@@ -486,7 +486,7 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
         actor: { kind: "agent", id: "planner-1" },
         change_set_id: "CS-missing",
         work_item_id: "W-100",
-        repository_id: "billing",
+        repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
         goal: "Implement billing",
         acceptance_criteria: [ "Verified" ]
       },

@@ -3,6 +3,7 @@
 RSpec.describe Coordinator::Write::Operations::ExecuteEvaluateWorkItemReadiness, :event_store do
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
+  let(:repository_id) { RepositoryScenario::DEFAULT_REPOSITORY_ID }
   subject(:operation) { described_class.new(event_store:) }
 
   it "persists WorkItemMadeReady with the full compound identity and source causation" do
@@ -27,7 +28,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteEvaluateWorkItemReadiness,
         command.process_decision_marker,
         "change-set:CS-100",
         "work-item:W-100",
-        "repository:billing",
+        "repository:#{repository_id}",
         "command:#{command.command_id}"
       ]).uniq.sort
     )
@@ -87,6 +88,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteEvaluateWorkItemReadiness,
   end
 
   def seed_activated_change_set(change_set_id:, work_item_ids:, dependency: nil)
+    RepositoryScenario.register(event_store:)
     create_change_set(change_set_id)
     work_item_ids.each { create_work_item(change_set_id, _1) }
     declare_dependency(change_set_id, *dependency) if dependency
@@ -116,7 +118,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteEvaluateWorkItemReadiness,
       actor: { kind: "agent", id: "planner-1" },
       change_set_id:,
       work_item_id:,
-      repository_id: "billing",
+      repository_id:,
       goal: "Implement #{work_item_id}",
       acceptance_criteria: [ "The work is verifiable" ]
     ).value!

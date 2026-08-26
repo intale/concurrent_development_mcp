@@ -49,12 +49,13 @@ RSpec.describe Coordinator::Read::Queries::OperationGet, :event_store, :read_mod
   end
 
   def create_work_item
+    RepositoryScenario.register(event_store:)
     Coordinator::Write::Operations::ExecuteCreateWorkItem.new(event_store:).call(
       command_id: "cmd-200",
       actor: { kind: "agent", id: "planner-1" },
       change_set_id: "CS-100",
       work_item_id: "W-100",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       goal: "Implement billing",
       acceptance_criteria: [ "The work is verifiable" ]
     ).value!

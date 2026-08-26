@@ -9,7 +9,7 @@ RSpec.describe Coordinator::Read::Projectors::MergeSnapshotsV1, :event_store, :r
       command_id: "cmd-register-merge-projection",
       actor: { kind: "agent", id: "integrator-1" },
       merge_snapshot_id: "MS-merge-projection",
-      repository_id: "billing",
+      repository_id: candidate.dig(:input, :repository_id),
       target_branch: "main",
       target_base_commit_oid: "a" * 40,
       ordered_candidates: [
