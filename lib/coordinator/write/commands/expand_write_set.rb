@@ -11,7 +11,7 @@ module Coordinator::Write
       attribute :work_item_id, Types::Identifier
       attribute :attempt_id, Types::Identifier
       attribute :lease_set_id, Types::UuidV7
-      attribute :repository_id, Types::RepositoryId
+      attribute :repository_id, Types::UuidV7
       attribute :base_commit_oid, Types::GitOid
       attribute :resources, Types::Array.of(Resource).constrained(min_size: 1, max_size: 32)
     end

@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 module CandidateScenario
+  REPOSITORY_ID = "01a03deb-6f55-74ba-bcc0-afd02e7b14dc"
+
   module_function
 
   def prepare(prefix:, path: "lib/candidate.rb", agent_id: "agent-a", head_commit_oid: "b" * 40)
@@ -16,7 +18,7 @@ module CandidateScenario
       change_set_id: ids.fetch(:change_set_id),
       work_item_id: ids.fetch(:work_item_id),
       attempt_id: ids.fetch(:attempt_id),
-      repository_id: "billing",
+      repository_id: REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: [ { kind: "file", path:, base_blob_oid: "c" * 40 } ],
       lease_duration_seconds: 900
@@ -128,7 +130,7 @@ module CandidateScenario
       change_set_id: ids.fetch(:change_set_id),
       work_item_id: ids.fetch(:work_item_id),
       attempt_id: ids.fetch(:attempt_id),
-      repository_id: "billing",
+      repository_id: REPOSITORY_ID,
       target_branch: "main",
       base_commit_oid: "a" * 40,
       head_commit_oid:,
@@ -170,6 +172,7 @@ module CandidateScenario
   end
 
   def seed_attempt(ids:, agent_id:)
+    RepositoryScenario.register(event_store:)
     execute(Coordinator::Write::Operations::ExecuteCreateChangeSet, {
       command_id: "seed-create-#{ids.fetch(:change_set_id)}",
       actor: { kind: "agent", id: "planner-1" },
@@ -182,7 +185,7 @@ module CandidateScenario
       actor: { kind: "agent", id: "planner-1" },
       change_set_id: ids.fetch(:change_set_id),
       work_item_id: ids.fetch(:work_item_id),
-      repository_id: "billing",
+      repository_id: REPOSITORY_ID,
       goal: "Produce one Candidate",
       acceptance_criteria: [ "The Candidate is checkpointed" ]
     })
@@ -202,7 +205,7 @@ module CandidateScenario
       change_set_id: ids.fetch(:change_set_id),
       work_item_id: ids.fetch(:work_item_id),
       attempt_id: ids.fetch(:attempt_id),
-      base_snapshots: [ { repository_id: "billing", commit_oid: "a" * 40 } ]
+      base_snapshots: [ { repository_id: REPOSITORY_ID, commit_oid: "a" * 40 } ]
     })
   end
 

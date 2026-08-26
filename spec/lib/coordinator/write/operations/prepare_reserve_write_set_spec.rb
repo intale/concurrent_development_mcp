@@ -10,7 +10,7 @@ RSpec.describe Coordinator::Write::Operations::PrepareReserveWriteSet do
       change_set_id: "CS-LSE",
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: [
         { kind: "file", path: "./app/models/user.rb", base_blob_oid: "b" * 40 },
@@ -45,6 +45,19 @@ RSpec.describe Coordinator::Write::Operations::PrepareReserveWriteSet do
     )
 
     expect(result.value!.resources.length).to eq(1)
+  end
+
+  it "rekeys normalized transport resources from the authoritative repository scope" do
+    command = prepare.call(input).value!
+    scoped = prepare.scope_for_repository(
+      command,
+      repository_registration: RepositoryScenario.registration
+    ).value!
+
+    expect(scoped.resources).to all(have_attributes(policy_version: "coordinator-resource-key/v2"))
+    expect(scoped.resources.map(&:resource_key)).to all(start_with(
+      "scope:#{RepositoryScenario::DEFAULT_SCOPE}:repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:"
+    ))
   end
 
   it "rejects conflicting duplicate evidence and invalid bounds before a command exists" do

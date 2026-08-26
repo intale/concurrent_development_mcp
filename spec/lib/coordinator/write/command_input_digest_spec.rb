@@ -185,7 +185,7 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
 
   it "freezes the lease-set identity and normalized additions in the expansion digest" do
     resource = Coordinator::Write::FileResourceNormalizer.new.call(
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       kind: "file",
       path: "app/models/invoice.rb",
       base_blob_oid: "b" * 40
@@ -197,7 +197,7 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
       work_item_id: "W-200",
       attempt_id: "A-300",
       lease_set_id: "01919191-9191-7191-8191-919191919191",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: [ resource ]
     )
@@ -218,7 +218,7 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
           work_item_id: "W-200",
           attempt_id: "A-300",
           lease_set_id: "01919191-9191-7191-8191-919191919191",
-          repository_id: "billing",
+          repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
           base_commit_oid: "a" * 40,
           resources: [ Coordinator::Write::CommandInputDocuments::FileResourceV1.new(resource.to_h) ]
         )
@@ -276,7 +276,7 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
       change_set_id: "CS-1",
       work_item_id: "W-1",
       attempt_id: "A-18",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       target_branch: "main",
       base_commit_oid: "a" * 40,
       head_commit_oid: "b" * 40,
@@ -325,7 +325,7 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
       Coordinator::Write::CommandInputDocuments::CandidateBuildContextV1
     )
     expect(digest.candidate_submit(candidate_command)).to eq(
-      "sha256:9adfc66ec0a215dfcb15124aa1572681227a290abfaf9b8f451db696958f1679"
+      "sha256:3423ce8197c09b7cf0628988d8b6b92e7a8deaabbce1ff55cbf3679537685190"
     )
     expect(digest.call(candidate_command)).to eq(digest.candidate_submit(candidate_command))
   end

@@ -11,7 +11,7 @@ RSpec.describe Coordinator::Write::Operations::PrepareExpandWriteSet do
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
       lease_set_id: "01919191-9191-7191-8191-919191919191",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: [
         { kind: "file", path: "./app/models/user.rb", base_blob_oid: "b" * 40 },
@@ -46,6 +46,17 @@ RSpec.describe Coordinator::Write::Operations::PrepareExpandWriteSet do
     expect(prepare.call(input.merge(resources: [ aliases.first, conflict ])).failure.code).to eq(
       :resource_evidence_conflict
     )
+  end
+
+  it "rekeys normalized transport resources from the authoritative repository scope" do
+    command = prepare.call(input).value!
+    scoped = prepare.scope_for_repository(
+      command,
+      repository_registration: RepositoryScenario.registration
+    ).value!
+
+    expect(scoped.resources).to all(have_attributes(policy_version: "coordinator-resource-key/v2"))
+    expect(scoped.resources.map(&:resource_key_hash)).not_to eq(command.resources.map(&:resource_key_hash))
   end
 
   it "rejects invalid set IDs, bounds, and Git evidence before a command exists" do

@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_store do
+  EXPAND_REPOSITORY_ID = RepositoryScenario::DEFAULT_REPOSITORY_ID
+
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
   let(:normalizer) { Coordinator::Write::FileResourceNormalizer.new }
@@ -49,6 +51,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_sto
       "lease_set_id" => reservation.lease_set_id,
       "expires_at" => reservation.expires_at,
       "fencing_token" => 1
+    )
+    expect(lease_events("app/b.rb").sole.markers).to include(
+      "scope:#{RepositoryScenario::DEFAULT_SCOPE}",
+      "repository:#{EXPAND_REPOSITORY_ID}"
     )
     expect(command_events("cmd-expand-a").map(&:type)).to eq([ "CommandCompleted" ])
   end
@@ -175,7 +181,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_sto
         change_set_id: "CS-LSE",
         work_item_id: "W-LSE-A",
         attempt_id: "A-LSE-A",
-        repository_id: "billing",
+        repository_id: EXPAND_REPOSITORY_ID,
         base_commit_oid: "a" * 40,
         resources: [ { kind: "file", path: "a.rb" } ],
         lease_duration_seconds: 30
@@ -330,7 +336,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_sto
       work_item_id:,
       attempt_id:,
       lease_set_id:,
-      repository_id: "billing",
+      repository_id: EXPAND_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: paths.map { { kind: "file", path: _1 } }
     }
@@ -343,7 +349,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_sto
       change_set_id: "CS-LSE",
       work_item_id:,
       attempt_id:,
-      repository_id: "billing",
+      repository_id: EXPAND_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: paths.map { { kind: "file", path: _1 } },
       lease_duration_seconds: 900
@@ -351,6 +357,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_sto
   end
 
   def seed_active_attempts(attempts)
+    RepositoryScenario.register(event_store:)
     Coordinator::Write::Operations::ExecuteCreateChangeSet.new(event_store:).call(
       command_id: "seed-create-CS-LSE",
       actor: { kind: "agent", id: "planner-1" },
@@ -364,7 +371,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_sto
         actor: { kind: "agent", id: "planner-1" },
         change_set_id: "CS-LSE",
         work_item_id:,
-        repository_id: "billing",
+        repository_id: EXPAND_REPOSITORY_ID,
         goal: "Implement #{work_item_id}",
         acceptance_criteria: [ "The work is verifiable" ]
       ).value!
@@ -386,14 +393,15 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_sto
         change_set_id: "CS-LSE",
         work_item_id:,
         attempt_id:,
-        base_snapshots: [ { repository_id: "billing", commit_oid: "a" * 40 } ]
+        base_snapshots: [ { repository_id: EXPAND_REPOSITORY_ID, commit_oid: "a" * 40 } ]
       ).value!
     end
   end
 
   def lease_events(path)
     resource = normalizer.call(
-      repository_id: "billing",
+      repository_id: EXPAND_REPOSITORY_ID,
+      scope: RepositoryScenario::DEFAULT_SCOPE,
       kind: "file",
       path:,
       base_blob_oid: nil

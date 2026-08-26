@@ -7,6 +7,7 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
   EXPAND_WORK_ITEM_ID = "W-MCP-EXPAND"
   EXPAND_ATTEMPT_ID = "A-MCP-EXPAND"
   EXPAND_BASE_COMMIT_OID = "a" * 40
+  MCP_EXPAND_REPOSITORY_ID = RepositoryScenario::DEFAULT_REPOSITORY_ID
 
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
@@ -126,7 +127,7 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
           work_item_id: EXPAND_WORK_ITEM_ID,
           attempt_id: EXPAND_ATTEMPT_ID,
           lease_set_id:,
-          repository_id: "billing",
+          repository_id: MCP_EXPAND_REPOSITORY_ID,
           base_commit_oid: EXPAND_BASE_COMMIT_OID,
           resources: paths.map { { kind: "file", path: _1 } }
         }
@@ -185,7 +186,7 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
       change_set_id: EXPAND_CHANGE_SET_ID,
       work_item_id: EXPAND_WORK_ITEM_ID,
       attempt_id: EXPAND_ATTEMPT_ID,
-      repository_id: "billing",
+      repository_id: MCP_EXPAND_REPOSITORY_ID,
       base_commit_oid: EXPAND_BASE_COMMIT_OID,
       resources: [ { kind: "file", path: "app/a.rb" } ],
       lease_duration_seconds: 300
@@ -193,6 +194,7 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
   end
 
   def seed_active_attempt
+    RepositoryScenario.register(event_store:)
     Coordinator::Write::Operations::ExecuteCreateChangeSet.new(event_store:).call(
       command_id: "seed-create-#{EXPAND_CHANGE_SET_ID}",
       actor: { kind: "agent", id: "planner-1" },
@@ -205,7 +207,7 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
       actor: { kind: "agent", id: "planner-1" },
       change_set_id: EXPAND_CHANGE_SET_ID,
       work_item_id: EXPAND_WORK_ITEM_ID,
-      repository_id: "billing",
+      repository_id: MCP_EXPAND_REPOSITORY_ID,
       goal: "Implement the coordinated change",
       acceptance_criteria: [ "The expanded set remains atomic" ]
     ).value!
@@ -225,7 +227,7 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
       change_set_id: EXPAND_CHANGE_SET_ID,
       work_item_id: EXPAND_WORK_ITEM_ID,
       attempt_id: EXPAND_ATTEMPT_ID,
-      base_snapshots: [ { repository_id: "billing", commit_oid: EXPAND_BASE_COMMIT_OID } ]
+      base_snapshots: [ { repository_id: MCP_EXPAND_REPOSITORY_ID, commit_oid: EXPAND_BASE_COMMIT_OID } ]
     ).value!
   end
 
@@ -264,7 +266,8 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
 
   def lease_events(path)
     resource = normalizer.call(
-      repository_id: "billing",
+      repository_id: MCP_EXPAND_REPOSITORY_ID,
+      scope: RepositoryScenario::DEFAULT_SCOPE,
       kind: "file",
       path:,
       base_blob_oid: nil

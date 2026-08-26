@@ -17,6 +17,8 @@ module Coordinator::Write
         stream_factory: StreamFactory.new,
         completion_builder: CommandCompletionBuilder.new,
         compound_marker_builder: CompoundMarkerBuilder.new,
+        repository_registration_loader: RepositoryRegistrationLoader.new(event_store:),
+        repository_marker_builder: RepositoryMarkerBuilder.new,
         event_plan_contract: Contracts::WriteSetExpansionEventPlan.new
       )
         @event_store = event_store
@@ -30,6 +32,8 @@ module Coordinator::Write
         @stream_factory = stream_factory
         @completion_builder = completion_builder
         @compound_marker_builder = compound_marker_builder
+        @repository_registration_loader = repository_registration_loader
+        @repository_marker_builder = repository_marker_builder
         @event_plan_contract = event_plan_contract
       end
 
@@ -40,9 +44,7 @@ module Coordinator::Write
 
       def call_command(command, caused_by: nil)
         steps do
-          prepared = prepare_logical_values(command)
-
-          step @event_store.multiple { execute_attempt(command:, prepared:, caused_by:) }
+          step @event_store.multiple { execute_scoped_attempt(command:, caused_by:) }
         end
       end
 
@@ -64,7 +66,23 @@ module Coordinator::Write
         )
       end
 
-      def execute_attempt(command:, prepared:, caused_by:)
+      def execute_scoped_attempt(command:, caused_by:)
+        registration = @repository_registration_loader.call(command.repository_id)
+        return repository_not_registered(command) unless registration
+
+        scoped = @preparer.scope_for_repository(command, repository_registration: registration)
+        return scoped if scoped.failure?
+
+        scoped_command = scoped.value!
+        execute_attempt(
+          command: scoped_command,
+          prepared: prepare_logical_values(scoped_command),
+          repository_registration: registration,
+          caused_by:
+        )
+      end
+
+      def execute_attempt(command:, prepared:, repository_registration:, caused_by:)
         replay = replay_result(command:, input_digest: prepared.input_digest)
         return replay if replay
 
@@ -93,6 +111,7 @@ module Coordinator::Write
           plan,
           command:,
           prepared:,
+          repository_registration:,
           caused_by:
         )
         expansion = plan.events.last
@@ -217,13 +236,13 @@ module Coordinator::Write
         raise InvalidWriteSetExpansionEventPlan, result.errors.to_h.inspect
       end
 
-      def persist_domain_plan(plan, command:, prepared:, caused_by:)
+      def persist_domain_plan(plan, command:, prepared:, repository_registration:, caused_by:)
         plan.writes.map do |write|
           event = @event_factory.build!(
             event: write.event,
             event_id: event_id_for(write.event, prepared:),
             metadata: command_metadata(command),
-            markers: event_markers(command, write.event),
+            markers: event_markers(command, write.event, repository_registration:),
             caused_by:
           )
 
@@ -239,17 +258,17 @@ module Coordinator::Write
         end.event_id
       end
 
-      def event_markers(command, event)
+      def event_markers(command, event, repository_registration:)
         common = [
           "change-set:#{command.change_set_id}",
           "work-item:#{command.work_item_id}",
           "attempt:#{command.attempt_id}",
-          "repository:#{command.repository_id}",
           "command:#{command.command_id}"
-        ]
+        ] + @repository_marker_builder.call(repository_registration)
         return common + [ "lease-set:#{event.lease_set_id}" ] unless event.is_a?(Events::ResourceLeaseAcquiredV1)
 
         components = [
+          "scope:#{repository_registration.scope}",
           "repository:#{event.repository_id}",
           "resource-kind:#{event.resource_kind}",
           "resource-key-hash:#{event.resource_key_hash}"
@@ -282,7 +301,17 @@ module Coordinator::Write
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
-          policy_version: ResourceKeyDocumentV1::POLICY_VERSION
+          policy_version: command.resources.first.policy_version
+        )
+      end
+
+      def repository_not_registered(command)
+        Failure(
+          OutcomeError.new(
+            code: :repository_not_registered,
+            message: "Repository is not registered",
+            details: { repository_id: command.repository_id }
+          )
         )
       end
     end

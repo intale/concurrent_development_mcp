@@ -11,6 +11,7 @@ module Coordinator::Write
         work_item_unavailable: "conflict",
         attempt_already_exists: "conflict",
         lease_busy: "busy",
+        resource_identity_policy_mismatch: "conflict",
         interpretation_slot_already_accepted: "conflict",
         decision_slot_occupied: "conflict",
         decision_partition_capacity_reached: "conflict",

@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_store do
+  RESERVE_REPOSITORY_ID = RepositoryScenario::DEFAULT_REPOSITORY_ID
+
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
   let(:normalizer) { Coordinator::Write::FileResourceNormalizer.new }
@@ -28,8 +30,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
       change_set_id: "CS-LSE",
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
-      repository_id: "billing",
-      policy_version: "coordinator-resource-key/v1"
+      repository_id: RESERVE_REPOSITORY_ID,
+      policy_version: "coordinator-resource-key/v2"
     )
     expect(completion.data.resources.map(&:fencing_token)).to eq([ 1, 1 ])
     expect(completion.emitted_events.map(&:stream_name)).to eq(
@@ -49,11 +51,12 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
         "fencing_token" => 1
       )
       expect(acquisition.metadata).to include(
-        "policy_version" => "coordinator-resource-key/v1"
+        "policy_version" => "coordinator-resource-key/v2"
       )
       expect(acquisition.metadata).not_to have_key("correlation_id")
       expect(acquisition.markers).to include(
-        "repository:billing",
+        "scope:#{RepositoryScenario::DEFAULT_SCOPE}",
+        "repository:#{RESERVE_REPOSITORY_ID}",
         "resource-kind:file",
         "resource-key-hash:#{acquisition.data.fetch('resource_key_hash')}"
       )
@@ -83,6 +86,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
   end
 
   it "returns precise zero-fact Attempt, owner, base, and existing-reservation denials" do
+    RepositoryScenario.register(event_store:)
     missing = operation.call(input.merge(command_id: "cmd-missing", attempt_id: "A-MISSING"))
     seed_active_attempts([ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ])
     wrong_owner = operation.call(input.merge(command_id: "cmd-owner", actor: { kind: "agent", id: "agent-b" }))
@@ -95,6 +99,17 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
     expect(wrong_base.failure.code).to eq(:repository_base_mismatch)
     expect(already_reserved.failure.code).to eq(:write_set_already_reserved)
     expect([ "cmd-missing", "cmd-owner", "cmd-base", "cmd-second" ].flat_map { command_events(_1) }).to be_empty
+  end
+
+  it "rejects an unregistered repository from authoritative event facts" do
+    unregistered_id = "01a03deb-6f55-74ba-bcc0-afd02e7b14dd"
+    result = operation.call(input.merge(command_id: "cmd-unregistered", repository_id: unregistered_id))
+
+    expect(result.failure).to have_attributes(
+      code: :repository_not_registered,
+      details: { repository_id: unregistered_id }
+    )
+    expect(command_events("cmd-unregistered")).to be_empty
   end
 
   it "acquires all requested resources or none when one resource is busy" do
@@ -253,7 +268,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
       change_set_id: "CS-LSE",
       work_item_id:,
       attempt_id:,
-      repository_id: "billing",
+      repository_id: RESERVE_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: paths.map { { kind: "file", path: _1 } },
       lease_duration_seconds:
@@ -261,6 +276,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
   end
 
   def seed_active_attempts(attempts)
+    RepositoryScenario.register(event_store:)
     Coordinator::Write::Operations::ExecuteCreateChangeSet.new(event_store:).call(
       command_id: "seed-create-CS-LSE",
       actor: { kind: "agent", id: "planner-1" },
@@ -275,7 +291,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
         actor: { kind: "agent", id: "planner-1" },
         change_set_id: "CS-LSE",
         work_item_id:,
-        repository_id: "billing",
+        repository_id: RESERVE_REPOSITORY_ID,
         goal: "Implement #{work_item_id}",
         acceptance_criteria: [ "The work is verifiable" ]
       ).value!
@@ -299,14 +315,15 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
         change_set_id: "CS-LSE",
         work_item_id:,
         attempt_id:,
-        base_snapshots: [ { repository_id: "billing", commit_oid: "a" * 40 } ]
+        base_snapshots: [ { repository_id: RESERVE_REPOSITORY_ID, commit_oid: "a" * 40 } ]
       ).value!
     end
   end
 
   def lease_events(path)
     resource = normalizer.call(
-      repository_id: "billing",
+      repository_id: RESERVE_REPOSITORY_ID,
+      scope: RepositoryScenario::DEFAULT_SCOPE,
       kind: "file",
       path:,
       base_blob_oid: nil

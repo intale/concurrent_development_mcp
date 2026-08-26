@@ -98,7 +98,7 @@ module Coordinator
           properties: common_mutation_properties.merge(
             change_set_id: identifier,
             work_item_id: identifier,
-            repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+            repository_id: uuid_v7,
             goal: { type: "string", minLength: 1, maxLength: 4_000 },
             acceptance_criteria: string_array(min_items: 1, max_items: 50, max_length: 2_000)
           ),
@@ -140,7 +140,7 @@ module Coordinator
       def work_item_acquire
         snapshot = object_schema(
           properties: {
-            repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+            repository_id: uuid_v7,
             commit_oid: { type: "string", pattern: "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" }
           },
           required: %w[repository_id commit_oid]
@@ -205,7 +205,7 @@ module Coordinator
             change_set_id: identifier,
             work_item_id: identifier,
             attempt_id: identifier,
-            repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+            repository_id: uuid_v7,
             base_commit_oid: git_oid,
             resources: {
               type: "array",

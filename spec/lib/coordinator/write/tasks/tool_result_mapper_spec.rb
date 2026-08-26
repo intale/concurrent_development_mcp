@@ -126,6 +126,18 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         "denied"
       ],
       [
+        :resource_identity_policy_mismatch,
+        {
+          change_set_id: "CS-task-result",
+          work_item_id: "W-task-result",
+          attempt_id: "ATT-task-result",
+          current_policy_version: "coordinator-resource-key/v1",
+          requested_policy_version: "coordinator-resource-key/v2"
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::ResourceIdentityPolicyMismatchError,
+        "conflict"
+      ],
+      [
         :write_set_limit_reached,
         {
           change_set_id: "CS-task-result",

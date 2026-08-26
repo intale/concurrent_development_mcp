@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_store do
+  CANDIDATE_REPOSITORY_ID = RepositoryScenario::DEFAULT_REPOSITORY_ID
+
   subject(:operation) { described_class.new(event_store:) }
 
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
@@ -36,7 +38,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
     expect(command_events("cmd-CAN-A").map(&:type)).to eq([ "CommandCompleted" ])
 
     submission = candidate_events("CAN-A").first
-    registration = head_events("billing", "b" * 40).sole
+    registration = head_events(CANDIDATE_REPOSITORY_ID, "b" * 40).sole
     expect(registration.data.fetch("candidate_event")).to eq(
       "event_id" => submission.id,
       "type" => "CandidateSubmitted",
@@ -46,7 +48,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
       "stream_revision" => 0
     )
     expect(registration.markers).to include(
-      "repository:billing",
+      "scope:#{RepositoryScenario::DEFAULT_SCOPE}",
+      "repository:#{CANDIDATE_REPOSITORY_ID}",
       "object-format:sha1",
       "head-commit-oid:#{"b" * 40}"
     )
@@ -141,7 +144,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
     expect(first).to be_success
     expect(second.failure.code).to eq(:candidate_id_already_used)
     expect(candidate_events("CAN-A").count { _1.type == "CandidateSubmitted" }).to eq(1)
-    expect(head_events("billing", "e" * 40)).to be_empty
+    expect(head_events(CANDIDATE_REPOSITORY_ID, "e" * 40)).to be_empty
     expect(command_events("cmd-candidate-reuse")).to be_empty
   end
 
@@ -176,7 +179,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
     expect(results.count(&:success?)).to eq(1)
     expect(results.count(&:failure?)).to eq(1)
     expect(results.find(&:failure?).failure.code).to eq(:candidate_head_already_registered)
-    expect(head_events("billing", "b" * 40).length).to eq(1)
+    expect(head_events(CANDIDATE_REPOSITORY_ID, "b" * 40).length).to eq(1)
     expect(%w[CAN-A CAN-B].sum { candidate_events(_1).count { |event| event.type == "CandidateSubmitted" } }).to eq(1)
   end
 
@@ -208,8 +211,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
     expect(results).to all(be_success)
     expect(candidate_events("CAN-A").count { _1.type == "CandidateSubmitted" }).to eq(1)
     expect(candidate_events("CAN-B").count { _1.type == "CandidateSubmitted" }).to eq(1)
-    expect(head_events("billing", "b" * 40).length).to eq(1)
-    expect(head_events("billing", "e" * 40).length).to eq(1)
+    expect(head_events(CANDIDATE_REPOSITORY_ID, "b" * 40).length).to eq(1)
+    expect(head_events(CANDIDATE_REPOSITORY_ID, "e" * 40).length).to eq(1)
   end
 
   it "serializes a lease release race without a partial Candidate" do
@@ -267,7 +270,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
       change_set_id: "CS-CAN",
       work_item_id:,
       attempt_id:,
-      repository_id: "billing",
+      repository_id: CANDIDATE_REPOSITORY_ID,
       target_branch: "main",
       base_commit_oid: "a" * 40,
       head_commit_oid:,
@@ -311,6 +314,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
   end
 
   def seed_attempts(attempts)
+    RepositoryScenario.register(event_store:)
     Coordinator::Write::Operations::ExecuteCreateChangeSet.new(event_store:).call(
       command_id: "seed-create-CS-CAN",
       actor: { kind: "agent", id: "planner-1" },
@@ -325,7 +329,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
         actor: { kind: "agent", id: "planner-1" },
         change_set_id: "CS-CAN",
         work_item_id:,
-        repository_id: "billing",
+        repository_id: CANDIDATE_REPOSITORY_ID,
         goal: "Implement #{work_item_id}",
         acceptance_criteria: [ "The Candidate is attributable" ]
       ).value!
@@ -349,7 +353,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
         change_set_id: "CS-CAN",
         work_item_id:,
         attempt_id:,
-        base_snapshots: [ { repository_id: "billing", commit_oid: "a" * 40 } ]
+        base_snapshots: [ { repository_id: CANDIDATE_REPOSITORY_ID, commit_oid: "a" * 40 } ]
       ).value!
     end
   end
@@ -361,7 +365,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
       change_set_id: "CS-CAN",
       work_item_id:,
       attempt_id:,
-      repository_id: "billing",
+      repository_id: CANDIDATE_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: [ { kind: "file", path:, base_blob_oid: "c" * 40 } ],
       lease_duration_seconds: 900

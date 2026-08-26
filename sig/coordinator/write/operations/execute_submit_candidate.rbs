@@ -4,7 +4,7 @@ module Coordinator
       class ExecuteSubmitCandidate
         TOOL_NAME: String
 
-        def initialize: (event_store: _EventStore, ?preparer: PrepareSubmitCandidate, ?decider: Domain::Candidates::Submit, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?head_identity_builder: Candidates::HeadIdentityBuilder, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?completion_builder: CommandCompletionBuilder, ?event_plan_contract: Contracts::CandidateSubmissionEventPlan) -> void
+        def initialize: (event_store: _EventStore, ?preparer: PrepareSubmitCandidate, ?decider: Domain::Candidates::Submit, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?head_identity_builder: Candidates::HeadIdentityBuilder, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?completion_builder: CommandCompletionBuilder, ?repository_registration_loader: RepositoryRegistrationLoader, ?repository_marker_builder: RepositoryMarkerBuilder, ?event_plan_contract: Contracts::CandidateSubmissionEventPlan) -> void
         %a{rbs:test:skip}
         def call: (command_input input) -> Dry::Monads::Result
         def call_command: (Commands::SubmitCandidate command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result

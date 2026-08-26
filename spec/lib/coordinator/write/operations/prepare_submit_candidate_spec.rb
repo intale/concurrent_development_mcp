@@ -46,6 +46,18 @@ RSpec.describe Coordinator::Write::Operations::PrepareSubmitCandidate do
     expect(changed.build_context.digest).to eq(original.build_context.digest)
   end
 
+  it "keeps evidence digests stable while binding actual resources to repository scope" do
+    command = prepare.call(input_with_context).value!
+    scoped = prepare.scope_for_repository(
+      command,
+      repository_registration: RepositoryScenario.registration
+    ).value!
+
+    expect(scoped.manifest.digest).to eq(command.manifest.digest)
+    expect(scoped.build_context.digest).to eq(command.build_context.digest)
+    expect(scoped.actual_resources).to all(have_attributes(policy_version: "coordinator-resource-key/v2"))
+  end
+
   it "expands rename resources and rejects manifests above the public write-set boundary" do
     renamed = valid_input
     renamed[:change_manifest][:files] = [
@@ -107,7 +119,7 @@ RSpec.describe Coordinator::Write::Operations::PrepareSubmitCandidate do
       change_set_id: "CS-1",
       work_item_id: "W-1",
       attempt_id: "A-18",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       target_branch: "main",
       base_commit_oid: "a" * 40,
       head_commit_oid: "b" * 40,

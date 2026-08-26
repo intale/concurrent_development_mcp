@@ -22,6 +22,22 @@ RSpec.describe Coordinator::Write::FileResourceNormalizer do
     )
   end
 
+  it "binds an authoritative identity to exact scope and repository UUID" do
+    result = normalizer.call(
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      scope: RepositoryScenario::DEFAULT_SCOPE,
+      kind: "file",
+      path: "./app/models/user.rb",
+      base_blob_oid: nil
+    )
+
+    expect(result.value!).to have_attributes(
+      resource_key: "scope:project:test/billing:repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:file:app/models/user.rb",
+      policy_version: "coordinator-resource-key/v2"
+    )
+    expect(result.value!.resource_key_hash).to match(/\Asha256:[0-9a-f]{64}\z/)
+  end
+
   it "preserves case and Unicode code-point sequences" do
     upper = normalizer.call(repository_id: "billing", kind: "file", path: "Models/Å.rb", base_blob_oid: nil).value!
     lower = normalizer.call(repository_id: "billing", kind: "file", path: "models/å.rb", base_blob_oid: nil).value!

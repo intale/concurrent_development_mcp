@@ -69,6 +69,11 @@ module Coordinator::Write
         attribute :requested_base_blob_oid, Types::GitOid.optional
       end
 
+      class ResourceIdentityPolicyMismatchDetails < AttemptDetails
+        attribute :current_policy_version, Types::ResourceKeyPolicyVersion
+        attribute :requested_policy_version, Types::ResourceKeyPolicyVersion
+      end
+
       class WriteSetLimitDetails < AttemptDetails
         attribute :current_resource_count, Types::WriteSetSize
         attribute :requested_addition_count, Types::WriteSetSize
@@ -504,6 +509,12 @@ module Coordinator::Write
         attribute :code, Types::String.enum("resource_evidence_conflict")
         attribute :message, Types::String
         attribute :details, ResourceEvidenceConflictDetails
+      end
+
+      class ResourceIdentityPolicyMismatchError < Value
+        attribute :code, Types::String.enum("resource_identity_policy_mismatch")
+        attribute :message, Types::String
+        attribute :details, ResourceIdentityPolicyMismatchDetails
       end
 
       class WriteSetLimitError < Value
@@ -1071,6 +1082,7 @@ module Coordinator::Write
              LeaseBusyError |
              LeaseSetMismatchError |
              ResourceEvidenceConflictError |
+             ResourceIdentityPolicyMismatchError |
              WriteSetLimitError |
              LeaseSetExpiredError |
              LeaseSetNotCurrentError |

@@ -5,6 +5,7 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
   WRITE_SET_TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
   CHANGE_SET_ID = "CS-MCP-LSE"
   BASE_COMMIT_OID = "a" * 40
+  MCP_RESERVE_REPOSITORY_ID = RepositoryScenario::DEFAULT_REPOSITORY_ID
 
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
@@ -52,7 +53,8 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
           "change_set_id" => CHANGE_SET_ID,
           "work_item_id" => "W-MCP-LSE-A",
           "attempt_id" => "A-MCP-LSE-A",
-          "repository_id" => "billing"
+          "repository_id" => MCP_RESERVE_REPOSITORY_ID,
+          "policy_version" => "coordinator-resource-key/v2"
         )
       )
     )
@@ -140,7 +142,7 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
           change_set_id: CHANGE_SET_ID,
           work_item_id:,
           attempt_id:,
-          repository_id: "billing",
+          repository_id: MCP_RESERVE_REPOSITORY_ID,
           base_commit_oid: BASE_COMMIT_OID,
           resources: paths.map { { kind: "file", path: _1 } },
           lease_duration_seconds: 300
@@ -189,6 +191,7 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
   end
 
   def seed_active_attempts(attempts)
+    RepositoryScenario.register(event_store:)
     Coordinator::Write::Operations::ExecuteCreateChangeSet.new(event_store:).call(
       command_id: "seed-create-#{CHANGE_SET_ID}",
       actor: { kind: "agent", id: "planner-1" },
@@ -202,7 +205,7 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
         actor: { kind: "agent", id: "planner-1" },
         change_set_id: CHANGE_SET_ID,
         work_item_id:,
-        repository_id: "billing",
+        repository_id: MCP_RESERVE_REPOSITORY_ID,
         goal: "Implement #{work_item_id}",
         acceptance_criteria: [ "The work is verifiable" ]
       ).value!
@@ -224,7 +227,7 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
         change_set_id: CHANGE_SET_ID,
         work_item_id:,
         attempt_id:,
-        base_snapshots: [ { repository_id: "billing", commit_oid: BASE_COMMIT_OID } ]
+        base_snapshots: [ { repository_id: MCP_RESERVE_REPOSITORY_ID, commit_oid: BASE_COMMIT_OID } ]
       ).value!
     end
   end
@@ -267,7 +270,8 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
 
   def lease_events(path)
     resource = normalizer.call(
-      repository_id: "billing",
+      repository_id: MCP_RESERVE_REPOSITORY_ID,
+      scope: RepositoryScenario::DEFAULT_SCOPE,
       kind: "file",
       path:,
       base_blob_oid: nil
