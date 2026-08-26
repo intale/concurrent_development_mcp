@@ -72,14 +72,14 @@ RSpec.describe "CHO-02 MCP AgentChoice impact reads", :event_store, :read_model 
       suffix: "#{prefix}-base",
       decision_id:,
       option_id: "rspec",
-      scope: InterpretationInput.scope(repository_ids: [ "billing" ])
+      scope: InterpretationInput.scope(repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ])
     )
     choice = AgentChoiceImpactScenario.record_choice(prepared:, option_id: "rspec")
     source = AgentChoiceImpactScenario.correct_decision(
       suffix: "#{prefix}-change",
       decision_id:,
       option_id: "minitest",
-      scope: InterpretationInput.scope(repository_ids: [ "billing" ])
+      scope: InterpretationInput.scope(repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ])
     )
     caused_by = AgentChoiceImpactScenario.start_scan(source)
     invocation = AgentChoiceImpactScenario.assessment_invocation(choice:, source:, caused_by:)

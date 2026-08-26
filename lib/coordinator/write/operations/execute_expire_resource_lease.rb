@@ -16,6 +16,8 @@ module Coordinator::Write
         stream_factory: StreamFactory.new,
         completion_builder: CommandCompletionBuilder.new,
         compound_marker_builder: CompoundMarkerBuilder.new,
+        repository_registration_loader: RepositoryRegistrationLoader.new(event_store:),
+        repository_marker_builder: RepositoryMarkerBuilder.new,
         event_plan_contract: Contracts::ResourceLeaseExpiryEventPlan.new
       )
         @event_store = event_store
@@ -28,6 +30,8 @@ module Coordinator::Write
         @stream_factory = stream_factory
         @completion_builder = completion_builder
         @compound_marker_builder = compound_marker_builder
+        @repository_registration_loader = repository_registration_loader
+        @repository_marker_builder = repository_marker_builder
         @event_plan_contract = event_plan_contract
       end
 
@@ -67,14 +71,18 @@ module Coordinator::Write
         return decision if decision.failure?
 
         plan = decision.value!
+        expiration = plan.events.fetch(0)
+        repository_registration = @repository_registration_loader.call(expiration.repository_id)
+        return repository_not_registered(expiration.repository_id) unless repository_registration
+
         verify_event_plan!(plan, command:, state:, expired_at: prepared.expired_at)
         persisted_expiration = persist_expiration(
           plan.writes.fetch(0),
           command:,
           event_id: prepared.expiration_event_id,
+          repository_registration:,
           caused_by:
         )
-        expiration = plan.events.fetch(0)
         completion = @completion_builder.lease_expire_policy(
           command:,
           expiration:,
@@ -86,6 +94,7 @@ module Coordinator::Write
           completion,
           command:,
           event_id: prepared.completion_event_id,
+          policy_version: expiration.policy_version,
           caused_by:
         )
 
@@ -149,20 +158,21 @@ module Coordinator::Write
         raise InvalidResourceLeaseExpiryEventPlan, result.errors.to_h.inspect
       end
 
-      def persist_expiration(write, command:, event_id:, caused_by:)
+      def persist_expiration(write, command:, event_id:, repository_registration:, caused_by:)
         event = @event_factory.build!(
           event: write.event,
           event_id:,
-          metadata: command_metadata(command),
-          markers: event_markers(command, write.event),
+          metadata: command_metadata(command, policy_version: write.event.policy_version),
+          markers: event_markers(command, write.event, repository_registration:),
           caused_by:
         )
 
         @event_store.append(write.stream, [ event ]).fetch(0)
       end
 
-      def event_markers(command, event)
+      def event_markers(command, event, repository_registration:)
         components = [
+          "scope:#{repository_registration.scope}",
           "repository:#{event.repository_id}",
           "resource-kind:#{event.resource_kind}",
           "resource-key-hash:#{event.resource_key_hash}"
@@ -180,16 +190,17 @@ module Coordinator::Write
           "attempt:#{event.attempt_id}",
           "command:#{command.command_id}",
           "lease-set:#{event.lease_set_id}",
+          *@repository_marker_builder.call(repository_registration),
           *components,
           compound.marker
         ]
       end
 
-      def persist_completion(completion, command:, event_id:, caused_by:)
+      def persist_completion(completion, command:, event_id:, policy_version:, caused_by:)
         event = @event_factory.build!(
           event: completion,
           event_id:,
-          metadata: command_metadata(command),
+          metadata: command_metadata(command, policy_version:),
           markers: [ "command:#{command.command_id}" ],
           caused_by:
         )
@@ -197,13 +208,23 @@ module Coordinator::Write
         @event_store.append(@stream_factory.command(command.command_id), [ event ])
       end
 
-      def command_metadata(command)
+      def command_metadata(command, policy_version:)
         EventMetadata.new(
           command_id: command.command_id,
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
-          policy_version: ResourceKeyDocumentV1::POLICY_VERSION
+          policy_version:
+        )
+      end
+
+      def repository_not_registered(repository_id)
+        Failure(
+          OutcomeError.new(
+            code: :repository_not_registered,
+            message: "Repository is not registered",
+            details: { repository_id: }
+          )
         )
       end
     end

@@ -56,6 +56,9 @@ RSpec.describe Coordinator::Write::Operations::PrepareExpandWriteSet do
     ).value!
 
     expect(scoped.resources).to all(have_attributes(policy_version: "coordinator-resource-key/v2"))
+    expect(scoped.resources.map(&:path)).to eq(
+      scoped.resources.sort_by { _1.resource_key_hash.b }.map(&:path)
+    )
     expect(scoped.resources.map(&:resource_key_hash)).not_to eq(command.resources.map(&:resource_key_hash))
   end
 

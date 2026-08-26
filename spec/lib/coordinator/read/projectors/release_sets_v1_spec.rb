@@ -22,7 +22,8 @@ RSpec.describe Coordinator::Read::Projectors::ReleaseSetsV1, :event_store, :read
       change_set_id: "CS-release-projection",
       status: "prepared"
     )
-    expect(observed.data.release_set.ordered_members.map(&:repository_id)).to eq(%w[billing ledger])
+    repository_ids = ReleaseSetScenario::REPOSITORIES.map { RepositoryScenario.repository_id(_1) }
+    expect(observed.data.release_set.ordered_members.map(&:repository_id)).to eq(repository_ids)
     expect(Coordinator::Read::ReleaseSet.count).to eq(1)
   end
 
@@ -56,7 +57,8 @@ RSpec.describe Coordinator::Read::Projectors::ReleaseSetsV1, :event_store, :read
       status: "verified",
       verification_status: "passed"
     )
-    expect(observed.data.release_set.integrations.map(&:repository_id)).to eq(%w[billing ledger])
+    repository_ids = ReleaseSetScenario::REPOSITORIES.map { RepositoryScenario.repository_id(_1) }
+    expect(observed.data.release_set.integrations.map(&:repository_id)).to eq(repository_ids)
     expect(observed.data.release_set.verifications.map { _1.evidence.outcome }).to eq([ "passed" ])
   end
 

@@ -50,7 +50,7 @@ RSpec.describe Coordinator::Read::Queries::VerificationObligationsList,
     filtered = query.call(
       change_set_id:,
       candidate_id: target.fetch(:candidate_id),
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       enforcement: "verification_gate"
     ).value!.data.page
     expect(filtered.items.map(&:obligation_id)).to eq([ second_result.obligation_id ])

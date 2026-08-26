@@ -22,13 +22,13 @@ RSpec.describe Coordinator::Write::Operations::ExecutePrepareReleaseSet, :event_
       policy_version: "release-set-preparation/v1"
     )
     expect(payload.ordered_members.map(&:position)).to eq([ 1, 2 ])
-    expect(payload.ordered_members.map(&:repository_id)).to eq(%w[billing ledger])
+    repository_ids = ReleaseSetScenario::REPOSITORIES.map { RepositoryScenario.repository_id(_1) }
+    expect(payload.ordered_members.map(&:repository_id)).to eq(repository_ids)
     expect(payload.release_digest).to match(Coordinator::Shared::Types::SHA256_DIGEST_PATTERN)
     expect(physical.markers).to include(
       "release-set:REL-success",
       "change-set:CS-release-success",
-      "repository:billing",
-      "repository:ledger"
+      *repository_ids.map { "repository:#{_1}" }
     )
     expect(command_events(input.fetch(:command_id)).length).to eq(1)
   end

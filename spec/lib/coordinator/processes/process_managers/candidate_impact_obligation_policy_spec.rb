@@ -157,7 +157,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CandidateImpactObligatio
       change_set_id: ids.fetch(:change_set_id),
       work_item_id: ids.fetch(:work_item_id),
       attempt_id: ids.fetch(:attempt_id),
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: %w[Gemfile.lock app/services/checkout.rb].map do |path|
         { kind: "file", path:, base_blob_oid: "c" * 40 }

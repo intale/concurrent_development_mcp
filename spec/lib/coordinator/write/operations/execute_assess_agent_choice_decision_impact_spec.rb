@@ -18,7 +18,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAssessAgentChoiceDecisionI
       decision_id: "D-impact-invalidate",
       option_id: "minitest",
       scope: InterpretationInput.scope(
-        repository_ids: [ "billing" ],
+        repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
         work_item_id: prepared.fetch(:identifiers).fetch(:work_item_id)
       )
     )
@@ -41,7 +41,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAssessAgentChoiceDecisionI
       source_advancements: contain_exactly(
         have_attributes(
           type: "DecisionPartitionAdvanced",
-          stream_id: "repo:billing:testing",
+          stream_id: "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing",
           stream_revision: 1
         ),
         have_attributes(
@@ -79,7 +79,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAssessAgentChoiceDecisionI
       "decision-change:#{source.id}"
     )
     expect(invalidation_event.markers).to include(
-      "decision-partition:repo:billing:testing",
+      "decision-partition:repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing",
       "decision-partition:attempt:#{choice.fetch(:identifiers).fetch(:attempt_id)}:testing"
     )
     expect(AgentChoiceImpactScenario.assessment_events(invocation.command.assessment_id).length).to eq(1)
@@ -251,6 +251,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAssessAgentChoiceDecisionI
   end
 
   it "CHO-02-ASSESS-RACE-01 serializes two independent invalidating Decision changes" do
+    prime_agent_choice_impact_partitions
     prepared = AgentChoiceImpactScenario.prepare_attempt(prefix: "impact-race")
     choice = AgentChoiceImpactScenario.record_choice(prepared:, option_id: "rspec")
     repository_source = AgentChoiceImpactScenario.activate_decision(
@@ -265,7 +266,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAssessAgentChoiceDecisionI
       decision_id: "D-impact-race-attempt",
       option_id: "minitest",
       scope: InterpretationInput.scope(
-        repository_ids: [ "billing" ],
+        repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
         change_set_id: identifiers.fetch(:change_set_id),
         work_item_id: identifiers.fetch(:work_item_id),
         attempt_id: identifiers.fetch(:attempt_id)
@@ -297,8 +298,34 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAssessAgentChoiceDecisionI
     described_class.new(event_store:)
   end
 
+  def prime_agent_choice_impact_partitions
+    repository_key = "impact-race-partition-prime"
+    prepared = AgentChoiceImpactScenario.prepare_attempt(
+      prefix: "impact-race-partition-prime",
+      repository_id: repository_key
+    )
+    scope = repository_scope(repository_key)
+    AgentChoiceImpactScenario.activate_decision(
+      suffix: "impact-race-partition-prime-base",
+      decision_id: "D-impact-race-partition-prime",
+      option_id: "rspec",
+      scope:
+    )
+    choice = AgentChoiceImpactScenario.record_choice(prepared:, option_id: "rspec")
+    source = AgentChoiceImpactScenario.correct_decision(
+      suffix: "impact-race-partition-prime-change",
+      decision_id: "D-impact-race-partition-prime",
+      option_id: "minitest",
+      scope:
+    )
+
+    operation.call(
+      AgentChoiceImpactScenario.assessment_invocation(choice:, source:)
+    ).value!
+  end
+
   def repository_scope(repository_id)
-    InterpretationInput.scope(repository_ids: [ repository_id ])
+    InterpretationInput.scope(repository_ids: [ RepositoryScenario.repository_id(repository_id) ])
   end
 
   def choice_id(choice)

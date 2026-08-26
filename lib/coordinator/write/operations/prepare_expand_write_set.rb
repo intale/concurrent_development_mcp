@@ -56,7 +56,7 @@ module Coordinator::Write
           result.value!
         end
 
-        Success(scoped)
+        Success(scoped.sort_by { _1.resource_key_hash.b })
       end
 
       def validate(input)

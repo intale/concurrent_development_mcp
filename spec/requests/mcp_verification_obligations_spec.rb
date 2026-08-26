@@ -32,7 +32,7 @@ RSpec.describe "IMP-02 MCP verification obligations", :event_store, :read_model 
       {
         change_set_id:,
         candidate_id: created.dig(:pair, :target, :candidate_id),
-        repository_id: "billing",
+        repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
         kind: "candidate_compatibility",
         enforcement: "merge_gate",
         status: "open",

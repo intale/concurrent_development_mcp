@@ -21,7 +21,10 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoicesV1, :event_store, :rea
     expect(available.recorded.to_h).to include(
       event: include(event_id: recorded.id, type: "AgentChoiceRecorded", stream_revision: 0),
       actor: include(kind: "agent", id: "agent-a", authenticated: false),
-      markers: include("choice:CHO-choice-project", "repository:billing"),
+      markers: include(
+        "choice:CHO-choice-project",
+        "repository:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}"
+      ),
       metadata: include("command_id" => "cmd-choice-project-choice", "schema_version" => 1),
       causation_id: recorded.causation_id,
       correlation_id: recorded.correlation_id

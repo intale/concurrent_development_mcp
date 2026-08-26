@@ -48,20 +48,32 @@ module Coordinator::Processes
         command_id = event.metadata["command_id"]
 
         Types::IDENTIFIER_PATTERN.match?(command_id.to_s) &&
-          Types::RESOURCE_KEY_POLICY_VERSIONS.include?(event.metadata["policy_version"])
+          event.metadata["policy_version"] == Coordinator::Write::ResourceKeyDocumentV2::POLICY_VERSION
       end
 
       def matching_markers?(event)
         data = event.data
+        scope_markers = event.markers.grep(/\Ascope:/)
+        return false unless scope_markers.one?
+
+        scope = scope_markers.fetch(0)
+        repository = "repository:#{data['repository_id']}"
         components = [
-          "repository:#{data['repository_id']}",
+          scope,
+          repository,
           "resource-kind:#{data['resource_kind']}",
           "resource-key-hash:#{data['resource_key_hash']}"
         ]
-        compound = @compound_marker_builder.call(
+        resource_identity = @compound_marker_builder.call(
           CompoundMarkerDefinitionV1.new(
             purpose: "resource-identity",
             components:
+          )
+        )
+        scoped_repository = @compound_marker_builder.call(
+          CompoundMarkerDefinitionV1.new(
+            purpose: "scoped-repository",
+            components: [ scope, repository ]
           )
         )
         expected = [
@@ -71,7 +83,8 @@ module Coordinator::Processes
           "command:#{event.metadata['command_id']}",
           "lease-set:#{data['lease_set_id']}",
           *components,
-          compound.marker
+          resource_identity.marker,
+          scoped_repository.marker
         ].uniq.sort
 
         event.markers == expected

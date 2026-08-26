@@ -19,7 +19,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordRepositoryIntegratio
 
     expect(replay).to eq(first)
     expect(payload).to have_attributes(
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       member_position: 1,
       attempt_number: 1,
       outcome: "integrated",
@@ -28,7 +28,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordRepositoryIntegratio
     expect(integration.correlation_id).to eq(prepared.fetch(:event).correlation_id)
     expect(integration.markers).to include(
       "release-set:REL-integration-success",
-      "repository:billing",
+      "repository:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}",
       "release-integration-outcome:integrated"
     )
     expect(lifecycle_events(prepared).count { _1.type == "RepositoryIntegrationRecorded" }).to eq(1)

@@ -17,6 +17,8 @@ module Coordinator::Write
         stream_factory: StreamFactory.new,
         completion_builder: CommandCompletionBuilder.new,
         compound_marker_builder: CompoundMarkerBuilder.new,
+        repository_registration_loader: RepositoryRegistrationLoader.new(event_store:),
+        repository_marker_builder: RepositoryMarkerBuilder.new,
         event_plan_contract: Contracts::WriteSetReleaseEventPlan.new
       )
         @event_store = event_store
@@ -30,6 +32,8 @@ module Coordinator::Write
         @stream_factory = stream_factory
         @completion_builder = completion_builder
         @compound_marker_builder = compound_marker_builder
+        @repository_registration_loader = repository_registration_loader
+        @repository_marker_builder = repository_marker_builder
         @event_plan_contract = event_plan_contract
       end
 
@@ -74,12 +78,17 @@ module Coordinator::Write
         )
         return decision if decision.failure?
 
+        repository_id = attempt_observation.state.lease_repository_id
+        repository_registration = @repository_registration_loader.call(repository_id)
+        return repository_not_registered(repository_id) unless repository_registration
+
         persistence = apply_decision(
           decision.value!,
           command:,
           attempt_observation:,
           current_observations:,
           prepared:,
+          repository_registration:,
           caused_by:
         )
         completion = @completion_builder.lease_release(
@@ -93,6 +102,7 @@ module Coordinator::Write
           completion,
           command:,
           event_id: prepared.completion_event_id,
+          policy_version: persistence.release.policy_version,
           caused_by:
         )
 
@@ -176,7 +186,15 @@ module Coordinator::Write
         )
       end
 
-      def apply_decision(decision, command:, attempt_observation:, current_observations:, prepared:, caused_by:)
+      def apply_decision(
+        decision,
+        command:,
+        attempt_observation:,
+        current_observations:,
+        prepared:,
+        repository_registration:,
+        caused_by:
+      )
         if decision.release?
           plan = decision.plan
           raise InvalidWriteSetReleaseEventPlan, "release decision has no event plan" unless plan
@@ -188,7 +206,7 @@ module Coordinator::Write
             current_observations:,
             released_at: prepared.released_at
           )
-          events = persist_domain_plan(plan, command:, prepared:, caused_by:)
+          events = persist_domain_plan(plan, command:, prepared:, repository_registration:, caused_by:)
           return PersistedLeaseSetReleaseV1.new(release: plan.events.last, events:)
         end
 
@@ -266,15 +284,15 @@ module Coordinator::Write
         raise InvalidWriteSetReleaseEventPlan, result.errors.to_h.inspect
       end
 
-      def persist_domain_plan(plan, command:, prepared:, caused_by:)
+      def persist_domain_plan(plan, command:, prepared:, repository_registration:, caused_by:)
         event_ids = prepared.releases.map(&:event_id) + [ prepared.write_set_event_id ]
 
         plan.writes.zip(event_ids).map do |write, event_id|
           event = @event_factory.build!(
             event: write.event,
             event_id:,
-            metadata: command_metadata(command),
-            markers: event_markers(command, write.event),
+            metadata: command_metadata(command, policy_version: write.event.policy_version),
+            markers: event_markers(command, write.event, repository_registration:),
             caused_by:
           )
 
@@ -282,18 +300,17 @@ module Coordinator::Write
         end
       end
 
-      def event_markers(command, event)
+      def event_markers(command, event, repository_registration:)
         common = [
           "change-set:#{command.change_set_id}",
           "work-item:#{command.work_item_id}",
           "attempt:#{command.attempt_id}",
-          "repository:#{event.repository_id}",
-          "command:#{command.command_id}",
-          "lease-set:#{event.lease_set_id}"
-        ]
+          "command:#{command.command_id}"
+        ] + @repository_marker_builder.call(repository_registration) + [ "lease-set:#{event.lease_set_id}" ]
         return common unless event.is_a?(Events::ResourceLeaseReleasedV1)
 
         components = [
+          "scope:#{repository_registration.scope}",
           "repository:#{event.repository_id}",
           "resource-kind:#{event.resource_kind}",
           "resource-key-hash:#{event.resource_key_hash}"
@@ -308,11 +325,11 @@ module Coordinator::Write
         common + components + [ compound.marker ]
       end
 
-      def persist_completion(completion, command:, event_id:, caused_by:)
+      def persist_completion(completion, command:, event_id:, policy_version:, caused_by:)
         event = @event_factory.build!(
           event: completion,
           event_id:,
-          metadata: command_metadata(command),
+          metadata: command_metadata(command, policy_version:),
           markers: [ "command:#{command.command_id}" ],
           caused_by:
         )
@@ -320,13 +337,23 @@ module Coordinator::Write
         @event_store.append(@stream_factory.command(command.command_id), [ event ])
       end
 
-      def command_metadata(command)
+      def command_metadata(command, policy_version:)
         EventMetadata.new(
           command_id: command.command_id,
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
-          policy_version: ResourceKeyDocumentV1::POLICY_VERSION
+          policy_version:
+        )
+      end
+
+      def repository_not_registered(repository_id)
+        Failure(
+          OutcomeError.new(
+            code: :repository_not_registered,
+            message: "Repository is not registered",
+            details: { repository_id: }
+          )
         )
       end
     end

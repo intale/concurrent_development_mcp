@@ -259,7 +259,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::AgentChoiceDecisionImpac
   end
 
   def repository_scope
-    InterpretationInput.scope(repository_ids: [ "billing" ])
+    InterpretationInput.scope(repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ])
   end
 
   def scan_id(source)
