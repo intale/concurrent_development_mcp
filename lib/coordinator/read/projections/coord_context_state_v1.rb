@@ -3,6 +3,12 @@
 module Coordinator::Read
   module Projections
     class CoordContextStateV1 < Value
+      HISTORICAL_RESOURCE_KEY_POLICY_VERSIONS = %w[
+        coordinator-resource-key/v1
+        coordinator-resource-key/v2
+        coordinator-resource-key/v3
+      ].freeze
+
       class ChangeSet < Value
         attribute :change_set_id, Types::Identifier
         attribute :goal, Types::Goal
@@ -60,7 +66,7 @@ module Coordinator::Read
 
         attribute :lease_set_id, Types::UuidV7
         attribute :repository_id, Types::RepositoryId
-        attribute :policy_version, Types::ResourceKeyPolicyVersion
+        attribute :policy_version, Types::String.enum(*HISTORICAL_RESOURCE_KEY_POLICY_VERSIONS)
         attribute :resources, Types::Array.of(Resource).constrained(min_size: 1, max_size: 32)
         attribute :reserved_at, Types::Timestamp
         attribute :last_expanded_at, Types::Timestamp.optional

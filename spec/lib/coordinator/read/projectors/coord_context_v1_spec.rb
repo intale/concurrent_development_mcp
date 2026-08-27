@@ -5,6 +5,32 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
   let(:streams) { Coordinator::Write::StreamFactory.new }
   subject(:projector) { described_class.new }
 
+  it "keeps immutable pre-v3 write-set observations readable" do
+    resource = Coordinator::Read::Projections::CoordContextStateV1::WriteSetResource.new(
+      lease_id: "01919191-9191-7191-8191-919191919191",
+      resource_key: "scope:project:history:repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:file:old.rb",
+      resource_key_hash: "sha256:#{'a' * 64}",
+      resource_kind: "file",
+      resource_path: "old.rb",
+      base_blob_oid: nil,
+      fencing_token: 1
+    )
+    observation = Coordinator::Read::Projections::CoordContextStateV1::WriteSet.new(
+      lease_set_id: "01919191-9191-7191-8191-919191919192",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      policy_version: "coordinator-resource-key/v2",
+      resources: [ resource ],
+      reserved_at: "2026-08-22T10:00:00.000000Z",
+      last_expanded_at: nil,
+      last_renewed_at: nil,
+      previous_expires_at: nil,
+      expires_at: "2026-08-22T10:15:00.000000Z",
+      released_at: "2026-08-22T10:05:00.000000Z"
+    )
+
+    expect(observation.policy_version).to eq("coordinator-resource-key/v2")
+  end
+
   it "atomically projects exact source identities and ignores duplicate delivery" do
     create_change_set("CS-100")
     create_work_item("CS-100", "W-100")

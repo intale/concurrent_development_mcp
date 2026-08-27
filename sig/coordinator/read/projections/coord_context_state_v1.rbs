@@ -2,6 +2,8 @@ module Coordinator
   module Read
     module Projections
       class CoordContextStateV1 < Shared::Value
+        HISTORICAL_RESOURCE_KEY_POLICY_VERSIONS: Array[String]
+
         class ChangeSet < Shared::Value
           def change_set_id: () -> String
           def goal: () -> String
