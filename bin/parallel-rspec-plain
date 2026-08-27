@@ -1,0 +1,23 @@
+#!/usr/bin/env sh
+
+set -eu
+
+parallel_rspec_processes="${PARALLEL_TEST_PROCESSORS:-10}"
+parallel_rspec_runtime_log="tmp/parallel_runtime_rspec_plain.log"
+
+case "$parallel_rspec_processes" in
+  ""|*[!0-9]*|0)
+    echo "PARALLEL_TEST_PROCESSORS must be a positive integer" >&2
+    exit 64
+    ;;
+esac
+
+unset RBS_TEST_TARGET RBS_TEST_LOGLEVEL RBS_TEST_OPT RBS_TEST_DOUBLE_SUITE RUBYOPT
+export PARALLEL_TEST_PROCESSORS="$parallel_rspec_processes"
+export PARALLEL_TEST_FIRST_IS_1=true
+export PARALLEL_TESTS_EXECUTABLE="bundle exec rspec"
+
+exec bundle exec parallel_rspec \
+  --runtime-log "$parallel_rspec_runtime_log" \
+  --test-options "--format ParallelTests::RSpec::RuntimeLogger --out $parallel_rspec_runtime_log" \
+  "$@"

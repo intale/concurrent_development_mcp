@@ -1,0 +1,21 @@
+#!/usr/bin/env sh
+
+set -eu
+
+parallel_cucumber_processes="${PARALLEL_TEST_PROCESSORS:-10}"
+parallel_cucumber_runtime_log="tmp/parallel_runtime_cucumber.log"
+
+case "$parallel_cucumber_processes" in
+  ""|*[!0-9]*|0)
+    echo "PARALLEL_TEST_PROCESSORS must be a positive integer" >&2
+    exit 64
+    ;;
+esac
+
+unset RBS_TEST_TARGET RBS_TEST_LOGLEVEL RBS_TEST_OPT RBS_TEST_DOUBLE_SUITE RUBYOPT
+export PARALLEL_TEST_PROCESSORS="$parallel_cucumber_processes"
+export PARALLEL_TEST_FIRST_IS_1=true
+
+exec bundle exec parallel_cucumber \
+  --runtime-log "$parallel_cucumber_runtime_log" \
+  "$@"
