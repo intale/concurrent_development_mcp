@@ -80,6 +80,75 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
     expect(Coordinator::Read::CoordContext.find("CS-100").document).to eq(first_document)
   end
 
+  it "converges abandonment and requeue facts in either cross-stream order" do
+    create_change_set("CS-ABANDON")
+    create_work_item("CS-ABANDON", "W-ABANDON")
+    activate_change_set("CS-ABANDON", "W-ABANDON")
+    acquire_work_item("CS-ABANDON", "W-ABANDON", "A-ABANDON", "agent-a")
+    abandon_attempt("CS-ABANDON", "W-ABANDON", "A-ABANDON", "agent-a")
+
+    sources = abandonment_context_sources(
+      change_set_id: "CS-ABANDON",
+      work_item_id: "W-ABANDON",
+      attempt_id: "A-ABANDON"
+    )
+    terminal = sources.select { %w[AttemptAbandoned WorkItemRequeued].include?(_1.type) }
+    initial = sources - terminal
+
+    initial.each { projector.call(_1) }
+    terminal.each { projector.call(_1) }
+    terminal.each { projector.call(_1) }
+    first_document = Coordinator::Read::CoordContext.find("CS-ABANDON").document
+    assert_abandoned_context
+
+    ReadModelTestSafety.clean!
+    initial.each { projector.call(_1) }
+    terminal.reverse_each { projector.call(_1) }
+
+    expect(Coordinator::Read::CoordContext.find("CS-ABANDON").document).to eq(first_document)
+    assert_abandoned_context
+  end
+
+  it "keeps only the newest one hundred Attempts in embedded context" do
+    reducer = Coordinator::Read::Projections::CoordContextReducer.new
+    state = reducer.apply(
+      Coordinator::Read::Projections::CoordContextStateV1.initial,
+      Coordinator::Write::Events::WorkItemCreatedV1.new(
+        work_item_id: "W-WINDOW",
+        change_set_id: "CS-WINDOW",
+        repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+        goal: "Keep recent Attempts bounded",
+        acceptance_criteria: [ "Older Attempts remain separately pageable" ],
+        competitive_mode: false,
+        created_at: "2026-08-27T10:00:00.000000Z"
+      )
+    )
+    snapshot = Coordinator::Write::RepositorySnapshotV1.new(
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      object_format: "sha1",
+      commit_oid: "a" * 40
+    )
+
+    101.times do |offset|
+      state = reducer.apply(
+        state,
+        Coordinator::Write::Events::AttemptAuthorizedV1.new(
+          attempt_id: format("A-WINDOW-%03d", offset),
+          change_set_id: "CS-WINDOW",
+          work_item_id: "W-WINDOW",
+          agent_id: "agent-window",
+          base_snapshots: [ snapshot ],
+          authorized_at: (Time.utc(2026, 8, 27, 10, 1) + offset).iso8601(6)
+        )
+      )
+    end
+
+    expect(state.attempts.length).to eq(100)
+    expect(state.attempts.first.attempt_id).to eq("A-WINDOW-100")
+    expect(state.attempts.last.attempt_id).to eq("A-WINDOW-001")
+    expect(state.attempts.map(&:attempt_id)).not_to include("A-WINDOW-000")
+  end
+
   it "projects activation, ownership, exact Attempt bases, and observed write-set evidence" do
     create_change_set("CS-100")
     create_work_item("CS-100", "W-100")
@@ -384,6 +453,97 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
       goal: "Implement #{work_item_id}",
       acceptance_criteria: [ "The work is verifiable" ]
     ).value!
+  end
+
+  def activate_change_set(change_set_id, work_item_id)
+    Coordinator::Write::Operations::ExecuteActivateChangeSet.new(event_store:).call(
+      command_id: "activate-#{change_set_id}",
+      actor: { kind: "agent", id: "planner-1" },
+      change_set_id:
+    ).value!
+    activation = change_set_events(change_set_id).find { _1.type == "ChangeSetActivated" }
+    Coordinator::Processes::ProcessManagers::ChangeSetReadiness.new(event_store:).call(activation)
+    raise "WorkItem #{work_item_id} was not made ready" unless work_item_events(work_item_id).any? do |event|
+      event.type == "WorkItemMadeReady"
+    end
+  end
+
+  def acquire_work_item(change_set_id, work_item_id, attempt_id, agent_id)
+    Coordinator::Write::Operations::ExecuteAcquireWorkItem.new(event_store:).call(
+      command_id: "acquire-#{attempt_id}",
+      actor: { kind: "agent", id: agent_id },
+      change_set_id:,
+      work_item_id:,
+      attempt_id:,
+      base_snapshots: [
+        { repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID, commit_oid: "a" * 40 }
+      ]
+    ).value!
+  end
+
+  def abandon_attempt(change_set_id, work_item_id, attempt_id, agent_id)
+    Coordinator::Write::Operations::ExecuteAbandonAttempt.new(event_store:).call(
+      command_id: "abandon-#{attempt_id}",
+      actor: { kind: "agent", id: agent_id },
+      change_set_id:,
+      work_item_id:,
+      attempt_id:,
+      reason: "The agent yielded this WorkItem."
+    ).value!
+  end
+
+  def abandonment_context_sources(change_set_id:, work_item_id:, attempt_id:)
+    change_set = change_set_events(change_set_id)
+    work_item = event_store.read(
+      streams.work_item(work_item_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[WorkItemCreated WorkItemMadeReady WorkItemAcquired WorkItemRequeued],
+        maximum_count: 4,
+        direction: :asc
+      )
+    )
+    attempt = event_store.read(
+      streams.attempt(attempt_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[AttemptAuthorized AttemptStarted AttemptAbandoned],
+        maximum_count: 3,
+        direction: :asc
+      )
+    )
+
+    (change_set + work_item + attempt).sort_by(&:global_position)
+  end
+
+  def assert_abandoned_context
+    snapshot = Coordinator::Read::Repositories::CoordContexts.new.resolve(
+      scope_kind: "work_item",
+      scope_id: "W-ABANDON"
+    )
+    expect(snapshot.state.work_items.sole).to have_attributes(
+      status: "ready",
+      active_attempt_id: nil,
+      active_agent_id: nil
+    )
+    expect(snapshot.state.attempts.sole).to have_attributes(
+      attempt_id: "A-ABANDON",
+      agent_id: "agent-a",
+      status: "abandoned",
+      abandonment_reason: "The agent yielded this WorkItem.",
+      abandoned_at: be_present
+    )
+    history = Coordinator::Read::Repositories::CoordContexts.new.attempt_page(
+      work_item_id: "W-ABANDON",
+      after_authorized_global_position: nil,
+      limit: 1
+    ).items.sole
+    expect(history).to have_attributes(
+      attempt_id: "A-ABANDON",
+      work_item_id: "W-ABANDON",
+      agent_id: "agent-a",
+      status: "abandoned",
+      abandonment_reason: "The agent yielded this WorkItem.",
+      terminal_at: be_present
+    )
   end
 
   def change_set_events(change_set_id)

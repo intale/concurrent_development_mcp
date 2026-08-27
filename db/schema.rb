@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_26_194500) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_27_153000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -79,6 +79,28 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_26_194500) do
     t.datetime "updated_at", null: false
     t.index ["choice_type"], name: "index_agent_choices_on_choice_type"
     t.index ["observation_status"], name: "index_agent_choices_on_observation_status"
+  end
+
+  create_table "attempt_histories", primary_key: "attempt_id", id: :string, force: :cascade do |t|
+    t.string "abandonment_reason"
+    t.string "agent_id", null: false
+    t.jsonb "authorization_event", default: {}, null: false
+    t.datetime "authorized_at_domain", null: false
+    t.bigint "authorized_global_position", null: false
+    t.jsonb "base_snapshots", default: [], null: false
+    t.string "change_set_id", null: false
+    t.datetime "created_at", null: false
+    t.jsonb "selected_candidate_event"
+    t.string "selected_candidate_id"
+    t.datetime "started_at_domain"
+    t.string "status", null: false
+    t.datetime "terminal_at_domain"
+    t.jsonb "terminal_event"
+    t.datetime "updated_at", null: false
+    t.string "work_item_id", null: false
+    t.index ["change_set_id"], name: "index_attempt_histories_on_change_set_id"
+    t.index ["status"], name: "index_attempt_histories_on_status"
+    t.index ["work_item_id", "authorized_global_position", "attempt_id"], name: "idx_attempt_histories_work_item_cursor", unique: true
   end
 
   create_table "candidate_changed_resources", id: false, force: :cascade do |t|

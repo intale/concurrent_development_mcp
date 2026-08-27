@@ -3,6 +3,8 @@
 module Coordinator::Read
   module Projections
     class CoordContextStateV1 < Value
+      RECENT_ATTEMPT_LIMIT = 100
+
       HISTORICAL_RESOURCE_KEY_POLICY_VERSIONS = %w[
         coordinator-resource-key/v1
         coordinator-resource-key/v2
@@ -82,13 +84,15 @@ module Coordinator::Read
         attribute :work_item_id, Types::Identifier
         attribute :agent_id, Types::Identifier
         attribute :base_snapshots, Types::Array.of(Coordinator::Write::RepositorySnapshotV1).constrained(size: 1)
-        attribute :status, Types::String.enum("authorized", "started", "completed")
+        attribute :status, Types::String.enum("authorized", "started", "abandoned", "completed")
         attribute :authorized_at, Types::Timestamp
         attribute :started_at, Types::Timestamp.optional
         attribute :write_set, WriteSet.optional
         attribute :selected_candidate_id, Types::Identifier.optional
         attribute :selected_candidate_event, Coordinator::Write::EventReference.optional
         attribute :completed_at, Types::Timestamp.optional
+        attribute :abandonment_reason, Types::String.optional.default(nil)
+        attribute :abandoned_at, Types::Timestamp.optional.default(nil)
       end
 
       class CandidateCheckpoint < Value
@@ -113,7 +117,7 @@ module Coordinator::Read
       attribute :work_item_ids, Types::WorkItemIds
       attribute :work_items, Types::Array.of(WorkItem).constrained(max_size: 100)
       attribute :dependencies, Types::Array.of(Dependency).constrained(max_size: 500)
-      attribute :attempts, Types::Array.of(Attempt).constrained(max_size: 100)
+      attribute :attempts, Types::Array.of(Attempt).constrained(max_size: RECENT_ATTEMPT_LIMIT)
       attribute :candidate_checkpoints,
                 Types::Array.of(CandidateCheckpoint).constrained(max_size: 100)
 

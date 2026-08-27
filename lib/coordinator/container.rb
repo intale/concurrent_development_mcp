@@ -776,6 +776,7 @@ module Coordinator
     register("projectors.coord_context_v1", memoize: true) do
       Read::Projectors::CoordContextV1.new(
         schema_registry: self["event_schema_registry"],
+        contexts: self["repositories.coord_contexts"],
         processed_events: self["repositories.processed_projection_events"]
       )
     end
@@ -912,6 +913,12 @@ module Coordinator
       Read::Queries::CoordContext.new(
         contexts: self["repositories.coord_contexts"],
         canonical_json: self["canonical_json"]
+      )
+    end
+
+    register("queries.attempt_list") do
+      Read::Queries::CoordContext::AttemptList.new(
+        contexts: self["repositories.coord_contexts"]
       )
     end
 

@@ -15,6 +15,8 @@ module Coordinator::Read
         when Coordinator::Write::Events::WorkItemAcquiredV1 then apply_work_item_acquired(state, event)
         when Coordinator::Write::Events::AttemptAuthorizedV1 then apply_attempt_authorized(state, event)
         when Coordinator::Write::Events::AttemptStartedV1 then apply_attempt_started(state, event)
+        when Coordinator::Write::Events::AttemptAbandonedV1 then apply_attempt_abandoned(state, event)
+        when Coordinator::Write::Events::WorkItemRequeuedV1 then apply_work_item_requeued(state, event)
         when Coordinator::Write::Events::WriteSetReservedV1 then apply_write_set_reserved(state, event)
         when Coordinator::Write::Events::WriteSetExpandedV1 then apply_write_set_expanded(state, event)
         when Coordinator::Write::Events::WriteSetRenewedV1 then apply_write_set_renewed(state, event)
@@ -146,6 +148,32 @@ module Coordinator::Read
         )
       end
 
+      def apply_work_item_requeued(state, event)
+        work_item = require_work_item(state, event.work_item_id, event.change_set_id)
+        return state if work_item.status == "completed"
+        return state if work_item.active_attempt_id && work_item.active_attempt_id != event.attempt_id
+        if work_item.active_agent_id && work_item.active_agent_id != event.agent_id
+          raise ProjectionStateError, "WorkItem #{event.work_item_id} active attribution changed"
+        end
+
+        replace(
+          state,
+          work_items: upsert(
+            state.work_items,
+            :work_item_id,
+            CoordContextStateV1::WorkItem.new(
+              work_item.attributes.merge(
+                status: "ready",
+                active_attempt_id: nil,
+                active_agent_id: nil,
+                made_ready_at: event.requeued_at,
+                acquired_at: nil
+              )
+            )
+          )
+        )
+      end
+
       def apply_attempt_authorized(state, event)
         require_work_item(state, event.work_item_id, event.change_set_id)
         attempt = CoordContextStateV1::Attempt.new(
@@ -160,10 +188,12 @@ module Coordinator::Read
           write_set: nil,
           selected_candidate_id: nil,
           selected_candidate_event: nil,
-          completed_at: nil
+          completed_at: nil,
+          abandonment_reason: nil,
+          abandoned_at: nil
         )
 
-        replace(state, attempts: upsert(state.attempts, :attempt_id, attempt))
+        replace(state, attempts: bounded_attempts(upsert(state.attempts, :attempt_id, attempt)))
       end
 
       def apply_attempt_started(state, event)
@@ -176,6 +206,32 @@ module Coordinator::Read
             :attempt_id,
             CoordContextStateV1::Attempt.new(
               attempt.attributes.merge(status: "started", started_at: event.started_at)
+            )
+          )
+        )
+      end
+
+      def apply_attempt_abandoned(state, event)
+        attempt = state.attempts.find { _1.attempt_id == event.attempt_id }
+        return state unless attempt
+        unless attempt.change_set_id == event.change_set_id && attempt.work_item_id == event.work_item_id
+          raise ProjectionStateError, "Attempt #{event.attempt_id} scope changed"
+        end
+        raise ProjectionStateError, "Attempt #{event.attempt_id} attribution changed" unless attempt.agent_id == event.agent_id
+        return state if attempt.status == "abandoned" && attempt.abandoned_at == event.abandoned_at
+        raise ProjectionStateError, "Completed Attempt #{event.attempt_id} cannot be abandoned" if attempt.status == "completed"
+
+        replace(
+          state,
+          attempts: upsert(
+            state.attempts,
+            :attempt_id,
+            CoordContextStateV1::Attempt.new(
+              attempt.attributes.merge(
+                status: "abandoned",
+                abandonment_reason: event.reason,
+                abandoned_at: event.abandoned_at
+              )
             )
           )
         )
@@ -468,6 +524,12 @@ module Coordinator::Read
         return collection + [ replacement ] unless existing_index
 
         collection.each_with_index.map { |value, index| index == existing_index ? replacement : value }
+      end
+
+      def bounded_attempts(attempts)
+        attempts.sort_by { [ _1.authorized_at, _1.attempt_id.b ] }
+                .last(CoordContextStateV1::RECENT_ATTEMPT_LIMIT)
+                .reverse
       end
     end
   end

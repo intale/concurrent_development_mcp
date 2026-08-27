@@ -51,6 +51,35 @@ module Coordinator
         def page: () -> AgentChoiceImpactPageV1
       end
 
+      class AttemptHistoryView < Shared::Value
+        def attempt_id: () -> String
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def agent_id: () -> String
+        def base_snapshots: () -> Array[Write::RepositorySnapshotV1]
+        def status: () -> String
+        def authorization_event: () -> Write::EventReference
+        def authorized_global_position: () -> Integer
+        def authorized_at: () -> String
+        def started_at: () -> String?
+        def selected_candidate_id: () -> String?
+        def selected_candidate_event: () -> Write::EventReference?
+        def abandonment_reason: () -> String?
+        def terminal_event: () -> Write::EventReference?
+        def terminal_at: () -> String?
+      end
+
+      class AttemptHistoryPage < Shared::Value
+        def work_item_id: () -> String
+        def items: () -> Array[AttemptHistoryView]
+        def next_authorized_global_position: () -> Integer?
+        def has_more: () -> bool
+      end
+
+      class AttemptHistoryPageData < Shared::Value
+        def page: () -> AttemptHistoryPage
+      end
+
       class CandidateData < Shared::Value
         def candidate: () -> CandidateViewV1
       end
@@ -115,7 +144,7 @@ module Coordinator
         def batch: () -> OperationBatchViewV1
       end
 
-      type data = EmptyData | DomainError | OperationData | ContextData | NotModifiedData | GuidanceData | InterpretationPageData | DecisionData | DecisionContextData | AgentChoiceData | AgentChoiceImpactPageData | CandidateData | CandidatePageData | CandidateImpactData | VerificationObligationPageData | MergeSnapshotData | ReleaseSetData | SkillData | RepositoryPageData | SkillPageData | SkillAssetData | DevelopmentArtifactData | DevelopmentArtifactContentData | DevelopmentArtifactPageData | DevelopmentArtifactRelationPageData | DevelopmentArtifactLocatorPageData | OperationBatchData
+      type data = EmptyData | DomainError | OperationData | ContextData | NotModifiedData | GuidanceData | InterpretationPageData | DecisionData | DecisionContextData | AgentChoiceData | AgentChoiceImpactPageData | AttemptHistoryPageData | CandidateData | CandidatePageData | CandidateImpactData | VerificationObligationPageData | MergeSnapshotData | ReleaseSetData | SkillData | RepositoryPageData | SkillPageData | SkillAssetData | DevelopmentArtifactData | DevelopmentArtifactContentData | DevelopmentArtifactPageData | DevelopmentArtifactRelationPageData | DevelopmentArtifactLocatorPageData | OperationBatchData
       type action = Write::NextAction | NextAction
 
       def status: () -> String

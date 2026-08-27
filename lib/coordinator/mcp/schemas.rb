@@ -1877,6 +1877,21 @@ module Coordinator
         )
       end
 
+      def attempt_list
+        object_schema(
+          properties: {
+            work_item_id: identifier,
+            after_authorized_global_position: {
+              anyOf: [ { type: "integer", minimum: 0 }, { type: "null" } ]
+            },
+            limit: {
+              anyOf: [ { type: "integer", minimum: 1, maximum: 100 }, { type: "null" } ]
+            }
+          },
+          required: %w[work_item_id]
+        )
+      end
+
       def guidance_get
         object_schema(
           properties: { message_id: identifier },

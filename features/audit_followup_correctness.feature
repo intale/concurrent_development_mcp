@@ -21,7 +21,7 @@ Feature: Audited coordination remains correct under replay, interruption, and co
 
   Rule: Coordination context converges after work is abandoned
 
-    @wip @AUD2-CONTEXT-ABANDON-01 @live-subscriptions
+    @AUD2-CONTEXT-ABANDON-01 @live-subscriptions
     Scenario: An abandoned Attempt requeues its WorkItem in available context
       Given agent "agent-a" owns an active Attempt for WorkItem "W-AUD2-ABANDON"
       When agent "agent-a" abandons that Attempt through public MCP
@@ -29,14 +29,14 @@ Feature: Audited coordination remains correct under replay, interruption, and co
       And the latest available WorkItem context eventually reports it ready
       And the abandoned Attempt remains attributed in its history
 
-    @wip @AUD2-CONTEXT-REACQUIRE-02 @live-subscriptions
+    @AUD2-CONTEXT-REACQUIRE-02 @live-subscriptions
     Scenario: A replacement agent resumes a requeued WorkItem from MCP context
       Given agent "agent-a" abandoned its active Attempt for WorkItem "W-AUD2-REACQUIRE"
       When independent agent "agent-b" reconstructs context and acquires the WorkItem
       Then agent "agent-b" receives a new authorized Attempt
       And the context identifies only that Attempt as active
 
-    @wip @AUD2-CONTEXT-ATTEMPT-WINDOW-03 @live-subscriptions
+    @AUD2-CONTEXT-ATTEMPT-WINDOW-03 @live-subscriptions
     Scenario: Lifetime Attempt churn cannot halt coordination projection
       Given WorkItem "W-AUD2-WINDOW" has more than 100 completed or abandoned Attempts
       When another agent acquires a fresh Attempt through public MCP

@@ -1,7 +1,7 @@
 module Coordinator
   module Read
     class NextAction < Shared::Value
-      type arguments = ChangeSetArguments | WorkItemArguments | AttemptArguments | WorkItemCompletionArguments | DevelopmentArtifactLocatorArguments
+      type arguments = ChangeSetArguments | WorkItemArguments | AttemptArguments | WorkItemCompletionArguments | AttemptHistoryArguments | DevelopmentArtifactLocatorArguments
 
       class ChangeSetArguments < Shared::Value
         def change_set_id: () -> String
@@ -22,6 +22,12 @@ module Coordinator
         def work_item_id: () -> String
         def attempt_id: () -> String
         def candidate_id: () -> String
+      end
+
+      class AttemptHistoryArguments < Shared::Value
+        def work_item_id: () -> String
+        def after_authorized_global_position: () -> Integer
+        def limit: () -> Integer
       end
 
       class DevelopmentArtifactLocatorArguments < Shared::Value

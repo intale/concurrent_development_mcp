@@ -115,6 +115,72 @@ module Coordinator::Read
           ).to_h
         )
       end
+
+      class AttemptList < Dry::Operation
+        def initialize(
+          contract: Contracts::CoordContext::AttemptList.new,
+          contexts: Repositories::CoordContexts.new
+        )
+          @contract = contract
+          @contexts = contexts
+        end
+
+        def call(input)
+          validated = @contract.call(input)
+          return invalid_result(validated.errors.to_h) if validated.failure?
+
+          limit = validated[:limit] || 20
+          page = @contexts.attempt_page(
+            work_item_id: validated[:work_item_id],
+            after_authorized_global_position: validated[:after_authorized_global_position],
+            limit:
+          )
+          QueryResultV1.new(
+            status: "ok",
+            summary: "Latest available projected Attempt history.",
+            command_id: nil,
+            receipt: nil,
+            context_token: nil,
+            data: QueryResultV1::AttemptHistoryPageData.new(page:),
+            warnings: [ "Attempt history is an available projection and may lag authoritative facts." ],
+            next_actions: next_actions(page, limit:)
+          )
+        end
+
+        private
+
+        def next_actions(page, limit:)
+          return [] unless page.has_more
+
+          [
+            NextAction.new(
+              tool: "attempt_list",
+              arguments: NextAction::AttemptHistoryArguments.new(
+                work_item_id: page.work_item_id,
+                after_authorized_global_position: page.next_authorized_global_position,
+                limit:
+              )
+            )
+          ]
+        end
+
+        def invalid_result(details)
+          QueryResultV1.new(
+            status: "invalid",
+            summary: "attempt_list input is invalid.",
+            command_id: nil,
+            receipt: nil,
+            context_token: nil,
+            data: QueryResultV1::DomainError.new(
+              code: "invalid_input",
+              message: "attempt_list input is invalid",
+              details:
+            ),
+            warnings: [],
+            next_actions: []
+          )
+        end
+      end
     end
   end
 end

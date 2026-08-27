@@ -53,6 +53,37 @@ module Coordinator::Read
       attribute :page, AgentChoiceImpactPageV1
     end
 
+    class AttemptHistoryView < Value
+      attribute :attempt_id, Types::Identifier
+      attribute :change_set_id, Types::Identifier
+      attribute :work_item_id, Types::Identifier
+      attribute :agent_id, Types::Identifier
+      attribute :base_snapshots, Types::Array.of(Coordinator::Write::RepositorySnapshotV1).constrained(size: 1)
+      attribute :status, Types::String.enum("authorized", "started", "abandoned", "completed")
+      attribute :authorization_event, Coordinator::Write::EventReference
+      attribute :authorized_global_position, Types::Integer.constrained(gteq: 0)
+      attribute :authorized_at, Types::Timestamp
+      attribute :started_at, Types::Timestamp.optional
+      attribute :selected_candidate_id, Types::Identifier.optional
+      attribute :selected_candidate_event, Coordinator::Write::EventReference.optional
+      attribute :abandonment_reason, Types::String.optional
+      attribute :terminal_event, Coordinator::Write::EventReference.optional
+      attribute :terminal_at, Types::Timestamp.optional
+    end
+
+    class AttemptHistoryPage < Value
+      Item = AttemptHistoryView
+
+      attribute :work_item_id, Types::Identifier
+      attribute :items, Types::Array.of(Item).constrained(max_size: 100)
+      attribute :next_authorized_global_position, Types::Integer.constrained(gteq: 0).optional
+      attribute :has_more, Types::Strict::Bool
+    end
+
+    class AttemptHistoryPageData < Value
+      attribute :page, AttemptHistoryPage
+    end
+
     class CandidateData < Value
       attribute :candidate, CandidateViewV1
     end
@@ -128,6 +159,7 @@ module Coordinator::Read
            DecisionContextData |
            AgentChoiceData |
            AgentChoiceImpactPageData |
+           AttemptHistoryPageData |
            CandidateData |
            CandidatePageData |
            CandidateImpactData |

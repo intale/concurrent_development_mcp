@@ -66,7 +66,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         "agent-choices-v1",
         "candidates-v1",
         "command-receipts-v1",
-        "coord-context-v1",
+        "coord-context-v2",
         "decision-governance-v1",
         "decision-interpretations-v1",
         "user-utterances-v1",
@@ -75,7 +75,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
     )
     expect(context_registration.definition.identity.to_h).to eq(
       set_name: "coordinator-read-models-v1",
-      subscription_name: "coord-context-v1"
+      subscription_name: "coord-context-v2"
     )
     expect(context_registration.definition.event_types).to include(
       "WorkItemCandidateSelected",
@@ -190,7 +190,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         command_id: "cmd-subscription-obligation-evidence"
       )
 
-      wait_for(subscription_set, "coord-context-v1", minimum: 2)
+      wait_for(subscription_set, "coord-context-v2", minimum: 2)
       wait_for(subscription_set, "command-receipts-v1", minimum: 5)
       wait_for(subscription_set, "user-utterances-v1", minimum: 1)
       wait_for(subscription_set, "decision-interpretations-v1", minimum: 2)

@@ -40,6 +40,7 @@ module Coordinator
       def self.development_artifact_list: () -> json_schema
       def self.agent_choice_get: () -> json_schema
       def self.agent_choice_impact_list: () -> json_schema
+      def self.attempt_list: () -> json_schema
       def self.candidate_get: () -> json_schema
       def self.candidate_list: () -> json_schema
       def self.candidate_impact_get: () -> json_schema

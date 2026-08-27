@@ -9,6 +9,7 @@ module Coordinator
           ?schema_registry: Write::EventSchemaRegistry,
           ?reducer: Projections::CoordContextReducer,
           ?scope_roots_builder: ProjectionScopeRootsBuilder,
+          ?contexts: Repositories::CoordContexts,
           ?processed_events: Repositories::ProcessedProjectionEvents
         ) -> void
         def call: (PgEventstore::Event event) -> void

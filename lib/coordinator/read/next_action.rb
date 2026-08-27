@@ -24,6 +24,12 @@ module Coordinator::Read
       attribute :candidate_id, Types::Identifier
     end
 
+    class AttemptHistoryArguments < Value
+      attribute :work_item_id, Types::Identifier
+      attribute :after_authorized_global_position, Types::Integer.constrained(gteq: 0)
+      attribute :limit, Types::Integer.constrained(gteq: 1, lteq: 100)
+    end
+
     class DevelopmentArtifactLocatorArguments < Value
       attribute :scope, Types::DevelopmentArtifactScope
       attribute :source_kind, Types::DevelopmentArtifactSourceKind
@@ -41,6 +47,7 @@ module Coordinator::Read
                 WorkItemArguments |
                 AttemptArguments |
                 WorkItemCompletionArguments |
+                AttemptHistoryArguments |
                 DevelopmentArtifactLocatorArguments
 
     attribute :tool, Types::Identifier

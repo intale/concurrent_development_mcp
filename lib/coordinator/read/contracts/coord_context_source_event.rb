@@ -16,6 +16,7 @@ module Coordinator::Read
         "WorkItemAcquired" => [ "DevelopmentExecution", "WorkItem" ],
         "AttemptAuthorized" => [ "DevelopmentExecution", "Attempt" ],
         "AttemptStarted" => [ "DevelopmentExecution", "Attempt" ],
+        "AttemptAbandoned" => [ "DevelopmentExecution", "Attempt" ],
         "WriteSetReserved" => [ "DevelopmentExecution", "Attempt" ],
         "WriteSetExpanded" => [ "DevelopmentExecution", "Attempt" ],
         "WriteSetRenewed" => [ "DevelopmentExecution", "Attempt" ],
@@ -23,6 +24,7 @@ module Coordinator::Read
         "CandidateAttachedToAttempt" => [ "DevelopmentExecution", "Attempt" ],
         "WorkItemCandidateSelected" => [ "DevelopmentExecution", "WorkItem" ],
         "WorkItemCompleted" => [ "DevelopmentExecution", "WorkItem" ],
+        "WorkItemRequeued" => [ "DevelopmentExecution", "WorkItem" ],
         "AttemptCompleted" => [ "DevelopmentExecution", "Attempt" ]
       }.freeze
 

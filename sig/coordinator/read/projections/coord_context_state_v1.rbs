@@ -2,6 +2,7 @@ module Coordinator
   module Read
     module Projections
       class CoordContextStateV1 < Shared::Value
+        RECENT_ATTEMPT_LIMIT: Integer
         HISTORICAL_RESOURCE_KEY_POLICY_VERSIONS: Array[String]
 
         class ChangeSet < Shared::Value
@@ -81,6 +82,8 @@ module Coordinator
           def selected_candidate_id: () -> String?
           def selected_candidate_event: () -> Write::EventReference?
           def completed_at: () -> String?
+          def abandonment_reason: () -> String?
+          def abandoned_at: () -> String?
         end
 
         class CandidateCheckpoint < Shared::Value

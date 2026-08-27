@@ -3,19 +3,21 @@
 module Coordinator::Read
   module Projectors
     class CoordContextV1
-      PROJECTION = ProjectionDefinition.new(name: "coord_context", version: 1)
+      PROJECTION = ProjectionDefinition.new(name: "coord_context", version: 2)
 
       def initialize(
         contract: Contracts::CoordContextSourceEvent.new,
         schema_registry: Coordinator::Write::EventSchemaRegistry.new,
         reducer: Projections::CoordContextReducer.new,
         scope_roots_builder: ProjectionScopeRootsBuilder.new,
+        contexts: Repositories::CoordContexts.new,
         processed_events: Repositories::ProcessedProjectionEvents.new
       )
         @contract = contract
         @schema_registry = schema_registry
         @reducer = reducer
         @scope_roots_builder = scope_roots_builder
+        @contexts = contexts
         @processed_events = processed_events
       end
 
@@ -33,8 +35,9 @@ module Coordinator::Read
           )
 
           record = locked_record(payload.change_set_id, processed_at:)
-          state = load_state(record)
-          positions = update_source_positions(record, identity.barrier)
+          rebuild = record.persisted? && record.projection_version != PROJECTION.version
+          state = rebuild ? Projections::CoordContextStateV1.initial : load_state(record)
+          positions = rebuild ? [ identity.barrier ] : update_source_positions(record, identity.barrier)
           updated = @reducer.apply(state, payload)
 
           record.assign_attributes(
@@ -44,6 +47,7 @@ module Coordinator::Read
             last_processed_at: processed_at
           )
           record.save!
+          @contexts.store_attempt_event(event:, payload:)
           persist_scope_roots(@scope_roots_builder.call(payload))
         end
 
@@ -53,10 +57,23 @@ module Coordinator::Read
       private
 
       def verify_stream_identity!(event, payload)
-        return unless payload.is_a?(Coordinator::Write::Events::CandidateAttachedToAttemptV1)
-        return if event.stream.stream_id == payload.attempt_id
+        expected_attempt_id =
+          case payload
+          when Coordinator::Write::Events::AttemptAuthorizedV1,
+               Coordinator::Write::Events::AttemptStartedV1,
+               Coordinator::Write::Events::AttemptAbandonedV1,
+               Coordinator::Write::Events::WriteSetReservedV1,
+               Coordinator::Write::Events::WriteSetExpandedV1,
+               Coordinator::Write::Events::WriteSetRenewedV1,
+               Coordinator::Write::Events::WriteSetReleasedV1,
+               Coordinator::Write::Events::CandidateAttachedToAttemptV1,
+               Coordinator::Write::Events::AttemptCompletedV1
+            payload.attempt_id
+          end
+        return unless expected_attempt_id
+        return if event.stream.stream_id == expected_attempt_id
 
-        raise InvalidProjectionSource, "Candidate checkpoint Attempt does not match its source stream"
+        raise InvalidProjectionSource, "Attempt identity does not match its source stream"
       end
 
       def load_payload(event)

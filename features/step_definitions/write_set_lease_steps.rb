@@ -792,7 +792,10 @@ Then("the predecessor's older context remains available without a freshness clai
   )
   previous_payload = @expiry_predecessor_context.dig("result", "structuredContent")
   payload = current.dig("result", "structuredContent")
-  write_set = payload.dig("data", "context", "attempts", 0, "write_set")
+  predecessor = payload.dig("data", "context", "attempts").find do |attempt|
+    attempt.fetch("attempt_id") == @expiry_predecessor.fetch(:attempt_id)
+  end
+  write_set = predecessor&.fetch("write_set")
 
   assert_acceptance_equal("ok", payload.fetch("status"), "Elapsed predecessor context status")
   assert_acceptance_equal(previous_payload.fetch("context_token"), payload.fetch("context_token"), "Context token")

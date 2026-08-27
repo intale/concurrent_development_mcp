@@ -33,6 +33,28 @@ module Coordinator::Read
 
         key.failure("must be a sha256 digest")
       end
+
+      class AttemptList < Dry::Validation::Contract
+        config.validate_keys = true
+
+        params do
+          required(:work_item_id).filled(:string)
+          optional(:after_authorized_global_position).maybe(:integer)
+          optional(:limit).maybe(:integer)
+        end
+
+        rule(:work_item_id) do
+          key.failure("must be a valid identifier") unless Types::IDENTIFIER_PATTERN.match?(value)
+        end
+
+        rule(:after_authorized_global_position) do
+          key.failure("must be non-negative") if value && value.negative?
+        end
+
+        rule(:limit) do
+          key.failure("must be between 1 and 100") if value && !(1..100).cover?(value)
+        end
+      end
     end
   end
 end
