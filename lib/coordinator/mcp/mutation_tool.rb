@@ -11,6 +11,10 @@ module Coordinator
       )
 
       class << self
+        def to_h
+          super.merge(outputSchema: MutationResultSchemas.for(tool_name))
+        end
+
         def inherited(subclass)
           super
           subclass.annotations(

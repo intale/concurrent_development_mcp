@@ -92,83 +92,18 @@ module Coordinator::Write
         @publish_skill_revision = publish_skill_revision
         @capture_development_artifact = capture_development_artifact
         @declare_development_artifact_relation = declare_development_artifact_relation
-        @operation_batch_command = operation_batch_command
+        @create_operation_batch = operation_batch_command
+        @cancel_operation_batch = operation_batch_command
       end
 
       def call(command, caused_by:)
-        case command
-        when Commands::RegisterRepository
-          @register_repository.call_command(command, caused_by:)
-        when Commands::CreateChangeSet
-          @create_change_set.call_command(command, caused_by:)
-        when Commands::CreateWorkItem
-          @create_work_item.call_command(command, caused_by:)
-        when Commands::DeclareWorkItemDependency
-          @declare_work_item_dependency.call_command(command, caused_by:)
-        when Commands::ActivateChangeSet
-          @activate_change_set.call_command(command, caused_by:)
-        when Commands::AcquireWorkItem
-          @acquire_work_item.call_command(command, caused_by:)
-        when Commands::CompleteWorkItem
-          @complete_work_item.call_command(command, caused_by:)
-        when Commands::AbandonAttempt
-          @abandon_attempt.call_command(command, caused_by:)
-        when Commands::ReserveWriteSet
-          @reserve_write_set.call_command(command, caused_by:)
-        when Commands::ExpandWriteSet
-          @expand_write_set.call_command(command, caused_by:)
-        when Commands::RenewLeaseSet
-          @renew_lease_set.call_command(command, caused_by:)
-        when Commands::ReleaseLeaseSet
-          @release_lease_set.call_command(command, caused_by:)
-        when Commands::RecordGuidance
-          @record_guidance.call_command(command, caused_by:)
-        when Commands::ProposeDecisionInterpretation
-          @propose_decision_interpretation.call_command(command, caused_by:)
-        when Commands::AdjudicateDecisionInterpretation
-          @adjudicate_decision_interpretation.call_command(command, caused_by:)
-        when Commands::ActivateDecision
-          @activate_decision.call_command(command, caused_by:)
-        when Commands::CorrectDecision
-          @correct_decision.call_command(command, caused_by:)
-        when Commands::RecordAgentChoice
-          @record_agent_choice.call_command(command, caused_by:)
-        when Commands::SubmitCandidate
-          @submit_candidate.call_command(command, caused_by:)
-        when Commands::SubmitCandidateImpactSurface
-          @submit_candidate_impact_surface.call_command(command, caused_by:)
-        when Commands::ClaimVerificationObligation
-          @claim_verification_obligation.call_command(command, caused_by:)
-        when Commands::SubmitCompatibilityAssessment
-          @submit_compatibility_assessment.call_command(command, caused_by:)
-        when Commands::WaiveVerificationObligation
-          @waive_verification_obligation.call_command(command, caused_by:)
-        when Commands::RegisterMergeSnapshot
-          @register_merge_snapshot.call_command(command, caused_by:)
-        when Commands::SubmitMergeSnapshotVerification
-          @submit_merge_snapshot_verification.call_command(command, caused_by:)
-        when Commands::RequestMergeAuthorization
-          @request_merge_authorization.call_command(command, caused_by:)
-        when Commands::RecordMergeObservation
-          @record_merge_observation.call_command(command, caused_by:)
-        when Commands::PrepareReleaseSet
-          @prepare_release_set.call_command(command, caused_by:)
-        when Commands::RecordRepositoryIntegration
-          @record_repository_integration.call_command(command, caused_by:)
-        when Commands::RecordReleaseSetVerification
-          @record_release_set_verification.call_command(command, caused_by:)
-        when Commands::RecordReleaseSetActivation
-          @record_release_set_activation.call_command(command, caused_by:)
-        when Commands::CompleteCompensatedReleaseSet
-          @complete_compensated_release_set.call_command(command, caused_by:)
-        when Commands::PublishSkillRevision
-          @publish_skill_revision.call_command(command, caused_by:)
-        when Commands::CaptureDevelopmentArtifact
-          @capture_development_artifact.call_command(command, caused_by:)
-        when Commands::DeclareDevelopmentArtifactRelation
-          @declare_development_artifact_relation.call_command(command, caused_by:)
-        when Commands::CreateOperationBatch, Commands::CancelOperationBatch
-          @operation_batch_command.call_command(command, caused_by:)
+        contract = TargetContractRegistry.fetch_by_command_class(command.class)
+        contract.command_type[command]
+        handler = instance_variable_get(contract.executor_variable)
+        result = handler.call_command(command, caused_by:)
+        result.fmap do |completion|
+          contract.receipt_type[completion.data]
+          completion
         end
       end
     end

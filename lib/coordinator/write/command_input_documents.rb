@@ -864,43 +864,46 @@ module Coordinator::Write
       attribute :input, CompleteChangeSetInputV1
     end
 
-    Type = RegisterRepositoryV1 |
-           CreateChangeSetV1 |
-           CreateWorkItemV1 |
-           DeclareWorkItemDependencyV1 |
-           ActivateChangeSetV1 |
-           AcquireWorkItemV1 |
-           CompleteWorkItemV1 |
-           AbandonAttemptV1 |
-           ReserveWriteSetV1 |
-           ExpandWriteSetV1 |
-           RenewLeaseSetV1 |
-           ReleaseLeaseSetV1 |
-           RecordGuidanceV1 |
-           ProposeDecisionInterpretationV1 |
-           AdjudicateDecisionInterpretationV1 |
-           ActivateDecisionV1 |
-           CorrectDecisionV1 |
-           RecordAgentChoiceV1 |
-           SubmitCandidateV1 |
-           SubmitCandidateImpactSurfaceV1 |
-           ClaimVerificationObligationV1 |
-           SubmitCompatibilityAssessmentV1 |
-           WaiveVerificationObligationV1 |
-           RegisterMergeSnapshotV1 |
-           SubmitMergeSnapshotVerificationV1 |
-           RequestMergeAuthorizationV1 |
-           RecordMergeObservationV1 |
-           PrepareReleaseSetV1 |
-           RecordRepositoryIntegrationV1 |
-           RecordReleaseSetVerificationV1 |
-           RecordReleaseSetActivationV1 |
-           CompleteCompensatedReleaseSetV1 |
-           PublishSkillRevisionV1 |
-           CaptureDevelopmentArtifactV1 |
-           DeclareDevelopmentArtifactRelationV1 |
-           CreateOperationBatchV1 |
-           CancelOperationBatchV1
+    TARGET_TYPES = [
+      RegisterRepositoryV1,
+      CreateChangeSetV1,
+      CreateWorkItemV1,
+      DeclareWorkItemDependencyV1,
+      ActivateChangeSetV1,
+      AcquireWorkItemV1,
+      CompleteWorkItemV1,
+      AbandonAttemptV1,
+      ReserveWriteSetV1,
+      ExpandWriteSetV1,
+      RenewLeaseSetV1,
+      ReleaseLeaseSetV1,
+      RecordGuidanceV1,
+      ProposeDecisionInterpretationV1,
+      AdjudicateDecisionInterpretationV1,
+      ActivateDecisionV1,
+      CorrectDecisionV1,
+      RecordAgentChoiceV1,
+      SubmitCandidateV1,
+      SubmitCandidateImpactSurfaceV1,
+      ClaimVerificationObligationV1,
+      SubmitCompatibilityAssessmentV1,
+      WaiveVerificationObligationV1,
+      RegisterMergeSnapshotV1,
+      SubmitMergeSnapshotVerificationV1,
+      RequestMergeAuthorizationV1,
+      RecordMergeObservationV1,
+      PrepareReleaseSetV1,
+      RecordRepositoryIntegrationV1,
+      RecordReleaseSetVerificationV1,
+      RecordReleaseSetActivationV1,
+      CompleteCompensatedReleaseSetV1,
+      PublishSkillRevisionV1,
+      CaptureDevelopmentArtifactV1,
+      DeclareDevelopmentArtifactRelationV1,
+      CreateOperationBatchV1,
+      CancelOperationBatchV1
+    ].freeze
+    Type = TARGET_TYPES.reduce { _1 | _2 }
 
     DigestType = Type |
                  ExpireResourceLeaseV1 |

@@ -16,7 +16,11 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
       }
     )
 
-    result = mapper.call(Failure(error), command_id: "cmd-task-result-limit")
+    result = mapper.call(
+      Failure(error),
+      command_id: "cmd-task-result-limit",
+      tool_name: "development_artifact_relation_declare"
+    )
 
     expect(result.structured_content.status).to eq("limit_reached")
     expect(result.is_error).to be(true)
@@ -688,7 +692,11 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         details:
       )
 
-      result = mapper.call(Failure(error), command_id: "cmd-task-result")
+      result = mapper.call(
+        Failure(error),
+        command_id: "cmd-task-result",
+        tool_name: "candidate_submit"
+      )
 
       expect(result.is_error).to be(true)
       expect(result.structured_content.status).to eq(status)
@@ -740,7 +748,8 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
             details: common_details
           )
         ),
-        command_id: "cmd-task-completion-#{code}"
+        command_id: "cmd-task-completion-#{code}",
+        tool_name: "work_item_complete"
       )
 
       expect(result.structured_content.data).to be_a(
@@ -760,7 +769,8 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
           )
         )
       ),
-      command_id: "cmd-task-completion-active-write-set"
+      command_id: "cmd-task-completion-active-write-set",
+      tool_name: "work_item_complete"
     )
 
     expect(active.structured_content).to have_attributes(status: "conflict")
@@ -768,6 +778,95 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
       Coordinator::Write::Tasks::DomainErrorV1::WorkItemCompletionActiveWriteSetError
     )
     expect(active.is_error).to be(true)
+  end
+
+  it "maps every Batch, merge-observation, and ReleaseSet denial into a terminal strict error" do
+    reference = event_reference(
+      event_id: "0198e03a-d112-7000-8000-000000000099",
+      type: "ReleaseSetPrepared",
+      stream_context: "DevelopmentIntegration",
+      stream_name: "ReleaseSet",
+      stream_id: "RS-task-result",
+      stream_revision: 0
+    )
+    families = [
+      [ Coordinator::Write::Tasks::DomainErrorV1::OperationBatchError,
+        { batch_id: "0198e03a-d112-7000-8000-000000000100" } ],
+      [ Coordinator::Write::Tasks::DomainErrorV1::OperationBatchItemError,
+        { batch_id: "0198e03a-d112-7000-8000-000000000100", index: 0 } ],
+      [ Coordinator::Write::Tasks::DomainErrorV1::MergeObservationExistingError,
+        { existing_event: reference } ],
+      [ Coordinator::Write::Tasks::DomainErrorV1::MergeObservationStateError, {} ],
+      [ Coordinator::Write::Tasks::DomainErrorV1::MergeAuthorizationStaleError,
+        { reasons: [] } ],
+      [ Coordinator::Write::Tasks::DomainErrorV1::MergeObservationMismatchError,
+        {
+          merge_snapshot_id: "MS-task-result",
+          expected_repository_id: nil,
+          expected_target_branch: nil,
+          expected_object_format: nil,
+          expected_before_commit_oid: nil,
+          expected_after_commit_oid: nil
+        } ],
+      [ Coordinator::Write::Tasks::DomainErrorV1::ReleaseSetExistingError,
+        { existing_event: reference } ],
+      [ Coordinator::Write::Tasks::DomainErrorV1::ReleaseSetError, {} ]
+    ]
+
+    families.each do |error_class, details|
+      error_class.schema.key(:code).type.values.each do |code|
+        result = mapper.call(
+          Failure(
+            Coordinator::Write::OutcomeError.new(
+              code: code.to_sym,
+              message: "The target command was denied",
+              details:
+            )
+          ),
+          command_id: "cmd-task-result-#{code}",
+          tool_name: "release_verification_record"
+        )
+
+        expect(result).to have_attributes(is_error: true)
+        expect(result.structured_content.status).to eq(
+          described_class::STATUS_BY_CODE.fetch(code.to_sym)
+        )
+        expect(result.structured_content.data).to be_a(error_class)
+      end
+    end
+  end
+
+  it "defines a status for every strict domain error code" do
+    expect(described_class::STATUS_BY_CODE.keys).to match_array(
+      Coordinator::Write::Tasks::DomainErrorV1::ERROR_CODES
+    )
+  end
+
+  it "rejects a success receipt that belongs to another originating tool" do
+    completion = Coordinator::Write::Events::CommandCompletedV1.new(
+      command_id: "cmd-cross-tool-receipt",
+      tool_name: "change_set_create",
+      canonical_input_digest: "sha256:#{'a' * 64}",
+      status: "ok",
+      summary: "Wrong receipt",
+      receipt: "cmd-cross-tool-receipt",
+      data: Coordinator::Write::CommandReceiptData::WorkItem.new(
+        change_set_id: "CS-cross-tool",
+        work_item_id: "W-cross-tool"
+      ),
+      warnings: [],
+      next_actions: [],
+      emitted_events: [],
+      completed_at: "2026-08-27T14:00:00.000000Z"
+    )
+
+    expect do
+      mapper.call(
+        Success(completion),
+        command_id: completion.command_id,
+        tool_name: "change_set_create"
+      )
+    end.to raise_error(Dry::Types::ConstraintError)
   end
 
   def event_reference(event_id:, type:, stream_context:, stream_name:, stream_id:, stream_revision:)

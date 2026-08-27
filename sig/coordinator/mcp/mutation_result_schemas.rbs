@@ -1,0 +1,9 @@
+module Coordinator
+  module Mcp
+    module MutationResultSchemas
+      def self.for: (String tool_name) -> Hash[Symbol, untyped]
+      def self.receipt: (Class receipt_class) -> Hash[Symbol, untyped]
+      def self.domain_error: () -> Hash[Symbol, untyped]
+    end
+  end
+end

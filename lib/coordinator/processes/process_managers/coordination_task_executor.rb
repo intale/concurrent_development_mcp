@@ -52,7 +52,11 @@ module Coordinator::Processes
           task_id: source.payload.task_id,
           tool_name: source.payload.tool_name
         )
-        outcome, parent_event = execute_target(command, started_event:)
+        outcome, parent_event = execute_target(
+          command,
+          started_event:,
+          tool_name: source.payload.tool_name
+        )
         transition_value!(
           @record_outcome.call(
             task_id: source.payload.task_id,
@@ -77,14 +81,18 @@ module Coordinator::Processes
               "Task #{task_id} is nonterminal without a persisted execution-started event"
       end
 
-      def execute_target(command, started_event:)
+      def execute_target(command, started_event:, tool_name:)
         resolution = resolve_target(command, started_event:)
         if resolution.failure?
           return [ Coordinator::Write::Tasks::OutcomeV1::Failed.new(error: resolution.failure), started_event ]
         end
 
         result, completion = resolution.value!
-        tool_result = @tool_result_mapper.call(result, command_id: command.command_id)
+        tool_result = @tool_result_mapper.call(
+          result,
+          command_id: command.command_id,
+          tool_name:
+        )
         parent_event = outcome_parent_event(result, completion:, started_event:)
 
         [ Coordinator::Write::Tasks::OutcomeV1::Completed.new(result: tool_result), parent_event ]

@@ -4,94 +4,26 @@ module Coordinator::Write
   module Tasks
     class TargetCommandBuilder
       def call(document)
-        case document
-        when CommandInputDocuments::RegisterRepositoryV1
-          input = document.input
-          Commands::RegisterRepository.new(
-            command_id: document.command_id,
-            actor: build_actor(input.actor),
-            repository_id: input.repository_id,
-            scope: input.scope,
-            display_name: input.display_name,
-            paths: input.paths,
-            remotes: input.remotes
-          )
-        when CommandInputDocuments::CreateChangeSetV1
-          build_create_change_set(document)
-        when CommandInputDocuments::CreateWorkItemV1
-          build_create_work_item(document)
-        when CommandInputDocuments::DeclareWorkItemDependencyV1
-          build_declare_work_item_dependency(document)
-        when CommandInputDocuments::ActivateChangeSetV1
-          build_activate_change_set(document)
-        when CommandInputDocuments::AcquireWorkItemV1
-          build_acquire_work_item(document)
-        when CommandInputDocuments::CompleteWorkItemV1
-          build_complete_work_item(document)
-        when CommandInputDocuments::AbandonAttemptV1
-          build_abandon_attempt(document)
-        when CommandInputDocuments::ReserveWriteSetV1
-          build_reserve_write_set(document)
-        when CommandInputDocuments::ExpandWriteSetV1
-          build_expand_write_set(document)
-        when CommandInputDocuments::RenewLeaseSetV1
-          build_renew_lease_set(document)
-        when CommandInputDocuments::ReleaseLeaseSetV1
-          build_release_lease_set(document)
-        when CommandInputDocuments::RecordGuidanceV1
-          build_record_guidance(document)
-        when CommandInputDocuments::ProposeDecisionInterpretationV1
-          build_propose_decision_interpretation(document)
-        when CommandInputDocuments::AdjudicateDecisionInterpretationV1
-          build_adjudicate_decision_interpretation(document)
-        when CommandInputDocuments::ActivateDecisionV1
-          build_activate_decision(document)
-        when CommandInputDocuments::CorrectDecisionV1
-          build_correct_decision(document)
-        when CommandInputDocuments::RecordAgentChoiceV1
-          build_record_agent_choice(document)
-        when CommandInputDocuments::SubmitCandidateV1
-          build_submit_candidate(document)
-        when CommandInputDocuments::SubmitCandidateImpactSurfaceV1
-          build_submit_candidate_impact_surface(document)
-        when CommandInputDocuments::ClaimVerificationObligationV1
-          build_claim_verification_obligation(document)
-        when CommandInputDocuments::SubmitCompatibilityAssessmentV1
-          build_submit_compatibility_assessment(document)
-        when CommandInputDocuments::WaiveVerificationObligationV1
-          build_waive_verification_obligation(document)
-        when CommandInputDocuments::RegisterMergeSnapshotV1
-          build_register_merge_snapshot(document)
-        when CommandInputDocuments::SubmitMergeSnapshotVerificationV1
-          build_submit_merge_snapshot_verification(document)
-        when CommandInputDocuments::RequestMergeAuthorizationV1
-          build_request_merge_authorization(document)
-        when CommandInputDocuments::RecordMergeObservationV1
-          build_record_merge_observation(document)
-        when CommandInputDocuments::PrepareReleaseSetV1
-          build_prepare_release_set(document)
-        when CommandInputDocuments::RecordRepositoryIntegrationV1
-          build_record_repository_integration(document)
-        when CommandInputDocuments::RecordReleaseSetVerificationV1
-          build_record_release_set_verification(document)
-        when CommandInputDocuments::RecordReleaseSetActivationV1
-          build_record_release_set_activation(document)
-        when CommandInputDocuments::CompleteCompensatedReleaseSetV1
-          build_complete_compensated_release_set(document)
-        when CommandInputDocuments::PublishSkillRevisionV1
-          build_publish_skill_revision(document)
-        when CommandInputDocuments::CaptureDevelopmentArtifactV1
-          build_capture_development_artifact(document)
-        when CommandInputDocuments::DeclareDevelopmentArtifactRelationV1
-          build_declare_development_artifact_relation(document)
-        when CommandInputDocuments::CreateOperationBatchV1
-          build_create_operation_batch(document)
-        when CommandInputDocuments::CancelOperationBatchV1
-          build_cancel_operation_batch(document)
-        end
+        contract = TargetContractRegistry.fetch(document.tool_name)
+        contract.input_document_type[document]
+        command = send(contract.builder_method, document)
+        contract.command_type[command]
       end
 
       private
+
+      def build_register_repository(document)
+        input = document.input
+        Commands::RegisterRepository.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          repository_id: input.repository_id,
+          scope: input.scope,
+          display_name: input.display_name,
+          paths: input.paths,
+          remotes: input.remotes
+        )
+      end
 
       def build_create_change_set(document)
         input = document.input

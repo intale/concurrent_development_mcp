@@ -89,7 +89,11 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
     expect(state.status).to eq("completed")
     expect(state.result.structured_content.to_h).to eq(
       Coordinator::Write::Tasks::ToolResultMapper.new
-        .call(Dry::Monads::Success(committed), command_id: command.command_id)
+        .call(
+          Dry::Monads::Success(committed),
+          command_id: command.command_id,
+          tool_name: "change_set_create"
+        )
         .structured_content
         .to_h
     )
@@ -153,6 +157,29 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
     expect([ submitted, started, completed ].map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
     )
+  end
+
+  it "keeps missing Batch and ReleaseSet denials terminal across redelivery" do
+    examples = [
+      [ cancel_operation_batch_command, "operation_batch_not_found" ],
+      [ record_release_set_verification_command, "release_set_not_found" ]
+    ]
+
+    examples.each do |command, code|
+      task_id, source = submit_task(command)
+
+      process_manager.call(source)
+      process_manager.call(source)
+
+      state = loader.call(task_id).state
+      expect(state).to have_attributes(status: "completed")
+      expect(state.result).to have_attributes(is_error: true)
+      expect(state.result.structured_content.data.code).to eq(code)
+      expect(task_events(task_id).map(&:type)).to eq(
+        %w[CoordinationTaskSubmitted CoordinationTaskExecutionStarted CoordinationTaskCompleted]
+      )
+      expect(command_events_for(command.command_id)).to be_empty
+    end
   end
 
   it "skips a target that was cancelled before its submission is delivered" do
@@ -229,6 +256,54 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
     )
   end
 
+  def cancel_operation_batch_command
+    Coordinator::Write::Commands::CancelOperationBatch.new(
+      command_id: "cmd-task-executor-missing-batch",
+      actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "agent-a"),
+      batch_id: "0198e03a-d112-7000-8000-000000000101"
+    )
+  end
+
+  def record_release_set_verification_command
+    Coordinator::Write::Operations::PrepareRecordReleaseSetVerification.new.call(
+      command_id: "cmd-task-executor-missing-release-set",
+      actor: { kind: "agent", id: "agent-a" },
+      release_set_id: "RS-task-executor-missing",
+      integration_events: [
+        event_reference(
+          event_id: "0198e03a-d112-7000-8000-000000000102",
+          stream_id: "RS-task-executor-missing",
+          stream_revision: 1
+        ),
+        event_reference(
+          event_id: "0198e03a-d112-7000-8000-000000000103",
+          stream_id: "RS-task-executor-missing",
+          stream_revision: 2
+        )
+      ],
+      evidence: {
+        outcome: "passed",
+        producer: { name: "coordinator-spec", version: "1" },
+        run_id: "run-task-executor-missing-release-set",
+        environment_digest: "sha256:#{'a' * 64}",
+        result_digest: "sha256:#{'b' * 64}",
+        findings: [],
+        produced_at: "2026-08-27T14:00:00.000000Z"
+      }
+    ).value!
+  end
+
+  def event_reference(event_id:, stream_id:, stream_revision:)
+    {
+      event_id:,
+      type: "RepositoryIntegrationRecorded",
+      stream_context: "DevelopmentIntegration",
+      stream_name: "ReleaseSet",
+      stream_id:,
+      stream_revision:
+    }
+  end
+
   def submit_task(command)
     task_id = submit.call(command).value!.task_id
     [ task_id, task_events(task_id).sole ]
@@ -255,6 +330,13 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
   def command_events
     event_store.read(
       streams.command("cmd-task-executor"),
+      Coordinator::Write::EventQueries::COMMAND_COMPLETION
+    )
+  end
+
+  def command_events_for(command_id)
+    event_store.read(
+      streams.command(command_id),
       Coordinator::Write::EventQueries::COMMAND_COMPLETION
     )
   end

@@ -1008,6 +1008,18 @@ module Coordinator::Write
         attribute :details, VerificationObligationTerminalDetails
       end
 
+      class VerificationObligationWaiverRequiresUserError < Value
+        attribute :code, Types::String.enum("verification_obligation_waiver_requires_user")
+        attribute :message, Types::String
+        attribute :details, VerificationObligationDetails
+      end
+
+      class VerificationObligationAlreadyWaivedError < Value
+        attribute :code, Types::String.enum("verification_obligation_already_waived")
+        attribute :message, Types::String
+        attribute :details, VerificationObligationTerminalDetails
+      end
+
       class MergeSnapshotExistingDetails < Value
         attribute :existing_event, EventReference
       end
@@ -1033,6 +1045,43 @@ module Coordinator::Write
       class MergeSnapshotVerificationLimitDetails < MergeSnapshotDetails
         attribute :maximum_count,
                   Types::Integer.enum(Types::MERGE_SNAPSHOT_VERIFICATION_MAXIMUM_COUNT)
+      end
+
+      class OperationBatchDetails < Value
+        attribute :batch_id, Types::OperationBatchId
+      end
+
+      class OperationBatchItemDetails < OperationBatchDetails
+        attribute :index, Types::OperationBatchItemIndex
+      end
+
+      class MergeObservationExistingDetails < Value
+        attribute :existing_event, EventReference
+      end
+
+      class MergeObservationMismatchDetails < Value
+        attribute :merge_snapshot_id, Types::Identifier
+        attribute :expected_repository_id, Types::RepositoryId.optional
+        attribute :expected_target_branch, Types::CandidateTargetBranch.optional
+        attribute :expected_object_format, Types::GitObjectFormat.optional
+        attribute :expected_before_commit_oid, Types::GitOid.optional
+        attribute :expected_after_commit_oid, Types::GitOid.optional
+      end
+
+      class MergeAuthorizationStaleDetails < Value
+        attribute :reasons, Types::Array.of(MergeAuthorizations::ReasonV1)
+      end
+
+      class MergeObservationStateDetails < Value
+        attribute? :merge_snapshot_id, Types::Identifier
+      end
+
+      class ReleaseSetDetails < Value
+        attribute? :release_set_id, Types::Identifier
+      end
+
+      class ReleaseSetExistingDetails < ReleaseSetDetails
+        attribute :existing_event, EventReference
       end
 
       class MergeSnapshotExistingError < Value
@@ -1084,7 +1133,102 @@ module Coordinator::Write
         attribute :details, MergeSnapshotVerificationLimitDetails
       end
 
-      Type = ChangeSetError |
+      class OperationBatchError < Value
+        attribute :code, Types::String.enum(
+          "operation_batch_id_conflict",
+          "operation_batch_not_found",
+          "operation_batch_terminal",
+          "operation_batch_cancellation_already_requested",
+          "operation_batch_cancellation_pending",
+          "operation_batch_ready_to_complete",
+          "operation_batch_continuation_invalid",
+          "operation_batch_items_pending",
+          "operation_batch_cancellation_not_requested"
+        )
+        attribute :message, Types::String
+        attribute :details, OperationBatchDetails
+      end
+
+      class OperationBatchItemError < Value
+        attribute :code, Types::String.enum(
+          "operation_batch_item_not_found",
+          "operation_batch_item_already_recorded"
+        )
+        attribute :message, Types::String
+        attribute :details, OperationBatchItemDetails
+      end
+
+      class MergeObservationExistingError < Value
+        attribute :code, Types::String.enum("merge_already_observed")
+        attribute :message, Types::String
+        attribute :details, MergeObservationExistingDetails
+      end
+
+      class MergeObservationStateError < Value
+        attribute :code, Types::String.enum(
+          "merge_authorization_not_found",
+          "merge_authorization_binding_stale"
+        )
+        attribute :message, Types::String
+        attribute :details, MergeObservationStateDetails
+      end
+
+      class MergeAuthorizationStaleError < Value
+        attribute :code, Types::String.enum("merge_authorization_stale")
+        attribute :message, Types::String
+        attribute :details, MergeAuthorizationStaleDetails
+      end
+
+      class MergeObservationMismatchError < Value
+        attribute :code, Types::String.enum("merge_observation_mismatch")
+        attribute :message, Types::String
+        attribute :details, MergeObservationMismatchDetails
+      end
+
+      class ReleaseSetExistingError < Value
+        attribute :code, Types::String.enum("release_set_id_already_used")
+        attribute :message, Types::String
+        attribute :details, ReleaseSetExistingDetails
+      end
+
+      class ReleaseSetError < Value
+        attribute :code, Types::String.enum(
+          "release_set_repositories_repeated",
+          "release_set_snapshots_repeated",
+          "release_set_change_sets_mixed",
+          "release_set_not_found",
+          "release_set_already_completed",
+          "release_set_compensation_requested",
+          "release_set_already_activated",
+          "release_member_not_found",
+          "release_integration_attempt_reused",
+          "release_member_already_integrated",
+          "release_integration_attempt_limit_reached",
+          "release_integration_out_of_order",
+          "release_integration_evidence_invalid",
+          "release_integration_observation_mismatch",
+          "release_set_integrations_incomplete",
+          "release_set_already_verified",
+          "release_verification_attempt_limit_reached",
+          "release_verification_integration_binding_stale",
+          "release_verification_evidence_invalid",
+          "release_set_not_verified",
+          "release_activation_verification_binding_stale",
+          "release_compensation_not_requested",
+          "release_compensation_request_binding_stale",
+          "release_compensation_evidence_mismatch",
+          "release_set_not_activated",
+          "release_activation_binding_stale",
+          "release_set_compensation_already_requested",
+          "release_compensation_trigger_not_found",
+          "release_compensation_not_required",
+          "release_compensation_trigger_invalid"
+        )
+        attribute :message, Types::String
+        attribute :details, ReleaseSetDetails
+      end
+
+      BaseType = ChangeSetError |
              ActivationDependencyError |
              WorkItemError |
              DependencyError |
@@ -1176,6 +1320,15 @@ module Coordinator::Write
              MergeSnapshotVerificationBindingStaleError |
              MergeSnapshotVerificationAlreadySubmittedError |
              MergeSnapshotVerificationLimitReachedError
+
+      ERROR_TYPES = constants(false).filter_map do |constant_name|
+        candidate = const_get(constant_name)
+        candidate if candidate.is_a?(Class) && candidate < Value && candidate.name.end_with?("Error")
+      end.sort_by(&:name).freeze
+      Type = ERROR_TYPES.reduce { _1 | _2 }
+      ERROR_CODES = ERROR_TYPES.flat_map do |error_type|
+        error_type.schema.key(:code).type.values
+      end.map(&:to_sym).uniq.sort.freeze
     end
   end
 end

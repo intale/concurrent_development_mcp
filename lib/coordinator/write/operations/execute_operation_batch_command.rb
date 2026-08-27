@@ -130,7 +130,13 @@ module Coordinator::Write
             OutcomeError.new(
               code: :command_id_reused,
               message: "Command ID is already bound to another tool or input",
-              details: { command_id: command.command_id }
+              details: {
+                command_id: command.command_id,
+                existing_tool_name: completion.tool_name,
+                existing_input_digest: completion.canonical_input_digest,
+                requested_tool_name: requested_tool,
+                requested_input_digest: input_digest
+              }
             )
           )
         end

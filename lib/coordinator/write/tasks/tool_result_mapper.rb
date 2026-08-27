@@ -3,7 +3,7 @@
 module Coordinator::Write
   module Tasks
     class ToolResultMapper
-      STATUS_BY_CODE = {
+      STATUS_BY_CODE = DomainErrorV1::ERROR_CODES.to_h { [ _1, "denied" ] }.merge(
         command_id_reused: "command_id_reused",
         repository_already_registered: "conflict",
         repository_identity_conflict: "conflict",
@@ -70,12 +70,40 @@ module Coordinator::Write
         merge_snapshot_verification_binding_stale: "stale_context",
         merge_snapshot_verification_already_submitted: "conflict",
         merge_snapshot_already_verified: "conflict",
-        merge_snapshot_verification_limit_reached: "conflict"
-      }.freeze
+        merge_snapshot_verification_limit_reached: "conflict",
+        merge_already_observed: "conflict",
+        merge_authorization_not_found: "not_found",
+        merge_authorization_binding_stale: "stale_context",
+        merge_authorization_stale: "stale_context",
+        merge_observation_mismatch: "conflict",
+        release_set_id_already_used: "conflict",
+        release_set_not_found: "not_found",
+        release_set_already_completed: "conflict",
+        release_set_compensation_requested: "conflict",
+        release_set_already_activated: "conflict",
+        release_member_not_found: "not_found",
+        release_integration_attempt_reused: "conflict",
+        release_member_already_integrated: "conflict",
+        release_integration_attempt_limit_reached: "limit_reached",
+        release_integration_out_of_order: "conflict",
+        release_set_integrations_incomplete: "conflict",
+        release_set_already_verified: "conflict",
+        release_verification_attempt_limit_reached: "limit_reached",
+        release_verification_integration_binding_stale: "stale_context",
+        release_set_not_verified: "conflict",
+        release_activation_verification_binding_stale: "stale_context",
+        release_compensation_not_requested: "conflict",
+        release_compensation_request_binding_stale: "stale_context",
+        release_set_not_activated: "conflict",
+        release_activation_binding_stale: "stale_context",
+        release_set_compensation_already_requested: "conflict",
+        release_compensation_trigger_not_found: "not_found"
+      ).freeze
 
-      def call(result, command_id:)
+      def call(result, command_id:, tool_name:)
+        contract = TargetContractRegistry.fetch(tool_name)
         structured_content = if result.success?
-                               success_content(result.value!)
+                               success_content(result.value!, contract:)
         else
                                failure_content(result.failure, command_id:)
         end
@@ -94,14 +122,15 @@ module Coordinator::Write
 
       private
 
-      def success_content(completion)
+      def success_content(completion, contract:)
+        data = contract.receipt_type[completion.data]
         StructuredContentV1.new(
           status: "ok",
           summary: completion.summary,
           command_id: completion.command_id,
           receipt: completion.receipt,
           context_token: nil,
-          data: completion.data,
+          data:,
           warnings: completion.warnings,
           next_actions: completion.next_actions
         )
@@ -117,7 +146,7 @@ module Coordinator::Write
         ]
 
         StructuredContentV1.new(
-          status: STATUS_BY_CODE.fetch(error.code, "denied"),
+          status: STATUS_BY_CODE.fetch(error.code),
           summary: error.message,
           command_id:,
           receipt: nil,

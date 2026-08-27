@@ -65,7 +65,11 @@ module Coordinator::Processes
       def execute_item(source:, item:)
         command = @target_builder.call(item.command_input)
         target_result = @target_executor.call(command, caused_by: source.event)
-        public_result = @result_mapper.call(target_result, command_id: command.command_id)
+        public_result = @result_mapper.call(
+          target_result,
+          command_id: command.command_id,
+          tool_name: item.command_input.tool_name
+        )
         completion = target_result.success? ? @completion_loader.call(command.command_id) : nil
         caused_by = completion&.event || source.event
         execute!(

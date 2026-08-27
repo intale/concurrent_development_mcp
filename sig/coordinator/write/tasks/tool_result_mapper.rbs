@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Tasks
       class ToolResultMapper
-        def call: (Dry::Monads::Result result, command_id: String) -> ToolResultV1
+        def call: (Dry::Monads::Result result, command_id: String, tool_name: String) -> ToolResultV1
       end
     end
   end

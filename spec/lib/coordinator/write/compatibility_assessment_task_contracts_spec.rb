@@ -115,7 +115,8 @@ RSpec.describe "compatibility assessment Task contracts" do
             details:
           )
         ),
-        command_id: "cmd-assessment"
+        command_id: "cmd-assessment",
+        tool_name: "compatibility_assessment_submit"
       )
 
       expect(result).to have_attributes(is_error: true)

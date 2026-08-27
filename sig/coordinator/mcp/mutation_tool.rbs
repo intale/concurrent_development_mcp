@@ -1,6 +1,7 @@
 module Coordinator
   module Mcp
     class MutationTool < Tool
+      def self.to_h: () -> Hash[Symbol, untyped]
       def self.operation: () -> String
                         | (String key) -> String
       def self.call: (?server_context: ::MCP::ServerContext?, **untyped arguments) -> Tasks::ResultV1::Created

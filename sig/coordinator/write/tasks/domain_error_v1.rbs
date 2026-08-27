@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Tasks
       module DomainErrorV1
-        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | WorkItemCompletionError | WorkItemCompletionActiveWriteSetError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | ResourceIdentityPolicyMismatchError | WriteSetLimitError | ResourceBoundaryHistoryLimitExceededError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError | InterpretationNotAcceptedError | DecisionAlreadyExistsError | InterpretationAlreadyActivatedError | DecisionDefinitionNotActivatableError | DecisionSlotOccupiedError | DecisionPartitionLimitReachedError | DecisionPartitionCapacityReachedError | DecisionPartitionStateInvalidError | DecisionNotFoundError | DecisionNotActiveError | InterpretationNotACorrectionError | DecisionDefinitionNotCorrectableError | DecisionRevisionChangedError | DecisionSlotStateInvalidError | AgentChoiceAlreadyExistsError | StaleDecisionContextError | DecisionContextMismatchError | DecisionContextConflictError | DecisionContextLimitReachedError | UnsupportedDecisionContextError | AgentChoiceBlockedByDecisionError | AgentChoiceConfirmationRequiredError | AgentChoicePartitionSnapshotInvalidError | AgentChoiceDecisionHeadInvalidError | AgentChoiceUnresolvedHeadsError | CandidateAlreadyExistsError | CandidateHeadAlreadyRegisteredError | CandidateLeaseObservationsMismatchError | CandidateLeaseNotActiveScopeError | CandidateLeaseNotActiveError | CandidateUnauthorizedResourcesError | CandidateManifestBaseMismatchError | CandidateNotFoundError | CandidateImpactIdentityMismatchError | CandidateImpactSourceEvidenceMismatchError | CandidateImpactSurfaceAlreadyRecordedError | RepositoryRegistrationError | RepositoryNotRegisteredError | SkillIdentityConflictError | SkillRevisionConflictError | DevelopmentArtifactIdentityConflictError | DevelopmentArtifactNotFoundError | DevelopmentArtifactTargetNotFoundError | DevelopmentArtifactRelationLimitReachedError | VerificationObligationNotFoundError | VerificationObligationAlreadyClaimedError | VerificationObligationPolicyStaleError | VerificationObligationUnclaimedError | VerificationObligationClaimStaleError | VerificationObligationClaimNotOwnedError | VerificationObligationClaimExpiredError | VerificationObligationBindingStaleError | VerificationEvidenceKindNotRequiredError | VerificationEvidenceAlreadySubmittedError | VerificationEvidenceLimitReachedError | VerificationObligationTerminalError | MergeSnapshotExistingError | MergeSnapshotCandidateError | MergeSnapshotStateError | MergeSnapshotVerificationBindingStaleError | MergeSnapshotVerificationAlreadySubmittedError | MergeSnapshotVerificationLimitReachedError
+        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | WorkItemCompletionError | WorkItemCompletionActiveWriteSetError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | ResourceIdentityPolicyMismatchError | WriteSetLimitError | ResourceBoundaryHistoryLimitExceededError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError | InterpretationNotAcceptedError | DecisionAlreadyExistsError | InterpretationAlreadyActivatedError | DecisionDefinitionNotActivatableError | DecisionSlotOccupiedError | DecisionPartitionLimitReachedError | DecisionPartitionCapacityReachedError | DecisionPartitionStateInvalidError | DecisionNotFoundError | DecisionNotActiveError | InterpretationNotACorrectionError | DecisionDefinitionNotCorrectableError | DecisionRevisionChangedError | DecisionSlotStateInvalidError | AgentChoiceAlreadyExistsError | StaleDecisionContextError | DecisionContextMismatchError | DecisionContextConflictError | DecisionContextLimitReachedError | UnsupportedDecisionContextError | AgentChoiceBlockedByDecisionError | AgentChoiceConfirmationRequiredError | AgentChoicePartitionSnapshotInvalidError | AgentChoiceDecisionHeadInvalidError | AgentChoiceUnresolvedHeadsError | CandidateAlreadyExistsError | CandidateHeadAlreadyRegisteredError | CandidateLeaseObservationsMismatchError | CandidateLeaseNotActiveScopeError | CandidateLeaseNotActiveError | CandidateUnauthorizedResourcesError | CandidateManifestBaseMismatchError | CandidateNotFoundError | CandidateImpactIdentityMismatchError | CandidateImpactSourceEvidenceMismatchError | CandidateImpactSurfaceAlreadyRecordedError | RepositoryRegistrationError | RepositoryNotRegisteredError | SkillIdentityConflictError | SkillRevisionConflictError | DevelopmentArtifactIdentityConflictError | DevelopmentArtifactNotFoundError | DevelopmentArtifactTargetNotFoundError | DevelopmentArtifactRelationLimitReachedError | VerificationObligationNotFoundError | VerificationObligationAlreadyClaimedError | VerificationObligationPolicyStaleError | VerificationObligationUnclaimedError | VerificationObligationClaimStaleError | VerificationObligationClaimNotOwnedError | VerificationObligationClaimExpiredError | VerificationObligationBindingStaleError | VerificationEvidenceKindNotRequiredError | VerificationEvidenceAlreadySubmittedError | VerificationEvidenceLimitReachedError | VerificationObligationTerminalError | VerificationObligationWaiverRequiresUserError | VerificationObligationAlreadyWaivedError | MergeSnapshotExistingError | MergeSnapshotCandidateError | MergeSnapshotStateError | MergeSnapshotVerificationBindingStaleError | MergeSnapshotVerificationAlreadySubmittedError | MergeSnapshotVerificationLimitReachedError | OperationBatchError | OperationBatchItemError | MergeObservationExistingError | MergeObservationStateError | MergeAuthorizationStaleError | MergeObservationMismatchError | ReleaseSetExistingError | ReleaseSetError
 
         class ChangeSetDetails < Shared::Value
           def change_set_id: () -> String
@@ -951,6 +951,18 @@ module Coordinator
           def details: () -> VerificationObligationTerminalDetails
         end
 
+        class VerificationObligationWaiverRequiresUserError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> VerificationObligationDetails
+        end
+
+        class VerificationObligationAlreadyWaivedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> VerificationObligationTerminalDetails
+        end
+
 
         class MergeSnapshotExistingDetails < Shared::Value
           def existing_event: () -> EventReference
@@ -976,6 +988,43 @@ module Coordinator
 
         class MergeSnapshotVerificationLimitDetails < MergeSnapshotDetails
           def maximum_count: () -> Integer
+        end
+
+        class OperationBatchDetails < Shared::Value
+          def batch_id: () -> String
+        end
+
+        class OperationBatchItemDetails < OperationBatchDetails
+          def index: () -> Integer
+        end
+
+        class MergeObservationExistingDetails < Shared::Value
+          def existing_event: () -> EventReference
+        end
+
+        class MergeObservationMismatchDetails < Shared::Value
+          def merge_snapshot_id: () -> String
+          def expected_repository_id: () -> String?
+          def expected_target_branch: () -> String?
+          def expected_object_format: () -> String?
+          def expected_before_commit_oid: () -> String?
+          def expected_after_commit_oid: () -> String?
+        end
+
+        class MergeAuthorizationStaleDetails < Shared::Value
+          def reasons: () -> Array[MergeAuthorizations::ReasonV1]
+        end
+
+        class MergeObservationStateDetails < Shared::Value
+          def merge_snapshot_id: () -> String?
+        end
+
+        class ReleaseSetDetails < Shared::Value
+          def release_set_id: () -> String?
+        end
+
+        class ReleaseSetExistingDetails < ReleaseSetDetails
+          def existing_event: () -> EventReference
         end
 
         class MergeSnapshotExistingError < Shared::Value
@@ -1012,6 +1061,54 @@ module Coordinator
           def code: () -> String
           def message: () -> String
           def details: () -> MergeSnapshotVerificationLimitDetails
+        end
+
+        class OperationBatchError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> OperationBatchDetails
+        end
+
+        class OperationBatchItemError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> OperationBatchItemDetails
+        end
+
+        class MergeObservationExistingError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> MergeObservationExistingDetails
+        end
+
+        class MergeObservationStateError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> MergeObservationStateDetails
+        end
+
+        class MergeAuthorizationStaleError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> MergeAuthorizationStaleDetails
+        end
+
+        class MergeObservationMismatchError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> MergeObservationMismatchDetails
+        end
+
+        class ReleaseSetExistingError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> ReleaseSetExistingDetails
+        end
+
+        class ReleaseSetError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> ReleaseSetDetails
         end
       end
     end

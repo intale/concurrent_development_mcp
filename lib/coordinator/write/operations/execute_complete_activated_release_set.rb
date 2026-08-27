@@ -101,7 +101,19 @@ module Coordinator::Write
         return unless completion
         return Success(completion) if completion.tool_name == TOOL_NAME && completion.canonical_input_digest == input_digest
 
-        Failure(OutcomeError.new(code: :command_id_reused, message: "Command ID is already bound to another tool or input", details: {}))
+        Failure(
+          OutcomeError.new(
+            code: :command_id_reused,
+            message: "Command ID is already bound to another tool or input",
+            details: {
+              command_id: command.command_id,
+              existing_tool_name: completion.tool_name,
+              existing_input_digest: completion.canonical_input_digest,
+              requested_tool_name: TOOL_NAME,
+              requested_input_digest: input_digest
+            }
+          )
+        )
       end
 
       def load_completion(command_id)

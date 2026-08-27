@@ -1,0 +1,32 @@
+module Coordinator
+  module Write
+    module Tasks
+      class TargetContractV1
+        ClassType: untyped
+
+        attr_reader tool_name: String
+        attr_reader input_document_class: Class
+        attr_reader command_class: Class
+        attr_reader receipt_class: Class
+
+        def input_document_type: () -> untyped
+        def command_type: () -> untyped
+        def receipt_type: () -> untyped
+        def builder_method: () -> Symbol
+        def executor_variable: () -> Symbol
+      end
+
+      module TargetContractRegistry
+        CONTRACTS: Array[TargetContractV1]
+        BY_TOOL_NAME: Hash[String, TargetContractV1]
+        BY_COMMAND_CLASS: Hash[Class, TargetContractV1]
+
+        def self.fetch: (String tool_name) -> TargetContractV1
+        def self.tool_names: () -> Array[String]
+        def self.fetch_by_command_class: (Class command_class) -> TargetContractV1
+        def self.input_document_classes: () -> Array[Class]
+        def self.command_classes: () -> Array[Class]
+      end
+    end
+  end
+end
