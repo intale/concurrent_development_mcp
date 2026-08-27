@@ -5,6 +5,8 @@ module Coordinator::Shared
     include Dry.Types()
 
     IDENTIFIER_PATTERN = /\A[A-Za-z0-9][A-Za-z0-9._:-]{0,199}\z/
+    PUBLIC_COMMAND_ID_PATTERN = /\A(?!internal:)[A-Za-z0-9][A-Za-z0-9._:-]{0,199}\z/
+    INTERNAL_COMMAND_ID_PATTERN = /\Ainternal:[A-Za-z0-9][A-Za-z0-9._:-]{0,190}\z/
     REPOSITORY_ID_PATTERN = /\A[a-z0-9][a-z0-9._-]{0,99}\z/
     GIT_OID_PATTERN = /\A(?:[0-9a-f]{40}|[0-9a-f]{64})\z/
     SHA256_DIGEST_PATTERN = /\Asha256:[0-9a-f]{64}\z/
@@ -525,6 +527,8 @@ module Coordinator::Shared
     ].freeze
 
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)
+    PublicCommandId = String.constrained(format: PUBLIC_COMMAND_ID_PATTERN)
+    InternalCommandId = String.constrained(format: INTERNAL_COMMAND_ID_PATTERN)
     RepositoryId = String.constrained(format: REPOSITORY_ID_PATTERN)
     GitOid = String.constrained(format: GIT_OID_PATTERN)
     GitObjectFormat = String.enum(*GIT_OBJECT_FORMATS)

@@ -46,7 +46,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpireResourceLease, :even
     )
     expect(expiration.markers.grep(/\Acompound:resource-identity:v1:sha256:/).length).to eq(1)
     expect(expiration.markers.grep(/\Acompound:scoped-repository:v1:sha256:/).length).to eq(1)
-    expect(command_events(source.id).map(&:type)).to eq([ "CommandCompleted" ])
+    expect(command_events(expiry_command_id(source)).map(&:type)).to eq([ "CommandCompleted" ])
   end
 
   it "returns a zero-fact early decision and can succeed when the same timer reaches its deadline" do
@@ -73,7 +73,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpireResourceLease, :even
     expect(early.failure.code).to eq(:lease_deadline_not_reached)
     expect(on_time).to be_success
     expect(lease_events("a.rb").map(&:type)).to eq([ "ResourceLeaseAcquired", "ResourceLeaseExpired" ])
-    expect(command_events(source.id).length).to eq(1)
+    expect(command_events(expiry_command_id(source)).length).to eq(1)
   end
 
   it "lets renewal supersede the old timer and expires only the renewed observation" do
@@ -108,8 +108,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpireResourceLease, :even
     expect(lease_events("a.rb").map(&:type)).to eq(
       [ "ResourceLeaseAcquired", "ResourceLeaseRenewed", "ResourceLeaseExpired" ]
     )
-    expect(command_events(acquisition.id)).to be_empty
-    expect(command_events(renewal.id).length).to eq(1)
+    expect(command_events(expiry_command_id(acquisition))).to be_empty
+    expect(command_events(expiry_command_id(renewal)).length).to eq(1)
   end
 
   it "cannot let an old timer expire a successor acquired after the elapsed deadline" do
@@ -148,7 +148,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpireResourceLease, :even
     events = lease_events("a.rb")
     expect(events.map(&:type)).to eq([ "ResourceLeaseAcquired", "ResourceLeaseAcquired" ])
     expect(events.map { _1.data.fetch("fencing_token") }).to eq([ 1, 2 ])
-    expect(command_events(source.id)).to be_empty
+    expect(command_events(expiry_command_id(source))).to be_empty
   end
 
   it "serializes duplicate timer execution into one fact and one completion" do
@@ -176,7 +176,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpireResourceLease, :even
     expect(results).to all(be_success)
     expect(results.map { _1.value!.to_h }.uniq.length).to eq(1)
     expect(lease_events("a.rb").count { _1.type == "ResourceLeaseExpired" }).to eq(1)
-    expect(command_events(source.id).length).to eq(1)
+    expect(command_events(expiry_command_id(source)).length).to eq(1)
   end
 
   private
@@ -184,7 +184,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpireResourceLease, :even
   def expiry_command(source)
     data = source.data
     Coordinator::Write::Commands::ExpireResourceLease.new(
-      command_id: source.id,
+      command_id: expiry_command_id(source),
       actor: Coordinator::Write::Commands::Actor.new(kind: "system", id: "lease-expiry-policy-v1"),
       resource_key_hash: data.fetch("resource_key_hash"),
       lease_id: data.fetch("lease_id"),
@@ -211,6 +211,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpireResourceLease, :even
       end,
       lease_duration_seconds: duration
     }
+  end
+
+  def expiry_command_id(event)
+    "#{Coordinator::Processes::LeaseExpiryCommandBuilder::COMMAND_ID_PREFIX}#{event.id}"
   end
 
   def reserve(command_id:, work_item_id:, attempt_id:, agent_id:, paths:, duration: 900)

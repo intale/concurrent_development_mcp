@@ -778,7 +778,9 @@ Then("the timer is superseded and cannot affect the successor") do
   )
   assert_acceptance_equal(
     [],
-    command_events(@expiry_source.id),
+    command_events(
+      "#{Coordinator::Processes::LeaseExpiryCommandBuilder::COMMAND_ID_PREFIX}#{@expiry_source.id}"
+    ),
     "Superseded expiry command completion"
   )
 end
@@ -1741,4 +1743,140 @@ end
 Then("no lease is stored for either path spelling") do
   assert_acceptance_equal([], command_events(@literal_path_command_id), "Command facts")
   assert_acceptance_equal([], lease_events("app/models/user.rb"), "Slash-path lease facts")
+end
+
+When(
+  "agent {string} reserves expiring file {string} through a public Task"
+) do |agent_id, path|
+  participant = @hierarchical_participants.find { _1.fetch(:agent_id) == agent_id }
+  assert_acceptance(participant, "Unknown expiry participant #{agent_id}")
+  @system_identity_path = path
+
+  task_id = submit_and_await(
+    "write_set_reserve",
+    command_id: "cs-aud-lse-expiry-id.reserve.predecessor",
+    actor: { kind: "agent", id: agent_id },
+    change_set_id: @hierarchical_change_set_id,
+    work_item_id: participant.fetch(:work_item_id),
+    attempt_id: participant.fetch(:attempt_id),
+    repository_id: acceptance_repository_id,
+    base_commit_oid: "a" * 40,
+    resources: [ { kind: "file", path: } ],
+    lease_duration_seconds: 30
+  )
+  state = task_request("tasks/get", task_id)
+  assert_acceptance_equal(false, state.dig("result", "result", "isError"), "Predecessor reservation")
+
+  @system_identity_source = hierarchical_lease_events("file", path).sole
+end
+
+When("a public client uses the acquisition event ID for an unrelated mutation") do
+  @public_collision_command_id = @system_identity_source.id
+  task_id = submit_and_await(
+    "change_set_create",
+    command_id: @public_collision_command_id,
+    actor: { kind: "agent", id: "agent-a" },
+    change_set_id: "CS-AUD-LSE-PUBLIC-COLLISION",
+    goal: "Prove public and internal command identities cannot collide",
+    acceptance_criteria: [ "The unrelated public command remains independently replayable" ]
+  )
+  state = task_request("tasks/get", task_id)
+  assert_acceptance_equal(false, state.dig("result", "result", "isError"), "Public collision command")
+end
+
+When("the real lease-expiry job handles the due source") do
+  source = Coordinator::Container["lease_expiry_source_builder"].call(@system_identity_source)
+  locator = Coordinator::Processes::LeaseExpirySourceLocatorV1.from_source(source)
+  @internal_expiry_command_id = Coordinator::Processes::LeaseExpiryCommandBuilder.new.call(source).command_id
+  deadline = Time.iso8601(@system_identity_source.data.fetch("expires_at"))
+
+  eventually("the real lease deadline", timeout_seconds: 35) do
+    observed_at = Time.now.utc
+    [ observed_at >= deadline, observed_at ]
+  end
+  Coordinator::Processes::Jobs::ExpireResourceLease.perform_now(
+    locator.source_event_id,
+    locator.resource_key_hash,
+    locator.stream_revision
+  )
+end
+
+Then("the lease expires under a distinct deterministic internal command") do
+  lifecycle = hierarchical_lease_events("file", @system_identity_path)
+  acquisition, expiration = lifecycle
+
+  assert_acceptance_equal(
+    [ "ResourceLeaseAcquired", "ResourceLeaseExpired" ],
+    lifecycle.map(&:type),
+    "Expired lifecycle"
+  )
+  assert_acceptance_equal(
+    "internal:lease-expiry:v1:#{acquisition.id}",
+    @internal_expiry_command_id,
+    "Internal command identity"
+  )
+  assert_acceptance(@internal_expiry_command_id != @public_collision_command_id, "Command namespaces collided")
+  assert_acceptance_equal(acquisition.id, expiration.causation_id, "Expiry causation")
+  assert_acceptance_equal(acquisition.correlation_id, expiration.correlation_id, "Expiry correlation")
+  assert_acceptance_equal(
+    @internal_expiry_command_id,
+    expiration.metadata.fetch("command_id"),
+    "Expiry command metadata"
+  )
+  assert_acceptance_equal(1, command_events(@public_collision_command_id).length, "Public completion")
+  assert_acceptance_equal(1, command_events(@internal_expiry_command_id).length, "Internal completion")
+end
+
+When("agent {string} reserves the expired file through a public Task") do |agent_id|
+  participant = @hierarchical_participants.find { _1.fetch(:agent_id) == agent_id }
+  @system_identity_successor_task_id = submit_and_await(
+    "write_set_reserve",
+    command_id: "cs-aud-lse-expiry-id.reserve.successor",
+    actor: { kind: "agent", id: agent_id },
+    change_set_id: @hierarchical_change_set_id,
+    work_item_id: participant.fetch(:work_item_id),
+    attempt_id: participant.fetch(:attempt_id),
+    repository_id: acceptance_repository_id,
+    base_commit_oid: "a" * 40,
+    resources: [ { kind: "file", path: @system_identity_path } ],
+    lease_duration_seconds: 300
+  )
+  @system_identity_successor_state = task_request("tasks/get", @system_identity_successor_task_id)
+end
+
+Then("the successor receives a higher fencing token") do
+  outcome = @system_identity_successor_state.dig("result", "result", "structuredContent")
+  assert_acceptance_equal("ok", outcome.fetch("status"), "Successor reservation")
+  assert_acceptance_equal(
+    2,
+    outcome.dig("data", "resources").sole.fetch("fencing_token"),
+    "Successor fencing token"
+  )
+  assert_acceptance_equal(
+    [ 1, 1, 2 ],
+    hierarchical_lease_events("file", @system_identity_path).map { _1.data.fetch("fencing_token") },
+    "Lifecycle fencing history"
+  )
+end
+
+When("a public client submits a command in the reserved internal namespace") do
+  @reserved_public_command_id = "internal:lease-expiry:v1:client-supplied"
+  @reserved_public_response = call_tool(
+    "change_set_create",
+    {
+      command_id: @reserved_public_command_id,
+      actor: { kind: "agent", id: "agent-a" },
+      change_set_id: "CS-AUD-LSE-INTERNAL-NAMESPACE",
+      goal: "This public request must not allocate a Task",
+      acceptance_criteria: [ "The internal namespace remains system-owned" ]
+    }
+  )
+end
+
+Then("MCP rejects the reserved command ID before allocating a Task") do
+  result = @reserved_public_response.fetch("result")
+  assert_acceptance_equal("complete", result.fetch("resultType"), "Immediate result type")
+  assert_acceptance_equal(true, result.fetch("isError"), "Reserved command-ID error flag")
+  assert_acceptance_equal([], task_events_for_command(@reserved_public_command_id), "Task facts")
+  assert_acceptance_equal([], command_events(@reserved_public_command_id), "Command facts")
 end

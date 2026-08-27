@@ -39,7 +39,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
       outcome: "expired_or_replayed"
     )
     expect(lease_events.map(&:type)).to eq([ "ResourceLeaseAcquired", "ResourceLeaseExpired" ])
-    expect(command_events(source.id).length).to eq(1)
+    expect(command_events(expiry_command_id(source)).length).to eq(1)
   end
 
   it "treats an acquisition timer superseded by renewal as a handled policy outcome" do
@@ -61,7 +61,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
       outcome: "lease_observation_superseded"
     )
     expect(lease_events.none? { _1.type == "ResourceLeaseExpired" }).to be(true)
-    expect(command_events(acquisition.id)).to be_empty
+    expect(command_events(expiry_command_id(acquisition))).to be_empty
   end
 
   it "lets the real job reschedule an early check and complete it at the deadline" do
@@ -85,7 +85,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
     end
 
     expect(lease_events.map(&:type)).to eq([ "ResourceLeaseAcquired", "ResourceLeaseExpired" ])
-    expect(command_events(source.id).length).to eq(1)
+    expect(command_events(expiry_command_id(source)).length).to eq(1)
   end
 
   it "runs a past-due source through one real filtered subscription and Active Job execution" do
@@ -111,7 +111,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
         expect(expiration.type).to eq("ResourceLeaseExpired")
         expect(expiration.causation_id).to eq(source.id)
         expect(expiration.correlation_id).to eq(source.correlation_id)
-        expect(command_events(source.id).length).to eq(1)
+        expect(command_events(expiry_command_id(source)).length).to eq(1)
       ensure
         subscription_set.stop
       end
@@ -142,8 +142,8 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
         expiration = lease_events.last
         expect(expiration.type).to eq("ResourceLeaseExpired")
         expect(expiration.causation_id).to eq(renewal.id)
-        expect(command_events(acquisition.id)).to be_empty
-        expect(command_events(renewal.id).length).to eq(1)
+        expect(command_events(expiry_command_id(acquisition))).to be_empty
+        expect(command_events(expiry_command_id(renewal)).length).to eq(1)
       ensure
         subscription_set.stop
       end
@@ -279,6 +279,10 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
 
   def command_events(command_id)
     event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+  end
+
+  def expiry_command_id(event)
+    "#{Coordinator::Processes::LeaseExpiryCommandBuilder::COMMAND_ID_PREFIX}#{event.id}"
   end
 
   def build_subscription_set(registrations)

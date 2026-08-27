@@ -5,9 +5,21 @@ module Coordinator
         def call: (Hash[Symbol, untyped] input) -> Dry::Monads::Result
       end
 
+      interface _PublicTargetCommand
+        def command_id: () -> String
+      end
+
       class PrepareAndSubmitCoordinationTask
-        def initialize: (preparer: _CoordinationTaskPreparer, submitter: SubmitCoordinationTask) -> void
+        def initialize: (
+          preparer: _CoordinationTaskPreparer,
+          submitter: SubmitCoordinationTask,
+          ?public_command_contract: Contracts::PublicCommand
+        ) -> void
         def call: (Hash[Symbol, untyped] input) -> Dry::Monads::Result
+
+        private
+
+        def validate_public_command: (_PublicTargetCommand command) -> Dry::Monads::Result
       end
     end
   end

@@ -2,6 +2,7 @@ module Coordinator
   module Processes
     class LeaseExpiryCommandBuilder
       POLICY_ID: String
+      COMMAND_ID_PREFIX: String
 
       def call: (LeaseExpirySource source) -> Write::Commands::ExpireResourceLease
     end

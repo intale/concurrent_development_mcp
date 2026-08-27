@@ -154,6 +154,18 @@ Feature: Dynamic write-set leases
 
   Rule: Elapsed lease availability does not wait for expiry audit
 
+    @AUD-LEASE-EXPIRY-ID-05 @live-subscriptions @event-contract
+    Scenario: A public use of the acquisition event ID cannot preempt lease expiry
+      Given two independent MCP agents have live active Attempts in ChangeSet "CS-AUD-LSE-EXPIRY-ID"
+      When agent "agent-a" reserves expiring file "app/expiry-owned.rb" through a public Task
+      And a public client uses the acquisition event ID for an unrelated mutation
+      And the real lease-expiry job handles the due source
+      Then the lease expires under a distinct deterministic internal command
+      When agent "agent-b" reserves the expired file through a public Task
+      Then the successor receives a higher fencing token
+      When a public client submits a command in the reserved internal namespace
+      Then MCP rejects the reserved command ID before allocating a Task
+
     @CDM-LEASE-009 @stale-view
     Scenario: A successor reserves an elapsed file before the predecessor timer runs
       Given agents "agent-a" and "agent-b" have active Attempts in ChangeSet "CS-CUC-EXPIRY"

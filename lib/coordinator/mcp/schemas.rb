@@ -1935,7 +1935,7 @@ module Coordinator
 
       def common_mutation_properties
         {
-          command_id: identifier,
+          command_id: public_command_id,
           actor: object_schema(
             properties: {
               kind: { type: "string", enum: Types::ACTOR_KINDS },
@@ -2173,6 +2173,13 @@ module Coordinator
 
       def identifier
         { type: "string", pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$" }
+      end
+
+      def public_command_id
+        {
+          type: "string",
+          pattern: "^(?!internal:)[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"
+        }
       end
 
       def nullable_identifier

@@ -30,7 +30,7 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::Expire do
   let(:state) { Coordinator::Write::Domain::ResourceLeases::State.reduce([ acquired ]) }
   let(:command) do
     Coordinator::Write::Commands::ExpireResourceLease.new(
-      command_id: "01919191-9191-7191-8191-919191919199",
+      command_id: "internal:lease-expiry:v1:01919191-9191-7191-8191-919191919199",
       actor: Coordinator::Write::Commands::Actor.new(kind: "system", id: "lease-expiry-policy-v1"),
       resource_key_hash: acquired.resource_key_hash,
       lease_id: acquired.lease_id,
