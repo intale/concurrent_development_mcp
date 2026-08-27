@@ -93,9 +93,12 @@ module Coordinator::Write
 
         attempt_state = load_attempt_state(command.attempt_id)
         lease_states = command.resources.map { load_lease_state(_1.resource_key_hash) }
+        boundary_states = load_boundary_states(command)
+        return boundary_states if boundary_states.failure?
+
         decision = @decider.call(
           attempt_state:,
-          lease_states:,
+          lease_states: lease_states + boundary_states.value!,
           command:,
           lease_set_id: prepared.lease_set_id,
           lease_ids: prepared.resources.map(&:lease_id),
@@ -182,6 +185,36 @@ module Coordinator::Write
         Domain::ResourceLeases::State.reduce(events)
       end
 
+      def load_boundary_states(command)
+        markers = command.resources.flat_map do |resource|
+          @repository_marker_builder.resource_boundary_markers(
+            repository_id: command.repository_id,
+            resource_kind: resource.kind,
+            resource_path: resource.path
+          )
+        end.uniq
+        events = @event_store.read_global_marked(EventQueries.resource_lease_boundary(markers))
+        states = events.group_by { _1.data.fetch("resource_key_hash") }
+          .sort_by { |resource_key_hash, _events| resource_key_hash.b }
+          .map do |_resource_key_hash, resource_events|
+            Domain::ResourceLeases::State.reduce(resource_events.map { load_event(_1) })
+          end
+
+        Success(states)
+      rescue EventHistoryLimitExceeded
+        Failure(
+          OutcomeError.new(
+            code: :resource_boundary_history_limit_exceeded,
+            message: "Resource lease boundary exceeds the bounded authoritative history",
+            details: {
+              repository_id: command.repository_id,
+              marker_count: markers.length,
+              maximum_event_count: EventQueries::RESOURCE_LEASE_BOUNDARY_MAXIMUM_COUNT
+            }
+          )
+        )
+      end
+
       def load_event(event)
         @schema_registry.load(
           type: event.type,
@@ -244,7 +277,15 @@ module Coordinator::Write
           )
         )
 
-        common + components + [ "lease-set:#{event.lease_set_id}", compound.marker ]
+        common + components + [
+          "lease-set:#{event.lease_set_id}",
+          compound.marker,
+          *@repository_marker_builder.resource_event_markers(
+            repository_id: event.repository_id,
+            resource_kind: event.resource_kind,
+            resource_path: event.resource_path
+          )
+        ]
       end
 
       def persist_completion(completion, command:, event_id:, caused_by:)

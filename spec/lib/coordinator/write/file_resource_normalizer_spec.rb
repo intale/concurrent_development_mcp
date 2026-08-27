@@ -3,69 +3,86 @@
 RSpec.describe Coordinator::Write::FileResourceNormalizer do
   subject(:normalizer) { described_class.new }
 
-  it "normalizes lexical Git paths into a versioned canonical identity" do
-    result = normalizer.call(
-      repository_id: "billing",
-      kind: "file",
-      path: ".\\app//services/../models/User.rb",
-      base_blob_oid: "b" * 40
-    )
-
-    expect(result).to be_success
-    expect(result.value!.to_h).to eq(
-      kind: "file",
-      path: "app/models/User.rb",
-      base_blob_oid: "b" * 40,
-      resource_key: "repo:billing:file:app/models/User.rb",
-      resource_key_hash: "sha256:71b26d2dd05c487749a92ba97a20c3144710d2e5f0750aded67d8f1d0f6b8e51",
-      policy_version: "coordinator-resource-key/v1"
-    )
-  end
-
-  it "binds an authoritative identity to exact scope and repository UUID" do
-    result = normalizer.call(
+  it "preserves an exact Git path while distinguishing file and directory identities" do
+    file = normalizer.call(
       repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       scope: RepositoryScenario::DEFAULT_SCOPE,
       kind: "file",
-      path: "./app/models/user.rb",
+      path: "app/models/User.rb",
+      base_blob_oid: "b" * 40
+    ).value!
+    directory = normalizer.call(
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      scope: RepositoryScenario::DEFAULT_SCOPE,
+      kind: "directory",
+      path: "app/models",
       base_blob_oid: nil
-    )
+    ).value!
 
-    expect(result.value!).to have_attributes(
-      resource_key: "scope:project:test/billing:repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:file:app/models/user.rb",
-      policy_version: "coordinator-resource-key/v2"
+    expect(file.to_h).to include(
+      kind: "file",
+      path: "app/models/User.rb",
+      resource_key: "scope:project:test/billing:repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:file:app/models/User.rb",
+      policy_version: "coordinator-resource-key/v3"
     )
-    expect(result.value!.resource_key_hash).to match(/\Asha256:[0-9a-f]{64}\z/)
+    expect(directory.to_h).to include(
+      kind: "directory",
+      path: "app/models",
+      resource_key: "scope:project:test/billing:repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:directory:app/models",
+      policy_version: "coordinator-resource-key/v3"
+    )
+    expect(file.resource_key_hash).not_to eq(directory.resource_key_hash)
   end
 
-  it "preserves case and Unicode code-point sequences" do
-    upper = normalizer.call(repository_id: "billing", kind: "file", path: "Models/Å.rb", base_blob_oid: nil).value!
+  it "keeps byte-distinct case and Unicode sequences distinct" do
+    composed = normalizer.call(repository_id: "billing", kind: "file", path: "Models/Å.rb", base_blob_oid: nil).value!
+    decomposed = normalizer.call(repository_id: "billing", kind: "file", path: "Models/A\u030A.rb", base_blob_oid: nil).value!
     lower = normalizer.call(repository_id: "billing", kind: "file", path: "models/å.rb", base_blob_oid: nil).value!
 
-    expect(upper.resource_key_hash).not_to eq(lower.resource_key_hash)
-    expect(upper.path).to eq("Models/Å.rb")
+    expect(composed.path).to eq("Models/Å.rb")
+    expect([ composed.resource_key_hash, decomposed.resource_key_hash, lower.resource_key_hash ].uniq.length).to eq(3)
   end
 
-  it "returns explicit errors for unsafe or unsupported resource identities" do
+  it "rejects aliasing syntax instead of rewriting caller bytes" do
     cases = {
-      "../secrets" => :resource_path_escape,
+      "app\\models\\user.rb" => :resource_path_backslash,
+      "app//models/user.rb" => :resource_path_empty_component,
+      "app/./models/user.rb" => :resource_path_dot_component,
+      "app/models/../user.rb" => :resource_path_parent_component,
+      "app/models/" => :resource_path_trailing_separator,
       "/etc/passwd" => :resource_path_absolute,
-      "C:\\repo\\file.rb" => :resource_path_absolute,
+      "C:/repo/file.rb" => :resource_path_absolute,
       "app/\u0000bad" => :resource_path_control_character,
-      "." => :resource_path_empty
+      "." => :resource_path_dot_component
     }
 
     cases.each do |path, code|
       result = normalizer.call(repository_id: "billing", kind: "file", path:, base_blob_oid: nil)
       expect(result.failure.code).to eq(code)
     end
+  end
 
-    unsupported = normalizer.call(
+  it "bounds UTF-8 bytes and path depth explicitly" do
+    too_long = "é" * 513
+    too_deep = 33.times.map { "a" }.join("/")
+    invalid_utf8 = "\xFF".b.force_encoding(Encoding::UTF_8)
+
+    expect(normalizer.call(repository_id: "billing", kind: "file", path: too_long, base_blob_oid: nil).failure.code)
+      .to eq(:resource_path_too_long)
+    expect(normalizer.call(repository_id: "billing", kind: "file", path: too_deep, base_blob_oid: nil).failure.code)
+      .to eq(:resource_path_too_deep)
+    expect(normalizer.call(repository_id: "billing", kind: "file", path: invalid_utf8, base_blob_oid: nil).failure.code)
+      .to eq(:resource_path_encoding)
+  end
+
+  it "rejects resource kinds outside the Git file/directory model" do
+    result = normalizer.call(
       repository_id: "billing",
       kind: "contract",
       path: "payments/v1",
       base_blob_oid: nil
     )
-    expect(unsupported.failure.code).to eq(:unsupported_resource_kind)
+
+    expect(result.failure.code).to eq(:unsupported_resource_kind)
   end
 end

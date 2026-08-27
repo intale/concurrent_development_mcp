@@ -97,6 +97,23 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
     ).to eq(:manifest_base_evidence_mismatch)
   end
 
+  it "authorizes manifest files covered by a leased directory without comparing tree evidence to blobs" do
+    reference = lease_reference_for(kind: "directory", path: "lib", base_blob_oid: "e" * 40)
+    command = prepared_command(
+      reference:,
+      files: [ manifest_file(old_path: "lib/nested/example.rb", new_path: "lib/nested/example.rb") ]
+    )
+
+    result = decide(
+      command:,
+      attempt: attempt_state(reference:),
+      current_leases: [ current_lease(reference:) ]
+    )
+
+    expect(result).to be_success
+    expect(result.value!.events.first.lease_references).to eq([ reference ])
+  end
+
   def decide(
     command: prepared_command,
     attempt: active_attempt,
@@ -118,7 +135,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
     )
   end
 
-  def prepared_command(files: [ manifest_file ], build_context: nil)
+  def prepared_command(files: [ manifest_file ], build_context: nil, reference: lease_reference)
     input = {
       command_id: "cmd-candidate-1",
       actor: { kind: "agent", id: "agent-7" },
@@ -134,9 +151,9 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
       lease_set_id: uuid("1"),
       leases: [
         {
-          resource_key_hash: lease_reference.resource_key_hash,
-          lease_id: lease_reference.lease_id,
-          fencing_token: lease_reference.fencing_token
+          resource_key_hash: reference.resource_key_hash,
+          lease_id: reference.lease_id,
+          fencing_token: reference.fencing_token
         }
       ],
       change_manifest: { collector_version: "git-evidence-v1", files: }
@@ -204,7 +221,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
       lease_set_id: uuid("1"),
       resource_key: reference.resource_key,
       resource_key_hash: reference.resource_key_hash,
-      resource_kind: "file",
+      resource_kind: reference.resource_kind,
       resource_path: reference.resource_path,
       policy_version: "coordinator-resource-key/v1",
       mode: "exclusive",
@@ -227,23 +244,29 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
   end
 
   def lease_reference
-    @lease_reference ||= begin
-      resource = Coordinator::Write::FileResourceNormalizer.new.call(
-        repository_id:,
-        kind: "file",
-        path: "lib/example.rb",
-        base_blob_oid: "c" * 40
-      ).value!
-      Coordinator::Write::LeaseReferenceV1.new(
-        lease_id: uuid("2"),
-        resource_key: resource.resource_key,
-        resource_key_hash: resource.resource_key_hash,
-        resource_kind: resource.kind,
-        resource_path: resource.path,
-        base_blob_oid: resource.base_blob_oid,
-        fencing_token: 1
-      )
-    end
+    @lease_reference ||= lease_reference_for(
+      kind: "file",
+      path: "lib/example.rb",
+      base_blob_oid: "c" * 40
+    )
+  end
+
+  def lease_reference_for(kind:, path:, base_blob_oid:)
+    resource = Coordinator::Write::FileResourceNormalizer.new.call(
+      repository_id:,
+      kind:,
+      path:,
+      base_blob_oid:
+    ).value!
+    Coordinator::Write::LeaseReferenceV1.new(
+      lease_id: uuid("2"),
+      resource_key: resource.resource_key,
+      resource_key_hash: resource.resource_key_hash,
+      resource_kind: resource.kind,
+      resource_path: resource.path,
+      base_blob_oid: resource.base_blob_oid,
+      fencing_token: 1
+    )
   end
 
   def head_identity

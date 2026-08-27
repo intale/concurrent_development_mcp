@@ -99,6 +99,7 @@ module Coordinator::Shared
     RESOURCE_KEY_POLICY_VERSIONS = %w[
       coordinator-resource-key/v1
       coordinator-resource-key/v2
+      coordinator-resource-key/v3
     ].freeze
 
     ACTOR_KINDS = %w[
@@ -534,7 +535,7 @@ module Coordinator::Shared
     UuidV7 = String.constrained(format: UUID_V7_PATTERN)
     TaskId = UuidV7
     ResourcePath = String.constrained(format: RESOURCE_PATH_PATTERN)
-    ResourceKind = String.enum("file")
+    ResourceKind = String.enum("file", "directory")
     ResourceKeyPolicyVersion = String.enum(*RESOURCE_KEY_POLICY_VERSIONS)
     LeaseMode = String.enum("exclusive")
     LeaseDurationSeconds = Integer.constrained(gteq: 30, lteq: 3_600)

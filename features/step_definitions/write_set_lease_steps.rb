@@ -1514,3 +1514,231 @@ Then("the checkpoint remains recorded while the Attempt is abandoned and requeue
   )
   assert_acceptance_equal(1, command_events(@candidate_abandonment_command_id).length, "Command receipt")
 end
+
+module HierarchicalWriteSetAcceptance
+  def prepare_live_hierarchical_attempts(change_set_id)
+    start_live_subscriptions
+    suffix = change_set_id.downcase
+    @hierarchical_change_set_id = change_set_id
+    @hierarchical_participants = [
+      { agent_id: "agent-a", work_item_id: "W-AUD-LSE-A", attempt_id: "A-AUD-LSE-A" },
+      { agent_id: "agent-b", work_item_id: "W-AUD-LSE-B", attempt_id: "A-AUD-LSE-B" }
+    ]
+
+    submit_and_await(
+      "change_set_create",
+      command_id: "#{suffix}.create",
+      actor: { kind: "agent", id: "planner" },
+      change_set_id:,
+      goal: "Coordinate Git hierarchy leases",
+      acceptance_criteria: [ "File and directory overlap has one active owner" ]
+    )
+    @hierarchical_participants.each do |participant|
+      submit_and_await(
+        "work_item_create",
+        command_id: "#{suffix}.create.#{participant.fetch(:work_item_id)}",
+        actor: { kind: "agent", id: "planner" },
+        change_set_id:,
+        work_item_id: participant.fetch(:work_item_id),
+        repository_id: acceptance_repository_id,
+        goal: "Edit a Git resource",
+        acceptance_criteria: [ "The resource is exclusively coordinated" ]
+      )
+    end
+    submit_and_await(
+      "change_set_activate",
+      command_id: "#{suffix}.activate",
+      actor: { kind: "agent", id: "planner" },
+      change_set_id:
+    )
+
+    @hierarchical_participants.each do |participant|
+      eventually("#{participant.fetch(:work_item_id)} to become ready") do
+        events = work_item_events(participant.fetch(:work_item_id))
+        [ events.any? { _1.type == "WorkItemMadeReady" }, events.map(&:type) ]
+      end
+      task_id = submit_and_await(
+        "work_item_acquire",
+        command_id: "#{suffix}.acquire.#{participant.fetch(:attempt_id)}",
+        actor: { kind: "agent", id: participant.fetch(:agent_id) },
+        change_set_id:,
+        work_item_id: participant.fetch(:work_item_id),
+        attempt_id: participant.fetch(:attempt_id),
+        base_snapshots: [
+          { repository_id: acceptance_repository_id, commit_oid: "a" * 40 }
+        ]
+      )
+      state = task_request("tasks/get", task_id)
+      assert_acceptance_equal(false, state.dig("result", "result", "isError"), "Attempt acquisition")
+    end
+  end
+
+  def submit_live_hierarchical_reservation(agent_id:, kind:, path:, command_suffix:)
+    participant = @hierarchical_participants.find { _1.fetch(:agent_id) == agent_id }
+    assert_acceptance(participant, "Unknown hierarchy participant #{agent_id}")
+    @mcp_session = nil
+    response = call_tool(
+      "write_set_reserve",
+      {
+        command_id: "#{@hierarchical_change_set_id.downcase}.reserve.#{command_suffix}",
+        actor: { kind: "agent", id: agent_id },
+        change_set_id: @hierarchical_change_set_id,
+        work_item_id: participant.fetch(:work_item_id),
+        attempt_id: participant.fetch(:attempt_id),
+        repository_id: acceptance_repository_id,
+        base_commit_oid: "a" * 40,
+        resources: [ { kind:, path: } ],
+        lease_duration_seconds: 300
+      }
+    )
+    task_id = response.dig("result", "taskId")
+    assert_acceptance(task_id, "write_set_reserve did not return a Task: #{response.inspect}")
+
+    {
+      agent_id:,
+      kind:,
+      path:,
+      task_id:,
+      state: await_task_terminal(task_id)
+    }
+  end
+
+  def hierarchical_lease_events(kind, path)
+    resource = Coordinator::Write::FileResourceNormalizer.new.call(
+      repository_id: acceptance_repository_id,
+      kind:,
+      path:,
+      base_blob_oid: nil,
+      scope: acceptance_repository_scope
+    ).value!
+    event_store.read(
+      streams.resource_lease(resource.resource_key_hash),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[
+          ResourceLeaseAcquired
+          ResourceLeaseRenewed
+          ResourceLeaseReleased
+          ResourceLeaseExpired
+        ],
+        maximum_count: 10,
+        direction: :asc
+      )
+    )
+  end
+
+  def hierarchical_outcome(reservation)
+    reservation.dig(:state, "result", "result", "structuredContent")
+  end
+end
+
+World(HierarchicalWriteSetAcceptance)
+
+Given(
+  "two independent MCP agents have live active Attempts in ChangeSet {string}"
+) do |change_set_id|
+  prepare_live_hierarchical_attempts(change_set_id)
+  @hierarchical_reservations = []
+end
+
+When(
+  "agent {string} reserves {word} {string} through a public Task"
+) do |agent_id, kind, path|
+  @hierarchical_reservations << submit_live_hierarchical_reservation(
+    agent_id:,
+    kind:,
+    path:,
+    command_suffix: @hierarchical_reservations.length + 1
+  )
+end
+
+Then("the first hierarchical reservation succeeds and the second completes busy") do
+  first, second = @hierarchical_reservations
+  assert_acceptance_equal("completed", first.dig(:state, "result", "status"), "First Task status")
+  assert_acceptance_equal("ok", hierarchical_outcome(first).fetch("status"), "First reservation")
+  assert_acceptance_equal("completed", second.dig(:state, "result", "status"), "Second Task status")
+  assert_acceptance_equal("busy", hierarchical_outcome(second).fetch("status"), "Second reservation")
+  assert_acceptance_equal(
+    first.fetch(:agent_id),
+    hierarchical_outcome(second).dig("data", "details", "owner_agent_id"),
+    "Blocking owner"
+  )
+end
+
+Then("only the {word} resource has a durable lease acquisition") do |winning_kind|
+  winning = @hierarchical_reservations.first
+  losing = @hierarchical_reservations.last
+  assert_acceptance_equal(winning_kind, winning.fetch(:kind), "Winning resource kind")
+  assert_acceptance_equal(
+    [ "ResourceLeaseAcquired" ],
+    hierarchical_lease_events(winning.fetch(:kind), winning.fetch(:path)).map(&:type),
+    "Winning lifecycle"
+  )
+  assert_acceptance_equal(
+    [],
+    hierarchical_lease_events(losing.fetch(:kind), losing.fetch(:path)),
+    "Losing lifecycle"
+  )
+end
+
+When("both agents submit public reservation Tasks for disjoint directory and file resources") do
+  @hierarchical_reservations = [
+    submit_live_hierarchical_reservation(
+      agent_id: "agent-a",
+      kind: "directory",
+      path: "app/models",
+      command_suffix: "disjoint-a"
+    ),
+    submit_live_hierarchical_reservation(
+      agent_id: "agent-b",
+      kind: "file",
+      path: "spec/services/user_spec.rb",
+      command_suffix: "disjoint-b"
+    )
+  ]
+end
+
+Then("both hierarchical reservation Tasks complete successfully") do
+  @hierarchical_reservations.each do |reservation|
+    assert_acceptance_equal("completed", reservation.dig(:state, "result", "status"), "Task status")
+    assert_acceptance_equal("ok", hierarchical_outcome(reservation).fetch("status"), "Reservation status")
+    assert_acceptance_equal(
+      [ "ResourceLeaseAcquired" ],
+      hierarchical_lease_events(reservation.fetch(:kind), reservation.fetch(:path)).map(&:type),
+      "Resource lifecycle"
+    )
+  end
+end
+
+When(
+  "agent {string} submits literal resource path {string} through public MCP"
+) do |agent_id, path|
+  @literal_resource_path = path
+  participant = @hierarchical_participants.find { _1.fetch(:agent_id) == agent_id }
+  @literal_path_command_id = "#{@hierarchical_change_set_id.downcase}.reserve.literal-path"
+  @literal_path_response = call_tool(
+    "write_set_reserve",
+    {
+      command_id: @literal_path_command_id,
+      actor: { kind: "agent", id: agent_id },
+      change_set_id: @hierarchical_change_set_id,
+      work_item_id: participant.fetch(:work_item_id),
+      attempt_id: participant.fetch(:attempt_id),
+      repository_id: acceptance_repository_id,
+      base_commit_oid: "a" * 40,
+      resources: [ { kind: "file", path: } ],
+      lease_duration_seconds: 300
+    }
+  )
+end
+
+Then("MCP rejects the unsupported path before allocating a Task") do
+  result = @literal_path_response.fetch("result")
+  assert_acceptance_equal("complete", result.fetch("resultType"), "Immediate result type")
+  assert_acceptance_equal(true, result.fetch("isError"), "Literal path error flag")
+  assert_acceptance_equal([], task_events_for_command(@literal_path_command_id), "Task facts")
+end
+
+Then("no lease is stored for either path spelling") do
+  assert_acceptance_equal([], command_events(@literal_path_command_id), "Command facts")
+  assert_acceptance_equal([], lease_events("app/models/user.rb"), "Slash-path lease facts")
+end

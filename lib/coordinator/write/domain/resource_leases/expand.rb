@@ -10,11 +10,19 @@ module Coordinator::Write
           @stream_factory = stream_factory
         end
 
-        def call(attempt_state:, current_observations:, requested_observations:, command:, expanded_at:)
+        def call(
+          attempt_state:,
+          current_observations:,
+          requested_observations:,
+          boundary_states: requested_observations.map(&:state),
+          command:,
+          expanded_at:
+        )
           denial = denied(
             attempt_state:,
             current_observations:,
             requested_observations:,
+            boundary_states:,
             command:,
             expanded_at:
           )
@@ -32,7 +40,14 @@ module Coordinator::Write
 
         private
 
-        def denied(attempt_state:, current_observations:, requested_observations:, command:, expanded_at:)
+        def denied(
+          attempt_state:,
+          current_observations:,
+          requested_observations:,
+          boundary_states:,
+          command:,
+          expanded_at:
+        )
           attempt_denial = attempt_denied(attempt_state:, command:)
           return attempt_denial if attempt_denial
 
@@ -61,7 +76,13 @@ module Coordinator::Write
             )
           end
 
-          busy_denied(additions:, command:, expanded_at:)
+          busy_denied(
+            additions:,
+            boundary_states:,
+            attempt_state:,
+            command:,
+            expanded_at:
+          )
         end
 
         def attempt_denied(attempt_state:, command:)
@@ -199,12 +220,19 @@ module Coordinator::Write
           end
         end
 
-        def busy_denied(additions:, command:, expanded_at:)
-          busy = additions.find { _1.state.active_at?(expanded_at) }
+        def busy_denied(additions:, boundary_states:, attempt_state:, command:, expanded_at:)
+          busy = additions.lazy.filter_map do |observation|
+            resource = observation.prepared_resource.resource
+            state = boundary_states.find do |candidate|
+              candidate.active_at?(expanded_at) &&
+                !owned_by_attempt?(candidate, attempt_state) &&
+                resources_overlap?(resource, candidate)
+            end
+            [ resource, state ] if state
+          end.first
           return unless busy
 
-          resource = busy.prepared_resource.resource
-          state = busy.state
+          resource, state = busy
           Failure(
             OutcomeError.new(
               code: :lease_busy,
@@ -220,6 +248,18 @@ module Coordinator::Write
               }
             )
           )
+        end
+
+        def owned_by_attempt?(state, attempt_state)
+          state.attempt_id == attempt_state.attempt_id &&
+            state.lease_set_id == attempt_state.lease_set_id
+        end
+
+        def resources_overlap?(resource, state)
+          return true if resource.path == state.resource_path
+
+          (resource.kind == "directory" && state.resource_path.start_with?("#{resource.path}/")) ||
+            (state.resource_kind == "directory" && resource.path.start_with?("#{state.resource_path}/"))
         end
 
         def build_plan(attempt_state:, requested_observations:, command:, expanded_at:)

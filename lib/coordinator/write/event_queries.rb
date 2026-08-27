@@ -12,7 +12,7 @@ module Coordinator::Write
         stream_context: "HumanGuidance",
         stream_name: "Conversation",
         event_types: GUIDANCE_MESSAGE_EVENT_TYPES,
-        marker:,
+        markers: [ marker ],
         maximum_count: 1,
         direction: :asc
       )
@@ -23,7 +23,7 @@ module Coordinator::Write
         stream_context: "HumanGuidance",
         stream_name: "Interpretation",
         event_types: [ "DecisionInterpretationProposed" ],
-        marker:,
+        markers: [ marker ],
         maximum_count: 1,
         direction: :asc
       )
@@ -34,7 +34,7 @@ module Coordinator::Write
         stream_context: "HumanGuidance",
         stream_name: "Interpretation",
         event_types: [ "DecisionInterpretationAccepted", "DecisionInterpretationRejected" ],
-        marker:,
+        markers: [ marker ],
         maximum_count: 1,
         direction: :asc
       )
@@ -45,7 +45,7 @@ module Coordinator::Write
         stream_context: "HumanGuidance",
         stream_name: "Interpretation",
         event_types: [ "DecisionInterpretationAccepted" ],
-        marker:,
+        markers: [ marker ],
         maximum_count: 1,
         direction: :asc
       )
@@ -56,7 +56,7 @@ module Coordinator::Write
         stream_context: "HumanGuidance",
         stream_name: "Interpretation",
         event_types: [ "DecisionInterpretationAccepted" ],
-        marker:,
+        markers: [ marker ],
         maximum_count: 1,
         direction: :asc
       )
@@ -67,7 +67,7 @@ module Coordinator::Write
         stream_context: "HumanGuidance",
         stream_name: "Decision",
         event_types: [ "DecisionActivated" ],
-        marker:,
+        markers: [ marker ],
         maximum_count: 1,
         direction: :asc
       )
@@ -78,6 +78,24 @@ module Coordinator::Write
         event_type: "CandidateImpactSurfaceRegistered",
         marker:,
         maximum_count: 1,
+        direction: :asc
+      )
+    end
+
+    RESOURCE_LEASE_BOUNDARY_MAXIMUM_COUNT = 256
+
+    def self.resource_lease_boundary(markers)
+      GlobalMarkedEventReadCriteria.new(
+        stream_context: "DevelopmentCoordination",
+        stream_name: "ResourceLease",
+        event_types: %w[
+          ResourceLeaseAcquired
+          ResourceLeaseRenewed
+          ResourceLeaseReleased
+          ResourceLeaseExpired
+        ],
+        markers: markers.uniq,
+        maximum_count: RESOURCE_LEASE_BOUNDARY_MAXIMUM_COUNT,
         direction: :asc
       )
     end

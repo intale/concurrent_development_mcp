@@ -301,7 +301,14 @@ module Coordinator::Write
           )
         )
 
-        common + components + [ compound.marker ]
+        common + components + [
+          compound.marker,
+          *RepositoryMarkerBuilder.new.resource_event_markers(
+            repository_id: event.repository_id,
+            resource_kind: event.resource_kind,
+            resource_path: event.resource_path
+          )
+        ]
       end
 
       def build_completion(command:, input_digest:, persisted_events:, abandoned_at:)

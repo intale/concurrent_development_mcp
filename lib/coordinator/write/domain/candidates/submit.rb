@@ -153,8 +153,8 @@ module Coordinator::Write
         end
 
         def denied_manifest_resources(attempt, command)
-          leased = attempt.lease_resources.to_h { [ _1.resource_key_hash, _1 ] }
-          missing = command.actual_resources.reject { leased.key?(_1.resource_key_hash) }
+          leased = attempt.lease_resources
+          missing = command.actual_resources.reject { covering_lease(leased, _1) }
           unless missing.empty?
             return failure(
               :actual_write_set_not_authorized,
@@ -165,11 +165,14 @@ module Coordinator::Write
           end
 
           mismatch = command.actual_resources.find do |resource|
-            leased.fetch(resource.resource_key_hash).base_blob_oid != resource.base_blob_oid
+            reference = leased.find do |candidate|
+              candidate.resource_kind == "file" && candidate.resource_key_hash == resource.resource_key_hash
+            end
+            reference && reference.base_blob_oid != resource.base_blob_oid
           end
           return unless mismatch
 
-          reference = leased.fetch(mismatch.resource_key_hash)
+          reference = leased.find { _1.resource_key_hash == mismatch.resource_key_hash }
           failure(
             :manifest_base_evidence_mismatch,
             "Candidate manifest old-side evidence differs from the reserved base",
@@ -179,6 +182,15 @@ module Coordinator::Write
             expected_base_blob_oid: reference.base_blob_oid,
             submitted_base_blob_oid: mismatch.base_blob_oid
           )
+        end
+
+        def covering_lease(leased, resource)
+          leased.find do |reference|
+            reference.resource_key_hash == resource.resource_key_hash ||
+              (reference.resource_kind == "directory" &&
+                (resource.path == reference.resource_path ||
+                  resource.path.start_with?("#{reference.resource_path}/")))
+          end
         end
 
         def build_plan(command:, state:, submitted_at:, candidate_event:, head_identity:)

@@ -173,6 +173,47 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::Expand do
     )
   end
 
+  it "Given another Attempt owns a parent directory, when adding a child file, then reports that blocker" do
+    directory = normalized_resource("app/models", kind: "directory")
+    blocking = Coordinator::Write::Domain::ResourceLeases::State.reduce(
+      [
+        Coordinator::Write::Events::ResourceLeaseAcquiredV1.new(
+          lease_id: "08919191-9191-7191-8191-919191919191",
+          lease_set_id: "09919191-9191-7191-8191-919191919191",
+          resource_key: directory.resource_key,
+          resource_key_hash: directory.resource_key_hash,
+          resource_kind: directory.kind,
+          resource_path: directory.path,
+          policy_version: directory.policy_version,
+          mode: "exclusive",
+          change_set_id: "CS-OTHER",
+          work_item_id: "W-OTHER",
+          attempt_id: "A-OTHER",
+          agent_id: "agent-b",
+          repository_id:,
+          object_format: "sha1",
+          base_commit_oid: "a" * 40,
+          base_blob_oid: nil,
+          fencing_token: 1,
+          acquired_at: "2026-08-22T10:00:00.000000Z",
+          expires_at:
+        )
+      ]
+    )
+
+    result = expand.call(
+      attempt_state:,
+      current_observations:,
+      requested_observations: requested_observations.last(1),
+      boundary_states: [ blocking ],
+      command: command.new(resources: command.resources.last(1)),
+      expanded_at:
+    )
+
+    expect(result.failure).to have_attributes(code: :lease_busy)
+    expect(result.failure.details).to include(owner_attempt_id: "A-OTHER")
+  end
+
   private
 
   def active_attempt_state
@@ -202,10 +243,10 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::Expand do
     )
   end
 
-  def normalized_resource(path, base_blob_oid: nil)
+  def normalized_resource(path, kind: "file", base_blob_oid: nil)
     Coordinator::Write::FileResourceNormalizer.new.call(
       repository_id:,
-      kind: "file",
+      kind:,
       path:,
       base_blob_oid:
     ).value!

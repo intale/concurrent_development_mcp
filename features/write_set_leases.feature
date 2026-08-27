@@ -8,6 +8,35 @@ Feature: Dynamic write-set leases
 
   Rule: Overlapping write sets are reserved atomically
 
+    @AUD-LEASE-DF-CONFLICT-01 @live-subscriptions @concurrency
+    Scenario: A directory lease blocks a later child-file lease through public MCP Tasks
+      Given two independent MCP agents have live active Attempts in ChangeSet "CS-AUD-LSE-DIR-FIRST"
+      When agent "agent-a" reserves directory "app/models" through a public Task
+      And agent "agent-b" reserves file "app/models/user.rb" through a public Task
+      Then the first hierarchical reservation succeeds and the second completes busy
+      And only the directory resource has a durable lease acquisition
+
+    @AUD-LEASE-DF-CONFLICT-02 @live-subscriptions @concurrency
+    Scenario: A child-file lease blocks a later parent-directory lease through public MCP Tasks
+      Given two independent MCP agents have live active Attempts in ChangeSet "CS-AUD-LSE-FILE-FIRST"
+      When agent "agent-a" reserves file "app/models/user.rb" through a public Task
+      And agent "agent-b" reserves directory "app/models" through a public Task
+      Then the first hierarchical reservation succeeds and the second completes busy
+      And only the file resource has a durable lease acquisition
+
+    @AUD-LEASE-DISJOINT-03 @live-subscriptions @concurrency
+    Scenario: Disjoint directory and file resources remain independently leasable
+      Given two independent MCP agents have live active Attempts in ChangeSet "CS-AUD-LSE-DISJOINT"
+      When both agents submit public reservation Tasks for disjoint directory and file resources
+      Then both hierarchical reservation Tasks complete successfully
+
+    @AUD-LEASE-PATH-BYTES-04 @live-subscriptions
+    Scenario: A literal backslash is rejected instead of aliased to a Git path separator
+      Given two independent MCP agents have live active Attempts in ChangeSet "CS-AUD-LSE-PATH-BYTES"
+      When agent "agent-a" submits literal resource path "app\\models\\user.rb" through public MCP
+      Then MCP rejects the unsupported path before allocating a Task
+      And no lease is stored for either path spelling
+
     @CDM-LEASE-001 @concurrency @stale-view
     Scenario: Two active agents request an overlapping file through concurrent Tasks
       Given agents "agent-a" and "agent-b" have active Attempts in ChangeSet "CS-CUC-LSE"
@@ -23,12 +52,6 @@ Feature: Dynamic write-set leases
       Given agents "agent-a" and "agent-b" have active Attempts in ChangeSet "CS-CUC-LSE-DISJOINT"
       When both agents concurrently reserve their disjoint files
       Then both disjoint reservation Tasks succeed with complete write sets
-
-    @CDM-LEASE-003 @concurrency
-    Scenario: Alias paths select one normalized consistency boundary
-      Given agents "agent-a" and "agent-b" have active Attempts in ChangeSet "CS-CUC-LSE-ALIAS"
-      When both agents concurrently reserve aliases "db/schema.rb" and "db/tmp/../schema.rb"
-      Then one normalized reservation wins and the loser owns no lease
 
     @CDM-CANCEL-001
     Scenario: Cancelling a queued reservation writes no lease

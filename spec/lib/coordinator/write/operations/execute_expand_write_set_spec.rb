@@ -28,7 +28,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_sto
           attempt_id: "A-LSE-A",
           agent_id: "agent-a",
           lease_set_id: reservation.lease_set_id,
-          paths: [ "app/./a.rb", "app/b.rb" ]
+          paths: [ "app/a.rb", "app/b.rb" ]
         )
       )
     end
@@ -79,7 +79,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_sto
 
     original = operation.call(input)
     original_event_ids = expansion_event_ids("A-LSE-A", "app/b.rb", "cmd-expand-a")
-    replay = operation.call(input.merge(resources: [ { kind: "file", path: "app/tmp/../b.rb" } ]))
+    replay = operation.call(input)
     changed = operation.call(input.merge(resources: [ { kind: "file", path: "app/c.rb" } ]))
 
     expect(replay).to be_success
@@ -288,6 +288,60 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_sto
     expect(%w[cmd-expand-a cmd-expand-b].sum { command_events(_1).length }).to eq(1)
   end
 
+  it "re-evaluates concurrent parent-directory and child-file expansions through one DCB" do
+    seed_active_attempts(
+      [
+        [ "W-LSE-A", "A-LSE-A", "agent-a" ],
+        [ "W-LSE-B", "A-LSE-B", "agent-b" ]
+      ]
+    )
+    reservations = [
+      reserve(
+        command_id: "cmd-reserve-a",
+        work_item_id: "W-LSE-A",
+        attempt_id: "A-LSE-A",
+        agent_id: "agent-a",
+        paths: [ "a.rb" ]
+      ).value!.data,
+      reserve(
+        command_id: "cmd-reserve-b",
+        work_item_id: "W-LSE-B",
+        attempt_id: "A-LSE-B",
+        agent_id: "agent-b",
+        paths: [ "b.rb" ]
+      ).value!.data
+    ]
+    inputs = [
+      expand_input(
+        command_id: "cmd-expand-directory",
+        work_item_id: "W-LSE-A",
+        attempt_id: "A-LSE-A",
+        agent_id: "agent-a",
+        lease_set_id: reservations.first.lease_set_id,
+        resources: [ { kind: "directory", path: "app/models" } ]
+      ),
+      expand_input(
+        command_id: "cmd-expand-child",
+        work_item_id: "W-LSE-B",
+        attempt_id: "A-LSE-B",
+        agent_id: "agent-b",
+        lease_set_id: reservations.last.lease_set_id,
+        resources: [ { kind: "file", path: "app/models/user.rb" } ]
+      )
+    ]
+
+    results = inputs.map do |input|
+      Thread.new { described_class.new(event_store:).call(input) }
+    end.map(&:value)
+
+    expect(results.count(&:success?)).to eq(1)
+    expect(results.count(&:failure?)).to eq(1)
+    expect(results.find(&:failure?).failure).to have_attributes(code: :lease_busy)
+    expect(
+      lease_events("app/models", kind: "directory").length + lease_events("app/models/user.rb").length
+    ).to eq(1)
+  end
+
   it "serializes disjoint expansions of one Attempt and retains both additions" do
     seed_active_attempts([ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ])
     reservation = reserve(
@@ -328,7 +382,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_sto
 
   private
 
-  def expand_input(command_id:, work_item_id:, attempt_id:, agent_id:, lease_set_id:, paths:)
+  def expand_input(command_id:, work_item_id:, attempt_id:, agent_id:, lease_set_id:, paths: nil, resources: nil)
     {
       command_id:,
       actor: { kind: "agent", id: agent_id },
@@ -338,7 +392,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_sto
       lease_set_id:,
       repository_id: EXPAND_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
-      resources: paths.map { { kind: "file", path: _1 } }
+      resources: resources || paths.map { { kind: "file", path: _1 } }
     }
   end
 
@@ -398,11 +452,11 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_sto
     end
   end
 
-  def lease_events(path)
+  def lease_events(path, kind: "file")
     resource = normalizer.call(
       repository_id: EXPAND_REPOSITORY_ID,
       scope: RepositoryScenario::DEFAULT_SCOPE,
-      kind: "file",
+      kind:,
       path:,
       base_blob_oid: nil
     ).value!

@@ -143,6 +143,58 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::Reserve do
     )
   end
 
+  it "treats an active parent directory as a structural conflict for a requested child file" do
+    child = command.resources.first.new(
+      path: "app/models/user.rb",
+      resource_key: "repo:#{repository_id}:file:app/models/user.rb",
+      resource_key_hash: "sha256:#{'a' * 64}"
+    )
+    directory = command.resources.first.new(
+      kind: "directory",
+      path: "app/models",
+      resource_key: "repo:#{repository_id}:directory:app/models",
+      resource_key_hash: "sha256:#{'b' * 64}"
+    )
+    blocking = Coordinator::Write::Domain::ResourceLeases::State.reduce(
+      [
+        Coordinator::Write::Events::ResourceLeaseAcquiredV1.new(
+          lease_id: "06919191-9191-7191-8191-919191919191",
+          lease_set_id: "07919191-9191-7191-8191-919191919191",
+          resource_key: directory.resource_key,
+          resource_key_hash: directory.resource_key_hash,
+          resource_kind: directory.kind,
+          resource_path: directory.path,
+          policy_version: directory.policy_version,
+          mode: "exclusive",
+          change_set_id: "CS-OTHER",
+          work_item_id: "W-OTHER",
+          attempt_id: "A-OTHER",
+          agent_id: "agent-b",
+          repository_id:,
+          object_format: "sha1",
+          base_commit_oid: "a" * 40,
+          base_blob_oid: nil,
+          fencing_token: 1,
+          acquired_at: "2026-08-22T10:00:00.000000Z",
+          expires_at: "2026-08-22T10:15:00.000000Z"
+        )
+      ]
+    )
+
+    result = reserve.call(
+      attempt_state:,
+      lease_states: [ Coordinator::Write::Domain::ResourceLeases::State.initial, blocking ],
+      command: command.new(resources: [ child ]),
+      lease_set_id: "03919191-9191-7191-8191-919191919191",
+      lease_ids: [ lease_ids.first ],
+      acquired_at: "2026-08-22T10:01:00.000000Z",
+      expires_at: "2026-08-22T10:16:00.000000Z"
+    )
+
+    expect(result.failure).to have_attributes(code: :lease_busy)
+    expect(result.failure.details).to include(resource_key_hash: child.resource_key_hash, owner_attempt_id: "A-OTHER")
+  end
+
   def repository_id
     RepositoryScenario::DEFAULT_REPOSITORY_ID
   end

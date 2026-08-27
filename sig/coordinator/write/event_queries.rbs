@@ -2,6 +2,7 @@ module Coordinator
   module Write
     module EventQueries
       GUIDANCE_MESSAGE_EVENT_TYPES: Array[String]
+      RESOURCE_LEASE_BOUNDARY_MAXIMUM_COUNT: Integer
 
       def self.guidance_message: (String marker) -> GlobalMarkedEventReadCriteria
       def self.interpretation_proposal: (String marker) -> GlobalMarkedEventReadCriteria
@@ -10,6 +11,7 @@ module Coordinator
       def self.interpretation_acceptance: (String marker) -> GlobalMarkedEventReadCriteria
       def self.decision_activation: (String marker) -> GlobalMarkedEventReadCriteria
       def self.candidate_impact_surface_registration: (String marker) -> MarkedEventReadCriteria
+      def self.resource_lease_boundary: (Array[String] markers) -> GlobalMarkedEventReadCriteria
 
       COMMAND_COMPLETION: EventReadCriteria
       REPOSITORY_REGISTRATION: EventReadCriteria

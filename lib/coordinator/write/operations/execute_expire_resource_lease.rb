@@ -192,7 +192,12 @@ module Coordinator::Write
           "lease-set:#{event.lease_set_id}",
           *@repository_marker_builder.call(repository_registration),
           *components,
-          compound.marker
+          compound.marker,
+          *@repository_marker_builder.resource_event_markers(
+            repository_id: event.repository_id,
+            resource_kind: event.resource_kind,
+            resource_path: event.resource_path
+          )
         ]
       end
 

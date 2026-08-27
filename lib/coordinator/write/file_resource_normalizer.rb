@@ -5,19 +5,24 @@ module Coordinator::Write
     include Dry::Monads[:result]
 
     MAX_PATH_BYTES = 1_024
+    MAX_PATH_COMPONENTS = 32
+    SUPPORTED_KINDS = %w[file directory].freeze
 
     def initialize(canonical_json: CanonicalJson.new)
       @canonical_json = canonical_json
     end
 
     def call(repository_id:, kind:, path:, base_blob_oid:, scope: nil)
-      return failure(:unsupported_resource_kind, "Resource kind is not supported", kind:) unless kind == "file"
+      unless SUPPORTED_KINDS.include?(kind)
+        return failure(:unsupported_resource_kind, "Resource kind is not supported", kind:)
+      end
 
       normalized_path = normalize_path(path)
       return normalized_path if normalized_path.failure?
 
       build_resource(
         repository_id:,
+        kind:,
         path: normalized_path.value!,
         base_blob_oid:,
         scope:
@@ -37,44 +42,45 @@ module Coordinator::Write
       if /[\u0000-\u001f\u007f]/.match?(path)
         return failure(:resource_path_control_character, "Resource path contains a control character", path:)
       end
+      if path.include?("\\")
+        return failure(
+          :resource_path_backslash,
+          "Git resource paths use '/' separators; literal backslashes are unsupported",
+          path:
+        )
+      end
 
-      separated = path.tr("\\", "/")
-      if separated.start_with?("/") || /\A[A-Za-z]:\//.match?(separated)
+      if path.start_with?("/") || /\A[A-Za-z]:\//.match?(path)
         return failure(:resource_path_absolute, "Resource path must be relative", path:)
       end
-
-      segments = reduce_segments(separated, original_path: path)
-      return segments if segments.failure?
-
-      normalized = segments.value!.join("/")
-      return failure(:resource_path_empty, "Resource path cannot be empty", path:) if normalized.empty?
-      if normalized.bytesize > MAX_PATH_BYTES
-        return failure(:resource_path_too_long, "Normalized resource path exceeds 1024 UTF-8 bytes", path:)
+      if path.end_with?("/")
+        return failure(:resource_path_trailing_separator, "Resource path cannot end with '/'", path:)
       end
 
-      Success(normalized)
-    end
-
-    def reduce_segments(path, original_path:)
-      segments = []
-
-      path.split("/").each do |segment|
-        next if segment.empty? || segment == "."
-
-        if segment == ".."
-          return failure(:resource_path_escape, "Resource path escapes its repository", path: original_path) if segments.empty?
-
-          segments.pop
-        else
-          segments << segment
-        end
+      segments = path.split("/", -1)
+      if segments.any?(&:empty?)
+        return failure(:resource_path_empty_component, "Resource path cannot contain empty components", path:)
+      end
+      if segments.include?(".")
+        return failure(:resource_path_dot_component, "Resource path cannot contain '.' components", path:)
+      end
+      if segments.include?("..")
+        return failure(:resource_path_parent_component, "Resource path cannot contain '..' components", path:)
+      end
+      if segments.length > MAX_PATH_COMPONENTS
+        return failure(
+          :resource_path_too_deep,
+          "Resource path exceeds 32 components",
+          path:,
+          component_count: segments.length
+        )
       end
 
-      Success(segments)
+      Success(path)
     end
 
-    def build_resource(repository_id:, path:, base_blob_oid:, scope:)
-      document = resource_key_document(repository_id:, path:, scope:)
+    def build_resource(repository_id:, kind:, path:, base_blob_oid:, scope:)
+      document = resource_key_document(repository_id:, kind:, path:, scope:)
 
       Success(
         FileResourceV1.new(
@@ -88,13 +94,13 @@ module Coordinator::Write
       )
     end
 
-    def resource_key_document(repository_id:, path:, scope:)
-      return ResourceKeyDocumentV2.new(
-        schema: ResourceKeyDocumentV2::POLICY_VERSION,
-        policy_version: ResourceKeyDocumentV2::POLICY_VERSION,
+    def resource_key_document(repository_id:, kind:, path:, scope:)
+      return ResourceKeyDocumentV3.new(
+        schema: ResourceKeyDocumentV3::POLICY_VERSION,
+        policy_version: ResourceKeyDocumentV3::POLICY_VERSION,
         scope:,
         repository_id:,
-        kind: "file",
+        kind:,
         path:
       ) if scope
 
@@ -102,7 +108,7 @@ module Coordinator::Write
         schema: ResourceKeyDocumentV1::POLICY_VERSION,
         policy_version: ResourceKeyDocumentV1::POLICY_VERSION,
         repository_id:,
-        kind: "file",
+        kind:,
         path:
       )
     end
@@ -110,7 +116,7 @@ module Coordinator::Write
     def resource_key(document)
       prefix = "scope:#{document.scope}:" if document.respond_to?(:scope)
 
-      "#{prefix}repo:#{document.repository_id}:file:#{document.path}"
+      "#{prefix}repo:#{document.repository_id}:#{document.kind}:#{document.path}"
     end
 
     def failure(code, message, **details)

@@ -1,8 +1,12 @@
 module Coordinator
   module Write
     class RepositoryMarkerBuilder
+      RESOURCE_PATH_MARKER_VERSION: String
+
       def initialize: (?compound_marker_builder: Shared::CompoundMarkerBuilder) -> void
       def call: (Events::RepositoryRegisteredV1 registration) -> Array[String]
+      def resource_event_markers: (repository_id: String, resource_kind: String, resource_path: String) -> Array[String]
+      def resource_boundary_markers: (repository_id: String, resource_kind: String, resource_path: String) -> Array[String]
     end
   end
 end

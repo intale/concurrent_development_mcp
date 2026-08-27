@@ -2197,8 +2197,13 @@ module Coordinator
       def write_set_resource
         object_schema(
           properties: {
-            kind: { type: "string", enum: [ "file" ] },
-            path: { type: "string", minLength: 1, maxLength: 1_024 },
+            kind: { type: "string", enum: %w[file directory] },
+            path: {
+              type: "string",
+              minLength: 1,
+              maxLength: 1_024,
+              pattern: "^(?!.*\\\\).+$"
+            },
             base_blob_oid: { anyOf: [ git_oid, { type: "null" } ] }
           },
           required: %w[kind path]

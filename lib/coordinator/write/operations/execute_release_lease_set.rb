@@ -322,7 +322,14 @@ module Coordinator::Write
           )
         )
 
-        common + components + [ compound.marker ]
+        common + components + [
+          compound.marker,
+          *@repository_marker_builder.resource_event_markers(
+            repository_id: event.repository_id,
+            resource_kind: event.resource_kind,
+            resource_path: event.resource_path
+          )
+        ]
       end
 
       def persist_completion(completion, command:, event_id:, policy_version:, caused_by:)

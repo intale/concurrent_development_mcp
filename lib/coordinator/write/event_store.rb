@@ -90,7 +90,7 @@ module Coordinator::Write
           filter: {
             streams: [ { context: criteria.stream_context, stream_name: criteria.stream_name } ],
             event_types: criteria.event_types.map do |event_type|
-              { type: event_type, markers: [ criteria.marker ] }
+              { type: event_type, markers: criteria.markers }
             end
           }
         }
@@ -98,7 +98,7 @@ module Coordinator::Write
       return events if events.length <= criteria.maximum_count
 
       raise EventHistoryLimitExceeded,
-            "Global marked event read exceeded #{criteria.maximum_count} relevant events for #{criteria.marker.inspect}"
+            "Global marked event read exceeded #{criteria.maximum_count} relevant events for #{criteria.markers.inspect}"
     end
 
     def read_global_marked_page(criteria)

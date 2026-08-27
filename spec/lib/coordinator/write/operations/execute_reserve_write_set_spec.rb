@@ -31,7 +31,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
       repository_id: RESERVE_REPOSITORY_ID,
-      policy_version: "coordinator-resource-key/v2"
+      policy_version: "coordinator-resource-key/v3"
     )
     expect(completion.data.resources.map(&:fencing_token)).to eq([ 1, 1 ])
     expect(completion.emitted_events.map(&:stream_name)).to eq(
@@ -51,7 +51,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
         "fencing_token" => 1
       )
       expect(acquisition.metadata).to include(
-        "policy_version" => "coordinator-resource-key/v2"
+        "policy_version" => "coordinator-resource-key/v3"
       )
       expect(acquisition.metadata).not_to have_key("correlation_id")
       expect(acquisition.markers).to include(
@@ -61,26 +61,20 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
         "resource-key-hash:#{acquisition.data.fetch('resource_key_hash')}"
       )
       expect(acquisition.markers.grep(/\Acompound:resource-identity:v1:sha256:/).length).to eq(1)
+      expect(acquisition.markers.grep(/\Aresource-path:v1:/).length).to eq(1)
     end
   end
 
-  it "replays the exact normalized completion and rejects changed command reuse" do
+  it "replays the exact byte-preserving completion and rejects changed command reuse" do
     seed_active_attempts([ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ])
     original = operation.call(input)
     original_ids = reservation_event_ids(input)
 
-    alias_replay = operation.call(
-      input.merge(
-        resources: [
-          { kind: "file", path: "app/./services/capture.rb" },
-          { kind: "file", path: "db/tmp/../schema.rb" }
-        ]
-      )
-    )
+    exact_replay = operation.call(input)
     changed = operation.call(input.merge(lease_duration_seconds: 901))
 
-    expect(alias_replay).to be_success
-    expect(alias_replay.value!).to eq(original.value!)
+    expect(exact_replay).to be_success
+    expect(exact_replay.value!).to eq(original.value!)
     expect(changed.failure.code).to eq(:command_id_reused)
     expect(reservation_event_ids(input)).to eq(original_ids)
   end
@@ -181,6 +175,109 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
     expect(inputs.sum { command_events(_1.fetch(:command_id)).length }).to eq(1)
   end
 
+  it "re-evaluates a concurrent directory/child-file DCB so exactly one Task decision wins" do
+    seed_active_attempts(
+      [
+        [ "W-LSE-A", "A-LSE-A", "agent-a" ],
+        [ "W-LSE-B", "A-LSE-B", "agent-b" ]
+      ]
+    )
+    inputs = [
+      reserve_input(
+        command_id: "cmd-directory-race",
+        agent_id: "agent-a",
+        work_item_id: "W-LSE-A",
+        attempt_id: "A-LSE-A",
+        resources: [ { kind: "directory", path: "app/models" } ]
+      ),
+      reserve_input(
+        command_id: "cmd-child-race",
+        agent_id: "agent-b",
+        work_item_id: "W-LSE-B",
+        attempt_id: "A-LSE-B",
+        resources: [ { kind: "file", path: "app/models/user.rb" } ]
+      )
+    ]
+
+    results = inputs.map do |candidate|
+      Thread.new { described_class.new(event_store:).call(candidate) }
+    end.map(&:value)
+
+    expect(results.count(&:success?)).to eq(1)
+    expect(results.count(&:failure?)).to eq(1)
+    expect(results.find(&:failure?).failure).to have_attributes(code: :lease_busy)
+    expect(
+      lease_events("app/models", kind: "directory").length + lease_events("app/models/user.rb").length
+    ).to eq(1)
+    expect(inputs.sum { command_events(_1.fetch(:command_id)).length }).to eq(1)
+  end
+
+  it "allows a file path and a child file path because neither lease covers descendants" do
+    seed_active_attempts(
+      [
+        [ "W-LSE-A", "A-LSE-A", "agent-a" ],
+        [ "W-LSE-B", "A-LSE-B", "agent-b" ]
+      ]
+    )
+    inputs = [
+      reserve_input(
+        command_id: "cmd-file-parent",
+        agent_id: "agent-a",
+        work_item_id: "W-LSE-A",
+        attempt_id: "A-LSE-A",
+        resources: [ { kind: "file", path: "app/models" } ]
+      ),
+      reserve_input(
+        command_id: "cmd-file-child",
+        agent_id: "agent-b",
+        work_item_id: "W-LSE-B",
+        attempt_id: "A-LSE-B",
+        resources: [ { kind: "file", path: "app/models/user.rb" } ]
+      )
+    ]
+
+    results = inputs.map do |candidate|
+      Thread.new { described_class.new(event_store:).call(candidate) }
+    end.map(&:value)
+
+    expect(results).to all(be_success)
+    expect(lease_events("app/models").length).to eq(1)
+    expect(lease_events("app/models/user.rb").length).to eq(1)
+  end
+
+  it "returns a typed zero-fact denial when the selected DCB history exceeds its explicit bound" do
+    seed_active_attempts([ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ])
+    marker = Coordinator::Write::RepositoryMarkerBuilder.new.resource_boundary_markers(
+      repository_id: RESERVE_REPOSITORY_ID,
+      resource_kind: "file",
+      resource_path: "bounded.rb"
+    ).sole
+    events = 257.times.map do
+      PgEventstore::Event.new(
+        id: Coordinator::Shared::IdGenerator.new.uuid_v7,
+        type: "ResourceLeaseAcquired",
+        data: {},
+        metadata: { "schema_version" => 1 },
+        markers: [ marker ]
+      )
+    end
+    event_store.append(streams.resource_lease("sha256:#{'f' * 64}"), events)
+
+    result = operation.call(
+      reserve_input(
+        command_id: "cmd-boundary-overflow",
+        agent_id: "agent-a",
+        work_item_id: "W-LSE-A",
+        attempt_id: "A-LSE-A",
+        paths: [ "bounded.rb" ]
+      )
+    )
+
+    expect(result.failure).to have_attributes(code: :resource_boundary_history_limit_exceeded)
+    expect(command_events("cmd-boundary-overflow")).to be_empty
+    expect(attempt_events("A-LSE-A").none? { _1.type == "WriteSetReserved" }).to be(true)
+  end
+
   it "allows disjoint dynamic resource sets to complete independently" do
     seed_active_attempts(
       [
@@ -259,7 +356,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
     agent_id:,
     work_item_id:,
     attempt_id:,
-    paths:,
+    paths: nil,
+    resources: nil,
     lease_duration_seconds: 900
   )
     {
@@ -270,7 +368,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
       attempt_id:,
       repository_id: RESERVE_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
-      resources: paths.map { { kind: "file", path: _1 } },
+      resources: resources || paths.map { { kind: "file", path: _1 } },
       lease_duration_seconds:
     }
   end
@@ -320,11 +418,11 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
     end
   end
 
-  def lease_events(path)
+  def lease_events(path, kind: "file")
     resource = normalizer.call(
       repository_id: RESERVE_REPOSITORY_ID,
       scope: RepositoryScenario::DEFAULT_SCOPE,
-      kind: "file",
+      kind:,
       path:,
       base_blob_oid: nil
     ).value!
@@ -350,7 +448,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
   end
 
   def reservation_event_ids(arguments)
-    arguments.fetch(:resources).flat_map { lease_events(_1.fetch(:path)).map(&:id) } +
+    arguments.fetch(:resources).flat_map do |resource|
+      lease_events(resource.fetch(:path), kind: resource.fetch(:kind)).map(&:id)
+    end +
       attempt_events(arguments.fetch(:attempt_id)).select { _1.type == "WriteSetReserved" }.map(&:id) +
       command_events(arguments.fetch(:command_id)).map(&:id)
   end

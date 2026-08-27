@@ -57,11 +57,15 @@ module Coordinator::Write
             return failure(:write_set_already_reserved, "Attempt already has an initial write set", command)
           end
 
-          busy_index = lease_states.find_index { _1.active_at?(acquired_at) }
-          return unless busy_index
+          busy = command.resources.lazy.filter_map do |resource|
+            state = lease_states.find do |candidate|
+              candidate.active_at?(acquired_at) && resources_overlap?(resource, candidate)
+            end
+            [ resource, state ] if state
+          end.first
+          return unless busy
 
-          busy_state = lease_states.fetch(busy_index)
-          resource = command.resources.fetch(busy_index)
+          resource, busy_state = busy
           Failure(
             OutcomeError.new(
               code: :lease_busy,
@@ -77,6 +81,13 @@ module Coordinator::Write
               }
             )
           )
+        end
+
+        def resources_overlap?(resource, state)
+          return true if resource.path == state.resource_path
+
+          (resource.kind == "directory" && state.resource_path.start_with?("#{resource.path}/")) ||
+            (state.resource_kind == "directory" && resource.path.start_with?("#{state.resource_path}/"))
         end
 
         def build_plan(attempt_state:, lease_states:, command:, lease_set_id:, lease_ids:, acquired_at:, expires_at:)
