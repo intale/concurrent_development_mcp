@@ -178,8 +178,30 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
         "lease-expiry-scheduler-v1",
         "operation-batch-runner-v1",
         "release-set-lifecycle-v1",
+        "resource-boundary-maintenance-v1",
         "verification-obligation-validity-v1"
       ]
+    )
+  end
+
+  it "stacks one four-event resource-boundary maintenance policy in that same manager" do
+    definition = Coordinator::Processes::Subscriptions::ResourceBoundaryMaintenance::DEFINITION
+
+    expect(definition.to_h).to eq(
+      set_name: "coordinator-process-managers-v1",
+      subscription_name: "resource-boundary-maintenance-v1",
+      stream_context: "DevelopmentCoordination",
+      stream_name: "ResourceLease",
+      event_types: %w[
+        ResourceLeaseAcquired
+        ResourceLeaseRenewed
+        ResourceLeaseReleased
+        ResourceLeaseExpired
+      ],
+      event_markers: []
+    )
+    expect(Coordinator::Container["process_managers.resource_boundary_maintenance"]).to be_a(
+      Coordinator::Processes::ProcessManagers::ResourceBoundaryMaintenance
     )
   end
 

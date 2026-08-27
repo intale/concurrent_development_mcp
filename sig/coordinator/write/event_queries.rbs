@@ -2,7 +2,12 @@ module Coordinator
   module Write
     module EventQueries
       GUIDANCE_MESSAGE_EVENT_TYPES: Array[String]
-      RESOURCE_LEASE_BOUNDARY_MAXIMUM_COUNT: Integer
+      RESOURCE_LEASE_LIFECYCLE_EVENT_TYPES: Array[String]
+      RESOURCE_BOUNDARY_DECISION_DELTA_MAXIMUM_COUNT: Integer
+      RESOURCE_BOUNDARY_ROLLOVER_SOFT_COUNT: Integer
+      RESOURCE_BOUNDARY_ROLLOVER_DELTA_MAXIMUM_COUNT: Integer
+      RESOURCE_BOUNDARY_ACTIVE_LEASE_MAXIMUM_COUNT: Integer
+      RESOURCE_BOUNDARY_MAXIMUM_GLOBAL_POSITION: Integer
 
       def self.guidance_message: (String marker) -> GlobalMarkedEventReadCriteria
       def self.interpretation_proposal: (String marker) -> GlobalMarkedEventReadCriteria
@@ -11,9 +16,15 @@ module Coordinator
       def self.interpretation_acceptance: (String marker) -> GlobalMarkedEventReadCriteria
       def self.decision_activation: (String marker) -> GlobalMarkedEventReadCriteria
       def self.candidate_impact_surface_registration: (String marker) -> MarkedEventReadCriteria
-      def self.resource_lease_boundary: (Array[String] markers) -> GlobalMarkedEventReadCriteria
+      def self.resource_lease_boundary_pages: (
+        String marker,
+        from_position: Integer,
+        to_position: Integer,
+        maximum_count: Integer
+      ) -> Array[GlobalMarkedEventPageCriteria]
 
       COMMAND_COMPLETION: EventReadCriteria
+      RESOURCE_BOUNDARY_LATEST_EPOCH: GroupedEventReadCriteria
       REPOSITORY_REGISTRATION: EventReadCriteria
       SKILL_LATEST_REVISION: GroupedEventReadCriteria
       DEVELOPMENT_ARTIFACT_HISTORY: EventReadCriteria

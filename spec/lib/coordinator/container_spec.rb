@@ -205,6 +205,7 @@ RSpec.describe Coordinator::Container do
         "lease-expiry-scheduler-v1",
         "operation-batch-runner-v1",
         "release-set-lifecycle-v1",
+        "resource-boundary-maintenance-v1",
         "verification-obligation-validity-v1"
       ]
     )

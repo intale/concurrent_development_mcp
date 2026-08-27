@@ -1,0 +1,25 @@
+module Coordinator
+  module Processes
+    module ProcessManagers
+      class ResourceBoundaryMaintenance
+        class Rejected < StandardError
+        end
+
+        class SourceContract < Dry::Validation::Contract
+          EVENT_TYPES: Array[String]
+        end
+
+        SYSTEM_ACTOR: Write::Commands::Actor
+
+        def initialize: (
+          event_store: Write::_EventStore,
+          ?contract: SourceContract,
+          ?schema_registry: Write::EventSchemaRegistry,
+          ?marker_builder: Write::RepositoryMarkerBuilder,
+          ?operation: Write::Operations::ExecuteRollResourceBoundaryEpoch
+        ) -> void
+        def call: (PgEventstore::Event event) -> nil
+      end
+    end
+  end
+end

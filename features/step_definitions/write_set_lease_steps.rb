@@ -1917,3 +1917,469 @@ Then("MCP rejects the reserved command ID before allocating a Task") do
   assert_acceptance_equal([], task_events_for_command(@reserved_public_command_id), "Task facts")
   assert_acceptance_equal([], command_events(@reserved_public_command_id), "Command facts")
 end
+
+class ResourceBoundaryRolloverGate
+  EVENT_NAME = "coordinator.command_boundary"
+  ROLLOVER_COMMAND_PREFIX = "internal:resource-boundary-rollover:v1:"
+
+  def initialize(reservation_command_id:)
+    @reservation_command_id = reservation_command_id
+    @mutex = Thread::Mutex.new
+    @condition = Thread::ConditionVariable.new
+    @arrivals = {}
+    @released = false
+    @subscriber = ActiveSupport::Notifications.subscribe(EVENT_NAME) do |_name, _start, _finish, _id, payload|
+      role = role_for(payload)
+      arrive(role, payload) if role
+    end
+  end
+
+  def wait(timeout_seconds: 120)
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout_seconds
+    @mutex.synchronize do
+      until @arrivals.keys.sort == %i[reservation rollover]
+        remaining = deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        raise timeout_error if remaining <= 0
+
+        @condition.wait(@mutex, remaining)
+      end
+      @arrivals.transform_values(&:dup).freeze
+    end
+  end
+
+  def release
+    @mutex.synchronize do
+      @released = true
+      @condition.broadcast
+    end
+  end
+
+  def close
+    release
+    ActiveSupport::Notifications.unsubscribe(@subscriber)
+  end
+
+  private
+
+  def role_for(payload)
+    return unless payload.fetch(:operation).to_s == "resource_boundary_dcb"
+
+    command_id = payload.fetch(:command_id).to_s
+    return :reservation if command_id == @reservation_command_id
+    :rollover if command_id.start_with?(ROLLOVER_COMMAND_PREFIX)
+  end
+
+  def arrive(role, payload)
+    @mutex.synchronize do
+      @arrivals[role] ||= payload.slice(:command_id, :event_id, :event_ids, :source_event_id).freeze
+      @condition.broadcast
+      @condition.wait(@mutex) until @released
+    end
+  end
+
+  def timeout_error
+    missing = %i[reservation rollover] - @arrivals.keys
+    "Timed out waiting for resource-boundary contention; missing arrivals: #{missing.inspect}"
+  end
+end
+
+module ResourceBoundaryRolloverAcceptance
+  ROLLOVER_CHANGE_SET_ID = "CS-AUD2-RESOURCE-ROLLOVER"
+  OWNER = {
+    agent_id: "rollover-owner",
+    work_item_id: "W-AUD2-ROLLOVER-A",
+    attempt_id: "A-AUD2-ROLLOVER-A"
+  }.freeze
+  CONTENDER = {
+    agent_id: "rollover-contender",
+    work_item_id: "W-AUD2-ROLLOVER-B",
+    attempt_id: "A-AUD2-ROLLOVER-B"
+  }.freeze
+
+  def prepare_rollover_attempts
+    prepare_mcp_clients(OWNER.fetch(:agent_id), CONTENDER.fetch(:agent_id))
+    submit_and_execute(
+      "change_set_create",
+      command_id: "audit2-rollover.create",
+      actor: { kind: "agent", id: "planner" },
+      change_set_id: ROLLOVER_CHANGE_SET_ID,
+      goal: "Keep hot resource boundaries available",
+      acceptance_criteria: [ "Rollover preserves authoritative lease decisions" ]
+    )
+    [ OWNER, CONTENDER ].each do |participant|
+      submit_and_execute(
+        "work_item_create",
+        command_id: "audit2-rollover.create.#{participant.fetch(:work_item_id)}",
+        actor: { kind: "agent", id: "planner" },
+        change_set_id: ROLLOVER_CHANGE_SET_ID,
+        work_item_id: participant.fetch(:work_item_id),
+        repository_id: acceptance_repository_id,
+        goal: "Coordinate #{participant.fetch(:agent_id)}",
+        acceptance_criteria: [ "The lease decision is serialized" ]
+      )
+    end
+    submit_and_execute(
+      "change_set_activate",
+      command_id: "audit2-rollover.activate",
+      actor: { kind: "agent", id: "planner" },
+      change_set_id: ROLLOVER_CHANGE_SET_ID
+    )
+    [ OWNER, CONTENDER ].each { await_work_item_ready(_1.fetch(:work_item_id)) }
+    [ OWNER, CONTENDER ].each do |participant|
+      submit_and_execute(
+        "work_item_acquire",
+        client_id: participant.fetch(:agent_id),
+        command_id: "audit2-rollover.acquire.#{participant.fetch(:attempt_id)}",
+        actor: { kind: "agent", id: participant.fetch(:agent_id) },
+        change_set_id: ROLLOVER_CHANGE_SET_ID,
+        work_item_id: participant.fetch(:work_item_id),
+        attempt_id: participant.fetch(:attempt_id),
+        base_snapshots: [ { repository_id: acceptance_repository_id, commit_oid: "a" * 40 } ]
+      )
+    end
+  end
+
+  def reserve_rollover_resources(resources)
+    task_id = submit_and_execute(
+      "write_set_reserve",
+      client_id: OWNER.fetch(:agent_id),
+      command_id: "audit2-rollover.reserve.owner",
+      actor: { kind: "agent", id: OWNER.fetch(:agent_id) },
+      change_set_id: ROLLOVER_CHANGE_SET_ID,
+      work_item_id: OWNER.fetch(:work_item_id),
+      attempt_id: OWNER.fetch(:attempt_id),
+      repository_id: acceptance_repository_id,
+      base_commit_oid: "a" * 40,
+      resources:,
+      lease_duration_seconds: 600
+    )
+    successful_rollover_task_data(task_id, client_id: OWNER.fetch(:agent_id))
+  end
+
+  def renew_rollover_resources(receipt, count:)
+    count.times.reduce(receipt) do |current, _index|
+      @rollover_renewal_sequence = @rollover_renewal_sequence.to_i + 1
+      task_id = submit_and_execute(
+        "lease_renew",
+        client_id: OWNER.fetch(:agent_id),
+        command_id: "audit2-rollover.renew.#{@rollover_renewal_sequence}",
+        actor: { kind: "agent", id: OWNER.fetch(:agent_id) },
+        change_set_id: ROLLOVER_CHANGE_SET_ID,
+        work_item_id: OWNER.fetch(:work_item_id),
+        attempt_id: OWNER.fetch(:attempt_id),
+        lease_set_id: current.fetch("lease_set_id"),
+        leases: lease_observations(current),
+        lease_duration_seconds: 600 + (@rollover_renewal_sequence * 60)
+      )
+      successful_rollover_task_data(task_id, client_id: OWNER.fetch(:agent_id))
+    end
+  end
+
+  def expand_rollover_resources(receipt, resources:)
+    task_id = submit_and_execute(
+      "write_set_expand",
+      client_id: OWNER.fetch(:agent_id),
+      command_id: "audit2-rollover.expand.owner",
+      actor: { kind: "agent", id: OWNER.fetch(:agent_id) },
+      change_set_id: ROLLOVER_CHANGE_SET_ID,
+      work_item_id: OWNER.fetch(:work_item_id),
+      attempt_id: OWNER.fetch(:attempt_id),
+      lease_set_id: receipt.fetch("lease_set_id"),
+      repository_id: acceptance_repository_id,
+      base_commit_oid: "a" * 40,
+      resources:
+    )
+    expansion = successful_rollover_task_data(task_id, client_id: OWNER.fetch(:agent_id))
+    all_resources = (receipt.fetch("resources") + expansion.fetch("added_resources"))
+      .sort_by { _1.fetch("resource_key_hash").b }
+    receipt.merge("resources" => all_resources, "expires_at" => expansion.fetch("expires_at"))
+  end
+
+  def release_rollover_resources(receipt)
+    task_id = submit_and_execute(
+      "lease_release",
+      client_id: OWNER.fetch(:agent_id),
+      command_id: "audit2-rollover.release.owner",
+      actor: { kind: "agent", id: OWNER.fetch(:agent_id) },
+      change_set_id: ROLLOVER_CHANGE_SET_ID,
+      work_item_id: OWNER.fetch(:work_item_id),
+      attempt_id: OWNER.fetch(:attempt_id),
+      lease_set_id: receipt.fetch("lease_set_id"),
+      leases: lease_observations(receipt)
+    )
+    successful_rollover_task_data(task_id, client_id: OWNER.fetch(:agent_id))
+  end
+
+  def successful_rollover_task_data(task_id, client_id:)
+    state = task_request("tasks/get", task_id, client_id:)
+    result = state.dig("result", "result")
+    assert_acceptance_equal("completed", state.dig("result", "status"), "Rollover setup Task")
+    assert_acceptance_equal(false, result.fetch("isError"), "Rollover setup result")
+    result.fetch("structuredContent").fetch("data")
+  end
+
+  def lease_observations(receipt)
+    receipt.fetch("resources").map do |reference|
+      {
+        resource_key_hash: reference.fetch("resource_key_hash"),
+        lease_id: reference.fetch("lease_id"),
+        fencing_token: reference.fetch("fencing_token")
+      }
+    end
+  end
+
+  def rollover_resource_events(kind:, path:, maximum_count: 400)
+    resource = Coordinator::Write::FileResourceNormalizer.new.call(
+      repository_id: acceptance_repository_id,
+      kind:,
+      path:,
+      base_blob_oid: nil,
+      scope: acceptance_repository_scope
+    ).value!
+    event_store.read(
+      streams.resource_lease(resource.resource_key_hash),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: Coordinator::Write::EventQueries::RESOURCE_LEASE_LIFECYCLE_EVENT_TYPES,
+        maximum_count:,
+        direction: :asc
+      )
+    )
+  end
+
+  def rollover_markers(kind:, path:)
+    Coordinator::Write::RepositoryMarkerBuilder.new.resource_boundary_markers(
+      repository_id: acceptance_repository_id,
+      resource_kind: kind,
+      resource_path: path
+    )
+  end
+
+  def rollover_boundary_marker(directory:, child_path:)
+    event_markers = Coordinator::Write::RepositoryMarkerBuilder.new.resource_event_markers(
+      repository_id: acceptance_repository_id,
+      resource_kind: "file",
+      resource_path: child_path
+    )
+    (event_markers & rollover_markers(kind: "directory", path: directory)).sole
+  end
+
+  def rollover_boundary_events(marker, maximum_count: 512)
+    Coordinator::Write::EventQueries.resource_lease_boundary_pages(
+      marker,
+      from_position: 0,
+      to_position: Coordinator::Write::EventQueries::RESOURCE_BOUNDARY_MAXIMUM_GLOBAL_POSITION,
+      maximum_count:
+    ).flat_map { event_store.read_global_marked_page(_1) }
+      .sort_by(&:global_position)
+  end
+
+  def rollover_snapshots(marker)
+    loader = Coordinator::Write::ResourceBoundaryLoader.new(event_store:)
+    event_store.read(
+      loader.snapshot_stream(marker),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: [ "ResourceBoundaryEpochRolled" ],
+        maximum_count: 10,
+        direction: :asc
+      )
+    )
+  end
+
+  def rollover_command_id(source, marker)
+    Coordinator::Processes::InternalCommandIdBuilder.call(
+      "resource-boundary-rollover:v1:#{source.id}:#{marker.split(':').last}"
+    )
+  end
+
+  def submit_rollover_contender(kind:, path:, await_terminal: true)
+    response = call_tool(
+      "write_set_reserve",
+      {
+        command_id: "audit2-rollover.reserve.contender",
+        actor: { kind: "agent", id: CONTENDER.fetch(:agent_id) },
+        change_set_id: ROLLOVER_CHANGE_SET_ID,
+        work_item_id: CONTENDER.fetch(:work_item_id),
+        attempt_id: CONTENDER.fetch(:attempt_id),
+        repository_id: acceptance_repository_id,
+        base_commit_oid: "a" * 40,
+        resources: [ { kind:, path: } ],
+        lease_duration_seconds: 600
+      },
+      client_id: CONTENDER.fetch(:agent_id)
+    )
+    task_id = response.dig("result", "taskId")
+    assert_acceptance(task_id, "Rollover contender did not receive an MCP Task")
+    state = await_task_terminal(task_id, client_id: CONTENDER.fetch(:agent_id)) if await_terminal
+    { task_id:, state: }
+  end
+
+  def await_rollover_epoch(marker, count)
+    eventually("resource boundary epoch #{count}", timeout_seconds: 120) do
+      snapshots = rollover_snapshots(marker)
+      [ snapshots.length >= count, snapshots.map { _1.data.fetch("epoch") } ]
+    end
+  end
+end
+
+World(ResourceBoundaryRolloverAcceptance)
+
+After do
+  @resource_boundary_rollover_gate&.close
+end
+
+Given("a directory boundary has exceeded the former lifecycle-history limit") do
+  prepare_rollover_attempts
+  @rollover_directory = "hot"
+  @rollover_children = 32.times.map { "#{@rollover_directory}/child-#{_1}.rb" }
+  @rollover_marker = rollover_boundary_marker(
+    directory: @rollover_directory,
+    child_path: @rollover_children.first
+  )
+  @rollover_receipt = reserve_rollover_resources(
+    @rollover_children.map { { kind: "file", path: _1 } }
+  )
+  @rollover_receipt = renew_rollover_resources(@rollover_receipt, count: 3)
+  await_rollover_epoch(@rollover_marker, 1)
+  @rollover_receipt = renew_rollover_resources(@rollover_receipt, count: 4)
+  await_rollover_epoch(@rollover_marker, 2)
+  @rollover_receipt = renew_rollover_resources(@rollover_receipt, count: 1)
+  assert_acceptance(
+    rollover_boundary_events(@rollover_marker).length > 256,
+    "The hot directory boundary did not exceed the former lifecycle limit"
+  )
+end
+
+Given("every prior child lease on that boundary is released or expired") do
+  release_rollover_resources(@rollover_receipt)
+end
+
+When("an agent reserves the directory through public MCP") do
+  @rollover_contender = submit_rollover_contender(kind: "directory", path: @rollover_directory)
+end
+
+Then("the reservation Task completes successfully") do
+  result = @rollover_contender.dig(:state, "result", "result")
+  assert_acceptance_equal(
+    "completed",
+    @rollover_contender.dig(:state, "result", "status"),
+    "Reservation Task"
+  )
+  assert_acceptance_equal(false, result.fetch("isError"), "Reservation result")
+  assert_acceptance_equal("ok", result.dig("structuredContent", "status"), "Reservation outcome")
+end
+
+Then("its authoritative decision uses a bounded snapshot plus delta") do
+  snapshots = rollover_snapshots(@rollover_marker)
+  boundary = Coordinator::Write::ResourceBoundaryLoader.new(event_store:).call([ @rollover_marker ]).boundaries.sole
+
+  assert_acceptance(snapshots.length >= 2, "The authoritative boundary has no rolled epochs")
+  assert_acceptance(boundary.previous_through_global_position, "The decision did not load a snapshot")
+  assert_acceptance(boundary.delta_count.between?(1, 256), "The decision delta was not bounded")
+  assert_acceptance(
+    boundary.states.any? do
+      _1.attempt_id == ResourceBoundaryRolloverAcceptance::CONTENDER.fetch(:attempt_id) &&
+        _1.active_at?(Time.now.utc.iso8601(6))
+    end,
+    "The bounded reconstruction omitted the successor lease"
+  )
+end
+
+Given("two independent agents can reach the same resource-boundary decision concurrently") do
+  prepare_rollover_attempts
+  @rollover_directory = "hot-race"
+  @rollover_children = 32.times.map { "#{@rollover_directory}/child-#{_1}.rb" }
+  @rollover_race_marker = rollover_boundary_marker(
+    directory: @rollover_directory,
+    child_path: @rollover_children.first
+  )
+  receipt = reserve_rollover_resources(
+    @rollover_children.first(31).map { { kind: "file", path: _1 } }
+  )
+  receipt = renew_rollover_resources(receipt, count: 1)
+  receipt = expand_rollover_resources(
+    receipt,
+    resources: [ { kind: "file", path: @rollover_children.last } ]
+  )
+  @rollover_receipt = renew_rollover_resources(receipt, count: 2)
+  assert_acceptance_equal(127, rollover_boundary_events(@rollover_race_marker).length, "Pre-race facts")
+  @rollover_reservation_command_id = "audit2-rollover.reserve.contender"
+  @resource_boundary_rollover_gate = ResourceBoundaryRolloverGate.new(
+    reservation_command_id: @rollover_reservation_command_id
+  )
+end
+
+When("the rollover command and conflicting reservation reach the deterministic database barrier") do
+  release_rollover_resources(@rollover_receipt)
+  lifecycle = rollover_boundary_events(@rollover_race_marker)
+  @rollover_race_source = lifecycle.fetch(127)
+  @rollover_race_command_id = rollover_command_id(@rollover_race_source, @rollover_race_marker)
+  @rollover_race_contender = submit_rollover_contender(
+    kind: "directory",
+    path: @rollover_directory,
+    await_terminal: false
+  )
+  @rollover_contention_evidence = @resource_boundary_rollover_gate.wait
+  assert_acceptance_equal(
+    @rollover_race_command_id,
+    @rollover_contention_evidence.dig(:rollover, :command_id),
+    "Rollover barrier command"
+  )
+end
+
+When("the barrier releases both operations") do
+  @resource_boundary_rollover_gate.release
+  @rollover_race_contender[:state] = await_task_terminal(
+    @rollover_race_contender.fetch(:task_id),
+    client_id: ResourceBoundaryRolloverAcceptance::CONTENDER.fetch(:agent_id)
+  )
+  eventually("the raced boundary snapshot") do
+    snapshots = rollover_snapshots(@rollover_race_marker)
+    [ snapshots.any?, snapshots.map(&:id) ]
+  end
+end
+
+Then("both operations terminate without a partial write") do
+  result = @rollover_race_contender.dig(:state, "result", "result")
+  assert_acceptance_equal(
+    "completed",
+    @rollover_race_contender.dig(:state, "result", "status"),
+    "Raced Task"
+  )
+  assert_acceptance_equal(false, result.fetch("isError"), "Raced reservation")
+  assert_acceptance_equal(1, rollover_snapshots(@rollover_race_marker).length, "Rollover facts")
+  assert_acceptance_equal(
+    1,
+    rollover_resource_events(kind: "directory", path: @rollover_directory).length,
+    "Directory lease facts"
+  )
+end
+
+Then("the resulting boundary has at most one active overlapping lease") do
+  boundary = Coordinator::Write::ResourceBoundaryLoader.new(event_store:).call([ @rollover_race_marker ])
+  active = boundary.states.select { _1.active_at?(Time.now.utc.iso8601(6)) }
+
+  assert_acceptance_equal(1, active.length, "The raced boundary active leases")
+  assert_acceptance_equal(
+    ResourceBoundaryRolloverAcceptance::CONTENDER.fetch(:attempt_id),
+    active.sole.attempt_id,
+    "Active lease owner"
+  )
+end
+
+Then("every retry retains its logical event identities") do
+  snapshot_ids = rollover_snapshots(@rollover_race_marker).map(&:id)
+  lease_ids = rollover_resource_events(kind: "directory", path: @rollover_directory).map(&:id)
+  replay = submit_rollover_contender(kind: "directory", path: @rollover_directory)
+  snapshot = rollover_snapshots(@rollover_race_marker).sole
+
+  assert_acceptance_equal(false, replay.dig(:state, "result", "result", "isError"), "Reservation replay")
+  assert_acceptance_equal(snapshot_ids, rollover_snapshots(@rollover_race_marker).map(&:id), "Rollover identities")
+  assert_acceptance_equal(
+    lease_ids,
+    rollover_resource_events(kind: "directory", path: @rollover_directory).map(&:id),
+    "Reservation identities"
+  )
+  assert_acceptance_equal(@rollover_race_command_id, snapshot.metadata.fetch("command_id"), "Rollover command")
+  assert_acceptance_equal(@rollover_race_source.id, snapshot.causation_id, "Rollover causation")
+  assert_acceptance_equal(@rollover_race_source.correlation_id, snapshot.correlation_id, "Rollover correlation")
+end

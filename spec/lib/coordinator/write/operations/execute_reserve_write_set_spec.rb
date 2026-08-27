@@ -61,7 +61,13 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
         "resource-key-hash:#{acquisition.data.fetch('resource_key_hash')}"
       )
       expect(acquisition.markers.grep(/\Acompound:resource-identity:v1:sha256:/).length).to eq(1)
-      expect(acquisition.markers.grep(/\Aresource-path:v1:/).length).to eq(1)
+      expect(acquisition.markers.grep(/\Acompound:resource-boundary:v1:sha256:/)).to eq(
+        Coordinator::Write::RepositoryMarkerBuilder.new.resource_event_markers(
+          repository_id: RESERVE_REPOSITORY_ID,
+          resource_kind: resource.fetch(:kind),
+          resource_path: resource.fetch(:path)
+        ).sort
+      )
     end
   end
 
@@ -245,7 +251,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
     expect(lease_events("app/models/user.rb").length).to eq(1)
   end
 
-  it "returns a typed zero-fact denial when the selected DCB history exceeds its explicit bound" do
+  it "returns a typed zero-fact maintenance denial when the selected DCB delta exceeds its hard bound" do
     seed_active_attempts([ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ])
     marker = Coordinator::Write::RepositoryMarkerBuilder.new.resource_boundary_markers(
       repository_id: RESERVE_REPOSITORY_ID,
@@ -273,9 +279,68 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
       )
     )
 
-    expect(result.failure).to have_attributes(code: :resource_boundary_history_limit_exceeded)
+    expect(result.failure).to have_attributes(
+      code: :resource_boundary_maintenance_required,
+      details: {
+        repository_id: RESERVE_REPOSITORY_ID,
+        boundary_marker_count: 1,
+        maximum_delta_event_count: 256
+      }
+    )
     expect(command_events("cmd-boundary-overflow")).to be_empty
     expect(attempt_events("A-LSE-A").none? { _1.type == "WriteSetReserved" }).to be(true)
+  end
+
+  it "rolls a hot inactive boundary into one idempotent snapshot and makes it leasable again" do
+    seed_active_attempts([ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ])
+    marker = Coordinator::Write::RepositoryMarkerBuilder.new.resource_boundary_markers(
+      repository_id: RESERVE_REPOSITORY_ID,
+      resource_kind: "file",
+      resource_path: "hot.rb"
+    ).sole
+    source = append_released_boundary_history(marker:, path: "hot.rb", lease_count: 129)
+    command = Coordinator::Write::Commands::RollResourceBoundaryEpoch.new(
+      command_id: "internal:resource-boundary-rollover:v1:spec",
+      actor: Coordinator::Write::Commands::Actor.new(kind: "system", id: "resource-boundary-maintenance-v1"),
+      repository_id: RESERVE_REPOSITORY_ID,
+      boundary_marker: marker,
+      source_event_id: source.id,
+      source_global_position: source.global_position
+    )
+    rollover = Coordinator::Write::Operations::ExecuteRollResourceBoundaryEpoch.new(event_store:)
+
+    first = rollover.call_command(command, caused_by: source)
+    replay = rollover.call_command(command, caused_by: source)
+
+    expect(first).to be_success
+    expect(replay).to be_success
+    snapshots = event_store.read(
+      Coordinator::Write::ResourceBoundaryLoader.new(event_store:).snapshot_stream(marker),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: [ "ResourceBoundaryEpochRolled" ],
+        maximum_count: 2,
+        direction: :asc
+      )
+    )
+    expect(snapshots.length).to eq(1)
+    expect(snapshots.sole).to have_attributes(causation_id: source.id, correlation_id: source.correlation_id)
+    expect(snapshots.sole.data).to include(
+      "boundary_marker" => marker,
+      "epoch" => 1,
+      "through_global_position" => source.global_position,
+      "active_leases" => []
+    )
+
+    reservation = operation.call(
+      reserve_input(
+        command_id: "cmd-hot-after-rollover",
+        agent_id: "agent-a",
+        work_item_id: "W-LSE-A",
+        attempt_id: "A-LSE-A",
+        paths: [ "hot.rb" ]
+      )
+    )
+    expect(reservation).to be_success
   end
 
   it "allows disjoint dynamic resource sets to complete independently" do
@@ -453,5 +518,66 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
     end +
       attempt_events(arguments.fetch(:attempt_id)).select { _1.type == "WriteSetReserved" }.map(&:id) +
       command_events(arguments.fetch(:command_id)).map(&:id)
+  end
+
+  def append_released_boundary_history(marker:, path:, lease_count:)
+    resource_key_hash = "sha256:#{'f' * 64}"
+    events = lease_count.times.flat_map do |index|
+      lease_id = Coordinator::Shared::IdGenerator.new.uuid_v7
+      acquired_at = "2026-08-22T10:00:00.000000Z"
+      released_at = "2026-08-22T10:00:01.000000Z"
+      expires_at = "2026-08-22T10:05:00.000000Z"
+      common = {
+        lease_id:,
+        lease_set_id: Coordinator::Shared::IdGenerator.new.uuid_v7,
+        resource_key: "test-resource:#{path}",
+        resource_key_hash:,
+        resource_kind: "file",
+        resource_path: path,
+        policy_version: "coordinator-resource-key/v3",
+        mode: "exclusive",
+        change_set_id: "CS-HOT",
+        work_item_id: "W-HOT",
+        attempt_id: "A-HOT",
+        agent_id: "hot-agent",
+        repository_id: RESERVE_REPOSITORY_ID,
+        object_format: "sha1",
+        base_commit_oid: "a" * 40,
+        base_blob_oid: nil,
+        fencing_token: index + 1
+      }
+      metadata = Coordinator::Write::EventMetadata.new(
+        command_id: "seed-hot-#{index}",
+        actor_kind: "system",
+        actor_id: "resource-boundary-spec",
+        recorded_by: "coordinator",
+        policy_version: "coordinator-resource-key/v3"
+      )
+      [
+        Coordinator::Write::EventFactory.new.build!(
+          event: Coordinator::Write::Events::ResourceLeaseAcquiredV1.new(
+            **common,
+            acquired_at:,
+            expires_at:
+          ),
+          event_id: Coordinator::Shared::IdGenerator.new.uuid_v7,
+          metadata:,
+          markers: [ marker ]
+        ),
+        Coordinator::Write::EventFactory.new.build!(
+          event: Coordinator::Write::Events::ResourceLeaseReleasedV1.new(
+            **common,
+            acquired_at:,
+            previous_expires_at: expires_at,
+            released_at:
+          ),
+          event_id: Coordinator::Shared::IdGenerator.new.uuid_v7,
+          metadata:,
+          markers: [ marker ]
+        )
+      ]
+    end
+
+    event_store.append(streams.resource_lease(resource_key_hash), events).last
   end
 end

@@ -70,15 +70,15 @@ Feature: Audited coordination remains correct under replay, interruption, and co
 
   Rule: Resource-boundary history remains bounded without becoming unavailable
 
-    @wip @AUD2-LEASE-HISTORY-ROLLOVER-01 @live-subscriptions
-    Scenario: A released hot resource remains leasable after lifecycle rollover
-      Given a file boundary has exceeded the former lifecycle-history limit
-      And every prior lease on that boundary is released or expired
-      When an agent reserves the file through public MCP
+    @AUD2-LEASE-HISTORY-ROLLOVER-01 @live-subscriptions
+    Scenario: A released hot directory remains leasable after lifecycle rollover
+      Given a directory boundary has exceeded the former lifecycle-history limit
+      And every prior child lease on that boundary is released or expired
+      When an agent reserves the directory through public MCP
       Then the reservation Task completes successfully
       And its authoritative decision uses a bounded snapshot plus delta
 
-    @wip @AUD2-LEASE-ROLLOVER-RACE-02 @live-subscriptions @concurrency
+    @AUD2-LEASE-ROLLOVER-RACE-02 @live-subscriptions @concurrency
     Scenario: Rollover racing a conflicting reservation preserves one valid lease decision
       Given two independent agents can reach the same resource-boundary decision concurrently
       When the rollover command and conflicting reservation reach the deterministic database barrier

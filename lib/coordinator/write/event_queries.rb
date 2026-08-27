@@ -82,23 +82,37 @@ module Coordinator::Write
       )
     end
 
-    RESOURCE_LEASE_BOUNDARY_MAXIMUM_COUNT = 256
+    RESOURCE_LEASE_LIFECYCLE_EVENT_TYPES = %w[
+      ResourceLeaseAcquired
+      ResourceLeaseRenewed
+      ResourceLeaseReleased
+      ResourceLeaseExpired
+    ].freeze
+    RESOURCE_BOUNDARY_DECISION_DELTA_MAXIMUM_COUNT = 256
+    RESOURCE_BOUNDARY_ROLLOVER_SOFT_COUNT = 128
+    RESOURCE_BOUNDARY_ROLLOVER_DELTA_MAXIMUM_COUNT = 4_096
+    RESOURCE_BOUNDARY_ACTIVE_LEASE_MAXIMUM_COUNT = 1_024
+    RESOURCE_BOUNDARY_MAXIMUM_GLOBAL_POSITION = (2**63) - 1
 
-    def self.resource_lease_boundary(markers)
-      GlobalMarkedEventReadCriteria.new(
-        stream_context: "DevelopmentCoordination",
-        stream_name: "ResourceLease",
-        event_types: %w[
-          ResourceLeaseAcquired
-          ResourceLeaseRenewed
-          ResourceLeaseReleased
-          ResourceLeaseExpired
-        ],
-        markers: markers.uniq,
-        maximum_count: RESOURCE_LEASE_BOUNDARY_MAXIMUM_COUNT,
-        direction: :asc
-      )
+    def self.resource_lease_boundary_pages(marker, from_position:, to_position:, maximum_count:)
+      RESOURCE_LEASE_LIFECYCLE_EVENT_TYPES.map do |event_type|
+        GlobalMarkedEventPageCriteria.new(
+          stream_context: "DevelopmentCoordination",
+          stream_name: "ResourceLease",
+          event_type:,
+          markers: [ marker ],
+          from_position:,
+          to_position:,
+          page_size: maximum_count,
+          direction: :asc
+        )
+      end
     end
+
+    RESOURCE_BOUNDARY_LATEST_EPOCH = GroupedEventReadCriteria.new(
+      event_types: [ "ResourceBoundaryEpochRolled" ],
+      direction: :desc
+    )
 
     COMMAND_COMPLETION = EventReadCriteria.new(
       event_types: [ "CommandCompleted" ],

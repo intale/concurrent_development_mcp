@@ -8,7 +8,7 @@ module Coordinator::Write
     attribute :markers, Types::Array.of(Types::Marker).constrained(min_size: 1, max_size: 32)
     attribute :from_position, Types::Integer.constrained(gteq: 0)
     attribute :to_position, Types::Integer.constrained(gteq: 0)
-    attribute :page_size, Types::Integer.constrained(gteq: 1, lteq: 50)
+    attribute :page_size, Types::Integer.constrained(gteq: 1, lteq: 4_096)
     attribute :direction, Types::Symbol.enum(:asc, :desc)
 
     def query_max_count

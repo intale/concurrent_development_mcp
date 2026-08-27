@@ -34,6 +34,7 @@ module Coordinator::Write
         @compound_marker_builder = compound_marker_builder
         @repository_registration_loader = repository_registration_loader
         @repository_marker_builder = repository_marker_builder
+        @resource_boundary_loader = ResourceBoundaryLoader.new(event_store:, schema_registry:)
         @event_plan_contract = event_plan_contract
       end
 
@@ -43,8 +44,9 @@ module Coordinator::Write
       end
 
       def call_command(command, caused_by: nil)
+        prepared = prepare_logical_values(command)
         steps do
-          step @event_store.multiple { execute_scoped_attempt(command:, caused_by:) }
+          step @event_store.multiple { execute_scoped_attempt(command:, prepared:, caused_by:) }
         end
       end
 
@@ -71,7 +73,7 @@ module Coordinator::Write
         )
       end
 
-      def execute_scoped_attempt(command:, caused_by:)
+      def execute_scoped_attempt(command:, prepared:, caused_by:)
         registration = @repository_registration_loader.call(command.repository_id)
         return repository_not_registered(command) unless registration
 
@@ -81,7 +83,7 @@ module Coordinator::Write
         scoped_command = scoped.value!
         execute_attempt(
           command: scoped_command,
-          prepared: prepare_logical_values(scoped_command),
+          prepared: rebind_prepared(prepared, scoped_command),
           repository_registration: registration,
           caused_by:
         )
@@ -113,6 +115,12 @@ module Coordinator::Write
           "coordinator.command_boundary",
           operation: TOOL_NAME,
           command_id: command.command_id
+        )
+        ActiveSupport::Notifications.instrument(
+          "coordinator.command_boundary",
+          operation: "resource_boundary_dcb",
+          command_id: command.command_id,
+          event_ids: prepared.resources.map(&:event_id)
         )
         persisted_domain_events = persist_domain_plan(
           plan,
@@ -198,25 +206,39 @@ module Coordinator::Write
             resource_path: resource.path
           )
         end.uniq
-        events = @event_store.read_global_marked(EventQueries.resource_lease_boundary(markers))
-        states = events.group_by { _1.data.fetch("resource_key_hash") }
-          .sort_by { |resource_key_hash, _events| resource_key_hash.b }
-          .map do |_resource_key_hash, resource_events|
-            Domain::ResourceLeases::State.reduce(resource_events.map { load_event(_1) })
-          end
-
-        Success(states)
+        Success(@resource_boundary_loader.call(markers).states)
       rescue EventHistoryLimitExceeded
         Failure(
           OutcomeError.new(
-            code: :resource_boundary_history_limit_exceeded,
-            message: "Resource lease boundary exceeds the bounded authoritative history",
+            code: :resource_boundary_maintenance_required,
+            message: "Resource boundary maintenance is catching up; retry this request",
             details: {
               repository_id: command.repository_id,
-              marker_count: markers.length,
-              maximum_event_count: EventQueries::RESOURCE_LEASE_BOUNDARY_MAXIMUM_COUNT
+              boundary_marker_count: markers.length,
+              maximum_delta_event_count: EventQueries::RESOURCE_BOUNDARY_DECISION_DELTA_MAXIMUM_COUNT
             }
           )
+        )
+      end
+
+      def rebind_prepared(prepared, command)
+        PreparedWriteSetReservation.new(
+          acquired_at: prepared.acquired_at,
+          expires_at: prepared.expires_at,
+          input_digest: @input_digest.write_set_reserve(command),
+          lease_set_id: prepared.lease_set_id,
+          resources: command.resources.map do |resource|
+            prior = prepared.resources.find do |candidate|
+              candidate.resource.kind == resource.kind && candidate.resource.path == resource.path
+            end
+            PreparedLeaseResourceV1.new(
+              resource:,
+              lease_id: prior.lease_id,
+              event_id: prior.event_id
+            )
+          end,
+          reservation_event_id: prepared.reservation_event_id,
+          completion_event_id: prepared.completion_event_id
         )
       end
 

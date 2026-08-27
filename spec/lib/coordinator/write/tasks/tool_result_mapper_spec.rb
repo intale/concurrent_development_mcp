@@ -154,13 +154,13 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         "denied"
       ],
       [
-        :resource_boundary_history_limit_exceeded,
+        :resource_boundary_maintenance_required,
         {
           repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
-          marker_count: 2,
-          maximum_event_count: Coordinator::Write::EventQueries::RESOURCE_LEASE_BOUNDARY_MAXIMUM_COUNT
+          boundary_marker_count: 2,
+          maximum_delta_event_count: Coordinator::Write::EventQueries::RESOURCE_BOUNDARY_DECISION_DELTA_MAXIMUM_COUNT
         },
-        Coordinator::Write::Tasks::DomainErrorV1::ResourceBoundaryHistoryLimitExceededError,
+        Coordinator::Write::Tasks::DomainErrorV1::ResourceBoundaryMaintenanceRequiredError,
         "limit_reached"
       ],
       [

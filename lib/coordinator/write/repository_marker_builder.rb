@@ -2,7 +2,7 @@
 
 module Coordinator::Write
   class RepositoryMarkerBuilder
-    RESOURCE_PATH_MARKER_VERSION = "v1"
+    RESOURCE_BOUNDARY_MARKER_PURPOSE = "resource-boundary"
 
     def initialize(compound_marker_builder: CompoundMarkerBuilder.new)
       @compound_marker_builder = compound_marker_builder
@@ -47,7 +47,16 @@ module Coordinator::Write
 
     def path_marker(prefix, repository_id, path)
       digest = OpenSSL::Digest::SHA256.hexdigest("#{path.bytesize}:#{path}")
-      "#{prefix}:#{RESOURCE_PATH_MARKER_VERSION}:#{repository_id}:sha256:#{digest}"
+      @compound_marker_builder.call(
+        CompoundMarkerDefinitionV1.new(
+          purpose: RESOURCE_BOUNDARY_MARKER_PURPOSE,
+          components: [
+            "repository:#{repository_id}",
+            "boundary-role:#{prefix}",
+            "resource-path-digest:sha256:#{digest}"
+          ]
+        )
+      ).marker
     end
   end
 end

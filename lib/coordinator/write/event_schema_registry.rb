@@ -40,6 +40,7 @@ module Coordinator::Write
       [ "ResourceLeaseRenewed", 1 ] => Events::ResourceLeaseRenewedV1,
       [ "ResourceLeaseReleased", 1 ] => Events::ResourceLeaseReleasedV1,
       [ "ResourceLeaseExpired", 1 ] => Events::ResourceLeaseExpiredV1,
+      [ "ResourceBoundaryEpochRolled", 1 ] => Events::ResourceBoundaryEpochRolledV1,
       [ "WriteSetReserved", 1 ] => Events::WriteSetReservedV1,
       [ "WriteSetExpanded", 1 ] => Events::WriteSetExpandedV1,
       [ "WriteSetRenewed", 1 ] => Events::WriteSetRenewedV1,

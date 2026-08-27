@@ -1306,6 +1306,15 @@ module Coordinator
       )
     end
 
+    register("operations.execute_roll_resource_boundary_epoch") do
+      Write::Operations::ExecuteRollResourceBoundaryEpoch.new(
+        event_store: self["event_store"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"]
+      )
+    end
+
     register("operations.execute_record_guidance") do
       Write::Operations::ExecuteRecordGuidance.new(
         event_store: self["event_store"],
@@ -2307,6 +2316,17 @@ module Coordinator
       )
     end
 
+    register("process_managers.resource_boundary_maintenance", memoize: true) do
+      Processes::ProcessManagers::ResourceBoundaryMaintenance.new(
+        event_store: self["event_store"],
+        schema_registry: self["event_schema_registry"],
+        marker_builder: Write::RepositoryMarkerBuilder.new(
+          compound_marker_builder: self["compound_marker_builder"]
+        ),
+        operation: self["operations.execute_roll_resource_boundary_epoch"]
+      )
+    end
+
     register("process_managers.agent_choice_decision_impact", memoize: true) do
       Processes::ProcessManagers::AgentChoiceDecisionImpact.new(
         event_store: self["event_store"],
@@ -2378,6 +2398,12 @@ module Coordinator
     register("subscriptions.lease_expiry_scheduler", memoize: true) do
       Processes::Subscriptions::LeaseExpiryScheduler.new(
         handler: self["process_managers.lease_expiry_scheduler"]
+      )
+    end
+
+    register("subscriptions.resource_boundary_maintenance", memoize: true) do
+      Processes::Subscriptions::ResourceBoundaryMaintenance.new(
+        handler: self["process_managers.resource_boundary_maintenance"]
       )
     end
 
@@ -2499,6 +2525,7 @@ module Coordinator
         *self["subscriptions.coordination_task_executors"],
         self["subscriptions.operation_batch_runner"],
         self["subscriptions.lease_expiry_scheduler"],
+        self["subscriptions.resource_boundary_maintenance"],
         self["subscriptions.agent_choice_decision_impact"],
         self["subscriptions.candidate_impact_obligation_policy"],
         self["subscriptions.verification_obligation_validity"],

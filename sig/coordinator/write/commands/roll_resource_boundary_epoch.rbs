@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Commands
+      class RollResourceBoundaryEpoch < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def repository_id: () -> String
+        def boundary_marker: () -> String
+        def source_event_id: () -> String
+        def source_global_position: () -> Integer
+      end
+    end
+  end
+end
