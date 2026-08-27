@@ -2,6 +2,7 @@
 
 RSpec.describe "Development Artifact contracts" do
   let(:capture) { Coordinator::Write::Contracts::CaptureDevelopmentArtifact.new }
+  let(:capture_batch) { Coordinator::Write::Contracts::DevelopmentArtifactCaptureBatch.new }
   let(:relation) { Coordinator::Write::Contracts::DeclareDevelopmentArtifactRelation.new }
   let(:relation_batch) { Coordinator::Write::Contracts::DevelopmentArtifactRelationDeclareBatch.new }
 
@@ -86,6 +87,35 @@ RSpec.describe "Development Artifact contracts" do
 
     expect(relation_batch.call(input)).to be_success
     expect(relation_batch.call(input.merge(items: [ item.merge(extra: true) ]))).to be_failure
+  end
+
+  it "reserves internal command identities across both Artifact Batch contracts" do
+    capture_item = capture_input(command_id: "internal:artifact:item")
+    capture_input_batch = {
+      command_id: "cmd-contract-artifact-batch",
+      actor: { kind: "agent", id: "agent-1" },
+      batch_id: SecureRandom.uuid_v7,
+      items: [ capture_item ]
+    }
+    relation_item = relation_input(
+      source_id: "artifact:v1:#{'a' * 64}",
+      target_id: "artifact:v1:#{'b' * 64}"
+    ).merge(command_id: "internal:relation:item")
+    relation_input_batch = {
+      command_id: "cmd-contract-relation-batch",
+      actor: { kind: "agent", id: "agent-1" },
+      batch_id: SecureRandom.uuid_v7,
+      items: [ relation_item ]
+    }
+
+    expect(capture_batch.call(capture_input_batch).errors.to_h).to have_key(:items)
+    expect(relation_batch.call(relation_input_batch).errors.to_h).to have_key(:items)
+    expect(
+      capture_batch.call(capture_input_batch.merge(command_id: "internal:artifact:batch")).errors.to_h
+    ).to have_key(:command_id)
+    expect(
+      relation_batch.call(relation_input_batch.merge(command_id: "internal:relation:batch")).errors.to_h
+    ).to have_key(:command_id)
   end
 
   def capture_input(**overrides)

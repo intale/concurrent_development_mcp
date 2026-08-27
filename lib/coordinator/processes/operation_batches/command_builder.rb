@@ -58,7 +58,7 @@ module Coordinator::Processes
 
       def command_id(kind, source:, suffix: nil)
         components = [ "batch", kind, source.payload.batch_id, source.reference.event_id, suffix ]
-        components.compact.join(":")
+        InternalCommandIdBuilder.call(components.compact.join(":"))
       end
 
       def timestamp(event)

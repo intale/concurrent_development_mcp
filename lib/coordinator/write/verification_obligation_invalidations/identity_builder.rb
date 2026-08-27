@@ -14,7 +14,7 @@ module Coordinator::Write
           superseding_partition_event:,
           rule_version:
         )
-        "verification-obligation-invalidation-v1:#{digest(document)}"
+        Types::InternalCommandId["internal:verification-obligation-invalidation-v1:#{digest(document)}"]
       end
 
       private

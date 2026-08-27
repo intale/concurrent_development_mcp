@@ -6,14 +6,14 @@ module Coordinator::Write
       config.validate_keys = true
 
       params do
-        required(:command_id).filled(:string)
+        required(:command_id).value(Types::PublicCommandId)
         required(:actor).hash do
           required(:kind).filled(:string, included_in?: %w[agent user])
           required(:id).filled(:string)
         end
         required(:batch_id).filled(:string)
         required(:items).array(:hash) do
-          required(:command_id).filled(:string)
+          required(:command_id).value(Types::PublicCommandId)
           required(:actor).hash do
             required(:kind).filled(:string, included_in?: %w[agent user])
             required(:id).filled(:string)
@@ -34,10 +34,6 @@ module Coordinator::Write
             required(:reason).filled(:string)
           end
         end
-      end
-
-      rule(:command_id) do
-        key.failure("must be a valid identifier") unless Types::IDENTIFIER_PATTERN.match?(value)
       end
 
       rule(:actor) do

@@ -21,7 +21,9 @@ module Coordinator::Processes
           components: document.component_markers
         )
       )
-      command_id = "readiness-v1:#{compound_marker.digest.delete_prefix("sha256:")}"
+      command_id = InternalCommandIdBuilder.call(
+        "readiness-v1:#{compound_marker.digest.delete_prefix("sha256:")}"
+      )
       identity = Coordinator::Write::ReadinessDecisionIdentity.new(document:, compound_marker:, command_id:)
 
       Coordinator::Write::Commands::EvaluateWorkItemReadiness.new(

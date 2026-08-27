@@ -14,7 +14,7 @@ module Coordinator::Write
           policy_head:,
           rule_version:
         )
-        "candidate-impact-registry-sweep-v1:#{digest(document)}"
+        Types::InternalCommandId["internal:candidate-impact-registry-sweep-v1:#{digest(document)}"]
       end
 
       def pair_scan(source_registration:, direction:, policy_partition_event:, policy_head:, rule_version:)
@@ -26,7 +26,7 @@ module Coordinator::Write
           policy_head:,
           rule_version:
         )
-        "candidate-impact-pair-scan-v1:#{digest(document)}"
+        Types::InternalCommandId["internal:candidate-impact-pair-scan-v1:#{digest(document)}"]
       end
 
       def progress(checkpoint_event:, rule_version:)
@@ -35,7 +35,7 @@ module Coordinator::Write
           checkpoint_event:,
           rule_version:
         )
-        "candidate-impact-scan-progress-v1:#{digest(document)}"
+        Types::InternalCommandId["internal:candidate-impact-scan-progress-v1:#{digest(document)}"]
       end
 
       private

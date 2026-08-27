@@ -13,7 +13,7 @@ module Coordinator::Write
           superseding_partition_event:,
           rule_version:
         )
-        "verification-obligation-validity-scan-v1:#{digest(document)}"
+        Types::InternalCommandId["internal:verification-obligation-validity-scan-v1:#{digest(document)}"]
       end
 
       def progress(checkpoint_event:, rule_version:)
@@ -22,7 +22,7 @@ module Coordinator::Write
           checkpoint_event:,
           rule_version:
         )
-        "verification-obligation-validity-progress-v1:#{digest(document)}"
+        Types::InternalCommandId["internal:verification-obligation-validity-progress-v1:#{digest(document)}"]
       end
 
       private

@@ -1,0 +1,7 @@
+module Coordinator
+  module Processes
+    module InternalCommandIdBuilder
+      def self.call: (String identity) -> String
+    end
+  end
+end

@@ -3,7 +3,7 @@
 module Coordinator::Write
   module CandidateObligations
     class IdentityBuilder
-      PREFIX = "candidate-compatibility-obligation-v1"
+      PREFIX = "internal:candidate-compatibility-obligation-v1"
 
       def initialize(canonical_json: CanonicalJson.new)
         @canonical_json = canonical_json
@@ -19,10 +19,11 @@ module Coordinator::Write
           policy_head:
         )
         digest = @canonical_json.sha256(document.to_h)
+        obligation_id = Types::InternalCommandId["#{PREFIX}:#{digest.delete_prefix("sha256:")}"]
         IdentityV1.new(
           document:,
           digest:,
-          obligation_id: "#{PREFIX}:#{digest.delete_prefix("sha256:")}"
+          obligation_id:
         )
       end
     end

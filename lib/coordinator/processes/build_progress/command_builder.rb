@@ -26,7 +26,9 @@ module Coordinator::Processes
             components: document.component_markers
           )
         )
-        command_id = "dependency-satisfaction:v1:#{compound_marker.digest.delete_prefix("sha256:")}"
+        command_id = InternalCommandIdBuilder.call(
+          "dependency-satisfaction:v1:#{compound_marker.digest.delete_prefix("sha256:")}"
+        )
         identity = Coordinator::Write::DependencySatisfactionDecisionIdentity.new(
           document:,
           compound_marker:,
@@ -62,7 +64,9 @@ module Coordinator::Processes
             components: document.component_markers
           )
         )
-        command_id = "change-set-completion:v1:#{compound_marker.digest.delete_prefix("sha256:")}"
+        command_id = InternalCommandIdBuilder.call(
+          "change-set-completion:v1:#{compound_marker.digest.delete_prefix("sha256:")}"
+        )
         identity = Coordinator::Write::ChangeSetCompletionDecisionIdentity.new(
           document:,
           compound_marker:,

@@ -24,7 +24,7 @@ RSpec.describe Coordinator::Write::CandidateObligations::IdentityBuilder do
 
     expect(first).to eq(second)
     expect(first.obligation_id).to eq(
-      "candidate-compatibility-obligation-v1:#{first.digest.delete_prefix('sha256:')}"
+      "internal:candidate-compatibility-obligation-v1:#{first.digest.delete_prefix('sha256:')}"
     )
     expect(first.document).to have_attributes(
       schema: "candidate-compatibility-obligation-identity/v1",

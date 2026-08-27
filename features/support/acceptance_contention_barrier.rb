@@ -55,6 +55,8 @@ class AcceptanceContentionBarrier
         operation: @operation,
         command_id:,
         task_id: payload[:task_id],
+        process_command_id: payload[:process_command_id],
+        source_event_id: payload[:source_event_id],
         thread_id: Thread.current.object_id,
         worker_lane: Coordinator::Write::Tasks::ExecutionLane.new.index(command_id),
         arrived_at: Process.clock_gettime(Process::CLOCK_MONOTONIC)

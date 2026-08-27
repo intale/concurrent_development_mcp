@@ -15,7 +15,7 @@ module Coordinator::Write
           decision_change:
         )
         digest = @canonical_json.sha256(document.to_h).delete_prefix("sha256:")
-        "choice-impact-v1:#{digest}"
+        Types::InternalCommandId["internal:choice-impact-v1:#{digest}"]
       end
     end
   end

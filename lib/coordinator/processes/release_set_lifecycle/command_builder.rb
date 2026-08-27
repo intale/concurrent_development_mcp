@@ -22,7 +22,7 @@ module Coordinator::Processes
 
       def compensation(source)
         Coordinator::Write::Commands::RequestReleaseSetCompensation.new(
-          command_id: "release-compensation:v1:#{source.event.id}",
+          command_id: InternalCommandIdBuilder.call("release-compensation:v1:#{source.event.id}"),
           actor: ACTOR,
           release_set_id: source.payload.release_set_id,
           trigger_event: source.reference,
@@ -32,7 +32,7 @@ module Coordinator::Processes
 
       def activated_completion(source)
         Coordinator::Write::Commands::CompleteActivatedReleaseSet.new(
-          command_id: "release-completion:v1:#{source.event.id}",
+          command_id: InternalCommandIdBuilder.call("release-completion:v1:#{source.event.id}"),
           actor: ACTOR,
           release_set_id: source.payload.release_set_id,
           activation_event: source.reference,

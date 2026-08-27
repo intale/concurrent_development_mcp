@@ -71,7 +71,7 @@ module Coordinator::Processes
           tool_name: item.command_input.tool_name
         )
         completion = target_result.success? ? @completion_loader.call(command.command_id) : nil
-        caused_by = completion&.event || source.event
+        caused_by = outcome_parent(source, completion)
         execute!(
           @batch_executor.call_command(
             @command_builder.record_outcome(
@@ -107,6 +107,14 @@ module Coordinator::Processes
             caused_by: source.event
           )
         )
+      end
+
+      def outcome_parent(source, completion)
+        completion_event = completion&.event
+        return source.event unless completion_event
+        return source.event unless completion_event.correlation_id == source.event.correlation_id
+
+        completion_event
       end
 
       def complete_observed_cancellation(snapshot)

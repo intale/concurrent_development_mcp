@@ -29,6 +29,8 @@ module Coordinator::Processes
         command = @command_builder.call(source)
         return unless command
 
+        instrument_command_boundary(source, command)
+
         case command
         when Coordinator::Write::Commands::RequestReleaseSetCompensation
           execute!(
@@ -47,6 +49,16 @@ module Coordinator::Processes
       end
 
       private
+
+      def instrument_command_boundary(source, command)
+        ActiveSupport::Notifications.instrument(
+          "coordinator.command_boundary",
+          operation: "release_set_lifecycle",
+          command_id: source.event.metadata.fetch("command_id"),
+          process_command_id: command.command_id,
+          source_event_id: source.event.id
+        )
+      end
 
       def execute!(result, handled_codes:, transition:)
         return result.value! if result.success?

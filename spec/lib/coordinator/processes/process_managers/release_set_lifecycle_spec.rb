@@ -27,6 +27,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::ReleaseSetLifecycle, :ev
     expect(payload.trigger_event).to eq(ReleaseSetScenario.reference(failure.fetch(:event)))
     expect(request.causation_id).to eq(failure.fetch(:event).id)
     expect(request.correlation_id).to eq(prepared.fetch(:event).correlation_id)
+    expect(request.metadata.fetch("command_id")).to start_with("internal:release-compensation:v1:")
   end
 
   it "completes an activated ReleaseSet exactly once under redelivery" do
@@ -49,6 +50,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::ReleaseSetLifecycle, :ev
     )
     expect(completion.causation_id).to eq(activation.fetch(:event).id)
     expect(completion.correlation_id).to eq(prepared.fetch(:event).correlation_id)
+    expect(completion.metadata.fetch("command_id")).to start_with("internal:release-completion:v1:")
   end
 
   it "requests compensation when exact composite verification fails after all integrations" do

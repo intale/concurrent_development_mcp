@@ -32,7 +32,8 @@ RSpec.describe Coordinator::Processes::ReadinessCommandBuilder do
   it "derives the deterministic internal command and compound marker from the complete tuple" do
     command = builder.call(source:, work_item_id: "W-200")
 
-    expect(command.command_id).to match(/\Areadiness-v1:[0-9a-f]{64}\z/)
+    expect(command.command_id).to match(/\Ainternal:readiness-v1:[0-9a-f]{64}\z/)
+    expect(Coordinator::Shared::Types::InternalCommandId[command.command_id]).to eq(command.command_id)
     expect(command.readiness_decision_id).to eq(command.command_id)
     expect(command.actor.to_h).to eq(kind: "system", id: "change-set-readiness")
     expect(command.source_activation_event_id).to eq(source_reference.event_id)
@@ -49,7 +50,7 @@ RSpec.describe Coordinator::Processes::ReadinessCommandBuilder do
       "process-step:evaluate-work-item-readiness"
     )
     expect(command.process_decision_marker).to eq(
-      "compound:process-decision:v1:sha256:#{command.command_id.delete_prefix("readiness-v1:")}"
+      "compound:process-decision:v1:sha256:#{command.command_id.delete_prefix("internal:readiness-v1:")}"
     )
   end
 

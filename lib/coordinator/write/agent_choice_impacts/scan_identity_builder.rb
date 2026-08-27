@@ -13,7 +13,7 @@ module Coordinator::Write
           policy_version:,
           source_event:
         )
-        "choice-impact-scan-v1:#{digest(document)}"
+        Types::InternalCommandId["internal:choice-impact-scan-v1:#{digest(document)}"]
       end
 
       def progress(checkpoint_event:, policy_version:)
@@ -22,7 +22,7 @@ module Coordinator::Write
           policy_version:,
           checkpoint_event:
         )
-        "choice-impact-progress-v1:#{digest(document)}"
+        Types::InternalCommandId["internal:choice-impact-progress-v1:#{digest(document)}"]
       end
 
       private

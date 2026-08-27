@@ -20,6 +20,14 @@ RSpec.describe Coordinator::Write::Contracts::SkillPublishBatch do
     expect(invalid.errors.to_h).to have_key(:items)
   end
 
+  it "rejects internal command identities at both public Batch boundaries" do
+    outer = contract.call(input(command_id: "internal:batch:reserved"))
+    nested = contract.call(input(items: [ item(command_id: "internal:item:reserved") ]))
+
+    expect(outer.errors.to_h).to have_key(:command_id)
+    expect(nested.errors.to_h).to have_key(:items)
+  end
+
   it "rejects collections and canonical envelopes above their independent limits" do
     too_many = (Coordinator::Shared::Types::OPERATION_BATCH_MAXIMUM_ITEMS + 1).times.map do |index|
       item(command_id: "item-#{index}", name: "skill-#{index}")

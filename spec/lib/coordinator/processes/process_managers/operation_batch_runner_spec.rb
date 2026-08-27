@@ -61,20 +61,36 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
     command = preparer.call(input(items: [ item ])).value!
     expect(batch_executor.call_command(command)).to be_success
     created = batch_events(command.batch_id).sole
+    unrelated_command = preparer.call(
+      input(
+        command_id: "unrelated-batch-command",
+        batch_id: SecureRandom.uuid_v7,
+        items: [ item(command_id: "unrelated-item", name: "unrelated") ]
+      )
+    ).value!
+    expect(batch_executor.call_command(unrelated_command)).to be_success
+    unrelated_created = batch_events(unrelated_command.batch_id).sole
     target = Coordinator::Write::Tasks::TargetCommandBuilder.new.call(command.items.sole.command_input)
     target_executor = Coordinator::Write::Tasks::TargetExecutor.new(event_store:)
 
-    expect(target_executor.call(target, caused_by: created)).to be_success
-    expect(command_events(target.command_id).map(&:type)).to eq([ "CommandCompleted" ])
+    expect(target_executor.call(target, caused_by: unrelated_created)).to be_success
+    target_completion = command_events(target.command_id).sole
+    expect(target_completion.type).to eq("CommandCompleted")
+    expect(target_completion.correlation_id).to eq(unrelated_created.correlation_id)
 
     runner.call(created)
     runner.call(created)
 
-    expect(batch_events(command.batch_id).map(&:type)).to eq([
+    history = batch_events(command.batch_id)
+    expect(history.map(&:type)).to eq([
       "OperationBatchCreated",
       "OperationBatchItemSucceeded",
       "OperationBatchCompleted"
     ])
+    outcome = history.fetch(1)
+    expect(outcome.causation_id).to eq(created.id)
+    expect(history.map(&:correlation_id).uniq).to eq([ created.correlation_id ])
+    expect(history.drop(1).map { _1.metadata.fetch("command_id") }).to all(start_with("internal:"))
     expect(skill_events.length).to eq(1)
     expect(command_events(target.command_id).map(&:type)).to eq([ "CommandCompleted" ])
   end

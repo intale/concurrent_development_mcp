@@ -46,21 +46,21 @@ Feature: Audited coordination remains correct under replay, interruption, and co
 
   Rule: Process-manager identities and tracing cannot be preempted
 
-    @wip @AUD2-SAGA-ID-PREEMPT-BATCH-01 @live-subscriptions
+    @AUD2-SAGA-ID-PREEMPT-BATCH-01 @live-subscriptions
     Scenario: A public client cannot occupy a future Batch process command identity
       Given an accepted Operation Batch whose next process command identity is known
       When an agent submits that internal command identity through a public mutation
       Then MCP rejects the input before allocating a Task
       And the live Batch Saga eventually completes normally
 
-    @wip @AUD2-SAGA-ID-PREEMPT-RELEASE-02 @live-subscriptions
+    @AUD2-SAGA-ID-PREEMPT-RELEASE-02 @live-subscriptions
     Scenario: A public client cannot occupy a future ReleaseSet process command identity
       Given a ReleaseSet whose next lifecycle command identity is known
       When an agent submits that internal command identity through a public mutation
       Then MCP rejects the input before allocating a Task
       And the live ReleaseSet Saga eventually reaches its valid terminal outcome
 
-    @wip @AUD2-BATCH-CORRELATION-03 @live-subscriptions
+    @AUD2-BATCH-CORRELATION-03 @live-subscriptions
     Scenario: A Batch replay of an unrelated prior command retains one Batch trace
       Given a target command completed before an Operation Batch under another correlation
       When a live Batch processes an item containing the exact prior command
