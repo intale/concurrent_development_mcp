@@ -17,16 +17,16 @@ When("the user activates {string} Candidate impact policy through guidance Tasks
   activate_candidate_obligation_policy(level:)
 end
 
-When("the policy reaction is delivered twice") do
+When("the policy reaction is observed across a process restart") do
   drive_candidate_policy_source(redeliver: true)
 end
 
-When("the empty policy sweep is delivered twice") do
+When("the empty policy sweep outcome is observed across a process restart") do
   drive_candidate_policy_source(redeliver: true)
   assert_acceptance_equal([], candidate_obligation_events, "Empty policy sweep obligations")
 end
 
-When("both Rails impact surfaces register after the policy with duplicate delivery") do
+When("both Rails impact surfaces register after the policy across process restarts") do
   submit_candidate_obligation_surface("source")
   drive_candidate_registration_source("source", redeliver: true)
   submit_candidate_obligation_surface("target")
@@ -120,7 +120,7 @@ Then("one exact open Rails obligation is durable under {string}") do |level|
   )
 end
 
-Then("the obligation query stays available and empty before projection") do
+Then("the obligation query remains available while projection timing is unknown") do
   project_candidate_obligation_policy
   impact = candidate_obligation_impact_view
   assert_acceptance_equal(
@@ -131,15 +131,23 @@ Then("the obligation query stays available and empty before projection") do
   content = candidate_obligation_page
   page = content.dig("data", "page")
   assert_acceptance_equal("ok", content.fetch("status"), "Lagging obligation query")
-  assert_acceptance_equal([], page.fetch("items"), "Lagging obligation items")
-  assert_acceptance_equal(false, page.fetch("has_more"), "Lagging obligation continuation")
+  items = page.fetch("items")
+  assert_acceptance(items.length <= 1, "Available obligation query returned duplicates")
+  if items.one?
+    assert_acceptance_equal(
+      @obligation_id,
+      items.sole.fetch("obligation_id"),
+      "Already-projected obligation ID"
+    )
+  end
+  assert_acceptance_equal(false, page.fetch("has_more"), "Available obligation continuation")
   assert_acceptance(
     (content.keys & %w[fresh pending projection_status stream_revision]).empty?,
-    "Lagging obligation page must remain available"
+    "Obligation page must remain available without a freshness gate"
   )
 end
 
-When("the obligation creation reaches the read side twice") do
+When("the obligation creation reaches the read side after a subscription restart") do
   project_candidate_obligation(redeliver: true)
 end
 

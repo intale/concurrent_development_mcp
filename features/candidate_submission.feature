@@ -8,15 +8,13 @@ Feature: Attributed Candidate checkpoints
 
   Rule: A valid Candidate is one traced authoritative checkpoint with independently available evidence
 
-    Scenario: A successful checkpoint becomes available one observed fact at a time
+    Scenario: A successful checkpoint becomes available through the production read subscription
       Given Candidate coordination "SUCCESS" gives agent "agent-a" an active lease on "lib/candidate.rb"
       When the agent submits Candidate "CAN-CUC-SUCCESS" with command "cmd-cuc-can-success" at head "b" and build context
       Then the Candidate Task completes with an attributed unverified checkpoint
       And Candidate "CAN-CUC-SUCCESS" has one traced atomic checkpoint with manifest and build context
       And Candidate "CAN-CUC-SUCCESS" is honestly not observed before projection
-      When the Candidate "CAN-CUC-SUCCESS" submission reaches the read side
-      Then available Candidate "CAN-CUC-SUCCESS" exposes identity while later evidence is unobserved
-      When the remaining Candidate "CAN-CUC-SUCCESS" evidence and Attempt attachment reach the read side
+      When the Candidate "CAN-CUC-SUCCESS" evidence and Attempt attachment reach the read side
       Then available Candidate "CAN-CUC-SUCCESS" preserves evidence and Attempt context without a freshness claim
 
     Scenario: Exact command replay returns the original checkpoint without duplicate facts

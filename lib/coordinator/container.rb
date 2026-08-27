@@ -2353,10 +2353,13 @@ module Coordinator
       Processes::Subscriptions::ChangeSetReadiness.new(handler: self["process_managers.change_set_readiness"])
     end
 
-    register("subscriptions.coordination_task_executor", memoize: true) do
-      Processes::Subscriptions::CoordinationTaskExecutor.new(
-        handler: self["process_managers.coordination_task_executor"]
-      )
+    register("subscriptions.coordination_task_executors", memoize: true) do
+      Processes::Subscriptions::CoordinationTaskExecutor::LANE_COUNT.times.map do |lane_index|
+        Processes::Subscriptions::CoordinationTaskExecutor.new(
+          handler: self["process_managers.coordination_task_executor"],
+          lane_index:
+        )
+      end.freeze
     end
 
     register("subscriptions.operation_batch_runner", memoize: true) do
@@ -2483,20 +2486,31 @@ module Coordinator
       )
     end
 
+    register("subscription_registrations.process_managers", memoize: true) do
+      [
+        self["subscriptions.change_set_readiness"],
+        *self["subscriptions.coordination_task_executors"],
+        self["subscriptions.operation_batch_runner"],
+        self["subscriptions.lease_expiry_scheduler"],
+        self["subscriptions.agent_choice_decision_impact"],
+        self["subscriptions.candidate_impact_obligation_policy"],
+        self["subscriptions.verification_obligation_validity"],
+        self["subscriptions.release_set_lifecycle"],
+        self["subscriptions.build_progress"]
+      ].freeze
+    end
+
+    register("subscription_set_factories.process_managers", memoize: true) do
+      Shared::Subscriptions::SetFactory.new(
+        set_class: Processes::Subscriptions::ProcessManagerSet,
+        set_name: Processes::Subscriptions::ProcessManagerSet::SET_NAME,
+        registrations: self["subscription_registrations.process_managers"]
+      )
+    end
+
     register("subscription_sets.process_managers", memoize: true) do
-      Processes::Subscriptions::ProcessManagerSet.new(
-        manager: self["subscription_managers.process_managers"],
-        registrations: [
-          self["subscriptions.change_set_readiness"],
-          self["subscriptions.coordination_task_executor"],
-          self["subscriptions.operation_batch_runner"],
-          self["subscriptions.lease_expiry_scheduler"],
-          self["subscriptions.agent_choice_decision_impact"],
-          self["subscriptions.candidate_impact_obligation_policy"],
-          self["subscriptions.verification_obligation_validity"],
-          self["subscriptions.release_set_lifecycle"],
-          self["subscriptions.build_progress"]
-        ]
+      self["subscription_set_factories.process_managers"].call(
+        manager: self["subscription_managers.process_managers"]
       )
     end
 
@@ -2507,26 +2521,37 @@ module Coordinator
       )
     end
 
+    register("subscription_registrations.read_models", memoize: true) do
+      [
+        self["subscriptions.coord_context"],
+        self["subscriptions.command_receipts"],
+        self["subscriptions.user_utterances"],
+        self["subscriptions.decision_governance"],
+        self["subscriptions.decision_interpretations"],
+        self["subscriptions.agent_choices"],
+        self["subscriptions.agent_choice_impacts"],
+        self["subscriptions.candidates"],
+        self["subscriptions.repositories"],
+        self["subscriptions.skills"],
+        self["subscriptions.development_artifacts"],
+        self["subscriptions.operation_batches"],
+        self["subscriptions.verification_obligations"],
+        self["subscriptions.merge_snapshots"],
+        self["subscriptions.release_sets"]
+      ].freeze
+    end
+
+    register("subscription_set_factories.read_models", memoize: true) do
+      Shared::Subscriptions::SetFactory.new(
+        set_class: Read::Subscriptions::ReadModelSet,
+        set_name: Read::Subscriptions::ReadModelSet::SET_NAME,
+        registrations: self["subscription_registrations.read_models"]
+      )
+    end
+
     register("subscription_sets.read_models", memoize: true) do
-      Read::Subscriptions::ReadModelSet.new(
-        manager: self["subscription_managers.read_models"],
-        registrations: [
-          self["subscriptions.coord_context"],
-          self["subscriptions.command_receipts"],
-          self["subscriptions.user_utterances"],
-          self["subscriptions.decision_governance"],
-          self["subscriptions.decision_interpretations"],
-          self["subscriptions.agent_choices"],
-          self["subscriptions.agent_choice_impacts"],
-          self["subscriptions.candidates"],
-          self["subscriptions.repositories"],
-          self["subscriptions.skills"],
-          self["subscriptions.development_artifacts"],
-          self["subscriptions.operation_batches"],
-          self["subscriptions.verification_obligations"],
-          self["subscriptions.merge_snapshots"],
-          self["subscriptions.release_sets"]
-        ]
+      self["subscription_set_factories.read_models"].call(
+        manager: self["subscription_managers.read_models"]
       )
     end
   end

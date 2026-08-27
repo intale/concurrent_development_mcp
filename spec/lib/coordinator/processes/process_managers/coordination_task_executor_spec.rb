@@ -170,15 +170,18 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
   end
 
   it "handles a real filtered subscription through the shared process-manager set" do
+    command = create_change_set_command
+    lane_index = Coordinator::Write::Tasks::ExecutionLane.new.index(command.command_id)
     registration = Coordinator::Processes::Subscriptions::CoordinationTaskExecutor.new(
       handler: process_manager,
+      lane_index:,
       pull_interval: 0.2
     )
     subscription_set = build_subscription_set([ registration ])
 
     begin
       subscription_set.start
-      task_id, = submit_task(create_change_set_command)
+      task_id, = submit_task(command)
       wait_for_subscription(subscription_set, registration.definition.subscription_name)
 
       expect(loader.call(task_id).state.status).to eq("completed")
@@ -190,21 +193,29 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
     end
   end
 
-  it "publishes a unique typed subscription identity and exact source filter" do
-    definition = Coordinator::Processes::Subscriptions::CoordinationTaskExecutor::DEFINITION
+  it "publishes two unique marker-filtered subscription identities in one shared set" do
+    definitions = Coordinator::Processes::Subscriptions::CoordinationTaskExecutor::LANE_COUNT.times.map do |lane|
+      Coordinator::Processes::Subscriptions::CoordinationTaskExecutor.new(
+        handler: process_manager,
+        lane_index: lane
+      ).definition
+    end
 
-    expect(definition.to_h).to eq(
-      set_name: "coordinator-process-managers-v1",
-      subscription_name: "coordination-task-executor-v1",
-      stream_context: "CoordinatorControl",
-      stream_name: "CoordinationTask",
-      event_types: [ "CoordinationTaskSubmitted" ]
+    expect(definitions.map(&:subscription_name)).to eq(
+      [ "coordination-task-executor-lane-0-v2", "coordination-task-executor-lane-1-v2" ]
     )
-    expect(definition.options).to eq(
-      filter: {
-        streams: [ { context: "CoordinatorControl", stream_name: "CoordinationTask" } ],
-        event_types: [ "CoordinationTaskSubmitted" ]
-      }
+    expect(definitions.map(&:identity).uniq.length).to eq(2)
+    expect(definitions.map(&:options)).to eq(
+      [ 0, 1 ].map do |lane|
+        {
+          filter: {
+            streams: [ { context: "CoordinatorControl", stream_name: "CoordinationTask" } ],
+            event_types: [
+              { type: "CoordinationTaskSubmitted", markers: [ "task-execution-lane:v1:#{lane}" ] }
+            ]
+          }
+        }
+      end
     )
   end
 

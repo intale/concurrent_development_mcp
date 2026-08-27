@@ -13,77 +13,98 @@ module McpAcceptanceWorld
     @tasks_capable != false
   end
 
-  def call_tool(name, arguments, expected_status: 200)
+  def call_tool(name, arguments, expected_status: 200, client_id: "default")
     mcp_request(
       method: "tools/call",
       params: { name:, arguments: },
       name:,
-      expected_status:
+      expected_status:,
+      client_id:
     )
   end
 
-  def task_request(method, task_id, params = {})
+  def task_request(method, task_id, params = {}, client_id: "default")
     mcp_request(
       method:,
       params: params.merge(taskId: task_id),
-      name: task_id
+      name: task_id,
+      client_id:
     )
   end
 
-  def mcp_request(method:, params:, name: nil, expected_status: 200)
-    mcp_session.post(
+  def mcp_request(method:, params:, name: nil, expected_status: 200, client_id: "default")
+    session = mcp_session(client_id)
+    session.post(
       "/mcp",
       params: JSON.generate(
         jsonrpc: "2.0",
-        id: next_request_id,
+        id: next_request_id(client_id),
         method:,
-        params: modern_params(params)
+        params: modern_params(params, client_id:)
       ),
       headers: request_headers(method:, name:)
     )
     assert_acceptance(
-      mcp_session.response.status == expected_status,
-      "Expected HTTP #{expected_status}, got #{mcp_session.response.status}: #{mcp_session.response.body}"
+      session.response.status == expected_status,
+      "Expected HTTP #{expected_status}, got #{session.response.status}: #{session.response.body}"
     )
-    JSON.parse(mcp_session.response.body)
+    JSON.parse(session.response.body)
   end
 
   def execute_task(task_id)
-    submitted = task_events(task_id).find { _1.type == "CoordinationTaskSubmitted" }
-    assert_acceptance(submitted, "Task #{task_id} has no persisted submission")
-    Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
-  end
-
-  def submit_and_execute(tool, **arguments)
-    response = call_tool(tool, arguments)
-    task_id = response.dig("result", "taskId")
-    assert_acceptance(task_id, "#{tool} did not return a Task handle: #{response.inspect}")
-    execute_task(task_id)
-    task_id
-  end
-
-  def submit_and_await(tool, **arguments)
-    response = call_tool(tool, arguments)
-    task_id = response.dig("result", "taskId")
-    assert_acceptance(task_id, "#{tool} did not return a Task handle: #{response.inspect}")
+    start_process_subscriptions
     await_task_terminal(task_id)
+  end
+
+  def submit_and_execute(tool, client_id: "default", **arguments)
+    response = call_tool(tool, arguments, client_id:)
+    task_id = response.dig("result", "taskId")
+    assert_acceptance(task_id, "#{tool} did not return a Task handle: #{response.inspect}")
+    start_process_subscriptions
+    await_task_terminal(task_id, client_id:)
     task_id
+  end
+
+  def submit_and_await(tool, client_id: "default", **arguments)
+    response = call_tool(tool, arguments, client_id:)
+    task_id = response.dig("result", "taskId")
+    assert_acceptance(task_id, "#{tool} did not return a Task handle: #{response.inspect}")
+    start_process_subscriptions
+    await_task_terminal(task_id, client_id:)
+    task_id
+  end
+
+  def prepare_mcp_clients(*client_ids)
+    client_ids.each { mcp_session(_1) }
   end
 
   def project_change_set(change_set_id)
-    projector = Coordinator::Container["projectors.coord_context_v1"]
-    change_set_events(change_set_id).each { projector.call(_1) }
+    await_read_model("ChangeSet #{change_set_id} to become available") do
+      payload = coordination_context(change_set_id:)
+      [ payload.dig("data", "context", "change_set", "change_set_id") == change_set_id, payload ]
+    end
   end
 
   def project_attempt_context(change_set_id:, work_item_id:, attempt_id:)
-    projector = Coordinator::Container["projectors.coord_context_v1"]
-    planning = change_set_events(change_set_id)
-    work = work_item_events(work_item_id)
-    planning.first(2).each { projector.call(_1) }
-    projector.call(work.first)
-    planning.drop(2).each { projector.call(_1) }
-    work.drop(1).each { projector.call(_1) }
-    attempt_events(attempt_id).each { projector.call(_1) }
+    expected_lease_set_id = write_set_events(attempt_id).last&.data&.fetch("lease_set_id", nil)
+    await_read_model("Attempt #{attempt_id} coordination context to become available") do
+      payload = coordination_context(attempt_id:)
+      context = payload.dig("data", "context")
+      attempt = context&.fetch("attempts", [])&.find { _1.fetch("attempt_id") == attempt_id }
+      matches = context&.dig("change_set", "change_set_id") == change_set_id &&
+                context.fetch("work_items", []).any? { _1.fetch("work_item_id") == work_item_id } &&
+                attempt &&
+                (!expected_lease_set_id || attempt.dig("write_set", "lease_set_id") == expected_lease_set_id)
+      [ matches, payload ]
+    end
+  end
+
+  def await_work_item_ready(work_item_id)
+    start_process_subscriptions
+    eventually("WorkItem #{work_item_id} to become ready") do
+      events = work_item_events(work_item_id)
+      [ events.any? { _1.type == "WorkItemMadeReady" }, events.map(&:type) ]
+    end
   end
 
   def task_events(task_id)
@@ -181,8 +202,12 @@ module McpAcceptanceWorld
   end
 
   def project_guidance(conversation_id)
-    projector = Coordinator::Container["projectors.user_utterances_v1"]
-    guidance_events(conversation_id).each { projector.call(_1) }
+    message_id = guidance_events(conversation_id).last&.data&.fetch("message_id", nil)
+    assert_acceptance(message_id, "Conversation #{conversation_id} has no guidance fact")
+    await_read_model("Guidance #{message_id} to become available") do
+      payload = call_tool("guidance_get", { message_id: }).dig("result", "structuredContent")
+      [ payload.dig("data", "guidance", "message_id") == message_id, payload ]
+    end
   end
 
   def interpretation_events(message_id)
@@ -202,8 +227,20 @@ module McpAcceptanceWorld
   end
 
   def project_interpretations(message_id)
-    projector = Coordinator::Container["projectors.decision_interpretations_v1"]
-    interpretation_events(message_id).each { projector.call(_1) }
+    expected = interpretation_events(message_id).each_with_object({}) do |event, statuses|
+      statuses[event.data.fetch("interpretation_id")] = {
+        "DecisionInterpretationProposed" => "proposed",
+        "DecisionClarificationRequired" => "clarification_required",
+        "DecisionInterpretationAccepted" => "accepted",
+        "DecisionInterpretationRejected" => "rejected"
+      }.fetch(event.type)
+    end
+    await_read_model("Interpretations for #{message_id} to converge") do
+      observed = interpretation_page(message_id).to_h do |item|
+        [ item.fetch("interpretation_id"), item.fetch("lifecycle_status") ]
+      end
+      [ expected.all? { |id, status| observed[id] == status }, observed ]
+    end
   end
 
   def interpretation_page(message_id)
@@ -269,22 +306,43 @@ module McpAcceptanceWorld
   def project_decision_recorded(decision_id)
     event = decision_events(decision_id).find { _1.type == "DecisionRecorded" }
     assert_acceptance(event, "Decision #{decision_id} has no DecisionRecorded fact")
-    decision_projector.call(event)
+    await_read_model("Decision #{decision_id} to become available") do
+      payload = decision_view(decision_id)
+      [ payload.dig("data", "decision", "decision_id") == decision_id, payload ]
+    end
   end
 
   def project_remaining_decision_facts(decision_id)
-    recorded, activated = decision_events(decision_id).first(2)
-    assert_acceptance(recorded && activated, "Decision #{decision_id} is not completely persisted")
-    slot_id = activated.data.fetch("slot").fetch("slot_id")
-    [ activated, *decision_slot_events(slot_id), *decision_partition_events ].each do |event|
-      decision_projector.call(event)
+    activated = decision_events(decision_id).find { _1.type == "DecisionActivated" }
+    assert_acceptance(activated, "Decision #{decision_id} is not activated")
+    await_read_model("Decision #{decision_id} to become active") do
+      payload = decision_view(decision_id)
+      [ payload.dig("data", "decision", "policy_status") == "active", payload ]
+    end
+  end
+
+  def await_effective_decision_context(decision_id, context:)
+    await_read_model("Decision #{decision_id} to resolve from its active partition") do
+      payload = call_tool(
+        "decision_resolve",
+        { topic_id: "testing.framework", context: }
+      ).dig("result", "structuredContent")
+      decision_context = payload.dig("data", "decision_context")
+      observed_decision_id = decision_context&.dig(
+        "document", "effective_decision", "head", "decision_id"
+      )
+      [ payload["status"] == "ok" && observed_decision_id == decision_id, decision_context ]
     end
   end
 
   def project_decision_correction(decision_id)
     event = decision_events(decision_id).find { _1.type == "DecisionDefinitionCorrected" }
     assert_acceptance(event, "Decision #{decision_id} has no DecisionDefinitionCorrected fact")
-    decision_projector.call(event)
+    await_read_model("Decision #{decision_id} correction to become available") do
+      payload = decision_view(decision_id)
+      observed = payload.dig("data", "decision", "current_head", "event", "event_id")
+      [ observed == event.id, payload ]
+    end
   end
 
   def agent_choice_events(choice_id)
@@ -302,7 +360,11 @@ module McpAcceptanceWorld
   def project_agent_choice_event(choice_id, event_type)
     event = agent_choice_events(choice_id).find { _1.type == event_type }
     assert_acceptance(event, "AgentChoice #{choice_id} has no #{event_type} fact")
-    Coordinator::Container["projectors.agent_choices_v1"].call(event)
+    expected_status = event_type == "AgentChoiceRecorded" ? %w[recorded accepted invalidated] : %w[accepted invalidated]
+    await_read_model("AgentChoice #{choice_id} to expose #{event_type}") do
+      payload = agent_choice_view(choice_id)
+      [ expected_status.include?(payload.dig("data", "choice", "observation_status")), payload ]
+    end
   end
 
   def record_testing_framework_choice(choice_id:, option_id:)
@@ -397,6 +459,7 @@ module McpAcceptanceWorld
     if available
       project_decision_recorded(decision_id)
       project_remaining_decision_facts(decision_id)
+      await_effective_decision_context(decision_id, context: @choice_context)
     end
     source
   end
@@ -429,15 +492,19 @@ module McpAcceptanceWorld
   end
 
   def drive_impact_saga(source)
-    process_manager = Coordinator::Container["process_managers.agent_choice_decision_impact"]
-    process_manager.call(source)
-    started = impact_scan_events(source).find { _1.type == "AgentChoiceImpactScanStarted" }
-    assert_acceptance(started, "Decision change #{source.id} did not start an impact scan")
-    process_manager.call(started)
-    process_manager.call(source)
-    process_manager.call(started)
-    completed = impact_scan_events(source).find { _1.type == "AgentChoiceImpactScanCompleted" }
-    assert_acceptance(completed, "Decision change #{source.id} did not complete its impact scan")
+    start_process_subscriptions
+    events = eventually("Decision change #{source.id} impact Saga to complete") do
+      observed = impact_scan_events(source)
+      [ observed.any? { _1.type == "AgentChoiceImpactScanCompleted" }, observed ]
+    end
+    restart_process_subscriptions
+    redelivered = eventually("Decision change #{source.id} impact Saga to remain terminal after restart") do
+      observed = impact_scan_events(source)
+      completed_count = observed.count { _1.type == "AgentChoiceImpactScanCompleted" }
+      [ completed_count == 1, observed ]
+    end
+    started = events.find { _1.type == "AgentChoiceImpactScanStarted" }
+    completed = redelivered.find { _1.type == "AgentChoiceImpactScanCompleted" }
     { started:, completed: }
   end
 
@@ -484,13 +551,20 @@ module McpAcceptanceWorld
   def project_impact_assessment(choice_id)
     event = impact_assessment_event(choice_id)
     assert_acceptance(event, "AgentChoice #{choice_id} has no impact assessment")
-    Coordinator::Container["projectors.agent_choice_impacts_v1"].call(event)
+    attempt_id = impact_payload(event).attempt_id
+    await_read_model("AgentChoice #{choice_id} impact assessment to become available") do
+      page = impact_page(attempt_id:)
+      [ page.fetch("items").any? { _1.fetch("choice_id") == choice_id }, page ]
+    end
   end
 
   def project_choice_invalidation(choice_id)
     event = impact_choice_events(choice_id).find { _1.type == "AgentChoiceInvalidatedByDecision" }
     assert_acceptance(event, "AgentChoice #{choice_id} has no invalidation")
-    Coordinator::Container["projectors.agent_choice_impacts_v1"].call(event)
+    await_read_model("AgentChoice #{choice_id} invalidation to become available") do
+      payload = agent_choice_view(choice_id)
+      [ payload.dig("data", "choice", "observation_status") == "invalidated", payload ]
+    end
   end
 
   def impact_page(attempt_id:, after_global_position: nil, limit: 20)
@@ -760,29 +834,37 @@ module McpAcceptanceWorld
     raise "#{context}: expected #{expected.inspect}, got #{actual.inspect}"
   end
 
-  private
-
-  def decision_projector
-    Coordinator::Container["projectors.decision_governance_v1"]
+  def coordination_context(**scope)
+    call_tool("coord_context", scope).dig("result", "structuredContent")
   end
 
-  def mcp_session
-    @mcp_session ||= ActionDispatch::Integration::Session.new(Rails.application).tap do |session|
-      session.host! "localhost"
+  private
+
+  def mcp_session(client_id = "default")
+    @mcp_sessions_mutex ||= Thread::Mutex.new
+    @mcp_sessions_mutex.synchronize do
+      @mcp_sessions ||= {}
+      @mcp_sessions[client_id] ||= ActionDispatch::Integration::Session.new(Rails.application).tap do |session|
+        session.host! "localhost"
+      end
     end
   end
 
-  def next_request_id
-    @request_id = @request_id.to_i + 1
+  def next_request_id(client_id)
+    @request_ids_mutex ||= Thread::Mutex.new
+    @request_ids_mutex.synchronize do
+      @request_ids ||= {}
+      @request_ids[client_id] = @request_ids.fetch(client_id, 0) + 1
+    end
   end
 
-  def modern_params(params)
+  def modern_params(params, client_id:)
     extensions = tasks_capable? ? { TASKS_EXTENSION => {} } : {}
     params.merge(
       _meta: {
         "io.modelcontextprotocol/protocolVersion": PROTOCOL_VERSION,
         "io.modelcontextprotocol/clientCapabilities": { extensions: },
-        "io.modelcontextprotocol/clientInfo": { name: "cucumber", version: "1.0" }
+        "io.modelcontextprotocol/clientInfo": { name: "cucumber/#{client_id}", version: "1.0" }
       }
     )
   end

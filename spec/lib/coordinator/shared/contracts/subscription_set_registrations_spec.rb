@@ -43,6 +43,26 @@ RSpec.describe Coordinator::Shared::Contracts::SubscriptionSetRegistrations do
     expect(first).not_to eq(another_set)
   end
 
+  it "builds exact marker selectors when a registration is lane-filtered" do
+    definition = Coordinator::Shared::Subscriptions::Definition.new(
+      set_name: "coordinator-process-managers-v1",
+      subscription_name: "task-lane-1-v1",
+      stream_context: "CoordinatorControl",
+      stream_name: "CoordinationTask",
+      event_types: [ "CoordinationTaskSubmitted" ],
+      event_markers: [ "task-execution-lane:v1:1" ]
+    )
+
+    expect(definition.options).to eq(
+      filter: {
+        streams: [ { context: "CoordinatorControl", stream_name: "CoordinationTask" } ],
+        event_types: [
+          { type: "CoordinationTaskSubmitted", markers: [ "task-execution-lane:v1:1" ] }
+        ]
+      }
+    )
+  end
+
   def registration(set_name, subscription_name)
     Coordinator::Shared::Subscriptions::Registration.new(
       definition: Coordinator::Shared::Subscriptions::Definition.new(

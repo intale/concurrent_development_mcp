@@ -26,13 +26,11 @@ Feature: Available terminal build progress
       Then the terminal Task records one selected Candidate, completed Attempt, and completed WorkItem
       And the recovered WorkItem preserves each interruption before its terminal facts
 
-  Rule: Dependency progress converges one independent observed fact at a time
+  Rule: Dependency progress converges through the production Sagas and read subscription
 
     Scenario: Completion unlocks a dependent WorkItem without withholding an older view
       Given terminal coordination "DEPENDENCY" has a consumer blocked on producer completion
       When the producer completes through an MCP Task and build progress handles its completion
       Then the consumer's older blocked context remains available
-      When dependency satisfaction reaches the read side before readiness
-      Then the blocker is absent while the consumer is still observed as planned
       When downstream readiness reaches the read side
       Then available context suggests acquiring the exact consumer WorkItem

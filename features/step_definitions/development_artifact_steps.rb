@@ -471,10 +471,11 @@ When("the same relationship command is executed through two Tasks") do
   end
 end
 
-When("its relation fact reaches the read side twice") do
+When("its relation fact reaches the read side after a subscription restart") do
   event = artifact_events(@replay_parent).find { _1.type == "DevelopmentArtifactRelationDeclared" }
   assert_acceptance(event, "Replay relation fact")
-  2.times { project_artifact_event(event) }
+  restart_read_model_subscriptions
+  project_artifact_event(event)
 end
 
 Then("both Tasks expose one logical relation result") do

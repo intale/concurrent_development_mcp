@@ -42,7 +42,7 @@ Given(
   )
   activation = change_set_events(change_set_id).find { _1.type == "ChangeSetActivated" }
   assert_acceptance(activation, "ChangeSet #{change_set_id} has no activation fact")
-  Coordinator::Container["process_managers.change_set_readiness"].call(activation)
+  await_work_item_ready(work_item_id)
   setup_tasks << submit_and_execute(
     "work_item_acquire",
     command_id: "cmd-cuc-choice-acquire-#{attempt_id}",
@@ -180,13 +180,10 @@ When("the agent follows the refresh action for the current Decision context") do
   stale_digest = @choice_decision_context.fetch("digest")
   project_decision_recorded(decision_id)
   project_remaining_decision_facts(decision_id)
-  payload = call_tool(
-    "decision_resolve",
-    { topic_id: "testing.framework", context: @choice_context }
-  ).dig("result", "structuredContent")
-
-  assert_acceptance_equal("ok", payload.fetch("status"), "Refreshed Decision context")
-  @choice_decision_context = payload.dig("data", "decision_context")
+  @choice_decision_context = await_effective_decision_context(
+    decision_id,
+    context: @choice_context
+  )
   assert_acceptance(
     @choice_decision_context.fetch("digest") != stale_digest,
     "The refreshed context must bind the current Decision head"
@@ -272,7 +269,7 @@ When("the impact assessment for {string} reaches the read side") do |choice_id|
 end
 
 Then(
-  "Attempt {string} exposes the invalidating assessment while AgentChoice {string} remains accepted"
+  "Attempt {string} exposes the invalidating assessment and AgentChoice {string} is invalidated"
 ) do |attempt_id, choice_id|
   item = impact_page(attempt_id:).fetch("items").sole
   choice = agent_choice_view(choice_id).dig("data", "choice")
@@ -284,7 +281,7 @@ Then(
     item.dig("assessment_evidence", "actor", "id"),
     "Assessment actor"
   )
-  assert_acceptance_equal("accepted", choice.fetch("observation_status"), "Independently lagging Choice")
+  assert_acceptance_equal("invalidated", choice.fetch("observation_status"), "Converged Choice status")
   assert_acceptance(
     (choice.keys & %w[active fresh pending projection_status stream_revision]).empty?,
     "Lagging Choice must not expose a freshness gate"

@@ -52,9 +52,13 @@ Then("the ReleaseSet remains available as not observed before projection") do
   )
 end
 
-When("the ReleaseSet preparation reaches the read side twice") do
-  event = release_set_events(@release_set_arguments.fetch(:release_set_id)).sole
-  2.times { Coordinator::Container["projectors.release_sets_v1"].call(event) }
+When("the ReleaseSet preparation reaches the read side after a subscription restart") do
+  release_set_id = @release_set_arguments.fetch(:release_set_id)
+  restart_read_model_subscriptions if @live_subscription_sets&.key?(:read_models)
+  await_read_model("ReleaseSet #{release_set_id} preparation to become available") do
+    payload = release_set_view(release_set_id)
+    [ payload.dig("data", "release_set", "status") == "prepared", payload ]
+  end
 end
 
 Then("the ordered ReleaseSet is available without a freshness gate") do
@@ -157,17 +161,19 @@ Then("the integration and verification Tasks preserve one ReleaseSet trace") do
 end
 
 Then("the older ReleaseSet view remains available while lifecycle projection lags") do
-  prepared = release_set_lifecycle_events(@release_set_arguments.fetch(:release_set_id)).first
-  Coordinator::Container["projectors.release_sets_v1"].call(prepared)
   release_set = release_set_view(@release_set_arguments.fetch(:release_set_id)).dig("data", "release_set")
   assert_acceptance_equal("prepared", release_set.fetch("status"), "Lagging ReleaseSet status")
   assert_acceptance_equal([], release_set.fetch("integrations"), "Lagging integrations")
 end
 
-When("the complete ReleaseSet lifecycle reaches the read side twice") do
-  projector = Coordinator::Container["projectors.release_sets_v1"]
-  release_set_lifecycle_events(@release_set_arguments.fetch(:release_set_id)).each do |event|
-    2.times { projector.call(event) }
+When("the complete ReleaseSet lifecycle reaches the read side after a subscription restart") do
+  release_set_id = @release_set_arguments.fetch(:release_set_id)
+  terminal = release_set_lifecycle_events(release_set_id).last
+  expected_status = terminal.type == "ReleaseSetCompleted" ? "completed" : "verified"
+  restart_read_model_subscriptions if @live_subscription_sets&.key?(:read_models)
+  await_read_model("ReleaseSet #{release_set_id} lifecycle to become #{expected_status}") do
+    payload = release_set_view(release_set_id)
+    [ payload.dig("data", "release_set", "status") == expected_status, payload ]
   end
 end
 
@@ -208,11 +214,13 @@ When("the agent records external ReleaseSet activation through MCP") do
   )
 end
 
-When("the ReleaseSet lifecycle Saga processes activation twice") do
-  activation = release_set_lifecycle_events(
-    @release_set_arguments.fetch(:release_set_id)
-  ).find { _1.type == "ReleaseSetActivated" }
-  2.times { Coordinator::Container["process_managers.release_set_lifecycle"].call(activation) }
+When("the ReleaseSet lifecycle Saga processes activation across a process restart") do
+  release_set_id = @release_set_arguments.fetch(:release_set_id)
+  restart_process_subscriptions
+  eventually("ReleaseSet #{release_set_id} activation Saga to complete") do
+    events = release_set_lifecycle_events(release_set_id)
+    [ events.any? { _1.type == "ReleaseSetCompleted" }, events.map(&:type) ]
+  end
 end
 
 Then("the activation Task and Saga completion preserve the ReleaseSet trace") do
@@ -305,14 +313,17 @@ When("the first repository integrates while the second records failure through M
   )
 end
 
-When("the ReleaseSet lifecycle Saga processes the failed integration twice") do
-  failure = release_set_lifecycle_events(
-    @release_set_arguments.fetch(:release_set_id)
-  ).select { _1.type == "RepositoryIntegrationRecorded" }.last
-  2.times { Coordinator::Container["process_managers.release_set_lifecycle"].call(failure) }
-  @release_compensation_request_event = release_set_lifecycle_events(
-    @release_set_arguments.fetch(:release_set_id)
-  ).select { _1.type == "ReleaseSetCompensationRequested" }.sole
+When("the ReleaseSet lifecycle Saga processes the failed integration across a process restart") do
+  release_set_id = @release_set_arguments.fetch(:release_set_id)
+  restart_process_subscriptions
+  @release_compensation_request_event = eventually(
+    "ReleaseSet #{release_set_id} compensation request"
+  ) do
+    event = release_set_lifecycle_events(release_set_id).find do |candidate|
+      candidate.type == "ReleaseSetCompensationRequested"
+    end
+    [ !event.nil?, event ]
+  end
 end
 
 Then("one exact compensation request is durable with Saga tracing") do

@@ -120,22 +120,22 @@ Then("the rejected command writes no command fact") do
 end
 
 Given("the Repository registration reaches scoped discovery") do
-  event = event_store.read(
-    streams.repository(@repository_id),
-    Coordinator::Write::EventReadCriteria.new(
-      event_types: [ "RepositoryRegistered" ],
-      maximum_count: 1,
-      direction: :asc
-    )
-  ).sole
-  Coordinator::Container["projectors.repositories_v1"].call(event)
+  await_read_model("Repository #{@repository_id} to become discoverable") do
+    payload = call_tool("repository_list", { scope: @repository_arguments.fetch(:scope) })
+      .dig("result", "structuredContent")
+    items = payload.dig("data", "page", "items") || []
+    [ items.any? { _1.fetch("repository_id") == @repository_id }, payload ]
+  end
 end
 
 When("two clean agents independently list Repositories using only that scope") do
-  @repository_discovery_responses = 2.times.map do
-    @mcp_session = nil
-    @request_id = 0
-    call_tool("repository_list", { scope: @repository_arguments.fetch(:scope) })
+  prepare_mcp_clients("repository-agent-a", "repository-agent-b")
+  @repository_discovery_responses = %w[repository-agent-a repository-agent-b].map do |client_id|
+    call_tool(
+      "repository_list",
+      { scope: @repository_arguments.fetch(:scope) },
+      client_id:
+    )
       .dig("result", "structuredContent")
   end
 end

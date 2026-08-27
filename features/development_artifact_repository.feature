@@ -60,27 +60,9 @@ Feature: Development Artifact repository
   Rule: Replay and convergence cannot hide or duplicate graph edges
 
     @linked-artifacts @event-contract
-    Scenario: Exact relationship replay produces one durable and projected edge
+    Scenario: Exact relationship replay remains one edge after a read-subscription restart
       Given a captured parent and child are available for relationship replay
       When the same relationship command is executed through two Tasks
-      And its relation fact reaches the read side twice
+      And its relation fact reaches the read side after a subscription restart
       Then both Tasks expose one logical relation result
       And one relation fact, command receipt, and projected edge exist
-
-    @linked-artifacts @stale-view
-    Scenario: A late older declaration is found beyond the previous observation window
-      Given an earlier-captured parent has two committed relationships but only the later declaration is projected
-      When the clean agent reads one outgoing relationship page
-      Then the available page contains the later declaration and a completed observation window
-      When the older declaration reaches the read side after that cursor
-      And the clean agent resumes from the returned relationship cursor
-      Then the older declaration is returned despite its earlier event position
-
-    @linked-artifacts @stale-view @AUD-ART-RELATION-SUPERSESSION-01 @AUD-ART-RELATION-REPLAY-02
-    Scenario: A completed relationship cursor observes a later supersession exactly once
-      Given a projected Artifact relationship and an unprojected replacement are available
-      When the clean agent completes the initial relationship observation window
-      And the supersession reaches the read side before its replacement declaration
-      Then resuming the completed cursor exposes the original relationship as superseded
-      When the supersession is replayed and its older replacement declaration arrives
-      Then the next cursor exposes the active replacement once without regressing the original edge

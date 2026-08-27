@@ -45,6 +45,13 @@ module Coordinator::Processes
 
         started_event = execution_started_event(source.payload.task_id)
         command = @target_command_builder.call(source.payload.command_input)
+        ActiveSupport::Notifications.instrument(
+          "coordinator.command_boundary",
+          operation: "coordination_task_execute",
+          command_id: command.command_id,
+          task_id: source.payload.task_id,
+          tool_name: source.payload.tool_name
+        )
         outcome, parent_event = execute_target(command, started_event:)
         transition_value!(
           @record_outcome.call(

@@ -3,6 +3,11 @@
 module Coordinator::Processes
   module Contracts
     class CoordinationTaskSourceEvent < Dry::Validation::Contract
+      def initialize(execution_lane: Coordinator::Write::Tasks::ExecutionLane.new)
+        super()
+        @execution_lane = execution_lane
+      end
+
       params do
         required(:event).value(Types.Instance(PgEventstore::Event))
       end
@@ -49,9 +54,10 @@ module Coordinator::Processes
       def matching_markers?(event)
         event.markers == [
           "command:#{event.data['command_id']}",
+          @execution_lane.marker(event.data["command_id"]),
           "task:#{event.data['task_id']}",
           "tool:#{event.data['tool_name']}"
-        ]
+        ].sort
       end
 
       def valid_trace_correlation?(event)

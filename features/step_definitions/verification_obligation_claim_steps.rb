@@ -33,8 +33,21 @@ Then("a checkpointed Task exists before any claim fact") do
   )
 end
 
-When("the claim Task executes at {string}") do |timestamp|
-  execute_verification_obligation_claim(@current_claim_attempt, at: timestamp)
+When("the claim Task executes") do
+  execute_verification_obligation_claim(@current_claim_attempt)
+end
+
+When("the claim Task executes while the first claim is active") do
+  execute_verification_obligation_claim(@current_claim_attempt)
+end
+
+When("the active claim expires") do
+  expires_at = @last_successful_claim.dig(:claim_data, "expires_at")
+  assert_acceptance(expires_at, "Active claim expiry is missing")
+  eventually("Active verification claim to expire", timeout_seconds: 35) do
+    now = Time.now.utc
+    [ now >= Time.iso8601(expires_at), now.iso8601(6) ]
+  end
 end
 
 Then(
@@ -131,8 +144,8 @@ Then("the denied command has no receipt or claim fact") do
 end
 
 When(
-  "agents {string} and {string} claim concurrently at {string}"
-) do |first_agent, second_agent, timestamp|
+  "agents {string} and {string} claim concurrently"
+) do |first_agent, second_agent|
   @concurrent_claim_attempts = [ first_agent, second_agent ].map do |agent_id|
     submit_verification_obligation_claim(
       agent_id:,
@@ -140,11 +153,9 @@ When(
       duration: 300
     )
   end
-  Timecop.freeze(Time.iso8601(timestamp)) do
-    @concurrent_claim_attempts.map do |attempt|
-      Thread.new { execute_task(attempt.fetch(:task_id)) }
-    end.each(&:value)
-  end
+  @concurrent_claim_attempts.map do |attempt|
+    Thread.new { execute_task(attempt.fetch(:task_id)) }
+  end.each(&:value)
   @concurrent_claim_attempts.each do |attempt|
     attempt[:state] = task_request("tasks/get", attempt.fetch(:task_id))
     attempt[:result] = attempt.dig(:state, "result", "result")
@@ -183,9 +194,9 @@ Then("both immutable claim facts retain their distinct fences") do
 end
 
 Then(
-  "at {string} the available view still reports an open unclaimed obligation"
-) do |timestamp|
-  content, page = available_verification_obligation(at: timestamp, claim_state: "unclaimed")
+  "the available view still reports an open unclaimed obligation"
+) do
+  content, page = available_verification_obligation(claim_state: "unclaimed")
   item = page.fetch("items").sole
   assert_acceptance_equal("ok", content.fetch("status"), "Lagging claim view status")
   assert_acceptance(
@@ -195,7 +206,7 @@ Then(
   assert_acceptance_equal("open", item.fetch("status"), "Lagging obligation status")
   assert_acceptance_equal("unclaimed", item.fetch("claim_state"), "Lagging claim state")
   assert_acceptance_equal(nil, item.fetch("claim"), "Lagging claim")
-  assert_acceptance_equal(timestamp, page.fetch("observed_at"), "Lagging observation time")
+  assert_acceptance(Time.iso8601(page.fetch("observed_at")), "Lagging observation time is invalid")
   assert_acceptance(
     (content.keys & %w[fresh pending projection_status stream_revision]).empty?,
     "Lagging claim view must not expose freshness gates"
@@ -206,8 +217,8 @@ When("the claim reaches the read side twice") do
   project_verification_obligation_claims(redeliver: true)
 end
 
-Then("at {string} the available view reports the open active claim") do |timestamp|
-  content, page = available_verification_obligation(at: timestamp, claim_state: "active")
+Then("the available view reports the open active claim") do
+  content, page = available_verification_obligation(claim_state: "active")
   item = page.fetch("items").sole
   claim = item.fetch("claim")
   assert_acceptance_equal("ok", content.fetch("status"), "Converged claim view status")
@@ -220,7 +231,7 @@ Then("at {string} the available view reports the open active claim") do |timesta
     claim.dig("evidence", "global_position"),
     "Converged claim evidence"
   )
-  assert_acceptance_equal(timestamp, page.fetch("observed_at"), "Converged observation time")
+  assert_acceptance(Time.iso8601(page.fetch("observed_at")), "Converged observation time is invalid")
   assert_acceptance(
     (item.keys & %w[authenticated work_started verified satisfied succeeded merge_safe]).empty?,
     "Converged claim view overstates claim semantics"

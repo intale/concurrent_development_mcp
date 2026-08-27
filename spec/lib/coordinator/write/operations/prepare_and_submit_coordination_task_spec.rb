@@ -21,6 +21,9 @@ RSpec.describe Coordinator::Write::Operations::PrepareAndSubmitCoordinationTask,
     )
     expect(events.map(&:type)).to eq([ "CoordinationTaskSubmitted" ])
     expect(events.sole.metadata.fetch("command_id")).to eq("cmd-public-create")
+    expect(events.sole.markers).to include(
+      Coordinator::Write::Tasks::ExecutionLane.new.marker("cmd-public-create")
+    )
   end
 
   it "rejects the internal namespace before allocating a Task" do

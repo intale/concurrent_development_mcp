@@ -62,6 +62,11 @@ module Coordinator::Write
         decision = @decider.call(state:, command:, published_at: preparation.published_at)
         return decision if decision.failure?
 
+        ActiveSupport::Notifications.instrument(
+          "coordinator.command_boundary",
+          operation: TOOL_NAME,
+          command_id: command.command_id
+        )
         persisted_events = persist_domain_plan(
           decision.value!,
           command:,

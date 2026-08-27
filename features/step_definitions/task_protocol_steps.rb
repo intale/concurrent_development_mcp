@@ -163,12 +163,12 @@ Then("only the original command and ChangeSet facts remain") do
 end
 
 When("the successful command receipt reaches the read side") do
-  completion = command_events(@current_arguments.fetch(:command_id)).sole
-  Coordinator::Container["projectors.command_receipts_v1"].call(completion)
-  @operation_response = call_tool(
-    "operation_get",
-    { command_id: @current_arguments.fetch(:command_id) }
-  )
+  command_id = @current_arguments.fetch(:command_id)
+  @operation_response = await_read_model("Command receipt #{command_id} to become available") do
+    response = call_tool("operation_get", { command_id: })
+    payload = response.dig("result", "structuredContent")
+    [ payload["status"] == "ok" && payload["receipt"] == command_id, response ]
+  end
 end
 
 Then("operation_get exposes the receipt without a freshness claim") do
@@ -249,9 +249,33 @@ Then("the cancelled command writes no coordination facts") do
   assert_no_current_coordination_facts
 end
 
-When("the agent requests cancellation as the Task workers restart") do
-  start_live_subscriptions
-  @cancel_response = task_request("tasks/cancel", @current_task_id)
+When("a Task worker restarts and reaches the durable execution boundary") do
+  install_contention_barrier(
+    operation: "coordination_task_execute",
+    command_ids: [ @current_arguments.fetch(:command_id) ]
+  )
+  start_process_subscriptions
+  await_contention_evidence
+end
+
+Then("the Task race has deterministic execution evidence") do
+  evidence = @contention_evidence.sole
+  assert_acceptance_equal(@current_arguments.fetch(:command_id), evidence.fetch(:command_id), "Task command")
+  assert_acceptance_equal(@current_task_id, evidence.fetch(:task_id), "Task identity")
+  assert_acceptance(evidence.fetch(:thread_id), "Task worker thread evidence is missing")
+end
+
+When("an independent MCP client requests cancellation before the worker resumes") do
+  prepare_mcp_clients("task-canceller")
+  @cancel_response = task_request(
+    "tasks/cancel",
+    @current_task_id,
+    client_id: "task-canceller"
+  )
+end
+
+When("the durable execution boundary is released") do
+  release_contention_barrier
 end
 
 Then("the Task eventually has exactly one terminal state") do

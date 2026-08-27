@@ -109,6 +109,11 @@ module Coordinator::Write
 
         plan = decision.value!
         verify_event_plan!(plan, command:, prepared:, lease_states:)
+        ActiveSupport::Notifications.instrument(
+          "coordinator.command_boundary",
+          operation: TOOL_NAME,
+          command_id: command.command_id
+        )
         persisted_domain_events = persist_domain_plan(
           plan,
           command:,

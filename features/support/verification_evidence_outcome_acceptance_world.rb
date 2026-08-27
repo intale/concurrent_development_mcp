@@ -1,22 +1,25 @@
 # frozen_string_literal: true
 
 module VerificationEvidenceOutcomeAcceptanceWorld
-  def prepare_claimed_verification_obligation(prefix:, agent_id:, project_claim: false)
+  def prepare_claimed_verification_obligation(
+    prefix:,
+    agent_id:,
+    project_claim: false,
+    claim_duration: 300
+  )
     prepare_open_verification_obligation(prefix:)
     project_candidate_obligation(redeliver: true) if project_claim
-    claimed_at = Time.now.utc.iso8601(6)
     attempt = submit_verification_obligation_claim(
       agent_id:,
       command_id: "cmd-cuc-evidence-claim-#{prefix.downcase}",
-      duration: 300
+      duration: claim_duration
     )
-    execute_verification_obligation_claim(attempt, at: claimed_at)
+    execute_verification_obligation_claim(attempt)
     assert_acceptance_equal(false, attempt.dig(:result, "isError"), "Evidence setup claim")
 
     @evidence_actor_id = agent_id
     @evidence_claim_attempt = attempt
     @evidence_claim = attempt.dig(:content, "data")
-    @evidence_execution_time = Time.iso8601(@evidence_claim.fetch("claimed_at")) + 60
     project_verification_obligation_claims(redeliver: true) if project_claim
   end
 
@@ -47,10 +50,9 @@ module VerificationEvidenceOutcomeAcceptanceWorld
     }
   end
 
-  def execute_evidence_attempt(attempt, at: @evidence_execution_time)
-    Timecop.freeze(at) { execute_task(attempt.fetch(:task_id)) }
+  def execute_evidence_attempt(attempt)
+    execute_task(attempt.fetch(:task_id))
     capture_evidence_attempt(attempt)
-    @evidence_execution_time = at + 1
     attempt
   end
 
@@ -73,7 +75,7 @@ module VerificationEvidenceOutcomeAcceptanceWorld
     assessment ||= compatibility_assessment_document(
       evidence_kind:,
       conclusion:,
-      produced_at: (@evidence_execution_time - 1).utc.iso8601(6)
+      produced_at: Time.now.utc.iso8601(6)
     )
     {
       command_id:,
@@ -151,10 +153,26 @@ module VerificationEvidenceOutcomeAcceptanceWorld
   end
 
   def project_verification_events(events, redeliver: false)
-    projector = Coordinator::Container["projectors.verification_obligations_v1"]
-    events.each do |event|
-      projector.call(event)
-      projector.call(event) if redeliver
+    expected_status =
+      if events.any? { _1.type == "VerificationObligationSatisfied" }
+        "satisfied"
+      elsif events.any? { _1.type == "VerificationObligationFailed" }
+        "failed"
+      end
+    expected_evidence = compatibility_evidence_events.length
+    restart_read_model_subscriptions if redeliver && @live_subscription_sets&.key?(:read_models)
+    await_read_model("Verification obligation #{@obligation_id} evidence to become available") do
+      payload = candidate_obligation_page(
+        obligation_id: @obligation_id,
+        status: expected_status || "open"
+      )
+      item = payload.dig("data", "page", "items")&.find do |candidate|
+        candidate.fetch("obligation_id") == @obligation_id
+      end
+      observed_evidence = item&.fetch("submitted_evidence", [])&.length || 0
+      matches = item && observed_evidence >= expected_evidence &&
+                (!expected_status || item.fetch("status") == expected_status)
+      [ matches, payload ]
     end
   end
 

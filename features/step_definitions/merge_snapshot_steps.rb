@@ -65,11 +65,11 @@ Then(
 end
 
 When("merge snapshot {string} reaches the read side") do |snapshot_id|
-  event = event_store.read(
-    streams.merge_snapshot(snapshot_id),
-    Coordinator::Write::EventQueries::MERGE_SNAPSHOT_REGISTRATION
-  ).sole
-  Coordinator::Container["projectors.merge_snapshots_v1"].call(event)
+  await_read_model("Merge snapshot #{snapshot_id} to become available") do
+    payload = call_tool("merge_snapshot_get", { merge_snapshot_id: snapshot_id })
+      .dig("result", "structuredContent")
+    [ payload.dig("data", "snapshot", "merge_snapshot_id") == snapshot_id, payload ]
+  end
 end
 
 Then("merge snapshot {string} is available without a freshness gate") do |snapshot_id|
@@ -141,10 +141,11 @@ Then("the available merge snapshot still reports {string}") do |status|
 end
 
 When("the submitted merge verification reaches the read side twice") do
-  event = merge_verification_events.find do |candidate|
-    candidate.type == "MergeSnapshotVerificationSubmitted"
+  await_read_model("Merge snapshot verification report to become available") do
+    snapshot = merge_snapshot_payload
+    submissions = snapshot.dig("verification", "submissions") || []
+    [ submissions.any?, snapshot ]
   end
-  2.times { Coordinator::Container["projectors.merge_snapshots_v1"].call(event) }
 end
 
 Then(
@@ -158,9 +159,12 @@ Then(
   assert_acceptance_equal("agent", source.dig("actor", "kind"), "Report attribution")
 end
 
-When("the terminal merge verification reaches the read side twice") do
-  event = merge_verification_events.find { _1.type == "MergeSnapshotVerified" }
-  2.times { Coordinator::Container["projectors.merge_snapshots_v1"].call(event) }
+When("the terminal merge verification reaches the read side after a subscription restart") do
+  restart_read_model_subscriptions if @live_subscription_sets&.key?(:read_models)
+  await_read_model("Merge snapshot verification to become terminal") do
+    snapshot = merge_snapshot_payload
+    [ snapshot.dig("verification", "status") == "verified", snapshot ]
+  end
 end
 
 Then(
@@ -276,9 +280,17 @@ Then("the available merge snapshot has no observed authorization yet") do
   assert_acceptance_equal(nil, snapshot.fetch("latest_authorization"), "Lagging authorization")
 end
 
-When("the merge authorization reaches the read side twice") do
-  event = merge_authorization_events.sole
-  2.times { Coordinator::Container["projectors.merge_snapshots_v1"].call(event) }
+When("the merge authorization reaches the read side after a subscription restart") do
+  expected = {
+    "MergeAuthorizationGranted" => "granted",
+    "MergeAuthorizationDenied" => "denied"
+  }[merge_authorization_events.sole.type]
+  assert_acceptance(expected, "Merge authorization outcome type is unsupported")
+  restart_read_model_subscriptions if @live_subscription_sets&.key?(:read_models)
+  await_read_model("Merge authorization #{expected} to become available") do
+    snapshot = merge_snapshot_payload
+    [ snapshot.dig("latest_authorization", "outcome") == expected, snapshot ]
+  end
 end
 
 Then(
@@ -334,9 +346,12 @@ Then("the available merge snapshot has no observed merge yet") do
   assert_acceptance_equal(nil, merge_snapshot_payload.fetch("observation"), "Lagging observation")
 end
 
-When("the merge observation reaches the read side twice") do
-  event = merge_observation_events.sole
-  2.times { Coordinator::Container["projectors.merge_snapshots_v1"].call(event) }
+When("the merge observation reaches the read side after a subscription restart") do
+  restart_read_model_subscriptions if @live_subscription_sets&.key?(:read_models)
+  await_read_model("Merge observation to become available") do
+    snapshot = merge_snapshot_payload
+    [ !snapshot["observation"].nil?, snapshot ]
+  end
 end
 
 Then("the available merge snapshot reports the exact merge without a freshness gate") do

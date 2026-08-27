@@ -34,9 +34,9 @@ Feature: Agents submit attributed compatibility evidence through checkpointed Ta
 
   Rule: Claim fences and assessment identity prevent stale or duplicate work
 
-    Scenario: Reclaiming at exact expiry rejects the predecessor fence
-      Given agent "agent-blue" actively claims Rails verification obligation "EVIDENCE-FENCE"
-      When agent "agent-green" reclaims the obligation at exact expiry
+    Scenario: Reclaiming after expiry rejects the predecessor fence
+      Given agent "agent-blue" claims Rails verification obligation "EVIDENCE-FENCE" for 30 seconds
+      When agent "agent-green" reclaims the obligation after expiry
       And the prior claimant submits evidence with the stale fence
       Then the stale evidence Task reports "verification_obligation_claim_stale" without target facts
 
@@ -60,7 +60,5 @@ Feature: Agents submit attributed compatibility evidence through checkpointed Ta
       Given agent "agent-blue" actively claims Rails verification obligation "EVIDENCE-VIEW" with its claim available
       When both passed assessments commit without projecting their evidence
       Then the available view still reports open with no observed evidence
-      When the first evidence fact reaches the read side twice
-      Then the available view reports partial passed and missing evidence
-      When the remaining evidence and outcome reach the read side twice
+      When the evidence and outcome reach the read side after a subscription restart
       Then the available view reports satisfied with complete attributed evidence

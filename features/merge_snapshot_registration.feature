@@ -27,9 +27,7 @@ Feature: Attributed merge snapshot registration
     Then the merge verification Task completes with status "verified"
     And 1 submitted report and 1 verified fact are durable for the exact snapshot
     And the available merge snapshot still reports "unverified"
-    When the submitted merge verification reaches the read side twice
-    Then the available merge snapshot reports "unverified" with one attributed report
-    When the terminal merge verification reaches the read side twice
+    When the terminal merge verification reaches the read side after a subscription restart
     Then the available merge snapshot reports "verified" without a freshness gate
 
   Scenario: A failed report remains durable and a later qualifying report can recover
@@ -62,7 +60,7 @@ Feature: Attributed merge snapshot registration
     And the agent requests merge authorization with command "cmd-cuc-merge-auth-grant"
     Then the merge authorization Task completes with durable outcome "granted"
     And the available merge snapshot has no observed authorization yet
-    When the merge authorization reaches the read side twice
+    When the merge authorization reaches the read side after a subscription restart
     Then the available merge snapshot reports authorization "granted" without a freshness gate
 
   Scenario: A changed target base is a durable authorization denial, not a Task failure
@@ -80,7 +78,7 @@ Feature: Attributed merge snapshot registration
   Scenario: An exact open merge-gate obligation blocks authorization from authoritative facts
     Given Rails 4 to Rails 5 Candidate pair "MERGE-AUTH-OPEN" has registered attributed impact surfaces
     When the user activates "merge_gate" Candidate impact policy through guidance Tasks
-    And the policy reaction is delivered twice
+    And the policy reaction is observed across a process restart
     Then one exact open Rails obligation is durable under "merge_gate"
     When the integrator registers exact Rails pair snapshot "MS-CUC-MERGE-AUTH-OPEN"
     And the agent submits "passed" merge verification with command "cmd-cuc-merge-auth-open-verification"
@@ -102,5 +100,5 @@ Feature: Attributed merge snapshot registration
     When the agent records the exact external merge with command "cmd-cuc-merge-observed"
     Then the merge observation Task completes with attributed unverified evidence
     And the available merge snapshot has no observed merge yet
-    When the merge observation reaches the read side twice
+    When the merge observation reaches the read side after a subscription restart
     Then the available merge snapshot reports the exact merge without a freshness gate

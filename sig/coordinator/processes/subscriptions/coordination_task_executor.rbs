@@ -2,7 +2,9 @@ module Coordinator
   module Processes
     module Subscriptions
       class CoordinationTaskExecutor < Shared::Subscriptions::Registration
-        def initialize: (handler: ProcessManagers::CoordinationTaskExecutor, ?pull_interval: Float) -> void
+        LANE_COUNT: Integer
+
+        def initialize: (handler: ProcessManagers::CoordinationTaskExecutor, lane_index: Integer, ?pull_interval: Float, ?execution_lane: Write::Tasks::ExecutionLane) -> void
       end
     end
   end

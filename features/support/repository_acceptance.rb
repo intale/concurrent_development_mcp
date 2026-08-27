@@ -26,18 +26,34 @@ module RepositoryAcceptance
     repository_id = acceptance_repository_id(key)
     return repository_id if registered_acceptance_repositories.include?(repository_id)
 
-    result = Coordinator::Write::Operations::ExecuteRegisterRepository.new(
-      event_store: Coordinator::Write::EventStore.new(client: PgEventstore.client)
-    ).call(
-      command_id: "seed-register-#{repository_id}",
-      actor: { kind: "agent", id: "test-repository-registrar" },
-      repository_id:,
-      scope: acceptance_repository_scope(key),
-      display_name: "#{key.to_s.capitalize} test repository",
-      paths: [],
-      remotes: []
+    response = call_tool(
+      "repository_register",
+      {
+        command_id: "seed-register-#{repository_id}",
+        actor: { kind: "agent", id: "test-repository-registrar" },
+        repository_id:,
+        scope: acceptance_repository_scope(key),
+        display_name: "#{key.to_s.capitalize} test repository",
+        paths: [],
+        remotes: []
+      },
+      client_id: "test-repository-bootstrap"
     )
-    result.value!
+    task_id = response.dig("result", "taskId")
+    assert_acceptance(task_id, "repository_register did not return a Task: #{response.inspect}")
+    start_process_subscriptions
+    state = await_task_terminal(task_id, client_id: "test-repository-bootstrap")
+    assert_acceptance_equal(false, state.dig("result", "result", "isError"), "Repository bootstrap")
+    await_read_model("Repository #{repository_id} to reach scoped discovery") do
+      payload = call_tool(
+        "repository_list",
+        { scope: acceptance_repository_scope(key), limit: 20 },
+        client_id: "test-repository-bootstrap"
+      ).dig("result", "structuredContent")
+      items = payload.dig("data", "page", "items") || []
+      [ items.any? { _1.fetch("repository_id") == repository_id }, payload ]
+    end
+    stop_live_subscriptions
     registered_acceptance_repositories << repository_id
     repository_id
   end

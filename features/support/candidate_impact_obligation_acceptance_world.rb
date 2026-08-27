@@ -47,8 +47,12 @@ module CandidateImpactObligationAcceptanceWorld
     project_impact(candidate)
     candidate[:impact_arguments] = arguments
     candidate[:impact_task_id] = task_id
-    candidate[:registration] = candidate_obligation_registrations.find do |event|
-      event.data.fetch("candidate_id") == candidate.dig(:arguments, :candidate_id)
+    candidate_id = candidate.dig(:arguments, :candidate_id)
+    candidate[:registration] = eventually("Candidate #{candidate_id} impact registration") do
+      registration = candidate_obligation_registrations.find do |event|
+        event.data.fetch("candidate_id") == candidate_id
+      end
+      [ !registration.nil?, registration ]
     end
     assert_acceptance(candidate[:registration], "Candidate obligation #{role} registration is missing")
     candidate[:registration]
@@ -137,47 +141,26 @@ module CandidateImpactObligationAcceptanceWorld
 
   def project_candidate_obligation_policy
     decision_id = @obligation_policy.fetch(:decision_id)
-    events = decision_events(decision_id)
-    recorded = events.find { _1.type == "DecisionRecorded" }
-    activated = events.find { _1.type == "DecisionActivated" }
-    assert_acceptance(recorded && activated, "Candidate impact Decision history is incomplete")
-    slot_id = activated.data.fetch("slot").fetch("slot_id")
-    projector = Coordinator::Container["projectors.decision_governance_v1"]
-    [
-      recorded,
-      activated,
-      *decision_slot_events(slot_id),
-      *candidate_policy_partition_events
-    ].each { projector.call(_1) }
+    project_remaining_decision_facts(decision_id)
+    level = @obligation_policy.fetch(:level)
+    await_read_model("Candidate impact policy #{level} to become available") do
+      payload = candidate_obligation_impact_view
+      [ payload.dig("data", "page", "impact_policy", "enforcement") == level, payload ]
+    end
   end
 
   def drive_candidate_policy_source(redeliver: true)
-    process_manager = candidate_obligation_process_manager
-    source = @obligation_policy.fetch(:partition_event)
-    process_manager.call(source)
-    process_manager.call(source) if redeliver
-    started = candidate_registry_sweep_events.find do
-      _1.type == "CandidateImpactRegistrySweepStarted"
-    end
-    return unless started
-
-    process_manager.call(started)
-    process_manager.call(started) if redeliver
-    drive_candidate_pair_scans(
-      registrations: candidate_obligation_registrations,
-      redeliver:
-    )
-    derive_candidate_obligation_id if candidate_obligation_registrations.length == 2
+    start_process_subscriptions
+    restart_process_subscriptions if redeliver
+    await_candidate_obligation_saga(include_registry: true)
   end
 
   def drive_candidate_registration_source(role, redeliver: true)
     registration = @obligation_candidates.dig(role, :registration)
     assert_acceptance(registration, "Candidate obligation #{role} registration is missing")
-    process_manager = candidate_obligation_process_manager
-    process_manager.call(registration)
-    process_manager.call(registration) if redeliver
-    drive_candidate_pair_scans(registrations: [ registration ], redeliver:)
-    derive_candidate_obligation_id if candidate_obligation_registrations.length == 2
+    start_process_subscriptions
+    restart_process_subscriptions if redeliver
+    await_candidate_obligation_saga(include_registry: false)
   end
 
   def candidate_obligation_events
@@ -199,10 +182,12 @@ module CandidateImpactObligationAcceptanceWorld
   end
 
   def project_candidate_obligation(redeliver: true)
-    event = candidate_obligation_events.sole
-    projector = Coordinator::Container["projectors.verification_obligations_v1"]
-    projector.call(event)
-    projector.call(event) if redeliver
+    restart_read_model_subscriptions if redeliver && @live_subscription_sets&.key?(:read_models)
+    await_read_model("Verification obligation #{@obligation_id} to become available") do
+      payload = candidate_obligation_page(obligation_id: @obligation_id)
+      items = payload.dig("data", "page", "items") || []
+      [ items.any? { _1.fetch("obligation_id") == @obligation_id }, payload ]
+    end
   end
 
   def candidate_obligation_page(**filters)
@@ -386,18 +371,28 @@ module CandidateImpactObligationAcceptanceWorld
     )
   end
 
-  def drive_candidate_pair_scans(registrations:, redeliver:)
-    process_manager = candidate_obligation_process_manager
-    registrations.each do |registration|
-      %w[outgoing incoming].each do |direction|
-        started = candidate_pair_scan_events(registration, direction).find do
-          _1.type == "CandidateImpactPairScanStarted"
-        end
-        next unless started
+  def await_candidate_obligation_saga(include_registry:)
+    return unless %w[verification_gate merge_gate].include?(@obligation_policy.fetch(:level))
 
-        process_manager.call(started)
-        process_manager.call(started) if redeliver
+    if candidate_obligation_registrations.length == 2
+      derive_candidate_obligation_id
+    elsif include_registry
+      eventually("Candidate impact registry sweep to complete") do
+        events = candidate_registry_sweep_events
+        terminal = events.any? do
+          %w[
+            CandidateImpactRegistrySweepSkipped
+            CandidateImpactRegistrySweepCompleted
+          ].include?(_1.type)
+        end
+        [ terminal, events.map(&:type) ]
       end
+    end
+    return unless @obligation_id
+
+    eventually("Verification obligation #{@obligation_id} to become durable") do
+      events = candidate_obligation_events
+      [ events.length == 1, events.map(&:type) ]
     end
   end
 
@@ -428,10 +423,6 @@ module CandidateImpactObligationAcceptanceWorld
       stream_id: event.stream.stream_id,
       stream_revision: event.stream_revision
     )
-  end
-
-  def candidate_obligation_process_manager
-    Coordinator::Container["process_managers.candidate_impact_obligation_policy"]
   end
 end
 

@@ -16,6 +16,7 @@ module Coordinator::Write
         id_generator: IdGenerator.new,
         event_factory: EventFactory.new,
         stream_factory: StreamFactory.new,
+        execution_lane: Tasks::ExecutionLane.new,
         correlation_resolver: Tasks::CorrelationResolver.new(
           release_set_correlation_loader: ReleaseSets::CorrelationLoader.new(event_store:)
         ),
@@ -28,6 +29,7 @@ module Coordinator::Write
         @id_generator = id_generator
         @event_factory = event_factory
         @stream_factory = stream_factory
+        @execution_lane = execution_lane
         @correlation_resolver = correlation_resolver
         @maximum_attempts = maximum_attempts
       end
@@ -84,6 +86,7 @@ module Coordinator::Write
           markers: [
             "task:#{event.task_id}",
             "command:#{target_command.command_id}",
+            @execution_lane.marker(target_command.command_id),
             "tool:#{event.tool_name}"
           ],
           correlation_id:

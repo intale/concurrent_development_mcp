@@ -40,7 +40,7 @@ Then("the available obligation still reports open before waiver projection") do
   )
 end
 
-When("the obligation lifecycle reaches the read side twice") do
+When("the obligation lifecycle reaches the read side after a subscription restart") do
   project_verification_obligation_lifecycle
 end
 
@@ -55,7 +55,7 @@ When("the user corrects the Candidate impact policy through guidance Tasks") do
   correct_candidate_obligation_policy
 end
 
-When("the validity policy reaction is delivered twice") do
+When("the validity policy reaction is observed across a process restart") do
   drive_verification_obligation_validity(redeliver: true)
 end
 

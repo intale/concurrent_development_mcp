@@ -221,6 +221,100 @@ Then("retrieving Skill {string} without a revision returns revision 2") do |name
   assert_acceptance_equal(2, payload.dig("data", "skill", "revision"), "Current Skill revision")
 end
 
+Given("two independent MCP agents will publish Skill {string} in scope {string}") do |name, scope|
+  @concurrent_skill_name = name
+  @concurrent_skill_scope = scope
+  lane = Coordinator::Write::Tasks::ExecutionLane.new
+  by_lane = {}
+  32.times do |index|
+    command_id = "cmd-cuc-skill-concurrent-#{index}"
+    by_lane[lane.index(command_id)] ||= command_id
+    break if by_lane.length == Coordinator::Write::Tasks::ExecutionLane::COUNT
+  end
+  assert_acceptance_equal(2, by_lane.length, "Distinct Skill execution lanes")
+  @concurrent_skill_commands = by_lane.sort.map(&:last)
+  prepare_mcp_clients("skill-agent-a", "skill-agent-b")
+end
+
+When("both agents submit expected revision 0 and reach the Skill decision boundary") do
+  install_contention_barrier(
+    operation: "skill_publish",
+    command_ids: @concurrent_skill_commands
+  )
+  start_process_subscriptions
+  @concurrent_skill_publications = [ "skill-agent-a", "skill-agent-b" ].map.with_index do |client_id, index|
+    Thread.new do
+      submit_skill_task(
+        name: @concurrent_skill_name,
+        scope: @concurrent_skill_scope,
+        command_id: @concurrent_skill_commands.fetch(index),
+        expected_revision: 0,
+        instructions: "Instructions proposed by #{client_id}.",
+        assets: [],
+        client_id:
+      )
+    end
+  end.map(&:value)
+  await_contention_evidence
+end
+
+Then("both Skill publications have deterministic contention evidence") do
+  assert_acceptance_equal(2, @contention_evidence.length, "Skill boundary arrivals")
+  assert_acceptance_equal(
+    @concurrent_skill_commands.sort,
+    @contention_evidence.map { _1.fetch(:command_id) }.sort,
+    "Skill boundary commands"
+  )
+  assert_acceptance_equal(2, @contention_evidence.map { _1.fetch(:thread_id) }.uniq.length, "Worker threads")
+  assert_acceptance_equal([ 0, 1 ], @contention_evidence.map { _1.fetch(:worker_lane) }.sort, "Worker lanes")
+end
+
+When("the Skill decision boundary is released") do
+  release_contention_barrier
+  @concurrent_skill_publications.each do |publication|
+    state = await_task_terminal(publication.fetch(:task_id), client_id: publication.fetch(:client_id))
+    publication[:state] = state
+    publication[:outcome] = state.dig("result", "result", "structuredContent")
+  end
+end
+
+Then("one Skill Task publishes revision 1 and the other completes with revision conflict") do
+  assert_acceptance(
+    @concurrent_skill_publications.all? { _1.dig(:state, "result", "status") == "completed" },
+    "Both Skill Tasks must complete"
+  )
+  statuses = @concurrent_skill_publications.map { _1.dig(:outcome, "status") }
+  assert_acceptance_equal([ "conflict", "ok" ], statuses.sort, "Concurrent publication outcomes")
+  @winning_skill_publication = @concurrent_skill_publications.find { _1.dig(:outcome, "status") == "ok" }
+  conflict = @concurrent_skill_publications.find { _1.dig(:outcome, "status") == "conflict" }
+  assert_acceptance_equal(1, @winning_skill_publication.dig(:outcome, "data", "revision"), "Winning revision")
+  assert_acceptance_equal(
+    "skill_revision_conflict",
+    conflict.dig(:outcome, "data", "code"),
+    "Losing conflict code"
+  )
+  assert_acceptance_equal(
+    1,
+    skill_events(name: @concurrent_skill_name, scope: @concurrent_skill_scope).length,
+    "Published Skill facts"
+  )
+end
+
+When("the winning Skill fact reaches the read side through live subscriptions") do
+  event = skill_events(name: @concurrent_skill_name, scope: @concurrent_skill_scope).sole
+  project_skill_event(event)
+end
+
+Then("Skill {string} exposes exactly the winning revision 1 snapshot") do |name|
+  skill = skill_view(name:, scope: @concurrent_skill_scope).dig("data", "skill")
+  assert_acceptance_equal(1, skill.fetch("revision"), "Available Skill revision")
+  assert_acceptance_equal(
+    @winning_skill_publication.dig(:arguments, :instructions),
+    skill.fetch("instructions"),
+    "Winning Skill instructions"
+  )
+end
+
 Given("Skill {string} in scope {string} has published revisions 1 and 2") do |name, scope|
   @replayed_skill_name = name
   @replayed_skill_scope = scope

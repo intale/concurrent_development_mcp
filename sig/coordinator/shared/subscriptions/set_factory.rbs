@@ -1,0 +1,16 @@
+module Coordinator::Shared
+  module Subscriptions
+    class SetFactory
+      def initialize: (
+        set_class: untyped,
+        set_name: String,
+        registrations: Array[Coordinator::Shared::Subscriptions::Registration]
+      ) -> void
+
+      def call: (?manager: PgEventstore::SubscriptionsManager?) -> (
+        Coordinator::Processes::Subscriptions::ProcessManagerSet |
+        Coordinator::Read::Subscriptions::ReadModelSet
+      )
+    end
+  end
+end

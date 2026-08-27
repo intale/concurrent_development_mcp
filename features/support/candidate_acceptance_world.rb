@@ -41,7 +41,7 @@ module CandidateAcceptanceWorld
       event.type == "ChangeSetActivated"
     end
     assert_acceptance(activation, "Candidate setup #{prefix} has no activation fact")
-    Coordinator::Container["process_managers.change_set_readiness"].call(activation)
+    await_work_item_ready(ids.fetch(:work_item_id))
 
     complete_candidate_setup_task(
       "work_item_acquire",
@@ -192,12 +192,21 @@ module CandidateAcceptanceWorld
   def project_candidate_submission(candidate_id)
     event = candidate_events(candidate_id).find { _1.type == "CandidateSubmitted" }
     assert_acceptance(event, "Candidate #{candidate_id} has no submission fact")
-    Coordinator::Container["projectors.candidates_v1"].call(event)
+    await_read_model("Candidate #{candidate_id} to become available") do
+      payload = candidate_view(candidate_id)
+      [ payload.dig("data", "candidate", "candidate_id") == candidate_id, payload ]
+    end
   end
 
   def project_remaining_candidate_evidence(candidate_id)
-    candidate_events(candidate_id).reject { _1.type == "CandidateSubmitted" }.each do |event|
-      Coordinator::Container["projectors.candidates_v1"].call(event)
+    expected_types = candidate_events(candidate_id).map(&:type)
+    await_read_model("Candidate #{candidate_id} evidence to converge") do
+      payload = candidate_view(candidate_id)
+      candidate = payload.dig("data", "candidate")
+      complete = candidate &&
+                 (!expected_types.include?("CandidateChangeManifestCaptured") || candidate["manifest"]) &&
+                 (!expected_types.include?("CandidateBuildContextCaptured") || candidate["build_context"])
+      [ complete, payload ]
     end
   end
 
@@ -206,7 +215,11 @@ module CandidateAcceptanceWorld
       candidate_event.data.fetch("candidate_id") == candidate_id
     end
     assert_acceptance(event, "Candidate #{candidate_id} has no Attempt attachment")
-    Coordinator::Container["projectors.coord_context_v1"].call(event)
+    await_read_model("Candidate #{candidate_id} Attempt attachment to become available") do
+      payload = candidate_context(attempt_id)
+      checkpoints = payload.dig("data", "context", "candidate_checkpoints") || []
+      [ checkpoints.any? { _1.fetch("candidate_id") == candidate_id }, payload ]
+    end
   end
 
   def project_complete_candidate(candidate_id, attempt_id)

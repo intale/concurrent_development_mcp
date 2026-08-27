@@ -40,10 +40,20 @@ module VerificationObligationLifecycleAcceptanceWorld
   end
 
   def project_verification_obligation_lifecycle
-    projector = Coordinator::Container["projectors.verification_obligations_v1"]
-    verification_obligation_lifecycle_events.drop(1).each do |event|
-      projector.call(event)
-      projector.call(event)
+    terminal = verification_obligation_lifecycle_events.reverse.find do |event|
+      %w[VerificationObligationWaived VerificationObligationInvalidated].include?(event.type)
+    end
+    assert_acceptance(terminal, "Verification obligation #{@obligation_id} has no lifecycle transition")
+    expected_status = terminal.type.delete_prefix("VerificationObligation").downcase
+    await_read_model("Verification obligation #{@obligation_id} to become #{expected_status}") do
+      payload = candidate_obligation_page(
+        obligation_id: @obligation_id,
+        status: expected_status
+      )
+      item = payload.dig("data", "page", "items")&.find do |candidate|
+        candidate.fetch("obligation_id") == @obligation_id
+      end
+      [ item&.fetch("status") == expected_status, payload ]
     end
   end
 
@@ -105,23 +115,15 @@ module VerificationObligationLifecycleAcceptanceWorld
   end
 
   def drive_verification_obligation_validity(redeliver: true)
-    manager = Coordinator::Container["process_managers.verification_obligation_validity"]
-    manager.call(@corrected_partition_event)
-    manager.call(@corrected_partition_event) if redeliver
-    loop do
-      checkpoint = verification_obligation_validity_scan_events.find do |event|
-        %w[
-          VerificationObligationValidityScanStarted
-          VerificationObligationValidityScanProgressed
-        ].include?(event.type)
-      end
-      break unless checkpoint
-
-      manager.call(checkpoint)
-      manager.call(checkpoint) if redeliver
-      break if verification_obligation_validity_scan_events.any? do |event|
-        event.type == "VerificationObligationValidityScanCompleted"
-      end
+    start_process_subscriptions
+    restart_process_subscriptions if redeliver
+    eventually("Verification obligation validity Saga to complete") do
+      events = verification_obligation_validity_scan_events
+      [ events.any? { _1.type == "VerificationObligationValidityScanCompleted" }, events.map(&:type) ]
+    end
+    eventually("Verification obligation #{@obligation_id} to become invalidated") do
+      events = verification_obligation_lifecycle_events
+      [ events.any? { _1.type == "VerificationObligationInvalidated" }, events.map(&:type) ]
     end
   end
 

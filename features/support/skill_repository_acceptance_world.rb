@@ -9,23 +9,60 @@ module SkillRepositoryAcceptanceWorld
     instructions:,
     assets: []
   )
-    task_id = submit_and_execute(
+    publication = submit_skill_task(
       "skill_publish",
+      name:,
+      scope:,
       command_id:,
-      actor: { kind: "agent", id: "skill-agent" },
+      expected_revision:,
+      instructions:,
+      assets:
+    )
+    start_process_subscriptions
+    state = await_task_terminal(publication.fetch(:task_id), client_id: publication.fetch(:client_id))
+    publication.merge(
+      state:,
+      outcome: state.dig("result", "result", "structuredContent")
+    )
+  end
+
+  def submit_skill_task(
+    _tool = "skill_publish",
+    name:,
+    scope:,
+    command_id:,
+    expected_revision:,
+    instructions:,
+    assets: [],
+    client_id: "skill-agent"
+  )
+    response = call_tool(
+      "skill_publish",
+      {
+      command_id:,
+      actor: { kind: "agent", id: client_id },
       name:,
       scope:,
       expected_revision:,
       description: "#{name} for #{scope}",
       instructions:,
       assets:
+      },
+      client_id:
     )
-    state = task_request("tasks/get", task_id)
+    task_id = response.dig("result", "taskId")
+    assert_acceptance(task_id, "skill_publish did not return a Task: #{response.inspect}")
     {
       task_id:,
       command_id:,
-      state:,
-      outcome: state.dig("result", "result", "structuredContent")
+      client_id:,
+      arguments: {
+        name:,
+        scope:,
+        expected_revision:,
+        instructions:,
+        assets:
+      }
     }
   end
 
@@ -42,7 +79,16 @@ module SkillRepositoryAcceptanceWorld
   end
 
   def project_skill_event(event)
-    Coordinator::Container["projectors.skills_v1"].call(event)
+    await_read_model(
+      "Skill #{event.data.fetch('name')} revision #{event.data.fetch('revision')} to become available"
+    ) do
+      payload = skill_view(
+        name: event.data.fetch("name"),
+        scope: event.data.fetch("scope"),
+        revision: event.data.fetch("revision")
+      )
+      [ payload.dig("data", "skill", "revision") == event.data.fetch("revision"), payload ]
+    end
   end
 
   def skill_view(name:, scope:, revision: nil)

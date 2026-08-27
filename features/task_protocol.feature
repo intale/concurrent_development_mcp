@@ -83,7 +83,10 @@ Feature: Durable MCP Task protocol
     Scenario: Cancellation racing execution preserves one terminal Task state
       Given the Task workers are interrupted
       When agent "planner-1" submits ChangeSet "CS-AUD-TASK-CANCEL-RACE" with command "cmd-aud-task-cancel-race"
-      And the agent requests cancellation as the Task workers restart
+      And a Task worker restarts and reaches the durable execution boundary
+      Then the Task race has deterministic execution evidence
+      When an independent MCP client requests cancellation before the worker resumes
+      And the durable execution boundary is released
       Then the Task eventually has exactly one terminal state
 
   Rule: Read availability does not depend on projection freshness

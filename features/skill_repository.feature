@@ -27,12 +27,22 @@ Feature: Scoped AI Skill repository
 
   Rule: Assets are passive content tied to one complete revision
 
-    @AUD-SKILL-SNAPSHOT-01 @AUD-SKILL-HISTORY-02 @AUD-SKILL-CONCURRENT-PUBLISH-03
+    @AUD-SKILL-SNAPSHOT-01 @AUD-SKILL-HISTORY-02
     Scenario: An agent pins a complete historical Skill snapshot while a newer revision is available
       Given Skill "review-history" in scope "project:alpha" has projected revisions 1 and 2 with different assets
       When the agent retrieves Skill "review-history" revision 1 and follows its asset manifest
       Then the Skill metadata, manifest, and asset content all describe revision 1
       And retrieving Skill "review-history" without a revision returns revision 2
+
+    @AUD-SKILL-CONCURRENT-PUBLISH-03 @live-subscriptions @concurrency
+    Scenario: Concurrent first publications converge on one Skill revision
+      Given two independent MCP agents will publish Skill "shared-review" in scope "project:alpha"
+      When both agents submit expected revision 0 and reach the Skill decision boundary
+      Then both Skill publications have deterministic contention evidence
+      When the Skill decision boundary is released
+      Then one Skill Task publishes revision 1 and the other completes with revision conflict
+      When the winning Skill fact reaches the read side through live subscriptions
+      Then Skill "shared-review" exposes exactly the winning revision 1 snapshot
 
     @AUD-SKILL-PROJECTION-REPLAY-04
     Scenario: Delayed and duplicate Skill projections preserve history without regressing the current revision

@@ -8,14 +8,12 @@ Feature: Agent choice governance
   Rule: Significant agent choices are authoritative Tasks with available evidence
 
     @CDM-CHOICE-001 @stale-view
-    Scenario: An accepted testing-framework choice becomes available one observed fact at a time
+    Scenario: An accepted testing-framework choice converges through the production read subscription
       Given agent "agent-a" has active Attempt "A-CUC-CHO-1" for WorkItem "W-CUC-CHO-1" in ChangeSet "CS-CUC-CHO-1" and repository "billing"
       When the agent resolves the available testing-framework context
       And the agent records testing-framework choice "rspec" as "CHO-CUC-1" through a Task
       Then the choice Task succeeds with accepted authoritative facts
       And AgentChoice "CHO-CUC-1" is honestly not observed before projection
-      When the AgentChoiceRecorded fact for "CHO-CUC-1" reaches the read side
-      Then the available AgentChoice "CHO-CUC-1" is recorded without a freshness claim
       When the AgentChoiceAccepted fact for "CHO-CUC-1" reaches the read side
       Then the available AgentChoice "CHO-CUC-1" is accepted without a freshness claim
 
@@ -49,16 +47,14 @@ Feature: Agent choice governance
       And the host activates active-attempt Decision "D-CUC-IMPACT-1" requiring "minitest" through Tasks
       And the impact Saga processes and redrives the Decision change
       Then one invalidating assessment and one terminal invalidation are durable for "CHO-CUC-IMPACT-1"
-      And Attempt "A-CUC-IMPACT-1" has no projected impacts while AgentChoice "CHO-CUC-IMPACT-1" remains accepted
       When the impact assessment for "CHO-CUC-IMPACT-1" reaches the read side
-      Then Attempt "A-CUC-IMPACT-1" exposes the invalidating assessment while AgentChoice "CHO-CUC-IMPACT-1" remains accepted
-      When the invalidation for AgentChoice "CHO-CUC-IMPACT-1" reaches the read side
-      Then AgentChoice "CHO-CUC-IMPACT-1" is invalidated and tells the agent to resolve current Decisions
+      Then Attempt "A-CUC-IMPACT-1" exposes the invalidating assessment and AgentChoice "CHO-CUC-IMPACT-1" is invalidated
+      And AgentChoice "CHO-CUC-IMPACT-1" is invalidated and tells the agent to resolve current Decisions
 
     @CDM-IMPACT-002
     Scenario: A compatible correction records an explicit still-valid assessment
-      Given active-attempt Decision "D-CUC-IMPACT-VALID" requiring "rspec" is active and available
-      And agent "agent-a" has active Attempt "A-CUC-IMPACT-VALID" for WorkItem "W-CUC-IMPACT-VALID" in ChangeSet "CS-CUC-IMPACT-VALID" and repository "billing"
+      Given agent "agent-a" has active Attempt "A-CUC-IMPACT-VALID" for WorkItem "W-CUC-IMPACT-VALID" in ChangeSet "CS-CUC-IMPACT-VALID" and repository "billing"
+      And active-attempt Decision "D-CUC-IMPACT-VALID" requiring "rspec" is active and available
       When the agent resolves the available testing-framework context
       And the agent records testing-framework choice "rspec" as "CHO-CUC-IMPACT-VALID" through a Task
       Then the choice Task succeeds with accepted authoritative facts

@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module Tasks
+      class ExecutionLane
+        COUNT: Integer
+        MARKER_PREFIX: String
+
+        def initialize: (?canonical_json: Shared::CanonicalJson) -> void
+        def index: (String command_id) -> Integer
+        def marker: (String command_id) -> String
+        def marker_for: (Integer index) -> String
+      end
+    end
+  end
+end

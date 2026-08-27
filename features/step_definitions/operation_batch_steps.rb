@@ -5,7 +5,7 @@ When("the agent submits a batch of {int} independent Skill publications") do |co
   items = count.times.map do |index|
     batch_skill_item(index:, name: "batch-skill-#{index}")
   end
-  submit_skill_batch(items)
+  submit_skill_batch(items, pause_at: "operation_batch_page")
 end
 
 When("the agent submits two competing initial revisions in one Skill batch") do
@@ -14,27 +14,23 @@ When("the agent submits two competing initial revisions in one Skill batch") do
     batch_skill_item(index: 0, name: "competing-skill", expected_revision: 0),
     batch_skill_item(index: 1, name: "competing-skill", expected_revision: 0)
   ]
-  submit_skill_batch(items)
+  submit_skill_batch(items, pause_at: "operation_batch_page_start")
 end
 
-Then("the Batch Task accepts all {int} items before target execution") do |count|
+Then("the Batch Task durably accepts all {int} items") do |count|
   outcome = @operation_batch_task.dig("result", "result", "structuredContent")
   assert_acceptance_equal("completed", @operation_batch_task.dig("result", "status"), "Batch Task status")
   assert_acceptance_equal("accepted", outcome.dig("data", "status"), "Batch acceptance")
   assert_acceptance_equal(count, outcome.dig("data", "total"), "Accepted item count")
-  assert_acceptance_equal([ "OperationBatchCreated" ], operation_batch_events.map(&:type), "Pre-Saga facts")
+  assert_acceptance_equal(1, operation_batch_events.count { _1.type == "OperationBatchCreated" }, "Creation facts")
 end
 
-Then("the Batch Task accepts both items before target execution") do
-  step("the Batch Task accepts all 2 items before target execution")
+Then("the Batch Task durably accepts both items") do
+  step("the Batch Task durably accepts all 2 items")
 end
 
-When("the Batch creation is delivered twice and all continuations run") do
-  run_operation_batch_sources(redeliver_creation: true)
-end
-
-When("the Batch Saga processes the competing revisions") do
-  run_operation_batch_sources
+When("the process workers restart after the first durable Batch page") do
+  restart_operation_batch_after_page
 end
 
 Then("the Batch has {int} successes, no rejection, and one terminal completion") do |count|
@@ -45,25 +41,23 @@ Then("the Batch has {int} successes, no rejection, and one terminal completion")
   assert_acceptance_equal(1, events.count { _1.type == "OperationBatchContinuationRequested" }, "Continuation facts")
 end
 
-When("only the first Batch progress facts reach the read side") do
-  events = operation_batch_events
-  project_operation_batch(
-    [
-      events.find { _1.type == "OperationBatchCreated" },
-      events.find { _1.type == "OperationBatchItemSucceeded" }
-    ]
-  )
+When("the Batch creation reaches the read side while item execution is paused") do
+  await_contention_evidence
+  creation = operation_batch_events.find { _1.type == "OperationBatchCreated" }
+  project_operation_batch([ creation ])
 end
 
-Then("the available Batch remains running with one observed success") do
+Then("the available Batch remains running with no observed item outcome") do
   view = operation_batch_view
   assert_acceptance_equal("running", view.fetch("status"), "Available running status")
-  assert_acceptance_equal(1, view.fetch("succeeded"), "Available successes")
+  assert_acceptance_equal(0, view.fetch("succeeded"), "Available successes")
   assert_acceptance_equal(0, view.fetch("rejected"), "Available rejections")
   assert_acceptance(!view.key?("fresh"), "Batch response must not expose a freshness gate")
 end
 
-When("the remaining Batch facts reach the read side") do
+When("the Batch decision boundary is released and terminal facts reach the read side") do
+  release_contention_barrier
+  await_operation_batch_terminal
   project_operation_batch(operation_batch_events)
 end
 
@@ -76,8 +70,7 @@ Then("the available Batch completes with one success and one rejection") do
 end
 
 When("the first Batch process page completes") do
-  creation = operation_batch_events.find { _1.type == "OperationBatchCreated" }
-  Coordinator::Container["process_managers.operation_batch_runner"].call(creation)
+  await_contention_evidence
 end
 
 Then("{int} item successes and one continuation are durable") do |count|
@@ -109,8 +102,8 @@ Then("the cancellation Task succeeds without undoing completed items") do
 end
 
 When("the pending Batch continuation observes cancellation") do
-  continuation = operation_batch_events.find { _1.type == "OperationBatchContinuationRequested" }
-  Coordinator::Container["process_managers.operation_batch_runner"].call(continuation)
+  release_contention_barrier
+  await_operation_batch_terminal
 end
 
 Then("the Batch is cancelled with {int} successes and one item not run") do |count|

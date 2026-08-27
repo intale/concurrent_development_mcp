@@ -78,7 +78,8 @@ RSpec.describe Coordinator::Processes::ProcessManagers::ChangeSetReadiness, :eve
       subscription_name: "change-set-readiness-v1",
       stream_context: "DevelopmentPlanning",
       stream_name: "ChangeSet",
-      event_types: [ "ChangeSetActivated" ]
+      event_types: [ "ChangeSetActivated" ],
+      event_markers: []
     )
     expect(definition.options).to eq(
       filter: {

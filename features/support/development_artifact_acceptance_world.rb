@@ -66,13 +66,26 @@ module DevelopmentArtifactAcceptanceWorld
   end
 
   def project_artifact(artifact_id)
-    artifact_events(artifact_id).each do |event|
-      Coordinator::Container["projectors.development_artifacts_v1"].call(event)
+    await_read_model("Development Artifact #{artifact_id} to become available") do
+      payload = artifact_view(artifact_id)
+      [ payload.dig("data", "artifact", "artifact", "artifact_id") == artifact_id, payload ]
     end
   end
 
   def project_artifact_event(event)
-    Coordinator::Container["projectors.development_artifacts_v1"].call(event)
+    case event.type
+    when "DevelopmentArtifactCaptured"
+      artifact_id = event.data.fetch("artifact").fetch("artifact_id")
+      project_artifact(artifact_id)
+    when "DevelopmentArtifactRelationDeclared"
+      artifact_id = event.data.fetch("artifact_relation").fetch("source_artifact_id")
+      relation_id = event.data.dig("artifact_relation", "relation_id")
+      await_artifact_relation(artifact_id, relation_id:, status: "active")
+    when "DevelopmentArtifactRelationSuperseded"
+      artifact_id = event.data.fetch("source_artifact_id")
+      relation_id = event.data.fetch("superseded_relation_id")
+      await_artifact_relation(artifact_id, relation_id:, status: "superseded")
+    end
   end
 
   def artifact_view(artifact_id)
@@ -115,6 +128,19 @@ module DevelopmentArtifactAcceptanceWorld
   def follow_artifact_action(action)
     call_tool(action.fetch("tool"), action.fetch("arguments"))
       .dig("result", "structuredContent")
+  end
+
+  def await_artifact_relation(artifact_id, relation_id:, status:)
+    await_read_model("Artifact relation #{relation_id} to become #{status}") do
+      page = artifact_relation_page(
+        artifact_id,
+        direction: "outgoing",
+        limit: 100,
+        include_superseded: true
+      )
+      item = page&.fetch("items", [])&.find { _1.fetch("relation_id") == relation_id }
+      [ item&.fetch("status") == status, page ]
+    end
   end
 end
 

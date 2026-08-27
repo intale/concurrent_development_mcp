@@ -99,16 +99,15 @@ end
 
 When("terminal facts and build progress reach the read side") do
   ids = @terminal_coordination.fetch(:ids)
-  work_item_events = terminal_work_item_events(ids.fetch(:work_item_id))
-  attempt_completed = terminal_attempt_events(ids.fetch(:attempt_id)).find { _1.type == "AttemptCompleted" }
-  projector = Coordinator::Container["projectors.coord_context_v1"]
-  projector.call(work_item_events.find { _1.type == "WorkItemCandidateSelected" })
-  projector.call(attempt_completed)
-  completion = work_item_events.find { _1.type == "WorkItemCompleted" }
-  projector.call(completion)
-  Coordinator::Container["process_managers.build_progress"].call(completion)
-  projector.call(terminal_change_set_events(ids.fetch(:change_set_id)).sole)
-  @terminal_converged_context = terminal_context(change_set_id: ids.fetch(:change_set_id))
+  start_process_subscriptions
+  eventually("ChangeSet #{ids.fetch(:change_set_id)} to complete") do
+    events = terminal_change_set_events(ids.fetch(:change_set_id))
+    [ events.length == 1, events.map(&:type) ]
+  end
+  @terminal_converged_context = await_read_model("Terminal coordination context to converge") do
+    payload = terminal_context(change_set_id: ids.fetch(:change_set_id))
+    [ payload.dig("data", "context", "change_set", "status") == "completed", payload ]
+  end
 end
 
 Then(
@@ -149,10 +148,12 @@ When("the producer completes through an MCP Task and build progress handles its 
   @dependency_context_before_progress = terminal_context(
     work_item_id: ids.fetch(:consumer_work_item_id)
   )
-  source = terminal_work_item_events(coordination.dig(:ids, :work_item_id)).find do |event|
-    event.type == "WorkItemCompleted"
+  start_process_subscriptions
+  eventually("Consumer WorkItem to become ready after producer completion") do
+    satisfied = terminal_dependency_events(ids.fetch(:change_set_id))
+    ready = terminal_readiness_events(ids.fetch(:consumer_work_item_id))
+    [ satisfied.length == 1 && ready.length == 1, { satisfied: satisfied.map(&:type), ready: ready.map(&:type) } ]
   end
-  Coordinator::Container["process_managers.build_progress"].call(source)
 end
 
 Then("the consumer's older blocked context remains available") do
@@ -169,9 +170,10 @@ end
 
 When("dependency satisfaction reaches the read side before readiness") do
   ids = @dependency_terminal.fetch(:ids)
-  event = terminal_dependency_events(ids.fetch(:change_set_id)).sole
-  Coordinator::Container["projectors.coord_context_v1"].call(event)
-  @dependency_partially_converged = terminal_context(work_item_id: ids.fetch(:consumer_work_item_id))
+  @dependency_partially_converged = await_read_model("Dependency satisfaction to become available") do
+    payload = terminal_context(work_item_id: ids.fetch(:consumer_work_item_id))
+    [ payload.dig("data", "blockers") == [], payload ]
+  end
 end
 
 Then("the blocker is absent while the consumer is still observed as planned") do
@@ -191,9 +193,14 @@ end
 
 When("downstream readiness reaches the read side") do
   ids = @dependency_terminal.fetch(:ids)
-  event = terminal_readiness_events(ids.fetch(:consumer_work_item_id)).sole
-  Coordinator::Container["projectors.coord_context_v1"].call(event)
-  @dependency_converged = terminal_context(work_item_id: ids.fetch(:consumer_work_item_id))
+  @dependency_converged = await_read_model("Consumer WorkItem readiness to become available") do
+    payload = terminal_context(work_item_id: ids.fetch(:consumer_work_item_id))
+    action = payload.fetch("next_actions", []).find do |candidate|
+      candidate.fetch("tool") == "work_item_acquire" &&
+        candidate.dig("arguments", "work_item_id") == ids.fetch(:consumer_work_item_id)
+    end
+    [ !action.nil?, payload ]
+  end
 end
 
 Then("available context suggests acquiring the exact consumer WorkItem") do

@@ -27,7 +27,9 @@ Feature: Dynamic write-set leases
     @AUD-LEASE-DISJOINT-03 @live-subscriptions @concurrency
     Scenario: Disjoint directory and file resources remain independently leasable
       Given two independent MCP agents have live active Attempts in ChangeSet "CS-AUD-LSE-DISJOINT"
-      When both agents submit public reservation Tasks for disjoint directory and file resources
+      When both agents submit public reservation Tasks for disjoint resources and reach the reservation decision boundary
+      Then both reservation operations have deterministic contention evidence
+      When the reservation decision boundary is released
       Then both hierarchical reservation Tasks complete successfully
 
     @AUD-LEASE-PATH-BYTES-04 @live-subscriptions
@@ -86,7 +88,7 @@ Feature: Dynamic write-set leases
     @CDM-LEASE-006
     Scenario: Renewal makes an older observed expiry non-authoritative
       Given agents "agent-a" and "agent-b" have active Attempts in ChangeSet "CS-CUC-RENEW-BUSY"
-      And agent "agent-a" reserves "app/shared.rb" for 30 seconds at "2026-08-22T10:00:00Z"
+      And agent "agent-a" reserves "app/shared.rb" for 30 seconds
       When the predecessor renews its exact lease set before the old deadline
       Then the authoritative deadline moves beyond the old expiry
       When agent "agent-b" deliberately reserves after the old deadline but before the renewed deadline
@@ -114,7 +116,7 @@ Feature: Dynamic write-set leases
     @CDM-LEASE-005 @stale-view
     Scenario: A deliberate reservation succeeds after authoritative release
       Given agents "agent-a" and "agent-b" have active Attempts in ChangeSet "CS-CUC-RELEASE-TAKEOVER"
-      And agent "agent-a" reserves "app/shared.rb" for 300 seconds at "2026-08-22T10:00:00Z"
+      And agent "agent-a" reserves "app/shared.rb" for 300 seconds
       When the predecessor releases its exact lease set
       Then the authoritative release succeeds
       When agent "agent-b" deliberately reserves after the release
@@ -135,7 +137,7 @@ Feature: Dynamic write-set leases
     @CDM-ATTEMPT-002 @concurrency
     Scenario: Abandonment never releases a fence acquired by a successor
       Given agents "agent-a" and "agent-b" have active Attempts in ChangeSet "CS-CUC-ABANDON-SUPERSEDED"
-      And agent "agent-a" reserves "app/shared.rb" for 30 seconds at "2026-08-22T10:00:00Z"
+      And agent "agent-a" reserves "app/shared.rb" for 30 seconds
       And after its deadline agent "agent-b" reserves the same file before the expiry policy runs
       When the expired predecessor abandons its Attempt
       Then the abandonment requeues the predecessor and leaves the successor fence untouched
@@ -169,7 +171,7 @@ Feature: Dynamic write-set leases
     @CDM-LEASE-009 @stale-view
     Scenario: A successor reserves an elapsed file before the predecessor timer runs
       Given agents "agent-a" and "agent-b" have active Attempts in ChangeSet "CS-CUC-EXPIRY"
-      When agent "agent-a" reserves "app/shared.rb" for 30 seconds at "2026-08-22T10:00:00Z"
+      When agent "agent-a" reserves "app/shared.rb" for 30 seconds
       And that reservation reaches the available read side
       And after its deadline agent "agent-b" reserves the same file before the expiry policy runs
       Then the successor reservation Task succeeds with the next fencing token

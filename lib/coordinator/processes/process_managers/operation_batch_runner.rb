@@ -45,6 +45,7 @@ module Coordinator::Processes
       private
 
       def process_page(source)
+        instrument_page_boundary("operation_batch_page_start", source)
         bounds(source).each do |index|
           snapshot = @loader.call(source.payload.batch_id)
           return if snapshot.state.terminal
@@ -58,6 +59,7 @@ module Coordinator::Processes
         end
 
         progress_after_page(source)
+        instrument_page_boundary("operation_batch_page", source)
       end
 
       def execute_item(source:, item:)
@@ -135,6 +137,16 @@ module Coordinator::Processes
         failure = result.failure
         raise OperationBatchProcessRejected,
               "Batch process rejected: #{failure.code} - #{failure.message}"
+      end
+
+      def instrument_page_boundary(operation, source)
+        ActiveSupport::Notifications.instrument(
+          "coordinator.command_boundary",
+          operation:,
+          command_id: source.event.metadata.fetch("command_id"),
+          batch_id: source.payload.batch_id,
+          source_event_id: source.event.id
+        )
       end
     end
   end

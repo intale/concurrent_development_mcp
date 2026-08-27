@@ -158,7 +158,8 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
       subscription_name: "lease-expiry-scheduler-v1",
       stream_context: "DevelopmentCoordination",
       stream_name: "ResourceLease",
-      event_types: [ "ResourceLeaseAcquired", "ResourceLeaseRenewed" ]
+      event_types: [ "ResourceLeaseAcquired", "ResourceLeaseRenewed" ],
+      event_markers: []
     )
     expect(definition.options).to eq(
       filter: {
@@ -172,7 +173,8 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
         "build-progress-v1",
         "candidate-impact-obligation-policy-v1",
         "change-set-readiness-v1",
-        "coordination-task-executor-v1",
+        "coordination-task-executor-lane-0-v2",
+        "coordination-task-executor-lane-1-v2",
         "lease-expiry-scheduler-v1",
         "operation-batch-runner-v1",
         "release-set-lifecycle-v1",

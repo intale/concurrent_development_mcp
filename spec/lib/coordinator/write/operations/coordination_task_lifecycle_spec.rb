@@ -59,6 +59,7 @@ RSpec.describe "Coordination Task lifecycle operations", :event_store do
     expect(event.markers).to eq(
       [
         "command:cmd-task-201",
+        Coordinator::Write::Tasks::ExecutionLane.new.marker(target_command.command_id),
         "task:#{state.task_id}",
         "tool:change_set_create"
       ]

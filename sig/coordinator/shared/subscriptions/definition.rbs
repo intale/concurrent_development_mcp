@@ -8,6 +8,7 @@ module Coordinator
         def stream_context: () -> String
         def stream_name: () -> String
         def event_types: () -> Array[String]
+        def event_markers: () -> Array[String]
         def identity: () -> Identity
       end
     end

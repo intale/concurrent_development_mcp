@@ -40,7 +40,7 @@ module CandidateImpactAcceptanceWorld
     )
     activation = change_set_events(change_set_id).find { _1.type == "ChangeSetActivated" }
     assert_acceptance(activation, "Impact setup #{prefix} has no activation fact")
-    Coordinator::Container["process_managers.change_set_readiness"].call(activation)
+    coordinations.each_value { await_work_item_ready(_1.fetch(:work_item_id)) }
 
     coordinations.each_value do |coordination|
       acquire_and_reserve_impact_coordination(prefix:, change_set_id:, coordination:)
@@ -62,9 +62,7 @@ module CandidateImpactAcceptanceWorld
       )
       task_id = submit_candidate_task(arguments)
       assert_successful_task(task_id, "Impact Candidate #{role}")
-      candidate_events(arguments.fetch(:candidate_id)).each do |event|
-        Coordinator::Container["projectors.candidates_v1"].call(event)
-      end
+      project_complete_candidate(arguments.fetch(:candidate_id), coordination.fetch(:attempt_id))
       [
         role,
         {
@@ -168,7 +166,11 @@ module CandidateImpactAcceptanceWorld
     candidate_id = candidate.dig(:arguments, :candidate_id)
     event = candidate_events(candidate_id).find { _1.type == "CandidateImpactSurfaceDerived" }
     assert_acceptance(event, "Candidate #{candidate_id} has no impact fact")
-    Coordinator::Container["projectors.candidates_v1"].call(event)
+    await_read_model("Candidate #{candidate_id} impact surface to become available") do
+      payload = candidate_impact_view(candidate_id)
+      surface = payload.dig("data", "page", "impact_surface")
+      [ !surface.nil?, payload ]
+    end
   end
 
   def impact_events(candidate)

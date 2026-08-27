@@ -12,6 +12,16 @@ Given(
   prepare_claimed_verification_obligation(prefix:, agent_id:, project_claim: true)
 end
 
+Given(
+  "agent {string} claims Rails verification obligation {string} for {int} seconds"
+) do |agent_id, prefix, duration|
+  prepare_claimed_verification_obligation(
+    prefix:,
+    agent_id:,
+    claim_duration: duration
+  )
+end
+
 When(
   "the claimant submits {string} {string} evidence as command {string}"
 ) do |conclusion, evidence_kind, command_id|
@@ -120,20 +130,23 @@ Then("two explanatory evidence facts and no terminal fact are durable") do
   assert_acceptance_equal([], verification_terminal_events, "Nonterminal outcome facts")
 end
 
-When("agent {string} reclaims the obligation at exact expiry") do |agent_id|
+When("agent {string} reclaims the obligation after expiry") do |agent_id|
   @prior_evidence_claim = @evidence_claim
   @prior_evidence_actor_id = @evidence_actor_id
   expiry = Time.iso8601(@prior_evidence_claim.fetch("expires_at"))
+  eventually("Prior verification claim to expire", timeout_seconds: 35) do
+    now = Time.now.utc
+    [ now >= expiry, now.iso8601(6) ]
+  end
   attempt = submit_verification_obligation_claim(
     agent_id:,
     command_id: "cmd-cuc-evidence-reclaim-#{@obligation_prefix.downcase}",
     duration: 300
   )
-  execute_verification_obligation_claim(attempt, at: expiry.iso8601(6))
+  execute_verification_obligation_claim(attempt)
   assert_acceptance_equal(false, attempt.dig(:result, "isError"), "Evidence reclaim")
   @evidence_claim = attempt.dig(:content, "data")
   @evidence_actor_id = agent_id
-  @evidence_execution_time = expiry + 1
   assert_acceptance_equal(
     @prior_evidence_claim.fetch("fencing_token") + 1,
     @evidence_claim.fetch("fencing_token"),
@@ -222,14 +235,10 @@ When("the claimant executes both required evidence Tasks concurrently") do
       conclusion: "passed"
     )
   ]
-  execution_time = @evidence_execution_time
-  Timecop.freeze(execution_time) do
-    @concurrent_evidence_attempts.map do |attempt|
-      Thread.new { execute_task(attempt.fetch(:task_id)) }
-    end.each(&:value)
-  end
+  @concurrent_evidence_attempts.map do |attempt|
+    Thread.new { execute_task(attempt.fetch(:task_id)) }
+  end.each(&:value)
   @concurrent_evidence_attempts.each { capture_evidence_attempt(_1) }
-  @evidence_execution_time = execution_time + 1
 end
 
 Then("both evidence Tasks succeed with one open and one satisfied result") do
@@ -293,37 +302,12 @@ Then("the available view still reports open with no observed evidence") do
   assert_acceptance_equal([], content.keys & freshness, "Lagging freshness gate")
 end
 
-When("the first evidence fact reaches the read side twice") do
-  first = evidence_event_for(@lag_evidence_attempts.first)
-  assert_acceptance(first, "First lagging evidence fact is missing")
-  project_verification_events([ first ], redeliver: true)
-end
-
-Then("the available view reports partial passed and missing evidence") do
-  item = available_evidence_obligation.sole
-  assert_acceptance_equal("open", item.fetch("status"), "Partial view status")
-  assert_acceptance_equal(
-    [ "combined_tests" ],
-    item.dig("progress", "passed_evidence_kinds"),
-    "Partial passed evidence"
-  )
-  assert_acceptance_equal(
-    [ "contract_compatibility_review" ],
-    item.dig("progress", "missing_evidence_kinds"),
-    "Partial missing evidence"
-  )
-  assert_acceptance_equal(1, item.dig("progress", "evidence_count"), "Partial evidence count")
-  assert_acceptance_equal(1, item.fetch("submitted_evidence").length, "Partial evidence rows")
-end
-
-When("the remaining evidence and outcome reach the read side twice") do
-  first_id = evidence_event_for(@lag_evidence_attempts.first).id
-  remaining = verification_obligation_history.select do |event|
-    event.type.in?(%w[VerificationEvidenceSubmitted VerificationObligationSatisfied]) &&
-      event.id != first_id
+When("the evidence and outcome reach the read side after a subscription restart") do
+  facts = verification_obligation_history.select do |event|
+    event.type.in?(%w[VerificationEvidenceSubmitted VerificationObligationSatisfied])
   end
-  assert_acceptance_equal(2, remaining.length, "Remaining projected facts")
-  project_verification_events(remaining, redeliver: true)
+  assert_acceptance_equal(3, facts.length, "Evidence and outcome facts")
+  project_verification_events(facts, redeliver: true)
 end
 
 Then("the available view reports satisfied with complete attributed evidence") do

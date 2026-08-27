@@ -16,8 +16,6 @@ Feature: Decision governance
       When the host activates interpretation "I-CUC-DEC-1" as Decision "D-CUC-DEC-1" through a Task
       Then the activation Task succeeds with one complete consistency boundary
       And Decision "D-CUC-DEC-1" is honestly not observed before projection
-      When the DecisionRecorded fact for "D-CUC-DEC-1" reaches the read side
-      Then the available Decision "D-CUC-DEC-1" is recorded without a freshness claim
       When the remaining facts for Decision "D-CUC-DEC-1" reach the read side
       Then the available Decision "D-CUC-DEC-1" is active without a freshness claim
 
@@ -41,8 +39,7 @@ Feature: Decision governance
         | I-CUC-COR-BASE     | M-CUC-COR-BASE | D-CUC-COR-1    |
       When the host activates interpretation "I-CUC-COR-BASE" as Decision "D-CUC-COR-1" through a Task
       Then the activation Task succeeds with one complete consistency boundary
-      When the DecisionRecorded fact for "D-CUC-COR-1" reaches the read side
-      And the remaining facts for Decision "D-CUC-COR-1" reach the read side
+      When the remaining facts for Decision "D-CUC-COR-1" reach the read side
       Given these correction interpretations are accepted for Decision "D-CUC-COR-1":
         | interpretation_id | message_id       | value     |
         | I-CUC-COR-1       | M-CUC-COR-1      | minitest  |

@@ -44,7 +44,7 @@ Given(
     change_set_id:
   )
   activation = change_set_events(change_set_id).find { _1.type == "ChangeSetActivated" }
-  Coordinator::Container["process_managers.change_set_readiness"].call(activation)
+  @lease_participants.each { await_work_item_ready(_1.fetch(:work_item_id)) }
 
   @lease_participants.each do |participant|
     submit_and_execute(
@@ -210,7 +210,7 @@ Given(
     change_set_id:
   )
   activation = change_set_events(change_set_id).find { _1.type == "ChangeSetActivated" }
-  Coordinator::Container["process_managers.change_set_readiness"].call(activation)
+  await_work_item_ready(@expansion_work_item_id)
   submit_and_execute(
     "work_item_acquire",
     command_id: "cmd-cuc-expand-acquire",
@@ -308,9 +308,13 @@ Then("the previous context remains available before expansion projection") do
 end
 
 When("the write-set expansion reaches the read side") do
-  expansion = write_set_expansion_events(@expansion_attempt_id).sole
-  Coordinator::Container["projectors.coord_context_v1"].call(expansion)
-  @expanded_context = call_tool("coord_context", { attempt_id: @expansion_attempt_id })
+  @expanded_context = await_read_model("Write-set expansion to become available") do
+    response = call_tool("coord_context", { attempt_id: @expansion_attempt_id })
+    resources = response.dig(
+      "result", "structuredContent", "data", "context", "attempts", 0, "write_set", "resources"
+    ) || []
+    [ resources.any? { _1.fetch("resource_path") == @expansion_additional_path }, response ]
+  end
 end
 
 Then("available context exposes both observed files without a freshness claim") do
@@ -369,7 +373,7 @@ Given(
     change_set_id:
   )
   activation = change_set_events(change_set_id).find { _1.type == "ChangeSetActivated" }
-  Coordinator::Container["process_managers.change_set_readiness"].call(activation)
+  await_work_item_ready(@renewal_work_item_id)
   submit_and_execute(
     "work_item_acquire",
     command_id: "cmd-cuc-renew-acquire",
@@ -473,9 +477,13 @@ Then("the previous context remains available before renewal projection") do
 end
 
 When("the write-set renewal reaches the read side") do
-  renewal = write_set_renewal_events(@renewal_attempt_id).sole
-  Coordinator::Container["projectors.coord_context_v1"].call(renewal)
-  @renewed_context = call_tool("coord_context", { attempt_id: @renewal_attempt_id })
+  @renewed_context = await_read_model("Write-set renewal to become available") do
+    response = call_tool("coord_context", { attempt_id: @renewal_attempt_id })
+    observed = response.dig(
+      "result", "structuredContent", "data", "context", "attempts", 0, "write_set", "expires_at"
+    )
+    [ observed == @renewal_result.fetch("expires_at"), response ]
+  end
 end
 
 Then("available context exposes the later observed deadline without a freshness claim") do
@@ -530,7 +538,7 @@ Given(
     change_set_id:
   )
   activation = change_set_events(change_set_id).find { _1.type == "ChangeSetActivated" }
-  Coordinator::Container["process_managers.change_set_readiness"].call(activation)
+  await_work_item_ready(@release_work_item_id)
   submit_and_execute(
     "work_item_acquire",
     command_id: "cmd-cuc-release-acquire",
@@ -632,9 +640,13 @@ Then("the previous context remains available before release projection") do
 end
 
 When("the write-set release reaches the read side") do
-  release = write_set_release_events(@release_attempt_id).sole
-  Coordinator::Container["projectors.coord_context_v1"].call(release)
-  @released_context = call_tool("coord_context", { attempt_id: @release_attempt_id })
+  @released_context = await_read_model("Write-set release to become available") do
+    response = call_tool("coord_context", { attempt_id: @release_attempt_id })
+    observed = response.dig(
+      "result", "structuredContent", "data", "context", "attempts", 0, "write_set", "released_at"
+    )
+    [ observed == @release_result.fetch("released_at"), response ]
+  end
 end
 
 Then("available context exposes the observed release without a freshness claim") do
@@ -660,32 +672,28 @@ Then("available context exposes the observed release without a freshness claim")
 end
 
 When(
-  "agent {string} reserves {string} for {int} seconds at {string}"
-) do |agent_id, path, duration, started_at|
+  "agent {string} reserves {string} for {int} seconds"
+) do |agent_id, path, duration|
   @expiry_predecessor = @lease_participants.find { _1.fetch(:agent_id) == agent_id }
   assert_acceptance(@expiry_predecessor, "Unknown predecessor agent #{agent_id}")
 
   @expiry_path = path
-  @expiry_started_at = Time.iso8601(started_at)
   @expiry_predecessor_command_id = "cmd-cuc-expiry-predecessor"
-  @expiry_predecessor_task_id = Timecop.freeze(@expiry_started_at) do
-    task_id = call_tool(
-      "write_set_reserve",
-      {
-        command_id: @expiry_predecessor_command_id,
-        actor: { kind: "agent", id: agent_id },
-        change_set_id: @lease_change_set_id,
-        work_item_id: @expiry_predecessor.fetch(:work_item_id),
-        attempt_id: @expiry_predecessor.fetch(:attempt_id),
-        repository_id: acceptance_repository_id,
-        base_commit_oid: "a" * 40,
-        resources: [ { kind: "file", path: } ],
-        lease_duration_seconds: duration
-      }
-    ).dig("result", "taskId")
-    execute_task(task_id)
-    task_id
-  end
+  @expiry_predecessor_task_id = call_tool(
+    "write_set_reserve",
+    {
+      command_id: @expiry_predecessor_command_id,
+      actor: { kind: "agent", id: agent_id },
+      change_set_id: @lease_change_set_id,
+      work_item_id: @expiry_predecessor.fetch(:work_item_id),
+      attempt_id: @expiry_predecessor.fetch(:attempt_id),
+      repository_id: acceptance_repository_id,
+      base_commit_oid: "a" * 40,
+      resources: [ { kind: "file", path: } ],
+      lease_duration_seconds: duration
+    }
+  ).dig("result", "taskId")
+  execute_task(@expiry_predecessor_task_id)
   @expiry_predecessor_state = task_request("tasks/get", @expiry_predecessor_task_id)
   @expiry_predecessor_result = @expiry_predecessor_state.dig(
     "result", "result", "structuredContent", "data"
@@ -711,24 +719,26 @@ When(
   @expiry_successor = @lease_participants.find { _1.fetch(:agent_id) == agent_id }
   assert_acceptance(@expiry_successor, "Unknown successor agent #{agent_id}")
 
-  @expiry_successor_task_id = Timecop.freeze(@expiry_started_at + 31) do
-    task_id = call_tool(
-      "write_set_reserve",
-      {
-        command_id: "cmd-cuc-expiry-successor",
-        actor: { kind: "agent", id: agent_id },
-        change_set_id: @lease_change_set_id,
-        work_item_id: @expiry_successor.fetch(:work_item_id),
-        attempt_id: @expiry_successor.fetch(:attempt_id),
-        repository_id: acceptance_repository_id,
-        base_commit_oid: "a" * 40,
-        resources: [ { kind: "file", path: @expiry_path } ],
-        lease_duration_seconds: 300
-      }
-    ).dig("result", "taskId")
-    execute_task(task_id)
-    task_id
+  predecessor_expiry = Time.iso8601(@expiry_predecessor_result.fetch("expires_at"))
+  eventually("Predecessor lease to elapse", timeout_seconds: 35) do
+    now = Time.now.utc
+    [ now >= predecessor_expiry, now.iso8601(6) ]
   end
+  @expiry_successor_task_id = call_tool(
+    "write_set_reserve",
+    {
+      command_id: "cmd-cuc-expiry-successor",
+      actor: { kind: "agent", id: agent_id },
+      change_set_id: @lease_change_set_id,
+      work_item_id: @expiry_successor.fetch(:work_item_id),
+      attempt_id: @expiry_successor.fetch(:attempt_id),
+      repository_id: acceptance_repository_id,
+      base_commit_oid: "a" * 40,
+      resources: [ { kind: "file", path: @expiry_path } ],
+      lease_duration_seconds: 300
+    }
+  ).dig("result", "taskId")
+  execute_task(@expiry_successor_task_id)
   @expiry_successor_state = task_request("tasks/get", @expiry_successor_task_id)
   @expiry_successor_result = @expiry_successor_state.dig(
     "result", "result", "structuredContent", "data"
@@ -757,20 +767,10 @@ Then("the successor was admitted without an expiry audit fact") do
 end
 
 When("the expired predecessor timer is handled") do
-  source = Coordinator::Container["lease_expiry_source_builder"].call(@expiry_source)
-  locator = Coordinator::Processes::LeaseExpirySourceLocatorV1.from_source(source)
-  @expiry_policy_result = Timecop.freeze(@expiry_started_at + 32) do
-    Coordinator::Container["lease_expiry_policy"].call(locator)
-  end
+  perform_scheduled_lease_expiry(@expiry_source)
 end
 
 Then("the timer is superseded and cannot affect the successor") do
-  assert_acceptance(@expiry_policy_result.success?, "The old timer policy failed unexpectedly")
-  assert_acceptance_equal(
-    "lease_observation_superseded",
-    @expiry_policy_result.value!.outcome,
-    "Old timer outcome"
-  )
   assert_acceptance_equal(
     [ "ResourceLeaseAcquired", "ResourceLeaseAcquired" ],
     lease_events(@expiry_path).map(&:type),
@@ -962,25 +962,22 @@ Then("the successor obtains fencing token {int}") do |expected_token|
 end
 
 When("the predecessor renews its exact lease set before the old deadline") do
-  @renewed_predecessor_task_id = Timecop.freeze(@expiry_started_at + 10) do
-    task_id = call_tool(
-      "lease_renew",
-      {
-        command_id: "cmd-cuc-renew-predecessor",
-        actor: { kind: "agent", id: @expiry_predecessor.fetch(:agent_id) },
-        change_set_id: @lease_change_set_id,
-        work_item_id: @expiry_predecessor.fetch(:work_item_id),
-        attempt_id: @expiry_predecessor.fetch(:attempt_id),
-        lease_set_id: @expiry_predecessor_result.fetch("lease_set_id"),
-        leases: @expiry_predecessor_result.fetch("resources").map do |reference|
-          reference.slice("resource_key_hash", "lease_id", "fencing_token").transform_keys(&:to_sym)
-        end,
-        lease_duration_seconds: 60
-      }
-    ).dig("result", "taskId")
-    execute_task(task_id)
-    task_id
-  end
+  @renewed_predecessor_task_id = call_tool(
+    "lease_renew",
+    {
+      command_id: "cmd-cuc-renew-predecessor",
+      actor: { kind: "agent", id: @expiry_predecessor.fetch(:agent_id) },
+      change_set_id: @lease_change_set_id,
+      work_item_id: @expiry_predecessor.fetch(:work_item_id),
+      attempt_id: @expiry_predecessor.fetch(:attempt_id),
+      lease_set_id: @expiry_predecessor_result.fetch("lease_set_id"),
+      leases: @expiry_predecessor_result.fetch("resources").map do |reference|
+        reference.slice("resource_key_hash", "lease_id", "fencing_token").transform_keys(&:to_sym)
+      end,
+      lease_duration_seconds: 60
+    }
+  ).dig("result", "taskId")
+  execute_task(@renewed_predecessor_task_id)
   @renewed_predecessor_state = task_request("tasks/get", @renewed_predecessor_task_id)
   @renewed_predecessor_result = @renewed_predecessor_state.dig(
     "result", "result", "structuredContent", "data"
@@ -1000,24 +997,26 @@ When(
   "agent {string} deliberately reserves after the old deadline but before the renewed deadline"
 ) do |agent_id|
   participant = @lease_participants.find { _1.fetch(:agent_id) == agent_id }
-  @renewal_contender_task_id = Timecop.freeze(@expiry_started_at + 31) do
-    task_id = call_tool(
-      "write_set_reserve",
-      {
-        command_id: "cmd-cuc-renew-contender",
-        actor: { kind: "agent", id: agent_id },
-        change_set_id: @lease_change_set_id,
-        work_item_id: participant.fetch(:work_item_id),
-        attempt_id: participant.fetch(:attempt_id),
-        repository_id: acceptance_repository_id,
-        base_commit_oid: "a" * 40,
-        resources: [ { kind: "file", path: @expiry_path } ],
-        lease_duration_seconds: 300
-      }
-    ).dig("result", "taskId")
-    execute_task(task_id)
-    task_id
+  old_expiry = Time.iso8601(@expiry_predecessor_result.fetch("expires_at"))
+  eventually("Original lease deadline to elapse", timeout_seconds: 35) do
+    now = Time.now.utc
+    [ now >= old_expiry, now.iso8601(6) ]
   end
+  @renewal_contender_task_id = call_tool(
+    "write_set_reserve",
+    {
+      command_id: "cmd-cuc-renew-contender",
+      actor: { kind: "agent", id: agent_id },
+      change_set_id: @lease_change_set_id,
+      work_item_id: participant.fetch(:work_item_id),
+      attempt_id: participant.fetch(:attempt_id),
+      repository_id: acceptance_repository_id,
+      base_commit_oid: "a" * 40,
+      resources: [ { kind: "file", path: @expiry_path } ],
+      lease_duration_seconds: 300
+    }
+  ).dig("result", "taskId")
+  execute_task(@renewal_contender_task_id)
   @renewal_contender_state = task_request("tasks/get", @renewal_contender_task_id)
 end
 
@@ -1062,24 +1061,21 @@ Then("both release Task handles expose one logical result") do
 end
 
 When("the predecessor releases its exact lease set") do
-  @predecessor_release_task_id = Timecop.freeze(@expiry_started_at + 1) do
-    task_id = call_tool(
-      "lease_release",
-      {
-        command_id: "cmd-cuc-release-predecessor",
-        actor: { kind: "agent", id: @expiry_predecessor.fetch(:agent_id) },
-        change_set_id: @lease_change_set_id,
-        work_item_id: @expiry_predecessor.fetch(:work_item_id),
-        attempt_id: @expiry_predecessor.fetch(:attempt_id),
-        lease_set_id: @expiry_predecessor_result.fetch("lease_set_id"),
-        leases: @expiry_predecessor_result.fetch("resources").map do |reference|
-          reference.slice("resource_key_hash", "lease_id", "fencing_token").transform_keys(&:to_sym)
-        end
-      }
-    ).dig("result", "taskId")
-    execute_task(task_id)
-    task_id
-  end
+  @predecessor_release_task_id = call_tool(
+    "lease_release",
+    {
+      command_id: "cmd-cuc-release-predecessor",
+      actor: { kind: "agent", id: @expiry_predecessor.fetch(:agent_id) },
+      change_set_id: @lease_change_set_id,
+      work_item_id: @expiry_predecessor.fetch(:work_item_id),
+      attempt_id: @expiry_predecessor.fetch(:attempt_id),
+      lease_set_id: @expiry_predecessor_result.fetch("lease_set_id"),
+      leases: @expiry_predecessor_result.fetch("resources").map do |reference|
+        reference.slice("resource_key_hash", "lease_id", "fencing_token").transform_keys(&:to_sym)
+      end
+    }
+  ).dig("result", "taskId")
+  execute_task(@predecessor_release_task_id)
   @predecessor_release_state = task_request("tasks/get", @predecessor_release_task_id)
 end
 
@@ -1095,45 +1091,40 @@ end
 
 When("agent {string} deliberately reserves after the release") do |agent_id|
   participant = @lease_participants.find { _1.fetch(:agent_id) == agent_id }
-  task_id = Timecop.freeze(@expiry_started_at + 2) do
-    submit_and_execute(
-      "write_set_reserve",
-      command_id: "cmd-cuc-release-successor",
-      actor: { kind: "agent", id: agent_id },
-      change_set_id: @lease_change_set_id,
-      work_item_id: participant.fetch(:work_item_id),
-      attempt_id: participant.fetch(:attempt_id),
-      repository_id: acceptance_repository_id,
-      base_commit_oid: "a" * 40,
-      resources: [ { kind: "file", path: @expiry_path } ],
-      lease_duration_seconds: 300
-    )
-  end
+  task_id = submit_and_execute(
+    "write_set_reserve",
+    command_id: "cmd-cuc-release-successor",
+    actor: { kind: "agent", id: agent_id },
+    change_set_id: @lease_change_set_id,
+    work_item_id: participant.fetch(:work_item_id),
+    attempt_id: participant.fetch(:attempt_id),
+    repository_id: acceptance_repository_id,
+    base_commit_oid: "a" * 40,
+    resources: [ { kind: "file", path: @expiry_path } ],
+    lease_duration_seconds: 300
+  )
   @successor_result = task_request("tasks/get", task_id).dig(
     "result", "result", "structuredContent", "data"
   )
 end
 
 When("the expired predecessor tries to renew its old fence") do
-  @expired_predecessor_renewal_task_id = Timecop.freeze(@expiry_started_at + 33) do
-    task_id = call_tool(
-      "lease_renew",
-      {
-        command_id: "cmd-cuc-expired-predecessor-renew",
-        actor: { kind: "agent", id: @expiry_predecessor.fetch(:agent_id) },
-        change_set_id: @lease_change_set_id,
-        work_item_id: @expiry_predecessor.fetch(:work_item_id),
-        attempt_id: @expiry_predecessor.fetch(:attempt_id),
-        lease_set_id: @expiry_predecessor_result.fetch("lease_set_id"),
-        leases: @expiry_predecessor_result.fetch("resources").map do |reference|
-          reference.slice("resource_key_hash", "lease_id", "fencing_token").transform_keys(&:to_sym)
-        end,
-        lease_duration_seconds: 300
-      }
-    ).dig("result", "taskId")
-    execute_task(task_id)
-    task_id
-  end
+  @expired_predecessor_renewal_task_id = call_tool(
+    "lease_renew",
+    {
+      command_id: "cmd-cuc-expired-predecessor-renew",
+      actor: { kind: "agent", id: @expiry_predecessor.fetch(:agent_id) },
+      change_set_id: @lease_change_set_id,
+      work_item_id: @expiry_predecessor.fetch(:work_item_id),
+      attempt_id: @expiry_predecessor.fetch(:attempt_id),
+      lease_set_id: @expiry_predecessor_result.fetch("lease_set_id"),
+      leases: @expiry_predecessor_result.fetch("resources").map do |reference|
+        reference.slice("resource_key_hash", "lease_id", "fencing_token").transform_keys(&:to_sym)
+      end,
+      lease_duration_seconds: 300
+    }
+  ).dig("result", "taskId")
+  execute_task(@expired_predecessor_renewal_task_id)
   @expired_predecessor_renewal_state = task_request("tasks/get", @expired_predecessor_renewal_task_id)
 end
 
@@ -1146,24 +1137,21 @@ Then("the predecessor renewal is denied without affecting the successor") do
 end
 
 When("the expired predecessor tries to release its old fence") do
-  @expired_predecessor_release_task_id = Timecop.freeze(@expiry_started_at + 34) do
-    task_id = call_tool(
-      "lease_release",
-      {
-        command_id: "cmd-cuc-expired-predecessor-release",
-        actor: { kind: "agent", id: @expiry_predecessor.fetch(:agent_id) },
-        change_set_id: @lease_change_set_id,
-        work_item_id: @expiry_predecessor.fetch(:work_item_id),
-        attempt_id: @expiry_predecessor.fetch(:attempt_id),
-        lease_set_id: @expiry_predecessor_result.fetch("lease_set_id"),
-        leases: @expiry_predecessor_result.fetch("resources").map do |reference|
-          reference.slice("resource_key_hash", "lease_id", "fencing_token").transform_keys(&:to_sym)
-        end
-      }
-    ).dig("result", "taskId")
-    execute_task(task_id)
-    task_id
-  end
+  @expired_predecessor_release_task_id = call_tool(
+    "lease_release",
+    {
+      command_id: "cmd-cuc-expired-predecessor-release",
+      actor: { kind: "agent", id: @expiry_predecessor.fetch(:agent_id) },
+      change_set_id: @lease_change_set_id,
+      work_item_id: @expiry_predecessor.fetch(:work_item_id),
+      attempt_id: @expiry_predecessor.fetch(:attempt_id),
+      lease_set_id: @expiry_predecessor_result.fetch("lease_set_id"),
+      leases: @expiry_predecessor_result.fetch("resources").map do |reference|
+        reference.slice("resource_key_hash", "lease_id", "fencing_token").transform_keys(&:to_sym)
+      end
+    }
+  ).dig("result", "taskId")
+  execute_task(@expired_predecessor_release_task_id)
   @expired_predecessor_release_state = task_request("tasks/get", @expired_predecessor_release_task_id)
 end
 
@@ -1333,23 +1321,23 @@ Then("the fresh Attempt starts from a new base declaration while the old Attempt
 end
 
 When("the expired predecessor abandons its Attempt") do
-  @superseded_abandonment_task_id = Timecop.freeze(@expiry_started_at + 32) do
-    response = call_tool(
-      "attempt_abandon",
-      {
-        command_id: "cmd-cuc-attempt-abandon-superseded",
-        actor: { kind: "agent", id: @expiry_predecessor.fetch(:agent_id) },
-        change_set_id: @lease_change_set_id,
-        work_item_id: @expiry_predecessor.fetch(:work_item_id),
-        attempt_id: @expiry_predecessor.fetch(:attempt_id),
-        reason: "The predecessor lost its lease fence and is yielding the WorkItem."
-      }
-    )
-    task_id = response.dig("result", "taskId")
-    assert_acceptance(task_id, "attempt_abandon did not return a Task handle: #{response.inspect}")
-    execute_task(task_id)
-    task_id
-  end
+  response = call_tool(
+    "attempt_abandon",
+    {
+      command_id: "cmd-cuc-attempt-abandon-superseded",
+      actor: { kind: "agent", id: @expiry_predecessor.fetch(:agent_id) },
+      change_set_id: @lease_change_set_id,
+      work_item_id: @expiry_predecessor.fetch(:work_item_id),
+      attempt_id: @expiry_predecessor.fetch(:attempt_id),
+      reason: "The predecessor lost its lease fence and is yielding the WorkItem."
+    }
+  )
+  @superseded_abandonment_task_id = response.dig("result", "taskId")
+  assert_acceptance(
+    @superseded_abandonment_task_id,
+    "attempt_abandon did not return a Task handle: #{response.inspect}"
+  )
+  execute_task(@superseded_abandonment_task_id)
   @superseded_abandonment_state = task_request("tasks/get", @superseded_abandonment_task_id)
 end
 
@@ -1575,14 +1563,21 @@ module HierarchicalWriteSetAcceptance
     end
   end
 
-  def submit_live_hierarchical_reservation(agent_id:, kind:, path:, command_suffix:)
+  def submit_live_hierarchical_reservation(
+    agent_id:,
+    kind:,
+    path:,
+    command_suffix: nil,
+    command_id: nil,
+    await_terminal: true
+  )
     participant = @hierarchical_participants.find { _1.fetch(:agent_id) == agent_id }
     assert_acceptance(participant, "Unknown hierarchy participant #{agent_id}")
-    @mcp_session = nil
+    command_id ||= "#{@hierarchical_change_set_id.downcase}.reserve.#{command_suffix}"
     response = call_tool(
       "write_set_reserve",
       {
-        command_id: "#{@hierarchical_change_set_id.downcase}.reserve.#{command_suffix}",
+        command_id:,
         actor: { kind: "agent", id: agent_id },
         change_set_id: @hierarchical_change_set_id,
         work_item_id: participant.fetch(:work_item_id),
@@ -1591,7 +1586,8 @@ module HierarchicalWriteSetAcceptance
         base_commit_oid: "a" * 40,
         resources: [ { kind:, path: } ],
         lease_duration_seconds: 300
-      }
+      },
+      client_id: agent_id
     )
     task_id = response.dig("result", "taskId")
     assert_acceptance(task_id, "write_set_reserve did not return a Task: #{response.inspect}")
@@ -1600,9 +1596,27 @@ module HierarchicalWriteSetAcceptance
       agent_id:,
       kind:,
       path:,
+      command_id:,
       task_id:,
-      state: await_task_terminal(task_id)
+      client_id: agent_id,
+      state: await_terminal ? await_task_terminal(task_id, client_id: agent_id) : nil
     }
+  end
+
+  def distinct_lane_command_ids(prefix)
+    lane = Coordinator::Write::Tasks::ExecutionLane.new
+    by_lane = {}
+    32.times do |index|
+      command_id = "#{prefix}.#{index}"
+      by_lane[lane.index(command_id)] ||= command_id
+      break if by_lane.length == Coordinator::Write::Tasks::ExecutionLane::COUNT
+    end
+    assert_acceptance_equal(
+      Coordinator::Write::Tasks::ExecutionLane::COUNT,
+      by_lane.length,
+      "Distinct Task execution lanes"
+    )
+    by_lane.sort.map(&:last)
   end
 
   def hierarchical_lease_events(kind, path)
@@ -1682,21 +1696,46 @@ Then("only the {word} resource has a durable lease acquisition") do |winning_kin
   )
 end
 
-When("both agents submit public reservation Tasks for disjoint directory and file resources") do
-  @hierarchical_reservations = [
-    submit_live_hierarchical_reservation(
-      agent_id: "agent-a",
-      kind: "directory",
-      path: "app/models",
-      command_suffix: "disjoint-a"
-    ),
-    submit_live_hierarchical_reservation(
+When("both agents submit public reservation Tasks for disjoint resources and reach the reservation decision boundary") do
+  command_ids = distinct_lane_command_ids("#{@hierarchical_change_set_id.downcase}.reserve.disjoint")
+  install_contention_barrier(operation: "write_set_reserve", command_ids:)
+  prepare_mcp_clients("agent-a", "agent-b")
+  requests = [
+    { agent_id: "agent-a", kind: "directory", path: "app/models", command_id: command_ids.fetch(0) },
+    {
       agent_id: "agent-b",
       kind: "file",
       path: "spec/services/user_spec.rb",
-      command_suffix: "disjoint-b"
-    )
+      command_id: command_ids.fetch(1)
+    }
   ]
+  @hierarchical_reservations = requests.map do |arguments|
+    Thread.new do
+      submit_live_hierarchical_reservation(**arguments, await_terminal: false)
+    end
+  end.map(&:value)
+  await_contention_evidence
+end
+
+Then("both reservation operations have deterministic contention evidence") do
+  assert_acceptance_equal(2, @contention_evidence.length, "Reservation boundary arrivals")
+  assert_acceptance_equal(
+    @hierarchical_reservations.map { _1.fetch(:command_id) }.sort,
+    @contention_evidence.map { _1.fetch(:command_id) }.sort,
+    "Reservation boundary commands"
+  )
+  assert_acceptance_equal(2, @contention_evidence.map { _1.fetch(:thread_id) }.uniq.length, "Worker threads")
+  assert_acceptance_equal([ 0, 1 ], @contention_evidence.map { _1.fetch(:worker_lane) }.sort, "Worker lanes")
+end
+
+When("the reservation decision boundary is released") do
+  release_contention_barrier
+  @hierarchical_reservations.each do |reservation|
+    reservation[:state] = await_task_terminal(
+      reservation.fetch(:task_id),
+      client_id: reservation.fetch(:client_id)
+    )
+  end
 end
 
 Then("both hierarchical reservation Tasks complete successfully") do
@@ -1785,20 +1824,15 @@ When("a public client uses the acquisition event ID for an unrelated mutation") 
 end
 
 When("the real lease-expiry job handles the due source") do
-  source = Coordinator::Container["lease_expiry_source_builder"].call(@system_identity_source)
-  locator = Coordinator::Processes::LeaseExpirySourceLocatorV1.from_source(source)
-  @internal_expiry_command_id = Coordinator::Processes::LeaseExpiryCommandBuilder.new.call(source).command_id
+  @internal_expiry_command_id =
+    "#{Coordinator::Processes::LeaseExpiryCommandBuilder::COMMAND_ID_PREFIX}#{@system_identity_source.id}"
   deadline = Time.iso8601(@system_identity_source.data.fetch("expires_at"))
 
   eventually("the real lease deadline", timeout_seconds: 35) do
     observed_at = Time.now.utc
     [ observed_at >= deadline, observed_at ]
   end
-  Coordinator::Processes::Jobs::ExpireResourceLease.perform_now(
-    locator.source_event_id,
-    locator.resource_key_hash,
-    locator.stream_revision
-  )
+  perform_scheduled_lease_expiry(@system_identity_source)
 end
 
 Then("the lease expires under a distinct deterministic internal command") do

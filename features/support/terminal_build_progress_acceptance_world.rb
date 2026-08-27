@@ -61,7 +61,7 @@ module TerminalBuildProgressAcceptanceWorld
     )
     activation = change_set_events(ids.fetch(:change_set_id)).find { _1.type == "ChangeSetActivated" }
     assert_acceptance(activation, "Terminal dependency #{prefix} has no activation fact")
-    Coordinator::Container["process_managers.change_set_readiness"].call(activation)
+    await_work_item_ready(ids.fetch(:producer_work_item_id))
     complete_terminal_task(
       "work_item_acquire",
       command_id: "cmd-cuc-terminal-#{prefix}-acquire",
@@ -199,7 +199,14 @@ module TerminalBuildProgressAcceptanceWorld
     )
     release = terminal_attempt_events(ids.fetch(:attempt_id)).find { _1.type == "WriteSetReleased" }
     assert_acceptance(release, "Terminal write set has no release fact")
-    Coordinator::Container["projectors.coord_context_v1"].call(release)
+    await_read_model("Terminal write set release to become available") do
+      payload = terminal_context(attempt_id: ids.fetch(:attempt_id))
+      attempt = payload.dig("data", "context", "attempts")&.find do |candidate|
+        candidate.fetch("attempt_id") == ids.fetch(:attempt_id)
+      end
+      observed = attempt&.dig("write_set", "released_at")
+      [ !observed.nil?, payload ]
+    end
     task_id
   end
 
@@ -219,31 +226,11 @@ module TerminalBuildProgressAcceptanceWorld
   end
 
   def project_terminal_context_sources(ids)
-    work_item_ids = [ ids[:work_item_id], ids[:producer_work_item_id], ids[:consumer_work_item_id] ].compact
-    events = event_store.read(
-      streams.change_set(ids.fetch(:change_set_id)),
-      Coordinator::Write::EventQueries::CHANGE_SET_FOR_ACTIVATION
+    project_attempt_context(
+      change_set_id: ids.fetch(:change_set_id),
+      work_item_id: ids[:work_item_id] || ids.fetch(:producer_work_item_id),
+      attempt_id: ids.fetch(:attempt_id)
     )
-    work_item_ids.each do |work_item_id|
-      events += event_store.read(
-        streams.work_item(work_item_id),
-        Coordinator::Write::EventReadCriteria.new(
-          event_types: %w[WorkItemCreated WorkItemMadeReady WorkItemAcquired],
-          maximum_count: 3,
-          direction: :asc
-        )
-      )
-    end
-    events += event_store.read(
-      streams.attempt(ids.fetch(:attempt_id)),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: %w[AttemptAuthorized AttemptStarted WriteSetReserved],
-        maximum_count: 3,
-        direction: :asc
-      )
-    )
-    projector = Coordinator::Container["projectors.coord_context_v1"]
-    events.sort_by(&:global_position).each { projector.call(_1) }
   end
 
   def terminal_work_item_events(work_item_id)
@@ -276,19 +263,11 @@ module TerminalBuildProgressAcceptanceWorld
   end
 
   def project_terminal_reacquisition(ids)
-    acquisition = event_store.read_grouped(
-      streams.work_item(ids.fetch(:work_item_id)),
-      Coordinator::Write::GroupedEventReadCriteria.new(
-        event_types: [ "WorkItemAcquired" ],
-        direction: :desc
-      )
-    ).sole
-    attempt_events = event_store.read(
-      streams.attempt(ids.fetch(:attempt_id)),
-      Coordinator::Write::EventQueries::ATTEMPT_FOR_WRITE_SET_RESERVATION
+    project_attempt_context(
+      change_set_id: ids.fetch(:change_set_id),
+      work_item_id: ids.fetch(:work_item_id),
+      attempt_id: ids.fetch(:attempt_id)
     )
-    projector = Coordinator::Container["projectors.coord_context_v1"]
-    ([ acquisition ] + attempt_events).each { projector.call(_1) }
   end
 
   def terminal_attempt_events(attempt_id)
