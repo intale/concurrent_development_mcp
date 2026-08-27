@@ -64,13 +64,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
     original = operation.call(input)
     event_ids = all_candidate_submission_event_ids(input)
 
-    replay = operation.call(
-      input.merge(
-        change_manifest: input.fetch(:change_manifest).merge(
-          files: [ manifest_file("lib/./a.rb") ]
-        )
-      )
-    )
+    replay = operation.call(input)
     changed = operation.call(input.merge(checkpoint_kind: "handoff"))
 
     expect(replay).to be_success

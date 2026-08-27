@@ -98,7 +98,6 @@ module Coordinator::Shared
     CANDIDATE_MANIFEST_MAXIMUM_FILE_COUNT = WRITE_SET_RESOURCE_MAXIMUM_COUNT
     RESOURCE_KEY_POLICY_VERSIONS = %w[
       coordinator-resource-key/v1
-      coordinator-resource-key/v2
       coordinator-resource-key/v3
     ].freeze
 

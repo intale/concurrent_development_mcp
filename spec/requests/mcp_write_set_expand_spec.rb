@@ -78,7 +78,7 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
     unchanged_response = submit_expansion(
       command_id: "cmd-mcp-unchanged",
       lease_set_id: reservation.lease_set_id,
-      paths: [ "app/./a.rb" ],
+      paths: [ "app/a.rb" ],
       request_id: 1
     )
     task_id = unchanged_response.dig("result", "taskId")

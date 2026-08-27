@@ -54,7 +54,7 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
           "work_item_id" => "W-MCP-LSE-A",
           "attempt_id" => "A-MCP-LSE-A",
           "repository_id" => MCP_RESERVE_REPOSITORY_ID,
-          "policy_version" => "coordinator-resource-key/v2"
+          "policy_version" => "coordinator-resource-key/v3"
         )
       )
     )

@@ -34,12 +34,11 @@ RSpec.describe Coordinator::Write::Operations::PrepareSubmitCandidate do
     )
   end
 
-  it "normalizes equivalent order and aliases to stable evidence digests" do
+  it "normalizes equivalent ordering to stable evidence digests" do
     original = prepare.call(input_with_context).value!
     reordered = input_with_context
     reordered[:change_manifest][:files] = reordered[:change_manifest][:files].reverse
     reordered[:build_context][:environment] = reordered[:build_context][:environment].reverse
-    reordered[:build_context][:inputs].first[:path] = "./config/../.ruby-version"
     changed = prepare.call(reordered).value!
 
     expect(changed.manifest.digest).to eq(original.manifest.digest)
@@ -55,7 +54,7 @@ RSpec.describe Coordinator::Write::Operations::PrepareSubmitCandidate do
 
     expect(scoped.manifest.digest).to eq(command.manifest.digest)
     expect(scoped.build_context.digest).to eq(command.build_context.digest)
-    expect(scoped.actual_resources).to all(have_attributes(policy_version: "coordinator-resource-key/v2"))
+    expect(scoped.actual_resources).to all(have_attributes(policy_version: "coordinator-resource-key/v3"))
   end
 
   it "expands rename resources and rejects manifests above the public write-set boundary" do
@@ -81,13 +80,17 @@ RSpec.describe Coordinator::Write::Operations::PrepareSubmitCandidate do
     )
   end
 
-  it "rejects normalized duplicate entries and conflicting base evidence" do
+  it "rejects duplicate entries and noncanonical paths" do
     duplicate = valid_input
-    duplicate[:change_manifest][:files] = [ file, file(old_path: "./lib/example.rb", new_path: "lib/./example.rb") ]
+    duplicate[:change_manifest][:files] = [ file, file ]
+    noncanonical = valid_input
+    noncanonical[:change_manifest][:files] = [ file(old_path: "lib/./example.rb") ]
 
     result = prepare.call(duplicate)
+    invalid_path = prepare.call(noncanonical)
 
     expect(result.failure).to have_attributes(code: :invalid_candidate_evidence)
+    expect(invalid_path.failure).to have_attributes(code: :resource_path_dot_component)
   end
 
   def input_with_context
@@ -97,7 +100,7 @@ RSpec.describe Coordinator::Write::Operations::PrepareSubmitCandidate do
       change_manifest: {
         collector_version: "git-evidence-v1",
         files: [
-          file(old_path: "lib/./services/../payments.rb", new_path: "lib/./services/../payments.rb"),
+          file(old_path: "lib/payments.rb", new_path: "lib/payments.rb"),
           file(status: "added", old: false, new_path: "spec/payments_spec.rb")
         ]
       },

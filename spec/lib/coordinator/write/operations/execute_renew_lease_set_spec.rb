@@ -47,7 +47,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRenewLeaseSet, :event_stor
         "previous_expires_at" => reservation.expires_at,
         "expires_at" => renewal.expires_at
       )
-      expect(renewed.metadata.fetch("policy_version")).to eq("coordinator-resource-key/v2")
+      expect(renewed.metadata.fetch("policy_version")).to eq("coordinator-resource-key/v3")
       expect(renewed.markers).to include(
         "scope:#{RepositoryScenario::DEFAULT_SCOPE}",
         "repository:#{repository_id}"

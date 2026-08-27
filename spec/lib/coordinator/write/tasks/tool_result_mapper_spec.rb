@@ -132,7 +132,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
           work_item_id: "W-task-result",
           attempt_id: "ATT-task-result",
           current_policy_version: "coordinator-resource-key/v1",
-          requested_policy_version: "coordinator-resource-key/v2"
+          requested_policy_version: "coordinator-resource-key/v3"
         },
         Coordinator::Write::Tasks::DomainErrorV1::ResourceIdentityPolicyMismatchError,
         "conflict"
@@ -148,6 +148,16 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         },
         Coordinator::Write::Tasks::DomainErrorV1::WriteSetLimitError,
         "denied"
+      ],
+      [
+        :resource_boundary_history_limit_exceeded,
+        {
+          repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+          marker_count: 2,
+          maximum_event_count: Coordinator::Write::EventQueries::RESOURCE_LEASE_BOUNDARY_MAXIMUM_COUNT
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::ResourceBoundaryHistoryLimitExceededError,
+        "limit_reached"
       ],
       [
         :lease_set_expired,

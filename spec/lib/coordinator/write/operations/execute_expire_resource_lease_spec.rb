@@ -39,7 +39,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpireResourceLease, :even
     expect(expiration.type).to eq("ResourceLeaseExpired")
     expect(expiration.causation_id).to eq(source.id)
     expect(expiration.correlation_id).to eq(source.correlation_id)
-    expect(expiration.metadata.fetch("policy_version")).to eq("coordinator-resource-key/v2")
+    expect(expiration.metadata.fetch("policy_version")).to eq("coordinator-resource-key/v3")
     expect(expiration.markers).to include(
       "scope:#{RepositoryScenario::DEFAULT_SCOPE}",
       "repository:#{repository_id}"

@@ -13,14 +13,14 @@ RSpec.describe Coordinator::Write::Operations::PrepareReserveWriteSet do
       repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: [
-        { kind: "file", path: "./app/models/user.rb", base_blob_oid: "b" * 40 },
+        { kind: "file", path: "app/models/user.rb", base_blob_oid: "b" * 40 },
         { kind: "file", path: "app/services/capture.rb" }
       ],
       lease_duration_seconds: 900
     }
   end
 
-  it "validates and constructs one immutable command with sorted normalized resources" do
+  it "validates and constructs one immutable command with sorted strict resources" do
     result = prepare.call(input)
 
     expect(result).to be_success
@@ -34,12 +34,12 @@ RSpec.describe Coordinator::Write::Operations::PrepareReserveWriteSet do
     expect(command).to be_frozen
   end
 
-  it "collapses semantic aliases with equal evidence" do
+  it "collapses duplicate exact identities with equal evidence" do
     result = prepare.call(
       input.merge(
         resources: [
-          { kind: "file", path: "app/./models/user.rb", base_blob_oid: "b" * 40 },
-          { kind: "file", path: "app/services/../models/user.rb", base_blob_oid: "b" * 40 }
+          { kind: "file", path: "app/models/user.rb", base_blob_oid: "b" * 40 },
+          { kind: "file", path: "app/models/user.rb", base_blob_oid: "b" * 40 }
         ]
       )
     )
@@ -54,7 +54,7 @@ RSpec.describe Coordinator::Write::Operations::PrepareReserveWriteSet do
       repository_registration: RepositoryScenario.registration
     ).value!
 
-    expect(scoped.resources).to all(have_attributes(policy_version: "coordinator-resource-key/v2"))
+    expect(scoped.resources).to all(have_attributes(policy_version: "coordinator-resource-key/v3"))
     expect(scoped.resources.map(&:path)).to eq(
       scoped.resources.sort_by { _1.resource_key_hash.b }.map(&:path)
     )
@@ -68,7 +68,7 @@ RSpec.describe Coordinator::Write::Operations::PrepareReserveWriteSet do
       input.merge(
         resources: [
           { kind: "file", path: "app/models/user.rb", base_blob_oid: "b" * 40 },
-          { kind: "file", path: "app/./models/user.rb", base_blob_oid: "c" * 40 }
+          { kind: "file", path: "app/models/user.rb", base_blob_oid: "c" * 40 }
         ]
       )
     )

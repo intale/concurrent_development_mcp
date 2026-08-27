@@ -175,7 +175,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
     write_set = snapshot.state.attempts.sole.write_set
     expect(write_set.to_h).to include(
       repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
-      policy_version: "coordinator-resource-key/v2"
+      policy_version: "coordinator-resource-key/v3"
     )
     expect(write_set.lease_set_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
     expect(write_set.resources).to eq(write_set.resources.sort_by { _1.resource_key_hash.b })

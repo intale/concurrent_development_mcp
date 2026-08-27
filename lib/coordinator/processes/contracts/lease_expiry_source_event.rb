@@ -9,9 +9,13 @@ module Coordinator::Processes
         required(:event).value(Types.Instance(PgEventstore::Event))
       end
 
-      def initialize(compound_marker_builder: CompoundMarkerBuilder.new)
+      def initialize(
+        compound_marker_builder: CompoundMarkerBuilder.new,
+        repository_marker_builder: Coordinator::Write::RepositoryMarkerBuilder.new
+      )
         super()
         @compound_marker_builder = compound_marker_builder
+        @repository_marker_builder = repository_marker_builder
       end
 
       rule(:event) do
@@ -48,7 +52,7 @@ module Coordinator::Processes
         command_id = event.metadata["command_id"]
 
         Types::IDENTIFIER_PATTERN.match?(command_id.to_s) &&
-          event.metadata["policy_version"] == Coordinator::Write::ResourceKeyDocumentV2::POLICY_VERSION
+          event.metadata["policy_version"] == Coordinator::Write::ResourceKeyDocumentV3::POLICY_VERSION
       end
 
       def matching_markers?(event)
@@ -84,7 +88,12 @@ module Coordinator::Processes
           "lease-set:#{data['lease_set_id']}",
           *components,
           resource_identity.marker,
-          scoped_repository.marker
+          scoped_repository.marker,
+          *@repository_marker_builder.resource_event_markers(
+            repository_id: data.fetch("repository_id"),
+            resource_kind: data.fetch("resource_kind"),
+            resource_path: data.fetch("resource_path")
+          )
         ].uniq.sort
 
         event.markers == expected

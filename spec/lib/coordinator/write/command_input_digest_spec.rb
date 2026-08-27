@@ -294,7 +294,7 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
         files: [
           {
             status: "modified",
-            old_path: "lib/./example.rb",
+            old_path: "lib/example.rb",
             new_path: "lib/example.rb",
             old_blob_oid: "c" * 40,
             new_blob_oid: "d" * 40,

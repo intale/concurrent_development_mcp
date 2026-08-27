@@ -79,6 +79,13 @@ module Coordinator::Write
         attribute :requested_addition_count, Types::WriteSetSize
       end
 
+      class ResourceBoundaryHistoryLimitDetails < Value
+        attribute :repository_id, Types::UuidV7
+        attribute :marker_count, Types::Integer.constrained(gteq: 1)
+        attribute :maximum_event_count,
+                  Types::Integer.constrained(eql: EventQueries::RESOURCE_LEASE_BOUNDARY_MAXIMUM_COUNT)
+      end
+
       class LeaseSetExpiredDetails < AttemptDetails
         attribute :resource_key_hash, Types::Sha256Digest
         attribute :lease_id, Types::UuidV7
@@ -521,6 +528,12 @@ module Coordinator::Write
         attribute :code, Types::String.enum("write_set_limit_reached")
         attribute :message, Types::String
         attribute :details, WriteSetLimitDetails
+      end
+
+      class ResourceBoundaryHistoryLimitExceededError < Value
+        attribute :code, Types::String.enum("resource_boundary_history_limit_exceeded")
+        attribute :message, Types::String
+        attribute :details, ResourceBoundaryHistoryLimitDetails
       end
 
       class LeaseSetExpiredError < Value
@@ -1084,6 +1097,7 @@ module Coordinator::Write
              ResourceEvidenceConflictError |
              ResourceIdentityPolicyMismatchError |
              WriteSetLimitError |
+             ResourceBoundaryHistoryLimitExceededError |
              LeaseSetExpiredError |
              LeaseSetNotCurrentError |
              WriteSetReleasedError |

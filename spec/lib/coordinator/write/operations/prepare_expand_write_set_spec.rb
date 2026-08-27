@@ -14,13 +14,13 @@ RSpec.describe Coordinator::Write::Operations::PrepareExpandWriteSet do
       repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: [
-        { kind: "file", path: "./app/models/user.rb", base_blob_oid: "b" * 40 },
+        { kind: "file", path: "app/models/user.rb", base_blob_oid: "b" * 40 },
         { kind: "file", path: "app/services/capture.rb" }
       ]
     }
   end
 
-  it "validates and constructs one immutable command with sorted normalized resources" do
+  it "validates and constructs one immutable command with sorted strict resources" do
     result = prepare.call(input)
 
     expect(result).to be_success
@@ -35,15 +35,15 @@ RSpec.describe Coordinator::Write::Operations::PrepareExpandWriteSet do
     expect(command).to be_frozen
   end
 
-  it "collapses aliases with equal evidence and rejects aliases with conflicting evidence" do
-    aliases = [
-      { kind: "file", path: "app/./models/user.rb", base_blob_oid: "b" * 40 },
-      { kind: "file", path: "app/services/../models/user.rb", base_blob_oid: "b" * 40 }
+  it "collapses duplicate exact identities and rejects conflicting evidence" do
+    duplicates = [
+      { kind: "file", path: "app/models/user.rb", base_blob_oid: "b" * 40 },
+      { kind: "file", path: "app/models/user.rb", base_blob_oid: "b" * 40 }
     ]
-    conflict = aliases.last.merge(base_blob_oid: "c" * 40)
+    conflict = duplicates.last.merge(base_blob_oid: "c" * 40)
 
-    expect(prepare.call(input.merge(resources: aliases)).value!.resources.length).to eq(1)
-    expect(prepare.call(input.merge(resources: [ aliases.first, conflict ])).failure.code).to eq(
+    expect(prepare.call(input.merge(resources: duplicates)).value!.resources.length).to eq(1)
+    expect(prepare.call(input.merge(resources: [ duplicates.first, conflict ])).failure.code).to eq(
       :resource_evidence_conflict
     )
   end
@@ -55,7 +55,7 @@ RSpec.describe Coordinator::Write::Operations::PrepareExpandWriteSet do
       repository_registration: RepositoryScenario.registration
     ).value!
 
-    expect(scoped.resources).to all(have_attributes(policy_version: "coordinator-resource-key/v2"))
+    expect(scoped.resources).to all(have_attributes(policy_version: "coordinator-resource-key/v3"))
     expect(scoped.resources.map(&:path)).to eq(
       scoped.resources.sort_by { _1.resource_key_hash.b }.map(&:path)
     )

@@ -46,7 +46,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReleaseLeaseSet, :event_st
         "previous_expires_at" => reservation.expires_at,
         "released_at" => release.released_at
       )
-      expect(released.metadata.fetch("policy_version")).to eq("coordinator-resource-key/v2")
+      expect(released.metadata.fetch("policy_version")).to eq("coordinator-resource-key/v3")
       expect(released.markers).to include(
         "scope:#{RepositoryScenario::DEFAULT_SCOPE}",
         "repository:#{repository_id}"

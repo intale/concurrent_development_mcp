@@ -4,7 +4,10 @@ module Coordinator
       class LeaseExpirySourceEvent < Dry::Validation::Contract
         SUPPORTED_TYPES: Array[String]
 
-        def initialize: (?compound_marker_builder: Shared::CompoundMarkerBuilder) -> void
+        def initialize: (
+          ?compound_marker_builder: Shared::CompoundMarkerBuilder,
+          ?repository_marker_builder: Write::RepositoryMarkerBuilder
+        ) -> void
         def call: ({ event: PgEventstore::Event } input) -> Dry::Validation::Result
       end
     end
