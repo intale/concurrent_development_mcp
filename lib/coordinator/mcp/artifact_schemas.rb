@@ -243,6 +243,7 @@ module Coordinator::Mcp
           },
           classification_reason: nullable({ type: "string", maxLength: 1_000 }),
           relationship_count: { type: "integer", minimum: 0 },
+          relationship_capacity: relationship_capacity,
           captured: event_evidence,
           observed: event_evidence,
           classified: event_evidence
@@ -250,6 +251,7 @@ module Coordinator::Mcp
         required: %w[
           artifact_id observation_id scope title kind labels media_type encoding content_sha256
           byte_size source classification_revision classification_reason relationship_count
+          relationship_capacity
           captured observed classified
         ]
       )
@@ -310,6 +312,10 @@ module Coordinator::Mcp
           relation_id: relation_id,
           source_artifact_id: artifact_id,
           relation: { type: "string", enum: Types::DEVELOPMENT_ARTIFACT_RELATION_KINDS },
+          display_relation: { type: "string" },
+          inverse_relation: { type: "string" },
+          transitive: { type: "boolean" },
+          supersedable: { type: "boolean" },
           target: relation_target,
           attributes: relation_attributes,
           direction: { type: "string", enum: %w[incoming outgoing] },
@@ -323,12 +329,14 @@ module Coordinator::Mcp
           supersession_reason: nullable(
             text(maximum: Types::DEVELOPMENT_ARTIFACT_RELATION_SUPERSESSION_REASON_MAXIMUM_BYTES)
           ),
-          superseded: nullable(event_evidence)
+          superseded: nullable(event_evidence),
+          follow_action: nullable(next_action)
         },
         required: %w[
-          relation_id source_artifact_id relation target attributes direction peer_kind peer_id
+          relation_id source_artifact_id relation display_relation inverse_relation transitive
+          supersedable target attributes direction peer_kind peer_id
           peer_artifact status observed_sequence declared replacement_relation_id
-          supersession_reason superseded
+          supersession_reason superseded follow_action
         ]
       )
     end
@@ -339,8 +347,8 @@ module Coordinator::Mcp
           kind: { type: "string", enum: Types::DEVELOPMENT_ARTIFACT_TARGET_KINDS },
           id: text(maximum: Types::DEVELOPMENT_ARTIFACT_TARGET_ID_MAXIMUM_BYTES),
           status: { type: "string", enum: Types::DEVELOPMENT_ARTIFACT_TARGET_STATUSES },
-          name: nullable(text(maximum: Types::SKILL_NAME_MAXIMUM_BYTES)),
-          scope: nullable(text(maximum: Types::SKILL_SCOPE_MAXIMUM_BYTES))
+          name: nullable(text(maximum: Types::DEVELOPMENT_ARTIFACT_TARGET_NAME_MAXIMUM_BYTES)),
+          scope: nullable(text(maximum: Types::DEVELOPMENT_ARTIFACT_TARGET_SCOPE_MAXIMUM_BYTES))
         },
         required: %w[kind id status name scope]
       )
@@ -360,6 +368,23 @@ module Coordinator::Mcp
           )
         },
         required: %w[path fragment normalized_locator]
+      )
+    end
+
+    def relationship_capacity
+      Schemas.object_schema(
+        properties: {
+          active_count: { type: "integer", minimum: 0 },
+          active_limit: { type: "integer", minimum: 1 },
+          active_remaining: { type: "integer", minimum: 0 },
+          lifetime_count: { type: "integer", minimum: 0 },
+          lifetime_limit: { type: "integer", minimum: 1 },
+          lifetime_remaining: { type: "integer", minimum: 0 }
+        },
+        required: %w[
+          active_count active_limit active_remaining lifetime_count lifetime_limit
+          lifetime_remaining
+        ]
       )
     end
 
@@ -478,6 +503,11 @@ module Coordinator::Mcp
           action("development_artifact_get", artifact_arguments),
           action("development_artifact_content_get", artifact_arguments),
           action("development_artifact_locator_resolve", locator_arguments),
+          action("coord_context", coordination_arguments),
+          action("candidate_get", identifier_arguments(:candidate_id)),
+          action("decision_get", identifier_arguments(:decision_id)),
+          action("skill_get", skill_arguments),
+          action("repository_list", repository_arguments),
           action("operation_batch_get", operation_batch_arguments)
         ]
       }
@@ -507,6 +537,45 @@ module Coordinator::Mcp
       Schemas.object_schema(
         properties: { batch_id: uuid_v7 },
         required: %w[batch_id]
+      )
+    end
+
+    def coordination_arguments
+      Schemas.object_schema(
+        properties: {
+          change_set_id: Schemas.identifier,
+          work_item_id: Schemas.identifier,
+          attempt_id: Schemas.identifier
+        },
+        required: [],
+        one_of: %w[change_set_id work_item_id attempt_id].map { { required: [ _1 ] } }
+      )
+    end
+
+    def identifier_arguments(name)
+      Schemas.object_schema(
+        properties: { name => Schemas.identifier },
+        required: [ name.to_s ]
+      )
+    end
+
+    def skill_arguments
+      Schemas.object_schema(
+        properties: {
+          name: text(maximum: Types::SKILL_NAME_MAXIMUM_BYTES),
+          scope: text(maximum: Types::SKILL_SCOPE_MAXIMUM_BYTES)
+        },
+        required: %w[name scope]
+      )
+    end
+
+    def repository_arguments
+      Schemas.object_schema(
+        properties: {
+          scope: text(maximum: Types::DEVELOPMENT_ARTIFACT_TARGET_SCOPE_MAXIMUM_BYTES),
+          repository_key: Schemas.identifier
+        },
+        required: %w[scope repository_key]
       )
     end
 

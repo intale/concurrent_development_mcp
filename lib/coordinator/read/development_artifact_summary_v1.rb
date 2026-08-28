@@ -16,6 +16,7 @@ module Coordinator::Read
     attribute :classification_revision, Types::DevelopmentArtifactClassificationRevision
     attribute :classification_reason, Types::String.optional
     attribute :relationship_count, Types::Integer.constrained(gteq: 0)
+    attribute :relationship_capacity, DevelopmentArtifactRelationshipCapacityV1
     attribute :captured, DevelopmentArtifactEventEvidenceV1
     attribute :observed, DevelopmentArtifactEventEvidenceV1
     attribute :classified, DevelopmentArtifactEventEvidenceV1

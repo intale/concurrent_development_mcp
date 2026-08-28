@@ -5,7 +5,7 @@ module Coordinator::Read
     attribute :artifact, DevelopmentArtifactSummaryV1
     attribute :relationships,
               Types::Array.of(DevelopmentArtifactRelationViewV1).constrained(
-                max_size: Types::DEVELOPMENT_ARTIFACT_RELATION_MAXIMUM_COUNT
+                max_size: Types::DEVELOPMENT_ARTIFACT_RELATION_LIFETIME_MAXIMUM_COUNT
               )
   end
 end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_28_085000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_28_103000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -445,6 +445,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_085000) do
     t.string "source_artifact_id", null: false
     t.text "target_id", null: false
     t.string "target_kind", null: false
+    t.string "target_name"
+    t.string "target_scope"
+    t.string "target_status", default: "legacy_unverified", null: false
     t.datetime "updated_at", null: false
     t.index ["declared_global_position"], name: "idx_on_declared_global_position_66c5eb75e9"
     t.index ["observed_sequence"], name: "index_development_artifact_relations_on_observed_sequence", unique: true

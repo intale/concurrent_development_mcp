@@ -6,9 +6,13 @@ module Coordinator::Write
       attribute :change_set_id, Types::Identifier
     end
 
-    class AttemptArguments < Value
-      attribute :change_set_id, Types::Identifier
+    class WorkItemArguments < Value
       attribute :work_item_id, Types::Identifier
+    end
+
+    class AttemptArguments < Value
+      attribute? :change_set_id, Types::Identifier.optional
+      attribute? :work_item_id, Types::Identifier.optional
       attribute :attempt_id, Types::Identifier
     end
 
@@ -53,6 +57,11 @@ module Coordinator::Write
       attribute :batch_id, Types::OperationBatchId
     end
 
+    class RepositoryArguments < Value
+      attribute :scope, Types::DevelopmentArtifactTargetScope
+      attribute :repository_key, Types::Identifier
+    end
+
     class DevelopmentArtifactArguments < Value
       attribute :artifact_id, Types::DevelopmentArtifactId
       attribute? :observation_id, Types::DevelopmentArtifactObservationId.optional
@@ -64,6 +73,7 @@ module Coordinator::Write
     end
 
     Arguments = ChangeSetArguments |
+                WorkItemArguments |
                 AttemptArguments |
                 GuidanceArguments |
                 InterpretationListArguments |
@@ -75,6 +85,7 @@ module Coordinator::Write
                 ReleaseSetArguments |
                 SkillArguments |
                 OperationBatchArguments |
+                RepositoryArguments |
                 DevelopmentArtifactArguments |
                 DecisionResolutionArguments
 

@@ -1,15 +1,19 @@
 module Coordinator
   module Write
     class NextAction < Shared::Value
-      type arguments = ChangeSetArguments | AttemptArguments | GuidanceArguments | InterpretationListArguments | DecisionArguments | AgentChoiceArguments | CandidateArguments | VerificationObligationArguments | MergeSnapshotArguments | ReleaseSetArguments | SkillArguments | DevelopmentArtifactArguments | OperationBatchArguments | DecisionResolutionArguments
+      type arguments = ChangeSetArguments | WorkItemArguments | AttemptArguments | GuidanceArguments | InterpretationListArguments | DecisionArguments | AgentChoiceArguments | CandidateArguments | VerificationObligationArguments | MergeSnapshotArguments | ReleaseSetArguments | SkillArguments | DevelopmentArtifactArguments | OperationBatchArguments | RepositoryArguments | DecisionResolutionArguments
 
       class ChangeSetArguments < Shared::Value
         def change_set_id: () -> String
       end
 
-      class AttemptArguments < Shared::Value
-        def change_set_id: () -> String
+      class WorkItemArguments < Shared::Value
         def work_item_id: () -> String
+      end
+
+      class AttemptArguments < Shared::Value
+        def change_set_id: () -> String?
+        def work_item_id: () -> String?
         def attempt_id: () -> String
       end
 
@@ -57,6 +61,11 @@ module Coordinator
 
       class OperationBatchArguments < Shared::Value
         def batch_id: () -> String
+      end
+
+      class RepositoryArguments < Shared::Value
+        def scope: () -> String
+        def repository_key: () -> String
       end
 
       class DecisionResolutionArguments < Shared::Value

@@ -1,0 +1,7 @@
+module Coordinator
+  module Read
+    class DevelopmentArtifactRelationFollowAction
+      def call: (direction: String, source_artifact_id: String, target: Write::DevelopmentArtifacts::RelationTargetV1) -> Write::NextAction?
+    end
+  end
+end

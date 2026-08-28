@@ -8,7 +8,7 @@ module Coordinator::Write
 
         def initialize(
           stream_factory: StreamFactory.new,
-          relation_registry: Coordinator::Write::DevelopmentArtifacts::RelationRegistry.new
+          relation_registry: Coordinator::Shared::DevelopmentArtifactRelationRegistry.new
         )
           @stream_factory = stream_factory
           @relation_registry = relation_registry

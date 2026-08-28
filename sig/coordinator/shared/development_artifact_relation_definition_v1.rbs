@@ -1,0 +1,11 @@
+module Coordinator
+  module Shared
+    class DevelopmentArtifactRelationDefinitionV1 < Value
+      def relation: () -> String
+      def target_kinds: () -> Array[String]
+      def inverse: () -> String
+      def transitive: () -> bool
+      def supersedable: () -> bool
+    end
+  end
+end

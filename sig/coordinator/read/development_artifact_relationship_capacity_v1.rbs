@@ -1,0 +1,12 @@
+module Coordinator
+  module Read
+    class DevelopmentArtifactRelationshipCapacityV1 < Shared::Value
+      def active_count: () -> Integer
+      def active_limit: () -> Integer
+      def active_remaining: () -> Integer
+      def lifetime_count: () -> Integer
+      def lifetime_limit: () -> Integer
+      def lifetime_remaining: () -> Integer
+    end
+  end
+end

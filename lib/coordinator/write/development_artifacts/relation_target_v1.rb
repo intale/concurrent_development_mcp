@@ -6,8 +6,8 @@ module Coordinator::Write
       attribute :kind, Types::DevelopmentArtifactTargetKind
       attribute :id, Types::DevelopmentArtifactTargetId
       attribute? :status, Types::DevelopmentArtifactTargetStatus.optional
-      attribute? :name, Types::SkillName.optional
-      attribute? :scope, Types::SkillScope.optional
+      attribute? :name, Types::DevelopmentArtifactTargetName.optional
+      attribute? :scope, Types::DevelopmentArtifactTargetScope.optional
     end
   end
 end

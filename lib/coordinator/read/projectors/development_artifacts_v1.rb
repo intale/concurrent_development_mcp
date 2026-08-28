@@ -3,7 +3,7 @@
 module Coordinator::Read
   module Projectors
     class DevelopmentArtifactsV1
-      PROJECTION = ProjectionDefinition.new(name: "development-artifacts", version: 3)
+      PROJECTION = ProjectionDefinition.new(name: "development-artifacts", version: 4)
 
       def initialize(
         contract: Contracts::DevelopmentArtifactSourceEvent.new,

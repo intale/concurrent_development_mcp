@@ -4,6 +4,10 @@ module Coordinator
       def relation_id: () -> String
       def source_artifact_id: () -> String
       def relation: () -> String
+      def display_relation: () -> String
+      def inverse_relation: () -> String
+      def transitive: () -> bool
+      def supersedable: () -> bool
       def target: () -> Write::DevelopmentArtifacts::RelationTargetV1
       def attributes: () -> Hash[Symbol, untyped]
       def relation_attributes: () -> Write::DevelopmentArtifacts::RelationAttributesV1
@@ -17,6 +21,7 @@ module Coordinator
       def replacement_relation_id: () -> String?
       def supersession_reason: () -> String?
       def superseded: () -> DevelopmentArtifactEventEvidenceV1?
+      def follow_action: () -> Write::NextAction?
     end
   end
 end

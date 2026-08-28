@@ -1,0 +1,12 @@
+module Coordinator
+  module Shared
+    class DevelopmentArtifactRelationRegistry
+      ALL_TARGETS: Array[String]
+      INTERNAL_TARGETS: Array[String]
+      DEFINITIONS: Array[DevelopmentArtifactRelationDefinitionV1]
+      BY_RELATION: Hash[String, DevelopmentArtifactRelationDefinitionV1]
+
+      def fetch: (String relation) -> DevelopmentArtifactRelationDefinitionV1
+    end
+  end
+end

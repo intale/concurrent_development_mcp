@@ -5,6 +5,10 @@ module Coordinator::Read
     attribute :relation_id, Types::DevelopmentArtifactRelationId
     attribute :source_artifact_id, Types::DevelopmentArtifactId
     attribute :relation, Types::DevelopmentArtifactRelationKind
+    attribute :display_relation, Types::String
+    attribute :inverse_relation, Types::String
+    attribute :transitive, Types::Strict::Bool
+    attribute :supersedable, Types::Strict::Bool
     attribute :target, Coordinator::Write::DevelopmentArtifacts::RelationTargetV1
     attribute :attributes, Coordinator::Write::DevelopmentArtifacts::RelationAttributesV1
     attribute :direction, Types::String.enum("incoming", "outgoing")
@@ -18,6 +22,7 @@ module Coordinator::Read
     attribute :supersession_reason,
               Types::DevelopmentArtifactRelationSupersessionReason.optional
     attribute :superseded, DevelopmentArtifactEventEvidenceV1.optional
+    attribute :follow_action, Coordinator::Write::NextAction.optional
 
     def relation_attributes
       self[:attributes]

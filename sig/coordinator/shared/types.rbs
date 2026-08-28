@@ -40,12 +40,13 @@ module Coordinator
       DEVELOPMENT_ARTIFACT_CLASSIFICATION_MAXIMUM_REVISIONS: Integer
       DEVELOPMENT_ARTIFACT_ACTIVE_RELATION_MAXIMUM_COUNT: Integer
       DEVELOPMENT_ARTIFACT_RELATION_LIFETIME_MAXIMUM_COUNT: Integer
-      DEVELOPMENT_ARTIFACT_RELATION_MAXIMUM_COUNT: Integer
       DEVELOPMENT_ARTIFACT_RELATION_PATH_MAXIMUM_BYTES: Integer
       DEVELOPMENT_ARTIFACT_RELATION_FRAGMENT_MAXIMUM_BYTES: Integer
       DEVELOPMENT_ARTIFACT_RELATION_SUPERSESSION_REASON_MAXIMUM_BYTES: Integer
       DEVELOPMENT_ARTIFACT_HISTORY_MAXIMUM_COUNT: Integer
       DEVELOPMENT_ARTIFACT_TARGET_ID_MAXIMUM_BYTES: Integer
+      DEVELOPMENT_ARTIFACT_TARGET_NAME_MAXIMUM_BYTES: Integer
+      DEVELOPMENT_ARTIFACT_TARGET_SCOPE_MAXIMUM_BYTES: Integer
       DEVELOPMENT_ARTIFACT_QUERY_MAXIMUM_ITEMS: Integer
       COORDINATION_DISCOVERY_MAXIMUM_ITEMS: Integer
       DECISION_DISCOVERY_MAXIMUM_ITEMS: Integer
@@ -224,6 +225,8 @@ module Coordinator
       DevelopmentArtifactCanonicalTargetKind: untyped
       DevelopmentArtifactTargetStatus: untyped
       DevelopmentArtifactTargetId: untyped
+      DevelopmentArtifactTargetName: untyped
+      DevelopmentArtifactTargetScope: untyped
       DevelopmentArtifactRelationPath: untyped
       DevelopmentArtifactRelationFragment: untyped
       DevelopmentArtifactRelationSupersessionReason: untyped

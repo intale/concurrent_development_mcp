@@ -2,6 +2,7 @@ module Coordinator
   module Read
     module Repositories
       class DevelopmentArtifacts
+        def initialize: (?relation_registry: Shared::DevelopmentArtifactRelationRegistry, ?follow_action: DevelopmentArtifactRelationFollowAction) -> void
         def fetch: (String artifact_id, ?observation_id: String?) -> DevelopmentArtifactViewV1?
         def fetch_content: (String artifact_id) -> DevelopmentArtifactContentViewV1?
         def page: (DevelopmentArtifactListQueryV1 query) -> DevelopmentArtifactPageV1

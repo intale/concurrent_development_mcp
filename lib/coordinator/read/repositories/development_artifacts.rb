@@ -10,6 +10,14 @@ module Coordinator::Read
         "GREATEST(#{RELATION_OBSERVED_SEQUENCE_SQL}, " \
         "COALESCE(#{SUPERSESSION_OBSERVED_SEQUENCE_SQL}, 0))"
 
+      def initialize(
+        relation_registry: Coordinator::Shared::DevelopmentArtifactRelationRegistry.new,
+        follow_action: DevelopmentArtifactRelationFollowAction.new
+      )
+        @relation_registry = relation_registry
+        @follow_action = follow_action
+      end
+
       def fetch(artifact_id, observation_id: nil)
         artifact = Coordinator::Read::DevelopmentArtifact.find_by(artifact_id:)
         return unless artifact
@@ -40,7 +48,11 @@ module Coordinator::Read
 
         rows = relation.order(:current_global_position, :observation_id).page(1).per(query.limit + 1).to_a
         has_more = rows.length > query.limit
-        items = rows.first(query.limit).map { build_summary(_1, _1.artifact) }
+        visible_rows = rows.first(query.limit)
+        counts = relationship_capacity_counts(visible_rows.map(&:artifact_id))
+        items = visible_rows.map do |record|
+          build_summary(record, record.artifact, relationship_counts: counts.fetch(record.artifact_id))
+        end
         DevelopmentArtifactPageV1.new(
           items:,
           next_global_position: has_more ? rows.fetch(query.limit - 1).current_global_position : nil,
@@ -114,12 +126,9 @@ module Coordinator::Read
           .to_a
         window_has_more = rows.length > query.limit
         visible_rows = rows.first(query.limit)
-        counts = active_relations
-          .where(source_artifact_id: visible_rows.map(&:artifact_id))
-          .group(:source_artifact_id)
-          .count
+        counts = relationship_capacity_counts(visible_rows.map(&:artifact_id))
         items = visible_rows.map do |record|
-          build_summary(record, record.artifact, relationship_count: counts.fetch(record.artifact_id, 0))
+          build_summary(record, record.artifact, relationship_counts: counts.fetch(record.artifact_id))
         end
         continuation = locator_continuation_cursor(
           cursor:,
@@ -508,6 +517,9 @@ module Coordinator::Read
           relation: relation.relation,
           target_kind: relation.target.kind,
           target_id: relation.target.id,
+          target_status: relation.target.status || "legacy_unverified",
+          target_name: relation.target.name,
+          target_scope: relation.target.scope,
           path: relation.relation_attributes.path,
           fragment: relation.relation_attributes.fragment,
           normalized_locator: relation.relation_attributes.normalized_locator,
@@ -583,6 +595,9 @@ module Coordinator::Read
                   record.relation == relation.relation &&
                   record.target_kind == relation.target.kind &&
                   record.target_id == relation.target.id &&
+                  record.target_status == (relation.target.status || "legacy_unverified") &&
+                  record.target_name == relation.target.name &&
+                  record.target_scope == relation.target.scope &&
                   record.path == attributes.path &&
                   record.fragment == attributes.fragment &&
                   record.normalized_locator == attributes.normalized_locator
@@ -616,7 +631,9 @@ module Coordinator::Read
         )
       end
 
-      def build_summary(observation, artifact, relationship_count: nil)
+      def build_summary(observation, artifact, relationship_counts: nil)
+        counts = relationship_counts || relationship_capacity_counts([ artifact.artifact_id ])
+          .fetch(artifact.artifact_id)
         DevelopmentArtifactSummaryV1.new(
           artifact_id: artifact.artifact_id,
           observation_id: observation.observation_id,
@@ -631,9 +648,8 @@ module Coordinator::Read
           source: provenance(observation),
           classification_revision: observation.classification_revision,
           classification_reason: observation.classification_reason,
-          relationship_count: relationship_count || active_relations.where(
-            source_artifact_id: artifact.artifact_id
-          ).count,
+          relationship_count: counts.fetch(:active),
+          relationship_capacity: relationship_capacity(counts),
           captured: evidence(artifact, "captured"),
           observed: evidence(observation, "observed"),
           classified: evidence(observation, "classified")
@@ -661,14 +677,23 @@ module Coordinator::Read
         peer_kind = direction == "outgoing" ? record.target_kind : "artifact"
         peer_id = direction == "outgoing" ? record.target_id : record.source_artifact_id
         supersession = visible_supersession(record)
+        definition = @relation_registry.fetch(record.relation)
+        target = Coordinator::Write::DevelopmentArtifacts::RelationTargetV1.new(
+          kind: record.target_kind,
+          id: record.target_id,
+          status: record.target_status.presence || "legacy_unverified",
+          name: record.target_name,
+          scope: record.target_scope
+        )
         DevelopmentArtifactRelationViewV1.new(
           relation_id: record.relation_id,
           source_artifact_id: record.source_artifact_id,
           relation: record.relation,
-          target: Coordinator::Write::DevelopmentArtifacts::RelationTargetV1.new(
-            kind: record.target_kind,
-            id: record.target_id
-          ),
+          display_relation: direction == "outgoing" ? definition.relation : definition.inverse,
+          inverse_relation: definition.inverse,
+          transitive: definition.transitive,
+          supersedable: definition.supersedable,
+          target:,
           attributes: Coordinator::Write::DevelopmentArtifacts::RelationAttributesV1.new(
             path: record.path,
             fragment: record.fragment,
@@ -683,7 +708,12 @@ module Coordinator::Read
           declared: evidence(record, "declared"),
           replacement_relation_id: supersession&.replacement_relation_id,
           supersession_reason: supersession&.reason,
-          superseded: supersession && evidence(supersession, "superseded")
+          superseded: supersession && evidence(supersession, "superseded"),
+          follow_action: @follow_action.call(
+            direction:,
+            source_artifact_id: record.source_artifact_id,
+            target:
+          )
         )
       end
 
@@ -730,14 +760,45 @@ module Coordinator::Read
           .order(:observed_global_position, :observation_id)
           .to_a
           .index_by(&:artifact_id)
-        counts = active_relations.where(source_artifact_id: ids).group(:source_artifact_id).count
+        counts = relationship_capacity_counts(ids)
         observations.transform_values do |observation|
           build_summary(
             observation,
             observation.artifact,
-            relationship_count: counts.fetch(observation.artifact_id, 0)
+            relationship_counts: counts.fetch(observation.artifact_id)
           )
         end
+      end
+
+      def relationship_capacity_counts(artifact_ids)
+        ids = artifact_ids.uniq
+        active = active_relations.where(source_artifact_id: ids).group(:source_artifact_id).count
+        lifetime = Coordinator::Read::DevelopmentArtifactRelation
+          .where(source_artifact_id: ids)
+          .group(:source_artifact_id)
+          .count
+        ids.to_h do |artifact_id|
+          [ artifact_id, { active: active.fetch(artifact_id, 0), lifetime: lifetime.fetch(artifact_id, 0) } ]
+        end
+      end
+
+      def relationship_capacity(counts)
+        active = counts.fetch(:active)
+        lifetime = counts.fetch(:lifetime)
+        DevelopmentArtifactRelationshipCapacityV1.new(
+          active_count: active,
+          active_limit: Types::DEVELOPMENT_ARTIFACT_ACTIVE_RELATION_MAXIMUM_COUNT,
+          active_remaining: [
+            Types::DEVELOPMENT_ARTIFACT_ACTIVE_RELATION_MAXIMUM_COUNT - active,
+            0
+          ].max,
+          lifetime_count: lifetime,
+          lifetime_limit: Types::DEVELOPMENT_ARTIFACT_RELATION_LIFETIME_MAXIMUM_COUNT,
+          lifetime_remaining: [
+            Types::DEVELOPMENT_ARTIFACT_RELATION_LIFETIME_MAXIMUM_COUNT - lifetime,
+            0
+          ].max
+        )
       end
 
       def complete_observations

@@ -15,6 +15,7 @@ module Coordinator
       def classification_revision: () -> Integer
       def classification_reason: () -> String?
       def relationship_count: () -> Integer
+      def relationship_capacity: () -> DevelopmentArtifactRelationshipCapacityV1
       def captured: () -> DevelopmentArtifactEventEvidenceV1
       def observed: () -> DevelopmentArtifactEventEvidenceV1
       def classified: () -> DevelopmentArtifactEventEvidenceV1

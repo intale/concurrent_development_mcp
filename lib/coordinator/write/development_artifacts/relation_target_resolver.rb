@@ -36,6 +36,10 @@ module Coordinator::Write
           publication = load_event(event)
           values[:name] = publication.name
           values[:scope] = publication.scope
+        elsif target.kind == "repository"
+          registration = load_event(event)
+          values[:name] = registration.repository_key
+          values[:scope] = registration.scope
         end
         RelationTargetV1.new(**values)
       end

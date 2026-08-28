@@ -3,7 +3,7 @@
 module Coordinator::Write
   module Contracts
     class DeclareDevelopmentArtifactRelation < Dry::Validation::Contract
-      RELATION_REGISTRY = DevelopmentArtifacts::RelationRegistry.new
+      RELATION_REGISTRY = Coordinator::Shared::DevelopmentArtifactRelationRegistry.new
       EXTERNAL_TARGET_PATTERN = %r{\Ahttps?://[^\s/?#]+(?:[/?#][^\s]*)?\z}
 
       config.validate_keys = true
