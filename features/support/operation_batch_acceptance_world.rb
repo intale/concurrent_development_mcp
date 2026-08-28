@@ -3,6 +3,7 @@
 module OperationBatchAcceptanceWorld
   def submit_skill_batch(items, pause_at: nil)
     @operation_batch_id ||= SecureRandom.uuid_v7
+    @submitted_operation_batch_items = JSON.parse(JSON.generate(items))
     @operation_batch_command_id = "cmd-cuc-batch-#{@operation_batch_id}"
     install_contention_barrier(
       operation: pause_at,
@@ -40,9 +41,9 @@ module OperationBatchAcceptanceWorld
     }
   end
 
-  def operation_batch_events
+  def operation_batch_events(batch_id: @operation_batch_id)
     event_store.read(
-      streams.operation_batch(@operation_batch_id),
+      streams.operation_batch(batch_id),
       Coordinator::Write::EventQueries::OPERATION_BATCH_HISTORY
     )
   end
@@ -56,20 +57,53 @@ module OperationBatchAcceptanceWorld
     await_operation_batch_terminal
   end
 
-  def project_operation_batch(events)
+  def project_operation_batch(events, batch_id: @operation_batch_id)
     expected = operation_batch_expectation(events)
-    await_read_model("Operation Batch #{@operation_batch_id} to expose #{expected.fetch(:status)}") do
-      view = operation_batch_view
+    await_read_model("Operation Batch #{batch_id} to expose #{expected.fetch(:status)}") do
+      view = operation_batch_view(batch_id:)
       matched = view && expected.all? { |key, value| view[key.to_s] == value }
       [ matched, view ]
     end
   end
 
-  def operation_batch_view
+  def operation_batch_view(batch_id: @operation_batch_id, after_index: nil, limit: 100)
     call_tool(
       "operation_batch_get",
-      { batch_id: @operation_batch_id, limit: 100 }
+      { batch_id:, after_index:, limit: }
     ).dig("result", "structuredContent", "data", "batch")
+  end
+
+  def operation_batch_manifest(batch_id: @operation_batch_id, limit: 25)
+    items = []
+    after_index = nil
+    pages = []
+
+    loop do
+      page = operation_batch_view(batch_id:, after_index:, limit:)
+      pages << page
+      items.concat(page.fetch("items"))
+      break unless page.fetch("has_more")
+
+      after_index = page.fetch("next_after_index")
+    end
+
+    { pages:, items: }
+  end
+
+  def resubmit_not_run_items
+    @cancelled_operation_batch_id = @operation_batch_id
+    manifest = operation_batch_manifest(batch_id: @cancelled_operation_batch_id)
+    @completed_prefix_command_ids = manifest.fetch(:items)
+      .select { _1.fetch("status") == "succeeded" }
+      .map { _1.fetch("command_id") }
+    not_run = manifest.fetch(:items).select { _1.fetch("status") == "not_run" }
+    assert_acceptance_equal(1, not_run.length, "Not-run manifest selection")
+
+    @operation_batch_id = SecureRandom.uuid_v7
+    @resumed_operation_batch_id = @operation_batch_id
+    submit_skill_batch(not_run.map { _1.fetch("arguments") })
+    await_operation_batch_terminal
+    project_operation_batch(operation_batch_events)
   end
 
   def await_operation_batch_terminal

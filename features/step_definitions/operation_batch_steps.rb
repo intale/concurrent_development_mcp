@@ -41,6 +41,31 @@ Then("the Batch has {int} successes, no rejection, and one terminal completion")
   assert_acceptance_equal(1, events.count { _1.type == "OperationBatchContinuationRequested" }, "Continuation facts")
 end
 
+Then("the complete normalized manifest and outcomes are recoverable in bounded pages using only the Batch ID") do
+  project_operation_batch(operation_batch_events)
+  manifest = operation_batch_manifest(limit: 20)
+  assert_acceptance_equal(3, manifest.fetch(:pages).length, "Bounded manifest pages")
+  assert_acceptance_equal(
+    @submitted_operation_batch_items,
+    manifest.fetch(:items).map { _1.fetch("arguments") },
+    "Normalized manifest arguments"
+  )
+  assert_acceptance_equal(
+    Array.new(51, "succeeded"),
+    manifest.fetch(:items).map { _1.fetch("status") },
+    "Manifest outcomes"
+  )
+end
+
+Then("page-boundary redelivery leaves one marked outcome per item") do
+  outcomes = operation_batch_events.select { _1.type == "OperationBatchItemSucceeded" }
+  assert_acceptance_equal((0...51).to_a, outcomes.map { _1.data.fetch("index") }.sort, "Unique item outcomes")
+  outcomes.each do |event|
+    marker = "batch-item:#{@operation_batch_id}:#{event.data.fetch("index")}"
+    assert_acceptance(event.markers.include?(marker), "Outcome #{event.id} is missing #{marker}")
+  end
+end
+
 When("the Batch creation reaches the read side while item execution is paused") do
   await_contention_evidence
   creation = operation_batch_events.find { _1.type == "OperationBatchCreated" }
@@ -101,6 +126,18 @@ Then("the cancellation Task succeeds without undoing completed items") do
   )
 end
 
+Then("the available Batch exposes accepted cancellation before terminal completion") do
+  view = await_read_model("Operation Batch #{@operation_batch_id} to expose accepted cancellation") do
+    observed = operation_batch_view
+    matched = observed&.fetch("status", nil) == "cancelling" &&
+              observed.dig("cancellation", "event", "type") == "OperationBatchCancellationRequested"
+    [ matched, observed ]
+  end
+  assert_acceptance_equal(1, view.fetch("pending"), "Pending cancellation remainder")
+  assert_acceptance_equal(0, view.fetch("not_run"), "Premature not-run count")
+  assert_acceptance_equal(nil, view.fetch("terminal"), "Premature terminal evidence")
+end
+
 When("the pending Batch continuation observes cancellation") do
   release_contention_barrier
   await_operation_batch_terminal
@@ -118,4 +155,26 @@ Then("the Batch is cancelled with {int} successes and one item not run") do |cou
   assert_acceptance_equal("cancelled", view.fetch("status"), "Available cancelled status")
   assert_acceptance_equal(count, view.fetch("succeeded"), "Available successes")
   assert_acceptance_equal(1, view.fetch("not_run"), "Available unprocessed count")
+end
+
+When("the agent resubmits only the not-run manifest items") do
+  resubmit_not_run_items
+end
+
+Then("the resumed Batch succeeds once without replaying the completed prefix") do
+  resumed = operation_batch_events(batch_id: @resumed_operation_batch_id)
+  assert_acceptance_equal(1, resumed.count { _1.type == "OperationBatchItemSucceeded" }, "Resumed success facts")
+  assert_acceptance_equal(0, resumed.count { _1.type == "OperationBatchItemRejected" }, "Resumed rejection facts")
+  assert_acceptance_equal(1, resumed.count { _1.type == "OperationBatchCompleted" }, "Resumed terminal facts")
+
+  resumed_manifest = operation_batch_manifest(batch_id: @resumed_operation_batch_id)
+  resumed_command_ids = resumed_manifest.fetch(:items).map { _1.fetch("command_id") }
+  assert_acceptance_equal(1, resumed_command_ids.length, "Resumed manifest size")
+  assert_acceptance(
+    (@completed_prefix_command_ids & resumed_command_ids).empty?,
+    "The completed prefix was included in the resumed Batch"
+  )
+  original = operation_batch_manifest(batch_id: @cancelled_operation_batch_id)
+  assert_acceptance_equal(50, original.fetch(:items).count { _1.fetch("status") == "succeeded" }, "Original prefix")
+  assert_acceptance_equal(1, original.fetch(:items).count { _1.fetch("status") == "not_run" }, "Original remainder")
 end

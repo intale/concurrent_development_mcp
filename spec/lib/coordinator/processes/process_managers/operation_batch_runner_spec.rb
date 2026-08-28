@@ -33,6 +33,10 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
     expect(batch_events(command.batch_id).map(&:id)).to eq(first_history.map(&:id))
     completed = load(first_history.last)
     expect(completed).to have_attributes(succeeded: 1, rejected: 1)
+    first_history.select { %w[OperationBatchItemSucceeded OperationBatchItemRejected].include?(_1.type) }
+      .each do |event|
+        expect(event.markers).to include("batch-item:#{command.batch_id}:#{event.data.fetch("index")}")
+      end
     expect(skill_events.length).to eq(1)
   end
 

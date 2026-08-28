@@ -8,12 +8,14 @@ Feature: Bounded command batches for checkpointed agent imports
 
   Rule: A Batch Saga resumes from durable facts and crosses bounded process pages
 
-    @CDM-BATCH-001 @event-contract
+    @CDM-BATCH-001 @AUD-BATCH-RESUME-01 @AUD-BATCH-PAGE-REPLAY-04 @event-contract
     Scenario: An import-sized Skill batch resumes after a page-boundary worker restart
       When the agent submits a batch of 51 independent Skill publications
       Then the Batch Task durably accepts all 51 items
       When the process workers restart after the first durable Batch page
       Then the Batch has 51 successes, no rejection, and one terminal completion
+      And the complete normalized manifest and outcomes are recoverable in bounded pages using only the Batch ID
+      And page-boundary redelivery leaves one marked outcome per item
 
   Rule: Per-item denial does not roll back successes or make available reads wait for convergence
 
@@ -28,7 +30,7 @@ Feature: Bounded command batches for checkpointed agent imports
 
   Rule: Cooperative cancellation preserves committed item outcomes
 
-    @CDM-BATCH-003 @event-contract
+    @CDM-BATCH-003 @AUD-BATCH-NOT-RUN-02 @AUD-BATCH-CANCEL-VIEW-03 @event-contract
     Scenario: A bounded remainder is not run after cancellation at a page boundary
       When the agent submits a batch of 51 independent Skill publications
       Then the Batch Task durably accepts all 51 items
@@ -36,5 +38,8 @@ Feature: Bounded command batches for checkpointed agent imports
       Then 50 item successes and one continuation are durable
       When the agent requests cooperative Batch cancellation
       Then the cancellation Task succeeds without undoing completed items
+      And the available Batch exposes accepted cancellation before terminal completion
       When the pending Batch continuation observes cancellation
       Then the Batch is cancelled with 50 successes and one item not run
+      When the agent resubmits only the not-run manifest items
+      Then the resumed Batch succeeds once without replaying the completed prefix
