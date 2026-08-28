@@ -251,6 +251,12 @@ module Coordinator::Write
           receipt_class: CommandReceiptData::OperationBatchAcceptance
         ),
         TargetContractV1.new(
+          tool_name: "development_artifact_classification_correct",
+          input_document_class: CommandInputDocuments::CorrectDevelopmentArtifactClassificationV1,
+          command_class: Commands::CorrectDevelopmentArtifactClassification,
+          receipt_class: CommandReceiptData::DevelopmentArtifactClassification
+        ),
+        TargetContractV1.new(
           tool_name: "development_artifact_relation_declare",
           input_document_class: CommandInputDocuments::DeclareDevelopmentArtifactRelationV1,
           command_class: Commands::DeclareDevelopmentArtifactRelation,

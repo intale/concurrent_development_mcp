@@ -19,19 +19,22 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
     outcome = task_request("tasks/get", task_id, id: 2)
       .dig("result", "result", "structuredContent")
     artifact_id = outcome.dig("data", "artifact_id")
+    observation_id = outcome.dig("data", "observation_id")
 
     expect(outcome).to include(
       "status" => "ok",
       "data" => include(
         "outcome" => "captured",
-        "artifact_id" => a_string_matching(Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_ID_PATTERN)
+        "artifact_id" => a_string_matching(Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_ID_PATTERN),
+        "observation_id" => a_string_matching(
+          Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_OBSERVATION_ID_PATTERN
+        ),
+        "classification_revision" => 1
       )
     )
-    artifact_events(artifact_id).each do |event|
-      Coordinator::Container["projectors.development_artifacts_v1"].call(event)
-    end
+    project_artifact(artifact_id, observation_id)
 
-    metadata = call_tool("development_artifact_get", { artifact_id: }, id: 3)
+    metadata = call_tool("development_artifact_get", { artifact_id:, observation_id: }, id: 3)
       .dig("result", "structuredContent")
     content = call_tool("development_artifact_content_get", { artifact_id: }, id: 4)
       .dig("result", "structuredContent")
@@ -52,7 +55,12 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
     ).dig("result", "structuredContent")
     expect(metadata.dig("data", "artifact", "artifact")).to include(
       "artifact_id" => artifact_id,
-      "scope" => "project:alpha"
+      "observation_id" => observation_id,
+      "scope" => "project:alpha",
+      "classification_revision" => 1,
+      "classification_reason" => nil,
+      "observed" => include("event" => include("type" => "DevelopmentArtifactObserved")),
+      "classified" => include("event" => include("type" => "DevelopmentArtifactObserved"))
     )
     expect(metadata.to_s).not_to include("MCP artifact body")
     expect(content.dig("data", "content")).to include(
@@ -73,11 +81,96 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
     )
   end
 
+  it "corrects one observation classification and rejects a stale revision through Tasks" do
+    capture_task = call_tool(
+      "development_artifact_capture",
+      capture_input(command_id: "cmd-mcp-classification-capture"),
+      id: 1
+    ).dig("result", "taskId")
+    execute_task(capture_task)
+    captured = task_request("tasks/get", capture_task, id: 2)
+      .dig("result", "result", "structuredContent", "data")
+    artifact_id = captured.fetch("artifact_id")
+    observation_id = captured.fetch("observation_id")
+    project_artifact(artifact_id, observation_id)
+
+    correction_task = call_tool(
+      "development_artifact_classification_correct",
+      {
+        command_id: "cmd-mcp-classification-correct",
+        actor: { kind: "agent", id: "agent-mcp-artifact" },
+        observation_id:,
+        expected_revision: 1,
+        title: "Corrected MCP Artifact",
+        kind: "contract",
+        labels: %w[corrected mcp],
+        reason: "The captured bytes describe a requirement, not general documentation."
+      },
+      id: 3
+    ).dig("result", "taskId")
+    execute_task(correction_task)
+    corrected = task_request("tasks/get", correction_task, id: 4)
+      .dig("result", "result", "structuredContent")
+    expect(corrected).to include(
+      "status" => "ok",
+      "data" => include(
+        "artifact_id" => artifact_id,
+        "observation_id" => observation_id,
+        "classification_revision" => 2,
+        "kind" => "contract",
+        "outcome" => "corrected"
+      )
+    )
+
+    observation_events(observation_id).each do |event|
+      Coordinator::Container["projectors.development_artifacts_v1"].call(event)
+    end
+    exact = call_tool(
+      "development_artifact_get",
+      { artifact_id:, observation_id: },
+      id: 5
+    ).dig("result", "structuredContent", "data", "artifact", "artifact")
+    expect(exact).to include(
+      "observation_id" => observation_id,
+      "classification_revision" => 2,
+      "classification_reason" => "The captured bytes describe a requirement, not general documentation.",
+      "kind" => "contract",
+      "classified" => include(
+        "event" => include("type" => "DevelopmentArtifactClassificationCorrected")
+      )
+    )
+
+    stale_task = call_tool(
+      "development_artifact_classification_correct",
+      {
+        command_id: "cmd-mcp-classification-stale",
+        actor: { kind: "agent", id: "agent-mcp-artifact" },
+        observation_id:,
+        expected_revision: 1,
+        title: "Stale correction",
+        kind: "documentation",
+        labels: [ "stale" ],
+        reason: "This command was based on an obsolete projected classification."
+      },
+      id: 6
+    ).dig("result", "taskId")
+    execute_task(stale_task)
+    stale = task_request("tasks/get", stale_task, id: 7)
+      .dig("result", "result", "structuredContent")
+    expect(stale.dig("data", "code")).to eq(
+      "development_artifact_classification_revision_conflict"
+    )
+    expect(observation_events(observation_id).map(&:type)).to eq(
+      [ "DevelopmentArtifactObserved", "DevelopmentArtifactClassificationCorrected" ]
+    )
+  end
+
   it "teaches a clean client the complete two-pass linked-document workflow in tools/list" do
     response = mcp_request(id: 1, method: "tools/list", params: {}, name: "tools")
     tools = response.dig("result", "tools").index_by { _1.fetch("name") }
     capture = tools.fetch("development_artifact_capture")
     capture_batch = tools.fetch("development_artifact_capture_batch")
+    classification = tools.fetch("development_artifact_classification_correct")
     declare = tools.fetch("development_artifact_relation_declare")
     declare_batch = tools.fetch("development_artifact_relation_declare_batch")
     traverse = tools.fetch("development_artifact_relation_list")
@@ -99,6 +192,12 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
       "filesystem",
       "Git",
       "URL fetching"
+    )
+    expect(classification.fetch("description")).to include(
+      "observation_id",
+      "classification_revision",
+      "stale expected revision",
+      "provenance remain immutable"
     )
     expect(declare.fetch("description")).to include(
       "Import pass 2",
@@ -142,6 +241,8 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
 
     get_data = tools.fetch("development_artifact_get")
       .dig("outputSchema", "properties", "data", "oneOf", 0, "properties")
+    get_input = tools.fetch("development_artifact_get").dig("inputSchema", "properties")
+    artifact_summary = get_data.dig("artifact", "properties", "artifact", "properties")
     relation_page = traverse
       .dig("outputSchema", "properties", "data", "oneOf", 0, "properties", "page")
     locator_page = resolve
@@ -153,9 +254,19 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
       .dig("outputSchema", "properties", "next_actions", "items", "oneOf")
     capture_data = capture
       .dig("outputSchema", "properties", "data", "oneOf", 0, "properties")
+    classification_data = classification
+      .dig("outputSchema", "properties", "data", "oneOf", 0, "properties")
     declare_data = declare
       .dig("outputSchema", "properties", "data", "oneOf", 0, "properties")
     expect(get_data).to include("artifact")
+    expect(get_input).to include("artifact_id", "observation_id")
+    expect(artifact_summary).to include(
+      "observation_id",
+      "classification_revision",
+      "classification_reason",
+      "observed",
+      "classified"
+    )
     expect(content.fetch("properties")).to include(
       "encoding",
       "media_type",
@@ -186,9 +297,21 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
     )
     expect(capture_data).to include(
       "artifact_id",
+      "observation_id",
+      "classification_revision",
       "content_sha256",
       "outcome",
-      "captured_at"
+      "recorded_at"
+    )
+    expect(classification_data).to include(
+      "artifact_id",
+      "observation_id",
+      "classification_revision",
+      "title",
+      "kind",
+      "labels",
+      "outcome",
+      "corrected_at"
     )
     expect(declare_data).to include(
       "relation_id",
@@ -313,11 +436,19 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
   it "exposes literal link evidence and immutable relation correction through MCP" do
     parent = capture_through_task(capture_input(command_id: "cmd-mcp-correction-parent"), id: 1)
     original_child = capture_through_task(
-      capture_input(command_id: "cmd-mcp-correction-original", locator: "docs/original.md"),
+      capture_input(
+        command_id: "cmd-mcp-correction-original",
+        locator: "docs/original.md",
+        text: "original child\n"
+      ),
       id: 2
     )
     replacement_child = capture_through_task(
-      capture_input(command_id: "cmd-mcp-correction-replacement", locator: "docs/replacement.md"),
+      capture_input(
+        command_id: "cmd-mcp-correction-replacement",
+        locator: "docs/replacement.md",
+        text: "replacement child\n"
+      ),
       id: 3
     )
     original_task = call_tool(
@@ -493,6 +624,19 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
       streams.development_artifact(artifact_id),
       Coordinator::Write::EventQueries::DEVELOPMENT_ARTIFACT_HISTORY
     )
+  end
+
+  def observation_events(observation_id)
+    event_store.read(
+      streams.development_artifact_observation(observation_id),
+      Coordinator::Write::EventQueries::DEVELOPMENT_ARTIFACT_OBSERVATION_HISTORY
+    )
+  end
+
+  def project_artifact(artifact_id, observation_id)
+    (artifact_events(artifact_id) + observation_events(observation_id)).each do |event|
+      Coordinator::Container["projectors.development_artifacts_v1"].call(event)
+    end
   end
 
   def load_completion(command_id)

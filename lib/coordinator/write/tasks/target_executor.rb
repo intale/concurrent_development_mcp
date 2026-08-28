@@ -52,6 +52,8 @@ module Coordinator::Write
           Operations::ExecutePublishSkillRevision.new(event_store:),
         capture_development_artifact:
           Operations::ExecuteCaptureDevelopmentArtifact.new(event_store:),
+        correct_development_artifact_classification:
+          Operations::ExecuteCorrectDevelopmentArtifactClassification.new(event_store:),
         declare_development_artifact_relation:
           Operations::ExecuteDeclareDevelopmentArtifactRelation.new(event_store:),
         operation_batch_command:
@@ -91,6 +93,7 @@ module Coordinator::Write
         @complete_compensated_release_set = complete_compensated_release_set
         @publish_skill_revision = publish_skill_revision
         @capture_development_artifact = capture_development_artifact
+        @correct_development_artifact_classification = correct_development_artifact_classification
         @declare_development_artifact_relation = declare_development_artifact_relation
         @create_operation_batch = operation_batch_command
         @cancel_operation_batch = operation_batch_command

@@ -26,6 +26,57 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
     expect(result.is_error).to be(true)
   end
 
+  it "keeps Artifact observation and classification failures typed across the Task boundary" do
+    observation_id = "artifact-observation:v1:#{'a' * 64}"
+    examples = [
+      [
+        :development_artifact_observation_identity_conflict,
+        { observation_id: },
+        Coordinator::Write::Tasks::DomainErrorV1::DevelopmentArtifactObservationIdentityConflictError,
+        "conflict"
+      ],
+      [
+        :development_artifact_classification_correction_required,
+        { observation_id:, classification_revision: 1 },
+        Coordinator::Write::Tasks::DomainErrorV1::DevelopmentArtifactClassificationCorrectionRequiredError,
+        "conflict"
+      ],
+      [
+        :development_artifact_observation_not_found,
+        { observation_id: },
+        Coordinator::Write::Tasks::DomainErrorV1::DevelopmentArtifactObservationNotFoundError,
+        "not_found"
+      ],
+      [
+        :development_artifact_classification_revision_conflict,
+        { observation_id:, expected_revision: 1, current_revision: 2 },
+        Coordinator::Write::Tasks::DomainErrorV1::DevelopmentArtifactClassificationRevisionConflictError,
+        "conflict"
+      ],
+      [
+        :development_artifact_classification_revision_limit_reached,
+        {
+          observation_id:,
+          current_revision: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_CLASSIFICATION_MAXIMUM_REVISIONS,
+          maximum_revisions: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_CLASSIFICATION_MAXIMUM_REVISIONS
+        },
+        Coordinator::Write::Tasks::DomainErrorV1::DevelopmentArtifactClassificationRevisionLimitReachedError,
+        "limit_reached"
+      ]
+    ]
+
+    examples.each do |code, details, error_class, status|
+      result = mapper.call(
+        Failure(Coordinator::Write::OutcomeError.new(code:, message: code.to_s, details:)),
+        command_id: "cmd-task-result-#{code}",
+        tool_name: "development_artifact_classification_correct"
+      )
+
+      expect(result.structured_content).to have_attributes(status:, data: be_a(error_class))
+      expect(result.is_error).to be(true)
+    end
+  end
+
   it "maps every modeled target denial into a strict persisted domain-error shape" do
     examples = [
       [

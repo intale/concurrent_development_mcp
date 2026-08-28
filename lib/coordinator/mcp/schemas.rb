@@ -826,6 +826,50 @@ module Coordinator
         operation_batch_schema(development_artifact_capture)
       end
 
+      def development_artifact_classification_correct
+        object_schema(
+          properties: common_mutation_properties.merge(
+            actor: attributed_actor(enum: %w[agent user]),
+            observation_id: {
+              type: "string",
+              pattern: "^artifact-observation:v1:[0-9a-f]{64}$",
+              description: "Exact immutable source observation whose semantic classification is being corrected."
+            },
+            expected_revision: {
+              type: "integer",
+              minimum: 1,
+              maximum: Types::DEVELOPMENT_ARTIFACT_CLASSIFICATION_MAXIMUM_REVISIONS,
+              description: "Current classification revision returned by development_artifact_get; stale revisions are rejected."
+            },
+            title: {
+              type: "string",
+              minLength: 1,
+              maxLength: Types::DEVELOPMENT_ARTIFACT_TITLE_MAXIMUM_BYTES
+            },
+            kind: { type: "string", enum: Types::DEVELOPMENT_ARTIFACT_KINDS },
+            labels: {
+              type: "array",
+              maxItems: Types::DEVELOPMENT_ARTIFACT_LABEL_MAXIMUM_COUNT,
+              uniqueItems: true,
+              items: {
+                type: "string",
+                minLength: 1,
+                maxLength: Types::DEVELOPMENT_ARTIFACT_LABEL_MAXIMUM_BYTES
+              }
+            },
+            reason: {
+              type: "string",
+              minLength: 1,
+              maxLength: 1_000,
+              description: "Why the caller is correcting semantic classification; bytes and provenance are unchanged."
+            }
+          ),
+          required: %w[
+            command_id actor observation_id expected_revision title kind labels reason
+          ]
+        )
+      end
+
       def development_artifact_relation_declare
         target = object_schema(
           properties: {
@@ -911,14 +955,26 @@ module Coordinator
       def development_artifact_get
         object_schema(
           properties: {
-            artifact_id: { type: "string", pattern: "^artifact:v1:[0-9a-f]{64}$" }
+            artifact_id: { type: "string", pattern: "^artifact:v1:[0-9a-f]{64}$" },
+            observation_id: {
+              anyOf: [
+                { type: "string", pattern: "^artifact-observation:v1:[0-9a-f]{64}$" },
+                { type: "null" }
+              ],
+              description: "Optional exact immutable observation; omit to receive the latest available observation."
+            }
           },
           required: %w[artifact_id]
         )
       end
 
       def development_artifact_content_get
-        development_artifact_get
+        object_schema(
+          properties: {
+            artifact_id: { type: "string", pattern: "^artifact:v1:[0-9a-f]{64}$" }
+          },
+          required: %w[artifact_id]
+        )
       end
 
       def development_artifact_relation_list
@@ -986,23 +1042,23 @@ module Coordinator
               anyOf: [ { type: "integer", minimum: 0 }, { type: "null" } ],
               description: "Fixed projection-observation upper bound, or null to open a new window."
             },
-            after_captured_global_position: {
+            after_current_global_position: {
               anyOf: [ { type: "integer", minimum: 0 }, { type: "null" } ],
-              description: "Capture-order position inside a fixed observation window."
+              description: "Current-classification event position inside a fixed observation window."
             },
-            after_artifact_id: {
+            after_observation_id: {
               anyOf: [
-                { type: "string", pattern: "^artifact:v1:[0-9a-f]{64}$" },
+                { type: "string", pattern: "^artifact-observation:v1:[0-9a-f]{64}$" },
                 { type: "null" }
               ],
-              description: "Artifact tie-breaker inside a fixed observation window."
+              description: "Immutable observation tie-breaker inside a fixed observation window."
             }
           },
           required: %w[
             after_observed_sequence
             through_observed_sequence
-            after_captured_global_position
-            after_artifact_id
+            after_current_global_position
+            after_observation_id
           ]
         )
         object_schema(

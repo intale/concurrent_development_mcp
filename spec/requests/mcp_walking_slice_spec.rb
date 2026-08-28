@@ -79,6 +79,7 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
       "skill_publish_batch",
       "development_artifact_capture",
       "development_artifact_capture_batch",
+      "development_artifact_classification_correct",
       "development_artifact_relation_declare",
       "development_artifact_relation_declare_batch",
       "operation_batch_cancel",
@@ -228,11 +229,19 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
     tools = mcp_request(id: 2, method: "tools/list", params: {}).dig("result", "tools")
     artifact = tools.find { _1.fetch("name") == "development_artifact_capture" }
     artifact_batch = tools.find { _1.fetch("name") == "development_artifact_capture_batch" }
+    classification = tools.find do |tool|
+      tool.fetch("name") == "development_artifact_classification_correct"
+    end
     skill = tools.find { _1.fetch("name") == "skill_publish" }
     relation = tools.find { _1.fetch("name") == "development_artifact_relation_declare" }
 
     expect(artifact.fetch("description")).to include("project it can inspect", "exact bytes")
     expect(artifact_batch.fetch("description")).to include("server assumes no project path layout")
+    expect(classification.fetch("description")).to include(
+      "classification_revision",
+      "Content bytes",
+      "provenance remain immutable"
+    )
     expect(skill.fetch("description")).to include("caller-discovered reusable instruction set")
     expect(relation.fetch("description")).to include("caller")
 
@@ -254,7 +263,8 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
       tools.select do |tool|
         %w[
           skill_publish skill_publish_batch development_artifact_capture
-          development_artifact_capture_batch development_artifact_relation_declare
+          development_artifact_capture_batch development_artifact_classification_correct
+          development_artifact_relation_declare
           development_artifact_relation_declare_batch
         ].include?(tool.fetch("name"))
       end

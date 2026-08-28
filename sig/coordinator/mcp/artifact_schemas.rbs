@@ -2,6 +2,7 @@ module Coordinator
   module Mcp
     module ArtifactSchemas
       def self.capture_result: () -> json_schema
+      def self.classification_result: () -> json_schema
       def self.operation_batch_acceptance_result: () -> json_schema
       def self.relation_declare_result: () -> json_schema
       def self.get_result: () -> json_schema
@@ -10,8 +11,12 @@ module Coordinator
       def self.relation_list_result: () -> json_schema
       def self.locator_resolve_result: () -> json_schema
       def self.result: (json_schema success_data) -> json_schema
+      def self.mutation_result: (json_schema success_data) -> json_schema
+      def self.result_with_error: (json_schema success_data, json_schema error_data) -> json_schema
       def self.domain_error: () -> json_schema
+      def self.command_domain_error: () -> json_schema
       def self.artifact_capture_data: () -> json_schema
+      def self.artifact_classification_data: () -> json_schema
       def self.operation_batch_acceptance_data: () -> json_schema
       def self.relation_declare_data: () -> json_schema
       def self.artifact_view: () -> json_schema
@@ -35,6 +40,7 @@ module Coordinator
       def self.operation_batch_arguments: () -> json_schema
       def self.locator_arguments: () -> json_schema
       def self.artifact_id: () -> json_schema
+      def self.observation_id: () -> json_schema
       def self.relation_id: () -> json_schema
       def self.artifact_byte_size: () -> json_schema
       def self.text: (maximum: Integer) -> json_schema

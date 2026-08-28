@@ -498,31 +498,56 @@ module Coordinator::Write
 
       def build_capture_development_artifact(document)
         input = document.input
-        artifact = input.artifact
+        artifact_document = input.artifact
+        source = DevelopmentArtifacts::SourceV1.new(
+          kind: artifact_document.source.kind,
+          locator: artifact_document.source.locator,
+          revision: artifact_document.source.revision,
+          observed_at: artifact_document.source.observed_at,
+          collector: artifact_document.source.collector
+        )
+        artifact = DevelopmentArtifacts::ArtifactV1.new(
+          artifact_id: artifact_document.artifact_id,
+          scope: artifact_document.scope,
+          title: artifact_document.title,
+          kind: artifact_document.kind,
+          labels: artifact_document.labels,
+          content: DevelopmentArtifacts::ContentV1.new(
+            encoding: artifact_document.content.encoding,
+            media_type: artifact_document.content.media_type,
+            content_base64: artifact_document.content.content_base64,
+            content_sha256: artifact_document.content.content_sha256,
+            byte_size: artifact_document.content.byte_size
+          ),
+          source:
+        )
         Commands::CaptureDevelopmentArtifact.new(
           command_id: document.command_id,
           actor: build_actor(input.actor),
-          artifact: DevelopmentArtifacts::ArtifactV1.new(
-            artifact_id: artifact.artifact_id,
-            scope: artifact.scope,
-            title: artifact.title,
-            kind: artifact.kind,
-            labels: artifact.labels,
-            content: DevelopmentArtifacts::ContentV1.new(
-              encoding: artifact.content.encoding,
-              media_type: artifact.content.media_type,
-              content_base64: artifact.content.content_base64,
-              content_sha256: artifact.content.content_sha256,
-              byte_size: artifact.content.byte_size
-            ),
-            source: DevelopmentArtifacts::SourceV1.new(
-              kind: artifact.source.kind,
-              locator: artifact.source.locator,
-              revision: artifact.source.revision,
-              observed_at: artifact.source.observed_at,
-              collector: artifact.source.collector
-            )
+          artifact:,
+          observation: DevelopmentArtifacts::ArtifactObservationV1.new(
+            observation_id: artifact_document.observation_id,
+            artifact_id: artifact_document.artifact_id,
+            scope: artifact_document.scope,
+            title: artifact_document.title,
+            kind: artifact_document.kind,
+            labels: artifact_document.labels,
+            source:
           )
+        )
+      end
+
+      def build_correct_development_artifact_classification(document)
+        input = document.input
+        Commands::CorrectDevelopmentArtifactClassification.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          observation_id: input.observation_id,
+          expected_revision: input.expected_revision,
+          title: input.title,
+          kind: input.kind,
+          labels: input.labels,
+          reason: input.reason
         )
       end
 

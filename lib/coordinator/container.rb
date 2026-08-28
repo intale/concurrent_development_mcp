@@ -221,6 +221,10 @@ module Coordinator
       )
     end
 
+    register("operations.prepare_correct_development_artifact_classification", memoize: true) do
+      Write::Operations::PrepareCorrectDevelopmentArtifactClassification.new
+    end
+
     register("operations.prepare_declare_development_artifact_relation", memoize: true) do
       Write::Operations::PrepareDeclareDevelopmentArtifactRelation.new(
         relation_builder: self["development_artifacts.relation_builder"]
@@ -425,6 +429,12 @@ module Coordinator
 
     register("domain.development_artifacts.capture", memoize: true) do
       Write::Domain::DevelopmentArtifacts::Capture.new(stream_factory: self["stream_factory"])
+    end
+
+    register("domain.development_artifacts.correct_classification", memoize: true) do
+      Write::Domain::DevelopmentArtifacts::CorrectClassification.new(
+        stream_factory: self["stream_factory"]
+      )
     end
 
     register("domain.development_artifacts.declare_relation", memoize: true) do
@@ -1479,6 +1489,23 @@ module Coordinator
       )
     end
 
+    register("operations.execute_correct_development_artifact_classification") do
+      Write::Operations::ExecuteCorrectDevelopmentArtifactClassification.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_correct_development_artifact_classification"],
+        loader: self["development_artifacts.loader"],
+        decider: self["domain.development_artifacts.correct_classification"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        marker_builder: self["development_artifacts.marker_builder"],
+        completion_builder: self["command_completion_builder"]
+      )
+    end
+
     register("operations.execute_declare_development_artifact_relation") do
       Write::Operations::ExecuteDeclareDevelopmentArtifactRelation.new(
         event_store: self["event_store"],
@@ -1928,6 +1955,8 @@ module Coordinator
           self["operations.execute_publish_skill_revision"],
         capture_development_artifact:
           self["operations.execute_capture_development_artifact"],
+        correct_development_artifact_classification:
+          self["operations.execute_correct_development_artifact_classification"],
         declare_development_artifact_relation:
           self["operations.execute_declare_development_artifact_relation"],
         operation_batch_command:
@@ -2107,6 +2136,13 @@ module Coordinator
     register("operations.submit_capture_development_artifact_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_capture_development_artifact"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_correct_development_artifact_classification_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_correct_development_artifact_classification"],
         submitter: self["operations.submit_coordination_task"]
       )
     end

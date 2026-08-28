@@ -5,15 +5,19 @@ module Coordinator::Mcp
     module_function
 
     def capture_result
-      result(artifact_capture_data)
+      mutation_result(artifact_capture_data)
+    end
+
+    def classification_result
+      mutation_result(artifact_classification_data)
     end
 
     def operation_batch_acceptance_result
-      result(operation_batch_acceptance_data)
+      mutation_result(operation_batch_acceptance_data)
     end
 
     def relation_declare_result
-      result(relation_declare_data)
+      mutation_result(relation_declare_data)
     end
 
     def get_result
@@ -62,6 +66,14 @@ module Coordinator::Mcp
     end
 
     def result(success_data)
+      result_with_error(success_data, domain_error)
+    end
+
+    def mutation_result(success_data)
+      result_with_error(success_data, command_domain_error)
+    end
+
+    def result_with_error(success_data, error_data)
       Schemas.object_schema(
         properties: {
           status: { type: "string" },
@@ -69,7 +81,7 @@ module Coordinator::Mcp
           command_id: Schemas.nullable_string,
           receipt: Schemas.nullable_string,
           context_token: Schemas.nullable_string,
-          data: { oneOf: [ success_data, domain_error ] },
+          data: { oneOf: [ success_data, error_data ] },
           warnings: { type: "array", items: { type: "string" } },
           next_actions: { type: "array", items: next_action }
         },
@@ -90,19 +102,66 @@ module Coordinator::Mcp
       )
     end
 
+    def command_domain_error
+      Schemas.object_schema(
+        properties: {
+          code: {
+            type: "string",
+            enum: Coordinator::Write::Tasks::DomainErrorV1::ERROR_CODES.map(&:to_s)
+          },
+          message: { type: "string" },
+          details: { type: "object" }
+        },
+        required: %w[code message details]
+      )
+    end
+
     def artifact_capture_data
       Schemas.object_schema(
         properties: {
           artifact_id: artifact_id,
+          observation_id: observation_id,
+          classification_revision: {
+            type: "integer",
+            minimum: 1,
+            maximum: Types::DEVELOPMENT_ARTIFACT_CLASSIFICATION_MAXIMUM_REVISIONS
+          },
           scope: text(maximum: Types::DEVELOPMENT_ARTIFACT_SCOPE_MAXIMUM_BYTES),
           kind: { type: "string", enum: Types::DEVELOPMENT_ARTIFACT_KINDS },
           content_sha256: sha256,
           byte_size: artifact_byte_size,
-          outcome: { type: "string", enum: %w[captured existing] },
-          captured_at: timestamp
+          outcome: { type: "string", enum: %w[captured observed existing] },
+          recorded_at: timestamp
         },
         required: %w[
-          artifact_id scope kind content_sha256 byte_size outcome captured_at
+          artifact_id observation_id classification_revision scope kind content_sha256
+          byte_size outcome recorded_at
+        ]
+      )
+    end
+
+    def artifact_classification_data
+      Schemas.object_schema(
+        properties: {
+          artifact_id: artifact_id,
+          observation_id: observation_id,
+          classification_revision: {
+            type: "integer",
+            minimum: 1,
+            maximum: Types::DEVELOPMENT_ARTIFACT_CLASSIFICATION_MAXIMUM_REVISIONS
+          },
+          title: text(maximum: Types::DEVELOPMENT_ARTIFACT_TITLE_MAXIMUM_BYTES),
+          kind: { type: "string", enum: Types::DEVELOPMENT_ARTIFACT_KINDS },
+          labels: {
+            type: "array",
+            maxItems: Types::DEVELOPMENT_ARTIFACT_LABEL_MAXIMUM_COUNT,
+            items: text(maximum: Types::DEVELOPMENT_ARTIFACT_LABEL_MAXIMUM_BYTES)
+          },
+          outcome: { type: "string", enum: %w[corrected existing] },
+          corrected_at: timestamp
+        },
+        required: %w[
+          artifact_id observation_id classification_revision title kind labels outcome corrected_at
         ]
       )
     end
@@ -163,6 +222,7 @@ module Coordinator::Mcp
       Schemas.object_schema(
         properties: {
           artifact_id: artifact_id,
+          observation_id: observation_id,
           scope: text(maximum: Types::DEVELOPMENT_ARTIFACT_SCOPE_MAXIMUM_BYTES),
           title: text(maximum: Types::DEVELOPMENT_ARTIFACT_TITLE_MAXIMUM_BYTES),
           kind: { type: "string", enum: Types::DEVELOPMENT_ARTIFACT_KINDS },
@@ -176,12 +236,21 @@ module Coordinator::Mcp
           content_sha256: sha256,
           byte_size: artifact_byte_size,
           source: provenance,
+          classification_revision: {
+            type: "integer",
+            minimum: 1,
+            maximum: Types::DEVELOPMENT_ARTIFACT_CLASSIFICATION_MAXIMUM_REVISIONS
+          },
+          classification_reason: nullable({ type: "string", maxLength: 1_000 }),
           relationship_count: { type: "integer", minimum: 0 },
-          captured: event_evidence
+          captured: event_evidence,
+          observed: event_evidence,
+          classified: event_evidence
         },
         required: %w[
-          artifact_id scope title kind labels media_type encoding content_sha256 byte_size
-          source relationship_count captured
+          artifact_id observation_id scope title kind labels media_type encoding content_sha256
+          byte_size source classification_revision classification_reason relationship_count
+          captured observed classified
         ]
       )
     end
@@ -343,12 +412,12 @@ module Coordinator::Mcp
         properties: {
           after_observed_sequence: { type: "integer", minimum: 0 },
           through_observed_sequence: nullable({ type: "integer", minimum: 0 }),
-          after_captured_global_position: nullable({ type: "integer", minimum: 0 }),
-          after_artifact_id: nullable(artifact_id)
+          after_current_global_position: nullable({ type: "integer", minimum: 0 }),
+          after_observation_id: nullable(observation_id)
         },
         required: %w[
           after_observed_sequence through_observed_sequence
-          after_captured_global_position after_artifact_id
+          after_current_global_position after_observation_id
         ]
       )
     end
@@ -423,7 +492,10 @@ module Coordinator::Mcp
 
     def artifact_arguments
       Schemas.object_schema(
-        properties: { artifact_id: artifact_id },
+        properties: {
+          artifact_id: artifact_id,
+          observation_id: nullable(observation_id)
+        },
         required: %w[artifact_id]
       )
     end
@@ -457,6 +529,10 @@ module Coordinator::Mcp
 
     def artifact_id
       { type: "string", pattern: "^artifact:v1:[0-9a-f]{64}$" }
+    end
+
+    def observation_id
+      { type: "string", pattern: "^artifact-observation:v1:[0-9a-f]{64}$" }
     end
 
     def relation_id

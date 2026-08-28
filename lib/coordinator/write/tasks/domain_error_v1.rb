@@ -900,6 +900,27 @@ module Coordinator::Write
         attribute :artifact_id, Types::DevelopmentArtifactId
       end
 
+      class DevelopmentArtifactObservationDetails < Value
+        attribute :observation_id, Types::DevelopmentArtifactObservationId
+      end
+
+      class DevelopmentArtifactObservationClassificationDetails < DevelopmentArtifactObservationDetails
+        attribute :classification_revision, Types::DevelopmentArtifactClassificationRevision
+      end
+
+      class DevelopmentArtifactClassificationRevisionDetails < DevelopmentArtifactObservationDetails
+        attribute :expected_revision, Types::DevelopmentArtifactClassificationRevision
+        attribute :current_revision, Types::DevelopmentArtifactClassificationRevision
+      end
+
+      class DevelopmentArtifactClassificationLimitDetails < DevelopmentArtifactObservationDetails
+        attribute :current_revision, Types::DevelopmentArtifactClassificationRevision
+        attribute :maximum_revisions,
+                  Types::Integer.constrained(
+                    eql: Types::DEVELOPMENT_ARTIFACT_CLASSIFICATION_MAXIMUM_REVISIONS
+                  )
+      end
+
       class DevelopmentArtifactTargetDetails < DevelopmentArtifactDetails
         attribute :target_artifact_id, Types::DevelopmentArtifactId
       end
@@ -916,6 +937,36 @@ module Coordinator::Write
         attribute :code, Types::String.enum("development_artifact_identity_conflict")
         attribute :message, Types::String
         attribute :details, DevelopmentArtifactDetails
+      end
+
+      class DevelopmentArtifactObservationIdentityConflictError < Value
+        attribute :code, Types::String.enum("development_artifact_observation_identity_conflict")
+        attribute :message, Types::String
+        attribute :details, DevelopmentArtifactObservationDetails
+      end
+
+      class DevelopmentArtifactClassificationCorrectionRequiredError < Value
+        attribute :code, Types::String.enum("development_artifact_classification_correction_required")
+        attribute :message, Types::String
+        attribute :details, DevelopmentArtifactObservationClassificationDetails
+      end
+
+      class DevelopmentArtifactObservationNotFoundError < Value
+        attribute :code, Types::String.enum("development_artifact_observation_not_found")
+        attribute :message, Types::String
+        attribute :details, DevelopmentArtifactObservationDetails
+      end
+
+      class DevelopmentArtifactClassificationRevisionConflictError < Value
+        attribute :code, Types::String.enum("development_artifact_classification_revision_conflict")
+        attribute :message, Types::String
+        attribute :details, DevelopmentArtifactClassificationRevisionDetails
+      end
+
+      class DevelopmentArtifactClassificationRevisionLimitReachedError < Value
+        attribute :code, Types::String.enum("development_artifact_classification_revision_limit_reached")
+        attribute :message, Types::String
+        attribute :details, DevelopmentArtifactClassificationLimitDetails
       end
 
       class DevelopmentArtifactNotFoundError < Value
@@ -1299,6 +1350,11 @@ module Coordinator::Write
              SkillIdentityConflictError |
              SkillRevisionConflictError |
              DevelopmentArtifactIdentityConflictError |
+             DevelopmentArtifactObservationIdentityConflictError |
+             DevelopmentArtifactClassificationCorrectionRequiredError |
+             DevelopmentArtifactObservationNotFoundError |
+             DevelopmentArtifactClassificationRevisionConflictError |
+             DevelopmentArtifactClassificationRevisionLimitReachedError |
              DevelopmentArtifactNotFoundError |
              DevelopmentArtifactTargetNotFoundError |
              DevelopmentArtifactRelationLimitReachedError |

@@ -32,6 +32,8 @@ RSpec.describe Coordinator::Container do
       described_class["operations.execute_submit_candidate_impact_surface"]
     skill_publish_operation = described_class["operations.execute_publish_skill_revision"]
     artifact_capture_operation = described_class["operations.execute_capture_development_artifact"]
+    artifact_classification_operation =
+      described_class["operations.execute_correct_development_artifact_classification"]
     artifact_relation_operation = described_class["operations.execute_declare_development_artifact_relation"]
     operation_batch_operation = described_class["operations.execute_operation_batch_command"]
     operation_batch_process_manager = described_class["process_managers.operation_batch_runner"]
@@ -98,6 +100,7 @@ RSpec.describe Coordinator::Container do
       operations.submit_publish_skill_revision_task
       operations.submit_create_skill_publish_batch_task
       operations.submit_capture_development_artifact_task
+      operations.submit_correct_development_artifact_classification_task
       operations.submit_declare_development_artifact_relation_task
       operations.submit_create_development_artifact_capture_batch_task
       operations.submit_create_development_artifact_relation_declare_batch_task
@@ -148,6 +151,9 @@ RSpec.describe Coordinator::Container do
     )
     expect(artifact_capture_operation).to be_a(
       Coordinator::Write::Operations::ExecuteCaptureDevelopmentArtifact
+    )
+    expect(artifact_classification_operation).to be_a(
+      Coordinator::Write::Operations::ExecuteCorrectDevelopmentArtifactClassification
     )
     expect(artifact_relation_operation).to be_a(
       Coordinator::Write::Operations::ExecuteDeclareDevelopmentArtifactRelation

@@ -526,6 +526,7 @@ module Coordinator::Shared
       skill_publish_batch
       development_artifact_capture
       development_artifact_capture_batch
+      development_artifact_classification_correct
       development_artifact_relation_declare
       development_artifact_relation_declare_batch
       operation_batch_cancel

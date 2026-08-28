@@ -218,7 +218,17 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
         producer: { name: "git-merge", version: "2.47.0" },
         run_id: "run-task-build",
         produced_at: "2026-08-24T15:30:00.000001Z"
-      ).value!
+      ).value!,
+      Coordinator::Write::Commands::CorrectDevelopmentArtifactClassification.new(
+        command_id: "cmd-task-build-17",
+        actor:,
+        observation_id: "artifact-observation:v1:" + ("a" * 64),
+        expected_revision: 1,
+        title: "Correct classification",
+        kind: "documentation",
+        labels: %w[classification corrected],
+        reason: "The original semantic classification was inaccurate."
+      )
     ]
 
     rebuilt = commands.map do |command|

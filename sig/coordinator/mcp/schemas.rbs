@@ -32,6 +32,7 @@ module Coordinator
       def self.skill_asset_get: () -> json_schema
       def self.development_artifact_capture: () -> json_schema
       def self.development_artifact_capture_batch: () -> json_schema
+      def self.development_artifact_classification_correct: () -> json_schema
       def self.development_artifact_relation_declare: () -> json_schema
       def self.development_artifact_relation_declare_batch: () -> json_schema
       def self.development_artifact_get: () -> json_schema
