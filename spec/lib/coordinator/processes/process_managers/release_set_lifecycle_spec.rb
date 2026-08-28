@@ -53,6 +53,43 @@ RSpec.describe Coordinator::Processes::ProcessManagers::ReleaseSetLifecycle, :ev
     expect(completion.metadata.fetch("command_id")).to start_with("internal:release-completion:v1:")
   end
 
+  it "completes an activated ReleaseSet through the real shared process-manager set" do
+    prepared = ReleaseSetScenario.prepare(prefix: "lifecycle-live-subscription")
+    integrations = ReleaseSetScenario.integrate_all(
+      prepared,
+      prefix: "lifecycle-live-subscription"
+    )
+    verification = ReleaseSetScenario.record_verification(
+      prepared,
+      integrations:,
+      prefix: "lifecycle-live-subscription"
+    )
+    registration = Coordinator::Processes::Subscriptions::ReleaseSetLifecycle.new(
+      handler: process_manager,
+      pull_interval: 0.2
+    )
+    subscription_set = build_subscription_set(registration)
+
+    begin
+      subscription_set.start
+      activation = ReleaseSetScenario.record_activation(
+        prepared,
+        verification:,
+        prefix: "lifecycle-live-subscription"
+      )
+      wait_until("ReleaseSet lifecycle subscription did not complete the activation") do
+        lifecycle(prepared).any? { _1.type == "ReleaseSetCompleted" }
+      end
+    ensure
+      subscription_set.stop
+    end
+
+    completion = lifecycle(prepared).select { _1.type == "ReleaseSetCompleted" }.sole
+    expect(subscription_set.processed_event_count(registration.definition.subscription_name)).to be >= 4
+    expect(completion.causation_id).to eq(activation.fetch(:event).id)
+    expect(completion.correlation_id).to eq(prepared.fetch(:event).correlation_id)
+  end
+
   it "requests compensation when exact composite verification fails after all integrations" do
     prepared = ReleaseSetScenario.prepare(prefix: "lifecycle-verification-failed")
     integrations = ReleaseSetScenario.integrate_all(
@@ -107,6 +144,25 @@ RSpec.describe Coordinator::Processes::ProcessManagers::ReleaseSetLifecycle, :ev
   end
 
   private
+
+  def build_subscription_set(registration)
+    manager = PgEventstore.subscriptions_manager(
+      subscription_set: Coordinator::Processes::Subscriptions::ProcessManagerSet::SET_NAME
+    )
+    Coordinator::Processes::Subscriptions::ProcessManagerSet.new(
+      manager:,
+      registrations: [ registration ]
+    )
+  end
+
+  def wait_until(message)
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 20
+    until yield
+      raise message if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+
+      sleep 0.05
+    end
+  end
 
   def lifecycle(prepared)
     ReleaseSetScenario.release_lifecycle_events(prepared.dig(:input, :release_set_id))

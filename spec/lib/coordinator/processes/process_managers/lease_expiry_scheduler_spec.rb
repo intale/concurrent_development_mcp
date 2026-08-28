@@ -150,6 +150,29 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
     end
   end
 
+  it "accepts a non-hot resource boundary through the real shared process-manager set" do
+    seed_active_attempt
+    reserve(duration: 300).value!
+    source = lease_events.sole
+    registration = Coordinator::Processes::Subscriptions::ResourceBoundaryMaintenance.new(
+      handler: Coordinator::Processes::ProcessManagers::ResourceBoundaryMaintenance.new(
+        event_store:
+      ),
+      pull_interval: 0.2
+    )
+    subscription_set = build_subscription_set([ registration ])
+
+    begin
+      subscription_set.start
+      wait_for_subscription(subscription_set, registration.definition.subscription_name)
+    ensure
+      subscription_set.stop
+    end
+
+    expect(command_events(maintenance_command_id(source))).to be_empty
+    expect(subscription_set.processed_event_count(registration.definition.subscription_name)).to eq(1)
+  end
+
   it "publishes one unique multi-event registration in the shared process-manager set" do
     definition = Coordinator::Processes::Subscriptions::LeaseExpiryScheduler::DEFINITION
 
@@ -309,6 +332,17 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
     "#{Coordinator::Processes::LeaseExpiryCommandBuilder::COMMAND_ID_PREFIX}#{event.id}"
   end
 
+  def maintenance_command_id(event)
+    marker = Coordinator::Write::RepositoryMarkerBuilder.new.resource_event_markers(
+      repository_id: event.data.fetch("repository_id"),
+      resource_kind: event.data.fetch("resource_kind"),
+      resource_path: event.data.fetch("resource_path")
+    ).sort_by(&:b).first
+    Coordinator::Processes::InternalCommandIdBuilder.call(
+      "resource-boundary-rollover:v1:#{event.id}:#{marker.split(':').last}"
+    )
+  end
+
   def build_subscription_set(registrations)
     manager = PgEventstore.subscriptions_manager(
       subscription_set: Coordinator::Processes::Subscriptions::ProcessManagerSet::SET_NAME
@@ -320,7 +354,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
     deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 10
 
     until subscription_set.processed_event_count(subscription_name) >= count
-      raise "lease-expiry subscription did not process the source within 10 seconds" if
+      raise "#{subscription_name} did not process the source within 10 seconds" if
         Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
 
       sleep 0.05

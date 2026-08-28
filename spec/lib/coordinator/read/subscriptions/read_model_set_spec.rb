@@ -50,14 +50,50 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       pull_interval: 0.2
     )
   end
+  let(:repository_registration) do
+    Coordinator::Read::Subscriptions::Repositories.new(
+      handler: Coordinator::Read::Projectors::RepositoriesV1.new,
+      pull_interval: 0.2
+    )
+  end
+  let(:skill_registration) do
+    Coordinator::Read::Subscriptions::Skills.new(
+      handler: Coordinator::Read::Projectors::SkillsV1.new,
+      pull_interval: 0.2
+    )
+  end
+  let(:development_artifact_registration) do
+    Coordinator::Read::Subscriptions::DevelopmentArtifacts.new(
+      handler: Coordinator::Read::Projectors::DevelopmentArtifactsV1.new,
+      pull_interval: 0.2
+    )
+  end
+  let(:operation_batch_registration) do
+    Coordinator::Read::Subscriptions::OperationBatches.new(
+      handler: Coordinator::Read::Projectors::OperationBatchesV1.new,
+      pull_interval: 0.2
+    )
+  end
   let(:verification_obligation_registration) do
     Coordinator::Read::Subscriptions::VerificationObligations.new(
       handler: Coordinator::Read::Projectors::VerificationObligationsV1.new,
       pull_interval: 0.2
     )
   end
+  let(:merge_snapshot_registration) do
+    Coordinator::Read::Subscriptions::MergeSnapshots.new(
+      handler: Coordinator::Read::Projectors::MergeSnapshotsV1.new,
+      pull_interval: 0.2
+    )
+  end
+  let(:release_set_registration) do
+    Coordinator::Read::Subscriptions::ReleaseSets.new(
+      handler: Coordinator::Read::Projectors::ReleaseSetsV1.new,
+      pull_interval: 0.2
+    )
+  end
 
-  it "stacks nine unique durable subscriptions on one read-model manager" do
+  it "stacks all fifteen unique durable subscriptions on one read-model manager" do
     subscription_set = build_set
 
     expect(subscription_set.subscription_names).to eq(
@@ -69,6 +105,12 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         "coord-context-v2",
         "decision-governance-v1",
         "decision-interpretations-v1",
+        "development-artifacts-v2",
+        "merge-snapshots-v1",
+        "operation-batches-v1",
+        "release-sets-v1",
+        "repositories-v1",
+        "skills-v2",
         "user-utterances-v1",
         "verification-obligations-v1"
       ]
@@ -112,9 +154,33 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       set_name: "coordinator-read-models-v1",
       subscription_name: "candidates-v1"
     )
+    expect(repository_registration.definition.identity.to_h).to eq(
+      set_name: "coordinator-read-models-v1",
+      subscription_name: "repositories-v1"
+    )
+    expect(skill_registration.definition.identity.to_h).to eq(
+      set_name: "coordinator-read-models-v1",
+      subscription_name: "skills-v2"
+    )
+    expect(development_artifact_registration.definition.identity.to_h).to eq(
+      set_name: "coordinator-read-models-v1",
+      subscription_name: "development-artifacts-v2"
+    )
+    expect(operation_batch_registration.definition.identity.to_h).to eq(
+      set_name: "coordinator-read-models-v1",
+      subscription_name: "operation-batches-v1"
+    )
     expect(verification_obligation_registration.definition.identity.to_h).to eq(
       set_name: "coordinator-read-models-v1",
       subscription_name: "verification-obligations-v1"
+    )
+    expect(merge_snapshot_registration.definition.identity.to_h).to eq(
+      set_name: "coordinator-read-models-v1",
+      subscription_name: "merge-snapshots-v1"
+    )
+    expect(release_set_registration.definition.identity.to_h).to eq(
+      set_name: "coordinator-read-models-v1",
+      subscription_name: "release-sets-v1"
     )
   end
 
@@ -172,6 +238,10 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       )
       candidate = CandidateScenario.submit(prefix: "subscription-candidate", build_context: false)
       CandidateScenario.submit_impact(candidate)
+      publish_skill
+      artifact_id = capture_development_artifact
+      batch_id = create_operation_batch
+      release_set = ReleaseSetScenario.prepare(prefix: "read-model-subscription")
       obligation = CandidateObligationScenario.create_obligation(
         prefix: "read-model-subscription",
         required_evidence: [ "combined_tests" ]
@@ -197,7 +267,13 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       wait_for(subscription_set, "decision-governance-v1", minimum: 5)
       wait_for(subscription_set, "agent-choices-v1", minimum: 2)
       wait_for(subscription_set, "candidates-v1", minimum: 3)
+      wait_for(subscription_set, "repositories-v1", minimum: 2)
+      wait_for(subscription_set, "skills-v2", minimum: 1)
+      wait_for(subscription_set, "development-artifacts-v2", minimum: 1)
+      wait_for(subscription_set, "operation-batches-v1", minimum: 1)
       wait_for(subscription_set, "verification-obligations-v1", minimum: 4)
+      wait_for(subscription_set, "merge-snapshots-v1", minimum: 1)
+      wait_for(subscription_set, "release-sets-v1", minimum: 1)
 
       expect(Coordinator::Read::CoordContext.find("CS-SUB-100").document).to include(
         "schema" => "coord-context/v1"
@@ -237,6 +313,29 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         candidate_id: "CAN-subscription-candidate",
         direction: "produces"
       ).impact_key).to eq("contract:payments-api:v2")
+      expect(Coordinator::Read::Repository.find(
+        RepositoryScenario.repository_id("ledger")
+      )).to have_attributes(
+        scope: RepositoryScenario.scope("ledger"),
+        display_name: "Ledger test repository"
+      )
+      expect(Coordinator::Read::Repositories::Skills.new.fetch(
+        name: "subscription-review",
+        scope: "project:subscription"
+      )).to have_attributes(revision: 1, instructions: "Inspect the live subscription result.")
+      expect(Coordinator::Read::DevelopmentArtifact.find(artifact_id)).to have_attributes(
+        title: "Subscription evidence"
+      )
+      expect(Coordinator::Read::OperationBatch.find(batch_id)).to have_attributes(
+        target_tool: "skill_publish",
+        total: 1
+      )
+      expect(Coordinator::Read::MergeSnapshot.find(
+        "MS-read-model-subscription-1"
+      )).to have_attributes(evidence_status: "attributed_unverified")
+      expect(Coordinator::Read::ReleaseSet.find(
+        release_set.dig(:input, :release_set_id)
+      )).to have_attributes(status: "prepared")
       expect(Coordinator::Read::VerificationObligation.find(
         obligation.fetch(:result).obligation_id
       )).to have_attributes(
@@ -280,16 +379,83 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         agent_choice_registration,
         agent_choice_impact_registration,
         candidate_registration,
-        verification_obligation_registration
+        repository_registration,
+        skill_registration,
+        development_artifact_registration,
+        operation_batch_registration,
+        verification_obligation_registration,
+        merge_snapshot_registration,
+        release_set_registration
       ]
     )
   end
 
+  def publish_skill
+    Coordinator::Write::Operations::ExecutePublishSkillRevision.new(event_store:).call(
+      command_id: "cmd-subscription-skill",
+      actor: { kind: "agent", id: "agent-subscription" },
+      name: "subscription-review",
+      scope: "project:subscription",
+      expected_revision: 0,
+      description: "Review live subscription evidence",
+      instructions: "Inspect the live subscription result.",
+      assets: []
+    ).value!
+  end
+
+  def capture_development_artifact
+    Coordinator::Write::Operations::ExecuteCaptureDevelopmentArtifact.new(event_store:).call(
+      command_id: "cmd-subscription-artifact",
+      actor: { kind: "agent", id: "agent-subscription" },
+      scope: "project:subscription",
+      title: "Subscription evidence",
+      kind: "verification_evidence",
+      labels: %w[live subscription],
+      content: {
+        encoding: "utf-8",
+        media_type: "text/plain",
+        text: "all registrations observed\n"
+      },
+      source: {
+        kind: "generated",
+        locator: "spec/read-model-set",
+        revision: nil,
+        observed_at: "2026-08-28T06:30:00.000000Z",
+        collector: "rspec/v1"
+      }
+    ).value!.data.artifact_id
+  end
+
+  def create_operation_batch
+    batch_id = SecureRandom.uuid_v7
+    command = Coordinator::Write::Operations::PrepareCreateSkillPublishBatch.new.call(
+      command_id: "cmd-subscription-batch",
+      actor: { kind: "agent", id: "agent-subscription" },
+      batch_id:,
+      items: [
+        {
+          command_id: "cmd-subscription-batch-item",
+          actor: { kind: "agent", id: "agent-subscription" },
+          name: "subscription-batch-skill",
+          scope: "project:subscription",
+          expected_revision: 0,
+          description: "Exercise the Batch projection",
+          instructions: "Project the accepted Batch.",
+          assets: []
+        }
+      ]
+    ).value!
+    Coordinator::Write::Operations::ExecuteOperationBatchCommand.new(event_store:).call_command(
+      command
+    ).value!
+    batch_id
+  end
+
   def wait_for(subscription_set, subscription_name, minimum:)
-    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 10
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 30
     until subscription_set.processed_event_count(subscription_name) >= minimum
       if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
-        raise "#{subscription_name} did not process #{minimum} events within 10 seconds"
+        raise "#{subscription_name} did not process #{minimum} events within 30 seconds"
       end
 
       sleep 0.05
