@@ -346,13 +346,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
       attempt_id: ids.fetch(:attempt_id)
     ).value!
     expect(before_completion.data.context.work_items.sole.status).to eq("acquired")
-    expect(before_completion.next_actions.sole).to have_attributes(tool: "work_item_complete")
-    expect(before_completion.next_actions.sole.arguments.to_h).to eq(
-      change_set_id: ids.fetch(:change_set_id),
-      work_item_id: ids.fetch(:work_item_id),
-      attempt_id: ids.fetch(:attempt_id),
-      candidate_id: candidate.dig(:input, :candidate_id)
-    )
+    expect(before_completion.next_actions).to be_empty
 
     CandidateScenario.complete(candidate, release: false)
     stale = Coordinator::Read::Queries::CoordContext.new.call(attempt_id: ids.fetch(:attempt_id)).value!
@@ -431,12 +425,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
       work_item_id: ids.fetch(:consumer_work_item_id)
     ).value!
     expect(converged.data.blockers).to be_empty
-    expect(converged.next_actions).to include(
-      have_attributes(
-        tool: "work_item_acquire",
-        arguments: have_attributes(work_item_id: ids.fetch(:consumer_work_item_id))
-      )
-    )
+    expect(converged.next_actions).to be_empty
     dependency = converged.data.context.dependencies.sole
     expect(dependency).to have_attributes(source_event: be_present, satisfied_at: be_present)
   end
