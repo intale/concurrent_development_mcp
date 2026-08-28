@@ -12,9 +12,11 @@ company.
 
 **Attention!** This tool was prompted using AI agent, so treat it accordingly.
 
-## Development
+## Usage
 
-Steps to setup development environment:
+### Environment setup
+
+Steps to setup the environment:
 
 - start docker compose first via `docker compose up`
 - run `./bin/setup_db` to create rails and pg_eventstore databases if this is your initial run
@@ -22,6 +24,20 @@ Steps to setup development environment:
 - run
   `bundle exec pg-eventstore subscriptions start -r ./config/environment.rb -r ./config/pg_eventstore_subscriptions.rb`
   to start pg_eventstore subscriptions
+
+### Import your development environment
+
+MCP can complete take a role of the repo of all your development assets, such as AI skills, use decisions, build state,
+etc. In order to do so, start you agent and point it to import your dev environment into MCP(assuming you are running
+MCP at `http://localhost:3000`):
+
+```
+Investigate tooling at http://localhost:3000/mcp server and import the agentic development environment of this project
+into it. After that adjust AGENTS.md to rely on this MCP serve to coordinate agentic development.
+```
+
+Optionally you can ask your agent to create an archived backup of your current agentic dev env, so you can revert it in
+case you find this MCP server not a suitable solution.
 
 ## Runtime-RBS test gate
 
