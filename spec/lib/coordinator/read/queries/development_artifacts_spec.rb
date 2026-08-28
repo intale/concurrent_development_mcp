@@ -323,6 +323,51 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
     )
   end
 
+  it "retrieves unchanged content as two exact historical observations" do
+    first = capture_and_project_data(
+      capture_input(
+        command_id: "cmd-query-same-a",
+        locator: "docs/unchanged.md",
+        revision: "commit-a",
+        text: "unchanged\n"
+      )
+    )
+    second = capture_and_project_data(
+      capture_input(
+        command_id: "cmd-query-same-b",
+        locator: "docs/unchanged.md",
+        revision: "commit-b",
+        observed_at: "2026-08-25T16:01:00.000000Z",
+        text: "unchanged\n"
+      )
+    )
+
+    history = locator_query.call(
+      scope: "project:alpha",
+      source_kind: "local_file",
+      locator: "docs/unchanged.md",
+      limit: 10
+    ).value!.data.page
+    first_exact = Coordinator::Read::Queries::DevelopmentArtifactGet.new.call(
+      artifact_id: first.artifact_id,
+      observation_id: first.observation_id
+    ).value!.data.artifact.artifact
+    second_exact = Coordinator::Read::Queries::DevelopmentArtifactGet.new.call(
+      artifact_id: second.artifact_id,
+      observation_id: second.observation_id
+    ).value!.data.artifact.artifact
+
+    expect(first.artifact_id).to eq(second.artifact_id)
+    expect(first.observation_id).not_to eq(second.observation_id)
+    expect(history).to have_attributes(resolution: "ambiguous")
+    expect(history.items.map(&:observation_id)).to contain_exactly(
+      first.observation_id,
+      second.observation_id
+    )
+    expect(first_exact.source.revision).to eq("commit-a")
+    expect(second_exact.source.revision).to eq("commit-b")
+  end
+
   it "builds followable exact-revision actions on every locator page" do
     revisions = %w[commit-a commit-b commit-c]
     expected = revisions.to_h do |revision|
@@ -464,11 +509,16 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
   end
 
   def capture_and_project(input)
+    capture_and_project_data(input).artifact_id
+  end
+
+  def capture_and_project_data(input)
     result = capture.call(input)
     expect(result).to be_success
-    artifact_id = result.value!.data.artifact_id
-    artifact_events(artifact_id).each { projector.call(_1) }
-    artifact_id
+    data = result.value!.data
+    artifact_events(data.artifact_id).each { projector.call(_1) }
+    observation_events(data.observation_id).each { projector.call(_1) }
+    data
   end
 
   def declare_and_project(command_id:, source:, target:, relation:, attributes: {})
@@ -513,8 +563,10 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
     scope: "project:alpha",
     source_kind: "local_file",
     revision: nil,
-    text: "first document\n"
+    observed_at: "2026-08-25T16:00:00.000000Z",
+    text: nil
   )
+    text ||= locator == "first.md" ? "first document\n" : "#{locator}\n"
     {
       command_id:,
       actor: { kind: "agent", id: "agent-query" },
@@ -531,7 +583,7 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
         kind: source_kind,
         locator:,
         revision:,
-        observed_at: "2026-08-25T16:00:00.000000Z",
+        observed_at:,
         collector: "spec/v1"
       }
     }
@@ -541,6 +593,13 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
     event_store.read(
       streams.development_artifact(artifact_id),
       Coordinator::Write::EventQueries::DEVELOPMENT_ARTIFACT_HISTORY
+    )
+  end
+
+  def observation_events(observation_id)
+    event_store.read(
+      streams.development_artifact_observation(observation_id),
+      Coordinator::Write::EventQueries::DEVELOPMENT_ARTIFACT_OBSERVATION_HISTORY
     )
   end
 end

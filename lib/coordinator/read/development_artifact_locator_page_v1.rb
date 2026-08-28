@@ -5,8 +5,8 @@ module Coordinator::Read
     class Cursor < Value
       attribute :after_observed_sequence, Types::Integer.constrained(gteq: 0)
       attribute :through_observed_sequence, Types::Integer.constrained(gteq: 0).optional
-      attribute :after_captured_global_position, Types::GlobalPosition.optional
-      attribute :after_artifact_id, Types::DevelopmentArtifactId.optional
+      attribute :after_current_global_position, Types::GlobalPosition.optional
+      attribute :after_observation_id, Types::DevelopmentArtifactObservationId.optional
     end
 
     attribute :resolution, Types::String.enum("absent", "unique", "ambiguous")

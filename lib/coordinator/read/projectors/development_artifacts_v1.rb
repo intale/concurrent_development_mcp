@@ -3,7 +3,7 @@
 module Coordinator::Read
   module Projectors
     class DevelopmentArtifactsV1
-      PROJECTION = ProjectionDefinition.new(name: "development-artifacts", version: 2)
+      PROJECTION = ProjectionDefinition.new(name: "development-artifacts", version: 3)
 
       def initialize(
         contract: Contracts::DevelopmentArtifactSourceEvent.new,
@@ -66,6 +66,10 @@ module Coordinator::Read
           case domain_event
           when Coordinator::Write::Events::DevelopmentArtifactCapturedV1
             domain_event.artifact.artifact_id
+          when Coordinator::Write::Events::DevelopmentArtifactObservedV1
+            domain_event.observation.observation_id
+          when Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectedV1
+            domain_event.observation_id
           when Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV1
             domain_event.artifact_relation.source_artifact_id
           when Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV1
@@ -80,6 +84,10 @@ module Coordinator::Read
         case domain_event
         when Coordinator::Write::Events::DevelopmentArtifactCapturedV1
           @artifacts.store_capture(event:, capture: domain_event)
+        when Coordinator::Write::Events::DevelopmentArtifactObservedV1
+          @artifacts.store_observation(event:, observed: domain_event)
+        when Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectedV1
+          @artifacts.store_classification(event:, correction: domain_event)
         when Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV1
           @artifacts.store_relation(event:, declaration: domain_event)
         when Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV1

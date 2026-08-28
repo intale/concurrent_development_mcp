@@ -7,10 +7,19 @@ module Coordinator::Read
 
       params do
         required(:artifact_id).filled(:string)
+        optional(:observation_id).maybe(:string)
       end
 
       rule(:artifact_id) do
         key.failure("must be a valid Artifact ID") unless Types::DEVELOPMENT_ARTIFACT_ID_PATTERN.match?(value)
+      end
+
+      rule(:observation_id) do
+        next unless value
+
+        unless Types::DEVELOPMENT_ARTIFACT_OBSERVATION_ID_PATTERN.match?(value)
+          key.failure("must be a valid Artifact observation ID")
+        end
       end
     end
   end

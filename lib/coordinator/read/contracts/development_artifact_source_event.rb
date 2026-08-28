@@ -10,13 +10,18 @@ module Coordinator::Read
           :string,
           included_in?: %w[
             DevelopmentArtifactCaptured
+            DevelopmentArtifactObserved
+            DevelopmentArtifactClassificationCorrected
             DevelopmentArtifactRelationDeclared
             DevelopmentArtifactRelationSuperseded
           ]
         )
         required(:schema_version).filled(:integer, eql?: 1)
         required(:stream_context).filled(:string, eql?: "DevelopmentMemory")
-        required(:stream_name).filled(:string, eql?: "DevelopmentArtifact")
+        required(:stream_name).filled(
+          :string,
+          included_in?: %w[DevelopmentArtifact DevelopmentArtifactObservation]
+        )
         required(:stream_id).filled(:string)
         required(:stream_revision).filled(:integer, gteq?: 0)
         required(:global_position).filled(:integer, gteq?: 0)
@@ -28,7 +33,22 @@ module Coordinator::Read
       end
 
       rule(:stream_id) do
-        key.failure("must be a valid Artifact ID") unless Types::DEVELOPMENT_ARTIFACT_ID_PATTERN.match?(value)
+        pattern =
+          if values[:stream_name] == "DevelopmentArtifactObservation"
+            Types::DEVELOPMENT_ARTIFACT_OBSERVATION_ID_PATTERN
+          else
+            Types::DEVELOPMENT_ARTIFACT_ID_PATTERN
+          end
+        key.failure("must match the selected Artifact stream identity") unless pattern.match?(value)
+      end
+
+      rule(:event_type, :stream_name) do
+        observation_event = %w[
+          DevelopmentArtifactObserved
+          DevelopmentArtifactClassificationCorrected
+        ].include?(values[:event_type])
+        expected_stream = observation_event ? "DevelopmentArtifactObservation" : "DevelopmentArtifact"
+        key(:stream_name).failure("does not carry this Artifact event type") unless values[:stream_name] == expected_stream
       end
 
       rule(:command_id, :actor_id) do

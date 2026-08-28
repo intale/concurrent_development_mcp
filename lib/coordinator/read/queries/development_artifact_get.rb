@@ -15,8 +15,11 @@ module Coordinator::Read
         validated = @contract.call(input)
         return invalid_result(validated.errors.to_h) if validated.failure?
 
-        query = DevelopmentArtifactGetQueryV1.new(artifact_id: validated[:artifact_id])
-        artifact = @artifacts.fetch(query.artifact_id)
+        query = DevelopmentArtifactGetQueryV1.new(
+          artifact_id: validated[:artifact_id],
+          observation_id: validated[:observation_id]
+        )
+        artifact = @artifacts.fetch(query.artifact_id, observation_id: query.observation_id)
         return not_found_result(query) unless artifact
 
         QueryResultV1.new(
@@ -39,7 +42,10 @@ module Coordinator::Read
           summary: "No projected Development Artifact is currently available for this ID.",
           code: "development_artifact_not_observed",
           message: "The read side has not observed this Development Artifact",
-          details: { artifact_id: query.artifact_id }
+          details: {
+            artifact_id: query.artifact_id,
+            observation_id: query.observation_id
+          }
         )
       end
 

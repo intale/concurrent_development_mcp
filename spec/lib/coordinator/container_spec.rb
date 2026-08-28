@@ -222,7 +222,7 @@ RSpec.describe Coordinator::Container do
         "coord-context-v2",
         "decision-governance-v1",
         "decision-interpretations-v1",
-        "development-artifacts-v2",
+          "development-artifacts-v3",
         "merge-snapshots-v1",
         "operation-batches-v1",
         "release-sets-v1",

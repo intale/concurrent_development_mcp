@@ -2,6 +2,7 @@ module Coordinator
   module Read
     class DevelopmentArtifactSummaryV1 < Shared::Value
       def artifact_id: () -> String
+      def observation_id: () -> String
       def scope: () -> String
       def title: () -> String
       def kind: () -> String
@@ -11,8 +12,12 @@ module Coordinator
       def content_sha256: () -> String
       def byte_size: () -> Integer
       def source: () -> DevelopmentArtifactProvenanceV1
+      def classification_revision: () -> Integer
+      def classification_reason: () -> String?
       def relationship_count: () -> Integer
       def captured: () -> DevelopmentArtifactEventEvidenceV1
+      def observed: () -> DevelopmentArtifactEventEvidenceV1
+      def classified: () -> DevelopmentArtifactEventEvidenceV1
     end
   end
 end

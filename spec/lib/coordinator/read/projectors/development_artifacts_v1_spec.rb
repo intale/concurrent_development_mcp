@@ -10,6 +10,9 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
   let(:declare_relation) do
     Coordinator::Write::Operations::ExecuteDeclareDevelopmentArtifactRelation.new(event_store:)
   end
+  let(:correct_classification) do
+    Coordinator::Write::Operations::ExecuteCorrectDevelopmentArtifactClassification.new(event_store:)
+  end
   let(:repository) { Coordinator::Read::Repositories::DevelopmentArtifacts.new }
   let(:streams) { Coordinator::Write::StreamFactory.new }
 
@@ -126,7 +129,77 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
     expect(active.items.map(&:status)).to eq([ "active" ])
   end
 
-  def capture_input(command_id: "cmd-project-source", locator: "evidence.md", binary: false)
+  it "converges immutable observations and a classification correction delivered out of order" do
+    first = capture.call(
+      capture_input(
+        command_id: "cmd-project-observation-a",
+        locator: "same.md",
+        revision: "commit-a",
+        text: "same bytes\n"
+      )
+    ).value!.data
+    second = capture.call(
+      capture_input(
+        command_id: "cmd-project-observation-b",
+        locator: "same.md",
+        revision: "commit-b",
+        observed_at: "2026-08-25T16:01:00.000000Z",
+        text: "same bytes\n"
+      )
+    ).value!.data
+    correction = correct_classification.call(
+      command_id: "cmd-project-classification",
+      actor: { kind: "agent", id: "agent-projector" },
+      observation_id: second.observation_id,
+      expected_revision: 1,
+      title: "Corrected title",
+      kind: "documentation",
+      labels: %w[corrected docs],
+      reason: "Correct imported classification"
+    )
+    expect(correction).to be_success
+
+    correction_event = observation_events(second.observation_id).last
+    projector.call(correction_event)
+    expect(repository.fetch(second.artifact_id, observation_id: second.observation_id)).to be_nil
+
+    projector.call(artifact_events(first.artifact_id).first)
+    projector.call(observation_events(second.observation_id).first)
+    projector.call(observation_events(first.observation_id).first)
+    projector.call(correction_event)
+
+    first_view = repository.fetch(first.artifact_id, observation_id: first.observation_id)
+    corrected_view = repository.fetch(second.artifact_id, observation_id: second.observation_id)
+    expect(first.artifact_id).to eq(second.artifact_id)
+    expect(first.observation_id).not_to eq(second.observation_id)
+    expect(first_view.artifact).to have_attributes(
+      observation_id: first.observation_id,
+      title: "Captured evidence",
+      classification_revision: 1,
+      source: have_attributes(revision: "commit-a")
+    )
+    expect(corrected_view.artifact).to have_attributes(
+      observation_id: second.observation_id,
+      title: "Corrected title",
+      labels: %w[corrected docs],
+      classification_revision: 2,
+      classification_reason: "Correct imported classification",
+      source: have_attributes(revision: "commit-b"),
+      observed: have_attributes(event: have_attributes(type: "DevelopmentArtifactObserved")),
+      classified: have_attributes(
+        event: have_attributes(type: "DevelopmentArtifactClassificationCorrected")
+      )
+    )
+  end
+
+  def capture_input(
+    command_id: "cmd-project-source",
+    locator: "evidence.md",
+    binary: false,
+    revision: nil,
+    observed_at: "2026-08-25T16:00:00.000000Z",
+    text: nil
+  )
     content =
       if binary
         {
@@ -135,7 +208,11 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
           base64: [ "\x00\xFF".b ].pack("m0")
         }
       else
-        { encoding: "utf-8", media_type: "text/markdown", text: "evidence\n" }
+        {
+          encoding: "utf-8",
+          media_type: "text/markdown",
+          text: text || (locator == "evidence.md" ? "evidence\n" : "#{locator}\n")
+        }
       end
     {
       command_id:,
@@ -148,8 +225,8 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
       source: {
         kind: "local_file",
         locator:,
-        revision: nil,
-        observed_at: "2026-08-25T16:00:00.000000Z",
+        revision:,
+        observed_at:,
         collector: "spec/v1"
       }
     }
@@ -175,10 +252,17 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
     )
   end
 
+  def observation_events(observation_id)
+    event_store.read(
+      streams.development_artifact_observation(observation_id),
+      Coordinator::Write::EventQueries::DEVELOPMENT_ARTIFACT_OBSERVATION_HISTORY
+    )
+  end
+
   def processed_events
     Coordinator::Read::ProcessedProjectionEvent.where(
       projection_name: "development-artifacts",
-      projection_version: 2
+      projection_version: 3
     )
   end
 

@@ -105,7 +105,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         "coord-context-v2",
         "decision-governance-v1",
         "decision-interpretations-v1",
-        "development-artifacts-v2",
+        "development-artifacts-v3",
         "merge-snapshots-v1",
         "operation-batches-v1",
         "release-sets-v1",
@@ -164,7 +164,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
     )
     expect(development_artifact_registration.definition.identity.to_h).to eq(
       set_name: "coordinator-read-models-v1",
-      subscription_name: "development-artifacts-v2"
+      subscription_name: "development-artifacts-v3"
     )
     expect(operation_batch_registration.definition.identity.to_h).to eq(
       set_name: "coordinator-read-models-v1",
@@ -269,7 +269,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       wait_for(subscription_set, "candidates-v1", minimum: 3)
       wait_for(subscription_set, "repositories-v1", minimum: 2)
       wait_for(subscription_set, "skills-v2", minimum: 1)
-      wait_for(subscription_set, "development-artifacts-v2", minimum: 1)
+      wait_for(subscription_set, "development-artifacts-v3", minimum: 1)
       wait_for(subscription_set, "operation-batches-v1", minimum: 1)
       wait_for(subscription_set, "verification-obligations-v1", minimum: 4)
       wait_for(subscription_set, "merge-snapshots-v1", minimum: 1)

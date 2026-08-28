@@ -2,6 +2,7 @@ module Coordinator
   module Read
     class DevelopmentArtifactGetQueryV1 < Shared::Value
       def artifact_id: () -> String
+      def observation_id: () -> String?
     end
   end
 end

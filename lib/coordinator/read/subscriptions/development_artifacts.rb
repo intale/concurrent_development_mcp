@@ -5,15 +5,21 @@ module Coordinator::Read
     class DevelopmentArtifacts < Coordinator::Shared::Subscriptions::Registration
       DEFINITION = ReadModelDefinition.new(
         set_name: ReadModelSet::SET_NAME,
-        subscription_name: "development-artifacts-v2",
+        subscription_name: "development-artifacts-v3",
         streams: [
           Coordinator::Shared::Subscriptions::StreamFilter.new(
             context: "DevelopmentMemory",
             stream_name: "DevelopmentArtifact"
+          ),
+          Coordinator::Shared::Subscriptions::StreamFilter.new(
+            context: "DevelopmentMemory",
+            stream_name: "DevelopmentArtifactObservation"
           )
         ],
         event_types: %w[
           DevelopmentArtifactCaptured
+          DevelopmentArtifactObserved
+          DevelopmentArtifactClassificationCorrected
           DevelopmentArtifactRelationDeclared
           DevelopmentArtifactRelationSuperseded
         ]

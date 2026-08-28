@@ -16,8 +16,8 @@ module Coordinator::Read
         optional(:cursor).maybe(:hash) do
           required(:after_observed_sequence).filled(:integer, gteq?: 0)
           required(:through_observed_sequence).maybe(:integer, gteq?: 0)
-          required(:after_captured_global_position).maybe(:integer, gteq?: 0)
-          required(:after_artifact_id).maybe(:string)
+          required(:after_current_global_position).maybe(:integer, gteq?: 0)
+          required(:after_observation_id).maybe(:string)
         end
         optional(:limit).maybe(
           :integer,
@@ -43,13 +43,14 @@ module Coordinator::Read
       rule(:cursor) do
         next unless value
 
-        after_position = value[:after_captured_global_position]
-        after_artifact_id = value[:after_artifact_id]
-        unless after_position.nil? == after_artifact_id.nil?
-          key.failure("capture position and Artifact ID must both be present or absent")
+        after_position = value[:after_current_global_position]
+        after_observation_id = value[:after_observation_id]
+        unless after_position.nil? == after_observation_id.nil?
+          key.failure("current position and observation ID must both be present or absent")
         end
-        if after_artifact_id && !Types::DEVELOPMENT_ARTIFACT_ID_PATTERN.match?(after_artifact_id)
-          key([ :cursor, :after_artifact_id ]).failure("must be a valid Artifact ID")
+        if after_observation_id &&
+           !Types::DEVELOPMENT_ARTIFACT_OBSERVATION_ID_PATTERN.match?(after_observation_id)
+          key([ :cursor, :after_observation_id ]).failure("must be a valid Artifact observation ID")
         end
         through = value[:through_observed_sequence]
         if through && through < value.fetch(:after_observed_sequence)
@@ -58,7 +59,7 @@ module Coordinator::Read
           )
         end
         if after_position && through.nil?
-          key.failure("a capture position requires a fixed observation window")
+          key.failure("a current position requires a fixed observation window")
         end
       end
 

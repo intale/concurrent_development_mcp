@@ -1,0 +1,40 @@
+module Coordinator
+  module Read
+    class DevelopmentArtifactObservation < ApplicationRecord
+      def observation_id: () -> String
+      def artifact_id: () -> String
+      def scope: () -> String?
+      def title: () -> String?
+      def kind: () -> String?
+      def labels: () -> Array[String]
+      def classification_revision: () -> Integer
+      def classification_reason: () -> String?
+      def source_kind: () -> String?
+      def source_locator: () -> String?
+      def source_revision: () -> String?
+      def source_observed_at: () -> Time?
+      def source_collector: () -> String?
+      def observed_event: () -> Hash[String, untyped]?
+      def observed_actor: () -> Hash[String, untyped]?
+      def observed_markers: () -> Array[String]
+      def observed_metadata: () -> Hash[String, untyped]
+      def observed_causation_id: () -> String?
+      def observed_correlation_id: () -> String?
+      def observed_global_position: () -> Integer?
+      def observed_at_domain: () -> Time?
+      def observed_at_store: () -> Time?
+      def classified_event: () -> Hash[String, untyped]?
+      def classified_actor: () -> Hash[String, untyped]?
+      def classified_markers: () -> Array[String]
+      def classified_metadata: () -> Hash[String, untyped]
+      def classified_causation_id: () -> String?
+      def classified_correlation_id: () -> String?
+      def classified_global_position: () -> Integer?
+      def classified_at_domain: () -> Time?
+      def classified_at_store: () -> Time?
+      def current_global_position: () -> Integer
+      def observed_sequence: () -> Integer
+      def artifact: () -> DevelopmentArtifact?
+    end
+  end
+end

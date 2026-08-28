@@ -26,6 +26,7 @@ module Coordinator
       def captured_at_domain: () -> Time
       def captured_at_store: () -> Time
       def relations: () -> untyped
+      def observations: () -> untyped
     end
   end
 end

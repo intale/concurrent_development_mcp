@@ -3,6 +3,7 @@
 module Coordinator::Read
   class DevelopmentArtifactSummaryV1 < Value
     attribute :artifact_id, Types::DevelopmentArtifactId
+    attribute :observation_id, Types::DevelopmentArtifactObservationId
     attribute :scope, Types::DevelopmentArtifactScope
     attribute :title, Types::DevelopmentArtifactTitle
     attribute :kind, Types::DevelopmentArtifactKind
@@ -12,7 +13,11 @@ module Coordinator::Read
     attribute :content_sha256, Types::Sha256Digest
     attribute :byte_size, Types::DevelopmentArtifactByteSize
     attribute :source, DevelopmentArtifactProvenanceV1
+    attribute :classification_revision, Types::DevelopmentArtifactClassificationRevision
+    attribute :classification_reason, Types::String.optional
     attribute :relationship_count, Types::Integer.constrained(gteq: 0)
     attribute :captured, DevelopmentArtifactEventEvidenceV1
+    attribute :observed, DevelopmentArtifactEventEvidenceV1
+    attribute :classified, DevelopmentArtifactEventEvidenceV1
   end
 end

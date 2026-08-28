@@ -112,8 +112,8 @@ module Coordinator::Read
         {
           after_observed_sequence: 0,
           through_observed_sequence: nil,
-          after_captured_global_position: nil,
-          after_artifact_id: nil
+          after_current_global_position: nil,
+          after_observation_id: nil
         }
       end
 

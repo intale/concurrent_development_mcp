@@ -4,8 +4,8 @@ module Coordinator
       class Cursor < Shared::Value
         def after_observed_sequence: () -> Integer
         def through_observed_sequence: () -> Integer?
-        def after_captured_global_position: () -> Integer?
-        def after_artifact_id: () -> String?
+        def after_current_global_position: () -> Integer?
+        def after_observation_id: () -> String?
       end
 
       def resolution: () -> String

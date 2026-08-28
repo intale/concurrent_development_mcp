@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_27_153000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_28_085000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -356,6 +356,52 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_27_153000) do
     t.jsonb "slot", null: false
     t.datetime "updated_at", null: false
     t.index ["decision_id"], name: "index_decision_slot_heads_on_decision_id"
+  end
+
+  create_table "development_artifact_observations", primary_key: "observation_id", id: :string, force: :cascade do |t|
+    t.string "artifact_id", null: false
+    t.text "classification_reason"
+    t.integer "classification_revision", default: 1, null: false
+    t.jsonb "classified_actor"
+    t.datetime "classified_at_domain"
+    t.datetime "classified_at_store"
+    t.string "classified_causation_id"
+    t.string "classified_correlation_id"
+    t.jsonb "classified_event"
+    t.bigint "classified_global_position"
+    t.jsonb "classified_markers", default: [], null: false
+    t.jsonb "classified_metadata", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.bigint "current_global_position", null: false
+    t.string "kind"
+    t.jsonb "labels", default: [], null: false
+    t.jsonb "observed_actor"
+    t.datetime "observed_at_domain"
+    t.datetime "observed_at_store"
+    t.string "observed_causation_id"
+    t.string "observed_correlation_id"
+    t.jsonb "observed_event"
+    t.bigint "observed_global_position"
+    t.jsonb "observed_markers", default: [], null: false
+    t.jsonb "observed_metadata", default: {}, null: false
+    t.bigserial "observed_sequence", null: false
+    t.text "scope"
+    t.string "source_collector"
+    t.string "source_kind"
+    t.text "source_locator"
+    t.datetime "source_observed_at"
+    t.text "source_revision"
+    t.text "title"
+    t.datetime "updated_at", null: false
+    t.index ["artifact_id"], name: "index_development_artifact_observations_on_artifact_id"
+    t.index ["current_global_position"], name: "idx_on_current_global_position_ed0086fb2b"
+    t.index ["kind"], name: "index_development_artifact_observations_on_kind"
+    t.index ["labels"], name: "index_development_artifact_observations_on_labels", using: :gin
+    t.index ["observed_sequence"], name: "index_development_artifact_observations_on_observed_sequence", unique: true
+    t.index ["scope", "source_kind", "source_revision", "observed_sequence"], name: "idx_artifact_observations_exact_locator"
+    t.index ["scope"], name: "index_development_artifact_observations_on_scope"
+    t.index ["source_kind"], name: "index_development_artifact_observations_on_source_kind"
+    t.index ["source_locator"], name: "index_development_artifact_observations_on_source_locator", using: :hash
   end
 
   create_table "development_artifact_relation_supersessions", primary_key: "superseded_relation_id", id: :string, force: :cascade do |t|
