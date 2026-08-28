@@ -405,8 +405,8 @@ Given("a source Artifact has reached its active relationship capacity") do
   initial = submit_artifact_relation_batch(items, command_suffix: "capacity-initial")
   batch = initial.dig("data", "batch")
   assert_acceptance_equal(active_limit, batch.fetch("succeeded"), "Initial capacity successes")
-  @capacity_initial_relation_ids = batch.fetch("outcomes").sort_by { _1.fetch("index") }.map do |outcome|
-    outcome.dig("result", "data", "relation_id")
+  @capacity_initial_relation_ids = batch.fetch("items").sort_by { _1.fetch("index") }.map do |item|
+    item.dig("result", "data", "relation_id")
   end
   assert_acceptance(@capacity_initial_relation_ids.none?(&:nil?), "Initial relation IDs")
 end
@@ -427,13 +427,21 @@ When("the agent supersedes one active relationship") do
 end
 
 Then("active graph capacity remains available for one replacement edge") do
-  page = await_artifact_relation_count(
-    @capacity_source,
-    Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_ACTIVE_RELATION_MAXIMUM_COUNT + 1
-  )
+  active_limit = Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_ACTIVE_RELATION_MAXIMUM_COUNT
+  page = await_read_model("Artifact replacement and supersession to converge") do
+    observed = artifact_relation_page(
+      @capacity_source,
+      direction: "outgoing",
+      limit: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_QUERY_MAXIMUM_ITEMS,
+      include_superseded: true
+    )
+    items = observed&.fetch("items", []) || []
+    active = items.count { _1.fetch("status") == "active" }
+    [ items.length == active_limit + 1 && active == active_limit, observed ]
+  end
   active = page.fetch("items").count { _1.fetch("status") == "active" }
   assert_acceptance_equal(
-    Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_ACTIVE_RELATION_MAXIMUM_COUNT,
+    active_limit,
     active,
     "Active relation count after replacement"
   )
