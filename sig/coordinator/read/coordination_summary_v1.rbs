@@ -1,0 +1,18 @@
+module Coordinator
+  module Read
+    class CoordinationSummaryV1 < Shared::Value
+      def scope: () -> String
+      def change_set_id: () -> String
+      def status: () -> String
+      def goal: () -> String
+      def repository_ids: () -> Array[String]
+      def work_item_ids: () -> Array[String]
+      def active_attempt_ids: () -> Array[String]
+      def candidate_checkpoint_count: () -> Integer
+      def created_at: () -> String
+      def activated_at: () -> String?
+      def completed_at: () -> String?
+      def last_processed_at: () -> String
+    end
+  end
+end

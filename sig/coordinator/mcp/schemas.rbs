@@ -5,6 +5,7 @@ module Coordinator
       def self.change_set_create: () -> json_schema
       def self.repository_register: () -> json_schema
       def self.repository_list: () -> json_schema
+      def self.coordination_list: () -> json_schema
       def self.work_item_create: () -> json_schema
       def self.work_item_dependency_declare: () -> json_schema
       def self.change_set_activate: () -> json_schema
@@ -64,6 +65,7 @@ module Coordinator
       def self.guidance_get: () -> json_schema
       def self.decision_interpretation_list: () -> json_schema
       def self.decision_get: () -> json_schema
+      def self.decision_list: () -> json_schema
       def self.decision_resolve: () -> json_schema
       def self.coord_context: () -> json_schema
       def self.common_mutation_properties: () -> json_schema
@@ -83,6 +85,7 @@ module Coordinator
       def self.nullable_string: () -> json_schema
       def self.git_oid: () -> json_schema
       def self.uuid_v7: () -> json_schema
+      def self.canonical_timestamp: () -> json_schema
       def self.write_set_resource: () -> json_schema
       def self.lease_renewal_reference: () -> json_schema
       def self.lease_release_reference: () -> json_schema

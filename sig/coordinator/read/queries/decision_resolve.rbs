@@ -10,6 +10,7 @@ module Coordinator
           ?governance: Repositories::DecisionGovernance,
           ?partition_selector: DecisionResolution::PartitionSelector,
           ?resolver: DecisionResolution::Resolver,
+          ?topic_registry: Write::Interpretations::TopicRegistry,
           ?canonical_json: Shared::CanonicalJson,
           ?clock: Shared::_Clock
         ) -> void

@@ -4,6 +4,7 @@ module Coordinator
       class DecisionGovernance
         def fetch: (String decision_id) -> DecisionViewV1?
         def fetch_many: (Array[String] decision_ids) -> Array[DecisionViewV1]
+        def page: (DecisionListQueryV1 query) -> DecisionPageV1
         def partition_observations: (
           Array[Write::Decisions::DecisionPartitionV1] partitions
         ) -> Array[DecisionResolution::PartitionObservationV1]

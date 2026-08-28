@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    class CoordinationListQueryV1 < Shared::Value
+      def scope: () -> String
+      def repository_id: () -> String?
+      def statuses: () -> Array[String]
+      def cursor: () -> CoordinationPageV1::Cursor?
+      def limit: () -> Integer
+    end
+  end
+end

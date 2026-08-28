@@ -1,0 +1,12 @@
+module Coordinator
+  module Read
+    class DecisionPageV1 < Shared::Value
+      def repository_id: () -> String
+      def topic_id: () -> String?
+      def policy_status: () -> String?
+      def items: () -> Array[DecisionViewV1]
+      def next_decision_id: () -> String?
+      def has_more: () -> bool
+    end
+  end
+end

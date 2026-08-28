@@ -1,0 +1,9 @@
+module Coordinator
+  module Read
+    module Repositories
+      class CoordinationDiscovery
+        def page: (CoordinationListQueryV1 query) -> CoordinationPageV1
+      end
+    end
+  end
+end

@@ -1,0 +1,14 @@
+module Coordinator
+  module Read
+    module Queries
+      class DecisionList
+        def initialize: (
+          ?contract: Contracts::DecisionList,
+          ?governance: Repositories::DecisionGovernance
+        ) -> void
+        %a{rbs:test:skip}
+        def call: (command_input input) -> QueryResultV1
+      end
+    end
+  end
+end

@@ -2,9 +2,7 @@ module Coordinator
   module Read
     module DecisionResolution
       class PartitionSelector
-        TOPIC_ROOT: String
-
-        def call: (QueryContextV1 context) -> Array[Write::Decisions::DecisionPartitionV1]
+        def call: (QueryContextV1 context, topic_id: String) -> Array[Write::Decisions::DecisionPartitionV1]
       end
     end
   end

@@ -1,0 +1,18 @@
+module Coordinator
+  module Read
+    class CoordinationPageV1 < Shared::Value
+      class Cursor < Shared::Value
+        def through_last_processed_at: () -> String
+        def after_last_processed_at: () -> String
+        def after_change_set_id: () -> String
+      end
+
+      def scope: () -> String
+      def repository_id: () -> String?
+      def statuses: () -> Array[String]
+      def items: () -> Array[CoordinationSummaryV1]
+      def continuation_cursor: () -> Cursor?
+      def has_more: () -> bool
+    end
+  end
+end

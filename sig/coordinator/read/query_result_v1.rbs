@@ -22,6 +22,10 @@ module Coordinator
         def last_processed_at: () -> String
       end
 
+      class CoordinationPageData < Shared::Value
+        def page: () -> CoordinationPageV1
+      end
+
       class NotModifiedData < Shared::Value
         def scope: () -> ContextTokenDocument::scope
         def last_processed_at: () -> String
@@ -37,6 +41,10 @@ module Coordinator
 
       class DecisionData < Shared::Value
         def decision: () -> DecisionViewV1
+      end
+
+      class DecisionPageData < Shared::Value
+        def page: () -> DecisionPageV1
       end
 
       class DecisionContextData < Shared::Value
@@ -144,7 +152,7 @@ module Coordinator
         def batch: () -> OperationBatchViewV1
       end
 
-      type data = EmptyData | DomainError | OperationData | ContextData | NotModifiedData | GuidanceData | InterpretationPageData | DecisionData | DecisionContextData | AgentChoiceData | AgentChoiceImpactPageData | AttemptHistoryPageData | CandidateData | CandidatePageData | CandidateImpactData | VerificationObligationPageData | MergeSnapshotData | ReleaseSetData | SkillData | RepositoryPageData | SkillPageData | SkillAssetData | DevelopmentArtifactData | DevelopmentArtifactContentData | DevelopmentArtifactPageData | DevelopmentArtifactRelationPageData | DevelopmentArtifactLocatorPageData | OperationBatchData
+      type data = EmptyData | DomainError | OperationData | ContextData | CoordinationPageData | NotModifiedData | GuidanceData | InterpretationPageData | DecisionData | DecisionPageData | DecisionContextData | AgentChoiceData | AgentChoiceImpactPageData | AttemptHistoryPageData | CandidateData | CandidatePageData | CandidateImpactData | VerificationObligationPageData | MergeSnapshotData | ReleaseSetData | SkillData | RepositoryPageData | SkillPageData | SkillAssetData | DevelopmentArtifactData | DevelopmentArtifactContentData | DevelopmentArtifactPageData | DevelopmentArtifactRelationPageData | DevelopmentArtifactLocatorPageData | OperationBatchData
       type action = Write::NextAction | NextAction
 
       def status: () -> String

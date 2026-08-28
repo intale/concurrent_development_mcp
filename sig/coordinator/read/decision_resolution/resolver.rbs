@@ -2,11 +2,11 @@ module Coordinator
   module Read
     module DecisionResolution
       class Resolver
-        TOPIC_ID: String
         APPLICABILITY_REASONS: Array[String]
         ANCHOR_RANKS: Hash[String, Integer]
 
         def call: (
+          topic_id: String,
           context: QueryContextV1,
           observations: Array[PartitionObservationV1],
           decisions: Array[DecisionViewV1],

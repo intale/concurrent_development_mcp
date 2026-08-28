@@ -1,0 +1,16 @@
+module Coordinator
+  module Read
+    module Queries
+      class CoordinationList
+        DEFAULT_STATUSES: Array[String]
+
+        def initialize: (
+          ?contract: Contracts::CoordinationList,
+          ?discovery: Repositories::CoordinationDiscovery
+        ) -> void
+        %a{rbs:test:skip}
+        def call: (command_input input) -> QueryResultV1
+      end
+    end
+  end
+end
