@@ -8,6 +8,7 @@ module Coordinator
       def development_artifact_observation: (String observation_id) -> StreamReference
       def operation_batch: (String batch_id) -> StreamReference
       def repository: (String repository_id) -> StreamReference
+      def resource: (String resource_id) -> StreamReference
       def change_set: (String change_set_id) -> StreamReference
       def work_item: (String work_item_id) -> StreamReference
       def attempt: (String attempt_id) -> StreamReference

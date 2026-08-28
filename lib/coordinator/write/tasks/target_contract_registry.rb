@@ -41,6 +41,12 @@ module Coordinator::Write
           receipt_class: CommandReceiptData::RepositoryRegistration
         ),
         TargetContractV1.new(
+          tool_name: "resource_resolve",
+          input_document_class: CommandInputDocuments::ResolveResourceV1,
+          command_class: Commands::ResolveResource,
+          receipt_class: CommandReceiptData::ResourceResolution
+        ),
+        TargetContractV1.new(
           tool_name: "change_set_create",
           input_document_class: CommandInputDocuments::CreateChangeSetV1,
           command_class: Commands::CreateChangeSet,

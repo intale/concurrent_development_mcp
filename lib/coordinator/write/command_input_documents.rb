@@ -29,6 +29,18 @@ module Coordinator::Write
       attribute :input, RegisterRepositoryInputV1
     end
 
+    class ResolveResourceInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :repository_id, Types::RepositoryId
+      attribute :kind, Types::ResourceKind
+      attribute :path, Types::ResourcePath
+    end
+
+    class ResolveResourceV1 < BaseV1
+      attribute :tool_name, Types::String.enum("resource_resolve")
+      attribute :input, ResolveResourceInputV1
+    end
+
     class CreateChangeSetInputV1 < Value
       attribute :actor, ActorV1
       attribute :change_set_id, Types::Identifier
@@ -883,6 +895,7 @@ module Coordinator::Write
 
     TARGET_TYPES = [
       RegisterRepositoryV1,
+      ResolveResourceV1,
       CreateChangeSetV1,
       CreateWorkItemV1,
       DeclareWorkItemDependencyV1,

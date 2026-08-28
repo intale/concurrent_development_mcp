@@ -26,6 +26,19 @@ module Coordinator::Write
         )
       end
 
+      def build_resolve_resource(document)
+        input = document.input
+        Commands::ResolveResource.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          identity: ResourceIdentityNormalizer.new.call(
+            repository_id: input.repository_id,
+            kind: input.kind,
+            path: input.path
+          ).value!
+        )
+      end
+
       def build_create_change_set(document)
         input = document.input
         Commands::CreateChangeSet.new(

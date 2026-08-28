@@ -27,6 +27,18 @@ module Coordinator::Write
             remotes: command.remotes
           )
         )
+      when Commands::ResolveResource
+        CommandInputDocuments::ResolveResourceV1.new(
+          schema: "command-input/v1",
+          command_id: command.command_id,
+          tool_name: "resource_resolve",
+          input: CommandInputDocuments::ResolveResourceInputV1.new(
+            actor: actor_document(command.actor),
+            repository_id: command.repository_id,
+            kind: command.kind,
+            path: command.normalized_path
+          )
+        )
       when Commands::CreateChangeSet then create_change_set_document(command)
       when Commands::CreateWorkItem then work_item_create_document(command)
       when Commands::DeclareWorkItemDependency then work_item_dependency_declare_document(command)

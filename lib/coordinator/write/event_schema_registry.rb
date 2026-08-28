@@ -7,6 +7,8 @@ module Coordinator::Write
 
     DEFAULT_DEFINITIONS = {
       [ "RepositoryRegistered", 1 ] => Events::RepositoryRegisteredV1,
+      [ "ResourceRegistered", 1 ] => Events::ResourceIdentityV1::Registered,
+      [ "ResourceBound", 1 ] => Events::ResourceIdentityV1::Bound,
       [ "ChangeSetCreated", 1 ] => Events::ChangeSetCreatedV1,
       [ "ChangeSetAcceptanceCriteriaDefined", 1 ] => Events::ChangeSetAcceptanceCriteriaDefinedV1,
       [ "CommandCompleted", 1 ] => Events::CommandCompletedV1,

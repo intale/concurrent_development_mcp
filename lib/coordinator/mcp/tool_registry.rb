@@ -34,6 +34,7 @@ module Coordinator
           Tools::VerificationObligationsList,
           Tools::MergeSnapshotGet,
           Tools::RepositoryRegister,
+          Tools::ResourceResolve,
           Tools::ChangeSetCreate,
           Tools::WorkItemCreate,
           Tools::WorkItemDependencyDeclare,

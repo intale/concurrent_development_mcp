@@ -60,6 +60,7 @@ module Coordinator::Write
           Operations::ExecuteOperationBatchCommand.new(event_store:)
       )
         @register_repository = Operations::ExecuteRegisterRepository.new(event_store:)
+        @resolve_resource = Operations::ExecuteResolveResource.new(event_store:)
         @create_change_set = create_change_set
         @create_work_item = create_work_item
         @declare_work_item_dependency = declare_work_item_dependency

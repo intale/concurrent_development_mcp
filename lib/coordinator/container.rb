@@ -74,6 +74,10 @@ module Coordinator
       self["operations.execute_register_repository"].method(:prepare)
     end
 
+    register("operations.prepare_resolve_resource", memoize: true) do
+      self["operations.execute_resolve_resource"].method(:prepare)
+    end
+
     register("operations.prepare_create_change_set", memoize: true) do
       Write::Operations::PrepareCreateChangeSet.new
     end
@@ -1098,6 +1102,18 @@ module Coordinator
       )
     end
 
+    register("operations.execute_resolve_resource") do
+      Write::Operations::ExecuteResolveResource.new(
+        event_store: self["event_store"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
     register("operations.execute_create_change_set") do
       Write::Operations::ExecuteCreateChangeSet.new(
         event_store: self["event_store"],
@@ -1990,6 +2006,13 @@ module Coordinator
     register("operations.submit_register_repository_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_register_repository"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_resolve_resource_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_resolve_resource"],
         submitter: self["operations.submit_coordination_task"]
       )
     end

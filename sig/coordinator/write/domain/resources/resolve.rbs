@@ -1,0 +1,24 @@
+module Coordinator
+  module Write
+    module Domain
+      module Resources
+        class Resolve
+          class DecisionV1 < Shared::Value
+            def registration: () -> Events::ResourceIdentityV1::Registered
+            def binding: () -> Events::ResourceIdentityV1::Bound
+            def events: () -> Array[Events::ResourceIdentityV1::Registered | Events::ResourceIdentityV1::Bound]
+            def outcome: () -> String
+          end
+
+          def call: (
+            identity: ResourceIdentityV1,
+            proposed_resource_id: String,
+            registration: Events::ResourceIdentityV1::Registered?,
+            current_binding: Events::ResourceIdentityV1::Bound?,
+            resolved_at: String
+          ) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

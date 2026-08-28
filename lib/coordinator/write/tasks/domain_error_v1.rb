@@ -74,6 +74,37 @@ module Coordinator::Write
         attribute :requested_policy_version, Types::ResourceKeyPolicyVersion
       end
 
+      class ResourceHistoryCorruptDetails < Value
+        attribute :repository_id, Types::RepositoryId
+        attribute :kind, Types::ResourceKind
+        attribute :normalized_path, Types::ResourcePath
+        attribute :identity_marker, Types::ResourceMarker
+        attribute :current_path_marker, Types::ResourceMarker
+        attribute :reason, Types::String.enum(
+          "duplicate_registration",
+          "registration_schema_invalid",
+          "registration_identity_mismatch",
+          "registration_stream_mismatch",
+          "registration_marker_mismatch",
+          "duplicate_current_binding",
+          "binding_schema_invalid",
+          "binding_identity_mismatch",
+          "binding_stream_mismatch",
+          "binding_marker_mismatch",
+          "binding_without_registration",
+          "registration_without_binding",
+          "binding_registration_mismatch"
+        )
+      end
+
+      class ResourcePathConflictDetails < Value
+        attribute :repository_id, Types::RepositoryId
+        attribute :normalized_path, Types::ResourcePath
+        attribute :requested_kind, Types::ResourceKind
+        attribute :active_resource_id, Types::ResourceId
+        attribute :active_kind, Types::ResourceKind
+      end
+
       class WriteSetLimitDetails < AttemptDetails
         attribute :current_resource_count, Types::WriteSetSize
         attribute :requested_addition_count, Types::WriteSetSize
@@ -522,6 +553,18 @@ module Coordinator::Write
         attribute :code, Types::String.enum("resource_identity_policy_mismatch")
         attribute :message, Types::String
         attribute :details, ResourceIdentityPolicyMismatchDetails
+      end
+
+      class ResourceHistoryCorruptError < Value
+        attribute :code, Types::String.enum("resource_history_corrupt")
+        attribute :message, Types::String
+        attribute :details, ResourceHistoryCorruptDetails
+      end
+
+      class ResourcePathConflictError < Value
+        attribute :code, Types::String.enum("resource_path_conflict")
+        attribute :message, Types::String
+        attribute :details, ResourcePathConflictDetails
       end
 
       class WriteSetLimitError < Value

@@ -46,6 +46,14 @@ module Coordinator::Write
       )
     end
 
+    def resource(resource_id)
+      StreamReference.new(
+        context: "DevelopmentCoordination",
+        stream_name: "Resource",
+        stream_id: resource_id
+      )
+    end
+
     def change_set(change_set_id)
       StreamReference.new(
         context: "DevelopmentPlanning",

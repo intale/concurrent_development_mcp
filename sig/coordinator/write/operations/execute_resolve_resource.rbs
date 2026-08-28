@@ -1,0 +1,40 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecuteResolveResource
+        class InputContract
+          def call: (command_input) -> Dry::Validation::Result
+        end
+
+        class PreparationV1 < Shared::Value
+          def resolved_at: () -> String
+          def input_digest: () -> String
+          def proposed_resource_id: () -> String
+          def registration_event_id: () -> String
+          def binding_event_id: () -> String
+          def completion_event_id: () -> String
+        end
+
+        def initialize: (
+          event_store: _EventStore,
+          ?contract: InputContract,
+          ?normalizer: ResourceIdentityNormalizer,
+          ?decider: Domain::Resources::Resolve,
+          ?repository_registration_loader: RepositoryRegistrationLoader,
+          ?input_digest: CommandInputDigest,
+          ?clock: Shared::_Clock,
+          ?resource_id_generator: ResourceIdGenerator,
+          ?id_generator: Shared::_IdGenerator,
+          ?event_factory: EventFactory,
+          ?schema_registry: EventSchemaRegistry,
+          ?stream_factory: StreamFactory
+        ) -> void
+        %a{rbs:test:skip}
+        def prepare: (command_input input) -> Dry::Monads::Result
+        %a{rbs:test:skip}
+        def call: (command_input input) -> Dry::Monads::Result
+        def call_command: (Commands::ResolveResource command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
+      end
+    end
+  end
+end

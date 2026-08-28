@@ -13,6 +13,16 @@ module Coordinator::Write
       attribute :registered_at, Types::Timestamp
     end
 
+    class ResourceResolution < Value
+      attribute :resource_id, Types::ResourceId
+      attribute :repository_id, Types::RepositoryId
+      attribute :kind, Types::ResourceKind
+      attribute :normalized_path, Types::ResourcePath
+      attribute :outcome, Types::String.enum("registered", "existing")
+      attribute :registered_at, Types::Timestamp
+      attribute :bound_at, Types::Timestamp
+    end
+
     class ChangeSet < Value
       attribute :change_set_id, Types::Identifier
     end
@@ -480,6 +490,7 @@ module Coordinator::Write
     end
 
     Type = RepositoryRegistration |
+           ResourceResolution |
            ChangeSet |
            WorkItem |
            Dependency |

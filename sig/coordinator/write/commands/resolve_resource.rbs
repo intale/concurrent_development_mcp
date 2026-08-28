@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Commands
+      class ResolveResource < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def identity: () -> ResourceIdentityV1
+        def repository_id: () -> String
+        def kind: () -> String
+        def normalized_path: () -> String
+      end
+    end
+  end
+end

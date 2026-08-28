@@ -507,6 +507,7 @@ module Coordinator::Shared
     ].freeze
     COORDINATION_TOOL_NAMES = %w[
       repository_register
+      resource_resolve
       change_set_create
       work_item_create
       work_item_dependency_declare
