@@ -528,6 +528,45 @@ module Coordinator::Write
       )
     end
 
+    def development_artifact_classification_correct(
+      command:,
+      decision:,
+      input_digest:,
+      persisted_events:,
+      completed_at:
+    )
+      build_completion(
+        command:,
+        tool_name: "development_artifact_classification_correct",
+        summary: case decision.outcome
+                 when "corrected" then "Development Artifact observation classification corrected."
+                 when "existing" then "Development Artifact observation classification is already current."
+                 end,
+        data: CommandReceiptData::DevelopmentArtifactClassification.new(
+          artifact_id: decision.observation.observation.artifact_id,
+          observation_id: command.observation_id,
+          classification_revision: decision.classification_revision,
+          title: decision.title,
+          kind: decision.kind,
+          labels: decision.labels,
+          outcome: decision.outcome,
+          corrected_at: completed_at
+        ),
+        next_actions: [
+          NextAction.new(
+            tool: "development_artifact_get",
+            arguments: NextAction::DevelopmentArtifactArguments.new(
+              artifact_id: decision.observation.observation.artifact_id,
+              observation_id: command.observation_id
+            )
+          )
+        ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
     def development_artifact_relation_declare(command:, decision:, input_digest:, persisted_events:, completed_at:)
       artifact_relation = decision.declaration.artifact_relation
       supersession = decision.supersession

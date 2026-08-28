@@ -44,6 +44,8 @@ module Coordinator
       def skill_publish_document: (Commands::PublishSkillRevision command) -> CommandInputDocuments::PublishSkillRevisionV1
       def development_artifact_capture: (Commands::CaptureDevelopmentArtifact command) -> String
       def development_artifact_capture_document: (Commands::CaptureDevelopmentArtifact command) -> CommandInputDocuments::CaptureDevelopmentArtifactV1
+      def development_artifact_classification_correct: (Commands::CorrectDevelopmentArtifactClassification command) -> String
+      def development_artifact_classification_correct_document: (Commands::CorrectDevelopmentArtifactClassification command) -> CommandInputDocuments::CorrectDevelopmentArtifactClassificationV1
       def development_artifact_relation_declare: (Commands::DeclareDevelopmentArtifactRelation command) -> String
       def development_artifact_relation_declare_document: (Commands::DeclareDevelopmentArtifactRelation command) -> CommandInputDocuments::DeclareDevelopmentArtifactRelationV1
       def operation_batch_create: (Commands::CreateOperationBatch command) -> String

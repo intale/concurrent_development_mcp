@@ -1,0 +1,16 @@
+module Coordinator
+  module Write
+    module Commands
+      class CorrectDevelopmentArtifactClassification < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def observation_id: () -> String
+        def expected_revision: () -> Integer
+        def title: () -> String
+        def kind: () -> String
+        def labels: () -> Array[String]
+        def reason: () -> String
+      end
+    end
+  end
+end

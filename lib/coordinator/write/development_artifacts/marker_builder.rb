@@ -17,6 +17,14 @@ module Coordinator::Write
         markers.freeze
       end
 
+      def classification(event:, command_id:)
+        [
+          "development-artifact:#{event.artifact_id}",
+          "development-artifact-observation:#{event.observation_id}",
+          "command:#{command_id}"
+        ].freeze
+      end
+
       def relation(artifact_relation:, command_id:)
         [
           "development-artifact:#{artifact_relation.source_artifact_id}",

@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Operations
+      class PrepareCorrectDevelopmentArtifactClassification
+        def initialize: (?contract: Contracts::CorrectDevelopmentArtifactClassification) -> void
+        %a{rbs:test:skip}
+        def call: (command_input input) -> Dry::Monads::Result
+      end
+    end
+  end
+end

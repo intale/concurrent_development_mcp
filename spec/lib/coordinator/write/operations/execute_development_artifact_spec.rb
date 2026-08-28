@@ -5,6 +5,9 @@ RSpec.describe "Development Artifact write operations", :event_store do
   let(:capture) do
     Coordinator::Write::Operations::ExecuteCaptureDevelopmentArtifact.new(event_store:)
   end
+  let(:correct_classification) do
+    Coordinator::Write::Operations::ExecuteCorrectDevelopmentArtifactClassification.new(event_store:)
+  end
   let(:declare_relation) do
     Coordinator::Write::Operations::ExecuteDeclareDevelopmentArtifactRelation.new(event_store:)
   end
@@ -40,14 +43,81 @@ RSpec.describe "Development Artifact write operations", :event_store do
     expect(changed.value!.data.artifact_id).not_to eq(first.value!.data.artifact_id)
   end
 
-  it "rejects different immutable fields that collide on the derived Artifact identity" do
+  it "corrects observation classification without changing content identity or provenance" do
     first = capture.call(capture_input)
-    conflicting = capture.call(capture_input(command_id: "cmd-artifact-conflict", title: "Other title"))
+    capture_with_changed_classification = capture.call(
+      capture_input(command_id: "cmd-artifact-reclassify", title: "Other title")
+    )
+    correction = correct_classification.call(
+      classification_input(observation_id: first.value!.data.observation_id)
+    )
+    existing = correct_classification.call(
+      classification_input(
+        command_id: "cmd-classification-existing",
+        observation_id: first.value!.data.observation_id,
+        expected_revision: 2
+      )
+    )
+    stale = correct_classification.call(
+      classification_input(
+        command_id: "cmd-classification-stale",
+        observation_id: first.value!.data.observation_id,
+        title: "Stale correction"
+      )
+    )
 
     expect(first).to be_success
-    expect(conflicting).to be_failure
-    expect(conflicting.failure.code).to eq(:development_artifact_identity_conflict)
-    expect(command_events("cmd-artifact-conflict")).to be_empty
+    expect(capture_with_changed_classification).to be_failure
+    expect(capture_with_changed_classification.failure.code).to eq(
+      :development_artifact_classification_correction_required
+    )
+    expect(correction).to be_success
+    expect(correction.value!.data).to have_attributes(
+      artifact_id: first.value!.data.artifact_id,
+      observation_id: first.value!.data.observation_id,
+      classification_revision: 2,
+      title: "Other title",
+      outcome: "corrected"
+    )
+    expect(correction.value!.emitted_events.map(&:type)).to eq(
+      [ "DevelopmentArtifactClassificationCorrected" ]
+    )
+    expect(existing).to be_success
+    expect(existing.value!.data.outcome).to eq("existing")
+    expect(existing.value!.emitted_events).to be_empty
+    expect(stale.failure.code).to eq(:development_artifact_classification_revision_conflict)
+    expect(command_events("cmd-artifact-reclassify")).to be_empty
+    expect(command_events("cmd-classification-stale")).to be_empty
+    expect(observation_events(first.value!.data.observation_id).map(&:type)).to eq(
+      %w[DevelopmentArtifactObserved DevelopmentArtifactClassificationCorrected]
+    )
+  end
+
+  it "records distinct observations for unchanged bytes at two revisions of one locator" do
+    first = capture.call(capture_input)
+    second = capture.call(
+      capture_input(
+        command_id: "cmd-artifact-second-observation",
+        revision: "def456",
+        observed_at: "2026-08-25T16:01:00.000000Z"
+      )
+    )
+
+    expect([ first, second ]).to all(be_success)
+    expect(second.value!.data).to have_attributes(
+      artifact_id: first.value!.data.artifact_id,
+      outcome: "observed"
+    )
+    expect(second.value!.data.observation_id).not_to eq(first.value!.data.observation_id)
+    expect(artifact_events(first.value!.data.artifact_id).map(&:type)).to eq(
+      [ "DevelopmentArtifactCaptured" ]
+    )
+    expect(observation_events(first.value!.data.observation_id).map(&:type)).to eq(
+      [ "DevelopmentArtifactObserved" ]
+    )
+    expect(observation_events(second.value!.data.observation_id).map(&:type)).to eq(
+      [ "DevelopmentArtifactObserved" ]
+    )
   end
 
   it "declares an exact relation once and requires both Artifact endpoints" do
@@ -236,7 +306,14 @@ RSpec.describe "Development Artifact write operations", :event_store do
     expect(command_events("cmd-limit-overflow")).to be_empty
   end
 
-  def capture_input(command_id: "cmd-artifact-capture", locator: "docs/readme.md", text: "hello\n", **overrides)
+  def capture_input(
+    command_id: "cmd-artifact-capture",
+    locator: "docs/readme.md",
+    revision: "abc123",
+    observed_at: "2026-08-25T16:00:00.000000Z",
+    text: "hello\n",
+    **overrides
+  )
     {
       command_id:,
       actor: { kind: "agent", id: "agent-1" },
@@ -252,11 +329,29 @@ RSpec.describe "Development Artifact write operations", :event_store do
       source: {
         kind: "local_file",
         locator:,
-        revision: "abc123",
-        observed_at: "2026-08-25T16:00:00.000000Z",
+        revision:,
+        observed_at:,
         collector: "spec/v1"
       }
     }.merge(overrides)
+  end
+
+  def classification_input(
+    command_id: "cmd-classification-correct",
+    observation_id:,
+    expected_revision: 1,
+    title: "Other title"
+  )
+    {
+      command_id:,
+      actor: { kind: "agent", id: "agent-1" },
+      observation_id:,
+      expected_revision:,
+      title:,
+      kind: "documentation",
+      labels: %w[docs imported],
+      reason: "Correct the observation title"
+    }
   end
 
   def relation_input(
@@ -284,6 +379,13 @@ RSpec.describe "Development Artifact write operations", :event_store do
     event_store.read(
       streams.development_artifact(artifact_id),
       Coordinator::Write::EventQueries::DEVELOPMENT_ARTIFACT_HISTORY
+    )
+  end
+
+  def observation_events(observation_id)
+    event_store.read(
+      streams.development_artifact_observation(observation_id),
+      Coordinator::Write::EventQueries::DEVELOPMENT_ARTIFACT_OBSERVATION_HISTORY
     )
   end
 

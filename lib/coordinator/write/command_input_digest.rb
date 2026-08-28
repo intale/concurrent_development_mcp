@@ -74,6 +74,8 @@ module Coordinator::Write
       when Commands::CompleteCompensatedReleaseSet then release_compensation_complete_document(command)
       when Commands::PublishSkillRevision then skill_publish_document(command)
       when Commands::CaptureDevelopmentArtifact then development_artifact_capture_document(command)
+      when Commands::CorrectDevelopmentArtifactClassification
+        development_artifact_classification_correct_document(command)
       when Commands::DeclareDevelopmentArtifactRelation then development_artifact_relation_declare_document(command)
       when Commands::CreateOperationBatch then operation_batch_create_document(command)
       when Commands::CancelOperationBatch then operation_batch_cancel_document(command)
@@ -832,6 +834,27 @@ module Coordinator::Write
               collector: artifact.source.collector
             )
           )
+        )
+      )
+    end
+
+    def development_artifact_classification_correct(command)
+      @canonical_json.sha256(development_artifact_classification_correct_document(command).to_h)
+    end
+
+    def development_artifact_classification_correct_document(command)
+      CommandInputDocuments::CorrectDevelopmentArtifactClassificationV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "development_artifact_classification_correct",
+        input: CommandInputDocuments::CorrectDevelopmentArtifactClassificationInputV1.new(
+          actor: actor_document(command.actor),
+          observation_id: command.observation_id,
+          expected_revision: command.expected_revision,
+          title: command.title,
+          kind: command.kind,
+          labels: command.labels,
+          reason: command.reason
         )
       )
     end

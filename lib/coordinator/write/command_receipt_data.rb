@@ -433,6 +433,17 @@ module Coordinator::Write
       attribute :recorded_at, Types::Timestamp
     end
 
+    class DevelopmentArtifactClassification < Value
+      attribute :artifact_id, Types::DevelopmentArtifactId
+      attribute :observation_id, Types::DevelopmentArtifactObservationId
+      attribute :classification_revision, Types::DevelopmentArtifactClassificationRevision
+      attribute :title, Types::DevelopmentArtifactTitle
+      attribute :kind, Types::DevelopmentArtifactKind
+      attribute :labels, Types::DevelopmentArtifactLabels
+      attribute :outcome, Types::String.enum("corrected", "existing")
+      attribute :corrected_at, Types::Timestamp
+    end
+
     class DevelopmentArtifactRelation < Value
       attribute :relation_id, Types::DevelopmentArtifactRelationId
       attribute :source_artifact_id, Types::DevelopmentArtifactId
@@ -504,6 +515,7 @@ module Coordinator::Write
            ChangeSetCompletion |
            SkillPublication |
            DevelopmentArtifactCapture |
+           DevelopmentArtifactClassification |
            DevelopmentArtifactRelation |
            OperationBatchAcceptance |
            OperationBatchCancellation |

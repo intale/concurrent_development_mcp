@@ -703,6 +703,21 @@ module Coordinator::Write
       attribute :input, CaptureDevelopmentArtifactInputV1
     end
 
+    class CorrectDevelopmentArtifactClassificationInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :observation_id, Types::DevelopmentArtifactObservationId
+      attribute :expected_revision, Types::DevelopmentArtifactClassificationRevision
+      attribute :title, Types::DevelopmentArtifactTitle
+      attribute :kind, Types::DevelopmentArtifactKind
+      attribute :labels, Types::DevelopmentArtifactLabels
+      attribute :reason, Types::String.constrained(min_size: 1, max_size: 1_000)
+    end
+
+    class CorrectDevelopmentArtifactClassificationV1 < BaseV1
+      attribute :tool_name, Types::String.enum("development_artifact_classification_correct")
+      attribute :input, CorrectDevelopmentArtifactClassificationInputV1
+    end
+
     class DevelopmentArtifactRelationTargetV1 < Value
       attribute :kind, Types::DevelopmentArtifactTargetKind
       attribute :id, Types::DevelopmentArtifactTargetId
@@ -901,6 +916,7 @@ module Coordinator::Write
       CompleteCompensatedReleaseSetV1,
       PublishSkillRevisionV1,
       CaptureDevelopmentArtifactV1,
+      CorrectDevelopmentArtifactClassificationV1,
       DeclareDevelopmentArtifactRelationV1,
       CreateOperationBatchV1,
       CancelOperationBatchV1
