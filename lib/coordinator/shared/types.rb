@@ -22,6 +22,10 @@ module Coordinator::Shared
     DEVELOPMENT_ARTIFACT_OBSERVATION_ID_PATTERN = /\Aartifact-observation:v1:[0-9a-f]{64}\z/
     DEVELOPMENT_ARTIFACT_RELATION_ID_PATTERN = /\Aartifact-relation:v1:[0-9a-f]{64}\z/
 
+    RESOURCE_MARKER_MAXIMUM_BYTES = 1_200
+    CONTENT_MAXIMUM_BYTES = 2_097_152
+    CONTENT_BASE64_MAXIMUM_BYTES = 2_796_204
+
     SKILL_NAME_MAXIMUM_BYTES = 128
     SKILL_SCOPE_MAXIMUM_BYTES = 256
     SKILL_DESCRIPTION_MAXIMUM_BYTES = 2_048
@@ -38,8 +42,8 @@ module Coordinator::Shared
     DEVELOPMENT_ARTIFACT_SOURCE_LOCATOR_MAXIMUM_BYTES = 2_048
     DEVELOPMENT_ARTIFACT_SOURCE_REVISION_MAXIMUM_BYTES = 512
     DEVELOPMENT_ARTIFACT_COLLECTOR_MAXIMUM_BYTES = 256
-    DEVELOPMENT_ARTIFACT_CONTENT_MAXIMUM_BYTES = 2_097_152
-    DEVELOPMENT_ARTIFACT_CONTENT_BASE64_MAXIMUM_BYTES = 2_796_204
+    DEVELOPMENT_ARTIFACT_CONTENT_MAXIMUM_BYTES = CONTENT_MAXIMUM_BYTES
+    DEVELOPMENT_ARTIFACT_CONTENT_BASE64_MAXIMUM_BYTES = CONTENT_BASE64_MAXIMUM_BYTES
     DEVELOPMENT_ARTIFACT_CLASSIFICATION_MAXIMUM_REVISIONS = 32
     DEVELOPMENT_ARTIFACT_ACTIVE_RELATION_MAXIMUM_COUNT = 64
     DEVELOPMENT_ARTIFACT_RELATION_LIFETIME_MAXIMUM_COUNT = 128
@@ -555,8 +559,10 @@ module Coordinator::Shared
     Timestamp = String.constrained(format: TIMESTAMP_PATTERN)
     UuidV7 = String.constrained(format: UUID_V7_PATTERN)
     TaskId = UuidV7
+    ResourceId = UuidV7
     ResourcePath = String.constrained(format: RESOURCE_PATH_PATTERN)
     ResourceKind = String.enum("file", "directory")
+    ResourceMarker = String.constrained(min_size: 1, max_size: RESOURCE_MARKER_MAXIMUM_BYTES)
     ResourceKeyPolicyVersion = String.enum(*RESOURCE_KEY_POLICY_VERSIONS)
     LeaseMode = String.enum("exclusive")
     LeaseDurationSeconds = Integer.constrained(gteq: 30, lteq: 3_600)
@@ -609,6 +615,11 @@ module Coordinator::Shared
       gteq: 0,
       lteq: DEVELOPMENT_ARTIFACT_CONTENT_MAXIMUM_BYTES
     )
+    ContentEncoding = String.enum("utf-8", "binary")
+    ContentMediaType = String.constrained(format: SKILL_MEDIA_TYPE_PATTERN)
+    ContentText = String.constrained(max_size: CONTENT_MAXIMUM_BYTES)
+    ContentBase64 = String.constrained(max_size: CONTENT_BASE64_MAXIMUM_BYTES)
+    ContentByteSize = Integer.constrained(gteq: 0, lteq: CONTENT_MAXIMUM_BYTES)
     DevelopmentArtifactSourceKind = String.enum(*DEVELOPMENT_ARTIFACT_SOURCE_KINDS)
     DevelopmentArtifactSourceLocator = String.constrained(
       min_size: 1,

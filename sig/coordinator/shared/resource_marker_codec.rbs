@@ -1,0 +1,11 @@
+module Coordinator
+  module Shared
+    class ResourceMarkerCodec
+      IDENTITY_PREFIX: String
+      CURRENT_PATH_PREFIX: String
+
+      def identity: (repository_id: String, kind: String, normalized_path: String) -> String
+      def current_path: (repository_id: String, normalized_path: String) -> String
+    end
+  end
+end

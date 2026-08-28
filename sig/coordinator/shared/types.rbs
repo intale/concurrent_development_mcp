@@ -19,6 +19,10 @@ module Coordinator
       DEVELOPMENT_ARTIFACT_OBSERVATION_ID_PATTERN: Regexp
       DEVELOPMENT_ARTIFACT_RELATION_ID_PATTERN: Regexp
 
+      RESOURCE_MARKER_MAXIMUM_BYTES: Integer
+      CONTENT_MAXIMUM_BYTES: Integer
+      CONTENT_BASE64_MAXIMUM_BYTES: Integer
+
       SKILL_NAME_MAXIMUM_BYTES: Integer
       SKILL_SCOPE_MAXIMUM_BYTES: Integer
       SKILL_DESCRIPTION_MAXIMUM_BYTES: Integer
@@ -184,8 +188,10 @@ module Coordinator
       Timestamp: untyped
       UuidV7: untyped
       TaskId: untyped
+      ResourceId: untyped
       ResourcePath: untyped
       ResourceKind: untyped
+      ResourceMarker: untyped
       LeaseMode: untyped
       LeaseDurationSeconds: untyped
       WriteSetSize: untyped
@@ -216,6 +222,11 @@ module Coordinator
       DevelopmentArtifactMediaType: untyped
       DevelopmentArtifactContentBase64: untyped
       DevelopmentArtifactByteSize: untyped
+      ContentEncoding: untyped
+      ContentMediaType: untyped
+      ContentText: untyped
+      ContentBase64: untyped
+      ContentByteSize: untyped
       DevelopmentArtifactSourceKind: untyped
       DevelopmentArtifactSourceLocator: untyped
       DevelopmentArtifactSourceRevision: untyped

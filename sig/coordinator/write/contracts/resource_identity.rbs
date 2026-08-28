@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Contracts
+      class ResourceIdentity < Dry::Validation::Contract
+        MAXIMUM_PATH_BYTES: Integer
+        MAXIMUM_PATH_COMPONENTS: Integer
+
+        def call: (Hash[Symbol, String] input) -> Dry::Validation::Result
+      end
+    end
+  end
+end

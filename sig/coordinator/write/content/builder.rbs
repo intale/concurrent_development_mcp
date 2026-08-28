@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Content
+      class Builder
+        def initialize: (?contract: InputContract) -> void
+        def call: (Hash[Symbol, String] input) -> Dry::Monads::Result
+      end
+    end
+  end
+end

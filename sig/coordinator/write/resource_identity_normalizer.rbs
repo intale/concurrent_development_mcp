@@ -1,0 +1,8 @@
+module Coordinator
+  module Write
+    class ResourceIdentityNormalizer
+      def initialize: (?contract: Contracts::ResourceIdentity, ?marker_codec: Shared::ResourceMarkerCodec) -> void
+      def call: (repository_id: String, kind: String, path: String) -> Dry::Monads::Result
+    end
+  end
+end

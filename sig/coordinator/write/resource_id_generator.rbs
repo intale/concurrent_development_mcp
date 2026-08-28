@@ -1,0 +1,8 @@
+module Coordinator
+  module Write
+    class ResourceIdGenerator
+      def initialize: (?id_generator: Shared::IdGenerator) -> void
+      def call: () -> String
+    end
+  end
+end

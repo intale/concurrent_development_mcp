@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Content
+      class InputContract < Dry::Validation::Contract
+        def call: (Hash[Symbol, String] input) -> Dry::Validation::Result
+      end
+    end
+  end
+end
