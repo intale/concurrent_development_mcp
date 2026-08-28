@@ -23,21 +23,17 @@ When("the agent submits the final terminal Candidate and releases its write set"
   @terminal_available_before_completion = terminal_context(attempt_id: ids.fetch(:attempt_id))
 end
 
-Then("available context suggests completing that exact Candidate") do
-  action = @terminal_available_before_completion.fetch("next_actions").find do |candidate|
-    candidate.fetch("tool") == "work_item_complete"
-  end
-  assert_acceptance(action, "Available context does not suggest work_item_complete")
+Then("available context exposes that exact Candidate without inventing a completion command") do
+  checkpoint = @terminal_available_before_completion.dig("data", "context", "candidate_checkpoints").sole
   assert_acceptance_equal(
-    {
-      "change_set_id" => @terminal_coordination.dig(:ids, :change_set_id),
-      "work_item_id" => @terminal_coordination.dig(:ids, :work_item_id),
-      "attempt_id" => @terminal_coordination.dig(:ids, :attempt_id),
-      "candidate_id" => @terminal_candidate.dig(:arguments, :candidate_id)
-    },
-    action.fetch("arguments"),
-    "Terminal completion suggestion"
+    @terminal_candidate.dig(:arguments, :candidate_id),
+    checkpoint.fetch("candidate_id"),
+    "Available Candidate checkpoint"
   )
+  completion_actions = @terminal_available_before_completion.fetch("next_actions").select do |action|
+    action.fetch("tool") == "work_item_complete"
+  end
+  assert_acceptance_equal([], completion_actions, "Incomplete completion actions")
 end
 
 When("the agent completes the WorkItem through an MCP Task") do
@@ -195,24 +191,25 @@ When("downstream readiness reaches the read side") do
   ids = @dependency_terminal.fetch(:ids)
   @dependency_converged = await_read_model("Consumer WorkItem readiness to become available") do
     payload = terminal_context(work_item_id: ids.fetch(:consumer_work_item_id))
-    action = payload.fetch("next_actions", []).find do |candidate|
-      candidate.fetch("tool") == "work_item_acquire" &&
-        candidate.dig("arguments", "work_item_id") == ids.fetch(:consumer_work_item_id)
+    consumer = payload.dig("data", "context", "work_items").find do |work_item|
+      work_item.fetch("work_item_id") == ids.fetch(:consumer_work_item_id)
     end
-    [ !action.nil?, payload ]
+    [ consumer&.fetch("status") == "ready" && payload.dig("data", "blockers") == [], payload ]
   end
 end
 
-Then("available context suggests acquiring the exact consumer WorkItem") do
+Then("available context exposes the exact ready consumer without inventing an acquisition command") do
   ids = @dependency_terminal.fetch(:ids)
-  action = @dependency_converged.fetch("next_actions").find { _1.fetch("tool") == "work_item_acquire" }
-  assert_acceptance(action, "Available context does not suggest work_item_acquire")
+  consumer = @dependency_converged.dig("data", "context", "work_items").find do |work_item|
+    work_item.fetch("work_item_id") == ids.fetch(:consumer_work_item_id)
+  end
   assert_acceptance_equal(
-    {
-      "change_set_id" => ids.fetch(:change_set_id),
-      "work_item_id" => ids.fetch(:consumer_work_item_id)
-    },
-    action.fetch("arguments"),
-    "Consumer acquisition suggestion"
+    { "work_item_id" => ids.fetch(:consumer_work_item_id), "status" => "ready" },
+    consumer.slice("work_item_id", "status"),
+    "Ready consumer context"
   )
+  acquisition_actions = @dependency_converged.fetch("next_actions").select do |action|
+    action.fetch("tool") == "work_item_acquire"
+  end
+  assert_acceptance_equal([], acquisition_actions, "Incomplete acquisition actions")
 end

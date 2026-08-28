@@ -11,7 +11,7 @@ Feature: Available terminal build progress
     Scenario: Final Candidate completion remains available through projection lag and converges
       Given terminal Candidate coordination "SINGLE" is ready for agent "agent-terminal"
       When the agent submits the final terminal Candidate and releases its write set
-      Then available context suggests completing that exact Candidate
+      Then available context exposes that exact Candidate without inventing a completion command
       When the agent completes the WorkItem through an MCP Task
       Then the terminal Task records one selected Candidate, completed Attempt, and completed WorkItem
       And the older acquired context remains available before terminal projection
@@ -33,4 +33,4 @@ Feature: Available terminal build progress
       When the producer completes through an MCP Task and build progress handles its completion
       Then the consumer's older blocked context remains available
       When downstream readiness reaches the read side
-      Then available context suggests acquiring the exact consumer WorkItem
+      Then available context exposes the exact ready consumer without inventing an acquisition command
