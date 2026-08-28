@@ -13,6 +13,7 @@ module Coordinator
           def relation: (String relation_id) -> Events::DevelopmentArtifactRelationDeclaredV1?
           def supersession_for: (String relation_id) -> Events::DevelopmentArtifactRelationSupersededV1?
           def active_relation: (String relation_id) -> Events::DevelopmentArtifactRelationDeclaredV1?
+          def active_relations: () -> Array[Events::DevelopmentArtifactRelationDeclaredV1]
         end
       end
     end

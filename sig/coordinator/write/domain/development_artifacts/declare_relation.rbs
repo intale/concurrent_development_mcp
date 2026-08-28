@@ -3,8 +3,8 @@ module Coordinator
     module Domain
       module DevelopmentArtifacts
         class DeclareRelation
-          def initialize: (?stream_factory: StreamFactory) -> void
-          def call: (state: State, command: Commands::DeclareDevelopmentArtifactRelation, target_captured: bool, declared_at: String) -> Dry::Monads::Result
+          def initialize: (?stream_factory: StreamFactory, ?relation_registry: Write::DevelopmentArtifacts::RelationRegistry) -> void
+          def call: (state: State, command: Commands::DeclareDevelopmentArtifactRelation, target: Write::DevelopmentArtifacts::RelationTargetV1, declared_at: String) -> Dry::Monads::Result
         end
       end
     end

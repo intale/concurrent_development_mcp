@@ -8,6 +8,7 @@ module Coordinator
         def target: () -> RelationTargetV1
         def attributes: () -> Hash[Symbol, untyped]
         def relation_attributes: () -> RelationAttributesV1
+        def with_target: (RelationTargetV1 target) -> RelationV1
       end
     end
   end

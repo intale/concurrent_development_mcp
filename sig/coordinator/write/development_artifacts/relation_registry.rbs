@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module DevelopmentArtifacts
+      class RelationRegistry
+        ALL_TARGETS: Array[String]
+        INTERNAL_TARGETS: Array[String]
+        DEFINITIONS: Array[RelationDefinitionV1]
+        BY_RELATION: Hash[String, RelationDefinitionV1]
+
+        def fetch: (String relation) -> RelationDefinitionV1
+      end
+    end
+  end
+end

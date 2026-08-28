@@ -6,16 +6,17 @@ module Coordinator::Write
       class DeclareRelation
         include Dry::Monads[:result]
 
-        def initialize(stream_factory: StreamFactory.new)
+        def initialize(
+          stream_factory: StreamFactory.new,
+          relation_registry: Coordinator::Write::DevelopmentArtifacts::RelationRegistry.new
+        )
           @stream_factory = stream_factory
+          @relation_registry = relation_registry
         end
 
-        def call(state:, command:, target_captured:, declared_at:)
-          artifact_relation = command.artifact_relation
+        def call(state:, command:, target:, declared_at:)
+          artifact_relation = command.artifact_relation.with_target(target)
           return artifact_missing(artifact_relation.source_artifact_id) unless state.capture
-          if artifact_relation.target.kind == "artifact" && !target_captured
-            return target_missing(artifact_relation)
-          end
 
           relation_id = artifact_relation.relation_id
           existing_declaration = state.relation(relation_id)
@@ -33,6 +34,10 @@ module Coordinator::Write
             return superseded_relation_missing(artifact_relation, superseded_relation_id)
           end
 
+          if previous_declaration && !supersession_allowed?(previous_declaration, artifact_relation)
+            return supersession_not_allowed(artifact_relation, previous_declaration)
+          end
+
           previous_supersession = superseded_relation_id && state.supersession_for(superseded_relation_id)
           if previous_supersession
             return existing_supersession(existing_declaration, previous_supersession) if
@@ -41,8 +46,25 @@ module Coordinator::Write
             return already_superseded(artifact_relation, previous_supersession)
           end
 
-          if !existing_declaration && state.relations.length >= Types::DEVELOPMENT_ARTIFACT_RELATION_MAXIMUM_COUNT
-            return relation_limit_reached(artifact_relation.source_artifact_id, state.relations.length)
+          unless existing_declaration
+            lifetime_count = state.relations.length
+            if lifetime_count >= Types::DEVELOPMENT_ARTIFACT_RELATION_LIFETIME_MAXIMUM_COUNT
+              return relation_limit_reached(
+                artifact_relation.source_artifact_id,
+                state:,
+                limit_kind: "lifetime"
+              )
+            end
+
+            active_count = state.active_relations.length
+            active_after = active_count + 1 - (previous_declaration ? 1 : 0)
+            if active_after > Types::DEVELOPMENT_ARTIFACT_ACTIVE_RELATION_MAXIMUM_COUNT
+              return relation_limit_reached(
+                artifact_relation.source_artifact_id,
+                state:,
+                limit_kind: "active"
+              )
+            end
           end
 
           declaration = existing_declaration || Events::DevelopmentArtifactRelationDeclaredV1.new(
@@ -98,28 +120,50 @@ module Coordinator::Write
           )
         end
 
-        def target_missing(artifact_relation)
+        def supersession_allowed?(previous_declaration, artifact_relation)
+          previous = previous_declaration.artifact_relation
+          previous.relation == artifact_relation.relation &&
+            @relation_registry.fetch(previous.relation).supersedable
+        end
+
+        def relation_limit_reached(artifact_id, state:, limit_kind:)
+          active_count = state.active_relations.length
+          lifetime_count = state.relations.length
           Failure(
             OutcomeError.new(
-              code: :development_artifact_target_not_found,
-              message: "Target Development Artifact was not found",
+              code: :development_artifact_relation_limit_reached,
+              message: "Development Artifact #{limit_kind} relation limit was reached",
               details: {
-                artifact_id: artifact_relation.source_artifact_id,
-                target_artifact_id: artifact_relation.target.id
+                artifact_id:,
+                limit_kind:,
+                active_count:,
+                active_maximum: Types::DEVELOPMENT_ARTIFACT_ACTIVE_RELATION_MAXIMUM_COUNT,
+                active_remaining: [
+                  Types::DEVELOPMENT_ARTIFACT_ACTIVE_RELATION_MAXIMUM_COUNT - active_count,
+                  0
+                ].max,
+                lifetime_count:,
+                lifetime_maximum: Types::DEVELOPMENT_ARTIFACT_RELATION_LIFETIME_MAXIMUM_COUNT,
+                lifetime_remaining: [
+                  Types::DEVELOPMENT_ARTIFACT_RELATION_LIFETIME_MAXIMUM_COUNT - lifetime_count,
+                  0
+                ].max
               }
             )
           )
         end
 
-        def relation_limit_reached(artifact_id, relation_count)
+        def supersession_not_allowed(artifact_relation, previous_declaration)
+          previous = previous_declaration.artifact_relation
           Failure(
             OutcomeError.new(
-              code: :development_artifact_relation_limit_reached,
-              message: "Development Artifact relation limit was reached",
+              code: :development_artifact_relation_supersession_not_allowed,
+              message: "Development Artifact relation cannot supersede this edge",
               details: {
-                artifact_id:,
-                relation_count:,
-                maximum_relation_count: Types::DEVELOPMENT_ARTIFACT_RELATION_MAXIMUM_COUNT
+                artifact_id: artifact_relation.source_artifact_id,
+                relation_id: previous.relation_id,
+                relation: previous.relation,
+                requested_relation: artifact_relation.relation
               }
             )
           )
@@ -143,7 +187,10 @@ module Coordinator::Write
             OutcomeError.new(
               code: :development_artifact_relation_self_supersession,
               message: "A Development Artifact relation cannot supersede itself",
-              details: { relation_id: artifact_relation.relation_id }
+              details: {
+                artifact_id: artifact_relation.source_artifact_id,
+                relation_id: artifact_relation.relation_id
+              }
             )
           )
         end
@@ -154,6 +201,7 @@ module Coordinator::Write
               code: :development_artifact_relation_superseded,
               message: "A superseded Development Artifact relation cannot be a replacement",
               details: {
+                artifact_id: artifact_relation.source_artifact_id,
                 relation_id: artifact_relation.relation_id,
                 replacement_relation_id: supersession.replacement_relation_id
               }
@@ -167,6 +215,7 @@ module Coordinator::Write
               code: :development_artifact_relation_already_superseded,
               message: "Development Artifact relation already has another replacement",
               details: {
+                artifact_id: artifact_relation.source_artifact_id,
                 relation_id: supersession.superseded_relation_id,
                 existing_replacement_relation_id: supersession.replacement_relation_id,
                 requested_replacement_relation_id: artifact_relation.relation_id

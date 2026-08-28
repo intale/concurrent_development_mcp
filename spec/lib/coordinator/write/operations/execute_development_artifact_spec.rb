@@ -139,6 +139,7 @@ RSpec.describe "Development Artifact write operations", :event_store do
 
     expect(first).to be_success
     expect(first.value!.data.outcome).to eq("declared")
+    expect(first.value!.data.target.status).to eq("verified")
     expect(replay).to be_success
     expect(replay.value!.data).to have_attributes(
       relation_id: first.value!.data.relation_id,
@@ -146,6 +147,10 @@ RSpec.describe "Development Artifact write operations", :event_store do
     )
     expect(replay.value!.emitted_events).to be_empty
     expect(missing.failure.code).to eq(:development_artifact_target_not_found)
+    expect(missing.failure.details).to include(
+      target_kind: "artifact",
+      target_id: "artifact:v1:#{'f' * 64}"
+    )
     expect(artifact_events(source).map(&:type)).to eq(
       [ "DevelopmentArtifactCaptured", "DevelopmentArtifactRelationDeclared" ]
     )
@@ -277,9 +282,9 @@ RSpec.describe "Development Artifact write operations", :event_store do
     expect(relation_ids.uniq).to eq(relation_ids)
   end
 
-  it "enforces the lifetime declaration bound from authoritative history" do
+  it "separates active capacity from bounded lifetime history and lets supersession replace an active edge" do
     source = capture.call(capture_input).value!.data.artifact_id
-    Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_RELATION_MAXIMUM_COUNT.times do |index|
+    active = Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_ACTIVE_RELATION_MAXIMUM_COUNT.times.map do |index|
       result = declare_relation.call(
         relation_input(
           command_id: "cmd-limit-#{index}",
@@ -290,20 +295,70 @@ RSpec.describe "Development Artifact write operations", :event_store do
         )
       )
       expect(result).to be_success
+      result.value!.data
     end
 
-    overflow = declare_relation.call(
+    active_overflow = declare_relation.call(
       relation_input(
-        command_id: "cmd-limit-overflow",
+        command_id: "cmd-active-limit-overflow",
         source:,
-        target: "https://example.test/overflow",
+        target: "https://example.test/active-overflow",
         relation: "references",
         target_kind: "external"
       )
     )
+    expect(active_overflow.failure.code).to eq(:development_artifact_relation_limit_reached)
+    expect(active_overflow.failure.details).to include(
+      limit_kind: "active",
+      active_remaining: 0,
+      lifetime_remaining: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_RELATION_LIFETIME_MAXIMUM_COUNT -
+        Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_ACTIVE_RELATION_MAXIMUM_COUNT
+    )
 
-    expect(overflow.failure.code).to eq(:development_artifact_relation_limit_reached)
-    expect(command_events("cmd-limit-overflow")).to be_empty
+    replacement = active.first
+    (
+      Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_RELATION_LIFETIME_MAXIMUM_COUNT -
+      Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_ACTIVE_RELATION_MAXIMUM_COUNT
+    ).times do |index|
+      result = declare_relation.call(
+        relation_input(
+          command_id: "cmd-lifetime-replacement-#{index}",
+          source:,
+          target: "https://example.test/replacement-#{index}",
+          relation: "references",
+          target_kind: "external",
+          supersedes: {
+            relation_id: replacement.relation_id,
+            reason: "replace active edge #{index}"
+          }
+        )
+      )
+      expect(result).to be_success
+      replacement = result.value!.data
+    end
+
+    lifetime_overflow = declare_relation.call(
+      relation_input(
+        command_id: "cmd-lifetime-limit-overflow",
+        source:,
+        target: "https://example.test/lifetime-overflow",
+        relation: "references",
+        target_kind: "external",
+        supersedes: {
+          relation_id: replacement.relation_id,
+          reason: "exceeds lifetime"
+        }
+      )
+    )
+
+    expect(lifetime_overflow.failure.code).to eq(:development_artifact_relation_limit_reached)
+    expect(lifetime_overflow.failure.details).to include(
+      limit_kind: "lifetime",
+      active_remaining: 0,
+      lifetime_remaining: 0
+    )
+    expect(command_events("cmd-active-limit-overflow")).to be_empty
+    expect(command_events("cmd-lifetime-limit-overflow")).to be_empty
   end
 
   def capture_input(

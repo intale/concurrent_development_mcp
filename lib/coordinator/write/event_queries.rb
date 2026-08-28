@@ -170,6 +170,12 @@ module Coordinator::Write
       direction: :asc
     )
 
+    OPERATION_BATCH_EXISTENCE = EventReadCriteria.new(
+      event_types: [ "OperationBatchCreated" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+
     DECISION_EXISTENCE = EventReadCriteria.new(
       event_types: [ "DecisionRecorded", "DecisionActivated" ],
       maximum_count: 2,

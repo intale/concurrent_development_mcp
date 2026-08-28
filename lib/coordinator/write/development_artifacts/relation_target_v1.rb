@@ -5,6 +5,9 @@ module Coordinator::Write
     class RelationTargetV1 < Value
       attribute :kind, Types::DevelopmentArtifactTargetKind
       attribute :id, Types::DevelopmentArtifactTargetId
+      attribute? :status, Types::DevelopmentArtifactTargetStatus.optional
+      attribute? :name, Types::SkillName.optional
+      attribute? :scope, Types::SkillScope.optional
     end
   end
 end

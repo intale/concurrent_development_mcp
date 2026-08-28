@@ -31,6 +31,7 @@ module Coordinator
       DEVELOPMENT_ARTIFACT_CAPTURE: EventReadCriteria
       DEVELOPMENT_ARTIFACT_OBSERVATION_HISTORY: EventReadCriteria
       OPERATION_BATCH_HISTORY: EventReadCriteria
+      OPERATION_BATCH_EXISTENCE: EventReadCriteria
       DECISION_EXISTENCE: EventReadCriteria
       DECISION_CORRECTION_STATE: GroupedEventReadCriteria
       DECISION_LATEST_IMPACT_CHANGE: GroupedEventReadCriteria

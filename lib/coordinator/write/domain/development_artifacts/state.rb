@@ -11,11 +11,11 @@ module Coordinator::Write
         attribute :capture, Capture.optional
         attribute :relations,
                   Types::Array.of(Relation).constrained(
-                    max_size: Types::DEVELOPMENT_ARTIFACT_RELATION_MAXIMUM_COUNT
+                    max_size: Types::DEVELOPMENT_ARTIFACT_RELATION_LIFETIME_MAXIMUM_COUNT
                   )
         attribute :supersessions,
                   Types::Array.of(Supersession).constrained(
-                    max_size: Types::DEVELOPMENT_ARTIFACT_RELATION_MAXIMUM_COUNT
+                    max_size: Types::DEVELOPMENT_ARTIFACT_RELATION_LIFETIME_MAXIMUM_COUNT
                   )
 
         def self.initial
@@ -82,6 +82,10 @@ module Coordinator::Write
         def active_relation(relation_id)
           declaration = relation(relation_id)
           declaration unless declaration && supersession_for(relation_id)
+        end
+
+        def active_relations
+          relations.reject { supersession_for(_1.artifact_relation.relation_id) }
         end
       end
     end

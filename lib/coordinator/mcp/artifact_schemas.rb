@@ -210,7 +210,7 @@ module Coordinator::Mcp
           artifact: artifact_summary,
           relationships: {
             type: "array",
-            maxItems: Types::DEVELOPMENT_ARTIFACT_RELATION_MAXIMUM_COUNT,
+            maxItems: Types::DEVELOPMENT_ARTIFACT_RELATION_LIFETIME_MAXIMUM_COUNT,
             items: relation
           }
         },
@@ -337,9 +337,12 @@ module Coordinator::Mcp
       Schemas.object_schema(
         properties: {
           kind: { type: "string", enum: Types::DEVELOPMENT_ARTIFACT_TARGET_KINDS },
-          id: text(maximum: Types::DEVELOPMENT_ARTIFACT_TARGET_ID_MAXIMUM_BYTES)
+          id: text(maximum: Types::DEVELOPMENT_ARTIFACT_TARGET_ID_MAXIMUM_BYTES),
+          status: { type: "string", enum: Types::DEVELOPMENT_ARTIFACT_TARGET_STATUSES },
+          name: nullable(text(maximum: Types::SKILL_NAME_MAXIMUM_BYTES)),
+          scope: nullable(text(maximum: Types::SKILL_SCOPE_MAXIMUM_BYTES))
         },
-        required: %w[kind id]
+        required: %w[kind id status name scope]
       )
     end
 

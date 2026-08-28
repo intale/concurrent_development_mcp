@@ -4,6 +4,9 @@ module Coordinator
       class RelationTargetV1 < Shared::Value
         def kind: () -> String
         def id: () -> String
+        def status: () -> String?
+        def name: () -> String?
+        def scope: () -> String?
       end
     end
   end

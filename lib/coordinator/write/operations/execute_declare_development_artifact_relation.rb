@@ -9,6 +9,7 @@ module Coordinator::Write
         event_store:,
         preparer: PrepareDeclareDevelopmentArtifactRelation.new,
         loader: DevelopmentArtifacts::Loader.new(event_store:),
+        target_resolver: DevelopmentArtifacts::RelationTargetResolver.new(event_store:),
         decider: Domain::DevelopmentArtifacts::DeclareRelation.new,
         input_digest: CommandInputDigest.new,
         clock: SystemClock.new,
@@ -22,6 +23,7 @@ module Coordinator::Write
         @event_store = event_store
         @preparer = preparer
         @loader = loader
+        @target_resolver = target_resolver
         @decider = decider
         @input_digest = input_digest
         @clock = clock
@@ -61,12 +63,16 @@ module Coordinator::Write
         return replay if replay
 
         artifact_relation = command.artifact_relation
-        target_captured = artifact_relation.target.kind != "artifact" ||
-                          @loader.captured?(artifact_relation.target.id)
+        target = @target_resolver.call(
+          source_artifact_id: artifact_relation.source_artifact_id,
+          target: artifact_relation.target
+        )
+        return target if target.failure?
+
         decision_result = @decider.call(
           state: @loader.load(artifact_relation.source_artifact_id),
           command:,
-          target_captured:,
+          target: target.value!,
           declared_at: preparation.declared_at
         )
         return decision_result if decision_result.failure?

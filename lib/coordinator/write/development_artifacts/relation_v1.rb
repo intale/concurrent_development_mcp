@@ -12,6 +12,10 @@ module Coordinator::Write
       def relation_attributes
         self[:attributes]
       end
+
+      def with_target(target)
+        self.class.new(to_h.merge(target:))
+      end
     end
   end
 end

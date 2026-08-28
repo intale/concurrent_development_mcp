@@ -922,15 +922,46 @@ module Coordinator::Write
       end
 
       class DevelopmentArtifactTargetDetails < DevelopmentArtifactDetails
-        attribute :target_artifact_id, Types::DevelopmentArtifactId
+        attribute :target_kind, Types::DevelopmentArtifactCanonicalTargetKind
+        attribute :target_id, Types::DevelopmentArtifactTargetId
       end
 
       class DevelopmentArtifactRelationLimitDetails < DevelopmentArtifactDetails
-        attribute :relation_count, Types::Integer.constrained(gteq: 0)
-        attribute :maximum_relation_count,
+        attribute :limit_kind, Types::String.enum("active", "lifetime")
+        attribute :active_count, Types::Integer.constrained(gteq: 0)
+        attribute :active_maximum,
+                  Types::Integer.constrained(eql: Types::DEVELOPMENT_ARTIFACT_ACTIVE_RELATION_MAXIMUM_COUNT)
+        attribute :active_remaining,
                   Types::Integer.constrained(
-                    eql: Types::DEVELOPMENT_ARTIFACT_RELATION_MAXIMUM_COUNT
+                    gteq: 0,
+                    lteq: Types::DEVELOPMENT_ARTIFACT_ACTIVE_RELATION_MAXIMUM_COUNT
                   )
+        attribute :lifetime_count, Types::Integer.constrained(gteq: 0)
+        attribute :lifetime_maximum,
+                  Types::Integer.constrained(eql: Types::DEVELOPMENT_ARTIFACT_RELATION_LIFETIME_MAXIMUM_COUNT)
+        attribute :lifetime_remaining,
+                  Types::Integer.constrained(
+                    gteq: 0,
+                    lteq: Types::DEVELOPMENT_ARTIFACT_RELATION_LIFETIME_MAXIMUM_COUNT
+                  )
+      end
+
+      class DevelopmentArtifactRelationDetails < DevelopmentArtifactDetails
+        attribute :relation_id, Types::DevelopmentArtifactRelationId
+      end
+
+      class DevelopmentArtifactRelationReplacementDetails < DevelopmentArtifactRelationDetails
+        attribute :replacement_relation_id, Types::DevelopmentArtifactRelationId
+      end
+
+      class DevelopmentArtifactRelationAlreadySupersededDetails < DevelopmentArtifactRelationDetails
+        attribute :existing_replacement_relation_id, Types::DevelopmentArtifactRelationId
+        attribute :requested_replacement_relation_id, Types::DevelopmentArtifactRelationId
+      end
+
+      class DevelopmentArtifactRelationSupersessionRuleDetails < DevelopmentArtifactRelationDetails
+        attribute :relation, Types::DevelopmentArtifactRelationKind
+        attribute :requested_relation, Types::DevelopmentArtifactRelationKind
       end
 
       class DevelopmentArtifactIdentityConflictError < Value
@@ -985,6 +1016,36 @@ module Coordinator::Write
         attribute :code, Types::String.enum("development_artifact_relation_limit_reached")
         attribute :message, Types::String
         attribute :details, DevelopmentArtifactRelationLimitDetails
+      end
+
+      class DevelopmentArtifactRelationNotFoundError < Value
+        attribute :code, Types::String.enum("development_artifact_relation_not_found")
+        attribute :message, Types::String
+        attribute :details, DevelopmentArtifactRelationDetails
+      end
+
+      class DevelopmentArtifactRelationSelfSupersessionError < Value
+        attribute :code, Types::String.enum("development_artifact_relation_self_supersession")
+        attribute :message, Types::String
+        attribute :details, DevelopmentArtifactRelationDetails
+      end
+
+      class DevelopmentArtifactRelationSupersededError < Value
+        attribute :code, Types::String.enum("development_artifact_relation_superseded")
+        attribute :message, Types::String
+        attribute :details, DevelopmentArtifactRelationReplacementDetails
+      end
+
+      class DevelopmentArtifactRelationAlreadySupersededError < Value
+        attribute :code, Types::String.enum("development_artifact_relation_already_superseded")
+        attribute :message, Types::String
+        attribute :details, DevelopmentArtifactRelationAlreadySupersededDetails
+      end
+
+      class DevelopmentArtifactRelationSupersessionNotAllowedError < Value
+        attribute :code, Types::String.enum("development_artifact_relation_supersession_not_allowed")
+        attribute :message, Types::String
+        attribute :details, DevelopmentArtifactRelationSupersessionRuleDetails
       end
 
       class VerificationObligationNotFoundError < Value

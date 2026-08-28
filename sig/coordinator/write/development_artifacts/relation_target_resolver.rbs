@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module DevelopmentArtifacts
+      class RelationTargetResolver
+        def initialize: (event_store: _EventStore, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory) -> void
+        def call: (source_artifact_id: String, target: RelationTargetV1) -> Dry::Monads::Result
+      end
+    end
+  end
+end

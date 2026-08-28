@@ -3,15 +3,8 @@
 module Coordinator::Write
   module Contracts
     class DeclareDevelopmentArtifactRelation < Dry::Validation::Contract
-      TARGET_KINDS_BY_RELATION = {
-        "references" => Types::DEVELOPMENT_ARTIFACT_TARGET_KINDS,
-        "contains" => %w[artifact],
-        "documents" => Types::DEVELOPMENT_ARTIFACT_TARGET_KINDS,
-        "evidences" => Types::DEVELOPMENT_ARTIFACT_TARGET_KINDS,
-        "derived_from" => Types::DEVELOPMENT_ARTIFACT_TARGET_KINDS,
-        "supersedes" => %w[artifact],
-        "produced_by_import" => %w[artifact build checkpoint]
-      }.freeze
+      RELATION_REGISTRY = DevelopmentArtifacts::RelationRegistry.new
+      EXTERNAL_TARGET_PATTERN = %r{\Ahttps?://[^\s/?#]+(?:[/?#][^\s]*)?\z}
 
       config.validate_keys = true
 
@@ -24,7 +17,10 @@ module Coordinator::Write
         required(:source_artifact_id).filled(:string)
         required(:relation).filled(:string, included_in?: Types::DEVELOPMENT_ARTIFACT_RELATION_KINDS)
         required(:target).hash do
-          required(:kind).filled(:string, included_in?: Types::DEVELOPMENT_ARTIFACT_TARGET_KINDS)
+          required(:kind).filled(
+            :string,
+            included_in?: Types::DEVELOPMENT_ARTIFACT_CANONICAL_TARGET_KINDS
+          )
           required(:id).filled(:string)
         end
         required(:attributes).hash do
@@ -58,8 +54,17 @@ module Coordinator::Write
           key([ :target, :id ]).failure("has an invalid byte length")
         end
         key([ :target, :id ]).failure("must not contain control characters") if /[\u0000-\u001f\u007f]/.match?(target_id)
-        if value.fetch(:kind) == "artifact" && !Types::DEVELOPMENT_ARTIFACT_ID_PATTERN.match?(target_id)
-          key([ :target, :id ]).failure("must be a valid Artifact ID")
+        target_kind = value.fetch(:kind)
+        valid_identity =
+          case target_kind
+          when "artifact" then Types::DEVELOPMENT_ARTIFACT_ID_PATTERN.match?(target_id)
+          when "skill" then Types::SKILL_ID_PATTERN.match?(target_id)
+          when "repository", "operation_batch" then Types::UUID_V7_PATTERN.match?(target_id)
+          when "external" then EXTERNAL_TARGET_PATTERN.match?(target_id)
+          else Types::IDENTIFIER_PATTERN.match?(target_id)
+          end
+        unless valid_identity
+          key([ :target, :id ]).failure("must be a valid #{target_kind} identity")
         end
       end
 
@@ -106,7 +111,7 @@ module Coordinator::Write
       end
 
       rule(:relation, :target) do
-        allowed = TARGET_KINDS_BY_RELATION.fetch(values[:relation])
+        allowed = RELATION_REGISTRY.fetch(values[:relation]).target_kinds
         key([ :target, :kind ]).failure("is incompatible with relation") unless allowed.include?(values[:target][:kind])
       end
 

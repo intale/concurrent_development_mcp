@@ -875,14 +875,14 @@ module Coordinator
           properties: {
             kind: {
               type: "string",
-              enum: Types::DEVELOPMENT_ARTIFACT_TARGET_KINDS,
-              description: "Ontology of the target identity; use artifact only for a captured Artifact ID."
+              enum: Types::DEVELOPMENT_ARTIFACT_CANONICAL_TARGET_KINDS,
+              description: "Canonical target ontology. Internal identities must already exist in pg_eventstore; external accepts only an absolute HTTP(S) URL and remains unverified."
             },
             id: {
               type: "string",
               minLength: 1,
               maxLength: Types::DEVELOPMENT_ARTIFACT_TARGET_ID_MAXIMUM_BYTES,
-              description: "Exact target identity already known to the caller; the server does not resolve a path or URL."
+              description: "Exact authoritative internal identity, or an absolute HTTP(S) URL for external. The server validates internal existence transactionally and never dereferences external URLs."
             }
           },
           required: %w[kind id]
@@ -936,7 +936,7 @@ module Coordinator
             relation: {
               type: "string",
               enum: Types::DEVELOPMENT_ARTIFACT_RELATION_KINDS,
-              description: "Directed caller-observed edge. For references and contains, use the parent or index Artifact as source and the linked child as target. Documents means the source describes the target and is not embedded-link evidence."
+              description: "Server-owned directed edge. Parent/index is the source for references and contains; documents and evidences point from the Artifact to the described/evidenced target; produced_by_import targets an Operation Batch."
             },
             target:,
             attributes:,

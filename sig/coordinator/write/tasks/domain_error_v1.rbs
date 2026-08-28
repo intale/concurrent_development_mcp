@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Tasks
       module DomainErrorV1
-        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | WorkItemCompletionError | WorkItemCompletionActiveWriteSetError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | ResourceIdentityPolicyMismatchError | WriteSetLimitError | ResourceBoundaryMaintenanceRequiredError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError | InterpretationNotAcceptedError | DecisionAlreadyExistsError | InterpretationAlreadyActivatedError | DecisionDefinitionNotActivatableError | DecisionSlotOccupiedError | DecisionPartitionLimitReachedError | DecisionPartitionCapacityReachedError | DecisionPartitionStateInvalidError | DecisionNotFoundError | DecisionNotActiveError | InterpretationNotACorrectionError | DecisionDefinitionNotCorrectableError | DecisionRevisionChangedError | DecisionSlotStateInvalidError | AgentChoiceAlreadyExistsError | StaleDecisionContextError | DecisionContextMismatchError | DecisionContextConflictError | DecisionContextLimitReachedError | UnsupportedDecisionContextError | AgentChoiceBlockedByDecisionError | AgentChoiceConfirmationRequiredError | AgentChoicePartitionSnapshotInvalidError | AgentChoiceDecisionHeadInvalidError | AgentChoiceUnresolvedHeadsError | CandidateAlreadyExistsError | CandidateHeadAlreadyRegisteredError | CandidateLeaseObservationsMismatchError | CandidateLeaseNotActiveScopeError | CandidateLeaseNotActiveError | CandidateUnauthorizedResourcesError | CandidateManifestBaseMismatchError | CandidateNotFoundError | CandidateImpactIdentityMismatchError | CandidateImpactSourceEvidenceMismatchError | CandidateImpactSurfaceAlreadyRecordedError | RepositoryRegistrationError | RepositoryNotRegisteredError | SkillIdentityConflictError | SkillRevisionConflictError | DevelopmentArtifactIdentityConflictError | DevelopmentArtifactObservationIdentityConflictError | DevelopmentArtifactClassificationCorrectionRequiredError | DevelopmentArtifactObservationNotFoundError | DevelopmentArtifactClassificationRevisionConflictError | DevelopmentArtifactClassificationRevisionLimitReachedError | DevelopmentArtifactNotFoundError | DevelopmentArtifactTargetNotFoundError | DevelopmentArtifactRelationLimitReachedError | VerificationObligationNotFoundError | VerificationObligationAlreadyClaimedError | VerificationObligationPolicyStaleError | VerificationObligationUnclaimedError | VerificationObligationClaimStaleError | VerificationObligationClaimNotOwnedError | VerificationObligationClaimExpiredError | VerificationObligationBindingStaleError | VerificationEvidenceKindNotRequiredError | VerificationEvidenceAlreadySubmittedError | VerificationEvidenceLimitReachedError | VerificationObligationTerminalError | VerificationObligationWaiverRequiresUserError | VerificationObligationAlreadyWaivedError | MergeSnapshotExistingError | MergeSnapshotCandidateError | MergeSnapshotStateError | MergeSnapshotVerificationBindingStaleError | MergeSnapshotVerificationAlreadySubmittedError | MergeSnapshotVerificationLimitReachedError | OperationBatchError | OperationBatchItemError | MergeObservationExistingError | MergeObservationStateError | MergeAuthorizationStaleError | MergeObservationMismatchError | ReleaseSetExistingError | ReleaseSetError
+        type domain_error = ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | WorkItemCompletionError | WorkItemCompletionActiveWriteSetError | CommandIdReusedError | LeaseBusyError | LeaseSetMismatchError | ResourceEvidenceConflictError | ResourceIdentityPolicyMismatchError | WriteSetLimitError | ResourceBoundaryMaintenanceRequiredError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError | InterpretationNotAcceptedError | DecisionAlreadyExistsError | InterpretationAlreadyActivatedError | DecisionDefinitionNotActivatableError | DecisionSlotOccupiedError | DecisionPartitionLimitReachedError | DecisionPartitionCapacityReachedError | DecisionPartitionStateInvalidError | DecisionNotFoundError | DecisionNotActiveError | InterpretationNotACorrectionError | DecisionDefinitionNotCorrectableError | DecisionRevisionChangedError | DecisionSlotStateInvalidError | AgentChoiceAlreadyExistsError | StaleDecisionContextError | DecisionContextMismatchError | DecisionContextConflictError | DecisionContextLimitReachedError | UnsupportedDecisionContextError | AgentChoiceBlockedByDecisionError | AgentChoiceConfirmationRequiredError | AgentChoicePartitionSnapshotInvalidError | AgentChoiceDecisionHeadInvalidError | AgentChoiceUnresolvedHeadsError | CandidateAlreadyExistsError | CandidateHeadAlreadyRegisteredError | CandidateLeaseObservationsMismatchError | CandidateLeaseNotActiveScopeError | CandidateLeaseNotActiveError | CandidateUnauthorizedResourcesError | CandidateManifestBaseMismatchError | CandidateNotFoundError | CandidateImpactIdentityMismatchError | CandidateImpactSourceEvidenceMismatchError | CandidateImpactSurfaceAlreadyRecordedError | RepositoryRegistrationError | RepositoryNotRegisteredError | SkillIdentityConflictError | SkillRevisionConflictError | DevelopmentArtifactIdentityConflictError | DevelopmentArtifactObservationIdentityConflictError | DevelopmentArtifactClassificationCorrectionRequiredError | DevelopmentArtifactObservationNotFoundError | DevelopmentArtifactClassificationRevisionConflictError | DevelopmentArtifactClassificationRevisionLimitReachedError | DevelopmentArtifactNotFoundError | DevelopmentArtifactTargetNotFoundError | DevelopmentArtifactRelationLimitReachedError | DevelopmentArtifactRelationNotFoundError | DevelopmentArtifactRelationSelfSupersessionError | DevelopmentArtifactRelationSupersededError | DevelopmentArtifactRelationAlreadySupersededError | DevelopmentArtifactRelationSupersessionNotAllowedError | VerificationObligationNotFoundError | VerificationObligationAlreadyClaimedError | VerificationObligationPolicyStaleError | VerificationObligationUnclaimedError | VerificationObligationClaimStaleError | VerificationObligationClaimNotOwnedError | VerificationObligationClaimExpiredError | VerificationObligationBindingStaleError | VerificationEvidenceKindNotRequiredError | VerificationEvidenceAlreadySubmittedError | VerificationEvidenceLimitReachedError | VerificationObligationTerminalError | VerificationObligationWaiverRequiresUserError | VerificationObligationAlreadyWaivedError | MergeSnapshotExistingError | MergeSnapshotCandidateError | MergeSnapshotStateError | MergeSnapshotVerificationBindingStaleError | MergeSnapshotVerificationAlreadySubmittedError | MergeSnapshotVerificationLimitReachedError | OperationBatchError | OperationBatchItemError | MergeObservationExistingError | MergeObservationStateError | MergeAuthorizationStaleError | MergeObservationMismatchError | ReleaseSetExistingError | ReleaseSetError
 
         class ChangeSetDetails < Shared::Value
           def change_set_id: () -> String
@@ -865,12 +865,36 @@ module Coordinator
         end
 
         class DevelopmentArtifactTargetDetails < DevelopmentArtifactDetails
-          def target_artifact_id: () -> String
+          def target_kind: () -> String
+          def target_id: () -> String
         end
 
         class DevelopmentArtifactRelationLimitDetails < DevelopmentArtifactDetails
-          def relation_count: () -> Integer
-          def maximum_relation_count: () -> Integer
+          def limit_kind: () -> String
+          def active_count: () -> Integer
+          def active_maximum: () -> Integer
+          def active_remaining: () -> Integer
+          def lifetime_count: () -> Integer
+          def lifetime_maximum: () -> Integer
+          def lifetime_remaining: () -> Integer
+        end
+
+        class DevelopmentArtifactRelationDetails < DevelopmentArtifactDetails
+          def relation_id: () -> String
+        end
+
+        class DevelopmentArtifactRelationReplacementDetails < DevelopmentArtifactRelationDetails
+          def replacement_relation_id: () -> String
+        end
+
+        class DevelopmentArtifactRelationAlreadySupersededDetails < DevelopmentArtifactRelationDetails
+          def existing_replacement_relation_id: () -> String
+          def requested_replacement_relation_id: () -> String
+        end
+
+        class DevelopmentArtifactRelationSupersessionRuleDetails < DevelopmentArtifactRelationDetails
+          def relation: () -> String
+          def requested_relation: () -> String
         end
 
         class DevelopmentArtifactIdentityConflictError < Shared::Value
@@ -926,6 +950,36 @@ module Coordinator
           def code: () -> String
           def message: () -> String
           def details: () -> DevelopmentArtifactRelationLimitDetails
+        end
+
+        class DevelopmentArtifactRelationNotFoundError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> DevelopmentArtifactRelationDetails
+        end
+
+        class DevelopmentArtifactRelationSelfSupersessionError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> DevelopmentArtifactRelationDetails
+        end
+
+        class DevelopmentArtifactRelationSupersededError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> DevelopmentArtifactRelationReplacementDetails
+        end
+
+        class DevelopmentArtifactRelationAlreadySupersededError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> DevelopmentArtifactRelationAlreadySupersededDetails
+        end
+
+        class DevelopmentArtifactRelationSupersessionNotAllowedError < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> DevelopmentArtifactRelationSupersessionRuleDetails
         end
 
         class VerificationObligationNotFoundError < Shared::Value

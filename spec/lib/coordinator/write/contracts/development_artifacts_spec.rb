@@ -54,13 +54,38 @@ RSpec.describe "Development Artifact contracts" do
     expect(relation.call(valid.merge(attributes: { path: "/a.md" }))).to be_failure
     expect(relation.call(valid.merge(attributes: { path: "a.md#part" }))).to be_failure
     expect(
-      relation.call(valid.merge(relation: "contains", target: { kind: "repository", id: "repo-1" }, attributes: {}))
+      relation.call(
+        valid.merge(
+          relation: "contains",
+          target: { kind: "repository", id: SecureRandom.uuid_v7.encode(Encoding::UTF_8) },
+          attributes: {}
+        )
+      )
     ).to be_failure
     expect(
       relation.call(valid.merge(target: { kind: "artifact", id: "not-an-artifact" }))
     ).to be_failure
     expect(relation.call(valid.merge(target: { kind: "artifact", id: source_id }))).to be_failure
     expect(relation.call(valid.merge(target: valid.fetch(:target).merge(extra: true)))).to be_failure
+    expect(
+      relation.call(
+        valid.merge(target: { kind: "external", id: "relative/path" })
+      )
+    ).to be_failure
+    expect(
+      relation.call(
+        valid.merge(target: { kind: "build", id: "historical-build" })
+      )
+    ).to be_failure
+    expect(
+      relation.call(
+        valid.merge(
+          relation: "produced_by_import",
+          target: { kind: "operation_batch", id: SecureRandom.uuid_v7.encode(Encoding::UTF_8) },
+          attributes: {}
+        )
+      )
+    ).to be_success
   end
 
   it "accepts the complete single-relation contract in each batch item" do

@@ -11,8 +11,13 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
       message: "Development Artifact relation limit reached",
       details: {
         artifact_id: "artifact:v1:#{'a' * 64}",
-        relation_count: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_RELATION_MAXIMUM_COUNT,
-        maximum_relation_count: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_RELATION_MAXIMUM_COUNT
+        limit_kind: "lifetime",
+        active_count: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_ACTIVE_RELATION_MAXIMUM_COUNT,
+        active_maximum: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_ACTIVE_RELATION_MAXIMUM_COUNT,
+        active_remaining: 0,
+        lifetime_count: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_RELATION_LIFETIME_MAXIMUM_COUNT,
+        lifetime_maximum: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_RELATION_LIFETIME_MAXIMUM_COUNT,
+        lifetime_remaining: 0
       }
     )
 
