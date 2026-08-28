@@ -493,25 +493,32 @@ module Coordinator::Write
 
     def development_artifact_capture(command:, decision:, input_digest:, persisted_events:, completed_at:)
       artifact = decision.capture.artifact
+      observation = decision.observation.observation
       build_completion(
         command:,
         tool_name: "development_artifact_capture",
-        summary: decision.outcome == "captured" ?
-          "Development Artifact captured." : "Development Artifact already exists.",
+        summary: case decision.outcome
+                 when "captured" then "Development Artifact content and observation captured."
+                 when "observed" then "Development Artifact observation captured for existing content."
+                 when "existing" then "Development Artifact observation already exists."
+                 end,
         data: CommandReceiptData::DevelopmentArtifactCapture.new(
           artifact_id: artifact.artifact_id,
-          scope: artifact.scope,
-          kind: artifact.kind,
+          observation_id: observation.observation_id,
+          classification_revision: 1,
+          scope: observation.scope,
+          kind: observation.kind,
           content_sha256: artifact.content.content_sha256,
           byte_size: artifact.content.byte_size,
           outcome: decision.outcome,
-          captured_at: decision.capture.captured_at
+          recorded_at: decision.observation.recorded_at
         ),
         next_actions: [
           NextAction.new(
             tool: "development_artifact_get",
             arguments: NextAction::DevelopmentArtifactArguments.new(
-              artifact_id: artifact.artifact_id
+              artifact_id: artifact.artifact_id,
+              observation_id: observation.observation_id
             )
           )
         ],

@@ -51,7 +51,8 @@ module Coordinator::Write
         DevelopmentArtifactCapturePreparationV1.new(
           captured_at: @clock.now,
           input_digest: @input_digest.development_artifact_capture(command),
-          domain_event_id: @id_generator.uuid_v7,
+          capture_event_id: @id_generator.uuid_v7,
+          observation_event_id: @id_generator.uuid_v7,
           completion_event_id: @id_generator.uuid_v7
         )
       end
@@ -62,6 +63,7 @@ module Coordinator::Write
 
         decision_result = @decider.call(
           state: @loader.load(command.artifact.artifact_id),
+          observation_state: @loader.load_observation(command.observation.observation_id),
           command:,
           captured_at: preparation.captured_at
         )
@@ -71,7 +73,7 @@ module Coordinator::Write
         persisted_events = persist_domain_plan(
           decision.event_plan,
           command:,
-          event_id: preparation.domain_event_id,
+          preparation:,
           caused_by:
         )
         completion = @completion_builder.development_artifact_capture(
@@ -132,25 +134,38 @@ module Coordinator::Write
         )
       end
 
-      def persist_domain_plan(plan, command:, event_id:, caused_by:)
+      def persist_domain_plan(plan, command:, preparation:, caused_by:)
         return [] unless plan
 
-        stream = @stream_factory.development_artifact(command.artifact.artifact_id)
-        unless plan.writes.length == 1 && plan.writes.first.stream == stream
-          raise "CaptureDevelopmentArtifact domain plan must contain one write to its Artifact stream"
+        expected_streams = [
+          @stream_factory.development_artifact(command.artifact.artifact_id),
+          @stream_factory.development_artifact_observation(command.observation.observation_id)
+        ]
+        unless plan.writes.length.between?(1, 2) &&
+               plan.writes.map(&:stream).uniq.length == plan.writes.length &&
+               plan.writes.all? { expected_streams.include?(_1.stream) }
+          raise "CaptureDevelopmentArtifact domain plan must write bounded Artifact and observation facts"
         end
 
-        persisted = @event_factory.build!(
-          event: plan.writes.first.event,
-          event_id:,
-          metadata: command_metadata(command),
-          markers: @marker_builder.capture(
-            artifact_id: command.artifact.artifact_id,
-            command_id: command.command_id
-          ),
-          caused_by:
-        )
-        @event_store.append(stream, [ persisted ])
+        plan.writes.flat_map do |write|
+          event = write.event
+          persisted = @event_factory.build!(
+            event:,
+            event_id: domain_event_id(event, preparation),
+            metadata: command_metadata(command),
+            markers: @marker_builder.capture(event:, command_id: command.command_id),
+            caused_by:
+          )
+          @event_store.append(write.stream, [ persisted ])
+        end
+      end
+
+      def domain_event_id(event, preparation)
+        case event
+        when Events::DevelopmentArtifactCapturedV1 then preparation.capture_event_id
+        when Events::DevelopmentArtifactObservedV1 then preparation.observation_event_id
+        else raise "Unexpected Development Artifact capture event #{event.class.name}"
+        end
       end
 
       def persist_completion(completion, command:, event_id:, caused_by:)

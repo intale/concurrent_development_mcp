@@ -1,0 +1,18 @@
+module Coordinator
+  module Write
+    module Domain
+      module DevelopmentArtifacts
+        class ObservationState < Shared::Value
+          def self.initial: () -> ObservationState
+          def self.reduce: (Array[Events::Base] events) -> ObservationState
+          def observation: () -> Events::DevelopmentArtifactObservedV1?
+          def corrections: () -> Array[Events::DevelopmentArtifactClassificationCorrectedV1]
+          def classification_revision: () -> Integer
+          def title: () -> String?
+          def kind: () -> String?
+          def labels: () -> Array[String]?
+        end
+      end
+    end
+  end
+end

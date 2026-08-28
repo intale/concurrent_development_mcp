@@ -388,12 +388,14 @@ module Coordinator
 
       class DevelopmentArtifactCapture < Shared::Value
         def artifact_id: () -> String
+        def observation_id: () -> String
+        def classification_revision: () -> Integer
         def scope: () -> String
         def kind: () -> String
         def content_sha256: () -> String
         def byte_size: () -> Integer
         def outcome: () -> String
-        def captured_at: () -> String
+        def recorded_at: () -> String
       end
 
       class DevelopmentArtifactRelation < Shared::Value

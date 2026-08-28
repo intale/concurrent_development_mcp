@@ -812,6 +812,7 @@ module Coordinator::Write
           actor: actor_document(command.actor),
           artifact: CommandInputDocuments::DevelopmentArtifactV1.new(
             artifact_id: artifact.artifact_id,
+            observation_id: command.observation.observation_id,
             scope: artifact.scope,
             title: artifact.title,
             kind: artifact.kind,

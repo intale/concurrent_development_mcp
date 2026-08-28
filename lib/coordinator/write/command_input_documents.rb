@@ -684,6 +684,7 @@ module Coordinator::Write
 
     class DevelopmentArtifactV1 < Value
       attribute :artifact_id, Types::DevelopmentArtifactId
+      attribute :observation_id, Types::DevelopmentArtifactObservationId
       attribute :scope, Types::DevelopmentArtifactScope
       attribute :title, Types::DevelopmentArtifactTitle
       attribute :kind, Types::DevelopmentArtifactKind

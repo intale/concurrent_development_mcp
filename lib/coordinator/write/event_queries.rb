@@ -147,6 +147,15 @@ module Coordinator::Write
       direction: :asc
     )
 
+    DEVELOPMENT_ARTIFACT_OBSERVATION_HISTORY = EventReadCriteria.new(
+      event_types: [
+        "DevelopmentArtifactObserved",
+        "DevelopmentArtifactClassificationCorrected"
+      ],
+      maximum_count: Types::DEVELOPMENT_ARTIFACT_CLASSIFICATION_MAXIMUM_REVISIONS,
+      direction: :asc
+    )
+
     OPERATION_BATCH_HISTORY = EventReadCriteria.new(
       event_types: [
         "OperationBatchCreated",

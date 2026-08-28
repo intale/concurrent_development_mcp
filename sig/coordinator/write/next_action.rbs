@@ -52,6 +52,7 @@ module Coordinator
 
       class DevelopmentArtifactArguments < Shared::Value
         def artifact_id: () -> String
+        def observation_id: () -> String?
       end
 
       class OperationBatchArguments < Shared::Value

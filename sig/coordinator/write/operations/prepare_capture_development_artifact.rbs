@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Operations
       class PrepareCaptureDevelopmentArtifact
-        def initialize: (?contract: Contracts::CaptureDevelopmentArtifact, ?content_builder: DevelopmentArtifacts::ContentBuilder, ?artifact_builder: DevelopmentArtifacts::ArtifactBuilder) -> void
+        def initialize: (?contract: Contracts::CaptureDevelopmentArtifact, ?content_builder: DevelopmentArtifacts::ContentBuilder, ?artifact_builder: DevelopmentArtifacts::ArtifactBuilder, ?observation_builder: DevelopmentArtifacts::ObservationBuilder) -> void
         %a{rbs:test:skip}
         def call: (command_input input) -> Dry::Monads::Result
       end

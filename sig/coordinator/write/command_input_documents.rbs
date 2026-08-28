@@ -644,6 +644,7 @@ module Coordinator
 
       class DevelopmentArtifactV1 < Shared::Value
         def artifact_id: () -> String
+        def observation_id: () -> String
         def scope: () -> String
         def title: () -> String
         def kind: () -> String

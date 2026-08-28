@@ -3,8 +3,18 @@
 module Coordinator::Write
   module DevelopmentArtifacts
     class MarkerBuilder
-      def capture(artifact_id:, command_id:)
-        [ "development-artifact:#{artifact_id}", "command:#{command_id}" ].freeze
+      def capture(event:, command_id:)
+        markers = [ "command:#{command_id}" ]
+        case event
+        when Events::DevelopmentArtifactCapturedV1
+          markers << "development-artifact:#{event.artifact.artifact_id}"
+        when Events::DevelopmentArtifactObservedV1
+          markers << "development-artifact:#{event.observation.artifact_id}"
+          markers << "development-artifact-observation:#{event.observation.observation_id}"
+        else
+          raise "Unexpected Development Artifact capture event #{event.class.name}"
+        end
+        markers.freeze
       end
 
       def relation(artifact_relation:, command_id:)

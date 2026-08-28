@@ -5,8 +5,9 @@ module Coordinator::Write
     module DevelopmentArtifacts
       class CaptureDecisionV1 < Value
         attribute :capture, Events::DevelopmentArtifactCapturedV1
+        attribute :observation, Events::DevelopmentArtifactObservedV1
         attribute :event_plan, EventPlan.optional
-        attribute :outcome, Types::String.enum("captured", "existing")
+        attribute :outcome, Types::String.enum("captured", "observed", "existing")
       end
     end
   end

@@ -4,6 +4,7 @@ module Coordinator
       class Loader
         def initialize: (event_store: _EventStore, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory) -> void
         def load: (String artifact_id) -> Domain::DevelopmentArtifacts::State
+        def load_observation: (String observation_id) -> Domain::DevelopmentArtifacts::ObservationState
         def captured?: (String artifact_id) -> bool
       end
     end

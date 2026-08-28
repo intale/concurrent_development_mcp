@@ -5,6 +5,7 @@ module Coordinator
         def command_id: () -> String
         def actor: () -> Actor
         def artifact: () -> DevelopmentArtifacts::ArtifactV1
+        def observation: () -> DevelopmentArtifacts::ArtifactObservationV1
       end
     end
   end

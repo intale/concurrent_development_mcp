@@ -4,7 +4,7 @@ module Coordinator
       module DevelopmentArtifacts
         class Capture
           def initialize: (?stream_factory: StreamFactory) -> void
-          def call: (state: State, command: Commands::CaptureDevelopmentArtifact, captured_at: String) -> Dry::Monads::Result
+          def call: (state: State, observation_state: ObservationState, command: Commands::CaptureDevelopmentArtifact, captured_at: String) -> Dry::Monads::Result
         end
       end
     end

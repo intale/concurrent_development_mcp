@@ -423,12 +423,14 @@ module Coordinator::Write
 
     class DevelopmentArtifactCapture < Value
       attribute :artifact_id, Types::DevelopmentArtifactId
+      attribute :observation_id, Types::DevelopmentArtifactObservationId
+      attribute :classification_revision, Types::DevelopmentArtifactClassificationRevision
       attribute :scope, Types::DevelopmentArtifactScope
       attribute :kind, Types::DevelopmentArtifactKind
       attribute :content_sha256, Types::Sha256Digest
       attribute :byte_size, Types::DevelopmentArtifactByteSize
-      attribute :outcome, Types::String.enum("captured", "existing")
-      attribute :captured_at, Types::Timestamp
+      attribute :outcome, Types::String.enum("captured", "observed", "existing")
+      attribute :recorded_at, Types::Timestamp
     end
 
     class DevelopmentArtifactRelation < Value

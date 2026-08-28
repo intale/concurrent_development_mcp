@@ -29,6 +29,15 @@ module Coordinator::Write
         ).any?
       end
 
+      def load_observation(observation_id)
+        events = @event_store.read(
+          @stream_factory.development_artifact_observation(observation_id),
+          EventQueries::DEVELOPMENT_ARTIFACT_OBSERVATION_HISTORY
+        ).map { load_event(_1) }
+
+        Domain::DevelopmentArtifacts::ObservationState.reduce(events)
+      end
+
       private
 
       def load_event(event)

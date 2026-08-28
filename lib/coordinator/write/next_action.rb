@@ -55,6 +55,7 @@ module Coordinator::Write
 
     class DevelopmentArtifactArguments < Value
       attribute :artifact_id, Types::DevelopmentArtifactId
+      attribute? :observation_id, Types::DevelopmentArtifactObservationId.optional
     end
 
     class DecisionResolutionArguments < Value
