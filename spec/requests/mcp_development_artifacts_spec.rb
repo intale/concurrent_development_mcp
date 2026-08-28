@@ -264,6 +264,7 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
       "observation_id",
       "classification_revision",
       "classification_reason",
+      "relationship_capacity",
       "observed",
       "classified"
     )
@@ -282,11 +283,16 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
     )
     expect(relation_item).to include(
       "direction",
+      "display_relation",
+      "inverse_relation",
+      "transitive",
+      "supersedable",
       "peer_id",
       "peer_artifact",
       "attributes",
       "declared",
-      "superseded"
+      "superseded",
+      "follow_action"
     )
     expect(
       locator_page.dig("properties", "resolution", "enum")
@@ -422,11 +428,23 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
     expect(outgoing.fetch("items").sole).to include(
       "direction" => "outgoing",
       "peer_id" => child,
-      "status" => "active"
+      "status" => "active",
+      "display_relation" => "references",
+      "inverse_relation" => "referenced_by",
+      "target" => include("status" => "verified"),
+      "follow_action" => {
+        "tool" => "development_artifact_get",
+        "arguments" => { "artifact_id" => child }
+      }
     )
     expect(incoming.fetch("items").sole).to include(
       "direction" => "incoming",
-      "peer_id" => parent
+      "peer_id" => parent,
+      "display_relation" => "referenced_by",
+      "follow_action" => {
+        "tool" => "development_artifact_get",
+        "arguments" => { "artifact_id" => parent }
+      }
     )
     expect(outgoing.fetch("continuation_cursor")).to include(
       "after_observed_sequence" => be_positive

@@ -44,6 +44,14 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
       artifact_id: source,
       title: "Captured evidence",
       relationship_count: 1,
+      relationship_capacity: have_attributes(
+        active_count: 1,
+        active_limit: 64,
+        active_remaining: 63,
+        lifetime_count: 1,
+        lifetime_limit: 128,
+        lifetime_remaining: 127
+      ),
       captured: have_attributes(
         event: have_attributes(event_id: source_capture.id, stream_revision: 0),
         global_position: source_capture.global_position,
@@ -53,8 +61,17 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
     )
     expect(view.relationships.sole).to have_attributes(
       relation_id: relation.data.fetch("artifact_relation").fetch("relation_id"),
-      target: have_attributes(kind: "artifact", id: target),
-      peer_artifact: nil
+      relation: "derived_from",
+      display_relation: "derived_from",
+      inverse_relation: "source_of",
+      transitive: true,
+      supersedable: true,
+      target: have_attributes(kind: "artifact", id: target, status: "verified"),
+      peer_artifact: nil,
+      follow_action: have_attributes(
+        tool: "development_artifact_get",
+        arguments: have_attributes(artifact_id: target)
+      )
     )
     expect(processed_events.count).to eq(2)
     expect(view.to_h.keys & %i[fresh pending projection_status]).to be_empty
@@ -262,7 +279,7 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
   def processed_events
     Coordinator::Read::ProcessedProjectionEvent.where(
       projection_name: "development-artifacts",
-      projection_version: 3
+      projection_version: 4
     )
   end
 

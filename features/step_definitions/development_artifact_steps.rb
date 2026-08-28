@@ -268,6 +268,24 @@ end
 
 When("the linked Artifact facts reach the read side") do
   @linked_artifacts.each_value { project_artifact(_1.fetch(:artifact_id)) }
+  expected_relation_ids = @linked_relations.values.map do |outcome|
+    outcome.dig(:result, "data", "relation_id")
+  end.sort
+  await_read_model("Every linked Artifact edge to become available") do
+    readme = artifact_relation_page(
+      @linked_artifacts.fetch(:readme).fetch(:artifact_id),
+      direction: "outgoing"
+    )
+    api = artifact_relation_page(
+      @linked_artifacts.fetch(:api).fetch(:artifact_id),
+      direction: "incoming"
+    )
+    observed_relation_ids = (readme.fetch("items") + api.fetch("items"))
+      .map { _1.fetch("relation_id") }
+      .uniq
+      .sort
+    [ observed_relation_ids == expected_relation_ids, { readme:, api: } ]
+  end
 end
 
 When("the clean agent walks outgoing relationships from the README") do

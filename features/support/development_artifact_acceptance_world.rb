@@ -10,12 +10,15 @@ module DevelopmentArtifactAcceptanceWorld
     source_kind:,
     content:,
     scope: "project:acceptance",
-    revision: nil
+    revision: nil,
+    actor_id: "artifact-agent",
+    client_id: "default"
   )
     task_id = submit_and_execute(
       "development_artifact_capture",
+      client_id:,
       command_id:,
-      actor: { kind: "agent", id: "artifact-agent" },
+      actor: { kind: "agent", id: actor_id },
       scope:,
       title:,
       kind:,
@@ -29,7 +32,7 @@ module DevelopmentArtifactAcceptanceWorld
         collector: "cucumber/v1"
       }
     )
-    state = task_request("tasks/get", task_id)
+    state = task_request("tasks/get", task_id, client_id:)
     state.dig("result", "result", "structuredContent")
   end
 
@@ -39,21 +42,27 @@ module DevelopmentArtifactAcceptanceWorld
     relation:,
     target:,
     attributes: {},
-    supersedes: nil
+    supersedes: nil,
+    actor_id: "artifact-agent",
+    client_id: "default"
   )
     arguments = {
       command_id:,
-      actor: { kind: "agent", id: "artifact-agent" },
+      actor: { kind: "agent", id: actor_id },
       source_artifact_id:,
       relation:,
       target:,
       attributes:
     }
     arguments[:supersedes] = supersedes if supersedes
-    task_id = submit_and_execute("development_artifact_relation_declare", **arguments)
+    task_id = submit_and_execute(
+      "development_artifact_relation_declare",
+      client_id:,
+      **arguments
+    )
     {
       task_id:,
-      result: task_request("tasks/get", task_id)
+      result: task_request("tasks/get", task_id, client_id:)
         .dig("result", "result", "structuredContent")
     }
   end
@@ -65,10 +74,13 @@ module DevelopmentArtifactAcceptanceWorld
     )
   end
 
-  def project_artifact(artifact_id)
+  def project_artifact(artifact_id, observation_id: nil)
     await_read_model("Development Artifact #{artifact_id} to become available") do
-      payload = artifact_view(artifact_id)
-      [ payload.dig("data", "artifact", "artifact", "artifact_id") == artifact_id, payload ]
+      payload = artifact_view(artifact_id, observation_id:)
+      artifact = payload.dig("data", "artifact", "artifact")
+      matches = artifact&.fetch("artifact_id") == artifact_id &&
+                (!observation_id || artifact.fetch("observation_id") == observation_id)
+      [ matches, payload ]
     end
   end
 
@@ -88,8 +100,10 @@ module DevelopmentArtifactAcceptanceWorld
     end
   end
 
-  def artifact_view(artifact_id)
-    call_tool("development_artifact_get", { artifact_id: })
+  def artifact_view(artifact_id, observation_id: nil)
+    arguments = { artifact_id: }
+    arguments[:observation_id] = observation_id if observation_id
+    call_tool("development_artifact_get", arguments)
       .dig("result", "structuredContent")
   end
 
@@ -140,6 +154,59 @@ module DevelopmentArtifactAcceptanceWorld
       )
       item = page&.fetch("items", [])&.find { _1.fetch("relation_id") == relation_id }
       [ item&.fetch("status") == status, page ]
+    end
+  end
+
+
+  def submit_artifact_relation_batch(items, command_suffix:)
+    batch_id = SecureRandom.uuid_v7
+    task_id = submit_and_execute(
+      "development_artifact_relation_declare_batch",
+      command_id: "cmd-cuc-artifact-relation-batch-#{command_suffix}",
+      actor: { kind: "agent", id: "artifact-batch-agent" },
+      batch_id:,
+      items:
+    )
+    state = task_request("tasks/get", task_id)
+    assert_acceptance_equal("completed", state.dig("result", "status"), "Relation Batch Task")
+    await_artifact_relation_batch(batch_id)
+  end
+
+  def await_artifact_relation_batch(batch_id)
+    start_process_subscriptions
+    eventually("Artifact relation Batch #{batch_id} to become terminal", timeout_seconds: 30) do
+      events = artifact_relation_batch_events(batch_id)
+      terminal = events.any? do |event|
+        %w[OperationBatchCompleted OperationBatchCancelled].include?(event.type)
+      end
+      [ terminal, events.map(&:type) ]
+    end
+    await_read_model("Artifact relation Batch #{batch_id} to become queryable") do
+      payload = call_tool(
+        "operation_batch_get",
+        { batch_id:, limit: Coordinator::Shared::Types::OPERATION_BATCH_QUERY_MAXIMUM_ITEMS }
+      ).dig("result", "structuredContent")
+      status = payload.dig("data", "batch", "status")
+      [ %w[completed completed_with_errors cancelled].include?(status), payload ]
+    end
+  end
+
+  def artifact_relation_batch_events(batch_id)
+    event_store.read(
+      streams.operation_batch(batch_id),
+      Coordinator::Write::EventQueries::OPERATION_BATCH_HISTORY
+    )
+  end
+
+  def await_artifact_relation_count(artifact_id, count, include_superseded: true)
+    await_read_model("Artifact #{artifact_id} to expose #{count} relationships") do
+      page = artifact_relation_page(
+        artifact_id,
+        direction: "outgoing",
+        limit: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_QUERY_MAXIMUM_ITEMS,
+        include_superseded:
+      )
+      [ page&.fetch("items", [])&.length == count, page ]
     end
   end
 end

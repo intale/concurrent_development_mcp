@@ -56,7 +56,7 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
       actor: { kind: "agent", id: "agent-query" },
       source_artifact_id: second,
       relation: "documents",
-      target: { kind: "build", id: "build-1" },
+      target: { kind: "external", id: "https://example.test/builds/build-1" },
       attributes: { path: "notes/second.md" }
     )
     expect(relation).to be_success
@@ -67,7 +67,7 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
       limit: 10
     ).value!
     related = Coordinator::Read::Queries::DevelopmentArtifactList.new.call(
-      relation_target: { kind: "build", id: "build-1" },
+      relation_target: { kind: "external", id: "https://example.test/builds/build-1" },
       limit: 10
     ).value!
     page_one = Coordinator::Read::Queries::DevelopmentArtifactList.new.call(limit: 1).value!
@@ -131,6 +131,17 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
 
     expect(incoming.items.map(&:relation_id)).to contain_exactly(first, second)
     expect(incoming.items).to all(have_attributes(direction: "incoming", peer_kind: "artifact"))
+    expect(filtered.items.sole).to have_attributes(
+      relation: "references",
+      display_relation: "referenced_by",
+      inverse_relation: "referenced_by",
+      transitive: false,
+      supersedable: true,
+      follow_action: have_attributes(
+        tool: "development_artifact_get",
+        arguments: have_attributes(artifact_id: first_parent)
+      )
+    )
     expect(incoming.items.map { _1.peer_artifact.artifact_id }).to contain_exactly(
       first_parent,
       second_parent
@@ -148,7 +159,14 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
       direction: "outgoing",
       peer_id: child,
       peer_artifact: have_attributes(artifact_id: child),
-      relation_attributes: have_attributes(path: "child.md", normalized_locator: "child.md")
+      relation_attributes: have_attributes(path: "child.md", normalized_locator: "child.md"),
+      display_relation: "references",
+      inverse_relation: "referenced_by",
+      target: have_attributes(status: "verified"),
+      follow_action: have_attributes(
+        tool: "development_artifact_get",
+        arguments: have_attributes(artifact_id: child)
+      )
     )
   end
 
