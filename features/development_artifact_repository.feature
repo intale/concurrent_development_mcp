@@ -66,3 +66,56 @@ Feature: Development Artifact repository
       And its relation fact reaches the read side after a subscription restart
       Then both Tasks expose one logical relation result
       And one relation fact, command receipt, and projected edge exist
+
+  Rule: Source observations are immutable while classification is explicitly correctable
+
+    @linked-artifacts @AUD-ART-OBSERVATION-01
+    Scenario: Identical bytes observed at two Git revisions remain separate historical observations
+      When the agent captures identical documentation bytes from two Git revisions
+      Then both capture Tasks name one content-addressed Artifact and two observation IDs
+      When both Artifact observations reach the read side
+      Then exact observation actions retrieve both Git revisions independently
+      And both observations lead to the same passive content
+
+    @linked-artifacts @AUD-ART-CLASSIFICATION-02
+    Scenario: Classification correction preserves captured bytes and source provenance
+      Given one projected documentation observation has an inaccurate title and labels
+      When the agent corrects that observation classification through a Task
+      Then the correction advances the classification revision without capturing new bytes
+      And exact observation retrieval exposes the corrected title and labels
+      And its content digest and immutable provenance are unchanged
+
+  Rule: Relationship ontology is canonical, authoritative, and navigable
+
+    @linked-artifacts @AUD-ART-DEAD-LINK-03
+    Scenario: Internal targets require authoritative facts while external targets remain unverified
+      Given a projected source Artifact is available for target validation
+      When the agent declares a relationship to a nonexistent Candidate
+      Then the relation Task is denied and no relation fact exists
+      When the agent declares a relationship to an external URL
+      Then the relation is accepted with an unverified target status
+
+    @linked-artifacts @AUD-ART-GRAPH-DIRECTION-04
+    Scenario: Independent agents converge on the canonical direction for one reference
+      Given two independent MCP agents know the same projected parent and child Artifacts
+      When both agents declare that the parent references the child
+      Then both relation Tasks identify one directed edge
+      And outgoing parent traversal and incoming child traversal expose inverse directions
+
+    @linked-artifacts @AUD-ART-GRAPH-FOLLOW-05
+    Scenario: Every verified internal target exposes a usable public follow-up action
+      Given a source Artifact and authoritative coordination targets are available
+      When the agent declares one documented relationship to each internal target kind
+      And the internal-target relationships reach the read side
+      Then every relationship supplies an action accepted by its public MCP tool
+
+  Rule: Graph capacity is bounded and supersession releases active capacity
+
+    @linked-artifacts @AUD-ART-GRAPH-CAPACITY-06
+    Scenario: Active and lifetime graph limits are explicit before history can grow without bound
+      Given a source Artifact has reached its active relationship capacity
+      When the agent supersedes one active relationship
+      Then active graph capacity remains available for one replacement edge
+      And Artifact metadata reports active and lifetime capacity separately
+      When another declaration would exceed the lifetime graph limit
+      Then it is denied from bounded history with the discoverable lifetime limit
