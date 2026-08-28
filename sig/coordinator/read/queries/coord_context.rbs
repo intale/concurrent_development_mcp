@@ -10,6 +10,7 @@ module Coordinator
           ?next_actions_builder: ContextNextActionsBuilder,
           ?canonical_json: Shared::CanonicalJson
         ) -> void
+        # dry-operation prepends #call; runtime RBS wrapping recursively re-enters that wrapper.
         %a{rbs:test:skip}
         def call: (command_input input) -> Dry::Monads::Result
 
@@ -18,6 +19,7 @@ module Coordinator
             ?contract: Contracts::CoordContext::AttemptList,
             ?contexts: Repositories::CoordContexts
           ) -> void
+          # dry-operation prepends #call; runtime RBS wrapping recursively re-enters that wrapper.
           %a{rbs:test:skip}
           def call: (command_input input) -> Dry::Monads::Result
         end

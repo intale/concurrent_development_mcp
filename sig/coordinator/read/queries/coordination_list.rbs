@@ -8,6 +8,7 @@ module Coordinator
           ?contract: Contracts::CoordinationList,
           ?discovery: Repositories::CoordinationDiscovery
         ) -> void
+        # dry-operation prepends #call; runtime RBS wrapping recursively re-enters that wrapper.
         %a{rbs:test:skip}
         def call: (command_input input) -> QueryResultV1
       end

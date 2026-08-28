@@ -1,6 +1,7 @@
 module Coordinator::Read::Queries
   class ReleaseSetGet < Dry::Operation
     def initialize: (?contract: Coordinator::Read::Contracts::ReleaseSetGet, ?release_sets: Coordinator::Read::Repositories::ReleaseSets) -> void
+    # dry-operation prepends #call; runtime RBS wrapping recursively re-enters that wrapper.
     %a{rbs:test:skip}
     def call: (Coordinator::Read::command_input input) -> Dry::Monads::Result
   end

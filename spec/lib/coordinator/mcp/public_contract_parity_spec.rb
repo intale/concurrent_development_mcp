@@ -79,6 +79,29 @@ RSpec.describe "MCP public contract parity" do
     end
   end
 
+  it "limits documented dry-operation runtime exemptions to generated call wrappers" do
+    query_signatures = Dir[Rails.root.join("sig/coordinator/read/queries/*.rbs")]
+
+    aggregate_failures do
+      query_signatures.each do |path|
+        signature = File.read(path)
+        call_count = signature.scan(/def call:/).length
+        documented_exemptions = signature.scan(
+          /# dry-operation prepends #call; runtime RBS wrapping recursively re-enters that wrapper\.\n\s+%a\{rbs:test:skip\}\n\s+def call:/
+        ).length
+
+        expect(signature.scan("rbs:test:skip").length).to eq(call_count), path
+        expect(documented_exemptions).to eq(call_count), path
+      end
+    end
+    expect(File.read(Rails.root.join("sig/coordinator/read/queries/operation_get.rbs"))).to include(
+      "def call: (command_input input) -> QueryResultV1"
+    )
+    expect(File.read(Rails.root.join("sig/coordinator/mcp/query_tool.rbs"))).to include(
+      "-> ::MCP::Tool::Response"
+    )
+  end
+
   def contract_actor_kinds(tool)
     operation = Coordinator::Container[tool.operation]
     preparer = operation.instance_variable_get(:@preparer)

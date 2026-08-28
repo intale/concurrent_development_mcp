@@ -10,7 +10,7 @@ RSpec.describe Coordinator::Read::Queries::DecisionResolve, :event_store, :read_
     {
       topic_id: "testing.framework",
       context: {
-        repository_id: "billing",
+        repository_id: "0198f5b8-57ab-7def-8abc-1234567890ab",
         change_set_id: "CS-resolve",
         work_item_id: "W-resolve",
         attempt_id: "A-resolve",
@@ -25,7 +25,7 @@ RSpec.describe Coordinator::Read::Queries::DecisionResolve, :event_store, :read_
   it "serves explicit absent and partial projections before converging on an effective Decision" do
     seed_active_decision
     recorded, activated = decision_events("D-resolve")
-    partition = partition_events("repo:billing:testing").sole
+    partition = partition_events("repo:0198f5b8-57ab-7def-8abc-1234567890ab:testing").sole
 
     absent = query.call(input).value!
     expect(absent).to have_attributes(status: "ok")
@@ -37,7 +37,7 @@ RSpec.describe Coordinator::Read::Queries::DecisionResolve, :event_store, :read_
     expect(absent.data.decision_context.document.query_context.paths).to eq(%w[spec/a_spec.rb spec/z_spec.rb])
     expect(absent.data.decision_context.document.partitions.map { _1.partition.partition_id }).to eq(
       %w[
-        repo:billing:testing
+        repo:0198f5b8-57ab-7def-8abc-1234567890ab:testing
         changeset:CS-resolve:testing
         workitem:W-resolve:testing
         attempt:A-resolve:testing
@@ -82,20 +82,25 @@ RSpec.describe Coordinator::Read::Queries::DecisionResolve, :event_store, :read_
       interpretation_id: "I-A",
       message_id: "M-A",
       command_suffix: "a",
-      scope: InterpretationInput.scope(repository_ids: [ "billing" ])
+      scope: InterpretationInput.scope(repository_ids: [ "0198f5b8-57ab-7def-8abc-1234567890ab" ])
     )
     seed_active_decision(
       decision_id: "D-B",
       interpretation_id: "I-B",
       message_id: "M-B",
       command_suffix: "b",
-      scope: InterpretationInput.scope(repository_ids: %w[billing orders]),
+      scope: InterpretationInput.scope(
+        repository_ids: %w[
+          0198f5b8-57ab-7def-8abc-1234567890ab
+          0198f5b8-57ab-7def-8abc-abcdefabcdef
+        ]
+      ),
       value: InterpretationInput.named_choice("minitest")
     )
     %w[D-A D-B].each do |decision_id|
       decision_events(decision_id).each { projector.call(_1) }
     end
-    partition_events("repo:billing:testing").each { projector.call(_1) }
+    partition_events("repo:0198f5b8-57ab-7def-8abc-1234567890ab:testing").each { projector.call(_1) }
 
     result = query.call(input).value!
 
@@ -166,7 +171,7 @@ RSpec.describe Coordinator::Read::Queries::DecisionResolve, :event_store, :read_
     )
 
     expect(query.call(golden).value!.context_token).to eq(
-      "sha256:29b7063e311213beb48a2d5aa4e1fa7f9d3a42f891c68f29d284615754b77c5a"
+      "sha256:02f73fdd77fbcbf1446402e05a370b93f4fe1bd76a090fe155b3323b42a25fb9"
     )
   end
 
@@ -186,7 +191,7 @@ RSpec.describe Coordinator::Read::Queries::DecisionResolve, :event_store, :read_
       source: "mcp_client",
       text: "Use RSpec.",
       anchors: {
-        repository_ids: [ "billing" ],
+        repository_ids: [ "0198f5b8-57ab-7def-8abc-1234567890ab" ],
         change_set_id: nil,
         work_item_id: nil,
         attempt_id: nil

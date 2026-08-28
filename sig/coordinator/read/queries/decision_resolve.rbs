@@ -14,6 +14,7 @@ module Coordinator
           ?canonical_json: Shared::CanonicalJson,
           ?clock: Shared::_Clock
         ) -> void
+        # dry-operation prepends #call; runtime RBS wrapping recursively re-enters that wrapper.
         %a{rbs:test:skip}
         def call: (Write::command_input input) -> QueryResultV1
       end

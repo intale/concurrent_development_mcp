@@ -3,6 +3,7 @@ module Coordinator
     module Queries
       class AgentChoiceImpactList < Dry::Operation
         def initialize: (?contract: Contracts::AgentChoiceImpactList, ?impacts: Repositories::AgentChoiceImpacts) -> void
+        # dry-operation prepends #call; runtime RBS wrapping recursively re-enters that wrapper.
         %a{rbs:test:skip}
         def call: (command_input input) -> Dry::Monads::Result
       end

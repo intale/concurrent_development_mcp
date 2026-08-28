@@ -6,7 +6,7 @@ module Coordinator
                             | (Hash[Symbol, untyped] value) -> untyped
       def self.query: () -> String
                     | (String key) -> String
-      def self.call: (?server_context: untyped, **untyped arguments) -> untyped
+      def self.call: (?server_context: untyped, **untyped arguments) -> ::MCP::Tool::Response
     end
   end
 end

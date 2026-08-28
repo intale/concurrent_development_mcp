@@ -100,7 +100,7 @@ RSpec.describe Coordinator::Read::Queries::DecisionList, :event_store, :read_mod
 
   it "returns typed invalid filters and an empty available page" do
     invalid = query.call(
-      repository_id: "billing",
+      repository_id: "0198f5b8-57ab-7def-8abc-1234567890ab",
       topic_id: "bad topic",
       policy_status: "retired",
       limit: 51

@@ -3,6 +3,7 @@ module Coordinator
     module Queries
       class DecisionGet
         def initialize: (?contract: Contracts::DecisionGet, ?governance: Repositories::DecisionGovernance) -> void
+        # dry-operation prepends #call; runtime RBS wrapping recursively re-enters that wrapper.
         %a{rbs:test:skip}
         def call: (Write::command_input input) -> QueryResultV1
       end

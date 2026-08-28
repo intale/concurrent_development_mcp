@@ -3,8 +3,9 @@ module Coordinator
     module Queries
       class OperationGet
         def initialize: (?contract: Contracts::OperationGet, ?completions: CommandCompletionLookup) -> void
+        # dry-operation prepends #call; runtime RBS wrapping recursively re-enters that wrapper.
         %a{rbs:test:skip}
-        def call: (command_input input) -> untyped
+        def call: (command_input input) -> QueryResultV1
       end
     end
   end

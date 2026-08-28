@@ -16,7 +16,7 @@ RSpec.describe Coordinator::Read::Queries::DecisionInterpretationList, :event_st
       source: "mcp_client",
       text: "Use RSpec.",
       anchors: {
-        repository_ids: [ "billing" ],
+        repository_ids: [ "0198f5b8-57ab-7def-8abc-1234567890ab" ],
         change_set_id: "CS-1",
         work_item_id: nil,
         attempt_id: nil
