@@ -36,6 +36,11 @@ RSpec.describe Coordinator::Read::Queries::RepositoryList, :event_store, :read_m
 
     other = query.call(scope: "project:other").value!.data.page
     expect(other.items.map(&:repository_id)).to eq([ repository_ids.fetch(3) ])
+
+    exact_key = query.call(scope: "project:alpha", repository_key: "repository-1").value!.data.page
+    expect(exact_key.items.map(&:repository_id)).to eq([ repository_ids.fetch(1) ])
+    case_mismatch = query.call(scope: "project:alpha", repository_key: "Repository-1").value!.data.page
+    expect(case_mismatch.items).to be_empty
   end
 
   it "serves the available projection while an unprojected registration exists" do
@@ -54,6 +59,7 @@ RSpec.describe Coordinator::Read::Queries::RepositoryList, :event_store, :read_m
     missing_scope = query.call({}).value!
     malformed = query.call(
       scope: "project:alpha",
+      repository_key: "invalid key",
       after_repository_id: "repository-alpha",
       limit: 101
     ).value!
@@ -70,6 +76,7 @@ RSpec.describe Coordinator::Read::Queries::RepositoryList, :event_store, :read_m
       actor: { kind: "agent", id: "agent-list" },
       repository_id:,
       scope:,
+      repository_key: "repository-#{index}",
       display_name: "Repository #{index}",
       paths: [ "/client/repository-#{index}" ],
       remotes: []

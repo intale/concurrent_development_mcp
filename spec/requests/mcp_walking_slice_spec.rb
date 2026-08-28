@@ -117,6 +117,7 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
       actor: { kind: "agent", id: "planner-repository" },
       repository_id:,
       scope: "project:payments/workspace:primary",
+      repository_key: "payments",
       display_name: "Payments API",
       paths: [ "/client-visible/payments", "/other-container/payments" ],
       remotes: [ "https://example.test/payments.git" ]
@@ -145,13 +146,21 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
     registration = repository_events(repository_id).sole
     expect(registration.type).to eq("RepositoryRegistered")
     expect(registration.markers).to include("repository:#{repository_id}")
-    expect(registration.markers.grep(/\Acompound:(?:repository-scope|scoped-repository):v1:/).length).to eq(2)
+    expect(
+      registration.markers.grep(
+        /\Acompound:(?:repository-scope|scoped-repository|scoped-repository-key):v1:/
+      ).length
+    ).to eq(3)
     expect(registration.metadata).not_to have_key("correlation_id")
 
     Coordinator::Container["projectors.repositories_v1"].call(registration)
     projected = call_tool(
       "repository_list",
-      { scope: arguments.fetch(:scope), limit: 20 },
+      {
+        scope: arguments.fetch(:scope),
+        repository_key: arguments.fetch(:repository_key),
+        limit: 20
+      },
       id: 8
     ).dig("result", "structuredContent")
     expect(projected).to include("status" => "ok")

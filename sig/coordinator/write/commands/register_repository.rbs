@@ -11,6 +11,7 @@ module Coordinator
         def actor: () -> Actor
         def repository_id: () -> String
         def scope: () -> String
+        def repository_key: () -> String
         def display_name: () -> String?
         def paths: () -> Array[String]
         def remotes: () -> Array[String]

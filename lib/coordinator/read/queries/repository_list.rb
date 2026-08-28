@@ -26,7 +26,9 @@ module Coordinator::Read
           command_id: nil,
           receipt: nil,
           context_token: nil,
-          data: QueryResultV1::RepositoryPageData.new(page: @catalog.page(query)),
+          data: QueryResultV1::RepositoryPageData.new(
+            page: @catalog.page(query, repository_key: validated[:repository_key])
+          ),
           warnings: [],
           next_actions: []
         )

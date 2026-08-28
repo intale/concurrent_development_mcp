@@ -2,7 +2,8 @@ module Coordinator
   module Read
     module Repositories
       class RepositoryCatalog
-        def page: (RepositoryListQueryV1 query) -> RepositoryPageV1
+        def initialize: (?compound_marker_builder: Shared::CompoundMarkerBuilder) -> void
+        def page: (RepositoryListQueryV1 query, ?repository_key: String?) -> RepositoryPageV1
         def store: (event: PgEventstore::Event, registration: Write::Events::RepositoryRegisteredV1) -> Repository
       end
     end

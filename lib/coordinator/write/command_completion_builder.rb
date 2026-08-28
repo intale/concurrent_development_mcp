@@ -14,12 +14,7 @@ module Coordinator::Write
         tool_name: "change_set_create",
         summary: "ChangeSet created.",
         data: CommandReceiptData::ChangeSet.new(change_set_id: command.change_set_id),
-        next_actions: [
-          NextAction.new(
-            tool: "work_item_create",
-            arguments: NextAction::ChangeSetArguments.new(change_set_id: command.change_set_id)
-          )
-        ],
+        next_actions: [],
         input_digest:,
         persisted_events:,
         completed_at:
@@ -35,16 +30,7 @@ module Coordinator::Write
           change_set_id: command.change_set_id,
           work_item_id: command.work_item_id
         ),
-        next_actions: [
-          NextAction.new(
-            tool: "work_item_create",
-            arguments: NextAction::ChangeSetArguments.new(change_set_id: command.change_set_id)
-          ),
-          NextAction.new(
-            tool: "change_set_activate",
-            arguments: NextAction::ChangeSetArguments.new(change_set_id: command.change_set_id)
-          )
-        ],
+        next_actions: [],
         input_digest:,
         persisted_events:,
         completed_at:
@@ -60,12 +46,7 @@ module Coordinator::Write
           change_set_id: command.change_set_id,
           dependency_id: command.dependency_id
         ),
-        next_actions: [
-          NextAction.new(
-            tool: "change_set_activate",
-            arguments: NextAction::ChangeSetArguments.new(change_set_id: command.change_set_id)
-          )
-        ],
+        next_actions: [],
         input_digest:,
         persisted_events:,
         completed_at:
@@ -102,7 +83,7 @@ module Coordinator::Write
         tool_name: "work_item_acquire",
         summary: "WorkItem acquired and Attempt started.",
         data: CommandReceiptData::Attempt.new(attempt_arguments.to_h),
-        next_actions: [ NextAction.new(tool: "write_set_reserve", arguments: attempt_arguments) ],
+        next_actions: [],
         input_digest:,
         persisted_events:,
         completed_at:
@@ -110,12 +91,6 @@ module Coordinator::Write
     end
 
     def work_item_complete(command:, completion:, input_digest:, persisted_events:, completed_at:)
-      attempt_arguments = NextAction::AttemptArguments.new(
-        change_set_id: command.change_set_id,
-        work_item_id: command.work_item_id,
-        attempt_id: command.attempt_id
-      )
-
       build_completion(
         command:,
         tool_name: "work_item_complete",
@@ -132,7 +107,12 @@ module Coordinator::Write
           produced_outputs: completion.produced_outputs,
           completed_at: completion.completed_at
         ),
-        next_actions: [ NextAction.new(tool: "coord_context", arguments: attempt_arguments) ],
+        next_actions: [
+          NextAction.new(
+            tool: "coord_context",
+            arguments: NextAction::ChangeSetArguments.new(change_set_id: command.change_set_id)
+          )
+        ],
         input_digest:,
         persisted_events:,
         completed_at:
@@ -140,12 +120,6 @@ module Coordinator::Write
     end
 
     def write_set_reserve(command:, reservation:, input_digest:, persisted_events:, completed_at:)
-      attempt_arguments = NextAction::AttemptArguments.new(
-        change_set_id: command.change_set_id,
-        work_item_id: command.work_item_id,
-        attempt_id: command.attempt_id
-      )
-
       build_completion(
         command:,
         tool_name: "write_set_reserve",
@@ -161,7 +135,12 @@ module Coordinator::Write
           expires_at: reservation.expires_at,
           resources: reservation.resources
         ),
-        next_actions: [ NextAction.new(tool: "coord_context", arguments: attempt_arguments) ],
+        next_actions: [
+          NextAction.new(
+            tool: "coord_context",
+            arguments: NextAction::ChangeSetArguments.new(change_set_id: command.change_set_id)
+          )
+        ],
         input_digest:,
         persisted_events:,
         completed_at:
@@ -169,12 +148,6 @@ module Coordinator::Write
     end
 
     def write_set_expand(command:, expansion:, input_digest:, persisted_events:, completed_at:)
-      attempt_arguments = NextAction::AttemptArguments.new(
-        change_set_id: command.change_set_id,
-        work_item_id: command.work_item_id,
-        attempt_id: command.attempt_id
-      )
-
       build_completion(
         command:,
         tool_name: "write_set_expand",
@@ -191,7 +164,12 @@ module Coordinator::Write
           added_resources: expansion.added_resources,
           resource_count: expansion.resource_count
         ),
-        next_actions: [ NextAction.new(tool: "coord_context", arguments: attempt_arguments) ],
+        next_actions: [
+          NextAction.new(
+            tool: "coord_context",
+            arguments: NextAction::ChangeSetArguments.new(change_set_id: command.change_set_id)
+          )
+        ],
         input_digest:,
         persisted_events:,
         completed_at:
@@ -199,12 +177,6 @@ module Coordinator::Write
     end
 
     def lease_renew(command:, renewal:, input_digest:, persisted_events:, completed_at:)
-      attempt_arguments = NextAction::AttemptArguments.new(
-        change_set_id: command.change_set_id,
-        work_item_id: command.work_item_id,
-        attempt_id: command.attempt_id
-      )
-
       build_completion(
         command:,
         tool_name: "lease_renew",
@@ -222,7 +194,12 @@ module Coordinator::Write
           previous_expires_at: renewal.previous_expires_at,
           expires_at: renewal.expires_at
         ),
-        next_actions: [ NextAction.new(tool: "coord_context", arguments: attempt_arguments) ],
+        next_actions: [
+          NextAction.new(
+            tool: "coord_context",
+            arguments: NextAction::ChangeSetArguments.new(change_set_id: command.change_set_id)
+          )
+        ],
         input_digest:,
         persisted_events:,
         completed_at:
@@ -230,12 +207,6 @@ module Coordinator::Write
     end
 
     def lease_release(command:, release:, input_digest:, persisted_events:, completed_at:)
-      attempt_arguments = NextAction::AttemptArguments.new(
-        change_set_id: command.change_set_id,
-        work_item_id: command.work_item_id,
-        attempt_id: command.attempt_id
-      )
-
       build_completion(
         command:,
         tool_name: "lease_release",
@@ -252,7 +223,12 @@ module Coordinator::Write
           previous_expires_at: release.previous_expires_at,
           released_at: release.released_at
         ),
-        next_actions: [ NextAction.new(tool: "coord_context", arguments: attempt_arguments) ],
+        next_actions: [
+          NextAction.new(
+            tool: "coord_context",
+            arguments: NextAction::ChangeSetArguments.new(change_set_id: command.change_set_id)
+          )
+        ],
         input_digest:,
         persisted_events:,
         completed_at:
@@ -651,12 +627,7 @@ module Coordinator::Write
           registration_event: event_reference(persisted_events.fetch(1)),
           derived_at: surface.derived_at
         ),
-        next_actions: [
-          NextAction.new(
-            tool: "candidate_impact_get",
-            arguments: NextAction::CandidateArguments.new(candidate_id: command.candidate_id)
-          )
-        ],
+        next_actions: [],
         input_digest:,
         persisted_events:,
         completed_at:

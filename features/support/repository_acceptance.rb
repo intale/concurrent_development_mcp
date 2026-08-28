@@ -33,6 +33,7 @@ module RepositoryAcceptance
         actor: { kind: "agent", id: "test-repository-registrar" },
         repository_id:,
         scope: acceptance_repository_scope(key),
+        repository_key: key.to_s,
         display_name: "#{key.to_s.capitalize} test repository",
         paths: [],
         remotes: []
@@ -47,7 +48,7 @@ module RepositoryAcceptance
     await_read_model("Repository #{repository_id} to reach scoped discovery") do
       payload = call_tool(
         "repository_list",
-        { scope: acceptance_repository_scope(key), limit: 20 },
+        { scope: acceptance_repository_scope(key), repository_key: key.to_s, limit: 20 },
         client_id: "test-repository-bootstrap"
       ).dig("result", "structuredContent")
       items = payload.dig("data", "page", "items") || []
@@ -60,6 +61,98 @@ module RepositoryAcceptance
 
   def reset_acceptance_repositories!
     @registered_acceptance_repositories = []
+  end
+
+  def repository_distinct_lane_command_ids(prefix)
+    lane = Coordinator::Write::Tasks::ExecutionLane.new
+    by_lane = {}
+    64.times do |index|
+      command_id = "#{prefix}.#{index}"
+      by_lane[lane.index(command_id)] ||= command_id
+      break if by_lane.length == Coordinator::Write::Tasks::ExecutionLane::COUNT
+    end
+    assert_acceptance_equal(
+      Coordinator::Write::Tasks::ExecutionLane::COUNT,
+      by_lane.length,
+      "Distinct repository-registration execution lanes"
+    )
+    by_lane.sort.map(&:last)
+  end
+
+  def prepare_shared_repository_lease_attempts(repository_id)
+    change_set_id = "CS-AUD2-REPOSITORY-NAMESPACE"
+    participants = [
+      { agent_id: "agent-a", work_item_id: "W-AUD2-REPOSITORY-A", attempt_id: "A-AUD2-REPOSITORY-A" },
+      { agent_id: "agent-b", work_item_id: "W-AUD2-REPOSITORY-B", attempt_id: "A-AUD2-REPOSITORY-B" }
+    ]
+    submit_and_execute(
+      "change_set_create",
+      command_id: "audit2.repository-namespace.create",
+      actor: { kind: "agent", id: "repository-planner" },
+      change_set_id:,
+      goal: "Prove clean clients share one repository lease namespace",
+      acceptance_criteria: [ "One overlapping file lease is authoritative" ]
+    )
+    participants.each do |participant|
+      submit_and_execute(
+        "work_item_create",
+        command_id: "audit2.repository-namespace.#{participant.fetch(:agent_id)}.create",
+        actor: { kind: "agent", id: "repository-planner" },
+        change_set_id:,
+        work_item_id: participant.fetch(:work_item_id),
+        repository_id:,
+        goal: "Coordinate #{participant.fetch(:agent_id)}",
+        acceptance_criteria: [ "The shared file cannot be leased twice" ]
+      )
+    end
+    submit_and_execute(
+      "change_set_activate",
+      command_id: "audit2.repository-namespace.activate",
+      actor: { kind: "agent", id: "repository-planner" },
+      change_set_id:
+    )
+    participants.each { await_work_item_ready(_1.fetch(:work_item_id)) }
+    participants.each do |participant|
+      submit_and_execute(
+        "work_item_acquire",
+        client_id: participant.fetch(:agent_id),
+        command_id: "audit2.repository-namespace.#{participant.fetch(:agent_id)}.acquire",
+        actor: { kind: "agent", id: participant.fetch(:agent_id) },
+        change_set_id:,
+        work_item_id: participant.fetch(:work_item_id),
+        attempt_id: participant.fetch(:attempt_id),
+        base_snapshots: [ { repository_id:, commit_oid: "a" * 40 } ]
+      )
+    end
+
+    [ change_set_id, participants ]
+  end
+
+  def contend_for_shared_repository_file(repository_id)
+    change_set_id, participants = prepare_shared_repository_lease_attempts(repository_id)
+    participants.map do |participant|
+      task_id = submit_and_execute(
+        "write_set_reserve",
+        client_id: participant.fetch(:agent_id),
+        command_id: "audit2.repository-namespace.#{participant.fetch(:agent_id)}.reserve",
+        actor: { kind: "agent", id: participant.fetch(:agent_id) },
+        change_set_id:,
+        work_item_id: participant.fetch(:work_item_id),
+        attempt_id: participant.fetch(:attempt_id),
+        repository_id:,
+        base_commit_oid: "a" * 40,
+        resources: [
+          {
+            kind: "file",
+            path: "app/models/shared_repository.rb",
+            base_blob_oid: "b" * 40
+          }
+        ],
+        lease_duration_seconds: 300
+      )
+      task_request("tasks/get", task_id, client_id: participant.fetch(:agent_id))
+        .dig("result", "result", "structuredContent")
+    end
   end
 
   private

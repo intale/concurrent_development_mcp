@@ -12,6 +12,7 @@ module Coordinator::Write
       attribute :actor, Actor
       attribute :repository_id, Types::UuidV7
       attribute :scope, Scope
+      attribute :repository_key, Types::Identifier
       attribute :display_name, DisplayName.optional
       attribute :paths, Types::Array.of(Path).constrained(max_size: 20)
       attribute :remotes, Types::Array.of(Remote).constrained(max_size: 20)

@@ -333,6 +333,7 @@ def audit_prepare_context_work_item(work_item_id:, owner_id:, attempt_id:)
       actor: planner,
       repository_id:,
       scope: "project:audit-followup/#{suffix.downcase}",
+      repository_key: "audit-followup-#{suffix.downcase}",
       display_name: "Audit follow-up #{suffix}",
       paths: [],
       remotes: []

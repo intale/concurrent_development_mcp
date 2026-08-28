@@ -21,6 +21,7 @@ module Coordinator::Write
             actor: actor_document(command.actor),
             repository_id: command.repository_id,
             scope: command.scope,
+            repository_key: command.repository_key,
             display_name: command.display_name,
             paths: command.paths,
             remotes: command.remotes

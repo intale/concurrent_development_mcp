@@ -13,6 +13,7 @@ module Coordinator::Write
         end
         required(:repository_id).filled(:string)
         required(:scope).filled(:string)
+        required(:repository_key).filled(:string)
         optional(:display_name).maybe(:string)
         required(:paths).array(:string)
         required(:remotes).array(:string)
@@ -35,6 +36,10 @@ module Coordinator::Write
 
       rule(:scope) do
         validate_identity_text(key, value, maximum_bytes: 500)
+      end
+
+      rule(:repository_key) do
+        key.failure("must be a valid identifier") unless Types::IDENTIFIER_PATTERN.match?(value)
       end
 
       rule(:display_name) do

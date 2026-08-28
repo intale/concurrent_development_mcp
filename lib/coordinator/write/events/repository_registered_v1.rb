@@ -7,6 +7,7 @@ module Coordinator::Write
 
       attribute :repository_id, Types::UuidV7
       attribute :scope, Types::String.constrained(min_size: 1, max_size: 500)
+      attribute? :repository_key, Types::Identifier.optional
       attribute :display_name, Types::String.constrained(min_size: 1, max_size: 255).optional
       attribute :paths,
                 Types::Array.of(Types::String.constrained(min_size: 1, max_size: 1_024)).constrained(max_size: 20)

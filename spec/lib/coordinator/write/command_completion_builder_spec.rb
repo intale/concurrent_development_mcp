@@ -47,7 +47,7 @@ RSpec.describe Coordinator::Write::CommandCompletionBuilder do
     )
     expect(completion.emitted_events.map(&:stream_revision)).to eq([ 0, 1 ])
     expect(completion.to_h).not_to include(:projection_barriers, :context_token)
-    expect(completion.next_actions).to all(be_a(Coordinator::Write::NextAction))
+    expect(completion.next_actions).to be_empty
   end
 
   it "rejects non-persisted references before building the completion" do
@@ -110,6 +110,7 @@ RSpec.describe Coordinator::Write::CommandCompletionBuilder do
     expect(completion.emitted_events.map { [ _1.stream_name, _1.stream_revision ] }).to eq(
       [ [ "WorkItem", 0 ], [ "ChangeSet", 2 ] ]
     )
+    expect(completion.next_actions).to be_empty
   end
 
   it "builds a dependency receipt from its exact ChangeSet revision" do
@@ -147,6 +148,7 @@ RSpec.describe Coordinator::Write::CommandCompletionBuilder do
     expect(completion.emitted_events.map { [ _1.stream_name, _1.stream_revision ] }).to eq(
       [ [ "ChangeSet", 4 ] ]
     )
+    expect(completion.next_actions).to be_empty
   end
 
   it "builds activation data and an available-read context action" do
@@ -179,6 +181,8 @@ RSpec.describe Coordinator::Write::CommandCompletionBuilder do
         arguments: Coordinator::Write::NextAction::ChangeSetArguments.new(change_set_id: "CS-100")
       )
     )
+    ::MCP::Tool::InputSchema.new(Coordinator::Mcp::Schemas.coord_context)
+      .validate_arguments(completion.next_actions.sole.arguments.to_h)
   end
 
   it "builds an Attempt-scoped acquisition receipt with exact event references" do
@@ -236,9 +240,7 @@ RSpec.describe Coordinator::Write::CommandCompletionBuilder do
     expect(completion.data).to eq(
       Coordinator::Write::CommandReceiptData::Attempt.new(attempt_arguments.to_h)
     )
-    expect(completion.next_actions).to contain_exactly(
-      Coordinator::Write::NextAction.new(tool: "write_set_reserve", arguments: attempt_arguments)
-    )
+    expect(completion.next_actions).to be_empty
     expect(completion.emitted_events.map(&:type)).to eq(
       [ "WorkItemAcquired", "AttemptAuthorized", "AttemptStarted" ]
     )

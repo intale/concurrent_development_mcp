@@ -19,6 +19,7 @@ module Coordinator::Write
           actor: build_actor(input.actor),
           repository_id: input.repository_id,
           scope: input.scope,
+          repository_key: input.repository_key,
           display_name: input.display_name,
           paths: input.paths,
           remotes: input.remotes

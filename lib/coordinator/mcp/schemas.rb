@@ -3,6 +3,9 @@
 module Coordinator
   module Mcp
     module Schemas
+      ACTOR_ATTRIBUTION_DESCRIPTION =
+        "Caller-supplied attribution label recorded with the request; it is not authenticated identity, authorization, or a session credential."
+
       module_function
 
       def envelope
@@ -41,7 +44,7 @@ module Coordinator
           properties: common_mutation_properties.merge(
             actor: agent_actor,
             repository_id: uuid_v7.merge(
-              description: "Caller-created canonical Repository identity; names, paths, and remotes are metadata."
+              description: "Caller-created Repository UUID proposal; the server returns the canonical UUID already bound to the exact scope and key when one exists."
             ),
             scope: {
               type: "string",
@@ -49,6 +52,9 @@ module Coordinator
               maxLength: 500,
               description: "Exact project/workspace coordination scope; the server infers no hierarchy."
             },
+            repository_key: identifier.merge(
+              description: "Exact case-sensitive caller/user-chosen logical key within scope; no filesystem location is inferred."
+            ),
             display_name: {
               type: [ "string", "null" ],
               minLength: 1,
@@ -57,7 +63,7 @@ module Coordinator
             paths: string_array(min_items: 0, max_items: 20, max_length: 1_024),
             remotes: string_array(min_items: 0, max_items: 20, max_length: 2_048)
           ),
-          required: %w[command_id actor repository_id scope display_name paths remotes]
+          required: %w[command_id actor repository_id scope repository_key display_name paths remotes]
         )
       end
 
@@ -70,6 +76,9 @@ module Coordinator
               maxLength: 500,
               description: "Exact caller/user-chosen coordination scope; no hierarchy or fallback is inferred."
             },
+            repository_key: identifier.merge(
+              description: "Optional exact logical key filter within scope; matching is case-sensitive."
+            ),
             after_repository_id: {
               anyOf: [ uuid_v7, { type: "null" } ],
               description: "Exclusive canonical Repository-ID cursor returned by the previous page."
@@ -518,13 +527,7 @@ module Coordinator
         )
         object_schema(
           properties: common_mutation_properties.merge(
-            actor: object_schema(
-              properties: {
-                kind: { type: "string", enum: %w[agent user] },
-                id: identifier
-              },
-              required: %w[kind id]
-            ),
+            actor: attributed_actor(enum: %w[agent user]),
             name: {
               type: "string",
               minLength: 1,
@@ -569,13 +572,7 @@ module Coordinator
       def skill_publish_batch
         object_schema(
           properties: common_mutation_properties.merge(
-            actor: object_schema(
-              properties: {
-                kind: { type: "string", enum: %w[agent user] },
-                id: identifier
-              },
-              required: %w[kind id]
-            ),
+            actor: attributed_actor(enum: %w[agent user]),
             batch_id: uuid_v7.merge(
               description: "Stable caller-generated UUIDv7 used to resume or inspect this asynchronous Batch Saga."
             ),
@@ -748,13 +745,7 @@ module Coordinator
         )
         object_schema(
           properties: common_mutation_properties.merge(
-            actor: object_schema(
-              properties: {
-                kind: { type: "string", enum: %w[agent user] },
-                id: identifier
-              },
-              required: %w[kind id]
-            ),
+            actor: attributed_actor(enum: %w[agent user]),
             scope: {
               type: "string",
               minLength: 1,
@@ -851,13 +842,7 @@ module Coordinator
         )
         object_schema(
           properties: common_mutation_properties.merge(
-            actor: object_schema(
-              properties: {
-                kind: { type: "string", enum: %w[agent user] },
-                id: identifier
-              },
-              required: %w[kind id]
-            ),
+            actor: attributed_actor(enum: %w[agent user]),
             source_artifact_id: {
               type: "string",
               pattern: "^artifact:v1:[0-9a-f]{64}$",
@@ -1250,13 +1235,7 @@ module Coordinator
       def verification_obligation_waive
         object_schema(
           properties: common_mutation_properties.merge(
-            actor: object_schema(
-              properties: {
-                kind: { type: "string", enum: [ "user" ] },
-                id: identifier
-              },
-              required: %w[kind id]
-            ),
+            actor: attributed_actor(enum: [ "user" ]),
             obligation_id: identifier,
             obligation_validity_input_digest: {
               type: "string",
@@ -1951,26 +1930,14 @@ module Coordinator
       def common_mutation_properties
         {
           command_id: public_command_id,
-          actor: object_schema(
-            properties: {
-              kind: { type: "string", enum: Types::ACTOR_KINDS },
-              id: identifier
-            },
-            required: %w[kind id]
-          )
+          actor: attributed_actor(enum: Types::ACTOR_KINDS)
         }
       end
 
       def operation_batch_schema(item_schema)
         object_schema(
           properties: common_mutation_properties.merge(
-            actor: object_schema(
-              properties: {
-                kind: { type: "string", enum: %w[agent user] },
-                id: identifier
-              },
-              required: %w[kind id]
-            ),
+            actor: attributed_actor(enum: %w[agent user]),
             batch_id: uuid_v7.merge(
               description: "Stable caller-generated UUIDv7 used to resume or inspect this asynchronous Batch Saga."
             ),
@@ -1987,13 +1954,18 @@ module Coordinator
       end
 
       def agent_actor
+        attributed_actor(const: "agent")
+      end
+
+      def attributed_actor(enum: nil, const: nil)
+        kind = const ? { type: "string", const: } : { type: "string", enum: }
         object_schema(
           properties: {
-            kind: { type: "string", const: "agent" },
+            kind:,
             id: identifier
           },
           required: %w[kind id]
-        )
+        ).merge(description: ACTOR_ATTRIBUTION_DESCRIPTION)
       end
 
       def decision_query_context(require_nullable_fields: false)

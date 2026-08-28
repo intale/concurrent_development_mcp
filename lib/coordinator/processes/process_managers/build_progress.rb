@@ -69,23 +69,20 @@ module Coordinator::Processes
 
       def dependencies_for(source)
         kinds = SOURCE_DEPENDENCY_KINDS.fetch(source.payload.class)
-        load_change_set(source.change_set_id).dependencies.select do |dependency|
-          kinds.include?(dependency.dependency_kind)
-        end
-      end
-
-      def load_change_set(change_set_id)
-        events = @event_store.read(
-          @stream_factory.change_set(change_set_id),
+        @event_store.read(
+          @stream_factory.change_set(source.change_set_id),
           Coordinator::Write::EventQueries::CHANGE_SET_FOR_DEPENDENCY_SATISFACTION
-        ).map do |event|
-          @schema_registry.load(
+        ).filter_map do |event|
+          payload = @schema_registry.load(
             type: event.type,
             schema_version: event.metadata.fetch("schema_version"),
             data: event.data
           )
+          next unless payload.is_a?(Coordinator::Write::Events::WorkItemDependencyDeclaredV1)
+          next unless kinds.include?(payload.dependency_kind)
+
+          payload
         end
-        Coordinator::Write::Domain::ChangeSets::State.reduce(events)
       end
 
       def handle_result!(result, identifier:)

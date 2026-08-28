@@ -89,23 +89,24 @@ Feature: Audited coordination remains correct under replay, interruption, and co
 
   Rule: Clean clients share canonical repository and public-action semantics
 
-    @wip @AUD2-REPOSITORY-BOOTSTRAP-RACE-01 @live-subscriptions @concurrency
+    @AUD2-REPOSITORY-BOOTSTRAP-RACE-01 @live-subscriptions @concurrency
     Scenario: Two clean agents concurrently register one logical repository key
       Given independent agents "agent-a" and "agent-b" know only the same project scope and repository key
       When both registrations reach the deterministic database barrier with different proposed UUIDs
       And the barrier releases both registrations
       Then one canonical Repository UUID is authoritative for that scope and key
       And both agents discover the same canonical Repository through MCP
-      And leases under either client use the shared Repository namespace
+      When both agents use the discovered Repository to contend for one file
+      Then the second lease is blocked in the shared Repository namespace
 
-    @wip @AUD2-NEXT-ACTION-EXECUTABLE-02
+    @AUD2-NEXT-ACTION-EXECUTABLE-02
     Scenario: Every advertised next action is an executable MCP request
       Given an MCP result contains one or more next actions
       When an agent validates each action against current tool discovery
       Then every action is complete and schema-valid for its target tool
       And no mutation action contains placeholders or omitted required intent
 
-    @wip @AUD2-ACTOR-ATTRIBUTION-03
+    @AUD2-ACTOR-ATTRIBUTION-03
     Scenario: MCP describes actor labels as attribution rather than authentication
       Given an agent inspects current MCP discovery
       When the agent reads a mutation actor schema and description

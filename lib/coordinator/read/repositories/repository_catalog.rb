@@ -3,8 +3,16 @@
 module Coordinator::Read
   module Repositories
     class RepositoryCatalog
-      def page(query)
+      def initialize(compound_marker_builder: Coordinator::Shared::CompoundMarkerBuilder.new)
+        @compound_marker_builder = compound_marker_builder
+      end
+
+      def page(query, repository_key: nil)
         relation = Coordinator::Read::Repository.where(scope: query.scope)
+        if repository_key
+          marker = scoped_repository_key_marker(scope: query.scope, repository_key:).marker
+          relation = relation.where("registered_markers @> ?::jsonb", JSON.generate([ marker ]))
+        end
         relation = relation.where("repository_id > ?", query.after_repository_id) if query.after_repository_id
         rows = relation.order(:repository_id).page(1).per(query.limit + 1).to_a
         has_more = rows.length > query.limit
@@ -28,6 +36,15 @@ module Coordinator::Read
       end
 
       private
+
+      def scoped_repository_key_marker(scope:, repository_key:)
+        @compound_marker_builder.call(
+          Coordinator::Shared::CompoundMarkerDefinitionV1.new(
+            purpose: "scoped-repository-key",
+            components: [ "scope:#{scope}", "repository-key:#{repository_key}" ]
+          )
+        )
+      end
 
       def registration_attributes(event, registration)
         {

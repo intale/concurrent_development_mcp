@@ -7,6 +7,7 @@ module Coordinator::Read
 
       params do
         required(:scope).filled(:string)
+        optional(:repository_key).maybe(:string)
         optional(:after_repository_id).maybe(:string)
         optional(:limit).maybe(:integer, gteq?: 1, lteq?: 100)
       end
@@ -22,6 +23,12 @@ module Coordinator::Read
         next unless value
 
         key.failure("must be a Repository UUIDv7") unless Types::UUID_V7_PATTERN.match?(value)
+      end
+
+      rule(:repository_key) do
+        next unless value
+
+        key.failure("must be a valid identifier") unless Types::IDENTIFIER_PATTERN.match?(value)
       end
     end
   end

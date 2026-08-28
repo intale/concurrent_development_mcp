@@ -7,8 +7,9 @@ module Coordinator
         tool_name "repository_register"
         title "Register a scoped repository identity"
         description <<~TEXT.squish
-          Register one caller-created UUIDv7 as the canonical repository identity under an exact
-          project/workspace scope. Display names, paths, and remotes are attributed metadata only.
+          Propose a caller-created UUIDv7 for one exact caller/user-chosen repository key and scope.
+          A compatible existing tuple returns its canonical UUID. Actor labels, display names, paths,
+          and remotes are caller-supplied attribution only; they do not prove identity or grant access.
         TEXT
         input_schema Schemas.repository_register
         operation "operations.submit_register_repository_task"

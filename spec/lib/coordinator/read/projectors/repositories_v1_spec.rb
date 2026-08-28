@@ -31,6 +31,9 @@ RSpec.describe Coordinator::Read::Projectors::RepositoriesV1, :event_store, :rea
     )
     expect(Coordinator::Read::Repository.count).to eq(1)
     expect(processed_events.count).to eq(1)
+    expect(
+      catalog.page(query(scope: "project:alpha"), repository_key: "alpha").items.sole.repository_id
+    ).to eq(repository_id)
   end
 
   it "can replay independently both over its existing row and from an empty projection" do
@@ -56,6 +59,7 @@ RSpec.describe Coordinator::Read::Projectors::RepositoriesV1, :event_store, :rea
       actor: { kind: "agent", id: "agent-repository" },
       repository_id:,
       scope: "project:alpha",
+      repository_key: "alpha",
       display_name: "Alpha",
       paths: [ "/client/alpha" ],
       remotes: [ "https://example.test/alpha.git" ]

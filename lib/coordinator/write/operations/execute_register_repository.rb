@@ -48,6 +48,7 @@ module Coordinator::Write
             actor: Commands::Actor.new(kind: actor.fetch(:kind), id: actor.fetch(:id)),
             repository_id: attributes.fetch(:repository_id),
             scope: attributes.fetch(:scope),
+            repository_key: attributes.fetch(:repository_key),
             display_name: attributes[:display_name],
             paths: attributes.fetch(:paths),
             remotes: attributes.fetch(:remotes)
@@ -87,23 +88,35 @@ module Coordinator::Write
         replay = replay_result(command:, input_digest: preparation.input_digest)
         return replay if replay
 
-        registration = load_registration(command.repository_id)
+        registration_by_key = load_registration_by_key(command)
+        registration_by_id = load_registration(command.repository_id)
+        ActiveSupport::Notifications.instrument(
+          "coordinator.command_boundary",
+          operation: "repository_register_dcb",
+          command_id: command.command_id
+        )
         decision = @decider.call(
-          registration:,
+          registration_by_key:,
+          registration_by_id:,
           command:,
           registered_at: preparation.registered_at
         )
         return decision if decision.failure?
 
-        persisted = persist_registration(
-          decision.value!,
-          command:,
-          event_id: preparation.domain_event_id,
-          caused_by:
-        )
+        decided = decision.value!
+        persisted = if decided.event_plan
+                      persist_registration(
+                        decided.event_plan,
+                        command:,
+                        event_id: preparation.domain_event_id,
+                        caused_by:
+                      )
+        end
         completion = build_completion(
           command:,
           input_digest: preparation.input_digest,
+          registration: decided.registration,
+          outcome: decided.outcome,
           persisted_event: persisted,
           completed_at: preparation.registered_at
         )
@@ -157,6 +170,21 @@ module Coordinator::Write
         deserialize(event)
       end
 
+      def load_registration_by_key(command)
+        repository_stream = @stream_factory.repository(command.repository_id)
+        event = @event_store.read_global_marked(
+          GlobalMarkedEventReadCriteria.new(
+            stream_context: repository_stream.context,
+            stream_name: repository_stream.stream_name,
+            event_types: [ "RepositoryRegistered" ],
+            markers: [ scoped_repository_key_marker(command).marker ],
+            maximum_count: 1,
+            direction: :asc
+          )
+        ).first
+        deserialize(event)
+      end
+
       def deserialize(event)
         return unless event
 
@@ -168,10 +196,7 @@ module Coordinator::Write
       end
 
       def persist_registration(plan, command:, event_id:, caused_by:)
-        write = plan.writes.fetch(0)
-        unless plan.writes.one? && write.stream == @stream_factory.repository(command.repository_id)
-          raise "RegisterRepository domain plan must contain one write to its Repository stream"
-        end
+        write = plan.writes.sole
 
         event = @event_factory.build!(
           event: write.event,
@@ -196,34 +221,48 @@ module Coordinator::Write
             components: [ "scope:#{command.scope}", "repository:#{command.repository_id}" ]
           )
         )
+        scoped_key = scoped_repository_key_marker(command)
 
         [
           "repository:#{command.repository_id}",
+          "repository-key:#{command.repository_key}",
           scope.marker,
           identity.marker,
+          scoped_key.marker,
           "command:#{command.command_id}"
         ]
       end
 
-      def build_completion(command:, input_digest:, persisted_event:, completed_at:)
+      def scoped_repository_key_marker(command)
+        @compound_marker_builder.call(
+          CompoundMarkerDefinitionV1.new(
+            purpose: "scoped-repository-key",
+            components: [ "scope:#{command.scope}", "repository-key:#{command.repository_key}" ]
+          )
+        )
+      end
+
+      def build_completion(command:, input_digest:, registration:, outcome:, persisted_event:, completed_at:)
         Events::CommandCompletedV1.new(
           command_id: command.command_id,
           tool_name: TOOL_NAME,
           canonical_input_digest: input_digest,
           status: "ok",
-          summary: "Repository registered under its exact coordination scope.",
+          summary: outcome == "registered" ?
+            "Repository registered under its exact coordination scope and key." :
+            "Canonical Repository registration already exists for the exact scope and key.",
           receipt: command.command_id,
           data: CommandReceiptData::RepositoryRegistration.new(
-            repository_id: command.repository_id,
-            scope: command.scope,
-            display_name: command.display_name,
-            paths: command.paths,
-            remotes: command.remotes,
-            registered_at: completed_at
+            repository_id: registration.repository_id,
+            scope: registration.scope,
+            display_name: registration.display_name,
+            paths: registration.paths,
+            remotes: registration.remotes,
+            registered_at: registration.registered_at
           ),
           warnings: [],
           next_actions: [],
-          emitted_events: [ event_reference(persisted_event) ],
+          emitted_events: persisted_event ? [ event_reference(persisted_event) ] : [],
           completed_at:
         )
       end

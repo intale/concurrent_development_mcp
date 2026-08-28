@@ -4,6 +4,7 @@ module Coordinator
       class RepositoryRegisteredV1 < Base
         def repository_id: () -> String
         def scope: () -> String
+        def repository_key: () -> String?
         def display_name: () -> String?
         def paths: () -> Array[String]
         def remotes: () -> Array[String]

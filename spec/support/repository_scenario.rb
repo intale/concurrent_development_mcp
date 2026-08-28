@@ -32,6 +32,7 @@ module RepositoryScenario
     Coordinator::Write::Events::RepositoryRegisteredV1.new(
       repository_id:,
       scope:,
+      repository_key: "billing",
       display_name:,
       paths: [],
       remotes: [],
@@ -52,6 +53,7 @@ module RepositoryScenario
       actor: { kind: "agent", id: "test-repository-registrar" },
       repository_id:,
       scope:,
+      repository_key: key.to_s,
       display_name:,
       paths: [],
       remotes: []

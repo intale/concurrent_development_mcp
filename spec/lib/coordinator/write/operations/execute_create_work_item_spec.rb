@@ -158,6 +158,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateWorkItem, :event_sto
       actor: { kind: "agent", id: "planner-1" },
       repository_id:,
       scope:,
+      repository_key: "billing",
       display_name: "Billing",
       paths: [ "/workspace/billing" ],
       remotes: [ "https://example.test/billing.git" ]
