@@ -91,6 +91,47 @@ module Coordinator
         )
       end
 
+      def coordination_list
+        cursor = object_schema(
+          properties: {
+            through_last_processed_at: canonical_timestamp,
+            after_last_processed_at: canonical_timestamp,
+            after_change_set_id: identifier
+          },
+          required: %w[through_last_processed_at after_last_processed_at after_change_set_id]
+        )
+        object_schema(
+          properties: {
+            scope: {
+              type: "string",
+              minLength: 1,
+              maxLength: 500,
+              description: "Exact project/workspace scope; the server infers no hierarchy or fallback."
+            },
+            repository_id: { anyOf: [ uuid_v7, { type: "null" } ] },
+            statuses: {
+              type: "array",
+              minItems: 1,
+              maxItems: 3,
+              uniqueItems: true,
+              items: { type: "string", enum: %w[planning active completed] }
+            },
+            cursor: { anyOf: [ cursor, { type: "null" } ] },
+            limit: {
+              anyOf: [
+                {
+                  type: "integer",
+                  minimum: 1,
+                  maximum: Types::COORDINATION_DISCOVERY_MAXIMUM_ITEMS
+                },
+                { type: "null" }
+              ]
+            }
+          },
+          required: %w[scope]
+        )
+      end
+
       def change_set_create
         object_schema(
           properties: common_mutation_properties.merge(
@@ -1900,10 +1941,37 @@ module Coordinator
         )
       end
 
+      def decision_list
+        object_schema(
+          properties: {
+            repository_id: uuid_v7,
+            topic_id: nullable_identifier,
+            policy_status: {
+              anyOf: [
+                { type: "string", enum: Types::DECISION_POLICY_STATUSES },
+                { type: "null" }
+              ]
+            },
+            after_decision_id: nullable_identifier,
+            limit: {
+              anyOf: [
+                {
+                  type: "integer",
+                  minimum: 1,
+                  maximum: Types::DECISION_DISCOVERY_MAXIMUM_ITEMS
+                },
+                { type: "null" }
+              ]
+            }
+          },
+          required: %w[repository_id]
+        )
+      end
+
       def decision_resolve
         object_schema(
           properties: {
-            topic_id: { type: "string", const: "testing.framework" },
+            topic_id: identifier,
             context: decision_query_context
           },
           required: %w[topic_id context]
@@ -1976,11 +2044,11 @@ module Coordinator
         object_schema(
           properties: {
             workspace_id: nullable_identifier,
-            repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+            repository_id: uuid_v7,
             change_set_id: identifier,
             work_item_id: identifier,
             attempt_id: identifier,
-            phase: { type: "string", const: "implementation" },
+            phase: { type: "string", enum: Types::DECISION_PHASES },
             language: identifier,
             paths: {
               type: "array",
@@ -2013,8 +2081,11 @@ module Coordinator
         object_schema(
           properties: {
             schema: { type: "string", const: "decision-context/v1" },
-            resolution_policy: { type: "string", const: "testing-framework-resolution/v1" },
-            topic_id: { type: "string", const: "testing.framework" },
+            resolution_policy: {
+              type: "string",
+              enum: %w[testing-framework-resolution/v1 single-choice-resolution/v1]
+            },
+            topic_id: identifier,
             query_context: decision_query_context(require_nullable_fields: true),
             partitions: {
               type: "array",
@@ -2054,7 +2125,7 @@ module Coordinator
             partition: object_schema(
               properties: {
                 partition_id: identifier,
-                topic_root: { type: "string", const: "testing" },
+                topic_root: identifier,
                 anchor_kind: { type: "string", enum: Types::DECISION_PARTITION_ANCHOR_KINDS },
                 anchor_id: identifier
               },
@@ -2105,7 +2176,7 @@ module Coordinator
           properties: {
             head: decision_head,
             definition_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
-            topic_id: { type: "string", const: "testing.framework" },
+            topic_id: identifier,
             effect: { type: "string", enum: Types::DECISION_EFFECTS },
             modality: { type: "string", enum: Types::DECISION_MODALITIES },
             value: interpretation_value,
@@ -2185,6 +2256,13 @@ module Coordinator
         {
           type: "string",
           pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        }
+      end
+
+      def canonical_timestamp
+        {
+          type: "string",
+          pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$"
         }
       end
 

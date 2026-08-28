@@ -3,9 +3,8 @@
 module Coordinator::Read
   module DecisionResolution
     class PartitionSelector
-      TOPIC_ROOT = "testing"
-
-      def call(context)
+      def call(context, topic_id:)
+        topic_root = topic_id.split(".", 2).first
         anchors = []
         anchors << [ "workspace", context.workspace_id ] if context.workspace_id
         anchors.concat(
@@ -19,8 +18,8 @@ module Coordinator::Read
 
         anchors.map do |kind, id|
           Coordinator::Write::Decisions::DecisionPartitionV1.new(
-            partition_id: "#{kind}:#{id}:#{TOPIC_ROOT}",
-            topic_root: TOPIC_ROOT,
+            partition_id: "#{kind}:#{id}:#{topic_root}",
+            topic_root:,
             anchor_kind: kind,
             anchor_id: id
           )

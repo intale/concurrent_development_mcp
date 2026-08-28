@@ -8,11 +8,13 @@ module Coordinator
       def all
         [
           Tools::CoordContext,
+          Tools::CoordinationList,
           Tools::AttemptList,
           Tools::OperationGet,
           Tools::GuidanceGet,
           Tools::DecisionInterpretationList,
           Tools::DecisionGet,
+          Tools::DecisionList,
           Tools::DecisionResolve,
           Tools::AgentChoiceGet,
           Tools::AgentChoiceImpactList,

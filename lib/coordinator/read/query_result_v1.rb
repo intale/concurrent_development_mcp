@@ -24,6 +24,10 @@ module Coordinator::Read
       attribute :last_processed_at, Types::Timestamp
     end
 
+    class CoordinationPageData < Value
+      attribute :page, CoordinationPageV1
+    end
+
     class NotModifiedData < Value
       attribute :scope, ContextTokenDocument::Scope
       attribute :last_processed_at, Types::Timestamp
@@ -39,6 +43,10 @@ module Coordinator::Read
 
     class DecisionData < Value
       attribute :decision, DecisionViewV1
+    end
+
+    class DecisionPageData < Value
+      attribute :page, DecisionPageV1
     end
 
     class DecisionContextData < Value
@@ -152,10 +160,12 @@ module Coordinator::Read
            DomainError |
            OperationData |
            ContextData |
+           CoordinationPageData |
            NotModifiedData |
            GuidanceData |
            InterpretationPageData |
            DecisionData |
+           DecisionPageData |
            DecisionContextData |
            AgentChoiceData |
            AgentChoiceImpactPageData |

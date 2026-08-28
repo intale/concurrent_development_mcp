@@ -45,6 +45,12 @@ module Coordinator
         Renew the entire exact observed lease set before its deadline when more work time is needed;
         a stale set, lease ID, or fencing token is safely rejected by authoritative event facts.
         Release the entire exact observed lease set when editing is finished; partial release is not available.
+        A clean or replacement client that knows only an exact project scope uses coordination_list to discover
+        available current/recent ChangeSets and follows its complete coord_context actions; this is not Task
+        enumeration. Canonical coordination IDs are globally namespaced, while human/local labels may repeat in
+        different project scopes. Use decision_list to discover projected policy by Repository UUID and extensible
+        topic. decision_resolve currently evaluates registered single-choice topics and returns a typed result for
+        strategies whose distinct merge semantics are not implemented.
         After submitting the final Candidate and releasing the write set, use work_item_complete to select that
         exact Candidate and finish the active Attempt/WorkItem. Produced artifact/contract labels are attributed
         coordination facts. Dependency and ChangeSet progress then converge through idempotent process commands;
@@ -54,7 +60,7 @@ module Coordinator
         To correct active policy, first accept a correction interpretation, then call decision_correct
         with decision_get's current_head event. A stale projected head is still served and may produce
         a decision_revision_changed conflict; refresh decision_get and submit a new command when appropriate.
-        Use decision_resolve for the latest available testing-framework context of an Attempt. Its digest
+        Use decision_resolve for the latest available registered single-choice context of an Attempt. Its digest
         and partition evidence may lag and are context for a later authoritative command, never authority alone.
         Before committing to a significant testing-framework selection, call decision_resolve and pass its
         exact decision_context to agent_choice_record. A stale_context result means no choice was recorded;

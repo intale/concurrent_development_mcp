@@ -11,6 +11,7 @@ module Coordinator::Read
         governance: Repositories::DecisionGovernance.new,
         partition_selector: DecisionResolution::PartitionSelector.new,
         resolver: DecisionResolution::Resolver.new,
+        topic_registry: Coordinator::Write::Interpretations::TopicRegistry.new,
         canonical_json: CanonicalJson.new,
         clock: Coordinator::Shared::SystemClock.new
       )
@@ -18,6 +19,7 @@ module Coordinator::Read
         @governance = governance
         @partition_selector = partition_selector
         @resolver = resolver
+        @topic_registry = topic_registry
         @canonical_json = canonical_json
         @clock = clock
       end
@@ -27,7 +29,11 @@ module Coordinator::Read
         return invalid_result(validated.errors.to_h) if validated.failure?
 
         query = build_query(validated.to_h)
-        partitions = @partition_selector.call(query.context)
+        topic = @topic_registry.fetch(query.topic_id)
+        return unsupported_topic_result(query.topic_id) unless topic
+        return unsupported_strategy_result(topic) unless topic.resolution_strategy == "single_choice"
+
+        partitions = @partition_selector.call(query.context, topic_id: query.topic_id)
         return partition_limit_result(partitions.length) if partitions.length > MAXIMUM_PARTITIONS
 
         observations = @governance.partition_observations(partitions)
@@ -36,6 +42,7 @@ module Coordinator::Read
 
         resolved_at = @clock.now
         resolution = @resolver.call(
+          topic_id: query.topic_id,
           context: query.context,
           observations:,
           decisions: @governance.fetch_many(heads.map(&:decision_id).uniq),
@@ -77,7 +84,7 @@ module Coordinator::Read
       def decision_context(query, observations, resolution, resolved_at)
         document = DecisionResolution::ContextDocumentV1.new(
           schema: "decision-context/v1",
-          resolution_policy: "testing-framework-resolution/v1",
+          resolution_policy: resolution_policy(query.topic_id),
           topic_id: query.topic_id,
           query_context: query.context,
           partitions: observations,
@@ -102,6 +109,39 @@ module Coordinator::Read
           context_token: context.digest,
           data: QueryResultV1::DecisionContextData.new(decision_context: context),
           warnings: unresolved_warnings(resolution.unresolved_decisions),
+          next_actions: []
+        )
+      end
+
+      def resolution_policy(topic_id)
+        topic_id == "testing.framework" ? "testing-framework-resolution/v1" : "single-choice-resolution/v1"
+      end
+
+      def unsupported_topic_result(topic_id)
+        unsupported_result_for(
+          code: "decision_topic_not_supported",
+          message: "Decision topic is not present in the executable registry",
+          details: { topic_id: }
+        )
+      end
+
+      def unsupported_strategy_result(topic)
+        unsupported_result_for(
+          code: "decision_resolution_strategy_not_supported",
+          message: "decision_resolve supports only single-choice topics in this protocol version",
+          details: { topic_id: topic.topic_id, resolution_strategy: topic.resolution_strategy }
+        )
+      end
+
+      def unsupported_result_for(code:, message:, details:)
+        QueryResultV1.new(
+          status: "invalid",
+          summary: message,
+          command_id: nil,
+          receipt: nil,
+          context_token: nil,
+          data: QueryResultV1::DomainError.new(code:, message:, details:),
+          warnings: [],
           next_actions: []
         )
       end

@@ -14,6 +14,27 @@ module Coordinator::Read
           .map { build_decision(_1) }
       end
 
+      def page(query)
+        relation = decisions_for_repository(query.repository_id)
+        if query.topic_id
+          relation = relation.where("definition #>> '{document,topic,topic_id}' = ?", query.topic_id)
+        end
+        relation = relation.where(policy_status: query.policy_status) if query.policy_status
+        relation = relation.where("decision_id > ?", query.after_decision_id) if query.after_decision_id
+        rows = relation.order(:decision_id).page(1).per(query.limit + 1).to_a
+        has_more = rows.length > query.limit
+        items = rows.first(query.limit).map { build_decision(_1) }
+
+        DecisionPageV1.new(
+          repository_id: query.repository_id,
+          topic_id: query.topic_id,
+          policy_status: query.policy_status,
+          items:,
+          next_decision_id: has_more ? items.last.decision_id : nil,
+          has_more:
+        )
+      end
+
       def partition_observations(partitions)
         records = Coordinator::Read::DecisionPartitionHead.where(
           partition_id: partitions.map(&:partition_id)
@@ -166,6 +187,60 @@ module Coordinator::Read
       end
 
       private
+
+      def decisions_for_repository(repository_id)
+        Coordinator::Read::DecisionDefinition.where(
+          <<~SQL.squish,
+            definition #> '{document,scope,repository_ids}' @> ?::jsonb
+            OR EXISTS (
+              SELECT 1
+              FROM coordinator_contexts AS context
+              WHERE EXISTS (
+                SELECT 1
+                FROM jsonb_array_elements(
+                  COALESCE(context.document -> 'work_items', '[]'::jsonb)
+                ) AS work_item
+                WHERE work_item ->> 'repository_id' = ?
+              )
+              AND (
+                definition #>> '{document,scope,change_set_id}' = context.change_set_id
+                OR EXISTS (
+                  SELECT 1
+                  FROM jsonb_array_elements(
+                    COALESCE(context.document -> 'work_items', '[]'::jsonb)
+                  ) AS work_item
+                  WHERE work_item ->> 'repository_id' = ?
+                  AND work_item ->> 'work_item_id' =
+                    definition #>> '{document,scope,work_item_id}'
+                )
+                OR EXISTS (
+                  SELECT 1
+                  FROM jsonb_array_elements(
+                    COALESCE(context.document -> 'attempts', '[]'::jsonb)
+                  ) AS attempt
+                  JOIN LATERAL jsonb_array_elements(
+                    COALESCE(context.document -> 'work_items', '[]'::jsonb)
+                  ) AS work_item ON work_item ->> 'work_item_id' = attempt ->> 'work_item_id'
+                  WHERE work_item ->> 'repository_id' = ?
+                  AND attempt ->> 'attempt_id' =
+                    definition #>> '{document,scope,attempt_id}'
+                )
+              )
+            )
+            OR EXISTS (
+              SELECT 1
+              FROM candidates AS candidate
+              WHERE candidate.repository_id = ?
+              AND candidate.candidate_id = definition #>> '{document,scope,candidate_id}'
+            )
+          SQL
+          JSON.generate([ repository_id ]),
+          repository_id,
+          repository_id,
+          repository_id,
+          repository_id
+        )
+      end
 
       def partition_observation(partition, record)
         return DecisionResolution::PartitionObservationV1.new(

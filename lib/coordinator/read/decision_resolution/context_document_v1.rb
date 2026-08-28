@@ -7,8 +7,9 @@ module Coordinator::Read
       Shadowed = ShadowedDecisionV1
 
       attribute :schema, Types::String.enum("decision-context/v1")
-      attribute :resolution_policy, Types::String.enum("testing-framework-resolution/v1")
-      attribute :topic_id, Types::String.enum("testing.framework")
+      attribute :resolution_policy,
+                Types::String.enum("testing-framework-resolution/v1", "single-choice-resolution/v1")
+      attribute :topic_id, Types::Identifier
       attribute :query_context, QueryContextV1
       attribute :partitions, Types::Array.of(Partition).constrained(min_size: 4, max_size: 5)
       attribute :effective_decision, ResolvedDecisionV1.optional

@@ -916,6 +916,12 @@ module Coordinator
       )
     end
 
+    register("queries.coordination_list") do
+      Read::Queries::CoordinationList.new(
+        discovery: Read::Repositories::CoordinationDiscovery.new
+      )
+    end
+
     register("queries.attempt_list") do
       Read::Queries::CoordContext::AttemptList.new(
         contexts: self["repositories.coord_contexts"]
@@ -936,6 +942,12 @@ module Coordinator
 
     register("queries.decision_get") do
       Read::Queries::DecisionGet.new(
+        governance: self["repositories.decision_governance"]
+      )
+    end
+
+    register("queries.decision_list") do
+      Read::Queries::DecisionList.new(
         governance: self["repositories.decision_governance"]
       )
     end

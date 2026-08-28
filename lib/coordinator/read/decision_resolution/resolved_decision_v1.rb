@@ -7,7 +7,7 @@ module Coordinator::Read
 
       attribute :head, Coordinator::Write::Decisions::DecisionHeadV1
       attribute :definition_digest, Types::Sha256Digest
-      attribute :topic_id, Types::String.enum("testing.framework")
+      attribute :topic_id, Types::Identifier
       attribute :effect, Types::DecisionEffect
       attribute :modality, Types::DecisionModality
       attribute :value, Coordinator::Write::Interpretations::DecisionValueV1

@@ -3,7 +3,6 @@
 module Coordinator::Read
   module DecisionResolution
     class Resolver
-      TOPIC_ID = "testing.framework"
       APPLICABILITY_REASONS = %w[
         topic_exact
         validity_current
@@ -18,7 +17,7 @@ module Coordinator::Read
         "attempt" => 5
       }.freeze
 
-      def call(context:, observations:, decisions:, resolved_at:)
+      def call(topic_id:, context:, observations:, decisions:, resolved_at:)
         heads = exact_heads(observations)
         resolved = []
         unsupported_dimensions = []
@@ -34,7 +33,7 @@ module Coordinator::Read
 
           definition = decision.definition
           document = definition.document
-          next unless document.topic.topic_id == TOPIC_ID
+          next unless document.topic.topic_id == topic_id
 
           dimensions = unsupported_context_dimensions(document)
           unless dimensions.empty?

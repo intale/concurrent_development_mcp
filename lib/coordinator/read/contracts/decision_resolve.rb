@@ -22,7 +22,7 @@ module Coordinator::Read
       end
 
       rule(:topic_id) do
-        key.failure("must be testing.framework") unless value == "testing.framework"
+        key.failure("must be a valid topic identifier") unless Types::IDENTIFIER_PATTERN.match?(value)
       end
 
       rule(:context) do
@@ -34,7 +34,9 @@ module Coordinator::Read
         %i[change_set_id work_item_id attempt_id language environment agent_role].each do |name|
           validate_identifier(value, name, report) if value[name]
         end
-        report.call([ :context, :phase ], "must be implementation") unless value[:phase] == "implementation"
+        unless Types::DECISION_PHASES.include?(value[:phase])
+          report.call([ :context, :phase ], "must be a supported Decision phase")
+        end
         validate_paths(value[:paths], report)
       end
 
