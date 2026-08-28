@@ -7,31 +7,24 @@ module Coordinator
 
       def for(tool_name)
         contract = Coordinator::Write::Tasks::TargetContractRegistry.fetch(tool_name)
-        envelope = Schemas.envelope
-        envelope.merge(
-          properties: envelope.fetch(:properties).merge(
-            data: {
-              oneOf: [
-                receipt(contract.receipt_class),
-                domain_error
-              ]
-            }
-          )
+        Schemas.envelope(
+          data: {
+            oneOf: [
+              receipt(contract.receipt_class),
+              domain_error
+            ]
+          },
+          next_action: NextActionSchemas.schema
         )
       end
 
       def receipt(receipt_class)
-        names = receipt_class.schema.keys.map { _1.name.to_s }
-        {
-          type: "object",
-          additionalProperties: false,
-          properties: names.to_h { [ _1.to_sym, {} ] },
-          required: names
-        }
+        DryStructSchema.new.call(receipt_class)
       end
 
       def domain_error
         {
+          title: "Coordinator::Write::Tasks::DomainErrorV1",
           type: "object",
           additionalProperties: false,
           properties: {

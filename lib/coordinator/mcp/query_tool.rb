@@ -11,6 +11,16 @@ module Coordinator
       )
 
       class << self
+        def to_h
+          super.merge(outputSchema: resolved_output_schema.to_h)
+        end
+
+        def output_schema(value = :__coordinator_not_set__)
+          return super(value) unless value == :__coordinator_not_set__
+
+          resolved_output_schema
+        end
+
         def inherited(subclass)
           super
           subclass.annotations(
@@ -29,6 +39,12 @@ module Coordinator
 
         def call(server_context: nil, **arguments)
           invoke(query, arguments)
+        end
+
+        private
+
+        def resolved_output_schema
+          @resolved_output_schema ||= ::MCP::Tool::OutputSchema.new(QueryResultSchemas.for(tool_name))
         end
       end
     end

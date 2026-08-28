@@ -15,6 +15,7 @@ module Coordinator
           acknowledge_task_input: Coordinator::Write::Operations::AcknowledgeTaskInput,
           cancel_task: Coordinator::Write::Operations::CancelCoordinationTask,
           ?result_mapper: ResultMapper,
+          ?terminal_result_validator: TerminalResultValidator,
           ?get_contract: _TaskRequestContract,
           ?update_contract: _TaskRequestContract,
           ?cancel_contract: _TaskRequestContract

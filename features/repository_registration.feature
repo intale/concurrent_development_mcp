@@ -34,3 +34,27 @@ Feature: Scoped repository registration
       When two clean agents independently list Repositories using only that scope
       Then both agents discover the same canonical Repository and attributed metadata
       And Repository discovery stays available without a freshness contract
+
+  Rule: Public discovery is the executable coordination contract
+
+    @AUD-MCP-SCHEMA-ACTOR-01
+    Scenario: Actor kinds match the mutation validators exactly
+      Given an agent inspects current MCP discovery
+      Then agent-only mutation families advertise only agent attribution
+      And Batch cancellation advertises exactly agent or user attribution
+
+    @AUD-MCP-SCHEMA-REPOSITORY-02
+    Scenario: Every Repository identity is a canonical UUIDv7
+      Given an agent inspects current MCP discovery
+      Then every discovered Repository identity field requires UUIDv7
+
+    @AUD-MCP-SCHEMA-UTF8-03
+    Scenario: UTF-8 byte limits are enforced before asynchronous work exists
+      When an agent registers a Repository with a multibyte scope beyond its advertised byte limit
+      Then the byte-invalid request is rejected before allocating a Task
+
+    @AUD-MCP-OUTPUT-TASK-04 @live-subscriptions
+    Scenario: Terminal Task output is valid for its originating mutation
+      When the agent registers a caller-created Repository for scope "project:audit/mcp-contract"
+      Then the Repository Task completes with the exact attributed metadata
+      And its terminal result is valid for the discovered repository_register output schema

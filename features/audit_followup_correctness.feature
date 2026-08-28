@@ -99,7 +99,7 @@ Feature: Audited coordination remains correct under replay, interruption, and co
       When both agents use the discovered Repository to contend for one file
       Then the second lease is blocked in the shared Repository namespace
 
-    @AUD2-NEXT-ACTION-EXECUTABLE-02
+    @AUD2-NEXT-ACTION-EXECUTABLE-02 @AUD-MCP-NEXT-ACTION-05
     Scenario: Every advertised next action is an executable MCP request
       Given an MCP result contains one or more next actions
       When an agent validates each action against current tool discovery

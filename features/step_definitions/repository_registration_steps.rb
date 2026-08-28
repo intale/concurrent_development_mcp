@@ -395,3 +395,113 @@ Then("no authentication or session capability is implied") do
     "No authentication/session capability"
   )
 end
+
+Then("agent-only mutation families advertise only agent attribution") do
+  agent_only = %w[
+    repository_register
+    work_item_acquire
+    work_item_complete
+    attempt_abandon
+    write_set_reserve
+    write_set_expand
+    lease_renew
+    lease_release
+    candidate_submit
+    candidate_impact_surface_submit
+    verification_obligation_claim
+    agent_choice_record
+    compatibility_assessment_submit
+    merge_snapshot_register
+    merge_verification_submit
+    merge_authorization_request
+    merge_observation_record
+    release_set_prepare
+    release_repository_integration_record
+    release_verification_record
+    release_activation_record
+    release_compensation_complete
+  ]
+  tools = @actor_discovery.to_h { [ _1.fetch("name"), _1 ] }
+
+  agent_only.each do |tool_name|
+    kind = tools.fetch(tool_name).dig("inputSchema", "properties", "actor", "properties", "kind")
+    assert_acceptance_equal("agent", kind.fetch("const"), "#{tool_name} actor kind")
+    assert_acceptance(!kind.key?("enum"), "#{tool_name} must not advertise broader actor kinds")
+  end
+end
+
+Then("Batch cancellation advertises exactly agent or user attribution") do
+  tool = @actor_discovery.find { _1.fetch("name") == "operation_batch_cancel" }
+  kinds = tool.dig("inputSchema", "properties", "actor", "properties", "kind", "enum")
+
+  assert_acceptance_equal(%w[agent user], kinds, "operation_batch_cancel actor kinds")
+end
+
+Then("every discovered Repository identity field requires UUIDv7") do
+  repository_schemas = @actor_discovery.flat_map do |tool|
+    cucumber_repository_identity_schemas(tool.fetch("inputSchema"))
+  end
+  uuid_pattern = "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+
+  assert_acceptance(repository_schemas.any?, "Expected Repository identity fields")
+  repository_schemas.each do |schema|
+    variants = schema.fetch("anyOf", [ schema ]).reject { _1["type"] == "null" }
+    variants.each do |variant|
+      assert_acceptance_equal(uuid_pattern, variant.fetch("pattern"), "Repository identity pattern")
+    end
+  end
+end
+
+When("an agent registers a Repository with a multibyte scope beyond its advertised byte limit") do
+  @byte_invalid_repository_command_id = "audit.mcp.repository.multibyte-limit"
+  @byte_invalid_repository_response = call_tool(
+    "repository_register",
+    {
+      command_id: @byte_invalid_repository_command_id,
+      actor: { kind: "agent", id: "utf8-contract-agent" },
+      repository_id: SecureRandom.uuid_v7,
+      scope: "é" * 251,
+      repository_key: "utf8-contract",
+      display_name: nil,
+      paths: [],
+      remotes: []
+    },
+    expected_status: 400
+  )
+end
+
+Then("the byte-invalid request is rejected before allocating a Task") do
+  error = @byte_invalid_repository_response.fetch("error")
+
+  assert_acceptance_equal(-32_602, error.fetch("code"), "Synchronous JSON-RPC error")
+  assert_acceptance_equal("invalid_input", error.dig("data", "code"), "Contract error code")
+  assert_acceptance_equal(nil, @byte_invalid_repository_response.dig("result", "taskId"), "Task handle")
+  assert_acceptance_equal(
+    [],
+    task_events_for_command(@byte_invalid_repository_command_id),
+    "Coordination Task facts"
+  )
+end
+
+Then("its terminal result is valid for the discovered repository_register output schema") do
+  tool = mcp_request(method: "tools/list", params: {})
+    .dig("result", "tools")
+    .find { _1.fetch("name") == "repository_register" }
+  content = @repository_task_state.dig("result", "result", "structuredContent")
+
+  ::MCP::Tool::OutputSchema.new(tool.fetch("outputSchema")).validate_result(content)
+end
+
+def cucumber_repository_identity_schemas(node)
+  case node
+  when Hash
+    properties = node.fetch("properties", {})
+    direct = [ properties["repository_id"] ].compact
+    plural = properties["repository_ids"]&.fetch("items", nil)
+    [ *direct, plural, *node.values.flat_map { cucumber_repository_identity_schemas(_1) } ].compact
+  when Array
+    node.flat_map { cucumber_repository_identity_schemas(_1) }
+  else
+    []
+  end
+end

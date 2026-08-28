@@ -1070,7 +1070,8 @@ module Coordinator
         get_task: self["operations.get_coordination_task"],
         acknowledge_task_input: self["operations.acknowledge_task_input"],
         cancel_task: self["operations.cancel_coordination_task"],
-        result_mapper: self["mcp.tasks.result_mapper"]
+        result_mapper: self["mcp.tasks.result_mapper"],
+        terminal_result_validator: Mcp::Tasks::TerminalResultValidator.new
       )
     end
     register("mcp.server", memoize: true) do

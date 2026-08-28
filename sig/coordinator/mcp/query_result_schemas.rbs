@@ -1,0 +1,9 @@
+module Coordinator
+  module Mcp
+    module QueryResultSchemas
+      DATA_CLASSES: Hash[String, Array[Class]]
+
+      def self.for: (String tool_name) -> json_schema
+    end
+  end
+end

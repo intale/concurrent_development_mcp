@@ -1,0 +1,9 @@
+module Coordinator
+  module Mcp
+    module Tasks
+      class TerminalResultValidator
+        def call: (Coordinator::Write::Domain::CoordinationTasks::State state) -> Coordinator::Write::Domain::CoordinationTasks::State
+      end
+    end
+  end
+end

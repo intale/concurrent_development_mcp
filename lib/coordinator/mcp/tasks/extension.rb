@@ -12,6 +12,7 @@ module Coordinator::Mcp
         acknowledge_task_input:,
         cancel_task:,
         result_mapper: ResultMapper.new,
+        terminal_result_validator: TerminalResultValidator.new,
         get_contract: Contracts::GetTaskRequest.new,
         update_contract: Contracts::UpdateTaskRequest.new,
         cancel_contract: Contracts::CancelTaskRequest.new
@@ -20,6 +21,7 @@ module Coordinator::Mcp
         @acknowledge_task_input = acknowledge_task_input
         @cancel_task = cancel_task
         @result_mapper = result_mapper
+        @terminal_result_validator = terminal_result_validator
         @get_contract = get_contract
         @update_contract = update_contract
         @cancel_contract = cancel_contract
@@ -42,6 +44,7 @@ module Coordinator::Mcp
           params
         )
 
+        @terminal_result_validator.call(state)
         @result_mapper.detailed(state).to_h
       end
 

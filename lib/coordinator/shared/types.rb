@@ -7,11 +7,11 @@ module Coordinator::Shared
     IDENTIFIER_PATTERN = /\A[A-Za-z0-9][A-Za-z0-9._:-]{0,199}\z/
     PUBLIC_COMMAND_ID_PATTERN = /\A(?!internal:)[A-Za-z0-9][A-Za-z0-9._:-]{0,199}\z/
     INTERNAL_COMMAND_ID_PATTERN = /\Ainternal:[A-Za-z0-9][A-Za-z0-9._:-]{0,190}\z/
-    REPOSITORY_ID_PATTERN = /\A[a-z0-9][a-z0-9._-]{0,99}\z/
     GIT_OID_PATTERN = /\A(?:[0-9a-f]{40}|[0-9a-f]{64})\z/
     SHA256_DIGEST_PATTERN = /\Asha256:[0-9a-f]{64}\z/
     TIMESTAMP_PATTERN = /\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z\z/
     UUID_V7_PATTERN = /\A[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/
+    REPOSITORY_ID_PATTERN = UUID_V7_PATTERN
     RESOURCE_PATH_PATTERN = /\A[^\u0000-\u001f\u007f]{1,1024}\z/
     CANDIDATE_IMPACT_KEY_PATTERN = /\A[a-z][a-z0-9_.-]*(?::[a-z0-9][a-z0-9_.-]*)+\z/
     MARKER_PURPOSE_PATTERN = /\A[a-z][a-z0-9-]{0,63}\z/

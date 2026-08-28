@@ -1,0 +1,11 @@
+module Coordinator
+  module Mcp
+    module NextActionSchemas
+      TARGET_TOOL_NAMES: Array[String]
+
+      def self.schema: () -> json_schema
+      def self.action_schema: (String tool_name) -> json_schema
+      def self.nested_schema: (json_schema schema) -> json_schema
+    end
+  end
+end

@@ -8,7 +8,7 @@ module Coordinator
 
       module_function
 
-      def envelope
+      def envelope(data: { type: "object" }, next_action: generic_next_action)
         {
           type: "object",
           additionalProperties: false,
@@ -18,24 +18,46 @@ module Coordinator
             command_id: nullable_string,
             receipt: nullable_string,
             context_token: nullable_string,
-            data: { type: "object" },
+            data:,
             warnings: { type: "array", items: { type: "string" } },
             next_actions: {
               type: "array",
-              items: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                  tool: { type: "string" },
-                  arguments: { type: "object" }
-                },
-                required: %w[tool arguments]
-              }
+              items: next_action
             }
           },
           required: %w[
             status summary command_id receipt context_token data warnings next_actions
           ]
+        }
+      end
+
+      def generic_next_action
+        object_schema(
+          properties: {
+            tool: { type: "string" },
+            arguments: { type: "object" }
+          },
+          required: %w[tool arguments]
+        )
+      end
+
+      def utf8_text(maximum_bytes:, minimum_bytes: 1)
+        {
+          type: "string",
+          minLength: minimum_bytes,
+          maxLength: maximum_bytes,
+          "x-encoding": "UTF-8",
+          "x-maxBytes": maximum_bytes
+        }
+      end
+
+      def utf8_text_array(max_items:, maximum_bytes:)
+        {
+          type: "array",
+          minItems: 0,
+          maxItems: max_items,
+          uniqueItems: true,
+          items: utf8_text(maximum_bytes:)
         }
       end
 
@@ -46,22 +68,15 @@ module Coordinator
             repository_id: uuid_v7.merge(
               description: "Caller-created Repository UUID proposal; the server returns the canonical UUID already bound to the exact scope and key when one exists."
             ),
-            scope: {
-              type: "string",
-              minLength: 1,
-              maxLength: 500,
+            scope: utf8_text(maximum_bytes: 500).merge(
               description: "Exact project/workspace coordination scope; the server infers no hierarchy."
-            },
+            ),
             repository_key: identifier.merge(
               description: "Exact case-sensitive caller/user-chosen logical key within scope; no filesystem location is inferred."
             ),
-            display_name: {
-              type: [ "string", "null" ],
-              minLength: 1,
-              maxLength: 255
-            },
-            paths: string_array(min_items: 0, max_items: 20, max_length: 1_024),
-            remotes: string_array(min_items: 0, max_items: 20, max_length: 2_048)
+            display_name: { anyOf: [ utf8_text(maximum_bytes: 255), { type: "null" } ] },
+            paths: utf8_text_array(max_items: 20, maximum_bytes: 1_024),
+            remotes: utf8_text_array(max_items: 20, maximum_bytes: 2_048)
           ),
           required: %w[command_id actor repository_id scope repository_key display_name paths remotes]
         )
@@ -197,6 +212,7 @@ module Coordinator
         )
         object_schema(
           properties: common_mutation_properties.merge(
+            actor: agent_actor,
             change_set_id: identifier,
             work_item_id: identifier,
             attempt_id: identifier,
@@ -216,6 +232,7 @@ module Coordinator
         )
         object_schema(
           properties: common_mutation_properties.merge(
+            actor: agent_actor,
             change_set_id: identifier,
             work_item_id: identifier,
             attempt_id: identifier,
@@ -236,6 +253,7 @@ module Coordinator
       def attempt_abandon
         object_schema(
           properties: common_mutation_properties.merge(
+            actor: agent_actor,
             change_set_id: identifier,
             work_item_id: identifier,
             attempt_id: identifier,
@@ -252,6 +270,7 @@ module Coordinator
       def write_set_reserve
         object_schema(
           properties: common_mutation_properties.merge(
+            actor: agent_actor,
             change_set_id: identifier,
             work_item_id: identifier,
             attempt_id: identifier,
@@ -275,11 +294,12 @@ module Coordinator
       def write_set_expand
         object_schema(
           properties: common_mutation_properties.merge(
+            actor: agent_actor,
             change_set_id: identifier,
             work_item_id: identifier,
             attempt_id: identifier,
             lease_set_id: uuid_v7,
-            repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+            repository_id: uuid_v7,
             base_commit_oid: git_oid,
             resources: {
               type: "array",
@@ -298,6 +318,7 @@ module Coordinator
       def lease_renew
         object_schema(
           properties: common_mutation_properties.merge(
+            actor: agent_actor,
             change_set_id: identifier,
             work_item_id: identifier,
             attempt_id: identifier,
@@ -321,6 +342,7 @@ module Coordinator
       def lease_release
         object_schema(
           properties: common_mutation_properties.merge(
+            actor: agent_actor,
             change_set_id: identifier,
             work_item_id: identifier,
             attempt_id: identifier,
@@ -344,7 +366,7 @@ module Coordinator
           properties: {
             repository_ids: {
               type: "array",
-              items: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+              items: uuid_v7,
               maxItems: 100,
               uniqueItems: true
             },
@@ -513,7 +535,7 @@ module Coordinator
             change_set_id: identifier,
             work_item_id: identifier,
             attempt_id: identifier,
-            repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+            repository_id: uuid_v7,
             target_branch: { type: "string", minLength: 1, maxLength: 255 },
             base_commit_oid: git_oid,
             head_commit_oid: git_oid,
@@ -631,7 +653,10 @@ module Coordinator
 
       def operation_batch_cancel
         object_schema(
-          properties: common_mutation_properties.merge(batch_id: uuid_v7),
+          properties: common_mutation_properties.merge(
+            actor: attributed_actor(enum: %w[agent user]),
+            batch_id: uuid_v7
+          ),
           required: %w[command_id actor batch_id]
         )
       end
@@ -1226,10 +1251,7 @@ module Coordinator
             change_set_id: nullable_identifier,
             candidate_id: nullable_identifier,
             work_item_id: nullable_identifier,
-            repository_id: {
-              type: [ "string", "null" ],
-              pattern: "^[a-z0-9][a-z0-9._-]{0,99}$"
-            },
+            repository_id: { anyOf: [ uuid_v7, { type: "null" } ] },
             kind: nullable_enum([ "candidate_compatibility" ]),
             enforcement: nullable_enum(%w[verification_gate merge_gate]),
             status: nullable_enum(Types::VERIFICATION_OBLIGATION_STATUSES),
@@ -1249,6 +1271,7 @@ module Coordinator
       def verification_obligation_claim
         object_schema(
           properties: common_mutation_properties.merge(
+            actor: agent_actor,
             obligation_id: identifier,
             claim_duration_seconds: { type: "integer", minimum: 30, maximum: 3_600 }
           ),
@@ -1371,7 +1394,7 @@ module Coordinator
           properties: common_mutation_properties.merge(
             actor: agent_actor,
             merge_snapshot_id: identifier,
-            repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+            repository_id: uuid_v7,
             target_branch: { type: "string", minLength: 1, maxLength: 255 },
             target_base_commit_oid: git_oid,
             ordered_candidates: {
@@ -1429,7 +1452,7 @@ module Coordinator
         )
         member = object_schema(
           properties: {
-            repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+            repository_id: uuid_v7,
             target_branch: { type: "string", minLength: 1, maxLength: 255 },
             object_format: { type: "string", enum: Types::GIT_OBJECT_FORMATS },
             merge_snapshot_id: identifier,
@@ -1501,7 +1524,7 @@ module Coordinator
           properties: common_mutation_properties.merge(
             actor: agent_actor,
             release_set_id: identifier,
-            repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+            repository_id: uuid_v7,
             attempt_id: identifier,
             outcome: { type: "string", enum: Types::RELEASE_SET_INTEGRATION_OUTCOMES },
             merge_observation_event: { anyOf: [ observation_event, { type: "null" } ] },
@@ -1536,7 +1559,7 @@ module Coordinator
             summary: { type: "string", minLength: 1, maxLength: 2_000 },
             repository_id: {
               anyOf: [
-                { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+                uuid_v7,
                 { type: "null" }
               ]
             }
@@ -1644,7 +1667,7 @@ module Coordinator
         )
         evidence = object_schema(
           properties: {
-            repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+            repository_id: uuid_v7,
             integration_event:,
             action: { type: "string", enum: Types::RELEASE_SET_COMPENSATION_ACTIONS },
             external_reference: { type: "string", minLength: 1, maxLength: 1_000 },
@@ -1700,7 +1723,7 @@ module Coordinator
           properties: {
             snapshot_event:,
             snapshot_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
-            repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+            repository_id: uuid_v7,
             target_branch: { type: "string", minLength: 1, maxLength: 255 },
             object_format: { type: "string", enum: Types::GIT_OBJECT_FORMATS },
             target_base_commit_oid: git_oid,
@@ -1832,7 +1855,7 @@ module Coordinator
             ),
             target_base_observation: object_schema(
               properties: {
-                repository_id: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" },
+                repository_id: uuid_v7,
                 target_branch: { type: "string", minLength: 1, maxLength: 255 },
                 object_format: { type: "string", enum: Types::GIT_OBJECT_FORMATS },
                 commit_oid: git_oid,
@@ -1879,9 +1902,7 @@ module Coordinator
             authorization_decision_digest: {
               type: "string", pattern: "^sha256:[0-9a-f]{64}$"
             },
-            repository_id: {
-              type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$"
-            },
+            repository_id: uuid_v7,
             target_branch: { type: "string", minLength: 1, maxLength: 255 },
             object_format: { type: "string", enum: Types::GIT_OBJECT_FORMATS },
             target_before_commit_oid: git_oid,
@@ -1904,11 +1925,9 @@ module Coordinator
       def candidate_impact_surface_submit
         object_schema(
           properties: common_mutation_properties.merge(
+            actor: agent_actor,
             candidate_id: identifier,
-            repository_id: {
-              type: "string",
-              pattern: "^[a-z0-9][a-z0-9._-]{0,99}$"
-            },
+            repository_id: uuid_v7,
             head_commit_oid: git_oid,
             manifest_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
             build_context_digest: nullable_sha256_digest,
@@ -2583,7 +2602,7 @@ module Coordinator
             type: "array",
             maxItems: 100,
             uniqueItems: true,
-            items: { type: "string", pattern: "^[a-z0-9][a-z0-9._-]{0,99}$" }
+            items: uuid_v7
           },
           branch_selectors: identifier_array,
           change_set_id: nullable_identifier,

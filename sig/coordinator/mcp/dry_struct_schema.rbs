@@ -1,0 +1,12 @@
+module Coordinator
+  module Mcp
+    interface _DryStructClass
+      def schema: () -> untyped
+      def name: () -> String
+    end
+
+    class DryStructSchema
+      def call: (_DryStructClass struct_class) -> json_schema
+    end
+  end
+end

@@ -1,6 +1,9 @@
 module Coordinator
   module Mcp
     class QueryTool < Tool
+      def self.to_h: () -> Hash[Symbol, untyped]
+      def self.output_schema: () -> ::MCP::Tool::OutputSchema
+                            | (Hash[Symbol, untyped] value) -> untyped
       def self.query: () -> String
                     | (String key) -> String
       def self.call: (?server_context: untyped, **untyped arguments) -> untyped
