@@ -18,7 +18,7 @@ Feature: Durable MCP Task protocol
       Then both Task handles expose the same result
       And the command and ChangeSet facts exist only once
 
-    @AUD-TASK-POST-COMMIT-01 @live-subscriptions
+    @AUD-TASK-POST-COMMIT-01 @TASK-SEMANTIC-01 @live-subscriptions
     Scenario: A working Task recovers the result of an already committed target command
       Given agent "planner-1" completed ChangeSet "CS-AUD-TASK-RECOVERY" with command "cmd-aud-task-recovery" through live subscriptions
       And the Task workers are interrupted
@@ -28,7 +28,7 @@ Feature: Durable MCP Task protocol
       Then the replacement Task exposes the original completed result
       And the recovered command and ChangeSet facts exist only once
 
-    @AUD-TASK-WORKER-RESTART-02 @live-subscriptions
+    @AUD-TASK-WORKER-RESTART-02 @TASK-RESTART-01 @live-subscriptions
     Scenario: A Task submitted while its worker is interrupted completes after restart
       Given the Task workers are interrupted
       When agent "planner-1" submits ChangeSet "CS-AUD-TASK-RESTART" with command "cmd-aud-task-restart"
@@ -63,7 +63,7 @@ Feature: Durable MCP Task protocol
       Then the current Task completes with coordination denial "change_set_not_found"
       And the denied command writes no coordination facts
 
-    @AUD-TASK-DOMAIN-DENIAL-03 @live-subscriptions
+    @AUD-TASK-DOMAIN-DENIAL-03 @TASK-DENIAL-01 @live-subscriptions
     Scenario: A live Task represents a domain denial as a completed tool error
       Given agent "planner-1" completed ChangeSet "CS-AUD-TASK-DENIAL" with command "cmd-aud-task-denial-seed" through live subscriptions
       When agent "planner-2" submits the same ChangeSet with command "cmd-aud-task-denial"

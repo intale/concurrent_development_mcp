@@ -14,6 +14,7 @@ Feature: Development Artifact repository
 
   Rule: Evidence is classified, attributed, and retrieved without executing content
 
+    @CONTENT-TEXT-01 @CONTENT-DERIVE-01
     Scenario: Documentation and web-search evidence are discoverable through exact filters
       When the agent captures documentation and web-search Development Artifacts
       Then both Artifact Tasks complete with different immutable IDs
@@ -24,6 +25,7 @@ Feature: Development Artifact repository
 
   Rule: Changed bytes are new facts connected by explicit relationships
 
+    @CONTENT-BINARY-01
     Scenario: A changed binary profile supersedes its earlier capture
       When the agent captures two binary profile versions from one source
       Then the changed profile has a different immutable Artifact ID

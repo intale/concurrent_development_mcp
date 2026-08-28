@@ -8,7 +8,7 @@ Feature: Dynamic write-set leases
 
   Rule: Overlapping write sets are reserved atomically
 
-    @AUD-LEASE-DF-CONFLICT-01 @live-subscriptions @concurrency
+    @AUD-LEASE-DF-CONFLICT-01 @LEASE-DESC-01 @live-subscriptions @concurrency
     Scenario: A directory lease blocks a later child-file lease through public MCP Tasks
       Given two independent MCP agents have live active Attempts in ChangeSet "CS-AUD-LSE-DIR-FIRST"
       When agent "agent-a" reserves directory "app/models" through a public Task
@@ -16,13 +16,28 @@ Feature: Dynamic write-set leases
       Then the first hierarchical reservation succeeds and the second completes busy
       And only the directory resource has a durable lease acquisition
 
-    @AUD-LEASE-DF-CONFLICT-02 @live-subscriptions @concurrency
+    @AUD-LEASE-DF-CONFLICT-02 @LEASE-DESC-01 @live-subscriptions @concurrency
     Scenario: A child-file lease blocks a later parent-directory lease through public MCP Tasks
       Given two independent MCP agents have live active Attempts in ChangeSet "CS-AUD-LSE-FILE-FIRST"
       When agent "agent-a" reserves file "app/models/user.rb" through a public Task
       And agent "agent-b" reserves directory "app/models" through a public Task
       Then the first hierarchical reservation succeeds and the second completes busy
       And only the file resource has a durable lease acquisition
+
+    @LEASE-EQUAL-01 @live-subscriptions
+    Scenario: Different resource kinds at the same path still overlap
+      Given two independent MCP agents have live active Attempts in ChangeSet "CS-ID-LSE-EQUAL-PATH"
+      When agent "agent-a" reserves file "app/models" through a public Task
+      And agent "agent-b" reserves directory "app/models" through a public Task
+      Then the first hierarchical reservation succeeds and the second completes busy
+      And only the file resource has a durable lease acquisition
+
+    @LEASE-FILE-PREFIX-01 @live-subscriptions
+    Scenario: A file lease does not cover a descendant-looking path
+      Given two independent MCP agents have live active Attempts in ChangeSet "CS-ID-LSE-FILE-PREFIX"
+      When agent "agent-a" reserves file "app/models" through a public Task
+      And agent "agent-b" reserves file "app/models/user.rb" through a public Task
+      Then both hierarchical reservation Tasks complete successfully
 
     @AUD-LEASE-DISJOINT-03 @live-subscriptions @concurrency
     Scenario: Disjoint directory and file resources remain independently leasable
