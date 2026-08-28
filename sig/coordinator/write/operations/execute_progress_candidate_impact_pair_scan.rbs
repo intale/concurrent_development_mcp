@@ -6,7 +6,7 @@ module Coordinator::Write
         ?exact_loader: Coordinator::Write::CandidateObligations::ExactEventLoader,
         ?loader: Coordinator::Write::CandidateObligationScans::PairScanLoader,
         ?decider: Coordinator::Write::Domain::CandidateObligationScans::ProgressPairScan,
-        ?retry_policy: Coordinator::Write::CandidateObligationScans::ExpectedRevisionRetry,
+        ?revision_guard: Coordinator::Write::CandidateObligationScans::ExpectedRevisionGuard,
         ?identity_builder: Coordinator::Write::CandidateObligationScans::IdentityBuilder,
         ?clock: Coordinator::Shared::_Clock,
         ?id_generator: Coordinator::Shared::_IdGenerator,

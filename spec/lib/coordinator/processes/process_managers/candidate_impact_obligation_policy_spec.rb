@@ -8,7 +8,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CandidateImpactObligatio
   let(:schemas) { Coordinator::Write::EventSchemaRegistry.new }
   let(:identities) { Coordinator::Write::CandidateObligationScans::IdentityBuilder.new }
 
-  it "IMP-02-POLICY-LATE-01 sweeps registered surfaces and converges redelivery on one exact obligation" do
+  it "IMP-02-POLICY-LATE-01 AUD-SCAN-REPLAY-03 converges duplicate delivery on one scan and obligation" do
     pair = CandidateObligationScenario.submit_pair(prefix: "obligation-process-policy-late")
     policy = CandidateObligationScenario.activate_policy(
       prefix: "obligation-process-policy-late",

@@ -1,8 +1,6 @@
 module Coordinator::Write
   module CandidateObligationScans
-    class ExpectedRevisionRetry
-      MAX_ATTEMPTS: Integer
-      def initialize: (?maximum_attempts: Integer) -> void
+    class ExpectedRevisionGuard
       def call: (scan_id: String) { () -> Dry::Monads::Result } -> Dry::Monads::Result
     end
   end

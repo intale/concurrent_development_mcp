@@ -10,7 +10,7 @@ module Coordinator::Write
         exact_loader: CandidateObligations::ExactEventLoader.new(event_store:),
         loader: CandidateObligationScans::RegistrySweepLoader.new(event_store:),
         decider: Domain::CandidateObligationScans::ProgressRegistrySweep.new,
-        retry_policy: CandidateObligationScans::ExpectedRevisionRetry.new,
+        revision_guard: CandidateObligationScans::ExpectedRevisionGuard.new,
         identity_builder: CandidateObligationScans::IdentityBuilder.new,
         clock: SystemClock.new,
         id_generator: IdGenerator.new,
@@ -23,7 +23,7 @@ module Coordinator::Write
         @exact_loader = exact_loader
         @loader = loader
         @decider = decider
-        @retry_policy = retry_policy
+        @revision_guard = revision_guard
         @identity_builder = identity_builder
         @clock = clock
         @id_generator = id_generator
@@ -40,7 +40,7 @@ module Coordinator::Write
           event_id: @id_generator.uuid_v7
         )
 
-        @retry_policy.call(scan_id: invocation.command.scan_id) do
+        @revision_guard.call(scan_id: invocation.command.scan_id) do
           execute_attempt(invocation:, preparation:)
         end
       end

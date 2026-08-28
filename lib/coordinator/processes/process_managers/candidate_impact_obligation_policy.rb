@@ -7,11 +7,13 @@ module Coordinator::Processes
       HANDLED_PAIR_START_CODES = [ :candidate_impact_pair_scan_already_decided ].freeze
       HANDLED_REGISTRY_PROGRESS_CODES = [
         :candidate_impact_registry_sweep_not_running,
-        :candidate_impact_registry_sweep_checkpoint_changed
+        :candidate_impact_registry_sweep_checkpoint_changed,
+        :candidate_impact_scan_concurrency_conflict
       ].freeze
       HANDLED_PAIR_PROGRESS_CODES = [
         :candidate_impact_pair_scan_not_running,
-        :candidate_impact_pair_scan_checkpoint_changed
+        :candidate_impact_pair_scan_checkpoint_changed,
+        :candidate_impact_scan_concurrency_conflict
       ].freeze
 
       def initialize(

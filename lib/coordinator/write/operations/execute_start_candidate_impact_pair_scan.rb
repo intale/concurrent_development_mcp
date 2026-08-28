@@ -5,6 +5,8 @@ module Coordinator::Write
     class ExecuteStartCandidateImpactPairScan
       include Dry::Monads[:result]
 
+      CONSISTENCY_BOUNDARY = "candidate_impact_pair_scan_start_consistency"
+
       def initialize(
         event_store:,
         exact_loader: CandidateObligations::ExactEventLoader.new(event_store:),
@@ -13,7 +15,6 @@ module Coordinator::Write
         marker_builder: Candidates::ImpactIndexMarkerBuilder.new,
         loader: CandidateObligationScans::PairScanLoader.new(event_store:),
         decider: Domain::CandidateObligationScans::StartPairScan.new,
-        retry_policy: CandidateObligationScans::ExpectedRevisionRetry.new,
         identity_builder: CandidateObligationScans::IdentityBuilder.new,
         clock: SystemClock.new,
         id_generator: IdGenerator.new,
@@ -29,7 +30,6 @@ module Coordinator::Write
         @marker_builder = marker_builder
         @loader = loader
         @decider = decider
-        @retry_policy = retry_policy
         @identity_builder = identity_builder
         @clock = clock
         @id_generator = id_generator
@@ -45,7 +45,7 @@ module Coordinator::Write
           event_id: @id_generator.uuid_v7
         )
 
-        @retry_policy.call(scan_id: invocation.command.scan_id) do
+        @event_store.multiple do
           execute_attempt(invocation:, preparation:)
         end
       end
@@ -77,6 +77,14 @@ module Coordinator::Write
           direction: command.direction
         )
         snapshot = @loader.call(command.scan_id)
+        ActiveSupport::Notifications.instrument(
+          "coordinator.command_boundary",
+          operation: CONSISTENCY_BOUNDARY,
+          command_id: command.command_id,
+          scan_id: command.scan_id,
+          policy_partition_event_id: command.policy_partition_event.event_id,
+          registry_revision: command.to_revision
+        )
         decision = @decider.call(
           state: snapshot.state,
           command:,
@@ -96,8 +104,7 @@ module Coordinator::Write
           markers: event_markers(command),
           caused_by: source.event
         )
-        expected_revision = snapshot.latest_revision || :no_stream
-        persisted = @event_store.append(stream, [ physical ], expected_revision:).sole
+        persisted = @event_store.append(stream, [ physical ]).sole
 
         Success(persisted)
       end

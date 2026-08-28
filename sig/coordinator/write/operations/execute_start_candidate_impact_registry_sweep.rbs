@@ -1,13 +1,14 @@
 module Coordinator::Write
   module Operations
     class ExecuteStartCandidateImpactRegistrySweep
+      CONSISTENCY_BOUNDARY: String
+
       def initialize: (
         event_store: Coordinator::Write::_EventStore,
         ?exact_loader: Coordinator::Write::CandidateObligations::ExactEventLoader,
         ?policy_loader: Coordinator::Write::CandidateObligations::ImpactPolicyLoader,
         ?loader: Coordinator::Write::CandidateObligationScans::RegistrySweepLoader,
         ?decider: Coordinator::Write::Domain::CandidateObligationScans::StartRegistrySweep,
-        ?retry_policy: Coordinator::Write::CandidateObligationScans::ExpectedRevisionRetry,
         ?identity_builder: Coordinator::Write::CandidateObligationScans::IdentityBuilder,
         ?clock: Coordinator::Shared::_Clock,
         ?id_generator: Coordinator::Shared::_IdGenerator,
