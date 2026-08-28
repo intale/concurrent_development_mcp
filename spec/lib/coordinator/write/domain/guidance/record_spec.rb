@@ -6,7 +6,7 @@ RSpec.describe Coordinator::Write::Domain::Guidance::Record do
   let(:occurred_at) { "2026-08-22T14:30:00.000000Z" }
   let(:anchors) do
     Coordinator::Write::GuidanceAnchorsV1.new(
-      repository_ids: [ "billing" ],
+      repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
       change_set_id: "CS-1",
       work_item_id: nil,
       attempt_id: nil

@@ -8,7 +8,10 @@ RSpec.describe Coordinator::Write::Domain::Interpretations::Adjudicate do
       message_id: "M-1",
       text: "Use RSpec.",
       anchors: Coordinator::Write::GuidanceAnchorsV1.new(
-        repository_ids: [ "billing" ], change_set_id: nil, work_item_id: nil, attempt_id: nil
+        repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
+        change_set_id: nil,
+        work_item_id: nil,
+        attempt_id: nil
       ),
       event: event_reference("000001", type: "UserUtteranceRecorded")
     )

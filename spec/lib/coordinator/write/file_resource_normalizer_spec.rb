@@ -35,9 +35,24 @@ RSpec.describe Coordinator::Write::FileResourceNormalizer do
   end
 
   it "keeps byte-distinct case and Unicode sequences distinct" do
-    composed = normalizer.call(repository_id: "billing", kind: "file", path: "Models/Å.rb", base_blob_oid: nil).value!
-    decomposed = normalizer.call(repository_id: "billing", kind: "file", path: "Models/A\u030A.rb", base_blob_oid: nil).value!
-    lower = normalizer.call(repository_id: "billing", kind: "file", path: "models/å.rb", base_blob_oid: nil).value!
+    composed = normalizer.call(
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      kind: "file",
+      path: "Models/Å.rb",
+      base_blob_oid: nil
+    ).value!
+    decomposed = normalizer.call(
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      kind: "file",
+      path: "Models/A\u030A.rb",
+      base_blob_oid: nil
+    ).value!
+    lower = normalizer.call(
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      kind: "file",
+      path: "models/å.rb",
+      base_blob_oid: nil
+    ).value!
 
     expect(composed.path).to eq("Models/Å.rb")
     expect([ composed.resource_key_hash, decomposed.resource_key_hash, lower.resource_key_hash ].uniq.length).to eq(3)
@@ -57,7 +72,12 @@ RSpec.describe Coordinator::Write::FileResourceNormalizer do
     }
 
     cases.each do |path, code|
-      result = normalizer.call(repository_id: "billing", kind: "file", path:, base_blob_oid: nil)
+      result = normalizer.call(
+        repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+        kind: "file",
+        path:,
+        base_blob_oid: nil
+      )
       expect(result.failure.code).to eq(code)
     end
   end
@@ -67,17 +87,32 @@ RSpec.describe Coordinator::Write::FileResourceNormalizer do
     too_deep = 33.times.map { "a" }.join("/")
     invalid_utf8 = "\xFF".b.force_encoding(Encoding::UTF_8)
 
-    expect(normalizer.call(repository_id: "billing", kind: "file", path: too_long, base_blob_oid: nil).failure.code)
+    expect(normalizer.call(
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      kind: "file",
+      path: too_long,
+      base_blob_oid: nil
+    ).failure.code)
       .to eq(:resource_path_too_long)
-    expect(normalizer.call(repository_id: "billing", kind: "file", path: too_deep, base_blob_oid: nil).failure.code)
+    expect(normalizer.call(
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      kind: "file",
+      path: too_deep,
+      base_blob_oid: nil
+    ).failure.code)
       .to eq(:resource_path_too_deep)
-    expect(normalizer.call(repository_id: "billing", kind: "file", path: invalid_utf8, base_blob_oid: nil).failure.code)
+    expect(normalizer.call(
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      kind: "file",
+      path: invalid_utf8,
+      base_blob_oid: nil
+    ).failure.code)
       .to eq(:resource_path_encoding)
   end
 
   it "rejects resource kinds outside the Git file/directory model" do
     result = normalizer.call(
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       kind: "contract",
       path: "payments/v1",
       base_blob_oid: nil

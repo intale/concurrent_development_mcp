@@ -49,7 +49,7 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
       actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "planner-1"),
       change_set_id: "CS-100",
       work_item_id: "W-200",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       goal: "Implement capture validation",
       acceptance_criteria: [ "Reject duplicate ownership" ]
     )
@@ -66,14 +66,14 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
           ),
           change_set_id: "CS-100",
           work_item_id: "W-200",
-          repository_id: "billing",
+          repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
           goal: "Implement capture validation",
           acceptance_criteria: [ "Reject duplicate ownership" ]
         )
       )
     )
     expect(digest.work_item_create(work_item_command)).to eq(
-      "sha256:eae762817e3077c7284917ed870ae60f97ad35ff1ac3680087dadd198e8efe5d"
+      "sha256:ebb121f550cc3bef74c00d50c769d23c2a7ce87635eff9fd98e1f936f0418bd4"
     )
   end
 
@@ -148,7 +148,7 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
       attempt_id: "A-300",
       base_snapshots: [
         Coordinator::Write::RepositorySnapshotV1.new(
-          repository_id: "billing",
+          repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
           object_format: "sha1",
           commit_oid: "0123456789abcdef0123456789abcdef01234567"
         )
@@ -170,7 +170,7 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
           attempt_id: "A-300",
           base_snapshots: [
             Coordinator::Write::CommandInputDocuments::RepositorySnapshotV1.new(
-              repository_id: "billing",
+              repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
               object_format: "sha1",
               commit_oid: "0123456789abcdef0123456789abcdef01234567"
             )
@@ -179,7 +179,7 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
       )
     )
     expect(digest.work_item_acquire(acquisition_command)).to eq(
-      "sha256:11382b77d0f6e7e226d4bb927aebeebfbf3fb1b61d929d2121f804449e3d16f0"
+      "sha256:5c9c8cec93e2167e9a5742fe99e358f832b6cea61405826e998063c79c3f1350"
     )
   end
 

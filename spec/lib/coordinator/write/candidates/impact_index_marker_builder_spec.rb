@@ -7,9 +7,9 @@ RSpec.describe Coordinator::Write::Candidates::ImpactIndexMarkerBuilder do
     markers = builder.call(evidence:, surface:)
 
     expect(markers).to eq([
-      "compound:candidate-impact-index:v1:sha256:6d2d878bd2551adda1fcbcc7911f73b3dc6462d28e9358f75aad78ae5133192e",
-      "compound:candidate-impact-index:v1:sha256:539c0caf9bea7ff27b2e324960e557b3f194e70a4f36a527719752ce87a669d0",
-      "compound:candidate-impact-index:v1:sha256:d17bab90959d3a38f79b2ee8820effba03bb9abf2ab3d3943761218fd8914f2c",
+      "compound:candidate-impact-index:v1:sha256:53fbd53f3730517edcd37911a443c5e529491392a39db07342b583935fb5cb5b",
+      "compound:candidate-impact-index:v1:sha256:a9a69deab5c6a7b1d5cf382348fa32d35eb274b1c071f8c9b9be4ce7c7e7d7ac",
+      "compound:candidate-impact-index:v1:sha256:e3a21b6088a85288ef518da68be0bc5dc3ff6615a2d1217ff9f07b620f1ee77d",
       "compound:candidate-impact-index:v1:sha256:b005e9c416b1208116f731009da03251680aff69094277e7c8db27693ca138a5",
       "compound:candidate-impact-index:v1:sha256:a05c9eff9000ea9c540b7eb482bd459b96867d577c04c56e477f97b8165b6fa4"
     ].sort_by(&:b))
@@ -46,7 +46,7 @@ RSpec.describe Coordinator::Write::Candidates::ImpactIndexMarkerBuilder do
       work_item_id: "W-index",
       attempt_id: "A-index",
       agent_id: "agent-index",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       target_branch: "main",
       object_format: "sha1",
       base_commit_oid: "a" * 40,
@@ -65,7 +65,7 @@ RSpec.describe Coordinator::Write::Candidates::ImpactIndexMarkerBuilder do
   def manifest
     Coordinator::Write::Events::CandidateChangeManifestCapturedV1.new(
       candidate_id: "CAN-index",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       target_branch: "main",
       object_format: "sha1",
       base_commit_oid: "a" * 40,
@@ -90,7 +90,7 @@ RSpec.describe Coordinator::Write::Candidates::ImpactIndexMarkerBuilder do
   def build_context
     Coordinator::Write::Events::CandidateBuildContextCapturedV1.new(
       candidate_id: "CAN-index",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       object_format: "sha1",
       head_commit_oid: "b" * 40,
       evidence_revision: 1,
@@ -115,7 +115,7 @@ RSpec.describe Coordinator::Write::Candidates::ImpactIndexMarkerBuilder do
       change_set_id: "CS-index",
       work_item_id: "W-index",
       attempt_id: "A-index",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       target_branch: "main",
       object_format: "sha1",
       head_commit_oid: "b" * 40,

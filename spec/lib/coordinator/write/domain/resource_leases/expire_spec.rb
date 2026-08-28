@@ -8,7 +8,7 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::Expire do
     Coordinator::Write::Events::ResourceLeaseAcquiredV1.new(
       lease_id: "01919191-9191-7191-8191-919191919191",
       lease_set_id: "02919191-9191-7191-8191-919191919191",
-      resource_key: "repo:billing:file:app/a.rb",
+      resource_key: "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:file:app/a.rb",
       resource_key_hash: "sha256:#{'a' * 64}",
       resource_kind: "file",
       resource_path: "app/a.rb",
@@ -18,7 +18,7 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::Expire do
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
       agent_id: "agent-a",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       object_format: "sha1",
       base_commit_oid: "b" * 40,
       base_blob_oid: nil,

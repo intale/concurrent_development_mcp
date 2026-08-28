@@ -9,7 +9,7 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::Release do
   let(:resources) do
     %w[app/a.rb app/b.rb].map.with_index do |path, index|
       resource = Coordinator::Write::FileResourceNormalizer.new.call(
-        repository_id: "billing",
+        repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
         kind: "file",
         path:,
         base_blob_oid: nil
@@ -35,7 +35,7 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::Release do
           agent_id: "agent-a",
           base_snapshots: [
             Coordinator::Write::RepositorySnapshotV1.new(
-              repository_id: "billing",
+              repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
               object_format: "sha1",
               commit_oid: "a" * 40
             )
@@ -53,7 +53,7 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::Release do
           change_set_id: "CS-LSE",
           work_item_id: "W-LSE-A",
           attempt_id: "A-LSE-A",
-          repository_id: "billing",
+          repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
           policy_version: "coordinator-resource-key/v1",
           resources:,
           reserved_at: "2026-08-22T10:00:00.000000Z",
@@ -174,7 +174,7 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::Release do
       change_set_id: "CS-LSE",
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       policy_version: "coordinator-resource-key/v1",
       resources:,
       resource_count: 2,
@@ -213,7 +213,7 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::Release do
           work_item_id: "W-LSE-A",
           attempt_id: "A-LSE-A",
           agent_id: "agent-a",
-          repository_id: "billing",
+          repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
           object_format: "sha1",
           base_commit_oid: "a" * 40,
           base_blob_oid: reference.base_blob_oid,

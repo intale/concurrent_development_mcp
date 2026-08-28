@@ -94,7 +94,7 @@ RSpec.describe Coordinator::Write::Domain::ChangeSets::State do
     completion = Coordinator::Write::ChangeSetCompletions::WorkItemEvidenceV1.new(
       change_set_id: "CS-100",
       work_item_id: "W-100",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       attempt_id: "A-100",
       candidate_id: "CAN-100",
       candidate_event: reference,

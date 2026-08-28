@@ -3,7 +3,7 @@
 RSpec.describe Coordinator::Write::Domain::Attempts::State do
   let(:snapshot) do
     Coordinator::Write::RepositorySnapshotV1.new(
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       object_format: "sha1",
       commit_oid: "0123456789abcdef0123456789abcdef01234567"
     )

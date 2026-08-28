@@ -67,7 +67,7 @@ RSpec.describe Coordinator::Write::CommandCompletionBuilder do
       actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "planner-1"),
       change_set_id: "CS-100",
       work_item_id: "W-200",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       goal: "Implement capture validation",
       acceptance_criteria: [ "Reject duplicate ownership" ]
     )
@@ -194,7 +194,7 @@ RSpec.describe Coordinator::Write::CommandCompletionBuilder do
       attempt_id: "A-300",
       base_snapshots: [
         Coordinator::Write::RepositorySnapshotV1.new(
-          repository_id: "billing",
+          repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
           object_format: "sha1",
           commit_oid: "0123456789abcdef0123456789abcdef01234567"
         )

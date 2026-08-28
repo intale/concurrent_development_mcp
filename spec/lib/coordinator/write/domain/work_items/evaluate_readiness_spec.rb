@@ -19,7 +19,7 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::EvaluateReadiness do
     Coordinator::Write::Domain::WorkItems::State.new(
       work_item_id: "W-100",
       change_set_id: "CS-100",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       goal: "Implement capture validation",
       acceptance_criteria: [ "The work is verifiable" ],
       status: "planned"

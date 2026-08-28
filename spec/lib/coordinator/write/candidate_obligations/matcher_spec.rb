@@ -48,7 +48,7 @@ RSpec.describe Coordinator::Write::CandidateObligations::Matcher do
       registry_revision: 0,
       path: "schema.graphql",
       produces: [ "contract:graphql:billing" ],
-      repository_id: "billing"
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID
     )
     target = CandidateObligationExamples.evidence(
       candidate_id: "CAN-target",
@@ -56,7 +56,7 @@ RSpec.describe Coordinator::Write::CandidateObligations::Matcher do
       path: "schema.graphql",
       observed_paths: [ "schema.graphql" ],
       consumes: [ "contract:graphql:billing" ],
-      repository_id: "orders"
+      repository_id: RepositoryScenario.repository_id("orders")
     )
 
     reasons = matcher.call(source:, target:)

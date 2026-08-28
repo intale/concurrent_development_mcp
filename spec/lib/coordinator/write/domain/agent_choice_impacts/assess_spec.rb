@@ -182,7 +182,7 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::Assess do
       agent_id: "agent-a",
       base_snapshots: [
         Coordinator::Write::RepositorySnapshotV1.new(
-          repository_id: "billing",
+          repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
           object_format: "sha1",
           commit_oid: "a" * 40
         )
@@ -283,7 +283,7 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::Assess do
   def query_context
     Coordinator::Write::DecisionContexts::QueryContextV1.new(
       workspace_id: nil,
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       change_set_id: "CS-assess",
       work_item_id: "W-assess",
       attempt_id: "A-assess",
@@ -297,10 +297,10 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::Assess do
 
   def partition
     Coordinator::Write::Decisions::DecisionPartitionV1.new(
-      partition_id: "repo:billing:testing",
+      partition_id: "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing",
       topic_root: "testing",
       anchor_kind: "repo",
-      anchor_id: "billing"
+      anchor_id: RepositoryScenario::DEFAULT_REPOSITORY_ID
     )
   end
 
@@ -369,7 +369,7 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::Assess do
       type: "DecisionPartitionAdvanced",
       stream_context: "HumanGuidance",
       stream_name: "DecisionPartition",
-      stream_id: "repo:billing:testing",
+      stream_id: "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing",
       stream_revision: 1
     )
   end

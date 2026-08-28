@@ -33,7 +33,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::SubmitImpactSurface do
 
   it "denies absent/mismatched Candidate identity and source evidence" do
     absent = decide(evidence: nil)
-    identity = decide(command: copy_command(repository_id: "other"))
+    identity = decide(command: copy_command(repository_id: RepositoryScenario.repository_id("other")))
     evidence = decide(command: copy_command(manifest_digest: "sha256:#{"f" * 64}"))
 
     expect(absent.failure.code).to eq(:candidate_not_found)
@@ -90,7 +90,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::SubmitImpactSurface do
       command_id: "cmd-impact-1",
       actor: { kind: "agent", id: "analyzer-7" },
       candidate_id: "CAN-41",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       head_commit_oid: "b" * 40,
       manifest_digest: "sha256:#{"a" * 64}",
       analyzer_version: "impact-v1",
@@ -110,7 +110,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::SubmitImpactSurface do
       work_item_id: "W-1",
       attempt_id: "A-1",
       agent_id: "agent-7",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       target_branch: "main",
       object_format: "sha1",
       base_commit_oid: "a" * 40,
@@ -129,7 +129,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::SubmitImpactSurface do
   def manifest
     Coordinator::Write::Events::CandidateChangeManifestCapturedV1.new(
       candidate_id: "CAN-41",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       target_branch: "main",
       object_format: "sha1",
       base_commit_oid: "a" * 40,

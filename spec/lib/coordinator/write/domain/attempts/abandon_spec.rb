@@ -8,7 +8,7 @@ RSpec.describe Coordinator::Write::Domain::Attempts::Abandon do
   let(:future_expires_at) { "2026-08-26T09:00:00.000000Z" }
   let(:snapshot) do
     Coordinator::Write::RepositorySnapshotV1.new(
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       object_format: "sha1",
       commit_oid: "a" * 40
     )
@@ -28,7 +28,7 @@ RSpec.describe Coordinator::Write::Domain::Attempts::Abandon do
   def build_reference(character:, path:, fencing_token: 1, lease_id: nil)
     Coordinator::Write::LeaseReferenceV1.new(
       lease_id: lease_id || id_generator.uuid_v7,
-      resource_key: "repo:billing:file:#{path}",
+      resource_key: "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:file:#{path}",
       resource_key_hash: "sha256:#{character * 64}",
       resource_kind: "file",
       resource_path: path,
@@ -45,7 +45,7 @@ RSpec.describe Coordinator::Write::Domain::Attempts::Abandon do
       agent_id: "agent-a",
       base_snapshots: [ snapshot ],
       lease_set_id: references.empty? ? nil : id_generator.uuid_v7,
-      lease_repository_id: references.empty? ? nil : "billing",
+      lease_repository_id: references.empty? ? nil : RepositoryScenario::DEFAULT_REPOSITORY_ID,
       lease_policy_version: references.empty? ? nil : "coordinator-resource-key/v1",
       lease_resources: references,
       lease_reserved_at: references.empty? ? nil : "2026-08-26T08:00:00.000000Z",
@@ -64,7 +64,7 @@ RSpec.describe Coordinator::Write::Domain::Attempts::Abandon do
     attributes = {
       work_item_id: "WI-abandon",
       change_set_id: "CS-abandon",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       goal: "Implement the abandoned work",
       acceptance_criteria: [ "The WorkItem can be retried" ],
       status: "active",

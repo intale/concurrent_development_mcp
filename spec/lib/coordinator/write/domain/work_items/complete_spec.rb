@@ -102,7 +102,7 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Complete do
       {
         work_item_id: "W-1",
         change_set_id: "CS-1",
-        repository_id: "billing",
+        repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
         goal: "Build billing",
         acceptance_criteria: [],
         status: "active",
@@ -125,7 +125,7 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Complete do
         agent_id: "agent-7",
         base_snapshots: [],
         lease_set_id: lease_set_id,
-        lease_repository_id: "billing",
+        lease_repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
         lease_policy_version: "coordinator-resource-key/v1",
         lease_resources: [],
         lease_reserved_at: "2026-08-25T07:00:00.000000Z",
@@ -148,7 +148,7 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Complete do
         work_item_id: "W-1",
         attempt_id: "A-1",
         agent_id: "agent-7",
-        repository_id: "billing",
+        repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
         target_branch: "main",
         object_format: "sha1",
         base_commit_oid: "a" * 40,
@@ -158,7 +158,7 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Complete do
         lease_policy_version: "coordinator-resource-key/v1",
         lease_references: [
           Coordinator::Write::LeaseReferenceV1.new(
-            resource_key: "file:billing:lib/candidate.rb",
+            resource_key: "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:file:lib/candidate.rb",
             resource_key_hash: "sha256:#{"c" * 64}",
             resource_kind: "file",
             resource_path: "lib/candidate.rb",

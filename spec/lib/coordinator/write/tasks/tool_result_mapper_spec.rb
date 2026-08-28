@@ -138,7 +138,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
       [
         :lease_busy,
         {
-          resource_key: "repo:billing:file:app/models/invoice.rb",
+          resource_key: "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:file:app/models/invoice.rb",
           resource_key_hash: "sha256:4ef29088b0a3df37b0bdf49785a9dce3dad97985b7f22d5ab5d86e04cdc4049a",
           lease_id: "0198e03a-d112-7000-8000-000000000001",
           owner_attempt_id: "ATT-task-result-owner",
@@ -177,7 +177,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
           change_set_id: "CS-task-result",
           work_item_id: "W-task-result",
           attempt_id: "ATT-task-result",
-          resource_key: "repo:billing:file:app/models/invoice.rb",
+          resource_key: "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:file:app/models/invoice.rb",
           resource_key_hash: "sha256:4ef29088b0a3df37b0bdf49785a9dce3dad97985b7f22d5ab5d86e04cdc4049a",
           current_base_blob_oid: "a" * 40,
           requested_base_blob_oid: "b" * 40
@@ -398,7 +398,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
       [
         :decision_partition_capacity_reached,
         {
-          partition_id: "repo:billing:testing",
+          partition_id: "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing",
           active_decision_count: 32,
           maximum_active_decisions: 32
         },
@@ -408,7 +408,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
       [
         :decision_partition_state_invalid,
         {
-          partition_id: "repo:billing:testing",
+          partition_id: "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing",
           decision_id: "D-task-result",
           expected_head: {
             decision_id: "D-task-result",
@@ -522,7 +522,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
       [
         :stale_decision_context,
         {
-          changed_partition_ids: [ "repo:billing:testing" ],
+          changed_partition_ids: [ "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing" ],
           submitted_digest: "sha256:#{'a' * 64}",
           current_digest: "sha256:#{'b' * 64}",
           topic_id: "testing.framework",
@@ -586,7 +586,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
       [
         :decision_partition_state_invalid,
         {
-          partition_id: "repo:billing:testing",
+          partition_id: "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing",
           stream_revision: 2,
           reason: "snapshot_invariant_violated"
         },
@@ -622,7 +622,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         :candidate_head_already_registered,
         {
           candidate_id: "CAN-task-result",
-          repository_id: "billing",
+          repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
           object_format: "sha1",
           head_commit_oid: "b" * 40,
           existing_event: event_reference(
@@ -703,9 +703,9 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         :candidate_impact_identity_mismatch,
         {
           candidate_id: "CAN-task-result",
-          expected_repository_id: "billing",
+          expected_repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
           expected_head_commit_oid: "b" * 40,
-          submitted_repository_id: "other",
+          submitted_repository_id: RepositoryScenario.repository_id("other"),
           submitted_head_commit_oid: "c" * 40
         },
         Coordinator::Write::Tasks::DomainErrorV1::CandidateImpactIdentityMismatchError,
@@ -1001,7 +1001,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
   def decision_query_context
     {
       workspace_id: nil,
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       change_set_id: "CS-task-result",
       work_item_id: "W-task-result",
       attempt_id: "A-task-result",

@@ -6,7 +6,7 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Acquire do
   let(:occurred_at) { "2026-08-20T14:20:00.000000Z" }
   let(:snapshot) do
     Coordinator::Write::RepositorySnapshotV1.new(
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       object_format: "sha1",
       commit_oid: "0123456789abcdef0123456789abcdef01234567"
     )
@@ -35,7 +35,7 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Acquire do
     Coordinator::Write::Domain::WorkItems::State.new(
       work_item_id: "W-200",
       change_set_id: "CS-100",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       goal: "Implement capture validation",
       acceptance_criteria: [ "The work is verifiable" ],
       status: "ready"
@@ -109,7 +109,9 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Acquire do
     wrong_repository = Coordinator::Write::Commands::AcquireWorkItem.new(
       command.to_h.merge(
         base_snapshots: [
-          Coordinator::Write::RepositorySnapshotV1.new(snapshot.to_h.merge(repository_id: "ledger"))
+          Coordinator::Write::RepositorySnapshotV1.new(
+            snapshot.to_h.merge(repository_id: RepositoryScenario.repository_id("ledger"))
+          )
         ]
       )
     )

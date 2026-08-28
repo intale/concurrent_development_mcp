@@ -5,7 +5,7 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::State do
     Coordinator::Write::Events::WorkItemCreatedV1.new(
       work_item_id: "W-200",
       change_set_id: "CS-100",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       goal: "Implement capture validation",
       acceptance_criteria: [ "Reject duplicate ownership" ],
       competitive_mode: false,
@@ -19,7 +19,7 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::State do
     expect(state.to_h).to eq(
       work_item_id: "W-200",
       change_set_id: "CS-100",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       goal: "Implement capture validation",
       acceptance_criteria: [ "Reject duplicate ownership" ],
       status: "planned",
@@ -47,7 +47,7 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::State do
 
     expect(ready.status).to eq("ready")
     expect(ready.work_item_id).to eq("W-200")
-    expect(ready.repository_id).to eq("billing")
+    expect(ready.repository_id).to eq(RepositoryScenario::DEFAULT_REPOSITORY_ID)
   end
 
   it "applies WorkItemAcquired as authoritative active ownership" do
