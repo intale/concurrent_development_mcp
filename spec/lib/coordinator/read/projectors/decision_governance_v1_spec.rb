@@ -10,7 +10,7 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :event_store
     activation = activate_decision
     recorded, activated = decision_events("D-project")
     slot_events = slot_events(activation.data.slot.slot_id)
-    partition = partition_events("repo:billing:testing").sole
+    partition = partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing").sole
 
     projector.call(recorded)
     projector.call(recorded)
@@ -40,9 +40,9 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :event_store
     expect(projected.definition.document.topic.topic_id).to eq("testing.framework")
     expect(projected.slot.slot_id).to eq(activation.data.slot.slot_id)
     expect(projected.partitions.sole).to have_attributes(
-      partition_id: "repo:billing:testing",
+      partition_id: "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing",
       anchor_kind: "repo",
-      anchor_id: "billing"
+      anchor_id: RepositoryScenario::DEFAULT_REPOSITORY_ID
     )
     expect(projected.activated.to_h).to include(
       event: include(event_id: activated.id, type: "DecisionActivated", stream_revision: 1),
@@ -53,7 +53,7 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :event_store
     expect(Coordinator::Read::DecisionSlotHead.find(activation.data.slot.slot_id)).to have_attributes(
       decision_id: "D-project"
     )
-    partition_head = Coordinator::Read::DecisionPartitionHead.find("repo:billing:testing")
+    partition_head = Coordinator::Read::DecisionPartitionHead.find("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing")
     expect(partition_head).to have_attributes(
       decision_id: "D-project",
       partition_revision: 0,
@@ -86,7 +86,7 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :event_store
       modality: "must",
       value: InterpretationInput.string_set(%w[rspec mutation])
     )
-    partition_events = partition_events("repo:billing:testing")
+    partition_events = partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing")
     expect(partition_events.map(&:stream_revision)).to eq([ 0, 1 ])
 
     %w[D-A D-B].each do |decision_id|
@@ -94,7 +94,7 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :event_store
     end
     partition_events.reverse_each { projector.call(_1) }
 
-    head = Coordinator::Read::DecisionPartitionHead.find("repo:billing:testing")
+    head = Coordinator::Read::DecisionPartitionHead.find("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing")
     expect(head).to have_attributes(decision_id: "D-B", partition_revision: 1, change_kind: "activated")
     expect(head.decision).to include("decision_id" => "D-B")
     expect(head.active_decisions.map { _1.fetch("decision_id") }).to eq(%w[D-A D-B])
@@ -105,7 +105,7 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :event_store
     recorded, activated = decision_events("D-project").first(2)
     old_slot_id = activation_receipt.data.slot.slot_id
     old_slot_events = slot_events(old_slot_id).first(2)
-    old_partition = partition_events("repo:billing:testing").first
+    old_partition = partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing").first
     [ recorded, activated, *old_slot_events, old_partition ].each { projector.call(_1) }
 
     stale_available = repository.fetch("D-project")
@@ -124,7 +124,7 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :event_store
       *slot_events(new_slot_id)
     ]
     correction_partitions = [
-      partition_events("repo:billing:testing").last,
+      partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing").last,
       partition_events("workitem:W-42:testing").sole
     ]
 
@@ -159,7 +159,7 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :event_store
     expect(Coordinator::Read::DecisionSlotHead.find(new_slot_id)).to have_attributes(
       decision_id: "D-project"
     )
-    repository_partition = Coordinator::Read::DecisionPartitionHead.find("repo:billing:testing")
+    repository_partition = Coordinator::Read::DecisionPartitionHead.find("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing")
     expect(repository_partition).to have_attributes(
       decision_id: "D-project",
       partition_revision: 1,
@@ -212,7 +212,7 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :event_store
       source: "mcp_client",
       text: "Use RSpec.",
       anchors: {
-        repository_ids: [ "billing" ],
+        repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
         change_set_id: nil,
         work_item_id: nil,
         attempt_id: nil
@@ -227,7 +227,7 @@ RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :event_store
       interpretation_id: "I-correction",
       source_message_id: "M-correction",
       value: InterpretationInput.named_choice("minitest"),
-      scope: InterpretationInput.scope(repository_ids: [ "billing" ], work_item_id: "W-42"),
+      scope: InterpretationInput.scope(repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ], work_item_id: "W-42"),
       relations: { corrects: [ "D-project" ], supersedes: [], exception_to: [], revokes: [] }
     ))
     execute(Coordinator::Write::Operations::ExecuteAdjudicateDecisionInterpretation, InterpretationInput.adjudication(

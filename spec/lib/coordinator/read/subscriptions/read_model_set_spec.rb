@@ -204,7 +204,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         source: "mcp_client",
         text: "Project attributed guidance evidence.",
         anchors: {
-          repository_ids: [ "billing" ],
+          repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
           change_set_id: nil,
           work_item_id: nil,
           attempt_id: nil
@@ -234,7 +234,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       ).value!
       AgentChoiceScenario.record_no_policy_choice(
         prefix: "subscription-choice",
-        repository_id: "choice-subscription"
+        repository_id: RepositoryScenario.repository_id("choice-subscription")
       )
       candidate = CandidateScenario.submit(prefix: "subscription-candidate", build_context: false)
       CandidateScenario.submit_impact(candidate)
@@ -296,7 +296,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       expect(Coordinator::Read::DecisionSlotHead.find(activation.data.slot.slot_id)).to have_attributes(
         decision_id: "D-subscription"
       )
-      expect(Coordinator::Read::DecisionPartitionHead.find("repo:billing:testing")).to have_attributes(
+      expect(Coordinator::Read::DecisionPartitionHead.find("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing")).to have_attributes(
         decision_id: "D-subscription",
         partition_revision: 0
       )

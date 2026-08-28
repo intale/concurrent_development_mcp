@@ -15,7 +15,7 @@ module CandidateObligationExamples
     consumes: [],
     may_affect: [],
     assumes: [],
-    repository_id: "billing",
+    repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
     change_set_id: "CS-obligation"
   )
     ids = Coordinator::Shared::IdGenerator.new
@@ -382,7 +382,7 @@ module CandidateObligationExamples
   def lease_reference(path)
     {
       lease_id: Coordinator::Shared::IdGenerator.new.uuid_v7,
-      resource_key: "repo:billing:file:#{path}",
+      resource_key: "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:file:#{path}",
       resource_key_hash: digest("lease", path),
       resource_kind: "file",
       resource_path: path,

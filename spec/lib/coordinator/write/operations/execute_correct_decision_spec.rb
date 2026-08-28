@@ -45,7 +45,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
       "decision_id" => "D-1",
       "decision_revision" => 2
     )
-    partition_history = partition_events("repo:billing:testing")
+    partition_history = partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing")
     expect(partition_history.map(&:stream_revision)).to eq([ 0, 1 ])
     expect(load(partition_history.last).active_decisions).to contain_exactly(
       have_attributes(decision_id: "D-1", decision_revision: 2)
@@ -63,7 +63,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
     old_slot_id = load(activation).slot.slot_id
     seed_correction(
       scope: InterpretationInput.scope(
-        repository_ids: [ "billing" ],
+        repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
         work_item_id: "W-42"
       )
     )
@@ -75,14 +75,17 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
     expect(new_slot_id).not_to eq(old_slot_id)
     expect(slot_events(old_slot_id).last.data.fetch("head")).to be_nil
     expect(slot_events(new_slot_id).map(&:type)).to eq(%w[DecisionSlotOpened DecisionSlotHeadChanged])
-    expect(partition_events("repo:billing:testing").map(&:stream_revision)).to eq([ 0, 1 ])
+    expect(partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing").map(&:stream_revision)).to eq([ 0, 1 ])
     expect(partition_events("workitem:W-42:testing").map(&:stream_revision)).to eq([ 0 ])
-    expect(load(partition_events("repo:billing:testing").last).active_decisions).to be_empty
+    expect(load(partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing").last).active_decisions).to be_empty
     expect(load(partition_events("workitem:W-42:testing").sole).active_decisions).to contain_exactly(
       have_attributes(decision_id: "D-1", decision_revision: 2)
     )
     expect(result.value!.data.partitions.map { _1.partition.partition_id }).to eq(
-      %w[repo:billing:testing workitem:W-42:testing]
+      [
+        "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing",
+        "workitem:W-42:testing"
+      ]
     )
   end
 
@@ -105,10 +108,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
       interpretation_id: "I-target",
       message_id: "M-target",
       command_suffix: "target",
-      scope: InterpretationInput.scope(repository_ids: [ "billing" ], work_item_id: "W-42")
+      scope: InterpretationInput.scope(repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ], work_item_id: "W-42")
     )
     seed_correction(
-      scope: InterpretationInput.scope(repository_ids: [ "billing" ], work_item_id: "W-42")
+      scope: InterpretationInput.scope(repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ], work_item_id: "W-42")
     )
 
     result = operation.call(InterpretationInput.correction(expected_head: reference(first_activation)))
@@ -158,12 +161,12 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
     expect(decision_events("D-1").map(&:type)).to eq(
       %w[DecisionRecorded DecisionActivated DecisionDefinitionCorrected]
     )
-    expect(partition_events("repo:billing:testing").map(&:stream_revision)).to eq([ 0, 1 ])
+    expect(partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing").map(&:stream_revision)).to eq([ 0, 1 ])
   end
 
   it "implements DEC-02A-PARTITION-LIMIT-01 over the old/new partition union" do
-    old_repositories = 32.times.map { "old-#{_1}" }
-    new_repositories = 32.times.map { "new-#{_1}" }
+    old_repositories = 32.times.map { RepositoryScenario.repository_id("old-#{_1}") }
+    new_repositories = 32.times.map { RepositoryScenario.repository_id("new-#{_1}") }
     activation = seed_active_decision(
       topic_id: "testing.required_suites",
       effect: "require",
@@ -236,14 +239,14 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
       effect: "require",
       modality: "must",
       value: InterpretationInput.string_set([ "cucumber" ]),
-      scope: InterpretationInput.scope(repository_ids: [ "billing" ], work_item_id: "W-42")
+      scope: InterpretationInput.scope(repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ], work_item_id: "W-42")
     )
     seed_correction(
       topic_id: "testing.required_suites",
       effect: "require",
       modality: "must",
       value: InterpretationInput.string_set(%w[rspec cucumber]),
-      scope: InterpretationInput.scope(repository_ids: [ "billing" ], work_item_id: "W-42")
+      scope: InterpretationInput.scope(repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ], work_item_id: "W-42")
     )
     bounded_operation = described_class.new(
       event_store:,
@@ -319,7 +322,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
       source: "mcp_client",
       text: "Use RSpec.",
       anchors: {
-        repository_ids: [ "billing" ],
+        repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
         change_set_id: nil,
         work_item_id: nil,
         attempt_id: nil

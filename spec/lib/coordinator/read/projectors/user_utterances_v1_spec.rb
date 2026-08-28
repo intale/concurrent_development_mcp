@@ -14,7 +14,7 @@ RSpec.describe Coordinator::Read::Projectors::UserUtterancesV1, :event_store, :r
       source: "mcp_client",
       text: "Keep raw evidence separate from policy.",
       anchors: {
-        repository_ids: [ "billing" ],
+        repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
         change_set_id: "CS-1",
         work_item_id: nil,
         attempt_id: nil
@@ -39,7 +39,7 @@ RSpec.describe Coordinator::Read::Projectors::UserUtterancesV1, :event_store, :r
       actor: { kind: "agent", id: "host-1", authenticated: false }
     )
     expect(projected.anchors.to_h).to eq(
-      repository_ids: [ "billing" ],
+      repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
       change_set_id: "CS-1",
       work_item_id: nil,
       attempt_id: nil

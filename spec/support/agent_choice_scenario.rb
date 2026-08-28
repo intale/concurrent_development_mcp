@@ -3,7 +3,7 @@
 module AgentChoiceScenario
   module_function
 
-  def record_no_policy_choice(prefix:, repository_id: "billing", actor_id: "agent-a")
+  def record_no_policy_choice(prefix:, repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID, actor_id: "agent-a")
     repository_id = RepositoryScenario.repository_id(repository_id)
     identifiers = identifiers(prefix)
     context = context(identifiers:, repository_id:)

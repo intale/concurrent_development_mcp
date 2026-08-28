@@ -174,7 +174,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteProposeDecisionInterpretat
       source: "mcp_client",
       text:,
       anchors: {
-        repository_ids: [ "billing" ],
+        repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
         change_set_id: "CS-1",
         work_item_id: "W-1",
         attempt_id: nil

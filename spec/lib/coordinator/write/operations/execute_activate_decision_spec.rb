@@ -38,16 +38,16 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
     expect(slot_events(slot.slot_id).map(&:type)).to eq(%w[DecisionSlotOpened DecisionSlotHeadChanged])
     receipt_partition = original.value!.data.partitions.sole
     expect(receipt_partition.partition).to have_attributes(
-      partition_id: "repo:billing:testing",
+      partition_id: "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing",
       anchor_kind: "repo",
-      anchor_id: "billing"
+      anchor_id: RepositoryScenario::DEFAULT_REPOSITORY_ID
     )
     expect(receipt_partition.partition_revision).to eq(0)
-    expect(partition_events("repo:billing:testing").sole).to have_attributes(
+    expect(partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing").sole).to have_attributes(
       type: "DecisionPartitionAdvanced",
       stream_revision: 0
     )
-    expect(load(partition_events("repo:billing:testing").sole).active_decisions).to contain_exactly(
+    expect(load(partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing").sole).active_decisions).to contain_exactly(
       have_attributes(decision_id: "D-1", decision_revision: 1)
     )
     expect(command_events("cmd-decision-activation-1").length).to eq(1)
@@ -108,7 +108,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
       )
     )
 
-    repositories = 33.times.map { "repo-#{_1}" }
+    repositories = 33.times.map { RepositoryScenario.repository_id("repo-#{_1}") }
     seed_accepted_interpretation(
       interpretation_id: "I-wide",
       message_id: "M-wide",
@@ -154,7 +154,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
     expect(results.count(&:failure?)).to eq(1)
     expect(results.find(&:failure?).failure.code).to eq(:decision_slot_occupied)
     expect(%w[D-A D-B].sum { decision_events(_1).length }).to eq(2)
-    expect(partition_events("repo:billing:testing").length).to eq(1)
+    expect(partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing").length).to eq(1)
   end
 
   it "implements DEC-01-SET-UNION-01 with successive partition revisions" do
@@ -187,7 +187,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
 
     expect(results).to all(be_success)
     expect(results.map { _1.value!.data.slot }).to all(be_nil)
-    partition_history = partition_events("repo:billing:testing")
+    partition_history = partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing")
     expect(partition_history.map(&:stream_revision)).to eq([ 0, 1 ])
     first_revision_decision_ids = load(partition_history.first).active_decisions.map(&:decision_id)
     expect(first_revision_decision_ids.length).to eq(1)
@@ -268,13 +268,13 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
     expect(second.failure).to have_attributes(
       code: :decision_partition_capacity_reached,
       details: include(
-        partition_id: "repo:billing:testing",
+        partition_id: "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing",
         active_decision_count: 1,
         maximum_active_decisions: 1
       )
     )
     expect(decision_events("D-B")).to be_empty
-    expect(load(partition_events("repo:billing:testing").sole).active_decisions.map(&:decision_id)).to eq([ "D-A" ])
+    expect(load(partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing").sole).active_decisions.map(&:decision_id)).to eq([ "D-A" ])
   end
 
   def seed_accepted_interpretation(
@@ -313,7 +313,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
       source: "mcp_client",
       text: "Use RSpec.",
       anchors: {
-        repository_ids: [ "billing" ],
+        repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
         change_set_id: nil,
         work_item_id: nil,
         attempt_id: nil

@@ -45,7 +45,7 @@ RSpec.describe "DEC-01 MCP Decision activation", :event_store, :read_model do
         "policy_status" => "active",
         "partitions" => [
           include(
-            "partition" => include("partition_id" => "repo:billing:testing"),
+            "partition" => include("partition_id" => "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing"),
             "partition_revision" => 0
           )
         ]
@@ -106,7 +106,7 @@ RSpec.describe "DEC-01 MCP Decision activation", :event_store, :read_model do
           "decision_id" => "D-mcp-decision",
           "policy_status" => "active",
           "slot" => include("slot_id" => slot.fetch("slot_id")),
-          "partitions" => [ include("partition_id" => "repo:billing:testing") ],
+          "partitions" => [ include("partition_id" => "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing") ],
           "activated" => include("event" => include("event_id" => activated.id))
         )
       )
@@ -154,7 +154,7 @@ RSpec.describe "DEC-01 MCP Decision activation", :event_store, :read_model do
       source: "mcp_client",
       text: "Use RSpec.",
       anchors: {
-        repository_ids: [ "billing" ],
+        repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
         change_set_id: nil,
         work_item_id: nil,
         attempt_id: nil
@@ -267,7 +267,7 @@ RSpec.describe "DEC-01 MCP Decision activation", :event_store, :read_model do
 
   def partition_events
     event_store.read(
-      streams.decision_partition("repo:billing:testing"),
+      streams.decision_partition("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing"),
       Coordinator::Write::EventReadCriteria.new(
         event_types: [ "DecisionPartitionAdvanced" ],
         maximum_count: 2,

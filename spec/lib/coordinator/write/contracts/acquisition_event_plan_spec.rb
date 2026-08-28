@@ -5,7 +5,7 @@ RSpec.describe Coordinator::Write::Contracts::AcquisitionEventPlan do
 
   let(:snapshot) do
     Coordinator::Write::RepositorySnapshotV1.new(
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       object_format: "sha1",
       commit_oid: "0123456789abcdef0123456789abcdef01234567"
     )
@@ -34,7 +34,7 @@ RSpec.describe Coordinator::Write::Contracts::AcquisitionEventPlan do
       work_item_state: Coordinator::Write::Domain::WorkItems::State.new(
         work_item_id: "W-200",
         change_set_id: "CS-100",
-        repository_id: "billing",
+        repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
         goal: "Implement capture validation",
         acceptance_criteria: [ "The work is verifiable" ],
         status: "ready"
@@ -71,7 +71,7 @@ RSpec.describe Coordinator::Write::Contracts::AcquisitionEventPlan do
 
   it "rejects an object format inconsistent with the Git OID length" do
     inconsistent_snapshot = Coordinator::Write::RepositorySnapshotV1.new(
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       object_format: "sha256",
       commit_oid: "0123456789abcdef0123456789abcdef01234567"
     )

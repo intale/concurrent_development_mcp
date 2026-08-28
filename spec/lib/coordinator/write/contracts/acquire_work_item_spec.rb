@@ -12,7 +12,7 @@ RSpec.describe Coordinator::Write::Contracts::AcquireWorkItem do
       attempt_id: "A-300",
       base_snapshots: [
         {
-          repository_id: "billing",
+          repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
           commit_oid: "0123456789abcdef0123456789abcdef01234567"
         }
       ]
@@ -39,7 +39,7 @@ RSpec.describe Coordinator::Write::Contracts::AcquireWorkItem do
 
   it "bounds structurally valid evidence before the domain count decision" do
     snapshots = 101.times.map do
-      { repository_id: "billing", commit_oid: "a" * 40 }
+      { repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID, commit_oid: "a" * 40 }
     end
 
     expect(contract.call(input.merge(base_snapshots: snapshots)).errors.to_h).to include(:base_snapshots)

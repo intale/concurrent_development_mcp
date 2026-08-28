@@ -49,7 +49,7 @@ RSpec.describe Coordinator::Write::Contracts::SubmitCandidateImpactSurface do
       command_id: "cmd-impact-1",
       actor: { kind: "agent", id: "analyzer-7" },
       candidate_id: "CAN-41",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       head_commit_oid: "b" * 40,
       manifest_digest: "sha256:#{"a" * 64}",
       build_context_digest: "sha256:#{"b" * 64}",

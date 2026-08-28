@@ -6,7 +6,7 @@ RSpec.describe Coordinator::Read::DecisionResolution::Resolver do
   let(:context) do
     Coordinator::Read::DecisionResolution::QueryContextV1.new(
       workspace_id: "workspace-1",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       change_set_id: "CS-1",
       work_item_id: "W-1",
       attempt_id: "A-1",
@@ -23,17 +23,17 @@ RSpec.describe Coordinator::Read::DecisionResolution::Resolver do
     repository = decision(
       decision_id: "D-repository",
       sequence: 1,
-      scope: scope(repository_ids: [ "billing" ]),
+      scope: scope(repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ]),
       value: "rspec"
     )
     attempt = decision(
       decision_id: "D-attempt",
       sequence: 2,
-      scope: scope(repository_ids: [ "billing" ], attempt_id: "A-1"),
+      scope: scope(repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ], attempt_id: "A-1"),
       value: "minitest"
     )
     observations = [
-      observation("repo:billing:testing", "repo", "billing", [ head(repository) ], sequence: 11),
+      observation("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing", "repo", "billing", [ head(repository) ], sequence: 11),
       observation("attempt:A-1:testing", "attempt", "A-1", [ head(attempt) ], sequence: 12)
     ]
 
@@ -63,17 +63,17 @@ RSpec.describe Coordinator::Read::DecisionResolution::Resolver do
     narrow_set = decision(
       decision_id: "D-A",
       sequence: 3,
-      scope: scope(repository_ids: [ "billing" ]),
+      scope: scope(repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ]),
       value: "rspec"
     )
     broad_set = decision(
       decision_id: "D-B",
       sequence: 4,
-      scope: scope(repository_ids: %w[billing orders]),
+      scope: scope(repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID, RepositoryScenario.repository_id("orders") ]),
       value: "minitest"
     )
     observation = observation(
-      "repo:billing:testing",
+      "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing",
       "repo",
       "billing",
       [ head(narrow_set), head(broad_set) ],
@@ -97,7 +97,7 @@ RSpec.describe Coordinator::Read::DecisionResolution::Resolver do
     unsupported = decision(
       decision_id: "D-unsupported",
       sequence: 5,
-      scope: scope(repository_ids: [ "billing" ]).merge(branch_selectors: [ "main" ]),
+      scope: scope(repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ]).merge(branch_selectors: [ "main" ]),
       value: "rspec"
     )
     missing = Coordinator::Write::Decisions::DecisionHeadV1.new(
@@ -106,7 +106,7 @@ RSpec.describe Coordinator::Read::DecisionResolution::Resolver do
       event: reference("D-missing", "Decision", "DecisionActivated", 1, 6)
     )
     observation = observation(
-      "repo:billing:testing",
+      "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing",
       "repo",
       "billing",
       [ head(unsupported), missing ],

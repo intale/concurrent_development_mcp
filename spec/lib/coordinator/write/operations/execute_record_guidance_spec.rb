@@ -21,7 +21,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordGuidance, :event_sto
       source: "mcp_client",
       text: "Do not use Redis in billing.",
       anchors: {
-        repository_ids: [ "billing" ],
+        repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
         change_set_id: "CS-1",
         work_item_id: nil,
         attempt_id: nil

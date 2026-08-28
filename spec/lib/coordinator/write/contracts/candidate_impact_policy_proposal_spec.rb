@@ -26,7 +26,7 @@ RSpec.describe Coordinator::Write::Contracts::CandidateImpactPolicyProposal do
         exact.value.to_h.merge(items: [ "unknown_review" ])
       )),
       copy(scope: Coordinator::Write::Interpretations::DecisionScopeV1.new(
-        exact.scope.to_h.merge(repository_ids: [ "billing" ])
+        exact.scope.to_h.merge(repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ])
       )),
       copy(conditions: Coordinator::Write::Interpretations::DecisionConditionsV1.new(
         exact.conditions.to_h.merge(phases: [ "verification" ])

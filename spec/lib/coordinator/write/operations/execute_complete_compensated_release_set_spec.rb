@@ -10,7 +10,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCompleteCompensatedRelease
     correct = compensation_input(prepared, request, "compensation-complete")
     stale = correct.merge(
       command_id: "cmd-release-compensation-stale",
-      evidence: correct.fetch(:evidence).map { _1.merge(repository_id: "wrong-repository") }
+      evidence: correct.fetch(:evidence).map { _1.merge(repository_id: RepositoryScenario.repository_id("wrong-repository")) }
     )
 
     denied = operation.call(stale)

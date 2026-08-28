@@ -24,7 +24,7 @@ RSpec.describe "CHO-02 AgentChoice impact scan operations", :event_store do
         source_event: reference(source),
         change_kind: "activated",
         retroactivity: "active_attempts",
-        affected_partitions: contain_exactly(have_attributes(partition_id: "repo:billing:testing"))
+        affected_partitions: contain_exactly(have_attributes(partition_id: "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing"))
       )
     )
     expect(original.value!).to have_attributes(
@@ -63,7 +63,7 @@ RSpec.describe "CHO-02 AgentChoice impact scan operations", :event_store do
       change_kind: "corrected",
       retroactivity: "active_attempts",
       affected_partitions: contain_exactly(
-        have_attributes(partition_id: "repo:billing:testing"),
+        have_attributes(partition_id: "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing"),
         have_attributes(partition_id: "workitem:W-impact-correction:testing")
       )
     )
@@ -243,7 +243,7 @@ RSpec.describe "CHO-02 AgentChoice impact scan operations", :event_store do
       source_span: { start_character: 4, end_character: 12, text: "Minitest" },
       value: InterpretationInput.named_choice("minitest"),
       scope: InterpretationInput.scope(
-        repository_ids: [ "billing" ],
+        repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
         work_item_id: "W-impact-correction"
       ),
       enforcement: {
@@ -285,7 +285,7 @@ RSpec.describe "CHO-02 AgentChoice impact scan operations", :event_store do
       source: "mcp_client",
       text:,
       anchors: {
-        repository_ids: [ "billing" ],
+        repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
         change_set_id: nil,
         work_item_id: nil,
         attempt_id: nil

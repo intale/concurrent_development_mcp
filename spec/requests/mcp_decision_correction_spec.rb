@@ -210,7 +210,7 @@ RSpec.describe "DEC-02A MCP Decision correction", :event_store, :read_model do
       source: "mcp_client",
       text: "Use the selected test framework.",
       anchors: {
-        repository_ids: [ "billing" ],
+        repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
         change_set_id: nil,
         work_item_id: nil,
         attempt_id: nil
@@ -336,7 +336,7 @@ RSpec.describe "DEC-02A MCP Decision correction", :event_store, :read_model do
 
   def partition_events
     event_store.read(
-      streams.decision_partition("repo:billing:testing"),
+      streams.decision_partition("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing"),
       Coordinator::Write::EventReadCriteria.new(
         event_types: [ "DecisionPartitionAdvanced" ],
         maximum_count: 10,

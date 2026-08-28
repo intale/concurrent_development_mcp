@@ -4,7 +4,7 @@ RSpec.describe Coordinator::Write::DecisionContexts::Resolver do
   it "shares the frozen empty-context canonical vector with the available read resolver" do
     context = Coordinator::Write::DecisionContexts::QueryContextV1.new(
       workspace_id: nil,
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       change_set_id: "CS-golden",
       work_item_id: "W-golden",
       attempt_id: "A-golden",
@@ -37,7 +37,7 @@ RSpec.describe Coordinator::Write::DecisionContexts::Resolver do
     )
 
     expect(choice_context.digest).to eq(
-      "sha256:29b7063e311213beb48a2d5aa4e1fa7f9d3a42f891c68f29d284615754b77c5a"
+      "sha256:de515474b6eccda722ee2a4b8d5931c702225ca6f723fba14eb7efa9fc04d4c9"
     )
   end
 end

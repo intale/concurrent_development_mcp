@@ -90,7 +90,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidateImpactSurfa
     valid = impact_input(candidate)
     cases = [
       valid.merge(command_id: "cmd-impact-absent", candidate_id: "CAN-absent"),
-      valid.merge(command_id: "cmd-impact-identity", repository_id: "other"),
+      valid.merge(command_id: "cmd-impact-identity", repository_id: RepositoryScenario.repository_id("other")),
       valid.merge(
         command_id: "cmd-impact-evidence",
         manifest_digest: "sha256:#{"f" * 64}"

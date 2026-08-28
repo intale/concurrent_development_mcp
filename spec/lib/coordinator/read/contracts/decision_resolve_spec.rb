@@ -8,7 +8,7 @@ RSpec.describe Coordinator::Read::Contracts::DecisionResolve do
       topic_id: "testing.framework",
       context: {
         workspace_id: nil,
-        repository_id: "billing",
+        repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
         change_set_id: "CS-1",
         work_item_id: "W-1",
         attempt_id: "A-1",

@@ -12,7 +12,7 @@ RSpec.describe Coordinator::Write::Operations::PrepareAcquireWorkItem do
       attempt_id: "A-300",
       base_snapshots: [
         {
-          repository_id: "billing",
+          repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
           commit_oid: "0123456789abcdef0123456789abcdef01234567"
         }
       ]
@@ -32,7 +32,7 @@ RSpec.describe Coordinator::Write::Operations::PrepareAcquireWorkItem do
         attempt_id: "A-300",
         base_snapshots: [
           Coordinator::Write::RepositorySnapshotV1.new(
-            repository_id: "billing",
+            repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
             object_format: "sha1",
             commit_oid: "0123456789abcdef0123456789abcdef01234567"
           )
@@ -45,7 +45,7 @@ RSpec.describe Coordinator::Write::Operations::PrepareAcquireWorkItem do
     result = operation.call(
       input.merge(
         base_snapshots: [
-          { repository_id: "billing", commit_oid: "a" * 64 }
+          { repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID, commit_oid: "a" * 64 }
         ]
       )
     )
@@ -57,14 +57,14 @@ RSpec.describe Coordinator::Write::Operations::PrepareAcquireWorkItem do
     uppercase = operation.call(
       input.merge(
         base_snapshots: [
-          { repository_id: "billing", commit_oid: "A" * 40 }
+          { repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID, commit_oid: "A" * 40 }
         ]
       )
     )
     empty = operation.call(
       input.merge(
         base_snapshots: [
-          { repository_id: "billing", commit_oid: "" }
+          { repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID, commit_oid: "" }
         ]
       )
     )

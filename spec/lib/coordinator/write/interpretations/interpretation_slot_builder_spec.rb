@@ -15,7 +15,10 @@ RSpec.describe Coordinator::Write::Interpretations::InterpretationSlotBuilder do
         ontology_version: 1,
         confidence_millionths: 900_000
       ),
-      proposed_decision: proposed_decision(%w[orders billing]),
+      proposed_decision: proposed_decision([
+        RepositoryScenario.repository_id("orders"),
+        RepositoryScenario::DEFAULT_REPOSITORY_ID
+      ]),
       scope_provenance: Coordinator::Write::Interpretations::DecisionScopeProvenanceV1.new(
         kind: "explicit",
         anchor_level: "repository",
@@ -91,14 +94,22 @@ RSpec.describe Coordinator::Write::Interpretations::InterpretationSlotBuilder do
 
   it "normalizes semantically identical exact scopes into one compound slot" do
     reordered = Coordinator::Write::Events::DecisionInterpretationProposedV1.new(
-      proposal.to_h.merge(proposed_decision: proposed_decision(%w[billing orders]))
+      proposal.to_h.merge(
+        proposed_decision: proposed_decision([
+          RepositoryScenario::DEFAULT_REPOSITORY_ID,
+          RepositoryScenario.repository_id("orders")
+        ])
+      )
     )
 
     first = builder.call(proposal)
     second = builder.call(reordered)
 
     expect(first.compound_marker.marker).to eq(second.compound_marker.marker)
-    expect(first.document.exact_scope.repository_ids).to eq(%w[billing orders])
+    expect(first.document.exact_scope.repository_ids).to eq([
+      RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      RepositoryScenario.repository_id("orders")
+    ].sort)
     expect(first.compound_marker.components).to include(
       "message:M-1",
       "topic:testing.framework",
@@ -113,7 +124,9 @@ RSpec.describe Coordinator::Write::Interpretations::InterpretationSlotBuilder do
       proposal.to_h.merge(source_message_id: "M-2")
     )
     another_scope = Coordinator::Write::Events::DecisionInterpretationProposedV1.new(
-      proposal.to_h.merge(proposed_decision: proposed_decision([ "catalog" ]))
+      proposal.to_h.merge(
+        proposed_decision: proposed_decision([ RepositoryScenario.repository_id("catalog") ])
+      )
     )
 
     markers = [ proposal, another_message, another_scope ].map { builder.call(_1).compound_marker.marker }

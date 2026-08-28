@@ -10,7 +10,7 @@ RSpec.describe Coordinator::Write::Domain::Interpretations::Propose do
       message_id: "M-1",
       text: "Use RSpec.",
       anchors: Coordinator::Write::GuidanceAnchorsV1.new(
-        repository_ids: [ "billing" ],
+        repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
         change_set_id: "CS-1",
         work_item_id: "W-1",
         attempt_id: nil
@@ -92,7 +92,7 @@ RSpec.describe Coordinator::Write::Domain::Interpretations::Propose do
     expect(proposal).to be_a(Coordinator::Write::Events::DecisionInterpretationProposedV1)
     expect(proposal.assessment.status).to eq("accepted_for_activation")
     expect(proposal.proposed_decision.scope).to have_attributes(
-      repository_ids: [ "billing" ],
+      repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
       work_item_id: "W-1"
     )
     expect(proposal.scope_provenance).to have_attributes(kind: "inferred", anchor_level: "work_item")
@@ -173,7 +173,10 @@ RSpec.describe Coordinator::Write::Domain::Interpretations::Propose do
     ambiguous_source = Coordinator::Write::Interpretations::GuidanceSourceEvidenceV1.new(
       source.to_h.merge(
         anchors: Coordinator::Write::GuidanceAnchorsV1.new(
-          repository_ids: %w[billing orders],
+          repository_ids: [
+            RepositoryScenario::DEFAULT_REPOSITORY_ID,
+            RepositoryScenario.repository_id("orders")
+          ],
           change_set_id: nil,
           work_item_id: nil,
           attempt_id: nil

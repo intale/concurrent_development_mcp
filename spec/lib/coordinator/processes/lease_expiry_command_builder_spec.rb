@@ -18,7 +18,7 @@ RSpec.describe Coordinator::Processes::LeaseExpiryCommandBuilder do
     Coordinator::Write::Events::ResourceLeaseAcquiredV1.new(
       lease_id: "0198c000-0000-7000-8000-000000000002",
       lease_set_id: "0198c000-0000-7000-8000-000000000003",
-      resource_key: "scope:project:test:repo:billing:file:app/a.rb",
+      resource_key: "scope:project:test:repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:file:app/a.rb",
       resource_key_hash: "sha256:#{'f' * 64}",
       resource_kind: "file",
       resource_path: "app/a.rb",
@@ -28,7 +28,7 @@ RSpec.describe Coordinator::Processes::LeaseExpiryCommandBuilder do
       work_item_id: "W-200",
       attempt_id: "A-300",
       agent_id: "agent-a",
-      repository_id: "billing",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       object_format: "sha1",
       base_commit_oid: "a" * 40,
       base_blob_oid: "b" * 40,
