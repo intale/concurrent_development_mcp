@@ -230,7 +230,7 @@ RSpec.describe Coordinator::Container do
         "decision-interpretations-v1",
           "development-artifacts-v3",
         "merge-snapshots-v1",
-        "operation-batches-v1",
+        "operation-batches-v2",
         "release-sets-v1",
         "repositories-v1",
         "skills-v2",

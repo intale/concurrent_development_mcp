@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_28_103000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_28_104228) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -550,6 +550,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_103000) do
     t.index ["verification_status"], name: "index_merge_snapshots_on_verification_status"
   end
 
+  create_table "operation_batch_items", force: :cascade do |t|
+    t.jsonb "arguments", null: false
+    t.string "batch_id", null: false
+    t.string "canonical_input_digest", null: false
+    t.string "command_id", null: false
+    t.datetime "created_at", null: false
+    t.integer "item_index", null: false
+    t.string "target_tool", null: false
+    t.datetime "updated_at", null: false
+    t.index ["batch_id", "item_index"], name: "index_operation_batch_items_on_batch_id_and_item_index", unique: true
+    t.index ["command_id"], name: "index_operation_batch_items_on_command_id"
+  end
+
   create_table "operation_batch_outcomes", force: :cascade do |t|
     t.string "batch_id", null: false
     t.string "canonical_input_digest", null: false
@@ -573,7 +586,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_103000) do
   end
 
   create_table "operation_batches", primary_key: "batch_id", id: :string, force: :cascade do |t|
+    t.jsonb "cancellation_actor"
+    t.datetime "cancellation_at_domain"
+    t.datetime "cancellation_at_store"
+    t.string "cancellation_causation_id"
+    t.string "cancellation_correlation_id"
     t.jsonb "cancellation_event"
+    t.bigint "cancellation_global_position"
+    t.jsonb "cancellation_markers", default: [], null: false
+    t.jsonb "cancellation_metadata", default: {}, null: false
     t.boolean "cancellation_requested", default: false, null: false
     t.jsonb "created_actor"
     t.datetime "created_at", null: false
@@ -834,6 +855,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_103000) do
     t.index ["target_work_item_id", "event_global_position"], name: "idx_verification_obligations_target_work_item"
   end
 
+  add_foreign_key "operation_batch_items", "operation_batches", column: "batch_id", primary_key: "batch_id", on_delete: :cascade
   add_foreign_key "operation_batch_outcomes", "operation_batches", column: "batch_id", primary_key: "batch_id", on_delete: :cascade
   add_foreign_key "skill_assets", "skills", primary_key: "skill_id", on_delete: :cascade
   add_foreign_key "skill_revisions", "skills", primary_key: "skill_id", on_delete: :cascade

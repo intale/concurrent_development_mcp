@@ -7,13 +7,15 @@ module Coordinator
       def total: () -> Integer
       def succeeded: () -> Integer
       def rejected: () -> Integer
+      def pending: () -> Integer
       def not_run: () -> Integer
       def manifest_digest: () -> String
       def encoded_byte_size: () -> Integer
-      def outcomes: () -> Array[OperationBatchOutcomeViewV1]
+      def items: () -> Array[OperationBatchItemViewV1]
       def next_after_index: () -> Integer?
       def has_more: () -> bool
       def created: () -> OperationBatchSourceEvidenceV1
+      def cancellation: () -> OperationBatchSourceEvidenceV1?
       def terminal: () -> OperationBatchSourceEvidenceV1?
     end
   end

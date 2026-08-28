@@ -1,7 +1,7 @@
 module Coordinator
   module Read
     module Projectors
-      class OperationBatchesV1
+      class OperationBatchesV2
         PROJECTION: ProjectionDefinition
 
         def initialize: (?contract: Contracts::OperationBatchSourceEvent, ?schema_registry: Write::EventSchemaRegistry, ?batches: Repositories::OperationBatches, ?processed_events: Repositories::ProcessedProjectionEvents) -> void

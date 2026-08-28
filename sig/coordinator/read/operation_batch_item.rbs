@@ -1,0 +1,13 @@
+module Coordinator
+  module Read
+    class OperationBatchItem < ApplicationRecord
+      def batch_id: () -> String
+      def item_index: () -> Integer
+      def target_tool: () -> String
+      def command_id: () -> String
+      def canonical_input_digest: () -> String
+      def arguments: () -> Hash[String, untyped]
+      def operation_batch: () -> OperationBatch
+    end
+  end
+end

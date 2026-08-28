@@ -45,7 +45,7 @@ RSpec.describe "BAT-01 MCP Operation Batches", :event_store, :read_model do
     created_event = batch_events(batch_id).sole
     Coordinator::Container["process_managers.operation_batch_runner"].call(created_event)
     batch_events(batch_id).each do |event|
-      Coordinator::Container["projectors.operation_batches_v1"].call(event)
+      Coordinator::Container["projectors.operation_batches_v2"].call(event)
     end
 
     available = call_tool("operation_batch_get", { batch_id:, limit: 100 }, id: 4)
@@ -62,7 +62,7 @@ RSpec.describe "BAT-01 MCP Operation Batches", :event_store, :read_model do
         )
       )
     )
-    expect(available.dig("data", "batch", "outcomes").map { _1.fetch("status") }).to eq(
+    expect(available.dig("data", "batch", "items").map { _1.fetch("status") }).to eq(
       %w[succeeded rejected]
     )
   end

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe Coordinator::Read::Projectors::OperationBatchesV1, :event_store, :read_model do
+RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :event_store, :read_model do
   subject(:projector) { described_class.new }
 
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
@@ -29,11 +29,12 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV1, :event_store, 
       total: 2,
       succeeded: 1,
       rejected: 1,
+      pending: 0,
       not_run: 0,
       has_more: true,
       next_after_index: 0
     )
-    expect(batch.outcomes.sole).to have_attributes(index: 0, status: "succeeded")
+    expect(batch.items.sole).to have_attributes(index: 0, status: "succeeded")
     expect(batch.created.correlation_id).to eq(created.correlation_id)
     expect(batch.terminal.event.type).to eq("OperationBatchCompleted")
     expect(Coordinator::Read::OperationBatch.count).to eq(1)
@@ -73,7 +74,7 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV1, :event_store, 
   def processed_events
     Coordinator::Read::ProcessedProjectionEvent.where(
       projection_name: "operation_batches",
-      projection_version: 1
+      projection_version: 2
     )
   end
 end

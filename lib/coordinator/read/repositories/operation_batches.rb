@@ -3,13 +3,20 @@
 module Coordinator::Read
   module Repositories
     class OperationBatches
+      def initialize(arguments_builder: OperationBatchArguments.new)
+        @arguments_builder = arguments_builder
+      end
+
       def fetch(query)
         record = Coordinator::Read::OperationBatch.find_by(batch_id: query.batch_id)
         return unless record&.total
 
-        rows = outcome_relation(record, query).page(1).per(query.limit + 1).to_a
+        rows = item_relation(record, query).page(1).per(query.limit + 1).to_a
         has_more = rows.length > query.limit
-        outcomes = rows.first(query.limit).map { build_outcome(_1) }
+        selected = rows.first(query.limit)
+        outcomes = outcomes_by_index(record, selected)
+        unprocessed = record.total - record.succeeded_count - record.rejected_count
+        items = selected.map { build_item(_1, outcomes[_1.item_index], terminal_kind: record.terminal_kind) }
 
         OperationBatchViewV1.new(
           batch_id: record.batch_id,
@@ -18,13 +25,15 @@ module Coordinator::Read
           total: record.total,
           succeeded: record.succeeded_count,
           rejected: record.rejected_count,
-          not_run: record.total - record.succeeded_count - record.rejected_count,
+          pending: record.terminal_kind ? 0 : unprocessed,
+          not_run: record.terminal_kind == "cancelled" ? unprocessed : 0,
           manifest_digest: record.manifest_digest,
           encoded_byte_size: record.encoded_byte_size,
-          outcomes:,
-          next_after_index: has_more ? outcomes.last.index : nil,
+          items:,
+          next_after_index: has_more ? items.last.index : nil,
           has_more:,
           created: source_evidence(record, "created"),
+          cancellation: record.cancellation_event && source_evidence(record, "cancellation"),
           terminal: record.terminal_event && source_evidence(record, "terminal")
         )
       end
@@ -39,7 +48,7 @@ module Coordinator::Read
         when Coordinator::Write::Events::OperationBatchItemRejectedV1
           store_outcome(record, event, payload, status: "rejected")
         when Coordinator::Write::Events::OperationBatchCancellationRequestedV1
-          record.update!(cancellation_requested: true, cancellation_event: event_reference(event).to_h)
+          store_cancellation(record, event, payload)
         when Coordinator::Write::Events::OperationBatchCompletedV1
           store_terminal(record, event, payload, kind: "completed")
         when Coordinator::Write::Events::OperationBatchCancelledV1
@@ -50,10 +59,18 @@ module Coordinator::Read
 
       private
 
-      def outcome_relation(record, query)
-        relation = Coordinator::Read::OperationBatchOutcome.where(batch_id: record.batch_id)
+      def item_relation(record, query)
+        relation = Coordinator::Read::OperationBatchItem.where(batch_id: record.batch_id)
         relation = relation.where("item_index > ?", query.after_index) if query.after_index
         relation.order(:item_index)
+      end
+
+      def outcomes_by_index(record, items)
+        indexes = items.map(&:item_index)
+        Coordinator::Read::OperationBatchOutcome.where(
+          batch_id: record.batch_id,
+          item_index: indexes
+        ).index_by(&:item_index)
       end
 
       def store_creation(record, event, payload)
@@ -77,6 +94,33 @@ module Coordinator::Read
           created_at_domain: payload.created_at,
           created_at_store: event.created_at
         )
+        payload.items.each { store_item(record, _1) }
+      end
+
+      def store_item(batch, item)
+        record = Coordinator::Read::OperationBatchItem.find_or_initialize_by(
+          batch_id: batch.batch_id,
+          item_index: item.index
+        )
+        attributes = {
+          target_tool: item.command_input.tool_name,
+          command_id: item.command_input.command_id,
+          canonical_input_digest: item.canonical_input_digest,
+          arguments: @arguments_builder.call(item.command_input)
+        }
+        if record.persisted?
+          matches = record.target_tool == attributes.fetch(:target_tool) &&
+                    record.command_id == attributes.fetch(:command_id) &&
+                    record.canonical_input_digest == attributes.fetch(:canonical_input_digest) &&
+                    record.arguments == attributes.fetch(:arguments).deep_stringify_keys
+          unless matches
+            raise ProjectionStateError, "Operation Batch manifest item changed for one stream"
+          end
+          return
+        end
+
+        record.assign_attributes(attributes)
+        record.save!
       end
 
       def store_outcome(record, event, payload, status:)
@@ -117,6 +161,21 @@ module Coordinator::Read
         raise ProjectionStateError, "Operation Batch item has conflicting outcomes"
       end
 
+      def store_cancellation(record, event, payload)
+        record.update!(
+          cancellation_requested: true,
+          cancellation_event: event_reference(event).to_h,
+          cancellation_actor: actor(event).to_h,
+          cancellation_markers: event.markers,
+          cancellation_metadata: event.metadata,
+          cancellation_causation_id: event.causation_id,
+          cancellation_correlation_id: event.correlation_id,
+          cancellation_global_position: event.global_position,
+          cancellation_at_domain: payload.requested_at,
+          cancellation_at_store: event.created_at
+        )
+      end
+
       def store_terminal(record, event, payload, kind:)
         if record.terminal_kind && record.terminal_kind != kind
           raise ProjectionStateError, "Operation Batch has conflicting terminal outcomes"
@@ -143,21 +202,29 @@ module Coordinator::Read
         status = case record.terminal_kind
         when "cancelled" then "cancelled"
         when "completed" then rejected.positive? ? "completed_with_errors" : "completed"
-        else "running"
+        else record.cancellation_requested ? "cancelling" : "running"
         end
         record.update!(succeeded_count: succeeded, rejected_count: rejected, status:)
       end
 
-      def build_outcome(record)
-        OperationBatchOutcomeViewV1.new(
-          index: record.item_index,
-          command_id: record.command_id,
-          canonical_input_digest: record.canonical_input_digest,
-          status: record.status,
-          result: Coordinator::Write::Tasks::StructuredContentV1.new(symbolize(record.result)),
-          finished_at: record.finished_at_domain.utc.iso8601(6),
-          source: outcome_source_evidence(record)
+      def build_item(item, outcome, terminal_kind:)
+        OperationBatchItemViewV1.new(
+          index: item.item_index,
+          target_tool: item.target_tool,
+          command_id: item.command_id,
+          canonical_input_digest: item.canonical_input_digest,
+          arguments: symbolize(item.arguments),
+          status: item_status(outcome, terminal_kind:),
+          result: outcome && Coordinator::Write::Tasks::StructuredContentV1.new(symbolize(outcome.result)),
+          finished_at: outcome&.finished_at_domain&.utc&.iso8601(6),
+          source: outcome && outcome_source_evidence(outcome)
         )
+      end
+
+      def item_status(outcome, terminal_kind:)
+        return outcome.status if outcome
+
+        terminal_kind == "cancelled" ? "not_run" : "pending"
       end
 
       def source_evidence(record, prefix)

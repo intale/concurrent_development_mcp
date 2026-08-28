@@ -236,7 +236,7 @@ module Coordinator
       OperationBatchPageSize: untyped
       OperationBatchEncodedByteSize: untyped
       OperationBatchTargetTool: untyped
-      OperationBatchOutcomeStatus: untyped
+      OperationBatchItemStatus: untyped
       OperationBatchStatus: untyped
       Marker: untyped
       MarkerPurpose: untyped

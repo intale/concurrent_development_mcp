@@ -70,7 +70,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
   end
   let(:operation_batch_registration) do
     Coordinator::Read::Subscriptions::OperationBatches.new(
-      handler: Coordinator::Read::Projectors::OperationBatchesV1.new,
+      handler: Coordinator::Read::Projectors::OperationBatchesV2.new,
       pull_interval: 0.2
     )
   end
@@ -107,7 +107,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
         "decision-interpretations-v1",
         "development-artifacts-v3",
         "merge-snapshots-v1",
-        "operation-batches-v1",
+        "operation-batches-v2",
         "release-sets-v1",
         "repositories-v1",
         "skills-v2",
@@ -168,7 +168,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
     )
     expect(operation_batch_registration.definition.identity.to_h).to eq(
       set_name: "coordinator-read-models-v1",
-      subscription_name: "operation-batches-v1"
+      subscription_name: "operation-batches-v2"
     )
     expect(verification_obligation_registration.definition.identity.to_h).to eq(
       set_name: "coordinator-read-models-v1",
@@ -270,7 +270,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet, :event_store, :re
       wait_for(subscription_set, "repositories-v1", minimum: 2)
       wait_for(subscription_set, "skills-v2", minimum: 1)
       wait_for(subscription_set, "development-artifacts-v3", minimum: 1)
-      wait_for(subscription_set, "operation-batches-v1", minimum: 1)
+      wait_for(subscription_set, "operation-batches-v2", minimum: 1)
       wait_for(subscription_set, "verification-obligations-v1", minimum: 4)
       wait_for(subscription_set, "merge-snapshots-v1", minimum: 1)
       wait_for(subscription_set, "release-sets-v1", minimum: 1)

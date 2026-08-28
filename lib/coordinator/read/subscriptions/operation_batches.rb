@@ -5,7 +5,7 @@ module Coordinator::Read
     class OperationBatches < Coordinator::Shared::Subscriptions::Registration
       DEFINITION = ReadModelDefinition.new(
         set_name: ReadModelSet::SET_NAME,
-        subscription_name: "operation-batches-v1",
+        subscription_name: "operation-batches-v2",
         streams: [
           Coordinator::Shared::Subscriptions::StreamFilter.new(
             context: "DevelopmentCoordination",

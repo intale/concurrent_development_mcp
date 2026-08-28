@@ -2,8 +2,8 @@
 
 module Coordinator::Read
   module Projectors
-    class OperationBatchesV1
-      PROJECTION = ProjectionDefinition.new(name: "operation_batches", version: 1)
+    class OperationBatchesV2
+      PROJECTION = ProjectionDefinition.new(name: "operation_batches", version: 2)
 
       def initialize(
         contract: Contracts::OperationBatchSourceEvent.new,

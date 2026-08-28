@@ -166,7 +166,7 @@ module Coordinator::Write
           event: plan.events.sole,
           event_id:,
           metadata: command_metadata(command),
-          markers: [ "operation-batch:#{command.batch_id}", "command:#{command.command_id}" ],
+          markers: markers(command),
           caused_by:
         )
         @event_store.append(expected_stream, [ event ])
@@ -177,7 +177,7 @@ module Coordinator::Write
           event: completion,
           event_id:,
           metadata: command_metadata(command),
-          markers: [ "command:#{command.command_id}", "operation-batch:#{command.batch_id}" ],
+          markers: markers(command),
           caused_by:
         )
         @event_store.append(@stream_factory.command(command.command_id), [ event ])
@@ -228,6 +228,14 @@ module Coordinator::Write
           recorded_by: "coordinator",
           policy_version: "operation-batch/v1"
         )
+      end
+
+      def markers(command)
+        markers = [ "operation-batch:#{command.batch_id}", "command:#{command.command_id}" ]
+        if command.is_a?(Commands::RecordOperationBatchItemOutcome)
+          markers << "batch-item:#{command.batch_id}:#{command.index}"
+        end
+        markers
       end
     end
   end

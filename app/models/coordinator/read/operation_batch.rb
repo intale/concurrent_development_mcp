@@ -9,5 +9,11 @@ module Coordinator::Read
              foreign_key: "batch_id",
              inverse_of: :operation_batch,
              dependent: :delete_all
+
+    has_many :items,
+             class_name: "Coordinator::Read::OperationBatchItem",
+             foreign_key: "batch_id",
+             inverse_of: :operation_batch,
+             dependent: :delete_all
   end
 end

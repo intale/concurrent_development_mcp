@@ -1,0 +1,15 @@
+module Coordinator
+  module Read
+    class OperationBatchItemViewV1 < Shared::Value
+      def index: () -> Integer
+      def target_tool: () -> String
+      def command_id: () -> String
+      def canonical_input_digest: () -> String
+      def arguments: () -> Hash[Symbol, untyped]
+      def status: () -> String
+      def result: () -> Write::Tasks::StructuredContentV1?
+      def finished_at: () -> String?
+      def source: () -> OperationBatchSourceEvidenceV1?
+    end
+  end
+end
