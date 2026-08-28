@@ -107,11 +107,53 @@ RSpec.describe Coordinator::Read::Queries::DecisionResolve, :event_store, :read_
     expect(result.data.decision_context.document.conflict.decisions.map { _1.head.decision_id }).to eq(%w[D-A D-B])
   end
 
-  it "returns typed invalid input without consulting pg_eventstore" do
-    result = query.call(input.merge(topic_id: "testing.required_suites")).value!
+  it "resolves a registered non-testing single-choice topic using its own partition root" do
+    seed_active_decision(
+      decision_id: "D-impact",
+      interpretation_id: "I-impact",
+      message_id: "M-impact",
+      command_suffix: "impact",
+      proposal: InterpretationInput.impact_policy(
+        level: "advisory",
+        change_set_id: "CS-resolve",
+        command_id: "cmd-proposal-impact",
+        interpretation_id: "I-impact",
+        source_message_id: "M-impact"
+      )
+    )
+    decision_events("D-impact").each { projector.call(_1) }
+    partition_events("changeset:CS-resolve:candidate").each { projector.call(_1) }
 
-    expect(result).to have_attributes(status: "invalid")
-    expect(result.data).to have_attributes(code: "invalid_input")
+    result = query.call(input.merge(topic_id: "candidate.impact_policy")).value!
+    document = result.data.decision_context.document
+
+    expect(result).to have_attributes(status: "ok")
+    expect(document).to have_attributes(
+      resolution_policy: "single-choice-resolution/v1",
+      topic_id: "candidate.impact_policy"
+    )
+    expect(document.partitions.map { _1.partition.topic_root }).to all(eq("candidate"))
+    expect(document.effective_decision).to have_attributes(
+      head: have_attributes(decision_id: "D-impact"),
+      topic_id: "candidate.impact_policy",
+      anchor_kind: "change_set",
+      anchor_rank: 3
+    )
+    expect(document.effective_decision.value.items).to eq([ "combined_tests" ])
+  end
+
+  it "returns typed unsupported strategy and unknown-topic results" do
+    unsupported = query.call(input.merge(topic_id: "testing.required_suites")).value!
+    unknown = query.call(input.merge(topic_id: "testing.unknown")).value!
+
+    expect(unsupported).to have_attributes(status: "invalid")
+    expect(unsupported.data).to have_attributes(code: "decision_resolution_strategy_not_supported")
+    expect(unsupported.data.details).to include(
+      topic_id: "testing.required_suites",
+      resolution_strategy: "set_union"
+    )
+    expect(unknown).to have_attributes(status: "invalid")
+    expect(unknown.data).to have_attributes(code: "decision_topic_not_supported")
   end
 
   it "freezes the canonical empty-context digest independently of observation time" do
@@ -133,6 +175,7 @@ RSpec.describe Coordinator::Read::Queries::DecisionResolve, :event_store, :read_
     interpretation_id: "I-resolve",
     message_id: "M-resolve",
     command_suffix: "resolve",
+    proposal: nil,
     **proposal_overrides
   )
     execute(Coordinator::Write::Operations::ExecuteRecordGuidance, {
@@ -149,12 +192,13 @@ RSpec.describe Coordinator::Read::Queries::DecisionResolve, :event_store, :read_
         attempt_id: nil
       }
     })
-    execute(Coordinator::Write::Operations::ExecuteProposeDecisionInterpretation, InterpretationInput.build(
+    proposal ||= InterpretationInput.build(
       command_id: "cmd-proposal-#{command_suffix}",
       interpretation_id:,
       source_message_id: message_id,
       **proposal_overrides
-    ))
+    )
+    execute(Coordinator::Write::Operations::ExecuteProposeDecisionInterpretation, proposal)
     execute(Coordinator::Write::Operations::ExecuteAdjudicateDecisionInterpretation, InterpretationInput.adjudication(
       command_id: "cmd-adjudication-#{command_suffix}",
       source_message_id: message_id,

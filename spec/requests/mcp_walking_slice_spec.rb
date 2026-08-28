@@ -29,11 +29,13 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
     tools = listed.dig("result", "tools")
     expect(tools.map { _1.fetch("name") }).to contain_exactly(
       "coord_context",
+      "coordination_list",
       "attempt_list",
       "operation_get",
       "guidance_get",
       "decision_interpretation_list",
       "decision_get",
+      "decision_list",
       "decision_resolve",
       "agent_choice_get",
       "agent_choice_impact_list",

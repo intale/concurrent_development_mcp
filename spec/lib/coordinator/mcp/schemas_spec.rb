@@ -31,6 +31,31 @@ RSpec.describe Coordinator::Mcp::Schemas do
     )
   end
 
+  it "bounds coordination and extensible Decision discovery without freshness inputs" do
+    coordination = described_class.coordination_list
+    decision_list = described_class.decision_list
+    resolution = described_class.decision_resolve
+
+    expect(coordination.fetch(:required)).to eq([ "scope" ])
+    expect(coordination.dig(:properties, :limit, :anyOf).first).to include(
+      maximum: Coordinator::Shared::Types::COORDINATION_DISCOVERY_MAXIMUM_ITEMS
+    )
+    expect(coordination.fetch(:properties).keys).not_to include(
+      :fresh,
+      :minimum_revision,
+      :projection_status
+    )
+    expect(decision_list.fetch(:required)).to eq([ "repository_id" ])
+    expect(decision_list.dig(:properties, :repository_id)).to eq(described_class.uuid_v7)
+    expect(decision_list.dig(:properties, :limit, :anyOf).first).to include(
+      maximum: Coordinator::Shared::Types::DECISION_DISCOVERY_MAXIMUM_ITEMS
+    )
+    expect(resolution.dig(:properties, :topic_id)).to eq(described_class.identifier)
+    expect(
+      resolution.dig(:properties, :context, :properties, :phase, :enum)
+    ).to eq(Coordinator::Shared::Types::DECISION_PHASES)
+  end
+
   it "lets Skill and Skill-asset reads pin one immutable projected revision" do
     [ described_class.skill_get, described_class.skill_asset_get ].each do |schema|
       expect(schema.dig(:properties, :revision, :anyOf).first).to include(

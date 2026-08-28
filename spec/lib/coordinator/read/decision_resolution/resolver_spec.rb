@@ -37,7 +37,13 @@ RSpec.describe Coordinator::Read::DecisionResolution::Resolver do
       observation("attempt:A-1:testing", "attempt", "A-1", [ head(attempt) ], sequence: 12)
     ]
 
-    result = resolver.call(context:, observations:, decisions: [ repository, attempt ], resolved_at:)
+    result = resolver.call(
+      topic_id: "testing.framework",
+      context:,
+      observations:,
+      decisions: [ repository, attempt ],
+      resolved_at:
+    )
 
     expect(result.effective_decision).to have_attributes(
       head: have_attributes(decision_id: "D-attempt"),
@@ -75,6 +81,7 @@ RSpec.describe Coordinator::Read::DecisionResolution::Resolver do
     )
 
     result = resolver.call(
+      topic_id: "testing.framework",
       context:,
       observations: [ observation ],
       decisions: [ broad_set, narrow_set ],
@@ -107,6 +114,7 @@ RSpec.describe Coordinator::Read::DecisionResolution::Resolver do
     )
 
     result = resolver.call(
+      topic_id: "testing.framework",
       context:,
       observations: [ observation ],
       decisions: [ unsupported ],

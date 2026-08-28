@@ -3,6 +3,7 @@
 RSpec.describe "CHO-01 MCP Decision resolution", :event_store, :read_model do
   RESOLUTION_PROTOCOL_VERSION = "2026-07-28"
   RESOLUTION_TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
+  RESOLUTION_REPOSITORY_ID = RepositoryScenario::DEFAULT_REPOSITORY_ID
 
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
@@ -16,7 +17,7 @@ RSpec.describe "CHO-01 MCP Decision resolution", :event_store, :read_model do
     {
       topic_id: "testing.framework",
       context: {
-        repository_id: "billing",
+        repository_id: RESOLUTION_REPOSITORY_ID,
         change_set_id: "CS-mcp-resolve",
         work_item_id: "W-mcp-resolve",
         attempt_id: "A-mcp-resolve",
@@ -60,15 +61,25 @@ RSpec.describe "CHO-01 MCP Decision resolution", :event_store, :read_model do
     expect(result.keys & %w[active fresh pending projection_status stream_revision]).to be_empty
   end
 
-  it "rejects unsupported wire input without allocating a Task" do
+  it "returns a typed result for a registered resolution strategy not implemented by this query" do
     response = call_tool(
       "decision_resolve",
       arguments.merge(topic_id: "testing.required_suites"),
       id: 2
     )
 
-    expect(response.dig("result", "isError")).to be(true)
-    expect(response.dig("result", "content").sole.fetch("text")).to include("testing.framework")
+    result = response.dig("result", "structuredContent")
+    expect(response.dig("result", "isError")).to be(false)
+    expect(result).to include(
+      "status" => "invalid",
+      "data" => include(
+        "code" => "decision_resolution_strategy_not_supported",
+        "details" => include(
+          "topic_id" => "testing.required_suites",
+          "resolution_strategy" => "set_union"
+        )
+      )
+    )
   end
 
   def seed_active_decision
@@ -80,7 +91,7 @@ RSpec.describe "CHO-01 MCP Decision resolution", :event_store, :read_model do
       source: "mcp_client",
       text: "Use RSpec.",
       anchors: {
-        repository_ids: [ "billing" ],
+        repository_ids: [ RESOLUTION_REPOSITORY_ID ],
         change_set_id: nil,
         work_item_id: nil,
         attempt_id: nil
@@ -146,7 +157,7 @@ RSpec.describe "CHO-01 MCP Decision resolution", :event_store, :read_model do
 
   def partition_events
     event_store.read(
-      streams.decision_partition("repo:billing:testing"),
+      streams.decision_partition("repo:#{RESOLUTION_REPOSITORY_ID}:testing"),
       Coordinator::Write::EventReadCriteria.new(
         event_types: [ "DecisionPartitionAdvanced" ],
         maximum_count: 2,

@@ -21,18 +21,26 @@ RSpec.describe Coordinator::Read::Contracts::DecisionResolve do
     }
   end
 
-  it "accepts the strict version-1 testing-framework context" do
+  it "accepts extensible Decision topics and supported phases" do
     expect(contract.call(input)).to be_success
+    expect(
+      contract.call(
+        input.merge(
+          topic_id: "candidate.impact_policy",
+          context: input.fetch(:context).merge(phase: "verification")
+        )
+      )
+    ).to be_success
   end
 
-  it "rejects unsupported topics, dimensions, identifiers, and bounds" do
+  it "rejects malformed topics, dimensions, identifiers, phases, and bounds" do
     result = contract.call(
       input.merge(
-        topic_id: "testing.required_suites",
+        topic_id: "testing required suites",
         unexpected: true,
         context: input.fetch(:context).merge(
           repository_id: "Billing Team",
-          phase: "verification",
+          phase: "coding",
           paths: Array.new(33, "spec/models/order_spec.rb"),
           branch: "main"
         )
@@ -47,7 +55,7 @@ RSpec.describe Coordinator::Read::Contracts::DecisionResolve do
       input.merge(
         context: input.fetch(:context).merge(
           repository_id: "Billing Team",
-          phase: "verification",
+          phase: "coding",
           paths: Array.new(33, "spec/models/order_spec.rb")
         )
       )

@@ -55,9 +55,11 @@ RSpec.describe Coordinator::Container do
     read_model_set = described_class["subscription_sets.read_models"]
     operation_query = described_class["queries.operation_get"]
     context_query = described_class["queries.coord_context"]
+    coordination_list_query = described_class["queries.coordination_list"]
     guidance_query = described_class["queries.guidance_get"]
     interpretation_query = described_class["queries.decision_interpretation_list"]
     decision_query = described_class["queries.decision_get"]
+    decision_list_query = described_class["queries.decision_list"]
     agent_choice_query = described_class["queries.agent_choice_get"]
     agent_choice_impact_query = described_class["queries.agent_choice_impact_list"]
     candidate_get_query = described_class["queries.candidate_get"]
@@ -232,9 +234,11 @@ RSpec.describe Coordinator::Container do
     )
     expect(operation_query).to be_a(Coordinator::Read::Queries::OperationGet)
     expect(context_query).to be_a(Coordinator::Read::Queries::CoordContext)
+    expect(coordination_list_query).to be_a(Coordinator::Read::Queries::CoordinationList)
     expect(guidance_query).to be_a(Coordinator::Read::Queries::GuidanceGet)
     expect(interpretation_query).to be_a(Coordinator::Read::Queries::DecisionInterpretationList)
     expect(decision_query).to be_a(Coordinator::Read::Queries::DecisionGet)
+    expect(decision_list_query).to be_a(Coordinator::Read::Queries::DecisionList)
     expect(agent_choice_query).to be_a(Coordinator::Read::Queries::AgentChoiceGet)
     expect(agent_choice_impact_query).to be_a(Coordinator::Read::Queries::AgentChoiceImpactList)
     expect(candidate_get_query).to be_a(Coordinator::Read::Queries::CandidateGet)
