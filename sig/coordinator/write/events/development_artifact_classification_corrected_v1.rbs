@@ -1,0 +1,16 @@
+module Coordinator
+  module Write
+    module Events
+      class DevelopmentArtifactClassificationCorrectedV1 < Base
+        def observation_id: () -> String
+        def artifact_id: () -> String
+        def classification_revision: () -> Integer
+        def title: () -> String
+        def kind: () -> String
+        def labels: () -> Array[String]
+        def reason: () -> String
+        def corrected_at: () -> String
+      end
+    end
+  end
+end

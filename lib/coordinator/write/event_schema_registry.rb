@@ -12,6 +12,9 @@ module Coordinator::Write
       [ "CommandCompleted", 1 ] => Events::CommandCompletedV1,
       [ "SkillRevisionPublished", 1 ] => Events::SkillRevisionPublishedV1,
       [ "DevelopmentArtifactCaptured", 1 ] => Events::DevelopmentArtifactCapturedV1,
+      [ "DevelopmentArtifactObserved", 1 ] => Events::DevelopmentArtifactObservedV1,
+      [ "DevelopmentArtifactClassificationCorrected", 1 ] =>
+        Events::DevelopmentArtifactClassificationCorrectedV1,
       [ "DevelopmentArtifactRelationDeclared", 1 ] => Events::DevelopmentArtifactRelationDeclaredV1,
       [ "DevelopmentArtifactRelationSuperseded", 1 ] => Events::DevelopmentArtifactRelationSupersededV1,
       [ "OperationBatchCreated", 1 ] => Events::OperationBatchCreatedV1,

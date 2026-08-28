@@ -16,6 +16,7 @@ module Coordinator
       SKILL_ID_PATTERN: Regexp
       SKILL_MEDIA_TYPE_PATTERN: Regexp
       DEVELOPMENT_ARTIFACT_ID_PATTERN: Regexp
+      DEVELOPMENT_ARTIFACT_OBSERVATION_ID_PATTERN: Regexp
       DEVELOPMENT_ARTIFACT_RELATION_ID_PATTERN: Regexp
 
       SKILL_NAME_MAXIMUM_BYTES: Integer
@@ -36,6 +37,7 @@ module Coordinator
       DEVELOPMENT_ARTIFACT_COLLECTOR_MAXIMUM_BYTES: Integer
       DEVELOPMENT_ARTIFACT_CONTENT_MAXIMUM_BYTES: Integer
       DEVELOPMENT_ARTIFACT_CONTENT_BASE64_MAXIMUM_BYTES: Integer
+      DEVELOPMENT_ARTIFACT_CLASSIFICATION_MAXIMUM_REVISIONS: Integer
       DEVELOPMENT_ARTIFACT_RELATION_MAXIMUM_COUNT: Integer
       DEVELOPMENT_ARTIFACT_RELATION_PATH_MAXIMUM_BYTES: Integer
       DEVELOPMENT_ARTIFACT_RELATION_FRAGMENT_MAXIMUM_BYTES: Integer
@@ -196,12 +198,14 @@ module Coordinator
       SkillAssetContentBase64: untyped
       SkillAssetByteSize: untyped
       DevelopmentArtifactId: untyped
+      DevelopmentArtifactObservationId: untyped
       DevelopmentArtifactRelationId: untyped
       DevelopmentArtifactScope: untyped
       DevelopmentArtifactTitle: untyped
       DevelopmentArtifactKind: untyped
       DevelopmentArtifactLabel: untyped
       DevelopmentArtifactLabels: untyped
+      DevelopmentArtifactClassificationRevision: untyped
       DevelopmentArtifactEncoding: untyped
       DevelopmentArtifactMediaType: untyped
       DevelopmentArtifactContentBase64: untyped

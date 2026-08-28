@@ -1,9 +1,9 @@
 module Coordinator
   module Write
     module DevelopmentArtifacts
-      class IdentityBuilder
+      class ObservationIdentityBuilder
         def initialize: (?canonical_json: Shared::CanonicalJson) -> void
-        def call: (content: ContentV1) -> String
+        def call: (artifact_id: String, scope: String, source: SourceV1) -> String
       end
     end
   end

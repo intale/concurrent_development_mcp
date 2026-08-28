@@ -5,6 +5,7 @@ module Coordinator
       def coordination_task: (String task_id) -> StreamReference
       def skill: (String skill_id) -> StreamReference
       def development_artifact: (String artifact_id) -> StreamReference
+      def development_artifact_observation: (String observation_id) -> StreamReference
       def operation_batch: (String batch_id) -> StreamReference
       def repository: (String repository_id) -> StreamReference
       def change_set: (String change_set_id) -> StreamReference

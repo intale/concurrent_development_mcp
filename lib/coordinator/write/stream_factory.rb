@@ -30,6 +30,14 @@ module Coordinator::Write
       )
     end
 
+    def development_artifact_observation(observation_id)
+      StreamReference.new(
+        context: "DevelopmentMemory",
+        stream_name: "DevelopmentArtifactObservation",
+        stream_id: observation_id
+      )
+    end
+
     def repository(repository_id)
       StreamReference.new(
         context: "DevelopmentPlanning",

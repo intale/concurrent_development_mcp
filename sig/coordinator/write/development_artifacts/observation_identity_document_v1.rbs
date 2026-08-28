@@ -1,0 +1,17 @@
+module Coordinator
+  module Write
+    module DevelopmentArtifacts
+      class ObservationIdentityDocumentV1 < Shared::Value
+        SCHEMA: String
+        def schema: () -> String
+        def artifact_id: () -> String
+        def scope: () -> String
+        def source_kind: () -> String
+        def source_locator: () -> String
+        def source_revision: () -> String?
+        def source_observed_at: () -> String
+        def source_collector: () -> String
+      end
+    end
+  end
+end

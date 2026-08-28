@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module DevelopmentArtifacts
+      class ObservationBuilder
+        def initialize: (?identity_builder: ObservationIdentityBuilder) -> void
+        def call: (artifact: ArtifactV1) -> ArtifactObservationV1
+      end
+    end
+  end
+end

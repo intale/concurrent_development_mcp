@@ -19,6 +19,7 @@ module Coordinator::Shared
     SKILL_ID_PATTERN = /\Askill:v1:[0-9a-f]{64}\z/
     SKILL_MEDIA_TYPE_PATTERN = /\A[\x21-\x7e]{1,255}\z/
     DEVELOPMENT_ARTIFACT_ID_PATTERN = /\Aartifact:v1:[0-9a-f]{64}\z/
+    DEVELOPMENT_ARTIFACT_OBSERVATION_ID_PATTERN = /\Aartifact-observation:v1:[0-9a-f]{64}\z/
     DEVELOPMENT_ARTIFACT_RELATION_ID_PATTERN = /\Aartifact-relation:v1:[0-9a-f]{64}\z/
 
     SKILL_NAME_MAXIMUM_BYTES = 128
@@ -39,6 +40,7 @@ module Coordinator::Shared
     DEVELOPMENT_ARTIFACT_COLLECTOR_MAXIMUM_BYTES = 256
     DEVELOPMENT_ARTIFACT_CONTENT_MAXIMUM_BYTES = 2_097_152
     DEVELOPMENT_ARTIFACT_CONTENT_BASE64_MAXIMUM_BYTES = 2_796_204
+    DEVELOPMENT_ARTIFACT_CLASSIFICATION_MAXIMUM_REVISIONS = 32
     DEVELOPMENT_ARTIFACT_RELATION_MAXIMUM_COUNT = 128
     DEVELOPMENT_ARTIFACT_RELATION_PATH_MAXIMUM_BYTES = 2_048
     DEVELOPMENT_ARTIFACT_RELATION_FRAGMENT_MAXIMUM_BYTES = 1_024
@@ -561,6 +563,9 @@ module Coordinator::Shared
     SkillAssetContentBase64 = String.constrained(max_size: SKILL_ASSET_BASE64_MAXIMUM_BYTES)
     SkillAssetByteSize = Integer.constrained(gteq: 0, lteq: SKILL_ASSET_MAXIMUM_BYTES)
     DevelopmentArtifactId = String.constrained(format: DEVELOPMENT_ARTIFACT_ID_PATTERN)
+    DevelopmentArtifactObservationId = String.constrained(
+      format: DEVELOPMENT_ARTIFACT_OBSERVATION_ID_PATTERN
+    )
     DevelopmentArtifactRelationId = String.constrained(format: DEVELOPMENT_ARTIFACT_RELATION_ID_PATTERN)
     DevelopmentArtifactScope = String.constrained(
       min_size: 1,
@@ -577,6 +582,10 @@ module Coordinator::Shared
     )
     DevelopmentArtifactLabels = Array.of(DevelopmentArtifactLabel).constrained(
       max_size: DEVELOPMENT_ARTIFACT_LABEL_MAXIMUM_COUNT
+    )
+    DevelopmentArtifactClassificationRevision = Integer.constrained(
+      gteq: 1,
+      lteq: DEVELOPMENT_ARTIFACT_CLASSIFICATION_MAXIMUM_REVISIONS
     )
     DevelopmentArtifactEncoding = String.enum("utf-8", "binary")
     DevelopmentArtifactMediaType = String.constrained(format: SKILL_MEDIA_TYPE_PATTERN)
