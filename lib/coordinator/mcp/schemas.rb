@@ -560,13 +560,12 @@ module Coordinator
       end
 
       def skill_publish
-        asset = object_schema(
+        content = object_schema(
           properties: {
-            path: {
+            encoding: {
               type: "string",
-              minLength: 1,
-              maxLength: Types::SKILL_ASSET_PATH_MAXIMUM_BYTES,
-              description: "Caller-chosen relative POSIX path inside this complete Skill revision."
+              enum: %w[utf-8 binary],
+              description: "Use utf-8 with text for valid UTF-8 bytes; otherwise use binary with base64."
             },
             media_type: {
               type: "string",
@@ -575,18 +574,47 @@ module Coordinator
               pattern: "^[\\x21-\\x7e]+$",
               description: "Media type observed by the caller; the server does not infer content type."
             },
+            text: {
+              type: "string",
+              maxLength: Types::SKILL_ASSET_MAXIMUM_BYTES,
+              description: "Exact valid UTF-8 asset content; no client-side Base64 or digest is needed."
+            },
+            base64: {
+              type: "string",
+              maxLength: Types::SKILL_ASSET_BASE64_MAXIMUM_BYTES,
+              pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+              description: "Canonical unwrapped Base64 for exact binary or non-UTF-8 bytes only."
+            }
+          },
+          required: %w[encoding media_type],
+          one_of: [
+            {
+              properties: { encoding: { const: "utf-8" } },
+              required: %w[encoding text],
+              not: { required: %w[base64] }
+            },
+            {
+              properties: { encoding: { const: "binary" } },
+              required: %w[encoding base64],
+              not: { required: %w[text] }
+            }
+          ]
+        )
+        asset = object_schema(
+          properties: {
+            path: {
+              type: "string",
+              minLength: 1,
+              maxLength: Types::SKILL_ASSET_PATH_MAXIMUM_BYTES,
+              description: "Caller-chosen relative POSIX path inside this complete Skill revision."
+            },
             executable: {
               type: "boolean",
               description: "Whether a retrieving client should treat the passive asset as executable after authorization."
             },
-            content_base64: {
-              type: "string",
-              maxLength: Types::SKILL_ASSET_BASE64_MAXIMUM_BYTES,
-              pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
-              description: "Canonical unwrapped Base64 for the exact asset bytes."
-            }
+            content:
           },
-          required: %w[path media_type executable content_base64]
+          required: %w[path executable content]
         )
         object_schema(
           properties: common_mutation_properties.merge(
@@ -773,8 +801,16 @@ module Coordinator
           },
           required: %w[encoding media_type],
           one_of: [
-            { properties: { encoding: { const: "utf-8" } }, required: %w[encoding text] },
-            { properties: { encoding: { const: "binary" } }, required: %w[encoding base64] }
+            {
+              properties: { encoding: { const: "utf-8" } },
+              required: %w[encoding text],
+              not: { required: %w[base64] }
+            },
+            {
+              properties: { encoding: { const: "binary" } },
+              required: %w[encoding base64],
+              not: { required: %w[text] }
+            }
           ]
         )
         source = object_schema(

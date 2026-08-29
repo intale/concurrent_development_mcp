@@ -144,7 +144,9 @@ Then("the exact script asset content and digest are available through MCP") do
   payload = skill_asset(name: @asset_skill_name, scope: @asset_skill_scope, path: @asset_path)
   asset = payload.dig("data", "asset")
   assert_acceptance_equal("ok", payload.fetch("status"), "Asset query status")
-  assert_acceptance_equal([ @asset_content ].pack("m0"), asset.fetch("content_base64"), "Asset content")
+  assert_acceptance_equal("utf-8", asset.fetch("encoding"), "Asset encoding")
+  assert_acceptance_equal(@asset_content, asset.fetch("text"), "Asset content")
+  assert_acceptance(!asset.key?("base64"), "UTF-8 asset must not expose Base64")
   assert_acceptance(
     asset.fetch("content_sha256").match?(Coordinator::Shared::Types::SHA256_DIGEST_PATTERN),
     "Asset digest must be a SHA-256 digest"
@@ -155,7 +157,121 @@ Then("the Skill view exposes the asset manifest without embedding its content") 
   skill = skill_view(name: @asset_skill_name, scope: @asset_skill_scope).dig("data", "skill")
   manifest = skill.fetch("assets").sole
   assert_acceptance_equal(@asset_path, manifest.fetch("path"), "Manifest path")
-  assert_acceptance(!manifest.key?("content_base64"), "Skill manifest must not embed asset content")
+  assert_acceptance(
+    (manifest.keys & %w[text base64 content_base64]).empty?,
+    "Skill manifest must not embed asset content"
+  )
+end
+
+When("the agent publishes and replays Skill {string} with Unicode text and binary assets") do |name|
+  @semantic_skill_name = name
+  @semantic_skill_scope = "project:semantic-content"
+  @semantic_text_path = "docs/unicode.txt"
+  @semantic_text = "Hej, världen — λ\n"
+  @semantic_binary_path = "fixtures/raw.bin"
+  @semantic_binary = "\x00\xFF\x10".b
+  assets = [
+    {
+      path: @semantic_text_path,
+      executable: false,
+      content: { encoding: "utf-8", media_type: "text/plain", text: @semantic_text }
+    },
+    {
+      path: @semantic_binary_path,
+      executable: false,
+      content: {
+        encoding: "binary",
+        media_type: "application/octet-stream",
+        base64: [ @semantic_binary ].pack("m0")
+      }
+    }
+  ]
+  @semantic_skill_publications = 2.times.map do
+    publish_skill_task(
+      name:,
+      scope: @semantic_skill_scope,
+      command_id: "cmd-cuc-skill-semantic-replay",
+      expected_revision: 0,
+      instructions: "Retrieve each passive asset in its declared representation.",
+      assets:
+    )
+  end
+end
+
+When("the semantic Skill fact reaches the read side") do
+  project_skill_event(
+    skill_events(name: @semantic_skill_name, scope: @semantic_skill_scope).sole
+  )
+end
+
+Then("the Unicode asset is returned as exact text without Base64") do
+  asset = skill_asset(
+    name: @semantic_skill_name,
+    scope: @semantic_skill_scope,
+    path: @semantic_text_path
+  ).dig("data", "asset")
+  assert_acceptance_equal("utf-8", asset.fetch("encoding"), "Unicode asset encoding")
+  assert_acceptance_equal(@semantic_text, asset.fetch("text"), "Unicode asset text")
+  assert_acceptance(!asset.key?("base64"), "Unicode asset exposed Base64")
+end
+
+Then("the binary asset is returned as exact Base64 without text") do
+  asset = skill_asset(
+    name: @semantic_skill_name,
+    scope: @semantic_skill_scope,
+    path: @semantic_binary_path
+  ).dig("data", "asset")
+  assert_acceptance_equal("binary", asset.fetch("encoding"), "Binary asset encoding")
+  assert_acceptance_equal([ @semantic_binary ].pack("m0"), asset.fetch("base64"), "Binary asset")
+  assert_acceptance(!asset.key?("text"), "Binary asset exposed text")
+end
+
+Then("replay leaves one semantic Skill publication fact") do
+  outcomes = @semantic_skill_publications.map { _1.fetch(:outcome).fetch("data") }
+  assert_acceptance_equal(1, outcomes.uniq.length, "Replay outcomes")
+  event = skill_events(name: @semantic_skill_name, scope: @semantic_skill_scope).sole
+  assert_acceptance_equal(2, event.metadata.fetch("schema_version"), "Skill event schema")
+  contents = event.data.fetch("assets").map { _1.fetch("content") }
+  assert_acceptance(contents.any? { _1.key?("text") && !_1.key?("base64") }, "Text fact")
+  assert_acceptance(contents.any? { _1.key?("base64") && !_1.key?("text") }, "Binary fact")
+end
+
+When("the agent submits a Skill asset with an invalid mixed encoding representation") do
+  @invalid_semantic_skill_command_id = "cmd-cuc-skill-invalid-semantic-content"
+  @invalid_semantic_skill_response = call_tool(
+    "skill_publish",
+    {
+      command_id: @invalid_semantic_skill_command_id,
+      actor: { kind: "agent", id: "skill-agent" },
+      name: "invalid-semantic-assets",
+      scope: "project:semantic-content",
+      expected_revision: 0,
+      description: "Invalid content boundary",
+      instructions: "This request must not be accepted.",
+      assets: [
+        {
+          path: "mixed.txt",
+          executable: false,
+          content: {
+            encoding: "utf-8",
+            media_type: "text/plain",
+            text: "text\n",
+            base64: "dGV4dAo="
+          }
+        }
+      ]
+    }
+  )
+end
+
+Then("the invalid Skill request allocates no Task or command fact") do
+  assert_acceptance_equal(true, @invalid_semantic_skill_response.dig("result", "isError"), "Schema error")
+  assert_acceptance(
+    @invalid_semantic_skill_response.dig("result", "content").sole.fetch("text").include?("Invalid arguments"),
+    "Invalid content explanation"
+  )
+  assert_acceptance_equal([], task_events_for_command(@invalid_semantic_skill_command_id), "Task facts")
+  assert_acceptance_equal([], command_events(@invalid_semantic_skill_command_id), "Command facts")
 end
 
 Given("Skill {string} in scope {string} has projected revisions 1 and 2 with different assets") do |name, scope|
@@ -209,8 +325,8 @@ Then("the Skill metadata, manifest, and asset content all describe revision 1") 
   assert_acceptance_equal(1, asset.fetch("revision"), "Historical asset revision")
   assert_acceptance_equal(manifest.fetch("content_sha256"), asset.fetch("content_sha256"), "Pinned digest")
   assert_acceptance_equal(
-    [ @historical_asset_content ].pack("m0"),
-    asset.fetch("content_base64"),
+    @historical_asset_content,
+    asset.fetch("text"),
     "Pinned asset content"
   )
 end

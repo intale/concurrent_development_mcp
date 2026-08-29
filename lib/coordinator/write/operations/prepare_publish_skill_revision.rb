@@ -16,7 +16,7 @@ module Coordinator::Write
       def call(input)
         attributes = step validate(input)
         identity = @identity_builder.call(name: attributes.fetch(:name), scope: attributes.fetch(:scope))
-        content = @revision_builder.call(
+        content = step @revision_builder.call(
           identity:,
           description: attributes.fetch(:description),
           instructions: attributes.fetch(:instructions),

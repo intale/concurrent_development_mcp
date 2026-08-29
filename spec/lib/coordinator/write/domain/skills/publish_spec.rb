@@ -27,6 +27,7 @@ RSpec.describe Coordinator::Write::Domain::Skills::Publish do
       revision: 1,
       published_at:
     )
+    expect(write.event).to be_a(Coordinator::Write::Events::SkillRevisionPublishedV2)
   end
 
   it "given revision one and expected revision one, emits revision two" do
@@ -60,7 +61,7 @@ RSpec.describe Coordinator::Write::Domain::Skills::Publish do
       description: "Review changes",
       instructions: "Inspect the entire diff.",
       assets: []
-    )
+    ).value!
     Coordinator::Write::Commands::PublishSkillRevision.new(
       command_id: "cmd-skill-#{expected_revision}",
       actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "agent-1"),

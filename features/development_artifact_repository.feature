@@ -23,6 +23,13 @@ Feature: Development Artifact repository
       And Artifact metadata excludes content bytes
       And focused Artifact content returns the exact documentation text as passive data
 
+    @CONTENT-EXTERNAL-REFERENCE-04 @event-contract
+    Scenario: An external reference stores only its URL and never a fetched body
+      When the agent captures an external reference to "https://example.test/reference"
+      And the external-reference Artifact fact reaches the read side
+      Then its persisted and projected content is exactly the URL followed by one newline
+      And the external-reference content contains no binary or fetched representation
+
   Rule: Changed bytes are new facts connected by explicit relationships
 
     @CONTENT-BINARY-01

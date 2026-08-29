@@ -3,7 +3,7 @@
 module Coordinator::Read
   module Projectors
     class DevelopmentArtifactsV1
-      PROJECTION = ProjectionDefinition.new(name: "development-artifacts", version: 4)
+      PROJECTION = ProjectionDefinition.new(name: "development-artifacts", version: 5)
 
       def initialize(
         contract: Contracts::DevelopmentArtifactSourceEvent.new,
@@ -64,7 +64,8 @@ module Coordinator::Read
       def verify_stream_identity!(event, domain_event)
         artifact_id =
           case domain_event
-          when Coordinator::Write::Events::DevelopmentArtifactCapturedV1
+          when Coordinator::Write::Events::DevelopmentArtifactCapturedV1,
+               Coordinator::Write::Events::DevelopmentArtifactCapturedV2
             domain_event.artifact.artifact_id
           when Coordinator::Write::Events::DevelopmentArtifactObservedV1
             domain_event.observation.observation_id
@@ -82,7 +83,8 @@ module Coordinator::Read
 
       def project(event, domain_event)
         case domain_event
-        when Coordinator::Write::Events::DevelopmentArtifactCapturedV1
+        when Coordinator::Write::Events::DevelopmentArtifactCapturedV1,
+             Coordinator::Write::Events::DevelopmentArtifactCapturedV2
           @artifacts.store_capture(event:, capture: domain_event)
         when Coordinator::Write::Events::DevelopmentArtifactObservedV1
           @artifacts.store_observation(event:, observed: domain_event)

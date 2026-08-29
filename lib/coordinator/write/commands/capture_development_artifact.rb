@@ -5,7 +5,7 @@ module Coordinator::Write
     class CaptureDevelopmentArtifact < Value
       attribute :command_id, Types::Identifier
       attribute :actor, Actor
-      attribute :artifact, DevelopmentArtifacts::ArtifactV1
+      attribute :artifact, DevelopmentArtifacts::ArtifactV2
       attribute :observation, DevelopmentArtifacts::ArtifactObservationV1
     end
   end

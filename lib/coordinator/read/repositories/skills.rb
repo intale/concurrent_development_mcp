@@ -105,10 +105,31 @@ module Coordinator::Read
 
         Coordinator::Read::SkillAsset.insert_all!(
           publication.assets.map do |asset|
-            asset.to_h.merge(skill_id: publication.skill_id, revision: publication.revision)
+            asset_attributes(asset).merge(
+              skill_id: publication.skill_id,
+              revision: publication.revision
+            )
           end,
           record_timestamps: true
         )
+      end
+
+      def asset_attributes(asset)
+        if asset.is_a?(Coordinator::Write::Skills::AssetV2)
+          content = asset.content
+          {
+            path: asset.path,
+            media_type: content.media_type,
+            executable: asset.executable,
+            content_encoding: content.encoding,
+            content_text: content.respond_to?(:text) ? content.text : nil,
+            content_base64: content.respond_to?(:base64) ? content.base64 : nil,
+            content_sha256: content.content_sha256,
+            byte_size: content.byte_size
+          }
+        else
+          asset.to_h.merge(content_encoding: "binary", content_text: nil)
+        end
       end
 
       def verify_identity!(record, publication)
@@ -168,15 +189,18 @@ module Coordinator::Read
       end
 
       def build_asset_view(record, snapshot, asset)
-        SkillAssetViewV1.new(
+        view = asset.content_encoding == "utf-8" ? SkillTextAssetViewV2 : SkillBinaryAssetViewV2
+        content_attribute = asset.content_encoding == "utf-8" ? { text: asset.content_text } : { base64: asset.content_base64 }
+        view.new(
           skill_id: record.skill_id,
           name: record.name,
           scope: record.scope,
           revision: snapshot.revision,
           path: asset.path,
+          encoding: asset.content_encoding,
           media_type: asset.media_type,
           executable: asset.executable,
-          content_base64: asset.content_base64,
+          **content_attribute,
           content_sha256: asset.content_sha256,
           byte_size: asset.byte_size,
           published: source_evidence(snapshot)

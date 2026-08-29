@@ -181,7 +181,10 @@ module DevelopmentArtifactAcceptanceWorld
       end
       [ terminal, events.map(&:type) ]
     end
-    await_read_model("Artifact relation Batch #{batch_id} to become queryable") do
+    await_read_model(
+      "Artifact relation Batch #{batch_id} to become queryable",
+      timeout_seconds: 60
+    ) do
       payload = call_tool(
         "operation_batch_get",
         { batch_id:, limit: Coordinator::Shared::Types::OPERATION_BATCH_QUERY_MAXIMUM_ITEMS }

@@ -2,7 +2,8 @@ module Coordinator
   module Write
     module DevelopmentArtifacts
       class ContentBuilder
-        def call: (Hash[Symbol, untyped] attributes) -> ContentV1
+        def initialize: (?builder: Content::Builder) -> void
+        def call: (Hash[Symbol, untyped] attributes) -> Dry::Monads::Result
       end
     end
   end

@@ -3,10 +3,12 @@ module Coordinator
     module Domain
       module Skills
         class State < Shared::Value
-          def self.initial: () -> State
-          def self.reduce: (Array[Events::SkillRevisionPublishedV1] events) -> State
+          type publication = Events::SkillRevisionPublishedV1 | Events::SkillRevisionPublishedV2
 
-          def publication: () -> Events::SkillRevisionPublishedV1?
+          def self.initial: () -> State
+          def self.reduce: (Array[publication] events) -> State
+
+          def publication: () -> publication?
           def current_revision: () -> Integer
         end
       end

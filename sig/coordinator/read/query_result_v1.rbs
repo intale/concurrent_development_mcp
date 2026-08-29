@@ -125,7 +125,7 @@ module Coordinator
       end
 
       class SkillAssetData < Shared::Value
-        def asset: () -> SkillAssetViewV1
+        def asset: () -> (SkillTextAssetViewV2 | SkillBinaryAssetViewV2)
       end
 
       class DevelopmentArtifactData < Shared::Value
@@ -133,7 +133,7 @@ module Coordinator
       end
 
       class DevelopmentArtifactContentData < Shared::Value
-        def content: () -> DevelopmentArtifactContentViewV1
+        def content: () -> (DevelopmentArtifactTextContentViewV2 | DevelopmentArtifactBinaryContentViewV2)
       end
 
       class DevelopmentArtifactPageData < Shared::Value

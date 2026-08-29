@@ -6,7 +6,10 @@ module Coordinator
       class SkillAssetGet < QueryTool
         tool_name "skill_asset_get"
         title "Get available AI Skill asset content"
-        description "Read one passive Base64 asset from the latest observed revision of an exact scoped Skill."
+        description <<~TEXT.squish
+          Read one passive asset from an exact scoped Skill revision. Valid UTF-8 is returned as text;
+          canonical Base64 is returned only for explicitly binary content.
+        TEXT
         input_schema Schemas.skill_asset_get
         query "queries.skill_asset_get"
       end

@@ -35,9 +35,12 @@ RSpec.describe Coordinator::Write::Contracts::SkillPublishBatch do
     oversized_assets = 3.times.map do |index|
       {
         path: "assets/payload-#{index}.bin",
-        media_type: "application/octet-stream",
         executable: false,
-        content_base64: [ "a" * 800_000 ].pack("m0")
+        content: {
+          encoding: "binary",
+          media_type: "application/octet-stream",
+          base64: [ "a" * 800_000 ].pack("m0")
+        }
       }
     end
 

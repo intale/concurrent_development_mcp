@@ -3,7 +3,7 @@ module Coordinator
     module DevelopmentArtifacts
       class ArtifactBuilder
         def initialize: (?identity_builder: IdentityBuilder) -> void
-        def call: (scope: String, title: String, kind: String, labels: Array[String], content: ContentV1, source: SourceV1) -> ArtifactV1
+        def call: (scope: String, title: String, kind: String, labels: Array[String], content: Content::TextV1 | Content::BinaryV1, source: SourceV1) -> ArtifactV2
       end
     end
   end

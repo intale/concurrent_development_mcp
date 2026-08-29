@@ -273,22 +273,33 @@ module Coordinator::Mcp
     end
 
     def artifact_content
-      Schemas.object_schema(
-        properties: {
-          artifact_id: artifact_id,
-          encoding: { type: "string", enum: %w[utf-8 binary] },
-          media_type: { type: "string" },
-          text: nullable({ type: "string" }),
-          base64: nullable(
-            { type: "string", maxLength: Types::DEVELOPMENT_ARTIFACT_CONTENT_BASE64_MAXIMUM_BYTES }
+      common = {
+        artifact_id: artifact_id,
+        media_type: { type: "string" },
+        content_sha256: sha256,
+        byte_size: artifact_byte_size
+      }
+      {
+        oneOf: [
+          Schemas.object_schema(
+            properties: common.merge(
+              encoding: { type: "string", const: "utf-8" },
+              text: { type: "string" }
+            ),
+            required: %w[artifact_id encoding media_type text content_sha256 byte_size]
           ),
-          content_sha256: sha256,
-          byte_size: artifact_byte_size
-        },
-        required: %w[
-          artifact_id encoding media_type text base64 content_sha256 byte_size
+          Schemas.object_schema(
+            properties: common.merge(
+              encoding: { type: "string", const: "binary" },
+              base64: {
+                type: "string",
+                maxLength: Types::DEVELOPMENT_ARTIFACT_CONTENT_BASE64_MAXIMUM_BYTES
+              }
+            ),
+            required: %w[artifact_id encoding media_type base64 content_sha256 byte_size]
+          )
         ]
-      )
+      }
     end
 
     def artifact_page

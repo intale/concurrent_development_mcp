@@ -17,9 +17,12 @@ RSpec.describe Coordinator::Read::OperationBatchArguments do
       assets: [
         {
           path: "bin/check",
-          media_type: "text/x-shellscript",
           executable: true,
-          content_base64: "IyEvYmluL3NoCg=="
+          content: {
+            encoding: "utf-8",
+            media_type: "text/x-shellscript",
+            text: "#!/bin/sh\n"
+          }
         }
       ]
     }

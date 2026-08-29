@@ -10,7 +10,7 @@ module Coordinator
         def expected_revision: () -> Integer
         def description: () -> String
         def instructions: () -> String
-        def assets: () -> Array[Skills::AssetV1]
+        def assets: () -> Array[Skills::AssetV2]
         def content_digest: () -> String
       end
     end

@@ -88,12 +88,13 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
 
     text = repository.fetch_content(text_id)
     binary = repository.fetch_content(binary_id)
-    expect(text).to have_attributes(text: "evidence\n", base64: nil, encoding: "utf-8")
+    expect(text).to have_attributes(text: "evidence\n", encoding: "utf-8")
+    expect(text.to_h).not_to have_key(:base64)
     expect(binary).to have_attributes(
-      text: nil,
       base64: [ "\x00\xFF".b ].pack("m0"),
       encoding: "binary"
     )
+    expect(binary.to_h).not_to have_key(:text)
     expect(repository.fetch(text_id).to_h.to_s).not_to include("evidence\\n")
   end
 
@@ -279,7 +280,7 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
   def processed_events
     Coordinator::Read::ProcessedProjectionEvent.where(
       projection_name: "development-artifacts",
-      projection_version: 4
+      projection_version: 5
     )
   end
 

@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module DevelopmentArtifacts
+      class ArtifactV2 < Shared::Value
+        def artifact_id: () -> String
+        def scope: () -> String
+        def title: () -> String
+        def kind: () -> String
+        def labels: () -> Array[String]
+        def content: () -> (Content::TextV1 | Content::BinaryV1)
+        def source: () -> SourceV1
+      end
+    end
+  end
+end

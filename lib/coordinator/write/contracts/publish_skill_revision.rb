@@ -18,9 +18,13 @@ module Coordinator::Write
         required(:instructions).filled(:string)
         required(:assets).array(:hash) do
           required(:path).filled(:string)
-          required(:media_type).filled(:string)
           required(:executable).value(:bool)
-          required(:content_base64).value(:string)
+          required(:content).hash do
+            required(:encoding).filled(:string, included_in?: %w[utf-8 binary])
+            required(:media_type).filled(:string)
+            optional(:text).value(:string)
+            optional(:base64).value(:string)
+          end
         end
       end
 
@@ -64,26 +68,25 @@ module Coordinator::Write
         total_bytes = 0
         value.each_with_index do |asset, index|
           path_key = key([ :assets, index, :path ])
-          media_key = key([ :assets, index, :media_type ])
-          content_key = key([ :assets, index, :content_base64 ])
           path = asset.fetch(:path)
-          media_type = asset.fetch(:media_type)
-          content = asset.fetch(:content_base64)
 
           path_key.failure("must be a safe relative POSIX path") unless valid_asset_path?(path)
-          unless media_type.ascii_only? && Types::SKILL_MEDIA_TYPE_PATTERN.match?(media_type)
-            media_key.failure("must be a visible ASCII media type")
-          end
-
-          bytes = decode_base64(content)
-          unless bytes
-            content_key.failure("must be canonical unwrapped Base64")
+          content = asset.fetch(:content)
+          content_result = Content::InputContract.new.call(content)
+          if content_result.failure?
+            content_result.errors.to_h.each do |attribute, messages|
+              Array(messages).each { key([ :assets, index, :content, attribute ]).failure(_1) }
+            end
             next
           end
-          if bytes.bytesize > Types::SKILL_ASSET_MAXIMUM_BYTES
-            content_key.failure("decoded asset exceeds #{Types::SKILL_ASSET_MAXIMUM_BYTES} bytes")
+
+          byte_size = content_byte_size(content_result.to_h)
+          if byte_size > Types::SKILL_ASSET_MAXIMUM_BYTES
+            key([ :assets, index, :content ]).failure(
+              "asset exceeds #{Types::SKILL_ASSET_MAXIMUM_BYTES} bytes"
+            )
           end
-          total_bytes += bytes.bytesize
+          total_bytes += byte_size
         end
 
         if total_bytes > Types::SKILL_ASSETS_TOTAL_MAXIMUM_BYTES
@@ -114,11 +117,10 @@ module Coordinator::Write
         value.split("/", -1).none? { _1.empty? || _1 == "." || _1 == ".." }
       end
 
-      def decode_base64(value)
-        bytes = value.unpack1("m0")
-        bytes if [ bytes ].pack("m0") == value
-      rescue ArgumentError
-        nil
+      def content_byte_size(content)
+        return content.fetch(:text).bytesize if content.fetch(:encoding) == "utf-8"
+
+        content.fetch(:base64).unpack1("m0").bytesize
       end
     end
   end

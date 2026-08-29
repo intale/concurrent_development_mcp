@@ -21,11 +21,15 @@ RSpec.describe Coordinator::Write::Operations::ExecutePublishSkillRevision, :eve
     event = skill_events("review", "project:alpha").sole
     expect(event).to have_attributes(type: "SkillRevisionPublished", stream_revision: 0)
     expect(event.markers).to include("command:cmd-skill-1")
-    expect(event.data.fetch("assets").sole).to include(
-      "path" => "scripts/check.sh",
+    persisted_asset = event.data.fetch("assets").sole
+    expect(persisted_asset).to include("path" => "scripts/check.sh")
+    expect(persisted_asset.fetch("content")).to include(
+      "encoding" => "utf-8",
+      "text" => "#!/bin/sh\nexit 0\n",
       "content_sha256" => a_string_matching(/\Asha256:[0-9a-f]{64}\z/),
       "byte_size" => 17
     )
+    expect(persisted_asset.fetch("content")).not_to have_key("base64")
     expect(command_events("cmd-skill-1").map(&:type)).to eq([ "CommandCompleted" ])
   end
 
@@ -96,9 +100,12 @@ RSpec.describe Coordinator::Write::Operations::ExecutePublishSkillRevision, :eve
       assets: [
         {
           path: "scripts/check.sh",
-          media_type: "text/x-shellscript",
           executable: true,
-          content_base64: [ "#!/bin/sh\nexit 0\n" ].pack("m0")
+          content: {
+            encoding: "utf-8",
+            media_type: "text/x-shellscript",
+            text: "#!/bin/sh\nexit 0\n"
+          }
         }
       ]
     }.merge(overrides)

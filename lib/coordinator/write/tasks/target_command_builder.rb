@@ -514,7 +514,7 @@ module Coordinator::Write
           expected_revision: input.expected_revision,
           description: input.description,
           instructions: input.instructions,
-          assets: input.assets.map { Skills::AssetV1.new(_1.to_h) },
+          assets: input.assets.map { build_skill_asset(_1) },
           content_digest: input.content_digest
         )
       end
@@ -529,19 +529,13 @@ module Coordinator::Write
           observed_at: artifact_document.source.observed_at,
           collector: artifact_document.source.collector
         )
-        artifact = DevelopmentArtifacts::ArtifactV1.new(
+        artifact = DevelopmentArtifacts::ArtifactV2.new(
           artifact_id: artifact_document.artifact_id,
           scope: artifact_document.scope,
           title: artifact_document.title,
           kind: artifact_document.kind,
           labels: artifact_document.labels,
-          content: DevelopmentArtifacts::ContentV1.new(
-            encoding: artifact_document.content.encoding,
-            media_type: artifact_document.content.media_type,
-            content_base64: artifact_document.content.content_base64,
-            content_sha256: artifact_document.content.content_sha256,
-            byte_size: artifact_document.content.byte_size
-          ),
+          content: build_artifact_content(artifact_document.content),
           source:
         )
         Commands::CaptureDevelopmentArtifact.new(
@@ -558,6 +552,44 @@ module Coordinator::Write
             source:
           )
         )
+      end
+
+      def build_skill_asset(asset)
+        return Skills::AssetV2.new(asset.to_h) if asset.is_a?(CommandInputDocuments::SkillAssetV2)
+
+        Skills::AssetV2.new(
+          path: asset.path,
+          executable: asset.executable,
+          content: Content::BinaryV1.new(
+            encoding: "binary",
+            media_type: asset.media_type,
+            base64: asset.content_base64,
+            content_sha256: asset.content_sha256,
+            byte_size: asset.byte_size
+          )
+        )
+      end
+
+      def build_artifact_content(content)
+        return content if content.is_a?(Content::TextV1) || content.is_a?(Content::BinaryV1)
+
+        if content.encoding == "utf-8"
+          Content::TextV1.new(
+            encoding: "utf-8",
+            media_type: content.media_type,
+            text: content.content_base64.unpack1("m0").force_encoding(Encoding::UTF_8),
+            content_sha256: content.content_sha256,
+            byte_size: content.byte_size
+          )
+        else
+          Content::BinaryV1.new(
+            encoding: "binary",
+            media_type: content.media_type,
+            base64: content.content_base64,
+            content_sha256: content.content_sha256,
+            byte_size: content.byte_size
+          )
+        end
       end
 
       def build_correct_development_artifact_classification(document)

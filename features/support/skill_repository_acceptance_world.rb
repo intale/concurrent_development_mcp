@@ -102,9 +102,12 @@ module SkillRepositoryAcceptanceWorld
   def script_asset(path, content)
     {
       path:,
-      media_type: "text/x-shellscript",
       executable: true,
-      content_base64: [ content ].pack("m0")
+      content: {
+        encoding: "utf-8",
+        media_type: "text/x-shellscript",
+        text: content
+      }
     }
   end
 end

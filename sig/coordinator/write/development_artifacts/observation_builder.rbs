@@ -3,7 +3,7 @@ module Coordinator
     module DevelopmentArtifacts
       class ObservationBuilder
         def initialize: (?identity_builder: ObservationIdentityBuilder) -> void
-        def call: (artifact: ArtifactV1) -> ArtifactObservationV1
+        def call: (artifact: ArtifactV1 | ArtifactV2) -> ArtifactObservationV1
       end
     end
   end

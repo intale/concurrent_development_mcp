@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Skills
+      class AssetV2 < Shared::Value
+        def path: () -> String
+        def executable: () -> bool
+        def content: () -> (Content::TextV1 | Content::BinaryV1)
+        def media_type: () -> String
+        def content_sha256: () -> String
+        def byte_size: () -> Integer
+      end
+    end
+  end
+end

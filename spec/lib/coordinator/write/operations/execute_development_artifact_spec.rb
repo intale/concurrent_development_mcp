@@ -29,9 +29,12 @@ RSpec.describe "Development Artifact write operations", :event_store do
       outcome: "existing"
     )
     expect(replay.value!.emitted_events).to be_empty
-    expect(artifact_events(first.value!.data.artifact_id).map(&:type)).to eq(
-      [ "DevelopmentArtifactCaptured" ]
-    )
+    persisted = artifact_events(first.value!.data.artifact_id).sole
+    expect(persisted.type).to eq("DevelopmentArtifactCaptured")
+    expect(persisted.metadata.fetch("schema_version")).to eq(2)
+    persisted_content = persisted.data.dig("artifact", "content")
+    expect(persisted_content).to include("encoding" => "utf-8", "text" => "hello\n")
+    expect(persisted_content).not_to have_key("base64")
     expect(command_events("cmd-artifact-replay").map(&:type)).to eq([ "CommandCompleted" ])
   end
 

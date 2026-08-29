@@ -4,7 +4,9 @@ module Coordinator::Write
   module OperationBatches
     class ItemV1 < Value
       Target = CommandInputDocuments::PublishSkillRevisionV1 |
+               CommandInputDocuments::PublishSkillRevisionV2 |
                CommandInputDocuments::CaptureDevelopmentArtifactV1 |
+               CommandInputDocuments::CaptureDevelopmentArtifactV2 |
                CommandInputDocuments::DeclareDevelopmentArtifactRelationV1
 
       attribute :index, Types::OperationBatchItemIndex

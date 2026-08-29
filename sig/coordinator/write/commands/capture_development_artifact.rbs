@@ -4,7 +4,7 @@ module Coordinator
       class CaptureDevelopmentArtifact < Shared::Value
         def command_id: () -> String
         def actor: () -> Actor
-        def artifact: () -> DevelopmentArtifacts::ArtifactV1
+        def artifact: () -> DevelopmentArtifacts::ArtifactV2
         def observation: () -> DevelopmentArtifacts::ArtifactObservationV1
       end
     end

@@ -3,7 +3,7 @@
 module Coordinator::Write
   module Commands
     class PublishSkillRevision < Value
-      Asset = Types.Instance(Skills::AssetV1)
+      Asset = Types.Instance(Skills::AssetV2)
 
       attribute :command_id, Types::Identifier
       attribute :actor, Actor

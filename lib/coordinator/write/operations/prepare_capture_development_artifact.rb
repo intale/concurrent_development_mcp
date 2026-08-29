@@ -25,7 +25,7 @@ module Coordinator::Write
           observed_at: source_attributes.fetch(:observed_at),
           collector: source_attributes.fetch(:collector)
         )
-        content = @content_builder.call(attributes.fetch(:content))
+        content = step @content_builder.call(attributes.fetch(:content))
         artifact = @artifact_builder.call(
           scope: attributes.fetch(:scope),
           title: attributes.fetch(:title),

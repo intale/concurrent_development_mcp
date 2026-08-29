@@ -1,0 +1,18 @@
+module Coordinator
+  module Read
+    class SkillBinaryAssetViewV2 < Shared::Value
+      def skill_id: () -> String
+      def name: () -> String
+      def scope: () -> String
+      def revision: () -> Integer
+      def path: () -> String
+      def encoding: () -> String
+      def media_type: () -> String
+      def executable: () -> bool
+      def base64: () -> String
+      def content_sha256: () -> String
+      def byte_size: () -> Integer
+      def published: () -> SkillSourceEvidenceV1
+    end
+  end
+end

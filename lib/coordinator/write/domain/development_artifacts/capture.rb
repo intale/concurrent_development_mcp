@@ -19,7 +19,7 @@ module Coordinator::Write
           return observation_result if observation_result.failure?
           observation = observation_result.value!
 
-          capture_event = capture || Events::DevelopmentArtifactCapturedV1.new(
+          capture_event = capture || Events::DevelopmentArtifactCapturedV2.new(
             artifact: command.artifact,
             captured_at:
           )
@@ -50,7 +50,7 @@ module Coordinator::Write
 
         def existing_capture(state, command)
           return Success(nil) unless state.capture
-          return Success(state.capture) if state.capture.artifact.content == command.artifact.content
+          return Success(state.capture) if same_content?(state.capture.artifact.content, command.artifact.content)
 
           Failure(
             OutcomeError.new(
@@ -94,6 +94,31 @@ module Coordinator::Write
               }
             )
           )
+        end
+
+        def same_content?(existing, requested)
+          return false unless existing.encoding == requested.encoding &&
+                              existing.media_type == requested.media_type &&
+                              existing.content_sha256 == requested.content_sha256 &&
+                              existing.byte_size == requested.byte_size
+
+          if requested.encoding == "utf-8"
+            existing_text(existing) == requested.text
+          else
+            existing_base64(existing) == requested.base64
+          end
+        end
+
+        def existing_text(content)
+          return content.text if content.respond_to?(:text)
+
+          content.content_base64.unpack1("m0").force_encoding(Encoding::UTF_8)
+        end
+
+        def existing_base64(content)
+          return content.base64 if content.respond_to?(:base64)
+
+          content.content_base64
         end
       end
     end

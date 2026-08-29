@@ -49,6 +49,16 @@ Then("the import-capable schemas require exact content and caller-owned provenan
     skill.dig("inputSchema", "properties", "assets", "description").include?("Complete passive asset snapshot"),
     "Complete Skill asset snapshot"
   )
+  skill_asset = skill.dig("inputSchema", "properties", "assets", "items")
+  skill_asset_properties = skill_asset.fetch("properties")
+  assert_acceptance(skill_asset_properties.key?("content"), "Skill asset semantic content union")
+  assert_acceptance(!skill_asset_properties.key?("content_base64"), "Skill asset legacy Base64 field")
+  assert_acceptance(
+    skill_asset_properties.dig("content", "properties", "text", "description").include?(
+      "no client-side Base64 or digest"
+    ),
+    "Text-first Skill guidance"
+  )
 end
 
 When("the agent captures documentation and web-search Development Artifacts") do
@@ -110,6 +120,40 @@ Then("focused Artifact content returns the exact documentation text as passive d
     "Documentation content"
   )
   assert_acceptance(content.fetch("warnings").sole.include?("passive data"), "Passive warning")
+end
+
+When("the agent captures an external reference to {string}") do |url|
+  @external_reference_url = url
+  @external_reference_outcome = capture_artifact_task(
+    command_id: "cmd-cuc-artifact-external-reference",
+    title: "External reference",
+    kind: "external_reference",
+    labels: %w[external reference],
+    locator: url,
+    source_kind: "web_page",
+    content: { encoding: "utf-8", media_type: "text/uri-list", text: "#{url}\n" }
+  )
+  @external_reference_id = @external_reference_outcome.dig("data", "artifact_id")
+end
+
+When("the external-reference Artifact fact reaches the read side") do
+  project_artifact(@external_reference_id)
+end
+
+Then("its persisted and projected content is exactly the URL followed by one newline") do
+  event_content = artifact_events(@external_reference_id).sole.data.dig("artifact", "content")
+  projected = artifact_content(@external_reference_id).dig("data", "content")
+  expected = "#{@external_reference_url}\n"
+  assert_acceptance_equal(expected, event_content.fetch("text"), "Persisted reference")
+  assert_acceptance_equal(expected, projected.fetch("text"), "Projected reference")
+end
+
+Then("the external-reference content contains no binary or fetched representation") do
+  event_content = artifact_events(@external_reference_id).sole.data.dig("artifact", "content")
+  projected = artifact_content(@external_reference_id).dig("data", "content")
+  assert_acceptance(!event_content.key?("base64"), "Reference event exposed Base64")
+  assert_acceptance(!projected.key?("base64"), "Reference query exposed Base64")
+  assert_acceptance_equal("text/uri-list", projected.fetch("media_type"), "Reference media type")
 end
 
 When("the agent captures two binary profile versions from one source") do

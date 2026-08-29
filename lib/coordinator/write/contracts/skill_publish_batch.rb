@@ -25,9 +25,13 @@ module Coordinator::Write
           required(:instructions).filled(:string)
           required(:assets).array(:hash) do
             required(:path).filled(:string)
-            required(:media_type).filled(:string)
             required(:executable).value(:bool)
-            required(:content_base64).value(:string)
+            required(:content).hash do
+              required(:encoding).filled(:string)
+              required(:media_type).filled(:string)
+              optional(:text).value(:string)
+              optional(:base64).value(:string)
+            end
           end
         end
       end

@@ -684,6 +684,20 @@ module Coordinator::Write
       attribute :byte_size, Types::SkillAssetByteSize
     end
 
+    class SkillAssetV2 < Value
+      Content = Coordinator::Write::Content::TextV1 | Coordinator::Write::Content::BinaryV1
+
+      attribute :path, Types::SkillAssetPath
+      attribute :executable, Types::Bool
+      attribute :content, Content
+    end
+
+    class PublishSkillRevisionBase < Value
+      attribute :schema, Types::String.enum("command-input/v1", "command-input/v2")
+      attribute :command_id, Types::Identifier
+      attribute :tool_name, Types::String.enum("skill_publish")
+    end
+
     class PublishSkillRevisionInputV1 < Value
       Asset = SkillAssetV1
 
@@ -699,9 +713,27 @@ module Coordinator::Write
       attribute :content_digest, Types::Sha256Digest
     end
 
-    class PublishSkillRevisionV1 < BaseV1
-      attribute :tool_name, Types::String.enum("skill_publish")
+    class PublishSkillRevisionV1 < PublishSkillRevisionBase
       attribute :input, PublishSkillRevisionInputV1
+    end
+
+    class PublishSkillRevisionInputV2 < Value
+      Asset = SkillAssetV2
+
+      attribute :actor, ActorV1
+      attribute :skill_id, Types::SkillId
+      attribute :name, Types::SkillName
+      attribute :scope, Types::SkillScope
+      attribute :expected_revision, Types::SkillExpectedRevision
+      attribute :description, Types::SkillDescription
+      attribute :instructions, Types::SkillInstructions
+      attribute :assets,
+                Types::Array.of(Asset).constrained(max_size: Types::SKILL_ASSET_MAXIMUM_COUNT)
+      attribute :content_digest, Types::Sha256Digest
+    end
+
+    class PublishSkillRevisionV2 < PublishSkillRevisionBase
+      attribute :input, PublishSkillRevisionInputV2
     end
 
     class DevelopmentArtifactContentV1 < Value
@@ -731,14 +763,41 @@ module Coordinator::Write
       attribute :source, DevelopmentArtifactSourceV1
     end
 
+    class DevelopmentArtifactV2 < Value
+      Content = Coordinator::Write::Content::TextV1 | Coordinator::Write::Content::BinaryV1
+
+      attribute :artifact_id, Types::DevelopmentArtifactId
+      attribute :observation_id, Types::DevelopmentArtifactObservationId
+      attribute :scope, Types::DevelopmentArtifactScope
+      attribute :title, Types::DevelopmentArtifactTitle
+      attribute :kind, Types::DevelopmentArtifactKind
+      attribute :labels, Types::DevelopmentArtifactLabels
+      attribute :content, Content
+      attribute :source, DevelopmentArtifactSourceV1
+    end
+
+    class CaptureDevelopmentArtifactBase < Value
+      attribute :schema, Types::String.enum("command-input/v1", "command-input/v2")
+      attribute :command_id, Types::Identifier
+      attribute :tool_name, Types::String.enum("development_artifact_capture")
+    end
+
     class CaptureDevelopmentArtifactInputV1 < Value
       attribute :actor, ActorV1
       attribute :artifact, DevelopmentArtifactV1
     end
 
-    class CaptureDevelopmentArtifactV1 < BaseV1
-      attribute :tool_name, Types::String.enum("development_artifact_capture")
+    class CaptureDevelopmentArtifactV1 < CaptureDevelopmentArtifactBase
       attribute :input, CaptureDevelopmentArtifactInputV1
+    end
+
+    class CaptureDevelopmentArtifactInputV2 < Value
+      attribute :actor, ActorV1
+      attribute :artifact, DevelopmentArtifactV2
+    end
+
+    class CaptureDevelopmentArtifactV2 < CaptureDevelopmentArtifactBase
+      attribute :input, CaptureDevelopmentArtifactInputV2
     end
 
     class CorrectDevelopmentArtifactClassificationInputV1 < Value
@@ -955,7 +1014,9 @@ module Coordinator::Write
       RecordReleaseSetActivationV1,
       CompleteCompensatedReleaseSetV1,
       PublishSkillRevisionV1,
+      PublishSkillRevisionV2,
       CaptureDevelopmentArtifactV1,
+      CaptureDevelopmentArtifactV2,
       CorrectDevelopmentArtifactClassificationV1,
       DeclareDevelopmentArtifactRelationV1,
       CreateOperationBatchV1,

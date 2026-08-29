@@ -16,7 +16,7 @@ module Coordinator::Read
             DevelopmentArtifactRelationSuperseded
           ]
         )
-        required(:schema_version).filled(:integer, eql?: 1)
+        required(:schema_version).filled(:integer, included_in?: [ 1, 2 ])
         required(:stream_context).filled(:string, eql?: "DevelopmentMemory")
         required(:stream_name).filled(
           :string,
@@ -49,6 +49,12 @@ module Coordinator::Read
         ].include?(values[:event_type])
         expected_stream = observation_event ? "DevelopmentArtifactObservation" : "DevelopmentArtifact"
         key(:stream_name).failure("does not carry this Artifact event type") unless values[:stream_name] == expected_stream
+      end
+
+      rule(:event_type, :schema_version) do
+        next if values[:event_type] == "DevelopmentArtifactCaptured" || values[:schema_version] == 1
+
+        key(:schema_version).failure("must be 1 for this Artifact event type")
       end
 
       rule(:command_id, :actor_id) do

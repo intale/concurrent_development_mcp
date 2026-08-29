@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_28_104228) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_29_115000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -465,11 +465,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_104228) do
     t.bigint "captured_global_position", null: false
     t.jsonb "captured_markers", default: [], null: false
     t.jsonb "captured_metadata", default: {}, null: false
-    t.text "content_base64", null: false
+    t.text "content_base64"
     t.bigint "content_byte_size", null: false
     t.string "content_encoding", null: false
     t.string "content_media_type", null: false
     t.string "content_sha256", null: false
+    t.text "content_text"
     t.datetime "created_at", null: false
     t.string "kind", null: false
     t.jsonb "labels", default: [], null: false
@@ -695,8 +696,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_104228) do
 
   create_table "skill_assets", force: :cascade do |t|
     t.bigint "byte_size", null: false
-    t.text "content_base64", null: false
+    t.text "content_base64"
+    t.string "content_encoding", null: false
     t.string "content_sha256", null: false
+    t.text "content_text"
     t.datetime "created_at", null: false
     t.boolean "executable", null: false
     t.string "media_type", null: false

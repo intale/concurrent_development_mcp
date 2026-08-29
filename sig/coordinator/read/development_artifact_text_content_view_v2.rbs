@@ -1,0 +1,12 @@
+module Coordinator
+  module Read
+    class DevelopmentArtifactTextContentViewV2 < Shared::Value
+      def artifact_id: () -> String
+      def encoding: () -> String
+      def media_type: () -> String
+      def text: () -> String
+      def content_sha256: () -> String
+      def byte_size: () -> Integer
+    end
+  end
+end

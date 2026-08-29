@@ -178,3 +178,61 @@ Then("the resumed Batch succeeds once without replaying the completed prefix") d
   assert_acceptance_equal(50, original.fetch(:items).count { _1.fetch("status") == "succeeded" }, "Original prefix")
   assert_acceptance_equal(1, original.fetch(:items).count { _1.fetch("status") == "not_run" }, "Original remainder")
 end
+
+When("the agent publishes equivalent Unicode Skill assets through single and Batch tools") do
+  @batch_parity_text = "Säker samordning — λ\n"
+  @batch_parity_asset = {
+    path: "docs/policy.txt",
+    executable: false,
+    content: {
+      encoding: "utf-8",
+      media_type: "text/plain",
+      text: @batch_parity_text
+    }
+  }
+  @batch_parity_single = publish_skill_task(
+    name: "semantic-single",
+    scope: "project:cucumber-batch",
+    command_id: "cmd-cuc-semantic-single",
+    expected_revision: 0,
+    instructions: "Apply the Unicode policy.",
+    assets: [ @batch_parity_asset ]
+  )
+
+  @operation_batch_id = SecureRandom.uuid_v7
+  @batch_parity_item = batch_skill_item(index: 0, name: "semantic-batch").merge(
+    instructions: "Apply the Unicode policy.",
+    assets: [ @batch_parity_asset ]
+  )
+  submit_skill_batch([ @batch_parity_item ])
+  await_operation_batch_terminal
+end
+
+Then("both Skill commands succeed with semantic version 2 facts") do
+  assert_acceptance_equal("ok", @batch_parity_single.fetch(:outcome).fetch("status"), "Single outcome")
+  batch_outcomes = operation_batch_events.select { _1.type == "OperationBatchItemSucceeded" }
+  assert_acceptance_equal(1, batch_outcomes.length, "Batch outcomes")
+
+  facts = [ "semantic-single", "semantic-batch" ].map do |name|
+    skill_events(name:, scope: "project:cucumber-batch").sole
+  end
+  assert_acceptance_equal([ 2, 2 ], facts.map { _1.metadata.fetch("schema_version") }, "Fact schemas")
+  contents = facts.map { _1.data.fetch("assets").sole.fetch("content") }
+  assert_acceptance_equal(1, contents.uniq.length, "Single/Batch semantic content")
+  assert_acceptance_equal(@batch_parity_text, contents.first.fetch("text"), "Persisted Unicode text")
+  assert_acceptance(!contents.first.key?("base64"), "Persisted Unicode content exposed Base64")
+end
+
+Then("the Batch manifest returns the original text-first ordinary command arguments") do
+  project_operation_batch(operation_batch_events)
+  arguments = operation_batch_manifest.fetch(:items).sole.fetch("arguments")
+  expected = JSON.parse(JSON.generate(@batch_parity_item))
+  assert_acceptance_equal(expected, arguments, "Batch ordinary command arguments")
+  content = arguments.fetch("assets").sole.fetch("content")
+  assert_acceptance_equal(@batch_parity_text, content.fetch("text"), "Manifest Unicode text")
+  assert_acceptance(!content.key?("base64"), "Manifest Unicode content exposed Base64")
+  assert_acceptance(
+    (content.keys & %w[content_sha256 byte_size]).empty?,
+    "Manifest exposed server-derived content fields"
+  )
+end

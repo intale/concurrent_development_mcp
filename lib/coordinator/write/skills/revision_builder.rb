@@ -3,15 +3,24 @@
 module Coordinator::Write
   module Skills
     class RevisionBuilder
+      include Dry::Monads[:result]
+
       def initialize(asset_builder: AssetBuilder.new, canonical_json: CanonicalJson.new)
         @asset_builder = asset_builder
         @canonical_json = canonical_json
       end
 
       def call(identity:, description:, instructions:, assets:)
-        built_assets = assets.map { @asset_builder.call(_1) }.sort_by { _1.path.b }.freeze
-        document = RevisionDocumentV1.new(
-          schema: RevisionDocumentV1::SCHEMA,
+        built_assets = []
+        assets.each do |asset|
+          result = @asset_builder.call(asset)
+          return result if result.failure?
+
+          built_assets << result.value!
+        end
+        built_assets = built_assets.sort_by { _1.path.b }.freeze
+        document = RevisionDocumentV2.new(
+          schema: RevisionDocumentV2::SCHEMA,
           skill_id: identity.skill_id,
           name: identity.name,
           scope: identity.scope,
@@ -20,12 +29,12 @@ module Coordinator::Write
           assets: built_assets
         )
 
-        RevisionContentV1.new(
+        Success(RevisionContentV2.new(
           description:,
           instructions:,
           assets: built_assets,
           content_digest: @canonical_json.sha256(document.to_h)
-        )
+        ))
       end
     end
   end

@@ -56,3 +56,16 @@ Feature: Scoped AI Skill repository
       And the Skill publication reaches the read side
       Then the exact script asset content and digest are available through MCP
       And the Skill view exposes the asset manifest without embedding its content
+
+    @CONTENT-SEMANTIC-02 @event-contract
+    Scenario: Unicode text and binary assets retain distinct semantic representations under replay
+      When the agent publishes and replays Skill "semantic-assets" with Unicode text and binary assets
+      And the semantic Skill fact reaches the read side
+      Then the Unicode asset is returned as exact text without Base64
+      And the binary asset is returned as exact Base64 without text
+      And replay leaves one semantic Skill publication fact
+
+    @CONTENT-INVALID-03
+    Scenario: Invalid or mixed asset encodings are rejected before Task allocation
+      When the agent submits a Skill asset with an invalid mixed encoding representation
+      Then the invalid Skill request allocates no Task or command fact

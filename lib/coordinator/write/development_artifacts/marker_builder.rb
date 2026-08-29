@@ -6,7 +6,7 @@ module Coordinator::Write
       def capture(event:, command_id:)
         markers = [ "command:#{command_id}" ]
         case event
-        when Events::DevelopmentArtifactCapturedV1
+        when Events::DevelopmentArtifactCapturedV1, Events::DevelopmentArtifactCapturedV2
           markers << "development-artifact:#{event.artifact.artifact_id}"
         when Events::DevelopmentArtifactObservedV1
           markers << "development-artifact:#{event.observation.artifact_id}"

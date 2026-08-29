@@ -4,7 +4,8 @@ module Coordinator::Write
   module Domain
     module Skills
       class State < Value
-        Publication = Types.Instance(Events::SkillRevisionPublishedV1)
+        Publication = Types.Instance(Events::SkillRevisionPublishedV1) |
+                      Types.Instance(Events::SkillRevisionPublishedV2)
 
         attribute :publication, Publication.optional
 

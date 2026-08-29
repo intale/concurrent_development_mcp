@@ -26,9 +26,9 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
     expect(content).to have_attributes(status: "ok")
     expect(content.data.content).to have_attributes(
       text: "first document\n",
-      base64: nil,
       media_type: "text/markdown"
     )
+    expect(content.data.content.to_h).not_to have_key(:base64)
     expect(content.warnings.sole).to include("passive data")
   end
 

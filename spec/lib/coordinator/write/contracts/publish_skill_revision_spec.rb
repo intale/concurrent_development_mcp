@@ -10,13 +10,20 @@ RSpec.describe Coordinator::Write::Contracts::PublishSkillRevision do
     expect(result.to_h.dig(:assets, 0, :executable)).to be(false)
   end
 
-  it "rejects unsafe paths, duplicate paths, and noncanonical Base64" do
+  it "rejects unsafe paths, duplicate paths, and noncanonical binary Base64" do
     result = contract.call(
       valid_input(
         assets: [
           asset(path: "../secrets"),
           asset(path: "scripts/run.sh"),
-          asset(path: "scripts/run.sh", content_base64: "YQ=\n")
+          asset(
+            path: "scripts/run.sh",
+            content: {
+              encoding: "binary",
+              media_type: "application/octet-stream",
+              base64: "YQ=\n"
+            }
+          )
         ]
       )
     )
@@ -48,9 +55,12 @@ RSpec.describe Coordinator::Write::Contracts::PublishSkillRevision do
   def asset(**overrides)
     {
       path: "scripts/run.sh",
-      media_type: "text/x-shellscript",
       executable: false,
-      content_base64: [ "#!/bin/sh\nexit 0\n" ].pack("m0")
+      content: {
+        encoding: "utf-8",
+        media_type: "text/x-shellscript",
+        text: "#!/bin/sh\nexit 0\n"
+      }
     }.merge(overrides)
   end
 end

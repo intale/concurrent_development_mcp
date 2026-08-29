@@ -129,7 +129,9 @@ module Coordinator::Read
     end
 
     class SkillAssetData < Value
-      attribute :asset, SkillAssetViewV1
+      Asset = SkillTextAssetViewV2 | SkillBinaryAssetViewV2
+
+      attribute :asset, Asset
     end
 
     class DevelopmentArtifactData < Value
@@ -137,7 +139,9 @@ module Coordinator::Read
     end
 
     class DevelopmentArtifactContentData < Value
-      attribute :content, DevelopmentArtifactContentViewV1
+      Content = DevelopmentArtifactTextContentViewV2 | DevelopmentArtifactBinaryContentViewV2
+
+      attribute :content, Content
     end
 
     class DevelopmentArtifactPageData < Value

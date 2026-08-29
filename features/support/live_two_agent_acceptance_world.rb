@@ -716,9 +716,12 @@ module LiveTwoAgentAcceptanceWorld
         assets: [
           {
             path: "examples/checkpoint.txt",
-            media_type: "text/plain",
             executable: false,
-            content_base64: "Y2hlY2twb2ludCB0aHJvdWdoIE1DUAo="
+            content: {
+              encoding: "utf-8",
+              media_type: "text/plain",
+              text: "checkpoint through MCP\n"
+            }
           }
         ]
       },

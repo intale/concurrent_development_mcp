@@ -162,7 +162,8 @@ module Coordinator::Write
 
       def domain_event_id(event, preparation)
         case event
-        when Events::DevelopmentArtifactCapturedV1 then preparation.capture_event_id
+        when Events::DevelopmentArtifactCapturedV1, Events::DevelopmentArtifactCapturedV2
+          preparation.capture_event_id
         when Events::DevelopmentArtifactObservedV1 then preparation.observation_event_id
         else raise "Unexpected Development Artifact capture event #{event.class.name}"
         end

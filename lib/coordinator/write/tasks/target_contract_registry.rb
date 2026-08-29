@@ -240,7 +240,7 @@ module Coordinator::Write
         ),
         TargetContractV1.new(
           tool_name: "skill_publish",
-          input_document_class: CommandInputDocuments::PublishSkillRevisionV1,
+          input_document_class: CommandInputDocuments::PublishSkillRevisionBase,
           command_class: Commands::PublishSkillRevision,
           receipt_class: CommandReceiptData::SkillPublication
         ),
@@ -252,7 +252,7 @@ module Coordinator::Write
         ),
         TargetContractV1.new(
           tool_name: "development_artifact_capture",
-          input_document_class: CommandInputDocuments::CaptureDevelopmentArtifactV1,
+          input_document_class: CommandInputDocuments::CaptureDevelopmentArtifactBase,
           command_class: Commands::CaptureDevelopmentArtifact,
           receipt_class: CommandReceiptData::DevelopmentArtifactCapture
         ),
@@ -306,7 +306,11 @@ module Coordinator::Write
       end
 
       def input_document_classes
-        CONTRACTS.map(&:input_document_class).uniq.freeze
+        accepted_classes = CONTRACTS.map(&:input_document_class)
+
+        CommandInputDocuments::TARGET_TYPES.select do |document_class|
+          accepted_classes.any? { document_class <= _1 }
+        end.freeze
       end
 
       def command_classes

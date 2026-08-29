@@ -15,7 +15,7 @@ module Coordinator::Write
           return conflict if conflict
           return revision_conflict(state, command) unless state.current_revision == command.expected_revision
 
-          event = Events::SkillRevisionPublishedV1.new(
+          event = Events::SkillRevisionPublishedV2.new(
             skill_id: command.skill_id,
             name: command.name,
             scope: command.scope,

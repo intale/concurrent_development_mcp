@@ -803,11 +803,11 @@ module Coordinator::Write
     end
 
     def skill_publish_document(command)
-      CommandInputDocuments::PublishSkillRevisionV1.new(
-        schema: "command-input/v1",
+      CommandInputDocuments::PublishSkillRevisionV2.new(
+        schema: "command-input/v2",
         command_id: command.command_id,
         tool_name: "skill_publish",
-        input: CommandInputDocuments::PublishSkillRevisionInputV1.new(
+        input: CommandInputDocuments::PublishSkillRevisionInputV2.new(
           actor: actor_document(command.actor),
           skill_id: command.skill_id,
           name: command.name,
@@ -816,7 +816,7 @@ module Coordinator::Write
           description: command.description,
           instructions: command.instructions,
           assets: command.assets.map do |asset|
-            CommandInputDocuments::SkillAssetV1.new(asset.to_h)
+            CommandInputDocuments::SkillAssetV2.new(asset.to_h)
           end,
           content_digest: command.content_digest
         )
@@ -829,26 +829,20 @@ module Coordinator::Write
 
     def development_artifact_capture_document(command)
       artifact = command.artifact
-      CommandInputDocuments::CaptureDevelopmentArtifactV1.new(
-        schema: "command-input/v1",
+      CommandInputDocuments::CaptureDevelopmentArtifactV2.new(
+        schema: "command-input/v2",
         command_id: command.command_id,
         tool_name: "development_artifact_capture",
-        input: CommandInputDocuments::CaptureDevelopmentArtifactInputV1.new(
+        input: CommandInputDocuments::CaptureDevelopmentArtifactInputV2.new(
           actor: actor_document(command.actor),
-          artifact: CommandInputDocuments::DevelopmentArtifactV1.new(
+          artifact: CommandInputDocuments::DevelopmentArtifactV2.new(
             artifact_id: artifact.artifact_id,
             observation_id: command.observation.observation_id,
             scope: artifact.scope,
             title: artifact.title,
             kind: artifact.kind,
             labels: artifact.labels,
-            content: CommandInputDocuments::DevelopmentArtifactContentV1.new(
-              encoding: artifact.content.encoding,
-              media_type: artifact.content.media_type,
-              content_base64: artifact.content.content_base64,
-              content_sha256: artifact.content.content_sha256,
-              byte_size: artifact.content.byte_size
-            ),
+            content: artifact.content,
             source: CommandInputDocuments::DevelopmentArtifactSourceV1.new(
               kind: artifact.source.kind,
               locator: artifact.source.locator,

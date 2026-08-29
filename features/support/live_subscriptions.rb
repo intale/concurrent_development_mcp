@@ -74,10 +74,10 @@ module LiveSubscriptions
     raise "#{error.message}; Task executor subscriptions: #{diagnostics.inspect}"
   end
 
-  def await_read_model(label, &predicate)
+  def await_read_model(label, timeout_seconds: DEFAULT_TIMEOUT_SECONDS, &predicate)
     owns_subscription_set = !subscription_set_started?(:read_models)
     start_read_model_subscriptions
-    eventually(label, &predicate)
+    eventually(label, timeout_seconds:, &predicate)
   ensure
     stop_read_model_subscriptions if owns_subscription_set
   end

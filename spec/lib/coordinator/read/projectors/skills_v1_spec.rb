@@ -91,9 +91,12 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :event_store, :read_mode
   def asset(path:, content:)
     {
       path:,
-      media_type: "application/octet-stream",
       executable: false,
-      content_base64: [ content ].pack("m0")
+      content: {
+        encoding: "utf-8",
+        media_type: "text/plain",
+        text: content
+      }
     }
   end
 
@@ -115,7 +118,7 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :event_store, :read_mode
   def processed_events
     Coordinator::Read::ProcessedProjectionEvent.where(
       projection_name: "skills",
-      projection_version: 2
+      projection_version: 3
     )
   end
 end

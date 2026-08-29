@@ -3,17 +3,32 @@
 module Coordinator::Write
   module Skills
     class AssetBuilder
-      def call(attributes)
-        bytes = attributes.fetch(:content_base64).unpack1("m0")
+      include Dry::Monads[:result]
 
-        AssetV1.new(
+      def initialize(content_builder: Content::Builder.new)
+        @content_builder = content_builder
+      end
+
+      def call(attributes)
+        result = @content_builder.call(attributes.fetch(:content))
+        return result if result.failure?
+
+        content = result.value!
+        if content.byte_size > Types::SKILL_ASSET_MAXIMUM_BYTES
+          return Failure(
+            OutcomeError.new(
+              code: :content_invalid,
+              message: "Skill asset content is invalid",
+              details: { byte_size: content.byte_size, maximum: Types::SKILL_ASSET_MAXIMUM_BYTES }
+            )
+          )
+        end
+
+        Success(AssetV2.new(
           path: attributes.fetch(:path),
-          media_type: attributes.fetch(:media_type),
           executable: attributes.fetch(:executable),
-          content_base64: [ bytes ].pack("m0"),
-          content_sha256: "sha256:#{OpenSSL::Digest::SHA256.hexdigest(bytes)}",
-          byte_size: bytes.bytesize
-        )
+          content:
+        ))
       end
     end
   end

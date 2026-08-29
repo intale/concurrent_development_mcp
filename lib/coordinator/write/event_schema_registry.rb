@@ -14,7 +14,9 @@ module Coordinator::Write
       [ "ChangeSetAcceptanceCriteriaDefined", 1 ] => Events::ChangeSetAcceptanceCriteriaDefinedV1,
       [ "CommandCompleted", 1 ] => Events::CommandCompletedV1,
       [ "SkillRevisionPublished", 1 ] => Events::SkillRevisionPublishedV1,
+      [ "SkillRevisionPublished", 2 ] => Events::SkillRevisionPublishedV2,
       [ "DevelopmentArtifactCaptured", 1 ] => Events::DevelopmentArtifactCapturedV1,
+      [ "DevelopmentArtifactCaptured", 2 ] => Events::DevelopmentArtifactCapturedV2,
       [ "DevelopmentArtifactObserved", 1 ] => Events::DevelopmentArtifactObservedV1,
       [ "DevelopmentArtifactClassificationCorrected", 1 ] =>
         Events::DevelopmentArtifactClassificationCorrectedV1,

@@ -63,10 +63,12 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
       "classified" => include("event" => include("type" => "DevelopmentArtifactObserved"))
     )
     expect(metadata.to_s).not_to include("MCP artifact body")
-    expect(content.dig("data", "content")).to include(
-      "text" => "MCP artifact body\n",
-      "base64" => nil
+    projected_content = content.dig("data", "content")
+    expect(projected_content).to include(
+      "encoding" => "utf-8",
+      "text" => "MCP artifact body\n"
     )
+    expect(projected_content).not_to have_key("base64")
     expect(content.fetch("warnings").sole).to include("passive data")
     expect(resolved.dig("data", "page")).to include(
       "resolution" => "unique",
@@ -268,12 +270,10 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
       "observed",
       "classified"
     )
-    expect(content.fetch("properties")).to include(
-      "encoding",
-      "media_type",
-      "text",
-      "base64",
-      "content_sha256"
+    content_variants = content.fetch("oneOf").map { _1.fetch("properties") }
+    expect(content_variants).to include(
+      include("encoding", "media_type", "text", "content_sha256"),
+      include("encoding", "media_type", "base64", "content_sha256")
     )
     expect(relation_page.fetch("properties")).to include(
       "artifact",

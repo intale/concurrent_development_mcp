@@ -392,11 +392,7 @@ module Coordinator::Read
           title: artifact.title,
           kind: artifact.kind,
           labels: artifact.labels,
-          content_encoding: artifact.content.encoding,
-          content_media_type: artifact.content.media_type,
-          content_base64: artifact.content.content_base64,
-          content_sha256: artifact.content.content_sha256,
-          content_byte_size: artifact.content.byte_size,
+          **content_attributes(artifact.content),
           source_kind: artifact.source.kind,
           source_locator: artifact.source.locator,
           source_revision: artifact.source.revision,
@@ -411,6 +407,26 @@ module Coordinator::Read
           captured_global_position: event.global_position,
           captured_at_domain: capture.captured_at,
           captured_at_store: event.created_at
+        }
+      end
+
+      def content_attributes(content)
+        if content.is_a?(Coordinator::Write::DevelopmentArtifacts::ContentV1)
+          text = content.encoding == "utf-8" ?
+            content.content_base64.unpack1("m0").force_encoding(Encoding::UTF_8) : nil
+          base64 = content.encoding == "binary" ? content.content_base64 : nil
+        else
+          text = content.respond_to?(:text) ? content.text : nil
+          base64 = content.respond_to?(:base64) ? content.base64 : nil
+        end
+
+        {
+          content_encoding: content.encoding,
+          content_media_type: content.media_type,
+          content_text: text,
+          content_base64: base64,
+          content_sha256: content.content_sha256,
+          content_byte_size: content.byte_size
         }
       end
 
@@ -553,11 +569,8 @@ module Coordinator::Read
       end
 
       def verify_artifact!(record, artifact)
-        matches = record.content_encoding == artifact.content.encoding &&
-                  record.content_media_type == artifact.content.media_type &&
-                  record.content_base64 == artifact.content.content_base64 &&
-                  record.content_sha256 == artifact.content.content_sha256 &&
-                  record.content_byte_size == artifact.content.byte_size
+        expected = content_attributes(artifact.content)
+        matches = expected.all? { |attribute, value| record.public_send(attribute) == value }
         return if matches
 
         raise ProjectionStateError, "Artifact identity changed across capture events"
@@ -657,16 +670,15 @@ module Coordinator::Read
       end
 
       def build_content(record)
-        text =
-          if record.content_encoding == "utf-8"
-            record.content_base64.unpack1("m0").force_encoding(Encoding::UTF_8)
-          end
-        DevelopmentArtifactContentViewV1.new(
+        view = record.content_encoding == "utf-8" ?
+          DevelopmentArtifactTextContentViewV2 : DevelopmentArtifactBinaryContentViewV2
+        content_attribute = record.content_encoding == "utf-8" ?
+          { text: record.content_text } : { base64: record.content_base64 }
+        view.new(
           artifact_id: record.artifact_id,
           encoding: record.content_encoding,
           media_type: record.content_media_type,
-          text:,
-          base64: record.content_encoding == "binary" ? record.content_base64 : nil,
+          **content_attribute,
           content_sha256: record.content_sha256,
           byte_size: record.content_byte_size
         )

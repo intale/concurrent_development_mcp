@@ -43,3 +43,11 @@ Feature: Bounded command batches for checkpointed agent imports
       Then the Batch is cancelled with 50 successes and one item not run
       When the agent resubmits only the not-run manifest items
       Then the resumed Batch succeeds once without replaying the completed prefix
+
+  Rule: Batch items retain the ordinary public content contract
+
+    @CONTENT-BATCH-PARITY-04 @event-contract
+    Scenario: Single and Batch Skill publication preserve the same Unicode text representation
+      When the agent publishes equivalent Unicode Skill assets through single and Batch tools
+      Then both Skill commands succeed with semantic version 2 facts
+      And the Batch manifest returns the original text-first ordinary command arguments

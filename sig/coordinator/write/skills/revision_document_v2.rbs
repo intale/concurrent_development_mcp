@@ -1,0 +1,17 @@
+module Coordinator
+  module Write
+    module Skills
+      class RevisionDocumentV2 < Shared::Value
+        SCHEMA: String
+
+        def schema: () -> String
+        def skill_id: () -> String
+        def name: () -> String
+        def scope: () -> String
+        def description: () -> String
+        def instructions: () -> String
+        def assets: () -> Array[AssetV2]
+      end
+    end
+  end
+end

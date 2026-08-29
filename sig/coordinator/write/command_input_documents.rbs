@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module CommandInputDocuments
       TARGET_TYPES: Array[Class]
-      type value = RegisterRepositoryV1 | ResolveResourceV1 | RemoveResourceV1 | CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | CompleteWorkItemV1 | AbandonAttemptV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1 | SubmitCandidateV1 | SubmitCandidateImpactSurfaceV1 | ClaimVerificationObligationV1 | SubmitCompatibilityAssessmentV1 | WaiveVerificationObligationV1 | RegisterMergeSnapshotV1 | SubmitMergeSnapshotVerificationV1 | RequestMergeAuthorizationV1 | RecordMergeObservationV1 | PrepareReleaseSetV1 | RecordRepositoryIntegrationV1 | RecordReleaseSetVerificationV1 | RecordReleaseSetActivationV1 | CompleteCompensatedReleaseSetV1 | PublishSkillRevisionV1 | CaptureDevelopmentArtifactV1 | CorrectDevelopmentArtifactClassificationV1 | DeclareDevelopmentArtifactRelationV1 | CreateOperationBatchV1 | CancelOperationBatchV1
+      type value = RegisterRepositoryV1 | ResolveResourceV1 | RemoveResourceV1 | CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | CompleteWorkItemV1 | AbandonAttemptV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1 | SubmitCandidateV1 | SubmitCandidateImpactSurfaceV1 | ClaimVerificationObligationV1 | SubmitCompatibilityAssessmentV1 | WaiveVerificationObligationV1 | RegisterMergeSnapshotV1 | SubmitMergeSnapshotVerificationV1 | RequestMergeAuthorizationV1 | RecordMergeObservationV1 | PrepareReleaseSetV1 | RecordRepositoryIntegrationV1 | RecordReleaseSetVerificationV1 | RecordReleaseSetActivationV1 | CompleteCompensatedReleaseSetV1 | PublishSkillRevisionV1 | PublishSkillRevisionV2 | CaptureDevelopmentArtifactV1 | CaptureDevelopmentArtifactV2 | CorrectDevelopmentArtifactClassificationV1 | DeclareDevelopmentArtifactRelationV1 | CreateOperationBatchV1 | CancelOperationBatchV1
       type digest_value = value | ExpireResourceLeaseV1 | RequestReleaseSetCompensationV1 | CompleteActivatedReleaseSetV1 | SatisfyWorkItemDependencyV1 | CompleteChangeSetV1 | RecordOperationBatchItemOutcomeV1 | RequestOperationBatchContinuationV1 | CompleteOperationBatchV1 | CompleteOperationBatchCancellationV1
 
       class ActorV1 < Shared::Value
@@ -643,6 +643,18 @@ module Coordinator
         def byte_size: () -> Integer
       end
 
+      class SkillAssetV2 < Shared::Value
+        def path: () -> String
+        def executable: () -> bool
+        def content: () -> (Content::TextV1 | Content::BinaryV1)
+      end
+
+      class PublishSkillRevisionBase < Shared::Value
+        def schema: () -> String
+        def command_id: () -> String
+        def tool_name: () -> String
+      end
+
       class PublishSkillRevisionInputV1 < Shared::Value
         def actor: () -> ActorV1
         def skill_id: () -> String
@@ -655,9 +667,24 @@ module Coordinator
         def content_digest: () -> String
       end
 
-      class PublishSkillRevisionV1 < BaseV1
-        def tool_name: () -> String
+      class PublishSkillRevisionV1 < PublishSkillRevisionBase
         def input: () -> PublishSkillRevisionInputV1
+      end
+
+      class PublishSkillRevisionInputV2 < Shared::Value
+        def actor: () -> ActorV1
+        def skill_id: () -> String
+        def name: () -> String
+        def scope: () -> String
+        def expected_revision: () -> Integer
+        def description: () -> String
+        def instructions: () -> String
+        def assets: () -> Array[SkillAssetV2]
+        def content_digest: () -> String
+      end
+
+      class PublishSkillRevisionV2 < PublishSkillRevisionBase
+        def input: () -> PublishSkillRevisionInputV2
       end
 
       class DevelopmentArtifactContentV1 < Shared::Value
@@ -687,14 +714,39 @@ module Coordinator
         def source: () -> DevelopmentArtifactSourceV1
       end
 
+      class DevelopmentArtifactV2 < Shared::Value
+        def artifact_id: () -> String
+        def observation_id: () -> String
+        def scope: () -> String
+        def title: () -> String
+        def kind: () -> String
+        def labels: () -> Array[String]
+        def content: () -> (Content::TextV1 | Content::BinaryV1)
+        def source: () -> DevelopmentArtifactSourceV1
+      end
+
+      class CaptureDevelopmentArtifactBase < Shared::Value
+        def schema: () -> String
+        def command_id: () -> String
+        def tool_name: () -> String
+      end
+
       class CaptureDevelopmentArtifactInputV1 < Shared::Value
         def actor: () -> ActorV1
         def artifact: () -> DevelopmentArtifactV1
       end
 
-      class CaptureDevelopmentArtifactV1 < BaseV1
-        def tool_name: () -> String
+      class CaptureDevelopmentArtifactV1 < CaptureDevelopmentArtifactBase
         def input: () -> CaptureDevelopmentArtifactInputV1
+      end
+
+      class CaptureDevelopmentArtifactInputV2 < Shared::Value
+        def actor: () -> ActorV1
+        def artifact: () -> DevelopmentArtifactV2
+      end
+
+      class CaptureDevelopmentArtifactV2 < CaptureDevelopmentArtifactBase
+        def input: () -> CaptureDevelopmentArtifactInputV2
       end
 
       class CorrectDevelopmentArtifactClassificationInputV1 < Shared::Value

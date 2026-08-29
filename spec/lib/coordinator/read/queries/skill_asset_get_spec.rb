@@ -19,9 +19,12 @@ RSpec.describe Coordinator::Read::Queries::SkillAssetGet, :event_store, :read_mo
       assets: [
         {
           path: "fixtures/input.bin",
-          media_type: "application/octet-stream",
           executable: false,
-          content_base64: [ content ].pack("m0")
+          content: {
+            encoding: "binary",
+            media_type: "application/octet-stream",
+            base64: [ content ].pack("m0")
+          }
         }
       ]
     )
@@ -47,7 +50,8 @@ RSpec.describe Coordinator::Read::Queries::SkillAssetGet, :event_store, :read_mo
     expect(available).to have_attributes(status: "ok")
     expect(available.data.asset).to have_attributes(
       revision: 1,
-      content_base64: [ content ].pack("m0"),
+      encoding: "binary",
+      base64: [ content ].pack("m0"),
       byte_size: content.bytesize,
       executable: false
     )
@@ -72,7 +76,7 @@ RSpec.describe Coordinator::Read::Queries::SkillAssetGet, :event_store, :read_mo
     expect(historical).to have_attributes(status: "ok")
     expect(historical.data.asset).to have_attributes(
       revision: 1,
-      content_base64: [ "one" ].pack("m0")
+      base64: [ "one" ].pack("m0")
     )
   end
 
@@ -88,9 +92,12 @@ RSpec.describe Coordinator::Read::Queries::SkillAssetGet, :event_store, :read_mo
       assets: [
         {
           path: "fixtures/input.bin",
-          media_type: "application/octet-stream",
           executable: false,
-          content_base64: [ content ].pack("m0")
+          content: {
+            encoding: "binary",
+            media_type: "application/octet-stream",
+            base64: [ content ].pack("m0")
+          }
         }
       ]
     )
