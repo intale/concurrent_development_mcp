@@ -16,7 +16,7 @@ company.
 
 ### Environment setup
 
-Steps to setup the environment(containerization is on its way after I fixed major issues):
+Steps to setup the environment(containerization is on its way after I fix major issues):
 
 - start docker compose first via `docker compose up`
 - run `./bin/setup_db` to create rails and pg_eventstore databases if this is your initial run
