@@ -327,4 +327,45 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
     )
     expect(digest.call(candidate_command)).to eq(digest.candidate_submit(candidate_command))
   end
+
+  it "persists Candidate command input with more changed files than leased resources" do
+    input = {
+      command_id: "cmd-candidate-directory-lease",
+      actor: { kind: "agent", id: "agent-7" },
+      candidate_id: "CAN-DIRECTORY-LEASE",
+      change_set_id: "CS-1",
+      work_item_id: "W-1",
+      attempt_id: "A-18",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      target_branch: "main",
+      base_commit_oid: "a" * 40,
+      head_commit_oid: "b" * 40,
+      checkpoint_kind: "final",
+      lease_set_id: "01919191-9191-7191-8191-919191919191",
+      leases: [
+        {
+          resource_id: "01919191-9191-7191-8191-919191919198",
+          lease_id: "01919191-9191-7191-8191-919191919192",
+          fencing_token: 3
+        }
+      ],
+      change_manifest: {
+        collector_version: "git-evidence-v1",
+        files: 33.times.map do |index|
+          {
+            status: "added",
+            new_path: "generated/#{index}.rb",
+            new_blob_oid: format("%040x", index + 1),
+            new_mode: "100644"
+          }
+        end
+      }
+    }
+
+    command = Coordinator::Write::Operations::PrepareSubmitCandidate.new.call(input).value!
+    document = digest.candidate_submit_document(command)
+
+    expect(document.input.leases.length).to eq(1)
+    expect(document.input.actual_resources.length).to eq(33)
+  end
 end

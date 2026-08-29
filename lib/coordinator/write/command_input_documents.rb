@@ -431,7 +431,11 @@ module Coordinator::Write
       attribute :leases, Types::Array.of(Lease).constrained(min_size: 1, max_size: 32)
       attribute :change_manifest, CandidateChangeManifestV1
       attribute :build_context, CandidateBuildContextV1.optional
-      attribute :actual_resources, Types::Array.of(Resource).constrained(min_size: 1, max_size: 32)
+      attribute :actual_resources,
+                Types::Array.of(Resource).constrained(
+                  min_size: 1,
+                  max_size: Types::CANDIDATE_ACTUAL_RESOURCE_MAXIMUM_COUNT
+                )
     end
 
     class SubmitCandidateV1 < BaseV1
