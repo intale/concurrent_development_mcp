@@ -69,6 +69,34 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :event_store, :read_mode
     expect(processed_events.count).to eq(2)
   end
 
+  it "normalizes a validated pre-semantic text asset without restoring its event schema" do
+    identity = Coordinator::Write::Skills::IdentityBuilder.new.call(
+      name: "review",
+      scope: "project:alpha"
+    )
+    event_store.append(
+      Coordinator::Write::StreamFactory.new.skill(identity.skill_id),
+      [ PreSemanticSkillEvent.build(identity:) ]
+    )
+    event = skill_events.sole
+
+    projector.call(event)
+
+    skill = repository.fetch(name: "review", scope: "project:alpha")
+    asset = repository.fetch_asset(
+      name: "review",
+      scope: "project:alpha",
+      path: "references/legacy.txt"
+    )
+    expect(skill).to have_attributes(revision: 1, instructions: "Preserve and normalize this Skill.")
+    expect(asset).to have_attributes(
+      encoding: "utf-8",
+      text: "legacy text\n",
+      byte_size: 12
+    )
+    expect(asset.to_h).not_to have_key(:base64)
+  end
+
   def publish(attributes)
     result = publisher.call(attributes)
     expect(result).to be_success

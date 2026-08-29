@@ -7,13 +7,13 @@ module Coordinator::Read
 
       def initialize(
         contract: Contracts::SkillSourceEvent.new,
-        schema_registry: Coordinator::Write::EventSchemaRegistry.new,
+        publication_loader: Coordinator::Write::Skills::PersistedPublicationLoader.new,
         identity_builder: Coordinator::Write::Skills::IdentityBuilder.new,
         skills: Repositories::Skills.new,
         processed_events: Repositories::ProcessedProjectionEvents.new
       )
         @contract = contract
-        @schema_registry = schema_registry
+        @publication_loader = publication_loader
         @identity_builder = identity_builder
         @skills = skills
         @processed_events = processed_events
@@ -56,11 +56,10 @@ module Coordinator::Read
         )
         raise InvalidProjectionSource, result.errors.to_h.inspect if result.failure?
 
-        @schema_registry.load(
-          type: event.type,
-          schema_version: event.metadata.fetch("schema_version"),
-          data: event.data
-        )
+        publication = @publication_loader.call(event)
+        raise InvalidProjectionSource, publication.failure.to_h.inspect if publication.failure?
+
+        publication.value!
       end
 
       def verify_stream_identity!(event, publication)

@@ -16,6 +16,13 @@ module Coordinator
     register("skills.revision_builder", memoize: true) do
       Write::Skills::RevisionBuilder.new(canonical_json: self["canonical_json"])
     end
+    register("skills.persisted_publication_loader", memoize: true) do
+      Write::Skills::PersistedPublicationLoader.new(
+        schema_registry: self["event_schema_registry"],
+        identity_builder: self["skills.identity_builder"],
+        revision_builder: self["skills.revision_builder"]
+      )
+    end
     register("skills.marker_builder", memoize: true) do
       Write::Skills::MarkerBuilder.new(canonical_json: self["canonical_json"])
     end
@@ -883,7 +890,7 @@ module Coordinator
 
     register("projectors.skills_v1", memoize: true) do
       Read::Projectors::SkillsV1.new(
-        schema_registry: self["event_schema_registry"],
+        publication_loader: self["skills.persisted_publication_loader"],
         identity_builder: self["skills.identity_builder"],
         skills: self["repositories.skills"],
         processed_events: self["repositories.processed_projection_events"]
@@ -1509,6 +1516,7 @@ module Coordinator
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
+        publication_loader: self["skills.persisted_publication_loader"],
         stream_factory: self["stream_factory"],
         marker_builder: self["skills.marker_builder"],
         completion_builder: self["command_completion_builder"]

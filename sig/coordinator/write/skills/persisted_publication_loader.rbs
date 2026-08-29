@@ -1,0 +1,11 @@
+module Coordinator::Write
+  module Skills
+    class PersistedPublicationLoader
+      CURRENT_SCHEMA_VERSION: Integer
+      PRE_SEMANTIC_SCHEMA_VERSION: Integer
+
+      def initialize: (?schema_registry: EventSchemaRegistry, ?pre_semantic_contract: Contracts::PreSemanticSkillRevision, ?identity_builder: IdentityBuilder, ?revision_builder: RevisionBuilder) -> void
+      def call: (PgEventstore::Event event) -> Dry::Monads::Result
+    end
+  end
+end

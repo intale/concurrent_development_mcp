@@ -14,6 +14,7 @@ module Coordinator::Write
         id_generator: IdGenerator.new,
         event_factory: EventFactory.new,
         schema_registry: EventSchemaRegistry.new,
+        publication_loader: Skills::PersistedPublicationLoader.new(schema_registry:),
         stream_factory: StreamFactory.new,
         marker_builder: Skills::MarkerBuilder.new,
         completion_builder: CommandCompletionBuilder.new
@@ -26,6 +27,7 @@ module Coordinator::Write
         @id_generator = id_generator
         @event_factory = event_factory
         @schema_registry = schema_registry
+        @publication_loader = publication_loader
         @stream_factory = stream_factory
         @marker_builder = marker_builder
         @completion_builder = completion_builder
@@ -58,7 +60,10 @@ module Coordinator::Write
         replay = replay_result(command:, input_digest: preparation.input_digest)
         return replay if replay
 
-        state = load_skill_state(command.skill_id)
+        state_result = load_skill_state(command.skill_id)
+        return state_result if state_result.failure?
+
+        state = state_result.value!
         decision = @decider.call(state:, command:, published_at: preparation.published_at)
         return decision if decision.failure?
 
@@ -122,21 +127,24 @@ module Coordinator::Write
         event && load_event(event)
       end
 
-      def load_skill_state(skill_id)
-        events = @event_store.read_grouped(
-          @stream_factory.skill(skill_id),
-          EventQueries::SKILL_LATEST_REVISION
-        ).map { load_event(_1) }
-
-        Domain::Skills::State.reduce(events)
-      end
-
       def load_event(event)
         @schema_registry.load(
           type: event.type,
           schema_version: event.metadata.fetch("schema_version"),
           data: event.data
         )
+      end
+
+      def load_skill_state(skill_id)
+        events = @event_store.read_grouped(
+          @stream_factory.skill(skill_id),
+          EventQueries::SKILL_LATEST_REVISION
+        )
+        return Success(Domain::Skills::State.initial) if events.empty?
+
+        @publication_loader.call(events.sole).fmap do |publication|
+          Domain::Skills::State.reduce([ publication ])
+        end
       end
 
       def persist_domain_plan(plan, command:, event_id:, caused_by:)
