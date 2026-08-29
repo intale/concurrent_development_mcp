@@ -42,6 +42,34 @@ Then("one registration and binding pair is durable in that Resource stream") do
   assert_acceptance_equal([ 0, 1 ], events.map(&:stream_revision), "Resource revisions")
 end
 
+Then("Resource discovery eventually reports it as {string}") do |status|
+  @resource_projection = await_read_model("Resource #{@resource_id} to project as #{status}") do
+    payload = projected_resource(@resource_id)
+    observed = payload.dig("data", "resource", "lifecycle_status")
+    [ payload["status"] == "ok" && observed == status, payload ]
+  end
+end
+
+When("read-model subscriptions are stopped after Resource discovery") do
+  stop_read_model_subscriptions
+end
+
+Then("available Resource discovery still reports it as {string} without a freshness gate") do |status|
+  payload = projected_resource(@resource_id)
+
+  assert_acceptance_equal("ok", payload.fetch("status"), "Available Resource query status")
+  assert_acceptance_equal(
+    status,
+    payload.dig("data", "resource", "lifecycle_status"),
+    "Available stale Resource lifecycle"
+  )
+  assert_acceptance_equal([], payload.fetch("warnings"), "Freshness warnings")
+end
+
+When("read-model subscriptions restart for Resource discovery") do
+  start_read_model_subscriptions
+end
+
 When("the agent resolves the same Resource tuple with another command") do
   task_id = submit_and_execute(
     "resource_resolve",
@@ -261,4 +289,9 @@ def resource_identity_events(resource_id)
       direction: :asc
     )
   )
+end
+
+def projected_resource(resource_id)
+  call_tool("resource_get", { resource_id: })
+    .dig("result", "structuredContent")
 end

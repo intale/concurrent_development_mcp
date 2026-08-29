@@ -106,6 +106,45 @@ module Coordinator
         )
       end
 
+      def resource_get
+        object_schema(
+          properties: {
+            resource_id: uuid_v7.merge(
+              description: "Server-owned Resource UUID returned by resource_resolve."
+            )
+          },
+          required: %w[resource_id]
+        )
+      end
+
+      def resource_list
+        object_schema(
+          properties: {
+            repository_id: uuid_v7.merge(
+              description: "Exact registered Repository whose available Resources should be listed."
+            ),
+            kind: {
+              anyOf: [ { type: "string", enum: %w[file directory] }, { type: "null" } ]
+            },
+            lifecycle_status: {
+              anyOf: [
+                { type: "string", enum: %w[registered current inactive] },
+                { type: "null" }
+              ],
+              description: "Optional projected lifecycle filter; an available result may lag writes."
+            },
+            after_resource_id: {
+              anyOf: [ uuid_v7, { type: "null" } ],
+              description: "Exclusive Resource-UUID cursor returned by the previous page."
+            },
+            limit: {
+              anyOf: [ { type: "integer", minimum: 1, maximum: 100 }, { type: "null" } ]
+            }
+          },
+          required: %w[repository_id]
+        )
+      end
+
       def coordination_list
         cursor = object_schema(
           properties: {

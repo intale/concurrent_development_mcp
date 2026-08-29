@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    class ResourceListQueryV1 < Shared::Value
+      def repository_id: () -> String
+      def kind: () -> String?
+      def lifecycle_status: () -> String?
+      def after_resource_id: () -> String?
+      def limit: () -> Integer
+    end
+  end
+end

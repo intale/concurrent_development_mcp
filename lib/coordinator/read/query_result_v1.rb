@@ -124,6 +124,14 @@ module Coordinator::Read
       attribute :page, RepositoryPageV1
     end
 
+    class ResourceData < Value
+      attribute :resource, ResourceViewV1
+    end
+
+    class ResourcePageData < Value
+      attribute :page, ResourcePageV1
+    end
+
     class SkillPageData < Value
       attribute :page, SkillPageV1
     end
@@ -182,6 +190,8 @@ module Coordinator::Read
            ReleaseSetData |
            SkillData |
            RepositoryPageData |
+           ResourceData |
+           ResourcePageData |
            SkillPageData |
            SkillAssetData |
            DevelopmentArtifactData |

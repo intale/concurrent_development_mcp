@@ -25,6 +25,17 @@ Feature: Server-owned Resource identities
 
   Rule: Lifecycle changes are explicit and preserve historical identity
 
+    @RES-PROJECTION-AVAILABLE-01 @RES-ID-LAG-01 @live-subscriptions
+    Scenario: An available Resource view remains servable while its lifecycle projection lags
+      When the agent resolves file "app/models/available_resource.rb" through MCP
+      Then the Resource Task returns a server-generated UUIDv7
+      And Resource discovery eventually reports it as "current"
+      When read-model subscriptions are stopped after Resource discovery
+      And the agent removes the current Resource because it was "removed"
+      Then available Resource discovery still reports it as "current" without a freshness gate
+      When read-model subscriptions restart for Resource discovery
+      Then Resource discovery eventually reports it as "inactive"
+
     @RES-LIFE-REMOVE-01 @RES-LIFE-REMOVE-REPLAY-01 @RES-LIFE-RECREATE-01 @live-subscriptions
     Scenario: An agent removes and later recreates the same Resource tuple
       When the agent resolves file "app/models/lifecycle.rb" through MCP

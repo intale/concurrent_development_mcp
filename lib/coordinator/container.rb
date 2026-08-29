@@ -754,6 +754,10 @@ module Coordinator
       Read::Repositories::RepositoryCatalog.new
     end
 
+    register("repositories.resources", memoize: true) do
+      Read::Repositories::Resources.new
+    end
+
     register("repositories.skills", memoize: true) do
       Read::Repositories::Skills.new
     end
@@ -865,6 +869,14 @@ module Coordinator
       Read::Projectors::RepositoriesV1.new(
         schema_registry: self["event_schema_registry"],
         catalog: self["repositories.repository_catalog"],
+        processed_events: self["repositories.processed_projection_events"]
+      )
+    end
+
+    register("projectors.resources_v1", memoize: true) do
+      Read::Projectors::ResourcesV1.new(
+        schema_registry: self["event_schema_registry"],
+        resources: self["repositories.resources"],
         processed_events: self["repositories.processed_projection_events"]
       )
     end
@@ -1008,6 +1020,14 @@ module Coordinator
 
     register("queries.repository_list") do
       Read::Queries::RepositoryList.new(catalog: self["repositories.repository_catalog"])
+    end
+
+    register("queries.resource_get") do
+      Read::Queries::ResourceGet.new(resources: self["repositories.resources"])
+    end
+
+    register("queries.resource_list") do
+      Read::Queries::ResourceList.new(resources: self["repositories.resources"])
     end
 
     register("queries.skill_get") do
@@ -2576,6 +2596,10 @@ module Coordinator
       Read::Subscriptions::Repositories.new(handler: self["projectors.repositories_v1"])
     end
 
+    register("subscriptions.resources", memoize: true) do
+      Read::Subscriptions::Resources.new(handler: self["projectors.resources_v1"])
+    end
+
     register("subscriptions.skills", memoize: true) do
       Read::Subscriptions::Skills.new(handler: self["projectors.skills_v1"])
     end
@@ -2661,6 +2685,7 @@ module Coordinator
         self["subscriptions.agent_choice_impacts"],
         self["subscriptions.candidates"],
         self["subscriptions.repositories"],
+        self["subscriptions.resources"],
         self["subscriptions.skills"],
         self["subscriptions.development_artifacts"],
         self["subscriptions.operation_batches"],

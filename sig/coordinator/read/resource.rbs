@@ -1,0 +1,30 @@
+module Coordinator
+  module Read
+    class Resource < ApplicationRecord
+      def resource_id: () -> String
+      def repository_id: () -> String
+      def kind: () -> String
+      def normalized_path: () -> String
+      def lifecycle_status: () -> String
+      def unbinding_reason: () -> String?
+      def registered_event: () -> Hash[String, untyped]?
+      def registered_actor: () -> Hash[String, untyped]?
+      def registered_markers: () -> Array[String]
+      def registered_metadata: () -> Hash[String, untyped]?
+      def registered_causation_id: () -> String?
+      def registered_correlation_id: () -> String?
+      def registered_global_position: () -> Integer?
+      def registered_at_domain: () -> Time?
+      def registered_at_store: () -> Time?
+      def latest_transition_event: () -> Hash[String, untyped]?
+      def latest_transition_actor: () -> Hash[String, untyped]?
+      def latest_transition_markers: () -> Array[String]
+      def latest_transition_metadata: () -> Hash[String, untyped]?
+      def latest_transition_causation_id: () -> String?
+      def latest_transition_correlation_id: () -> String?
+      def latest_transition_global_position: () -> Integer?
+      def latest_transition_at_domain: () -> Time?
+      def latest_transition_at_store: () -> Time?
+    end
+  end
+end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_29_115000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_29_132000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -692,6 +692,39 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_29_115000) do
     t.datetime "updated_at", null: false
     t.index ["registered_global_position"], name: "index_repositories_on_registered_global_position"
     t.index ["scope", "repository_id"], name: "index_repositories_on_scope_and_repository_id"
+  end
+
+  create_table "resources", primary_key: "resource_id", id: :string, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "kind", null: false
+    t.jsonb "latest_transition_actor"
+    t.datetime "latest_transition_at_domain"
+    t.datetime "latest_transition_at_store"
+    t.string "latest_transition_causation_id"
+    t.string "latest_transition_correlation_id"
+    t.jsonb "latest_transition_event"
+    t.bigint "latest_transition_global_position"
+    t.jsonb "latest_transition_markers", default: [], null: false
+    t.jsonb "latest_transition_metadata"
+    t.string "lifecycle_status", null: false
+    t.text "normalized_path", null: false
+    t.jsonb "registered_actor"
+    t.datetime "registered_at_domain"
+    t.datetime "registered_at_store"
+    t.string "registered_causation_id"
+    t.string "registered_correlation_id"
+    t.jsonb "registered_event"
+    t.bigint "registered_global_position"
+    t.jsonb "registered_markers", default: [], null: false
+    t.jsonb "registered_metadata"
+    t.string "repository_id", null: false
+    t.string "unbinding_reason"
+    t.datetime "updated_at", null: false
+    t.index ["latest_transition_global_position"], name: "index_resources_on_latest_transition_global_position", unique: true
+    t.index ["registered_global_position"], name: "index_resources_on_registered_global_position", unique: true
+    t.index ["repository_id", "kind", "normalized_path"], name: "idx_resources_on_repository_kind_path", unique: true
+    t.index ["repository_id", "lifecycle_status", "resource_id"], name: "idx_resources_on_repository_status_id"
+    t.index ["repository_id", "resource_id"], name: "idx_resources_on_repository_id"
   end
 
   create_table "skill_assets", force: :cascade do |t|

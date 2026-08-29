@@ -1,0 +1,14 @@
+module Coordinator
+  module Read
+    class ResourceViewV1 < Shared::Value
+      def resource_id: () -> String
+      def repository_id: () -> String
+      def kind: () -> String
+      def normalized_path: () -> String
+      def lifecycle_status: () -> String
+      def unbinding_reason: () -> String?
+      def registered: () -> ResourceSourceEvidenceV1?
+      def latest_transition: () -> ResourceSourceEvidenceV1?
+    end
+  end
+end

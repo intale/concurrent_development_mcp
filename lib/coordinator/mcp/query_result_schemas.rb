@@ -20,6 +20,8 @@ module Coordinator
         "candidate_list" => [ Coordinator::Read::QueryResultV1::CandidatePageData ],
         "candidate_impact_get" => [ Coordinator::Read::QueryResultV1::CandidateImpactData ],
         "repository_list" => [ Coordinator::Read::QueryResultV1::RepositoryPageData ],
+        "resource_get" => [ Coordinator::Read::QueryResultV1::ResourceData ],
+        "resource_list" => [ Coordinator::Read::QueryResultV1::ResourcePageData ],
         "skill_get" => [ Coordinator::Read::QueryResultV1::SkillData ],
         "skill_list" => [ Coordinator::Read::QueryResultV1::SkillPageData ],
         "skill_asset_get" => [ Coordinator::Read::QueryResultV1::SkillAssetData ],

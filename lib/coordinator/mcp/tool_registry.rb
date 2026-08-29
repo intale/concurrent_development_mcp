@@ -22,6 +22,8 @@ module Coordinator
           Tools::CandidateList,
           Tools::CandidateImpactGet,
           Tools::RepositoryList,
+          Tools::ResourceGet,
+          Tools::ResourceList,
           Tools::SkillGet,
           Tools::SkillList,
           Tools::SkillAssetGet,

@@ -8,6 +8,8 @@ module Coordinator
       def self.change_set_create: () -> json_schema
       def self.repository_register: () -> json_schema
       def self.repository_list: () -> json_schema
+      def self.resource_get: () -> json_schema
+      def self.resource_list: () -> json_schema
       def self.coordination_list: () -> json_schema
       def self.work_item_create: () -> json_schema
       def self.work_item_dependency_declare: () -> json_schema

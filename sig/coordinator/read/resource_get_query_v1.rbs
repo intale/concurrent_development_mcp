@@ -1,0 +1,7 @@
+module Coordinator
+  module Read
+    class ResourceGetQueryV1 < Shared::Value
+      def resource_id: () -> String
+    end
+  end
+end

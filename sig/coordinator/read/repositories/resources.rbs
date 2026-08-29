@@ -1,0 +1,13 @@
+module Coordinator
+  module Read
+    module Repositories
+      class Resources
+        type resource_event = Write::Events::ResourceIdentityV1::Registered | Write::Events::ResourceIdentityV1::Bound | Write::Events::ResourceIdentityV1::Unbound
+
+        def fetch: (String resource_id) -> ResourceViewV1?
+        def page: (ResourceListQueryV1 query) -> ResourcePageV1
+        def store: (event: PgEventstore::Event, resource: resource_event) -> Resource
+      end
+    end
+  end
+end

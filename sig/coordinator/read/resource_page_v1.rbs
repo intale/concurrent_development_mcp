@@ -1,0 +1,10 @@
+module Coordinator
+  module Read
+    class ResourcePageV1 < Shared::Value
+      def repository_id: () -> String
+      def items: () -> Array[ResourceViewV1]
+      def next_resource_id: () -> String?
+      def has_more: () -> bool
+    end
+  end
+end
