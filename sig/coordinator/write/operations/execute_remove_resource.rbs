@@ -1,0 +1,41 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecuteRemoveResource
+        class InputContract
+          def call: (command_input) -> Dry::Validation::Result
+        end
+
+        class PreparationV1 < Shared::Value
+          def removed_at: () -> String
+          def input_digest: () -> String
+          def unbinding_event_id: () -> String
+          def completion_event_id: () -> String
+        end
+
+        class RegisteredIdentityV1 < Shared::Value
+          def registration: () -> Events::ResourceIdentityV1::Registered
+          def identity: () -> ResourceIdentityV1
+        end
+
+        def initialize: (
+          event_store: _EventStore,
+          ?contract: InputContract,
+          ?normalizer: ResourceIdentityNormalizer,
+          ?decider: Domain::Resources::Remove,
+          ?input_digest: CommandInputDigest,
+          ?clock: Shared::_Clock,
+          ?id_generator: Shared::_IdGenerator,
+          ?event_factory: EventFactory,
+          ?schema_registry: EventSchemaRegistry,
+          ?stream_factory: StreamFactory
+        ) -> void
+        %a{rbs:test:skip}
+        def prepare: (command_input input) -> Dry::Monads::Result
+        %a{rbs:test:skip}
+        def call: (command_input input) -> Dry::Monads::Result
+        def call_command: (Commands::RemoveResource command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
+      end
+    end
+  end
+end

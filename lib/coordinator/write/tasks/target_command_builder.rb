@@ -39,6 +39,16 @@ module Coordinator::Write
         )
       end
 
+      def build_remove_resource(document)
+        input = document.input
+        Commands::RemoveResource.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          resource_id: input.resource_id,
+          reason: input.reason
+        )
+      end
+
       def build_create_change_set(document)
         input = document.input
         Commands::CreateChangeSet.new(

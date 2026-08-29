@@ -5,6 +5,7 @@ module Coordinator::Write
     class TargetExecutor
       def initialize(
         event_store:,
+        remove_resource: Operations::ExecuteRemoveResource.new(event_store:),
         create_change_set: Operations::ExecuteCreateChangeSet.new(event_store:),
         create_work_item: Operations::ExecuteCreateWorkItem.new(event_store:),
         declare_work_item_dependency: Operations::ExecuteDeclareWorkItemDependency.new(event_store:),
@@ -61,6 +62,7 @@ module Coordinator::Write
       )
         @register_repository = Operations::ExecuteRegisterRepository.new(event_store:)
         @resolve_resource = Operations::ExecuteResolveResource.new(event_store:)
+        @remove_resource = remove_resource
         @create_change_set = create_change_set
         @create_work_item = create_work_item
         @declare_work_item_dependency = declare_work_item_dependency

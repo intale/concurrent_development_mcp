@@ -4,6 +4,7 @@ module Coordinator
     type event_data = Hash[String | Symbol, untyped]
     type coordination_command = Commands::RegisterRepository |
                                 Commands::ResolveResource |
+                                Commands::RemoveResource |
                                 Commands::CreateChangeSet |
                                 Commands::CreateWorkItem |
                                 Commands::DeclareWorkItemDependency |
@@ -71,6 +72,8 @@ module Coordinator
       def read_marked: (StreamReference, MarkedEventReadCriteria) -> Array[PgEventstore::Event]
 
       def read_global_marked: (GlobalMarkedEventReadCriteria) -> Array[PgEventstore::Event]
+
+      def read_latest_global_marked: (GlobalMarkedEventReadCriteria) -> PgEventstore::Event?
 
       def read_global_marked_page: (GlobalMarkedEventPageCriteria) -> Array[PgEventstore::Event]
 

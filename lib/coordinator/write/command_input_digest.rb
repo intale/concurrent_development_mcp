@@ -39,6 +39,17 @@ module Coordinator::Write
             path: command.normalized_path
           )
         )
+      when Commands::RemoveResource
+        CommandInputDocuments::RemoveResourceV1.new(
+          schema: "command-input/v1",
+          command_id: command.command_id,
+          tool_name: "resource_remove",
+          input: CommandInputDocuments::RemoveResourceInputV1.new(
+            actor: actor_document(command.actor),
+            resource_id: command.resource_id,
+            reason: command.reason
+          )
+        )
       when Commands::CreateChangeSet then create_change_set_document(command)
       when Commands::CreateWorkItem then work_item_create_document(command)
       when Commands::DeclareWorkItemDependency then work_item_dependency_declare_document(command)

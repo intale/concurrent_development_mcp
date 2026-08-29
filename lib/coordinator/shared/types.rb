@@ -508,6 +508,7 @@ module Coordinator::Shared
     COORDINATION_TOOL_NAMES = %w[
       repository_register
       resource_resolve
+      resource_remove
       change_set_create
       work_item_create
       work_item_dependency_declare

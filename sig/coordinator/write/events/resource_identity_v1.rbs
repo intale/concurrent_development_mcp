@@ -4,6 +4,9 @@ module Coordinator
       module ResourceIdentityV1
         Registration: untyped
         Binding: untyped
+        Unbinding: untyped
+        CurrentBinding: untyped
+        ResolutionEvent: untyped
         Event: untyped
 
         class Registered < Base
@@ -20,6 +23,16 @@ module Coordinator
           def kind: () -> String
           def normalized_path: () -> String
           def bound_at: () -> String
+        end
+
+
+        class Unbound < Base
+          def resource_id: () -> String
+          def repository_id: () -> String
+          def kind: () -> String
+          def normalized_path: () -> String
+          def reason: () -> String
+          def unbound_at: () -> String
         end
       end
     end

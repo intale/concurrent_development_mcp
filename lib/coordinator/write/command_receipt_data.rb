@@ -18,9 +18,19 @@ module Coordinator::Write
       attribute :repository_id, Types::RepositoryId
       attribute :kind, Types::ResourceKind
       attribute :normalized_path, Types::ResourcePath
-      attribute :outcome, Types::String.enum("registered", "existing")
+      attribute :outcome, Types::String.enum("registered", "reactivated", "existing")
       attribute :registered_at, Types::Timestamp
       attribute :bound_at, Types::Timestamp
+    end
+
+    class ResourceRemoval < Value
+      attribute :resource_id, Types::ResourceId
+      attribute :repository_id, Types::RepositoryId
+      attribute :kind, Types::ResourceKind
+      attribute :normalized_path, Types::ResourcePath
+      attribute :outcome, Types::String.enum("removed", "already_inactive", "superseded")
+      attribute :reason, ResourceIdentityV1::UnbindingReason
+      attribute :unbound_at, Types::Timestamp.optional
     end
 
     class ChangeSet < Value
@@ -491,6 +501,7 @@ module Coordinator::Write
 
     Type = RepositoryRegistration |
            ResourceResolution |
+           ResourceRemoval |
            ChangeSet |
            WorkItem |
            Dependency |

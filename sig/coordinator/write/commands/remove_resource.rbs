@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Commands
+      class RemoveResource < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def resource_id: () -> String
+        def reason: () -> String
+      end
+    end
+  end
+end

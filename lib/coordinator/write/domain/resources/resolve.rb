@@ -10,13 +10,15 @@ module Coordinator::Write
           attribute :registration, Events::ResourceIdentityV1::Registration
           attribute :binding, Events::ResourceIdentityV1::Binding
           attribute :events,
-                    Types::Array.of(Events::ResourceIdentityV1::Event).constrained(max_size: 2)
-          attribute :outcome, Types::String.enum("registered", "existing")
+                    Types::Array.of(Events::ResourceIdentityV1::ResolutionEvent).constrained(max_size: 2)
+          attribute :outcome, Types::String.enum("registered", "reactivated", "existing")
         end
 
         def call(identity:, proposed_resource_id:, registration:, current_binding:, resolved_at:)
           return resolve_registered(identity:, registration:, current_binding:, resolved_at:) if registration
-          return resolve_occupied(identity:, current_binding:) if current_binding
+          if current_binding.is_a?(Events::ResourceIdentityV1::Bound)
+            return resolve_occupied(identity:, current_binding:)
+          end
 
           register(identity:, resource_id: proposed_resource_id, resolved_at:)
         end
@@ -26,7 +28,8 @@ module Coordinator::Write
         def resolve_registered(identity:, registration:, current_binding:, resolved_at:)
           return corrupt(identity, "registration_without_binding") unless current_binding
 
-          if current_binding.resource_id == registration.resource_id
+          if current_binding.is_a?(Events::ResourceIdentityV1::Bound) &&
+             current_binding.resource_id == registration.resource_id
             return corrupt(identity, "binding_registration_mismatch") unless
               current_binding.kind == registration.kind
 
@@ -40,6 +43,15 @@ module Coordinator::Write
             )
           end
 
+          if current_binding.is_a?(Events::ResourceIdentityV1::Unbound)
+            if current_binding.resource_id == registration.resource_id &&
+               current_binding.kind != registration.kind
+              return corrupt(identity, "binding_registration_mismatch")
+            end
+
+            return reactivate(identity:, registration:, resolved_at:)
+          end
+
           return path_conflict(identity, current_binding) unless current_binding.kind == identity.kind
 
           corrupt(identity, "binding_registration_mismatch")
@@ -49,6 +61,25 @@ module Coordinator::Write
           return path_conflict(identity, current_binding) unless current_binding.kind == identity.kind
 
           corrupt(identity, "binding_without_registration")
+        end
+
+        def reactivate(identity:, registration:, resolved_at:)
+          binding = Events::ResourceIdentityV1::Bound.new(
+            resource_id: registration.resource_id,
+            repository_id: identity.repository_id,
+            kind: identity.kind,
+            normalized_path: identity.normalized_path,
+            bound_at: resolved_at
+          )
+
+          Success(
+            DecisionV1.new(
+              registration:,
+              binding:,
+              events: [ binding ],
+              outcome: "reactivated"
+            )
+          )
         end
 
         def register(identity:, resource_id:, resolved_at:)

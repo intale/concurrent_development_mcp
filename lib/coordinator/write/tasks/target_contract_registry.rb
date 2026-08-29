@@ -47,6 +47,12 @@ module Coordinator::Write
           receipt_class: CommandReceiptData::ResourceResolution
         ),
         TargetContractV1.new(
+          tool_name: "resource_remove",
+          input_document_class: CommandInputDocuments::RemoveResourceV1,
+          command_class: Commands::RemoveResource,
+          receipt_class: CommandReceiptData::ResourceRemoval
+        ),
+        TargetContractV1.new(
           tool_name: "change_set_create",
           input_document_class: CommandInputDocuments::CreateChangeSetV1,
           command_class: Commands::CreateChangeSet,

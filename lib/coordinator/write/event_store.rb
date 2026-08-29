@@ -101,6 +101,22 @@ module Coordinator::Write
             "Global marked event read exceeded #{criteria.maximum_count} relevant events for #{criteria.markers.inspect}"
     end
 
+    def read_latest_global_marked(criteria)
+      @client.read(
+        PgEventstore::Stream.all_stream,
+        options: {
+          direction: :desc,
+          max_count: 1,
+          filter: {
+            streams: [ { context: criteria.stream_context, stream_name: criteria.stream_name } ],
+            event_types: criteria.event_types.map do |event_type|
+              { type: event_type, markers: criteria.markers }
+            end
+          }
+        }
+      ).first
+    end
+
     def read_global_marked_page(criteria)
       @client.read(
         PgEventstore::Stream.all_stream,

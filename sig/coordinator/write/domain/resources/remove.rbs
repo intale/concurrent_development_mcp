@@ -2,20 +2,21 @@ module Coordinator
   module Write
     module Domain
       module Resources
-        class Resolve
+        class Remove
           class DecisionV1 < Shared::Value
             def registration: () -> Events::ResourceIdentityV1::Registered
-            def binding: () -> Events::ResourceIdentityV1::Bound
-            def events: () -> Array[Events::ResourceIdentityV1::Registered | Events::ResourceIdentityV1::Bound]
+            def current_binding: () -> (Events::ResourceIdentityV1::Bound | Events::ResourceIdentityV1::Unbound)
+            def unbinding: () -> Events::ResourceIdentityV1::Unbound?
+            def events: () -> Array[Events::ResourceIdentityV1::Unbound]
             def outcome: () -> String
+            def unbound_at: () -> String?
           end
 
           def call: (
-            identity: ResourceIdentityV1,
-            proposed_resource_id: String,
-            registration: Events::ResourceIdentityV1::Registered?,
+            registration: Events::ResourceIdentityV1::Registered,
             current_binding: Events::ResourceIdentityV1::Bound | Events::ResourceIdentityV1::Unbound | nil,
-            resolved_at: String
+            reason: String,
+            removed_at: String
           ) -> Dry::Monads::Result
         end
       end

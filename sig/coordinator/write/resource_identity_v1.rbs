@@ -1,6 +1,8 @@
 module Coordinator
   module Write
     class ResourceIdentityV1 < Shared::Value
+      UnbindingReason: untyped
+
       def repository_id: () -> String
       def kind: () -> String
       def normalized_path: () -> String

@@ -78,6 +78,10 @@ module Coordinator
       self["operations.execute_resolve_resource"].method(:prepare)
     end
 
+    register("operations.prepare_remove_resource", memoize: true) do
+      self["operations.execute_remove_resource"].method(:prepare)
+    end
+
     register("operations.prepare_create_change_set", memoize: true) do
       Write::Operations::PrepareCreateChangeSet.new
     end
@@ -1114,6 +1118,18 @@ module Coordinator
       )
     end
 
+    register("operations.execute_remove_resource") do
+      Write::Operations::ExecuteRemoveResource.new(
+        event_store: self["event_store"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
     register("operations.execute_create_change_set") do
       Write::Operations::ExecuteCreateChangeSet.new(
         event_store: self["event_store"],
@@ -1925,6 +1941,7 @@ module Coordinator
     register("tasks.target_executor", memoize: true) do
       Write::Tasks::TargetExecutor.new(
         event_store: self["event_store"],
+        remove_resource: self["operations.execute_remove_resource"],
         create_change_set: self["operations.execute_create_change_set"],
         create_work_item: self["operations.execute_create_work_item"],
         declare_work_item_dependency: self["operations.execute_declare_work_item_dependency"],
@@ -2013,6 +2030,13 @@ module Coordinator
     register("operations.submit_resolve_resource_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_resolve_resource"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_remove_resource_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_remove_resource"],
         submitter: self["operations.submit_coordination_task"]
       )
     end

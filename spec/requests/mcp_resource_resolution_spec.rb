@@ -81,6 +81,80 @@ RSpec.describe "MCP server-owned Resource resolution", :event_store do
     ActiveSupport::Notifications.unsubscribe(barrier) if barrier
   end
 
+  it "removes idempotently and reactivates the original UUID without another registration" do
+    first = resolve_resource(command_id: "cmd-resource-lifecycle-new")
+    resource_id = first.dig("structuredContent", "data", "resource_id")
+
+    removed = remove_resource(
+      command_id: "cmd-resource-lifecycle-remove",
+      resource_id:,
+      reason: "removed"
+    )
+    repeated = remove_resource(
+      command_id: "cmd-resource-lifecycle-remove-again",
+      resource_id:,
+      reason: "removed"
+    )
+    reactivated = resolve_resource(command_id: "cmd-resource-lifecycle-reactivate")
+
+    expect(removed.dig("structuredContent", "data")).to include(
+      "resource_id" => resource_id,
+      "outcome" => "removed",
+      "reason" => "removed"
+    )
+    expect(repeated.dig("structuredContent", "data")).to include(
+      "resource_id" => resource_id,
+      "outcome" => "already_inactive"
+    )
+    expect(reactivated.dig("structuredContent", "data")).to include(
+      "resource_id" => resource_id,
+      "outcome" => "reactivated"
+    )
+    expect(resource_events(resource_id).map(&:type)).to eq(
+      %w[ResourceRegistered ResourceBound ResourceUnbound ResourceBound]
+    )
+  end
+
+  it "requires explicit removal before a kind change and gives the new tuple another UUID" do
+    file = resolve_resource(
+      command_id: "cmd-resource-kind-file",
+      path: "docs",
+      kind: "file"
+    )
+    file_id = file.dig("structuredContent", "data", "resource_id")
+
+    conflict = resolve_resource(
+      command_id: "cmd-resource-kind-conflict",
+      path: "docs",
+      kind: "directory"
+    )
+    remove_resource(
+      command_id: "cmd-resource-kind-remove",
+      resource_id: file_id,
+      reason: "type_changed"
+    )
+    directory = resolve_resource(
+      command_id: "cmd-resource-kind-directory",
+      path: "docs",
+      kind: "directory"
+    )
+
+    expect(conflict).to include(
+      "isError" => true,
+      "structuredContent" => include(
+        "data" => include("code" => "resource_path_conflict")
+      )
+    )
+    expect(directory.dig("structuredContent", "data")).to include(
+      "kind" => "directory",
+      "outcome" => "registered"
+    )
+    expect(directory.dig("structuredContent", "data", "resource_id")).not_to eq(file_id)
+    expect(resource_events(file_id).map(&:type)).to eq(
+      %w[ResourceRegistered ResourceBound ResourceUnbound]
+    )
+  end
+
   it "turns duplicate exact-marker registrations into a typed denial without a command fact" do
     identity = Coordinator::Write::ResourceIdentityNormalizer.new.call(
       repository_id:,
@@ -106,8 +180,26 @@ RSpec.describe "MCP server-owned Resource resolution", :event_store do
 
   private
 
-  def resolve_resource(command_id:)
-    response = call_tool("resource_resolve", resource_arguments(command_id:))
+  def resolve_resource(command_id:, path: RESOURCE_PATH, kind: "file")
+    response = call_tool("resource_resolve", resource_arguments(command_id:, path:, kind:))
+    execute_task(response)
+  end
+
+  def remove_resource(command_id:, resource_id:, reason:)
+    response = call_tool(
+      "resource_remove",
+      {
+        command_id:,
+        actor: { kind: "agent", id: "resource-agent" },
+        resource_id:,
+        reason:
+      }
+    )
+    execute_task(response)
+  end
+
+  def execute_task(response)
+    expect(response["error"]).to be_nil, response.inspect
     task_id = response.dig("result", "taskId")
     submitted = task_events(task_id).find { _1.type == "CoordinationTaskSubmitted" }
     collector = ReportedErrorCollector.new
@@ -120,13 +212,13 @@ RSpec.describe "MCP server-owned Resource resolution", :event_store do
     Rails.error.unsubscribe(collector) if collector
   end
 
-  def resource_arguments(command_id:, actor_id: "resource-agent")
+  def resource_arguments(command_id:, actor_id: "resource-agent", path: RESOURCE_PATH, kind: "file")
     {
       command_id:,
       actor: { kind: "agent", id: actor_id },
       repository_id:,
-      kind: "file",
-      path: RESOURCE_PATH
+      kind:,
+      path:
     }
   end
 
@@ -134,8 +226,8 @@ RSpec.describe "MCP server-owned Resource resolution", :event_store do
     event_store.read(
       streams.resource(resource_id),
       Coordinator::Write::EventReadCriteria.new(
-        event_types: %w[ResourceRegistered ResourceBound],
-        maximum_count: 2,
+        event_types: %w[ResourceRegistered ResourceBound ResourceUnbound],
+        maximum_count: 16,
         direction: :asc
       )
     )

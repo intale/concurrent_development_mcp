@@ -2,8 +2,8 @@
 
 module Coordinator::Write
   module Operations
-    class ExecuteResolveResource < Dry::Operation
-      TOOL_NAME = "resource_resolve"
+    class ExecuteRemoveResource < Dry::Operation
+      TOOL_NAME = "resource_remove"
 
       class InputContract < Dry::Validation::Contract
         config.validate_keys = true
@@ -14,9 +14,8 @@ module Coordinator::Write
             required(:kind).filled(:string, included_in?: [ "agent" ])
             required(:id).filled(:string)
           end
-          required(:repository_id).filled(:string)
-          required(:kind).filled(:string)
-          required(:path).filled(:string)
+          required(:resource_id).filled(:string)
+          required(:reason).filled(:string, included_in?: %w[removed renamed type_changed])
         end
 
         rule(:command_id) do
@@ -27,26 +26,31 @@ module Coordinator::Write
           key([ :actor, :id ]).failure("must be a valid identifier") unless
             Types::IDENTIFIER_PATTERN.match?(value.fetch(:id))
         end
+
+        rule(:resource_id) do
+          key.failure("must be a UUIDv7 Resource ID") unless Types::UUID_V7_PATTERN.match?(value)
+        end
       end
 
       class PreparationV1 < Value
-        attribute :resolved_at, Types::Timestamp
+        attribute :removed_at, Types::Timestamp
         attribute :input_digest, Types::Sha256Digest
-        attribute :proposed_resource_id, Types::ResourceId
-        attribute :registration_event_id, Types::UuidV7
-        attribute :binding_event_id, Types::UuidV7
+        attribute :unbinding_event_id, Types::UuidV7
         attribute :completion_event_id, Types::UuidV7
+      end
+
+      class RegisteredIdentityV1 < Value
+        attribute :registration, Events::ResourceIdentityV1::Registration
+        attribute :identity, ResourceIdentityV1
       end
 
       def initialize(
         event_store:,
         contract: InputContract.new,
         normalizer: ResourceIdentityNormalizer.new,
-        decider: Domain::Resources::Resolve.new,
-        repository_registration_loader: RepositoryRegistrationLoader.new(event_store:),
+        decider: Domain::Resources::Remove.new,
         input_digest: CommandInputDigest.new,
         clock: SystemClock.new,
-        resource_id_generator: ResourceIdGenerator.new,
         id_generator: IdGenerator.new,
         event_factory: EventFactory.new,
         schema_registry: EventSchemaRegistry.new,
@@ -56,10 +60,8 @@ module Coordinator::Write
         @contract = contract
         @normalizer = normalizer
         @decider = decider
-        @repository_registration_loader = repository_registration_loader
         @input_digest = input_digest
         @clock = clock
-        @resource_id_generator = resource_id_generator
         @id_generator = id_generator
         @event_factory = event_factory
         @schema_registry = schema_registry
@@ -71,19 +73,13 @@ module Coordinator::Write
         return invalid_input(result.errors.to_h) if result.failure?
 
         attributes = result.to_h
-        identity = @normalizer.call(
-          repository_id: attributes.fetch(:repository_id),
-          kind: attributes.fetch(:kind),
-          path: attributes.fetch(:path)
-        )
-        return invalid_input(identity.failure.details) if identity.failure?
-
         actor = attributes.fetch(:actor)
         Success(
-          Commands::ResolveResource.new(
+          Commands::RemoveResource.new(
             command_id: attributes.fetch(:command_id),
             actor: Commands::Actor.new(kind: actor.fetch(:kind), id: actor.fetch(:id)),
-            identity: identity.value!
+            resource_id: attributes.fetch(:resource_id),
+            reason: attributes.fetch(:reason)
           )
         )
       end
@@ -96,11 +92,9 @@ module Coordinator::Write
       def call_command(command, caused_by: nil)
         steps do
           preparation = PreparationV1.new(
-            resolved_at: @clock.now,
+            removed_at: @clock.now,
             input_digest: @input_digest.call(command),
-            proposed_resource_id: @resource_id_generator.call,
-            registration_event_id: @id_generator.uuid_v7,
-            binding_event_id: @id_generator.uuid_v7,
+            unbinding_event_id: @id_generator.uuid_v7,
             completion_event_id: @id_generator.uuid_v7
           )
 
@@ -110,54 +104,37 @@ module Coordinator::Write
 
       private
 
-      def invalid_input(details)
-        Failure(
-          OutcomeError.new(
-            code: :invalid_input,
-            message: "ResolveResource input is invalid",
-            details:
-          )
-        )
-      end
-
       def execute_attempt(command:, preparation:, caused_by:)
         replay = replay_result(command:, input_digest: preparation.input_digest)
         return replay if replay
 
-        repository = @repository_registration_loader.call(command.repository_id)
-        return repository_not_registered(command) unless repository
-
-        registration = step load_registration(command.identity)
-        current_binding = step load_current_binding(command.identity)
-
-        ActiveSupport::Notifications.instrument(
-          "coordinator.command_boundary",
-          operation: "resource_resolve_dcb",
-          command_id: command.command_id
+        registered = step load_registered_identity(command.resource_id)
+        current_binding = step load_current_binding(
+          registered.identity,
+          resource_id: command.resource_id
         )
-
         decision = @decider.call(
-          identity: command.identity,
-          proposed_resource_id: preparation.proposed_resource_id,
-          registration:,
+          registration: registered.registration,
           current_binding:,
-          resolved_at: preparation.resolved_at
+          reason: command.reason,
+          removed_at: preparation.removed_at
         )
         return decision if decision.failure?
 
-        resolved = decision.value!
+        removal = decision.value!
         persisted = persist_resource_events(
-          resolved,
+          removal,
+          identity: registered.identity,
           command:,
-          preparation:,
+          event_id: preparation.unbinding_event_id,
           caused_by:
         )
         completion = build_completion(
           command:,
-          resolution: resolved,
+          removal:,
           input_digest: preparation.input_digest,
           persisted_events: persisted,
-          completed_at: preparation.resolved_at
+          completed_at: preparation.removed_at
         )
         persist_completion(
           completion,
@@ -200,94 +177,106 @@ module Coordinator::Write
         deserialize(event)
       end
 
-      def load_registration(identity)
-        event = @event_store.read_global_marked(
-          resource_criteria(
-            identity:,
+      def load_registered_identity(resource_id)
+        event = @event_store.read(
+          @stream_factory.resource(resource_id),
+          EventReadCriteria.new(
             event_types: [ "ResourceRegistered" ],
-            marker: identity.identity_marker,
+            maximum_count: 1,
             direction: :asc
           )
         ).first
-        return Success(nil) unless event
+        return resource_not_found(resource_id) unless event
 
         registration = deserialize(event)
-        return corrupt(identity, "registration_marker_mismatch") unless
-          event.markers.include?(identity.identity_marker)
-        return corrupt(identity, "registration_stream_mismatch") unless
-          event.stream.stream_id == registration.resource_id
-        return corrupt(identity, "registration_identity_mismatch") unless
-          registration.repository_id == identity.repository_id &&
-          registration.kind == identity.kind &&
-          registration.normalized_path == identity.normalized_path
+        identity_result = @normalizer.call(
+          repository_id: registration.repository_id,
+          kind: registration.kind,
+          path: registration.normalized_path
+        )
+        return corrupt(resource_id, "registration_identity_invalid") if identity_result.failure?
 
-        Success(registration)
+        identity = identity_result.value!
+        return corrupt(resource_id, "registration_stream_mismatch") unless
+          event.stream.stream_id == resource_id && registration.resource_id == resource_id
+        return corrupt(resource_id, "registration_revision_mismatch") unless event.stream_revision.zero?
+        return corrupt(resource_id, "registration_marker_mismatch") unless
+          event.markers.include?(identity.identity_marker)
+
+        canonical_event = @event_store.read_global_marked(
+          GlobalMarkedEventReadCriteria.new(
+            stream_context: event.stream.context,
+            stream_name: event.stream.stream_name,
+            event_types: [ "ResourceRegistered" ],
+            markers: [ identity.identity_marker ],
+            maximum_count: 1,
+            direction: :asc
+          )
+        ).first
+        return corrupt(resource_id, "registration_global_mismatch") unless
+          canonical_event&.id == event.id
+
+        Success(RegisteredIdentityV1.new(registration:, identity:))
       rescue EventHistoryLimitExceeded
-        corrupt(identity, "duplicate_registration")
+        corrupt(resource_id, "duplicate_registration")
       rescue KeyError, Dry::Struct::Error
-        corrupt(identity, "registration_schema_invalid")
+        corrupt(resource_id, "registration_schema_invalid")
       end
 
-      def load_current_binding(identity)
+      def load_current_binding(identity, resource_id:)
+        resource_stream = @stream_factory.resource(resource_id)
         event = @event_store.read_latest_global_marked(
-          resource_criteria(
-            identity:,
+          GlobalMarkedEventReadCriteria.new(
+            stream_context: resource_stream.context,
+            stream_name: resource_stream.stream_name,
             event_types: [ "ResourceBound", "ResourceUnbound" ],
-            marker: identity.current_path_marker,
+            markers: [ identity.current_path_marker ],
+            maximum_count: 1,
             direction: :desc
           )
         )
         return Success(nil) unless event
 
         binding = deserialize(event)
-        return corrupt(identity, "binding_marker_mismatch") unless
+        return corrupt(resource_id, "binding_marker_mismatch") unless
           event.markers.include?(identity.current_path_marker)
-        return corrupt(identity, "binding_stream_mismatch") unless
+        return corrupt(resource_id, "binding_stream_mismatch") unless
           event.stream.stream_id == binding.resource_id
-        return corrupt(identity, "binding_identity_mismatch") unless
+        return corrupt(resource_id, "binding_identity_mismatch") unless
           binding.repository_id == identity.repository_id &&
           binding.normalized_path == identity.normalized_path
 
         Success(binding)
       rescue KeyError, Dry::Struct::Error
-        corrupt(identity, "binding_schema_invalid")
+        corrupt(resource_id, "binding_schema_invalid")
       end
 
-      def resource_criteria(identity:, event_types:, marker:, direction:)
-        stream = @stream_factory.resource(identity.repository_id)
-        GlobalMarkedEventReadCriteria.new(
-          stream_context: stream.context,
-          stream_name: stream.stream_name,
-          event_types:,
-          markers: [ marker ],
-          maximum_count: 1,
-          direction:
-        )
-      end
-
-      def repository_not_registered(command)
+      def resource_not_found(resource_id)
         Failure(
           OutcomeError.new(
-            code: :repository_not_registered,
-            message: "Repository must be registered before resolving Resources",
-            details: { repository_id: command.repository_id }
+            code: :resource_not_found,
+            message: "Resource is not registered",
+            details: { resource_id: }
           )
         )
       end
 
-      def corrupt(identity, reason)
+      def corrupt(resource_id, reason)
         Failure(
           OutcomeError.new(
             code: :resource_history_corrupt,
             message: "Resource identity history is inconsistent",
-            details: {
-              repository_id: identity.repository_id,
-              kind: identity.kind,
-              normalized_path: identity.normalized_path,
-              identity_marker: identity.identity_marker,
-              current_path_marker: identity.current_path_marker,
-              reason:
-            }
+            details: { resource_id:, reason: }
+          )
+        )
+      end
+
+      def invalid_input(details)
+        Failure(
+          OutcomeError.new(
+            code: :invalid_input,
+            message: "RemoveResource input is invalid",
+            details:
           )
         )
       end
@@ -302,59 +291,43 @@ module Coordinator::Write
         )
       end
 
-      def persist_resource_events(resolution, command:, preparation:, caused_by:)
-        return [] if resolution.events.empty?
+      def persist_resource_events(removal, identity:, command:, event_id:, caused_by:)
+        return [] if removal.events.empty?
 
-        events = resolution.events.map do |payload|
-          @event_factory.build!(
-            event: payload,
-            event_id: event_id(payload, preparation),
-            metadata: command_metadata(command),
-            markers: resource_markers(payload, command),
-            caused_by:
-          )
-        end
-
-        @event_store.append(@stream_factory.resource(resolution.registration.resource_id), events)
+        payload = removal.events.sole
+        event = @event_factory.build!(
+          event: payload,
+          event_id:,
+          metadata: command_metadata(command),
+          markers: [
+            identity.identity_marker,
+            identity.current_path_marker,
+            "resource:#{payload.resource_id}",
+            "repository:#{payload.repository_id}",
+            "command:#{command.command_id}"
+          ],
+          caused_by:
+        )
+        @event_store.append(@stream_factory.resource(payload.resource_id), [ event ])
       end
 
-      def event_id(payload, preparation)
-        case payload
-        when Events::ResourceIdentityV1::Registered then preparation.registration_event_id
-        when Events::ResourceIdentityV1::Bound then preparation.binding_event_id
-        end
-      end
-
-      def resource_markers(payload, command)
-        markers = [
-          command.identity.identity_marker,
-          "resource:#{payload.resource_id}",
-          "repository:#{payload.repository_id}",
-          "command:#{command.command_id}"
-        ]
-        case payload
-        when Events::ResourceIdentityV1::Bound
-          markers << command.identity.current_path_marker
-        end
-        markers
-      end
-
-      def build_completion(command:, resolution:, input_digest:, persisted_events:, completed_at:)
+      def build_completion(command:, removal:, input_digest:, persisted_events:, completed_at:)
+        registration = removal.registration
         Events::CommandCompletedV1.new(
           command_id: command.command_id,
           tool_name: TOOL_NAME,
           canonical_input_digest: input_digest,
           status: "ok",
-          summary: resolution_summary(resolution.outcome),
+          summary: removal_summary(removal.outcome),
           receipt: command.command_id,
-          data: CommandReceiptData::ResourceResolution.new(
-            resource_id: resolution.registration.resource_id,
-            repository_id: resolution.registration.repository_id,
-            kind: resolution.registration.kind,
-            normalized_path: resolution.registration.normalized_path,
-            outcome: resolution.outcome,
-            registered_at: resolution.registration.registered_at,
-            bound_at: resolution.binding.bound_at
+          data: CommandReceiptData::ResourceRemoval.new(
+            resource_id: registration.resource_id,
+            repository_id: registration.repository_id,
+            kind: registration.kind,
+            normalized_path: registration.normalized_path,
+            outcome: removal.outcome,
+            reason: command.reason,
+            unbound_at: removal.unbound_at
           ),
           warnings: [],
           next_actions: [],
@@ -363,11 +336,11 @@ module Coordinator::Write
         )
       end
 
-      def resolution_summary(outcome)
+      def removal_summary(outcome)
         case outcome
-        when "registered" then "Resource identity registered and bound."
-        when "reactivated" then "Existing Resource identity reactivated."
-        else "Existing Resource identity resolved."
+        when "removed" then "Resource binding removed."
+        when "already_inactive" then "Resource binding was already inactive."
+        else "Resource binding was already superseded."
         end
       end
 

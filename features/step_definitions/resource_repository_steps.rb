@@ -106,12 +106,158 @@ Then("exactly one registration and binding pair exists for the contended tuple")
   )
 end
 
+When("the agent removes the current Resource because it was {string}") do |reason|
+  @resource_unbinding_count_before = resource_identity_events(@resource_id).count do
+    _1.type == "ResourceUnbound"
+  end
+  @resource_removal_state = execute_resource_removal(
+    command_suffix: "remove",
+    reason:
+  )
+end
+
+When("the agent repeats the Resource removal because it was {string}") do |reason|
+  @resource_unbinding_count_before = resource_identity_events(@resource_id).count do
+    _1.type == "ResourceUnbound"
+  end
+  @resource_removal_state = execute_resource_removal(
+    command_suffix: "remove-again",
+    reason:
+  )
+end
+
+Then("the Resource removal reports {string} with one unbinding fact") do |outcome|
+  result = @resource_removal_state.dig("result", "result")
+  data = result.dig("structuredContent", "data")
+
+  assert_acceptance_equal(false, result.fetch("isError"), "Resource removal error")
+  assert_acceptance_equal(outcome, data.fetch("outcome"), "Resource removal outcome")
+  assert_acceptance_equal(
+    @resource_unbinding_count_before + 1,
+    resource_identity_events(@resource_id).count { _1.type == "ResourceUnbound" },
+    "Resource unbinding count"
+  )
+end
+
+Then("the Resource removal reports {string} without another unbinding fact") do |outcome|
+  result = @resource_removal_state.dig("result", "result")
+  data = result.dig("structuredContent", "data")
+
+  assert_acceptance_equal(false, result.fetch("isError"), "Repeated removal error")
+  assert_acceptance_equal(outcome, data.fetch("outcome"), "Repeated removal outcome")
+  assert_acceptance_equal(
+    @resource_unbinding_count_before,
+    resource_identity_events(@resource_id).count { _1.type == "ResourceUnbound" },
+    "Repeated Resource unbinding count"
+  )
+end
+
+When("the agent resolves the inactive Resource tuple again") do
+  @reactivated_resource_state = execute_resource_resolution(
+    command_suffix: "reactivate",
+    kind: "file",
+    path: @resource_path
+  )
+end
+
+Then("the Resource is reactivated with its original UUID and no new registration") do
+  result = @reactivated_resource_state.dig("result", "result")
+  data = result.dig("structuredContent", "data")
+  events = resource_identity_events(@resource_id)
+
+  assert_acceptance_equal(false, result.fetch("isError"), "Resource reactivation error")
+  assert_acceptance_equal(@resource_id, data.fetch("resource_id"), "Reactivated Resource ID")
+  assert_acceptance_equal("reactivated", data.fetch("outcome"), "Reactivation outcome")
+  assert_acceptance_equal(1, events.count { _1.type == "ResourceRegistered" }, "Registration count")
+  assert_acceptance_equal(2, events.count { _1.type == "ResourceBound" }, "Binding count")
+end
+
+When("the agent resolves renamed file {string} through MCP") do |path|
+  @previous_resource_id = @resource_id
+  @resource_path = path
+  @renamed_resource_state = execute_resource_resolution(
+    command_suffix: "renamed",
+    kind: "file",
+    path:
+  )
+end
+
+Then("the renamed tuple has a distinct current UUID") do
+  result = @renamed_resource_state.dig("result", "result")
+  data = result.dig("structuredContent", "data")
+
+  assert_acceptance_equal(false, result.fetch("isError"), "Renamed Resource resolution error")
+  assert_acceptance(data.fetch("resource_id") != @previous_resource_id, "Rename reused the old tuple UUID")
+  assert_acceptance_equal("registered", data.fetch("outcome"), "Renamed Resource outcome")
+end
+
+When("the agent tries to resolve directory {string} through MCP") do |path|
+  @kind_conflict_state = execute_resource_resolution(
+    command_suffix: "kind-conflict",
+    kind: "directory",
+    path:
+  )
+end
+
+Then("Resource resolution is denied by the current kind") do
+  result = @kind_conflict_state.dig("result", "result")
+
+  assert_acceptance_equal(true, result.fetch("isError"), "Kind conflict error flag")
+  assert_acceptance_equal(
+    "resource_path_conflict",
+    result.dig("structuredContent", "data", "code"),
+    "Kind conflict code"
+  )
+end
+
+When("the agent resolves directory {string} after removal") do |path|
+  @previous_resource_id = @resource_id
+  @new_kind_resource_state = execute_resource_resolution(
+    command_suffix: "kind-changed",
+    kind: "directory",
+    path:
+  )
+end
+
+Then("the new kind has a distinct current UUID") do
+  result = @new_kind_resource_state.dig("result", "result")
+  data = result.dig("structuredContent", "data")
+
+  assert_acceptance_equal(false, result.fetch("isError"), "Kind-change Resource resolution error")
+  assert_acceptance(data.fetch("resource_id") != @previous_resource_id, "Kind change reused the old tuple UUID")
+  assert_acceptance_equal("directory", data.fetch("kind"), "Kind-change Resource kind")
+  assert_acceptance_equal("registered", data.fetch("outcome"), "Kind-change Resource outcome")
+end
+
+def execute_resource_removal(command_suffix:, reason:)
+  task_id = submit_and_execute(
+    "resource_remove",
+    command_id: "#{@resource_command_id}-#{command_suffix}",
+    actor: { kind: "agent", id: "resource-agent" },
+    resource_id: @resource_id,
+    reason:
+  )
+  task_request("tasks/get", task_id)
+end
+
+def execute_resource_resolution(command_suffix:, kind:, path:)
+  task_id = submit_and_execute(
+    "resource_resolve",
+    command_id: "#{@resource_command_id}-#{command_suffix}",
+    actor: { kind: "agent", id: "resource-agent" },
+    repository_id: @resource_repository_id,
+    kind:,
+    path:
+  )
+  task_request("tasks/get", task_id)
+end
+
 def resource_identity_events(resource_id)
   event_store.read(
     streams.resource(resource_id),
     Coordinator::Write::EventReadCriteria.new(
-      event_types: %w[ResourceRegistered ResourceBound],
-      maximum_count: 2,
+      event_types: %w[ResourceRegistered ResourceBound ResourceUnbound],
+      maximum_count: 16,
       direction: :asc
     )
   )
