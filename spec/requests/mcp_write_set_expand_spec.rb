@@ -11,7 +11,6 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
 
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
-  let(:normalizer) { Coordinator::Write::FileResourceNormalizer.new }
   let(:session) do
     ActionDispatch::Integration::Session.new(Rails.application).tap do |integration|
       integration.host! "localhost"
@@ -21,11 +20,13 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
   it "durably expands the current set and exposes exact trace readers across the Saga" do
     seed_active_attempt
     reservation = reserve_initial_set.value!.data
+    existing_resource_id = reservation.resources.sole.resource_id
+    added_resource_id = resolve_resource("app/b.rb")
 
     submitted_response = submit_expansion(
       command_id: "cmd-mcp-expand",
       lease_set_id: reservation.lease_set_id,
-      paths: [ "app/a.rb", "app/b.rb" ],
+      resource_ids: [ existing_resource_id, added_resource_id ],
       request_id: 1
     )
     task_id = submitted_response.dig("result", "taskId")
@@ -50,13 +51,13 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
           "lease_set_id" => reservation.lease_set_id,
           "resource_count" => 2,
           "expires_at" => reservation.expires_at,
-          "added_resources" => [ include("resource_path" => "app/b.rb") ]
+          "added_resources" => [ include("resource_id" => added_resource_id) ]
         )
       )
     )
 
     submitted, started, task_completed = task_events(task_id)
-    target_events = lease_events("app/b.rb") +
+    target_events = lease_events(added_resource_id) +
                     expansion_events +
                     command_events("cmd-mcp-expand")
     command_completion = command_events("cmd-mcp-expand").sole
@@ -75,10 +76,11 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
   it "completes an unchanged decision as a Task error and rejects malformed input before Task allocation" do
     seed_active_attempt
     reservation = reserve_initial_set.value!.data
+    existing_resource_id = reservation.resources.sole.resource_id
     unchanged_response = submit_expansion(
       command_id: "cmd-mcp-unchanged",
       lease_set_id: reservation.lease_set_id,
-      paths: [ "app/a.rb" ],
+      resource_ids: [ existing_resource_id ],
       request_id: 1
     )
     task_id = unchanged_response.dig("result", "taskId")
@@ -100,7 +102,7 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
     malformed = submit_expansion(
       command_id: "cmd-mcp-malformed",
       lease_set_id: "not-a-uuid",
-      paths: [ "app/b.rb" ],
+      resource_ids: [ "not-a-uuid" ],
       request_id: 3
     )
 
@@ -112,7 +114,7 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
 
   private
 
-  def submit_expansion(command_id:, lease_set_id:, paths:, request_id:, expected_status: 200)
+  def submit_expansion(command_id:, lease_set_id:, resource_ids:, request_id:, expected_status: 200)
     mcp_request(
       id: request_id,
       method: "tools/call",
@@ -129,7 +131,7 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
           lease_set_id:,
           repository_id: MCP_EXPAND_REPOSITORY_ID,
           base_commit_oid: EXPAND_BASE_COMMIT_OID,
-          resources: paths.map { { kind: "file", path: _1 } }
+          resources: resource_ids.map { { resource_id: _1 } }
         }
       }
     )
@@ -180,6 +182,7 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
   end
 
   def reserve_initial_set
+    resource_id = resolve_resource("app/a.rb")
     Coordinator::Write::Operations::ExecuteReserveWriteSet.new(event_store:).call(
       command_id: "seed-reserve-#{EXPAND_ATTEMPT_ID}",
       actor: { kind: "agent", id: "agent-a" },
@@ -188,7 +191,7 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
       attempt_id: EXPAND_ATTEMPT_ID,
       repository_id: MCP_EXPAND_REPOSITORY_ID,
       base_commit_oid: EXPAND_BASE_COMMIT_OID,
-      resources: [ { kind: "file", path: "app/a.rb" } ],
+      resources: [ { resource_id: } ],
       lease_duration_seconds: 300
     )
   end
@@ -264,16 +267,19 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
     ).select { _1.type == "WriteSetExpanded" }
   end
 
-  def lease_events(path)
-    resource = normalizer.call(
+  def resolve_resource(path)
+    @resource_ids ||= {}
+    @resource_ids[path] ||= ResourceScenario.resolve(
+      event_store:,
       repository_id: MCP_EXPAND_REPOSITORY_ID,
-      scope: RepositoryScenario::DEFAULT_SCOPE,
       kind: "file",
-      path:,
-      base_blob_oid: nil
-    ).value!
+      path:
+    )
+  end
+
+  def lease_events(resource_id)
     event_store.read(
-      streams.resource_lease(resource.resource_key_hash),
+      streams.resource_lease(resource_id),
       Coordinator::Write::EventReadCriteria.new(
         event_types: [ "ResourceLeaseAcquired" ],
         maximum_count: 10,

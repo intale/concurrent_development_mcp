@@ -61,7 +61,15 @@ module CandidateAcceptanceWorld
       attempt_id: ids.fetch(:attempt_id),
       repository_id:,
       base_commit_oid: BASE_COMMIT_OID,
-      resources: [ { kind: "file", path:, base_blob_oid: BASE_BLOB_OID } ],
+      resources: [
+        resource_target(
+          kind: "file",
+          path:,
+          repository_id:,
+          base_blob_oid: BASE_BLOB_OID,
+          actor_id: agent_id
+        )
+      ],
       lease_duration_seconds: 900
     )
     reservation = task_request("tasks/get", reservation_task_id).dig(
@@ -106,7 +114,7 @@ module CandidateAcceptanceWorld
       lease_set_id: reservation.fetch("lease_set_id"),
       leases: reservation.fetch("resources").map do |reference|
         {
-          resource_key_hash: reference.fetch("resource_key_hash"),
+          resource_id: reference.fetch("resource_id"),
           lease_id: reference.fetch("lease_id"),
           fencing_token: reference.fetch("fencing_token")
         }

@@ -138,8 +138,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
       [
         :lease_busy,
         {
-          resource_key: "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:file:app/models/invoice.rb",
-          resource_key_hash: "sha256:4ef29088b0a3df37b0bdf49785a9dce3dad97985b7f22d5ab5d86e04cdc4049a",
+          resource_id: resource_id(1),
           lease_id: "0198e03a-d112-7000-8000-000000000001",
           owner_attempt_id: "ATT-task-result-owner",
           owner_agent_id: "agent-owner",
@@ -177,8 +176,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
           change_set_id: "CS-task-result",
           work_item_id: "W-task-result",
           attempt_id: "ATT-task-result",
-          resource_key: "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:file:app/models/invoice.rb",
-          resource_key_hash: "sha256:4ef29088b0a3df37b0bdf49785a9dce3dad97985b7f22d5ab5d86e04cdc4049a",
+          resource_id: resource_id(1),
           current_base_blob_oid: "a" * 40,
           requested_base_blob_oid: "b" * 40
         },
@@ -225,7 +223,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
           change_set_id: "CS-task-result",
           work_item_id: "W-task-result",
           attempt_id: "ATT-task-result",
-          resource_key_hash: "sha256:4ef29088b0a3df37b0bdf49785a9dce3dad97985b7f22d5ab5d86e04cdc4049a",
+          resource_id: resource_id(1),
           lease_id: "0198e03a-d112-7000-8000-000000000001",
           fencing_token: 7,
           expires_at: "2026-08-22T10:30:00.000000Z"
@@ -239,7 +237,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
           change_set_id: "CS-task-result",
           work_item_id: "W-task-result",
           attempt_id: "ATT-task-result",
-          resource_key_hash: "sha256:4ef29088b0a3df37b0bdf49785a9dce3dad97985b7f22d5ab5d86e04cdc4049a",
+          resource_id: resource_id(1),
           expected_lease_id: "0198e03a-d112-7000-8000-000000000001",
           current_lease_id: "0198e03a-d112-7000-8000-000000000002",
           expected_fencing_token: 7,
@@ -270,8 +268,8 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
           change_set_id: "CS-task-result",
           work_item_id: "W-task-result",
           attempt_id: "ATT-task-result",
-          current_resource_key_hashes: [ "sha256:#{'a' * 64}" ],
-          requested_resource_key_hashes: [ "sha256:#{'b' * 64}" ]
+          current_resource_ids: [ resource_id(1) ],
+          requested_resource_ids: [ resource_id(2) ]
         },
         Coordinator::Write::Tasks::DomainErrorV1::LeaseSetSnapshotMismatchError,
         "denied"
@@ -282,7 +280,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
           change_set_id: "CS-task-result",
           work_item_id: "W-task-result",
           attempt_id: "ATT-task-result",
-          resource_key_hash: "sha256:#{'a' * 64}",
+          resource_id: resource_id(1),
           current_lease_id: "0198e03a-d112-7000-8000-000000000001",
           requested_lease_id: "0198e03a-d112-7000-8000-000000000002",
           current_fencing_token: 7,
@@ -641,8 +639,8 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         :lease_observations_mismatch,
         {
           attempt_id: "A-task-result",
-          expected_resource_key_hashes: [ "sha256:#{'a' * 64}" ],
-          submitted_resource_key_hashes: [ "sha256:#{'b' * 64}" ]
+          expected_resource_ids: [ resource_id(1) ],
+          submitted_resource_ids: [ resource_id(2) ]
         },
         Coordinator::Write::Tasks::DomainErrorV1::CandidateLeaseObservationsMismatchError,
         "conflict"
@@ -661,7 +659,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         :lease_not_active,
         {
           attempt_id: "A-task-result",
-          resource_key_hash: "sha256:#{'a' * 64}",
+          resource_id: resource_id(1),
           submitted_lease_id: "0198e03a-d112-7000-8000-000000000001",
           current_lease_id: "0198e03a-d112-7000-8000-000000000002",
           current_fencing_token: 2,
@@ -675,7 +673,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         {
           candidate_id: "CAN-task-result",
           resources: [
-            { resource_key_hash: "sha256:#{'a' * 64}", path: "lib/candidate.rb" }
+            { path: "lib/candidate.rb" }
           ]
         },
         Coordinator::Write::Tasks::DomainErrorV1::CandidateUnauthorizedResourcesError,
@@ -685,7 +683,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
         :manifest_base_evidence_mismatch,
         {
           candidate_id: "CAN-task-result",
-          resource_key_hash: "sha256:#{'a' * 64}",
+          resource_id: resource_id(1),
           path: "lib/candidate.rb",
           expected_base_blob_oid: "a" * 40,
           submitted_base_blob_oid: "b" * 40
@@ -934,6 +932,10 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
       stream_id:,
       stream_revision:
     }
+  end
+
+  def resource_id(suffix)
+    format("0198e03a-d112-7000-8000-%012d", suffix)
   end
 
   def decision_head(decision_id)

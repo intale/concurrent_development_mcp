@@ -10,7 +10,6 @@ RSpec.describe "MCP lease_renew Task boundary", :event_store do
 
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
-  let(:normalizer) { Coordinator::Write::FileResourceNormalizer.new }
   let(:repository_id) { RepositoryScenario::DEFAULT_REPOSITORY_ID }
   let(:session) do
     ActionDispatch::Integration::Session.new(Rails.application).tap do |integration|
@@ -136,7 +135,7 @@ RSpec.describe "MCP lease_renew Task boundary", :event_store do
   def lease_inputs(reservation)
     reservation.resources.map do |reference|
       {
-        resource_key_hash: reference.resource_key_hash,
+        resource_id: reference.resource_id,
         lease_id: reference.lease_id,
         fencing_token: reference.fencing_token
       }
@@ -188,6 +187,7 @@ RSpec.describe "MCP lease_renew Task boundary", :event_store do
   end
 
   def reserve_initial_set
+    resource_ids = %w[app/a.rb app/b.rb].map { resolve_resource(_1) }
     Coordinator::Write::Operations::ExecuteReserveWriteSet.new(event_store:).call(
       command_id: "seed-reserve-#{RENEW_ATTEMPT_ID}",
       actor: { kind: "agent", id: "agent-a" },
@@ -196,7 +196,7 @@ RSpec.describe "MCP lease_renew Task boundary", :event_store do
       attempt_id: RENEW_ATTEMPT_ID,
       repository_id:,
       base_commit_oid: RENEW_BASE_COMMIT_OID,
-      resources: %w[app/a.rb app/b.rb].map { { kind: "file", path: _1 } },
+      resources: resource_ids.map { { resource_id: _1 } },
       lease_duration_seconds: 600
     )
   end
@@ -278,15 +278,8 @@ RSpec.describe "MCP lease_renew Task boundary", :event_store do
 
   def resource_renewal_events
     %w[app/a.rb app/b.rb].flat_map do |path|
-      resource = normalizer.call(
-        repository_id:,
-        kind: "file",
-        path:,
-        base_blob_oid: nil,
-        scope: RepositoryScenario::DEFAULT_SCOPE
-      ).value!
       event_store.read(
-        streams.resource_lease(resource.resource_key_hash),
+        streams.resource_lease(resolve_resource(path)),
         Coordinator::Write::EventReadCriteria.new(
           event_types: [ "ResourceLeaseRenewed" ],
           maximum_count: 10,
@@ -294,5 +287,10 @@ RSpec.describe "MCP lease_renew Task boundary", :event_store do
         )
       )
     end
+  end
+
+  def resolve_resource(path)
+    @resource_ids ||= {}
+    @resource_ids[path] ||= ResourceScenario.resolve(event_store:, repository_id:, kind: "file", path:)
   end
 end

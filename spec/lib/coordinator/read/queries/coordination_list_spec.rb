@@ -167,6 +167,13 @@ RSpec.describe Coordinator::Read::Queries::CoordinationList, :event_store, :read
 
   def reserve_write_set(coordination)
     ids = coordination.fetch(:ids)
+    path = "app/#{coordination.fetch(:prefix).downcase}.rb"
+    resource_id = ResourceScenario.resolve(
+      event_store:,
+      repository_id: coordination.fetch(:repository_id),
+      kind: "file",
+      path:
+    )
     execute(Coordinator::Write::Operations::ExecuteReserveWriteSet, {
       command_id: "cmd-#{coordination.fetch(:prefix)}-reserve",
       actor: { kind: "agent", id: "agent-#{coordination.fetch(:prefix)}" },
@@ -177,8 +184,7 @@ RSpec.describe Coordinator::Read::Queries::CoordinationList, :event_store, :read
       base_commit_oid: "a" * 40,
       resources: [
         {
-          kind: "file",
-          path: "app/#{coordination.fetch(:prefix).downcase}.rb",
+          resource_id:,
           base_blob_oid: "b" * 40
         }
       ],
@@ -205,7 +211,7 @@ RSpec.describe Coordinator::Read::Queries::CoordinationList, :event_store, :read
       lease_set_id: reservation.lease_set_id,
       leases: reservation.resources.map do |reference|
         {
-          resource_key_hash: reference.resource_key_hash,
+          resource_id: reference.resource_id,
           lease_id: reference.lease_id,
           fencing_token: reference.fencing_token
         }

@@ -64,7 +64,13 @@ module CandidateObligationScenario
       repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: [ source_path, target_path ].uniq.map do |path|
-        { kind: "file", path:, base_blob_oid: "c" * 40 }
+        ResourceScenario.target(
+          event_store:,
+          repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+          kind: "file",
+          path:,
+          base_blob_oid: "c" * 40
+        )
       end,
       lease_duration_seconds: 900
     }).data
@@ -211,6 +217,13 @@ module CandidateObligationScenario
         { repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID, commit_oid: "a" * 40 }
       ]
     })
+    resource = ResourceScenario.target(
+      event_store:,
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      kind: "file",
+      path:,
+      base_blob_oid: "c" * 40
+    )
     execute(Coordinator::Write::Operations::ExecuteReserveWriteSet, {
       command_id: "seed-reserve-#{role}-#{prefix}",
       actor: { kind: "agent", id: "agent-a" },
@@ -219,7 +232,7 @@ module CandidateObligationScenario
       attempt_id: ids.fetch(:attempt_id),
       repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
-      resources: [ { kind: "file", path:, base_blob_oid: "c" * 40 } ],
+      resources: [ resource ],
       lease_duration_seconds: 900
     }).data
   end

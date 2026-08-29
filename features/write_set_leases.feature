@@ -25,12 +25,12 @@ Feature: Dynamic write-set leases
       And only the file resource has a durable lease acquisition
 
     @LEASE-EQUAL-01 @live-subscriptions
-    Scenario: Different resource kinds at the same path still overlap
+    Scenario: A second agent cannot introduce another kind at a currently leased path
       Given two independent MCP agents have live active Attempts in ChangeSet "CS-ID-LSE-EQUAL-PATH"
       When agent "agent-a" reserves file "app/models" through a public Task
-      And agent "agent-b" reserves directory "app/models" through a public Task
-      Then the first hierarchical reservation succeeds and the second completes busy
-      And only the file resource has a durable lease acquisition
+      And agent "agent-b" tries to resolve directory "app/models" for leasing
+      Then the first hierarchical reservation succeeds and the alternative kind is denied
+      And only the current file resource has a durable lease acquisition
 
     @LEASE-FILE-PREFIX-01 @live-subscriptions
     Scenario: A file lease does not cover a descendant-looking path

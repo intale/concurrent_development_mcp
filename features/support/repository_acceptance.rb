@@ -142,11 +142,14 @@ module RepositoryAcceptance
         repository_id:,
         base_commit_oid: "a" * 40,
         resources: [
-          {
+          resource_target(
             kind: "file",
             path: "app/models/shared_repository.rb",
-            base_blob_oid: "b" * 40
-          }
+            repository_id:,
+            base_blob_oid: "b" * 40,
+            client_id: participant.fetch(:agent_id),
+            actor_id: participant.fetch(:agent_id)
+          )
         ],
         lease_duration_seconds: 300
       )

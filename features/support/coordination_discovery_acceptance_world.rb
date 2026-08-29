@@ -111,7 +111,7 @@ module CoordinationDiscoveryAcceptanceWorld
       lease_set_id: reservation.fetch("lease_set_id"),
       leases: reservation.fetch("resources").map do |reference|
         {
-          resource_key_hash: reference.fetch("resource_key_hash"),
+          resource_id: reference.fetch("resource_id"),
           lease_id: reference.fetch("lease_id"),
           fencing_token: reference.fetch("fencing_token")
         }
@@ -269,11 +269,13 @@ module CoordinationDiscoveryAcceptanceWorld
       repository_id: coordination.fetch(:repository_id),
       base_commit_oid: DISCOVERY_BASE_COMMIT,
       resources: [
-        {
+        resource_target(
           kind: "file",
           path: discovery_path(suffix),
-          base_blob_oid: DISCOVERY_BASE_BLOB
-        }
+          repository_id: coordination.fetch(:repository_id),
+          base_blob_oid: DISCOVERY_BASE_BLOB,
+          client_id: "agent-#{suffix}"
+        )
       ],
       lease_duration_seconds: 900
     )

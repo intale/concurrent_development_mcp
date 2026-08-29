@@ -9,7 +9,6 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
 
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
-  let(:normalizer) { Coordinator::Write::FileResourceNormalizer.new }
   let(:session) do
     ActionDispatch::Integration::Session.new(Rails.application).tap do |integration|
       integration.host! "localhost"
@@ -23,13 +22,15 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
         [ "W-MCP-LSE-B", "A-MCP-LSE-B", "agent-b" ]
       ]
     )
+    invoice_resource_id = resolve_resource("app/models/invoice.rb")
+    schema_resource_id = resolve_resource("db/schema.rb")
 
     winner = submit_reservation(
       command_id: "cmd-mcp-lse-a",
       agent_id: "agent-a",
       work_item_id: "W-MCP-LSE-A",
       attempt_id: "A-MCP-LSE-A",
-      paths: [ "app/models/invoice.rb", "db/schema.rb" ],
+      resource_ids: [ invoice_resource_id, schema_resource_id ],
       request_id: 1
     )
     expect(winner).to include(
@@ -54,14 +55,18 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
           "work_item_id" => "W-MCP-LSE-A",
           "attempt_id" => "A-MCP-LSE-A",
           "repository_id" => MCP_RESERVE_REPOSITORY_ID,
-          "policy_version" => "coordinator-resource-key/v3"
+          "policy_version" => "coordinator-resource-lease/v2",
+          "resources" => contain_exactly(
+            include("resource_id" => invoice_resource_id),
+            include("resource_id" => schema_resource_id)
+          )
         )
       )
     )
 
     submitted, started, task_completed = task_events(winner_task_id)
-    target_events = lease_events("app/models/invoice.rb") +
-                    lease_events("db/schema.rb") +
+    target_events = lease_events(invoice_resource_id) +
+                    lease_events(schema_resource_id) +
                     write_set_events("A-MCP-LSE-A") +
                     command_events("cmd-mcp-lse-a")
     command_completion = command_events("cmd-mcp-lse-a").sole
@@ -72,12 +77,13 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
       [ submitted.correlation_id ]
     )
 
+    free_resource_id = resolve_resource("free.rb")
     contender = submit_reservation(
       command_id: "cmd-mcp-lse-b",
       agent_id: "agent-b",
       work_item_id: "W-MCP-LSE-B",
       attempt_id: "A-MCP-LSE-B",
-      paths: [ "free.rb", "db/schema.rb" ],
+      resource_ids: [ free_resource_id, schema_resource_id ],
       request_id: 3
     )
     contender_task_id = contender.dig("result", "taskId")
@@ -99,7 +105,7 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
         )
       )
     )
-    expect(lease_events("free.rb")).to be_empty
+    expect(lease_events(free_resource_id)).to be_empty
     expect(write_set_events("A-MCP-LSE-B")).to be_empty
     expect(command_events("cmd-mcp-lse-b")).to be_empty
   end
@@ -110,13 +116,13 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
       agent_id: "agent-a",
       work_item_id: "W-MCP-LSE-A",
       attempt_id: "A-MCP-LSE-A",
-      paths: [ "/absolute/path.rb" ],
-      request_id: 1,
-      expected_status: 400
+      resource_ids: [ "not-a-uuid" ],
+      request_id: 1
     )
 
-    expect(response.dig("error", "code")).to eq(-32_602)
-    expect(response.dig("error", "data", "code")).to eq("resource_path_absolute")
+    expect(response.dig("result", "resultType")).to eq("complete")
+    expect(response.dig("result", "isError")).to be(true)
+    expect(response.dig("result", "content", 0, "text")).to include("resource_id")
     expect(task_events_for_command("cmd-mcp-lse-invalid")).to be_empty
   end
 
@@ -125,7 +131,7 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
     agent_id:,
     work_item_id:,
     attempt_id:,
-    paths:,
+    resource_ids:,
     request_id:,
     expected_status: 200
   )
@@ -144,7 +150,7 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
           attempt_id:,
           repository_id: MCP_RESERVE_REPOSITORY_ID,
           base_commit_oid: BASE_COMMIT_OID,
-          resources: paths.map { { kind: "file", path: _1 } },
+          resources: resource_ids.map { { resource_id: _1 } },
           lease_duration_seconds: 300
         }
       }
@@ -268,16 +274,19 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
     ).select { _1.type == "WriteSetReserved" }
   end
 
-  def lease_events(path)
-    resource = normalizer.call(
+  def resolve_resource(path)
+    @resource_ids ||= {}
+    @resource_ids[path] ||= ResourceScenario.resolve(
+      event_store:,
       repository_id: MCP_RESERVE_REPOSITORY_ID,
-      scope: RepositoryScenario::DEFAULT_SCOPE,
       kind: "file",
-      path:,
-      base_blob_oid: nil
-    ).value!
+      path:
+    )
+  end
+
+  def lease_events(resource_id)
     event_store.read(
-      streams.resource_lease(resource.resource_key_hash),
+      streams.resource_lease(resource_id),
       Coordinator::Write::EventReadCriteria.new(
         event_types: [ "ResourceLeaseAcquired" ],
         maximum_count: 10,

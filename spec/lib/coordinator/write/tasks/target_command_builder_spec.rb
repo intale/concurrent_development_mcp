@@ -69,13 +69,9 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
         repository_id:,
         base_commit_oid: "a" * 40,
         resources: [
-          Coordinator::Write::FileResourceV1.new(
-            kind: "file",
-            path: "app/models/invoice.rb",
+          Coordinator::Write::ResourceLeaseTargetV1.new(
+            resource_id: "0198e03a-d112-7000-8000-000000000006",
             base_blob_oid: "b" * 40,
-            resource_key: "repo:#{repository_id}:file:app/models/invoice.rb",
-            resource_key_hash: "sha256:4ef29088b0a3df37b0bdf49785a9dce3dad97985b7f22d5ab5d86e04cdc4049a",
-            policy_version: "coordinator-resource-key/v1"
           )
         ],
         lease_duration_seconds: 300
@@ -90,13 +86,9 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
         repository_id:,
         base_commit_oid: "a" * 40,
         resources: [
-          Coordinator::Write::FileResourceV1.new(
-            kind: "file",
-            path: "app/services/tax.rb",
+          Coordinator::Write::ResourceLeaseTargetV1.new(
+            resource_id: "0198e03a-d112-7000-8000-000000000007",
             base_blob_oid: "c" * 40,
-            resource_key: "repo:#{repository_id}:file:app/services/tax.rb",
-            resource_key_hash: "sha256:f42d279fef1baf9ea3a532d1a89b57de451648cab46bba073a397a509382c67b",
-            policy_version: "coordinator-resource-key/v1"
           )
         ]
       ),
@@ -108,8 +100,8 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
         attempt_id: "ATT-task-build",
         lease_set_id: "0198e03a-d112-7000-8000-000000000007",
         leases: [
-          Coordinator::Write::LeaseRenewalReferenceV1.new(
-            resource_key_hash: "sha256:f42d279fef1baf9ea3a532d1a89b57de451648cab46bba073a397a509382c67b",
+          Coordinator::Write::LeaseRenewalReferenceV2.new(
+            resource_id: "0198e03a-d112-7000-8000-000000000007",
             lease_id: "0198e03a-d112-7000-8000-000000000008",
             fencing_token: 4
           )
@@ -124,8 +116,8 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
         attempt_id: "ATT-task-build",
         lease_set_id: "0198e03a-d112-7000-8000-000000000007",
         leases: [
-          Coordinator::Write::LeaseReleaseReferenceV1.new(
-            resource_key_hash: "sha256:f42d279fef1baf9ea3a532d1a89b57de451648cab46bba073a397a509382c67b",
+          Coordinator::Write::LeaseReleaseReferenceV2.new(
+            resource_id: "0198e03a-d112-7000-8000-000000000007",
             lease_id: "0198e03a-d112-7000-8000-000000000008",
             fencing_token: 4
           )

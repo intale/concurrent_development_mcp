@@ -185,6 +185,12 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCompleteWorkItem, :event_s
         { repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID, commit_oid: "a" * 40 }
       ]
     })
+    resource_id = ResourceScenario.resolve(
+      event_store:,
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      kind: "file",
+      path:
+    )
     reservation = execute!(Coordinator::Write::Operations::ExecuteReserveWriteSet, {
       command_id: "cmd-#{prefix}-reserve-#{index}",
       actor: { kind: "agent", id: "agent-a" },
@@ -193,7 +199,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCompleteWorkItem, :event_s
       attempt_id: ids.fetch(:attempt_id),
       repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
-      resources: [ { kind: "file", path:, base_blob_oid: "c" * 40 } ],
+      resources: [ { resource_id:, base_blob_oid: "c" * 40 } ],
       lease_duration_seconds: 900
     }).data
 

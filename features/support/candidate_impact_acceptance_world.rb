@@ -104,11 +104,13 @@ module CandidateImpactAcceptanceWorld
       repository_id: coordination.fetch(:repository_id),
       base_commit_oid: CandidateAcceptanceWorld::BASE_COMMIT_OID,
       resources: [
-        {
+        resource_target(
           kind: "file",
           path: coordination.fetch(:path),
-          base_blob_oid: CandidateAcceptanceWorld::BASE_BLOB_OID
-        }
+          repository_id: coordination.fetch(:repository_id),
+          base_blob_oid: CandidateAcceptanceWorld::BASE_BLOB_OID,
+          actor_id: coordination.fetch(:agent_id)
+        )
       ],
       lease_duration_seconds: 900
     )

@@ -120,7 +120,9 @@ module LiveTwoAgentAcceptanceWorld
     requests = {
       agent_a: [ agent_a, { kind: "directory", path: "app/models" } ],
       agent_b: [ agent_b, { kind: "file", path: "app/models/order.rb", base_blob_oid: BASE_BLOB } ]
-    }
+    }.transform_values do |entry, resource|
+      [ entry, luna_resource_target(entry, resource) ]
+    end
     @luna_contention_handles = requests.to_h do |key, (entry, resource)|
       handle = Thread.new do
         luna_task_handle(
@@ -649,7 +651,7 @@ module LiveTwoAgentAcceptanceWorld
       reservation_arguments(
         entry,
         command_id: "two-luna.reserve.disjoint.#{key}",
-        resources: [ resource ]
+        resources: [ luna_resource_target(entry, resource) ]
       ),
       client_id: entry.fetch(:client_id)
     ).fetch("data")
@@ -675,8 +677,19 @@ module LiveTwoAgentAcceptanceWorld
 
   def luna_lease_references(reservation)
     reservation.fetch("resources").map do |resource|
-      resource.slice("resource_key_hash", "lease_id", "fencing_token")
+      resource.slice("resource_id", "lease_id", "fencing_token")
     end
+  end
+
+  def luna_resource_target(entry, resource)
+    resource_target(
+      kind: resource.fetch(:kind),
+      path: resource.fetch(:path),
+      repository_id: entry.fetch(:repository_id),
+      base_blob_oid: resource[:base_blob_oid],
+      client_id: entry.fetch(:client_id),
+      actor_id: entry.fetch(:agent_id)
+    )
   end
 
   def luna_attempt(payload, attempt_id)

@@ -10,7 +10,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
     expect(result).to be_success
     plan = result.value!
     expect(plan.events.map(&:class)).to eq([
-      Coordinator::Write::Events::CandidateSubmittedV1,
+      Coordinator::Write::Events::CandidateSubmittedV2,
       Coordinator::Write::Events::CandidateChangeManifestCapturedV1,
       Coordinator::Write::Events::CandidateHeadRegisteredV1,
       Coordinator::Write::Events::CandidateAttachedToAttemptV1
@@ -36,7 +36,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
     events = decide(command:).value!.events
 
     expect(events.map(&:class)).to eq([
-      Coordinator::Write::Events::CandidateSubmittedV1,
+      Coordinator::Write::Events::CandidateSubmittedV2,
       Coordinator::Write::Events::CandidateChangeManifestCapturedV1,
       Coordinator::Write::Events::CandidateBuildContextCapturedV1,
       Coordinator::Write::Events::CandidateHeadRegisteredV1,
@@ -69,7 +69,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
     mismatched = copy_command(
       command,
       leases: [ Coordinator::Write::Candidates::LeaseObservationV1.new(
-        resource_key_hash: lease_reference.resource_key_hash,
+        resource_id: lease_reference.resource_id,
         lease_id: uuid("9"),
         fencing_token: 1
       ) ]
@@ -85,7 +85,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
     undeclared_command = prepared_command(
       files: [ manifest_file(old_path: "lib/other.rb", new_path: "lib/other.rb") ]
     )
-    mismatched_reference = Coordinator::Write::LeaseReferenceV1.new(
+    mismatched_reference = Coordinator::Write::LeaseReferenceV2.new(
       lease_reference.to_h.merge(base_blob_oid: "e" * 40)
     )
     mismatched_attempt = attempt_state(reference: mismatched_reference)
@@ -151,7 +151,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
       lease_set_id: uuid("1"),
       leases: [
         {
-          resource_key_hash: reference.resource_key_hash,
+          resource_id: reference.resource_id,
           lease_id: reference.lease_id,
           fencing_token: reference.fencing_token
         }
@@ -189,7 +189,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
       ],
       lease_set_id: uuid("1"),
       lease_repository_id: repository_id,
-      lease_policy_version: "coordinator-resource-key/v1",
+      lease_policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
       lease_resources: [ reference ],
       lease_reserved_at: "2026-08-23T11:00:00.000000Z",
       lease_renewed_at: nil,
@@ -219,11 +219,12 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
     state = Coordinator::Write::Domain::ResourceLeases::State.new(
       lease_id: reference.lease_id,
       lease_set_id: uuid("1"),
-      resource_key: reference.resource_key,
-      resource_key_hash: reference.resource_key_hash,
+      resource_id: reference.resource_id,
+      resource_key: nil,
+      resource_key_hash: nil,
       resource_kind: reference.resource_kind,
       resource_path: reference.resource_path,
-      policy_version: "coordinator-resource-key/v1",
+      policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
       mode: "exclusive",
       change_set_id: "CS-1",
       work_item_id: "W-1",
@@ -240,7 +241,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
       released_at: nil,
       expired_at: nil
     )
-    Coordinator::Write::CurrentLeaseObservationV1.new(reference:, state:)
+    Coordinator::Write::CurrentLeaseObservationV2.new(reference:, state:)
   end
 
   def lease_reference
@@ -252,19 +253,12 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
   end
 
   def lease_reference_for(kind:, path:, base_blob_oid:)
-    resource = Coordinator::Write::FileResourceNormalizer.new.call(
-      repository_id:,
-      kind:,
-      path:,
-      base_blob_oid:
-    ).value!
-    Coordinator::Write::LeaseReferenceV1.new(
+    Coordinator::Write::LeaseReferenceV2.new(
       lease_id: uuid("2"),
-      resource_key: resource.resource_key,
-      resource_key_hash: resource.resource_key_hash,
-      resource_kind: resource.kind,
-      resource_path: resource.path,
-      base_blob_oid: resource.base_blob_oid,
+      resource_id: kind == "file" ? uuid("5") : uuid("6"),
+      resource_kind: kind,
+      resource_path: path,
+      base_blob_oid:,
       fencing_token: 1
     )
   end

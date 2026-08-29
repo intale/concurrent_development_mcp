@@ -75,8 +75,12 @@ When(
       repository_id: acceptance_repository_id,
       base_commit_oid: "a" * 40,
       resources: [
-        { kind: "file", path: participant.fetch(:unique_path) },
-        { kind: "file", path: shared_path }
+        resource_target(
+          kind: "file",
+          path: participant.fetch(:unique_path),
+          actor_id: participant.fetch(:agent_id)
+        ),
+        resource_target(kind: "file", path: shared_path, actor_id: participant.fetch(:agent_id))
       ],
       lease_duration_seconds: 300
     }
@@ -229,7 +233,7 @@ Given(
     attempt_id:,
     repository_id: acceptance_repository_id,
     base_commit_oid: "a" * 40,
-    resources: [ { kind: "file", path: initial_path } ],
+    resources: [ resource_target(kind: "file", path: initial_path, actor_id: agent_id) ],
     lease_duration_seconds: 300
   )
   @expansion_reservation = task_request("tasks/get", reservation_task_id).dig(
@@ -258,7 +262,7 @@ When("the agent expands the current write set with {string}") do |additional_pat
       lease_set_id: @expansion_reservation.fetch("lease_set_id"),
       repository_id: acceptance_repository_id,
       base_commit_oid: "a" * 40,
-      resources: [ { kind: "file", path: additional_path } ]
+      resources: [ resource_target(kind: "file", path: additional_path, actor_id: @expansion_agent_id) ]
     }
   ).dig("result", "taskId")
   execute_task(@expansion_task_id)
@@ -392,7 +396,7 @@ Given(
     attempt_id:,
     repository_id: acceptance_repository_id,
     base_commit_oid: "a" * 40,
-    resources: @renewal_paths.map { { kind: "file", path: _1 } },
+    resources: @renewal_paths.map { resource_target(kind: "file", path: _1, actor_id: agent_id) },
     lease_duration_seconds: 300
   )
   @renewal_reservation = task_request("tasks/get", reservation_task_id).dig(
@@ -419,7 +423,7 @@ When("the agent renews the complete observed lease set") do
       lease_set_id: @renewal_reservation.fetch("lease_set_id"),
       leases: @renewal_reservation.fetch("resources").map do |reference|
         {
-          resource_key_hash: reference.fetch("resource_key_hash"),
+          resource_id: reference.fetch("resource_id"),
           lease_id: reference.fetch("lease_id"),
           fencing_token: reference.fetch("fencing_token")
         }
@@ -435,10 +439,10 @@ Then("the renewal Task succeeds without changing lease identities or fencing tok
   result = @renewal_task_state.dig("result", "result")
   data = result.fetch("structuredContent").fetch("data")
   before_refs = @renewal_reservation.fetch("resources").map do |reference|
-    reference.values_at("resource_key_hash", "lease_id", "fencing_token")
+    reference.values_at("resource_id", "lease_id", "fencing_token")
   end
   after_refs = data.fetch("resources").map do |reference|
-    reference.values_at("resource_key_hash", "lease_id", "fencing_token")
+    reference.values_at("resource_id", "lease_id", "fencing_token")
   end
 
   assert_acceptance_equal("completed", @renewal_task_state.dig("result", "status"), "Renewal Task status")
@@ -557,7 +561,7 @@ Given(
     attempt_id:,
     repository_id: acceptance_repository_id,
     base_commit_oid: "a" * 40,
-    resources: @release_paths.map { { kind: "file", path: _1 } },
+    resources: @release_paths.map { resource_target(kind: "file", path: _1, actor_id: agent_id) },
     lease_duration_seconds: 300
   )
   @release_reservation = task_request("tasks/get", reservation_task_id).dig(
@@ -584,7 +588,7 @@ When("the agent releases the complete observed lease set") do
       lease_set_id: @release_reservation.fetch("lease_set_id"),
       leases: @release_reservation.fetch("resources").map do |reference|
         {
-          resource_key_hash: reference.fetch("resource_key_hash"),
+          resource_id: reference.fetch("resource_id"),
           lease_id: reference.fetch("lease_id"),
           fencing_token: reference.fetch("fencing_token")
         }
@@ -599,10 +603,10 @@ Then("the release Task succeeds without changing lease identities or fencing tok
   result = @release_task_state.dig("result", "result")
   data = result.fetch("structuredContent").fetch("data")
   before_refs = @release_reservation.fetch("resources").map do |reference|
-    reference.values_at("resource_key_hash", "lease_id", "fencing_token")
+    reference.values_at("resource_id", "lease_id", "fencing_token")
   end
   after_refs = data.fetch("resources").map do |reference|
-    reference.values_at("resource_key_hash", "lease_id", "fencing_token")
+    reference.values_at("resource_id", "lease_id", "fencing_token")
   end
 
   assert_acceptance_equal("completed", @release_task_state.dig("result", "status"), "Release Task status")
@@ -689,7 +693,7 @@ When(
       attempt_id: @expiry_predecessor.fetch(:attempt_id),
       repository_id: acceptance_repository_id,
       base_commit_oid: "a" * 40,
-      resources: [ { kind: "file", path: } ],
+      resources: [ resource_target(kind: "file", path:, actor_id: agent_id) ],
       lease_duration_seconds: duration
     }
   ).dig("result", "taskId")
@@ -734,7 +738,7 @@ When(
       attempt_id: @expiry_successor.fetch(:attempt_id),
       repository_id: acceptance_repository_id,
       base_commit_oid: "a" * 40,
-      resources: [ { kind: "file", path: @expiry_path } ],
+      resources: [ resource_target(kind: "file", path: @expiry_path, actor_id: agent_id) ],
       lease_duration_seconds: 300
     }
   ).dig("result", "taskId")
@@ -822,7 +826,13 @@ When("both agents concurrently reserve their disjoint files") do
       attempt_id: participant.fetch(:attempt_id),
       repository_id: acceptance_repository_id,
       base_commit_oid: "a" * 40,
-      resources: [ { kind: "file", path: participant.fetch(:unique_path) } ],
+      resources: [
+        resource_target(
+          kind: "file",
+          path: participant.fetch(:unique_path),
+          actor_id: participant.fetch(:agent_id)
+        )
+      ],
       lease_duration_seconds: 300
     }
     task_id = call_tool("write_set_reserve", arguments).dig("result", "taskId")
@@ -868,7 +878,7 @@ When(
       attempt_id: participant.fetch(:attempt_id),
       repository_id: acceptance_repository_id,
       base_commit_oid: "a" * 40,
-      resources: [ { kind: "file", path: } ],
+      resources: [ resource_target(kind: "file", path:, actor_id: participant.fetch(:agent_id)) ],
       lease_duration_seconds: 300
     }
     task_id = call_tool("write_set_reserve", arguments).dig("result", "taskId")
@@ -917,7 +927,7 @@ When(
     attempt_id: @cancelled_reservation_owner.fetch(:attempt_id),
     repository_id: acceptance_repository_id,
     base_commit_oid: "a" * 40,
-    resources: [ { kind: "file", path: } ],
+    resources: [ resource_target(kind: "file", path:, actor_id: agent_id) ],
     lease_duration_seconds: 300
   }
   @cancelled_reservation_task_id = call_tool("write_set_reserve", arguments).dig("result", "taskId")
@@ -948,7 +958,7 @@ When("agent {string} deliberately reserves {string}") do |agent_id, path|
     attempt_id: participant.fetch(:attempt_id),
     repository_id: acceptance_repository_id,
     base_commit_oid: "a" * 40,
-    resources: [ { kind: "file", path: } ],
+    resources: [ resource_target(kind: "file", path:, actor_id: agent_id) ],
     lease_duration_seconds: 300
   )
   @successor_result = task_request("tasks/get", task_id).dig(
@@ -975,7 +985,7 @@ When("the predecessor renews its exact lease set before the old deadline") do
       attempt_id: @expiry_predecessor.fetch(:attempt_id),
       lease_set_id: @expiry_predecessor_result.fetch("lease_set_id"),
       leases: @expiry_predecessor_result.fetch("resources").map do |reference|
-        reference.slice("resource_key_hash", "lease_id", "fencing_token").transform_keys(&:to_sym)
+        reference.slice("resource_id", "lease_id", "fencing_token").transform_keys(&:to_sym)
       end,
       lease_duration_seconds: 60
     }
@@ -1015,7 +1025,7 @@ When(
       attempt_id: participant.fetch(:attempt_id),
       repository_id: acceptance_repository_id,
       base_commit_oid: "a" * 40,
-      resources: [ { kind: "file", path: @expiry_path } ],
+      resources: [ resource_target(kind: "file", path: @expiry_path, actor_id: agent_id) ],
       lease_duration_seconds: 300
     }
   ).dig("result", "taskId")
@@ -1045,7 +1055,7 @@ When("the exact release command is retried through another Task") do
     attempt_id: @release_attempt_id,
     lease_set_id: @release_reservation.fetch("lease_set_id"),
     leases: @release_reservation.fetch("resources").map do |reference|
-      reference.slice("resource_key_hash", "lease_id", "fencing_token").transform_keys(&:to_sym)
+      reference.slice("resource_id", "lease_id", "fencing_token").transform_keys(&:to_sym)
     end
   }
   @release_retry_task_id = call_tool("lease_release", arguments).dig("result", "taskId")
@@ -1074,7 +1084,7 @@ When("the predecessor releases its exact lease set") do
       attempt_id: @expiry_predecessor.fetch(:attempt_id),
       lease_set_id: @expiry_predecessor_result.fetch("lease_set_id"),
       leases: @expiry_predecessor_result.fetch("resources").map do |reference|
-        reference.slice("resource_key_hash", "lease_id", "fencing_token").transform_keys(&:to_sym)
+        reference.slice("resource_id", "lease_id", "fencing_token").transform_keys(&:to_sym)
       end
     }
   ).dig("result", "taskId")
@@ -1103,7 +1113,7 @@ When("agent {string} deliberately reserves after the release") do |agent_id|
     attempt_id: participant.fetch(:attempt_id),
     repository_id: acceptance_repository_id,
     base_commit_oid: "a" * 40,
-    resources: [ { kind: "file", path: @expiry_path } ],
+    resources: [ resource_target(kind: "file", path: @expiry_path, actor_id: agent_id) ],
     lease_duration_seconds: 300
   )
   @successor_result = task_request("tasks/get", task_id).dig(
@@ -1122,7 +1132,7 @@ When("the expired predecessor tries to renew its old fence") do
       attempt_id: @expiry_predecessor.fetch(:attempt_id),
       lease_set_id: @expiry_predecessor_result.fetch("lease_set_id"),
       leases: @expiry_predecessor_result.fetch("resources").map do |reference|
-        reference.slice("resource_key_hash", "lease_id", "fencing_token").transform_keys(&:to_sym)
+        reference.slice("resource_id", "lease_id", "fencing_token").transform_keys(&:to_sym)
       end,
       lease_duration_seconds: 300
     }
@@ -1150,7 +1160,7 @@ When("the expired predecessor tries to release its old fence") do
       attempt_id: @expiry_predecessor.fetch(:attempt_id),
       lease_set_id: @expiry_predecessor_result.fetch("lease_set_id"),
       leases: @expiry_predecessor_result.fetch("resources").map do |reference|
-        reference.slice("resource_key_hash", "lease_id", "fencing_token").transform_keys(&:to_sym)
+        reference.slice("resource_id", "lease_id", "fencing_token").transform_keys(&:to_sym)
       end
     }
   ).dig("result", "taskId")
@@ -1219,13 +1229,13 @@ Then("the abandonment Task releases current fences and requeues the WorkItem") d
   assert_acceptance_equal(1, abandonment_events.length, "Attempt abandonment facts")
   assert_acceptance_equal(1, requeue_events.length, "WorkItem requeue facts")
   assert_acceptance_equal(
-    @release_reservation.fetch("resources").map { _1.fetch("resource_key_hash") }.sort,
-    abandonment_events.sole.data.fetch("released_leases").map { _1.fetch("resource_key_hash") }.sort,
+    @release_reservation.fetch("resources").map { _1.fetch("resource_id") }.sort,
+    abandonment_events.sole.data.fetch("released_leases").map { _1.fetch("resource_id") }.sort,
     "Released abandonment fences"
   )
   assert_acceptance_equal(
     [],
-    abandonment_events.sole.data.fetch("untouched_resource_key_hashes"),
+    abandonment_events.sole.data.fetch("untouched_resource_ids"),
     "Untouched abandonment fences"
   )
   @release_paths.each do |path|
@@ -1367,8 +1377,8 @@ Then("the abandonment requeues the predecessor and leaves the successor fence un
   assert_acceptance_equal(false, result.fetch("isError"), "Superseded abandonment error flag")
   assert_acceptance_equal([], abandonment.data.fetch("released_leases"), "Released predecessor fences")
   assert_acceptance_equal(
-    [ @expiry_predecessor_result.fetch("resources").sole.fetch("resource_key_hash") ],
-    abandonment.data.fetch("untouched_resource_key_hashes"),
+    [ @expiry_predecessor_result.fetch("resources").sole.fetch("resource_id") ],
+    abandonment.data.fetch("untouched_resource_ids"),
     "Untouched predecessor fences"
   )
   assert_acceptance_equal(@expiry_predecessor.fetch(:attempt_id), requeue.data.fetch("attempt_id"), "Requeued Attempt")
@@ -1587,7 +1597,14 @@ module HierarchicalWriteSetAcceptance
         attempt_id: participant.fetch(:attempt_id),
         repository_id: acceptance_repository_id,
         base_commit_oid: "a" * 40,
-        resources: [ { kind:, path: } ],
+        resources: [
+          resource_target(
+            kind:,
+            path:,
+            client_id: agent_id,
+            actor_id: agent_id
+          )
+        ],
         lease_duration_seconds: 300
       },
       client_id: agent_id
@@ -1623,15 +1640,11 @@ module HierarchicalWriteSetAcceptance
   end
 
   def hierarchical_lease_events(kind, path)
-    resource = Coordinator::Write::FileResourceNormalizer.new.call(
-      repository_id: acceptance_repository_id,
-      kind:,
-      path:,
-      base_blob_oid: nil,
-      scope: acceptance_repository_scope
-    ).value!
+    resource_id = (@acceptance_resource_ids || {}).fetch(
+      [ acceptance_repository_id, kind, path ]
+    )
     event_store.read(
-      streams.resource_lease(resource.resource_key_hash),
+      streams.resource_lease(resource_id),
       Coordinator::Write::EventReadCriteria.new(
         event_types: %w[
           ResourceLeaseAcquired
@@ -1667,6 +1680,49 @@ When(
     kind:,
     path:,
     command_suffix: @hierarchical_reservations.length + 1
+  )
+end
+
+When(
+  "agent {string} tries to resolve {word} {string} for leasing"
+) do |agent_id, kind, path|
+  task_id = submit_and_await(
+    "resource_resolve",
+    client_id: agent_id,
+    command_id: "#{@hierarchical_change_set_id.downcase}.resolve.alternative-kind",
+    actor: { kind: "agent", id: agent_id },
+    repository_id: acceptance_repository_id,
+    kind:,
+    path:
+  )
+  @alternative_kind_resolution = {
+    kind:,
+    path:,
+    state: task_request("tasks/get", task_id, client_id: agent_id)
+  }
+end
+
+Then("the first hierarchical reservation succeeds and the alternative kind is denied") do
+  reservation = @hierarchical_reservations.sole
+  resolution = @alternative_kind_resolution.fetch(:state).dig("result", "result")
+
+  assert_acceptance_equal("completed", reservation.dig(:state, "result", "status"), "Reservation Task")
+  assert_acceptance_equal("ok", hierarchical_outcome(reservation).fetch("status"), "Reservation outcome")
+  assert_acceptance_equal(true, resolution.fetch("isError"), "Alternative-kind error flag")
+  assert_acceptance_equal(
+    "resource_path_conflict",
+    resolution.dig("structuredContent", "data", "code"),
+    "Alternative-kind denial"
+  )
+end
+
+Then("only the current file resource has a durable lease acquisition") do
+  reservation = @hierarchical_reservations.sole
+  assert_acceptance_equal("file", reservation.fetch(:kind), "Current Resource kind")
+  assert_acceptance_equal(
+    [ "ResourceLeaseAcquired" ],
+    hierarchical_lease_events("file", reservation.fetch(:path)).map(&:type),
+    "Current Resource lifecycle"
   )
 end
 
@@ -1757,34 +1813,38 @@ When(
   "agent {string} submits literal resource path {string} through public MCP"
 ) do |agent_id, path|
   @literal_resource_path = path
-  participant = @hierarchical_participants.find { _1.fetch(:agent_id) == agent_id }
   @literal_path_command_id = "#{@hierarchical_change_set_id.downcase}.reserve.literal-path"
   @literal_path_response = call_tool(
-    "write_set_reserve",
+    "resource_resolve",
     {
       command_id: @literal_path_command_id,
       actor: { kind: "agent", id: agent_id },
-      change_set_id: @hierarchical_change_set_id,
-      work_item_id: participant.fetch(:work_item_id),
-      attempt_id: participant.fetch(:attempt_id),
       repository_id: acceptance_repository_id,
-      base_commit_oid: "a" * 40,
-      resources: [ { kind: "file", path: } ],
-      lease_duration_seconds: 300
-    }
+      kind: "file",
+      path:
+    },
+    expected_status: 400
   )
 end
 
 Then("MCP rejects the unsupported path before allocating a Task") do
-  result = @literal_path_response.fetch("result")
-  assert_acceptance_equal("complete", result.fetch("resultType"), "Immediate result type")
-  assert_acceptance_equal(true, result.fetch("isError"), "Literal path error flag")
+  error = @literal_path_response.fetch("error")
+  assert_acceptance_equal(-32_602, error.fetch("code"), "JSON-RPC error")
+  assert_acceptance_equal("invalid_input", error.dig("data", "code"), "Literal path error")
   assert_acceptance_equal([], task_events_for_command(@literal_path_command_id), "Task facts")
 end
 
 Then("no lease is stored for either path spelling") do
   assert_acceptance_equal([], command_events(@literal_path_command_id), "Command facts")
-  assert_acceptance_equal([], lease_events("app/models/user.rb"), "Slash-path lease facts")
+  lease = PgEventstore.client.read(
+    PgEventstore::Stream.all_stream,
+    options: {
+      direction: :asc,
+      max_count: 1,
+      filter: { event_types: [ { type: "ResourceLeaseAcquired" } ] }
+    }
+  )
+  assert_acceptance_equal([], lease, "Lease facts")
 end
 
 When(
@@ -1803,7 +1863,7 @@ When(
     attempt_id: participant.fetch(:attempt_id),
     repository_id: acceptance_repository_id,
     base_commit_oid: "a" * 40,
-    resources: [ { kind: "file", path: } ],
+    resources: [ resource_target(kind: "file", path:, actor_id: agent_id) ],
     lease_duration_seconds: 30
   )
   state = task_request("tasks/get", task_id)
@@ -1875,7 +1935,7 @@ When("agent {string} reserves the expired file through a public Task") do |agent
     attempt_id: participant.fetch(:attempt_id),
     repository_id: acceptance_repository_id,
     base_commit_oid: "a" * 40,
-    resources: [ { kind: "file", path: @system_identity_path } ],
+    resources: [ resource_target(kind: "file", path: @system_identity_path, actor_id: agent_id) ],
     lease_duration_seconds: 300
   )
   @system_identity_successor_state = task_request("tasks/get", @system_identity_successor_task_id)
@@ -2040,6 +2100,14 @@ module ResourceBoundaryRolloverAcceptance
   end
 
   def reserve_rollover_resources(resources)
+    targets = resources.map do |resource|
+      resource_target(
+        kind: resource.fetch(:kind),
+        path: resource.fetch(:path),
+        client_id: OWNER.fetch(:agent_id),
+        actor_id: OWNER.fetch(:agent_id)
+      )
+    end
     task_id = submit_and_execute(
       "write_set_reserve",
       client_id: OWNER.fetch(:agent_id),
@@ -2050,7 +2118,7 @@ module ResourceBoundaryRolloverAcceptance
       attempt_id: OWNER.fetch(:attempt_id),
       repository_id: acceptance_repository_id,
       base_commit_oid: "a" * 40,
-      resources:,
+      resources: targets,
       lease_duration_seconds: 600
     )
     successful_rollover_task_data(task_id, client_id: OWNER.fetch(:agent_id))
@@ -2076,6 +2144,14 @@ module ResourceBoundaryRolloverAcceptance
   end
 
   def expand_rollover_resources(receipt, resources:)
+    targets = resources.map do |resource|
+      resource_target(
+        kind: resource.fetch(:kind),
+        path: resource.fetch(:path),
+        client_id: OWNER.fetch(:agent_id),
+        actor_id: OWNER.fetch(:agent_id)
+      )
+    end
     task_id = submit_and_execute(
       "write_set_expand",
       client_id: OWNER.fetch(:agent_id),
@@ -2087,11 +2163,11 @@ module ResourceBoundaryRolloverAcceptance
       lease_set_id: receipt.fetch("lease_set_id"),
       repository_id: acceptance_repository_id,
       base_commit_oid: "a" * 40,
-      resources:
+      resources: targets
     )
     expansion = successful_rollover_task_data(task_id, client_id: OWNER.fetch(:agent_id))
     all_resources = (receipt.fetch("resources") + expansion.fetch("added_resources"))
-      .sort_by { _1.fetch("resource_key_hash").b }
+      .sort_by { _1.fetch("resource_id").b }
     receipt.merge("resources" => all_resources, "expires_at" => expansion.fetch("expires_at"))
   end
 
@@ -2121,7 +2197,7 @@ module ResourceBoundaryRolloverAcceptance
   def lease_observations(receipt)
     receipt.fetch("resources").map do |reference|
       {
-        resource_key_hash: reference.fetch("resource_key_hash"),
+        resource_id: reference.fetch("resource_id"),
         lease_id: reference.fetch("lease_id"),
         fencing_token: reference.fetch("fencing_token")
       }
@@ -2129,15 +2205,11 @@ module ResourceBoundaryRolloverAcceptance
   end
 
   def rollover_resource_events(kind:, path:, maximum_count: 400)
-    resource = Coordinator::Write::FileResourceNormalizer.new.call(
-      repository_id: acceptance_repository_id,
-      kind:,
-      path:,
-      base_blob_oid: nil,
-      scope: acceptance_repository_scope
-    ).value!
+    resource_id = (@acceptance_resource_ids || {}).fetch(
+      [ acceptance_repository_id, kind, path ]
+    )
     event_store.read(
-      streams.resource_lease(resource.resource_key_hash),
+      streams.resource_lease(resource_id),
       Coordinator::Write::EventReadCriteria.new(
         event_types: Coordinator::Write::EventQueries::RESOURCE_LEASE_LIFECYCLE_EVENT_TYPES,
         maximum_count:,
@@ -2202,7 +2274,14 @@ module ResourceBoundaryRolloverAcceptance
         attempt_id: CONTENDER.fetch(:attempt_id),
         repository_id: acceptance_repository_id,
         base_commit_oid: "a" * 40,
-        resources: [ { kind:, path: } ],
+        resources: [
+          resource_target(
+            kind:,
+            path:,
+            client_id: CONTENDER.fetch(:agent_id),
+            actor_id: CONTENDER.fetch(:agent_id)
+          )
+        ],
         lease_duration_seconds: 600
       },
       client_id: CONTENDER.fetch(:agent_id)

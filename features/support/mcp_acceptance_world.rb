@@ -74,6 +74,57 @@ module McpAcceptanceWorld
     task_id
   end
 
+  def resource_target(
+    kind:,
+    path:,
+    repository_id: acceptance_repository_id,
+    base_blob_oid: nil,
+    client_id: "default",
+    actor_id: nil
+  )
+    resource_id = resolve_resource_id(
+      kind:,
+      path:,
+      repository_id:,
+      client_id:,
+      actor_id:
+    )
+    { resource_id:, base_blob_oid: }.compact
+  end
+
+  def resolve_resource_id(
+    kind:,
+    path:,
+    repository_id: acceptance_repository_id,
+    client_id: "default",
+    actor_id: nil
+  )
+    @acceptance_resource_ids ||= {}
+    key = [ repository_id, kind, path ]
+    return @acceptance_resource_ids.fetch(key) if @acceptance_resource_ids.key?(key)
+
+    @resource_resolution_sequence = @resource_resolution_sequence.to_i + 1
+    task_id = submit_and_execute(
+      "resource_resolve",
+      client_id:,
+      command_id: "cuc-resource-resolve-#{@resource_resolution_sequence}",
+      actor: { kind: "agent", id: actor_id || (client_id == "default" ? "resource-agent" : client_id) },
+      repository_id:,
+      kind:,
+      path:
+    )
+    state = task_request("tasks/get", task_id, client_id:)
+    result = state.dig("result", "result")
+    assert_acceptance_equal("completed", state.dig("result", "status"), "Resource resolution Task")
+    assert_acceptance_equal(false, result&.fetch("isError"), "Resource resolution error")
+    resource_id = result.dig("structuredContent", "data", "resource_id")
+    assert_acceptance(
+      Coordinator::Shared::Types::UUID_V7_PATTERN.match?(resource_id.to_s),
+      "Resource resolution returned no UUIDv7: #{result.inspect}"
+    )
+    @acceptance_resource_ids[key] = resource_id
+  end
+
   def prepare_mcp_clients(*client_ids)
     client_ids.each { mcp_session(_1) }
   end
@@ -781,16 +832,12 @@ module McpAcceptanceWorld
     }
   end
 
-  def lease_events(path)
-    resource = Coordinator::Write::FileResourceNormalizer.new.call(
-      repository_id: acceptance_repository_id,
-      kind: "file",
-      path:,
-      base_blob_oid: nil,
-      scope: acceptance_repository_scope
-    ).value!
+  def lease_events(path, kind: "file", repository_id: acceptance_repository_id)
+    resource_id = (@acceptance_resource_ids || {}).fetch([ repository_id, kind, path ]) do
+      raise "Resource #{repository_id}/#{kind}/#{path} was not resolved through MCP"
+    end
     event_store.read(
-      streams.resource_lease(resource.resource_key_hash),
+      streams.resource_lease(resource_id),
       Coordinator::Write::EventReadCriteria.new(
         event_types: [
           "ResourceLeaseAcquired",

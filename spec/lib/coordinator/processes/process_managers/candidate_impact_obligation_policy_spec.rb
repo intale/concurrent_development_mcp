@@ -160,7 +160,13 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CandidateImpactObligatio
       repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: %w[Gemfile.lock app/services/checkout.rb].map do |path|
-        { kind: "file", path:, base_blob_oid: "c" * 40 }
+        ResourceScenario.target(
+          event_store:,
+          repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+          kind: "file",
+          path:,
+          base_blob_oid: "c" * 40
+        )
       end,
       lease_duration_seconds: 900
     }).data

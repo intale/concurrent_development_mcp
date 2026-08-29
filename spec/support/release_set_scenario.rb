@@ -266,6 +266,7 @@ module ReleaseSetScenario
     base_oid = format("%040x", identity_seed)
     head_oid = format("%040x", identity_seed + 10_000)
     path = "lib/#{repository_name}.rb"
+    resource_id = ResourceScenario.resolve(event_store:, repository_id:, kind: "file", path:)
     execute(Coordinator::Write::Operations::ExecuteAcquireWorkItem, {
       command_id: "seed-release-acquire-#{prefix}-#{index}",
       actor: { kind: "agent", id: "agent-#{index}" },
@@ -282,7 +283,7 @@ module ReleaseSetScenario
       attempt_id:,
       repository_id:,
       base_commit_oid: base_oid,
-      resources: [ { kind: "file", path:, base_blob_oid: "a" * 40 } ],
+      resources: [ { resource_id:, base_blob_oid: "a" * 40 } ],
       lease_duration_seconds: 900
     }).data
     input = {
@@ -300,7 +301,7 @@ module ReleaseSetScenario
       lease_set_id: reservation.lease_set_id,
       leases: reservation.resources.map do |reference|
         {
-          resource_key_hash: reference.resource_key_hash,
+          resource_id: reference.resource_id,
           lease_id: reference.lease_id,
           fencing_token: reference.fencing_token
         }
@@ -331,7 +332,7 @@ module ReleaseSetScenario
       lease_set_id: reservation.lease_set_id,
       leases: reservation.resources.map do |lease|
         {
-          resource_key_hash: lease.resource_key_hash,
+          resource_id: lease.resource_id,
           lease_id: lease.lease_id,
           fencing_token: lease.fencing_token
         }

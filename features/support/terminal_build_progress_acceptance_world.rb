@@ -81,11 +81,13 @@ module TerminalBuildProgressAcceptanceWorld
       repository_id:,
       base_commit_oid: "a" * 40,
       resources: [
-        {
+        resource_target(
           kind: "file",
           path: "lib/terminal_dependency.rb",
-          base_blob_oid: CandidateAcceptanceWorld::BASE_BLOB_OID
-        }
+          repository_id:,
+          base_blob_oid: CandidateAcceptanceWorld::BASE_BLOB_OID,
+          actor_id: agent_id
+        )
       ],
       lease_duration_seconds: 900
     )
@@ -142,11 +144,13 @@ module TerminalBuildProgressAcceptanceWorld
         repository_id:,
         base_commit_oid: "a" * 40,
         resources: [
-          {
+          resource_target(
             kind: "file",
             path: recovered.fetch(:path),
-            base_blob_oid: CandidateAcceptanceWorld::BASE_BLOB_OID
-          }
+            repository_id:,
+            base_blob_oid: CandidateAcceptanceWorld::BASE_BLOB_OID,
+            actor_id: recovered.fetch(:agent_id)
+          )
         ],
         lease_duration_seconds: 900
       )
@@ -191,7 +195,7 @@ module TerminalBuildProgressAcceptanceWorld
       lease_set_id: reservation.fetch("lease_set_id"),
       leases: reservation.fetch("resources").map do |reference|
         {
-          resource_key_hash: reference.fetch("resource_key_hash"),
+          resource_id: reference.fetch("resource_id"),
           lease_id: reference.fetch("lease_id"),
           fencing_token: reference.fetch("fencing_token")
         }

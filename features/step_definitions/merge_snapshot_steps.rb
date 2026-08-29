@@ -480,7 +480,7 @@ def complete_merge_candidate_work_item(candidate)
     lease_set_id: reservation.fetch("lease_set_id"),
     leases: reservation.fetch("resources").map do |reference|
       {
-        resource_key_hash: reference.fetch("resource_key_hash"),
+        resource_id: reference.fetch("resource_id"),
         lease_id: reference.fetch("lease_id"),
         fencing_token: reference.fetch("fencing_token")
       }
