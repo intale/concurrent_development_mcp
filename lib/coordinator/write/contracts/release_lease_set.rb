@@ -16,7 +16,7 @@ module Coordinator::Write
         required(:attempt_id).filled(:string)
         required(:lease_set_id).filled(:string)
         required(:leases).array(:hash) do
-          required(:resource_key_hash).filled(:string)
+          required(:resource_id).filled(:string)
           required(:lease_id).filled(:string)
           required(:fencing_token).filled(:integer)
         end
@@ -44,11 +44,11 @@ module Coordinator::Write
         end
 
         value.each_with_index do |reference, index|
-          hash = reference[:resource_key_hash]
+          resource_id = reference[:resource_id]
           lease_id = reference[:lease_id]
           token = reference[:fencing_token]
-          unless hash.is_a?(String) && Types::SHA256_DIGEST_PATTERN.match?(hash)
-            key([ :leases, index, :resource_key_hash ]).failure("must be a SHA-256 resource digest")
+          unless resource_id.is_a?(String) && Types::UUID_V7_PATTERN.match?(resource_id)
+            key([ :leases, index, :resource_id ]).failure("must be a UUIDv7")
           end
           unless lease_id.is_a?(String) && Types::UUID_V7_PATTERN.match?(lease_id)
             key([ :leases, index, :lease_id ]).failure("must be a UUIDv7")
@@ -58,9 +58,9 @@ module Coordinator::Write
           end
         end
 
-        hashes = value.filter_map { _1[:resource_key_hash] }
+        resource_ids = value.filter_map { _1[:resource_id] }
         lease_ids = value.filter_map { _1[:lease_id] }
-        key.failure("must not repeat a resource identity") unless hashes.uniq.length == hashes.length
+        key.failure("must not repeat a Resource ID") unless resource_ids.uniq.length == resource_ids.length
         key.failure("must not repeat a lease ID") unless lease_ids.uniq.length == lease_ids.length
       end
     end

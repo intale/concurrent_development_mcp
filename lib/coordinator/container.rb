@@ -1293,8 +1293,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"],
-        compound_marker_builder: self["compound_marker_builder"]
+        completion_builder: self["command_completion_builder"]
       )
     end
 
@@ -1309,8 +1308,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"],
-        compound_marker_builder: self["compound_marker_builder"]
+        completion_builder: self["command_completion_builder"]
       )
     end
 
@@ -1325,8 +1323,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"],
-        compound_marker_builder: self["compound_marker_builder"]
+        completion_builder: self["command_completion_builder"]
       )
     end
 
@@ -1341,8 +1338,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"],
-        compound_marker_builder: self["compound_marker_builder"]
+        completion_builder: self["command_completion_builder"]
       )
     end
 
@@ -1356,8 +1352,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"],
-        compound_marker_builder: self["compound_marker_builder"]
+        completion_builder: self["command_completion_builder"]
       )
     end
 

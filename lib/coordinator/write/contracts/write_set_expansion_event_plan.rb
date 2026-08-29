@@ -7,7 +7,7 @@ module Coordinator::Write
         required(:plan).value(Types.Instance(Domain::EventPlan))
         required(:command).value(Types.Instance(Commands::ExpandWriteSet))
         required(:attempt_state).value(Types.Instance(Domain::Attempts::State))
-        required(:requested_observations).array(Types.Instance(RequestedLeaseObservationV1))
+        required(:requested_observations).array(Types.Instance(RequestedLeaseObservationV2))
         required(:expanded_at).filled(:string)
       end
 
@@ -22,13 +22,13 @@ module Coordinator::Write
         acquisitions = plan.events.first(observations.length)
         expansion = plan.events.last
         expected_streams = observations.map do |observation|
-          StreamFactory.new.resource_lease(observation.prepared_resource.resource.resource_key_hash)
+          StreamFactory.new.resource_lease(observation.resource.resource_id)
         end + [ StreamFactory.new.attempt(command.attempt_id) ]
 
         unless plan.writes.length == observations.length + 1 &&
                plan.writes.map(&:stream) == expected_streams &&
-               acquisitions.all? { _1.is_a?(Events::ResourceLeaseAcquiredV1) } &&
-               expansion.is_a?(Events::WriteSetExpandedV1)
+               acquisitions.all? { _1.is_a?(Events::ResourceLeaseAcquiredV2) } &&
+               expansion.is_a?(Events::WriteSetExpandedV2)
           key(:plan).failure("must contain ordered new resource acquisitions followed by one Attempt expansion")
           next
         end
@@ -52,22 +52,21 @@ module Coordinator::Write
       private
 
       def additions(attempt_state:, requested_observations:)
-        current_hashes = attempt_state.lease_resources.map(&:resource_key_hash)
+        current_ids = attempt_state.lease_resources.map(&:resource_id)
         requested_observations.reject do |observation|
-          current_hashes.include?(observation.prepared_resource.resource.resource_key_hash)
+          current_ids.include?(observation.resource.resource_id)
         end
       end
 
       def verify_acquisitions(acquisitions:, observations:, attempt_state:, command:, expanded_at:)
         valid = acquisitions.each_with_index.all? do |event, index|
           observation = observations.fetch(index)
-          prepared = observation.prepared_resource
-          resource = prepared.resource
+          prepared = observation.prepared_target
+          resource = observation.resource
 
           event.lease_id == prepared.lease_id &&
             event.lease_set_id == command.lease_set_id &&
-            event.resource_key == resource.resource_key &&
-            event.resource_key_hash == resource.resource_key_hash &&
+            event.resource_id == resource.resource_id &&
             event.resource_path == resource.path &&
             event.base_blob_oid == resource.base_blob_oid &&
             event.change_set_id == command.change_set_id &&
@@ -99,10 +98,9 @@ module Coordinator::Write
       end
 
       def lease_reference(event)
-        LeaseReferenceV1.new(
+        LeaseReferenceV2.new(
           lease_id: event.lease_id,
-          resource_key: event.resource_key,
-          resource_key_hash: event.resource_key_hash,
+          resource_id: event.resource_id,
           resource_kind: event.resource_kind,
           resource_path: event.resource_path,
           base_blob_oid: event.base_blob_oid,

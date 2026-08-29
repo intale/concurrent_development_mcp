@@ -32,7 +32,7 @@ module Coordinator::Read
 
       params do
         required(:event_type).filled(:string, included_in?: EVENT_STREAMS.keys)
-        required(:schema_version).filled(:integer, eql?: 1)
+        required(:schema_version).filled(:integer, included_in?: [ 1, 2 ])
         required(:stream_context).filled(:string)
         required(:stream_name).filled(:string)
         required(:stream_id).filled(:string)
@@ -45,6 +45,18 @@ module Coordinator::Read
         next if expected == [ values[:stream_context], values[:stream_name] ]
 
         key(:event_type).failure("does not belong to the supplied source stream")
+      end
+
+      rule(:event_type, :schema_version) do
+        versioned = %w[
+          AttemptAbandoned
+          WriteSetReserved
+          WriteSetExpanded
+          WriteSetRenewed
+          WriteSetReleased
+        ]
+        expected = versioned.include?(values[:event_type]) ? [ 1, 2 ] : [ 1 ]
+        key(:schema_version).failure("must match the projected event schema") unless expected.include?(values[:schema_version])
       end
 
       rule(:stream_id) do

@@ -45,18 +45,6 @@ RSpec.describe Coordinator::Write::Operations::PrepareSubmitCandidate do
     expect(changed.build_context.digest).to eq(original.build_context.digest)
   end
 
-  it "keeps evidence digests stable while binding actual resources to repository scope" do
-    command = prepare.call(input_with_context).value!
-    scoped = prepare.scope_for_repository(
-      command,
-      repository_registration: RepositoryScenario.registration
-    ).value!
-
-    expect(scoped.manifest.digest).to eq(command.manifest.digest)
-    expect(scoped.build_context.digest).to eq(command.build_context.digest)
-    expect(scoped.actual_resources).to all(have_attributes(policy_version: "coordinator-resource-key/v3"))
-  end
-
   it "expands rename resources and rejects manifests above the public write-set boundary" do
     renamed = valid_input
     renamed[:change_manifest][:files] = [
@@ -130,7 +118,7 @@ RSpec.describe Coordinator::Write::Operations::PrepareSubmitCandidate do
       lease_set_id: "01919191-9191-7191-8191-919191919191",
       leases: [
         {
-          resource_key_hash: "sha256:#{"1" * 64}",
+          resource_id: "02919191-9191-7191-8191-919191919191",
           lease_id: "01919191-9191-7191-8191-919191919192",
           fencing_token: 1
         }

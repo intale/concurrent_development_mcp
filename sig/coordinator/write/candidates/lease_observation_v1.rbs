@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Candidates
       class LeaseObservationV1 < Coordinator::Shared::Value
-        attr_reader resource_key_hash: String
+        attr_reader resource_id: String
         attr_reader lease_id: String
         attr_reader fencing_token: Integer
       end

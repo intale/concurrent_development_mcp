@@ -30,8 +30,8 @@ module Coordinator::Write
       def build_command(attributes)
         actor = attributes.fetch(:actor)
         leases = attributes.fetch(:leases).map do |reference|
-          LeaseRenewalReferenceV1.new(reference)
-        end.sort_by { _1.resource_key_hash.b }
+          LeaseRenewalReferenceV2.new(reference)
+        end.sort_by { _1.resource_id.b }
 
         Success(
           Commands::RenewLeaseSet.new(

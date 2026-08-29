@@ -56,11 +56,20 @@ module Coordinator
           def fencing_token: () -> Integer
         end
 
+        class WriteSetResourceV2 < Shared::Value
+          def lease_id: () -> String
+          def resource_id: () -> String
+          def resource_kind: () -> String
+          def resource_path: () -> String
+          def base_blob_oid: () -> String?
+          def fencing_token: () -> Integer
+        end
+
         class WriteSet < Shared::Value
           def lease_set_id: () -> String
           def repository_id: () -> String
           def policy_version: () -> String
-          def resources: () -> Array[WriteSetResource]
+          def resources: () -> Array[WriteSetResource | WriteSetResourceV2]
           def reserved_at: () -> String
           def last_expanded_at: () -> String?
           def last_renewed_at: () -> String?

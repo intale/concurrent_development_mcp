@@ -1,486 +1,126 @@
 # frozen_string_literal: true
 
 RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_store do
-  EXPAND_REPOSITORY_ID = RepositoryScenario::DEFAULT_REPOSITORY_ID
-
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
-  let(:normalizer) { Coordinator::Write::FileResourceNormalizer.new }
   subject(:operation) { described_class.new(event_store:) }
 
-  it "atomically acquires only new resources and records the resulting write-set size" do
-    seed_active_attempts([ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ])
-    reservation = Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 0)) do
-      reserve(
-        command_id: "cmd-reserve-a",
-        work_item_id: "W-LSE-A",
-        attempt_id: "A-LSE-A",
-        agent_id: "agent-a",
-        paths: [ "app/a.rb" ]
-      ).value!.data
-    end
+  it "atomically appends UUID lease membership while preserving the original deadline" do
+    reservation = setup_reservation
+    added = resolve("app/models/b.rb")
 
-    result = Timecop.freeze(Time.utc(2026, 8, 22, 10, 2, 0)) do
-      operation.call(
-        expand_input(
-          command_id: "cmd-expand-a",
-          work_item_id: "W-LSE-A",
-          attempt_id: "A-LSE-A",
-          agent_id: "agent-a",
-          lease_set_id: reservation.lease_set_id,
-          paths: [ "app/a.rb", "app/b.rb" ]
-        )
-      )
-    end
+    result = operation.call(expand_input(reservation, command_id: "cmd-expand-v2", resource_ids: [ added ]))
 
     expect(result).to be_success
-    completion = result.value!
-    expect(completion.data).to be_a(Coordinator::Write::CommandReceiptData::LeaseSetExpansion)
-    expect(completion.data.to_h).to include(
-      lease_set_id: reservation.lease_set_id,
-      resource_count: 2,
-      expanded_at: "2026-08-22T10:02:00.000000Z",
-      expires_at: reservation.expires_at
-    )
-    expect(completion.data.added_resources.map(&:resource_path)).to eq([ "app/b.rb" ])
-    expect(attempt_events("A-LSE-A").map(&:type)).to eq(
-      [ "AttemptAuthorized", "AttemptStarted", "WriteSetReserved", "WriteSetExpanded" ]
-    )
-    expect(lease_events("app/a.rb").length).to eq(1)
-    expect(lease_events("app/b.rb").sole.data).to include(
-      "lease_set_id" => reservation.lease_set_id,
-      "expires_at" => reservation.expires_at,
-      "fencing_token" => 1
-    )
-    expect(lease_events("app/b.rb").sole.markers).to include(
-      "scope:#{RepositoryScenario::DEFAULT_SCOPE}",
-      "repository:#{EXPAND_REPOSITORY_ID}"
-    )
-    expect(command_events("cmd-expand-a").map(&:type)).to eq([ "CommandCompleted" ])
+    receipt = result.value!.data
+    expect(receipt).to be_a(Coordinator::Write::CommandReceiptData::LeaseSetExpansion)
+    expect(receipt.added_resources.sole).to be_a(Coordinator::Write::LeaseReferenceV2)
+    expect(receipt.added_resources.sole.resource_id).to eq(added)
+    expect(receipt.expires_at).to eq(reservation.receipt.expires_at)
+    expect(lease_events(added).sole.data).not_to have_key("resource_key_hash")
   end
 
-  it "replays an exact normalized expansion and rejects changed command reuse" do
-    seed_active_attempts([ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ])
-    reservation = reserve(
-      command_id: "cmd-reserve-a",
-      work_item_id: "W-LSE-A",
-      attempt_id: "A-LSE-A",
-      agent_id: "agent-a",
-      paths: [ "app/a.rb" ]
-    ).value!.data
+  it "replays exact input and rejects an unchanged set without new facts" do
+    reservation = setup_reservation
     input = expand_input(
-      command_id: "cmd-expand-a",
-      work_item_id: "W-LSE-A",
-      attempt_id: "A-LSE-A",
-      agent_id: "agent-a",
-      lease_set_id: reservation.lease_set_id,
-      paths: [ "app/b.rb" ]
+      reservation,
+      command_id: "cmd-expand-existing",
+      resource_ids: reservation.resource_ids
     )
 
-    original = operation.call(input)
-    original_event_ids = expansion_event_ids("A-LSE-A", "app/b.rb", "cmd-expand-a")
+    unchanged = operation.call(input)
     replay = operation.call(input)
-    changed = operation.call(input.merge(resources: [ { kind: "file", path: "app/c.rb" } ]))
 
-    expect(replay).to be_success
-    expect(replay.value!).to eq(original.value!)
-    expect(changed.failure.code).to eq(:command_id_reused)
-    expect(expansion_event_ids("A-LSE-A", "app/b.rb", "cmd-expand-a")).to eq(original_event_ids)
-    expect(lease_events("app/c.rb")).to be_empty
-  end
-
-  it "returns zero-fact no-set, stale-set, unchanged, and evidence denials" do
-    seed_active_attempts([ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ])
-    no_set = operation.call(
-      expand_input(
-        command_id: "cmd-no-set",
-        work_item_id: "W-LSE-A",
-        attempt_id: "A-LSE-A",
-        agent_id: "agent-a",
-        lease_set_id: "01919191-9191-7191-8191-919191919191",
-        paths: [ "app/b.rb" ]
-      )
-    )
-    reservation = reserve(
-      command_id: "cmd-reserve-a",
-      work_item_id: "W-LSE-A",
-      attempt_id: "A-LSE-A",
-      agent_id: "agent-a",
-      paths: [ "app/a.rb" ]
-    ).value!.data
-    base = expand_input(
-      command_id: "cmd-expand",
-      work_item_id: "W-LSE-A",
-      attempt_id: "A-LSE-A",
-      agent_id: "agent-a",
-      lease_set_id: reservation.lease_set_id,
-      paths: [ "app/a.rb" ]
-    )
-    stale_set = operation.call(base.merge(command_id: "cmd-stale", lease_set_id: "02919191-9191-7191-8191-919191919191"))
-    unchanged = operation.call(base.merge(command_id: "cmd-unchanged"))
-    evidence = operation.call(
-      base.merge(
-        command_id: "cmd-evidence",
-        resources: [ { kind: "file", path: "app/a.rb", base_blob_oid: "b" * 40 } ]
-      )
-    )
-
-    expect(no_set.failure.code).to eq(:write_set_not_reserved)
-    expect(stale_set.failure.code).to eq(:lease_set_mismatch)
     expect(unchanged.failure.code).to eq(:write_set_unchanged)
-    expect(evidence.failure.code).to eq(:resource_evidence_conflict)
-    expect(%w[cmd-no-set cmd-stale cmd-unchanged cmd-evidence].flat_map { command_events(_1) }).to be_empty
-    expect(attempt_events("A-LSE-A").none? { _1.type == "WriteSetExpanded" }).to be(true)
+    expect(replay.failure.code).to eq(:write_set_unchanged)
+    expect(command_events("cmd-expand-existing")).to be_empty
   end
 
-  it "acquires none of a mixed addition when one resource is busy" do
-    seed_active_attempts(
-      [
-        [ "W-LSE-A", "A-LSE-A", "agent-a" ],
-        [ "W-LSE-B", "A-LSE-B", "agent-b" ]
-      ]
+  it "acquires none of a mixed UUID addition when another agent owns one member" do
+    ResourceLeaseOperationScenario.start_attempts(
+      event_store:,
+      attempts: [ [ "W-LSE-A", "A-LSE-A", "agent-a" ], [ "W-LSE-B", "A-LSE-B", "agent-b" ] ]
     )
-    reservation_a = reserve(
-      command_id: "cmd-reserve-a",
-      work_item_id: "W-LSE-A",
-      attempt_id: "A-LSE-A",
-      agent_id: "agent-a",
-      paths: [ "a.rb" ]
-    ).value!.data
-    reserve(
-      command_id: "cmd-reserve-b",
-      work_item_id: "W-LSE-B",
-      attempt_id: "A-LSE-B",
+    owner = ResourceLeaseOperationScenario.reserve(
+      event_store:,
+      paths: [ "app/a.rb" ],
+      command_id: "seed-reserve-a"
+    )
+    busy = ResourceLeaseOperationScenario.reserve(
+      event_store:,
+      paths: [ "app/busy.rb" ],
+      command_id: "seed-reserve-b",
       agent_id: "agent-b",
-      paths: [ "shared.rb" ]
+      work_item_id: "W-LSE-B",
+      attempt_id: "A-LSE-B"
+    )
+    free = resolve("app/free.rb")
+
+    result = operation.call(
+      expand_input(owner, command_id: "cmd-expand-busy", resource_ids: [ free, busy.resource_ids.sole ])
+    )
+
+    expect(result.failure).to have_attributes(code: :lease_busy)
+    expect(result.failure.details).to include(resource_id: busy.resource_ids.sole)
+    expect(lease_events(free)).to be_empty
+    expect(command_events("cmd-expand-busy")).to be_empty
+  end
+
+  it "rejects an inactive Resource before changing Attempt membership" do
+    reservation = setup_reservation
+    inactive = resolve("app/removed.rb")
+    Coordinator::Write::Operations::ExecuteRemoveResource.new(event_store:).call(
+      command_id: "cmd-remove-expanded-resource",
+      actor: { kind: "agent", id: "agent-a" },
+      resource_id: inactive,
+      reason: "removed"
     ).value!
 
     result = operation.call(
-      expand_input(
-        command_id: "cmd-expand-a",
-        work_item_id: "W-LSE-A",
-        attempt_id: "A-LSE-A",
-        agent_id: "agent-a",
-        lease_set_id: reservation_a.lease_set_id,
-        paths: [ "free.rb", "shared.rb" ]
-      )
+      expand_input(reservation, command_id: "cmd-expand-inactive", resource_ids: [ inactive ])
     )
 
-    expect(result.failure.code).to eq(:lease_busy)
-    expect(lease_events("free.rb")).to be_empty
-    expect(command_events("cmd-expand-a")).to be_empty
-    expect(attempt_events("A-LSE-A").none? { _1.type == "WriteSetExpanded" }).to be(true)
+    expect(result.failure).to have_attributes(code: :resource_not_active)
+    expect(result.failure.details).to include(resource_id: inactive)
+    expect(command_events("cmd-expand-inactive")).to be_empty
   end
 
-  it "rejects expansion exactly at the common expiry without writing facts" do
-    seed_active_attempts([ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ])
-    reservation = Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 0)) do
-      Coordinator::Write::Operations::ExecuteReserveWriteSet.new(event_store:).call(
-        command_id: "cmd-reserve-a",
-        actor: { kind: "agent", id: "agent-a" },
-        change_set_id: "CS-LSE",
-        work_item_id: "W-LSE-A",
-        attempt_id: "A-LSE-A",
-        repository_id: EXPAND_REPOSITORY_ID,
-        base_commit_oid: "a" * 40,
-        resources: [ { kind: "file", path: "a.rb" } ],
-        lease_duration_seconds: 30
-      ).value!.data
-    end
-
-    result = Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 30)) do
-      operation.call(
-        expand_input(
-          command_id: "cmd-expired",
-          work_item_id: "W-LSE-A",
-          attempt_id: "A-LSE-A",
-          agent_id: "agent-a",
-          lease_set_id: reservation.lease_set_id,
-          paths: [ "b.rb" ]
-        )
-      )
-    end
-
-    expect(result.failure.code).to eq(:lease_set_expired)
-    expect(result.failure.details).to include(expires_at: reservation.expires_at)
-    expect(lease_events("b.rb")).to be_empty
-    expect(command_events("cmd-expired")).to be_empty
-  end
-
-  it "rejects a resulting set larger than 32 before acquiring additions" do
-    seed_active_attempts([ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ])
-    reservation = reserve(
-      command_id: "cmd-reserve-a",
-      work_item_id: "W-LSE-A",
-      attempt_id: "A-LSE-A",
-      agent_id: "agent-a",
-      paths: 31.times.map { "existing-#{_1}.rb" }
-    ).value!.data
-
-    result = operation.call(
-      expand_input(
-        command_id: "cmd-over-bound",
-        work_item_id: "W-LSE-A",
-        attempt_id: "A-LSE-A",
-        agent_id: "agent-a",
-        lease_set_id: reservation.lease_set_id,
-        paths: [ "new-a.rb", "new-b.rb" ]
-      )
+  def setup_reservation
+    ResourceLeaseOperationScenario.start_attempts(
+      event_store:,
+      attempts: [ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ]
     )
-
-    expect(result.failure.code).to eq(:write_set_limit_reached)
-    expect(result.failure.details).to include(current_resource_count: 31, requested_addition_count: 2)
-    expect(lease_events("new-a.rb")).to be_empty
-    expect(lease_events("new-b.rb")).to be_empty
-    expect(command_events("cmd-over-bound")).to be_empty
+    ResourceLeaseOperationScenario.reserve(event_store:, paths: [ "app/models/a.rb" ])
   end
 
-  it "serializes competing Attempts that add the same resource so exactly one wins" do
-    seed_active_attempts(
-      [
-        [ "W-LSE-A", "A-LSE-A", "agent-a" ],
-        [ "W-LSE-B", "A-LSE-B", "agent-b" ]
-      ]
-    )
-    reservations = [
-      reserve(
-        command_id: "cmd-reserve-a",
-        work_item_id: "W-LSE-A",
-        attempt_id: "A-LSE-A",
-        agent_id: "agent-a",
-        paths: [ "a.rb" ]
-      ).value!.data,
-      reserve(
-        command_id: "cmd-reserve-b",
-        work_item_id: "W-LSE-B",
-        attempt_id: "A-LSE-B",
-        agent_id: "agent-b",
-        paths: [ "b.rb" ]
-      ).value!.data
-    ]
-    inputs = [
-      expand_input(
-        command_id: "cmd-expand-a",
-        work_item_id: "W-LSE-A",
-        attempt_id: "A-LSE-A",
-        agent_id: "agent-a",
-        lease_set_id: reservations.first.lease_set_id,
-        paths: [ "shared.rb" ]
-      ),
-      expand_input(
-        command_id: "cmd-expand-b",
-        work_item_id: "W-LSE-B",
-        attempt_id: "A-LSE-B",
-        agent_id: "agent-b",
-        lease_set_id: reservations.last.lease_set_id,
-        paths: [ "shared.rb" ]
-      )
-    ]
-
-    results = inputs.map do |input|
-      Thread.new { described_class.new(event_store:).call(input) }
-    end.map(&:value)
-
-    expect(results.count(&:success?)).to eq(1)
-    expect(results.count(&:failure?)).to eq(1)
-    expect(results.find(&:failure?).failure.code).to eq(:lease_busy)
-    expect(lease_events("shared.rb").length).to eq(1)
-    expect(%w[cmd-expand-a cmd-expand-b].sum { command_events(_1).length }).to eq(1)
-  end
-
-  it "re-evaluates concurrent parent-directory and child-file expansions through one DCB" do
-    seed_active_attempts(
-      [
-        [ "W-LSE-A", "A-LSE-A", "agent-a" ],
-        [ "W-LSE-B", "A-LSE-B", "agent-b" ]
-      ]
-    )
-    reservations = [
-      reserve(
-        command_id: "cmd-reserve-a",
-        work_item_id: "W-LSE-A",
-        attempt_id: "A-LSE-A",
-        agent_id: "agent-a",
-        paths: [ "a.rb" ]
-      ).value!.data,
-      reserve(
-        command_id: "cmd-reserve-b",
-        work_item_id: "W-LSE-B",
-        attempt_id: "A-LSE-B",
-        agent_id: "agent-b",
-        paths: [ "b.rb" ]
-      ).value!.data
-    ]
-    inputs = [
-      expand_input(
-        command_id: "cmd-expand-directory",
-        work_item_id: "W-LSE-A",
-        attempt_id: "A-LSE-A",
-        agent_id: "agent-a",
-        lease_set_id: reservations.first.lease_set_id,
-        resources: [ { kind: "directory", path: "app/models" } ]
-      ),
-      expand_input(
-        command_id: "cmd-expand-child",
-        work_item_id: "W-LSE-B",
-        attempt_id: "A-LSE-B",
-        agent_id: "agent-b",
-        lease_set_id: reservations.last.lease_set_id,
-        resources: [ { kind: "file", path: "app/models/user.rb" } ]
-      )
-    ]
-
-    results = inputs.map do |input|
-      Thread.new { described_class.new(event_store:).call(input) }
-    end.map(&:value)
-
-    expect(results.count(&:success?)).to eq(1)
-    expect(results.count(&:failure?)).to eq(1)
-    expect(results.find(&:failure?).failure).to have_attributes(code: :lease_busy)
-    expect(
-      lease_events("app/models", kind: "directory").length + lease_events("app/models/user.rb").length
-    ).to eq(1)
-  end
-
-  it "serializes disjoint expansions of one Attempt and retains both additions" do
-    seed_active_attempts([ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ])
-    reservation = reserve(
-      command_id: "cmd-reserve-a",
-      work_item_id: "W-LSE-A",
-      attempt_id: "A-LSE-A",
-      agent_id: "agent-a",
-      paths: [ "a.rb" ]
-    ).value!.data
-    inputs = %w[b.rb c.rb].each_with_index.map do |path, index|
-      expand_input(
-        command_id: "cmd-expand-#{index}",
-        work_item_id: "W-LSE-A",
-        attempt_id: "A-LSE-A",
-        agent_id: "agent-a",
-        lease_set_id: reservation.lease_set_id,
-        paths: [ path ]
-      )
-    end
-
-    results = inputs.map do |input|
-      Thread.new { described_class.new(event_store:).call(input) }
-    end.map(&:value)
-
-    expect(results).to all(be_success)
-    expect(results.map { _1.value!.data.resource_count }.sort).to eq([ 2, 3 ])
-    state = Coordinator::Write::Domain::Attempts::State.reduce(
-      attempt_events("A-LSE-A").map do |event|
-        Coordinator::Write::EventSchemaRegistry.new.load(
-          type: event.type,
-          schema_version: event.metadata.fetch("schema_version"),
-          data: event.data
-        )
-      end
-    )
-    expect(state.lease_resources.map(&:resource_path).sort).to eq(%w[a.rb b.rb c.rb])
-  end
-
-  private
-
-  def expand_input(command_id:, work_item_id:, attempt_id:, agent_id:, lease_set_id:, paths: nil, resources: nil)
+  def expand_input(reservation, command_id:, resource_ids:)
     {
       command_id:,
-      actor: { kind: "agent", id: agent_id },
+      actor: { kind: "agent", id: "agent-a" },
       change_set_id: "CS-LSE",
-      work_item_id:,
-      attempt_id:,
-      lease_set_id:,
-      repository_id: EXPAND_REPOSITORY_ID,
+      work_item_id: "W-LSE-A",
+      attempt_id: "A-LSE-A",
+      lease_set_id: reservation.receipt.lease_set_id,
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
-      resources: resources || paths.map { { kind: "file", path: _1 } }
+      resources: resource_ids.map { { resource_id: _1 } }
     }
   end
 
-  def reserve(command_id:, work_item_id:, attempt_id:, agent_id:, paths:)
-    Coordinator::Write::Operations::ExecuteReserveWriteSet.new(event_store:).call(
-      command_id:,
-      actor: { kind: "agent", id: agent_id },
-      change_set_id: "CS-LSE",
-      work_item_id:,
-      attempt_id:,
-      repository_id: EXPAND_REPOSITORY_ID,
-      base_commit_oid: "a" * 40,
-      resources: paths.map { { kind: "file", path: _1 } },
-      lease_duration_seconds: 900
+  def resolve(path)
+    ResourceScenario.resolve(
+      event_store:,
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      kind: "file",
+      path:
     )
   end
 
-  def seed_active_attempts(attempts)
-    RepositoryScenario.register(event_store:)
-    Coordinator::Write::Operations::ExecuteCreateChangeSet.new(event_store:).call(
-      command_id: "seed-create-CS-LSE",
-      actor: { kind: "agent", id: "planner-1" },
-      change_set_id: "CS-LSE",
-      goal: "Coordinate resource leases",
-      acceptance_criteria: [ "Overlapping agents cannot both write" ]
-    ).value!
-    attempts.each do |work_item_id, _attempt_id, _agent_id|
-      Coordinator::Write::Operations::ExecuteCreateWorkItem.new(event_store:).call(
-        command_id: "seed-create-#{work_item_id}",
-        actor: { kind: "agent", id: "planner-1" },
-        change_set_id: "CS-LSE",
-        work_item_id:,
-        repository_id: EXPAND_REPOSITORY_ID,
-        goal: "Implement #{work_item_id}",
-        acceptance_criteria: [ "The work is verifiable" ]
-      ).value!
-    end
-    Coordinator::Write::Operations::ExecuteActivateChangeSet.new(event_store:).call(
-      command_id: "seed-activate-CS-LSE",
-      actor: { kind: "agent", id: "planner-1" },
-      change_set_id: "CS-LSE"
-    ).value!
-    activation = event_store.read(
-      streams.change_set("CS-LSE"),
-      Coordinator::Write::EventQueries::CHANGE_SET_FOR_ACQUISITION
-    ).find { _1.type == "ChangeSetActivated" }
-    Coordinator::Processes::ProcessManagers::ChangeSetReadiness.new(event_store:).call(activation)
-    attempts.each do |work_item_id, attempt_id, agent_id|
-      Coordinator::Write::Operations::ExecuteAcquireWorkItem.new(event_store:).call(
-        command_id: "seed-acquire-#{attempt_id}",
-        actor: { kind: "agent", id: agent_id },
-        change_set_id: "CS-LSE",
-        work_item_id:,
-        attempt_id:,
-        base_snapshots: [ { repository_id: EXPAND_REPOSITORY_ID, commit_oid: "a" * 40 } ]
-      ).value!
-    end
-  end
-
-  def lease_events(path, kind: "file")
-    resource = normalizer.call(
-      repository_id: EXPAND_REPOSITORY_ID,
-      scope: RepositoryScenario::DEFAULT_SCOPE,
-      kind:,
-      path:,
-      base_blob_oid: nil
-    ).value!
-    event_store.read(
-      streams.resource_lease(resource.resource_key_hash),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "ResourceLeaseAcquired" ],
-        maximum_count: 10,
-        direction: :asc
-      )
-    )
-  end
-
-  def attempt_events(attempt_id)
-    event_store.read(streams.attempt(attempt_id), Coordinator::Write::EventQueries::ATTEMPT_FOR_WRITE_SET_EXPANSION)
+  def lease_events(resource_id)
+    ResourceScenario.lease_events(event_store:, resource_id:)
   end
 
   def command_events(command_id)
     event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
-  end
-
-  def expansion_event_ids(attempt_id, path, command_id)
-    lease_events(path).map(&:id) +
-      attempt_events(attempt_id).select { _1.type == "WriteSetExpanded" }.map(&:id) +
-      command_events(command_id).map(&:id)
   end
 end

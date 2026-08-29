@@ -3,7 +3,7 @@
 module Coordinator::Write
   module Commands
     class ReserveWriteSet < Value
-      Resource = Types.Instance(FileResourceV1)
+      Resource = Types.Instance(ResourceLeaseTargetV1)
 
       attribute :command_id, Types::Identifier
       attribute :actor, Actor

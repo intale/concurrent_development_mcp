@@ -1,0 +1,6 @@
+module ResourceScenario
+  def self.resolve: (event_store: Coordinator::Write::_EventStore, repository_id: String, kind: String, path: String) -> String
+  def self.target: (event_store: Coordinator::Write::_EventStore, repository_id: String, kind: String, path: String, ?base_blob_oid: String?) -> Hash[Symbol, String?]
+  def self.resource_events: (event_store: Coordinator::Write::_EventStore, resource_id: String) -> Array[PgEventstore::Event]
+  def self.lease_events: (event_store: Coordinator::Write::_EventStore, resource_id: String) -> Array[PgEventstore::Event]
+end

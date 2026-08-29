@@ -15,11 +15,11 @@ module Coordinator::Write
         command = values[:command]
         state = values[:state]
         event = plan.events.first
-        expected_stream = StreamFactory.new.resource_lease(command.resource_key_hash)
+        expected_stream = StreamFactory.new.resource_lease(command.resource_id)
 
         valid = plan.writes.length == 1 &&
           plan.writes.first.stream == expected_stream &&
-          event.is_a?(Events::ResourceLeaseExpiredV1) &&
+          event.is_a?(Events::ResourceLeaseExpiredV2) &&
           exact_expiration?(event:, state:, command:, expired_at: values[:expired_at])
         key(:plan).failure("must expire only the exact current lease observation") unless valid
       end
@@ -30,8 +30,7 @@ module Coordinator::Write
         event.to_h == {
           lease_id: command.lease_id,
           lease_set_id: command.lease_set_id,
-          resource_key: state.resource_key,
-          resource_key_hash: command.resource_key_hash,
+          resource_id: command.resource_id,
           resource_kind: state.resource_kind,
           resource_path: state.resource_path,
           policy_version: state.policy_version,

@@ -21,7 +21,7 @@ module Coordinator::Processes
       rule(:event) do
         key.failure("must be a persisted event") unless persisted?(value)
         key.failure("must have a UUIDv7 event ID") unless Types::UUID_V7_PATTERN.match?(value.id)
-        key.failure("must be a supported ResourceLease lifecycle source at schema 1") unless supported_schema?(value)
+        key.failure("must be a supported ResourceLease lifecycle source") unless supported_schema?(value)
         key.failure("must belong to its ResourceLease stream") unless matching_resource_stream?(value)
         key.failure("must carry command provenance") unless matching_provenance?(value)
         key.failure("must carry its complete resource-routing markers") unless matching_markers?(value)
@@ -35,24 +35,33 @@ module Coordinator::Processes
       end
 
       def supported_schema?(event)
-        SUPPORTED_TYPES.include?(event.type) && event.metadata["schema_version"] == 1
+        SUPPORTED_TYPES.include?(event.type) && [ 1, 2 ].include?(event.metadata["schema_version"])
       end
 
       def matching_resource_stream?(event)
         stream = event.stream
-        resource_key_hash = event.data["resource_key_hash"]
-        return false unless stream && Types::SHA256_DIGEST_PATTERN.match?(resource_key_hash.to_s)
+        identity = if event.metadata["schema_version"] == 2
+                     event.data["resource_id"]
+                   else
+                     event.data["resource_key_hash"]
+                   end
+        return false unless stream && identity
 
         stream.context == "DevelopmentCoordination" &&
           stream.stream_name == "ResourceLease" &&
-          stream.stream_id == resource_key_hash
+          stream.stream_id == identity
       end
 
       def matching_provenance?(event)
         command_id = event.metadata["command_id"]
 
-        Types::IDENTIFIER_PATTERN.match?(command_id.to_s) &&
-          event.metadata["policy_version"] == Coordinator::Write::ResourceKeyDocumentV3::POLICY_VERSION
+        expected_policy = if event.metadata["schema_version"] == 2
+                            Coordinator::Write::LeaseResourceV2::POLICY_VERSION
+                          else
+                            Coordinator::Write::ResourceKeyDocumentV3::POLICY_VERSION
+                          end
+
+        Types::IDENTIFIER_PATTERN.match?(command_id.to_s) && event.metadata["policy_version"] == expected_policy
       end
 
       def matching_markers?(event)
@@ -62,22 +71,14 @@ module Coordinator::Processes
 
         scope = scope_markers.fetch(0)
         repository = "repository:#{data['repository_id']}"
-        components = [
+        repository_components = [
           scope,
-          repository,
-          "resource-kind:#{data['resource_kind']}",
-          "resource-key-hash:#{data['resource_key_hash']}"
+          repository
         ]
-        resource_identity = @compound_marker_builder.call(
-          CompoundMarkerDefinitionV1.new(
-            purpose: "resource-identity",
-            components:
-          )
-        )
         scoped_repository = @compound_marker_builder.call(
           CompoundMarkerDefinitionV1.new(
             purpose: "scoped-repository",
-            components: [ scope, repository ]
+            components: repository_components
           )
         )
         expected = [
@@ -86,9 +87,9 @@ module Coordinator::Processes
           "attempt:#{data['attempt_id']}",
           "command:#{event.metadata['command_id']}",
           "lease-set:#{data['lease_set_id']}",
-          *components,
-          resource_identity.marker,
+          *repository_components,
           scoped_repository.marker,
+          *resource_identity_markers(event),
           *@repository_marker_builder.resource_event_markers(
             repository_id: data.fetch("repository_id"),
             resource_kind: data.fetch("resource_kind"),
@@ -97,6 +98,28 @@ module Coordinator::Processes
         ].uniq.sort
 
         event.markers == expected
+      end
+
+      def resource_identity_markers(event)
+        data = event.data
+        return [
+          "resource:#{data['resource_id']}",
+          "resource-kind:#{data['resource_kind']}"
+        ] if event.metadata["schema_version"] == 2
+
+        components = [
+          event.markers.grep(/\Ascope:/).sole,
+          "repository:#{data['repository_id']}",
+          "resource-kind:#{data['resource_kind']}",
+          "resource-key-hash:#{data['resource_key_hash']}"
+        ]
+        compound = @compound_marker_builder.call(
+          CompoundMarkerDefinitionV1.new(
+            purpose: "resource-identity",
+            components:
+          )
+        )
+        components.drop(2) + [ compound.marker ]
       end
 
       def valid_trace_correlation?(event)

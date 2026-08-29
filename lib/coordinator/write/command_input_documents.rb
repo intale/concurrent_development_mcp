@@ -163,8 +163,13 @@ module Coordinator::Write
       attribute :policy_version, Types::ResourceKeyPolicyVersion
     end
 
+    class ResourceLeaseTargetV1 < Value
+      attribute :resource_id, Types::ResourceId
+      attribute :base_blob_oid, Types::GitOid.optional
+    end
+
     class ReserveWriteSetInputV1 < Value
-      Resource = FileResourceV1
+      Resource = ResourceLeaseTargetV1
 
       attribute :actor, ActorV1
       attribute :change_set_id, Types::Identifier
@@ -182,7 +187,7 @@ module Coordinator::Write
     end
 
     class ExpandWriteSetInputV1 < Value
-      Resource = FileResourceV1
+      Resource = ResourceLeaseTargetV1
 
       attribute :actor, ActorV1
       attribute :change_set_id, Types::Identifier
@@ -200,7 +205,7 @@ module Coordinator::Write
     end
 
     class LeaseRenewalReferenceV1 < Value
-      attribute :resource_key_hash, Types::Sha256Digest
+      attribute :resource_id, Types::ResourceId
       attribute :lease_id, Types::UuidV7
       attribute :fencing_token, Types::FencingToken
     end
@@ -223,7 +228,7 @@ module Coordinator::Write
     end
 
     class LeaseReleaseReferenceV1 < Value
-      attribute :resource_key_hash, Types::Sha256Digest
+      attribute :resource_id, Types::ResourceId
       attribute :lease_id, Types::UuidV7
       attribute :fencing_token, Types::FencingToken
     end
@@ -349,9 +354,15 @@ module Coordinator::Write
     end
 
     class CandidateLeaseObservationV1 < Value
-      attribute :resource_key_hash, Types::Sha256Digest
+      attribute :resource_id, Types::ResourceId
       attribute :lease_id, Types::UuidV7
       attribute :fencing_token, Types::FencingToken
+    end
+
+    class CandidateActualResourceV2 < Value
+      attribute :kind, Types::String.enum("file")
+      attribute :path, Types::ResourcePath
+      attribute :base_blob_oid, Types::GitOid.optional
     end
 
     class CandidateManifestFileV1 < Value
@@ -403,7 +414,7 @@ module Coordinator::Write
 
     class SubmitCandidateInputV1 < Value
       Lease = CandidateLeaseObservationV1
-      Resource = FileResourceV1
+      Resource = CandidateActualResourceV2
 
       attribute :actor, ActorV1
       attribute :candidate_id, Types::Identifier
@@ -866,7 +877,7 @@ module Coordinator::Write
 
     class ExpireResourceLeaseInputV1 < Value
       attribute :actor, ActorV1
-      attribute :resource_key_hash, Types::Sha256Digest
+      attribute :resource_id, Types::ResourceId
       attribute :lease_id, Types::UuidV7
       attribute :lease_set_id, Types::UuidV7
       attribute :fencing_token, Types::FencingToken

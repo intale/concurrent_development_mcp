@@ -145,7 +145,7 @@ module Coordinator::Write
           attempt_id: input.attempt_id,
           repository_id: input.repository_id,
           base_commit_oid: input.base_commit_oid,
-          resources: input.resources.map { FileResourceV1.new(_1.to_h) },
+          resources: input.resources.map { ResourceLeaseTargetV1.new(_1.to_h) },
           lease_duration_seconds: input.lease_duration_seconds
         )
       end
@@ -161,7 +161,7 @@ module Coordinator::Write
           lease_set_id: input.lease_set_id,
           repository_id: input.repository_id,
           base_commit_oid: input.base_commit_oid,
-          resources: input.resources.map { FileResourceV1.new(_1.to_h) }
+          resources: input.resources.map { ResourceLeaseTargetV1.new(_1.to_h) }
         )
       end
 
@@ -174,7 +174,7 @@ module Coordinator::Write
           work_item_id: input.work_item_id,
           attempt_id: input.attempt_id,
           lease_set_id: input.lease_set_id,
-          leases: input.leases.map { LeaseRenewalReferenceV1.new(_1.to_h) },
+          leases: input.leases.map { LeaseRenewalReferenceV2.new(_1.to_h) },
           lease_duration_seconds: input.lease_duration_seconds
         )
       end
@@ -188,7 +188,7 @@ module Coordinator::Write
           work_item_id: input.work_item_id,
           attempt_id: input.attempt_id,
           lease_set_id: input.lease_set_id,
-          leases: input.leases.map { LeaseReleaseReferenceV1.new(_1.to_h) }
+          leases: input.leases.map { LeaseReleaseReferenceV2.new(_1.to_h) }
         )
       end
 
@@ -290,7 +290,7 @@ module Coordinator::Write
           leases: input.leases.map { Candidates::LeaseObservationV1.new(_1.to_h) },
           manifest: candidate_manifest(input.change_manifest, actor:),
           build_context: candidate_build_context(input.build_context, actor:),
-          actual_resources: input.actual_resources.map { FileResourceV1.new(_1.to_h) }
+          actual_resources: input.actual_resources.map { Candidates::ActualResourceV2.new(_1.to_h) }
         )
       end
 

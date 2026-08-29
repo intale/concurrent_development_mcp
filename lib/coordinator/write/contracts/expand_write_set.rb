@@ -18,8 +18,7 @@ module Coordinator::Write
         required(:repository_id).filled(:string)
         required(:base_commit_oid).value(:string)
         required(:resources).array(:hash) do
-          required(:kind).filled(:string)
-          required(:path).value(:string)
+          required(:resource_id).filled(:string)
           optional(:base_blob_oid).maybe(:string)
         end
       end
@@ -45,6 +44,12 @@ module Coordinator::Write
 
       rule(:resources) do
         key.failure("must contain between 1 and 32 entries") unless (1..32).cover?(value.length)
+
+        value.each_with_index do |resource, index|
+          next if Types::UUID_V7_PATTERN.match?(resource[:resource_id])
+
+          key([ :resources, index, :resource_id ]).failure("must be a UUIDv7")
+        end
       end
 
       rule(:base_commit_oid, :resources) do

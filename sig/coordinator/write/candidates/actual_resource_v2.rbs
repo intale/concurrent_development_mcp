@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Candidates
+      class ActualResourceV2 < Shared::Value
+        def kind: () -> String
+        def path: () -> String
+        def base_blob_oid: () -> String?
+      end
+    end
+  end
+end

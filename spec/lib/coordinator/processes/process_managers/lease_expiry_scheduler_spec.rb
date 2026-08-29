@@ -2,9 +2,6 @@
 
 RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :event_store do
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
-  let(:streams) { Coordinator::Write::StreamFactory.new }
-  let(:normalizer) { Coordinator::Write::FileResourceNormalizer.new }
-  let(:repository_id) { RepositoryScenario::DEFAULT_REPOSITORY_ID }
   let(:source_builder) { Coordinator::Processes::LeaseExpirySourceBuilder.new }
   let(:source_loader) do
     Coordinator::Processes::LeaseExpirySourceLoader.new(event_store:, source_builder:)
@@ -17,13 +14,11 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
   end
   let(:job_scheduler) { Coordinator::Processes::LeaseExpiryJobScheduler.new(policy:) }
 
-  it "reloads the exact source revision and turns an early execution into a typed reschedule" do
-    seed_active_attempt
-    source = Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 0)) do
-      reserve(duration: 30).value!
-      lease_events.sole
-    end
-    locator = Coordinator::Processes::LeaseExpirySourceLocatorV1.from_source(source_builder.call(source))
+  it "reloads the exact UUID resource revision and turns an early execution into a typed reschedule" do
+    setup_attempt
+    reservation = Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 0)) { reserve(duration: 30) }
+    source = lifecycle_event(reservation, "ResourceLeaseAcquired")
+    locator = locator_for(source)
 
     early = Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 29)) { policy.call(locator) }
     due = Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 30)) { policy.call(locator) }
@@ -38,77 +33,71 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
       class: Coordinator::Processes::LeaseExpiryHandledV1,
       outcome: "expired_or_replayed"
     )
-    expect(lease_events.map(&:type)).to eq([ "ResourceLeaseAcquired", "ResourceLeaseExpired" ])
+    expect(lease_events(reservation).map(&:type)).to contain_exactly(
+      "ResourceLeaseAcquired",
+      "ResourceLeaseExpired"
+    )
     expect(command_events(expiry_command_id(source)).length).to eq(1)
   end
 
   it "treats an acquisition timer superseded by renewal as a handled policy outcome" do
-    seed_active_attempt
-    reservation = Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 0)) do
-      reserve(duration: 30).value!.data
-    end
-    acquisition = lease_events.sole
-    Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 15)) do
-      renew(reservation:, duration: 60).value!
-    end
-    locator = Coordinator::Processes::LeaseExpirySourceLocatorV1.from_source(source_builder.call(acquisition))
+    setup_attempt
+    reservation = Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 0)) { reserve(duration: 30) }
+    acquisition = lifecycle_event(reservation, "ResourceLeaseAcquired")
+    Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 15)) { renew(reservation, duration: 60) }
 
-    result = Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 30)) { policy.call(locator) }
+    result = Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 30)) do
+      policy.call(locator_for(acquisition))
+    end
 
     expect(result).to be_success
     expect(result.value!).to have_attributes(
       class: Coordinator::Processes::LeaseExpiryHandledV1,
       outcome: "lease_observation_superseded"
     )
-    expect(lease_events.none? { _1.type == "ResourceLeaseExpired" }).to be(true)
+    expect(lease_events(reservation).none? { _1.type == "ResourceLeaseExpired" }).to be(true)
     expect(command_events(expiry_command_id(acquisition))).to be_empty
   end
 
   it "lets the real job reschedule an early check and complete it at the deadline" do
-    seed_active_attempt
-    source = Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 0)) do
-      reserve(duration: 30).value!
-      lease_events.sole
-    end
-    locator = Coordinator::Processes::LeaseExpirySourceLocatorV1.from_source(source_builder.call(source))
+    setup_attempt
+    reservation = Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 0)) { reserve(duration: 30) }
+    source = lifecycle_event(reservation, "ResourceLeaseAcquired")
+    locator = locator_for(source)
     job_scheduler
 
     with_real_async_jobs do
       Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 29)) do
         Coordinator::Processes::Jobs::ExpireResourceLease.perform_now(
           locator.source_event_id,
-          locator.resource_key_hash,
+          locator.resource_stream_id,
           locator.stream_revision
         )
       end
-      wait_for_expiration
+      wait_for_expiration(reservation)
     end
 
-    expect(lease_events.map(&:type)).to eq([ "ResourceLeaseAcquired", "ResourceLeaseExpired" ])
+    expect(lease_events(reservation).map(&:type)).to contain_exactly(
+      "ResourceLeaseAcquired",
+      "ResourceLeaseExpired"
+    )
     expect(command_events(expiry_command_id(source)).length).to eq(1)
   end
 
-  it "runs a past-due source through one real filtered subscription and Active Job execution" do
-    seed_active_attempt
-    source_time = Time.now.utc - 31
-    source = Timecop.freeze(source_time) do
-      reserve(duration: 30).value!
-      lease_events.sole
-    end
-    registration = Coordinator::Processes::Subscriptions::LeaseExpiryScheduler.new(
-      handler: described_class.new(job_scheduler:),
-      pull_interval: 0.2
-    )
+  it "runs a past-due V2 source through one real filtered subscription and Active Job execution" do
+    setup_attempt
+    reservation = Timecop.freeze(Time.now.utc - 31) { reserve(duration: 30) }
+    source = lifecycle_event(reservation, "ResourceLeaseAcquired")
+    registration = expiry_registration
     subscription_set = build_subscription_set([ registration ])
 
     with_real_async_jobs do
       begin
         subscription_set.start
         wait_for_subscription(subscription_set, registration.definition.subscription_name)
-        wait_for_expiration
+        wait_for_expiration(reservation)
 
-        expiration = lease_events.last
-        expect(expiration.type).to eq("ResourceLeaseExpired")
+        expiration = lifecycle_event(reservation, "ResourceLeaseExpired")
         expect(expiration.causation_id).to eq(source.id)
         expect(expiration.correlation_id).to eq(source.correlation_id)
         expect(command_events(expiry_command_id(source)).length).to eq(1)
@@ -118,29 +107,23 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
     end
   end
 
-  it "schedules both lifecycle source types while only the renewed observation expires" do
-    seed_active_attempt
+  it "schedules acquisition and renewal while only the current UUID lease observation expires" do
+    setup_attempt
     source_time = Time.now.utc - 61
-    reservation = Timecop.freeze(source_time) { reserve(duration: 30).value!.data }
-    acquisition = lease_events.sole
-    Timecop.freeze(source_time + 15) do
-      renew(reservation:, duration: 30).value!
-    end
-    renewal = lease_events.last
-    registration = Coordinator::Processes::Subscriptions::LeaseExpiryScheduler.new(
-      handler: described_class.new(job_scheduler:),
-      pull_interval: 0.2
-    )
+    reservation = Timecop.freeze(source_time) { reserve(duration: 30) }
+    acquisition = lifecycle_event(reservation, "ResourceLeaseAcquired")
+    Timecop.freeze(source_time + 15) { renew(reservation, duration: 30) }
+    renewal = lifecycle_event(reservation, "ResourceLeaseRenewed")
+    registration = expiry_registration
     subscription_set = build_subscription_set([ registration ])
 
     with_real_async_jobs do
       begin
         subscription_set.start
         wait_for_subscription(subscription_set, registration.definition.subscription_name, count: 2)
-        wait_for_expiration
+        wait_for_expiration(reservation)
 
-        expiration = lease_events.last
-        expect(expiration.type).to eq("ResourceLeaseExpired")
+        expiration = lifecycle_event(reservation, "ResourceLeaseExpired")
         expect(expiration.causation_id).to eq(renewal.id)
         expect(command_events(expiry_command_id(acquisition))).to be_empty
         expect(command_events(expiry_command_id(renewal)).length).to eq(1)
@@ -150,14 +133,12 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
     end
   end
 
-  it "accepts a non-hot resource boundary through the real shared process-manager set" do
-    seed_active_attempt
-    reserve(duration: 300).value!
-    source = lease_events.sole
+  it "accepts a non-hot V2 resource boundary through the real shared process-manager set" do
+    setup_attempt
+    reservation = reserve(duration: 300)
+    source = lifecycle_event(reservation, "ResourceLeaseAcquired")
     registration = Coordinator::Processes::Subscriptions::ResourceBoundaryMaintenance.new(
-      handler: Coordinator::Processes::ProcessManagers::ResourceBoundaryMaintenance.new(
-        event_store:
-      ),
+      handler: Coordinator::Processes::ProcessManagers::ResourceBoundaryMaintenance.new(event_store:),
       pull_interval: 0.2
     )
     subscription_set = build_subscription_set([ registration ])
@@ -207,7 +188,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
     )
   end
 
-  it "stacks one four-event resource-boundary maintenance policy in that same manager" do
+  it "stacks one four-event resource-boundary policy in that same manager" do
     definition = Coordinator::Processes::Subscriptions::ResourceBoundaryMaintenance::DEFINITION
 
     expect(definition.to_h).to eq(
@@ -230,102 +211,59 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
 
   private
 
+  def setup_attempt
+    ResourceLeaseOperationScenario.start_attempts(
+      event_store:,
+      attempts: [ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ]
+    )
+  end
+
   def reserve(duration:)
-    Coordinator::Write::Operations::ExecuteReserveWriteSet.new(event_store:).call(
+    ResourceLeaseOperationScenario.reserve(
+      event_store:,
+      paths: [ "app/a.rb" ],
       command_id: "cmd-reserve-a",
-      actor: { kind: "agent", id: "agent-a" },
-      change_set_id: "CS-LSE",
-      work_item_id: "W-LSE-A",
-      attempt_id: "A-LSE-A",
-      repository_id:,
-      base_commit_oid: "a" * 40,
-      resources: [ { kind: "file", path: "app/a.rb" } ],
       lease_duration_seconds: duration
     )
   end
 
-  def renew(reservation:, duration:)
+  def renew(reservation, duration:)
     Coordinator::Write::Operations::ExecuteRenewLeaseSet.new(event_store:).call(
       command_id: "cmd-renew-a",
       actor: { kind: "agent", id: "agent-a" },
       change_set_id: "CS-LSE",
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
-      lease_set_id: reservation.lease_set_id,
-      leases: reservation.resources.map do |reference|
-        {
-          resource_key_hash: reference.resource_key_hash,
-          lease_id: reference.lease_id,
-          fencing_token: reference.fencing_token
-        }
-      end,
+      lease_set_id: reservation.receipt.lease_set_id,
+      leases: ResourceLeaseOperationScenario.lease_inputs(reservation.receipt),
       lease_duration_seconds: duration
-    )
-  end
-
-  def seed_active_attempt
-    RepositoryScenario.register(event_store:)
-    Coordinator::Write::Operations::ExecuteCreateChangeSet.new(event_store:).call(
-      command_id: "seed-create-CS-LSE",
-      actor: { kind: "agent", id: "planner-1" },
-      change_set_id: "CS-LSE",
-      goal: "Coordinate resource leases",
-      acceptance_criteria: [ "Expired resources remain available" ]
-    ).value!
-    Coordinator::Write::Operations::ExecuteCreateWorkItem.new(event_store:).call(
-      command_id: "seed-create-W-LSE-A",
-      actor: { kind: "agent", id: "planner-1" },
-      change_set_id: "CS-LSE",
-      work_item_id: "W-LSE-A",
-      repository_id:,
-      goal: "Implement the lease holder",
-      acceptance_criteria: [ "The work is verifiable" ]
-    ).value!
-    Coordinator::Write::Operations::ExecuteActivateChangeSet.new(event_store:).call(
-      command_id: "seed-activate-CS-LSE",
-      actor: { kind: "agent", id: "planner-1" },
-      change_set_id: "CS-LSE"
-    ).value!
-    activation = event_store.read(
-      streams.change_set("CS-LSE"),
-      Coordinator::Write::EventQueries::CHANGE_SET_FOR_ACQUISITION
-    ).find { _1.type == "ChangeSetActivated" }
-    Coordinator::Processes::ProcessManagers::ChangeSetReadiness.new(event_store:).call(activation)
-    Coordinator::Write::Operations::ExecuteAcquireWorkItem.new(event_store:).call(
-      command_id: "seed-acquire-A-LSE-A",
-      actor: { kind: "agent", id: "agent-a" },
-      change_set_id: "CS-LSE",
-      work_item_id: "W-LSE-A",
-      attempt_id: "A-LSE-A",
-      base_snapshots: [ { repository_id:, commit_oid: "a" * 40 } ]
     ).value!
   end
 
-  def lease_events
-    resource = normalizer.call(
-      repository_id:,
-      kind: "file",
-      path: "app/a.rb",
-      base_blob_oid: nil,
-      scope: RepositoryScenario::DEFAULT_SCOPE
-    ).value!
-    event_store.read(
-      streams.resource_lease(resource.resource_key_hash),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: [
-          "ResourceLeaseAcquired",
-          "ResourceLeaseRenewed",
-          "ResourceLeaseReleased",
-          "ResourceLeaseExpired"
-        ],
-        maximum_count: 20,
-        direction: :asc
-      )
+  def lease_events(reservation)
+    ResourceScenario.lease_events(event_store:, resource_id: reservation.resource_ids.sole)
+  end
+
+  def lifecycle_event(reservation, event_type)
+    lease_events(reservation).find { _1.type == event_type }
+  end
+
+  def locator_for(event)
+    Coordinator::Processes::LeaseExpirySourceLocatorV1.from_source(source_builder.call(event))
+  end
+
+  def expiry_registration
+    Coordinator::Processes::Subscriptions::LeaseExpiryScheduler.new(
+      handler: described_class.new(job_scheduler:),
+      pull_interval: 0.2
     )
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(
+      Coordinator::Write::StreamFactory.new.command(command_id),
+      Coordinator::Write::EventQueries::COMMAND_COMPLETION
+    )
   end
 
   def expiry_command_id(event)
@@ -361,10 +299,10 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
     end
   end
 
-  def wait_for_expiration
+  def wait_for_expiration(reservation)
     deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 10
 
-    until lease_events.any? { _1.type == "ResourceLeaseExpired" }
+    until lease_events(reservation).any? { _1.type == "ResourceLeaseExpired" }
       raise "lease-expiry job did not append its fact within 10 seconds" if
         Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
 

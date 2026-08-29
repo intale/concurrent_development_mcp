@@ -161,6 +161,11 @@ module Coordinator
         def policy_version: () -> String
       end
 
+      class ResourceLeaseTargetV1 < Shared::Value
+        def resource_id: () -> String
+        def base_blob_oid: () -> String?
+      end
+
       class ReserveWriteSetInputV1 < Shared::Value
         def actor: () -> ActorV1
         def change_set_id: () -> String
@@ -168,7 +173,7 @@ module Coordinator
         def attempt_id: () -> String
         def repository_id: () -> String
         def base_commit_oid: () -> String
-        def resources: () -> Array[FileResourceV1]
+        def resources: () -> Array[ResourceLeaseTargetV1]
         def lease_duration_seconds: () -> Integer
       end
 
@@ -185,7 +190,7 @@ module Coordinator
         def lease_set_id: () -> String
         def repository_id: () -> String
         def base_commit_oid: () -> String
-        def resources: () -> Array[FileResourceV1]
+        def resources: () -> Array[ResourceLeaseTargetV1]
       end
 
       class ExpandWriteSetV1 < BaseV1
@@ -194,7 +199,7 @@ module Coordinator
       end
 
       class LeaseRenewalReferenceV1 < Shared::Value
-        def resource_key_hash: () -> String
+        def resource_id: () -> String
         def lease_id: () -> String
         def fencing_token: () -> Integer
       end
@@ -215,7 +220,7 @@ module Coordinator
       end
 
       class LeaseReleaseReferenceV1 < Shared::Value
-        def resource_key_hash: () -> String
+        def resource_id: () -> String
         def lease_id: () -> String
         def fencing_token: () -> Integer
       end
@@ -339,9 +344,15 @@ module Coordinator
       end
 
       class CandidateLeaseObservationV1 < Shared::Value
-        def resource_key_hash: () -> String
+        def resource_id: () -> String
         def lease_id: () -> String
         def fencing_token: () -> Integer
+      end
+
+      class CandidateActualResourceV2 < Shared::Value
+        def kind: () -> String
+        def path: () -> String
+        def base_blob_oid: () -> String?
       end
 
       class CandidateManifestFileV1 < Shared::Value
@@ -398,7 +409,7 @@ module Coordinator
         def leases: () -> Array[CandidateLeaseObservationV1]
         def change_manifest: () -> CandidateChangeManifestV1
         def build_context: () -> CandidateBuildContextV1?
-        def actual_resources: () -> Array[FileResourceV1]
+        def actual_resources: () -> Array[CandidateActualResourceV2]
       end
 
       class SubmitCandidateV1 < BaseV1

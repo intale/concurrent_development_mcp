@@ -14,7 +14,6 @@ module Coordinator
           ?schema_registry: EventSchemaRegistry,
           ?stream_factory: StreamFactory,
           ?completion_builder: CommandCompletionBuilder,
-          ?compound_marker_builder: Shared::CompoundMarkerBuilder,
           ?repository_registration_loader: RepositoryRegistrationLoader,
           ?repository_marker_builder: RepositoryMarkerBuilder,
           ?event_plan_contract: Contracts::ResourceLeaseExpiryEventPlan

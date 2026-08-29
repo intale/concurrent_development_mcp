@@ -7,7 +7,7 @@ module Coordinator::Write
         required(:plan).value(Types.Instance(Domain::EventPlan))
         required(:command).value(Types.Instance(Commands::RenewLeaseSet))
         required(:attempt_state).value(Types.Instance(Domain::Attempts::State))
-        required(:current_observations).array(Types.Instance(CurrentLeaseObservationV1))
+        required(:current_observations).array(Types.Instance(CurrentLeaseObservationV2))
         required(:renewed_at).filled(:string)
         required(:expires_at).filled(:string)
       end
@@ -20,13 +20,13 @@ module Coordinator::Write
         renewals = plan.events.first(observations.length)
         write_set_renewal = plan.events.last
         expected_streams = observations.map do |observation|
-          StreamFactory.new.resource_lease(observation.reference.resource_key_hash)
+          StreamFactory.new.resource_lease(observation.reference.resource_id)
         end + [ StreamFactory.new.attempt(command.attempt_id) ]
 
         unless plan.writes.length == observations.length + 1 &&
                plan.writes.map(&:stream) == expected_streams &&
-               renewals.all? { _1.is_a?(Events::ResourceLeaseRenewedV1) } &&
-               write_set_renewal.is_a?(Events::WriteSetRenewedV1)
+               renewals.all? { _1.is_a?(Events::ResourceLeaseRenewedV2) } &&
+               write_set_renewal.is_a?(Events::WriteSetRenewedV2)
           key(:plan).failure("must contain ordered resource renewals followed by one Attempt set renewal")
           next
         end
@@ -56,8 +56,7 @@ module Coordinator::Write
           reference = observations.fetch(index).reference
           event.lease_id == reference.lease_id &&
             event.lease_set_id == command.lease_set_id &&
-            event.resource_key == reference.resource_key &&
-            event.resource_key_hash == reference.resource_key_hash &&
+            event.resource_id == reference.resource_id &&
             event.resource_kind == reference.resource_kind &&
             event.resource_path == reference.resource_path &&
             event.base_blob_oid == reference.base_blob_oid &&

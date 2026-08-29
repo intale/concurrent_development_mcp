@@ -178,6 +178,24 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
         { repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID, commit_oid: "a" * 40 }
       ]
     ).value!
+    invoice_resource_id = ResourceScenario.resolve(
+      event_store:,
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      kind: "file",
+      path: "app/models/invoice.rb"
+    )
+    schema_resource_id = ResourceScenario.resolve(
+      event_store:,
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      kind: "file",
+      path: "db/schema.rb"
+    )
+    tax_resource_id = ResourceScenario.resolve(
+      event_store:,
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      kind: "file",
+      path: "app/services/tax.rb"
+    )
     reservation = Coordinator::Write::Operations::ExecuteReserveWriteSet.new(event_store:).call(
       command_id: "reserve-A-100",
       actor: { kind: "agent", id: "agent-1" },
@@ -187,8 +205,8 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
       repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: [
-        { kind: "file", path: "app/models/invoice.rb", base_blob_oid: "b" * 40 },
-        { kind: "file", path: "db/schema.rb" }
+        { resource_id: invoice_resource_id, base_blob_oid: "b" * 40 },
+        { resource_id: schema_resource_id }
       ],
       lease_duration_seconds: 300
     ).value!.data
@@ -202,8 +220,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
       repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: [
-        { kind: "file", path: "app/models/invoice.rb", base_blob_oid: "b" * 40 },
-        { kind: "file", path: "app/services/tax.rb", base_blob_oid: "c" * 40 }
+        { resource_id: tax_resource_id, base_blob_oid: "c" * 40 }
       ]
     ).value!.data
     renewal = Coordinator::Write::Operations::ExecuteRenewLeaseSet.new(event_store:).call(
@@ -215,7 +232,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
       lease_set_id: reservation.lease_set_id,
       leases: (reservation.resources + expansion.added_resources).map do |reference|
         {
-          resource_key_hash: reference.resource_key_hash,
+          resource_id: reference.resource_id,
           lease_id: reference.lease_id,
           fencing_token: reference.fencing_token
         }
@@ -231,7 +248,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
       lease_set_id: reservation.lease_set_id,
       leases: (reservation.resources + expansion.added_resources).map do |reference|
         {
-          resource_key_hash: reference.resource_key_hash,
+          resource_id: reference.resource_id,
           lease_id: reference.lease_id,
           fencing_token: reference.fencing_token
         }
@@ -279,10 +296,10 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
     write_set = snapshot.state.attempts.sole.write_set
     expect(write_set.to_h).to include(
       repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
-      policy_version: "coordinator-resource-key/v3"
+      policy_version: "coordinator-resource-lease/v2"
     )
     expect(write_set.lease_set_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
-    expect(write_set.resources).to eq(write_set.resources.sort_by { _1.resource_key_hash.b })
+    expect(write_set.resources).to eq(write_set.resources.sort_by { _1.resource_id.b })
     expect(write_set.resources.map(&:resource_path)).to contain_exactly(
       "app/models/invoice.rb",
       "app/services/tax.rb",

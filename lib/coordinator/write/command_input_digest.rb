@@ -245,7 +245,7 @@ module Coordinator::Write
           repository_id: command.repository_id,
           base_commit_oid: command.base_commit_oid,
           resources: command.resources.map do |resource|
-            CommandInputDocuments::FileResourceV1.new(resource.to_h)
+            CommandInputDocuments::ResourceLeaseTargetV1.new(resource.to_h)
           end,
           lease_duration_seconds: command.lease_duration_seconds
         )
@@ -270,7 +270,7 @@ module Coordinator::Write
           repository_id: command.repository_id,
           base_commit_oid: command.base_commit_oid,
           resources: command.resources.map do |resource|
-            CommandInputDocuments::FileResourceV1.new(resource.to_h)
+            CommandInputDocuments::ResourceLeaseTargetV1.new(resource.to_h)
           end
         )
       )
@@ -332,7 +332,7 @@ module Coordinator::Write
         tool_name: "lease_expire_policy",
         input: CommandInputDocuments::ExpireResourceLeaseInputV1.new(
           actor: actor_document(command.actor),
-          resource_key_hash: command.resource_key_hash,
+          resource_id: command.resource_id,
           lease_id: command.lease_id,
           lease_set_id: command.lease_set_id,
           fencing_token: command.fencing_token,
@@ -485,7 +485,7 @@ module Coordinator::Write
           lease_set_id: command.lease_set_id,
           leases: command.leases.map do |lease|
             CommandInputDocuments::CandidateLeaseObservationV1.new(
-              resource_key_hash: lease.resource_key_hash,
+              resource_id: lease.resource_id,
               lease_id: lease.lease_id,
               fencing_token: lease.fencing_token
             )
@@ -493,7 +493,7 @@ module Coordinator::Write
           change_manifest: candidate_manifest_document(command.manifest),
           build_context: candidate_build_context_document(command.build_context),
           actual_resources: command.actual_resources.map do |resource|
-            CommandInputDocuments::FileResourceV1.new(resource.to_h)
+            CommandInputDocuments::CandidateActualResourceV2.new(resource.to_h)
           end
         )
       )

@@ -15,12 +15,17 @@ module Coordinator::Read
         when Coordinator::Write::Events::WorkItemAcquiredV1 then apply_work_item_acquired(state, event)
         when Coordinator::Write::Events::AttemptAuthorizedV1 then apply_attempt_authorized(state, event)
         when Coordinator::Write::Events::AttemptStartedV1 then apply_attempt_started(state, event)
-        when Coordinator::Write::Events::AttemptAbandonedV1 then apply_attempt_abandoned(state, event)
+        when Coordinator::Write::Events::AttemptAbandonedV1,
+             Coordinator::Write::Events::AttemptAbandonedV2 then apply_attempt_abandoned(state, event)
         when Coordinator::Write::Events::WorkItemRequeuedV1 then apply_work_item_requeued(state, event)
-        when Coordinator::Write::Events::WriteSetReservedV1 then apply_write_set_reserved(state, event)
-        when Coordinator::Write::Events::WriteSetExpandedV1 then apply_write_set_expanded(state, event)
-        when Coordinator::Write::Events::WriteSetRenewedV1 then apply_write_set_renewed(state, event)
-        when Coordinator::Write::Events::WriteSetReleasedV1 then apply_write_set_released(state, event)
+        when Coordinator::Write::Events::WriteSetReservedV1,
+             Coordinator::Write::Events::WriteSetReservedV2 then apply_write_set_reserved(state, event)
+        when Coordinator::Write::Events::WriteSetExpandedV1,
+             Coordinator::Write::Events::WriteSetExpandedV2 then apply_write_set_expanded(state, event)
+        when Coordinator::Write::Events::WriteSetRenewedV1,
+             Coordinator::Write::Events::WriteSetRenewedV2 then apply_write_set_renewed(state, event)
+        when Coordinator::Write::Events::WriteSetReleasedV1,
+             Coordinator::Write::Events::WriteSetReleasedV2 then apply_write_set_released(state, event)
         when Coordinator::Write::Events::CandidateAttachedToAttemptV1 then apply_candidate_attached(state, event)
         when Coordinator::Write::Events::WorkItemCandidateSelectedV1 then apply_candidate_selected(state, event)
         when Coordinator::Write::Events::AttemptCompletedV1 then apply_attempt_completed(state, event)
@@ -244,7 +249,7 @@ module Coordinator::Read
           repository_id: event.repository_id,
           policy_version: event.policy_version,
           resources: event.resources.map do |resource|
-            CoordContextStateV1::WriteSetResource.new(resource.to_h)
+            projected_write_set_resource(resource)
           end,
           reserved_at: event.reserved_at,
           last_expanded_at: nil,
@@ -276,12 +281,8 @@ module Coordinator::Read
         end
 
         resources = event.added_resources.reduce(write_set.resources) do |observed, reference|
-          upsert(
-            observed,
-            :resource_key_hash,
-            CoordContextStateV1::WriteSetResource.new(reference.to_h)
-          )
-        end.sort_by { _1.resource_key_hash.b }
+          upsert_write_set_resource(observed, projected_write_set_resource(reference))
+        end.sort_by { write_set_resource_identity(_1).b }
         unless resources.length == event.resource_count
           raise ProjectionStateError, "Attempt #{event.attempt_id} write-set count changed"
         end
@@ -517,6 +518,27 @@ module Coordinator::Read
 
       def replace(state, **changes)
         CoordContextStateV1.new(state.attributes.merge(changes))
+      end
+
+      def projected_write_set_resource(reference)
+        resource_class = reference.respond_to?(:resource_id) ?
+          CoordContextStateV1::WriteSetResourceV2 :
+          CoordContextStateV1::WriteSetResource
+        resource_class.new(reference.to_h)
+      end
+
+      def write_set_resource_identity(resource)
+        return resource.resource_id if resource.respond_to?(:resource_id)
+
+        resource.resource_key_hash
+      end
+
+      def upsert_write_set_resource(collection, replacement)
+        identity = write_set_resource_identity(replacement)
+        existing_index = collection.index { write_set_resource_identity(_1) == identity }
+        return collection + [ replacement ] unless existing_index
+
+        collection.each_with_index.map { |value, index| index == existing_index ? replacement : value }
       end
 
       def upsert(collection, identity_method, replacement)

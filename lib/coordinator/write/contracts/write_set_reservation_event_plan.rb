@@ -6,6 +6,7 @@ module Coordinator::Write
       params do
         required(:plan).value(Types.Instance(Domain::EventPlan))
         required(:command).value(Types.Instance(Commands::ReserveWriteSet))
+        required(:resources).array(Types.Instance(LeaseResourceV2))
         required(:attempt_stream).value(Types.Instance(StreamReference))
         required(:lease_states).array(Types.Instance(Domain::ResourceLeases::State))
         required(:lease_set_id).filled(:string)
@@ -17,6 +18,7 @@ module Coordinator::Write
       rule(
         :plan,
         :command,
+        :resources,
         :attempt_stream,
         :lease_states,
         :lease_set_id,
@@ -26,16 +28,17 @@ module Coordinator::Write
       ) do
         plan = values[:plan]
         command = values[:command]
-        acquisitions = plan.events.first(command.resources.length)
+        resources = values[:resources]
+        acquisitions = plan.events.first(resources.length)
         reservation = plan.events.last
-        expected_streams = command.resources.map do |resource|
-          StreamFactory.new.resource_lease(resource.resource_key_hash)
+        expected_streams = resources.map do |resource|
+          StreamFactory.new.resource_lease(resource.resource_id)
         end + [ values[:attempt_stream] ]
 
-        unless plan.writes.length == command.resources.length + 1 &&
+        unless plan.writes.length == resources.length + 1 &&
                plan.writes.map(&:stream) == expected_streams &&
-               acquisitions.all? { _1.is_a?(Events::ResourceLeaseAcquiredV1) } &&
-               reservation.is_a?(Events::WriteSetReservedV1)
+               acquisitions.all? { _1.is_a?(Events::ResourceLeaseAcquiredV2) } &&
+               reservation.is_a?(Events::WriteSetReservedV2)
           key(:plan).failure("must contain ordered resource acquisitions followed by one Attempt reservation")
           next
         end
@@ -43,6 +46,7 @@ module Coordinator::Write
         verify_acquisitions(
           acquisitions:,
           command:,
+          resources:,
           states: values[:lease_states],
           lease_set_id: values[:lease_set_id],
           lease_ids: values[:lease_ids],
@@ -61,15 +65,23 @@ module Coordinator::Write
 
       private
 
-      def verify_acquisitions(acquisitions:, command:, states:, lease_set_id:, lease_ids:, acquired_at:, expires_at:)
+      def verify_acquisitions(
+        acquisitions:,
+        command:,
+        resources:,
+        states:,
+        lease_set_id:,
+        lease_ids:,
+        acquired_at:,
+        expires_at:
+      )
         valid = acquisitions.each_with_index.all? do |event, index|
-          resource = command.resources.fetch(index)
+          resource = resources.fetch(index)
           state = states.fetch(index)
 
           event.lease_id == lease_ids.fetch(index) &&
             event.lease_set_id == lease_set_id &&
-            event.resource_key == resource.resource_key &&
-            event.resource_key_hash == resource.resource_key_hash &&
+            event.resource_id == resource.resource_id &&
             event.resource_path == resource.path &&
             event.base_blob_oid == resource.base_blob_oid &&
             event.change_set_id == command.change_set_id &&
@@ -87,10 +99,9 @@ module Coordinator::Write
 
       def verify_reservation(reservation:, acquisitions:, command:, lease_set_id:, acquired_at:, expires_at:)
         references = acquisitions.map do |event|
-          LeaseReferenceV1.new(
+          LeaseReferenceV2.new(
             lease_id: event.lease_id,
-            resource_key: event.resource_key,
-            resource_key_hash: event.resource_key_hash,
+            resource_id: event.resource_id,
             resource_kind: event.resource_kind,
             resource_path: event.resource_path,
             base_blob_oid: event.base_blob_oid,

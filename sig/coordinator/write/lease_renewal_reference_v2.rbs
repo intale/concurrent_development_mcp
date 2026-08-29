@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    class LeaseRenewalReferenceV2 < Shared::Value
+      def resource_id: () -> String
+      def lease_id: () -> String
+      def fencing_token: () -> Integer
+    end
+  end
+end

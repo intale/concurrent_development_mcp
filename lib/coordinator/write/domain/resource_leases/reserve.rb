@@ -14,12 +14,13 @@ module Coordinator::Write
           attempt_state:,
           lease_states:,
           command:,
+          resources:,
           lease_set_id:,
           lease_ids:,
           acquired_at:,
           expires_at:
         )
-          denial = denied(attempt_state:, lease_states:, command:, acquired_at:)
+          denial = denied(attempt_state:, lease_states:, command:, resources:, acquired_at:)
           return denial if denial
 
           Success(
@@ -27,6 +28,7 @@ module Coordinator::Write
               attempt_state:,
               lease_states:,
               command:,
+              resources:,
               lease_set_id:,
               lease_ids:,
               acquired_at:,
@@ -37,7 +39,7 @@ module Coordinator::Write
 
         private
 
-        def denied(attempt_state:, lease_states:, command:, acquired_at:)
+        def denied(attempt_state:, lease_states:, command:, resources:, acquired_at:)
           return failure(:attempt_not_found, "Attempt does not exist", command) if attempt_state.absent?
           return failure(:attempt_not_active, "Attempt is not active", command) unless attempt_state.status == "active"
 
@@ -57,7 +59,7 @@ module Coordinator::Write
             return failure(:write_set_already_reserved, "Attempt already has an initial write set", command)
           end
 
-          busy = command.resources.lazy.filter_map do |resource|
+          busy = resources.lazy.filter_map do |resource|
             state = lease_states.find do |candidate|
               candidate.active_at?(acquired_at) && resources_overlap?(resource, candidate)
             end
@@ -71,8 +73,7 @@ module Coordinator::Write
               code: :lease_busy,
               message: "A requested resource already has an active exclusive lease",
               details: {
-                resource_key: resource.resource_key,
-                resource_key_hash: resource.resource_key_hash,
+                resource_id: resource.resource_id,
                 lease_id: busy_state.lease_id,
                 owner_attempt_id: busy_state.attempt_id,
                 owner_agent_id: busy_state.agent_id,
@@ -90,9 +91,18 @@ module Coordinator::Write
             (state.resource_kind == "directory" && resource.path.start_with?("#{state.resource_path}/"))
         end
 
-        def build_plan(attempt_state:, lease_states:, command:, lease_set_id:, lease_ids:, acquired_at:, expires_at:)
+        def build_plan(
+          attempt_state:,
+          lease_states:,
+          command:,
+          resources:,
+          lease_set_id:,
+          lease_ids:,
+          acquired_at:,
+          expires_at:
+        )
           snapshot = attempt_state.base_snapshots.first
-          acquisitions = command.resources.each_with_index.map do |resource, index|
+          acquisitions = resources.each_with_index.map do |resource, index|
             build_acquisition(
               resource:,
               state: lease_states.fetch(index),
@@ -109,19 +119,19 @@ module Coordinator::Write
           EventPlan.new(
             writes: acquisitions.map do |event|
               EventWrite.new(
-                stream: @stream_factory.resource_lease(event.resource_key_hash),
+                stream: @stream_factory.resource_lease(event.resource_id),
                 event:
               )
             end + [
               EventWrite.new(
                 stream: @stream_factory.attempt(command.attempt_id),
-                event: Events::WriteSetReservedV1.new(
+                event: Events::WriteSetReservedV2.new(
                   lease_set_id:,
                   change_set_id: command.change_set_id,
                   work_item_id: command.work_item_id,
                   attempt_id: command.attempt_id,
                   repository_id: command.repository_id,
-                  policy_version: command.resources.first.policy_version,
+                  policy_version: LeaseResourceV2::POLICY_VERSION,
                   resources: references,
                   reserved_at: acquired_at,
                   expires_at:
@@ -132,11 +142,10 @@ module Coordinator::Write
         end
 
         def build_acquisition(resource:, state:, command:, snapshot:, lease_set_id:, lease_id:, acquired_at:, expires_at:)
-          Events::ResourceLeaseAcquiredV1.new(
+          Events::ResourceLeaseAcquiredV2.new(
             lease_id:,
             lease_set_id:,
-            resource_key: resource.resource_key,
-            resource_key_hash: resource.resource_key_hash,
+            resource_id: resource.resource_id,
             resource_kind: resource.kind,
             resource_path: resource.path,
             policy_version: resource.policy_version,
@@ -156,10 +165,9 @@ module Coordinator::Write
         end
 
         def lease_reference(event)
-          LeaseReferenceV1.new(
+          LeaseReferenceV2.new(
             lease_id: event.lease_id,
-            resource_key: event.resource_key,
-            resource_key_hash: event.resource_key_hash,
+            resource_id: event.resource_id,
             resource_kind: event.resource_kind,
             resource_path: event.resource_path,
             base_blob_oid: event.base_blob_oid,

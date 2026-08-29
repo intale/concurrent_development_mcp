@@ -3,7 +3,7 @@
 module Coordinator::Write
   module Commands
     class ReleaseLeaseSet < Value
-      Reference = Types.Instance(LeaseReleaseReferenceV1)
+      Reference = Types.Instance(LeaseReleaseReferenceV2)
 
       attribute :command_id, Types::Identifier
       attribute :actor, Actor

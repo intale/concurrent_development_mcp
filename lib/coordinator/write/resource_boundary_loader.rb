@@ -110,15 +110,17 @@ module Coordinator::Write
 
     def apply_delta(snapshot, events)
       states = (snapshot&.active_leases || []).to_h do |lease|
-        [ lease.resource_key_hash, lease.to_state ]
+        state = lease.to_state
+        [ state.identity, state ]
       end
       events.each do |event|
         payload = load_event(event)
-        state = states.fetch(payload.resource_key_hash, Domain::ResourceLeases::State.initial)
-        states[payload.resource_key_hash] = state.apply(payload)
+        identity = event_identity(payload)
+        state = states.fetch(identity, Domain::ResourceLeases::State.initial)
+        states[identity] = state.apply(payload)
       end
 
-      states.sort_by { |resource_key_hash, _state| resource_key_hash.b }.map(&:last)
+      states.sort_by { |identity, _state| identity.b }.map(&:last)
     end
 
     def merge_states(boundaries)
@@ -126,13 +128,19 @@ module Coordinator::Write
       boundaries.each do |boundary|
         position = boundary.through_global_position || 0
         boundary.states.each do |state|
-          current = observations[state.resource_key_hash]
-          observations[state.resource_key_hash] = [ position, state ] if current.nil? || position >= current.first
+          current = observations[state.identity]
+          observations[state.identity] = [ position, state ] if current.nil? || position >= current.first
         end
       end
 
-      observations.sort_by { |resource_key_hash, _observation| resource_key_hash.b }
-        .map { |_resource_key_hash, observation| observation.last }
+      observations.sort_by { |identity, _observation| identity.b }
+        .map { |_identity, observation| observation.last }
+    end
+
+    def event_identity(payload)
+      return payload.resource_id if payload.respond_to?(:resource_id)
+
+      payload.resource_key_hash
     end
 
     def load_event(event)

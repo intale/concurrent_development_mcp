@@ -16,7 +16,6 @@ module Coordinator::Write
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
         completion_builder: CommandCompletionBuilder.new,
-        compound_marker_builder: CompoundMarkerBuilder.new,
         repository_registration_loader: RepositoryRegistrationLoader.new(event_store:),
         repository_marker_builder: RepositoryMarkerBuilder.new,
         event_plan_contract: Contracts::WriteSetRenewalEventPlan.new
@@ -31,7 +30,6 @@ module Coordinator::Write
         @schema_registry = schema_registry
         @stream_factory = stream_factory
         @completion_builder = completion_builder
-        @compound_marker_builder = compound_marker_builder
         @repository_registration_loader = repository_registration_loader
         @repository_marker_builder = repository_marker_builder
         @event_plan_contract = event_plan_contract
@@ -73,6 +71,9 @@ module Coordinator::Write
         return replay if replay
 
         attempt_state = load_attempt_state(command.attempt_id)
+        compatibility = v2_attempt(attempt_state, command:)
+        return compatibility if compatibility.failure?
+
         current_observations = load_current_observations(attempt_state)
         decision = @decider.call(
           attempt_state:,
@@ -170,20 +171,39 @@ module Coordinator::Write
 
       def load_current_observations(attempt_state)
         attempt_state.lease_resources.map do |reference|
-          CurrentLeaseObservationV1.new(
+          CurrentLeaseObservationV2.new(
             reference:,
-            state: load_lease_state(reference.resource_key_hash)
+            state: load_lease_state(reference.resource_id)
           )
         end
       end
 
-      def load_lease_state(resource_key_hash)
+      def load_lease_state(resource_id)
         events = @event_store.read_grouped(
-          @stream_factory.resource_lease(resource_key_hash),
+          @stream_factory.resource_lease(resource_id),
           EventQueries::RESOURCE_LEASE_FOR_RESERVATION
         ).reverse.map { load_event(_1) }
 
         Domain::ResourceLeases::State.reduce(events)
+      end
+
+      def v2_attempt(attempt_state, command:)
+        return Success() if attempt_state.lease_policy_version.nil? ||
+          attempt_state.lease_policy_version == LeaseResourceV2::POLICY_VERSION
+
+        Failure(
+          OutcomeError.new(
+            code: :resource_identity_policy_mismatch,
+            message: "The current write set predates Resource UUID leases and must be reacquired",
+            details: {
+              change_set_id: command.change_set_id,
+              work_item_id: command.work_item_id,
+              attempt_id: command.attempt_id,
+              current_policy_version: attempt_state.lease_policy_version,
+              requested_policy_version: LeaseResourceV2::POLICY_VERSION
+            }
+          )
+        )
       end
 
       def load_event(event)
@@ -231,23 +251,11 @@ module Coordinator::Write
           "attempt:#{command.attempt_id}",
           "command:#{command.command_id}"
         ] + @repository_marker_builder.call(repository_registration) + [ "lease-set:#{event.lease_set_id}" ]
-        return common unless event.is_a?(Events::ResourceLeaseRenewedV1)
+        return common unless event.is_a?(Events::ResourceLeaseRenewedV2)
 
-        components = [
-          "scope:#{repository_registration.scope}",
-          "repository:#{event.repository_id}",
+        common + [
+          "resource:#{event.resource_id}",
           "resource-kind:#{event.resource_kind}",
-          "resource-key-hash:#{event.resource_key_hash}"
-        ]
-        compound = @compound_marker_builder.call(
-          CompoundMarkerDefinitionV1.new(
-            purpose: "resource-identity",
-            components:
-          )
-        )
-
-        common + components + [
-          compound.marker,
           *@repository_marker_builder.resource_event_markers(
             repository_id: event.repository_id,
             resource_kind: event.resource_kind,

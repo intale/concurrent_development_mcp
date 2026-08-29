@@ -10,7 +10,7 @@ module Coordinator::Processes
       Coordinator::Write::Commands::ExpireResourceLease.new(
         command_id: InternalCommandIdBuilder.call("lease-expiry:v1:#{source.reference.event_id}"),
         actor: Coordinator::Write::Commands::Actor.new(kind: "system", id: POLICY_ID),
-        resource_key_hash: payload.resource_key_hash,
+        resource_id: payload.resource_id,
         lease_id: payload.lease_id,
         lease_set_id: payload.lease_set_id,
         fencing_token: payload.fencing_token,

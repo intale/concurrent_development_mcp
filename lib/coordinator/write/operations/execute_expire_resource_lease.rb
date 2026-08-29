@@ -15,7 +15,6 @@ module Coordinator::Write
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
         completion_builder: CommandCompletionBuilder.new,
-        compound_marker_builder: CompoundMarkerBuilder.new,
         repository_registration_loader: RepositoryRegistrationLoader.new(event_store:),
         repository_marker_builder: RepositoryMarkerBuilder.new,
         event_plan_contract: Contracts::ResourceLeaseExpiryEventPlan.new
@@ -29,7 +28,6 @@ module Coordinator::Write
         @schema_registry = schema_registry
         @stream_factory = stream_factory
         @completion_builder = completion_builder
-        @compound_marker_builder = compound_marker_builder
         @repository_registration_loader = repository_registration_loader
         @repository_marker_builder = repository_marker_builder
         @event_plan_contract = event_plan_contract
@@ -62,7 +60,7 @@ module Coordinator::Write
         replay = replay_result(command:, input_digest: prepared.input_digest)
         return replay if replay
 
-        state = load_lease_state(command.resource_key_hash)
+        state = load_lease_state(command.resource_id)
         decision = @decider.call(
           state:,
           command:,
@@ -134,9 +132,9 @@ module Coordinator::Write
         load_event(event)
       end
 
-      def load_lease_state(resource_key_hash)
+      def load_lease_state(resource_id)
         events = @event_store.read_grouped(
-          @stream_factory.resource_lease(resource_key_hash),
+          @stream_factory.resource_lease(resource_id),
           EventQueries::RESOURCE_LEASE_FOR_RESERVATION
         ).reverse.map { load_event(_1) }
 
@@ -171,19 +169,6 @@ module Coordinator::Write
       end
 
       def event_markers(command, event, repository_registration:)
-        components = [
-          "scope:#{repository_registration.scope}",
-          "repository:#{event.repository_id}",
-          "resource-kind:#{event.resource_kind}",
-          "resource-key-hash:#{event.resource_key_hash}"
-        ]
-        compound = @compound_marker_builder.call(
-          CompoundMarkerDefinitionV1.new(
-            purpose: "resource-identity",
-            components:
-          )
-        )
-
         [
           "change-set:#{event.change_set_id}",
           "work-item:#{event.work_item_id}",
@@ -191,8 +176,8 @@ module Coordinator::Write
           "command:#{command.command_id}",
           "lease-set:#{event.lease_set_id}",
           *@repository_marker_builder.call(repository_registration),
-          *components,
-          compound.marker,
+          "resource:#{event.resource_id}",
+          "resource-kind:#{event.resource_kind}",
           *@repository_marker_builder.resource_event_markers(
             repository_id: event.repository_id,
             resource_kind: event.resource_kind,

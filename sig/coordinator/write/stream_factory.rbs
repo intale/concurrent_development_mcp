@@ -12,7 +12,7 @@ module Coordinator
       def change_set: (String change_set_id) -> StreamReference
       def work_item: (String work_item_id) -> StreamReference
       def attempt: (String attempt_id) -> StreamReference
-      def resource_lease: (String resource_key_hash) -> StreamReference
+      def resource_lease: (String resource_id) -> StreamReference
       def conversation: (String conversation_id) -> StreamReference
       def interpretation: (String message_id) -> StreamReference
       def decision: (String decision_id) -> StreamReference

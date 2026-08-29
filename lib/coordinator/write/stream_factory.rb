@@ -78,11 +78,11 @@ module Coordinator::Write
       )
     end
 
-    def resource_lease(resource_key_hash)
+    def resource_lease(resource_id)
       StreamReference.new(
         context: "DevelopmentCoordination",
         stream_name: "ResourceLease",
-        stream_id: resource_key_hash
+        stream_id: resource_id
       )
     end
 

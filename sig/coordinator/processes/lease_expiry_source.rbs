@@ -1,7 +1,7 @@
 module Coordinator
   module Processes
     class LeaseExpirySource < Shared::Value
-      type payload = Write::Events::ResourceLeaseAcquiredV1 | Write::Events::ResourceLeaseRenewedV1
+      type payload = Write::Events::ResourceLeaseAcquiredV1 | Write::Events::ResourceLeaseRenewedV1 | Write::Events::ResourceLeaseAcquiredV2 | Write::Events::ResourceLeaseRenewedV2
 
       def event: () -> PgEventstore::Event
       def reference: () -> Write::EventReference

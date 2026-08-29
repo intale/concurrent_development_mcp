@@ -7,6 +7,7 @@ module Coordinator::Processes
       lease_observation_superseded
       lease_released
       lease_already_expired
+      legacy_source_ignored
     ].freeze
 
     attribute :outcome, Types::String.enum(*OUTCOMES)

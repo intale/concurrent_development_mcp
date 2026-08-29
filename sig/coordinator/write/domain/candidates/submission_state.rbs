@@ -6,7 +6,7 @@ module Coordinator
           attr_reader existing_candidate: Coordinator::Write::EventReference?
           attr_reader existing_head: Coordinator::Write::EventReference?
           attr_reader attempt: Coordinator::Write::Domain::Attempts::State
-          attr_reader current_leases: Array[Coordinator::Write::CurrentLeaseObservationV1]
+          attr_reader current_leases: Array[Coordinator::Write::CurrentLeaseObservationV1 | Coordinator::Write::CurrentLeaseObservationV2]
         end
       end
     end

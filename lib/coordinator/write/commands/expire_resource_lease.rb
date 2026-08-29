@@ -5,7 +5,7 @@ module Coordinator::Write
     class ExpireResourceLease < Value
       attribute :command_id, Types::InternalCommandId
       attribute :actor, Actor
-      attribute :resource_key_hash, Types::Sha256Digest
+      attribute :resource_id, Types::ResourceId
       attribute :lease_id, Types::UuidV7
       attribute :lease_set_id, Types::UuidV7
       attribute :fencing_token, Types::FencingToken

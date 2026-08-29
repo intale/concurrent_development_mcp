@@ -1,0 +1,27 @@
+module Coordinator
+  module Write
+    module Events
+      class ResourceLeaseRenewedV2 < Base
+        def lease_id: () -> String
+        def lease_set_id: () -> String
+        def resource_id: () -> String
+        def resource_kind: () -> String
+        def resource_path: () -> String
+        def policy_version: () -> String
+        def mode: () -> String
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def attempt_id: () -> String
+        def agent_id: () -> String
+        def repository_id: () -> String
+        def object_format: () -> String
+        def base_commit_oid: () -> String
+        def base_blob_oid: () -> String?
+        def fencing_token: () -> Integer
+        def renewed_at: () -> String
+        def previous_expires_at: () -> String
+        def expires_at: () -> String
+      end
+    end
+  end
+end

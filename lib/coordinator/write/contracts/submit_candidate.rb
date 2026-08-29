@@ -22,7 +22,7 @@ module Coordinator::Write
         required(:checkpoint_kind).filled(:string, included_in?: Types::CANDIDATE_CHECKPOINT_KINDS)
         required(:lease_set_id).filled(:string)
         required(:leases).array(:hash) do
-          required(:resource_key_hash).filled(:string)
+          required(:resource_id).filled(:string)
           required(:lease_id).filled(:string)
           required(:fencing_token).filled(:integer)
         end
@@ -87,13 +87,13 @@ module Coordinator::Write
 
       rule(:leases) do
         key.failure("must contain between 1 and 32 entries") unless (1..32).cover?(value.length)
-        keys = value.map { [ _1[:resource_key_hash], _1[:lease_id], _1[:fencing_token] ] }
+        keys = value.map { [ _1[:resource_id], _1[:lease_id], _1[:fencing_token] ] }
         key.failure("must not contain duplicate lease observations") unless keys.uniq.length == keys.length
-        hashes = value.map { _1[:resource_key_hash] }
-        key.failure("must not contain duplicate resource identities") unless hashes.uniq.length == hashes.length
+        resource_ids = value.map { _1[:resource_id] }
+        key.failure("must not contain duplicate Resource IDs") unless resource_ids.uniq.length == resource_ids.length
 
         value.each_with_index do |lease, index|
-          key([ :leases, index, :resource_key_hash ]).failure("must be a SHA-256 digest") unless Types::SHA256_DIGEST_PATTERN.match?(lease[:resource_key_hash])
+          key([ :leases, index, :resource_id ]).failure("must be a UUIDv7") unless Types::UUID_V7_PATTERN.match?(lease[:resource_id])
           key([ :leases, index, :lease_id ]).failure("must be a UUIDv7") unless Types::UUID_V7_PATTERN.match?(lease[:lease_id])
           key([ :leases, index, :fencing_token ]).failure("must be positive") unless lease[:fencing_token].positive?
         end

@@ -14,10 +14,10 @@ module Coordinator::Processes
         end
       end
 
-      def perform(source_event_id, resource_key_hash, stream_revision)
+      def perform(source_event_id, resource_stream_id, stream_revision)
         locator = LeaseExpirySourceLocatorV1.new(
           source_event_id:,
-          resource_key_hash:,
+          resource_stream_id:,
           stream_revision:
         )
         result = self.class.policy.call(locator)

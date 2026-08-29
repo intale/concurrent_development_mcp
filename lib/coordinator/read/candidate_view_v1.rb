@@ -2,7 +2,7 @@
 
 module Coordinator::Read
   class CandidateViewV1 < Value
-    Lease = Coordinator::Write::LeaseReferenceV1
+    Lease = Coordinator::Write::LeaseReferenceV1 | Coordinator::Write::LeaseReferenceV2
 
     attribute :candidate_id, Types::Identifier
     attribute :change_set_id, Types::Identifier

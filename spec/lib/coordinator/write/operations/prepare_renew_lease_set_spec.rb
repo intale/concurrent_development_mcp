@@ -5,16 +5,8 @@ RSpec.describe Coordinator::Write::Operations::PrepareRenewLeaseSet do
 
   let(:leases) do
     [
-      {
-        resource_key_hash: "sha256:#{'b' * 64}",
-        lease_id: "02919191-9191-7191-8191-919191919191",
-        fencing_token: 3
-      },
-      {
-        resource_key_hash: "sha256:#{'a' * 64}",
-        lease_id: "01919191-9191-7191-8191-919191919191",
-        fencing_token: 1
-      }
+      { resource_id: "02919191-9191-7191-8191-919191919191", lease_id: "04919191-9191-7191-8191-919191919191", fencing_token: 3 },
+      { resource_id: "01919191-9191-7191-8191-919191919191", lease_id: "05919191-9191-7191-8191-919191919191", fencing_token: 1 }
     ]
   end
   let(:input) do
@@ -30,41 +22,30 @@ RSpec.describe Coordinator::Write::Operations::PrepareRenewLeaseSet do
     }
   end
 
-  it "builds one immutable command with canonical lease-reference order" do
-    result = prepare.call(input)
+  it "builds one immutable command in Resource UUID order" do
+    command = prepare.call(input).value!
 
-    expect(result).to be_success
-    command = result.value!
     expect(command).to be_a(Coordinator::Write::Commands::RenewLeaseSet)
-    expect(command.leases.map(&:resource_key_hash)).to eq(
-      leases.map { _1.fetch(:resource_key_hash) }.sort_by(&:b)
-    )
+    expect(command.leases.map(&:resource_id)).to eq(leases.map { _1.fetch(:resource_id) }.sort_by(&:b))
     expect(command.lease_duration_seconds).to eq(900)
     expect(command).to be_frozen
   end
 
-  it "rejects duplicate resource, duplicate lease, and duration evidence before a command exists" do
+  it "rejects duplicate Resources, duplicate leases, malformed references, bounds, and duration" do
     duplicate_resource = prepare.call(input.merge(leases: [ leases.first, leases.first.merge(lease_id: leases.last[:lease_id]) ]))
     duplicate_lease = prepare.call(input.merge(leases: [ leases.first, leases.last.merge(lease_id: leases.first[:lease_id]) ]))
+    malformed = prepare.call(input.merge(leases: [ leases.first.merge(resource_id: "abc", lease_id: "abc", fencing_token: 0) ]))
+    over_bound = prepare.call(input.merge(leases: 33.times.map { lease_reference(_1) }))
     duration = prepare.call(input.merge(lease_duration_seconds: 29))
 
-    expect(duplicate_resource.failure.code).to eq(:invalid_input)
-    expect(duplicate_lease.failure.code).to eq(:invalid_input)
-    expect(duration.failure.code).to eq(:invalid_input)
+    expect([ duplicate_resource, duplicate_lease, malformed, over_bound, duration ].map { _1.failure.code }).to all(eq(:invalid_input))
   end
 
-  it "rejects malformed hashes, lease IDs, tokens, and over-bound sets" do
-    malformed = leases.first.merge(resource_key_hash: "abc", lease_id: "abc", fencing_token: 0)
-    bad_reference = prepare.call(input.merge(leases: [ malformed ]))
-    over_bound = prepare.call(input.merge(leases: 33.times.map do |index|
-      {
-        resource_key_hash: "sha256:#{format('%064x', index)}",
-        lease_id: format("%08x-9191-7191-8191-%012x", index, index),
-        fencing_token: 1
-      }
-    end))
-
-    expect(bad_reference.failure.code).to eq(:invalid_input)
-    expect(over_bound.failure.code).to eq(:invalid_input)
+  def lease_reference(index)
+    {
+      resource_id: format("%08x-9191-7191-8191-%012x", index + 1, index + 1),
+      lease_id: format("%08x-9292-7292-8292-%012x", index + 1, index + 1),
+      fencing_token: 1
+    }
   end
 end

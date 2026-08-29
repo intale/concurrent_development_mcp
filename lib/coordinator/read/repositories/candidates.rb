@@ -155,7 +155,11 @@ module Coordinator::Read
           lease_set_id: record.lease_set_id,
           lease_policy_version: record.lease_policy_version,
           lease_references: record.lease_references.map do |reference|
-            Coordinator::Write::LeaseReferenceV1.new(symbolize(reference))
+            attributes = symbolize(reference)
+            reference_class = attributes.key?(:resource_id) ?
+              Coordinator::Write::LeaseReferenceV2 :
+              Coordinator::Write::LeaseReferenceV1
+            reference_class.new(attributes)
           end,
           manifest_digest: record.manifest_digest,
           build_context_digest: record.build_context_digest,

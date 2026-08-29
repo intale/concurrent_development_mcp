@@ -3,9 +3,11 @@
 module Coordinator::Write
   module CandidateObligations
     class CandidateEvidenceV1 < Value
+      Candidate = Events::CandidateSubmittedV1 | Events::CandidateSubmittedV2
+
       attribute :registration, Events::CandidateImpactSurfaceRegisteredV1
       attribute :registration_event, EventReference
-      attribute :candidate, Events::CandidateSubmittedV1
+      attribute :candidate, Candidate
       attribute :manifest, Events::CandidateChangeManifestCapturedV1
       attribute :build_context, Events::CandidateBuildContextCapturedV1.optional
       attribute :surface, Events::CandidateImpactSurfaceDerivedV1

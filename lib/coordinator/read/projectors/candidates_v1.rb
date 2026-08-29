@@ -71,7 +71,8 @@ module Coordinator::Read
 
       def project(event, payload)
         case payload
-        when Coordinator::Write::Events::CandidateSubmittedV1
+        when Coordinator::Write::Events::CandidateSubmittedV1,
+             Coordinator::Write::Events::CandidateSubmittedV2
           @candidates.store_submission(event:, candidate: payload)
         when Coordinator::Write::Events::CandidateChangeManifestCapturedV1
           @candidates.store_manifest(event:, manifest: payload)

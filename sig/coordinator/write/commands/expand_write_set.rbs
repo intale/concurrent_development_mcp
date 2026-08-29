@@ -10,7 +10,7 @@ module Coordinator
         def lease_set_id: () -> String
         def repository_id: () -> String
         def base_commit_oid: () -> String
-        def resources: () -> Array[FileResourceV1]
+        def resources: () -> Array[ResourceLeaseTargetV1]
       end
     end
   end

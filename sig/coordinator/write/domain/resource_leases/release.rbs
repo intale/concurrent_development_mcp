@@ -4,7 +4,7 @@ module Coordinator
       module ResourceLeases
         class Release
           def initialize: (?stream_factory: StreamFactory) -> void
-          def call: (attempt_state: Domain::Attempts::State, current_observations: Array[CurrentLeaseObservationV1], command: Commands::ReleaseLeaseSet, released_at: String) -> Dry::Monads::Result
+          def call: (attempt_state: Domain::Attempts::State, current_observations: Array[CurrentLeaseObservationV2], command: Commands::ReleaseLeaseSet, released_at: String) -> Dry::Monads::Result
         end
       end
     end

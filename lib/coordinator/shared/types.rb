@@ -122,6 +122,7 @@ module Coordinator::Shared
       coordinator-resource-key/v1
       coordinator-resource-key/v2
       coordinator-resource-key/v3
+      coordinator-resource-lease/v2
     ].freeze
 
     ACTOR_KINDS = %w[

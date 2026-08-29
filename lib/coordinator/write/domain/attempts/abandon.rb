@@ -91,27 +91,23 @@ module Coordinator::Write
               abandoned_at:
             )
           end
-          released_references = releasable.map(&:reference).sort_by(&:resource_key_hash)
-          untouched_hashes = untouched.map { _1.reference.resource_key_hash }.sort
+          released_references = releasable.map(&:reference).sort_by { lease_identity(_1).b }
+          untouched_identities = untouched.map { lease_identity(_1.reference) }.sort
 
           EventPlan.new(
             writes: release_events.map do |event|
               EventWrite.new(
-                stream: @stream_factory.resource_lease(event.resource_key_hash),
+                stream: @stream_factory.resource_lease(lease_identity(event)),
                 event:
               )
             end + [
               EventWrite.new(
                 stream: @stream_factory.attempt(command.attempt_id),
-                event: Events::AttemptAbandonedV1.new(
-                  change_set_id: command.change_set_id,
-                  work_item_id: command.work_item_id,
-                  attempt_id: command.attempt_id,
-                  agent_id: command.actor.id,
-                  reason: command.reason,
-                  lease_set_id: attempt_state.lease_set_id,
-                  released_leases: released_references,
-                  untouched_resource_key_hashes: untouched_hashes,
+                event: build_abandonment(
+                  attempt_state:,
+                  command:,
+                  released_references:,
+                  untouched_identities:,
                   abandoned_at:
                 )
               ),
@@ -139,8 +135,7 @@ module Coordinator::Write
           state.active_at?(abandoned_at) &&
             state.lease_id == reference.lease_id &&
             state.lease_set_id == attempt_state.lease_set_id &&
-            state.resource_key == reference.resource_key &&
-            state.resource_key_hash == reference.resource_key_hash &&
+            state.identity == lease_identity(reference) &&
             state.resource_kind == reference.resource_kind &&
             state.resource_path == reference.resource_path &&
             state.base_blob_oid == reference.base_blob_oid &&
@@ -164,11 +159,9 @@ module Coordinator::Write
           state = observation.state
           snapshot = attempt_state.base_snapshots.first
 
-          Events::ResourceLeaseReleasedV1.new(
+          attributes = {
             lease_id: reference.lease_id,
             lease_set_id: attempt_state.lease_set_id,
-            resource_key: reference.resource_key,
-            resource_key_hash: reference.resource_key_hash,
             resource_kind: reference.resource_kind,
             resource_path: reference.resource_path,
             policy_version: attempt_state.lease_policy_version,
@@ -185,7 +178,46 @@ module Coordinator::Write
             acquired_at: state.acquired_at,
             previous_expires_at: state.expires_at,
             released_at: abandoned_at
+          }
+          if reference.respond_to?(:resource_id)
+            return Events::ResourceLeaseReleasedV2.new(**attributes, resource_id: reference.resource_id)
+          end
+
+          Events::ResourceLeaseReleasedV1.new(
+            **attributes,
+            resource_key: reference.resource_key,
+            resource_key_hash: reference.resource_key_hash
           )
+        end
+
+        def build_abandonment(attempt_state:, command:, released_references:, untouched_identities:, abandoned_at:)
+          attributes = {
+            change_set_id: command.change_set_id,
+            work_item_id: command.work_item_id,
+            attempt_id: command.attempt_id,
+            agent_id: command.actor.id,
+            reason: command.reason,
+            lease_set_id: attempt_state.lease_set_id,
+            released_leases: released_references,
+            abandoned_at:
+          }
+          if attempt_state.lease_policy_version == LeaseResourceV2::POLICY_VERSION
+            return Events::AttemptAbandonedV2.new(
+              **attributes,
+              untouched_resource_ids: untouched_identities
+            )
+          end
+
+          Events::AttemptAbandonedV1.new(
+            **attributes,
+            untouched_resource_key_hashes: untouched_identities
+          )
+        end
+
+        def lease_identity(value)
+          return value.resource_id if value.respond_to?(:resource_id)
+
+          value.resource_key_hash
         end
 
         def failure(code, message, command)

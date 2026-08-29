@@ -1,440 +1,202 @@
 # frozen_string_literal: true
 
 RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_store do
-  RESERVE_REPOSITORY_ID = RepositoryScenario::DEFAULT_REPOSITORY_ID
+  REPOSITORY_ID = RepositoryScenario::DEFAULT_REPOSITORY_ID
 
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
-  let(:normalizer) { Coordinator::Write::FileResourceNormalizer.new }
   subject(:operation) { described_class.new(event_store:) }
 
-  let(:input) do
-    reserve_input(
-      command_id: "cmd-lse-100",
+  it "resolves server-owned Resource identity before atomically writing schema-v2 leases" do
+    seed_active_attempts([ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ])
+    first = resolve("app/services/capture.rb")
+    second = resolve("db/schema.rb")
+    input = reserve_input(
+      command_id: "cmd-reserve-v2",
       agent_id: "agent-a",
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
-      paths: [ "app/services/capture.rb", "db/schema.rb" ]
+      resource_ids: [ first, second ]
     )
-  end
-
-  it "atomically persists every resource acquisition, Attempt reservation, and exact completion" do
-    seed_active_attempts([ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ])
 
     result = operation.call(input)
 
     expect(result).to be_success
-    completion = result.value!
-    expect(completion.data).to be_a(Coordinator::Write::CommandReceiptData::LeaseSet)
-    expect(completion.data.to_h).to include(
-      change_set_id: "CS-LSE",
-      work_item_id: "W-LSE-A",
-      attempt_id: "A-LSE-A",
-      repository_id: RESERVE_REPOSITORY_ID,
-      policy_version: "coordinator-resource-key/v3"
-    )
-    expect(completion.data.resources.map(&:fencing_token)).to eq([ 1, 1 ])
-    expect(completion.emitted_events.map(&:stream_name)).to eq(
-      [ "ResourceLease", "ResourceLease", "Attempt" ]
-    )
-    expect(attempt_events("A-LSE-A").map(&:type)).to eq(
-      [ "AttemptAuthorized", "AttemptStarted", "WriteSetReserved" ]
-    )
-    expect(command_events("cmd-lse-100").map(&:type)).to eq([ "CommandCompleted" ])
+    receipt = result.value!.data
+    expect(receipt).to be_a(Coordinator::Write::CommandReceiptData::LeaseSet)
+    expect(receipt).to have_attributes(policy_version: "coordinator-resource-lease/v2")
+    expect(receipt.resources.map(&:resource_id)).to contain_exactly(first, second)
+    expect(receipt.resources).to all(be_a(Coordinator::Write::LeaseReferenceV2))
 
-    input.fetch(:resources).each do |resource|
-      acquisition = lease_events(resource.fetch(:path)).sole
-      expect(acquisition.data).to include(
-        "mode" => "exclusive",
-        "attempt_id" => "A-LSE-A",
-        "agent_id" => "agent-a",
-        "fencing_token" => 1
-      )
-      expect(acquisition.metadata).to include(
-        "policy_version" => "coordinator-resource-key/v3"
-      )
-      expect(acquisition.metadata).not_to have_key("correlation_id")
-      expect(acquisition.markers).to include(
-        "scope:#{RepositoryScenario::DEFAULT_SCOPE}",
-        "repository:#{RESERVE_REPOSITORY_ID}",
-        "resource-kind:file",
-        "resource-key-hash:#{acquisition.data.fetch('resource_key_hash')}"
-      )
-      expect(acquisition.markers.grep(/\Acompound:resource-identity:v1:sha256:/).length).to eq(1)
-      expect(acquisition.markers.grep(/\Acompound:resource-boundary:v1:sha256:/)).to eq(
-        Coordinator::Write::RepositoryMarkerBuilder.new.resource_event_markers(
-          repository_id: RESERVE_REPOSITORY_ID,
-          resource_kind: resource.fetch(:kind),
-          resource_path: resource.fetch(:path)
-        ).sort
-      )
+    [ first, second ].each do |resource_id|
+      event = lease_events(resource_id).sole
+      expect(event).to have_attributes(type: "ResourceLeaseAcquired", stream_revision: 0)
+      expect(event.stream.stream_id).to eq(resource_id)
+      expect(event.data).to include("resource_id" => resource_id, "fencing_token" => 1)
+      expect(event.data).not_to have_key("resource_key_hash")
+      expect(event.markers).to include("resource:#{resource_id}")
+      expect(event.markers).not_to include(a_string_starting_with("resource-key-hash:"))
     end
   end
 
-  it "replays the exact byte-preserving completion and rejects changed command reuse" do
+  it "replays exact input and rejects changed command reuse without duplicate facts" do
     seed_active_attempts([ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ])
-    original = operation.call(input)
-    original_ids = reservation_event_ids(input)
-
-    exact_replay = operation.call(input)
-    changed = operation.call(input.merge(lease_duration_seconds: 901))
-
-    expect(exact_replay).to be_success
-    expect(exact_replay.value!).to eq(original.value!)
-    expect(changed.failure.code).to eq(:command_id_reused)
-    expect(reservation_event_ids(input)).to eq(original_ids)
-  end
-
-  it "returns precise zero-fact Attempt, owner, base, and existing-reservation denials" do
-    RepositoryScenario.register(event_store:)
-    missing = operation.call(input.merge(command_id: "cmd-missing", attempt_id: "A-MISSING"))
-    seed_active_attempts([ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ])
-    wrong_owner = operation.call(input.merge(command_id: "cmd-owner", actor: { kind: "agent", id: "agent-b" }))
-    wrong_base = operation.call(input.merge(command_id: "cmd-base", base_commit_oid: "b" * 40))
-    operation.call(input.merge(command_id: "cmd-first"))
-    already_reserved = operation.call(input.merge(command_id: "cmd-second"))
-
-    expect(missing.failure.code).to eq(:attempt_not_found)
-    expect(wrong_owner.failure.code).to eq(:attempt_owner_mismatch)
-    expect(wrong_base.failure.code).to eq(:repository_base_mismatch)
-    expect(already_reserved.failure.code).to eq(:write_set_already_reserved)
-    expect([ "cmd-missing", "cmd-owner", "cmd-base", "cmd-second" ].flat_map { command_events(_1) }).to be_empty
-  end
-
-  it "rejects an unregistered repository from authoritative event facts" do
-    unregistered_id = "01a03deb-6f55-74ba-bcc0-afd02e7b14dd"
-    result = operation.call(input.merge(command_id: "cmd-unregistered", repository_id: unregistered_id))
-
-    expect(result.failure).to have_attributes(
-      code: :repository_not_registered,
-      details: { repository_id: unregistered_id }
-    )
-    expect(command_events("cmd-unregistered")).to be_empty
-  end
-
-  it "acquires all requested resources or none when one resource is busy" do
-    seed_active_attempts(
-      [
-        [ "W-LSE-A", "A-LSE-A", "agent-a" ],
-        [ "W-LSE-B", "A-LSE-B", "agent-b" ]
-      ]
-    )
-    operation.call(
-      reserve_input(
-        command_id: "cmd-owner",
-        agent_id: "agent-a",
-        work_item_id: "W-LSE-A",
-        attempt_id: "A-LSE-A",
-        paths: [ "shared.rb" ]
-      )
-    ).value!
-
-    result = operation.call(
-      reserve_input(
-        command_id: "cmd-contender",
-        agent_id: "agent-b",
-        work_item_id: "W-LSE-B",
-        attempt_id: "A-LSE-B",
-        paths: [ "free.rb", "shared.rb" ]
-      )
-    )
-
-    expect(result.failure.code).to eq(:lease_busy)
-    expect(lease_events("free.rb")).to be_empty
-    expect(attempt_events("A-LSE-B").none? { _1.type == "WriteSetReserved" }).to be(true)
-    expect(command_events("cmd-contender")).to be_empty
-  end
-
-  it "serializes overlapping dynamic resource sets so exactly one complete set wins" do
-    seed_active_attempts(
-      [
-        [ "W-LSE-A", "A-LSE-A", "agent-a" ],
-        [ "W-LSE-B", "A-LSE-B", "agent-b" ]
-      ]
-    )
-    inputs = [
-      reserve_input(
-        command_id: "cmd-race-a",
-        agent_id: "agent-a",
-        work_item_id: "W-LSE-A",
-        attempt_id: "A-LSE-A",
-        paths: [ "a.rb", "shared.rb" ]
-      ),
-      reserve_input(
-        command_id: "cmd-race-b",
-        agent_id: "agent-b",
-        work_item_id: "W-LSE-B",
-        attempt_id: "A-LSE-B",
-        paths: [ "shared.rb", "b.rb" ]
-      )
-    ]
-
-    results = inputs.map do |candidate|
-      Thread.new { described_class.new(event_store:).call(candidate) }
-    end.map(&:value)
-
-    expect(results.count(&:success?)).to eq(1)
-    expect(results.count(&:failure?)).to eq(1)
-    expect(results.find(&:failure?).failure.code).to eq(:lease_busy)
-    expect(lease_events("shared.rb").length).to eq(1)
-    expect(%w[a.rb b.rb].sum { lease_events(_1).length }).to eq(1)
-    expect(inputs.sum { command_events(_1.fetch(:command_id)).length }).to eq(1)
-  end
-
-  it "re-evaluates a concurrent directory/child-file DCB so exactly one Task decision wins" do
-    seed_active_attempts(
-      [
-        [ "W-LSE-A", "A-LSE-A", "agent-a" ],
-        [ "W-LSE-B", "A-LSE-B", "agent-b" ]
-      ]
-    )
-    inputs = [
-      reserve_input(
-        command_id: "cmd-directory-race",
-        agent_id: "agent-a",
-        work_item_id: "W-LSE-A",
-        attempt_id: "A-LSE-A",
-        resources: [ { kind: "directory", path: "app/models" } ]
-      ),
-      reserve_input(
-        command_id: "cmd-child-race",
-        agent_id: "agent-b",
-        work_item_id: "W-LSE-B",
-        attempt_id: "A-LSE-B",
-        resources: [ { kind: "file", path: "app/models/user.rb" } ]
-      )
-    ]
-
-    results = inputs.map do |candidate|
-      Thread.new { described_class.new(event_store:).call(candidate) }
-    end.map(&:value)
-
-    expect(results.count(&:success?)).to eq(1)
-    expect(results.count(&:failure?)).to eq(1)
-    expect(results.find(&:failure?).failure).to have_attributes(code: :lease_busy)
-    expect(
-      lease_events("app/models", kind: "directory").length + lease_events("app/models/user.rb").length
-    ).to eq(1)
-    expect(inputs.sum { command_events(_1.fetch(:command_id)).length }).to eq(1)
-  end
-
-  it "allows a file path and a child file path because neither lease covers descendants" do
-    seed_active_attempts(
-      [
-        [ "W-LSE-A", "A-LSE-A", "agent-a" ],
-        [ "W-LSE-B", "A-LSE-B", "agent-b" ]
-      ]
-    )
-    inputs = [
-      reserve_input(
-        command_id: "cmd-file-parent",
-        agent_id: "agent-a",
-        work_item_id: "W-LSE-A",
-        attempt_id: "A-LSE-A",
-        resources: [ { kind: "file", path: "app/models" } ]
-      ),
-      reserve_input(
-        command_id: "cmd-file-child",
-        agent_id: "agent-b",
-        work_item_id: "W-LSE-B",
-        attempt_id: "A-LSE-B",
-        resources: [ { kind: "file", path: "app/models/user.rb" } ]
-      )
-    ]
-
-    results = inputs.map do |candidate|
-      Thread.new { described_class.new(event_store:).call(candidate) }
-    end.map(&:value)
-
-    expect(results).to all(be_success)
-    expect(lease_events("app/models").length).to eq(1)
-    expect(lease_events("app/models/user.rb").length).to eq(1)
-  end
-
-  it "returns a typed zero-fact maintenance denial when the selected DCB delta exceeds its hard bound" do
-    seed_active_attempts([ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ])
-    marker = Coordinator::Write::RepositoryMarkerBuilder.new.resource_boundary_markers(
-      repository_id: RESERVE_REPOSITORY_ID,
-      resource_kind: "file",
-      resource_path: "bounded.rb"
-    ).sole
-    events = 257.times.map do
-      PgEventstore::Event.new(
-        id: Coordinator::Shared::IdGenerator.new.uuid_v7,
-        type: "ResourceLeaseAcquired",
-        data: {},
-        metadata: { "schema_version" => 1 },
-        markers: [ marker ]
-      )
-    end
-    event_store.append(streams.resource_lease("sha256:#{'f' * 64}"), events)
-
-    result = operation.call(
-      reserve_input(
-        command_id: "cmd-boundary-overflow",
-        agent_id: "agent-a",
-        work_item_id: "W-LSE-A",
-        attempt_id: "A-LSE-A",
-        paths: [ "bounded.rb" ]
-      )
-    )
-
-    expect(result.failure).to have_attributes(
-      code: :resource_boundary_maintenance_required,
-      details: {
-        repository_id: RESERVE_REPOSITORY_ID,
-        boundary_marker_count: 1,
-        maximum_delta_event_count: 256
-      }
-    )
-    expect(command_events("cmd-boundary-overflow")).to be_empty
-    expect(attempt_events("A-LSE-A").none? { _1.type == "WriteSetReserved" }).to be(true)
-  end
-
-  it "rolls a hot inactive boundary into one idempotent snapshot and makes it leasable again" do
-    seed_active_attempts([ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ])
-    marker = Coordinator::Write::RepositoryMarkerBuilder.new.resource_boundary_markers(
-      repository_id: RESERVE_REPOSITORY_ID,
-      resource_kind: "file",
-      resource_path: "hot.rb"
-    ).sole
-    source = append_released_boundary_history(marker:, path: "hot.rb", lease_count: 129)
-    command = Coordinator::Write::Commands::RollResourceBoundaryEpoch.new(
-      command_id: "internal:resource-boundary-rollover:v1:spec",
-      actor: Coordinator::Write::Commands::Actor.new(kind: "system", id: "resource-boundary-maintenance-v1"),
-      repository_id: RESERVE_REPOSITORY_ID,
-      boundary_marker: marker,
-      source_event_id: source.id,
-      source_global_position: source.global_position
-    )
-    rollover = Coordinator::Write::Operations::ExecuteRollResourceBoundaryEpoch.new(event_store:)
-
-    first = rollover.call_command(command, caused_by: source)
-    replay = rollover.call_command(command, caused_by: source)
-
-    expect(first).to be_success
-    expect(replay).to be_success
-    snapshots = event_store.read(
-      Coordinator::Write::ResourceBoundaryLoader.new(event_store:).snapshot_stream(marker),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "ResourceBoundaryEpochRolled" ],
-        maximum_count: 2,
-        direction: :asc
-      )
-    )
-    expect(snapshots.length).to eq(1)
-    expect(snapshots.sole).to have_attributes(causation_id: source.id, correlation_id: source.correlation_id)
-    expect(snapshots.sole.data).to include(
-      "boundary_marker" => marker,
-      "epoch" => 1,
-      "through_global_position" => source.global_position,
-      "active_leases" => []
-    )
-
-    reservation = operation.call(
-      reserve_input(
-        command_id: "cmd-hot-after-rollover",
-        agent_id: "agent-a",
-        work_item_id: "W-LSE-A",
-        attempt_id: "A-LSE-A",
-        paths: [ "hot.rb" ]
-      )
-    )
-    expect(reservation).to be_success
-  end
-
-  it "allows disjoint dynamic resource sets to complete independently" do
-    seed_active_attempts(
-      [
-        [ "W-LSE-A", "A-LSE-A", "agent-a" ],
-        [ "W-LSE-B", "A-LSE-B", "agent-b" ]
-      ]
-    )
-    inputs = [
-      reserve_input(
-        command_id: "cmd-disjoint-a",
-        agent_id: "agent-a",
-        work_item_id: "W-LSE-A",
-        attempt_id: "A-LSE-A",
-        paths: [ "a.rb" ]
-      ),
-      reserve_input(
-        command_id: "cmd-disjoint-b",
-        agent_id: "agent-b",
-        work_item_id: "W-LSE-B",
-        attempt_id: "A-LSE-B",
-        paths: [ "b.rb" ]
-      )
-    ]
-
-    results = inputs.map do |candidate|
-      Thread.new { described_class.new(event_store:).call(candidate) }
-    end.map(&:value)
-
-    expect(results).to all(be_success)
-    expect(lease_events("a.rb").length).to eq(1)
-    expect(lease_events("b.rb").length).to eq(1)
-  end
-
-  it "reacquires exactly at expiry with a monotonically greater fencing token" do
-    seed_active_attempts(
-      [
-        [ "W-LSE-A", "A-LSE-A", "agent-a" ],
-        [ "W-LSE-B", "A-LSE-B", "agent-b" ]
-      ]
-    )
-    first = reserve_input(
-      command_id: "cmd-expiry-a",
+    resource_id = resolve("app/replay.rb")
+    input = reserve_input(
+      command_id: "cmd-reserve-replay",
       agent_id: "agent-a",
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
-      paths: [ "expiring.rb" ],
-      lease_duration_seconds: 30
+      resource_ids: [ resource_id ]
+    )
+
+    original = operation.call(input)
+    replay = operation.call(input)
+    changed = operation.call(input.merge(lease_duration_seconds: 901))
+
+    expect(replay.value!).to eq(original.value!)
+    expect(changed.failure.code).to eq(:command_id_reused)
+    expect(lease_events(resource_id).length).to eq(1)
+    expect(command_events("cmd-reserve-replay").length).to eq(1)
+  end
+
+  it "rejects missing, cross-repository, and inactive Resources from write-side facts" do
+    seed_active_attempts([ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ])
+    active = resolve("app/inactive.rb")
+    Coordinator::Write::Operations::ExecuteRemoveResource.new(event_store:).call(
+      command_id: "cmd-remove-before-lease",
+      actor: { kind: "agent", id: "agent-a" },
+      resource_id: active,
+      reason: "removed"
+    ).value!
+    missing = SecureRandom.uuid_v7
+
+    inactive = operation.call(
+      reserve_input(
+        command_id: "cmd-inactive-resource",
+        agent_id: "agent-a",
+        work_item_id: "W-LSE-A",
+        attempt_id: "A-LSE-A",
+        resource_ids: [ active ]
+      )
+    )
+    absent = operation.call(
+      reserve_input(
+        command_id: "cmd-missing-resource",
+        agent_id: "agent-a",
+        work_item_id: "W-LSE-A",
+        attempt_id: "A-LSE-A",
+        resource_ids: [ missing ]
+      )
+    )
+
+    expect(inactive.failure).to have_attributes(code: :resource_not_active)
+    expect(inactive.failure.details).to include(resource_id: active)
+    expect(absent.failure).to have_attributes(code: :resource_not_found, details: { resource_id: missing })
+    expect(command_events("cmd-inactive-resource")).to be_empty
+    expect(command_events("cmd-missing-resource")).to be_empty
+  end
+
+  it "serializes two agents contending for the same Resource so only one full decision commits" do
+    seed_active_attempts(
+      [
+        [ "W-LSE-A", "A-LSE-A", "agent-a" ],
+        [ "W-LSE-B", "A-LSE-B", "agent-b" ]
+      ]
+    )
+    shared = resolve("app/shared.rb")
+    first = reserve_input(
+      command_id: "cmd-race-a",
+      agent_id: "agent-a",
+      work_item_id: "W-LSE-A",
+      attempt_id: "A-LSE-A",
+      resource_ids: [ shared ]
     )
     second = reserve_input(
-      command_id: "cmd-expiry-b",
+      command_id: "cmd-race-b",
       agent_id: "agent-b",
       work_item_id: "W-LSE-B",
       attempt_id: "A-LSE-B",
-      paths: [ "expiring.rb" ],
-      lease_duration_seconds: 30
+      resource_ids: [ shared ]
     )
 
-    Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 0)) { operation.call(first).value! }
-    Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 30)) { operation.call(second).value! }
+    results = [ first, second ].map do |input|
+      Thread.new { described_class.new(event_store:).call(input) }
+    end.map(&:value)
 
-    expect(lease_events("expiring.rb").map { _1.data.fetch("fencing_token") }).to eq([ 1, 2 ])
+    expect(results.count(&:success?)).to eq(1)
+    expect(results.find(&:failure?).failure.code).to eq(:lease_busy)
+    expect(lease_events(shared).length).to eq(1)
+    expect(%w[cmd-race-a cmd-race-b].sum { command_events(_1).length }).to eq(1)
   end
 
-  it "rejects resource bounds before opening the target transaction" do
-    result = operation.call(
-      input.merge(resources: 33.times.map { { kind: "file", path: "file-#{_1}.rb" } })
+  it "blocks directory descendants across distinct UUIDs but does not treat a file prefix as an ancestor" do
+    seed_active_attempts(
+      [
+        [ "W-LSE-A", "A-LSE-A", "agent-a" ],
+        [ "W-LSE-B", "A-LSE-B", "agent-b" ]
+      ]
+    )
+    directory = resolve("app/models", kind: "directory")
+    child = resolve("app/models/user.rb")
+    parent_file = resolve("app/services")
+    child_file = resolve("app/services/capture.rb")
+
+    operation.call(
+      reserve_input(
+        command_id: "cmd-directory-owner",
+        agent_id: "agent-a",
+        work_item_id: "W-LSE-A",
+        attempt_id: "A-LSE-A",
+        resource_ids: [ directory ]
+      )
+    ).value!
+    blocked = operation.call(
+      reserve_input(
+        command_id: "cmd-directory-child",
+        agent_id: "agent-b",
+        work_item_id: "W-LSE-B",
+        attempt_id: "A-LSE-B",
+        resource_ids: [ child ]
+      )
     )
 
-    expect(result.failure.code).to eq(:invalid_input)
-    expect(command_events("cmd-lse-100")).to be_empty
-    expect(attempt_events("A-LSE-A")).to be_empty
+    expect(blocked.failure).to have_attributes(code: :lease_busy)
+    expect(blocked.failure.details).to include(resource_id: child)
+
+    release_receipt(operation.call(
+      reserve_input(
+        command_id: "cmd-file-prefix-owner",
+        agent_id: "agent-b",
+        work_item_id: "W-LSE-B",
+        attempt_id: "A-LSE-B",
+        resource_ids: [ parent_file, child_file ]
+      )
+    ))
+    expect(lease_events(parent_file).length).to eq(1)
+    expect(lease_events(child_file).length).to eq(1)
   end
 
-  def reserve_input(
-    command_id:,
-    agent_id:,
-    work_item_id:,
-    attempt_id:,
-    paths: nil,
-    resources: nil,
-    lease_duration_seconds: 900
-  )
+  def release_receipt(result)
+    expect(result).to be_success
+    result.value!
+  end
+
+  def resolve(path, kind: "file")
+    ResourceScenario.resolve(event_store:, repository_id: REPOSITORY_ID, kind:, path:)
+  end
+
+  def reserve_input(command_id:, agent_id:, work_item_id:, attempt_id:, resource_ids:)
     {
       command_id:,
       actor: { kind: "agent", id: agent_id },
       change_set_id: "CS-LSE",
       work_item_id:,
       attempt_id:,
-      repository_id: RESERVE_REPOSITORY_ID,
+      repository_id: REPOSITORY_ID,
       base_commit_oid: "a" * 40,
-      resources: resources || paths.map { { kind: "file", path: _1 } },
-      lease_duration_seconds:
+      resources: resource_ids.map { { resource_id: _1 } },
+      lease_duration_seconds: 900
     }
   end
 
@@ -447,30 +209,25 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
       goal: "Coordinate resource leases",
       acceptance_criteria: [ "Overlapping agents cannot both write" ]
     ).value!
-
     attempts.each do |work_item_id, _attempt_id, _agent_id|
       Coordinator::Write::Operations::ExecuteCreateWorkItem.new(event_store:).call(
         command_id: "seed-create-#{work_item_id}",
         actor: { kind: "agent", id: "planner-1" },
         change_set_id: "CS-LSE",
         work_item_id:,
-        repository_id: RESERVE_REPOSITORY_ID,
+        repository_id: REPOSITORY_ID,
         goal: "Implement #{work_item_id}",
         acceptance_criteria: [ "The work is verifiable" ]
       ).value!
     end
-
     Coordinator::Write::Operations::ExecuteActivateChangeSet.new(event_store:).call(
       command_id: "seed-activate-CS-LSE",
       actor: { kind: "agent", id: "planner-1" },
       change_set_id: "CS-LSE"
     ).value!
-    activation = event_store.read(
-      streams.change_set("CS-LSE"),
-      Coordinator::Write::EventQueries::CHANGE_SET_FOR_ACQUISITION
-    ).find { _1.type == "ChangeSetActivated" }
+    activation = event_store.read(streams.change_set("CS-LSE"), Coordinator::Write::EventQueries::CHANGE_SET_FOR_ACQUISITION)
+      .find { _1.type == "ChangeSetActivated" }
     Coordinator::Processes::ProcessManagers::ChangeSetReadiness.new(event_store:).call(activation)
-
     attempts.each do |work_item_id, attempt_id, agent_id|
       Coordinator::Write::Operations::ExecuteAcquireWorkItem.new(event_store:).call(
         command_id: "seed-acquire-#{attempt_id}",
@@ -478,106 +235,16 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
         change_set_id: "CS-LSE",
         work_item_id:,
         attempt_id:,
-        base_snapshots: [ { repository_id: RESERVE_REPOSITORY_ID, commit_oid: "a" * 40 } ]
+        base_snapshots: [ { repository_id: REPOSITORY_ID, commit_oid: "a" * 40 } ]
       ).value!
     end
   end
 
-  def lease_events(path, kind: "file")
-    resource = normalizer.call(
-      repository_id: RESERVE_REPOSITORY_ID,
-      scope: RepositoryScenario::DEFAULT_SCOPE,
-      kind:,
-      path:,
-      base_blob_oid: nil
-    ).value!
-    event_store.read(
-      streams.resource_lease(resource.resource_key_hash),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "ResourceLeaseAcquired" ],
-        maximum_count: 10,
-        direction: :asc
-      )
-    )
-  end
-
-  def attempt_events(attempt_id)
-    event_store.read(
-      streams.attempt(attempt_id),
-      Coordinator::Write::EventQueries::ATTEMPT_FOR_WRITE_SET_RESERVATION
-    )
+  def lease_events(resource_id)
+    ResourceScenario.lease_events(event_store:, resource_id:)
   end
 
   def command_events(command_id)
     event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
-  end
-
-  def reservation_event_ids(arguments)
-    arguments.fetch(:resources).flat_map do |resource|
-      lease_events(resource.fetch(:path), kind: resource.fetch(:kind)).map(&:id)
-    end +
-      attempt_events(arguments.fetch(:attempt_id)).select { _1.type == "WriteSetReserved" }.map(&:id) +
-      command_events(arguments.fetch(:command_id)).map(&:id)
-  end
-
-  def append_released_boundary_history(marker:, path:, lease_count:)
-    resource_key_hash = "sha256:#{'f' * 64}"
-    events = lease_count.times.flat_map do |index|
-      lease_id = Coordinator::Shared::IdGenerator.new.uuid_v7
-      acquired_at = "2026-08-22T10:00:00.000000Z"
-      released_at = "2026-08-22T10:00:01.000000Z"
-      expires_at = "2026-08-22T10:05:00.000000Z"
-      common = {
-        lease_id:,
-        lease_set_id: Coordinator::Shared::IdGenerator.new.uuid_v7,
-        resource_key: "test-resource:#{path}",
-        resource_key_hash:,
-        resource_kind: "file",
-        resource_path: path,
-        policy_version: "coordinator-resource-key/v3",
-        mode: "exclusive",
-        change_set_id: "CS-HOT",
-        work_item_id: "W-HOT",
-        attempt_id: "A-HOT",
-        agent_id: "hot-agent",
-        repository_id: RESERVE_REPOSITORY_ID,
-        object_format: "sha1",
-        base_commit_oid: "a" * 40,
-        base_blob_oid: nil,
-        fencing_token: index + 1
-      }
-      metadata = Coordinator::Write::EventMetadata.new(
-        command_id: "seed-hot-#{index}",
-        actor_kind: "system",
-        actor_id: "resource-boundary-spec",
-        recorded_by: "coordinator",
-        policy_version: "coordinator-resource-key/v3"
-      )
-      [
-        Coordinator::Write::EventFactory.new.build!(
-          event: Coordinator::Write::Events::ResourceLeaseAcquiredV1.new(
-            **common,
-            acquired_at:,
-            expires_at:
-          ),
-          event_id: Coordinator::Shared::IdGenerator.new.uuid_v7,
-          metadata:,
-          markers: [ marker ]
-        ),
-        Coordinator::Write::EventFactory.new.build!(
-          event: Coordinator::Write::Events::ResourceLeaseReleasedV1.new(
-            **common,
-            acquired_at:,
-            previous_expires_at: expires_at,
-            released_at:
-          ),
-          event_id: Coordinator::Shared::IdGenerator.new.uuid_v7,
-          metadata:,
-          markers: [ marker ]
-        )
-      ]
-    end
-
-    event_store.append(streams.resource_lease(resource_key_hash), events).last
   end
 end

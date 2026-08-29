@@ -62,10 +62,15 @@ module Coordinator::Read
           when Coordinator::Write::Events::AttemptAuthorizedV1,
                Coordinator::Write::Events::AttemptStartedV1,
                Coordinator::Write::Events::AttemptAbandonedV1,
+               Coordinator::Write::Events::AttemptAbandonedV2,
                Coordinator::Write::Events::WriteSetReservedV1,
+               Coordinator::Write::Events::WriteSetReservedV2,
                Coordinator::Write::Events::WriteSetExpandedV1,
+               Coordinator::Write::Events::WriteSetExpandedV2,
                Coordinator::Write::Events::WriteSetRenewedV1,
+               Coordinator::Write::Events::WriteSetRenewedV2,
                Coordinator::Write::Events::WriteSetReleasedV1,
+               Coordinator::Write::Events::WriteSetReleasedV2,
                Coordinator::Write::Events::CandidateAttachedToAttemptV1,
                Coordinator::Write::Events::AttemptCompletedV1
             payload.attempt_id

@@ -4,7 +4,7 @@ module Coordinator::Write
   module Commands
     class SubmitCandidate < Value
       Lease = Types.Instance(Candidates::LeaseObservationV1)
-      Resource = Types.Instance(FileResourceV1)
+      Resource = Types.Instance(Candidates::ActualResourceV2)
 
       attribute :command_id, Types::Identifier
       attribute :actor, Actor

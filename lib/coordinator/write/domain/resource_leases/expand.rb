@@ -128,7 +128,7 @@ module Coordinator::Write
 
         def evidence_denied(attempt_state:, requested_observations:, command:)
           policy_conflict = requested_observations.find do |observation|
-            observation.prepared_resource.resource.policy_version != attempt_state.lease_policy_version
+            observation.resource.policy_version != attempt_state.lease_policy_version
           end
           if policy_conflict
             return failure(
@@ -136,26 +136,25 @@ module Coordinator::Write
               "Requested resource identity policy differs from the current write set",
               command,
               current_policy_version: attempt_state.lease_policy_version,
-              requested_policy_version: policy_conflict.prepared_resource.resource.policy_version
+              requested_policy_version: policy_conflict.resource.policy_version
             )
           end
 
-          current_by_hash = attempt_state.lease_resources.to_h { [ _1.resource_key_hash, _1 ] }
+          current_by_id = attempt_state.lease_resources.to_h { [ _1.resource_id, _1 ] }
           conflict = requested_observations.find do |observation|
-            resource = observation.prepared_resource.resource
-            reference = current_by_hash[resource.resource_key_hash]
+            resource = observation.resource
+            reference = current_by_id[resource.resource_id]
             reference && reference.base_blob_oid != resource.base_blob_oid
           end
           return unless conflict
 
-          resource = conflict.prepared_resource.resource
-          reference = current_by_hash.fetch(resource.resource_key_hash)
+          resource = conflict.resource
+          reference = current_by_id.fetch(resource.resource_id)
           failure(
             :resource_evidence_conflict,
             "Requested base evidence differs from the current write-set member",
             command,
-            resource_key: resource.resource_key,
-            resource_key_hash: resource.resource_key_hash,
+            resource_id: resource.resource_id,
             current_base_blob_oid: reference.base_blob_oid,
             requested_base_blob_oid: resource.base_blob_oid
           )
@@ -168,7 +167,7 @@ module Coordinator::Write
               :lease_set_expired,
               "The current write set has expired",
               command,
-              resource_key_hash: reference.resource_key_hash,
+              resource_id: reference.resource_id,
               lease_id: reference.lease_id,
               fencing_token: reference.fencing_token,
               expires_at: attempt_state.lease_expires_at
@@ -184,7 +183,7 @@ module Coordinator::Write
             :lease_set_not_current,
             "A current write-set member is no longer owned by this lease set",
             command,
-            resource_key_hash: stale.reference.resource_key_hash,
+            resource_id: stale.reference.resource_id,
             expected_lease_id: stale.reference.lease_id,
             current_lease_id: stale.state.lease_id,
             expected_fencing_token: stale.reference.fencing_token,
@@ -203,8 +202,7 @@ module Coordinator::Write
 
           state.lease_id == reference.lease_id &&
             state.lease_set_id == attempt_state.lease_set_id &&
-            state.resource_key == reference.resource_key &&
-            state.resource_key_hash == reference.resource_key_hash &&
+            state.resource_id == reference.resource_id &&
             state.attempt_id == attempt_state.attempt_id &&
             state.agent_id == attempt_state.agent_id &&
             state.fencing_token == reference.fencing_token &&
@@ -214,15 +212,15 @@ module Coordinator::Write
         end
 
         def additions(attempt_state:, requested_observations:)
-          current_hashes = attempt_state.lease_resources.map(&:resource_key_hash)
+          current_ids = attempt_state.lease_resources.map(&:resource_id)
           requested_observations.reject do |observation|
-            current_hashes.include?(observation.prepared_resource.resource.resource_key_hash)
+            current_ids.include?(observation.resource.resource_id)
           end
         end
 
         def busy_denied(additions:, boundary_states:, attempt_state:, command:, expanded_at:)
           busy = additions.lazy.filter_map do |observation|
-            resource = observation.prepared_resource.resource
+            resource = observation.resource
             state = boundary_states.find do |candidate|
               candidate.active_at?(expanded_at) &&
                 !owned_by_attempt?(candidate, attempt_state) &&
@@ -238,8 +236,7 @@ module Coordinator::Write
               code: :lease_busy,
               message: "A requested resource already has an active exclusive lease",
               details: {
-                resource_key: resource.resource_key,
-                resource_key_hash: resource.resource_key_hash,
+                resource_id: resource.resource_id,
                 lease_id: state.lease_id,
                 owner_attempt_id: state.attempt_id,
                 owner_agent_id: state.agent_id,
@@ -279,13 +276,13 @@ module Coordinator::Write
           EventPlan.new(
             writes: acquisitions.map do |event|
               EventWrite.new(
-                stream: @stream_factory.resource_lease(event.resource_key_hash),
+                stream: @stream_factory.resource_lease(event.resource_id),
                 event:
               )
             end + [
               EventWrite.new(
                 stream: @stream_factory.attempt(command.attempt_id),
-                event: Events::WriteSetExpandedV1.new(
+                event: Events::WriteSetExpandedV2.new(
                   lease_set_id: command.lease_set_id,
                   change_set_id: command.change_set_id,
                   work_item_id: command.work_item_id,
@@ -303,13 +300,12 @@ module Coordinator::Write
         end
 
         def build_acquisition(observation:, attempt_state:, command:, snapshot:, expanded_at:)
-          prepared = observation.prepared_resource
-          resource = prepared.resource
-          Events::ResourceLeaseAcquiredV1.new(
+          prepared = observation.prepared_target
+          resource = observation.resource
+          Events::ResourceLeaseAcquiredV2.new(
             lease_id: prepared.lease_id,
             lease_set_id: command.lease_set_id,
-            resource_key: resource.resource_key,
-            resource_key_hash: resource.resource_key_hash,
+            resource_id: resource.resource_id,
             resource_kind: resource.kind,
             resource_path: resource.path,
             policy_version: resource.policy_version,
@@ -329,10 +325,9 @@ module Coordinator::Write
         end
 
         def lease_reference(event)
-          LeaseReferenceV1.new(
+          LeaseReferenceV2.new(
             lease_id: event.lease_id,
-            resource_key: event.resource_key,
-            resource_key_hash: event.resource_key_hash,
+            resource_id: event.resource_id,
             resource_kind: event.resource_kind,
             resource_path: event.resource_path,
             base_blob_oid: event.base_blob_oid,

@@ -43,8 +43,9 @@ module Coordinator::Write
       end
 
       def call_command(command, caused_by: nil)
+        prepared = prepare_logical_values(command)
         steps do
-          step @event_store.multiple { execute_scoped_attempt(command:, caused_by:) }
+          step @event_store.multiple { execute_scoped_attempt(command:, prepared:, caused_by:) }
         end
       end
 
@@ -68,17 +69,13 @@ module Coordinator::Write
         )
       end
 
-      def execute_scoped_attempt(command:, caused_by:)
+      def execute_scoped_attempt(command:, prepared:, caused_by:)
         registration = @repository_registration_loader.call(command.repository_id)
         return repository_not_registered(command) unless registration
 
-        scoped = @preparer.scope_for_repository(command, repository_registration: registration)
-        return scoped if scoped.failure?
-
-        scoped_command = scoped.value!
         execute_attempt(
-          command: scoped_command,
-          prepared: prepare_logical_values(scoped_command),
+          command:,
+          prepared:,
           repository_registration: registration,
           caused_by:
         )
@@ -88,7 +85,10 @@ module Coordinator::Write
         replay = replay_result(command:, input_digest: prepared.input_digest)
         return replay if replay
 
-        state = load_submission_state(command, prepared.head_identity)
+        state_result = load_submission_state(command, prepared.head_identity)
+        return state_result if state_result.failure?
+
+        state = state_result.value!
         candidate_event = future_candidate_reference(command, prepared.candidate_event_id)
         decision = @decider.call(
           state:,
@@ -164,14 +164,29 @@ module Coordinator::Write
 
       def load_submission_state(command, head_identity)
         attempt = load_attempt_state(command.attempt_id)
+        unless attempt.lease_policy_version.nil? || attempt.lease_policy_version == LeaseResourceV2::POLICY_VERSION
+          return Failure(
+            OutcomeError.new(
+              code: :resource_identity_policy_mismatch,
+              message: "The current write set predates Resource UUID leases and must be reacquired",
+              details: {
+                change_set_id: command.change_set_id,
+                work_item_id: command.work_item_id,
+                attempt_id: command.attempt_id,
+                current_policy_version: attempt.lease_policy_version,
+                requested_policy_version: LeaseResourceV2::POLICY_VERSION
+              }
+            )
+          )
+        end
         current_leases = attempt.lease_resources.map do |reference|
-          CurrentLeaseObservationV1.new(
+          CurrentLeaseObservationV2.new(
             reference:,
-            state: load_lease_state(reference.resource_key_hash)
+            state: load_lease_state(reference.resource_id)
           )
         end
 
-        Domain::Candidates::SubmissionState.new(
+        Success(Domain::Candidates::SubmissionState.new(
           existing_candidate: load_existing_reference(
             @stream_factory.candidate(command.candidate_id),
             EventQueries::CANDIDATE_EXISTENCE
@@ -182,7 +197,7 @@ module Coordinator::Write
           ),
           attempt:,
           current_leases:
-        )
+        ))
       end
 
       def load_existing_reference(stream, criteria)
@@ -205,9 +220,9 @@ module Coordinator::Write
         Domain::Attempts::State.reduce(events.map { load_event(_1) })
       end
 
-      def load_lease_state(resource_key_hash)
+      def load_lease_state(resource_id)
         events = @event_store.read_grouped(
-          @stream_factory.resource_lease(resource_key_hash),
+          @stream_factory.resource_lease(resource_id),
           EventQueries::RESOURCE_LEASE_FOR_CANDIDATE_SUBMISSION
         ).reverse.map { load_event(_1) }
 
@@ -300,7 +315,7 @@ module Coordinator::Write
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
-          policy_version: command.actual_resources.first.policy_version
+          policy_version: LeaseResourceV2::POLICY_VERSION
         )
       end
 

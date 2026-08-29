@@ -59,13 +59,13 @@ module Coordinator::Write
           )
         end
 
-        event = Events::ResourceBoundaryEpochRolledV1.new(
+        event = build_epoch_event(
           repository_id: command.repository_id,
           boundary_marker: command.boundary_marker,
           epoch: boundary.epoch + 1,
           previous_through_global_position: boundary.previous_through_global_position,
           through_global_position: boundary.through_global_position,
-          active_leases: active_leases.map { Events::ResourceBoundaryEpochRolledV1::ActiveLeaseV1.from_state(_1) },
+          active_leases:,
           rolled_at:
         )
         persisted = @event_factory.build!(
@@ -94,6 +94,20 @@ module Coordinator::Write
 
       def rollover_required?(boundary)
         boundary.truncated || boundary.delta_count >= EventQueries::RESOURCE_BOUNDARY_ROLLOVER_SOFT_COUNT
+      end
+
+      def build_epoch_event(active_leases:, **attributes)
+        if active_leases.all?(&:resource_id)
+          return Events::ResourceBoundaryEpochRolledV2.new(
+            **attributes,
+            active_leases: active_leases.map { Events::ResourceBoundaryEpochRolledV2::ActiveLeaseV2.from_state(_1) }
+          )
+        end
+
+        Events::ResourceBoundaryEpochRolledV1.new(
+          **attributes,
+          active_leases: active_leases.map { Events::ResourceBoundaryEpochRolledV1::ActiveLeaseV1.from_state(_1) }
+        )
       end
 
       def load_replay(command)

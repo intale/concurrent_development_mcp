@@ -15,13 +15,15 @@ module Coordinator::Processes
         rule(:event) do
           key.failure("must be a persisted event") unless value.stream_revision && value.global_position
           key.failure("must have a UUIDv7 event ID") unless Types::UUID_V7_PATTERN.match?(value.id)
-          unless EVENT_TYPES.include?(value.type) && value.metadata["schema_version"] == 1
-            key.failure("must be a ResourceLease lifecycle event at schema 1")
+          schema_version = value.metadata["schema_version"]
+          unless EVENT_TYPES.include?(value.type) && [ 1, 2 ].include?(schema_version)
+            key.failure("must be a ResourceLease lifecycle event at schema 1 or 2")
           end
           stream = value.stream
+          resource_identity = schema_version == 2 ? value.data["resource_id"] : value.data["resource_key_hash"]
           unless stream&.context == "DevelopmentCoordination" &&
                  stream.stream_name == "ResourceLease" &&
-                 stream.stream_id == value.data["resource_key_hash"]
+                 stream.stream_id == resource_identity
             key.failure("must belong to its ResourceLease stream")
           end
           key.failure("must carry command provenance") unless Types::IDENTIFIER_PATTERN.match?(value.metadata["command_id"].to_s)

@@ -12,7 +12,7 @@ module Coordinator::Processes
         locator = values[:locator]
         source = values[:source]
         matches = source.reference.event_id == locator.source_event_id &&
-          source.reference.stream_id == locator.resource_key_hash &&
+          source.reference.stream_id == locator.resource_stream_id &&
           source.reference.stream_revision == locator.stream_revision
         key(:source).failure("must exactly match the scheduled source locator") unless matches
       end

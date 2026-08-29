@@ -47,7 +47,7 @@ module Coordinator::Write
       end
 
       def candidate_submitted(command:, state:, submitted_at:)
-        Events::CandidateSubmittedV1.new(
+        Events::CandidateSubmittedV2.new(
           candidate_id: command.candidate_id,
           change_set_id: command.change_set_id,
           work_item_id: command.work_item_id,

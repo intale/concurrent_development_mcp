@@ -3,7 +3,9 @@
 module Coordinator::Write
   module Candidates
     class ImpactSurfaceEvidenceV1 < Value
-      attribute :submission, Events::CandidateSubmittedV1
+      Submission = Events::CandidateSubmittedV1 | Events::CandidateSubmittedV2
+
+      attribute :submission, Submission
       attribute :submission_event, EventReference
       attribute :manifest, Events::CandidateChangeManifestCapturedV1
       attribute :manifest_event, EventReference

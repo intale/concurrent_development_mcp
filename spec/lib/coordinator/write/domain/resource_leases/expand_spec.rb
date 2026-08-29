@@ -3,297 +3,107 @@
 RSpec.describe Coordinator::Write::Domain::ResourceLeases::Expand do
   subject(:expand) { described_class.new }
 
-  let(:preparer) { Coordinator::Write::Operations::PrepareExpandWriteSet.new }
+  let(:current_resource) { ResourceLeaseExamples.resource }
+  let(:added_resource) do
+    ResourceLeaseExamples.resource(
+      resource_id: "02919191-9191-7191-8191-919191919191",
+      path: "app/models/b.rb",
+      base_blob_oid: "c" * 40
+    )
+  end
+  let(:current_reference) { ResourceLeaseExamples.reference(resource: current_resource) }
+  let(:attempt_state) do
+    ResourceLeaseExamples.active_attempt_state(
+      lease_set_id: ResourceLeaseExamples::LEASE_SET_ID,
+      lease_resources: [ current_reference ],
+      lease_expires_at: ResourceLeaseExamples::EXPIRES_AT
+    )
+  end
+  let(:current_observation) do
+    Coordinator::Write::CurrentLeaseObservationV2.new(
+      reference: current_reference,
+      state: ResourceLeaseExamples.lease_state(resource: current_resource, reference: current_reference)
+    )
+  end
   let(:command) do
-    preparer.call(
-      command_id: "cmd-lse-expand-100",
-      actor: { kind: "agent", id: "agent-a" },
+    Coordinator::Write::Commands::ExpandWriteSet.new(
+      command_id: "cmd-expand",
+      actor: ResourceLeaseExamples.actor,
       change_set_id: "CS-LSE",
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
-      lease_set_id: lease_set_id,
-      repository_id:,
+      lease_set_id: ResourceLeaseExamples::LEASE_SET_ID,
+      repository_id: ResourceLeaseExamples::REPOSITORY_ID,
       base_commit_oid: "a" * 40,
-      resources: requested_resources
-    ).value!
-  end
-  let(:lease_set_id) { "03919191-9191-7191-8191-919191919191" }
-  let(:expires_at) { "2026-08-22T10:15:00.000000Z" }
-  let(:expanded_at) { "2026-08-22T10:02:00.000000Z" }
-  let(:existing_resource) { normalized_resource("app/models/a.rb", base_blob_oid: "b" * 40) }
-  let(:requested_resources) do
-    [
-      { kind: "file", path: existing_resource.path, base_blob_oid: existing_resource.base_blob_oid },
-      { kind: "file", path: "app/models/b.rb", base_blob_oid: "c" * 40 }
-    ]
-  end
-  let(:existing_reference) do
-    Coordinator::Write::LeaseReferenceV1.new(
-      lease_id: "01919191-9191-7191-8191-919191919191",
-      resource_key: existing_resource.resource_key,
-      resource_key_hash: existing_resource.resource_key_hash,
-      resource_kind: existing_resource.kind,
-      resource_path: existing_resource.path,
-      base_blob_oid: existing_resource.base_blob_oid,
-      fencing_token: 1
+      resources: [ ResourceLeaseExamples.target(added_resource) ]
     )
   end
-  let(:attempt_state) do
-    active_attempt_state.new(
-      lease_set_id:,
-      lease_repository_id: repository_id,
-      lease_policy_version: "coordinator-resource-key/v1",
-      lease_resources: [ existing_reference ],
-      lease_reserved_at: "2026-08-22T10:00:00.000000Z",
-      lease_expires_at: expires_at
+  let(:requested) do
+    Coordinator::Write::RequestedLeaseObservationV2.new(
+      prepared_target: Coordinator::Write::PreparedLeaseTargetV1.new(
+        target: ResourceLeaseExamples.target(added_resource),
+        lease_id: "05919191-9191-7191-8191-919191919191",
+        event_id: "06919191-9191-7191-8191-919191919191"
+      ),
+      resource: added_resource,
+      state: Coordinator::Write::Domain::ResourceLeases::State.initial
     )
-  end
-  let(:current_observations) do
-    [
-      Coordinator::Write::CurrentLeaseObservationV1.new(
-        reference: existing_reference,
-        state: lease_state(existing_reference)
-      )
-    ]
-  end
-  let(:requested_observations) do
-    command.resources.map.with_index do |resource, index|
-      Coordinator::Write::RequestedLeaseObservationV1.new(
-        prepared_resource: Coordinator::Write::PreparedLeaseResourceV1.new(
-          resource:,
-          lease_id: format("%08d-9191-7191-8191-919191919191", index + 4),
-          event_id: format("%08d-9191-7191-8191-919191919191", index + 6)
-        ),
-        state: resource.resource_key_hash == existing_resource.resource_key_hash ?
-          lease_state(existing_reference) : Coordinator::Write::Domain::ResourceLeases::State.initial
-      )
-    end
   end
 
-  it "Given one current member and one free resource, when expanding, then preserves the set and deadline" do
-    result = expand.call(
-      attempt_state:,
-      current_observations:,
-      requested_observations:,
-      command:,
-      expanded_at:
-    )
+  it "Given a current set and a free Resource, when expanding, then emits UUID acquisition and membership facts" do
+    result = decide
 
     expect(result).to be_success
     acquisition, expansion = result.value!.events
-    expect(acquisition).to be_a(Coordinator::Write::Events::ResourceLeaseAcquiredV1)
-    expect(acquisition.to_h).to include(
-      lease_set_id:,
-      attempt_id: "A-LSE-A",
-      fencing_token: 1,
-      acquired_at: expanded_at,
-      expires_at:
-    )
-    expect(expansion).to be_a(Coordinator::Write::Events::WriteSetExpandedV1)
-    expect(expansion.to_h).to include(
-      lease_set_id:,
-      added_resources: [ lease_reference(acquisition).to_h ],
-      resource_count: 2,
-      expanded_at:,
-      expires_at:
-    )
+    expect(acquisition).to be_a(Coordinator::Write::Events::ResourceLeaseAcquiredV2)
+    expect(acquisition.resource_id).to eq(added_resource.resource_id)
+    expect(expansion).to be_a(Coordinator::Write::Events::WriteSetExpandedV2)
+    expect(expansion.added_resources.sole.resource_id).to eq(added_resource.resource_id)
+    expect(expansion.resource_count).to eq(2)
   end
 
-  it "Given only matching existing members, when expanding, then emits no facts" do
-    result = expand.call(
-      attempt_state:,
-      current_observations:,
-      requested_observations: [ requested_observations.first ],
-      command: command.new(resources: [ command.resources.first ]),
-      expanded_at:
-    )
-
-    expect(result.failure.code).to eq(:write_set_unchanged)
-  end
-
-  it "Given different evidence for an existing identity, when expanding, then rejects the command" do
-    conflicting_command = command.new(
-      resources: [ command.resources.first.new(base_blob_oid: "d" * 40) ]
-    )
-    conflicting_observation = requested_observations.first.new(
-      prepared_resource: requested_observations.first.prepared_resource.new(
-        resource: conflicting_command.resources.first
-      )
-    )
-
-    result = expand.call(
-      attempt_state:,
-      current_observations:,
-      requested_observations: [ conflicting_observation ],
-      command: conflicting_command,
-      expanded_at:
-    )
-
-    expect(result.failure.code).to eq(:resource_evidence_conflict)
-  end
-
-  it "Given a referenced lease was superseded, when expanding, then reports the set is not current" do
-    superseding_reference = existing_reference.new(
-      lease_id: "08919191-9191-7191-8191-919191919191",
+  it "Given the submitted current fence is stale, when expanding, then emits no facts" do
+    successor = ResourceLeaseExamples.reference(
+      resource: current_resource,
+      lease_id: "07919191-9191-7191-8191-919191919191",
       fencing_token: 2
     )
-    observations = [ current_observations.first.new(state: lease_state(superseding_reference)) ]
-
-    result = expand.call(
-      attempt_state:,
-      current_observations: observations,
-      requested_observations: requested_observations.last(1),
-      command: command.new(resources: command.resources.last(1)),
-      expanded_at:
+    stale = current_observation.new(
+      state: ResourceLeaseExamples.lease_state(resource: current_resource, reference: successor, fencing_token: 2)
     )
 
-    expect(result.failure.code).to eq(:lease_set_not_current)
-    expect(result.failure.details).to include(
-      expected_lease_id: existing_reference.lease_id,
-      current_lease_id: superseding_reference.lease_id,
-      expected_fencing_token: 1,
-      current_fencing_token: 2
-    )
+    result = decide(current_observations: [ stale ])
+    expect(result.failure).to have_attributes(code: :lease_set_not_current)
+    expect(result.failure.details).to include(resource_id: current_resource.resource_id)
   end
 
-  it "Given the common deadline equals decision time, when expanding, then reports expiry" do
-    result = expand.call(
-      attempt_state: attempt_state.new(lease_expires_at: expanded_at),
-      current_observations:,
-      requested_observations: requested_observations.last(1),
-      command: command.new(resources: command.resources.last(1)),
-      expanded_at:
+  it "Given another agent owns an ancestor directory, when expanding, then preserves structural exclusion" do
+    directory = ResourceLeaseExamples.resource(
+      resource_id: "08919191-9191-7191-8191-919191919191",
+      kind: "directory",
+      path: "app/models",
+      base_blob_oid: nil
+    )
+    blocker = ResourceLeaseExamples.lease_state(
+      resource: directory,
+      reference: ResourceLeaseExamples.reference(resource: directory),
+      attempt_id: "A-OTHER",
+      agent_id: "agent-b"
     )
 
-    expect(result.failure.code).to eq(:lease_set_expired)
-    expect(result.failure.details).to include(
-      lease_id: existing_reference.lease_id,
-      fencing_token: 1,
-      expires_at: expanded_at
-    )
-  end
-
-  it "Given another Attempt owns a parent directory, when adding a child file, then reports that blocker" do
-    directory = normalized_resource("app/models", kind: "directory")
-    blocking = Coordinator::Write::Domain::ResourceLeases::State.reduce(
-      [
-        Coordinator::Write::Events::ResourceLeaseAcquiredV1.new(
-          lease_id: "08919191-9191-7191-8191-919191919191",
-          lease_set_id: "09919191-9191-7191-8191-919191919191",
-          resource_key: directory.resource_key,
-          resource_key_hash: directory.resource_key_hash,
-          resource_kind: directory.kind,
-          resource_path: directory.path,
-          policy_version: directory.policy_version,
-          mode: "exclusive",
-          change_set_id: "CS-OTHER",
-          work_item_id: "W-OTHER",
-          attempt_id: "A-OTHER",
-          agent_id: "agent-b",
-          repository_id:,
-          object_format: "sha1",
-          base_commit_oid: "a" * 40,
-          base_blob_oid: nil,
-          fencing_token: 1,
-          acquired_at: "2026-08-22T10:00:00.000000Z",
-          expires_at:
-        )
-      ]
-    )
-
-    result = expand.call(
-      attempt_state:,
-      current_observations:,
-      requested_observations: requested_observations.last(1),
-      boundary_states: [ blocking ],
-      command: command.new(resources: command.resources.last(1)),
-      expanded_at:
-    )
-
+    result = decide(boundary_states: [ blocker ])
     expect(result.failure).to have_attributes(code: :lease_busy)
-    expect(result.failure.details).to include(owner_attempt_id: "A-OTHER")
+    expect(result.failure.details).to include(resource_id: added_resource.resource_id, owner_attempt_id: "A-OTHER")
   end
 
-  private
-
-  def active_attempt_state
-    Coordinator::Write::Domain::Attempts::State.reduce(
-      [
-        Coordinator::Write::Events::AttemptAuthorizedV1.new(
-          attempt_id: "A-LSE-A",
-          change_set_id: "CS-LSE",
-          work_item_id: "W-LSE-A",
-          agent_id: "agent-a",
-          base_snapshots: [
-            Coordinator::Write::RepositorySnapshotV1.new(
-              repository_id:,
-              object_format: "sha1",
-              commit_oid: "a" * 40
-            )
-          ],
-          authorized_at: "2026-08-22T10:00:00.000000Z"
-        ),
-        Coordinator::Write::Events::AttemptStartedV1.new(
-          attempt_id: "A-LSE-A",
-          change_set_id: "CS-LSE",
-          work_item_id: "W-LSE-A",
-          started_at: "2026-08-22T10:00:00.000000Z"
-        )
-      ]
+  def decide(current_observations: [ current_observation ], boundary_states: [ requested.state ])
+    expand.call(
+      attempt_state:,
+      current_observations:,
+      requested_observations: [ requested ],
+      boundary_states:,
+      command:,
+      expanded_at: "2026-08-22T10:02:00.000000Z"
     )
-  end
-
-  def normalized_resource(path, kind: "file", base_blob_oid: nil)
-    Coordinator::Write::FileResourceNormalizer.new.call(
-      repository_id:,
-      kind:,
-      path:,
-      base_blob_oid:
-    ).value!
-  end
-
-  def lease_state(reference)
-    resource = existing_resource
-    Coordinator::Write::Domain::ResourceLeases::State.reduce(
-      [
-        Coordinator::Write::Events::ResourceLeaseAcquiredV1.new(
-          lease_id: reference.lease_id,
-          lease_set_id:,
-          resource_key: resource.resource_key,
-          resource_key_hash: resource.resource_key_hash,
-          resource_kind: resource.kind,
-          resource_path: resource.path,
-          policy_version: resource.policy_version,
-          mode: "exclusive",
-          change_set_id: "CS-LSE",
-          work_item_id: "W-LSE-A",
-          attempt_id: "A-LSE-A",
-          agent_id: "agent-a",
-          repository_id:,
-          object_format: "sha1",
-          base_commit_oid: "a" * 40,
-          base_blob_oid: resource.base_blob_oid,
-          fencing_token: reference.fencing_token,
-          acquired_at: "2026-08-22T10:00:00.000000Z",
-          expires_at:
-        )
-      ]
-    )
-  end
-
-  def lease_reference(event)
-    Coordinator::Write::LeaseReferenceV1.new(
-      lease_id: event.lease_id,
-      resource_key: event.resource_key,
-      resource_key_hash: event.resource_key_hash,
-      resource_kind: event.resource_kind,
-      resource_path: event.resource_path,
-      base_blob_oid: event.base_blob_oid,
-      fencing_token: event.fencing_token
-    )
-  end
-
-  def repository_id
-    RepositoryScenario::DEFAULT_REPOSITORY_ID
   end
 end

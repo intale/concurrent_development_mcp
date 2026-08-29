@@ -18,7 +18,7 @@ module Coordinator::Write
             EventPlan.new(
               writes: [
                 EventWrite.new(
-                  stream: @stream_factory.resource_lease(command.resource_key_hash),
+                  stream: @stream_factory.resource_lease(command.resource_id),
                   event: build_expiration(state:, expired_at:)
                 )
               ]
@@ -56,7 +56,7 @@ module Coordinator::Write
         end
 
         def exact_observation?(state:, command:)
-          state.resource_key_hash == command.resource_key_hash &&
+          state.resource_id == command.resource_id &&
             state.lease_id == command.lease_id &&
             state.lease_set_id == command.lease_set_id &&
             state.fencing_token == command.fencing_token &&
@@ -64,11 +64,10 @@ module Coordinator::Write
         end
 
         def build_expiration(state:, expired_at:)
-          Events::ResourceLeaseExpiredV1.new(
+          Events::ResourceLeaseExpiredV2.new(
             lease_id: state.lease_id,
             lease_set_id: state.lease_set_id,
-            resource_key: state.resource_key,
-            resource_key_hash: state.resource_key_hash,
+            resource_id: state.resource_id,
             resource_kind: state.resource_kind,
             resource_path: state.resource_path,
             policy_version: state.policy_version,
@@ -95,7 +94,7 @@ module Coordinator::Write
               code:,
               message:,
               details: {
-                resource_key_hash: command.resource_key_hash,
+                resource_id: command.resource_id,
                 expected_lease_id: command.lease_id,
                 current_lease_id: state.lease_id,
                 expected_lease_set_id: command.lease_set_id,

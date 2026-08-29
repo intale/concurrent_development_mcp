@@ -17,7 +17,7 @@ module Coordinator::Write
         object_format = attributes.fetch(:base_commit_oid).length == 40 ? "sha1" : "sha256"
         collector = collector(attributes.fetch(:actor), attributes.dig(:change_manifest, :collector_version))
         files = step normalize_manifest_files(attributes.fetch(:repository_id), attributes.dig(:change_manifest, :files))
-        resources = step actual_resources(attributes.fetch(:repository_id), files)
+        resources = actual_resources(files)
         build_context_parts = step normalize_build_context(attributes)
         step validate_uniqueness(files, resources, build_context_parts)
 
@@ -37,23 +37,6 @@ module Coordinator::Write
             details: { reason: error.message }
           )
         )
-      end
-
-      def scope_resources(resources, repository_registration:)
-        scoped = resources.map do |resource|
-          result = @resource_normalizer.call(
-            repository_id: repository_registration.repository_id,
-            kind: resource.kind,
-            path: resource.path,
-            base_blob_oid: resource.base_blob_oid,
-            scope: repository_registration.scope
-          )
-          return result if result.failure?
-
-          result.value!
-        end
-
-        Success(collapse_resources(scoped))
       end
 
       private
@@ -121,22 +104,12 @@ module Coordinator::Write
         Success(result.value!.path)
       end
 
-      def actual_resources(repository_id, files)
-        resources = []
-        files.each do |file|
-          resource_specs(file).each do |path, base_blob_oid|
-            result = @resource_normalizer.call(
-              repository_id:,
-              kind: "file",
-              path:,
-              base_blob_oid:
-            )
-            return result if result.failure?
-
-            resources << result.value!
+      def actual_resources(files)
+        files.flat_map do |file|
+          resource_specs(file).map do |path, base_blob_oid|
+            ActualResourceV2.new(kind: "file", path:, base_blob_oid:)
           end
         end
-        Success(resources)
       end
 
       def resource_specs(file)
@@ -154,7 +127,7 @@ module Coordinator::Write
         result = @uniqueness_contract.call(
           manifest_files: files.map(&:to_h),
           actual_resource_evidence: resources.map do
-            { resource_key_hash: _1.resource_key_hash, base_blob_oid: _1.base_blob_oid }
+            { path: _1.path, base_blob_oid: _1.base_blob_oid }
           end,
           build_input_keys: build_context_parts ? build_context_parts.inputs.map(&:path) : [],
           environment_names: build_context_parts ? build_context_parts.environment.map(&:name) : []
@@ -171,7 +144,7 @@ module Coordinator::Write
       end
 
       def collapse_resources(resources)
-        resources.group_by(&:resource_key_hash).values.map(&:first).sort_by { _1.resource_key_hash.b }
+        resources.group_by(&:path).values.map(&:first).sort_by { _1.path.b }
       end
 
       def build_manifest(attributes, object_format:, collector:, files:)

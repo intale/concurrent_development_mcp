@@ -3,7 +3,7 @@
 module Coordinator::Write
   module Commands
     class RenewLeaseSet < Value
-      Reference = Types.Instance(LeaseRenewalReferenceV1)
+      Reference = Types.Instance(LeaseRenewalReferenceV2)
 
       attribute :command_id, Types::Identifier
       attribute :actor, Actor

@@ -66,31 +66,31 @@ module Coordinator::Write
         end
 
         def snapshot_denied(attempt_state:, command:)
-          current_hashes = attempt_state.lease_resources.map(&:resource_key_hash)
-          requested_hashes = command.leases.map(&:resource_key_hash)
-          unless requested_hashes == current_hashes
+          current_ids = attempt_state.lease_resources.map(&:resource_id)
+          requested_ids = command.leases.map(&:resource_id)
+          unless requested_ids == current_ids
             return failure(
               :lease_set_snapshot_mismatch,
               "Submitted lease members do not equal the Attempt's write set",
               command,
-              current_resource_key_hashes: current_hashes,
-              requested_resource_key_hashes: requested_hashes
+              current_resource_ids: current_ids,
+              requested_resource_ids: requested_ids
             )
           end
 
-          current_by_hash = attempt_state.lease_resources.to_h { [ _1.resource_key_hash, _1 ] }
+          current_by_id = attempt_state.lease_resources.to_h { [ _1.resource_id, _1 ] }
           mismatch = command.leases.find do |submitted|
-            current = current_by_hash.fetch(submitted.resource_key_hash)
+            current = current_by_id.fetch(submitted.resource_id)
             submitted.lease_id != current.lease_id || submitted.fencing_token != current.fencing_token
           end
           return unless mismatch
 
-          current = current_by_hash.fetch(mismatch.resource_key_hash)
+          current = current_by_id.fetch(mismatch.resource_id)
           failure(
             :lease_reference_mismatch,
             "Submitted lease identity or fencing token is stale",
             command,
-            resource_key_hash: mismatch.resource_key_hash,
+            resource_id: mismatch.resource_id,
             current_lease_id: current.lease_id,
             requested_lease_id: mismatch.lease_id,
             current_fencing_token: current.fencing_token,
@@ -108,7 +108,7 @@ module Coordinator::Write
             :lease_set_not_current,
             "A write-set member is no longer owned by this lease set",
             command,
-            resource_key_hash: stale.reference.resource_key_hash,
+            resource_id: stale.reference.resource_id,
             expected_lease_id: stale.reference.lease_id,
             current_lease_id: stale.state.lease_id,
             expected_fencing_token: stale.reference.fencing_token,
@@ -128,8 +128,7 @@ module Coordinator::Write
 
           state.lease_id == reference.lease_id &&
             state.lease_set_id == attempt_state.lease_set_id &&
-            state.resource_key == reference.resource_key &&
-            state.resource_key_hash == reference.resource_key_hash &&
+            state.resource_id == reference.resource_id &&
             state.resource_kind == reference.resource_kind &&
             state.resource_path == reference.resource_path &&
             state.base_blob_oid == reference.base_blob_oid &&
@@ -161,13 +160,13 @@ module Coordinator::Write
           EventPlan.new(
             writes: releases.map do |event|
               EventWrite.new(
-                stream: @stream_factory.resource_lease(event.resource_key_hash),
+                stream: @stream_factory.resource_lease(event.resource_id),
                 event:
               )
             end + [
               EventWrite.new(
                 stream: @stream_factory.attempt(command.attempt_id),
-                event: Events::WriteSetReleasedV1.new(
+                event: Events::WriteSetReleasedV2.new(
                   lease_set_id: command.lease_set_id,
                   change_set_id: command.change_set_id,
                   work_item_id: command.work_item_id,
@@ -188,11 +187,10 @@ module Coordinator::Write
           reference = observation.reference
           state = observation.state
           snapshot = attempt_state.base_snapshots.first
-          Events::ResourceLeaseReleasedV1.new(
+          Events::ResourceLeaseReleasedV2.new(
             lease_id: reference.lease_id,
             lease_set_id: command.lease_set_id,
-            resource_key: reference.resource_key,
-            resource_key_hash: reference.resource_key_hash,
+            resource_id: reference.resource_id,
             resource_kind: reference.resource_kind,
             resource_path: reference.resource_path,
             policy_version: attempt_state.lease_policy_version,

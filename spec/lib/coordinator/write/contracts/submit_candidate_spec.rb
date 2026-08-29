@@ -85,7 +85,7 @@ RSpec.describe Coordinator::Write::Contracts::SubmitCandidate do
       lease_set_id: uuid("1"),
       leases: [
         {
-          resource_key_hash: "sha256:#{"1" * 64}",
+          resource_id: uuid("3"),
           lease_id: uuid("2"),
           fencing_token: 1
         }

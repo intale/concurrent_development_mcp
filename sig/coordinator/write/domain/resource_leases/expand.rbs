@@ -4,7 +4,7 @@ module Coordinator
       module ResourceLeases
         class Expand
           def initialize: (?stream_factory: StreamFactory) -> void
-          def call: (attempt_state: Domain::Attempts::State, current_observations: Array[CurrentLeaseObservationV1], requested_observations: Array[RequestedLeaseObservationV1], ?boundary_states: Array[State], command: Commands::ExpandWriteSet, expanded_at: String) -> Dry::Monads::Result
+          def call: (attempt_state: Domain::Attempts::State, current_observations: Array[CurrentLeaseObservationV2], requested_observations: Array[RequestedLeaseObservationV2], ?boundary_states: Array[State], command: Commands::ExpandWriteSet, expanded_at: String) -> Dry::Monads::Result
         end
       end
     end

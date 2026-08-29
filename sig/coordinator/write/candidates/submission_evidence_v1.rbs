@@ -5,7 +5,7 @@ module Coordinator
         attr_reader object_format: String
         attr_reader manifest: ChangeManifestV1
         attr_reader build_context: BuildContextV1?
-        attr_reader actual_resources: Array[Coordinator::Write::FileResourceV1]
+        attr_reader actual_resources: Array[ActualResourceV2]
       end
     end
   end

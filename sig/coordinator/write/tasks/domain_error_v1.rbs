@@ -49,8 +49,7 @@ module Coordinator
         end
 
         class LeaseBusyDetails < Shared::Value
-          def resource_key: () -> String
-          def resource_key_hash: () -> String
+          def resource_id: () -> String
           def lease_id: () -> String
           def owner_attempt_id: () -> String
           def owner_agent_id: () -> String
@@ -64,15 +63,32 @@ module Coordinator
         end
 
         class ResourceEvidenceConflictDetails < AttemptDetails
-          def resource_key: () -> String
-          def resource_key_hash: () -> String
+          def resource_id: () -> String
           def current_base_blob_oid: () -> String?
           def requested_base_blob_oid: () -> String?
         end
 
         class ResourceIdentityPolicyMismatchDetails < AttemptDetails
-          def current_policy_version: () -> String
+          def current_policy_version: () -> String?
           def requested_policy_version: () -> String
+        end
+
+        class ResourceIdDetails < Shared::Value
+          def resource_id: () -> String
+        end
+
+        class ResourceRepositoryMismatchDetails < ResourceIdDetails
+          def requested_repository_id: () -> String
+          def resource_repository_id: () -> String
+        end
+
+        class ResourceNotActiveDetails < ResourceIdDetails
+          def current_resource_id: () -> String
+          def current_binding: () -> String
+        end
+
+        class ResourceStreamHistoryCorruptDetails < ResourceIdDetails
+          def reason: () -> String
         end
 
         class ResourceHistoryCorruptDetails < Shared::Value
@@ -104,14 +120,14 @@ module Coordinator
         end
 
         class LeaseSetExpiredDetails < AttemptDetails
-          def resource_key_hash: () -> String
+          def resource_id: () -> String
           def lease_id: () -> String
           def fencing_token: () -> Integer
           def expires_at: () -> String
         end
 
         class LeaseSetNotCurrentDetails < AttemptDetails
-          def resource_key_hash: () -> String
+          def resource_id: () -> String
           def expected_lease_id: () -> String
           def current_lease_id: () -> String?
           def expected_fencing_token: () -> Integer
@@ -128,12 +144,12 @@ module Coordinator
         end
 
         class LeaseSetSnapshotMismatchDetails < AttemptDetails
-          def current_resource_key_hashes: () -> Array[String]
-          def requested_resource_key_hashes: () -> Array[String]
+          def current_resource_ids: () -> Array[String]
+          def requested_resource_ids: () -> Array[String]
         end
 
         class LeaseReferenceMismatchDetails < AttemptDetails
-          def resource_key_hash: () -> String
+          def resource_id: () -> String
           def current_lease_id: () -> String
           def requested_lease_id: () -> String
           def current_fencing_token: () -> Integer
@@ -322,13 +338,13 @@ module Coordinator
 
         class CandidateLeaseObservationsMismatchDetails < Shared::Value
           def attempt_id: () -> String
-          def expected_resource_key_hashes: () -> Array[String]
-          def submitted_resource_key_hashes: () -> Array[String]
+          def expected_resource_ids: () -> Array[String]
+          def submitted_resource_ids: () -> Array[String]
         end
 
         class CandidateLeaseNotActiveDetails < Shared::Value
           def attempt_id: () -> String
-          def resource_key_hash: () -> String
+          def resource_id: () -> String
           def submitted_lease_id: () -> String
           def current_lease_id: () -> String?
           def current_fencing_token: () -> Integer
@@ -336,7 +352,6 @@ module Coordinator
         end
 
         class CandidateUnauthorizedResource < Shared::Value
-          def resource_key_hash: () -> String
           def path: () -> String
         end
 
@@ -347,7 +362,7 @@ module Coordinator
 
         class CandidateManifestBaseMismatchDetails < Shared::Value
           def candidate_id: () -> String
-          def resource_key_hash: () -> String
+          def resource_id: () -> String
           def path: () -> String
           def expected_base_blob_oid: () -> String?
           def submitted_base_blob_oid: () -> String?

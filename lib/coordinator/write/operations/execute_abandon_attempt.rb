@@ -218,20 +218,31 @@ module Coordinator::Write
 
       def load_current_observations(attempt_state)
         attempt_state.lease_resources.map do |reference|
-          CurrentLeaseObservationV1.new(
+          observation_class = if reference.respond_to?(:resource_id)
+                                CurrentLeaseObservationV2
+                              else
+                                CurrentLeaseObservationV1
+                              end
+          observation_class.new(
             reference:,
-            state: load_lease_state(reference.resource_key_hash)
+            state: load_lease_state(lease_identity(reference))
           )
         end
       end
 
-      def load_lease_state(resource_key_hash)
+      def load_lease_state(resource_identity)
         events = @event_store.read_grouped(
-          @stream_factory.resource_lease(resource_key_hash),
+          @stream_factory.resource_lease(resource_identity),
           EventQueries::RESOURCE_LEASE_FOR_RESERVATION
         ).reverse.map { load_event(_1) }
 
         Domain::ResourceLeases::State.reduce(events)
+      end
+
+      def lease_identity(value)
+        return value.resource_id if value.respond_to?(:resource_id)
+
+        value.resource_key_hash
       end
 
       def load_event(event)
@@ -283,10 +294,25 @@ module Coordinator::Write
         ]
         lease_set_id =
           case event
-          when Events::ResourceLeaseReleasedV1, Events::AttemptAbandonedV1
+          when Events::ResourceLeaseReleasedV1,
+               Events::ResourceLeaseReleasedV2,
+               Events::AttemptAbandonedV1,
+               Events::AttemptAbandonedV2
             event.lease_set_id
           end
         common << "lease-set:#{lease_set_id}" if lease_set_id
+        if event.is_a?(Events::ResourceLeaseReleasedV2)
+          return common + [
+            "repository:#{event.repository_id}",
+            "resource:#{event.resource_id}",
+            "resource-kind:#{event.resource_kind}",
+            *RepositoryMarkerBuilder.new.resource_event_markers(
+              repository_id: event.repository_id,
+              resource_kind: event.resource_kind,
+              resource_path: event.resource_path
+            )
+          ]
+        end
         return common unless event.is_a?(Events::ResourceLeaseReleasedV1)
 
         components = [
@@ -314,7 +340,11 @@ module Coordinator::Write
       def build_completion(command:, input_digest:, persisted_events:, abandoned_at:)
         abandonment = persisted_events[-2]
         released_count = abandonment.data.fetch("released_leases").length
-        untouched_count = abandonment.data.fetch("untouched_resource_key_hashes").length
+        untouched_count = if abandonment.data.key?("untouched_resource_ids")
+                            abandonment.data.fetch("untouched_resource_ids").length
+                          else
+                            abandonment.data.fetch("untouched_resource_key_hashes").length
+                          end
         warnings = [
           "Reacquire the WorkItem with a fresh Attempt ID and base snapshot before resuming."
         ]

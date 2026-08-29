@@ -16,7 +16,7 @@ module Coordinator::Processes
 
     def call(locator)
       event = @event_store.read_at(
-        @stream_factory.resource_lease(locator.resource_key_hash),
+        @stream_factory.resource_lease(locator.resource_stream_id),
         locator.stream_revision
       )
       raise InvalidSourceEvent, "scheduled lease-expiry source event is unavailable" unless event

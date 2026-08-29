@@ -2,7 +2,7 @@
 
 module Coordinator::Write
   class PreparedWriteSetExpansion < Value
-    Resource = Types.Instance(PreparedLeaseResourceV1)
+    Resource = Types.Instance(PreparedLeaseTargetV1)
 
     attribute :expanded_at, Types::Timestamp
     attribute :input_digest, Types::Sha256Digest

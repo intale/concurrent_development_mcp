@@ -48,8 +48,7 @@ module Coordinator::Write
       end
 
       class LeaseBusyDetails < Value
-        attribute :resource_key, Types::String
-        attribute :resource_key_hash, Types::Sha256Digest
+        attribute :resource_id, Types::ResourceId
         attribute :lease_id, Types::UuidV7
         attribute :owner_attempt_id, Types::Identifier
         attribute :owner_agent_id, Types::Identifier
@@ -63,15 +62,32 @@ module Coordinator::Write
       end
 
       class ResourceEvidenceConflictDetails < AttemptDetails
-        attribute :resource_key, Types::String
-        attribute :resource_key_hash, Types::Sha256Digest
+        attribute :resource_id, Types::ResourceId
         attribute :current_base_blob_oid, Types::GitOid.optional
         attribute :requested_base_blob_oid, Types::GitOid.optional
       end
 
       class ResourceIdentityPolicyMismatchDetails < AttemptDetails
-        attribute :current_policy_version, Types::ResourceKeyPolicyVersion
-        attribute :requested_policy_version, Types::ResourceKeyPolicyVersion
+        attribute :current_policy_version, Types::String.optional
+        attribute :requested_policy_version, Types::String
+      end
+
+      class ResourceIdDetails < Value
+        attribute :resource_id, Types::ResourceId
+      end
+
+      class ResourceRepositoryMismatchDetails < ResourceIdDetails
+        attribute :requested_repository_id, Types::RepositoryId
+        attribute :resource_repository_id, Types::RepositoryId
+      end
+
+      class ResourceNotActiveDetails < ResourceIdDetails
+        attribute :current_resource_id, Types::ResourceId
+        attribute :current_binding, Types::String.enum("ResourceBound", "ResourceUnbound")
+      end
+
+      class ResourceStreamHistoryCorruptDetails < ResourceIdDetails
+        attribute :reason, Types::String
       end
 
       class ResourceHistoryCorruptDetails < Value
@@ -118,14 +134,14 @@ module Coordinator::Write
       end
 
       class LeaseSetExpiredDetails < AttemptDetails
-        attribute :resource_key_hash, Types::Sha256Digest
+        attribute :resource_id, Types::ResourceId
         attribute :lease_id, Types::UuidV7
         attribute :fencing_token, Types::FencingToken
         attribute :expires_at, Types::Timestamp
       end
 
       class LeaseSetNotCurrentDetails < AttemptDetails
-        attribute :resource_key_hash, Types::Sha256Digest
+        attribute :resource_id, Types::ResourceId
         attribute :expected_lease_id, Types::UuidV7
         attribute :current_lease_id, Types::UuidV7.optional
         attribute :expected_fencing_token, Types::FencingToken
@@ -142,12 +158,12 @@ module Coordinator::Write
       end
 
       class LeaseSetSnapshotMismatchDetails < AttemptDetails
-        attribute :current_resource_key_hashes, Types::Array.of(Types::Sha256Digest).constrained(max_size: 32)
-        attribute :requested_resource_key_hashes, Types::Array.of(Types::Sha256Digest).constrained(max_size: 32)
+        attribute :current_resource_ids, Types::Array.of(Types::ResourceId).constrained(max_size: 32)
+        attribute :requested_resource_ids, Types::Array.of(Types::ResourceId).constrained(max_size: 32)
       end
 
       class LeaseReferenceMismatchDetails < AttemptDetails
-        attribute :resource_key_hash, Types::Sha256Digest
+        attribute :resource_id, Types::ResourceId
         attribute :current_lease_id, Types::UuidV7
         attribute :requested_lease_id, Types::UuidV7
         attribute :current_fencing_token, Types::FencingToken
@@ -336,15 +352,13 @@ module Coordinator::Write
 
       class CandidateLeaseObservationsMismatchDetails < Value
         attribute :attempt_id, Types::Identifier
-        attribute :expected_resource_key_hashes,
-                  Types::Array.of(Types::Sha256Digest).constrained(max_size: 32)
-        attribute :submitted_resource_key_hashes,
-                  Types::Array.of(Types::Sha256Digest).constrained(max_size: 32)
+        attribute :expected_resource_ids, Types::Array.of(Types::ResourceId).constrained(max_size: 32)
+        attribute :submitted_resource_ids, Types::Array.of(Types::ResourceId).constrained(max_size: 32)
       end
 
       class CandidateLeaseNotActiveDetails < Value
         attribute :attempt_id, Types::Identifier
-        attribute :resource_key_hash, Types::Sha256Digest
+        attribute :resource_id, Types::ResourceId
         attribute :submitted_lease_id, Types::UuidV7
         attribute :current_lease_id, Types::UuidV7.optional
         attribute :current_fencing_token, Types::Integer.constrained(gteq: 0)
@@ -352,7 +366,6 @@ module Coordinator::Write
       end
 
       class CandidateUnauthorizedResource < Value
-        attribute :resource_key_hash, Types::Sha256Digest
         attribute :path, Types::ResourcePath
       end
 
@@ -365,7 +378,7 @@ module Coordinator::Write
 
       class CandidateManifestBaseMismatchDetails < Value
         attribute :candidate_id, Types::Identifier
-        attribute :resource_key_hash, Types::Sha256Digest
+        attribute :resource_id, Types::ResourceId
         attribute :path, Types::ResourcePath
         attribute :expected_base_blob_oid, Types::GitOid.optional
         attribute :submitted_base_blob_oid, Types::GitOid.optional
@@ -559,6 +572,30 @@ module Coordinator::Write
         attribute :code, Types::String.enum("resource_history_corrupt")
         attribute :message, Types::String
         attribute :details, ResourceHistoryCorruptDetails
+      end
+
+      class ResourceStreamHistoryCorruptError < Value
+        attribute :code, Types::String.enum("resource_history_corrupt")
+        attribute :message, Types::String
+        attribute :details, ResourceStreamHistoryCorruptDetails
+      end
+
+      class ResourceNotFoundError < Value
+        attribute :code, Types::String.enum("resource_not_found")
+        attribute :message, Types::String
+        attribute :details, ResourceIdDetails
+      end
+
+      class ResourceRepositoryMismatchError < Value
+        attribute :code, Types::String.enum("resource_repository_mismatch")
+        attribute :message, Types::String
+        attribute :details, ResourceRepositoryMismatchDetails
+      end
+
+      class ResourceNotActiveError < Value
+        attribute :code, Types::String.enum("resource_not_active")
+        attribute :message, Types::String
+        attribute :details, ResourceNotActiveDetails
       end
 
       class ResourcePathConflictError < Value

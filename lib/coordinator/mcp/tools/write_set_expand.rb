@@ -5,8 +5,8 @@ module Coordinator
     module Tools
       class WriteSetExpand < MutationTool
         tool_name "write_set_expand"
-        title "Expand a file write set"
-        description "Atomically add files to an Attempt's current write set without renewing its deadline."
+        title "Expand a Resource write set"
+        description "Atomically add Resource IDs to an Attempt's current write set without renewing its deadline."
         input_schema Schemas.write_set_expand
         operation "operations.submit_expand_write_set_task"
       end

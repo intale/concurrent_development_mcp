@@ -70,7 +70,7 @@ module Coordinator::Write
     end
 
     class LeaseSet < Value
-      Reference = LeaseReferenceV1
+      Reference = LeaseReferenceV1 | LeaseReferenceV2
 
       attribute :change_set_id, Types::Identifier
       attribute :work_item_id, Types::Identifier
@@ -84,7 +84,7 @@ module Coordinator::Write
     end
 
     class LeaseSetExpansion < Value
-      Reference = LeaseReferenceV1
+      Reference = LeaseReferenceV1 | LeaseReferenceV2
 
       attribute :change_set_id, Types::Identifier
       attribute :work_item_id, Types::Identifier
@@ -99,7 +99,7 @@ module Coordinator::Write
     end
 
     class LeaseSetRenewal < Value
-      Reference = LeaseReferenceV1
+      Reference = LeaseReferenceV1 | LeaseReferenceV2
 
       attribute :change_set_id, Types::Identifier
       attribute :work_item_id, Types::Identifier
@@ -115,7 +115,7 @@ module Coordinator::Write
     end
 
     class LeaseSetRelease < Value
-      Reference = LeaseReferenceV1
+      Reference = LeaseReferenceV1 | LeaseReferenceV2
 
       attribute :change_set_id, Types::Identifier
       attribute :work_item_id, Types::Identifier
@@ -131,6 +131,15 @@ module Coordinator::Write
 
     class ResourceLeaseExpiry < Value
       attribute :resource_key_hash, Types::Sha256Digest
+      attribute :lease_id, Types::UuidV7
+      attribute :lease_set_id, Types::UuidV7
+      attribute :fencing_token, Types::FencingToken
+      attribute :expires_at, Types::Timestamp
+      attribute :expired_at, Types::Timestamp
+    end
+
+    class ResourceLeaseExpiryV2 < Value
+      attribute :resource_id, Types::ResourceId
       attribute :lease_id, Types::UuidV7
       attribute :lease_set_id, Types::UuidV7
       attribute :fencing_token, Types::FencingToken
@@ -512,6 +521,7 @@ module Coordinator::Write
            LeaseSetRenewal |
            LeaseSetRelease |
            ResourceLeaseExpiry |
+           ResourceLeaseExpiryV2 |
            Guidance |
            InterpretationProposal |
            InterpretationAdjudication |

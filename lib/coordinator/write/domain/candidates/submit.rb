@@ -83,10 +83,9 @@ module Coordinator::Write
               released_at: attempt.lease_released_at
             )
           end
-          resource_policy_versions = command.actual_resources.map(&:policy_version).uniq
           unless attempt.lease_set_id == command.lease_set_id &&
                  attempt.lease_repository_id == command.repository_id &&
-                 resource_policy_versions == [ attempt.lease_policy_version ]
+                 attempt.lease_policy_version == LeaseResourceV2::POLICY_VERSION
             return failure(
               :lease_set_mismatch,
               "Lease set does not match the Attempt",
@@ -98,15 +97,15 @@ module Coordinator::Write
             )
           end
 
-          expected = attempt.lease_resources.map { [ _1.resource_key_hash, _1.lease_id, _1.fencing_token ] }
-          submitted = command.leases.map { [ _1.resource_key_hash, _1.lease_id, _1.fencing_token ] }
+          expected = attempt.lease_resources.map { [ _1.resource_id, _1.lease_id, _1.fencing_token ] }
+          submitted = command.leases.map { [ _1.resource_id, _1.lease_id, _1.fencing_token ] }
           unless submitted == expected
             return failure(
               :lease_observations_mismatch,
               "Submitted lease observations are not the exact Attempt lease set",
               attempt_id: command.attempt_id,
-              expected_resource_key_hashes: expected.map(&:first),
-              submitted_resource_key_hashes: submitted.map(&:first)
+              expected_resource_ids: expected.map(&:first),
+              submitted_resource_ids: submitted.map(&:first)
             )
           end
 
@@ -126,7 +125,7 @@ module Coordinator::Write
             :lease_not_active,
             "A submitted lease observation is stale or inactive",
             attempt_id: command.attempt_id,
-            resource_key_hash: invalid.reference.resource_key_hash,
+            resource_id: invalid.reference.resource_id,
             submitted_lease_id: invalid.reference.lease_id,
             current_lease_id: invalid.state.lease_id,
             current_fencing_token: invalid.state.fencing_token,
@@ -140,7 +139,7 @@ module Coordinator::Write
           state.active_at?(submitted_at) &&
             state.lease_id == reference.lease_id &&
             state.lease_set_id == command.lease_set_id &&
-            state.resource_key_hash == reference.resource_key_hash &&
+            state.resource_id == reference.resource_id &&
             state.fencing_token == reference.fencing_token &&
             state.change_set_id == command.change_set_id &&
             state.work_item_id == command.work_item_id &&
@@ -160,24 +159,24 @@ module Coordinator::Write
               :actual_write_set_not_authorized,
               "Candidate manifest includes resources outside the reserved write set",
               candidate_id: command.candidate_id,
-              resources: missing.map { { resource_key_hash: _1.resource_key_hash, path: _1.path } }
+              resources: missing.map { { path: _1.path } }
             )
           end
 
           mismatch = command.actual_resources.find do |resource|
             reference = leased.find do |candidate|
-              candidate.resource_kind == "file" && candidate.resource_key_hash == resource.resource_key_hash
+              candidate.resource_kind == "file" && candidate.resource_path == resource.path
             end
             reference && reference.base_blob_oid != resource.base_blob_oid
           end
           return unless mismatch
 
-          reference = leased.find { _1.resource_key_hash == mismatch.resource_key_hash }
+          reference = leased.find { _1.resource_kind == "file" && _1.resource_path == mismatch.path }
           failure(
             :manifest_base_evidence_mismatch,
             "Candidate manifest old-side evidence differs from the reserved base",
             candidate_id: command.candidate_id,
-            resource_key_hash: mismatch.resource_key_hash,
+            resource_id: reference.resource_id,
             path: mismatch.path,
             expected_base_blob_oid: reference.base_blob_oid,
             submitted_base_blob_oid: mismatch.base_blob_oid
@@ -186,7 +185,7 @@ module Coordinator::Write
 
         def covering_lease(leased, resource)
           leased.find do |reference|
-            reference.resource_key_hash == resource.resource_key_hash ||
+            (reference.resource_kind == "file" && reference.resource_path == resource.path) ||
               (reference.resource_kind == "directory" &&
                 (resource.path == reference.resource_path ||
                   resource.path.start_with?("#{reference.resource_path}/")))
@@ -197,7 +196,7 @@ module Coordinator::Write
           candidate_stream = @stream_factory.candidate(command.candidate_id)
           manifest = command.manifest
           context = command.build_context
-          candidate = Events::CandidateSubmittedV1.new(
+          candidate = Events::CandidateSubmittedV2.new(
             candidate_id: command.candidate_id,
             change_set_id: command.change_set_id,
             work_item_id: command.work_item_id,

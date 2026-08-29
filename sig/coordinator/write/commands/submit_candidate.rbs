@@ -18,7 +18,7 @@ module Coordinator
         attr_reader leases: Array[Coordinator::Write::Candidates::LeaseObservationV1]
         attr_reader manifest: Coordinator::Write::Candidates::ChangeManifestV1
         attr_reader build_context: Coordinator::Write::Candidates::BuildContextV1?
-        attr_reader actual_resources: Array[Coordinator::Write::FileResourceV1]
+        attr_reader actual_resources: Array[Coordinator::Write::Candidates::ActualResourceV2]
       end
     end
   end

@@ -4,7 +4,7 @@ module Coordinator
       def self.from_source: (LeaseExpirySource source) -> LeaseExpirySourceLocatorV1
 
       def source_event_id: () -> String
-      def resource_key_hash: () -> String
+      def resource_stream_id: () -> String
       def stream_revision: () -> Integer
     end
   end

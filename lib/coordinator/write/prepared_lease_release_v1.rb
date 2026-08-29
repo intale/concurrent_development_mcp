@@ -2,7 +2,7 @@
 
 module Coordinator::Write
   class PreparedLeaseReleaseV1 < Value
-    attribute :reference, Types.Instance(LeaseReleaseReferenceV1)
+    attribute :reference, Types.Instance(LeaseReleaseReferenceV2)
     attribute :event_id, Types::UuidV7
   end
 end

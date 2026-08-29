@@ -1,0 +1,19 @@
+module Coordinator
+  module Write
+    module Events
+      class WriteSetReservedV2 < Base
+        Reference: untyped
+
+        def lease_set_id: () -> String
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def attempt_id: () -> String
+        def repository_id: () -> String
+        def policy_version: () -> String
+        def resources: () -> Array[LeaseReferenceV2]
+        def reserved_at: () -> String
+        def expires_at: () -> String
+      end
+    end
+  end
+end

@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    class LeaseResourceV2 < Shared::Value
+      POLICY_VERSION: String
+
+      def resource_id: () -> String
+      def kind: () -> String
+      def path: () -> String
+      def base_blob_oid: () -> String?
+      def policy_version: () -> String
+    end
+  end
+end

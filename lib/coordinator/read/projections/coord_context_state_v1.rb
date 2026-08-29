@@ -9,6 +9,7 @@ module Coordinator::Read
         coordinator-resource-key/v1
         coordinator-resource-key/v2
         coordinator-resource-key/v3
+        coordinator-resource-lease/v2
       ].freeze
 
       class ChangeSet < Value
@@ -63,8 +64,18 @@ module Coordinator::Read
         attribute :fencing_token, Types::FencingToken
       end
 
+
+      class WriteSetResourceV2 < Value
+        attribute :lease_id, Types::UuidV7
+        attribute :resource_id, Types::ResourceId
+        attribute :resource_kind, Types::ResourceKind
+        attribute :resource_path, Types::ResourcePath
+        attribute :base_blob_oid, Types::GitOid.optional
+        attribute :fencing_token, Types::FencingToken
+      end
+
       class WriteSet < Value
-        Resource = WriteSetResource
+        Resource = WriteSetResource | WriteSetResourceV2
 
         attribute :lease_set_id, Types::UuidV7
         attribute :repository_id, Types::RepositoryId

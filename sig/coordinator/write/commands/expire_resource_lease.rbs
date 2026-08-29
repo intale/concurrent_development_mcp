@@ -4,7 +4,7 @@ module Coordinator
       class ExpireResourceLease < Shared::Value
         def command_id: () -> String
         def actor: () -> Actor
-        def resource_key_hash: () -> String
+        def resource_id: () -> String
         def lease_id: () -> String
         def lease_set_id: () -> String
         def fencing_token: () -> Integer

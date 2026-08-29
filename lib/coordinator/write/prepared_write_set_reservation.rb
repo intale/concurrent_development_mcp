@@ -2,7 +2,7 @@
 
 module Coordinator::Write
   class PreparedWriteSetReservation < Value
-    Resource = Types.Instance(PreparedLeaseResourceV1)
+    Resource = Types.Instance(PreparedLeaseTargetV1)
 
     attribute :acquired_at, Types::Timestamp
     attribute :expires_at, Types::Timestamp

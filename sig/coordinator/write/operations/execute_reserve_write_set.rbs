@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Operations
       class ExecuteReserveWriteSet
-        def initialize: (event_store: _EventStore, ?preparer: PrepareReserveWriteSet, ?decider: Domain::ResourceLeases::Reserve, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?completion_builder: CommandCompletionBuilder, ?compound_marker_builder: Shared::CompoundMarkerBuilder, ?repository_registration_loader: RepositoryRegistrationLoader, ?repository_marker_builder: RepositoryMarkerBuilder, ?event_plan_contract: Contracts::WriteSetReservationEventPlan) -> void
+        def initialize: (event_store: _EventStore, ?preparer: PrepareReserveWriteSet, ?decider: Domain::ResourceLeases::Reserve, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?completion_builder: CommandCompletionBuilder, ?repository_registration_loader: RepositoryRegistrationLoader, ?repository_marker_builder: RepositoryMarkerBuilder, ?lease_resource_loader: LeaseResourceLoader, ?event_plan_contract: Contracts::WriteSetReservationEventPlan) -> void
         %a{rbs:test:skip}
         def call: (command_input input) -> Dry::Monads::Result
         def call_command: (Commands::ReserveWriteSet command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result

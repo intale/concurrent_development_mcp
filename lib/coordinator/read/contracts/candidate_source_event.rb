@@ -14,7 +14,7 @@ module Coordinator::Read
 
       params do
         required(:event_type).filled(:string, included_in?: EVENT_TYPES)
-        required(:schema_version).filled(:integer, eql?: 1)
+        required(:schema_version).filled(:integer, included_in?: [ 1, 2 ])
         required(:stream_context).filled(:string, eql?: "DevelopmentIntegration")
         required(:stream_name).filled(:string, eql?: "Candidate")
         required(:stream_id).filled(:string)
@@ -39,9 +39,16 @@ module Coordinator::Read
         key(:stream_revision).failure("must match the Candidate evidence chronology")
       end
 
+      rule(:event_type, :schema_version) do
+        expected = values[:event_type] == "CandidateSubmitted" ? [ 1, 2 ] : [ 1 ]
+        key(:schema_version).failure("must match the projected event schema") unless expected.include?(values[:schema_version])
+      end
+
       rule(:event_type, :policy_version) do
         expected = if values[:event_type] == "CandidateImpactSurfaceDerived"
           [ Coordinator::Write::Candidates::ImpactSurfaceDocumentV1::SCHEMA ]
+        elsif values[:schema_version] == 2
+          [ Coordinator::Write::LeaseResourceV2::POLICY_VERSION ]
         else
           Types::RESOURCE_KEY_POLICY_VERSIONS
         end

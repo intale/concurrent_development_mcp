@@ -16,9 +16,9 @@ module Coordinator::Write
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
         completion_builder: CommandCompletionBuilder.new,
-        compound_marker_builder: CompoundMarkerBuilder.new,
         repository_registration_loader: RepositoryRegistrationLoader.new(event_store:),
         repository_marker_builder: RepositoryMarkerBuilder.new,
+        lease_resource_loader: LeaseResourceLoader.new(event_store:),
         event_plan_contract: Contracts::WriteSetReservationEventPlan.new
       )
         @event_store = event_store
@@ -31,9 +31,9 @@ module Coordinator::Write
         @schema_registry = schema_registry
         @stream_factory = stream_factory
         @completion_builder = completion_builder
-        @compound_marker_builder = compound_marker_builder
         @repository_registration_loader = repository_registration_loader
         @repository_marker_builder = repository_marker_builder
+        @lease_resource_loader = lease_resource_loader
         @resource_boundary_loader = ResourceBoundaryLoader.new(event_store:, schema_registry:)
         @event_plan_contract = event_plan_contract
       end
@@ -62,8 +62,8 @@ module Coordinator::Write
           input_digest: @input_digest.write_set_reserve(command),
           lease_set_id: @id_generator.uuid_v7,
           resources: command.resources.map do |resource|
-            PreparedLeaseResourceV1.new(
-              resource:,
+            PreparedLeaseTargetV1.new(
+              target: resource,
               lease_id: @id_generator.uuid_v7,
               event_id: @id_generator.uuid_v7
             )
@@ -77,31 +77,32 @@ module Coordinator::Write
         registration = @repository_registration_loader.call(command.repository_id)
         return repository_not_registered(command) unless registration
 
-        scoped = @preparer.scope_for_repository(command, repository_registration: registration)
-        return scoped if scoped.failure?
+        resources = load_resources(command)
+        return resources if resources.failure?
 
-        scoped_command = scoped.value!
         execute_attempt(
-          command: scoped_command,
-          prepared: rebind_prepared(prepared, scoped_command),
+          command:,
+          resources: resources.value!,
+          prepared:,
           repository_registration: registration,
           caused_by:
         )
       end
 
-      def execute_attempt(command:, prepared:, repository_registration:, caused_by:)
+      def execute_attempt(command:, resources:, prepared:, repository_registration:, caused_by:)
         replay = replay_result(command:, input_digest: prepared.input_digest)
         return replay if replay
 
         attempt_state = load_attempt_state(command.attempt_id)
-        lease_states = command.resources.map { load_lease_state(_1.resource_key_hash) }
-        boundary_states = load_boundary_states(command)
+        lease_states = resources.map { load_lease_state(_1.resource_id) }
+        boundary_states = load_boundary_states(command, resources:)
         return boundary_states if boundary_states.failure?
 
         decision = @decider.call(
           attempt_state:,
           lease_states: lease_states + boundary_states.value!,
           command:,
+          resources:,
           lease_set_id: prepared.lease_set_id,
           lease_ids: prepared.resources.map(&:lease_id),
           acquired_at: prepared.acquired_at,
@@ -110,7 +111,7 @@ module Coordinator::Write
         return decision if decision.failure?
 
         plan = decision.value!
-        verify_event_plan!(plan, command:, prepared:, lease_states:)
+        verify_event_plan!(plan, command:, resources:, prepared:, lease_states:)
         ActiveSupport::Notifications.instrument(
           "coordinator.command_boundary",
           operation: TOOL_NAME,
@@ -189,17 +190,17 @@ module Coordinator::Write
         Domain::Attempts::State.reduce(events)
       end
 
-      def load_lease_state(resource_key_hash)
+      def load_lease_state(resource_id)
         events = @event_store.read_grouped(
-          @stream_factory.resource_lease(resource_key_hash),
+          @stream_factory.resource_lease(resource_id),
           EventQueries::RESOURCE_LEASE_FOR_RESERVATION
         ).reverse.map { load_event(_1) }
 
         Domain::ResourceLeases::State.reduce(events)
       end
 
-      def load_boundary_states(command)
-        markers = command.resources.flat_map do |resource|
+      def load_boundary_states(command, resources:)
+        markers = resources.flat_map do |resource|
           @repository_marker_builder.resource_boundary_markers(
             repository_id: command.repository_id,
             resource_kind: resource.kind,
@@ -221,25 +222,15 @@ module Coordinator::Write
         )
       end
 
-      def rebind_prepared(prepared, command)
-        PreparedWriteSetReservation.new(
-          acquired_at: prepared.acquired_at,
-          expires_at: prepared.expires_at,
-          input_digest: @input_digest.write_set_reserve(command),
-          lease_set_id: prepared.lease_set_id,
-          resources: command.resources.map do |resource|
-            prior = prepared.resources.find do |candidate|
-              candidate.resource.kind == resource.kind && candidate.resource.path == resource.path
-            end
-            PreparedLeaseResourceV1.new(
-              resource:,
-              lease_id: prior.lease_id,
-              event_id: prior.event_id
-            )
-          end,
-          reservation_event_id: prepared.reservation_event_id,
-          completion_event_id: prepared.completion_event_id
-        )
+      def load_resources(command)
+        resources = command.resources.map do |target|
+          result = @lease_resource_loader.call(target, repository_id: command.repository_id)
+          return result if result.failure?
+
+          result.value!
+        end
+
+        Success(resources)
       end
 
       def load_event(event)
@@ -250,10 +241,11 @@ module Coordinator::Write
         )
       end
 
-      def verify_event_plan!(plan, command:, prepared:, lease_states:)
+      def verify_event_plan!(plan, command:, resources:, prepared:, lease_states:)
         result = @event_plan_contract.call(
           plan:,
           command:,
+          resources:,
           attempt_stream: @stream_factory.attempt(command.attempt_id),
           lease_states:,
           lease_set_id: prepared.lease_set_id,
@@ -289,24 +281,12 @@ module Coordinator::Write
           "attempt:#{command.attempt_id}",
           "command:#{command.command_id}"
         ] + @repository_marker_builder.call(repository_registration)
-        return common + [ "lease-set:#{event.lease_set_id}" ] unless event.is_a?(Events::ResourceLeaseAcquiredV1)
+        return common + [ "lease-set:#{event.lease_set_id}" ] unless event.is_a?(Events::ResourceLeaseAcquiredV2)
 
-        components = [
-          "scope:#{repository_registration.scope}",
-          "repository:#{event.repository_id}",
-          "resource-kind:#{event.resource_kind}",
-          "resource-key-hash:#{event.resource_key_hash}"
-        ]
-        compound = @compound_marker_builder.call(
-          CompoundMarkerDefinitionV1.new(
-            purpose: "resource-identity",
-            components:
-          )
-        )
-
-        common + components + [
+        common + [
           "lease-set:#{event.lease_set_id}",
-          compound.marker,
+          "resource:#{event.resource_id}",
+          "resource-kind:#{event.resource_kind}",
           *@repository_marker_builder.resource_event_markers(
             repository_id: event.repository_id,
             resource_kind: event.resource_kind,
@@ -333,7 +313,7 @@ module Coordinator::Write
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
-          policy_version: command.resources.first.policy_version
+          policy_version: LeaseResourceV2::POLICY_VERSION
         )
       end
 

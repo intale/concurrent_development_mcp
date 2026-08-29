@@ -1,0 +1,8 @@
+module Coordinator
+  module Write
+    class ResourceLeaseTargetV1 < Shared::Value
+      def resource_id: () -> String
+      def base_blob_oid: () -> String?
+    end
+  end
+end

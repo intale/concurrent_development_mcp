@@ -3,7 +3,7 @@ module Coordinator::Write
     class CandidateEvidenceV1 < Coordinator::Shared::Value
       def registration: () -> Coordinator::Write::Events::CandidateImpactSurfaceRegisteredV1
       def registration_event: () -> Coordinator::Write::EventReference
-      def candidate: () -> Coordinator::Write::Events::CandidateSubmittedV1
+      def candidate: () -> (Coordinator::Write::Events::CandidateSubmittedV1 | Coordinator::Write::Events::CandidateSubmittedV2)
       def manifest: () -> Coordinator::Write::Events::CandidateChangeManifestCapturedV1
       def build_context: () -> Coordinator::Write::Events::CandidateBuildContextCapturedV1?
       def surface: () -> Coordinator::Write::Events::CandidateImpactSurfaceDerivedV1

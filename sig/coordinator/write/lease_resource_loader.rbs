@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    class LeaseResourceLoader
+      def initialize: (
+        event_store: _EventStore,
+        ?normalizer: ResourceIdentityNormalizer,
+        ?schema_registry: EventSchemaRegistry,
+        ?stream_factory: StreamFactory
+      ) -> void
+
+      def call: (ResourceLeaseTargetV1 target, repository_id: String) -> Dry::Monads::Result
+    end
+  end
+end

@@ -14,7 +14,7 @@ module Coordinator::Write
           optional(:new_mode).maybe(:string)
         end
         required(:actual_resource_evidence).array(:hash) do
-          required(:resource_key_hash).filled(:string)
+          required(:path).filled(:string)
           optional(:base_blob_oid).maybe(:string)
         end
         required(:build_input_keys).array(:string)
@@ -38,8 +38,8 @@ module Coordinator::Write
       end
 
       rule(:actual_resource_evidence) do
-        key.failure("must contain between 1 and 32 resources") unless (1..32).cover?(value.map { _1[:resource_key_hash] }.uniq.length)
-        conflicting = value.group_by { _1[:resource_key_hash] }.values.any? do |entries|
+        key.failure("must contain between 1 and 32 resources") unless (1..32).cover?(value.map { _1[:path] }.uniq.length)
+        conflicting = value.group_by { _1[:path] }.values.any? do |entries|
           entries.map { _1[:base_blob_oid] }.uniq.length > 1
         end
         key.failure("contains conflicting base evidence for one normalized resource") if conflicting

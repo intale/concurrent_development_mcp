@@ -1,0 +1,28 @@
+module Coordinator
+  module Write
+    module Events
+      class CandidateSubmittedV2 < Base
+        Reference: untyped
+
+        def candidate_id: () -> String
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def attempt_id: () -> String
+        def agent_id: () -> String
+        def repository_id: () -> String
+        def target_branch: () -> String
+        def object_format: () -> String
+        def base_commit_oid: () -> String
+        def head_commit_oid: () -> String
+        def checkpoint_kind: () -> String
+        def lease_set_id: () -> String
+        def lease_policy_version: () -> String
+        def lease_references: () -> Array[LeaseReferenceV2]
+        def manifest_digest: () -> String
+        def build_context_digest: () -> String?
+        def evidence_status: () -> String
+        def submitted_at: () -> String
+      end
+    end
+  end
+end

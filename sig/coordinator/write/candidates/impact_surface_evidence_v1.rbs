@@ -1,7 +1,7 @@
 module Coordinator::Write
   module Candidates
     class ImpactSurfaceEvidenceV1 < Coordinator::Shared::Value
-      def submission: () -> Coordinator::Write::Events::CandidateSubmittedV1
+      def submission: () -> (Coordinator::Write::Events::CandidateSubmittedV1 | Coordinator::Write::Events::CandidateSubmittedV2)
       def submission_event: () -> Coordinator::Write::EventReference
       def manifest: () -> Coordinator::Write::Events::CandidateChangeManifestCapturedV1
       def manifest_event: () -> Coordinator::Write::EventReference

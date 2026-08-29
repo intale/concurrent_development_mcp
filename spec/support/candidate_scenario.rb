@@ -12,6 +12,12 @@ module CandidateScenario
       attempt_id: "A-#{prefix}"
     }
     seed_attempt(ids:, agent_id:)
+    resource_id = ResourceScenario.resolve(
+      event_store:,
+      repository_id: REPOSITORY_ID,
+      kind: "file",
+      path:
+    )
     reservation = execute(Coordinator::Write::Operations::ExecuteReserveWriteSet, {
       command_id: "seed-reserve-#{prefix}",
       actor: { kind: "agent", id: agent_id },
@@ -20,7 +26,7 @@ module CandidateScenario
       attempt_id: ids.fetch(:attempt_id),
       repository_id: REPOSITORY_ID,
       base_commit_oid: "a" * 40,
-      resources: [ { kind: "file", path:, base_blob_oid: "c" * 40 } ],
+      resources: [ { resource_id:, base_blob_oid: "c" * 40 } ],
       lease_duration_seconds: 900
     }).data
 
@@ -94,7 +100,7 @@ module CandidateScenario
       lease_set_id: reservation.lease_set_id,
       leases: reservation.resources.map do |reference|
         {
-          resource_key_hash: reference.resource_key_hash,
+          resource_id: reference.resource_id,
           lease_id: reference.lease_id,
           fencing_token: reference.fencing_token
         }
@@ -138,7 +144,7 @@ module CandidateScenario
       lease_set_id: reservation.lease_set_id,
       leases: reservation.resources.map do |reference|
         {
-          resource_key_hash: reference.resource_key_hash,
+          resource_id: reference.resource_id,
           lease_id: reference.lease_id,
           fencing_token: reference.fencing_token
         }

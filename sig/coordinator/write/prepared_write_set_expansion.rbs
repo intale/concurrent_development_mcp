@@ -3,7 +3,7 @@ module Coordinator
     class PreparedWriteSetExpansion < Shared::Value
       def expanded_at: () -> String
       def input_digest: () -> String
-      def resources: () -> Array[PreparedLeaseResourceV1]
+      def resources: () -> Array[PreparedLeaseTargetV1]
       def expansion_event_id: () -> String
       def completion_event_id: () -> String
     end

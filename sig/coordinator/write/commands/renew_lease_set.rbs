@@ -8,7 +8,7 @@ module Coordinator
         def work_item_id: () -> String
         def attempt_id: () -> String
         def lease_set_id: () -> String
-        def leases: () -> Array[LeaseRenewalReferenceV1]
+        def leases: () -> Array[LeaseRenewalReferenceV2]
         def lease_duration_seconds: () -> Integer
       end
     end

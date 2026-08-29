@@ -14,7 +14,11 @@ module Coordinator::Write
 
       def call(registration_reference)
         registration = payload!(@exact_loader.call(registration_reference), Events::CandidateImpactSurfaceRegisteredV1)
-        candidate = payload!(@exact_loader.call(registration.candidate_event), Events::CandidateSubmittedV1)
+        candidate = payload!(
+          @exact_loader.call(registration.candidate_event),
+          Events::CandidateSubmittedV1,
+          Events::CandidateSubmittedV2
+        )
         manifest = payload!(@exact_loader.call(registration.manifest_event), Events::CandidateChangeManifestCapturedV1)
         build_context = registration.build_context_event && payload!(
           @exact_loader.call(registration.build_context_event),
@@ -41,14 +45,14 @@ module Coordinator::Write
 
       private
 
-      def payload!(persisted, expected_class)
-        return persisted.payload if persisted.payload.is_a?(expected_class)
+      def payload!(persisted, *expected_classes)
+        return persisted.payload if expected_classes.any? { persisted.payload.is_a?(_1) }
 
         raise InvalidHistory.new(
           reason: "referenced_event_type_invalid",
           evidence: {
             reference: persisted.reference.to_h,
-            expected_class: expected_class.name,
+            expected_classes: expected_classes.map(&:name),
             actual_class: persisted.payload.class.name
           }
         )

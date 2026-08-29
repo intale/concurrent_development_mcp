@@ -11,7 +11,7 @@ module Coordinator::Processes
         .set(wait_until: Time.iso8601(wait_until))
         .perform_later(
           locator.source_event_id,
-          locator.resource_key_hash,
+          locator.resource_stream_id,
           locator.stream_revision
         )
     end
