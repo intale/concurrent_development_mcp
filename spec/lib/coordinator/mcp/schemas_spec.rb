@@ -1,14 +1,15 @@
 # frozen_string_literal: true
 
 RSpec.describe Coordinator::Mcp::Schemas do
-  it "advertises the same Candidate and write-set resource boundary" do
+  it "advertises independent Candidate-file and write-set resource boundaries" do
     write_set_maximum = described_class.write_set_reserve
       .dig(:properties, :resources, :maxItems)
     candidate_maximum = described_class.candidate_submit
       .dig(:properties, :change_manifest, :properties, :files, :maxItems)
 
-    expect(candidate_maximum).to eq(write_set_maximum)
-    expect(candidate_maximum).to eq(Coordinator::Shared::Types::WRITE_SET_RESOURCE_MAXIMUM_COUNT)
+    expect(write_set_maximum).to eq(Coordinator::Shared::Types::WRITE_SET_RESOURCE_MAXIMUM_COUNT)
+    expect(candidate_maximum).to eq(Coordinator::Shared::Types::CANDIDATE_MANIFEST_MAXIMUM_FILE_COUNT)
+    expect(candidate_maximum).to be > write_set_maximum
   end
 
   it "requires one exact scope and bounds the Repository discovery cursor" do

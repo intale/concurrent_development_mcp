@@ -38,7 +38,10 @@ module Coordinator::Write
       end
 
       rule(:actual_resource_evidence) do
-        key.failure("must contain between 1 and 32 resources") unless (1..32).cover?(value.map { _1[:path] }.uniq.length)
+        maximum = Types::CANDIDATE_ACTUAL_RESOURCE_MAXIMUM_COUNT
+        unless (1..maximum).cover?(value.map { _1[:path] }.uniq.length)
+          key.failure("must contain between 1 and #{maximum} normalized changed-file paths")
+        end
         conflicting = value.group_by { _1[:path] }.values.any? do |entries|
           entries.map { _1[:base_blob_oid] }.uniq.length > 1
         end

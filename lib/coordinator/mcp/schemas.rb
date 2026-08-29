@@ -2375,7 +2375,9 @@ module Coordinator
               minItems: 1,
               maxItems: Types::CANDIDATE_MANIFEST_MAXIMUM_FILE_COUNT,
               uniqueItems: true,
-              description: "A Candidate covers at most 32 leased resources. Split larger work into separate WorkItems.",
+              description: "A Candidate records at most #{Types::CANDIDATE_MANIFEST_MAXIMUM_FILE_COUNT} " \
+                           "changed files independently of its " \
+                           "at-most-32 leased resources. Split larger checkpoints across WorkItems.",
               items: candidate_manifest_file
             }
           },

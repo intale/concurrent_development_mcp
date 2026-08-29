@@ -104,7 +104,7 @@ module Coordinator::Write
         maximum = Types::CANDIDATE_MANIFEST_MAXIMUM_FILE_COUNT
         unless (1..maximum).cover?(files.length)
           key([ :change_manifest, :files ]).failure(
-            "must contain between 1 and #{maximum} entries; split larger work into separate WorkItems"
+            "must contain between 1 and #{maximum} entries; split larger checkpoints across WorkItems"
           )
         end
         unless valid_collector_version?(value.fetch(:collector_version))

@@ -39,9 +39,9 @@ Feature: Attributed Candidate checkpoints
       And invalid Candidate "CAN-CUC-INVALID" writes no target facts
 
     @CDM-BOUND-001 @event-contract
-    Scenario: A Candidate cannot exceed its bounded write-set resources
+    Scenario: Candidate file evidence is bounded independently of directory leases
       Given Candidate coordination "BOUND" gives agent "agent-a" an active lease on "lib/bound.rb"
-      When the agent attempts Candidate "CAN-CUC-BOUND" with 33 changed files
+      When the agent attempts Candidate "CAN-CUC-BOUND" with 1001 changed files
       Then the Candidate request is rejected and its schema directs the agent to split WorkItems
       And invalid Candidate "CAN-CUC-BOUND" writes no target facts
 

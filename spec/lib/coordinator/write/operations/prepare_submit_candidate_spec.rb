@@ -45,7 +45,7 @@ RSpec.describe Coordinator::Write::Operations::PrepareSubmitCandidate do
     expect(changed.build_context.digest).to eq(original.build_context.digest)
   end
 
-  it "expands rename resources and rejects manifests above the public write-set boundary" do
+  it "expands rename resources and bounds file evidence independently of leased resources" do
     renamed = valid_input
     renamed[:change_manifest][:files] = [
       file(status: "renamed", old_path: "lib/old.rb", new_path: "lib/new.rb")
@@ -56,15 +56,23 @@ RSpec.describe Coordinator::Write::Operations::PrepareSubmitCandidate do
     expect(command.actual_resources.find { _1.path == "lib/old.rb" }.base_blob_oid).to eq("c" * 40)
     expect(command.actual_resources.find { _1.path == "lib/new.rb" }.base_blob_oid).to be_nil
 
+    directory_lease_manifest = valid_input
+    directory_lease_manifest[:change_manifest][:files] = 33.times.map do |index|
+      file(status: "added", old: false, new_path: "generated/#{index}.rb")
+    end
+    expect(prepare.call(directory_lease_manifest)).to be_success
+
     oversized = valid_input
-    oversized[:change_manifest][:files] = 33.times.map do |index|
+    oversized[:change_manifest][:files] = (
+      Coordinator::Shared::Types::CANDIDATE_MANIFEST_MAXIMUM_FILE_COUNT + 1
+    ).times.map do |index|
       file(status: "added", old: false, new_path: "generated/#{index}.rb")
     end
     result = prepare.call(oversized)
 
     expect(result.failure).to have_attributes(code: :invalid_input)
     expect(result.failure.details.dig(:change_manifest, :files).join).to include(
-      "split larger work into separate WorkItems"
+      "split larger checkpoints across WorkItems"
     )
   end
 

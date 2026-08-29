@@ -289,7 +289,7 @@ Then("the Candidate request is rejected and its schema directs the agent to spli
     "Candidate manifest maximum"
   )
   assert_acceptance(
-    files.fetch("description").include?("Split larger work into separate WorkItems"),
+    files.fetch("description").include?("Split larger checkpoints across WorkItems"),
     "Candidate schema must explain how to replan larger work"
   )
 end

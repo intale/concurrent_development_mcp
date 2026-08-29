@@ -7,7 +7,10 @@ module Coordinator::Write
       attribute :manifest, Types.Instance(ChangeManifestV1)
       attribute :build_context, Types.Instance(BuildContextV1).optional
       attribute :actual_resources,
-                Types::Array.of(Types.Instance(ActualResourceV2)).constrained(min_size: 1, max_size: 32)
+                Types::Array.of(Types.Instance(ActualResourceV2)).constrained(
+                  min_size: 1,
+                  max_size: Types::CANDIDATE_ACTUAL_RESOURCE_MAXIMUM_COUNT
+                )
     end
   end
 end
