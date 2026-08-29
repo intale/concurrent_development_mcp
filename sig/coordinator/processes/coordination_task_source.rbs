@@ -3,7 +3,7 @@ module Coordinator
     class CoordinationTaskSource < Shared::Value
       def event: () -> PgEventstore::Event
       def reference: () -> Write::EventReference
-      def payload: () -> Write::Events::CoordinationTaskSubmittedV1
+      def payload: () -> (Write::Events::CoordinationTaskSubmittedV1 | Write::Events::CoordinationTaskSubmittedV2)
     end
   end
 end

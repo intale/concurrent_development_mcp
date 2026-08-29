@@ -15,7 +15,7 @@ module Coordinator::Processes
       rule(:event) do
         key.failure("must be a persisted event") unless persisted?(value)
         key.failure("must have a UUIDv7 event ID") unless Types::UUID_V7_PATTERN.match?(value.id)
-        key.failure("must be CoordinationTaskSubmitted@1") unless submitted_schema?(value)
+        key.failure("must be CoordinationTaskSubmitted@1 or @2") unless submitted_schema?(value)
         key.failure("must belong to its CoordinationTask stream") unless matching_task_stream?(value)
         key.failure("must carry its submitted command provenance") unless matching_provenance?(value)
         key.failure("must carry its complete routing markers") unless matching_markers?(value)
@@ -30,7 +30,7 @@ module Coordinator::Processes
       end
 
       def submitted_schema?(event)
-        event.type == "CoordinationTaskSubmitted" && event.metadata["schema_version"] == 1
+        event.type == "CoordinationTaskSubmitted" && [ 1, 2 ].include?(event.metadata["schema_version"])
       end
 
       def matching_task_stream?(event)
@@ -47,8 +47,8 @@ module Coordinator::Processes
         task_id = event.data["task_id"]
         command_id = event.data["command_id"]
 
-        event.metadata["command_id"] == command_id &&
-          event.metadata["policy_version"] == "coordination-task/v1"
+        expected_policy = "coordination-task/v#{event.metadata['schema_version']}"
+        event.metadata["command_id"] == command_id && event.metadata["policy_version"] == expected_policy
       end
 
       def matching_markers?(event)

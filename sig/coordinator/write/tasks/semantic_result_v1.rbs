@@ -1,0 +1,28 @@
+module Coordinator
+  module Write
+    module Tasks
+      module SemanticResultV1
+        type value = Success | DomainRejection
+
+        class Success < Shared::Value
+          def kind: () -> String
+          def summary: () -> String
+          def command_id: () -> String
+          def receipt: () -> String
+          def data: () -> CommandReceiptData::value
+          def warnings: () -> Array[String]
+          def next_actions: () -> Array[NextAction]
+        end
+
+        class DomainRejection < Shared::Value
+          def kind: () -> String
+          def status: () -> String
+          def summary: () -> String
+          def command_id: () -> String
+          def error: () -> DomainErrorV1::domain_error
+          def next_actions: () -> Array[NextAction]
+        end
+      end
+    end
+  end
+end

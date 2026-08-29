@@ -1,7 +1,7 @@
 module Coordinator
   module Write
-    module Commands
-      class SubmitCoordinationTask < Shared::Value
+    module Events
+      class CoordinationTaskSubmittedV2 < Base
         def task_id: () -> String
         def tool_name: () -> String
         def command_id: () -> String

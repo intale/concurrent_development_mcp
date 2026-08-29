@@ -18,11 +18,10 @@ module Coordinator::Write
           end
 
           Success(
-            Events::CoordinationTaskSubmittedV1.new(
+            Events::CoordinationTaskSubmittedV2.new(
               task_id: command.task_id,
               tool_name: command.tool_name,
               command_id: command.command_id,
-              canonical_input_digest: command.canonical_input_digest,
               command_input: command.command_input,
               submitted_at: command.submitted_at,
               ttl_ms: command.ttl_ms,

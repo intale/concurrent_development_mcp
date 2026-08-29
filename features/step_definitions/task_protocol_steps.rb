@@ -26,13 +26,24 @@ Then("the Task is durable before coordination begins") do
     @current_task_id&.match?(Coordinator::Shared::Types::UUID_V7_PATTERN),
     "The server did not return a UUIDv7 Task handle"
   )
-  assert_acceptance_equal(
-    [ "CoordinationTaskSubmitted" ],
-    task_events(@current_task_id).map(&:type),
-    "Persisted Task history before execution"
+  submitted = task_events(@current_task_id).sole
+  assert_acceptance_equal("CoordinationTaskSubmitted", submitted.type, "Persisted Task fact")
+  assert_acceptance_equal(2, submitted.metadata.fetch("schema_version"), "Task submission schema")
+  assert_acceptance(
+    !submitted.data.key?("canonical_input_digest"),
+    "Task submission must not duplicate a digest derivable from command_input"
   )
+  assert_acceptance(submitted.data.key?("command_input"), "Task submission command input is missing")
   assert_acceptance_equal([], command_events(@current_arguments.fetch(:command_id)), "Command facts")
   assert_acceptance_equal([], change_set_events(@current_arguments.fetch(:change_set_id)), "ChangeSet facts")
+end
+
+Then("the completed Task persists one semantic success without MCP wire copies") do
+  assert_semantic_task_completion(@current_task_id, kind: "success")
+end
+
+Then("the completed Task persists one semantic domain rejection without MCP wire copies") do
+  assert_semantic_task_completion(@current_task_id, kind: "domain_rejection")
 end
 
 When("the Task executor processes the current Task") do
@@ -113,6 +124,22 @@ Then("the replacement Task exposes the original completed result") do
     @original_task_state.dig("result", "result"),
     replacement.dig("result", "result"),
     "Recovered Task result"
+  )
+end
+
+Then("an independent MCP client reconstructs the same terminal result") do
+  prepare_mcp_clients("semantic-task-reader")
+  independent = task_request(
+    "tasks/get",
+    @replacement_task_id,
+    client_id: "semantic-task-reader"
+  )
+  expected = task_request("tasks/get", @replacement_task_id)
+
+  assert_acceptance_equal(
+    expected.dig("result", "result"),
+    independent.dig("result", "result"),
+    "Independently reconstructed terminal result"
   )
 end
 
@@ -368,4 +395,19 @@ Then("the rejected request writes no coordination facts") do
     "Rejected Task submissions"
   )
   assert_no_current_coordination_facts
+end
+
+
+def assert_semantic_task_completion(task_id, kind:)
+  completion = task_events(task_id).find { _1.type == "CoordinationTaskCompleted" }
+  assert_acceptance(completion, "Task #{task_id} has no completion fact")
+  assert_acceptance_equal(2, completion.metadata.fetch("schema_version"), "Task completion schema")
+  semantic = completion.data.fetch("result")
+  assert_acceptance_equal(kind, semantic.fetch("kind"), "Semantic Task outcome kind")
+  forbidden = %w[content structured_content structuredContent is_error isError]
+  assert_acceptance_equal(
+    [],
+    semantic.keys & forbidden,
+    "Persisted MCP wire fields"
+  )
 end

@@ -36,7 +36,6 @@ module Coordinator::Write
 
       def call(target_command)
         command_input = @input_digest.document(target_command)
-        canonical_input_digest = @input_digest.call(target_command)
         submitted_at = @clock.now
         correlation_id = @correlation_resolver.call(target_command)
         last_task_id = nil
@@ -48,7 +47,6 @@ module Coordinator::Write
             task_id:,
             tool_name: command_input.tool_name,
             command_id: target_command.command_id,
-            canonical_input_digest:,
             command_input:,
             submitted_at:,
             ttl_ms: nil,
@@ -81,7 +79,7 @@ module Coordinator::Write
             actor_kind: target_command.actor.kind,
             actor_id: target_command.actor.id,
             recorded_by: "coordinator",
-            policy_version: "coordination-task/v1"
+            policy_version: "coordination-task/v2"
           ),
           markers: [
             "task:#{event.task_id}",

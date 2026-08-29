@@ -20,6 +20,7 @@ module Coordinator
           def started: () -> bool
           def cancellation_requested: () -> bool
           def result: () -> Tasks::ToolResultV1?
+          def semantic_result: () -> Tasks::SemanticResultV1::value?
           def error: () -> Tasks::JsonRpcErrorV1?
           def absent?: () -> bool
           def terminal?: () -> bool

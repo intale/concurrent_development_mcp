@@ -12,14 +12,13 @@ RSpec.describe Coordinator::Write::Contracts::CoordinationTaskSubmission do
       acceptance_criteria: [ "Every target command is durable" ]
     )
   end
-  let(:digest) { Coordinator::Write::CommandInputDigest.new }
+  let(:input_builder) { Coordinator::Write::CommandInputDigest.new }
   let(:event) do
-    Coordinator::Write::Events::CoordinationTaskSubmittedV1.new(
+    Coordinator::Write::Events::CoordinationTaskSubmittedV2.new(
       task_id: "01919191-9191-7191-8191-919191919191",
       tool_name: "change_set_create",
       command_id: target_command.command_id,
-      canonical_input_digest: digest.call(target_command),
-      command_input: digest.document(target_command),
+      command_input: input_builder.document(target_command),
       submitted_at: "2026-08-22T06:30:00.000000Z",
       ttl_ms: nil,
       poll_interval_ms: 500
@@ -30,8 +29,12 @@ RSpec.describe Coordinator::Write::Contracts::CoordinationTaskSubmission do
     expect(contract.call(event:)).to be_success
   end
 
-  it "rejects a digest that does not describe the nested command document" do
-    changed = described_event(canonical_input_digest: "sha256:#{'0' * 64}")
+  it "does not persist a digest derivable from the nested command document" do
+    expect(event.to_h).not_to have_key(:canonical_input_digest)
+  end
+
+  it "rejects a public identity that disagrees with the nested command document" do
+    changed = described_event(command_id: "cmd-task-other")
 
     expect(contract.call(event: changed).errors.to_h).to include(:event)
   end
@@ -42,13 +45,23 @@ RSpec.describe Coordinator::Write::Contracts::CoordinationTaskSubmission do
     expect do
       Coordinator::Write::EventSchemaRegistry.new.load(
         type: "CoordinationTaskSubmitted",
-        schema_version: 1,
+        schema_version: 2,
         data: payload
       )
     end.to raise_error(Coordinator::Write::InvalidCoordinationTaskSubmission)
   end
 
+  it "continues validating the canonical digest of historical submissions" do
+    historical = Coordinator::Write::Events::CoordinationTaskSubmittedV1.new(
+      event.to_h.merge(
+        canonical_input_digest: "sha256:#{'0' * 64}"
+      )
+    )
+
+    expect(contract.call(event: historical).errors.to_h).to include(:event)
+  end
+
   def described_event(overrides)
-    Coordinator::Write::Events::CoordinationTaskSubmittedV1.new(event.to_h.merge(overrides))
+    Coordinator::Write::Events::CoordinationTaskSubmittedV2.new(event.to_h.merge(overrides))
   end
 end

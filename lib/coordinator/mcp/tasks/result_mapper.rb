@@ -3,6 +3,10 @@
 module Coordinator::Mcp
   module Tasks
     class ResultMapper
+      def initialize(semantic_presenter: SemanticResultPresenterV1.new)
+        @semantic_presenter = semantic_presenter
+      end
+
       def created(state)
         ResultV1::Created.new(
           common_attributes(state).merge(
@@ -21,7 +25,7 @@ module Coordinator::Mcp
             common_attributes(state).merge(
               resultType: "complete",
               status: "completed",
-              result: call_tool_result(state.result)
+              result: completed_result(state)
             )
           )
         when "failed"
@@ -80,6 +84,12 @@ module Coordinator::Mcp
           isError: result.is_error,
           structuredContent: result.structured_content
         )
+      end
+
+      def completed_result(state)
+        return @semantic_presenter.call(state.semantic_result) if state.semantic_result
+
+        call_tool_result(state.result)
       end
     end
   end

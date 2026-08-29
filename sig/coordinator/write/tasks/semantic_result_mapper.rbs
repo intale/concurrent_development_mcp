@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Tasks
+      class SemanticResultMapper
+        def call: (Dry::Monads::Result result, command_id: String, tool_name: String) -> SemanticResultV1::value
+      end
+    end
+  end
+end

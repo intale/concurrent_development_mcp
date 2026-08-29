@@ -1,0 +1,17 @@
+module Coordinator
+  module Write
+    module Tasks
+      module OutcomeV2
+        type value = Completed | Failed
+
+        class Completed < Shared::Value
+          def result: () -> SemanticResultV1::value
+        end
+
+        class Failed < Shared::Value
+          def error: () -> JsonRpcErrorV1
+        end
+      end
+    end
+  end
+end

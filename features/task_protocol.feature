@@ -14,6 +14,7 @@ Feature: Durable MCP Task protocol
       Then the Task is durable before coordination begins
       When the current Task completes through live subscriptions
       Then the current Task completes successfully
+      And the completed Task persists one semantic success without MCP wire copies
       When the same command is retried through another live Task
       Then both Task handles expose the same result
       And the command and ChangeSet facts exist only once
@@ -26,6 +27,7 @@ Feature: Durable MCP Task protocol
       Then the replacement Task remains working without duplicate coordination facts
       When the Task workers restart
       Then the replacement Task exposes the original completed result
+      And an independent MCP client reconstructs the same terminal result
       And the recovered command and ChangeSet facts exist only once
 
     @AUD-TASK-WORKER-RESTART-02 @TASK-RESTART-01 @live-subscriptions
@@ -68,6 +70,7 @@ Feature: Durable MCP Task protocol
       Given agent "planner-1" completed ChangeSet "CS-AUD-TASK-DENIAL" with command "cmd-aud-task-denial-seed" through live subscriptions
       When agent "planner-2" submits the same ChangeSet with command "cmd-aud-task-denial"
       Then the current Task eventually completes with coordination denial "change_set_already_exists"
+      And the completed Task persists one semantic domain rejection without MCP wire copies
 
   Rule: Queued work can be cancelled cooperatively
 

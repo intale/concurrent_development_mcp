@@ -42,11 +42,10 @@ RSpec.describe Coordinator::Mcp::Tasks::TerminalResultValidator do
   end
 
   def submitted_event
-    Coordinator::Write::Events::CoordinationTaskSubmittedV1.new(
+    Coordinator::Write::Events::CoordinationTaskSubmittedV2.new(
       task_id: task_id,
       tool_name: "change_set_create",
       command_id: target_command.command_id,
-      canonical_input_digest: Coordinator::Write::CommandInputDigest.new.call(target_command),
       command_input: Coordinator::Write::CommandInputDigest.new.document(target_command),
       submitted_at: "2026-08-28T10:00:00.000000Z",
       ttl_ms: nil,
@@ -62,28 +61,18 @@ RSpec.describe Coordinator::Mcp::Tasks::TerminalResultValidator do
   end
 
   def completed_event(data:, next_actions:)
-    structured_content = Coordinator::Write::Tasks::StructuredContentV1.new(
-      status: "ok",
+    result = Coordinator::Write::Tasks::SemanticResultV1::Success.new(
+      kind: "success",
       summary: "Completed",
       command_id: target_command.command_id,
       receipt: target_command.command_id,
-      context_token: nil,
       data:,
       warnings: [],
       next_actions:
     )
-    Coordinator::Write::Events::CoordinationTaskCompletedV1.new(
+    Coordinator::Write::Events::CoordinationTaskCompletedV2.new(
       task_id:,
-      result: Coordinator::Write::Tasks::ToolResultV1.new(
-        content: [
-          Coordinator::Write::Tasks::TextContentV1.new(
-            type: "text",
-            text: JSON.generate(structured_content.to_h)
-          )
-        ],
-        is_error: false,
-        structured_content:
-      ),
+      result:,
       completed_at: "2026-08-28T10:00:02.000000Z"
     )
   end

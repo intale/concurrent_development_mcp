@@ -121,15 +121,18 @@ module Coordinator::Write
       [ "ReleaseSetCompensationRequested", 1 ] => Events::ReleaseSetCompensationRequestedV1,
       [ "ReleaseSetCompleted", 1 ] => Events::ReleaseSetCompletedV1,
       [ "CoordinationTaskSubmitted", 1 ] => Events::CoordinationTaskSubmittedV1,
+      [ "CoordinationTaskSubmitted", 2 ] => Events::CoordinationTaskSubmittedV2,
       [ "CoordinationTaskExecutionStarted", 1 ] => Events::CoordinationTaskExecutionStartedV1,
       [ "CoordinationTaskCompleted", 1 ] => Events::CoordinationTaskCompletedV1,
+      [ "CoordinationTaskCompleted", 2 ] => Events::CoordinationTaskCompletedV2,
       [ "CoordinationTaskFailed", 1 ] => Events::CoordinationTaskFailedV1,
       [ "CoordinationTaskCancellationRequested", 1 ] => Events::CoordinationTaskCancellationRequestedV1,
       [ "CoordinationTaskCancelled", 1 ] => Events::CoordinationTaskCancelledV1
     }.freeze
 
     DEFAULT_VALIDATORS = {
-      Events::CoordinationTaskSubmittedV1 => Contracts::CoordinationTaskSubmission.new
+      Events::CoordinationTaskSubmittedV1 => Contracts::CoordinationTaskSubmission.new,
+      Events::CoordinationTaskSubmittedV2 => Contracts::CoordinationTaskSubmission.new
     }.freeze
 
     def initialize(definitions: DEFAULT_DEFINITIONS, validators: DEFAULT_VALIDATORS)

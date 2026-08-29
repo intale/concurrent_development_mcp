@@ -4,7 +4,9 @@ module Coordinator::Write
   module Commands
     class RecordCoordinationTaskOutcome < Value
       attribute :task_id, Types::TaskId
-      attribute :outcome, Tasks::OutcomeV1::Type
+      Outcome = Tasks::OutcomeV1::Type | Tasks::OutcomeV2::Type
+
+      attribute :outcome, Outcome
       attribute :recorded_at, Types::Timestamp
     end
   end

@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Events
+      class CoordinationTaskCompletedV2 < Base
+        def task_id: () -> String
+        def result: () -> Tasks::SemanticResultV1::value
+        def completed_at: () -> String
+      end
+    end
+  end
+end

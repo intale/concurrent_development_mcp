@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
 module Coordinator::Write
-  module Commands
-    class SubmitCoordinationTask < Value
+  module Events
+    class CoordinationTaskSubmittedV2 < Base
+      contract type: "CoordinationTaskSubmitted", version: 2
+
       attribute :task_id, Types::TaskId
       attribute :tool_name, Types::CoordinationToolName
       attribute :command_id, Types::Identifier

@@ -2,6 +2,7 @@ module Coordinator
   module Mcp
     module Tasks
       class TerminalResultValidator
+        def initialize: (?semantic_presenter: SemanticResultPresenterV1) -> void
         def call: (Coordinator::Write::Domain::CoordinationTasks::State state) -> Coordinator::Write::Domain::CoordinationTasks::State
       end
     end

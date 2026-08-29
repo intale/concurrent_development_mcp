@@ -1,0 +1,9 @@
+module Coordinator
+  module Mcp
+    module Tasks
+      class SemanticResultPresenterV1
+        def call: (Coordinator::Write::Tasks::SemanticResultV1::value result) -> ResultV1::CallToolResult
+      end
+    end
+  end
+end

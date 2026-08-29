@@ -59,9 +59,11 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
 
     state = loader.call(task_id).state
     expect(state.status).to eq("completed")
-    expect(state.result.is_error).to be(false)
-    expect(state.result.structured_content.status).to eq("ok")
-    expect(state.result.structured_content.command_id).to eq("cmd-task-executor")
+    expect(state.semantic_result).to have_attributes(
+      kind: "success",
+      command_id: "cmd-task-executor"
+    )
+    expect(task_events(task_id).last.metadata.fetch("schema_version")).to eq(2)
   end
 
   it "reconciles a working Task from its already committed target outcome" do
@@ -87,14 +89,13 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
     completed = task_events(task_id).last
     target_completion = command_events.sole
     expect(state.status).to eq("completed")
-    expect(state.result.structured_content.to_h).to eq(
-      Coordinator::Write::Tasks::ToolResultMapper.new
+    expect(state.semantic_result.to_h).to eq(
+      Coordinator::Write::Tasks::SemanticResultMapper.new
         .call(
           Dry::Monads::Success(committed),
           command_id: command.command_id,
           tool_name: "change_set_create"
         )
-        .structured_content
         .to_h
     )
     expect(completed.causation_id).to eq(target_completion.id)
@@ -149,9 +150,11 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
     submitted, started, completed = task_events(task_id)
     state = loader.call(task_id).state
     expect(state.status).to eq("completed")
-    expect(state.result.is_error).to be(true)
-    expect(state.result.structured_content.status).to eq("denied")
-    expect(state.result.structured_content.data.code).to eq("change_set_already_exists")
+    expect(state.semantic_result).to have_attributes(
+      kind: "domain_rejection",
+      status: "denied",
+      error: have_attributes(code: "change_set_already_exists")
+    )
     expect(command_events).to be_empty
     expect(completed.causation_id).to eq(started.id)
     expect([ submitted, started, completed ].map(&:correlation_id).uniq).to eq(
@@ -173,8 +176,10 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
 
       state = loader.call(task_id).state
       expect(state).to have_attributes(status: "completed")
-      expect(state.result).to have_attributes(is_error: true)
-      expect(state.result.structured_content.data.code).to eq(code)
+      expect(state.semantic_result).to have_attributes(
+        kind: "domain_rejection",
+        error: have_attributes(code:)
+      )
       expect(task_events(task_id).map(&:type)).to eq(
         %w[CoordinationTaskSubmitted CoordinationTaskExecutionStarted CoordinationTaskCompleted]
       )

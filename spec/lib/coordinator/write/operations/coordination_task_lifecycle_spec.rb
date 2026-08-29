@@ -56,6 +56,8 @@ RSpec.describe "Coordination Task lifecycle operations", :event_store do
 
     event = task_events(state.task_id).sole
     expect(event.type).to eq("CoordinationTaskSubmitted")
+    expect(event.metadata.fetch("schema_version")).to eq(2)
+    expect(event.data).not_to have_key("canonical_input_digest")
     expect(event.markers).to eq(
       [
         "command:cmd-task-201",
@@ -111,14 +113,15 @@ RSpec.describe "Coordination Task lifecycle operations", :event_store do
     start.call(task_id:).value!
     cancel.call(task_id:).value!
 
-    result = domain_error_result(task_id:)
-    outcome = Coordinator::Write::Tasks::OutcomeV1::Completed.new(result:)
+    result = domain_rejection
+    outcome = Coordinator::Write::Tasks::OutcomeV2::Completed.new(result:)
     completed = record_outcome.call(task_id:, outcome:)
 
     expect(completed).to be_success
     expect(completed.value!.status).to eq("completed")
-    expect(completed.value!.result).to eq(result)
-    expect(get_task.call(task_id:).value!.result).to eq(result)
+    expect(completed.value!.semantic_result).to eq(result)
+    expect(completed.value!.result).to be_nil
+    expect(get_task.call(task_id:).value!.semantic_result).to eq(result)
     expect(acknowledge_input.call(task_id:)).to be_success
     expect(task_events(task_id).map(&:type)).to eq(
       [
@@ -140,7 +143,7 @@ RSpec.describe "Coordination Task lifecycle operations", :event_store do
 
     result = record_outcome.call(
       task_id:,
-      outcome: Coordinator::Write::Tasks::OutcomeV1::Failed.new(error:)
+      outcome: Coordinator::Write::Tasks::OutcomeV2::Failed.new(error:)
     )
 
     expect(result).to be_success
@@ -148,6 +151,7 @@ RSpec.describe "Coordination Task lifecycle operations", :event_store do
     expect(persisted.status).to eq("failed")
     expect(persisted.error).to eq(error)
     expect(persisted.result).to be_nil
+    expect(persisted.semantic_result).to be_nil
   end
 
   it "returns task-not-found without appending for get, update, and cancel" do
@@ -171,7 +175,7 @@ RSpec.describe "Coordination Task lifecycle operations", :event_store do
     )
   end
 
-  def domain_error_result(task_id:)
+  def domain_rejection
     error = Coordinator::Write::Tasks::DomainErrorV1::ChangeSetError.new(
       code: "change_set_already_exists",
       message: "ChangeSet already exists",
@@ -180,24 +184,13 @@ RSpec.describe "Coordination Task lifecycle operations", :event_store do
       )
     )
 
-    Coordinator::Write::Tasks::ToolResultV1.new(
-      content: [
-        Coordinator::Write::Tasks::TextContentV1.new(
-          type: "text",
-          text: "Task #{task_id} completed with a domain denial"
-        )
-      ],
-      is_error: true,
-      structured_content: Coordinator::Write::Tasks::StructuredContentV1.new(
-        status: "denied",
-        summary: error.message,
-        command_id: target_command.command_id,
-        receipt: nil,
-        context_token: nil,
-        data: error,
-        warnings: [],
-        next_actions: []
-      )
+    Coordinator::Write::Tasks::SemanticResultV1::DomainRejection.new(
+      kind: "domain_rejection",
+      status: "denied",
+      summary: error.message,
+      command_id: target_command.command_id,
+      error:,
+      next_actions: []
     )
   end
 end

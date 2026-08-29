@@ -23,7 +23,7 @@ module Coordinator::Processes
         target_command_builder: Coordinator::Write::Tasks::TargetCommandBuilder.new,
         target_executor: Coordinator::Write::Tasks::TargetExecutor.new(event_store:),
         target_completion_loader: Coordinator::Write::Tasks::TargetCompletionLoader.new(event_store:),
-        tool_result_mapper: Coordinator::Write::Tasks::ToolResultMapper.new
+        semantic_result_mapper: Coordinator::Write::Tasks::SemanticResultMapper.new
       )
         @source_builder = source_builder
         @task_loader = task_loader
@@ -32,7 +32,7 @@ module Coordinator::Processes
         @target_command_builder = target_command_builder
         @target_executor = target_executor
         @target_completion_loader = target_completion_loader
-        @tool_result_mapper = tool_result_mapper
+        @semantic_result_mapper = semantic_result_mapper
       end
 
       def call(event)
@@ -84,18 +84,18 @@ module Coordinator::Processes
       def execute_target(command, started_event:, tool_name:)
         resolution = resolve_target(command, started_event:)
         if resolution.failure?
-          return [ Coordinator::Write::Tasks::OutcomeV1::Failed.new(error: resolution.failure), started_event ]
+          return [ Coordinator::Write::Tasks::OutcomeV2::Failed.new(error: resolution.failure), started_event ]
         end
 
         result, completion = resolution.value!
-        tool_result = @tool_result_mapper.call(
+        semantic_result = @semantic_result_mapper.call(
           result,
           command_id: command.command_id,
           tool_name:
         )
         parent_event = outcome_parent_event(result, completion:, started_event:)
 
-        [ Coordinator::Write::Tasks::OutcomeV1::Completed.new(result: tool_result), parent_event ]
+        [ Coordinator::Write::Tasks::OutcomeV2::Completed.new(result: semantic_result), parent_event ]
       end
 
       def resolve_target(command, started_event:)

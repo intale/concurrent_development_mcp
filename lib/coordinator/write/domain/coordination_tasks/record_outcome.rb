@@ -24,7 +24,13 @@ module Coordinator::Write
               result: command.outcome.result,
               completed_at: command.recorded_at
             )
-          when Tasks::OutcomeV1::Failed
+          when Tasks::OutcomeV2::Completed
+            Events::CoordinationTaskCompletedV2.new(
+              task_id: command.task_id,
+              result: command.outcome.result,
+              completed_at: command.recorded_at
+            )
+          when Tasks::OutcomeV1::Failed, Tasks::OutcomeV2::Failed
             Events::CoordinationTaskFailedV1.new(
               task_id: command.task_id,
               error: command.outcome.error,

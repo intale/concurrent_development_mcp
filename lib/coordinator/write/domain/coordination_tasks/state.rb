@@ -18,6 +18,7 @@ module Coordinator::Write
         attribute :started, Types::Strict::Bool
         attribute :cancellation_requested, Types::Strict::Bool
         attribute :result, Tasks::ToolResultV1.optional
+        attribute :semantic_result, Tasks::SemanticResultV1::Type.optional
         attribute :error, Tasks::JsonRpcErrorV1.optional
 
         def self.initial
@@ -36,6 +37,7 @@ module Coordinator::Write
             started: false,
             cancellation_requested: false,
             result: nil,
+            semantic_result: nil,
             error: nil
           )
         end
@@ -57,14 +59,14 @@ module Coordinator::Write
 
         def apply(event)
           attributes = case event
-          when Events::CoordinationTaskSubmittedV1
+          when Events::CoordinationTaskSubmittedV1, Events::CoordinationTaskSubmittedV2
                          {
                            task_id: event.task_id,
                            status: "working",
                            status_message: nil,
                            tool_name: event.tool_name,
                            command_id: event.command_id,
-                           canonical_input_digest: event.canonical_input_digest,
+                           canonical_input_digest: submitted_digest(event),
                            command_input: event.command_input,
                            created_at: event.submitted_at,
                            last_updated_at: event.submitted_at,
@@ -86,6 +88,13 @@ module Coordinator::Write
                            result: event.result,
                            last_updated_at: event.completed_at
                          }
+          when Events::CoordinationTaskCompletedV2
+                         {
+                           status: "completed",
+                           status_message: nil,
+                           semantic_result: event.result,
+                           last_updated_at: event.completed_at
+                         }
           when Events::CoordinationTaskFailedV1
                          {
                            status: "failed",
@@ -102,6 +111,12 @@ module Coordinator::Write
           end
 
           self.class.new(to_h.merge(attributes))
+        end
+
+        private
+
+        def submitted_digest(event)
+          event.canonical_input_digest if event.respond_to?(:canonical_input_digest)
         end
       end
     end

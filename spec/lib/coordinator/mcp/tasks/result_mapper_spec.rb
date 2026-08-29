@@ -6,11 +6,10 @@ RSpec.describe Coordinator::Mcp::Tasks::ResultMapper do
   let(:task_id) { "01919191-9191-7191-8191-919191919191" }
   let(:submitted_at) { "2026-08-22T10:00:00.000000Z" }
   let(:submitted) do
-    Coordinator::Write::Events::CoordinationTaskSubmittedV1.new(
+    Coordinator::Write::Events::CoordinationTaskSubmittedV2.new(
       task_id:,
       tool_name: "change_set_create",
       command_id: "cmd-task-wire",
-      canonical_input_digest: Coordinator::Write::CommandInputDigest.new.call(target_command),
       command_input: Coordinator::Write::CommandInputDigest.new.document(target_command),
       submitted_at:,
       ttl_ms: nil,
@@ -62,16 +61,30 @@ RSpec.describe Coordinator::Mcp::Tasks::ResultMapper do
     )
   end
 
-  it "inlines the exact CallToolResult for a completed Task" do
-    completed = Coordinator::Write::Events::CoordinationTaskCompletedV1.new(
+  it "presents a semantic completion as the exact CallToolResult" do
+    completed = Coordinator::Write::Events::CoordinationTaskCompletedV2.new(
       task_id:,
-      result: tool_result,
+      result: semantic_success,
       completed_at: "2026-08-22T10:00:03.000000Z"
     )
 
     result = mapper.detailed(state(submitted, started, completed)).to_h
 
     expect(result).to include(resultType: "complete", status: "completed")
+    expect(result.fetch(:result)).to eq(
+      Coordinator::Mcp::Tasks::SemanticResultPresenterV1.new.call(semantic_success).to_h
+    )
+  end
+
+  it "still serves a historical completion carrying the V1 wire snapshot" do
+    completed = Coordinator::Write::Events::CoordinationTaskCompletedV1.new(
+      task_id:,
+      result: tool_result,
+      completed_at: "2026-08-22T10:00:03.000000Z"
+    )
+
+    result = mapper.detailed(state(historical_submitted, started, completed)).to_h
+
     expect(result.fetch(:result)).to eq(
       content: [ { type: "text", text: "Target command completed" } ],
       isError: false,
@@ -134,6 +147,28 @@ RSpec.describe Coordinator::Mcp::Tasks::ResultMapper do
         ),
         warnings: [],
         next_actions: []
+      )
+    )
+  end
+
+  def semantic_success
+    @semantic_success ||= Coordinator::Write::Tasks::SemanticResultV1::Success.new(
+      kind: "success",
+      summary: "Target command completed",
+      command_id: "cmd-task-wire",
+      receipt: "cmd-task-wire",
+      data: Coordinator::Write::CommandReceiptData::ChangeSet.new(
+        change_set_id: "CS-task-wire"
+      ),
+      warnings: [],
+      next_actions: []
+    )
+  end
+
+  def historical_submitted
+    Coordinator::Write::Events::CoordinationTaskSubmittedV1.new(
+      submitted.to_h.merge(
+        canonical_input_digest: Coordinator::Write::CommandInputDigest.new.call(target_command)
       )
     )
   end

@@ -710,6 +710,10 @@ module Coordinator
       Write::Tasks::ToolResultMapper.new
     end
 
+    register("tasks.semantic_result_mapper", memoize: true) do
+      Write::Tasks::SemanticResultMapper.new
+    end
+
     register("repositories.processed_projection_events", memoize: true) do
       Read::Repositories::ProcessedProjectionEvents.new
     end
@@ -2369,7 +2373,7 @@ module Coordinator
         target_command_builder: self["tasks.target_command_builder"],
         target_executor: self["tasks.target_executor"],
         target_completion_loader: self["tasks.target_completion_loader"],
-        tool_result_mapper: self["tasks.tool_result_mapper"]
+        semantic_result_mapper: self["tasks.semantic_result_mapper"]
       )
     end
 
