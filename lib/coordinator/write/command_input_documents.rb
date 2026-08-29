@@ -154,15 +154,6 @@ module Coordinator::Write
       attribute :input, AbandonAttemptInputV1
     end
 
-    class FileResourceV1 < Value
-      attribute :kind, Types::ResourceKind
-      attribute :path, Types::ResourcePath
-      attribute :base_blob_oid, Types::GitOid.optional
-      attribute :resource_key, Types::String
-      attribute :resource_key_hash, Types::Sha256Digest
-      attribute :policy_version, Types::ResourceKeyPolicyVersion
-    end
-
     class ResourceLeaseTargetV1 < Value
       attribute :resource_id, Types::ResourceId
       attribute :base_blob_oid, Types::GitOid.optional

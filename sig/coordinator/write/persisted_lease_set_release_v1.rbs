@@ -1,8 +1,0 @@
-module Coordinator
-  module Write
-    class PersistedLeaseSetReleaseV1 < Shared::Value
-      def release: () -> (Events::WriteSetReleasedV1 | Events::WriteSetReleasedV2)
-      def events: () -> Array[PgEventstore::Event]
-    end
-  end
-end

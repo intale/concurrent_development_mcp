@@ -1301,7 +1301,6 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        compound_marker_builder: self["compound_marker_builder"],
         event_plan_contract: Write::Contracts::AttemptAbandonmentEventPlan.new
       )
     end

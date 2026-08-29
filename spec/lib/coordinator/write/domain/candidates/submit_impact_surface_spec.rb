@@ -104,7 +104,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::SubmitImpactSurface do
   end
 
   def submission
-    Coordinator::Write::Events::CandidateSubmittedV1.new(
+    Coordinator::Write::Events::CandidateSubmittedV2.new(
       candidate_id: "CAN-41",
       change_set_id: "CS-1",
       work_item_id: "W-1",
@@ -117,7 +117,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::SubmitImpactSurface do
       head_commit_oid: "b" * 40,
       checkpoint_kind: "final",
       lease_set_id: "01919191-9191-7191-8191-919191919191",
-      lease_policy_version: "coordinator-resource-key/v1",
+      lease_policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
       lease_references: [ lease_reference ],
       manifest_digest: "sha256:#{"a" * 64}",
       build_context_digest: nil,
@@ -156,9 +156,8 @@ RSpec.describe Coordinator::Write::Domain::Candidates::SubmitImpactSurface do
   end
 
   def lease_reference
-    Coordinator::Write::LeaseReferenceV1.new(
-      resource_key_hash: "sha256:#{"1" * 64}",
-      resource_key: "key",
+    Coordinator::Write::LeaseReferenceV2.new(
+      resource_id: "01919191-9191-7191-8191-919191919190",
       resource_kind: "file",
       resource_path: "Gemfile",
       base_blob_oid: "c" * 40,

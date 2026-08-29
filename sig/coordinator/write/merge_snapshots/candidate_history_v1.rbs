@@ -1,7 +1,7 @@
 module Coordinator::Write::MergeSnapshots
   class CandidateHistoryV1 < Coordinator::Shared::Value
     attr_reader requested: RequestedCandidateV1
-    attr_reader candidate: (Coordinator::Write::Events::CandidateSubmittedV1 | Coordinator::Write::Events::CandidateSubmittedV2)?
+    attr_reader candidate: Coordinator::Write::Events::CandidateSubmittedV2?
     attr_reader manifest: Coordinator::Write::Events::CandidateChangeManifestCapturedV1?
     attr_reader candidate_event: Coordinator::Write::EventReference?
     attr_reader manifest_event: Coordinator::Write::EventReference?

@@ -86,7 +86,7 @@ RSpec.describe Coordinator::Write::Operations::PrepareSubmitCandidate do
     invalid_path = prepare.call(noncanonical)
 
     expect(result.failure).to have_attributes(code: :invalid_candidate_evidence)
-    expect(invalid_path.failure).to have_attributes(code: :resource_path_dot_component)
+    expect(invalid_path.failure).to have_attributes(code: :resource_identity_invalid)
   end
 
   def input_with_context

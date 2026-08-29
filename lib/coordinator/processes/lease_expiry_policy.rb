@@ -22,10 +22,6 @@ module Coordinator::Processes
 
     def call(locator)
       source = @source_loader.call(locator)
-      unless source.payload.respond_to?(:resource_id)
-        return Success(LeaseExpiryHandledV1.new(outcome: "legacy_source_ignored"))
-      end
-
       command = @command_builder.call(source)
       result = @operation.call(command, caused_by: source.event)
       return Success(LeaseExpiryHandledV1.new(outcome: "expired_or_replayed")) if result.success?

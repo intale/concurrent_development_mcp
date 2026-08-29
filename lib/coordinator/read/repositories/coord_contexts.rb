@@ -27,8 +27,7 @@ module Coordinator::Read
           store_attempt_authorized(event:, payload:)
         when Coordinator::Write::Events::AttemptStartedV1
           update_attempt_started(payload)
-        when Coordinator::Write::Events::AttemptAbandonedV1,
-             Coordinator::Write::Events::AttemptAbandonedV2
+        when Coordinator::Write::Events::AttemptAbandonedV2
           update_attempt_abandoned(event:, payload:)
         when Coordinator::Write::Events::AttemptCompletedV1
           update_attempt_completed(event:, payload:)

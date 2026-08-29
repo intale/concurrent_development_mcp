@@ -67,9 +67,6 @@ module Coordinator::Write
         return replay if replay
 
         attempt_observation = load_attempt_observation(command.attempt_id)
-        compatibility = v2_attempt(attempt_observation.state, command:)
-        return compatibility if compatibility.failure?
-
         current_observations = load_current_observations(attempt_observation.state)
         decision = @decider.call(
           attempt_state: attempt_observation.state,
@@ -179,25 +176,6 @@ module Coordinator::Write
         Domain::ResourceLeases::State.reduce(events)
       end
 
-      def v2_attempt(attempt_state, command:)
-        return Success() if attempt_state.lease_policy_version.nil? ||
-          attempt_state.lease_policy_version == LeaseResourceV2::POLICY_VERSION
-
-        Failure(
-          OutcomeError.new(
-            code: :resource_identity_policy_mismatch,
-            message: "The current write set predates Resource UUID leases and must be reacquired",
-            details: {
-              change_set_id: command.change_set_id,
-              work_item_id: command.work_item_id,
-              attempt_id: command.attempt_id,
-              current_policy_version: attempt_state.lease_policy_version,
-              requested_policy_version: LeaseResourceV2::POLICY_VERSION
-            }
-          )
-        )
-      end
-
       def load_event(event)
         @schema_registry.load(
           type: event.type,
@@ -227,7 +205,7 @@ module Coordinator::Write
             released_at: prepared.released_at
           )
           events = persist_domain_plan(plan, command:, prepared:, repository_registration:, caused_by:)
-          return PersistedLeaseSetReleaseV1.new(release: plan.events.last, events:)
+          return PersistedLeaseSetRelease.new(release: plan.events.last, events:)
         end
 
         load_original_release(
@@ -285,7 +263,7 @@ module Coordinator::Write
           released_at: release.released_at
         )
 
-        PersistedLeaseSetReleaseV1.new(
+        PersistedLeaseSetRelease.new(
           release:,
           events: resource_events + [ set_event ]
         )

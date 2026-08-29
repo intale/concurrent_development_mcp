@@ -5,13 +5,6 @@ module Coordinator::Read
     class CoordContextStateV1 < Value
       RECENT_ATTEMPT_LIMIT = 100
 
-      HISTORICAL_RESOURCE_KEY_POLICY_VERSIONS = %w[
-        coordinator-resource-key/v1
-        coordinator-resource-key/v2
-        coordinator-resource-key/v3
-        coordinator-resource-lease/v2
-      ].freeze
-
       class ChangeSet < Value
         attribute :change_set_id, Types::Identifier
         attribute :goal, Types::Goal
@@ -56,17 +49,6 @@ module Coordinator::Read
 
       class WriteSetResource < Value
         attribute :lease_id, Types::UuidV7
-        attribute :resource_key, Types::String
-        attribute :resource_key_hash, Types::Sha256Digest
-        attribute :resource_kind, Types::ResourceKind
-        attribute :resource_path, Types::ResourcePath
-        attribute :base_blob_oid, Types::GitOid.optional
-        attribute :fencing_token, Types::FencingToken
-      end
-
-
-      class WriteSetResourceV2 < Value
-        attribute :lease_id, Types::UuidV7
         attribute :resource_id, Types::ResourceId
         attribute :resource_kind, Types::ResourceKind
         attribute :resource_path, Types::ResourcePath
@@ -75,11 +57,11 @@ module Coordinator::Read
       end
 
       class WriteSet < Value
-        Resource = WriteSetResource | WriteSetResourceV2
+        Resource = WriteSetResource
 
         attribute :lease_set_id, Types::UuidV7
         attribute :repository_id, Types::RepositoryId
-        attribute :policy_version, Types::String.enum(*HISTORICAL_RESOURCE_KEY_POLICY_VERSIONS)
+        attribute :policy_version, Types::ResourceLeasePolicyVersion
         attribute :resources, Types::Array.of(Resource).constrained(min_size: 1, max_size: 32)
         attribute :reserved_at, Types::Timestamp
         attribute :last_expanded_at, Types::Timestamp.optional

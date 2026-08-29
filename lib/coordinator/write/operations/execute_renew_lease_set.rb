@@ -71,9 +71,6 @@ module Coordinator::Write
         return replay if replay
 
         attempt_state = load_attempt_state(command.attempt_id)
-        compatibility = v2_attempt(attempt_state, command:)
-        return compatibility if compatibility.failure?
-
         current_observations = load_current_observations(attempt_state)
         decision = @decider.call(
           attempt_state:,
@@ -185,25 +182,6 @@ module Coordinator::Write
         ).reverse.map { load_event(_1) }
 
         Domain::ResourceLeases::State.reduce(events)
-      end
-
-      def v2_attempt(attempt_state, command:)
-        return Success() if attempt_state.lease_policy_version.nil? ||
-          attempt_state.lease_policy_version == LeaseResourceV2::POLICY_VERSION
-
-        Failure(
-          OutcomeError.new(
-            code: :resource_identity_policy_mismatch,
-            message: "The current write set predates Resource UUID leases and must be reacquired",
-            details: {
-              change_set_id: command.change_set_id,
-              work_item_id: command.work_item_id,
-              attempt_id: command.attempt_id,
-              current_policy_version: attempt_state.lease_policy_version,
-              requested_policy_version: LeaseResourceV2::POLICY_VERSION
-            }
-          )
-        )
       end
 
       def load_event(event)

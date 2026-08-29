@@ -3,6 +3,7 @@ module Coordinator
     module Queries
       class ResourceGet
         def initialize: (?contract: Contracts::ResourceGet, ?resources: Repositories::Resources) -> void
+        # dry-operation prepends #call; runtime RBS wrapping recursively re-enters that wrapper.
         %a{rbs:test:skip}
         def call: (command_input input) -> QueryResultV1
       end

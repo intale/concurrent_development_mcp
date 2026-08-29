@@ -5,7 +5,7 @@ module Coordinator::Write
     module Attempts
       class State < Value
         Snapshot = Types.Instance(RepositorySnapshotV1)
-        LeaseReference = LeaseReferenceV1 | LeaseReferenceV2
+        LeaseReference = LeaseReferenceV2
 
         attribute :attempt_id, Types::Identifier.optional
         attribute :change_set_id, Types::Identifier.optional
@@ -101,7 +101,7 @@ module Coordinator::Write
               selected_candidate_checkpoint_kind:,
               completed_at:
             )
-          when Events::WriteSetReservedV1, Events::WriteSetReservedV2
+          when Events::WriteSetReservedV2
             self.class.new(
               attempt_id:,
               change_set_id:,
@@ -122,7 +122,7 @@ module Coordinator::Write
               selected_candidate_checkpoint_kind:,
               completed_at:
             )
-          when Events::WriteSetExpandedV1, Events::WriteSetExpandedV2
+          when Events::WriteSetExpandedV2
             self.class.new(
               attempt_id:,
               change_set_id:,
@@ -132,7 +132,7 @@ module Coordinator::Write
               lease_set_id: event.lease_set_id,
               lease_repository_id: event.repository_id,
               lease_policy_version: event.policy_version,
-              lease_resources: (lease_resources + event.added_resources).sort_by { lease_identity(_1).b },
+              lease_resources: (lease_resources + event.added_resources).sort_by { _1.resource_id.b },
               lease_reserved_at:,
               lease_renewed_at:,
               lease_expires_at: event.expires_at,
@@ -143,7 +143,7 @@ module Coordinator::Write
               selected_candidate_checkpoint_kind:,
               completed_at:
             )
-          when Events::WriteSetRenewedV1, Events::WriteSetRenewedV2
+          when Events::WriteSetRenewedV2
             self.class.new(
               attempt_id:,
               change_set_id:,
@@ -164,7 +164,7 @@ module Coordinator::Write
               selected_candidate_checkpoint_kind:,
               completed_at:
             )
-          when Events::WriteSetReleasedV1, Events::WriteSetReleasedV2
+          when Events::WriteSetReleasedV2
             self.class.new(
               attempt_id:,
               change_set_id:,
@@ -206,7 +206,7 @@ module Coordinator::Write
               selected_candidate_checkpoint_kind: event.checkpoint_kind,
               completed_at:
             )
-          when Events::AttemptAbandonedV1, Events::AttemptAbandonedV2
+          when Events::AttemptAbandonedV2
             self.class.new(
               attempt_id:,
               change_set_id:,
@@ -251,14 +251,6 @@ module Coordinator::Write
           else
             self
           end
-        end
-
-        private
-
-        def lease_identity(reference)
-          return reference.resource_id if reference.respond_to?(:resource_id)
-
-          reference.resource_key_hash
         end
       end
     end

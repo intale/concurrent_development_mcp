@@ -1,8 +1,0 @@
-module Coordinator
-  module Write
-    class CurrentLeaseObservationV1 < Shared::Value
-      def reference: () -> LeaseReferenceV1
-      def state: () -> Domain::ResourceLeases::State
-    end
-  end
-end

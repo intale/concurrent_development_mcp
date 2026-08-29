@@ -13,7 +13,7 @@ module Coordinator
           def lease_set_id: () -> String?
           def lease_repository_id: () -> String?
           def lease_policy_version: () -> String?
-          def lease_resources: () -> Array[LeaseReferenceV1 | LeaseReferenceV2]
+          def lease_resources: () -> Array[LeaseReferenceV2]
           def lease_reserved_at: () -> String?
           def lease_renewed_at: () -> String?
           def lease_expires_at: () -> String?

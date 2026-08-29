@@ -12,7 +12,6 @@ module Coordinator::Write
         attempt_already_exists: "conflict",
         lease_busy: "busy",
         resource_boundary_maintenance_required: "limit_reached",
-        resource_identity_policy_mismatch: "conflict",
         resource_history_corrupt: "conflict",
         resource_path_conflict: "conflict",
         resource_not_found: "not_found",

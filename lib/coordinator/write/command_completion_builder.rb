@@ -240,7 +240,7 @@ module Coordinator::Write
         command:,
         tool_name: "lease_expire_policy",
         summary: "Resource lease explicitly expired.",
-        data: CommandReceiptData::ResourceLeaseExpiryV2.new(
+        data: CommandReceiptData::ResourceLeaseExpiry.new(
           resource_id: expiration.resource_id,
           lease_id: expiration.lease_id,
           lease_set_id: expiration.lease_set_id,

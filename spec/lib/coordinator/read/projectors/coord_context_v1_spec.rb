@@ -5,41 +5,6 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
   let(:streams) { Coordinator::Write::StreamFactory.new }
   subject(:projector) { described_class.new }
 
-  it "keeps immutable pre-v3 write-set observations readable" do
-    create_change_set("CS-HISTORICAL-V2")
-    create_work_item("CS-HISTORICAL-V2", "W-HISTORICAL-V2")
-    activate_change_set("CS-HISTORICAL-V2", "W-HISTORICAL-V2")
-    acquire_work_item(
-      "CS-HISTORICAL-V2",
-      "W-HISTORICAL-V2",
-      "A-HISTORICAL-V2",
-      "agent-history"
-    )
-    event_store.append(
-      streams.attempt("A-HISTORICAL-V2"),
-      [ historical_v2_write_set_reserved ]
-    )
-
-    sources = change_set_events("CS-HISTORICAL-V2") +
-              work_item_events("W-HISTORICAL-V2") +
-              event_store.read(
-                streams.attempt("A-HISTORICAL-V2"),
-                Coordinator::Write::EventReadCriteria.new(
-                  event_types: %w[AttemptAuthorized AttemptStarted WriteSetReserved],
-                  maximum_count: 3,
-                  direction: :asc
-                )
-              )
-    sources.sort_by(&:global_position).each { projector.call(_1) }
-
-    snapshot = Coordinator::Read::Repositories::CoordContexts.new.resolve(
-      scope_kind: "attempt",
-      scope_id: "A-HISTORICAL-V2"
-    )
-    expect(snapshot.state.attempts.sole.write_set.policy_version)
-      .to eq("coordinator-resource-key/v2")
-  end
-
   it "atomically projects exact source identities and ignores duplicate delivery" do
     create_change_set("CS-100")
     create_work_item("CS-100", "W-100")
@@ -455,35 +420,6 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
       goal: "Coordinate #{change_set_id}",
       acceptance_criteria: [ "Agents do not overlap" ]
     ).value!
-  end
-
-  def historical_v2_write_set_reserved
-    PgEventstore::Event.new(
-      id: Coordinator::Shared::IdGenerator.new.uuid_v7,
-      type: "WriteSetReserved",
-      data: {
-        "lease_set_id" => "01919191-9191-7191-8191-919191919192",
-        "change_set_id" => "CS-HISTORICAL-V2",
-        "work_item_id" => "W-HISTORICAL-V2",
-        "attempt_id" => "A-HISTORICAL-V2",
-        "repository_id" => RepositoryScenario::DEFAULT_REPOSITORY_ID,
-        "policy_version" => "coordinator-resource-key/v2",
-        "resources" => [
-          {
-            "lease_id" => "01919191-9191-7191-8191-919191919191",
-            "resource_key" => "scope:project:history:repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:file:old.rb",
-            "resource_key_hash" => "sha256:#{'a' * 64}",
-            "resource_kind" => "file",
-            "resource_path" => "old.rb",
-            "base_blob_oid" => nil,
-            "fencing_token" => 1
-          }
-        ],
-        "reserved_at" => "2026-08-22T10:00:00.000000Z",
-        "expires_at" => "2026-08-22T10:15:00.000000Z"
-      },
-      metadata: { "schema_version" => 1 }
-    )
   end
 
   def create_work_item(change_set_id, work_item_id)

@@ -152,15 +152,6 @@ module Coordinator
         def input: () -> AbandonAttemptInputV1
       end
 
-      class FileResourceV1 < Shared::Value
-        def kind: () -> String
-        def path: () -> String
-        def base_blob_oid: () -> String?
-        def resource_key: () -> String
-        def resource_key_hash: () -> String
-        def policy_version: () -> String
-      end
-
       class ResourceLeaseTargetV1 < Shared::Value
         def resource_id: () -> String
         def base_blob_oid: () -> String?
@@ -877,7 +868,7 @@ module Coordinator
 
       class ExpireResourceLeaseInputV1 < Shared::Value
         def actor: () -> ActorV1
-        def resource_key_hash: () -> String
+        def resource_id: () -> String
         def lease_id: () -> String
         def lease_set_id: () -> String
         def fencing_token: () -> Integer

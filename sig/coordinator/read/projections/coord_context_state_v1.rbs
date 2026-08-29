@@ -3,8 +3,6 @@ module Coordinator
     module Projections
       class CoordContextStateV1 < Shared::Value
         RECENT_ATTEMPT_LIMIT: Integer
-        HISTORICAL_RESOURCE_KEY_POLICY_VERSIONS: Array[String]
-
         class ChangeSet < Shared::Value
           def change_set_id: () -> String
           def goal: () -> String
@@ -48,16 +46,6 @@ module Coordinator
 
         class WriteSetResource < Shared::Value
           def lease_id: () -> String
-          def resource_key: () -> String
-          def resource_key_hash: () -> String
-          def resource_kind: () -> String
-          def resource_path: () -> String
-          def base_blob_oid: () -> String?
-          def fencing_token: () -> Integer
-        end
-
-        class WriteSetResourceV2 < Shared::Value
-          def lease_id: () -> String
           def resource_id: () -> String
           def resource_kind: () -> String
           def resource_path: () -> String
@@ -69,7 +57,7 @@ module Coordinator
           def lease_set_id: () -> String
           def repository_id: () -> String
           def policy_version: () -> String
-          def resources: () -> Array[WriteSetResource | WriteSetResourceV2]
+          def resources: () -> Array[WriteSetResource]
           def reserved_at: () -> String
           def last_expanded_at: () -> String?
           def last_renewed_at: () -> String?

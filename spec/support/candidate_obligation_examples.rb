@@ -257,7 +257,7 @@ module CandidateObligationExamples
   end
 
   def candidate_event(candidate_id:, change_set_id:, repository_id:, head_character:, manifest_digest:, context_digest:, path:)
-    Coordinator::Write::Events::CandidateSubmittedV1.new(
+    Coordinator::Write::Events::CandidateSubmittedV2.new(
       candidate_id:,
       change_set_id:,
       work_item_id: "W-obligation",
@@ -270,7 +270,7 @@ module CandidateObligationExamples
       head_commit_oid: head_character * 40,
       checkpoint_kind: "final",
       lease_set_id: Coordinator::Shared::IdGenerator.new.uuid_v7,
-      lease_policy_version: "coordinator-resource-key/v1",
+      lease_policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
       lease_references: [ lease_reference(path) ],
       manifest_digest:,
       build_context_digest: context_digest,
@@ -382,8 +382,7 @@ module CandidateObligationExamples
   def lease_reference(path)
     {
       lease_id: Coordinator::Shared::IdGenerator.new.uuid_v7,
-      resource_key: "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:file:#{path}",
-      resource_key_hash: digest("lease", path),
+      resource_id: Coordinator::Shared::IdGenerator.new.uuid_v7,
       resource_kind: "file",
       resource_path: path,
       base_blob_oid: "c" * 40,

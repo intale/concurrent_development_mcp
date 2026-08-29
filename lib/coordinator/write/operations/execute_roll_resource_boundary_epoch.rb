@@ -97,16 +97,9 @@ module Coordinator::Write
       end
 
       def build_epoch_event(active_leases:, **attributes)
-        if active_leases.all?(&:resource_id)
-          return Events::ResourceBoundaryEpochRolledV2.new(
-            **attributes,
-            active_leases: active_leases.map { Events::ResourceBoundaryEpochRolledV2::ActiveLeaseV2.from_state(_1) }
-          )
-        end
-
-        Events::ResourceBoundaryEpochRolledV1.new(
+        Events::ResourceBoundaryEpochRolledV2.new(
           **attributes,
-          active_leases: active_leases.map { Events::ResourceBoundaryEpochRolledV1::ActiveLeaseV1.from_state(_1) }
+          active_leases: active_leases.map { Events::ResourceBoundaryEpochRolledV2::ActiveLeaseV2.from_state(_1) }
         )
       end
 

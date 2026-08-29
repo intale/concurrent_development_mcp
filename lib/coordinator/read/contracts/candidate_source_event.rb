@@ -40,17 +40,15 @@ module Coordinator::Read
       end
 
       rule(:event_type, :schema_version) do
-        expected = values[:event_type] == "CandidateSubmitted" ? [ 1, 2 ] : [ 1 ]
+        expected = values[:event_type] == "CandidateSubmitted" ? [ 2 ] : [ 1 ]
         key(:schema_version).failure("must match the projected event schema") unless expected.include?(values[:schema_version])
       end
 
       rule(:event_type, :policy_version) do
         expected = if values[:event_type] == "CandidateImpactSurfaceDerived"
           [ Coordinator::Write::Candidates::ImpactSurfaceDocumentV1::SCHEMA ]
-        elsif values[:schema_version] == 2
-          [ Coordinator::Write::LeaseResourceV2::POLICY_VERSION ]
         else
-          Types::RESOURCE_KEY_POLICY_VERSIONS
+          [ Coordinator::Write::LeaseResourceV2::POLICY_VERSION ]
         end
         unless expected.include?(values[:policy_version])
           key(:policy_version).failure("must match the projected event policy")

@@ -28,7 +28,6 @@ module Coordinator::Write
         event_factory: EventFactory.new,
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
-        compound_marker_builder: CompoundMarkerBuilder.new,
         event_plan_contract: Contracts::AttemptAbandonmentEventPlan.new
       )
         @event_store = event_store
@@ -40,7 +39,6 @@ module Coordinator::Write
         @event_factory = event_factory
         @schema_registry = schema_registry
         @stream_factory = stream_factory
-        @compound_marker_builder = compound_marker_builder
         @event_plan_contract = event_plan_contract
       end
 
@@ -218,14 +216,9 @@ module Coordinator::Write
 
       def load_current_observations(attempt_state)
         attempt_state.lease_resources.map do |reference|
-          observation_class = if reference.respond_to?(:resource_id)
-                                CurrentLeaseObservationV2
-                              else
-                                CurrentLeaseObservationV1
-                              end
-          observation_class.new(
+          CurrentLeaseObservationV2.new(
             reference:,
-            state: load_lease_state(lease_identity(reference))
+            state: load_lease_state(reference.resource_id)
           )
         end
       end
@@ -237,12 +230,6 @@ module Coordinator::Write
         ).reverse.map { load_event(_1) }
 
         Domain::ResourceLeases::State.reduce(events)
-      end
-
-      def lease_identity(value)
-        return value.resource_id if value.respond_to?(:resource_id)
-
-        value.resource_key_hash
       end
 
       def load_event(event)
@@ -294,41 +281,17 @@ module Coordinator::Write
         ]
         lease_set_id =
           case event
-          when Events::ResourceLeaseReleasedV1,
-               Events::ResourceLeaseReleasedV2,
-               Events::AttemptAbandonedV1,
+          when Events::ResourceLeaseReleasedV2,
                Events::AttemptAbandonedV2
             event.lease_set_id
           end
         common << "lease-set:#{lease_set_id}" if lease_set_id
-        if event.is_a?(Events::ResourceLeaseReleasedV2)
-          return common + [
-            "repository:#{event.repository_id}",
-            "resource:#{event.resource_id}",
-            "resource-kind:#{event.resource_kind}",
-            *RepositoryMarkerBuilder.new.resource_event_markers(
-              repository_id: event.repository_id,
-              resource_kind: event.resource_kind,
-              resource_path: event.resource_path
-            )
-          ]
-        end
-        return common unless event.is_a?(Events::ResourceLeaseReleasedV1)
+        return common unless event.is_a?(Events::ResourceLeaseReleasedV2)
 
-        components = [
+        common + [
           "repository:#{event.repository_id}",
+          "resource:#{event.resource_id}",
           "resource-kind:#{event.resource_kind}",
-          "resource-key-hash:#{event.resource_key_hash}"
-        ]
-        compound = @compound_marker_builder.call(
-          CompoundMarkerDefinitionV1.new(
-            purpose: "resource-identity",
-            components:
-          )
-        )
-
-        common + components + [
-          compound.marker,
           *RepositoryMarkerBuilder.new.resource_event_markers(
             repository_id: event.repository_id,
             resource_kind: event.resource_kind,
@@ -340,11 +303,7 @@ module Coordinator::Write
       def build_completion(command:, input_digest:, persisted_events:, abandoned_at:)
         abandonment = persisted_events[-2]
         released_count = abandonment.data.fetch("released_leases").length
-        untouched_count = if abandonment.data.key?("untouched_resource_ids")
-                            abandonment.data.fetch("untouched_resource_ids").length
-                          else
-                            abandonment.data.fetch("untouched_resource_key_hashes").length
-                          end
+        untouched_count = abandonment.data.fetch("untouched_resource_ids").length
         warnings = [
           "Reacquire the WorkItem with a fresh Attempt ID and base snapshot before resuming."
         ]

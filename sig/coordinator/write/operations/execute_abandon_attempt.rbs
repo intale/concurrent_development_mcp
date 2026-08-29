@@ -14,7 +14,7 @@ module Coordinator
         class InvalidEventPlan < StandardError
         end
 
-        def initialize: (event_store: _EventStore, ?contract: Contracts::AbandonAttempt, ?decider: Domain::Attempts::Abandon, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?compound_marker_builder: Shared::CompoundMarkerBuilder, ?event_plan_contract: Contracts::AttemptAbandonmentEventPlan) -> void
+        def initialize: (event_store: _EventStore, ?contract: Contracts::AbandonAttempt, ?decider: Domain::Attempts::Abandon, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?event_plan_contract: Contracts::AttemptAbandonmentEventPlan) -> void
         %a{rbs:test:skip}
         def call: (command_input input) -> Dry::Monads::Result
         def prepare: (command_input input) -> Dry::Monads::Result

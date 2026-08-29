@@ -16,7 +16,6 @@ module Coordinator::Write
         registration = payload!(@exact_loader.call(registration_reference), Events::CandidateImpactSurfaceRegisteredV1)
         candidate = payload!(
           @exact_loader.call(registration.candidate_event),
-          Events::CandidateSubmittedV1,
           Events::CandidateSubmittedV2
         )
         manifest = payload!(@exact_loader.call(registration.manifest_event), Events::CandidateChangeManifestCapturedV1)

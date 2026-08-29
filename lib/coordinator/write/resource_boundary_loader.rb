@@ -115,7 +115,7 @@ module Coordinator::Write
       end
       events.each do |event|
         payload = load_event(event)
-        identity = event_identity(payload)
+        identity = payload.resource_id
         state = states.fetch(identity, Domain::ResourceLeases::State.initial)
         states[identity] = state.apply(payload)
       end
@@ -135,12 +135,6 @@ module Coordinator::Write
 
       observations.sort_by { |identity, _observation| identity.b }
         .map { |_identity, observation| observation.last }
-    end
-
-    def event_identity(payload)
-      return payload.resource_id if payload.respond_to?(:resource_id)
-
-      payload.resource_key_hash
     end
 
     def load_event(event)

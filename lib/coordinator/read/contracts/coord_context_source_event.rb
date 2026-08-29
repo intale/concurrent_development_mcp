@@ -55,7 +55,7 @@ module Coordinator::Read
           WriteSetRenewed
           WriteSetReleased
         ]
-        expected = versioned.include?(values[:event_type]) ? [ 1, 2 ] : [ 1 ]
+        expected = versioned.include?(values[:event_type]) ? [ 2 ] : [ 1 ]
         key(:schema_version).failure("must match the projected event schema") unless expected.include?(values[:schema_version])
       end
 

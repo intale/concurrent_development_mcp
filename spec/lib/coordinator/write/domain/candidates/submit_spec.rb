@@ -220,8 +220,6 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
       lease_id: reference.lease_id,
       lease_set_id: uuid("1"),
       resource_id: reference.resource_id,
-      resource_key: nil,
-      resource_key_hash: nil,
       resource_kind: reference.resource_kind,
       resource_path: reference.resource_path,
       policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,

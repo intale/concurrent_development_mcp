@@ -51,8 +51,6 @@ module Coordinator::Write
         def to_state
           Domain::ResourceLeases::State.new(
             **to_h,
-            resource_key: nil,
-            resource_key_hash: nil,
             released_at: nil,
             expired_at: nil
           )

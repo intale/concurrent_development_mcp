@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandReceiptData
-      type value = RepositoryRegistration | ResourceResolution | ResourceRemoval | ChangeSet | WorkItem | Dependency | Attempt | WorkItemCompletion | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | ResourceLeaseExpiryV2 | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver | MergeSnapshotRegistration | MergeSnapshotVerification | MergeAuthorization | MergeObservation | ReleaseSetPreparation | RepositoryIntegration | ReleaseSetVerification | ReleaseSetActivation | ReleaseSetCompensationRequest | ReleaseSetCompletion | DependencySatisfaction | ChangeSetCompletion | SkillPublication | DevelopmentArtifactCapture | DevelopmentArtifactClassification | DevelopmentArtifactRelation | OperationBatchAcceptance | OperationBatchCancellation | OperationBatchTransition
+      type value = RepositoryRegistration | ResourceResolution | ResourceRemoval | ChangeSet | WorkItem | Dependency | Attempt | WorkItemCompletion | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver | MergeSnapshotRegistration | MergeSnapshotVerification | MergeAuthorization | MergeObservation | ReleaseSetPreparation | RepositoryIntegration | ReleaseSetVerification | ReleaseSetActivation | ReleaseSetCompensationRequest | ReleaseSetCompletion | DependencySatisfaction | ChangeSetCompletion | SkillPublication | DevelopmentArtifactCapture | DevelopmentArtifactClassification | DevelopmentArtifactRelation | OperationBatchAcceptance | OperationBatchCancellation | OperationBatchTransition
 
       class RepositoryRegistration < Shared::Value
         def repository_id: () -> String
@@ -95,7 +95,7 @@ module Coordinator
         def policy_version: () -> String
         def acquired_at: () -> String
         def expires_at: () -> String
-        def resources: () -> Array[LeaseReferenceV1 | LeaseReferenceV2]
+        def resources: () -> Array[LeaseReferenceV2]
       end
 
       class LeaseSetExpansion < Shared::Value
@@ -107,7 +107,7 @@ module Coordinator
         def policy_version: () -> String
         def expanded_at: () -> String
         def expires_at: () -> String
-        def added_resources: () -> Array[LeaseReferenceV1 | LeaseReferenceV2]
+        def added_resources: () -> Array[LeaseReferenceV2]
         def resource_count: () -> Integer
       end
 
@@ -118,7 +118,7 @@ module Coordinator
         def repository_id: () -> String
         def lease_set_id: () -> String
         def policy_version: () -> String
-        def resources: () -> Array[LeaseReferenceV1 | LeaseReferenceV2]
+        def resources: () -> Array[LeaseReferenceV2]
         def resource_count: () -> Integer
         def renewed_at: () -> String
         def previous_expires_at: () -> String
@@ -132,22 +132,13 @@ module Coordinator
         def repository_id: () -> String
         def lease_set_id: () -> String
         def policy_version: () -> String
-        def resources: () -> Array[LeaseReferenceV1 | LeaseReferenceV2]
+        def resources: () -> Array[LeaseReferenceV2]
         def resource_count: () -> Integer
         def previous_expires_at: () -> String
         def released_at: () -> String
       end
 
       class ResourceLeaseExpiry < Shared::Value
-        def resource_key_hash: () -> String
-        def lease_id: () -> String
-        def lease_set_id: () -> String
-        def fencing_token: () -> Integer
-        def expires_at: () -> String
-        def expired_at: () -> String
-      end
-
-      class ResourceLeaseExpiryV2 < Shared::Value
         def resource_id: () -> String
         def lease_id: () -> String
         def lease_set_id: () -> String

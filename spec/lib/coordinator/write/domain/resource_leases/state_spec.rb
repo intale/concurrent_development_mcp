@@ -33,67 +33,18 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::State do
     expect(closed.next_fencing_token).to eq(2)
   end
 
-  it "temporarily reads a schema-v1 lifecycle for in-flight pre-cutover cleanup" do
-    legacy = Coordinator::Write::Events::ResourceLeaseAcquiredV1.new(
-      lease_id: reference.lease_id,
-      lease_set_id: ResourceLeaseExamples::LEASE_SET_ID,
-      resource_key: "legacy-resource",
-      resource_key_hash: "sha256:#{'f' * 64}",
-      resource_kind: "file",
-      resource_path: "legacy.rb",
-      policy_version: "coordinator-resource-key/v3",
-      mode: "exclusive",
-      change_set_id: "CS-LSE",
-      work_item_id: "W-LSE-A",
-      attempt_id: "A-LSE-A",
-      agent_id: "agent-a",
-      repository_id: ResourceLeaseExamples::REPOSITORY_ID,
-      object_format: "sha1",
-      base_commit_oid: "a" * 40,
-      base_blob_oid: nil,
-      fencing_token: 1,
-      acquired_at: ResourceLeaseExamples::ACQUIRED_AT,
-      expires_at: ResourceLeaseExamples::EXPIRES_AT
-    )
+  it "restores a UUID boundary snapshot into the lease state" do
+    active = described_class.reduce([ acquisition ])
 
-    state = described_class.reduce([ legacy ])
-    expect(state.identity).to eq("sha256:#{'f' * 64}")
-    expect(state.resource_id).to be_nil
-  end
-
-  it "restores a schema-v1 boundary snapshot into the expanded lease state" do
-    legacy = Coordinator::Write::Events::ResourceLeaseAcquiredV1.new(
-      lease_id: reference.lease_id,
-      lease_set_id: ResourceLeaseExamples::LEASE_SET_ID,
-      resource_key: "legacy-resource",
-      resource_key_hash: "sha256:#{'f' * 64}",
-      resource_kind: "directory",
-      resource_path: "lib/coordinator/write",
-      policy_version: "coordinator-resource-key/v3",
-      mode: "exclusive",
-      change_set_id: "CS-LSE",
-      work_item_id: "W-LSE-A",
-      attempt_id: "A-LSE-A",
-      agent_id: "agent-a",
-      repository_id: ResourceLeaseExamples::REPOSITORY_ID,
-      object_format: "sha1",
-      base_commit_oid: "a" * 40,
-      base_blob_oid: nil,
-      fencing_token: 3,
-      acquired_at: ResourceLeaseExamples::ACQUIRED_AT,
-      expires_at: ResourceLeaseExamples::EXPIRES_AT
-    )
-    active = described_class.reduce([ legacy ])
-
-    restored = Coordinator::Write::Events::ResourceBoundaryEpochRolledV1::ActiveLeaseV1
+    restored = Coordinator::Write::Events::ResourceBoundaryEpochRolledV2::ActiveLeaseV2
       .from_state(active)
       .to_state
 
     expect(restored).to have_attributes(
-      identity: "sha256:#{'f' * 64}",
-      resource_id: nil,
-      resource_path: "lib/coordinator/write",
-      fencing_token: 3
+      identity: resource.resource_id,
+      resource_id: resource.resource_id,
+      resource_path: resource.path,
+      fencing_token: 1
     )
   end
 end

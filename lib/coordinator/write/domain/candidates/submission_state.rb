@@ -4,8 +4,7 @@ module Coordinator::Write
   module Domain
     module Candidates
       class SubmissionState < Value
-        LeaseObservation = Types.Instance(CurrentLeaseObservationV1) |
-                           Types.Instance(CurrentLeaseObservationV2)
+        LeaseObservation = Types.Instance(CurrentLeaseObservationV2)
 
         attribute :existing_candidate, EventReference.optional
         attribute :existing_head, EventReference.optional

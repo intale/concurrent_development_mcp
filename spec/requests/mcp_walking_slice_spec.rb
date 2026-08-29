@@ -44,6 +44,8 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
       "candidate_list",
       "candidate_impact_get",
       "repository_list",
+      "resource_get",
+      "resource_list",
       "skill_get",
       "skill_list",
       "skill_asset_get",

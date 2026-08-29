@@ -1,9 +1,0 @@
-module Coordinator
-  module Write
-    class PreparedLeaseResourceV1 < Shared::Value
-      def resource: () -> FileResourceV1
-      def lease_id: () -> String
-      def event_id: () -> String
-    end
-  end
-end

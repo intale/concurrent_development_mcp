@@ -6,7 +6,7 @@ module Coordinator
           RULE_VERSION: String
 
           def initialize: (?stream_factory: StreamFactory) -> void
-          def call: (change_set_state: ChangeSets::State, work_item_state: State, attempt_state: Attempts::State, candidate: (Events::CandidateSubmittedV1 | Events::CandidateSubmittedV2)?, candidate_event: EventReference?, command: Commands::CompleteWorkItem, completed_at: String) -> Dry::Monads::Result
+          def call: (change_set_state: ChangeSets::State, work_item_state: State, attempt_state: Attempts::State, candidate: Events::CandidateSubmittedV2?, candidate_event: EventReference?, command: Commands::CompleteWorkItem, completed_at: String) -> Dry::Monads::Result
         end
       end
     end

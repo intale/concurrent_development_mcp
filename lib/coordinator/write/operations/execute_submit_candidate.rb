@@ -164,21 +164,6 @@ module Coordinator::Write
 
       def load_submission_state(command, head_identity)
         attempt = load_attempt_state(command.attempt_id)
-        unless attempt.lease_policy_version.nil? || attempt.lease_policy_version == LeaseResourceV2::POLICY_VERSION
-          return Failure(
-            OutcomeError.new(
-              code: :resource_identity_policy_mismatch,
-              message: "The current write set predates Resource UUID leases and must be reacquired",
-              details: {
-                change_set_id: command.change_set_id,
-                work_item_id: command.work_item_id,
-                attempt_id: command.attempt_id,
-                current_policy_version: attempt.lease_policy_version,
-                requested_policy_version: LeaseResourceV2::POLICY_VERSION
-              }
-            )
-          )
-        end
         current_leases = attempt.lease_resources.map do |reference|
           CurrentLeaseObservationV2.new(
             reference:,

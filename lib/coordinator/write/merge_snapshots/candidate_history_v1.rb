@@ -3,7 +3,7 @@
 module Coordinator::Write
   module MergeSnapshots
     class CandidateHistoryV1 < Value
-      Candidate = Events::CandidateSubmittedV1 | Events::CandidateSubmittedV2
+      Candidate = Events::CandidateSubmittedV2
 
       attribute :requested, RequestedCandidateV1
       attribute :candidate, Candidate.optional

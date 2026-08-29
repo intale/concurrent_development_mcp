@@ -4,11 +4,11 @@ module Coordinator::Write
   module Candidates
     class SubmissionEvidenceBuilder < Dry::Operation
       def initialize(
-        resource_normalizer: FileResourceNormalizer.new,
+        resource_identity_normalizer: ResourceIdentityNormalizer.new,
         canonical_json: CanonicalJson.new,
         uniqueness_contract: Contracts::CandidateEvidenceUniqueness.new
       )
-        @resource_normalizer = resource_normalizer
+        @resource_identity_normalizer = resource_identity_normalizer
         @canonical_json = canonical_json
         @uniqueness_contract = uniqueness_contract
       end
@@ -52,8 +52,8 @@ module Coordinator::Write
       def normalize_manifest_files(repository_id, files)
         normalized = []
         files.each do |file|
-          old_path = step normalize_path(repository_id, file[:old_path], file[:old_blob_oid])
-          new_path = step normalize_path(repository_id, file[:new_path], nil)
+          old_path = step normalize_path(repository_id, file[:old_path])
+          new_path = step normalize_path(repository_id, file[:new_path])
           normalized << ManifestFileV1.new(
             status: file.fetch(:status),
             old_path:,
@@ -73,7 +73,7 @@ module Coordinator::Write
 
         inputs = []
         context.fetch(:inputs).each do |input|
-          path = step normalize_path(attributes.fetch(:repository_id), input.fetch(:path), input.fetch(:blob_oid))
+          path = step normalize_path(attributes.fetch(:repository_id), input.fetch(:path))
           inputs << BuildInputV1.new(kind: input.fetch(:kind), path:, blob_oid: input.fetch(:blob_oid))
         end
         environment = context.fetch(:environment).map do |entry|
@@ -90,18 +90,17 @@ module Coordinator::Write
         )
       end
 
-      def normalize_path(repository_id, path, base_blob_oid)
+      def normalize_path(repository_id, path)
         return Success(nil) unless path
 
-        result = @resource_normalizer.call(
+        result = @resource_identity_normalizer.call(
           repository_id:,
           kind: "file",
-          path:,
-          base_blob_oid:
+          path:
         )
         return result if result.failure?
 
-        Success(result.value!.path)
+        Success(result.value!.normalized_path)
       end
 
       def actual_resources(files)

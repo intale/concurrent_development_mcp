@@ -14,7 +14,7 @@ module Coordinator
       attr_reader checkpoint_kind: String
       attr_reader lease_set_id: String
       attr_reader lease_policy_version: String
-      attr_reader lease_references: Array[Write::LeaseReferenceV1 | Write::LeaseReferenceV2]
+      attr_reader lease_references: Array[Write::LeaseReferenceV2]
       attr_reader manifest_digest: String
       attr_reader build_context_digest: String?
       attr_reader evidence_status: String

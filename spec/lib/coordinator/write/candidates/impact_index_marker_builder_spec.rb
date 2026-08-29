@@ -40,7 +40,7 @@ RSpec.describe Coordinator::Write::Candidates::ImpactIndexMarkerBuilder do
   end
 
   def submission
-    Coordinator::Write::Events::CandidateSubmittedV1.new(
+    Coordinator::Write::Events::CandidateSubmittedV2.new(
       candidate_id: "CAN-index",
       change_set_id: "CS-index",
       work_item_id: "W-index",
@@ -53,7 +53,7 @@ RSpec.describe Coordinator::Write::Candidates::ImpactIndexMarkerBuilder do
       head_commit_oid: "b" * 40,
       checkpoint_kind: "final",
       lease_set_id: "01919191-9191-7191-8191-919191919191",
-      lease_policy_version: "coordinator-resource-key/v1",
+      lease_policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
       lease_references: [ lease_reference ],
       manifest_digest: "sha256:#{"a" * 64}",
       build_context_digest: "sha256:#{"b" * 64}",
@@ -154,9 +154,8 @@ RSpec.describe Coordinator::Write::Candidates::ImpactIndexMarkerBuilder do
   end
 
   def lease_reference
-    Coordinator::Write::LeaseReferenceV1.new(
-      resource_key_hash: "sha256:#{"1" * 64}",
-      resource_key: "key",
+    Coordinator::Write::LeaseReferenceV2.new(
+      resource_id: "01919191-9191-7191-8191-919191919190",
       resource_kind: "file",
       resource_path: "Gemfile",
       base_blob_oid: "c" * 40,

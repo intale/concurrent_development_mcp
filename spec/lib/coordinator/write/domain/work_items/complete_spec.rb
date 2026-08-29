@@ -126,7 +126,7 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Complete do
         base_snapshots: [],
         lease_set_id: lease_set_id,
         lease_repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
-        lease_policy_version: "coordinator-resource-key/v1",
+        lease_policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
         lease_resources: [],
         lease_reserved_at: "2026-08-25T07:00:00.000000Z",
         lease_renewed_at: nil,
@@ -141,7 +141,7 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Complete do
   end
 
   def candidate(**overrides)
-    Coordinator::Write::Events::CandidateSubmittedV1.new(
+    Coordinator::Write::Events::CandidateSubmittedV2.new(
       {
         candidate_id: "CAN-1",
         change_set_id: "CS-1",
@@ -155,11 +155,10 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Complete do
         head_commit_oid: "b" * 40,
         checkpoint_kind: "final",
         lease_set_id: lease_set_id,
-        lease_policy_version: "coordinator-resource-key/v1",
+        lease_policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
         lease_references: [
-          Coordinator::Write::LeaseReferenceV1.new(
-            resource_key: "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:file:lib/candidate.rb",
-            resource_key_hash: "sha256:#{"c" * 64}",
+          Coordinator::Write::LeaseReferenceV2.new(
+            resource_id: "01919191-9191-7191-8191-919191919190",
             resource_kind: "file",
             resource_path: "lib/candidate.rb",
             base_blob_oid: "e" * 40,

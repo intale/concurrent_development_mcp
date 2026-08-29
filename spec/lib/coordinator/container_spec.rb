@@ -228,11 +228,12 @@ RSpec.describe Coordinator::Container do
         "coord-context-v2",
         "decision-governance-v1",
         "decision-interpretations-v1",
-          "development-artifacts-v3",
+        "development-artifacts-v3",
         "merge-snapshots-v1",
         "operation-batches-v2",
         "release-sets-v1",
         "repositories-v1",
+        "resources-v1",
         "skills-v2",
         "user-utterances-v1",
         "verification-obligations-v1"

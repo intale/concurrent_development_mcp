@@ -67,11 +67,6 @@ module Coordinator::Write
         attribute :requested_base_blob_oid, Types::GitOid.optional
       end
 
-      class ResourceIdentityPolicyMismatchDetails < AttemptDetails
-        attribute :current_policy_version, Types::String.optional
-        attribute :requested_policy_version, Types::String
-      end
-
       class ResourceIdDetails < Value
         attribute :resource_id, Types::ResourceId
       end
@@ -560,12 +555,6 @@ module Coordinator::Write
         attribute :code, Types::String.enum("resource_evidence_conflict")
         attribute :message, Types::String
         attribute :details, ResourceEvidenceConflictDetails
-      end
-
-      class ResourceIdentityPolicyMismatchError < Value
-        attribute :code, Types::String.enum("resource_identity_policy_mismatch")
-        attribute :message, Types::String
-        attribute :details, ResourceIdentityPolicyMismatchDetails
       end
 
       class ResourceHistoryCorruptError < Value
@@ -1431,7 +1420,6 @@ module Coordinator::Write
              LeaseBusyError |
              LeaseSetMismatchError |
              ResourceEvidenceConflictError |
-             ResourceIdentityPolicyMismatchError |
              WriteSetLimitError |
              ResourceBoundaryMaintenanceRequiredError |
              LeaseSetExpiredError |

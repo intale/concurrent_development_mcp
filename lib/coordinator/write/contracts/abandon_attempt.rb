@@ -59,17 +59,15 @@ module Coordinator::Write
         requeue = plan.events[-1]
         releases = plan.events.first(plan.events.length - 2)
         expected_streams = releases.map do |event|
-          StreamFactory.new.resource_lease(lease_identity(event))
+          StreamFactory.new.resource_lease(event.resource_id)
         end + [
           StreamFactory.new.attempt(command.attempt_id),
           StreamFactory.new.work_item(command.work_item_id)
         ]
 
-        release_class = v2?(attempt_state) ? Events::ResourceLeaseReleasedV2 : Events::ResourceLeaseReleasedV1
-        abandonment_class = v2?(attempt_state) ? Events::AttemptAbandonedV2 : Events::AttemptAbandonedV1
         unless plan.writes.map(&:stream) == expected_streams &&
-               releases.all? { _1.is_a?(release_class) } &&
-               abandonment.is_a?(abandonment_class) &&
+               releases.all? { _1.is_a?(Events::ResourceLeaseReleasedV2) } &&
+               abandonment.is_a?(Events::AttemptAbandonedV2) &&
                requeue.is_a?(Events::WorkItemRequeuedV1)
           key(:plan).failure("must release zero or more resources before one Attempt abandonment and WorkItem requeue")
           next
@@ -89,31 +87,15 @@ module Coordinator::Write
           key(:plan).failure("must preserve the accepted scope, actor, reason, and timestamp")
         end
 
-        released_identities = abandonment.released_leases.map { lease_identity(_1) }
-        untouched_identities = if abandonment.respond_to?(:untouched_resource_ids)
-                                 abandonment.untouched_resource_ids
-                               else
-                                 abandonment.untouched_resource_key_hashes
-                               end
-        expected_identities = attempt_state.lease_resources.map { lease_identity(_1) }.sort
+        released_identities = abandonment.released_leases.map(&:resource_id)
+        untouched_identities = abandonment.untouched_resource_ids
+        expected_identities = attempt_state.lease_resources.map(&:resource_id).sort
         unless abandonment.lease_set_id == attempt_state.lease_set_id &&
-               releases.map { lease_identity(_1) } == released_identities &&
+               releases.map(&:resource_id) == released_identities &&
                (released_identities + untouched_identities).sort == expected_identities &&
                (released_identities & untouched_identities).empty?
           key(:plan).failure("must partition the recorded write set into released and untouched fences")
         end
-      end
-
-      private
-
-      def v2?(attempt_state)
-        attempt_state.lease_policy_version == LeaseResourceV2::POLICY_VERSION
-      end
-
-      def lease_identity(value)
-        return value.resource_id if value.respond_to?(:resource_id)
-
-        value.resource_key_hash
       end
     end
   end

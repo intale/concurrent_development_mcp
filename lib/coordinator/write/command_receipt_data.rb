@@ -70,28 +70,28 @@ module Coordinator::Write
     end
 
     class LeaseSet < Value
-      Reference = LeaseReferenceV1 | LeaseReferenceV2
+      Reference = LeaseReferenceV2
 
       attribute :change_set_id, Types::Identifier
       attribute :work_item_id, Types::Identifier
       attribute :attempt_id, Types::Identifier
       attribute :repository_id, Types::RepositoryId
       attribute :lease_set_id, Types::UuidV7
-      attribute :policy_version, Types::ResourceKeyPolicyVersion
+      attribute :policy_version, Types::ResourceLeasePolicyVersion
       attribute :acquired_at, Types::Timestamp
       attribute :expires_at, Types::Timestamp
       attribute :resources, Types::Array.of(Reference).constrained(min_size: 1, max_size: 32)
     end
 
     class LeaseSetExpansion < Value
-      Reference = LeaseReferenceV1 | LeaseReferenceV2
+      Reference = LeaseReferenceV2
 
       attribute :change_set_id, Types::Identifier
       attribute :work_item_id, Types::Identifier
       attribute :attempt_id, Types::Identifier
       attribute :repository_id, Types::RepositoryId
       attribute :lease_set_id, Types::UuidV7
-      attribute :policy_version, Types::ResourceKeyPolicyVersion
+      attribute :policy_version, Types::ResourceLeasePolicyVersion
       attribute :expanded_at, Types::Timestamp
       attribute :expires_at, Types::Timestamp
       attribute :added_resources, Types::Array.of(Reference).constrained(min_size: 1, max_size: 31)
@@ -99,14 +99,14 @@ module Coordinator::Write
     end
 
     class LeaseSetRenewal < Value
-      Reference = LeaseReferenceV1 | LeaseReferenceV2
+      Reference = LeaseReferenceV2
 
       attribute :change_set_id, Types::Identifier
       attribute :work_item_id, Types::Identifier
       attribute :attempt_id, Types::Identifier
       attribute :repository_id, Types::RepositoryId
       attribute :lease_set_id, Types::UuidV7
-      attribute :policy_version, Types::ResourceKeyPolicyVersion
+      attribute :policy_version, Types::ResourceLeasePolicyVersion
       attribute :resources, Types::Array.of(Reference).constrained(min_size: 1, max_size: 32)
       attribute :resource_count, Types::WriteSetSize
       attribute :renewed_at, Types::Timestamp
@@ -115,14 +115,14 @@ module Coordinator::Write
     end
 
     class LeaseSetRelease < Value
-      Reference = LeaseReferenceV1 | LeaseReferenceV2
+      Reference = LeaseReferenceV2
 
       attribute :change_set_id, Types::Identifier
       attribute :work_item_id, Types::Identifier
       attribute :attempt_id, Types::Identifier
       attribute :repository_id, Types::RepositoryId
       attribute :lease_set_id, Types::UuidV7
-      attribute :policy_version, Types::ResourceKeyPolicyVersion
+      attribute :policy_version, Types::ResourceLeasePolicyVersion
       attribute :resources, Types::Array.of(Reference).constrained(min_size: 1, max_size: 32)
       attribute :resource_count, Types::WriteSetSize
       attribute :previous_expires_at, Types::Timestamp
@@ -130,15 +130,6 @@ module Coordinator::Write
     end
 
     class ResourceLeaseExpiry < Value
-      attribute :resource_key_hash, Types::Sha256Digest
-      attribute :lease_id, Types::UuidV7
-      attribute :lease_set_id, Types::UuidV7
-      attribute :fencing_token, Types::FencingToken
-      attribute :expires_at, Types::Timestamp
-      attribute :expired_at, Types::Timestamp
-    end
-
-    class ResourceLeaseExpiryV2 < Value
       attribute :resource_id, Types::ResourceId
       attribute :lease_id, Types::UuidV7
       attribute :lease_set_id, Types::UuidV7
@@ -521,7 +512,6 @@ module Coordinator::Write
            LeaseSetRenewal |
            LeaseSetRelease |
            ResourceLeaseExpiry |
-           ResourceLeaseExpiryV2 |
            Guidance |
            InterpretationProposal |
            InterpretationAdjudication |

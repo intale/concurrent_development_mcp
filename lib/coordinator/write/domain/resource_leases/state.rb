@@ -7,8 +7,6 @@ module Coordinator::Write
         attribute :lease_id, Types::UuidV7.optional
         attribute :lease_set_id, Types::UuidV7.optional
         attribute :resource_id, Types::ResourceId.optional
-        attribute :resource_key, Types::String.optional
-        attribute :resource_key_hash, Types::Sha256Digest.optional
         attribute :resource_kind, Types::ResourceKind.optional
         attribute :resource_path, Types::ResourcePath.optional
         attribute :policy_version, Types::String.optional
@@ -33,8 +31,6 @@ module Coordinator::Write
             lease_id: nil,
             lease_set_id: nil,
             resource_id: nil,
-            resource_key: nil,
-            resource_key_hash: nil,
             resource_kind: nil,
             resource_path: nil,
             policy_version: nil,
@@ -69,18 +65,18 @@ module Coordinator::Write
         end
 
         def identity
-          resource_id || resource_key_hash
+          resource_id
         end
 
         def apply(event)
           case event
-          when Events::ResourceLeaseAcquiredV1, Events::ResourceLeaseAcquiredV2
+          when Events::ResourceLeaseAcquiredV2
             from_acquisition(event)
-          when Events::ResourceLeaseRenewedV1, Events::ResourceLeaseRenewedV2
+          when Events::ResourceLeaseRenewedV2
             from_renewal(event)
-          when Events::ResourceLeaseReleasedV1, Events::ResourceLeaseReleasedV2
+          when Events::ResourceLeaseReleasedV2
             from_release(event)
-          when Events::ResourceLeaseExpiredV1, Events::ResourceLeaseExpiredV2
+          when Events::ResourceLeaseExpiredV2
             from_expiration(event)
           else
             self
@@ -93,9 +89,7 @@ module Coordinator::Write
           self.class.new(
             lease_id: event.lease_id,
             lease_set_id: event.lease_set_id,
-            resource_id: optional_attribute(event, :resource_id),
-            resource_key: optional_attribute(event, :resource_key),
-            resource_key_hash: optional_attribute(event, :resource_key_hash),
+            resource_id: event.resource_id,
             resource_kind: event.resource_kind,
             resource_path: event.resource_path,
             policy_version: event.policy_version,
@@ -121,9 +115,7 @@ module Coordinator::Write
           self.class.new(
             lease_id: event.lease_id,
             lease_set_id: event.lease_set_id,
-            resource_id: optional_attribute(event, :resource_id),
-            resource_key: optional_attribute(event, :resource_key),
-            resource_key_hash: optional_attribute(event, :resource_key_hash),
+            resource_id: event.resource_id,
             resource_kind: event.resource_kind,
             resource_path: event.resource_path,
             policy_version: event.policy_version,
@@ -149,9 +141,7 @@ module Coordinator::Write
           self.class.new(
             lease_id: event.lease_id,
             lease_set_id: event.lease_set_id,
-            resource_id: optional_attribute(event, :resource_id),
-            resource_key: optional_attribute(event, :resource_key),
-            resource_key_hash: optional_attribute(event, :resource_key_hash),
+            resource_id: event.resource_id,
             resource_kind: event.resource_kind,
             resource_path: event.resource_path,
             policy_version: event.policy_version,
@@ -177,9 +167,7 @@ module Coordinator::Write
           self.class.new(
             lease_id: event.lease_id,
             lease_set_id: event.lease_set_id,
-            resource_id: optional_attribute(event, :resource_id),
-            resource_key: optional_attribute(event, :resource_key),
-            resource_key_hash: optional_attribute(event, :resource_key_hash),
+            resource_id: event.resource_id,
             resource_kind: event.resource_kind,
             resource_path: event.resource_path,
             policy_version: event.policy_version,
@@ -199,10 +187,6 @@ module Coordinator::Write
             released_at: nil,
             expired_at: event.expired_at
           )
-        end
-
-        def optional_attribute(event, name)
-          event.public_send(name) if event.respond_to?(name)
         end
       end
     end
