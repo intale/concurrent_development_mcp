@@ -2,10 +2,6 @@
 
 module Coordinator::Processes
   class LeaseExpiryJobScheduler
-    def initialize(policy:)
-      Jobs::ExpireResourceLease.configure(policy:, job_scheduler: self)
-    end
-
     def call(locator, wait_until:)
       Jobs::ExpireResourceLease
         .set(wait_until: Time.iso8601(wait_until))

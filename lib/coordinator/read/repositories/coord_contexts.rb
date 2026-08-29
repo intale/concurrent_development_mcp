@@ -3,6 +3,10 @@
 module Coordinator::Read
   module Repositories
     class CoordContexts
+      def initialize(state_loader: Projections::CoordContextStateLoader.new)
+        @state_loader = state_loader
+      end
+
       class AttemptHistoryRecord < ApplicationRecord
         self.table_name = "attempt_histories"
         self.primary_key = "attempt_id"
@@ -187,7 +191,7 @@ module Coordinator::Read
         return unless record
 
         CoordContextSnapshot.new(
-          state: Projections::CoordContextStateV1.new(deep_symbolize(record.document)),
+          state: @state_loader.call(record.document),
           source_positions: record.source_positions.map do |position|
             ProjectionBarrier.new(deep_symbolize(position))
           end,

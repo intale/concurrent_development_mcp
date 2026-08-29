@@ -3,6 +3,10 @@
 module Coordinator::Read
   module Repositories
     class CoordinationDiscovery
+      def initialize(state_loader: Projections::CoordContextStateLoader.new)
+        @state_loader = state_loader
+      end
+
       def page(query)
         repository_ids = scoped_repository_ids(query)
         return empty_page(query) if repository_ids.empty?
@@ -67,7 +71,7 @@ module Coordinator::Read
       end
 
       def build_summary(record, scope, repository_ids)
-        state = Projections::CoordContextStateV1.new(deep_symbolize(record.document))
+        state = @state_loader.call(record.document)
         scoped_work_items = state.work_items.select { repository_ids.include?(_1.repository_id) }
         scoped_work_item_ids = scoped_work_items.map(&:work_item_id)
         scoped_attempts = state.attempts.select { scoped_work_item_ids.include?(_1.work_item_id) }
@@ -115,14 +119,6 @@ module Coordinator::Read
           continuation_cursor: nil,
           has_more: false
         )
-      end
-
-      def deep_symbolize(value)
-        case value
-        when Hash then value.to_h { |key, nested| [ key.to_sym, deep_symbolize(nested) ] }
-        when Array then value.map { deep_symbolize(_1) }
-        else value
-        end
       end
     end
   end

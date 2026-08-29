@@ -9,6 +9,7 @@ module Coordinator::Read
         contract: Contracts::CoordContextSourceEvent.new,
         schema_registry: Coordinator::Write::EventSchemaRegistry.new,
         reducer: Projections::CoordContextReducer.new,
+        state_loader: Projections::CoordContextStateLoader.new,
         scope_roots_builder: ProjectionScopeRootsBuilder.new,
         contexts: Repositories::CoordContexts.new,
         processed_events: Repositories::ProcessedProjectionEvents.new
@@ -16,6 +17,7 @@ module Coordinator::Read
         @contract = contract
         @schema_registry = schema_registry
         @reducer = reducer
+        @state_loader = state_loader
         @scope_roots_builder = scope_roots_builder
         @contexts = contexts
         @processed_events = processed_events
@@ -110,7 +112,7 @@ module Coordinator::Read
       def load_state(record)
         return Projections::CoordContextStateV1.initial if record.new_record?
 
-        Projections::CoordContextStateV1.new(deep_symbolize(record.document))
+        @state_loader.call(record.document)
       end
 
       def update_source_positions(record, barrier)

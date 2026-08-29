@@ -683,7 +683,7 @@ module Coordinator
     end
 
     register("lease_expiry_job_scheduler", memoize: true) do
-      Processes::LeaseExpiryJobScheduler.new(policy: self["lease_expiry_policy"])
+      Processes::LeaseExpiryJobScheduler.new
     end
 
     register("tasks.loader", memoize: true) do

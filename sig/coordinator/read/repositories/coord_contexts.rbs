@@ -20,6 +20,7 @@ module Coordinator
           def terminal_at_domain: () -> Time?
         end
 
+        def initialize: (?state_loader: Projections::CoordContextStateLoader) -> void
         def fetch: (String change_set_id) -> CoordContextSnapshot?
         def resolve: (scope_kind: String, scope_id: String) -> CoordContextSnapshot?
         def store_attempt_event: (event: PgEventstore::Event, payload: Write::Events::Base) -> nil

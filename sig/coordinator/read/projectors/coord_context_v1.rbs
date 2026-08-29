@@ -8,6 +8,7 @@ module Coordinator
           ?contract: Contracts::CoordContextSourceEvent,
           ?schema_registry: Write::EventSchemaRegistry,
           ?reducer: Projections::CoordContextReducer,
+          ?state_loader: Projections::CoordContextStateLoader,
           ?scope_roots_builder: ProjectionScopeRootsBuilder,
           ?contexts: Repositories::CoordContexts,
           ?processed_events: Repositories::ProcessedProjectionEvents

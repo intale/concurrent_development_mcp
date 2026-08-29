@@ -19,7 +19,7 @@ RSpec.describe Coordinator::Write::RepositoryMarkerBuilder do
         marker("resource-overlap", "app/models")
       ]
     )
-    expect(markers).to all(match(/\Acompound:resource-boundary:v1:sha256:[0-9a-f]{64}\z/))
+    expect(markers).to all(match(/\Acompound:resource-boundary-v2:v1:sha256:[0-9a-f]{64}\z/))
   end
 
   it "adds a directory's own overlap marker so descendant queries select it symmetrically" do
@@ -63,14 +63,14 @@ RSpec.describe Coordinator::Write::RepositoryMarkerBuilder do
     )
 
     expect(first).not_to eq(second)
-    expect(first).to all(match(/\Acompound:resource-boundary:v1:sha256:[0-9a-f]{64}\z/))
+    expect(first).to all(match(/\Acompound:resource-boundary-v2:v1:sha256:[0-9a-f]{64}\z/))
   end
 
   def marker(prefix, path)
     path_digest = OpenSSL::Digest::SHA256.hexdigest("#{path.bytesize}:#{path}")
     Coordinator::Shared::CompoundMarkerBuilder.new.call(
       Coordinator::Shared::CompoundMarkerDefinitionV1.new(
-        purpose: "resource-boundary",
+        purpose: "resource-boundary-v2",
         components: [
           "repository:#{repository_id}",
           "boundary-role:#{prefix}",

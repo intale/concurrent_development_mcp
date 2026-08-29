@@ -229,6 +229,7 @@ module Coordinator::Read
             CoordContextStateV1::Attempt.new(
               attempt.attributes.merge(
                 status: "abandoned",
+                write_set: nil,
                 abandonment_reason: event.reason,
                 abandoned_at: event.abandoned_at
               )
@@ -420,6 +421,7 @@ module Coordinator::Read
             CoordContextStateV1::Attempt.new(
               attempt.attributes.merge(
                 status: "completed",
+                write_set: nil,
                 selected_candidate_id: event.candidate_id,
                 selected_candidate_event: event.candidate_event,
                 completed_at: event.completed_at

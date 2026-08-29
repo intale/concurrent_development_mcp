@@ -364,6 +364,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
     expect(converged.data.context.work_items.sole.produced_outputs).to eq([])
     expect(converged.data.context.attempts.sole).to have_attributes(
       status: "completed",
+      write_set: nil,
       selected_candidate_id: candidate.dig(:input, :candidate_id),
       completed_at: be_present
     )

@@ -2,7 +2,7 @@
 
 module Coordinator::Write
   class RepositoryMarkerBuilder
-    RESOURCE_BOUNDARY_MARKER_PURPOSE = "resource-boundary"
+    RESOURCE_BOUNDARY_MARKER_PURPOSE = "resource-boundary-v2"
 
     def initialize(compound_marker_builder: CompoundMarkerBuilder.new)
       @compound_marker_builder = compound_marker_builder
