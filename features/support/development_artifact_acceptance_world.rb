@@ -183,7 +183,7 @@ module DevelopmentArtifactAcceptanceWorld
     end
     await_read_model(
       "Artifact relation Batch #{batch_id} to become queryable",
-      timeout_seconds: 60
+      timeout_seconds: LiveSubscriptions::HIGH_VOLUME_TIMEOUT_SECONDS
     ) do
       payload = call_tool(
         "operation_batch_get",

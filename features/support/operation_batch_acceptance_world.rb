@@ -57,9 +57,16 @@ module OperationBatchAcceptanceWorld
     await_operation_batch_terminal
   end
 
-  def project_operation_batch(events, batch_id: @operation_batch_id)
+  def project_operation_batch(
+    events,
+    batch_id: @operation_batch_id,
+    timeout_seconds: LiveSubscriptions::DEFAULT_TIMEOUT_SECONDS
+  )
     expected = operation_batch_expectation(events)
-    await_read_model("Operation Batch #{batch_id} to expose #{expected.fetch(:status)}") do
+    await_read_model(
+      "Operation Batch #{batch_id} to expose #{expected.fetch(:status)}",
+      timeout_seconds:
+    ) do
       view = operation_batch_view(batch_id:)
       matched = view && expected.all? { |key, value| view[key.to_s] == value }
       [ matched, view ]

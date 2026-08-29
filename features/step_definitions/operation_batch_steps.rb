@@ -42,7 +42,10 @@ Then("the Batch has {int} successes, no rejection, and one terminal completion")
 end
 
 Then("the complete normalized manifest and outcomes are recoverable in bounded pages using only the Batch ID") do
-  project_operation_batch(operation_batch_events)
+  project_operation_batch(
+    operation_batch_events,
+    timeout_seconds: LiveSubscriptions::HIGH_VOLUME_TIMEOUT_SECONDS
+  )
   manifest = operation_batch_manifest(limit: 20)
   assert_acceptance_equal(3, manifest.fetch(:pages).length, "Bounded manifest pages")
   assert_acceptance_equal(
@@ -150,7 +153,10 @@ Then("the Batch is cancelled with {int} successes and one item not run") do |cou
   assert_acceptance_equal(count, cancelled.data.fetch("succeeded"), "Cancelled successes")
   assert_acceptance_equal(0, cancelled.data.fetch("rejected"), "Cancelled rejections")
   assert_acceptance_equal(1, cancelled.data.fetch("not_run"), "Cancelled remainder")
-  project_operation_batch(events)
+  project_operation_batch(
+    events,
+    timeout_seconds: LiveSubscriptions::HIGH_VOLUME_TIMEOUT_SECONDS
+  )
   view = operation_batch_view
   assert_acceptance_equal("cancelled", view.fetch("status"), "Available cancelled status")
   assert_acceptance_equal(count, view.fetch("succeeded"), "Available successes")

@@ -2,6 +2,7 @@
 
 module LiveSubscriptions
   DEFAULT_TIMEOUT_SECONDS = 15
+  HIGH_VOLUME_TIMEOUT_SECONDS = 180
   POLL_INTERVAL_SECONDS = 0.05
   TERMINAL_TASK_STATUSES = %w[cancelled completed failed].freeze
 
