@@ -51,16 +51,6 @@ RSpec.describe Coordinator::Write::Contracts::CoordinationTaskSubmission do
     end.to raise_error(Coordinator::Write::InvalidCoordinationTaskSubmission)
   end
 
-  it "continues validating the canonical digest of historical submissions" do
-    historical = Coordinator::Write::Events::CoordinationTaskSubmittedV1.new(
-      event.to_h.merge(
-        canonical_input_digest: "sha256:#{'0' * 64}"
-      )
-    )
-
-    expect(contract.call(event: historical).errors.to_h).to include(:event)
-  end
-
   def described_event(overrides)
     Coordinator::Write::Events::CoordinationTaskSubmittedV2.new(event.to_h.merge(overrides))
   end

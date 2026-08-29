@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module DevelopmentArtifacts
       class MarkerBuilder
-        def capture: (event: Events::DevelopmentArtifactCapturedV1 | Events::DevelopmentArtifactCapturedV2 | Events::DevelopmentArtifactObservedV1, command_id: String) -> Array[String]
+        def capture: (event: Events::DevelopmentArtifactCapturedV2 | Events::DevelopmentArtifactObservedV1, command_id: String) -> Array[String]
         def classification: (event: Events::DevelopmentArtifactClassificationCorrectedV1, command_id: String) -> Array[String]
         def relation: (artifact_relation: RelationV1, command_id: String) -> Array[String]
         def supersession: (event: Events::DevelopmentArtifactRelationSupersededV1, command_id: String) -> Array[String]

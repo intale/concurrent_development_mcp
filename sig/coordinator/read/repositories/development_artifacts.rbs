@@ -8,7 +8,7 @@ module Coordinator
         def page: (DevelopmentArtifactListQueryV1 query) -> DevelopmentArtifactPageV1
         def relation_page: (DevelopmentArtifactRelationQueryV1 query) -> DevelopmentArtifactRelationPageV1
         def locator_page: (DevelopmentArtifactLocatorQueryV1 query) -> DevelopmentArtifactLocatorPageV1
-        def store_capture: (event: PgEventstore::Event, capture: Write::Events::DevelopmentArtifactCapturedV1 | Write::Events::DevelopmentArtifactCapturedV2) -> DevelopmentArtifact
+        def store_capture: (event: PgEventstore::Event, capture: Write::Events::DevelopmentArtifactCapturedV2) -> DevelopmentArtifact
         def store_observation: (event: PgEventstore::Event, observed: Write::Events::DevelopmentArtifactObservedV1) -> DevelopmentArtifactObservation
         def store_classification: (event: PgEventstore::Event, correction: Write::Events::DevelopmentArtifactClassificationCorrectedV1) -> DevelopmentArtifactObservation
         def store_relation: (event: PgEventstore::Event, declaration: Write::Events::DevelopmentArtifactRelationDeclaredV1) -> DevelopmentArtifactRelation

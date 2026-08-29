@@ -3,7 +3,7 @@ module Coordinator
     module Domain
       module DevelopmentArtifacts
         class CaptureDecisionV1 < Shared::Value
-          def capture: () -> (Events::DevelopmentArtifactCapturedV1 | Events::DevelopmentArtifactCapturedV2)
+          def capture: () -> Events::DevelopmentArtifactCapturedV2
           def observation: () -> Events::DevelopmentArtifactObservedV1
           def event_plan: () -> EventPlan?
           def outcome: () -> String

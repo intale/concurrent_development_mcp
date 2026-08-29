@@ -13,9 +13,7 @@ module Coordinator::Write
       [ "ChangeSetCreated", 1 ] => Events::ChangeSetCreatedV1,
       [ "ChangeSetAcceptanceCriteriaDefined", 1 ] => Events::ChangeSetAcceptanceCriteriaDefinedV1,
       [ "CommandCompleted", 1 ] => Events::CommandCompletedV1,
-      [ "SkillRevisionPublished", 1 ] => Events::SkillRevisionPublishedV1,
       [ "SkillRevisionPublished", 2 ] => Events::SkillRevisionPublishedV2,
-      [ "DevelopmentArtifactCaptured", 1 ] => Events::DevelopmentArtifactCapturedV1,
       [ "DevelopmentArtifactCaptured", 2 ] => Events::DevelopmentArtifactCapturedV2,
       [ "DevelopmentArtifactObserved", 1 ] => Events::DevelopmentArtifactObservedV1,
       [ "DevelopmentArtifactClassificationCorrected", 1 ] =>
@@ -111,10 +109,8 @@ module Coordinator::Write
       [ "ReleaseSetActivated", 1 ] => Events::ReleaseSetActivatedV1,
       [ "ReleaseSetCompensationRequested", 1 ] => Events::ReleaseSetCompensationRequestedV1,
       [ "ReleaseSetCompleted", 1 ] => Events::ReleaseSetCompletedV1,
-      [ "CoordinationTaskSubmitted", 1 ] => Events::CoordinationTaskSubmittedV1,
       [ "CoordinationTaskSubmitted", 2 ] => Events::CoordinationTaskSubmittedV2,
       [ "CoordinationTaskExecutionStarted", 1 ] => Events::CoordinationTaskExecutionStartedV1,
-      [ "CoordinationTaskCompleted", 1 ] => Events::CoordinationTaskCompletedV1,
       [ "CoordinationTaskCompleted", 2 ] => Events::CoordinationTaskCompletedV2,
       [ "CoordinationTaskFailed", 1 ] => Events::CoordinationTaskFailedV1,
       [ "CoordinationTaskCancellationRequested", 1 ] => Events::CoordinationTaskCancellationRequestedV1,
@@ -122,7 +118,6 @@ module Coordinator::Write
     }.freeze
 
     DEFAULT_VALIDATORS = {
-      Events::CoordinationTaskSubmittedV1 => Contracts::CoordinationTaskSubmission.new,
       Events::CoordinationTaskSubmittedV2 => Contracts::CoordinationTaskSubmission.new
     }.freeze
 

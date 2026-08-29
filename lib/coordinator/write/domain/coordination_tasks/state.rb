@@ -9,7 +9,6 @@ module Coordinator::Write
         attribute :status_message, Types::String.optional
         attribute :tool_name, Types::Identifier.optional
         attribute :command_id, Types::Identifier.optional
-        attribute :canonical_input_digest, Types::Sha256Digest.optional
         attribute :command_input, CommandInputDocuments::Type.optional
         attribute :created_at, Types::Timestamp.optional
         attribute :last_updated_at, Types::Timestamp.optional
@@ -17,7 +16,6 @@ module Coordinator::Write
         attribute :poll_interval_ms, Types::Integer.optional
         attribute :started, Types::Strict::Bool
         attribute :cancellation_requested, Types::Strict::Bool
-        attribute :result, Tasks::ToolResultV1.optional
         attribute :semantic_result, Tasks::SemanticResultV1::Type.optional
         attribute :error, Tasks::JsonRpcErrorV1.optional
 
@@ -28,7 +26,6 @@ module Coordinator::Write
             status_message: nil,
             tool_name: nil,
             command_id: nil,
-            canonical_input_digest: nil,
             command_input: nil,
             created_at: nil,
             last_updated_at: nil,
@@ -36,7 +33,6 @@ module Coordinator::Write
             poll_interval_ms: nil,
             started: false,
             cancellation_requested: false,
-            result: nil,
             semantic_result: nil,
             error: nil
           )
@@ -59,14 +55,13 @@ module Coordinator::Write
 
         def apply(event)
           attributes = case event
-          when Events::CoordinationTaskSubmittedV1, Events::CoordinationTaskSubmittedV2
+          when Events::CoordinationTaskSubmittedV2
                          {
                            task_id: event.task_id,
                            status: "working",
                            status_message: nil,
                            tool_name: event.tool_name,
                            command_id: event.command_id,
-                           canonical_input_digest: submitted_digest(event),
                            command_input: event.command_input,
                            created_at: event.submitted_at,
                            last_updated_at: event.submitted_at,
@@ -80,13 +75,6 @@ module Coordinator::Write
                            cancellation_requested: true,
                            status_message: "Cancellation requested; execution may still complete",
                            last_updated_at: event.requested_at
-                         }
-          when Events::CoordinationTaskCompletedV1
-                         {
-                           status: "completed",
-                           status_message: nil,
-                           result: event.result,
-                           last_updated_at: event.completed_at
                          }
           when Events::CoordinationTaskCompletedV2
                          {
@@ -111,12 +99,6 @@ module Coordinator::Write
           end
 
           self.class.new(to_h.merge(attributes))
-        end
-
-        private
-
-        def submitted_digest(event)
-          event.canonical_input_digest if event.respond_to?(:canonical_input_digest)
         end
       end
     end

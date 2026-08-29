@@ -76,22 +76,6 @@ RSpec.describe Coordinator::Mcp::Tasks::ResultMapper do
     )
   end
 
-  it "still serves a historical completion carrying the V1 wire snapshot" do
-    completed = Coordinator::Write::Events::CoordinationTaskCompletedV1.new(
-      task_id:,
-      result: tool_result,
-      completed_at: "2026-08-22T10:00:03.000000Z"
-    )
-
-    result = mapper.detailed(state(historical_submitted, started, completed)).to_h
-
-    expect(result.fetch(:result)).to eq(
-      content: [ { type: "text", text: "Target command completed" } ],
-      isError: false,
-      structuredContent: tool_result.structured_content.to_h
-    )
-  end
-
   it "keeps JSON-RPC failure and cancellation as distinct terminal wire variants" do
     failed = Coordinator::Write::Events::CoordinationTaskFailedV1.new(
       task_id:,
@@ -127,30 +111,6 @@ RSpec.describe Coordinator::Mcp::Tasks::ResultMapper do
     Coordinator::Write::Domain::CoordinationTasks::State.reduce(events)
   end
 
-  def tool_result
-    Coordinator::Write::Tasks::ToolResultV1.new(
-      content: [
-        Coordinator::Write::Tasks::TextContentV1.new(
-          type: "text",
-          text: "Target command completed"
-        )
-      ],
-      is_error: false,
-      structured_content: Coordinator::Write::Tasks::StructuredContentV1.new(
-        status: "ok",
-        summary: "Target command completed",
-        command_id: "cmd-task-wire",
-        receipt: "cmd-task-wire",
-        context_token: nil,
-        data: Coordinator::Write::CommandReceiptData::ChangeSet.new(
-          change_set_id: "CS-task-wire"
-        ),
-        warnings: [],
-        next_actions: []
-      )
-    )
-  end
-
   def semantic_success
     @semantic_success ||= Coordinator::Write::Tasks::SemanticResultV1::Success.new(
       kind: "success",
@@ -162,14 +122,6 @@ RSpec.describe Coordinator::Mcp::Tasks::ResultMapper do
       ),
       warnings: [],
       next_actions: []
-    )
-  end
-
-  def historical_submitted
-    Coordinator::Write::Events::CoordinationTaskSubmittedV1.new(
-      submitted.to_h.merge(
-        canonical_input_digest: Coordinator::Write::CommandInputDigest.new.call(target_command)
-      )
     )
   end
 end

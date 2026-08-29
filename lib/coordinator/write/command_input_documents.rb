@@ -666,15 +666,6 @@ module Coordinator::Write
       attribute :input, CompleteCompensatedReleaseSetInputV1
     end
 
-    class SkillAssetV1 < Value
-      attribute :path, Types::SkillAssetPath
-      attribute :media_type, Types::SkillAssetMediaType
-      attribute :executable, Types::Bool
-      attribute :content_base64, Types::SkillAssetContentBase64
-      attribute :content_sha256, Types::Sha256Digest
-      attribute :byte_size, Types::SkillAssetByteSize
-    end
-
     class SkillAssetV2 < Value
       Content = Coordinator::Write::Content::TextV1 | Coordinator::Write::Content::BinaryV1
 
@@ -684,28 +675,9 @@ module Coordinator::Write
     end
 
     class PublishSkillRevisionBase < Value
-      attribute :schema, Types::String.enum("command-input/v1", "command-input/v2")
+      attribute :schema, Types::String.enum("command-input/v2")
       attribute :command_id, Types::Identifier
       attribute :tool_name, Types::String.enum("skill_publish")
-    end
-
-    class PublishSkillRevisionInputV1 < Value
-      Asset = SkillAssetV1
-
-      attribute :actor, ActorV1
-      attribute :skill_id, Types::SkillId
-      attribute :name, Types::SkillName
-      attribute :scope, Types::SkillScope
-      attribute :expected_revision, Types::SkillExpectedRevision
-      attribute :description, Types::SkillDescription
-      attribute :instructions, Types::SkillInstructions
-      attribute :assets,
-                Types::Array.of(Asset).constrained(max_size: Types::SKILL_ASSET_MAXIMUM_COUNT)
-      attribute :content_digest, Types::Sha256Digest
-    end
-
-    class PublishSkillRevisionV1 < PublishSkillRevisionBase
-      attribute :input, PublishSkillRevisionInputV1
     end
 
     class PublishSkillRevisionInputV2 < Value
@@ -727,31 +699,12 @@ module Coordinator::Write
       attribute :input, PublishSkillRevisionInputV2
     end
 
-    class DevelopmentArtifactContentV1 < Value
-      attribute :encoding, Types::DevelopmentArtifactEncoding
-      attribute :media_type, Types::DevelopmentArtifactMediaType
-      attribute :content_base64, Types::DevelopmentArtifactContentBase64
-      attribute :content_sha256, Types::Sha256Digest
-      attribute :byte_size, Types::DevelopmentArtifactByteSize
-    end
-
     class DevelopmentArtifactSourceV1 < Value
       attribute :kind, Types::DevelopmentArtifactSourceKind
       attribute :locator, Types::DevelopmentArtifactSourceLocator
       attribute :revision, Types::DevelopmentArtifactSourceRevision.optional
       attribute :observed_at, Types::Timestamp
       attribute :collector, Types::DevelopmentArtifactCollector
-    end
-
-    class DevelopmentArtifactV1 < Value
-      attribute :artifact_id, Types::DevelopmentArtifactId
-      attribute :observation_id, Types::DevelopmentArtifactObservationId
-      attribute :scope, Types::DevelopmentArtifactScope
-      attribute :title, Types::DevelopmentArtifactTitle
-      attribute :kind, Types::DevelopmentArtifactKind
-      attribute :labels, Types::DevelopmentArtifactLabels
-      attribute :content, DevelopmentArtifactContentV1
-      attribute :source, DevelopmentArtifactSourceV1
     end
 
     class DevelopmentArtifactV2 < Value
@@ -768,18 +721,9 @@ module Coordinator::Write
     end
 
     class CaptureDevelopmentArtifactBase < Value
-      attribute :schema, Types::String.enum("command-input/v1", "command-input/v2")
+      attribute :schema, Types::String.enum("command-input/v2")
       attribute :command_id, Types::Identifier
       attribute :tool_name, Types::String.enum("development_artifact_capture")
-    end
-
-    class CaptureDevelopmentArtifactInputV1 < Value
-      attribute :actor, ActorV1
-      attribute :artifact, DevelopmentArtifactV1
-    end
-
-    class CaptureDevelopmentArtifactV1 < CaptureDevelopmentArtifactBase
-      attribute :input, CaptureDevelopmentArtifactInputV1
     end
 
     class CaptureDevelopmentArtifactInputV2 < Value
@@ -1004,9 +948,7 @@ module Coordinator::Write
       RecordReleaseSetVerificationV1,
       RecordReleaseSetActivationV1,
       CompleteCompensatedReleaseSetV1,
-      PublishSkillRevisionV1,
       PublishSkillRevisionV2,
-      CaptureDevelopmentArtifactV1,
       CaptureDevelopmentArtifactV2,
       CorrectDevelopmentArtifactClassificationV1,
       DeclareDevelopmentArtifactRelationV1,

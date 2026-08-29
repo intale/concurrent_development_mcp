@@ -78,18 +78,8 @@ module Coordinator::Mcp
         }
       end
 
-      def call_tool_result(result)
-        ResultV1::CallToolResult.new(
-          content: result.content,
-          isError: result.is_error,
-          structuredContent: result.structured_content
-        )
-      end
-
       def completed_result(state)
-        return @semantic_presenter.call(state.semantic_result) if state.semantic_result
-
-        call_tool_result(state.result)
+        @semantic_presenter.call(state.semantic_result)
       end
     end
   end

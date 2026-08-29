@@ -3,7 +3,7 @@ module Coordinator
     module Domain
       module Skills
         class State < Shared::Value
-          type publication = Events::SkillRevisionPublishedV1 | Events::SkillRevisionPublishedV2
+          type publication = Events::SkillRevisionPublishedV2
 
           def self.initial: () -> State
           def self.reduce: (Array[publication] events) -> State

@@ -4,8 +4,7 @@ module Coordinator::Write
   module Domain
     module DevelopmentArtifacts
       class State < Value
-        Capture = Types.Instance(Events::DevelopmentArtifactCapturedV1) |
-                  Types.Instance(Events::DevelopmentArtifactCapturedV2)
+        Capture = Types.Instance(Events::DevelopmentArtifactCapturedV2)
         Relation = Types.Instance(Events::DevelopmentArtifactRelationDeclaredV1)
         Supersession = Types.Instance(Events::DevelopmentArtifactRelationSupersededV1)
 
@@ -32,7 +31,7 @@ module Coordinator::Write
 
           events.each do |event|
             case event
-            when Events::DevelopmentArtifactCapturedV1, Events::DevelopmentArtifactCapturedV2
+            when Events::DevelopmentArtifactCapturedV2
               raise InvalidDevelopmentArtifactHistory, "Artifact was captured more than once" if capture
 
               capture = event

@@ -555,41 +555,11 @@ module Coordinator::Write
       end
 
       def build_skill_asset(asset)
-        return Skills::AssetV2.new(asset.to_h) if asset.is_a?(CommandInputDocuments::SkillAssetV2)
-
-        Skills::AssetV2.new(
-          path: asset.path,
-          executable: asset.executable,
-          content: Content::BinaryV1.new(
-            encoding: "binary",
-            media_type: asset.media_type,
-            base64: asset.content_base64,
-            content_sha256: asset.content_sha256,
-            byte_size: asset.byte_size
-          )
-        )
+        Skills::AssetV2.new(asset.to_h)
       end
 
       def build_artifact_content(content)
-        return content if content.is_a?(Content::TextV1) || content.is_a?(Content::BinaryV1)
-
-        if content.encoding == "utf-8"
-          Content::TextV1.new(
-            encoding: "utf-8",
-            media_type: content.media_type,
-            text: content.content_base64.unpack1("m0").force_encoding(Encoding::UTF_8),
-            content_sha256: content.content_sha256,
-            byte_size: content.byte_size
-          )
-        else
-          Content::BinaryV1.new(
-            encoding: "binary",
-            media_type: content.media_type,
-            base64: content.content_base64,
-            content_sha256: content.content_sha256,
-            byte_size: content.byte_size
-          )
-        end
+        content
       end
 
       def build_correct_development_artifact_classification(document)

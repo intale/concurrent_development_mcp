@@ -120,7 +120,6 @@ RSpec.describe "Coordination Task lifecycle operations", :event_store do
     expect(completed).to be_success
     expect(completed.value!.status).to eq("completed")
     expect(completed.value!.semantic_result).to eq(result)
-    expect(completed.value!.result).to be_nil
     expect(get_task.call(task_id:).value!.semantic_result).to eq(result)
     expect(acknowledge_input.call(task_id:)).to be_success
     expect(task_events(task_id).map(&:type)).to eq(
@@ -150,7 +149,6 @@ RSpec.describe "Coordination Task lifecycle operations", :event_store do
     persisted = get_task.call(task_id:).value!
     expect(persisted.status).to eq("failed")
     expect(persisted.error).to eq(error)
-    expect(persisted.result).to be_nil
     expect(persisted.semantic_result).to be_nil
   end
 

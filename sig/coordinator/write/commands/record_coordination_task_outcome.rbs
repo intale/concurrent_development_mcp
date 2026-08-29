@@ -3,7 +3,7 @@ module Coordinator
     module Commands
       class RecordCoordinationTaskOutcome < Shared::Value
         def task_id: () -> String
-        def outcome: () -> (Tasks::OutcomeV1::value | Tasks::OutcomeV2::value)
+        def outcome: () -> Tasks::OutcomeV2::value
         def recorded_at: () -> String
       end
     end

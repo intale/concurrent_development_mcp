@@ -17,7 +17,8 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
   let(:streams) { Coordinator::Write::StreamFactory.new }
 
   it "projects capture and delayed relation delivery idempotently with exact source evidence" do
-    source = capture.call(capture_input).value!.data.artifact_id
+    source_data = capture.call(capture_input).value!.data
+    source = source_data.artifact_id
     target = capture.call(
       capture_input(command_id: "cmd-project-target", locator: "target.bin", binary: true)
     ).value!.data.artifact_id
@@ -39,6 +40,9 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
 
     projector.call(source_capture)
     projector.call(source_capture)
+    source_observation = observation_events(source_data.observation_id).sole
+    projector.call(source_observation)
+    projector.call(source_observation)
     view = repository.fetch(source)
     expect(view.artifact).to have_attributes(
       artifact_id: source,
@@ -73,29 +77,30 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
         arguments: have_attributes(artifact_id: target)
       )
     )
-    expect(processed_events.count).to eq(2)
+    expect(processed_events.count).to eq(3)
     expect(view.to_h.keys & %i[fresh pending projection_status]).to be_empty
   end
 
   it "round-trips UTF-8 and binary content without embedding bytes in metadata" do
-    text_id = capture.call(capture_input).value!.data.artifact_id
-    binary_id = capture.call(
+    text = capture.call(capture_input).value!.data
+    binary = capture.call(
       capture_input(command_id: "cmd-project-binary", locator: "profile.bin", binary: true)
-    ).value!.data.artifact_id
-    [ text_id, binary_id ].each do |artifact_id|
-      artifact_events(artifact_id).each { |event| projector.call(event) }
+    ).value!.data
+    [ text, binary ].each do |data|
+      artifact_events(data.artifact_id).each { |event| projector.call(event) }
+      observation_events(data.observation_id).each { |event| projector.call(event) }
     end
 
-    text = repository.fetch_content(text_id)
-    binary = repository.fetch_content(binary_id)
-    expect(text).to have_attributes(text: "evidence\n", encoding: "utf-8")
-    expect(text.to_h).not_to have_key(:base64)
-    expect(binary).to have_attributes(
+    text_content = repository.fetch_content(text.artifact_id)
+    binary_content = repository.fetch_content(binary.artifact_id)
+    expect(text_content).to have_attributes(text: "evidence\n", encoding: "utf-8")
+    expect(text_content.to_h).not_to have_key(:base64)
+    expect(binary_content).to have_attributes(
       base64: [ "\x00\xFF".b ].pack("m0"),
       encoding: "binary"
     )
-    expect(binary.to_h).not_to have_key(:text)
-    expect(repository.fetch(text_id).to_h.to_s).not_to include("evidence\\n")
+    expect(binary_content.to_h).not_to have_key(:text)
+    expect(repository.fetch(text.artifact_id).to_h.to_s).not_to include("evidence\\n")
   end
 
   it "projects an out-of-order supersession without hiding its immutable declaration history" do

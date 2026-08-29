@@ -77,7 +77,7 @@ RSpec.describe Coordinator::Write::Domain::Skills::Publish do
   end
 
   def publication(revision:)
-    Coordinator::Write::Events::SkillRevisionPublishedV1.new(
+    Coordinator::Write::Events::SkillRevisionPublishedV2.new(
       skill_id: command.skill_id,
       name: command.name,
       scope: command.scope,

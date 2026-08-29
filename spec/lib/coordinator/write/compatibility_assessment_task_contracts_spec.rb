@@ -36,11 +36,10 @@ RSpec.describe "compatibility assessment Task contracts" do
   end
 
   it "round-trips the persisted Task command document into the exact typed command" do
-    submitted = Coordinator::Write::Events::CoordinationTaskSubmittedV1.new(
+    submitted = Coordinator::Write::Events::CoordinationTaskSubmittedV2.new(
       task_id: "0198e03a-d112-7000-8000-000000000001",
       tool_name: "compatibility_assessment_submit",
       command_id: command.command_id,
-      canonical_input_digest: command_digest.call(command),
       command_input: command_digest.document(command),
       submitted_at: "2026-08-24T08:00:00.000000Z",
       ttl_ms: nil,
@@ -48,7 +47,7 @@ RSpec.describe "compatibility assessment Task contracts" do
     )
     reloaded = Coordinator::Write::EventSchemaRegistry.new.load(
       type: "CoordinationTaskSubmitted",
-      schema_version: 1,
+      schema_version: 2,
       data: JSON.parse(JSON.generate(submitted.to_h))
     )
 

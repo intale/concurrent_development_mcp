@@ -52,9 +52,10 @@ module Coordinator::Read
       end
 
       rule(:event_type, :schema_version) do
-        next if values[:event_type] == "DevelopmentArtifactCaptured" || values[:schema_version] == 1
+        expected_version = values[:event_type] == "DevelopmentArtifactCaptured" ? 2 : 1
+        next if values[:schema_version] == expected_version
 
-        key(:schema_version).failure("must be 1 for this Artifact event type")
+        key(:schema_version).failure("must be #{expected_version} for this Artifact event type")
       end
 
       rule(:command_id, :actor_id) do

@@ -115,21 +115,17 @@ module Coordinator::Read
       end
 
       def asset_attributes(asset)
-        if asset.is_a?(Coordinator::Write::Skills::AssetV2)
-          content = asset.content
-          {
-            path: asset.path,
-            media_type: content.media_type,
-            executable: asset.executable,
-            content_encoding: content.encoding,
-            content_text: content.respond_to?(:text) ? content.text : nil,
-            content_base64: content.respond_to?(:base64) ? content.base64 : nil,
-            content_sha256: content.content_sha256,
-            byte_size: content.byte_size
-          }
-        else
-          asset.to_h.merge(content_encoding: "binary", content_text: nil)
-        end
+        content = asset.content
+        {
+          path: asset.path,
+          media_type: content.media_type,
+          executable: asset.executable,
+          content_encoding: content.encoding,
+          content_text: content.respond_to?(:text) ? content.text : nil,
+          content_base64: content.respond_to?(:base64) ? content.base64 : nil,
+          content_sha256: content.content_sha256,
+          byte_size: content.byte_size
+        }
       end
 
       def verify_identity!(record, publication)

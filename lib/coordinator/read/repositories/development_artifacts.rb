@@ -153,7 +153,6 @@ module Coordinator::Read
         record ||= Coordinator::Read::DevelopmentArtifact.new(artifact_id: artifact.artifact_id)
         record.assign_attributes(capture_attributes(event, capture))
         record.save!
-        store_legacy_observation(event:, capture:)
         record
       end
 
@@ -411,61 +410,14 @@ module Coordinator::Read
       end
 
       def content_attributes(content)
-        if content.is_a?(Coordinator::Write::DevelopmentArtifacts::ContentV1)
-          text = content.encoding == "utf-8" ?
-            content.content_base64.unpack1("m0").force_encoding(Encoding::UTF_8) : nil
-          base64 = content.encoding == "binary" ? content.content_base64 : nil
-        else
-          text = content.respond_to?(:text) ? content.text : nil
-          base64 = content.respond_to?(:base64) ? content.base64 : nil
-        end
-
         {
           content_encoding: content.encoding,
           content_media_type: content.media_type,
-          content_text: text,
-          content_base64: base64,
+          content_text: content.respond_to?(:text) ? content.text : nil,
+          content_base64: content.respond_to?(:base64) ? content.base64 : nil,
           content_sha256: content.content_sha256,
           content_byte_size: content.byte_size
         }
-      end
-
-      def store_legacy_observation(event:, capture:)
-        artifact = capture.artifact
-        observation_id = Coordinator::Write::DevelopmentArtifacts::ObservationIdentityBuilder.new.call(
-          artifact_id: artifact.artifact_id,
-          scope: artifact.scope,
-          source: artifact.source
-        )
-        record = Coordinator::Read::DevelopmentArtifactObservation.find_or_initialize_by(
-          observation_id:
-        )
-        legacy_observation = Coordinator::Write::DevelopmentArtifacts::ArtifactObservationV1.new(
-          observation_id:,
-          artifact_id: artifact.artifact_id,
-          scope: artifact.scope,
-          title: artifact.title,
-          kind: artifact.kind,
-          labels: artifact.labels,
-          source: artifact.source
-        )
-        verify_observation_identity!(record, legacy_observation) if record.artifact_id
-        return record if record.observed_event
-
-        attributes = observation_value_attributes(legacy_observation).merge(
-          observed_evidence_attributes(event, occurred_at: capture.captured_at)
-        )
-        if record.classification_revision <= 1
-          attributes.merge!(
-            title: artifact.title,
-            kind: artifact.kind,
-            labels: artifact.labels,
-            classification_revision: 1,
-            classification_reason: nil,
-            **classified_evidence_attributes(event, occurred_at: capture.captured_at)
-          )
-        end
-        assign_observation_change(record, attributes, global_position: event.global_position)
       end
 
       def observation_attributes(event, observed)

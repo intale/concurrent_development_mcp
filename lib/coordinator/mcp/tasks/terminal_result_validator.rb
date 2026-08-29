@@ -21,10 +21,7 @@ module Coordinator::Mcp
       private
 
       def completed_structured_content(state)
-        return @semantic_presenter.call(state.semantic_result).structuredContent if state.semantic_result
-        return state.result.structured_content if state.result
-
-        raise KeyError, "Completed Task has no persisted outcome"
+        @semantic_presenter.call(state.semantic_result).structuredContent
       end
     end
   end

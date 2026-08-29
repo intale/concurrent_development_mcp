@@ -121,6 +121,21 @@ RSpec.describe Coordinator::Write::EventFactory do
     end.to raise_error(Dry::Struct::Error, /unexpected keys/)
   end
 
+  it "rejects superseded Task and content-encoding event schemas" do
+    superseded = [
+      [ "CoordinationTaskSubmitted", 1 ],
+      [ "CoordinationTaskCompleted", 1 ],
+      [ "SkillRevisionPublished", 1 ],
+      [ "DevelopmentArtifactCaptured", 1 ]
+    ]
+
+    superseded.each do |type, schema_version|
+      expect do
+        Coordinator::Write::EventSchemaRegistry.new.fetch(type:, schema_version:)
+      end.to raise_error(Coordinator::Write::EventSchemaRegistry::UnknownSchema)
+    end
+  end
+
   it "reconstructs nested dry values from historical event hashes" do
     loaded = Coordinator::Write::EventSchemaRegistry.new.load(
       type: "WorkItemDependencyDeclared",

@@ -20,7 +20,6 @@ RSpec.describe Coordinator::Write::Domain::CoordinationTasks::State do
     expect(state.status).to eq("completed")
     expect(state.started).to be(true)
     expect(state.semantic_result).to eq(successful_semantic_result)
-    expect(state.result).to be_nil
     expect(state.last_updated_at).to eq("2026-08-22T06:30:02.000000Z")
   end
 

@@ -3,7 +3,7 @@ module Coordinator
     module Domain
       module DevelopmentArtifacts
         class State < Shared::Value
-          type capture_event = Events::DevelopmentArtifactCapturedV1 | Events::DevelopmentArtifactCapturedV2
+          type capture_event = Events::DevelopmentArtifactCapturedV2
           def self.initial: () -> State
           type history_event = capture_event | Events::DevelopmentArtifactRelationDeclaredV1 | Events::DevelopmentArtifactRelationSupersededV1
 

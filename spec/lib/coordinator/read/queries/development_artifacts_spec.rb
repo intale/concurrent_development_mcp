@@ -491,7 +491,7 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
         revision: "older",
         text: "older\n"
       )
-    ).value!.data.artifact_id
+    ).value!.data
     newer = capture.call(
       capture_input(
         command_id: "cmd-locator-late-newer",
@@ -499,8 +499,9 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
         revision: "newer",
         text: "newer\n"
       )
-    ).value!.data.artifact_id
-    projector.call(artifact_events(newer).sole)
+    ).value!.data
+    projector.call(artifact_events(newer.artifact_id).sole)
+    projector.call(observation_events(newer.observation_id).sole)
 
     first_page = locator_query.call(
       scope: "project:alpha",
@@ -509,9 +510,10 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
       limit: 1
     ).value!.data.page
     expect(first_page).to have_attributes(resolution: "unique", has_more: false)
-    expect(first_page.items.sole).to have_attributes(artifact_id: newer)
+    expect(first_page.items.sole).to have_attributes(artifact_id: newer.artifact_id)
 
-    projector.call(artifact_events(older).sole)
+    projector.call(artifact_events(older.artifact_id).sole)
+    projector.call(observation_events(older.observation_id).sole)
     converged = locator_query.call(
       scope: "project:alpha",
       source_kind: "local_file",
@@ -521,7 +523,7 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
     ).value!.data.page
 
     expect(converged).to have_attributes(resolution: "ambiguous")
-    expect(converged.items.sole).to have_attributes(artifact_id: older)
+    expect(converged.items.sole).to have_attributes(artifact_id: older.artifact_id)
     expect(converged.items.sole.captured.global_position).to be <
       first_page.items.sole.captured.global_position
   end

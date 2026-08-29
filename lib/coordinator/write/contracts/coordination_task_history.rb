@@ -15,8 +15,7 @@ module Coordinator::Write
         end
         next if events.empty?
 
-        unless events.first.is_a?(Events::CoordinationTaskSubmittedV1) ||
-               events.first.is_a?(Events::CoordinationTaskSubmittedV2)
+        unless events.first.is_a?(Events::CoordinationTaskSubmittedV2)
           key.failure("must start with CoordinationTaskSubmitted")
           next
         end
@@ -38,8 +37,7 @@ module Coordinator::Write
                     allowed = started && !cancellation_requested && !terminal
                     cancellation_requested = true if allowed
                     allowed
-          when Events::CoordinationTaskCompletedV1,
-               Events::CoordinationTaskCompletedV2,
+          when Events::CoordinationTaskCompletedV2,
                Events::CoordinationTaskFailedV1
                     allowed = started && !terminal
                     terminal = true if allowed

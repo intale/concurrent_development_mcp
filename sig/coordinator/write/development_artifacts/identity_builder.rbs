@@ -3,7 +3,7 @@ module Coordinator
     module DevelopmentArtifacts
       class IdentityBuilder
         def initialize: (?canonical_json: Shared::CanonicalJson) -> void
-        def call: (content: ContentV1 | Content::TextV1 | Content::BinaryV1) -> String
+        def call: (content: Content::TextV1 | Content::BinaryV1) -> String
       end
     end
   end

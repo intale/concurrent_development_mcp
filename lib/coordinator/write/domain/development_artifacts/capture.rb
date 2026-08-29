@@ -103,22 +103,10 @@ module Coordinator::Write
                               existing.byte_size == requested.byte_size
 
           if requested.encoding == "utf-8"
-            existing_text(existing) == requested.text
+            existing.text == requested.text
           else
-            existing_base64(existing) == requested.base64
+            existing.base64 == requested.base64
           end
-        end
-
-        def existing_text(content)
-          return content.text if content.respond_to?(:text)
-
-          content.content_base64.unpack1("m0").force_encoding(Encoding::UTF_8)
-        end
-
-        def existing_base64(content)
-          return content.base64 if content.respond_to?(:base64)
-
-          content.content_base64
         end
       end
     end
