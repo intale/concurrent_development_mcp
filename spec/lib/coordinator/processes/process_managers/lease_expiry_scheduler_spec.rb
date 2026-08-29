@@ -12,7 +12,14 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
       operation: Coordinator::Write::Operations::ExecuteExpireResourceLease.new(event_store:)
     )
   end
-  let(:job_scheduler) { Coordinator::Processes::LeaseExpiryJobScheduler.new }
+  let(:job_scheduler) do
+    scheduler = Coordinator::Processes::LeaseExpiryJobScheduler.new
+    Coordinator::Processes::Jobs::ExpireResourceLease.configure(
+      policy:,
+      job_scheduler: scheduler
+    )
+    scheduler
+  end
 
   it "reloads the exact UUID resource revision and turns an early execution into a typed reschedule" do
     setup_attempt

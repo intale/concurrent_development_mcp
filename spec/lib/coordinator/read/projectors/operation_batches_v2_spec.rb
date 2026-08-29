@@ -79,6 +79,28 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :event_store, 
     expect(cancelled.terminal.event.type).to eq("OperationBatchCancelled")
   end
 
+  it "acknowledges pre-semantic creation facts without restoring their removed command schemas" do
+    creation = pre_semantic_creation_event
+    outcome = pre_semantic_outcome_event(creation)
+
+    projector.call(creation)
+    projector.call(outcome)
+    projector.call(creation)
+
+    expect(repository.fetch(
+      Coordinator::Read::OperationBatchGetQueryV1.new(
+        batch_id: creation.stream.stream_id,
+        after_index: nil,
+        limit: 100
+      )
+    )).to be_nil
+    expect(Coordinator::Read::OperationBatch.sole).to have_attributes(
+      batch_id: creation.stream.stream_id,
+      manifest_generation: "pre_semantic"
+    )
+    expect(processed_events.count).to eq(2)
+  end
+
   def prepared_batch
     Coordinator::Write::Operations::PrepareCreateSkillPublishBatch.new.call(input).value!
   end
@@ -122,6 +144,53 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :event_store, 
     Coordinator::Read::ProcessedProjectionEvent.where(
       projection_name: "operation_batches",
       projection_version: 2
+    )
+  end
+
+  def pre_semantic_creation_event
+    batch_id = SecureRandom.uuid_v7
+    PgEventstore::Event.new(
+      id: SecureRandom.uuid_v7,
+      type: "OperationBatchCreated",
+      stream: PgEventstore::Stream.new(
+        context: "DevelopmentCoordination",
+        stream_name: "OperationBatch",
+        stream_id: batch_id
+      ),
+      stream_revision: 0,
+      global_position: 1,
+      data: {
+        "batch_id" => batch_id,
+        "items" => [
+          {
+            "command_input" => {
+              "schema" => "command-input/v1"
+            }
+          }
+        ]
+      },
+      metadata: {
+        "schema_version" => 1,
+        "command_id" => "pre-semantic-batch-command",
+        "actor_kind" => "agent",
+        "actor_id" => "pre-semantic-importer",
+        "recorded_by" => "coordinator",
+        "policy_version" => "operation-batch/v1"
+      },
+      created_at: Time.utc(2026, 8, 25)
+    )
+  end
+
+  def pre_semantic_outcome_event(creation)
+    PgEventstore::Event.new(
+      id: SecureRandom.uuid_v7,
+      type: "OperationBatchItemSucceeded",
+      stream: creation.stream,
+      stream_revision: 1,
+      global_position: 2,
+      data: { "removed_pre_semantic_shape" => true },
+      metadata: creation.metadata.merge("command_id" => "pre-semantic-item-command"),
+      created_at: Time.utc(2026, 8, 25)
     )
   end
 end
