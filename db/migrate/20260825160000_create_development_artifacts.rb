@@ -11,7 +11,8 @@ class CreateDevelopmentArtifacts < ActiveRecord::Migration[8.1]
 
       t.string :content_encoding, null: false
       t.string :content_media_type, null: false
-      t.text :content_base64, null: false
+      t.text :content_text
+      t.text :content_base64
       t.string :content_sha256, null: false
       t.bigint :content_byte_size, null: false
 
