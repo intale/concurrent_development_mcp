@@ -2,7 +2,7 @@
 
 set -eu
 
-parallel_cucumber_processes="${PARALLEL_TEST_PROCESSORS:-10}"
+parallel_cucumber_processes="${PARALLEL_TEST_PROCESSORS:-15}"
 parallel_cucumber_runtime_log="tmp/parallel_runtime_cucumber.log"
 
 case "$parallel_cucumber_processes" in

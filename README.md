@@ -39,23 +39,24 @@ into it. After that adjust AGENTS.md to rely on this MCP serve to coordinate age
 Optionally you can ask your agent to create an archived backup of your current agentic dev env, so you can revert it in
 case you find this MCP server not a suitable solution.
 
-## Runtime-RBS test gate
+## Parallel test gates
 
-Run the logical suite first:
+Prepare fifteen isolated Rails and pg_eventstore database pairs once:
 
 ```sh
-bundle exec rspec
+bin/setup_parallel_tests
 ```
 
-Prepare ten isolated Rails and pg_eventstore database pairs, then run only the
-runtime-RBS suite in parallel:
+Run the logical RSpec and Cucumber suites during development, then run the
+slower runtime-RBS suite as the final contract gate:
 
 ```sh
-bin/setup_parallel_rbs
+bin/parallel-rspec-plain
+bin/parallel-cucumber
 bin/parallel-rspec
 ```
 
-The parallel workers use explicit numbers 1 through 10. Worker `N` owns
+The parallel workers use explicit numbers 1 through 15. Worker `N` owns
 `concurrent_development_mcp<N>_test` and `eventstore<N>_test`; sequential tests
 continue to use the unnumbered test databases.
 
@@ -63,10 +64,13 @@ Set the same positive process count for setup and execution to override the
 default:
 
 ```sh
-PARALLEL_TEST_PROCESSORS=4 bin/setup_parallel_rbs
+PARALLEL_TEST_PROCESSORS=4 bin/setup_parallel_tests
+PARALLEL_TEST_PROCESSORS=4 bin/parallel-rspec-plain
+PARALLEL_TEST_PROCESSORS=4 bin/parallel-cucumber
 PARALLEL_TEST_PROCESSORS=4 bin/parallel-rspec
 ```
 
-Paths and `parallel_tests`/RSpec options may be passed to `bin/parallel-rspec`.
-Every worker delegates its file group to `bin/rspec`, preserving the complete
-repository RBS target.
+Each suite keeps its own smart-runtime timing file. Paths and relevant
+`parallel_tests` options may be passed to its runner. The runtime-RBS workers
+delegate their file groups to `bin/rspec`, preserving the complete repository
+RBS target.

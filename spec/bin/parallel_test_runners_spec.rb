@@ -22,10 +22,10 @@ RSpec.describe "parallel test executables" do
     end
   end
 
-  it "defaults every runner to ten workers and rejects invalid counts before execution" do
+  it "defaults every runner to fifteen workers and rejects invalid counts before execution" do
     RUNNERS.each_key do |relative_path|
       contents = Rails.root.join(relative_path).read
-      expect(contents).to include('PARALLEL_TEST_PROCESSORS:-10')
+      expect(contents).to include('PARALLEL_TEST_PROCESSORS:-15')
 
       _stdout, stderr, status = Open3.capture3(
         { "PARALLEL_TEST_PROCESSORS" => "0" },
@@ -68,7 +68,7 @@ RSpec.describe "parallel test executables" do
   it "provides one neutral database setup for all three runners" do
     setup = Rails.root.join("bin/setup_parallel_tests").read
 
-    expect(setup).to include('PARALLEL_TEST_PROCESSORS:-10')
+    expect(setup).to include('PARALLEL_TEST_PROCESSORS:-15')
     expect(setup).to include('parallel:create[$parallel_test_processes]')
     expect(setup).to include('parallel:migrate[$parallel_test_processes]')
     expect(setup).to include('eventstore${parallel_test_worker}_test')

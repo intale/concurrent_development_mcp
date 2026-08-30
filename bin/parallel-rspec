@@ -2,7 +2,7 @@
 
 set -eu
 
-parallel_rbs_processes="${PARALLEL_TEST_PROCESSORS:-10}"
+parallel_rbs_processes="${PARALLEL_TEST_PROCESSORS:-15}"
 parallel_rbs_runtime_log="tmp/parallel_runtime_rspec_rbs.log"
 
 case "$parallel_rbs_processes" in
