@@ -187,7 +187,7 @@ module DevelopmentArtifactAcceptanceWorld
     ) do
       payload = call_tool(
         "operation_batch_get",
-        { batch_id:, limit: Coordinator::Shared::Types::OPERATION_BATCH_QUERY_MAXIMUM_ITEMS }
+        { batch_id:, limit: 1 }
       ).dig("result", "structuredContent")
       status = payload.dig("data", "batch", "status")
       [ %w[completed completed_with_errors cancelled].include?(status), payload ]

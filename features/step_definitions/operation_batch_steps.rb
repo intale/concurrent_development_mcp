@@ -131,7 +131,7 @@ end
 
 Then("the available Batch exposes accepted cancellation before terminal completion") do
   view = await_read_model("Operation Batch #{@operation_batch_id} to expose accepted cancellation") do
-    observed = operation_batch_view
+    observed = operation_batch_view(limit: 1)
     matched = observed&.fetch("status", nil) == "cancelling" &&
               observed.dig("cancellation", "event", "type") == "OperationBatchCancellationRequested"
     [ matched, observed ]

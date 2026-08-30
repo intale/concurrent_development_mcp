@@ -67,7 +67,7 @@ module OperationBatchAcceptanceWorld
       "Operation Batch #{batch_id} to expose #{expected.fetch(:status)}",
       timeout_seconds:
     ) do
-      view = operation_batch_view(batch_id:)
+      view = operation_batch_view(batch_id:, limit: 1)
       matched = view && expected.all? { |key, value| view[key.to_s] == value }
       [ matched, view ]
     end
