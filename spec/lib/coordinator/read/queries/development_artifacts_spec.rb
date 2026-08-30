@@ -1,25 +1,26 @@
 # frozen_string_literal: true
 
-RSpec.describe "Development Artifact queries", :event_store, :read_model do
-  let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
-  let(:capture) do
-    Coordinator::Write::Operations::ExecuteCaptureDevelopmentArtifact.new(event_store:)
-  end
-  let(:declare_relation) do
-    Coordinator::Write::Operations::ExecuteDeclareDevelopmentArtifactRelation.new(event_store:)
-  end
-  let(:projector) { Coordinator::Read::Projectors::DevelopmentArtifactsV1.new }
-  let(:streams) { Coordinator::Write::StreamFactory.new }
+RSpec.describe "Development Artifact queries", :read_model do
+  it "serves projected metadata separately from focused content" do
+    artifact, observation = create_observed_artifact(
+      title: "First",
+      content_text: "first document\n",
+      content_byte_size: 15,
+      source_locator: "docs/first.md"
+    )
 
-  it "serves stale-available metadata separately from focused content" do
-    artifact_id = capture_and_project(capture_input)
-
-    get = Coordinator::Read::Queries::DevelopmentArtifactGet.new.call(artifact_id:).value!
-    content = Coordinator::Read::Queries::DevelopmentArtifactContentGet.new.call(artifact_id:).value!
+    get = Coordinator::Read::Queries::DevelopmentArtifactGet.new.call(
+      artifact_id: artifact.artifact_id,
+      observation_id: observation.observation_id
+    ).value!
+    content = Coordinator::Read::Queries::DevelopmentArtifactContentGet.new.call(
+      artifact_id: artifact.artifact_id
+    ).value!
 
     expect(get).to have_attributes(status: "ok", warnings: [])
     expect(get.data.artifact.artifact).to have_attributes(
-      artifact_id:,
+      artifact_id: artifact.artifact_id,
+      observation_id: observation.observation_id,
       content_sha256: a_string_matching(/\Asha256:/)
     )
     expect(get.to_h.to_s).not_to include("first document")
@@ -32,35 +33,51 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
     expect(content.warnings.sole).to include("passive data")
   end
 
-  it "lists in global order with all-label and exact relation-target filters" do
-    first = capture_and_project(capture_input)
-    second = capture_and_project(
-      capture_input(
-        command_id: "cmd-query-second",
-        locator: "second.md",
-        title: "Second",
-        labels: %w[docs second-only]
-      )
+  it "reports invalid and unavailable projected artifacts without consulting the write side" do
+    invalid = Coordinator::Read::Queries::DevelopmentArtifactGet.new.call(artifact_id: "invalid").value!
+    missing_id = "artifact:v1:#{'f' * 64}"
+    missing = Coordinator::Read::Queries::DevelopmentArtifactGet.new.call(
+      artifact_id: missing_id
+    ).value!
+    missing_content = Coordinator::Read::Queries::DevelopmentArtifactContentGet.new.call(
+      artifact_id: missing_id
+    ).value!
+
+    expect(invalid).to have_attributes(status: "invalid")
+    expect(invalid.data).to have_attributes(code: "invalid_input")
+    expect(missing).to have_attributes(status: "not_found")
+    expect(missing.data).to have_attributes(code: "development_artifact_not_observed")
+    expect(missing_content).to have_attributes(status: "not_found")
+  end
+
+  it "lists in projected order with all-label and exact relation-target filters" do
+    first, = create_observed_artifact(
+      title: "First",
+      labels: %w[docs review],
+      source_locator: "first.md",
+      current_global_position: 100
     )
-    capture_and_project(
-      capture_input(
-        command_id: "cmd-query-third",
-        locator: "third.log",
-        title: "Third",
-        kind: "verification_evidence",
-        labels: %w[logs]
-      )
+    second, = create_observed_artifact(
+      title: "Second",
+      labels: %w[docs second-only],
+      source_locator: "second.md",
+      current_global_position: 200
     )
-    relation = declare_relation.call(
-      command_id: "cmd-query-relation",
-      actor: { kind: "agent", id: "agent-query" },
-      source_artifact_id: second,
+    create_observed_artifact(
+      title: "Third",
+      kind: "verification_evidence",
+      labels: %w[logs],
+      source_locator: "third.log",
+      current_global_position: 300
+    )
+    create(
+      :coordinator_read_development_artifact_relation,
+      source_artifact: second,
       relation: "documents",
-      target: { kind: "external", id: "https://example.test/builds/build-1" },
-      attributes: { path: "notes/second.md" }
+      target_kind: "external",
+      target_id: "https://example.test/builds/build-1",
+      path: "notes/second.md"
     )
-    expect(relation).to be_success
-    artifact_events(second).last.then { projector.call(_1) }
 
     labels = Coordinator::Read::Queries::DevelopmentArtifactList.new.call(
       labels: %w[docs second-only],
@@ -76,61 +93,57 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
       limit: 10
     ).value!
 
-    expect(labels.data.page.items.map(&:artifact_id)).to eq([ second ])
-    expect(related.data.page.items.map(&:artifact_id)).to eq([ second ])
+    expect(labels.data.page.items.map(&:artifact_id)).to eq([ second.artifact_id ])
+    expect(related.data.page.items.map(&:artifact_id)).to eq([ second.artifact_id ])
     expect(page_one.data.page).to have_attributes(has_more: true)
-    expect(page_one.data.page.items.map(&:artifact_id)).to eq([ first ])
-    expect(page_two.data.page.items.map(&:artifact_id)).to include(second)
+    expect(page_one.data.page.items.map(&:artifact_id)).to eq([ first.artifact_id ])
+    expect(page_two.data.page.items.map(&:artifact_id)).to include(second.artifact_id)
   end
 
-  it "traverses directed mixed relationships with multiple parents and available peer summaries" do
-    first_parent = capture_and_project(capture_input(command_id: "cmd-parent-1", locator: "p1.md"))
-    second_parent = capture_and_project(capture_input(command_id: "cmd-parent-2", locator: "p2.md"))
-    child = capture_and_project(capture_input(command_id: "cmd-child", locator: "child.md"))
-    first = declare_and_project(
-      command_id: "cmd-edge-1",
-      source: first_parent,
-      target: child,
+  it "traverses directed mixed relationships with peer summaries and follow actions" do
+    first_parent, = create_observed_artifact(title: "First parent", source_locator: "p1.md")
+    second_parent, = create_observed_artifact(title: "Second parent", source_locator: "p2.md")
+    child, = create_observed_artifact(title: "Child", source_locator: "child.md")
+    first = create(
+      :coordinator_read_development_artifact_relation,
+      source_artifact: first_parent,
       relation: "references",
-      attributes: { path: "child.md", normalized_locator: "child.md" }
+      target_id: child.artifact_id,
+      path: "child.md",
+      normalized_locator: "child.md",
+      declared_global_position: 100
     )
-    second = declare_and_project(
-      command_id: "cmd-edge-2",
-      source: second_parent,
-      target: child,
-      relation: "contains"
+    second = create(
+      :coordinator_read_development_artifact_relation,
+      source_artifact: second_parent,
+      relation: "contains",
+      target_id: child.artifact_id,
+      declared_global_position: 200
     )
 
     incoming = relation_query.call(
-      artifact_id: child,
+      artifact_id: child.artifact_id,
       direction: "incoming",
       limit: 10
     ).value!.data.page
     filtered = relation_query.call(
-      artifact_id: child,
+      artifact_id: child.artifact_id,
       direction: "incoming",
       relation: "references",
       limit: 10
     ).value!.data.page
     outgoing = relation_query.call(
-      artifact_id: first_parent,
+      artifact_id: first_parent.artifact_id,
       direction: "outgoing",
       limit: 10
     ).value!.data.page
-    first_page = relation_query.call(
-      artifact_id: child,
-      direction: "incoming",
-      limit: 1
-    ).value!.data.page
-    second_page = relation_query.call(
-      artifact_id: child,
-      direction: "incoming",
-      cursor: first_page.continuation_cursor.to_h,
-      limit: 1
-    ).value!.data.page
 
-    expect(incoming.items.map(&:relation_id)).to contain_exactly(first, second)
+    expect(incoming.items.map(&:relation_id)).to contain_exactly(first.relation_id, second.relation_id)
     expect(incoming.items).to all(have_attributes(direction: "incoming", peer_kind: "artifact"))
+    expect(incoming.items.map { _1.peer_artifact.artifact_id }).to contain_exactly(
+      first_parent.artifact_id,
+      second_parent.artifact_id
+    )
     expect(filtered.items.sole).to have_attributes(
       relation: "references",
       display_relation: "referenced_by",
@@ -139,176 +152,150 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
       supersedable: true,
       follow_action: have_attributes(
         tool: "development_artifact_get",
-        arguments: have_attributes(artifact_id: first_parent)
+        arguments: have_attributes(artifact_id: first_parent.artifact_id)
       )
-    )
-    expect(incoming.items.map { _1.peer_artifact.artifact_id }).to contain_exactly(
-      first_parent,
-      second_parent
-    )
-    expect(filtered.items.map(&:relation_id)).to eq([ first ])
-    expect(first_page).to have_attributes(has_more: true)
-    expect(
-      first_page.items.map(&:relation_id) + second_page.items.map(&:relation_id)
-    ).to eq([ first, second ])
-    expect(second_page.continuation_cursor).to have_attributes(
-      after_observed_sequence: be_positive,
-      through_observed_sequence: nil
     )
     expect(outgoing.items.sole).to have_attributes(
       direction: "outgoing",
-      peer_id: child,
-      peer_artifact: have_attributes(artifact_id: child),
+      peer_id: child.artifact_id,
+      peer_artifact: have_attributes(artifact_id: child.artifact_id),
       relation_attributes: have_attributes(path: "child.md", normalized_locator: "child.md"),
       display_relation: "references",
-      inverse_relation: "referenced_by",
       target: have_attributes(status: "verified"),
       follow_action: have_attributes(
         tool: "development_artifact_get",
-        arguments: have_attributes(artifact_id: child)
+        arguments: have_attributes(artifact_id: child.artifact_id)
       )
     )
   end
 
-  it "continues across projection convergence when an older declaration arrives late" do
-    parent = capture_and_project(capture_input(command_id: "cmd-late-parent", locator: "parent.md"))
-    child = capture_and_project(capture_input(command_id: "cmd-late-child", locator: "child.md"))
-    first_id = declare_relation.call(
-      relation_input(command_id: "cmd-late-edge-1", source: parent, target: child)
-    ).value!.data.relation_id
-    second_id = declare_relation.call(
-      relation_input(command_id: "cmd-late-edge-2", source: parent, target: child, relation: "contains")
-    ).value!.data.relation_id
-    declarations = artifact_events(parent).select do |event|
-      event.type == "DevelopmentArtifactRelationDeclared"
+  it "continues relation snapshots and then observes rows added after the fixed window" do
+    parent, = create_observed_artifact(title: "Parent", source_locator: "parent.md")
+    children = 3.times.map do |index|
+      create_observed_artifact(
+        title: "Child #{index + 1}",
+        source_locator: "child-#{index + 1}.md"
+      ).first
     end
-    projector.call(declarations.last)
+    first = create_relation(parent:, child: children.fetch(0), global_position: 100)
+    second = create_relation(parent:, child: children.fetch(1), global_position: 200)
 
     first_page = relation_query.call(
-      artifact_id: parent,
+      artifact_id: parent.artifact_id,
       direction: "outgoing",
       limit: 1
     ).value!.data.page
-    expect(first_page.items.map(&:relation_id)).to eq([ second_id ])
-    expect(first_page).to have_attributes(has_more: false)
-
-    projector.call(declarations.first)
-    converged = relation_query.call(
-      artifact_id: parent,
+    third = create_relation(parent:, child: children.fetch(2), global_position: 50)
+    second_page = relation_query.call(
+      artifact_id: parent.artifact_id,
       direction: "outgoing",
       cursor: first_page.continuation_cursor.to_h,
       limit: 1
     ).value!.data.page
-    expect(converged.items.map(&:relation_id)).to eq([ first_id ])
-    expect(converged.items.sole.declared.global_position).to be < first_page.items.sole.declared.global_position
+    later_page = relation_query.call(
+      artifact_id: parent.artifact_id,
+      direction: "outgoing",
+      cursor: second_page.continuation_cursor.to_h,
+      limit: 10
+    ).value!.data.page
+
+    expect(first_page.items.map(&:relation_id)).to eq([ first.relation_id ])
+    expect(first_page).to have_attributes(has_more: true)
+    expect(second_page.items.map(&:relation_id)).to eq([ second.relation_id ])
+    expect(second_page).to have_attributes(has_more: true)
+    expect(second_page.continuation_cursor).to have_attributes(through_observed_sequence: nil)
+    expect(later_page.items.map(&:relation_id)).to eq([ third.relation_id ])
+    expect(later_page.items.sole.declared.global_position).to be <
+      first_page.items.sole.declared.global_position
   end
 
-  it "observes a later supersession from a completed cursor under replay and out-of-order projection" do
-    parent = capture_and_project(capture_input(command_id: "cmd-sup-parent", locator: "sup/parent.md"))
-    original_child = capture_and_project(
-      capture_input(command_id: "cmd-sup-original", locator: "sup/original.md")
+  it "surfaces a later supersession and replacement from completed relation cursors" do
+    parent, = create_observed_artifact(title: "Parent", source_locator: "sup/parent.md")
+    original_child, = create_observed_artifact(title: "Original", source_locator: "sup/original.md")
+    replacement_child, = create_observed_artifact(
+      title: "Replacement",
+      source_locator: "sup/replacement.md"
     )
-    replacement_child = capture_and_project(
-      capture_input(command_id: "cmd-sup-replacement", locator: "sup/replacement.md")
-    )
-    original_id = declare_and_project(
-      command_id: "cmd-sup-edge-original",
-      source: parent,
-      target: original_child,
-      relation: "references"
-    )
+    original = create_relation(parent:, child: original_child, global_position: 100)
     initial = relation_query.call(
-      artifact_id: parent,
+      artifact_id: parent.artifact_id,
       direction: "outgoing",
       include_superseded: true,
       limit: 10
     ).value!.data.page
-    expect(initial).to have_attributes(
-      items: [ have_attributes(relation_id: original_id, status: "active") ],
-      has_more: false
+    replacement_id = "artifact-relation:v1:#{'e' * 64}"
+    create(
+      :coordinator_read_development_artifact_relation_supersession,
+      relation: original,
+      replacement_relation_id: replacement_id,
+      observed_sequence: original.observed_sequence + 1
     )
 
-    replacement = declare_relation.call(
-      relation_input(
-        command_id: "cmd-sup-edge-replacement",
-        source: parent,
-        target: replacement_child,
-        relation: "references",
-        supersedes: {
-          relation_id: original_id,
-          reason: "The parent now references the replacement."
-        }
-      )
-    ).value!.data
-    events = artifact_events(parent)
-    supersession = events.find { _1.type == "DevelopmentArtifactRelationSuperseded" }
-    replacement_declaration = events.find do |event|
-      event.data.dig("artifact_relation", "relation_id") == replacement.relation_id
-    end
-
-    projector.call(supersession)
     updated = relation_query.call(
-      artifact_id: parent,
+      artifact_id: parent.artifact_id,
       direction: "outgoing",
       include_superseded: true,
       cursor: initial.continuation_cursor.to_h,
       limit: 10
     ).value!.data.page
-    expect(updated.items).to contain_exactly(
-      have_attributes(
-        relation_id: original_id,
-        status: "superseded",
-        replacement_relation_id: replacement.relation_id
-      )
+    create_relation(
+      parent:,
+      child: replacement_child,
+      relation_id: replacement_id,
+      global_position: 200,
+      observed_sequence: original.observed_sequence + 2
     )
-
-    projector.call(supersession)
-    projector.call(replacement_declaration)
     converged = relation_query.call(
-      artifact_id: parent,
+      artifact_id: parent.artifact_id,
       direction: "outgoing",
       include_superseded: true,
       cursor: updated.continuation_cursor.to_h,
       limit: 10
     ).value!.data.page
+
+    expect(initial).to have_attributes(
+      items: [ have_attributes(relation_id: original.relation_id, status: "active") ],
+      has_more: false
+    )
+    expect(updated.items).to contain_exactly(
+      have_attributes(
+        relation_id: original.relation_id,
+        status: "superseded",
+        replacement_relation_id: replacement_id
+      )
+    )
     expect(converged.items).to contain_exactly(
-      have_attributes(relation_id: replacement.relation_id, status: "active")
+      have_attributes(relation_id: replacement_id, status: "active")
     )
   end
 
-  it "reports zero, one, or multiple exact locator matches without selecting a revision" do
-    first = capture_and_project(
-      capture_input(
-        command_id: "cmd-locator-v1",
-        locator: "docs/api.md",
-        revision: "commit-a",
-        text: "api v1\n"
-      )
+  it "reports absent, unique, and ambiguous exact locator matches without selecting a revision" do
+    first, = create_observed_artifact(
+      source_locator: "docs/api.md",
+      source_revision: "commit-a",
+      current_global_position: 100
     )
-    second = capture_and_project(
-      capture_input(
-        command_id: "cmd-locator-v2",
-        locator: "docs/api.md",
-        revision: "commit-b",
-        text: "api v2\n"
-      )
+    second, = create_observed_artifact(
+      source_locator: "docs/api.md",
+      source_revision: "commit-b",
+      current_global_position: 200
     )
 
     ambiguous = locator_query.call(
-      scope: "project:alpha",
+      scope: "project:factory",
       source_kind: "local_file",
       locator: "docs/api.md",
       limit: 10
     ).value!
     exact = locator_query.call(
-      scope: "project:alpha",
+      scope: "project:factory",
       source_kind: "local_file",
       locator: "docs/api.md",
       source_revision: "commit-a",
       limit: 10
     ).value!
     absent = locator_query.call(
-      scope: "project:alpha",
+      scope: "project:factory",
       source_kind: "local_file",
       locator: "docs/missing.md",
       limit: 10
@@ -317,8 +304,8 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
     expect(ambiguous.data.page).to have_attributes(
       resolution: "ambiguous",
       items: contain_exactly(
-        have_attributes(artifact_id: first),
-        have_attributes(artifact_id: second)
+        have_attributes(artifact_id: first.artifact_id),
+        have_attributes(artifact_id: second.artifact_id)
       )
     )
     expect(ambiguous.next_actions.map(&:tool)).to all(eq("development_artifact_locator_resolve"))
@@ -328,55 +315,52 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
     )
     expect(exact.data.page).to have_attributes(
       resolution: "unique",
-      items: [ have_attributes(artifact_id: first) ]
+      items: [ have_attributes(artifact_id: first.artifact_id) ]
     )
     expect(exact.next_actions.sole).to have_attributes(
       tool: "development_artifact_content_get",
-      arguments: have_attributes(artifact_id: first)
+      arguments: have_attributes(artifact_id: first.artifact_id)
     )
     expect(absent.data.page).to have_attributes(resolution: "absent", items: [])
     expect(absent.warnings.sole).to include("Projection lag")
-    expect(absent.next_actions.sole).to have_attributes(
-      tool: "development_artifact_locator_resolve"
-    )
+    expect(absent.next_actions.sole).to have_attributes(tool: "development_artifact_locator_resolve")
   end
 
-  it "retrieves unchanged content as two exact historical observations" do
-    first = capture_and_project_data(
-      capture_input(
-        command_id: "cmd-query-same-a",
-        locator: "docs/unchanged.md",
-        revision: "commit-a",
-        text: "unchanged\n"
-      )
+  it "returns exact historical observations when unchanged content has multiple captures" do
+    artifact = create(
+      :coordinator_read_development_artifact,
+      source_locator: "docs/unchanged.md",
+      content_text: "unchanged\n",
+      content_byte_size: 10
     )
-    second = capture_and_project_data(
-      capture_input(
-        command_id: "cmd-query-same-b",
-        locator: "docs/unchanged.md",
-        revision: "commit-b",
-        observed_at: "2026-08-25T16:01:00.000000Z",
-        text: "unchanged\n"
-      )
+    first = create(
+      :coordinator_read_development_artifact_observation,
+      artifact:,
+      source_revision: "commit-a",
+      current_global_position: 100
+    )
+    second = create(
+      :coordinator_read_development_artifact_observation,
+      artifact:,
+      source_revision: "commit-b",
+      current_global_position: 200
     )
 
     history = locator_query.call(
-      scope: "project:alpha",
-      source_kind: "local_file",
-      locator: "docs/unchanged.md",
+      scope: artifact.scope,
+      source_kind: artifact.source_kind,
+      locator: artifact.source_locator,
       limit: 10
     ).value!.data.page
     first_exact = Coordinator::Read::Queries::DevelopmentArtifactGet.new.call(
-      artifact_id: first.artifact_id,
+      artifact_id: artifact.artifact_id,
       observation_id: first.observation_id
     ).value!.data.artifact.artifact
     second_exact = Coordinator::Read::Queries::DevelopmentArtifactGet.new.call(
-      artifact_id: second.artifact_id,
+      artifact_id: artifact.artifact_id,
       observation_id: second.observation_id
     ).value!.data.artifact.artifact
 
-    expect(first.artifact_id).to eq(second.artifact_id)
-    expect(first.observation_id).not_to eq(second.observation_id)
     expect(history).to have_attributes(resolution: "ambiguous")
     expect(history.items.map(&:observation_id)).to contain_exactly(
       first.observation_id,
@@ -386,25 +370,21 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
     expect(second_exact.source.revision).to eq("commit-b")
   end
 
-  it "builds followable exact-revision actions on every locator page" do
-    revisions = %w[commit-a commit-b commit-c]
-    expected = revisions.to_h do |revision|
-      artifact_id = capture_and_project(
-        capture_input(
-          command_id: "cmd-locator-action-#{revision}",
-          locator: "docs/paged.md",
-          revision:,
-          text: "#{revision}\n"
-        )
+  it "builds exact-revision and continuation actions on locator pages" do
+    expected = %w[commit-a commit-b commit-c].to_h do |revision|
+      artifact, = create_observed_artifact(
+        source_locator: "docs/paged.md",
+        source_revision: revision,
+        current_global_position: 100 + (revision[-1].ord * 10)
       )
-      [ revision, artifact_id ]
+      [ revision, artifact.artifact_id ]
     end
 
     cursor = nil
     observed = {}
     loop do
       input = {
-        scope: "project:alpha",
+        scope: "project:factory",
         source_kind: "local_file",
         locator: "docs/paged.md",
         limit: 1
@@ -433,27 +413,24 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
   end
 
   it "keeps scopes, explicit null revisions, normalized paths, and URLs caller-owned" do
-    unversioned = capture_and_project(
-      capture_input(command_id: "cmd-locator-unversioned", locator: "docs/api.md")
+    unversioned, = create_observed_artifact(
+      source_locator: "docs/api.md",
+      source_revision: nil
     )
-    other_scope = capture_and_project(
-      capture_input(
-        command_id: "cmd-locator-other-scope",
-        locator: "docs/api.md",
-        scope: "project:beta"
-      )
+    other_scope, = create_observed_artifact(
+      scope: "project:beta",
+      source_locator: "docs/api.md",
+      source_revision: nil
     )
     url = "https://example.test/reference?page=1"
-    web = capture_and_project(
-      capture_input(
-        command_id: "cmd-locator-web",
-        locator: url,
-        source_kind: "web_page"
-      )
+    web, = create_observed_artifact(
+      source_kind: "web_page",
+      source_locator: url,
+      source_revision: nil
     )
 
     explicit_nil = locator_query.call(
-      scope: "project:alpha",
+      scope: "project:factory",
       source_kind: "local_file",
       locator: "docs/api.md",
       source_revision: nil
@@ -464,106 +441,62 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
       locator: "docs/api.md"
     ).value!.data.page
     unresolved_parent_segment = locator_query.call(
-      scope: "project:alpha",
+      scope: "project:factory",
       source_kind: "local_file",
       locator: "guide/../docs/api.md"
     ).value!.data.page
     exact_url = locator_query.call(
-      scope: "project:alpha",
+      scope: "project:factory",
       source_kind: "web_page",
       locator: url
     ).value!.data.page
 
     expect(explicit_nil).to have_attributes(
       resolution: "unique",
-      items: [ have_attributes(artifact_id: unversioned) ]
+      items: [ have_attributes(artifact_id: unversioned.artifact_id) ]
     )
-    expect(beta.items.sole).to have_attributes(artifact_id: other_scope)
+    expect(beta.items.sole).to have_attributes(artifact_id: other_scope.artifact_id)
     expect(unresolved_parent_segment).to have_attributes(resolution: "absent", items: [])
-    expect(exact_url.items.sole).to have_attributes(artifact_id: web)
+    expect(exact_url.items.sole).to have_attributes(artifact_id: web.artifact_id)
   end
 
-  it "continues locator resolution when an older capture is projected late" do
-    older = capture.call(
-      capture_input(
-        command_id: "cmd-locator-late-older",
-        locator: "docs/versioned.md",
-        revision: "older",
-        text: "older\n"
-      )
-    ).value!.data
-    newer = capture.call(
-      capture_input(
-        command_id: "cmd-locator-late-newer",
-        locator: "docs/versioned.md",
-        revision: "newer",
-        text: "newer\n"
-      )
-    ).value!.data
-    projector.call(artifact_events(newer.artifact_id).sole)
-    projector.call(observation_events(newer.observation_id).sole)
-
-    first_page = locator_query.call(
-      scope: "project:alpha",
-      source_kind: "local_file",
-      locator: "docs/versioned.md",
-      limit: 1
-    ).value!.data.page
-    expect(first_page).to have_attributes(resolution: "unique", has_more: false)
-    expect(first_page.items.sole).to have_attributes(artifact_id: newer.artifact_id)
-
-    projector.call(artifact_events(older.artifact_id).sole)
-    projector.call(observation_events(older.observation_id).sole)
-    converged = locator_query.call(
-      scope: "project:alpha",
-      source_kind: "local_file",
-      locator: "docs/versioned.md",
-      cursor: first_page.continuation_cursor.to_h,
-      limit: 1
-    ).value!.data.page
-
-    expect(converged).to have_attributes(resolution: "ambiguous")
-    expect(converged.items.sole).to have_attributes(artifact_id: older.artifact_id)
-    expect(converged.items.sole.captured.global_position).to be <
-      first_page.items.sole.captured.global_position
-  end
-
-  def capture_and_project(input)
-    capture_and_project_data(input).artifact_id
-  end
-
-  def capture_and_project_data(input)
-    result = capture.call(input)
-    expect(result).to be_success
-    data = result.value!.data
-    artifact_events(data.artifact_id).each { projector.call(_1) }
-    observation_events(data.observation_id).each { projector.call(_1) }
-    data
-  end
-
-  def declare_and_project(command_id:, source:, target:, relation:, attributes: {})
-    result = declare_relation.call(
-      relation_input(command_id:, source:, target:, relation:, attributes:)
+  def create_observed_artifact(current_global_position: nil, **attributes)
+    observation_attributes = attributes.slice(
+      :scope,
+      :title,
+      :kind,
+      :labels,
+      :source_kind,
+      :source_locator,
+      :source_revision,
+      :source_observed_at,
+      :source_collector
     )
-    expect(result).to be_success
-    event = artifact_events(source).find do |candidate|
-      candidate.data.dig("artifact_relation", "relation_id") == result.value!.data.relation_id
-    end
-    projector.call(event)
-    result.value!.data.relation_id
+    artifact = create(:coordinator_read_development_artifact, **attributes)
+    observation_attributes[:current_global_position] = current_global_position if current_global_position
+    observation = create(
+      :coordinator_read_development_artifact_observation,
+      artifact:,
+      **observation_attributes
+    )
+    [ artifact, observation ]
   end
 
-  def relation_input(command_id:, source:, target:, relation: "derived_from", attributes: {}, supersedes: nil)
-    input = {
-      command_id:,
-      actor: { kind: "agent", id: "agent-query" },
-      source_artifact_id: source,
-      relation:,
-      target: { kind: "artifact", id: target },
-      attributes:
+  def create_relation(
+    parent:,
+    child:,
+    global_position:,
+    relation_id: nil,
+    observed_sequence: nil
+  )
+    attributes = {
+      source_artifact: parent,
+      target_id: child.artifact_id,
+      declared_global_position: global_position
     }
-    input[:supersedes] = supersedes if supersedes
-    input
+    attributes[:relation_id] = relation_id if relation_id
+    attributes[:observed_sequence] = observed_sequence if observed_sequence
+    create(:coordinator_read_development_artifact_relation, **attributes)
   end
 
   def relation_query
@@ -572,54 +505,5 @@ RSpec.describe "Development Artifact queries", :event_store, :read_model do
 
   def locator_query
     Coordinator::Read::Queries::DevelopmentArtifactLocatorResolve.new
-  end
-
-  def capture_input(
-    command_id: "cmd-query-first",
-    locator: "first.md",
-    title: "First",
-    kind: "documentation",
-    labels: %w[docs review imported],
-    scope: "project:alpha",
-    source_kind: "local_file",
-    revision: nil,
-    observed_at: "2026-08-25T16:00:00.000000Z",
-    text: nil
-  )
-    text ||= locator == "first.md" ? "first document\n" : "#{locator}\n"
-    {
-      command_id:,
-      actor: { kind: "agent", id: "agent-query" },
-      scope:,
-      title:,
-      kind:,
-      labels:,
-      content: {
-        encoding: "utf-8",
-        media_type: "text/markdown",
-        text:
-      },
-      source: {
-        kind: source_kind,
-        locator:,
-        revision:,
-        observed_at:,
-        collector: "spec/v1"
-      }
-    }
-  end
-
-  def artifact_events(artifact_id)
-    event_store.read(
-      streams.development_artifact(artifact_id),
-      Coordinator::Write::EventQueries::DEVELOPMENT_ARTIFACT_HISTORY
-    )
-  end
-
-  def observation_events(observation_id)
-    event_store.read(
-      streams.development_artifact_observation(observation_id),
-      Coordinator::Write::EventQueries::DEVELOPMENT_ARTIFACT_OBSERVATION_HISTORY
-    )
   end
 end

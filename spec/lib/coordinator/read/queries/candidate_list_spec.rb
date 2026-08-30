@@ -1,24 +1,20 @@
 # frozen_string_literal: true
 
-RSpec.describe Coordinator::Read::Queries::CandidateList, :event_store, :read_model do
+RSpec.describe Coordinator::Read::Queries::CandidateList, :read_model do
   subject(:query) { described_class.new }
 
-  let(:projector) { Coordinator::Read::Projectors::CandidatesV1.new }
-
-  it "pages Attempt checkpoints with Kaminari behind an opaque global-position cursor" do
-    prepared = CandidateScenario.prepare(prefix: "candidate-list")
-    inputs = %w[b e f].each_with_index.map do |oid_character, index|
-      prepared.fetch(:input).merge(
-        command_id: "cmd-candidate-list-#{index}",
-        candidate_id: "CAN-candidate-list-#{index}",
-        head_commit_oid: oid_character * 40
+  it "pages Attempt checkpoints behind an opaque global-position cursor" do
+    attempt_id = "A-candidate-list"
+    %w[0 1 2].each_with_index do |suffix, index|
+      create(
+        :coordinator_read_candidate,
+        :manifest_observed,
+        candidate_id: "CAN-candidate-list-#{suffix}",
+        attempt_id:,
+        submitted_global_position: 100 + index,
+        head_commit_oid: (index + 2).to_s * 40
       )
     end
-    inputs.each do |input|
-      CandidateScenario.execute(Coordinator::Write::Operations::ExecuteSubmitCandidate, input)
-      CandidateScenario.candidate_events(input.fetch(:candidate_id)).each { projector.call(_1) }
-    end
-    attempt_id = prepared.dig(:ids, :attempt_id)
 
     first = query.call(attempt_id:, limit: 2).value!.data.page
     expect(first).to have_attributes(has_more: true)

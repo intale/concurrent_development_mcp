@@ -1,8 +1,9 @@
 # frozen_string_literal: true
 
-RSpec.describe "DEC-02A MCP Decision correction", :event_store, :read_model do
+RSpec.describe "DEC-02A MCP Decision correction" do
   CORRECTION_PROTOCOL_VERSION = "2026-07-28"
   CORRECTION_TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
+  CORRECTION_REPOSITORY_ID = "018f0f4d-4e45-7abc-8def-000000000731"
 
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
@@ -12,7 +13,7 @@ RSpec.describe "DEC-02A MCP Decision correction", :event_store, :read_model do
     end
   end
 
-  it "corrects through a traced Task while a stale view stays available and is safely rejected" do
+  it "corrects through a traced Task and safely rejects a stale expected head", :event_store do
     activated = seed_active_decision
     seed_correction(
       interpretation_id: "I-mcp-correction",
@@ -26,10 +27,7 @@ RSpec.describe "DEC-02A MCP Decision correction", :event_store, :read_model do
       suffix: "stale-correction",
       value: InterpretationInput.named_choice("test-unit")
     )
-    decision_events.each { projector.call(_1) }
-
-    active_view = decision_get(id: 1)
-    expected_head = active_view.dig("data", "decision", "current_head", "event")
+    expected_head = event_reference_hash(activated)
     expect(expected_head).to include(
       "event_id" => activated.id,
       "type" => "DecisionActivated",
@@ -41,13 +39,13 @@ RSpec.describe "DEC-02A MCP Decision correction", :event_store, :read_model do
       interpretation_id: "I-mcp-correction",
       expected_head:
     )
-    created = call_tool("decision_correct", arguments, id: 2)
+    created = call_tool("decision_correct", arguments, id: 1)
     task_id = created.dig("result", "taskId")
     expect(task_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
     expect(task_events(task_id).map(&:type)).to eq([ "CoordinationTaskSubmitted" ])
 
     execute_task(task_id)
-    completed = task_request("tasks/get", task_id, id: 3)
+    completed = task_request("tasks/get", task_id, id: 2)
     result = completed.dig("result", "result", "structuredContent")
     expect(completed.dig("result", "status")).to eq("completed")
     expect(completed.dig("result", "result", "isError")).to be(false)
@@ -87,26 +85,14 @@ RSpec.describe "DEC-02A MCP Decision correction", :event_store, :read_model do
       [ submitted.correlation_id ]
     )
 
-    stale_view = decision_get(id: 4)
-    expect(stale_view).to include(
-      "status" => "ok",
-      "data" => include(
-        "decision" => include(
-          "interpretation_id" => "I-mcp-decision",
-          "correction_count" => 0,
-          "current_head" => include("event" => include("event_id" => activated.id))
-        )
-      )
-    )
-
     stale_arguments = correction_arguments(
       command_id: "cmd-mcp-stale-correction",
       interpretation_id: "I-mcp-stale-correction",
       expected_head:
     )
-    stale_task_id = call_tool("decision_correct", stale_arguments, id: 5).dig("result", "taskId")
+    stale_task_id = call_tool("decision_correct", stale_arguments, id: 3).dig("result", "taskId")
     execute_task(stale_task_id)
-    denied = task_request("tasks/get", stale_task_id, id: 6)
+    denied = task_request("tasks/get", stale_task_id, id: 4)
     expect(denied.dig("result", "result")).to include(
       "isError" => true,
       "structuredContent" => include(
@@ -123,8 +109,36 @@ RSpec.describe "DEC-02A MCP Decision correction", :event_store, :read_model do
     expect(command_events(stale_arguments.fetch(:command_id))).to be_empty
     expect(decision_events.count { _1.type == "DecisionDefinitionCorrected" }).to eq(1)
 
-    projector.call(corrected)
-    projected = decision_get(id: 7)
+  end
+
+  it "serves a directly persisted corrected Decision projection", :read_model do
+    corrected_event = {
+      "event_id" => SecureRandom.uuid_v7,
+      "type" => "DecisionDefinitionCorrected",
+      "stream_context" => "HumanGuidance",
+      "stream_name" => "Decision",
+      "stream_id" => "D-mcp-decision",
+      "stream_revision" => 2
+    }
+    create(
+      :coordinator_read_decision_definition,
+      :active,
+      decision_id: "D-mcp-decision",
+      interpretation_id: "I-mcp-correction",
+      repository_id: CORRECTION_REPOSITORY_ID,
+      previous_definition_digest: "sha256:#{'a' * 64}",
+      correction_count: 1,
+      correction_rationale: {
+        "code" => "normalization_corrected",
+        "summary" => "Use the accepted normalized choice."
+      },
+      corrected_event:,
+      corrected_actor: { "kind" => "orchestrator", "id" => "guidance-host", "authenticated" => false },
+      corrected_at_domain: Time.utc(2026, 8, 30, 12, 2),
+      corrected_at_store: Time.utc(2026, 8, 30, 12, 2, 1)
+    )
+
+    projected = decision_get(id: 5)
     expect(projected).to include(
       "status" => "ok",
       "data" => include(
@@ -134,7 +148,7 @@ RSpec.describe "DEC-02A MCP Decision correction", :event_store, :read_model do
           "correction_rationale" => include("code" => "normalization_corrected"),
           "current_head" => include(
             "event" => include(
-              "event_id" => corrected.id,
+              "event_id" => corrected_event.fetch("event_id"),
               "type" => "DecisionDefinitionCorrected",
               "stream_revision" => 2
             )
@@ -144,7 +158,7 @@ RSpec.describe "DEC-02A MCP Decision correction", :event_store, :read_model do
     )
   end
 
-  it "rejects malformed correction input before allocating a Task" do
+  it "rejects malformed correction input before allocating a Task", :event_store do
     response = call_tool(
       "decision_correct",
       correction_arguments(
@@ -210,7 +224,7 @@ RSpec.describe "DEC-02A MCP Decision correction", :event_store, :read_model do
       source: "mcp_client",
       text: "Use the selected test framework.",
       anchors: {
-        repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
+        repository_ids: [ CORRECTION_REPOSITORY_ID ],
         change_set_id: nil,
         work_item_id: nil,
         attempt_id: nil
@@ -336,7 +350,7 @@ RSpec.describe "DEC-02A MCP Decision correction", :event_store, :read_model do
 
   def partition_events
     event_store.read(
-      streams.decision_partition("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing"),
+      streams.decision_partition("repo:#{CORRECTION_REPOSITORY_ID}:testing"),
       Coordinator::Write::EventReadCriteria.new(
         event_types: [ "DecisionPartitionAdvanced" ],
         maximum_count: 10,
@@ -349,7 +363,14 @@ RSpec.describe "DEC-02A MCP Decision correction", :event_store, :read_model do
     event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
   end
 
-  def projector
-    Coordinator::Container["projectors.decision_governance_v1"]
+  def event_reference_hash(event)
+    {
+      "event_id" => event.id,
+      "type" => event.type,
+      "stream_context" => event.stream.context,
+      "stream_name" => event.stream.stream_name,
+      "stream_id" => event.stream.stream_id,
+      "stream_revision" => event.stream_revision
+    }
   end
 end

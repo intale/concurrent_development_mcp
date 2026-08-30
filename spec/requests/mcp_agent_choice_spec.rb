@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
-RSpec.describe "CHO-01 MCP agent choice recording", :event_store, :read_model do
+RSpec.describe "CHO-01 MCP agent choice recording" do
   CHOICE_PROTOCOL_VERSION = "2026-07-28"
   CHOICE_TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
 
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
-  let(:repository_id) { RepositoryScenario::DEFAULT_REPOSITORY_ID }
+  let(:repository_id) { "018f0f4d-4e45-7abc-8def-000000000751" }
   let(:session) do
     ActionDispatch::Integration::Session.new(Rails.application).tap do |integration|
       integration.host! "localhost"
@@ -26,9 +26,9 @@ RSpec.describe "CHO-01 MCP agent choice recording", :event_store, :read_model do
     }
   end
 
-  before { seed_active_attempt }
+  before(:each, :event_store) { seed_active_attempt }
 
-  it "records an authoritative choice through a traced Task" do
+  it "records an authoritative choice through a traced Task", :event_store do
     decision_context = resolve_context(id: 1)
     arguments = choice_arguments(
       command_id: "cmd-mcp-choice",
@@ -69,47 +69,53 @@ RSpec.describe "CHO-01 MCP agent choice recording", :event_store, :read_model do
       [ submitted.correlation_id ]
     )
 
-    absent = call_tool("agent_choice_get", { choice_id: "CHO-mcp-choice" }, id: 4)
-    expect(absent.dig("result", "structuredContent")).to include(
-      "status" => "not_found",
-      "data" => include("code" => "agent_choice_not_observed")
-    )
+  end
 
-    projector = Coordinator::Container["projectors.agent_choices_v1"]
-    projector.call(choice_facts.first)
-    recorded_view = call_tool("agent_choice_get", { choice_id: "CHO-mcp-choice" }, id: 5)
+  it "serves directly persisted recorded and accepted Choice views", :read_model do
+    recorded = create(
+      :coordinator_read_agent_choice,
+      choice_id: "CHO-mcp-choice-recorded",
+      recorded_causation_id: SecureRandom.uuid_v7,
+      recorded_correlation_id: SecureRandom.uuid_v7
+    )
+    recorded_view = call_tool("agent_choice_get", { choice_id: recorded.choice_id }, id: 4)
       .dig("result", "structuredContent", "data", "choice")
     expect(recorded_view).to include(
-      "choice_id" => "CHO-mcp-choice",
+      "choice_id" => recorded.choice_id,
       "observation_status" => "recorded",
       "selected" => include("option_id" => "rspec"),
       "assessment" => nil,
       "accepted" => nil,
       "recorded" => include(
-        "event" => include("event_id" => choice_facts.first.id),
-        "markers" => include("choice:CHO-mcp-choice"),
-        "metadata" => include("command_id" => "cmd-mcp-choice"),
-        "causation_id" => choice_facts.first.causation_id,
-        "correlation_id" => choice_facts.first.correlation_id
+        "event" => include("event_id" => recorded.recorded_event.fetch("event_id")),
+        "markers" => include("choice:#{recorded.choice_id}"),
+        "causation_id" => recorded.recorded_causation_id,
+        "correlation_id" => recorded.recorded_correlation_id
       )
     )
 
-    projector.call(choice_facts.last)
-    accepted_view = call_tool("agent_choice_get", { choice_id: "CHO-mcp-choice" }, id: 6)
+    accepted = create(
+      :coordinator_read_agent_choice,
+      :accepted,
+      choice_id: "CHO-mcp-choice",
+      accepted_causation_id: SecureRandom.uuid_v7,
+      accepted_correlation_id: SecureRandom.uuid_v7
+    )
+    accepted_view = call_tool("agent_choice_get", { choice_id: accepted.choice_id }, id: 5)
       .dig("result", "structuredContent", "data", "choice")
     expect(accepted_view).to include(
       "observation_status" => "accepted",
       "assessment" => include("basis" => "no_policy"),
       "accepted" => include(
-        "event" => include("event_id" => choice_facts.last.id),
-        "causation_id" => choice_facts.last.causation_id,
-        "correlation_id" => choice_facts.last.correlation_id
+        "event" => include("event_id" => accepted.accepted_event.fetch("event_id")),
+        "causation_id" => accepted.accepted_causation_id,
+        "correlation_id" => accepted.accepted_correlation_id
       )
     )
     expect(accepted_view.keys & %w[fresh pending projection_status]).to be_empty
   end
 
-  it "serves stale context but rejects its later command without choice facts" do
+  it "serves stale context but rejects its later command without choice facts", :event_store do
     stale_context = resolve_context(id: 1)
     seed_active_decision
     arguments = choice_arguments(
@@ -148,7 +154,7 @@ RSpec.describe "CHO-01 MCP agent choice recording", :event_store, :read_model do
     expect(command_events("cmd-mcp-choice-stale")).to be_empty
   end
 
-  it "rejects a forged context digest before allocating a Task" do
+  it "rejects a forged context digest before allocating a Task", :event_store do
     decision_context = resolve_context(id: 1)
     decision_context["digest"] = "sha256:#{'f' * 64}"
     arguments = choice_arguments(
@@ -167,7 +173,12 @@ RSpec.describe "CHO-01 MCP agent choice recording", :event_store, :read_model do
   end
 
   def seed_active_attempt
-    RepositoryScenario.register(event_store:)
+    RepositoryScenario.register(
+      event_store:,
+      key: "mcp-choice",
+      repository_id:,
+      scope: "project:test/mcp-choice"
+    )
     execute(Coordinator::Write::Operations::ExecuteCreateChangeSet, {
       command_id: "seed-mcp-choice-change-set",
       actor: { kind: "agent", id: "planner-1" },

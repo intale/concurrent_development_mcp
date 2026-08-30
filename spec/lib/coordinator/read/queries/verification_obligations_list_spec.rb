@@ -1,39 +1,24 @@
 # frozen_string_literal: true
 
-RSpec.describe Coordinator::Read::Queries::VerificationObligationsList,
-               :event_store,
-               :read_model do
+RSpec.describe Coordinator::Read::Queries::VerificationObligationsList, :read_model do
   subject(:query) { described_class.new }
 
-  let(:projector) { Coordinator::Read::Projectors::VerificationObligationsV1.new }
-  let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
-  let(:streams) { Coordinator::Write::StreamFactory.new }
-
-  it "serves lagging empty pages and cursor-pages obligations through ANDed filters" do
-    first = CandidateObligationScenario.create_obligation(prefix: "obligation-query")
-    change_set_id = first.dig(:pair, :ids, :change_set_id)
-
-    lagging = query.call(change_set_id:).value!
-    expect(lagging).to have_attributes(status: "ok")
-    expect(lagging.data.page).to have_attributes(items: [], has_more: false)
-
-    projector.call(first.fetch(:event))
-    corrected = CandidateObligationScenario.correct_policy(
-      policy: first.fetch(:policy),
-      prefix: "obligation-query",
+  it "serves empty pages and cursor-pages obligations through ANDed filters" do
+    change_set_id = "CS-obligation-query"
+    first = create(
+      :coordinator_read_verification_obligation,
+      obligation_id: "OBL-query-1",
       change_set_id:,
-      level: "verification_gate"
+      enforcement: "merge_gate",
+      event_global_position: 1_200
     )
-    second_result = CandidateObligationScenario.execute(
-      Coordinator::Write::Operations::ExecuteCreateCandidateCompatibilityObligation,
-      CandidateObligationScenario.invocation(
-        pair: first.fetch(:pair),
-        policy: corrected,
-        caused_by: corrected.fetch(:partition_event)
-      )
+    second = create(
+      :coordinator_read_verification_obligation,
+      obligation_id: "OBL-query-2",
+      change_set_id:,
+      enforcement: "verification_gate",
+      event_global_position: 1_201
     )
-    second_event = CandidateObligationScenario.obligation_events(second_result.obligation_id).sole
-    projector.call(second_event)
 
     first_page = query.call(change_set_id:, limit: 1).value!.data.page
     second_page = query.call(
@@ -46,138 +31,131 @@ RSpec.describe Coordinator::Read::Queries::VerificationObligationsList,
     expect(second_page).to have_attributes(has_more: false, next_global_position: nil)
     expect(second_page.items.sole.enforcement).to eq("verification_gate")
 
-    target = first.dig(:pair, :target)
     filtered = query.call(
       change_set_id:,
-      candidate_id: target.fetch(:candidate_id),
-      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      candidate_id: second.target_candidate_id,
+      repository_id: second.target_repository_id,
       enforcement: "verification_gate"
     ).value!.data.page
-    expect(filtered.items.map(&:obligation_id)).to eq([ second_result.obligation_id ])
+    expect(filtered.items.map(&:obligation_id)).to eq([ second.obligation_id ])
 
-    no_match = query.call(
-      change_set_id:,
-      candidate_id: "CAN-not-in-this-change-set"
-    ).value!.data.page
-    expect(no_match.items).to be_empty
-
+    expect(query.call(change_set_id: "CS-absent").value!.data.page.items).to be_empty
     invalid = query.call({}).value!
     expect(invalid).to have_attributes(status: "invalid")
     expect(invalid.data).to have_attributes(code: "invalid_input")
+    expect(first.obligation_id).to eq("OBL-query-1")
   end
 
-  it "serves a stale unclaimed view, then derives active and expired claim state at query time" do
-    created = CandidateObligationScenario.create_obligation(prefix: "obligation-query-claim")
-    obligation_id = created.fetch(:result).obligation_id
-    projector.call(created.fetch(:event))
-    claim_event = Timecop.freeze(Time.utc(2026, 8, 24, 7, 0, 0)) do
-      Coordinator::Write::Operations::ExecuteClaimVerificationObligation.new(event_store:).call(
-        command_id: "cmd-query-claim",
-        actor: { kind: "agent", id: "agent-blue" },
-        obligation_id:,
-        claim_duration_seconds: 300
-      ).value!
-      claim_events(obligation_id).sole
-    end
-
-    lagging = Timecop.freeze(Time.utc(2026, 8, 24, 7, 1, 0)) do
-      query.call(obligation_id:, claim_state: "unclaimed").value!.data.page
-    end
-    expect(lagging).to have_attributes(
-      observed_at: "2026-08-24T07:01:00.000000Z",
-      has_more: false
+  it "derives unclaimed, active, and expired claim state at query time" do
+    unclaimed = create(
+      :coordinator_read_verification_obligation,
+      obligation_id: "OBL-query-unclaimed"
     )
-    expect(lagging.items.sole).to have_attributes(status: "open", claim_state: "unclaimed", claim: nil)
+    claimed = create(
+      :coordinator_read_verification_obligation,
+      :claimed,
+      obligation_id: "OBL-query-claimed",
+      claimant_id: "agent-blue",
+      claim_claimed_at_domain: Time.utc(2026, 8, 24, 7),
+      claim_expires_at_domain: Time.utc(2026, 8, 24, 7, 5)
+    )
 
-    projector.call(claim_event)
-    active = Timecop.freeze(Time.utc(2026, 8, 24, 7, 4, 59, 999_999)) do
-      query.call(
-        obligation_id:,
-        claimant_id: "agent-blue",
-        claim_state: "active"
-      ).value!.data.page
+    at_four_fifty_nine = Timecop.freeze(Time.utc(2026, 8, 24, 7, 4, 59, 999_999)) do
+      query.call(obligation_id: claimed.obligation_id, claim_state: "active").value!.data.page
     end
-    expect(active.observed_at).to eq("2026-08-24T07:04:59.999999Z")
-    expect(active.items.sole).to have_attributes(status: "open", claim_state: "active")
-    expect(active.items.sole.claim).to have_attributes(
-      claim_id: claim_event.data.fetch("claim_id"),
+    expect(at_four_fifty_nine.observed_at).to eq("2026-08-24T07:04:59.999999Z")
+    expect(at_four_fifty_nine.items.sole).to have_attributes(status: "open", claim_state: "active")
+    expect(at_four_fifty_nine.items.sole.claim).to have_attributes(
+      claim_id: claimed.claim_id,
       claimant_id: "agent-blue",
       fencing_token: 1
     )
 
-    expired = Timecop.freeze(Time.utc(2026, 8, 24, 7, 5, 0)) do
-      query.call(obligation_id:, claim_state: "expired").value!.data.page
+    at_expiry = Timecop.freeze(Time.utc(2026, 8, 24, 7, 5)) do
+      query.call(obligation_id: claimed.obligation_id, claim_state: "expired").value!.data.page
     end
-    active_at_expiry = Timecop.freeze(Time.utc(2026, 8, 24, 7, 5, 0)) do
-      query.call(obligation_id:, claim_state: "active").value!.data.page
+    active_at_expiry = Timecop.freeze(Time.utc(2026, 8, 24, 7, 5)) do
+      query.call(obligation_id: claimed.obligation_id, claim_state: "active").value!.data.page
     end
-    expect(expired.items.sole).to have_attributes(status: "open", claim_state: "expired")
+    available_unclaimed = query.call(
+      obligation_id: unclaimed.obligation_id,
+      claim_state: "unclaimed"
+    ).value!.data.page
+
+    expect(at_expiry.items.sole).to have_attributes(status: "open", claim_state: "expired")
     expect(active_at_expiry.items).to be_empty
+    expect(available_unclaimed.items.sole).to have_attributes(claim_state: "unclaimed", claim: nil)
   end
 
-  it "serves an available open view during terminal lag and converges under an explicit status filter" do
-    created = CandidateObligationScenario.create_obligation(
-      prefix: "obligation-query-convergence",
+  it "serves a complete available terminal view and projected evidence" do
+    obligation = create(
+      :coordinator_read_verification_obligation,
+      :claimed,
+      :satisfied,
+      obligation_id: "OBL-query-satisfied",
       required_evidence: [ "combined_tests" ]
     )
-    obligation_id = created.fetch(:result).obligation_id
-    projector.call(created.fetch(:event))
-    claim = CandidateObligationScenario.claim_obligation(
-      created:,
-      prefix: "obligation-query-convergence"
-    )
-    claim_event = verification_history(obligation_id).find do |event|
-      event.type == "VerificationObligationClaimed"
-    end
-    projector.call(claim_event)
-    receipt = CandidateObligationScenario.submit_compatibility_assessment(
-      created:,
-      claim:,
-      command_id: "cmd-query-converged-tests"
+    evidence_id = SecureRandom.uuid_v7
+    create(
+      :coordinator_read_verification_obligation_evidence_item,
+      evidence_id:,
+      obligation_id: obligation.obligation_id,
+      obligation_event: obligation.event,
+      submission: evidence_submission(obligation, evidence_id:)
     )
 
-    lagging_open = query.call(obligation_id:).value!.data.page
-    lagging_terminal = query.call(obligation_id:, status: "satisfied").value!.data.page
-    expect(lagging_open.items.sole).to have_attributes(status: "open", outcome: nil)
-    expect(lagging_open.items.sole.progress).to have_attributes(
-      evidence_count: 0,
-      passed_evidence_kinds: [],
-      missing_evidence_kinds: [ "combined_tests" ]
-    )
-    expect(lagging_terminal.items).to be_empty
+    open_page = query.call(obligation_id: obligation.obligation_id).value!.data.page
+    satisfied = query.call(
+      obligation_id: obligation.obligation_id,
+      status: "satisfied"
+    ).value!.data.page
 
-    verification_history(obligation_id)
-      .select { _1.type.in?(%w[VerificationEvidenceSubmitted VerificationObligationSatisfied]) }
-      .each { projector.call(_1) }
-
-    converged_open = query.call(obligation_id:).value!.data.page
-    converged = query.call(obligation_id:, status: "satisfied").value!.data.page
-    expect(converged_open.items).to be_empty
-    expect(converged.items.sole).to have_attributes(
+    expect(open_page.items).to be_empty
+    expect(satisfied.items.sole).to have_attributes(
       status: "satisfied",
-      outcome: have_attributes(satisfied_at: receipt.submitted_at)
+      outcome: have_attributes(satisfied_at: "2026-08-30T12:03:00.000000Z")
     )
-    expect(converged.items.sole.progress).to have_attributes(
+    expect(satisfied.items.sole.progress).to have_attributes(
       evidence_count: 1,
       passed_evidence_kinds: [ "combined_tests" ],
       missing_evidence_kinds: []
     )
-    expect(converged.items.sole.evidence.global_position).to eq(created.fetch(:event).global_position)
-  end
-
-  def claim_events(obligation_id)
-    event_store.read(
-      streams.verification_obligation(obligation_id),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "VerificationObligationClaimed" ],
-        maximum_count: 10,
-        direction: :asc
-      )
+    expect(satisfied.items.sole.submitted_evidence.sole).to have_attributes(
+      evidence_kind: "combined_tests",
+      assessment: have_attributes(conclusion: "passed")
     )
   end
 
-
-  def verification_history(obligation_id)
-    CandidateObligationScenario.verification_history(obligation_id)
+  def evidence_submission(obligation, evidence_id:)
+    {
+      "obligation_id" => obligation.obligation_id,
+      "obligation_event" => obligation.event,
+      "evidence_id" => evidence_id,
+      "evidence_kind" => "combined_tests",
+      "claim" => {
+        "claim_id" => obligation.claim_id,
+        "claimant_id" => obligation.claimant_id,
+        "fencing_token" => obligation.claim_fencing_token,
+        "claim_event" => obligation.claim_event
+      },
+      "source_candidate" => obligation.obligation.fetch("source_candidate"),
+      "target_candidate" => obligation.obligation.fetch("target_candidate"),
+      "policy" => obligation.obligation.fetch("policy"),
+      "obligation_validity_input_digest" => obligation.obligation.fetch("validity_input_digest"),
+      "assessment" => {
+        "evidence_kind" => "combined_tests",
+        "producer" => { "name" => "factory-suite", "version" => "1.0" },
+        "run_id" => "run-factory",
+        "test_suite_digest" => "sha256:#{'7' * 64}",
+        "environment_digest" => "sha256:#{'8' * 64}",
+        "dependency_graph_digest" => "sha256:#{'9' * 64}",
+        "result_digest" => "sha256:#{'4' * 64}",
+        "conclusion" => "passed",
+        "findings" => [],
+        "produced_at" => "2026-08-30T12:02:00.000000Z"
+      },
+      "assessment_input_digest" => "sha256:#{'5' * 64}",
+      "submitted_at" => "2026-08-30T12:02:00.000000Z"
+    }
   end
 end

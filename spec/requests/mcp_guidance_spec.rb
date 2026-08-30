@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe "GDN-01 MCP guidance evidence", :event_store, :read_model do
+RSpec.describe "GDN-01 MCP guidance evidence" do
   GUIDANCE_PROTOCOL_VERSION = "2026-07-28"
   GUIDANCE_TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
 
@@ -20,7 +20,7 @@ RSpec.describe "GDN-01 MCP guidance evidence", :event_store, :read_model do
       source: "mcp_client",
       text: "Do not use Redis in billing.",
       anchors: {
-        repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
+        repository_ids: [ "018f0f4d-4e45-7abc-8def-000000000711" ],
         change_set_id: "CS-1",
         work_item_id: "W-1",
         attempt_id: nil
@@ -28,9 +28,7 @@ RSpec.describe "GDN-01 MCP guidance evidence", :event_store, :read_model do
     }
   end
 
-  it "records evidence through a durable Task and later serves the available projection" do
-    expect(guidance_get(arguments.fetch(:message_id), id: 1)).to include("status" => "not_found")
-
+  it "records evidence through a durable Task", :event_store do
     created = call_tool("guidance_record", arguments, id: 2)
     task_id = created.dig("result", "taskId")
     expect(task_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
@@ -63,10 +61,21 @@ RSpec.describe "GDN-01 MCP guidance evidence", :event_store, :read_model do
       satisfy { !_1.metadata.key?("causation_id") && !_1.metadata.key?("correlation_id") }
     )
 
-    expect(guidance_get(arguments.fetch(:message_id), id: 4)).to include("status" => "not_found")
-    Coordinator::Container["projectors.user_utterances_v1"].call(utterance)
+  end
 
-    available = guidance_get(arguments.fetch(:message_id), id: 5)
+  it "serves a directly persisted available guidance projection", :read_model do
+    create(
+      :coordinator_read_user_utterance,
+      message_id: arguments.fetch(:message_id),
+      conversation_id: arguments.fetch(:conversation_id),
+      text: arguments.fetch(:text),
+      source: arguments.fetch(:source),
+      anchors: arguments.fetch(:anchors).transform_keys(&:to_s),
+      actor_kind: "agent",
+      actor_id: "host-1"
+    )
+
+    available = guidance_get(arguments.fetch(:message_id), id: 4)
     expect(available).to include("status" => "ok")
     expect(available.fetch("data").fetch("guidance")).to include(
       "message_id" => arguments.fetch(:message_id),
@@ -82,7 +91,7 @@ RSpec.describe "GDN-01 MCP guidance evidence", :event_store, :read_model do
     expect(available.keys & %w[active fresh pending projection_status]).to be_empty
   end
 
-  it "keeps forwarded evidence distinct and denies reuse of its global message identity" do
+  it "keeps forwarded evidence distinct and denies reuse of its global message identity", :event_store do
     forwarded = arguments.merge(
       command_id: "cmd-mcp-guidance-forwarded",
       message_id: "M-mcp-guidance-forwarded",

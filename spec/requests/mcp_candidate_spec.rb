@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe "CAN-01 MCP Candidate coordination", :event_store, :read_model do
+RSpec.describe "CAN-01 MCP Candidate coordination" do
   CANDIDATE_PROTOCOL_VERSION = "2026-07-28"
   CANDIDATE_TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
 
@@ -12,7 +12,7 @@ RSpec.describe "CAN-01 MCP Candidate coordination", :event_store, :read_model do
     end
   end
 
-  it "submits a traced Task and serves every available Candidate projection stage" do
+  it "submits a traced Candidate Task", :event_store do
     prepared = CandidateScenario.prepare(prefix: "mcp-candidate")
     arguments = prepared.fetch(:input).merge(
       build_context: CandidateScenario.build_context_for("lib/candidate.rb")
@@ -53,33 +53,40 @@ RSpec.describe "CAN-01 MCP Candidate coordination", :event_store, :read_model do
       [ submitted.correlation_id ]
     )
 
-    absent = call_tool("candidate_get", { candidate_id: "CAN-mcp-candidate" }, id: 3)
-    expect(absent.dig("result", "structuredContent")).to include(
-      "status" => "not_found",
-      "data" => include("code" => "candidate_not_observed")
-    )
+  end
 
-    projector = Coordinator::Container["projectors.candidates_v1"]
-    projector.call(candidate_facts.first)
-    partial = call_tool("candidate_get", { candidate_id: "CAN-mcp-candidate" }, id: 4)
+  it "serves directly persisted partial and complete Candidate views", :read_model do
+    create(
+      :coordinator_read_candidate,
+      candidate_id: "CAN-mcp-candidate-partial",
+      submitted_causation_id: SecureRandom.uuid_v7,
+      submitted_correlation_id: SecureRandom.uuid_v7
+    )
+    partial = call_tool("candidate_get", { candidate_id: "CAN-mcp-candidate-partial" }, id: 3)
       .dig("result", "structuredContent")
     expect(partial).to include(
       "status" => "ok",
       "data" => include(
         "candidate" => include(
-          "candidate_id" => "CAN-mcp-candidate",
+          "candidate_id" => "CAN-mcp-candidate-partial",
           "manifest" => nil,
           "build_context" => nil,
           "submitted" => include(
-            "causation_id" => candidate_facts.first.causation_id,
-            "correlation_id" => candidate_facts.first.correlation_id
+            "causation_id" => a_string_matching(Coordinator::Shared::Types::UUID_V7_PATTERN),
+            "correlation_id" => a_string_matching(Coordinator::Shared::Types::UUID_V7_PATTERN)
           )
         )
       )
     )
 
-    candidate_facts.drop(1).each { projector.call(_1) }
-    full = call_tool("candidate_get", { candidate_id: "CAN-mcp-candidate" }, id: 5)
+    create(
+      :coordinator_read_candidate,
+      :manifest_observed,
+      :build_context_observed,
+      candidate_id: "CAN-mcp-candidate",
+      attempt_id: "A-mcp-candidate"
+    )
+    full = call_tool("candidate_get", { candidate_id: "CAN-mcp-candidate" }, id: 4)
       .dig("result", "structuredContent", "data", "candidate")
     expect(full).to include(
       "evidence_status" => "attributed_unverified",
@@ -91,7 +98,7 @@ RSpec.describe "CAN-01 MCP Candidate coordination", :event_store, :read_model do
     page = call_tool(
       "candidate_list",
       { attempt_id: "A-mcp-candidate", limit: 20 },
-      id: 6
+      id: 5
     ).dig("result", "structuredContent", "data", "page")
     expect(page).to include("has_more" => false, "next_global_position" => nil)
     expect(page.fetch("items").sole).to include(
@@ -101,7 +108,7 @@ RSpec.describe "CAN-01 MCP Candidate coordination", :event_store, :read_model do
     )
   end
 
-  it "completes a stale lease Task as a conflict without target facts" do
+  it "completes a stale lease Task as a conflict without target facts", :event_store do
     prepared = CandidateScenario.prepare(prefix: "mcp-candidate-stale")
     arguments = prepared.fetch(:input)
     arguments[:leases] = arguments.fetch(:leases).map do |lease|
@@ -128,7 +135,7 @@ RSpec.describe "CAN-01 MCP Candidate coordination", :event_store, :read_model do
     expect(command_events("cmd-mcp-candidate-stale")).to be_empty
   end
 
-  it "rejects malformed evidence before allocating a Task" do
+  it "rejects malformed evidence before allocating a Task", :event_store do
     arguments = CandidateScenario.prepare(prefix: "mcp-candidate-invalid").fetch(:input)
     arguments[:leases] = []
 

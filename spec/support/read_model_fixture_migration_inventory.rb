@@ -72,5 +72,5 @@ module ReadModelFixtureMigrationInventory
   }.freeze
 
   ALL = BY_TARGET_BOUNDARY.values.flatten.freeze
-  LEGACY_FULL_CHAIN = (ALL - [ "spec/lib/coordinator/read/queries/operation_batch_get_spec.rb" ]).freeze
+  LEGACY_FULL_CHAIN = [].freeze
 end

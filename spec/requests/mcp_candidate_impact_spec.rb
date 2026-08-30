@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe "IMP-01 MCP Candidate impact evidence", :event_store, :read_model do
+RSpec.describe "IMP-01 MCP Candidate impact evidence" do
   CANDIDATE_IMPACT_PROTOCOL_VERSION = "2026-07-28"
   CANDIDATE_IMPACT_TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
 
@@ -12,7 +12,7 @@ RSpec.describe "IMP-01 MCP Candidate impact evidence", :event_store, :read_model
     end
   end
 
-  it "submits a traced Task and serves the available attributed surface without a freshness gate" do
+  it "submits a traced Task with attributed impact evidence", :event_store do
     candidate = CandidateScenario.submit(prefix: "mcp-impact")
     arguments = CandidateScenario.impact_input(candidate)
 
@@ -42,32 +42,22 @@ RSpec.describe "IMP-01 MCP Candidate impact evidence", :event_store, :read_model
       [ submitted.correlation_id ]
     )
 
-    absent = call_tool(
-      "candidate_impact_get",
-      { candidate_id: "CAN-mcp-impact", direction: "outgoing" },
-      id: 3
-    ).dig("result", "structuredContent")
-    expect(absent).to include("status" => "not_found")
+  end
 
-    projector = Coordinator::Container["projectors.candidates_v1"]
-    projector.call(candidate_events.first)
-    partial = call_tool(
-      "candidate_impact_get",
-      { candidate_id: "CAN-mcp-impact", direction: "outgoing" },
-      id: 4
-    ).dig("result", "structuredContent")
-    expect(partial).to include(
-      "status" => "ok",
-      "data" => include(
-        "page" => include("impact_surface" => nil, "relationships" => [])
-      )
+  it "serves a directly persisted attributed surface without a freshness gate", :read_model do
+    candidate = create(
+      :coordinator_read_candidate,
+      :manifest_observed,
+      :build_context_observed,
+      :impact_surface_observed,
+      candidate_id: "CAN-mcp-impact",
+      impact_causation_id: SecureRandom.uuid_v7,
+      impact_correlation_id: SecureRandom.uuid_v7
     )
-
-    candidate_events.drop(1).each { projector.call(_1) }
     available = call_tool(
       "candidate_impact_get",
-      { candidate_id: "CAN-mcp-impact", direction: "outgoing", limit: 20 },
-      id: 5
+      { candidate_id: candidate.candidate_id, direction: "outgoing", limit: 20 },
+      id: 3
     ).dig("result", "structuredContent")
     expect(available).to include(
       "status" => "ok",
@@ -77,8 +67,8 @@ RSpec.describe "IMP-01 MCP Candidate impact evidence", :event_store, :read_model
           "impact_surface" => include(
             "evidence_status" => "attributed_unverified",
             "evidence" => include(
-              "causation_id" => surface.causation_id,
-              "correlation_id" => surface.correlation_id
+              "causation_id" => candidate.impact_causation_id,
+              "correlation_id" => candidate.impact_correlation_id
             )
           ),
           "relationships" => [],
@@ -90,7 +80,7 @@ RSpec.describe "IMP-01 MCP Candidate impact evidence", :event_store, :read_model
     expect(available.fetch("warnings")).to be_empty
   end
 
-  it "rejects an empty surface before Task allocation" do
+  it "rejects an empty surface before Task allocation", :event_store do
     candidate = CandidateScenario.submit(prefix: "mcp-impact-invalid", build_context: false)
     arguments = CandidateScenario.impact_input(candidate).merge(
       command_id: "cmd-mcp-impact-invalid",

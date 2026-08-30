@@ -1,29 +1,36 @@
 # frozen_string_literal: true
 
-RSpec.describe Coordinator::Read::Queries::SkillList, :event_store, :read_model do
+RSpec.describe Coordinator::Read::Queries::SkillList, :read_model do
   subject(:query) { described_class.new }
 
-  let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
-  let(:publisher) { Coordinator::Write::Operations::ExecutePublishSkillRevision.new(event_store:) }
-  let(:projector) { Coordinator::Read::Projectors::SkillsV1.new }
+  SKILL_IDS = %w[
+    skill:v1:0000000000000000000000000000000000000000000000000000000000000021
+    skill:v1:0000000000000000000000000000000000000000000000000000000000000022
+    skill:v1:0000000000000000000000000000000000000000000000000000000000000023
+  ].freeze
 
   it "pages by deterministic Skill ID and applies exact optional filters" do
-    events = [
-      publish(name: "review", scope: "work", command_id: "cmd-list-1"),
-      publish(name: "review", scope: "home", command_id: "cmd-list-2"),
-      publish(name: "deploy", scope: "work", command_id: "cmd-list-3")
-    ]
-    events.each { projector.call(_1) }
+    [
+      [ "review", "work" ],
+      [ "review", "home" ],
+      [ "deploy", "work" ]
+    ].each_with_index do |(name, scope), index|
+      skill = create(
+        :coordinator_read_skill,
+        skill_id: SKILL_IDS.fetch(index),
+        name:,
+        scope:
+      )
+      create(:coordinator_read_skill_revision, skill:, description: "#{name} in #{scope}")
+    end
 
     first = query.call(limit: 2).value!.data.page
     expect(first).to have_attributes(has_more: true)
-    expect(first.items.map(&:skill_id)).to eq(first.items.map(&:skill_id).sort)
+    expect(first.items.map(&:skill_id)).to eq(SKILL_IDS.first(2))
 
     second = query.call(after_skill_id: first.next_skill_id, limit: 2).value!.data.page
     expect(second).to have_attributes(has_more: false, next_skill_id: nil)
-    expect((first.items + second.items).map(&:skill_id)).to eq(
-      Coordinator::Read::Skill.order(:skill_id).pluck(:skill_id)
-    )
+    expect((first.items + second.items).map(&:skill_id)).to eq(SKILL_IDS)
 
     work = query.call(scope: "work").value!.data.page
     review = query.call(name: "review").value!.data.page
@@ -38,24 +45,5 @@ RSpec.describe Coordinator::Read::Queries::SkillList, :event_store, :read_model 
 
     expect(result).to have_attributes(status: "invalid")
     expect(result.data).to have_attributes(code: "invalid_input")
-  end
-
-  def publish(name:, scope:, command_id:)
-    result = publisher.call(
-      command_id:,
-      actor: { kind: "agent", id: "agent-1" },
-      name:,
-      scope:,
-      expected_revision: 0,
-      description: "#{name} in #{scope}",
-      instructions: "Follow the scoped instructions.",
-      assets: []
-    )
-    expect(result).to be_success
-    reference = result.value!.data.publication_event
-    event_store.read_at(
-      Coordinator::Write::StreamFactory.new.skill(result.value!.data.skill_id),
-      reference.stream_revision
-    )
   end
 end

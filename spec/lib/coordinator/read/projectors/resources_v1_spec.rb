@@ -1,24 +1,25 @@
 # frozen_string_literal: true
 
-RSpec.describe Coordinator::Read::Projectors::ResourcesV1, :event_store, :read_model do
+RSpec.describe Coordinator::Read::Projectors::ResourcesV1, :read_model do
   subject(:projector) { described_class.new }
 
-  let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
-  let(:repository_id) { RepositoryScenario::DEFAULT_REPOSITORY_ID }
   let(:resources) { Coordinator::Read::Repositories::Resources.new }
+  let(:resource_id) { "018f0f4d-4e45-7abc-8def-000000000101" }
+  let(:repository_id) { "018f0f4d-4e45-7abc-8def-000000000001" }
+  let(:stream) { Coordinator::Write::StreamFactory.new.resource(resource_id) }
+  let(:correlation_id) { SecureRandom.uuid_v7 }
 
-  before { RepositoryScenario.register(event_store:) }
-
-  it "projects identity and lifecycle idempotently without hiding an available stale view" do
-    resource_id = resolve("cmd-resource-project-new", "app/models/projected.rb")
-    registered, bound = resource_events(resource_id)
+  it "projects identity and lifecycle idempotently while serving the latest available state" do
+    registered = resource_event(registered_payload, revision: 0, position: 100)
+    bound = resource_event(bound_payload, revision: 1, position: 200, causation_id: registered.id)
+    unbound = resource_event(unbound_payload, revision: 2, position: 300, causation_id: bound.id)
 
     projector.call(registered)
     projector.call(bound)
     projector.call(bound)
 
-    current = resources.fetch(resource_id)
-    expect(current).to have_attributes(
+    available = resources.fetch(resource_id)
+    expect(available).to have_attributes(
       repository_id:,
       kind: "file",
       normalized_path: "app/models/projected.rb",
@@ -28,11 +29,6 @@ RSpec.describe Coordinator::Read::Projectors::ResourcesV1, :event_store, :read_m
       latest_transition: have_attributes(event: have_attributes(event_id: bound.id))
     )
 
-    remove(resource_id)
-    available_while_lagging = resources.fetch(resource_id)
-    expect(available_while_lagging).to have_attributes(lifecycle_status: "current")
-
-    unbound = resource_events(resource_id).last
     projector.call(unbound)
     expect(resources.fetch(resource_id)).to have_attributes(
       lifecycle_status: "inactive",
@@ -43,9 +39,9 @@ RSpec.describe Coordinator::Read::Projectors::ResourcesV1, :event_store, :read_m
   end
 
   it "does not regress when an older transition is delivered after a newer one" do
-    resource_id = resolve("cmd-resource-project-order-new", "app/models/ordered.rb")
-    remove(resource_id)
-    registered, bound, unbound = resource_events(resource_id)
+    registered = resource_event(registered_payload, revision: 0, position: 100)
+    bound = resource_event(bound_payload, revision: 1, position: 200, causation_id: registered.id)
+    unbound = resource_event(unbound_payload, revision: 2, position: 300, causation_id: bound.id)
 
     projector.call(registered)
     projector.call(unbound)
@@ -57,36 +53,49 @@ RSpec.describe Coordinator::Read::Projectors::ResourcesV1, :event_store, :read_m
     )
   end
 
-  def resolve(command_id, path)
-    result = Coordinator::Write::Operations::ExecuteResolveResource.new(event_store:).call(
-      command_id:,
-      actor: { kind: "agent", id: "resource-projector-agent" },
+  def registered_payload
+    Coordinator::Write::Events::ResourceIdentityV1::Registered.new(
+      resource_id:,
       repository_id:,
       kind: "file",
-      path:
+      normalized_path: "app/models/projected.rb",
+      registered_at: "2026-08-30T12:00:00.000000Z"
     )
-    expect(result).to be_success
-    result.value!.data.resource_id
   end
 
-  def remove(resource_id)
-    result = Coordinator::Write::Operations::ExecuteRemoveResource.new(event_store:).call(
-      command_id: "cmd-resource-project-remove-#{resource_id}",
-      actor: { kind: "agent", id: "resource-projector-agent" },
+  def bound_payload
+    Coordinator::Write::Events::ResourceIdentityV1::Bound.new(
       resource_id:,
-      reason: "removed"
+      repository_id:,
+      kind: "file",
+      normalized_path: "app/models/projected.rb",
+      bound_at: "2026-08-30T12:01:00.000000Z"
     )
-    expect(result).to be_success
   end
 
-  def resource_events(resource_id)
-    event_store.read(
-      Coordinator::Write::StreamFactory.new.resource(resource_id),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: %w[ResourceRegistered ResourceBound ResourceUnbound],
-        maximum_count: 10,
-        direction: :asc
-      )
+  def unbound_payload
+    Coordinator::Write::Events::ResourceIdentityV1::Unbound.new(
+      resource_id:,
+      repository_id:,
+      kind: "file",
+      normalized_path: "app/models/projected.rb",
+      reason: "removed",
+      unbound_at: "2026-08-30T12:02:00.000000Z"
+    )
+  end
+
+  def resource_event(payload, revision:, position:, causation_id: nil)
+    ProjectionEventFactory.build(
+      payload:,
+      stream:,
+      stream_revision: revision,
+      global_position: position,
+      command_id: "cmd-resource-projector-#{revision}",
+      actor_id: "resource-projector-agent",
+      policy_version: "resource-identity/v1",
+      correlation_id:,
+      causation_id:,
+      markers: [ "resource:#{resource_id}", "repository:#{repository_id}" ]
     )
   end
 

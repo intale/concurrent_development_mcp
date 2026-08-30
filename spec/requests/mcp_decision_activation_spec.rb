@@ -1,8 +1,9 @@
 # frozen_string_literal: true
 
-RSpec.describe "DEC-01 MCP Decision activation", :event_store, :read_model do
+RSpec.describe "DEC-01 MCP Decision activation" do
   DECISION_PROTOCOL_VERSION = "2026-07-28"
   DECISION_TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
+  DECISION_REPOSITORY_ID = "018f0f4d-4e45-7abc-8def-000000000721"
 
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
@@ -19,20 +20,19 @@ RSpec.describe "DEC-01 MCP Decision activation", :event_store, :read_model do
     )
   end
 
-  before { seed_accepted_interpretation }
+  before(:each, :event_store) { seed_accepted_interpretation }
 
-  it "activates only through a traced Task and serves every available projection stage" do
+  it "activates only through a traced Task", :event_store do
     expect(decision_events).to be_empty
-    expect(decision_get(id: 1)).to include("status" => "not_found")
 
-    created = call_tool("decision_activate", arguments, id: 2)
+    created = call_tool("decision_activate", arguments, id: 1)
     task_id = created.dig("result", "taskId")
     expect(task_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
     expect(task_events(task_id).map(&:type)).to eq([ "CoordinationTaskSubmitted" ])
     expect(decision_events).to be_empty
 
     execute_task(task_id)
-    completed = task_request("tasks/get", task_id, id: 3)
+    completed = task_request("tasks/get", task_id, id: 2)
     result = completed.dig("result", "result", "structuredContent")
     expect(completed.dig("result", "status")).to eq("completed")
     expect(completed.dig("result", "result", "isError")).to be(false)
@@ -45,7 +45,7 @@ RSpec.describe "DEC-01 MCP Decision activation", :event_store, :read_model do
         "policy_status" => "active",
         "partitions" => [
           include(
-            "partition" => include("partition_id" => "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing"),
+            "partition" => include("partition_id" => "repo:#{DECISION_REPOSITORY_ID}:testing"),
             "partition_revision" => 0
           )
         ]
@@ -79,14 +79,24 @@ RSpec.describe "DEC-01 MCP Decision activation", :event_store, :read_model do
       satisfy { !_1.metadata.key?("causation_id") && !_1.metadata.key?("correlation_id") }
     )
 
-    expect(decision_get(id: 4)).to include("status" => "not_found")
-    projector.call(recorded)
-    recorded_view = decision_get(id: 5)
+  end
+
+  it "serves directly persisted recorded and active Decision views", :read_model do
+    create(
+      :coordinator_read_decision_definition,
+      decision_id: "D-mcp-decision-recorded",
+      repository_id: DECISION_REPOSITORY_ID
+    )
+    recorded_view = call_tool(
+      "decision_get",
+      { decision_id: "D-mcp-decision-recorded" },
+      id: 3
+    ).dig("result", "structuredContent")
     expect(recorded_view).to include(
       "status" => "ok",
       "data" => include(
         "decision" => include(
-          "decision_id" => "D-mcp-decision",
+          "decision_id" => "D-mcp-decision-recorded",
           "policy_status" => "recorded",
           "activated" => nil
         )
@@ -94,26 +104,28 @@ RSpec.describe "DEC-01 MCP Decision activation", :event_store, :read_model do
     )
     expect(recorded_view.keys & %w[active fresh pending projection_status stream_revision]).to be_empty
 
-    [ activated, *slot_facts, partition ].each do |event|
-      projector.call(event)
-      projector.call(event)
-    end
-    active_view = decision_get(id: 6)
+    active = create(
+      :coordinator_read_decision_definition,
+      :active,
+      decision_id: "D-mcp-decision",
+      repository_id: DECISION_REPOSITORY_ID
+    )
+    active_view = decision_get(id: 4)
     expect(active_view).to include(
       "status" => "ok",
       "data" => include(
         "decision" => include(
           "decision_id" => "D-mcp-decision",
           "policy_status" => "active",
-          "slot" => include("slot_id" => slot.fetch("slot_id")),
-          "partitions" => [ include("partition_id" => "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing") ],
-          "activated" => include("event" => include("event_id" => activated.id))
+          "slot" => include("slot_id" => active.slot.fetch("slot_id")),
+          "partitions" => [ include("partition_id" => "testing:repo:#{DECISION_REPOSITORY_ID}") ],
+          "activated" => include("event" => include("event_id" => active.activated_event.fetch("event_id")))
         )
       )
     )
   end
 
-  it "returns command denials through Tasks and rejects malformed input before Task allocation" do
+  it "returns command denials through Tasks and rejects malformed input before Task allocation", :event_store do
     missing = arguments.merge(
       command_id: "cmd-mcp-decision-missing",
       decision_id: "D-missing",
@@ -154,7 +166,7 @@ RSpec.describe "DEC-01 MCP Decision activation", :event_store, :read_model do
       source: "mcp_client",
       text: "Use RSpec.",
       anchors: {
-        repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
+        repository_ids: [ DECISION_REPOSITORY_ID ],
         change_set_id: nil,
         work_item_id: nil,
         attempt_id: nil
@@ -267,7 +279,7 @@ RSpec.describe "DEC-01 MCP Decision activation", :event_store, :read_model do
 
   def partition_events
     event_store.read(
-      streams.decision_partition("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing"),
+      streams.decision_partition("repo:#{DECISION_REPOSITORY_ID}:testing"),
       Coordinator::Write::EventReadCriteria.new(
         event_types: [ "DecisionPartitionAdvanced" ],
         maximum_count: 2,
@@ -280,7 +292,4 @@ RSpec.describe "DEC-01 MCP Decision activation", :event_store, :read_model do
     event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
   end
 
-  def projector
-    Coordinator::Container["projectors.decision_governance_v1"]
-  end
 end

@@ -1,30 +1,32 @@
 # frozen_string_literal: true
 
-RSpec.describe Coordinator::Read::Projectors::UserUtterancesV1, :event_store, :read_model do
+RSpec.describe Coordinator::Read::Projectors::UserUtterancesV1, :read_model do
   subject(:projector) { described_class.new }
 
-  let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
-  let(:streams) { Coordinator::Write::StreamFactory.new }
-  let(:input) do
-    {
-      command_id: "cmd-guidance-project",
-      actor: { kind: "agent", id: "host-1" },
+  let(:repository_id) { "018f0f4d-4e45-7abc-8def-000000000001" }
+
+  it "stores one concrete attributed utterance and ignores duplicate delivery" do
+    payload = Coordinator::Write::Events::UserUtteranceRecordedV1.new(
       message_id: "M-project",
       conversation_id: "C-project",
-      source: "mcp_client",
       text: "Keep raw evidence separate from policy.",
-      anchors: {
-        repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
+      source: "mcp_client",
+      anchors: Coordinator::Write::GuidanceAnchorsV1.new(
+        repository_ids: [ repository_id ],
         change_set_id: "CS-1",
         work_item_id: nil,
         attempt_id: nil
-      }
-    }
-  end
-
-  it "stores one immutable attributed row and ignores duplicate delivery" do
-    Coordinator::Write::Operations::ExecuteRecordGuidance.new(event_store:).call(input).value!
-    event = guidance_event
+      ),
+      recorded_at: "2026-08-30T12:00:00.000000Z"
+    )
+    event = ProjectionEventFactory.build(
+      payload:,
+      stream: Coordinator::Write::StreamFactory.new.conversation("C-project"),
+      stream_revision: 0,
+      global_position: 100,
+      policy_version: "human-guidance/v1",
+      actor_id: "host-1"
+    )
 
     projector.call(event)
     projector.call(event)
@@ -39,7 +41,7 @@ RSpec.describe Coordinator::Read::Projectors::UserUtterancesV1, :event_store, :r
       actor: { kind: "agent", id: "host-1", authenticated: false }
     )
     expect(projected.anchors.to_h).to eq(
-      repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
+      repository_ids: [ repository_id ],
       change_set_id: "CS-1",
       work_item_id: nil,
       attempt_id: nil
@@ -56,16 +58,5 @@ RSpec.describe Coordinator::Read::Projectors::UserUtterancesV1, :event_store, :r
     expect(
       Coordinator::Read::ProcessedProjectionEvent.where(projection_name: "user_utterances").count
     ).to eq(1)
-  end
-
-  def guidance_event
-    event_store.read(
-      streams.conversation("C-project"),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: Coordinator::Write::EventQueries::GUIDANCE_MESSAGE_EVENT_TYPES,
-        maximum_count: 1,
-        direction: :asc
-      )
-    ).sole
   end
 end

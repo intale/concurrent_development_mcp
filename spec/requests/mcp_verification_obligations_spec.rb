@@ -1,38 +1,38 @@
 # frozen_string_literal: true
 
-RSpec.describe "IMP-02 MCP verification obligations", :event_store, :read_model do
+RSpec.describe "IMP-02 MCP verification obligations", :read_model do
   OBLIGATION_PROTOCOL_VERSION = "2026-07-28"
   OBLIGATION_TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
 
-  let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
-  let(:streams) { Coordinator::Write::StreamFactory.new }
   let(:session) do
     ActionDispatch::Integration::Session.new(Rails.application).tap do |integration|
       integration.host! "localhost"
     end
   end
 
-  it "serves an available empty page under lag and then complete projected evidence" do
-    created = CandidateObligationScenario.create_obligation(prefix: "mcp-obligation")
-    change_set_id = created.dig(:pair, :ids, :change_set_id)
-
-    lagging = call_tool(
-      { change_set_id:, status: "open" },
-      id: 1
-    ).dig("result", "structuredContent")
+  it "serves an available empty page and then a directly persisted projection" do
+    change_set_id = "CS-mcp-obligation"
+    lagging = call_tool({ change_set_id:, status: "open" }, id: 1)
+      .dig("result", "structuredContent")
     expect(lagging).to include(
       "status" => "ok",
-      "data" => include(
-        "page" => include("items" => [], "has_more" => false)
-      )
+      "data" => include("page" => include("items" => [], "has_more" => false))
     )
 
-    Coordinator::Read::Projectors::VerificationObligationsV1.new.call(created.fetch(:event))
+    obligation = create(
+      :coordinator_read_verification_obligation,
+      obligation_id: "OBL-mcp-obligation",
+      change_set_id:,
+      required_evidence: %w[combined_tests contract_compatibility_review],
+      event_global_position: 1_200,
+      causation_id: SecureRandom.uuid_v7,
+      correlation_id: SecureRandom.uuid_v7
+    )
     available = call_tool(
       {
         change_set_id:,
-        candidate_id: created.dig(:pair, :target, :candidate_id),
-        repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+        candidate_id: obligation.target_candidate_id,
+        repository_id: obligation.target_repository_id,
         kind: "candidate_compatibility",
         enforcement: "merge_gate",
         status: "open",
@@ -42,24 +42,19 @@ RSpec.describe "IMP-02 MCP verification obligations", :event_store, :read_model 
     ).dig("result", "structuredContent")
 
     item = available.dig("data", "page", "items").sole
-    expect(available).to include("status" => "ok")
     expect(item).to include(
-      "obligation_id" => created.fetch(:result).obligation_id,
+      "obligation_id" => obligation.obligation_id,
       "kind" => "candidate_compatibility",
       "status" => "open",
       "change_set_id" => change_set_id,
       "enforcement" => "merge_gate",
       "required_evidence" => %w[combined_tests contract_compatibility_review],
-      "source_candidate" => include(
-        "candidate_id" => created.dig(:pair, :source, :candidate_id)
-      ),
-      "target_candidate" => include(
-        "candidate_id" => created.dig(:pair, :target, :candidate_id)
-      ),
+      "source_candidate" => include("candidate_id" => obligation.source_candidate_id),
+      "target_candidate" => include("candidate_id" => obligation.target_candidate_id),
       "evidence" => include(
-        "global_position" => created.fetch(:event).global_position,
-        "causation_id" => created.fetch(:event).causation_id,
-        "correlation_id" => created.fetch(:event).correlation_id
+        "global_position" => 1_200,
+        "causation_id" => obligation.causation_id,
+        "correlation_id" => obligation.correlation_id
       )
     )
   end
@@ -72,25 +67,25 @@ RSpec.describe "IMP-02 MCP verification obligations", :event_store, :read_model 
   end
 
   it "exposes the latest available claim and query-time claim state without closing the obligation" do
-    created = CandidateObligationScenario.create_obligation(prefix: "mcp-obligation-claim")
-    obligation_id = created.fetch(:result).obligation_id
-    projector = Coordinator::Read::Projectors::VerificationObligationsV1.new
-    projector.call(created.fetch(:event))
-    claim_event = Timecop.freeze(Time.utc(2026, 8, 24, 7, 0, 0)) do
-      Coordinator::Write::Operations::ExecuteClaimVerificationObligation.new(event_store:).call(
-        command_id: "cmd-mcp-obligation-claim",
-        actor: { kind: "agent", id: "agent-blue" },
-        obligation_id:,
-        claim_duration_seconds: 300
-      ).value!
-      claim_events(obligation_id).sole
-    end
-    projector.call(claim_event)
+    claim_causation_id = SecureRandom.uuid_v7
+    claim_correlation_id = SecureRandom.uuid_v7
+    obligation = create(
+      :coordinator_read_verification_obligation,
+      :claimed,
+      obligation_id: "OBL-mcp-obligation-claim",
+      change_set_id: "CS-mcp-obligation-claim",
+      claimant_id: "agent-blue",
+      claim_claimed_at_domain: Time.utc(2026, 8, 30, 7),
+      claim_expires_at_domain: Time.utc(2026, 8, 30, 7, 5),
+      claim_event_global_position: 1_301,
+      claim_causation_id:,
+      claim_correlation_id:
+    )
 
-    available = Timecop.freeze(Time.utc(2026, 8, 24, 7, 1, 0)) do
+    available = Timecop.freeze(Time.utc(2026, 8, 30, 7, 1)) do
       call_tool(
         {
-          obligation_id:,
+          obligation_id: obligation.obligation_id,
           claimant_id: "agent-blue",
           claim_state: "active"
         },
@@ -99,49 +94,55 @@ RSpec.describe "IMP-02 MCP verification obligations", :event_store, :read_model 
     end
 
     page = available.dig("data", "page")
-    expect(page).to include("observed_at" => "2026-08-24T07:01:00.000000Z")
+    expect(page).to include("observed_at" => "2026-08-30T07:01:00.000000Z")
     expect(page.fetch("items").sole).to include(
-      "obligation_id" => obligation_id,
+      "obligation_id" => obligation.obligation_id,
       "status" => "open",
       "claim_state" => "active",
       "claim" => include(
-        "claim_id" => claim_event.data.fetch("claim_id"),
+        "claim_id" => obligation.claim_id,
         "claimant_id" => "agent-blue",
         "fencing_token" => 1,
         "evidence" => include(
-          "global_position" => claim_event.global_position,
-          "causation_id" => claim_event.causation_id,
-          "correlation_id" => claim_event.correlation_id
+          "global_position" => 1_301,
+          "causation_id" => claim_causation_id,
+          "correlation_id" => claim_correlation_id
         )
       )
     )
   end
 
   it "filters terminal status and exposes ordered evidence, progress, and outcome provenance" do
-    created = CandidateObligationScenario.create_obligation(
-      prefix: "mcp-obligation-evidence",
-      required_evidence: [ "combined_tests" ]
+    obligation = create(
+      :coordinator_read_verification_obligation,
+      :claimed,
+      :satisfied,
+      obligation_id: "OBL-mcp-obligation-evidence",
+      change_set_id: "CS-mcp-obligation-evidence",
+      required_evidence: [ "combined_tests" ],
+      event_global_position: 1_400,
+      terminal_causation_id: SecureRandom.uuid_v7,
+      terminal_correlation_id: SecureRandom.uuid_v7
     )
-    claim = CandidateObligationScenario.claim_obligation(
-      created:,
-      prefix: "mcp-obligation-evidence"
+    evidence_id = SecureRandom.uuid_v7
+    evidence = create(
+      :coordinator_read_verification_obligation_evidence_item,
+      evidence_id:,
+      obligation_id: obligation.obligation_id,
+      obligation_event: obligation.event,
+      submission: evidence_submission(obligation, evidence_id:),
+      event_global_position: 1_402,
+      causation_id: obligation.terminal_causation_id,
+      correlation_id: obligation.terminal_correlation_id
     )
-    receipt = CandidateObligationScenario.submit_compatibility_assessment(
-      created:,
-      claim:,
-      command_id: "cmd-mcp-obligation-evidence"
-    )
-    history = CandidateObligationScenario.verification_history(receipt.obligation_id)
-    projector = Coordinator::Read::Projectors::VerificationObligationsV1.new
-    history.each { projector.call(_1) }
 
-    available = call_tool(
-      { obligation_id: receipt.obligation_id, status: "satisfied" },
+    response = call_tool(
+      { obligation_id: obligation.obligation_id, status: "satisfied" },
       id: 4
-    ).dig("result", "structuredContent")
-    item = available.dig("data", "page", "items").sole
+    )
+    expect(response).to include("result" => include("structuredContent" => include("status" => "ok")))
+    item = response.fetch("result").fetch("structuredContent").fetch("data").fetch("page").fetch("items").sole
     submitted = item.fetch("submitted_evidence").sole
-    outcome_event = history.find { _1.type == "VerificationObligationSatisfied" }
     expect(item).to include(
       "status" => "satisfied",
       "progress" => {
@@ -151,35 +152,68 @@ RSpec.describe "IMP-02 MCP verification obligations", :event_store, :read_model 
         "evidence_count" => 1
       },
       "outcome" => include(
-        "satisfied_at" => receipt.submitted_at,
+        "satisfied_at" => "2026-08-30T12:03:00.000000Z",
         "evidence" => include(
-          "event" => include("event_id" => outcome_event.id),
-          "causation_id" => outcome_event.causation_id,
-          "correlation_id" => outcome_event.correlation_id
+          "event" => include("event_id" => obligation.terminal_event.fetch("event_id")),
+          "causation_id" => obligation.terminal_causation_id,
+          "correlation_id" => obligation.terminal_correlation_id
         )
       )
     )
     expect(submitted).to include(
-      "evidence_id" => receipt.evidence_id,
+      "evidence_id" => evidence.evidence_id,
       "evidence_kind" => "combined_tests",
       "assessment" => include("conclusion" => "passed"),
       "evidence" => include(
-        "event" => include("event_id" => receipt.evidence_event.event_id),
-        "causation_id" => outcome_event.causation_id,
-        "correlation_id" => outcome_event.correlation_id
+        "event" => include("event_id" => evidence.event_id),
+        "causation_id" => obligation.terminal_causation_id,
+        "correlation_id" => obligation.terminal_correlation_id
       )
     )
-    expect(item.dig("evidence", "global_position")).to eq(created.fetch(:event).global_position)
-
+    expect(item.dig("evidence", "global_position")).to eq(1_400)
     expect(
       call_tool(
-        { obligation_id: receipt.obligation_id, status: "open" },
+        { obligation_id: obligation.obligation_id, status: "open" },
         id: 5
       ).dig("result", "structuredContent", "data", "page", "items")
     ).to be_empty
   end
 
   private
+
+  def evidence_submission(obligation, evidence_id:)
+    evidence_id ||= SecureRandom.uuid_v7
+    {
+      "obligation_id" => obligation.obligation_id,
+      "obligation_event" => obligation.event,
+      "evidence_id" => evidence_id,
+      "evidence_kind" => "combined_tests",
+      "claim" => {
+        "claim_id" => obligation.claim_id,
+        "claimant_id" => obligation.claimant_id,
+        "fencing_token" => obligation.claim_fencing_token,
+        "claim_event" => obligation.claim_event
+      },
+      "source_candidate" => obligation.obligation.fetch("source_candidate"),
+      "target_candidate" => obligation.obligation.fetch("target_candidate"),
+      "policy" => obligation.obligation.fetch("policy"),
+      "obligation_validity_input_digest" => obligation.obligation.fetch("validity_input_digest"),
+      "assessment" => {
+        "evidence_kind" => "combined_tests",
+        "producer" => { "name" => "factory-suite", "version" => "1.0" },
+        "run_id" => "run-factory",
+        "test_suite_digest" => "sha256:#{'7' * 64}",
+        "environment_digest" => "sha256:#{'8' * 64}",
+        "dependency_graph_digest" => "sha256:#{'9' * 64}",
+        "result_digest" => "sha256:#{'4' * 64}",
+        "conclusion" => "passed",
+        "findings" => [],
+        "produced_at" => "2026-08-30T12:02:00.000000Z"
+      },
+      "assessment_input_digest" => "sha256:#{'5' * 64}",
+      "submitted_at" => "2026-08-30T12:02:00.000000Z"
+    }
+  end
 
   def call_tool(arguments, id:, expected_status: 200)
     session.post(
@@ -214,16 +248,5 @@ RSpec.describe "IMP-02 MCP verification obligations", :event_store, :read_model 
         "io.modelcontextprotocol/clientInfo" => { name: "rspec", version: "1.0" }
       }
     }
-  end
-
-  def claim_events(obligation_id)
-    event_store.read(
-      streams.verification_obligation(obligation_id),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "VerificationObligationClaimed" ],
-        maximum_count: 10,
-        direction: :asc
-      )
-    )
   end
 end

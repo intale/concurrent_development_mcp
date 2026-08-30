@@ -1,25 +1,18 @@
 # frozen_string_literal: true
 
-RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :read_model do
-  let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
-  let(:streams) { Coordinator::Write::StreamFactory.new }
+RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model do
   subject(:projector) { described_class.new }
 
+  let(:repository) { Coordinator::Read::Repositories::CoordContexts.new }
+  let(:repository_id) { "018f0f4d-4e45-7abc-8def-000000000601" }
+  let(:correlation_id) { SecureRandom.uuid_v7 }
+
   it "atomically projects exact source identities and ignores duplicate delivery" do
-    create_change_set("CS-100")
-    create_work_item("CS-100", "W-100")
-    change_set_events = change_set_events("CS-100")
-    work_item_event = work_item_events("W-100").sole
+    events = planning_events(change_set_id: "CS-100", work_item_id: "W-100")
+    %i[created criteria membership work_item].each { projector.call(events.fetch(_1)) }
+    projector.call(events.fetch(:work_item))
 
-    change_set_events.first(2).each { projector.call(_1) }
-    projector.call(change_set_events.find { _1.type == "WorkItemAddedToChangeSet" })
-    projector.call(work_item_event)
-    projector.call(work_item_event)
-
-    snapshot = Coordinator::Read::Repositories::CoordContexts.new.resolve(
-      scope_kind: "work_item",
-      scope_id: "W-100"
-    )
+    snapshot = repository.resolve(scope_kind: "work_item", scope_id: "W-100")
     expect(snapshot.state.change_set.to_h).to include(
       change_set_id: "CS-100",
       goal: "Coordinate CS-100",
@@ -28,7 +21,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
     expect(snapshot.state.work_item_ids).to eq([ "W-100" ])
     expect(snapshot.state.work_items.sole.to_h).to include(
       work_item_id: "W-100",
-      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      repository_id:,
       status: "planned"
     )
     expect(snapshot.source_positions.length).to eq(2)
@@ -36,48 +29,63 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
   end
 
   it "converges when cross-stream WorkItem siblings arrive in either order" do
-    create_change_set("CS-100")
-    create_work_item("CS-100", "W-100")
-    change_set_events("CS-100").first(2).each { projector.call(_1) }
-
-    membership = change_set_events("CS-100").find { _1.type == "WorkItemAddedToChangeSet" }
-    details = work_item_events("W-100").sole
-    projector.call(membership)
-    projector.call(details)
-    first_document = Coordinator::Read::CoordContext.find("CS-100").document
+    events = planning_events(change_set_id: "CS-ORDER", work_item_id: "W-ORDER")
+    [ events.fetch(:created), events.fetch(:criteria), events.fetch(:membership), events.fetch(:work_item) ]
+      .each { projector.call(_1) }
+    first_document = Coordinator::Read::CoordContext.find("CS-ORDER").document
 
     ReadModelTestSafety.clean!
-    change_set_events("CS-100").first(2).each { projector.call(_1) }
-    projector.call(details)
-    projector.call(membership)
+    [ events.fetch(:created), events.fetch(:criteria), events.fetch(:work_item), events.fetch(:membership) ]
+      .each { projector.call(_1) }
 
-    expect(Coordinator::Read::CoordContext.find("CS-100").document).to eq(first_document)
+    expect(Coordinator::Read::CoordContext.find("CS-ORDER").document).to eq(first_document)
   end
 
   it "converges abandonment and requeue facts in either cross-stream order" do
-    create_change_set("CS-ABANDON")
-    create_work_item("CS-ABANDON", "W-ABANDON")
-    activate_change_set("CS-ABANDON", "W-ABANDON")
-    acquire_work_item("CS-ABANDON", "W-ABANDON", "A-ABANDON", "agent-a")
-    abandon_attempt("CS-ABANDON", "W-ABANDON", "A-ABANDON", "agent-a")
-
-    sources = abandonment_context_sources(
+    events = active_attempt_events(
       change_set_id: "CS-ABANDON",
       work_item_id: "W-ABANDON",
-      attempt_id: "A-ABANDON"
+      attempt_id: "A-ABANDON",
+      agent_id: "agent-a"
     )
-    terminal = sources.select { %w[AttemptAbandoned WorkItemRequeued].include?(_1.type) }
-    initial = sources - terminal
+    abandoned = attempt_event(
+      Coordinator::Write::Events::AttemptAbandonedV2.new(
+        change_set_id: "CS-ABANDON",
+        work_item_id: "W-ABANDON",
+        attempt_id: "A-ABANDON",
+        agent_id: "agent-a",
+        reason: "The agent yielded this WorkItem.",
+        lease_set_id: nil,
+        released_leases: [],
+        untouched_resource_ids: [],
+        abandoned_at: "2026-08-30T12:05:00.000000Z"
+      ),
+      attempt_id: "A-ABANDON",
+      revision: 2,
+      position: 500
+    )
+    requeued = work_item_event(
+      Coordinator::Write::Events::WorkItemRequeuedV1.new(
+        change_set_id: "CS-ABANDON",
+        work_item_id: "W-ABANDON",
+        attempt_id: "A-ABANDON",
+        agent_id: "agent-a",
+        reason: "The agent yielded this WorkItem.",
+        requeued_at: "2026-08-30T12:05:01.000000Z"
+      ),
+      work_item_id: "W-ABANDON",
+      revision: 3,
+      position: 501
+    )
 
-    initial.each { projector.call(_1) }
-    terminal.each { projector.call(_1) }
-    terminal.each { projector.call(_1) }
+    events.each { projector.call(_1) }
+    [ abandoned, requeued, abandoned, requeued ].each { projector.call(_1) }
     first_document = Coordinator::Read::CoordContext.find("CS-ABANDON").document
     assert_abandoned_context
 
     ReadModelTestSafety.clean!
-    initial.each { projector.call(_1) }
-    terminal.reverse_each { projector.call(_1) }
+    events.each { projector.call(_1) }
+    [ requeued, abandoned ].each { projector.call(_1) }
 
     expect(Coordinator::Read::CoordContext.find("CS-ABANDON").document).to eq(first_document)
     assert_abandoned_context
@@ -90,15 +98,15 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
       Coordinator::Write::Events::WorkItemCreatedV1.new(
         work_item_id: "W-WINDOW",
         change_set_id: "CS-WINDOW",
-        repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+        repository_id:,
         goal: "Keep recent Attempts bounded",
         acceptance_criteria: [ "Older Attempts remain separately pageable" ],
         competitive_mode: false,
-        created_at: "2026-08-27T10:00:00.000000Z"
+        created_at: "2026-08-30T10:00:00.000000Z"
       )
     )
     snapshot = Coordinator::Write::RepositorySnapshotV1.new(
-      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      repository_id:,
       object_format: "sha1",
       commit_oid: "a" * 40
     )
@@ -112,7 +120,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
           work_item_id: "W-WINDOW",
           agent_id: "agent-window",
           base_snapshots: [ snapshot ],
-          authorized_at: (Time.utc(2026, 8, 27, 10, 1) + offset).iso8601(6)
+          authorized_at: (Time.utc(2026, 8, 30, 10, 1) + offset).iso8601(6)
         )
       )
     end
@@ -124,190 +132,162 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
   end
 
   it "projects activation, ownership, exact Attempt bases, and observed write-set evidence" do
-    create_change_set("CS-100")
-    create_work_item("CS-100", "W-100")
-    Coordinator::Write::Operations::ExecuteActivateChangeSet.new(event_store:).call(
-      command_id: "activate-CS-100",
-      actor: { kind: "agent", id: "planner-1" },
-      change_set_id: "CS-100"
-    ).value!
-    activation = change_set_events("CS-100").find { _1.type == "ChangeSetActivated" }
-    Coordinator::Processes::ProcessManagers::ChangeSetReadiness.new(event_store:).call(activation)
-    Coordinator::Write::Operations::ExecuteAcquireWorkItem.new(event_store:).call(
-      command_id: "acquire-W-100",
-      actor: { kind: "agent", id: "agent-1" },
-      change_set_id: "CS-100",
-      work_item_id: "W-100",
-      attempt_id: "A-100",
-      base_snapshots: [
-        { repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID, commit_oid: "a" * 40 }
-      ]
-    ).value!
-    invoice_resource_id = ResourceScenario.resolve(
-      event_store:,
-      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
-      kind: "file",
-      path: "app/models/invoice.rb"
+    events = active_attempt_events(
+      change_set_id: "CS-WRITE",
+      work_item_id: "W-WRITE",
+      attempt_id: "A-WRITE",
+      agent_id: "agent-1"
     )
-    schema_resource_id = ResourceScenario.resolve(
-      event_store:,
-      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
-      kind: "file",
-      path: "db/schema.rb"
+    reserved_resources = [
+      lease_reference(resource_suffix: "611", lease_suffix: "621", path: "app/models/invoice.rb", blob: "b" * 40),
+      lease_reference(resource_suffix: "613", lease_suffix: "623", path: "db/schema.rb", blob: nil)
+    ]
+    added_resource = lease_reference(
+      resource_suffix: "612",
+      lease_suffix: "622",
+      path: "app/services/tax.rb",
+      blob: "c" * 40
     )
-    tax_resource_id = ResourceScenario.resolve(
-      event_store:,
-      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
-      kind: "file",
-      path: "app/services/tax.rb"
+    lease_set_id = "018f0f4d-4e45-7abc-8def-000000000620"
+    reserved = write_set_event(
+      Coordinator::Write::Events::WriteSetReservedV2.new(
+        lease_set_id:,
+        change_set_id: "CS-WRITE",
+        work_item_id: "W-WRITE",
+        attempt_id: "A-WRITE",
+        repository_id:,
+        policy_version: "coordinator-resource-lease/v2",
+        resources: reserved_resources,
+        reserved_at: "2026-08-30T12:02:00.000000Z",
+        expires_at: "2026-08-30T12:10:00.000000Z"
+      ),
+      attempt_id: "A-WRITE",
+      revision: 2,
+      position: 500
     )
-    reservation = Coordinator::Write::Operations::ExecuteReserveWriteSet.new(event_store:).call(
-      command_id: "reserve-A-100",
-      actor: { kind: "agent", id: "agent-1" },
-      change_set_id: "CS-100",
-      work_item_id: "W-100",
-      attempt_id: "A-100",
-      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
-      base_commit_oid: "a" * 40,
-      resources: [
-        { resource_id: invoice_resource_id, base_blob_oid: "b" * 40 },
-        { resource_id: schema_resource_id }
-      ],
-      lease_duration_seconds: 300
-    ).value!.data
-    expansion = Coordinator::Write::Operations::ExecuteExpandWriteSet.new(event_store:).call(
-      command_id: "expand-A-100",
-      actor: { kind: "agent", id: "agent-1" },
-      change_set_id: "CS-100",
-      work_item_id: "W-100",
-      attempt_id: "A-100",
-      lease_set_id: reservation.lease_set_id,
-      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
-      base_commit_oid: "a" * 40,
-      resources: [
-        { resource_id: tax_resource_id, base_blob_oid: "c" * 40 }
-      ]
-    ).value!.data
-    renewal = Coordinator::Write::Operations::ExecuteRenewLeaseSet.new(event_store:).call(
-      command_id: "renew-A-100",
-      actor: { kind: "agent", id: "agent-1" },
-      change_set_id: "CS-100",
-      work_item_id: "W-100",
-      attempt_id: "A-100",
-      lease_set_id: reservation.lease_set_id,
-      leases: (reservation.resources + expansion.added_resources).map do |reference|
-        {
-          resource_id: reference.resource_id,
-          lease_id: reference.lease_id,
-          fencing_token: reference.fencing_token
-        }
-      end,
-      lease_duration_seconds: 600
-    ).value!.data
-    release = Coordinator::Write::Operations::ExecuteReleaseLeaseSet.new(event_store:).call(
-      command_id: "release-A-100",
-      actor: { kind: "agent", id: "agent-1" },
-      change_set_id: "CS-100",
-      work_item_id: "W-100",
-      attempt_id: "A-100",
-      lease_set_id: reservation.lease_set_id,
-      leases: (reservation.resources + expansion.added_resources).map do |reference|
-        {
-          resource_id: reference.resource_id,
-          lease_id: reference.lease_id,
-          fencing_token: reference.fencing_token
-        }
-      end
-    ).value!.data
+    expanded = write_set_event(
+      Coordinator::Write::Events::WriteSetExpandedV2.new(
+        lease_set_id:,
+        change_set_id: "CS-WRITE",
+        work_item_id: "W-WRITE",
+        attempt_id: "A-WRITE",
+        repository_id:,
+        policy_version: "coordinator-resource-lease/v2",
+        added_resources: [ added_resource ],
+        resource_count: 3,
+        expanded_at: "2026-08-30T12:03:00.000000Z",
+        expires_at: "2026-08-30T12:10:00.000000Z"
+      ),
+      attempt_id: "A-WRITE",
+      revision: 3,
+      position: 600
+    )
+    all_resources = [ *reserved_resources, added_resource ].sort_by { _1.resource_id.b }
+    renewed = write_set_event(
+      Coordinator::Write::Events::WriteSetRenewedV2.new(
+        lease_set_id:,
+        change_set_id: "CS-WRITE",
+        work_item_id: "W-WRITE",
+        attempt_id: "A-WRITE",
+        repository_id:,
+        policy_version: "coordinator-resource-lease/v2",
+        resources: all_resources,
+        resource_count: 3,
+        renewed_at: "2026-08-30T12:04:00.000000Z",
+        previous_expires_at: "2026-08-30T12:10:00.000000Z",
+        expires_at: "2026-08-30T12:20:00.000000Z"
+      ),
+      attempt_id: "A-WRITE",
+      revision: 4,
+      position: 700
+    )
+    released = write_set_event(
+      Coordinator::Write::Events::WriteSetReleasedV2.new(
+        lease_set_id:,
+        change_set_id: "CS-WRITE",
+        work_item_id: "W-WRITE",
+        attempt_id: "A-WRITE",
+        repository_id:,
+        policy_version: "coordinator-resource-lease/v2",
+        resources: all_resources,
+        resource_count: 3,
+        previous_expires_at: "2026-08-30T12:20:00.000000Z",
+        released_at: "2026-08-30T12:05:00.000000Z"
+      ),
+      attempt_id: "A-WRITE",
+      revision: 5,
+      position: 800
+    )
+    [ *events, reserved, expanded, renewed, released ].each { projector.call(_1) }
 
-    planning = change_set_events("CS-100")
-    work = work_item_events("W-100")
-    attempt = event_store.read(
-      streams.attempt("A-100"),
-      Coordinator::Write::EventQueries::ATTEMPT_FOR_WRITE_SET_EXPANSION
-    ) + event_store.read(
-      streams.attempt("A-100"),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "WriteSetRenewed", "WriteSetReleased" ],
-        maximum_count: 2,
-        direction: :asc
-      )
-    )
-    [ planning[0], planning[1], work[0], planning[2], planning[3], work[1], work[2], *attempt ].each do |event|
-      projector.call(event)
-    end
-
-    snapshot = Coordinator::Read::Repositories::CoordContexts.new.resolve(
-      scope_kind: "attempt",
-      scope_id: "A-100"
-    )
+    snapshot = repository.resolve(scope_kind: "attempt", scope_id: "A-WRITE")
     expect(snapshot.state.change_set.status).to eq("active")
     expect(snapshot.state.work_items.sole.to_h).to include(
       status: "acquired",
-      active_attempt_id: "A-100",
+      active_attempt_id: "A-WRITE",
       active_agent_id: "agent-1"
     )
     expect(snapshot.state.attempts.sole.to_h).to include(
-      attempt_id: "A-100",
+      attempt_id: "A-WRITE",
       status: "started",
-      base_snapshots: [
-        {
-          repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
-          object_format: "sha1",
-          commit_oid: "a" * 40
-        }
-      ]
+      base_snapshots: [ { repository_id:, object_format: "sha1", commit_oid: "a" * 40 } ]
     )
     write_set = snapshot.state.attempts.sole.write_set
-    expect(write_set.to_h).to include(
-      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
-      policy_version: "coordinator-resource-lease/v2"
-    )
-    expect(write_set.lease_set_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
+    expect(write_set.to_h).to include(repository_id:, policy_version: "coordinator-resource-lease/v2")
+    expect(write_set.lease_set_id).to eq(lease_set_id)
     expect(write_set.resources).to eq(write_set.resources.sort_by { _1.resource_id.b })
     expect(write_set.resources.map(&:resource_path)).to contain_exactly(
-      "app/models/invoice.rb",
-      "app/services/tax.rb",
-      "db/schema.rb"
+      "app/models/invoice.rb", "app/services/tax.rb", "db/schema.rb"
     )
     expect(write_set.resources.map(&:fencing_token)).to eq([ 1, 1, 1 ])
-    expect(write_set.expires_at).to eq(renewal.expires_at)
-    expect(write_set.last_expanded_at).to be > write_set.reserved_at
-    expect(write_set.last_renewed_at).to be > write_set.reserved_at
-    expect(write_set.previous_expires_at).to eq(reservation.expires_at)
-    expect(write_set.released_at).to eq(release.released_at)
-    expect(write_set.expires_at).to eq(release.previous_expires_at)
+    expect(write_set).to have_attributes(
+      reserved_at: "2026-08-30T12:02:00.000000Z",
+      last_expanded_at: "2026-08-30T12:03:00.000000Z",
+      last_renewed_at: "2026-08-30T12:04:00.000000Z",
+      previous_expires_at: "2026-08-30T12:10:00.000000Z",
+      expires_at: "2026-08-30T12:20:00.000000Z",
+      released_at: "2026-08-30T12:05:00.000000Z"
+    )
     expect(write_set.to_h.keys & %i[active fresh pending]).to be_empty
-    expect(Coordinator::Read::ContextNextActionsBuilder.new.call(snapshot.state)).to be_empty
   end
 
   it "keeps the latest observed Candidate checkpoint per Attempt while history remains separate" do
-    prepared = CandidateScenario.prepare(prefix: "context-candidate")
-    first_input = prepared.fetch(:input)
-    second_input = first_input.merge(
-      command_id: "cmd-context-candidate-2",
+    events = active_attempt_events(
+      change_set_id: "CS-CANDIDATE",
+      work_item_id: "W-CANDIDATE",
+      attempt_id: "A-CANDIDATE",
+      agent_id: "agent-a"
+    )
+    first = candidate_attached_event(
+      change_set_id: "CS-CANDIDATE",
+      work_item_id: "W-CANDIDATE",
+      attempt_id: "A-CANDIDATE",
+      candidate_id: "CAN-context-candidate-1",
+      checkpoint_kind: "intermediate",
+      head_character: "b",
+      revision: 2,
+      position: 500
+    )
+    second = candidate_attached_event(
+      change_set_id: "CS-CANDIDATE",
+      work_item_id: "W-CANDIDATE",
+      attempt_id: "A-CANDIDATE",
       candidate_id: "CAN-context-candidate-2",
-      head_commit_oid: "e" * 40,
-      checkpoint_kind: "handoff"
+      checkpoint_kind: "handoff",
+      head_character: "e",
+      revision: 3,
+      position: 600
     )
-    CandidateScenario.execute(Coordinator::Write::Operations::ExecuteSubmitCandidate, first_input)
-    CandidateScenario.execute(Coordinator::Write::Operations::ExecuteSubmitCandidate, second_input)
-    project_candidate_context_sources(prepared.fetch(:ids))
-    CandidateScenario.attachment_events(prepared.dig(:ids, :attempt_id)).each do |event|
-      projector.call(event)
-    end
+    [ *events, first, second ].each { projector.call(_1) }
 
-    snapshot = Coordinator::Read::Repositories::CoordContexts.new.resolve(
-      scope_kind: "attempt",
-      scope_id: prepared.dig(:ids, :attempt_id)
-    )
-    checkpoint = snapshot.state.candidate_checkpoints.sole
+    checkpoint = repository.resolve(scope_kind: "attempt", scope_id: "A-CANDIDATE")
+      .state.candidate_checkpoints.sole
     expect(checkpoint).to have_attributes(
       candidate_id: "CAN-context-candidate-2",
-      attempt_id: "A-context-candidate",
+      attempt_id: "A-CANDIDATE",
       checkpoint_kind: "handoff",
       head_commit_oid: "e" * 40,
-      manifest_digest: match(Coordinator::Shared::Types::SHA256_DIGEST_PATTERN)
+      manifest_digest: digest("e")
     )
     expect(checkpoint.candidate_event).to have_attributes(
       stream_id: "CAN-context-candidate-2",
@@ -316,190 +296,523 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
   end
 
   it "serves observed final-Candidate context while terminal facts lag, then converges the ChangeSet" do
-    candidate = CandidateScenario.submit(prefix: "context-terminal")
-    ids = candidate.fetch(:ids)
-    project_candidate_context_sources(ids)
-    projector.call(candidate.fetch(:attachment))
-    CandidateScenario.release(candidate)
-    release = attempt_terminal_context_events(ids.fetch(:attempt_id)).find { _1.type == "WriteSetReleased" }
-    projector.call(release)
+    change_set_id = "CS-TERMINAL"
+    work_item_id = "W-TERMINAL"
+    attempt_id = "A-TERMINAL"
+    candidate_id = "CAN-context-terminal"
+    events = active_attempt_events(change_set_id:, work_item_id:, attempt_id:, agent_id: "agent-a")
+    lease = lease_reference(resource_suffix: "631", lease_suffix: "632", path: "app/final.rb", blob: "b" * 40)
+    lease_set_id = "018f0f4d-4e45-7abc-8def-000000000630"
+    reserved = write_set_event(
+      Coordinator::Write::Events::WriteSetReservedV2.new(
+        lease_set_id:,
+        change_set_id:,
+        work_item_id:,
+        attempt_id:,
+        repository_id:,
+        policy_version: "coordinator-resource-lease/v2",
+        resources: [ lease ],
+        reserved_at: "2026-08-30T12:02:00.000000Z",
+        expires_at: "2026-08-30T12:10:00.000000Z"
+      ),
+      attempt_id:,
+      revision: 2,
+      position: 500
+    )
+    attached = candidate_attached_event(
+      change_set_id:,
+      work_item_id:,
+      attempt_id:,
+      candidate_id:,
+      checkpoint_kind: "final",
+      head_character: "e",
+      revision: 3,
+      position: 600
+    )
+    released = write_set_event(
+      Coordinator::Write::Events::WriteSetReleasedV2.new(
+        lease_set_id:,
+        change_set_id:,
+        work_item_id:,
+        attempt_id:,
+        repository_id:,
+        policy_version: "coordinator-resource-lease/v2",
+        resources: [ lease ],
+        resource_count: 1,
+        previous_expires_at: "2026-08-30T12:10:00.000000Z",
+        released_at: "2026-08-30T12:03:00.000000Z"
+      ),
+      attempt_id:,
+      revision: 4,
+      position: 700
+    )
+    [ *events, reserved, attached, released ].each { projector.call(_1) }
 
-    before_completion = Coordinator::Read::Queries::CoordContext.new.call(
-      attempt_id: ids.fetch(:attempt_id)
-    ).value!
+    before_completion = Coordinator::Read::Queries::CoordContext.new.call(attempt_id:).value!
     expect(before_completion.data.context.work_items.sole.status).to eq("acquired")
-    expect(before_completion.next_actions).to be_empty
 
-    CandidateScenario.complete(candidate, release: false)
-    stale = Coordinator::Read::Queries::CoordContext.new.call(attempt_id: ids.fetch(:attempt_id)).value!
-    expect(stale.status).to eq("ok")
-    expect(stale.context_token).to eq(before_completion.context_token)
-    expect(stale.data.context.work_items.sole.status).to eq("acquired")
-
-    terminal = work_item_terminal_context_events(ids.fetch(:work_item_id))
-    attempt_completed = attempt_terminal_context_events(ids.fetch(:attempt_id)).find do |event|
-      event.type == "AttemptCompleted"
-    end
-    projector.call(terminal.find { _1.type == "WorkItemCandidateSelected" })
-    projector.call(attempt_completed)
-    projector.call(terminal.find { _1.type == "WorkItemCompleted" })
-    Coordinator::Processes::ProcessManagers::BuildProgress.new(event_store:).call(
-      terminal.find { _1.type == "WorkItemCompleted" }
+    candidate_reference = event_payload(attached).candidate_event
+    selected = work_item_event(
+      Coordinator::Write::Events::WorkItemCandidateSelectedV1.new(
+        change_set_id:,
+        work_item_id:,
+        attempt_id:,
+        candidate_id:,
+        candidate_event: candidate_reference,
+        selected_at: "2026-08-30T12:04:00.000000Z"
+      ),
+      work_item_id:,
+      revision: 3,
+      position: 800
     )
-    projector.call(change_set_terminal_context_events(ids.fetch(:change_set_id)).sole)
+    attempt_completed = attempt_event(
+      Coordinator::Write::Events::AttemptCompletedV1.new(
+        attempt_id:,
+        change_set_id:,
+        work_item_id:,
+        candidate_id:,
+        candidate_event: candidate_reference,
+        completed_at: "2026-08-30T12:04:01.000000Z"
+      ),
+      attempt_id:,
+      revision: 5,
+      position: 801
+    )
+    work_completed = work_item_event(
+      Coordinator::Write::Events::WorkItemCompletedV1.new(
+        change_set_id:,
+        work_item_id:,
+        attempt_id:,
+        candidate_id:,
+        candidate_event: candidate_reference,
+        produced_outputs: [],
+        rule_version: "work-item-completion/v1",
+        completed_at: "2026-08-30T12:04:02.000000Z"
+      ),
+      work_item_id:,
+      revision: 4,
+      position: 802
+    )
+    change_completed = change_set_event(
+      Coordinator::Write::Events::ChangeSetCompletedV1.new(
+        change_set_id:,
+        work_item_completions: [
+          Coordinator::Write::ChangeSetCompletions::WorkItemEvidenceV1.new(
+            change_set_id:,
+            work_item_id:,
+            repository_id:,
+            attempt_id:,
+            candidate_id:,
+            candidate_event: candidate_reference,
+            selected_event: event_reference(selected),
+            completed_event: event_reference(work_completed),
+            completed_at: "2026-08-30T12:04:02.000000Z"
+          )
+        ],
+        release_set_completion_event: nil,
+        rule_version: "change-set-completion/v1",
+        completed_at: "2026-08-30T12:05:00.000000Z"
+      ),
+      change_set_id:,
+      revision: 4,
+      position: 900
+    )
+    [ selected, attempt_completed, work_completed, change_completed ].each { projector.call(_1) }
 
-    converged = Coordinator::Read::Queries::CoordContext.new.call(
-      change_set_id: ids.fetch(:change_set_id)
-    ).value!
+    converged = Coordinator::Read::Queries::CoordContext.new.call(change_set_id:).value!
     expect(converged.status).to eq("ok")
-    expect(converged.data.context.change_set).to have_attributes(
-      status: "completed",
-      completed_at: be_present
-    )
+    expect(converged.data.context.change_set).to have_attributes(status: "completed", completed_at: be_present)
     expect(converged.data.context.work_items.sole).to have_attributes(
       status: "completed",
-      selected_candidate_id: candidate.dig(:input, :candidate_id),
-      completed_at: be_present
+      selected_candidate_id: candidate_id,
+      completed_at: be_present,
+      produced_outputs: []
     )
-    expect(converged.data.context.work_items.sole.produced_outputs).to eq([])
     expect(converged.data.context.attempts.sole).to have_attributes(
       status: "completed",
       write_set: nil,
-      selected_candidate_id: candidate.dig(:input, :candidate_id),
+      selected_candidate_id: candidate_id,
       completed_at: be_present
     )
-    expect(converged.next_actions).to be_empty
     expect(converged.to_h).not_to include(:projection_status, :fresh, :pending)
   end
 
   it "removes an observed dependency blocker before the independently projected readiness fact" do
-    scenario = DependencyProgressScenario.prepare(
-      prefix: "context-unlock",
-      dependency_kind: "requires_completion"
+    change_set_id = "CS-DEPENDENCY"
+    producer_id = "W-PRODUCER"
+    consumer_id = "W-CONSUMER"
+    dependency_id = "DEP-context-unlock"
+    events = dependency_planning_events(
+      change_set_id:,
+      producer_id:,
+      consumer_id:,
+      dependency_id:
     )
-    ids = scenario.fetch(:ids)
-    project_dependency_context_sources(ids)
+    events.each { projector.call(_1) }
 
-    blocked = Coordinator::Read::Queries::CoordContext.new.call(
-      work_item_id: ids.fetch(:consumer_work_item_id)
-    ).value!
-    expect(blocked.data.blockers.sole).to have_attributes(
-      dependency_id: "DEP-progress-#{ids.fetch(:candidate_id)}"
+    blocked = Coordinator::Read::Queries::CoordContext.new.call(work_item_id: consumer_id).value!
+    expect(blocked.data.blockers.sole).to have_attributes(dependency_id:)
+
+    source = source_reference("WorkItemCompleted", "WorkItem", producer_id, 4)
+    satisfied = change_set_event(
+      Coordinator::Write::Events::WorkItemDependencySatisfiedV1.new(
+        change_set_id:,
+        dependency_id:,
+        producer_work_item_id: producer_id,
+        consumer_work_item_id: consumer_id,
+        dependency_kind: "requires_completion",
+        required_output: nil,
+        source_event: source,
+        rule_version: "dependency-satisfaction/v1",
+        satisfied_at: "2026-08-30T12:06:00.000000Z"
+      ),
+      change_set_id:,
+      revision: 6,
+      position: 700
     )
+    projector.call(satisfied)
 
-    completed = DependencyProgressScenario.complete(scenario)
-    source = DependencyProgressScenario.work_item_event(completed, "WorkItemCompleted")
-    Coordinator::Processes::ProcessManagers::BuildProgress.new(event_store:).call(source)
-    satisfaction = DependencyProgressScenario.dependency_events(completed).sole
-    readiness = DependencyProgressScenario.readiness_events(completed).sole
-    projector.call(satisfaction)
-
-    partially_converged = Coordinator::Read::Queries::CoordContext.new.call(
-      work_item_id: ids.fetch(:consumer_work_item_id)
-    ).value!
+    partially_converged = Coordinator::Read::Queries::CoordContext.new.call(work_item_id: consumer_id).value!
     expect(partially_converged.status).to eq("ok")
     expect(partially_converged.data.blockers).to be_empty
-    expect(partially_converged.data.context.work_items.find do |work_item|
-      work_item.work_item_id == ids.fetch(:consumer_work_item_id)
-    end.status).to eq("planned")
+    expect(partially_converged.data.context.work_items.find { _1.work_item_id == consumer_id }.status).to eq("planned")
 
-    projector.call(readiness)
-    converged = Coordinator::Read::Queries::CoordContext.new.call(
-      work_item_id: ids.fetch(:consumer_work_item_id)
-    ).value!
+    ready = work_item_event(
+      Coordinator::Write::Events::WorkItemMadeReadyV1.new(
+        change_set_id:,
+        work_item_id: consumer_id,
+        readiness_decision_id: "ready-consumer",
+        reason: "dependencies_satisfied",
+        made_ready_at: "2026-08-30T12:06:01.000000Z"
+      ),
+      work_item_id: consumer_id,
+      revision: 1,
+      position: 701
+    )
+    projector.call(ready)
+    converged = Coordinator::Read::Queries::CoordContext.new.call(work_item_id: consumer_id).value!
     expect(converged.data.blockers).to be_empty
     expect(converged.next_actions).to be_empty
-    dependency = converged.data.context.dependencies.sole
-    expect(dependency).to have_attributes(source_event: be_present, satisfied_at: be_present)
+    expect(converged.data.context.dependencies.sole).to have_attributes(
+      source_event: source,
+      satisfied_at: "2026-08-30T12:06:00.000000Z"
+    )
   end
 
-  def create_change_set(change_set_id)
-    Coordinator::Write::Operations::ExecuteCreateChangeSet.new(event_store:).call(
-      command_id: "create-#{change_set_id}",
-      actor: { kind: "agent", id: "planner-1" },
-      change_set_id:,
-      goal: "Coordinate #{change_set_id}",
-      acceptance_criteria: [ "Agents do not overlap" ]
-    ).value!
+  def planning_events(change_set_id:, work_item_id:)
+    {
+      created: change_set_event(
+        Coordinator::Write::Events::ChangeSetCreatedV1.new(
+          change_set_id:,
+          goal: "Coordinate #{change_set_id}",
+          created_at: "2026-08-30T12:00:00.000000Z"
+        ),
+        change_set_id:,
+        revision: 0,
+        position: 100
+      ),
+      criteria: change_set_event(
+        Coordinator::Write::Events::ChangeSetAcceptanceCriteriaDefinedV1.new(
+          change_set_id:,
+          acceptance_criteria: [ "Agents do not overlap" ],
+          defined_at: "2026-08-30T12:00:01.000000Z"
+        ),
+        change_set_id:,
+        revision: 1,
+        position: 101
+      ),
+      membership: change_set_event(
+        Coordinator::Write::Events::WorkItemAddedToChangeSetV1.new(
+          change_set_id:,
+          work_item_id:,
+          added_at: "2026-08-30T12:00:02.000000Z"
+        ),
+        change_set_id:,
+        revision: 2,
+        position: 102
+      ),
+      work_item: work_item_event(
+        work_item_payload(change_set_id:, work_item_id:),
+        work_item_id:,
+        revision: 0,
+        position: 200
+      )
+    }
   end
 
-  def create_work_item(change_set_id, work_item_id)
-    RepositoryScenario.register(event_store:)
-    Coordinator::Write::Operations::ExecuteCreateWorkItem.new(event_store:).call(
-      command_id: "create-#{work_item_id}",
-      actor: { kind: "agent", id: "planner-1" },
+  def active_attempt_events(change_set_id:, work_item_id:, attempt_id:, agent_id:)
+    planning = planning_events(change_set_id:, work_item_id:)
+    activated = change_set_event(
+      Coordinator::Write::Events::ChangeSetActivatedV1.new(
+        change_set_id:,
+        work_item_count: 1,
+        dependency_count: 0,
+        activated_at: "2026-08-30T12:00:03.000000Z"
+      ),
       change_set_id:,
+      revision: 3,
+      position: 103
+    )
+    ready = work_item_event(
+      Coordinator::Write::Events::WorkItemMadeReadyV1.new(
+        change_set_id:,
+        work_item_id:,
+        readiness_decision_id: "ready-#{work_item_id}",
+        reason: "change_set_activated",
+        made_ready_at: "2026-08-30T12:00:04.000000Z"
+      ),
       work_item_id:,
-      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
-      goal: "Implement #{work_item_id}",
-      acceptance_criteria: [ "The work is verifiable" ]
-    ).value!
+      revision: 1,
+      position: 201
+    )
+    acquired = work_item_event(
+      Coordinator::Write::Events::WorkItemAcquiredV1.new(
+        change_set_id:,
+        work_item_id:,
+        attempt_id:,
+        agent_id:,
+        acquired_at: "2026-08-30T12:01:00.000000Z"
+      ),
+      work_item_id:,
+      revision: 2,
+      position: 202
+    )
+    authorized = attempt_event(
+      Coordinator::Write::Events::AttemptAuthorizedV1.new(
+        attempt_id:,
+        change_set_id:,
+        work_item_id:,
+        agent_id:,
+        base_snapshots: [ repository_snapshot ],
+        authorized_at: "2026-08-30T12:01:00.000000Z"
+      ),
+      attempt_id:,
+      revision: 0,
+      position: 300
+    )
+    started = attempt_event(
+      Coordinator::Write::Events::AttemptStartedV1.new(
+        attempt_id:,
+        change_set_id:,
+        work_item_id:,
+        started_at: "2026-08-30T12:01:01.000000Z"
+      ),
+      attempt_id:,
+      revision: 1,
+      position: 301
+    )
+    [
+      planning.fetch(:created), planning.fetch(:criteria), planning.fetch(:membership),
+      planning.fetch(:work_item), activated, ready, acquired, authorized, started
+    ]
   end
 
-  def activate_change_set(change_set_id, work_item_id)
-    Coordinator::Write::Operations::ExecuteActivateChangeSet.new(event_store:).call(
-      command_id: "activate-#{change_set_id}",
-      actor: { kind: "agent", id: "planner-1" },
-      change_set_id:
-    ).value!
-    activation = change_set_events(change_set_id).find { _1.type == "ChangeSetActivated" }
-    Coordinator::Processes::ProcessManagers::ChangeSetReadiness.new(event_store:).call(activation)
-    raise "WorkItem #{work_item_id} was not made ready" unless work_item_events(work_item_id).any? do |event|
-      event.type == "WorkItemMadeReady"
+  def dependency_planning_events(change_set_id:, producer_id:, consumer_id:, dependency_id:)
+    created = change_set_event(
+      Coordinator::Write::Events::ChangeSetCreatedV1.new(
+        change_set_id:,
+        goal: "Coordinate dependency",
+        created_at: "2026-08-30T12:00:00.000000Z"
+      ),
+      change_set_id:,
+      revision: 0,
+      position: 100
+    )
+    criteria = change_set_event(
+      Coordinator::Write::Events::ChangeSetAcceptanceCriteriaDefinedV1.new(
+        change_set_id:,
+        acceptance_criteria: [ "Dependencies converge" ],
+        defined_at: "2026-08-30T12:00:01.000000Z"
+      ),
+      change_set_id:,
+      revision: 1,
+      position: 101
+    )
+    memberships = [ producer_id, consumer_id ].each_with_index.map do |work_item_id, index|
+      change_set_event(
+        Coordinator::Write::Events::WorkItemAddedToChangeSetV1.new(
+          change_set_id:,
+          work_item_id:,
+          added_at: "2026-08-30T12:00:0#{index + 2}.000000Z"
+        ),
+        change_set_id:,
+        revision: index + 2,
+        position: 102 + index
+      )
     end
-  end
-
-  def acquire_work_item(change_set_id, work_item_id, attempt_id, agent_id)
-    Coordinator::Write::Operations::ExecuteAcquireWorkItem.new(event_store:).call(
-      command_id: "acquire-#{attempt_id}",
-      actor: { kind: "agent", id: agent_id },
+    declared = change_set_event(
+      Coordinator::Write::Events::WorkItemDependencyDeclaredV1.new(
+        change_set_id:,
+        dependency_id:,
+        producer_work_item_id: producer_id,
+        consumer_work_item_id: consumer_id,
+        dependency_kind: "requires_completion",
+        required_output: nil,
+        declared_at: "2026-08-30T12:00:04.000000Z"
+      ),
       change_set_id:,
-      work_item_id:,
-      attempt_id:,
-      base_snapshots: [
-        { repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID, commit_oid: "a" * 40 }
-      ]
-    ).value!
-  end
-
-  def abandon_attempt(change_set_id, work_item_id, attempt_id, agent_id)
-    Coordinator::Write::Operations::ExecuteAbandonAttempt.new(event_store:).call(
-      command_id: "abandon-#{attempt_id}",
-      actor: { kind: "agent", id: agent_id },
+      revision: 4,
+      position: 104
+    )
+    activated = change_set_event(
+      Coordinator::Write::Events::ChangeSetActivatedV1.new(
+        change_set_id:,
+        work_item_count: 2,
+        dependency_count: 1,
+        activated_at: "2026-08-30T12:00:05.000000Z"
+      ),
       change_set_id:,
-      work_item_id:,
-      attempt_id:,
-      reason: "The agent yielded this WorkItem."
-    ).value!
+      revision: 5,
+      position: 105
+    )
+    work_items = [ producer_id, consumer_id ].each_with_index.map do |work_item_id, index|
+      work_item_event(
+        work_item_payload(change_set_id:, work_item_id:),
+        work_item_id:,
+        revision: 0,
+        position: 200 + index
+      )
+    end
+    [ created, criteria, *memberships, *work_items, declared, activated ]
   end
 
-  def abandonment_context_sources(change_set_id:, work_item_id:, attempt_id:)
-    change_set = change_set_events(change_set_id)
-    work_item = event_store.read(
-      streams.work_item(work_item_id),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: %w[WorkItemCreated WorkItemMadeReady WorkItemAcquired WorkItemRequeued],
-        maximum_count: 4,
-        direction: :asc
-      )
+  def work_item_payload(change_set_id:, work_item_id:)
+    Coordinator::Write::Events::WorkItemCreatedV1.new(
+      work_item_id:,
+      change_set_id:,
+      repository_id:,
+      goal: "Implement #{work_item_id}",
+      acceptance_criteria: [ "The work is verifiable" ],
+      competitive_mode: false,
+      created_at: "2026-08-30T12:00:02.000000Z"
     )
-    attempt = event_store.read(
-      streams.attempt(attempt_id),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: %w[AttemptAuthorized AttemptStarted AttemptAbandoned],
-        maximum_count: 3,
-        direction: :asc
-      )
-    )
+  end
 
-    (change_set + work_item + attempt).sort_by(&:global_position)
+  def candidate_attached_event(
+    change_set_id:,
+    work_item_id:,
+    attempt_id:,
+    candidate_id:,
+    checkpoint_kind:,
+    head_character:,
+    revision:,
+    position:
+  )
+    attempt_event(
+      Coordinator::Write::Events::CandidateAttachedToAttemptV1.new(
+        candidate_id:,
+        candidate_event: source_reference("CandidateSubmitted", "Candidate", candidate_id, 0),
+        change_set_id:,
+        work_item_id:,
+        attempt_id:,
+        repository_id:,
+        target_branch: "main",
+        object_format: "sha1",
+        base_commit_oid: "a" * 40,
+        head_commit_oid: head_character * 40,
+        checkpoint_kind:,
+        manifest_digest: digest(head_character),
+        build_context_digest: nil,
+        attached_at: "2026-08-30T12:03:00.000000Z"
+      ),
+      attempt_id:,
+      revision:,
+      position:
+    )
+  end
+
+  def lease_reference(resource_suffix:, lease_suffix:, path:, blob:)
+    Coordinator::Write::LeaseReferenceV2.new(
+      lease_id: "018f0f4d-4e45-7abc-8def-000000000#{lease_suffix}",
+      resource_id: "018f0f4d-4e45-7abc-8def-000000000#{resource_suffix}",
+      resource_kind: "file",
+      resource_path: path,
+      base_blob_oid: blob,
+      fencing_token: 1
+    )
+  end
+
+  def repository_snapshot
+    Coordinator::Write::RepositorySnapshotV1.new(
+      repository_id:,
+      object_format: "sha1",
+      commit_oid: "a" * 40
+    )
+  end
+
+  def change_set_event(payload, change_set_id:, revision:, position:)
+    projection_event(
+      payload:,
+      stream: Coordinator::Write::StreamFactory.new.change_set(change_set_id),
+      revision:,
+      position:
+    )
+  end
+
+  def work_item_event(payload, work_item_id:, revision:, position:)
+    projection_event(
+      payload:,
+      stream: Coordinator::Write::StreamFactory.new.work_item(work_item_id),
+      revision:,
+      position:
+    )
+  end
+
+  def attempt_event(payload, attempt_id:, revision:, position:)
+    projection_event(
+      payload:,
+      stream: Coordinator::Write::StreamFactory.new.attempt(attempt_id),
+      revision:,
+      position:
+    )
+  end
+
+  alias_method :write_set_event, :attempt_event
+
+  def projection_event(payload:, stream:, revision:, position:)
+    ProjectionEventFactory.build(
+      payload:,
+      stream:,
+      stream_revision: revision,
+      global_position: position,
+      policy_version: "coord-context/v1",
+      command_id: "cmd-coord-context-projection",
+      correlation_id:
+    )
+  end
+
+  def source_reference(type, stream_name, stream_id, revision)
+    Coordinator::Write::EventReference.new(
+      event_id: SecureRandom.uuid_v7,
+      type:,
+      stream_context: stream_name == "Decision" ? "HumanGuidance" : "DevelopmentExecution",
+      stream_name:,
+      stream_id:,
+      stream_revision: revision
+    )
+  end
+
+  def event_reference(event)
+    Coordinator::Write::EventReference.new(
+      event_id: event.id,
+      type: event.type,
+      stream_context: event.stream.context,
+      stream_name: event.stream.stream_name,
+      stream_id: event.stream.stream_id,
+      stream_revision: event.stream_revision
+    )
+  end
+
+  def event_payload(event)
+    Coordinator::Write::EventSchemaRegistry.new.load(
+      type: event.type,
+      schema_version: event.metadata.fetch("schema_version"),
+      data: event.data
+    )
   end
 
   def assert_abandoned_context
-    snapshot = Coordinator::Read::Repositories::CoordContexts.new.resolve(
-      scope_kind: "work_item",
-      scope_id: "W-ABANDON"
-    )
+    snapshot = repository.resolve(scope_kind: "work_item", scope_id: "W-ABANDON")
     expect(snapshot.state.work_items.sole).to have_attributes(
       status: "ready",
       active_attempt_id: nil,
@@ -512,7 +825,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
       abandonment_reason: "The agent yielded this WorkItem.",
       abandoned_at: be_present
     )
-    history = Coordinator::Read::Repositories::CoordContexts.new.attempt_page(
+    history = repository.attempt_page(
       work_item_id: "W-ABANDON",
       after_authorized_global_position: nil,
       limit: 1
@@ -527,112 +840,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :event_store, :rea
     )
   end
 
-  def change_set_events(change_set_id)
-    event_store.read(
-      streams.change_set(change_set_id),
-      Coordinator::Write::EventQueries::CHANGE_SET_FOR_ACTIVATION
-    )
-  end
-
-  def work_item_events(work_item_id)
-    event_store.read(
-      streams.work_item(work_item_id),
-      Coordinator::Write::EventQueries::WORK_ITEM_FOR_ACQUISITION
-    )
-  end
-
-  def project_candidate_context_sources(ids)
-    planning = event_store.read(
-      streams.change_set(ids.fetch(:change_set_id)),
-      Coordinator::Write::EventQueries::CHANGE_SET_FOR_ACTIVATION
-    )
-    work = event_store.read(
-      streams.work_item(ids.fetch(:work_item_id)),
-      Coordinator::Write::EventQueries::WORK_ITEM_FOR_ACQUISITION
-    )
-    attempt = event_store.read(
-      streams.attempt(ids.fetch(:attempt_id)),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: %w[AttemptAuthorized AttemptStarted WriteSetReserved],
-        maximum_count: 3,
-        direction: :asc
-      )
-    )
-    event_types = %w[
-      ChangeSetCreated
-      ChangeSetAcceptanceCriteriaDefined
-      WorkItemCreated
-      WorkItemAddedToChangeSet
-      ChangeSetActivated
-      WorkItemMadeReady
-      WorkItemAcquired
-      AttemptAuthorized
-      AttemptStarted
-      WriteSetReserved
-    ]
-    events = planning + work + attempt
-    event_types.each { |type| projector.call(events.find { _1.type == type }) }
-  end
-
-  def project_dependency_context_sources(ids)
-    planning = event_store.read(
-      streams.change_set(ids.fetch(:change_set_id)),
-      Coordinator::Write::EventQueries::CHANGE_SET_FOR_ACTIVATION
-    )
-    producer = work_item_context_events(ids.fetch(:producer_work_item_id))
-    consumer = work_item_context_events(ids.fetch(:consumer_work_item_id))
-    attempt = event_store.read(
-      streams.attempt(ids.fetch(:attempt_id)),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: %w[AttemptAuthorized AttemptStarted WriteSetReserved CandidateAttachedToAttempt],
-        maximum_count: 4,
-        direction: :asc
-      )
-    )
-    (planning + producer + consumer + attempt).sort_by(&:global_position).each { projector.call(_1) }
-  end
-
-  def work_item_context_events(work_item_id)
-    event_store.read(
-      streams.work_item(work_item_id),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: %w[WorkItemCreated WorkItemMadeReady WorkItemAcquired],
-        maximum_count: 3,
-        direction: :asc
-      )
-    )
-  end
-
-  def work_item_terminal_context_events(work_item_id)
-    event_store.read(
-      streams.work_item(work_item_id),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: %w[WorkItemCandidateSelected WorkItemCompleted],
-        maximum_count: 2,
-        direction: :asc
-      )
-    )
-  end
-
-  def attempt_terminal_context_events(attempt_id)
-    event_store.read(
-      streams.attempt(attempt_id),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: %w[WriteSetReleased AttemptCompleted],
-        maximum_count: 2,
-        direction: :asc
-      )
-    )
-  end
-
-  def change_set_terminal_context_events(change_set_id)
-    event_store.read(
-      streams.change_set(change_set_id),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "ChangeSetCompleted" ],
-        maximum_count: 1,
-        direction: :asc
-      )
-    )
+  def digest(character)
+    "sha256:#{character * 64}"
   end
 end

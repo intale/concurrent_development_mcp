@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
+RSpec.describe "ART-01 MCP Development Artifacts" do
   ART_PROTOCOL_VERSION = "2026-07-28"
   ART_TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
 
@@ -12,7 +12,7 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
     end
   end
 
-  it "captures through a Task and independently serves metadata and passive content" do
+  it "captures through a Task and records authoritative artifact facts", :event_store do
     task_id = call_tool("development_artifact_capture", capture_input, id: 1)
       .dig("result", "taskId")
     execute_task(task_id)
@@ -32,7 +32,32 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
         "classification_revision" => 1
       )
     )
-    project_artifact(artifact_id, observation_id)
+    expect(artifact_events(artifact_id).map(&:type)).to eq([ "DevelopmentArtifactCaptured" ])
+    expect(observation_events(observation_id).map(&:type)).to eq([ "DevelopmentArtifactObserved" ])
+  end
+
+  it "serves projected metadata and passive content independently", :read_model do
+    artifact = create(
+      :coordinator_read_development_artifact,
+      scope: "project:alpha",
+      title: "MCP Artifact",
+      labels: %w[docs mcp],
+      content_text: "MCP artifact body\n",
+      content_byte_size: 18,
+      source_locator: "docs/mcp.md",
+      source_revision: nil
+    )
+    observation = create(
+      :coordinator_read_development_artifact_observation,
+      artifact:,
+      scope: artifact.scope,
+      title: artifact.title,
+      labels: artifact.labels,
+      source_locator: artifact.source_locator,
+      source_revision: nil
+    )
+    artifact_id = artifact.artifact_id
+    observation_id = observation.observation_id
 
     metadata = call_tool("development_artifact_get", { artifact_id:, observation_id: }, id: 3)
       .dig("result", "structuredContent")
@@ -83,7 +108,7 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
     )
   end
 
-  it "corrects one observation classification and rejects a stale revision through Tasks" do
+  it "corrects one observation classification and rejects a stale revision through Tasks", :event_store do
     capture_task = call_tool(
       "development_artifact_capture",
       capture_input(command_id: "cmd-mcp-classification-capture"),
@@ -94,7 +119,6 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
       .dig("result", "result", "structuredContent", "data")
     artifact_id = captured.fetch("artifact_id")
     observation_id = captured.fetch("observation_id")
-    project_artifact(artifact_id, observation_id)
 
     correction_task = call_tool(
       "development_artifact_classification_correct",
@@ -124,24 +148,6 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
       )
     )
 
-    observation_events(observation_id).each do |event|
-      Coordinator::Container["projectors.development_artifacts_v1"].call(event)
-    end
-    exact = call_tool(
-      "development_artifact_get",
-      { artifact_id:, observation_id: },
-      id: 5
-    ).dig("result", "structuredContent", "data", "artifact", "artifact")
-    expect(exact).to include(
-      "observation_id" => observation_id,
-      "classification_revision" => 2,
-      "classification_reason" => "The captured bytes describe a requirement, not general documentation.",
-      "kind" => "contract",
-      "classified" => include(
-        "event" => include("type" => "DevelopmentArtifactClassificationCorrected")
-      )
-    )
-
     stale_task = call_tool(
       "development_artifact_classification_correct",
       {
@@ -164,6 +170,49 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
     )
     expect(observation_events(observation_id).map(&:type)).to eq(
       [ "DevelopmentArtifactObserved", "DevelopmentArtifactClassificationCorrected" ]
+    )
+  end
+
+  it "serves the latest projected observation classification", :read_model do
+    artifact = create(:coordinator_read_development_artifact, scope: "project:alpha")
+    classified_event = {
+      "event_id" => SecureRandom.uuid_v7,
+      "type" => "DevelopmentArtifactClassificationCorrected",
+      "stream_context" => "DevelopmentMemory",
+      "stream_name" => "DevelopmentArtifactObservation",
+      "stream_id" => "artifact-observation:v1:#{'c' * 64}",
+      "stream_revision" => 1
+    }
+    observation = create(
+      :coordinator_read_development_artifact_observation,
+      artifact:,
+      observation_id: classified_event.fetch("stream_id"),
+      scope: artifact.scope,
+      title: "Corrected MCP Artifact",
+      kind: "contract",
+      labels: %w[corrected mcp],
+      classification_revision: 2,
+      classification_reason: "The captured bytes describe a requirement, not general documentation.",
+      classified_event:,
+      classified_global_position: 902,
+      classified_at_domain: Time.utc(2026, 8, 30, 12, 2),
+      classified_at_store: Time.utc(2026, 8, 30, 12, 2, 1)
+    )
+
+    exact = call_tool(
+      "development_artifact_get",
+      { artifact_id: artifact.artifact_id, observation_id: observation.observation_id },
+      id: 5
+    ).dig("result", "structuredContent", "data", "artifact", "artifact")
+
+    expect(exact).to include(
+      "observation_id" => observation.observation_id,
+      "classification_revision" => 2,
+      "classification_reason" => "The captured bytes describe a requirement, not general documentation.",
+      "kind" => "contract",
+      "classified" => include(
+        "event" => include("type" => "DevelopmentArtifactClassificationCorrected")
+      )
     )
   end
 
@@ -327,7 +376,7 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
     )
   end
 
-  it "runs capture and relation batches as idempotent Operation Batch Sagas" do
+  it "runs capture and relation batches as idempotent Operation Batch Sagas", :event_store do
     batch_id = SecureRandom.uuid_v7
     created = call_tool(
       "development_artifact_capture_batch",
@@ -389,61 +438,48 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
     )
   end
 
-  it "exposes bounded forward and reverse relationship traversal through MCP" do
-    parent = capture_through_task(capture_input(command_id: "cmd-mcp-parent"), id: 1)
-    child = capture_through_task(
-      capture_input(command_id: "cmd-mcp-child", locator: "docs/child.md", text: "child\n"),
-      id: 2
+  it "exposes bounded forward and reverse relationship traversal through MCP", :read_model do
+    parent = create(:coordinator_read_development_artifact, title: "Parent", source_locator: "docs/mcp.md")
+    child = create(:coordinator_read_development_artifact, title: "Child", source_locator: "docs/child.md")
+    create(:coordinator_read_development_artifact_observation, artifact: parent)
+    create(:coordinator_read_development_artifact_observation, artifact: child)
+    create(
+      :coordinator_read_development_artifact_relation,
+      source_artifact: parent,
+      target_id: child.artifact_id,
+      path: "child.md"
     )
-    relation_task = call_tool(
-      "development_artifact_relation_declare",
-      {
-        command_id: "cmd-mcp-edge",
-        actor: { kind: "agent", id: "agent-mcp-artifact" },
-        source_artifact_id: parent,
-        relation: "references",
-        target: { kind: "artifact", id: child },
-        attributes: { path: "child.md" }
-      },
-      id: 3
-    ).dig("result", "taskId")
-    execute_task(relation_task)
-    [ parent, child ].each do |artifact_id|
-      artifact_events(artifact_id).each do |event|
-        Coordinator::Container["projectors.development_artifacts_v1"].call(event)
-      end
-    end
 
     outgoing = call_tool(
       "development_artifact_relation_list",
-      { artifact_id: parent, direction: "outgoing", limit: 10 },
+      { artifact_id: parent.artifact_id, direction: "outgoing", limit: 10 },
       id: 4
     ).dig("result", "structuredContent", "data", "page")
     incoming = call_tool(
       "development_artifact_relation_list",
-      { artifact_id: child, direction: "incoming", limit: 10 },
+      { artifact_id: child.artifact_id, direction: "incoming", limit: 10 },
       id: 5
     ).dig("result", "structuredContent", "data", "page")
 
     expect(outgoing.fetch("items").sole).to include(
       "direction" => "outgoing",
-      "peer_id" => child,
+      "peer_id" => child.artifact_id,
       "status" => "active",
       "display_relation" => "references",
       "inverse_relation" => "referenced_by",
       "target" => include("status" => "verified"),
       "follow_action" => {
         "tool" => "development_artifact_get",
-        "arguments" => { "artifact_id" => child }
+        "arguments" => { "artifact_id" => child.artifact_id }
       }
     )
     expect(incoming.fetch("items").sole).to include(
       "direction" => "incoming",
-      "peer_id" => parent,
+      "peer_id" => parent.artifact_id,
       "display_relation" => "referenced_by",
       "follow_action" => {
         "tool" => "development_artifact_get",
-        "arguments" => { "artifact_id" => parent }
+        "arguments" => { "artifact_id" => parent.artifact_id }
       }
     )
     expect(outgoing.fetch("continuation_cursor")).to include(
@@ -451,7 +487,7 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
     )
   end
 
-  it "exposes literal link evidence and immutable relation correction through MCP" do
+  it "records immutable relation correction through MCP Tasks", :event_store do
     parent = capture_through_task(capture_input(command_id: "cmd-mcp-correction-parent"), id: 1)
     original_child = capture_through_task(
       capture_input(
@@ -512,14 +548,55 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
     execute_task(replacement_task)
     replacement = task_request("tasks/get", replacement_task, id: 15)
       .dig("result", "result", "structuredContent", "data")
-    artifact_events(parent).each do |event|
-      Coordinator::Container["projectors.development_artifacts_v1"].call(event)
+
+    expect(replacement).to include(
+      "outcome" => "superseded",
+      "superseded_relation_id" => original.fetch("relation_id")
+    )
+    expect(artifact_events(parent).map(&:type)).to eq(
+      [
+        "DevelopmentArtifactCaptured",
+        "DevelopmentArtifactRelationDeclared",
+        "DevelopmentArtifactRelationDeclared",
+        "DevelopmentArtifactRelationSuperseded"
+      ]
+    )
+  end
+
+  it "serves literal link evidence and projected relation supersession", :read_model do
+    parent = create(:coordinator_read_development_artifact, title: "Parent")
+    original_child = create(:coordinator_read_development_artifact, title: "Original child")
+    replacement_child = create(:coordinator_read_development_artifact, title: "Replacement child")
+    [ parent, original_child, replacement_child ].each do |artifact|
+      create(:coordinator_read_development_artifact_observation, artifact:)
     end
+    original = create(
+      :coordinator_read_development_artifact_relation,
+      source_artifact: parent,
+      target_id: original_child.artifact_id,
+      path: "guide/../docs/original.md",
+      fragment: "usage",
+      normalized_locator: "docs/original.md"
+    )
+    replacement = create(
+      :coordinator_read_development_artifact_relation,
+      source_artifact: parent,
+      target_id: replacement_child.artifact_id,
+      path: "guide/../docs/replacement.md",
+      fragment: "usage",
+      normalized_locator: "docs/replacement.md"
+    )
+    create(
+      :coordinator_read_development_artifact_relation_supersession,
+      relation: original,
+      replacement_relation_id: replacement.relation_id,
+      reason: "The parent link now names the replacement document."
+    )
 
     page = call_tool(
       "development_artifact_relation_list",
       {
-        artifact_id: parent,
+        artifact_id: parent.artifact_id,
         direction: "outgoing",
         include_superseded: true,
         limit: 10
@@ -528,16 +605,12 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
     ).dig("result", "structuredContent", "data", "page")
     by_id = page.fetch("items").index_by { _1.fetch("relation_id") }
 
-    expect(replacement).to include(
-      "outcome" => "superseded",
-      "superseded_relation_id" => original.fetch("relation_id")
-    )
-    expect(by_id.fetch(original.fetch("relation_id"))).to include(
+    expect(by_id.fetch(original.relation_id)).to include(
       "status" => "superseded",
-      "replacement_relation_id" => replacement.fetch("relation_id"),
+      "replacement_relation_id" => replacement.relation_id,
       "supersession_reason" => "The parent link now names the replacement document."
     )
-    expect(by_id.fetch(replacement.fetch("relation_id"))).to include(
+    expect(by_id.fetch(replacement.relation_id)).to include(
       "status" => "active",
       "attributes" => include(
         "path" => "guide/../docs/replacement.md",
@@ -649,12 +722,6 @@ RSpec.describe "ART-01 MCP Development Artifacts", :event_store, :read_model do
       streams.development_artifact_observation(observation_id),
       Coordinator::Write::EventQueries::DEVELOPMENT_ARTIFACT_OBSERVATION_HISTORY
     )
-  end
-
-  def project_artifact(artifact_id, observation_id)
-    (artifact_events(artifact_id) + observation_events(observation_id)).each do |event|
-      Coordinator::Container["projectors.development_artifacts_v1"].call(event)
-    end
   end
 
   def load_completion(command_id)

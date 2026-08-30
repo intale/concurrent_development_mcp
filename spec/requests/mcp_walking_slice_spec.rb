@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
+RSpec.describe "D-053 MCP Tasks walking slice" do
   PROTOCOL_VERSION = "2026-07-28"
   TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
 
@@ -123,7 +123,7 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
     )
   end
 
-  it "registers one exact scoped UUIDv7 repository through a replayable durable Task" do
+  it "registers one exact scoped UUIDv7 repository through a replayable durable Task", :event_store do
     repository_id = SecureRandom.uuid_v7
     arguments = {
       command_id: "cmd-mcp-repository-register",
@@ -166,25 +166,6 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
     ).to eq(3)
     expect(registration.metadata).not_to have_key("correlation_id")
 
-    Coordinator::Container["projectors.repositories_v1"].call(registration)
-    projected = call_tool(
-      "repository_list",
-      {
-        scope: arguments.fetch(:scope),
-        repository_key: arguments.fetch(:repository_key),
-        limit: 20
-      },
-      id: 8
-    ).dig("result", "structuredContent")
-    expect(projected).to include("status" => "ok")
-    expect(projected.dig("data", "page", "items").sole).to include(
-      "repository_id" => repository_id,
-      "scope" => arguments.fetch(:scope),
-      "paths" => arguments.fetch(:paths),
-      "remotes" => arguments.fetch(:remotes)
-    )
-    expect(JSON.generate(projected)).not_to include("projection_status", "pending")
-
     replay_task_id = call_tool("repository_register", arguments, id: 3).dig("result", "taskId")
     execute_task(replay_task_id)
     replay = task_request("tasks/get", task_id: replay_task_id, id: 4)
@@ -218,6 +199,32 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
     expect(invalid.dig("result", "resultType")).to eq("complete")
     expect(invalid.dig("result", "isError")).to be(true)
     expect(task_events_for_command("cmd-mcp-repository-invalid")).to be_empty
+  end
+
+  it "serves an available repository projection without freshness gating", :read_model do
+    repository = create(
+      :coordinator_read_repository,
+      scope: "project:payments/workspace:primary",
+      repository_key: "payments",
+      display_name: "Payments API",
+      paths: [ "/client-visible/payments", "/other-container/payments" ],
+      remotes: [ "https://example.test/payments.git" ]
+    )
+
+    projected = call_tool(
+      "repository_list",
+      { scope: repository.scope, repository_key: "payments", limit: 20 },
+      id: 8
+    ).dig("result", "structuredContent")
+
+    expect(projected).to include("status" => "ok")
+    expect(projected.dig("data", "page", "items").sole).to include(
+      "repository_id" => repository.repository_id,
+      "scope" => repository.scope,
+      "paths" => repository.paths,
+      "remotes" => repository.remotes
+    )
+    expect(JSON.generate(projected)).not_to include("projection_status", "pending")
   end
 
   it "teaches a clean agent to migrate client-visible development memory semantically" do
@@ -282,7 +289,7 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
     expect(reusable_surface).not_to include(".build", ".to_review", "source_root", "Rails.root")
   end
 
-  it "submits, polls, executes, replays, and independently projects one mutation" do
+  it "submits, polls, executes, and replays one mutation", :event_store do
     arguments = {
       command_id: "cmd-mcp-task-100",
       actor: { kind: "agent", id: "planner-1" },
@@ -341,22 +348,62 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
     expect(replayed.dig("result", "result")).to eq(tool_result)
     expect(command_events(arguments.fetch(:command_id)).length).to eq(1)
     expect(change_set_events(arguments.fetch(:change_set_id)).length).to eq(2)
+  end
 
-    absent = call_tool("operation_get", { command_id: arguments.fetch(:command_id) }, id: 6)
-    expect(absent.dig("result", "resultType")).to eq("complete")
-    expect(absent.dig("result", "structuredContent", "status")).to eq("not_found")
-
-    Coordinator::Read::Projectors::CommandReceiptsV1.new.call(
-      command_events(arguments.fetch(:command_id)).sole
+  it "serves independently available operation and coordination projections", :read_model do
+    command_id = "cmd-mcp-task-projected"
+    change_set_id = "CS-MCP-TASK-PROJECTED"
+    create(
+      :coordinator_read_command_receipt,
+      command_id:,
+      completion: {
+        "command_id" => command_id,
+        "tool_name" => "change_set_create",
+        "canonical_input_digest" => "sha256:#{'f' * 64}",
+        "status" => "ok",
+        "summary" => "ChangeSet created.",
+        "receipt" => command_id,
+        "data" => { "change_set_id" => change_set_id },
+        "warnings" => [],
+        "next_actions" => [],
+        "emitted_events" => [],
+        "completed_at" => "2026-08-30T12:00:00.000000Z"
+      }
     )
-    current = call_tool("operation_get", { command_id: arguments.fetch(:command_id) }, id: 7)
+    create(
+      :coordinator_read_coord_context,
+      change_set_id:,
+      document: {
+        "schema" => "coord-context/v1",
+        "change_set" => {
+          "change_set_id" => change_set_id,
+          "goal" => "Coordinate repositories",
+          "acceptance_criteria" => [ "Agents do not overlap" ],
+          "status" => "planning",
+          "created_at" => "2026-08-30T12:00:00.000000Z",
+          "activated_at" => nil,
+          "completed_at" => nil
+        },
+        "work_item_ids" => [],
+        "work_items" => [],
+        "dependencies" => [],
+        "attempts" => [],
+        "candidate_checkpoints" => []
+      }
+    )
+    create(
+      :coordinator_read_coord_context_scope,
+      change_set_id:,
+      scope_kind: "change_set",
+      scope_id: change_set_id
+    )
+
+    current = call_tool("operation_get", { command_id: }, id: 7)
     expect(current.dig("result", "structuredContent", "status")).to eq("ok")
 
-    projector = Coordinator::Read::Projectors::CoordContextV1.new
-    change_set_events(arguments.fetch(:change_set_id)).each { projector.call(_1) }
     context = call_tool(
       "coord_context",
-      { change_set_id: arguments.fetch(:change_set_id) },
+      { change_set_id: },
       id: 8
     )
     context_payload = context.dig("result", "structuredContent")
@@ -367,7 +414,7 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
     )
   end
 
-  it "completes a WorkItem through a durable Task after its final Candidate relinquishes leases" do
+  it "completes a WorkItem through a durable Task after its final Candidate relinquishes leases", :event_store do
     collector = ReportedErrorCollector.new
     Rails.error.subscribe(collector)
     candidate = CandidateScenario.submit(prefix: "mcp-complete")
@@ -399,7 +446,7 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
     Rails.error.unsubscribe(collector) if collector
   end
 
-  it "runs merge snapshot registration as a durable Task and serves its lagging projection" do
+  it "runs merge snapshot registration as a durable Task", :event_store do
     candidate = CandidateScenario.submit(prefix: "mcp-merge-snapshot", build_context: false)
     arguments = {
       command_id: "cmd-mcp-merge-snapshot-register",
@@ -432,30 +479,31 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
       "evidence_status" => "attributed_unverified"
     )
 
-    unavailable = call_tool(
-      "merge_snapshot_get",
-      { merge_snapshot_id: arguments.fetch(:merge_snapshot_id) },
-      id: 3
-    )
-    expect(unavailable.dig("result", "structuredContent", "status")).to eq("not_found")
-
     snapshot = event_store.read(
       streams.merge_snapshot(arguments.fetch(:merge_snapshot_id)),
       Coordinator::Write::EventQueries::MERGE_SNAPSHOT_REGISTRATION
     ).sole
-    Coordinator::Container["projectors.merge_snapshots_v1"].call(snapshot)
+    expect(snapshot.type).to eq("MergeSnapshotRegistered")
+    expect(snapshot.data.fetch("evidence_status")).to eq("attributed_unverified")
+  end
+
+  it "serves an independently available merge snapshot projection", :read_model do
+    snapshot = create(
+      :coordinator_read_merge_snapshot,
+      merge_snapshot_id: "MS-mcp-merge-snapshot"
+    )
     available = call_tool(
       "merge_snapshot_get",
-      { merge_snapshot_id: arguments.fetch(:merge_snapshot_id) },
+      { merge_snapshot_id: snapshot.merge_snapshot_id },
       id: 4
     )
     expect(available.dig("result", "structuredContent", "data", "snapshot")).to include(
-      "merge_snapshot_id" => arguments.fetch(:merge_snapshot_id),
+      "merge_snapshot_id" => snapshot.merge_snapshot_id,
       "evidence_status" => "attributed_unverified"
     )
   end
 
-  it "requests merge authorization as a durable Task against authoritative event facts" do
+  it "requests merge authorization as a durable Task against authoritative event facts", :event_store do
     registration = MergeSnapshotScenario.register(prefix: "mcp-merge-authorization")
     verification = MergeSnapshotScenario.verify(
       registration,
@@ -483,7 +531,7 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
     )
   end
 
-  it "records an exact external merge observation through a durable Task" do
+  it "records an exact external merge observation through a durable Task", :event_store do
     registration = MergeSnapshotScenario.register(prefix: "mcp-merge-observation")
     verification = MergeSnapshotScenario.verify(registration, prefix: "mcp-merge-observation")
     authorization = MergeSnapshotScenario.authorize(
@@ -512,7 +560,7 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
     )
   end
 
-  it "completes a domain denial as a tool error instead of failing the Task" do
+  it "completes a domain denial as a tool error instead of failing the Task", :event_store do
     created = call_tool(
       "work_item_create",
       {
@@ -540,7 +588,7 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
     expect(command_events("cmd-task-denied")).to be_empty
   end
 
-  it "acknowledges input, cooperatively cancels queued work, and skips execution" do
+  it "acknowledges input, cooperatively cancels queued work, and skips execution", :event_store do
     created = call_tool(
       "change_set_create",
       {
@@ -575,7 +623,7 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
     expect(change_set_events("CS-task-cancel")).to be_empty
   end
 
-  it "rejects clients without Tasks and validates Task handles and routing headers" do
+  it "rejects clients without Tasks and validates Task handles and routing headers", :event_store do
     arguments = {
       command_id: "cmd-task-capability",
       actor: { kind: "agent", id: "planner-1" },

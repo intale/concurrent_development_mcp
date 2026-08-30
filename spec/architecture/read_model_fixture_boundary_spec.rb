@@ -15,18 +15,37 @@ RSpec.describe "Read-model test fixture boundaries", :read_model do
     /Coordinator::Container\["projectors\./,
     /Coordinator::Write::Operations::/,
     /PgEventstore\.client/,
-    /\b[A-Z][A-Za-z0-9]*Scenario\.new/
+    /\b[A-Z][A-Za-z0-9]*Scenario\b/
   )
   REQUEST_FIXTURE_CROSSING = Regexp.union(
     /Coordinator::Read::Projectors::/,
     /Coordinator::Container\["projectors\./
   )
+  PROJECTOR_SETUP_CROSSING = Regexp.union(
+    /Coordinator::Read::Subscriptions::/,
+    /Coordinator::Write::Operations::/,
+    /Coordinator::Processes::/,
+    /PgEventstore/,
+    /\b[A-Z][A-Za-z0-9]*Scenario\b/
+  )
+  SUBSCRIPTION_DELIVERY_CROSSING = Regexp.union(
+    /Coordinator::Write/,
+    /Coordinator::Processes::/,
+    /PgEventstore\.client/,
+    /\b[A-Z][A-Za-z0-9]*Scenario\b/,
+    /\.start\b/,
+    /\.stop\b/,
+    /\bwait_for\b/,
+    /\bsleep\b/
+  )
 
-  it "provides a valid namespaced read-side factory" do
-    factory = FactoryBot.factories[:coordinator_read_attempt_history]
+  it "provides valid namespaced read-side factories" do
+    factories = FactoryBot.factories.select do |factory|
+      factory.name.to_s.start_with?("coordinator_read_")
+    end
 
-    expect(factory.build_class).to eq(Coordinator::Read::AttemptHistory)
-    expect { FactoryBot.lint([ factory ]) }.not_to raise_error
+    expect(factories).not_to be_empty
+    expect { FactoryBot.lint(factories) }.not_to raise_error
   end
 
   it "keeps factories callback-free and isolated from write/process/projection behavior" do
@@ -72,7 +91,7 @@ RSpec.describe "Read-model test fixture boundaries", :read_model do
     expect(paths).to all(satisfy { Rails.root.join(_1).file? })
   end
 
-  it "rejects new non-Cucumber write-to-read fixture crossings during migration" do
+  it "rejects non-Cucumber write-to-read fixture crossings" do
     inventory = ReadModelFixtureMigrationInventory
     dual_store_specs = spec_files.filter_map do |path|
       declaration = path.each_line.first(10).join
@@ -83,6 +102,26 @@ RSpec.describe "Read-model test fixture boundaries", :read_model do
     expect(dual_store_specs).to match_array(inventory::LEGACY_FULL_CHAIN)
     expect(fixture_crossings - inventory::LEGACY_FULL_CHAIN).to be_empty,
       "unplanned read-fixture crossings: #{(fixture_crossings - inventory::LEGACY_FULL_CHAIN).join(', ')}"
+  end
+
+  it "keeps projector setup direct and subscription delivery in Cucumber" do
+    inventory = ReadModelFixtureMigrationInventory
+    projector_violations = inventory::DIRECT_EVENT_PROJECTOR_SPECS.filter_map do |relative_path|
+      path = Rails.root.join(relative_path)
+      source = path.read
+      reasons = []
+      reasons << "indirect setup" if source.match?(PROJECTOR_SETUP_CROSSING)
+      reasons << "missing ProjectionEventFactory" unless source.include?("ProjectionEventFactory")
+      "#{relative_path}: #{reasons.join(', ')}" if reasons.any?
+    end
+    subscription_violations = inventory::SUBSCRIPTION_CONTRACT_SPECS.filter_map do |relative_path|
+      source = Rails.root.join(relative_path).read
+      relative_path if source.match?(SUBSCRIPTION_DELIVERY_CROSSING)
+    end
+
+    expect(projector_violations).to be_empty, projector_violations.join("\n")
+    expect(subscription_violations).to be_empty,
+      "subscription specs must cover registration only: #{subscription_violations.join(', ')}"
   end
 
   def factory_files

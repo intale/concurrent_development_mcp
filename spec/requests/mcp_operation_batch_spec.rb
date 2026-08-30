@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe "BAT-01 MCP Operation Batches", :event_store, :read_model do
+RSpec.describe "BAT-01 MCP Operation Batches" do
   BATCH_PROTOCOL_VERSION = "2026-07-28"
   BATCH_TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
 
@@ -12,7 +12,7 @@ RSpec.describe "BAT-01 MCP Operation Batches", :event_store, :read_model do
     end
   end
 
-  it "accepts a Task-backed typed batch, runs its Saga, and serves stale-available projected progress" do
+  it "accepts a Task-backed typed batch and runs its Saga", :event_store do
     batch_id = SecureRandom.uuid_v7
     arguments = {
       command_id: "batch-command",
@@ -39,22 +39,55 @@ RSpec.describe "BAT-01 MCP Operation Batches", :event_store, :read_model do
       )
     )
 
-    absent = call_tool("operation_batch_get", { batch_id: }, id: 3)
-    expect(absent.dig("result", "structuredContent", "status")).to eq("not_found")
-
     created_event = batch_events(batch_id).sole
     Coordinator::Container["process_managers.operation_batch_runner"].call(created_event)
-    batch_events(batch_id).each do |event|
-      Coordinator::Container["projectors.operation_batches_v2"].call(event)
-    end
+    expect(batch_events(batch_id).map(&:type)).to eq(%w[
+      OperationBatchCreated
+      OperationBatchItemSucceeded
+      OperationBatchItemRejected
+      OperationBatchCompleted
+    ])
+  end
 
-    available = call_tool("operation_batch_get", { batch_id:, limit: 100 }, id: 4)
+  it "serves directly persisted stale-available batch progress", :read_model do
+    batch = create(:coordinator_read_operation_batch)
+    first = create(
+      :coordinator_read_operation_batch_item,
+      operation_batch: batch,
+      item_index: 0,
+      command_id: "item-1",
+      canonical_input_digest: "sha256:#{'b' * 64}"
+    )
+    second = create(
+      :coordinator_read_operation_batch_item,
+      operation_batch: batch,
+      item_index: 1,
+      command_id: "item-2",
+      canonical_input_digest: "sha256:#{'c' * 64}"
+    )
+    create(
+      :coordinator_read_operation_batch_outcome,
+      operation_batch: batch,
+      item_index: 0,
+      command_id: first.command_id,
+      canonical_input_digest: first.canonical_input_digest
+    )
+    create(
+      :coordinator_read_operation_batch_outcome,
+      :rejected,
+      operation_batch: batch,
+      item_index: 1,
+      command_id: second.command_id,
+      canonical_input_digest: second.canonical_input_digest
+    )
+
+    available = call_tool("operation_batch_get", { batch_id: batch.batch_id, limit: 100 }, id: 3)
       .dig("result", "structuredContent")
     expect(available).to include(
       "status" => "ok",
       "data" => include(
         "batch" => include(
-          "batch_id" => batch_id,
+          "batch_id" => batch.batch_id,
           "status" => "completed_with_errors",
           "succeeded" => 1,
           "rejected" => 1,
@@ -67,7 +100,7 @@ RSpec.describe "BAT-01 MCP Operation Batches", :event_store, :read_model do
     )
   end
 
-  it "rejects malformed nested items before allocating a Task" do
+  it "rejects malformed nested items before allocating a Task", :event_store do
     response = call_tool(
       "skill_publish_batch",
       {

@@ -1,76 +1,64 @@
 # frozen_string_literal: true
 
-RSpec.describe Coordinator::Read::Queries::CoordContext, :event_store, :read_model do
-  let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
-  let(:streams) { Coordinator::Write::StreamFactory.new }
-  let(:projector) { Coordinator::Read::Projectors::CoordContextV1.new }
-
+RSpec.describe Coordinator::Read::Queries::CoordContext, :read_model do
   subject(:query) { described_class.new }
 
-  it "serves an existing stale context immediately and supports observed-view cache tokens" do
-    create_change_set
-    create_work_item
-    change_set_events.first(2).each { projector.call(_1) }
-
+  it "serves an available context immediately and supports observed-view cache tokens" do
     expect(query.call(work_item_id: "W-100").value!.status).to eq("not_found")
 
-    projector.call(work_item_events.sole)
-    stale = query.call(work_item_id: "W-100").value!
-    expect(stale.status).to eq("ok")
-    expect(stale.data.context.work_items.sole.work_item_id).to eq("W-100")
-    expect(stale.to_h).not_to include(:projection_status)
+    create(
+      :coordinator_read_coord_context,
+      change_set_id: "CS-100",
+      work_item_id: "W-100",
+      attempt_id: "A-100"
+    )
+    create(
+      :coordinator_read_coord_context_scope,
+      change_set_id: "CS-100",
+      scope_kind: "work_item",
+      scope_id: "W-100"
+    )
 
-    projector.call(change_set_events.find { _1.type == "WorkItemAddedToChangeSet" })
     current = query.call(work_item_id: "W-100").value!
     expect(current.status).to eq("ok")
+    expect(current.data.context.work_items.sole.work_item_id).to eq("W-100")
+    expect(current.to_h).not_to include(:projection_status)
 
     unchanged = query.call(work_item_id: "W-100", context_token: current.context_token).value!
     expect(unchanged.status).to eq("not_modified")
     expect(unchanged.context_token).to eq(current.context_token)
   end
 
-  it "rejects ambiguous roots and the removed causal-freshness parameter" do
-    create_change_set
-    change_set_events.each { projector.call(_1) }
+  it "resolves exact ChangeSet and Attempt projection scopes" do
+    create(
+      :coordinator_read_coord_context,
+      change_set_id: "CS-scopes",
+      work_item_id: "W-scopes",
+      attempt_id: "A-scopes"
+    )
+    %w[change_set attempt].each do |kind|
+      identifier = kind == "change_set" ? "CS-scopes" : "A-scopes"
+      create(
+        :coordinator_read_coord_context_scope,
+        change_set_id: "CS-scopes",
+        scope_kind: kind,
+        scope_id: identifier
+      )
+    end
 
+    change_set = query.call(change_set_id: "CS-scopes").value!
+    attempt = query.call(attempt_id: "A-scopes").value!
+
+    expect(change_set.data.scope).to have_attributes(change_set_id: "CS-scopes")
+    expect(attempt.data.scope).to have_attributes(
+      change_set_id: "CS-scopes",
+      work_item_id: "W-scopes",
+      attempt_id: "A-scopes"
+    )
+  end
+
+  it "rejects ambiguous roots and the removed causal-freshness parameter" do
     expect(query.call(change_set_id: "CS-100", work_item_id: "W-100").value!.status).to eq("invalid")
     expect(query.call(change_set_id: "CS-100", after_command_id: "cmd-other").value!.status).to eq("invalid")
-  end
-
-  def create_change_set
-    Coordinator::Write::Operations::ExecuteCreateChangeSet.new(event_store:).call(
-      command_id: "cmd-100",
-      actor: { kind: "agent", id: "planner-1" },
-      change_set_id: "CS-100",
-      goal: "Coordinate repositories",
-      acceptance_criteria: [ "Agents do not overlap" ]
-    ).value!
-  end
-
-  def create_work_item
-    RepositoryScenario.register(event_store:)
-    Coordinator::Write::Operations::ExecuteCreateWorkItem.new(event_store:).call(
-      command_id: "cmd-200",
-      actor: { kind: "agent", id: "planner-1" },
-      change_set_id: "CS-100",
-      work_item_id: "W-100",
-      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
-      goal: "Implement billing",
-      acceptance_criteria: [ "The work is verifiable" ]
-    ).value!
-  end
-
-  def change_set_events
-    event_store.read(
-      streams.change_set("CS-100"),
-      Coordinator::Write::EventQueries::CHANGE_SET_FOR_ACTIVATION
-    )
-  end
-
-  def work_item_events
-    event_store.read(
-      streams.work_item("W-100"),
-      Coordinator::Write::EventQueries::WORK_ITEM_FOR_ACQUISITION
-    )
   end
 end

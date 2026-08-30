@@ -1,20 +1,18 @@
 # frozen_string_literal: true
 
-RSpec.describe Coordinator::Read::Projectors::RepositoriesV1, :event_store, :read_model do
+RSpec.describe Coordinator::Read::Projectors::RepositoriesV1, :read_model do
   subject(:projector) { described_class.new }
 
-  let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
-  let(:registrar) { Coordinator::Write::Operations::ExecuteRegisterRepository.new(event_store:) }
   let(:catalog) { Coordinator::Read::Repositories::RepositoryCatalog.new }
   let(:repository_id) { "018f0f4d-4e45-7abc-8def-000000000001" }
 
-  it "projects an immutable registration idempotently with complete source attribution" do
-    event = register_repository
+  it "projects a concrete validated registration idempotently with source attribution" do
+    event = registration_event
 
     projector.call(event)
     projector.call(event)
 
-    item = catalog.page(query(scope: "project:alpha")).items.sole
+    item = catalog.page(query).items.sole
     expect(item).to have_attributes(
       repository_id:,
       scope: "project:alpha",
@@ -32,53 +30,58 @@ RSpec.describe Coordinator::Read::Projectors::RepositoriesV1, :event_store, :rea
     expect(Coordinator::Read::Repository.count).to eq(1)
     expect(processed_events.count).to eq(1)
     expect(
-      catalog.page(query(scope: "project:alpha"), repository_key: "alpha").items.sole.repository_id
+      catalog.page(query, repository_key: "alpha").items.sole.repository_id
     ).to eq(repository_id)
   end
 
-  it "can replay independently both over its existing row and from an empty projection" do
-    event = register_repository
-    projector.call(event)
+  it "rolls back its idempotency claim when source identity is invalid" do
+    event = registration_event(
+      stream: Coordinator::Write::StreamFactory.new.repository(
+        "018f0f4d-4e45-7abc-8def-000000000002"
+      )
+    )
 
-    processed_events.delete_all
-    projector.call(event)
-    expect(Coordinator::Read::Repository.count).to eq(1)
-    expect(processed_events.count).to eq(1)
-
-    Coordinator::Read::Repository.delete_all
-    processed_events.delete_all
-    projector.call(event)
-
-    expect(catalog.page(query(scope: "project:alpha")).items.sole.repository_id).to eq(repository_id)
-    expect(processed_events.count).to eq(1)
+    expect { projector.call(event) }.to raise_error(
+      Coordinator::Read::InvalidProjectionSource,
+      "Repository identity does not match its source stream"
+    )
+    expect(Coordinator::Read::Repository.count).to eq(0)
+    expect(processed_events).to be_empty
   end
 
-  def register_repository
-    result = registrar.call(
-      command_id: "cmd-project-repository-alpha",
-      actor: { kind: "agent", id: "agent-repository" },
+  def registration_event(stream: Coordinator::Write::StreamFactory.new.repository(repository_id))
+    payload = Coordinator::Write::Events::RepositoryRegisteredV1.new(
       repository_id:,
       scope: "project:alpha",
       repository_key: "alpha",
       display_name: "Alpha",
       paths: [ "/client/alpha" ],
-      remotes: [ "https://example.test/alpha.git" ]
+      remotes: [ "https://example.test/alpha.git" ],
+      registered_at: "2026-08-30T12:00:00.000000Z"
     )
-    expect(result).to be_success
-
-    event_store.read(
-      Coordinator::Write::StreamFactory.new.repository(repository_id),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "RepositoryRegistered" ],
-        maximum_count: 1,
-        direction: :asc
-      )
-    ).sole
+    ProjectionEventFactory.build(
+      payload:,
+      stream:,
+      stream_revision: 0,
+      global_position: 100,
+      policy_version: "repository-registration/v1",
+      actor_id: "agent-repository",
+      markers: [ "repository:#{repository_id}", repository_key_marker ]
+    )
   end
 
-  def query(scope:)
+  def repository_key_marker
+    Coordinator::Shared::CompoundMarkerBuilder.new.call(
+      Coordinator::Shared::CompoundMarkerDefinitionV1.new(
+        purpose: "scoped-repository-key",
+        components: [ "scope:project:alpha", "repository-key:alpha" ]
+      )
+    ).marker
+  end
+
+  def query
     Coordinator::Read::RepositoryListQueryV1.new(
-      scope:,
+      scope: "project:alpha",
       after_repository_id: nil,
       limit: 20
     )

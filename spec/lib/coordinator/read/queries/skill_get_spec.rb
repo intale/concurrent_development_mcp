@@ -1,19 +1,20 @@
 # frozen_string_literal: true
 
-RSpec.describe Coordinator::Read::Queries::SkillGet, :event_store, :read_model do
+RSpec.describe Coordinator::Read::Queries::SkillGet, :read_model do
   subject(:query) { described_class.new }
 
-  let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
-  let(:publisher) { Coordinator::Write::Operations::ExecutePublishSkillRevision.new(event_store:) }
-  let(:projector) { Coordinator::Read::Projectors::SkillsV1.new }
-
-  it "serves an observed revision even after the write side has advanced" do
-    first_event = publish_and_fetch_event(command_id: "cmd-skill-get-1", expected_revision: 0)
-    projector.call(first_event)
-    publish_and_fetch_event(
-      command_id: "cmd-skill-get-2",
-      expected_revision: 1,
-      instructions: "A newer unprojected revision."
+  it "serves the latest available projected revision" do
+    skill = create(
+      :coordinator_read_skill,
+      name: "review",
+      scope: "project:alpha",
+      revision: 1
+    )
+    create(
+      :coordinator_read_skill_revision,
+      skill:,
+      revision: 1,
+      instructions: "Inspect the complete diff."
     )
 
     result = query.call(name: "review", scope: "project:alpha").value!
@@ -26,8 +27,8 @@ RSpec.describe Coordinator::Read::Queries::SkillGet, :event_store, :read_model d
   end
 
   it "distinguishes exact scopes and returns typed invalid and absent results" do
-    event = publish_and_fetch_event(command_id: "cmd-skill-work", expected_revision: 0, scope: "work")
-    projector.call(event)
+    skill = create(:coordinator_read_skill, name: "review", scope: "work")
+    create(:coordinator_read_skill_revision, skill:)
 
     available = query.call(name: "review", scope: "work").value!
     absent = query.call(name: "review", scope: "home").value!
@@ -40,14 +41,19 @@ RSpec.describe Coordinator::Read::Queries::SkillGet, :event_store, :read_model d
   end
 
   it "retrieves an immutable historical revision after the projected head advances" do
-    first_event = publish_and_fetch_event(command_id: "cmd-skill-history-1", expected_revision: 0)
-    second_event = publish_and_fetch_event(
-      command_id: "cmd-skill-history-2",
-      expected_revision: 1,
-      instructions: "Revision two."
+    skill = create(
+      :coordinator_read_skill,
+      name: "review",
+      scope: "project:alpha",
+      revision: 2
     )
-    projector.call(first_event)
-    projector.call(second_event)
+    create(
+      :coordinator_read_skill_revision,
+      skill:,
+      revision: 1,
+      instructions: "Inspect the complete diff."
+    )
+    create(:coordinator_read_skill_revision, skill:, revision: 2, instructions: "Revision two.")
 
     historical = query.call(name: "review", scope: "project:alpha", revision: 1).value!
     absent = query.call(name: "review", scope: "project:alpha", revision: 3).value!
@@ -59,25 +65,5 @@ RSpec.describe Coordinator::Read::Queries::SkillGet, :event_store, :read_model d
     )
     expect(absent).to have_attributes(status: "not_found")
     expect(absent.data.details).to include(revision: 3)
-  end
-
-  def publish_and_fetch_event(**overrides)
-    input = {
-      command_id: "cmd-skill-get-1",
-      actor: { kind: "agent", id: "agent-1" },
-      name: "review",
-      scope: "project:alpha",
-      expected_revision: 0,
-      description: "Review a change",
-      instructions: "Inspect the complete diff.",
-      assets: []
-    }.merge(overrides)
-    result = publisher.call(input)
-    expect(result).to be_success
-    reference = result.value!.data.publication_event
-    event_store.read_at(
-      Coordinator::Write::StreamFactory.new.skill(result.value!.data.skill_id),
-      reference.stream_revision
-    )
   end
 end

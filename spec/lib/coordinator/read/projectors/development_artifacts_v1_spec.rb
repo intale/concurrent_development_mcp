@@ -1,36 +1,28 @@
 # frozen_string_literal: true
 
-RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_store, :read_model do
+RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_model do
   subject(:projector) { described_class.new }
 
-  let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
-  let(:capture) do
-    Coordinator::Write::Operations::ExecuteCaptureDevelopmentArtifact.new(event_store:)
-  end
-  let(:declare_relation) do
-    Coordinator::Write::Operations::ExecuteDeclareDevelopmentArtifactRelation.new(event_store:)
-  end
-  let(:correct_classification) do
-    Coordinator::Write::Operations::ExecuteCorrectDevelopmentArtifactClassification.new(event_store:)
-  end
   let(:repository) { Coordinator::Read::Repositories::DevelopmentArtifacts.new }
-  let(:streams) { Coordinator::Write::StreamFactory.new }
+  let(:correlation_id) { SecureRandom.uuid_v7 }
 
   it "projects capture and delayed relation delivery idempotently with exact source evidence" do
-    source_data = capture.call(capture_input).value!.data
-    source = source_data.artifact_id
-    target = capture.call(
-      capture_input(command_id: "cmd-project-target", locator: "target.bin", binary: true)
-    ).value!.data.artifact_id
-    declare_relation.call(relation_input(source:, target:))
-    source_capture, relation = artifact_events(source)
+    source, observation = build_artifact(locator: "evidence.md", text: "evidence\n")
+    target, = build_artifact(locator: "target.bin", binary: true)
+    capture = capture_event(source, position: 100)
+    observed = observation_event(observation, position: 200)
+    relation = relation_event(
+      relation_payload(source: source.artifact_id, target: target.artifact_id),
+      revision: 1,
+      position: 300
+    )
 
     projector.call(relation)
     projector.call(relation)
-    expect(repository.fetch(source)).to be_nil
+    expect(repository.fetch(source.artifact_id)).to be_nil
     expect(Coordinator::Read::DevelopmentArtifactRelation.count).to eq(1)
     lagging = relation_query.call(
-      artifact_id: source,
+      artifact_id: source.artifact_id,
       direction: "outgoing",
       limit: 10
     ).value!
@@ -38,14 +30,10 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
     expect(lagging.data.page.items.sole).to have_attributes(peer_artifact: nil)
     expect(lagging.warnings.sole).to include("not yet observed")
 
-    projector.call(source_capture)
-    projector.call(source_capture)
-    source_observation = observation_events(source_data.observation_id).sole
-    projector.call(source_observation)
-    projector.call(source_observation)
-    view = repository.fetch(source)
+    [ capture, capture, observed, observed ].each { projector.call(_1) }
+    view = repository.fetch(source.artifact_id)
     expect(view.artifact).to have_attributes(
-      artifact_id: source,
+      artifact_id: source.artifact_id,
       title: "Captured evidence",
       relationship_count: 1,
       relationship_capacity: have_attributes(
@@ -57,24 +45,24 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
         lifetime_remaining: 255
       ),
       captured: have_attributes(
-        event: have_attributes(event_id: source_capture.id, stream_revision: 0),
-        global_position: source_capture.global_position,
-        causation_id: source_capture.causation_id,
-        correlation_id: source_capture.correlation_id
+        event: have_attributes(event_id: capture.id, stream_revision: 0),
+        global_position: capture.global_position,
+        causation_id: capture.causation_id,
+        correlation_id: capture.correlation_id
       )
     )
     expect(view.relationships.sole).to have_attributes(
-      relation_id: relation.data.fetch("artifact_relation").fetch("relation_id"),
+      relation_id: relation.data.dig("artifact_relation", "relation_id"),
       relation: "derived_from",
       display_relation: "derived_from",
       inverse_relation: "source_of",
       transitive: true,
       supersedable: true,
-      target: have_attributes(kind: "artifact", id: target, status: "verified"),
+      target: have_attributes(kind: "artifact", id: target.artifact_id, status: "verified"),
       peer_artifact: nil,
       follow_action: have_attributes(
         tool: "development_artifact_get",
-        arguments: have_attributes(artifact_id: target)
+        arguments: have_attributes(artifact_id: target.artifact_id)
       )
     )
     expect(processed_events.count).to eq(3)
@@ -82,56 +70,54 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
   end
 
   it "round-trips UTF-8 and binary content without embedding bytes in metadata" do
-    text = capture.call(capture_input).value!.data
-    binary = capture.call(
-      capture_input(command_id: "cmd-project-binary", locator: "profile.bin", binary: true)
-    ).value!.data
-    [ text, binary ].each do |data|
-      artifact_events(data.artifact_id).each { |event| projector.call(event) }
-      observation_events(data.observation_id).each { |event| projector.call(event) }
-    end
+    text, text_observation = build_artifact(locator: "evidence.md", text: "evidence\n")
+    binary, binary_observation = build_artifact(locator: "profile.bin", binary: true)
+
+    [
+      capture_event(text, position: 100),
+      observation_event(text_observation, position: 200),
+      capture_event(binary, position: 300),
+      observation_event(binary_observation, position: 400)
+    ].each { projector.call(_1) }
 
     text_content = repository.fetch_content(text.artifact_id)
     binary_content = repository.fetch_content(binary.artifact_id)
     expect(text_content).to have_attributes(text: "evidence\n", encoding: "utf-8")
     expect(text_content.to_h).not_to have_key(:base64)
-    expect(binary_content).to have_attributes(
-      base64: [ "\x00\xFF".b ].pack("m0"),
-      encoding: "binary"
-    )
+    expect(binary_content).to have_attributes(base64: "AP8=", encoding: "binary")
     expect(binary_content.to_h).not_to have_key(:text)
     expect(repository.fetch(text.artifact_id).to_h.to_s).not_to include("evidence\\n")
   end
 
-  it "projects an out-of-order supersession without hiding its immutable declaration history" do
-    source = capture.call(capture_input).value!.data.artifact_id
-    old_target = capture.call(
-      capture_input(command_id: "cmd-project-old", locator: "old.md")
-    ).value!.data.artifact_id
-    new_target = capture.call(
-      capture_input(command_id: "cmd-project-new", locator: "new.md")
-    ).value!.data.artifact_id
-    old = declare_relation.call(relation_input(source:, target: old_target)).value!.data
-    declare_relation.call(
-      relation_input(
-        command_id: "cmd-project-correct",
-        source:,
-        target: new_target,
-        supersedes: { relation_id: old.relation_id, reason: "wrong target" }
-      )
+  it "projects an out-of-order supersession without hiding immutable declaration history" do
+    source, = build_artifact(locator: "source.md", text: "source\n")
+    old_target, = build_artifact(locator: "old.md", text: "old\n")
+    new_target, = build_artifact(locator: "new.md", text: "new\n")
+    old_payload = relation_payload(source: source.artifact_id, target: old_target.artifact_id)
+    new_payload = relation_payload(source: source.artifact_id, target: new_target.artifact_id)
+    old_declaration = relation_event(old_payload, revision: 1, position: 200)
+    new_declaration = relation_event(new_payload, revision: 3, position: 400)
+    supersession = relation_event(
+      Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV1.new(
+        source_artifact_id: source.artifact_id,
+        superseded_relation_id: old_payload.artifact_relation.relation_id,
+        replacement_relation_id: new_payload.artifact_relation.relation_id,
+        reason: "wrong target",
+        superseded_at: "2026-08-30T12:02:00.000000Z"
+      ),
+      revision: 2,
+      position: 300
     )
-    events = artifact_events(source)
-    declarations = events.select { _1.type == "DevelopmentArtifactRelationDeclared" }
-    supersession = events.find { _1.type == "DevelopmentArtifactRelationSuperseded" }
 
     projector.call(supersession)
     projector.call(supersession)
     expect(Coordinator::Read::DevelopmentArtifactRelationSupersession.count).to eq(1)
-    declarations.reverse_each { projector.call(_1) }
-    projector.call(events.first)
+    projector.call(new_declaration)
+    projector.call(old_declaration)
+    projector.call(capture_event(source, position: 100))
 
     page = relation_query.call(
-      artifact_id: source,
+      artifact_id: source.artifact_id,
       direction: "outgoing",
       include_superseded: true,
       limit: 10
@@ -139,13 +125,13 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
     expect(page.items.map(&:status)).to contain_exactly("active", "superseded")
     superseded = page.items.find { _1.status == "superseded" }
     expect(superseded).to have_attributes(
-      relation_id: old.relation_id,
-      replacement_relation_id: a_string_matching(/\Aartifact-relation:v1:/),
+      relation_id: old_payload.artifact_relation.relation_id,
+      replacement_relation_id: new_payload.artifact_relation.relation_id,
       supersession_reason: "wrong target",
       superseded: have_attributes(event: have_attributes(type: "DevelopmentArtifactRelationSuperseded"))
     )
     active = relation_query.call(
-      artifact_id: source,
+      artifact_id: source.artifact_id,
       direction: "outgoing",
       limit: 10
     ).value!.data.page
@@ -153,132 +139,176 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
   end
 
   it "converges immutable observations and a classification correction delivered out of order" do
-    first = capture.call(
-      capture_input(
-        command_id: "cmd-project-observation-a",
-        locator: "same.md",
-        revision: "commit-a",
-        text: "same bytes\n"
-      )
-    ).value!.data
-    second = capture.call(
-      capture_input(
-        command_id: "cmd-project-observation-b",
-        locator: "same.md",
-        revision: "commit-b",
-        observed_at: "2026-08-25T16:01:00.000000Z",
-        text: "same bytes\n"
-      )
-    ).value!.data
-    correction = correct_classification.call(
-      command_id: "cmd-project-classification",
-      actor: { kind: "agent", id: "agent-projector" },
-      observation_id: second.observation_id,
-      expected_revision: 1,
-      title: "Corrected title",
-      kind: "documentation",
-      labels: %w[corrected docs],
-      reason: "Correct imported classification"
+    first, first_observation = build_artifact(
+      locator: "same.md",
+      revision: "commit-a",
+      text: "same bytes\n"
     )
-    expect(correction).to be_success
+    second, second_observation = build_artifact(
+      locator: "same.md",
+      revision: "commit-b",
+      observed_at: "2026-08-30T12:01:00.000000Z",
+      text: "same bytes\n"
+    )
+    correction = observation_stream_event(
+      Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectedV1.new(
+        observation_id: second_observation.observation_id,
+        artifact_id: second.artifact_id,
+        classification_revision: 2,
+        title: "Corrected title",
+        kind: "documentation",
+        labels: %w[corrected docs],
+        reason: "Correct imported classification",
+        corrected_at: "2026-08-30T12:02:00.000000Z"
+      ),
+      observation_id: second_observation.observation_id,
+      revision: 1,
+      position: 400
+    )
 
-    correction_event = observation_events(second.observation_id).last
-    projector.call(correction_event)
-    expect(repository.fetch(second.artifact_id, observation_id: second.observation_id)).to be_nil
+    projector.call(correction)
+    expect(repository.fetch(second.artifact_id, observation_id: second_observation.observation_id)).to be_nil
 
-    projector.call(artifact_events(first.artifact_id).first)
-    projector.call(observation_events(second.observation_id).first)
-    projector.call(observation_events(first.observation_id).first)
-    projector.call(correction_event)
+    projector.call(capture_event(first, position: 100))
+    projector.call(observation_event(second_observation, position: 300))
+    projector.call(observation_event(first_observation, position: 200))
+    projector.call(correction)
 
-    first_view = repository.fetch(first.artifact_id, observation_id: first.observation_id)
-    corrected_view = repository.fetch(second.artifact_id, observation_id: second.observation_id)
+    first_view = repository.fetch(first.artifact_id, observation_id: first_observation.observation_id)
+    corrected_view = repository.fetch(second.artifact_id, observation_id: second_observation.observation_id)
     expect(first.artifact_id).to eq(second.artifact_id)
-    expect(first.observation_id).not_to eq(second.observation_id)
+    expect(first_observation.observation_id).not_to eq(second_observation.observation_id)
     expect(first_view.artifact).to have_attributes(
-      observation_id: first.observation_id,
+      observation_id: first_observation.observation_id,
       title: "Captured evidence",
       classification_revision: 1,
       source: have_attributes(revision: "commit-a")
     )
     expect(corrected_view.artifact).to have_attributes(
-      observation_id: second.observation_id,
+      observation_id: second_observation.observation_id,
       title: "Corrected title",
       labels: %w[corrected docs],
       classification_revision: 2,
       classification_reason: "Correct imported classification",
       source: have_attributes(revision: "commit-b"),
       observed: have_attributes(event: have_attributes(type: "DevelopmentArtifactObserved")),
-      classified: have_attributes(
-        event: have_attributes(type: "DevelopmentArtifactClassificationCorrected")
-      )
+      classified: have_attributes(event: have_attributes(type: "DevelopmentArtifactClassificationCorrected"))
     )
   end
 
-  def capture_input(
-    command_id: "cmd-project-source",
-    locator: "evidence.md",
+  def build_artifact(
+    locator:,
+    text: nil,
     binary: false,
     revision: nil,
-    observed_at: "2026-08-25T16:00:00.000000Z",
-    text: nil
+    observed_at: "2026-08-30T12:00:00.000000Z"
   )
-    content =
-      if binary
-        {
-          encoding: "binary",
-          media_type: "application/octet-stream",
-          base64: [ "\x00\xFF".b ].pack("m0")
-        }
-      else
-        {
-          encoding: "utf-8",
-          media_type: "text/markdown",
-          text: text || (locator == "evidence.md" ? "evidence\n" : "#{locator}\n")
-        }
-      end
-    {
-      command_id:,
-      actor: { kind: "agent", id: "agent-projector" },
+    content_input = binary ?
+      { encoding: "binary", media_type: "application/octet-stream", base64: "AP8=" } :
+      { encoding: "utf-8", media_type: "text/markdown", text: }
+    content = Coordinator::Write::DevelopmentArtifacts::ContentBuilder.new.call(content_input).value!
+    source = Coordinator::Write::DevelopmentArtifacts::SourceV1.new(
+      kind: "local_file",
+      locator:,
+      revision:,
+      observed_at:,
+      collector: "spec/v1"
+    )
+    artifact = Coordinator::Write::DevelopmentArtifacts::ArtifactBuilder.new.call(
       scope: "project:alpha",
       title: "Captured evidence",
       kind: binary ? "performance_profile" : "documentation",
       labels: binary ? %w[binary profile] : %w[docs evidence],
       content:,
-      source: {
-        kind: "local_file",
-        locator:,
-        revision:,
-        observed_at:,
-        collector: "spec/v1"
-      }
-    }
+      source:
+    )
+    observation = Coordinator::Write::DevelopmentArtifacts::ObservationBuilder.new.call(artifact:)
+    [ artifact, observation ]
   end
 
-  def relation_input(source:, target:, command_id: "cmd-project-relation", supersedes: nil)
-    input = {
-      command_id:,
-      actor: { kind: "agent", id: "agent-projector" },
-      source_artifact_id: source,
-      relation: "derived_from",
-      target: { kind: "artifact", id: target },
-      attributes: {}
-    }
-    input[:supersedes] = supersedes if supersedes
-    input
+  def capture_event(artifact, position:)
+    payload = Coordinator::Write::Events::DevelopmentArtifactCapturedV2.new(
+      artifact:,
+      captured_at: "2026-08-30T12:00:00.000000Z"
+    )
+    artifact_stream_event(payload, artifact_id: artifact.artifact_id, revision: 0, position:)
   end
 
-  def artifact_events(artifact_id)
-    event_store.read(
-      streams.development_artifact(artifact_id),
-      Coordinator::Write::EventQueries::DEVELOPMENT_ARTIFACT_HISTORY
+  def observation_event(observation, position:)
+    payload = Coordinator::Write::Events::DevelopmentArtifactObservedV1.new(
+      observation:,
+      recorded_at: observation.source.observed_at
+    )
+    observation_stream_event(
+      payload,
+      observation_id: observation.observation_id,
+      revision: 0,
+      position:
     )
   end
 
-  def observation_events(observation_id)
-    event_store.read(
-      streams.development_artifact_observation(observation_id),
-      Coordinator::Write::EventQueries::DEVELOPMENT_ARTIFACT_OBSERVATION_HISTORY
+  def relation_payload(source:, target:)
+    target_value = Coordinator::Write::DevelopmentArtifacts::RelationTargetV1.new(
+      kind: "artifact",
+      id: target,
+      status: "verified",
+      name: nil,
+      scope: nil
+    )
+    attributes = Coordinator::Write::DevelopmentArtifacts::RelationAttributesV1.new(
+      path: nil,
+      fragment: nil,
+      normalized_locator: nil
+    )
+    relation = Coordinator::Write::DevelopmentArtifacts::RelationBuilder.new.call(
+      source_artifact_id: source,
+      relation: "derived_from",
+      target: target_value,
+      attributes:
+    )
+    Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV1.new(
+      artifact_relation: relation,
+      declared_at: "2026-08-30T12:01:00.000000Z"
+    )
+  end
+
+  def relation_event(payload, revision:, position:)
+    source_id = payload.respond_to?(:artifact_relation) ?
+      payload.artifact_relation.source_artifact_id : payload.source_artifact_id
+    artifact_stream_event(payload, artifact_id: source_id, revision:, position:)
+  end
+
+  def artifact_stream_event(payload, artifact_id:, revision:, position:)
+    projection_event(
+      payload:,
+      stream: Coordinator::Write::StreamFactory.new.development_artifact(artifact_id),
+      revision:,
+      position:,
+      markers: [ "development-artifact:#{artifact_id}" ]
+    )
+  end
+
+  def observation_stream_event(payload, observation_id:, revision:, position:)
+    projection_event(
+      payload:,
+      stream: Coordinator::Write::StreamFactory.new.development_artifact_observation(observation_id),
+      revision:,
+      position:,
+      markers: [ "development-artifact-observation:#{observation_id}" ]
+    )
+  end
+
+  def projection_event(payload:, stream:, revision:, position:, markers:)
+    ProjectionEventFactory.build(
+      payload:,
+      stream:,
+      stream_revision: revision,
+      global_position: position,
+      command_id: "cmd-artifact-projector-#{position}",
+      policy_version: "development-artifact-repository/v1",
+      actor_id: "agent-projector",
+      correlation_id:,
+      markers:
     )
   end
 

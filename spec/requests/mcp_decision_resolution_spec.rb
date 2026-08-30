@@ -1,13 +1,10 @@
 # frozen_string_literal: true
 
-RSpec.describe "CHO-01 MCP Decision resolution", :event_store, :read_model do
+RSpec.describe "CHO-01 MCP Decision resolution", :read_model do
   RESOLUTION_PROTOCOL_VERSION = "2026-07-28"
   RESOLUTION_TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
-  RESOLUTION_REPOSITORY_ID = RepositoryScenario::DEFAULT_REPOSITORY_ID
+  RESOLUTION_REPOSITORY_ID = "018f0f4d-4e45-7abc-8def-000000000701"
 
-  let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
-  let(:streams) { Coordinator::Write::StreamFactory.new }
-  let(:projector) { Coordinator::Read::Projectors::DecisionGovernanceV1.new }
   let(:session) do
     ActionDispatch::Integration::Session.new(Rails.application).tap do |integration|
       integration.host! "localhost"
@@ -30,14 +27,29 @@ RSpec.describe "CHO-01 MCP Decision resolution", :event_store, :read_model do
   end
 
   before do
-    seed_active_decision
-    decision_events.each { projector.call(_1) }
-    projector.call(partition_events.sole)
+    decision = create(
+      :coordinator_read_decision_definition,
+      :active,
+      decision_id: "D-mcp-resolve",
+      repository_id: RESOLUTION_REPOSITORY_ID
+    )
+    create(
+      :coordinator_read_decision_partition_head,
+      partition_id: "repo:#{RESOLUTION_REPOSITORY_ID}:testing",
+      decision_id: decision.decision_id,
+      partition: {
+        "partition_id" => "repo:#{RESOLUTION_REPOSITORY_ID}:testing",
+        "topic_root" => "testing",
+        "anchor_kind" => "repo",
+        "anchor_id" => RESOLUTION_REPOSITORY_ID
+      },
+      decision: decision_head(decision),
+      active_decisions: [ decision_head(decision) ]
+    )
   end
 
   it "exposes latest available context and exact evidence as a read-only MCP tool" do
-    response = call_tool("decision_resolve", arguments, id: 1)
-    result = response.dig("result", "structuredContent")
+    result = call_tool("decision_resolve", arguments, id: 1).dig("result", "structuredContent")
 
     expect(result).to include(
       "status" => "ok",
@@ -82,40 +94,12 @@ RSpec.describe "CHO-01 MCP Decision resolution", :event_store, :read_model do
     )
   end
 
-  def seed_active_decision
-    execute(Coordinator::Write::Operations::ExecuteRecordGuidance, {
-      command_id: "cmd-mcp-resolve-guidance",
-      actor: { kind: "user", id: "user-label" },
-      message_id: "M-mcp-resolve",
-      conversation_id: "C-mcp-resolve",
-      source: "mcp_client",
-      text: "Use RSpec.",
-      anchors: {
-        repository_ids: [ RESOLUTION_REPOSITORY_ID ],
-        change_set_id: nil,
-        work_item_id: nil,
-        attempt_id: nil
-      }
-    })
-    execute(Coordinator::Write::Operations::ExecuteProposeDecisionInterpretation, InterpretationInput.build(
-      command_id: "cmd-mcp-resolve-proposal",
-      interpretation_id: "I-mcp-resolve",
-      source_message_id: "M-mcp-resolve"
-    ))
-    execute(Coordinator::Write::Operations::ExecuteAdjudicateDecisionInterpretation, InterpretationInput.adjudication(
-      command_id: "cmd-mcp-resolve-adjudication",
-      source_message_id: "M-mcp-resolve",
-      interpretation_id: "I-mcp-resolve"
-    ))
-    execute(Coordinator::Write::Operations::ExecuteActivateDecision, InterpretationInput.activation(
-      command_id: "cmd-mcp-resolve-activation",
-      decision_id: "D-mcp-resolve",
-      interpretation_id: "I-mcp-resolve"
-    ))
-  end
-
-  def execute(operation_class, input)
-    operation_class.new(event_store:).call(input).value!
+  def decision_head(decision)
+    {
+      "decision_id" => decision.decision_id,
+      "decision_revision" => 1,
+      "event" => decision.activated_event
+    }
   end
 
   def call_tool(name, tool_arguments, id:)
@@ -148,21 +132,6 @@ RSpec.describe "CHO-01 MCP Decision resolution", :event_store, :read_model do
         },
         "io.modelcontextprotocol/clientInfo" => { name: "rspec", version: "1.0" }
       }
-    )
-  end
-
-  def decision_events
-    event_store.read(streams.decision("D-mcp-resolve"), Coordinator::Write::EventQueries::DECISION_EXISTENCE)
-  end
-
-  def partition_events
-    event_store.read(
-      streams.decision_partition("repo:#{RESOLUTION_REPOSITORY_ID}:testing"),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "DecisionPartitionAdvanced" ],
-        maximum_count: 2,
-        direction: :asc
-      )
     )
   end
 end
