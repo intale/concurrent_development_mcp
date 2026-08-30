@@ -12,7 +12,7 @@ module Coordinator::Write
     class Boundary < Value
       State = Types.Instance(Domain::ResourceLeases::State)
 
-      attribute :marker, Types::Marker
+      attribute :marker, Types::ResourceMarker
       attribute :epoch, Types::Integer.constrained(gteq: 0)
       attribute :previous_through_global_position, Types::GlobalPosition.optional
       attribute :through_global_position, Types::GlobalPosition.optional
@@ -36,29 +36,30 @@ module Coordinator::Write
 
     def call(
       markers,
+      repository_id:,
       maximum_delta_count: EventQueries::RESOURCE_BOUNDARY_DECISION_DELTA_MAXIMUM_COUNT,
       to_position: EventQueries::RESOURCE_BOUNDARY_MAXIMUM_GLOBAL_POSITION,
       strict: true
     )
       boundaries = markers.uniq.sort_by(&:b).map do |marker|
-        load_boundary(marker, maximum_delta_count:, to_position:, strict:)
+        load_boundary(marker, repository_id:, maximum_delta_count:, to_position:, strict:)
       end
 
       Selection.new(boundaries:, states: merge_states(boundaries))
     end
 
-    def snapshot_stream(marker)
+    def snapshot_stream(repository_id)
       StreamReference.new(
         context: "DevelopmentCoordination",
         stream_name: "ResourceBoundaryEpoch",
-        stream_id: marker
+        stream_id: repository_id
       )
     end
 
     private
 
-    def load_boundary(marker, maximum_delta_count:, to_position:, strict:)
-      snapshot = load_snapshot(marker)
+    def load_boundary(marker, repository_id:, maximum_delta_count:, to_position:, strict:)
+      snapshot = load_snapshot(marker, repository_id:)
       previous_position = snapshot&.through_global_position
       delta = load_delta(
         marker,
@@ -81,10 +82,13 @@ module Coordinator::Write
       )
     end
 
-    def load_snapshot(marker)
-      event = @event_store.read_grouped(
-        snapshot_stream(marker),
-        EventQueries::RESOURCE_BOUNDARY_LATEST_EPOCH
+    def load_snapshot(marker, repository_id:)
+      event = @event_store.read_latest_marked(
+        snapshot_stream(repository_id),
+        LatestMarkedEventReadCriteria.new(
+          event_type: "ResourceBoundaryEpochRolled",
+          marker:
+        )
       ).first
       event && load_event(event)
     end

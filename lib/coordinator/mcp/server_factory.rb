@@ -41,7 +41,8 @@ module Coordinator
         the server does not infer scope precedence. Use skill_get before updating and pass its revision as
         skill_publish expected_revision (zero creates a new tuple). A skill_revision_conflict writes no Skill
         or Command fact; refresh skill_get and retry with a new command when appropriate. Each publication is
-        one complete immutable instructions-and-assets snapshot. skill_asset_get returns passive Base64 content;
+        one complete immutable instructions-and-assets snapshot. skill_asset_get returns text for UTF-8 assets
+        and canonical Base64 only for binary assets;
         the coordinator never inspects or executes stored assets, so inspect and authorize them externally.
         Skill reads are available projections and may keep serving an older revision while projection catches up.
         After acquiring a WorkItem, reserve its complete initial file write set before editing,
@@ -77,7 +78,7 @@ module Coordinator
         explicit invalidating and no-effect assessments. Both Choice queries may lag, and no observed status
         is a freshness or write-authorization claim.
         Use candidate_submit to checkpoint an attributed commit only after passing the full exact lease set,
-        lease IDs, resource hashes, fencing tokens, and a typed change manifest. The mutation is a durable Task;
+        lease IDs, Resource IDs, fencing tokens, and a typed change manifest. The mutation is a durable Task;
         stale or unauthorized observations are rejected from authoritative event-store facts. Candidate evidence
         remains attributed_unverified because the coordinator does not inspect Git or run CI. candidate_get serves
         every currently observed evidence component, candidate_list retains bounded Attempt checkpoint history,

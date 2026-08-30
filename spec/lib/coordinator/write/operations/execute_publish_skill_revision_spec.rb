@@ -62,36 +62,6 @@ RSpec.describe Coordinator::Write::Operations::ExecutePublishSkillRevision, :eve
     expect(command_events("cmd-skill-stale")).to be_empty
   end
 
-  it "advances from a strictly validated pre-semantic revision through the current event contract" do
-    identity = identity_builder.call(name: "review", scope: "project:alpha")
-    event_store.append(streams.skill(identity.skill_id), [ PreSemanticSkillEvent.build(identity:) ])
-
-    result = operation.call(input(command_id: "cmd-skill-cutover", expected_revision: 1))
-
-    expect(result).to be_success
-    expect(result.value!.data.revision).to eq(2)
-    pre_semantic, current = skill_events("review", "project:alpha")
-    expect(pre_semantic.metadata.fetch("schema_version")).to eq(1)
-    expect(current.metadata.fetch("schema_version")).to eq(2)
-    expect(current.data.dig("assets", 0, "content")).to include(
-      "encoding" => "utf-8",
-      "text" => "#!/bin/sh\nexit 0\n"
-    )
-  end
-
-  it "rejects corrupt pre-semantic Skill bytes without appending a current revision" do
-    identity = identity_builder.call(name: "review", scope: "project:alpha")
-    corrupt = PreSemanticSkillEvent.build(identity:, content_sha256: "sha256:#{'0' * 64}")
-    event_store.append(streams.skill(identity.skill_id), [ corrupt ])
-
-    result = operation.call(input(command_id: "cmd-skill-corrupt", expected_revision: 1))
-
-    expect(result).to be_failure
-    expect(result.failure.code).to eq(:stored_skill_revision_invalid)
-    expect(skill_events("review", "project:alpha").length).to eq(1)
-    expect(command_events("cmd-skill-corrupt")).to be_empty
-  end
-
   it "treats equal names under different exact scopes as independent skills" do
     home = operation.call(input(scope: "home"))
     work = operation.call(input(command_id: "cmd-skill-work", scope: "work"))

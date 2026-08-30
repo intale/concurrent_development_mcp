@@ -4,7 +4,7 @@ module Coordinator
       class OperationBatchesV2
         PROJECTION: ProjectionDefinition
 
-        def initialize: (?contract: Contracts::OperationBatchSourceEvent, ?pre_semantic_creation: Contracts::PreSemanticOperationBatchCreation, ?schema_registry: Write::EventSchemaRegistry, ?batches: Repositories::OperationBatches, ?processed_events: Repositories::ProcessedProjectionEvents) -> void
+        def initialize: (?contract: Contracts::OperationBatchSourceEvent, ?schema_registry: Write::EventSchemaRegistry, ?batches: Repositories::OperationBatches, ?processed_events: Repositories::ProcessedProjectionEvents) -> void
         def call: (PgEventstore::Event event) -> void
       end
     end

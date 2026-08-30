@@ -24,11 +24,12 @@ module Coordinator
       def initialize: (event_store: _EventStore, ?schema_registry: EventSchemaRegistry) -> void
       def call: (
         Array[String] markers,
+        repository_id: String,
         ?maximum_delta_count: Integer,
         ?to_position: Integer,
         ?strict: bool
       ) -> Selection
-      def snapshot_stream: (String marker) -> StreamReference
+      def snapshot_stream: (String repository_id) -> StreamReference
     end
   end
 end

@@ -5,8 +5,6 @@ module Coordinator
         def initialize: (?arguments_builder: OperationBatchArguments) -> void
         def fetch: (OperationBatchGetQueryV1 query) -> OperationBatchViewV1?
         def store: (event: PgEventstore::Event, payload: Write::Events::OperationBatchCreatedV1 | Write::Events::OperationBatchItemSucceededV1 | Write::Events::OperationBatchItemRejectedV1 | Write::Events::OperationBatchContinuationRequestedV1 | Write::Events::OperationBatchCancellationRequestedV1 | Write::Events::OperationBatchCancelledV1 | Write::Events::OperationBatchCompletedV1) -> untyped
-        def pre_semantic?: (String batch_id) -> bool
-        def classify_pre_semantic: (String batch_id) -> void
       end
     end
   end

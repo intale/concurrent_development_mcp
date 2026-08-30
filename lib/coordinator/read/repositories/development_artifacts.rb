@@ -485,7 +485,7 @@ module Coordinator::Read
           relation: relation.relation,
           target_kind: relation.target.kind,
           target_id: relation.target.id,
-          target_status: relation.target.status || "legacy_unverified",
+          target_status: relation.target.status,
           target_name: relation.target.name,
           target_scope: relation.target.scope,
           path: relation.relation_attributes.path,
@@ -560,7 +560,7 @@ module Coordinator::Read
                   record.relation == relation.relation &&
                   record.target_kind == relation.target.kind &&
                   record.target_id == relation.target.id &&
-                  record.target_status == (relation.target.status || "legacy_unverified") &&
+                  record.target_status == relation.target.status &&
                   record.target_name == relation.target.name &&
                   record.target_scope == relation.target.scope &&
                   record.path == attributes.path &&
@@ -645,7 +645,7 @@ module Coordinator::Read
         target = Coordinator::Write::DevelopmentArtifacts::RelationTargetV1.new(
           kind: record.target_kind,
           id: record.target_id,
-          status: record.target_status.presence || "legacy_unverified",
+          status: record.target_status,
           name: record.target_name,
           scope: record.target_scope
         )

@@ -57,22 +57,6 @@ module Coordinator::Read
         refresh_summary(record)
       end
 
-      def pre_semantic?(batch_id)
-        Coordinator::Read::OperationBatch.where(
-          batch_id:,
-          manifest_generation: "pre_semantic"
-        ).exists?
-      end
-
-      def classify_pre_semantic(batch_id)
-        record = Coordinator::Read::OperationBatch.lock.find_or_create_by!(batch_id:)
-        if record.manifest_generation == "semantic"
-          raise ProjectionStateError, "Semantic Operation Batch cannot become pre-semantic"
-        end
-
-        record.update!(manifest_generation: "pre_semantic")
-      end
-
       private
 
       def item_relation(record, query)
@@ -90,15 +74,11 @@ module Coordinator::Read
       end
 
       def store_creation(record, event, payload)
-        if record.manifest_generation == "pre_semantic"
-          raise ProjectionStateError, "Pre-semantic Operation Batch cannot become semantic"
-        end
         if record.created_event && record.manifest_digest != payload.manifest_digest
           raise ProjectionStateError, "Operation Batch creation changed for one stream"
         end
 
         record.update!(
-          manifest_generation: "semantic",
           target_tool: payload.target_tool,
           total: payload.total,
           page_size: payload.page_size,

@@ -56,8 +56,11 @@ module Coordinator::Processes
           schema_version: event.metadata.fetch("schema_version"),
           data: event.data
         )
-        boundary_markers(payload).each do |marker|
-          result = @operation.call_command(command(event:, payload:, marker:), caused_by: event)
+        boundary_markers(payload).each_with_index do |marker, boundary_index|
+          result = @operation.call_command(
+            command(event:, payload:, marker:, boundary_index:),
+            caused_by: event
+          )
           next if result.success?
 
           failure = result.failure
@@ -80,11 +83,10 @@ module Coordinator::Processes
         ).sort_by(&:b)
       end
 
-      def command(event:, payload:, marker:)
-        marker_digest = marker.split(":").last
+      def command(event:, payload:, marker:, boundary_index:)
         Coordinator::Write::Commands::RollResourceBoundaryEpoch.new(
           command_id: InternalCommandIdBuilder.call(
-            "resource-boundary-rollover:v1:#{event.id}:#{marker_digest}"
+            "resource-boundary-rollover:v2:#{event.id}:#{boundary_index}"
           ),
           actor: SYSTEM_ACTOR,
           repository_id: payload.repository_id,

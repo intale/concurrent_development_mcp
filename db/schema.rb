@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_29_160000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_29_132000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -447,7 +447,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_29_160000) do
     t.string "target_kind", null: false
     t.string "target_name"
     t.string "target_scope"
-    t.string "target_status", default: "legacy_unverified", null: false
+    t.string "target_status", null: false
     t.datetime "updated_at", null: false
     t.index ["declared_global_position"], name: "idx_on_declared_global_position_66c5eb75e9"
     t.index ["observed_sequence"], name: "index_development_artifact_relations_on_observed_sequence", unique: true
@@ -609,7 +609,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_29_160000) do
     t.jsonb "created_metadata", default: {}, null: false
     t.bigint "encoded_byte_size"
     t.string "manifest_digest"
-    t.string "manifest_generation"
     t.integer "page_size"
     t.integer "rejected_count", default: 0, null: false
     t.string "status", default: "running", null: false
@@ -629,7 +628,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_29_160000) do
     t.datetime "updated_at", null: false
     t.index ["created_global_position"], name: "index_operation_batches_on_created_global_position"
     t.index ["status"], name: "index_operation_batches_on_status"
-    t.check_constraint "manifest_generation::text = ANY (ARRAY['pre_semantic'::character varying, 'semantic'::character varying]::text[])", name: "operation_batches_manifest_generation"
   end
 
   create_table "processed_projection_events", id: false, force: :cascade do |t|

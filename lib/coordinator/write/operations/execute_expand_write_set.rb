@@ -231,7 +231,7 @@ module Coordinator::Write
             resource_path: resource.path
           )
         end.uniq
-        Success(@resource_boundary_loader.call(markers).states)
+        Success(@resource_boundary_loader.call(markers, repository_id: command.repository_id).states)
       rescue EventHistoryLimitExceeded
         Failure(
           OutcomeError.new(

@@ -38,6 +38,7 @@ module Coordinator::Write
 
         boundary = @loader.call(
           [ command.boundary_marker ],
+          repository_id: command.repository_id,
           maximum_delta_count: EventQueries::RESOURCE_BOUNDARY_ROLLOVER_DELTA_MAXIMUM_COUNT,
           to_position: command.source_global_position,
           strict: false
@@ -89,7 +90,7 @@ module Coordinator::Write
           event_id:
         )
 
-        Success(@event_store.append(@loader.snapshot_stream(command.boundary_marker), [ persisted ]).sole)
+        Success(@event_store.append(@loader.snapshot_stream(command.repository_id), [ persisted ]).sole)
       end
 
       def rollover_required?(boundary)
@@ -105,7 +106,7 @@ module Coordinator::Write
 
       def load_replay(command)
         @event_store.read_marked(
-          @loader.snapshot_stream(command.boundary_marker),
+          @loader.snapshot_stream(command.repository_id),
           MarkedEventReadCriteria.new(
             event_type: "ResourceBoundaryEpochRolled",
             marker: "command:#{command.command_id}",

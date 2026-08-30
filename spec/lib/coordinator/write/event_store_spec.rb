@@ -93,6 +93,26 @@ RSpec.describe Coordinator::Write::EventStore, :event_store do
     expect(event_store.read_marked(stream, criteria).map(&:id)).to eq([ target.id ])
   end
 
+  it "reads only the latest matching fact from a marker-partitioned stream" do
+    marker = "resource-boundary:v2|r=36:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}|" \
+      "role=13:resource-path|p=6:app.rb"
+    newest = build_event(type: "ResourceBoundaryEpochRolled", markers: [ marker ])
+    event_store.append(
+      stream,
+      [
+        build_event(type: "ResourceBoundaryEpochRolled", markers: [ marker ]),
+        build_event(type: "ResourceBoundaryEpochRolled", markers: [ "another-boundary" ]),
+        newest
+      ]
+    )
+    criteria = Coordinator::Write::LatestMarkedEventReadCriteria.new(
+      event_type: "ResourceBoundaryEpochRolled",
+      marker:
+    )
+
+    expect(event_store.read_latest_marked(stream, criteria).map(&:id)).to eq([ newest.id ])
+  end
+
   it "reads one globally marked fact only within the declared context, stream name, and types" do
     target = build_event(type: "UserUtteranceRecorded", markers: [ "message:M-real-store" ])
     event_store.append(

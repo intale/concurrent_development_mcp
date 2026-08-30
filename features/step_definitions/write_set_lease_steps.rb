@@ -1980,7 +1980,7 @@ end
 
 class ResourceBoundaryRolloverGate
   EVENT_NAME = "coordinator.command_boundary"
-  ROLLOVER_COMMAND_PREFIX = "internal:resource-boundary-rollover:v1:"
+  ROLLOVER_COMMAND_PREFIX = "internal:resource-boundary-rollover:v2:"
 
   def initialize(reservation_command_id:)
     @reservation_command_id = reservation_command_id
@@ -2247,10 +2247,11 @@ module ResourceBoundaryRolloverAcceptance
 
   def rollover_snapshots(marker)
     loader = Coordinator::Write::ResourceBoundaryLoader.new(event_store:)
-    event_store.read(
-      loader.snapshot_stream(marker),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "ResourceBoundaryEpochRolled" ],
+    event_store.read_marked(
+      loader.snapshot_stream(acceptance_repository_id),
+      Coordinator::Write::MarkedEventReadCriteria.new(
+        event_type: "ResourceBoundaryEpochRolled",
+        marker:,
         maximum_count: 10,
         direction: :asc
       )
@@ -2258,8 +2259,14 @@ module ResourceBoundaryRolloverAcceptance
   end
 
   def rollover_command_id(source, marker)
+    markers = Coordinator::Write::RepositoryMarkerBuilder.new.resource_event_markers(
+      repository_id: source.data.fetch("repository_id"),
+      resource_kind: source.data.fetch("resource_kind"),
+      resource_path: source.data.fetch("resource_path")
+    ).sort_by(&:b)
+    boundary_index = markers.index(marker) || raise("Source event does not carry the boundary marker")
     Coordinator::Processes::InternalCommandIdBuilder.call(
-      "resource-boundary-rollover:v1:#{source.id}:#{marker.split(':').last}"
+      "resource-boundary-rollover:v2:#{source.id}:#{boundary_index}"
     )
   end
 
@@ -2349,7 +2356,10 @@ end
 
 Then("its authoritative decision uses a bounded snapshot plus delta") do
   snapshots = rollover_snapshots(@rollover_marker)
-  boundary = Coordinator::Write::ResourceBoundaryLoader.new(event_store:).call([ @rollover_marker ]).boundaries.sole
+  boundary = Coordinator::Write::ResourceBoundaryLoader.new(event_store:).call(
+    [ @rollover_marker ],
+    repository_id: acceptance_repository_id
+  ).boundaries.sole
 
   assert_acceptance(snapshots.length >= 2, "The authoritative boundary has no rolled epochs")
   assert_acceptance(boundary.previous_through_global_position, "The decision did not load a snapshot")
@@ -2434,7 +2444,10 @@ Then("both operations terminate without a partial write") do
 end
 
 Then("the resulting boundary has at most one active overlapping lease") do
-  boundary = Coordinator::Write::ResourceBoundaryLoader.new(event_store:).call([ @rollover_race_marker ])
+  boundary = Coordinator::Write::ResourceBoundaryLoader.new(event_store:).call(
+    [ @rollover_race_marker ],
+    repository_id: acceptance_repository_id
+  )
   active = boundary.states.select { _1.active_at?(Time.now.utc.iso8601(6)) }
 
   assert_acceptance_equal(1, active.length, "The raced boundary active leases")

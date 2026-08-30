@@ -7,7 +7,7 @@ module Coordinator::Read
 
       params do
         required(:event_type).filled(:string, eql?: "SkillRevisionPublished")
-        required(:schema_version).filled(:integer, included_in?: [ 1, 2 ])
+        required(:schema_version).filled(:integer, eql?: 2)
         required(:stream_context).filled(:string, eql?: "AgentKnowledge")
         required(:stream_name).filled(:string, eql?: "Skill")
         required(:stream_id).filled(:string)

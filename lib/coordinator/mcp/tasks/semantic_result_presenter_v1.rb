@@ -4,12 +4,13 @@ module Coordinator::Mcp
   module Tasks
     class SemanticResultPresenterV1
       def call(result)
-        structured_content, is_error = case result
-                                       when Coordinator::Write::Tasks::SemanticResultV1::Success
-                                         [ success_content(result), false ]
-                                       when Coordinator::Write::Tasks::SemanticResultV1::DomainRejection
-                                         [ rejection_content(result), true ]
-                                       end
+        structured_content, is_error =
+          case result
+          when Coordinator::Write::Tasks::SemanticResultV1::Success
+            [ success_content(result), false ]
+          when Coordinator::Write::Tasks::SemanticResultV1::DomainRejection
+            [ rejection_content(result), true ]
+          end
 
         ResultV1::CallToolResult.new(
           content: [

@@ -24,7 +24,6 @@ module Coordinator
       ) -> Array[GlobalMarkedEventPageCriteria]
 
       COMMAND_COMPLETION: EventReadCriteria
-      RESOURCE_BOUNDARY_LATEST_EPOCH: GroupedEventReadCriteria
       REPOSITORY_REGISTRATION: EventReadCriteria
       SKILL_LATEST_REVISION: GroupedEventReadCriteria
       DEVELOPMENT_ARTIFACT_HISTORY: EventReadCriteria

@@ -1,0 +1,8 @@
+module Coordinator
+  module Write
+    class LatestMarkedEventReadCriteria < Shared::Value
+      def event_type: () -> String
+      def marker: () -> String
+    end
+  end
+end

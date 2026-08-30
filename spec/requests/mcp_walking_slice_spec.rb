@@ -24,6 +24,12 @@ RSpec.describe "D-053 MCP Tasks walking slice", :event_store, :read_model do
     expect(
       discovered.dig("result", "capabilities", "extensions", TASKS_EXTENSION)
     ).to eq({})
+    instructions = discovered.dig("result", "instructions")
+    expect(instructions).to include("skill_asset_get returns text for UTF-8 assets")
+    expect(instructions).to include("canonical Base64 only for binary assets")
+    expect(instructions).to include("lease IDs, Resource IDs, fencing tokens")
+    expect(instructions).not_to include("resource hashes")
+    expect(instructions).not_to include("passive Base64 content")
 
     listed = mcp_request(id: 2, method: "tools/list", params: {})
     tools = listed.dig("result", "tools")

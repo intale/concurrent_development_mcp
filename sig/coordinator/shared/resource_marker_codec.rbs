@@ -3,9 +3,11 @@ module Coordinator
     class ResourceMarkerCodec
       IDENTITY_PREFIX: String
       CURRENT_PATH_PREFIX: String
+      BOUNDARY_PREFIX: String
 
       def identity: (repository_id: String, kind: String, normalized_path: String) -> String
       def current_path: (repository_id: String, normalized_path: String) -> String
+      def boundary: (repository_id: String, role: String, normalized_path: String) -> String
     end
   end
 end

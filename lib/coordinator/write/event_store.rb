@@ -81,6 +81,23 @@ module Coordinator::Write
       []
     end
 
+    def read_latest_marked(reference, criteria)
+      stream = @pg_stream_factory.call(reference)
+
+      @client.read(
+        stream,
+        options: {
+          direction: :desc,
+          max_count: 1,
+          filter: {
+            event_types: [ { type: criteria.event_type, markers: [ criteria.marker ] } ]
+          }
+        }
+      )
+    rescue PgEventstore::StreamNotFoundError
+      []
+    end
+
     def read_global_marked(criteria)
       events = @client.read(
         PgEventstore::Stream.all_stream,

@@ -14,6 +14,9 @@ RSpec.describe Coordinator::Shared::ResourceMarkerCodec do
     expect(codec.current_path(repository_id:, normalized_path: path)).to eq(
       "resource-current-path:v1|r=36:#{repository_id}|p=9:app/Å.rb"
     )
+    expect(codec.boundary(repository_id:, role: "resource-path", normalized_path: path)).to eq(
+      "resource-boundary:v2|r=36:#{repository_id}|role=13:resource-path|p=9:app/Å.rb"
+    )
   end
 
   it "keeps identity kind-specific while sharing one current-path boundary" do

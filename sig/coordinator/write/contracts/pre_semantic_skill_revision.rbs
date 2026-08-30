@@ -1,6 +1,0 @@
-module Coordinator::Write
-  module Contracts
-    class PreSemanticSkillRevision < Dry::Validation::Contract
-    end
-  end
-end

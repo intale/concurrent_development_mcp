@@ -278,13 +278,8 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
   end
 
   def maintenance_command_id(event)
-    marker = Coordinator::Write::RepositoryMarkerBuilder.new.resource_event_markers(
-      repository_id: event.data.fetch("repository_id"),
-      resource_kind: event.data.fetch("resource_kind"),
-      resource_path: event.data.fetch("resource_path")
-    ).sort_by(&:b).first
     Coordinator::Processes::InternalCommandIdBuilder.call(
-      "resource-boundary-rollover:v1:#{event.id}:#{marker.split(':').last}"
+      "resource-boundary-rollover:v2:#{event.id}:0"
     )
   end
 

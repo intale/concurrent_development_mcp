@@ -109,11 +109,6 @@ module Coordinator::Write
       end
     end
 
-    RESOURCE_BOUNDARY_LATEST_EPOCH = GroupedEventReadCriteria.new(
-      event_types: [ "ResourceBoundaryEpochRolled" ],
-      direction: :desc
-    )
-
     COMMAND_COMPLETION = EventReadCriteria.new(
       event_types: [ "CommandCompleted" ],
       maximum_count: 1,

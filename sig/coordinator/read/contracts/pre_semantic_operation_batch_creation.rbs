@@ -1,9 +1,0 @@
-module Coordinator
-  module Read
-    module Contracts
-      class PreSemanticOperationBatchCreation < Dry::Validation::Contract
-        def call: (Hash[Symbol, untyped] input) -> Dry::Validation::Result
-      end
-    end
-  end
-end

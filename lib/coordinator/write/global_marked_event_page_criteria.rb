@@ -5,7 +5,7 @@ module Coordinator::Write
     attribute :stream_context, Types::Identifier
     attribute :stream_name, Types::Identifier
     attribute :event_type, Types::Identifier
-    attribute :markers, Types::Array.of(Types::Marker).constrained(min_size: 1, max_size: 32)
+    attribute :markers, Types::Array.of(Types::ResourceMarker).constrained(min_size: 1, max_size: 32)
     attribute :from_position, Types::Integer.constrained(gteq: 0)
     attribute :to_position, Types::Integer.constrained(gteq: 0)
     attribute :page_size, Types::Integer.constrained(gteq: 1, lteq: 4_096)

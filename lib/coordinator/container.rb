@@ -18,9 +18,7 @@ module Coordinator
     end
     register("skills.persisted_publication_loader", memoize: true) do
       Write::Skills::PersistedPublicationLoader.new(
-        schema_registry: self["event_schema_registry"],
-        identity_builder: self["skills.identity_builder"],
-        revision_builder: self["skills.revision_builder"]
+        schema_registry: self["event_schema_registry"]
       )
     end
     register("skills.marker_builder", memoize: true) do

@@ -4,6 +4,7 @@ module Coordinator::Shared
   class ResourceMarkerCodec
     IDENTITY_PREFIX = "resource-identity:v1"
     CURRENT_PATH_PREFIX = "resource-current-path:v1"
+    BOUNDARY_PREFIX = "resource-boundary:v2"
 
     def identity(repository_id:, kind:, normalized_path:)
       [
@@ -18,6 +19,15 @@ module Coordinator::Shared
       [
         CURRENT_PATH_PREFIX,
         "r=#{component(repository_id)}",
+        "p=#{component(normalized_path)}"
+      ].join("|")
+    end
+
+    def boundary(repository_id:, role:, normalized_path:)
+      [
+        BOUNDARY_PREFIX,
+        "r=#{component(repository_id)}",
+        "role=#{component(role)}",
         "p=#{component(normalized_path)}"
       ].join("|")
     end

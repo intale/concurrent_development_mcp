@@ -62,7 +62,7 @@ module Coordinator::Write
       contract type: "ResourceBoundaryEpochRolled", version: 2
 
       attribute :repository_id, Types::RepositoryId
-      attribute :boundary_marker, Types::Marker
+      attribute :boundary_marker, Types::ResourceMarker
       attribute :epoch, Types::Integer.constrained(gteq: 1)
       attribute :previous_through_global_position, Types::GlobalPosition.optional
       attribute :through_global_position, Types::GlobalPosition
