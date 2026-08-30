@@ -405,9 +405,14 @@ Given("a source Artifact has reached its active relationship capacity") do
   initial = submit_artifact_relation_batch(items, command_suffix: "capacity-initial")
   batch = initial.dig("data", "batch")
   assert_acceptance_equal(active_limit, batch.fetch("succeeded"), "Initial capacity successes")
-  @capacity_initial_relation_ids = batch.fetch("items").sort_by { _1.fetch("index") }.map do |item|
+  manifest = operation_batch_manifest(
+    batch_id: batch.fetch("batch_id"),
+    limit: Coordinator::Shared::Types::OPERATION_BATCH_QUERY_MAXIMUM_ITEMS
+  )
+  @capacity_initial_relation_ids = manifest.fetch(:items).sort_by { _1.fetch("index") }.map do |item|
     item.dig("result", "data", "relation_id")
   end
+  assert_acceptance_equal(active_limit, @capacity_initial_relation_ids.length, "Initial relation manifest")
   assert_acceptance(@capacity_initial_relation_ids.none?(&:nil?), "Initial relation IDs")
 end
 
@@ -428,21 +433,21 @@ end
 
 Then("active graph capacity remains available for one replacement edge") do
   active_limit = Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_ACTIVE_RELATION_MAXIMUM_COUNT
-  page = await_read_model("Artifact replacement and supersession to converge") do
-    observed = artifact_relation_page(
-      @capacity_source,
-      direction: "outgoing",
-      limit: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_QUERY_MAXIMUM_ITEMS,
-      include_superseded: true
-    )
-    items = observed&.fetch("items", []) || []
-    active = items.count { _1.fetch("status") == "active" }
-    [ items.length == active_limit + 1 && active == active_limit, observed ]
+  artifact = await_read_model(
+    "Artifact replacement and supersession to converge",
+    timeout_seconds: LiveSubscriptions::HIGH_VOLUME_TIMEOUT_SECONDS
+  ) do
+    observed = artifact_view(@capacity_source).dig("data", "artifact", "artifact")
+    capacity = observed&.fetch("relationship_capacity", nil)
+    [
+      capacity&.fetch("active_count", nil) == active_limit &&
+        capacity&.fetch("lifetime_count", nil) == active_limit + 1,
+      observed
+    ]
   end
-  active = page.fetch("items").count { _1.fetch("status") == "active" }
   assert_acceptance_equal(
     active_limit,
-    active,
+    artifact.dig("relationship_capacity", "active_count"),
     "Active relation count after replacement"
   )
 end
@@ -450,10 +455,10 @@ end
 Then("Artifact metadata reports active and lifetime capacity separately") do
   summary = artifact_view(@capacity_source).dig("data", "artifact", "artifact")
   capacity = summary.fetch("relationship_capacity")
-  assert_acceptance_equal(64, capacity.fetch("active_count"), "Active capacity count")
-  assert_acceptance_equal(64, capacity.fetch("active_limit"), "Active capacity limit")
-  assert_acceptance_equal(65, capacity.fetch("lifetime_count"), "Lifetime capacity count")
-  assert_acceptance_equal(128, capacity.fetch("lifetime_limit"), "Lifetime capacity limit")
+  assert_acceptance_equal(128, capacity.fetch("active_count"), "Active capacity count")
+  assert_acceptance_equal(128, capacity.fetch("active_limit"), "Active capacity limit")
+  assert_acceptance_equal(129, capacity.fetch("lifetime_count"), "Lifetime capacity count")
+  assert_acceptance_equal(256, capacity.fetch("lifetime_limit"), "Lifetime capacity limit")
 end
 
 When("another declaration would exceed the lifetime graph limit") do
@@ -484,12 +489,12 @@ Then("it is denied from bounded history with the discoverable lifetime limit") d
   )
   details = @capacity_overflow.dig("data", "details")
   assert_acceptance_equal("lifetime", details.fetch("limit_kind"), "Lifetime limit kind")
-  assert_acceptance_equal(128, details.fetch("lifetime_maximum"), "Lifetime maximum")
+  assert_acceptance_equal(256, details.fetch("lifetime_maximum"), "Lifetime maximum")
   assert_acceptance_equal(0, details.fetch("lifetime_remaining"), "Lifetime remaining")
   declarations = artifact_events(@capacity_source).count do |event|
     event.type == "DevelopmentArtifactRelationDeclared"
   end
-  assert_acceptance_equal(128, declarations, "Bounded declaration history")
+  assert_acceptance_equal(256, declarations, "Bounded declaration history")
 end
 
 def artifact_capacity_relation_item(index:, phase:, supersedes_relation_id: nil)

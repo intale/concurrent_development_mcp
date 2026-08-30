@@ -50,11 +50,11 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :event_sto
       relationship_count: 1,
       relationship_capacity: have_attributes(
         active_count: 1,
-        active_limit: 64,
-        active_remaining: 63,
+        active_limit: 128,
+        active_remaining: 127,
         lifetime_count: 1,
-        lifetime_limit: 128,
-        lifetime_remaining: 127
+        lifetime_limit: 256,
+        lifetime_remaining: 255
       ),
       captured: have_attributes(
         event: have_attributes(event_id: source_capture.id, stream_revision: 0),
