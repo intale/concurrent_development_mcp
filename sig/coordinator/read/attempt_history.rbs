@@ -1,0 +1,21 @@
+module Coordinator
+  module Read
+    class AttemptHistory < ApplicationRecord
+      def attempt_id: () -> String
+      def change_set_id: () -> String
+      def work_item_id: () -> String
+      def agent_id: () -> String
+      def base_snapshots: () -> Array[Hash[String, untyped]]
+      def status: () -> String
+      def authorization_event: () -> Hash[String, untyped]
+      def authorized_global_position: () -> Integer
+      def authorized_at_domain: () -> Time
+      def started_at_domain: () -> Time?
+      def selected_candidate_id: () -> String?
+      def selected_candidate_event: () -> Hash[String, untyped]?
+      def abandonment_reason: () -> String?
+      def terminal_event: () -> Hash[String, untyped]?
+      def terminal_at_domain: () -> Time?
+    end
+  end
+end

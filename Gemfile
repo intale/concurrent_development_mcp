@@ -75,6 +75,7 @@ group :test do
   gem "timecop", ">= 0.9.11"
   gem "rack-test", ">= 2.2"
   gem "database_cleaner", ">= 2.1"
+  gem "factory_bot_rails", ">= 6.5"
 end
 
 group :development do

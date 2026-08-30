@@ -7,12 +7,6 @@ module Coordinator::Read
         @state_loader = state_loader
       end
 
-      class AttemptHistoryRecord < ApplicationRecord
-        self.table_name = "attempt_histories"
-        self.primary_key = "attempt_id"
-      end
-      private_constant :AttemptHistoryRecord
-
       def fetch(change_set_id)
         record = Coordinator::Read::CoordContext.find_by(change_set_id:)
         build_snapshot(record)
@@ -41,7 +35,7 @@ module Coordinator::Read
       end
 
       def attempt_page(work_item_id:, after_authorized_global_position:, limit:)
-        relation = AttemptHistoryRecord.where(work_item_id:)
+        relation = Coordinator::Read::AttemptHistory.where(work_item_id:)
         if after_authorized_global_position
           relation = relation.where("authorized_global_position > ?", after_authorized_global_position)
         end
@@ -60,7 +54,7 @@ module Coordinator::Read
       private
 
       def store_attempt_authorized(event:, payload:)
-        record = AttemptHistoryRecord.find_or_initialize_by(attempt_id: payload.attempt_id)
+        record = Coordinator::Read::AttemptHistory.find_or_initialize_by(attempt_id: payload.attempt_id)
         if record.persisted?
           verify_authorization!(record, event:, payload:)
           return
@@ -139,7 +133,7 @@ module Coordinator::Read
       end
 
       def attempt_history!(payload)
-        record = AttemptHistoryRecord.find_by(attempt_id: payload.attempt_id)
+        record = Coordinator::Read::AttemptHistory.find_by(attempt_id: payload.attempt_id)
         raise ProjectionStateError, "Attempt #{payload.attempt_id} authorization is not projected" unless record
         unless record.change_set_id == payload.change_set_id && record.work_item_id == payload.work_item_id
           raise ProjectionStateError, "Attempt #{payload.attempt_id} history scope changed"

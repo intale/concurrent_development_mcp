@@ -30,7 +30,9 @@ RSpec.describe "Cucumber public MCP boundary" do
 
     expect(violations).to be_empty, <<~MESSAGE
       Cucumber must advance coordination through HTTP MCP and tasks/get only.
-      Move direct write/process/projector/event-store behavior to a real-store RSpec assertion:
+      Move a lower-level assertion to one bounded RSpec responsibility: real pg_eventstore for
+      write/process behavior, direct concrete events for projectors, or FactoryBot for read state.
+      Keep the complete production write-to-read journey in Cucumber:
       #{violations.join("\n")}
     MESSAGE
   end
