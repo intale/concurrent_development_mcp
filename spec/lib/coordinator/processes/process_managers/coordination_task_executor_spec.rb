@@ -201,30 +201,6 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
     expect(cancelled.correlation_id).to eq(submitted.correlation_id)
   end
 
-  it "handles a real filtered subscription through the shared process-manager set" do
-    command = create_change_set_command
-    lane_index = Coordinator::Write::Tasks::ExecutionLane.new.index(command.command_id)
-    registration = Coordinator::Processes::Subscriptions::CoordinationTaskExecutor.new(
-      handler: process_manager,
-      lane_index:,
-      pull_interval: 0.2
-    )
-    subscription_set = build_subscription_set([ registration ])
-
-    begin
-      subscription_set.start
-      task_id, = submit_task(command)
-      wait_for_subscription(subscription_set, registration.definition.subscription_name)
-
-      expect(loader.call(task_id).state.status).to eq("completed")
-      expect(change_set_events.map(&:type)).to eq(
-        [ "ChangeSetCreated", "ChangeSetAcceptanceCriteriaDefined" ]
-      )
-    ensure
-      subscription_set.stop
-    end
-  end
-
   it "publishes two unique marker-filtered subscription identities in one shared set" do
     definitions = Coordinator::Processes::Subscriptions::CoordinationTaskExecutor::LANE_COUNT.times.map do |lane|
       Coordinator::Processes::Subscriptions::CoordinationTaskExecutor.new(
@@ -344,23 +320,5 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
       streams.command(command_id),
       Coordinator::Write::EventQueries::COMMAND_COMPLETION
     )
-  end
-
-  def build_subscription_set(registrations)
-    manager = PgEventstore.subscriptions_manager(
-      subscription_set: Coordinator::Processes::Subscriptions::ProcessManagerSet::SET_NAME
-    )
-    Coordinator::Processes::Subscriptions::ProcessManagerSet.new(manager:, registrations:)
-  end
-
-  def wait_for_subscription(subscription_set, subscription_name)
-    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 10
-
-    until subscription_set.processed_event_count(subscription_name) >= 1
-      raise "Task subscription did not process the submission within 10 seconds" if
-        Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
-
-      sleep 0.05
-    end
   end
 end

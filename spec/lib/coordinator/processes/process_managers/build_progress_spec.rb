@@ -91,35 +91,6 @@ RSpec.describe Coordinator::Processes::ProcessManagers::BuildProgress, :event_st
     expect(DependencyProgressScenario.readiness_events(completed).length).to eq(1)
   end
 
-  it "processes terminal WorkItem facts through the real shared subscription set" do
-    scenario = DependencyProgressScenario.prepare(
-      prefix: "live-subscription",
-      dependency_kind: "requires_completion"
-    )
-    registration = Coordinator::Processes::Subscriptions::BuildProgress.new(
-      handler: process_manager,
-      pull_interval: 0.2
-    )
-    manager = PgEventstore.subscriptions_manager(
-      subscription_set: Coordinator::Processes::Subscriptions::ProcessManagerSet::SET_NAME
-    )
-    subscription_set = Coordinator::Processes::Subscriptions::ProcessManagerSet.new(
-      manager:,
-      registrations: [ registration ]
-    )
-
-    begin
-      subscription_set.start
-      completed = DependencyProgressScenario.complete(scenario)
-      wait_for_satisfaction(completed)
-
-      expect(DependencyProgressScenario.dependency_events(completed).length).to eq(1)
-      expect(DependencyProgressScenario.readiness_events(completed).length).to eq(1)
-    ensure
-      subscription_set.stop
-    end
-  end
-
   it "loads exact ReleaseSet integration, verification, and activated-completion sources" do
     integration = ReleaseSetScenario.prepare(
       prefix: "dependency-integration",
@@ -309,16 +280,6 @@ RSpec.describe Coordinator::Processes::ProcessManagers::BuildProgress, :event_st
       { context: "DevelopmentExecution", stream_name: "WorkItem" },
       { context: "DevelopmentIntegration", stream_name: "ReleaseSet" }
     ])
-  end
-
-  def wait_for_satisfaction(scenario)
-    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 10
-    until DependencyProgressScenario.dependency_events(scenario).any?
-      raise "build-progress subscription did not converge within 10 seconds" if
-        Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
-
-      sleep 0.05
-    end
   end
 
   def release_dependency_events(prepared)

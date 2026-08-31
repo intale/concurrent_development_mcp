@@ -198,7 +198,10 @@ Then("scoped discovery eventually includes the Candidate checkpoint") do
       scope: @stale_discovery_coordination.fetch(:scope),
       client_id: "stale-reader"
     )
-    item = coordination_discovery_items(payload).sole
+    items = coordination_discovery_items(payload)
+    next [ false, payload ] unless items.one?
+
+    item = items.sole
     context = call_tool(
       "coord_context",
       { change_set_id: item.fetch("change_set_id") },

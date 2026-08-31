@@ -28,28 +28,6 @@ RSpec.describe Coordinator::Processes::ProcessManagers::ChangeSetReadiness, :eve
     expect(made_ready.causation_id).to eq(activation.id)
   end
 
-  it "handles a real filtered pg_eventstore subscription from activation to readiness" do
-    create_change_set("CS-100")
-    create_work_item("CS-100", "W-100")
-    registration = Coordinator::Processes::Subscriptions::ChangeSetReadiness.new(
-      handler: process_manager,
-      pull_interval: 0.2
-    )
-    subscription_set = build_subscription_set([ registration ])
-
-    begin
-      subscription_set.start
-      activation = activate_change_set("CS-100")
-      wait_for_subscription(subscription_set, registration.definition.subscription_name)
-
-      made_ready = readiness_events("W-100").sole
-      expect(made_ready.causation_id).to eq(activation.id)
-      expect(made_ready.correlation_id).to eq(activation.correlation_id)
-    ensure
-      subscription_set.stop
-    end
-  end
-
   it "stacks every registration for the set on one subscriptions manager" do
     readiness = Coordinator::Processes::Subscriptions::ChangeSetReadiness.new(handler: process_manager)
     audit = Coordinator::Shared::Subscriptions::Registration.new(
@@ -158,16 +136,5 @@ RSpec.describe Coordinator::Processes::ProcessManagers::ChangeSetReadiness, :eve
       subscription_set: Coordinator::Processes::Subscriptions::ProcessManagerSet::SET_NAME
     )
     Coordinator::Processes::Subscriptions::ProcessManagerSet.new(manager:, registrations:)
-  end
-
-  def wait_for_subscription(subscription_set, subscription_name)
-    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 10
-
-    until subscription_set.processed_event_count(subscription_name) >= 1
-      raise "readiness subscription did not process the activation within 10 seconds" if
-        Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
-
-      sleep 0.05
-    end
   end
 end

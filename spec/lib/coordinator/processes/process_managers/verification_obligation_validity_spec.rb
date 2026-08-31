@@ -78,30 +78,6 @@ RSpec.describe Coordinator::Processes::ProcessManagers::VerificationObligationVa
     )
   end
 
-  it "converges from the real shared-set subscription" do
-    created = CandidateObligationScenario.create_obligation(prefix: "validity-process-subscription")
-    corrected = correct_policy(created, "validity-process-subscription")
-    registration = Coordinator::Processes::Subscriptions::VerificationObligationValidity.new(
-      handler: process_manager,
-      pull_interval: 0.1
-    )
-    subscription_set = build_subscription_set([ registration ])
-
-    begin
-      subscription_set.start
-      wait_until("Validity subscription did not invalidate the stale obligation") do
-        invalidation_events(created).one?
-      end
-    ensure
-      subscription_set.stop
-    end
-
-    invalidated = invalidation_events(created).sole
-    expect(load(invalidated).superseding_partition_event)
-      .to eq(reference(corrected.fetch(:partition_event)))
-    expect(subscription_set.processed_event_count(registration.definition.subscription_name)).to be_positive
-  end
-
   it "persists and resumes a 51-obligation scan across two bounded pages" do
     created = CandidateObligationScenario.create_obligation(prefix: "validity-process-pages")
     obligation_ids = [ created.fetch(:payload).obligation_id ] + seed_obligation_clones(created, count: 50)
@@ -206,21 +182,5 @@ RSpec.describe Coordinator::Processes::ProcessManagers::VerificationObligationVa
 
   def reference(event)
     Coordinator::Processes::CandidateObligations::EventReferenceBuilder.new.call(event)
-  end
-
-  def build_subscription_set(registrations)
-    manager = PgEventstore.subscriptions_manager(
-      subscription_set: Coordinator::Processes::Subscriptions::ProcessManagerSet::SET_NAME
-    )
-    Coordinator::Processes::Subscriptions::ProcessManagerSet.new(manager:, registrations:)
-  end
-
-  def wait_until(message)
-    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 20
-    until yield
-      raise message if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
-
-      sleep 0.05
-    end
   end
 end

@@ -99,34 +99,22 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
     expect(command_events(target.command_id).map(&:type)).to eq([ "CommandCompleted" ])
   end
 
-  it "crosses a page boundary through the real shared-set subscription" do
-    items = 51.times.map do |index|
-      item(command_id: "item-#{index}", name: "subscribed-skill-#{index}")
-    end
-    command = preparer.call(input(items:)).value!
-    expect(batch_executor.call_command(command)).to be_success
-    registration = Coordinator::Processes::Subscriptions::OperationBatchRunner.new(
-      handler: runner,
-      pull_interval: 0.1
-    )
-    subscription_set = build_subscription_set([ registration ])
+  it "publishes one unique multi-event registration in the shared process-manager set" do
+    definition = Coordinator::Processes::Subscriptions::OperationBatchRunner::DEFINITION
 
-    begin
-      subscription_set.start
-      wait_until("Operation Batch subscription did not complete two pages") do
-        batch_events(command.batch_id).any? { _1.type == "OperationBatchCompleted" }
-      end
-    ensure
-      subscription_set.stop
-    end
-
-    events = batch_events(command.batch_id)
-    expect(events.count { _1.type == "OperationBatchItemSucceeded" }).to eq(51)
-    expect(events.count { _1.type == "OperationBatchContinuationRequested" }).to eq(1)
-    expect(events.count { _1.type == "OperationBatchCompleted" }).to eq(1)
-    expect(registration.definition.identity.to_h).to eq(
+    expect(definition.identity.to_h).to eq(
       set_name: "coordinator-process-managers-v1",
       subscription_name: "operation-batch-runner-v1"
+    )
+    expect(definition.options).to eq(
+      filter: {
+        streams: [ { context: "DevelopmentCoordination", stream_name: "OperationBatch" } ],
+        event_types: %w[
+          OperationBatchCreated
+          OperationBatchContinuationRequested
+          OperationBatchCancellationRequested
+        ]
+      }
     )
   end
 
@@ -170,22 +158,6 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
 
   def command_events(command_id)
     event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
-  end
-
-  def build_subscription_set(registrations)
-    manager = PgEventstore.subscriptions_manager(
-      subscription_set: Coordinator::Processes::Subscriptions::ProcessManagerSet::SET_NAME
-    )
-    Coordinator::Processes::Subscriptions::ProcessManagerSet.new(manager:, registrations:)
-  end
-
-  def wait_until(message)
-    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 240
-    until yield
-      raise message if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
-
-      sleep 0.05
-    end
   end
 
   def load(event)

@@ -191,51 +191,9 @@ RSpec.describe Coordinator::Processes::ProcessManagers::AgentChoiceDecisionImpac
     expect(choices.sum { choice_events(_1).count { |event| event.type == "AgentChoiceInvalidatedByDecision" } }).to eq(51)
   end
 
-  it "runs from the real shared-set subscription and publishes one unique multi-stream filter" do
-    prepared = AgentChoiceImpactScenario.prepare_attempt(prefix: "impact-process-subscription")
-    decision_id = "D-impact-process-subscription"
-    AgentChoiceImpactScenario.activate_decision(
-      suffix: "impact-process-subscription-base",
-      decision_id:,
-      option_id: "rspec",
-      scope: repository_scope,
-      enforcement: {
-        level: "implementation_gate",
-        retroactivity: "future_only",
-        on_violation: "block"
-      }
-    )
-    choice = AgentChoiceImpactScenario.record_choice(prepared:, option_id: "rspec")
-    registration = Coordinator::Processes::Subscriptions::AgentChoiceDecisionImpact.new(
-      handler: process_manager,
-      pull_interval: 0.1
-    )
-    subscription_set = build_subscription_set([ registration ])
+  it "publishes one unique multi-stream filter in the shared process-manager set" do
+    definition = Coordinator::Processes::Subscriptions::AgentChoiceDecisionImpact::DEFINITION
 
-    begin
-      subscription_set.start
-      wait_until("initial impact sources were not checkpointed") do
-        subscription_set.processed_event_count(registration.definition.subscription_name) >= 2
-      end
-      source = AgentChoiceImpactScenario.correct_decision(
-        suffix: "impact-process-subscription-change",
-        decision_id:,
-        option_id: "minitest",
-        scope: repository_scope
-      )
-      wait_until("impact subscription did not complete the correction scan") do
-        scan_event(source, "AgentChoiceImpactScanCompleted", required: false)
-      end
-
-      assessment = assessment_events(choice, source).sole
-      invalidation = choice_events(choice).find { _1.type == "AgentChoiceInvalidatedByDecision" }
-      expect(assessment.causation_id).to eq(scan_event(source, "AgentChoiceImpactScanStarted").id)
-      expect(invalidation.correlation_id).to eq(source.correlation_id)
-    ensure
-      subscription_set.stop
-    end
-
-    definition = registration.definition
     expect(definition.identity.to_h).to eq(
       set_name: "coordinator-process-managers-v1",
       subscription_name: "agent-choice-decision-impact-v1"
@@ -315,21 +273,5 @@ RSpec.describe Coordinator::Processes::ProcessManagers::AgentChoiceDecisionImpac
 
   def reference(event)
     Coordinator::Processes::AgentChoiceImpacts::EventReferenceBuilder.new.call(event)
-  end
-
-  def build_subscription_set(registrations)
-    manager = PgEventstore.subscriptions_manager(
-      subscription_set: Coordinator::Processes::Subscriptions::ProcessManagerSet::SET_NAME
-    )
-    Coordinator::Processes::Subscriptions::ProcessManagerSet.new(manager:, registrations:)
-  end
-
-  def wait_until(message)
-    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 15
-    until yield
-      raise message if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
-
-      sleep 0.05
-    end
   end
 end

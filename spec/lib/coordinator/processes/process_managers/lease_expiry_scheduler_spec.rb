@@ -91,76 +91,6 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
     expect(command_events(expiry_command_id(source)).length).to eq(1)
   end
 
-  it "runs a past-due V2 source through one real filtered subscription and Active Job execution" do
-    setup_attempt
-    reservation = Timecop.freeze(Time.now.utc - 31) { reserve(duration: 30) }
-    source = lifecycle_event(reservation, "ResourceLeaseAcquired")
-    registration = expiry_registration
-    subscription_set = build_subscription_set([ registration ])
-
-    with_real_async_jobs do
-      begin
-        subscription_set.start
-        wait_for_subscription(subscription_set, registration.definition.subscription_name)
-        wait_for_expiration(reservation)
-
-        expiration = lifecycle_event(reservation, "ResourceLeaseExpired")
-        expect(expiration.causation_id).to eq(source.id)
-        expect(expiration.correlation_id).to eq(source.correlation_id)
-        expect(command_events(expiry_command_id(source)).length).to eq(1)
-      ensure
-        subscription_set.stop
-      end
-    end
-  end
-
-  it "schedules acquisition and renewal while only the current UUID lease observation expires" do
-    setup_attempt
-    source_time = Time.now.utc - 61
-    reservation = Timecop.freeze(source_time) { reserve(duration: 30) }
-    acquisition = lifecycle_event(reservation, "ResourceLeaseAcquired")
-    Timecop.freeze(source_time + 15) { renew(reservation, duration: 30) }
-    renewal = lifecycle_event(reservation, "ResourceLeaseRenewed")
-    registration = expiry_registration
-    subscription_set = build_subscription_set([ registration ])
-
-    with_real_async_jobs do
-      begin
-        subscription_set.start
-        wait_for_subscription(subscription_set, registration.definition.subscription_name, count: 2)
-        wait_for_expiration(reservation)
-
-        expiration = lifecycle_event(reservation, "ResourceLeaseExpired")
-        expect(expiration.causation_id).to eq(renewal.id)
-        expect(command_events(expiry_command_id(acquisition))).to be_empty
-        expect(command_events(expiry_command_id(renewal)).length).to eq(1)
-      ensure
-        subscription_set.stop
-      end
-    end
-  end
-
-  it "accepts a non-hot V2 resource boundary through the real shared process-manager set" do
-    setup_attempt
-    reservation = reserve(duration: 300)
-    source = lifecycle_event(reservation, "ResourceLeaseAcquired")
-    registration = Coordinator::Processes::Subscriptions::ResourceBoundaryMaintenance.new(
-      handler: Coordinator::Processes::ProcessManagers::ResourceBoundaryMaintenance.new(event_store:),
-      pull_interval: 0.2
-    )
-    subscription_set = build_subscription_set([ registration ])
-
-    begin
-      subscription_set.start
-      wait_for_subscription(subscription_set, registration.definition.subscription_name)
-    ensure
-      subscription_set.stop
-    end
-
-    expect(command_events(maintenance_command_id(source))).to be_empty
-    expect(subscription_set.processed_event_count(registration.definition.subscription_name)).to eq(1)
-  end
-
   it "publishes one unique multi-event registration in the shared process-manager set" do
     definition = Coordinator::Processes::Subscriptions::LeaseExpiryScheduler::DEFINITION
 
@@ -259,13 +189,6 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
     Coordinator::Processes::LeaseExpirySourceLocatorV1.from_source(source_builder.call(event))
   end
 
-  def expiry_registration
-    Coordinator::Processes::Subscriptions::LeaseExpiryScheduler.new(
-      handler: described_class.new(job_scheduler:),
-      pull_interval: 0.2
-    )
-  end
-
   def command_events(command_id)
     event_store.read(
       Coordinator::Write::StreamFactory.new.command(command_id),
@@ -275,30 +198,6 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
 
   def expiry_command_id(event)
     "#{Coordinator::Processes::LeaseExpiryCommandBuilder::COMMAND_ID_PREFIX}#{event.id}"
-  end
-
-  def maintenance_command_id(event)
-    Coordinator::Processes::InternalCommandIdBuilder.call(
-      "resource-boundary-rollover:v2:#{event.id}:0"
-    )
-  end
-
-  def build_subscription_set(registrations)
-    manager = PgEventstore.subscriptions_manager(
-      subscription_set: Coordinator::Processes::Subscriptions::ProcessManagerSet::SET_NAME
-    )
-    Coordinator::Processes::Subscriptions::ProcessManagerSet.new(manager:, registrations:)
-  end
-
-  def wait_for_subscription(subscription_set, subscription_name, count: 1)
-    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 10
-
-    until subscription_set.processed_event_count(subscription_name) >= count
-      raise "#{subscription_name} did not process the source within 10 seconds" if
-        Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
-
-      sleep 0.05
-    end
   end
 
   def wait_for_expiration(reservation)

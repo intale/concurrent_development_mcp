@@ -38,6 +38,11 @@ RSpec.describe "Read-model test fixture boundaries", :read_model do
     /\bwait_for\b/,
     /\bsleep\b/
   )
+  PROCESS_MANAGER_DELIVERY_CROSSING = Regexp.union(
+    /\bsubscription_set\.(?:start|stop)\b/,
+    /\bprocessed_event_count\b/,
+    /\bwait_for_subscription\b/
+  )
 
   it "provides valid namespaced read-side factories" do
     factories = FactoryBot.factories.select do |factory|
@@ -124,12 +129,25 @@ RSpec.describe "Read-model test fixture boundaries", :read_model do
       "subscription specs must cover registration only: #{subscription_violations.join(', ')}"
   end
 
+  it "keeps process-manager RSpec on direct decisions and subscription contracts" do
+    violations = process_manager_spec_files.filter_map do |path|
+      relative(path) if path.read.match?(PROCESS_MANAGER_DELIVERY_CROSSING)
+    end
+
+    expect(violations).to be_empty,
+      "process-manager specs must not start live subscription delivery: #{violations.join(', ')}"
+  end
+
   def factory_files
     FACTORY_ROOT.glob("coordinator/read/**/*.rb")
   end
 
   def spec_files
     Rails.root.glob("spec/**/*_spec.rb")
+  end
+
+  def process_manager_spec_files
+    Rails.root.glob("spec/lib/coordinator/processes/process_managers/**/*_spec.rb")
   end
 
   def crossing_paths

@@ -58,33 +58,14 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CandidateImpactObligatio
     expect(command_events(invocation.command.command_id)).to be_empty
   end
 
-  it "runs from the real shared subscription set with one unique multi-stream registration" do
-    pair = CandidateObligationScenario.submit_pair(prefix: "obligation-process-subscription")
-    policy = CandidateObligationScenario.activate_policy(
-      prefix: "obligation-process-subscription",
-      change_set_id: pair.dig(:ids, :change_set_id)
-    )
-    registration = Coordinator::Processes::Subscriptions::CandidateImpactObligationPolicy.new(
-      handler: process_manager,
-      pull_interval: 0.1
-    )
-    subscription_set = build_subscription_set([ registration ])
-    invocation = CandidateObligationScenario.invocation(pair:, policy:)
+  it "publishes one unique multi-stream registration in the shared process-manager set" do
+    definition = Coordinator::Processes::Subscriptions::CandidateImpactObligationPolicy::DEFINITION
 
-    begin
-      subscription_set.start
-      wait_until("Candidate-obligation subscription did not converge") do
-        CandidateObligationScenario.obligation_events(invocation.command.obligation_id).one?
-      end
-    ensure
-      subscription_set.stop
-    end
-
-    expect(registration.definition.identity.to_h).to eq(
+    expect(definition.identity.to_h).to eq(
       set_name: "coordinator-process-managers-v1",
       subscription_name: "candidate-impact-obligation-policy-v1"
     )
-    expect(registration.definition.options).to eq(
+    expect(definition.options).to eq(
       filter: {
         streams: [
           { context: "HumanGuidance", stream_name: "DecisionPartition" },
@@ -216,21 +197,5 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CandidateImpactObligatio
 
   def reference(event)
     Coordinator::Processes::CandidateObligations::EventReferenceBuilder.new.call(event)
-  end
-
-  def build_subscription_set(registrations)
-    manager = PgEventstore.subscriptions_manager(
-      subscription_set: Coordinator::Processes::Subscriptions::ProcessManagerSet::SET_NAME
-    )
-    Coordinator::Processes::Subscriptions::ProcessManagerSet.new(manager:, registrations:)
-  end
-
-  def wait_until(message)
-    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 20
-    until yield
-      raise message if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
-
-      sleep 0.05
-    end
   end
 end
