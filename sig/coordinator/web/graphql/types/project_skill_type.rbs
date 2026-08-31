@@ -1,0 +1,4 @@
+module Coordinator::Web::Graphql::Types
+  class ProjectSkillType < BaseObject
+  end
+end

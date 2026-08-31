@@ -100,6 +100,7 @@ export function ProjectResourcesView(props: ProjectResourcesViewProps) {
       <p className="small text-body-secondary mb-0">Viewing latest available projections for <strong>{project.name ?? project.id}</strong> in <code>{project.scope}</code>. Projection freshness never gates availability.</p>
       <div className="d-flex flex-wrap gap-2">
         <Link className="btn btn-outline-primary" to={`/projects/${project.id}/coordination`}>View coordination</Link>
+        <Link className="btn btn-outline-primary" to={`/projects/${project.id}/knowledge`}>View knowledge</Link>
         <Link className="btn btn-outline-secondary" to={`/projects?scope=${encodeURIComponent(project.scope)}`}>Back to project catalog</Link>
       </div>
     </div>

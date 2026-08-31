@@ -1,0 +1,7 @@
+module Coordinator::Web::Graphql::Types
+  class DevelopmentArtifactSummaryType < BaseObject
+    def captured_at: () -> String
+    def classified_at: () -> String
+    def observed_at: () -> String
+  end
+end

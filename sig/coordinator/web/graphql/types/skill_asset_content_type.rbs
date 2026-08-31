@@ -1,0 +1,6 @@
+module Coordinator::Web::Graphql::Types
+  class SkillAssetContentType < BaseObject
+    def base64: () -> String?
+    def text: () -> String?
+  end
+end

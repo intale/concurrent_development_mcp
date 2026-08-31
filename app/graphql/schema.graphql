@@ -29,6 +29,12 @@ type ActiveResourceLeaseConnection {
   pageInfo: PageInfo!
 }
 
+enum ArtifactRelationDirection {
+  BOTH
+  INCOMING
+  OUTGOING
+}
+
 type CoordinationChangeSet {
   acceptanceCriteria: [String!]!
   domainStatus: String!
@@ -104,6 +110,110 @@ type CoordinationWorkItemConnection {
   pageInfo: PageInfo!
 }
 
+type DevelopmentArtifactConnection {
+  nodes: [DevelopmentArtifactSummary!]!
+  pageInfo: PageInfo!
+}
+
+type DevelopmentArtifactContent {
+  base64: String
+  byteSize: Int!
+  contentDigest: String!
+  encoding: String!
+  mediaType: String!
+  text: String
+}
+
+enum DevelopmentArtifactKind {
+  BUILD_MANIFEST
+  BUILD_PLAN
+  CONTRACT
+  DECISION_LOG
+  DECISION_RECORD
+  DOCUMENTATION
+  EVENT_MODEL
+  EXTERNAL_REFERENCE
+  GOVERNANCE
+  IMPLEMENTATION_RECORD
+  IMPORT_MANIFEST
+  OTHER
+  PERFORMANCE_PROFILE
+  REPOSITORY_CHECKPOINT
+  VERIFICATION_EVIDENCE
+  WEB_RESEARCH
+}
+
+type DevelopmentArtifactRelation {
+  declaredAt: String!
+  direction: ArtifactRelationDirection!
+  displayRelation: String!
+  fragment: String
+  id: ID!
+  normalizedLocator: String
+  path: String
+  peerArtifact: DevelopmentArtifactSummary
+  peerId: ID!
+  peerKind: String!
+  relation: DevelopmentArtifactRelationKind!
+  status: String!
+  targetName: String
+  targetScope: String
+  targetStatus: String!
+}
+
+type DevelopmentArtifactRelationConnection {
+  nodes: [DevelopmentArtifactRelation!]!
+  pageInfo: PageInfo!
+}
+
+enum DevelopmentArtifactRelationKind {
+  CONTAINS
+  DERIVED_FROM
+  DOCUMENTS
+  EVIDENCES
+  PRODUCED_BY_IMPORT
+  REFERENCES
+  SUPERSEDES
+}
+
+type DevelopmentArtifactSource {
+  collector: String!
+  kind: DevelopmentArtifactSourceKind!
+  locator: String!
+  observedAt: String!
+  revision: String
+}
+
+enum DevelopmentArtifactSourceKind {
+  DOWNLOADED_DOCUMENT
+  GENERATED
+  GIT_COMMIT
+  LOCAL_FILE
+  OTHER
+  WEB_PAGE
+  WEB_SEARCH
+}
+
+type DevelopmentArtifactSummary {
+  byteSize: Int!
+  capturedAt: String!
+  classificationReason: String
+  classificationRevision: Int!
+  classifiedAt: String!
+  contentDigest: String!
+  encoding: String!
+  id: ID!
+  kind: DevelopmentArtifactKind!
+  labels: [String!]!
+  mediaType: String!
+  observationId: ID!
+  observedAt: String!
+  relationshipCount: Int!
+  scope: String!
+  source: DevelopmentArtifactSource!
+  title: String!
+}
+
 """
 Opaque forward-pagination state for one bounded read-model window.
 """
@@ -124,6 +234,13 @@ type Project {
   scope: String!
 }
 
+type ProjectArtifact {
+  artifact: DevelopmentArtifactSummary!
+  content: DevelopmentArtifactContent!
+  project: CoordinationProject!
+  relationships: DevelopmentArtifactRelationConnection!
+}
+
 """
 A bounded page of projects and its opaque continuation state.
 """
@@ -137,6 +254,12 @@ type ProjectCoordination {
   dependencies: CoordinationDependencyConnection!
   project: CoordinationProject!
   workItems: CoordinationWorkItemConnection!
+}
+
+type ProjectKnowledge {
+  artifacts: DevelopmentArtifactConnection!
+  project: CoordinationProject!
+  skills: SkillConnection!
 }
 
 type ProjectResource {
@@ -161,19 +284,49 @@ type ProjectResources {
   resources: ProjectResourceConnection!
 }
 
+type ProjectSkill {
+  project: CoordinationProject!
+  skill: Skill!
+}
+
+type ProjectSkillAsset {
+  asset: SkillAssetContent!
+  project: CoordinationProject!
+}
+
 """
 Read-only access to the latest available coordination projections.
 """
 type Query {
+  """
+  One project-scoped Artifact with passive content and active relationships.
+  """
+  projectArtifact(artifactId: ID!, direction: ArtifactRelationDirection = BOTH, first: Int = 20, relation: DevelopmentArtifactRelationKind, relationsAfter: String, repositoryId: ID!): ProjectArtifact
+
   """
   Latest available coordination facts for one registered project.
   """
   projectCoordination(blocking: Boolean, changeSetsAfter: String, dependenciesAfter: String, first: Int = 20, presentationStatuses: [CoordinationPresentationStatus!], repositoryId: ID!, workItemSort: WorkItemSort = WORK_ITEM_ID_ASC, workItemsAfter: String): ProjectCoordination
 
   """
+  Current Skills and Development Artifacts for one registered project.
+  """
+  projectKnowledge(artifactKind: DevelopmentArtifactKind, artifactLabels: [String!], artifactSourceKind: DevelopmentArtifactSourceKind, artifactsAfter: String, first: Int = 20, repositoryId: ID!, skillName: String, skillsAfter: String): ProjectKnowledge
+
+  """
   Latest available resource inventory and factual active leases for one project.
   """
   projectResources(activeLeasesAfter: String, first: Int = 20, repositoryId: ID!, resourceKind: ResourceKind, resourceLifecycleStatus: ResourceLifecycleStatus, resourcesAfter: String): ProjectResources
+
+  """
+  Current projected revision of one Skill in a project's exact scope.
+  """
+  projectSkill(name: String!, repositoryId: ID!): ProjectSkill
+
+  """
+  Current projected content of one Skill asset in a project's exact scope.
+  """
+  projectSkillAsset(name: String!, path: String!, repositoryId: ID!): ProjectSkillAsset
 
   """
   List projects in one exact caller-chosen scope in stable Repository-ID order.
@@ -190,6 +343,54 @@ enum ResourceLifecycleStatus {
   CURRENT
   INACTIVE
   REGISTERED
+}
+
+type Skill {
+  assets: [SkillAssetManifest!]!
+  contentDigest: String!
+  description: String!
+  id: ID!
+  instructions: String!
+  name: String!
+  publishedAt: String!
+  revision: Int!
+  scope: String!
+}
+
+type SkillAssetContent {
+  base64: String
+  byteSize: Int!
+  contentDigest: String!
+  encoding: String!
+  executable: Boolean!
+  mediaType: String!
+  path: String!
+  revision: Int!
+  text: String
+}
+
+type SkillAssetManifest {
+  byteSize: Int!
+  contentDigest: String!
+  executable: Boolean!
+  mediaType: String!
+  path: String!
+}
+
+type SkillConnection {
+  nodes: [SkillSummary!]!
+  pageInfo: PageInfo!
+}
+
+type SkillSummary {
+  assetCount: Int!
+  contentDigest: String!
+  description: String!
+  id: ID!
+  name: String!
+  publishedAt: String!
+  revision: Int!
+  scope: String!
 }
 
 enum WorkItemSort {

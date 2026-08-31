@@ -1,0 +1,21 @@
+module Coordinator
+  module Read
+    module Web
+      module Contracts
+        class KnowledgeBrowser
+          class Catalog < Dry::Validation::Contract
+          end
+
+          class Skill < Dry::Validation::Contract
+          end
+
+          class SkillAsset < Dry::Validation::Contract
+          end
+
+          class Artifact < Dry::Validation::Contract
+          end
+        end
+      end
+    end
+  end
+end

@@ -1,0 +1,23 @@
+module Coordinator
+  module Read
+    module Web
+      module Repositories
+        class KnowledgeBrowser
+          def initialize: (
+            ?skills: Read::Repositories::Skills,
+            ?artifacts: Read::Repositories::DevelopmentArtifacts
+          ) -> void
+          def catalog: (KnowledgeBrowserQueryV1::Catalog query) -> KnowledgeBrowserV1::Catalog?
+          def skill: (KnowledgeBrowserQueryV1::Skill query) -> KnowledgeBrowserV1::SkillDetail?
+          def skill_asset: (KnowledgeBrowserQueryV1::SkillAsset query) -> KnowledgeBrowserV1::SkillAssetDetail?
+          def artifact: (KnowledgeBrowserQueryV1::Artifact query) -> KnowledgeBrowserV1::ArtifactDetail?
+
+          private
+
+          def find_project: (String repository_id) -> Read::Repository?
+          def build_project: (Read::Repository record) -> KnowledgeBrowserV1::Project
+        end
+      end
+    end
+  end
+end

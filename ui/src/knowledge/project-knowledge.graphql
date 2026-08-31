@@ -1,0 +1,151 @@
+query ProjectKnowledge(
+  $repositoryId: ID!
+  $first: Int
+  $skillName: String
+  $skillsAfter: String
+  $artifactKind: DevelopmentArtifactKind
+  $artifactLabels: [String!]
+  $artifactSourceKind: DevelopmentArtifactSourceKind
+  $artifactsAfter: String
+) {
+  projectKnowledge(
+    repositoryId: $repositoryId
+    first: $first
+    skillName: $skillName
+    skillsAfter: $skillsAfter
+    artifactKind: $artifactKind
+    artifactLabels: $artifactLabels
+    artifactSourceKind: $artifactSourceKind
+    artifactsAfter: $artifactsAfter
+  ) {
+    project { id name scope }
+    skills {
+      nodes { id name scope revision description assetCount contentDigest publishedAt }
+      pageInfo { endCursor hasNextPage }
+    }
+    artifacts {
+      nodes {
+        id
+        observationId
+        scope
+        title
+        kind
+        labels
+        mediaType
+        encoding
+        contentDigest
+        byteSize
+        classificationRevision
+        classificationReason
+        relationshipCount
+        capturedAt
+        observedAt
+        classifiedAt
+        source { kind locator revision observedAt collector }
+      }
+      pageInfo { endCursor hasNextPage }
+    }
+  }
+}
+
+query ProjectSkill($repositoryId: ID!, $name: String!) {
+  projectSkill(repositoryId: $repositoryId, name: $name) {
+    project { id name scope }
+    skill {
+      id
+      name
+      scope
+      revision
+      description
+      instructions
+      contentDigest
+      publishedAt
+      assets { path mediaType executable contentDigest byteSize }
+    }
+  }
+}
+
+query ProjectSkillAsset($repositoryId: ID!, $name: String!, $path: String!) {
+  projectSkillAsset(repositoryId: $repositoryId, name: $name, path: $path) {
+    project { id name scope }
+    asset { path revision encoding mediaType executable text base64 contentDigest byteSize }
+  }
+}
+
+query ProjectArtifact(
+  $repositoryId: ID!
+  $artifactId: ID!
+  $first: Int
+  $direction: ArtifactRelationDirection
+  $relation: DevelopmentArtifactRelationKind
+  $relationsAfter: String
+) {
+  projectArtifact(
+    repositoryId: $repositoryId
+    artifactId: $artifactId
+    first: $first
+    direction: $direction
+    relation: $relation
+    relationsAfter: $relationsAfter
+  ) {
+    project { id name scope }
+    artifact {
+      id
+      observationId
+      scope
+      title
+      kind
+      labels
+      mediaType
+      encoding
+      contentDigest
+      byteSize
+      classificationRevision
+      classificationReason
+      relationshipCount
+      capturedAt
+      observedAt
+      classifiedAt
+      source { kind locator revision observedAt collector }
+    }
+    content { encoding mediaType text base64 contentDigest byteSize }
+    relationships {
+      nodes {
+        id
+        direction
+        relation
+        displayRelation
+        peerKind
+        peerId
+        status
+        targetStatus
+        targetName
+        targetScope
+        path
+        fragment
+        normalizedLocator
+        declaredAt
+        peerArtifact {
+          id
+          observationId
+          scope
+          title
+          kind
+          labels
+          mediaType
+          encoding
+          contentDigest
+          byteSize
+          classificationRevision
+          classificationReason
+          relationshipCount
+          capturedAt
+          observedAt
+          classifiedAt
+          source { kind locator revision observedAt collector }
+        }
+      }
+      pageInfo { endCursor hasNextPage }
+    }
+  }
+}

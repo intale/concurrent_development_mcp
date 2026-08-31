@@ -34,6 +34,44 @@ module Coordinator::Web::Graphql::Types
       argument :resources_after, String, required: false
     end
 
+    field :project_knowledge, ProjectKnowledgeType, null: true do
+      description "Current Skills and Development Artifacts for one registered project."
+      argument :artifacts_after, String, required: false
+      argument :artifact_kind, DevelopmentArtifactKindEnum, required: false
+      argument :artifact_labels, [ String ], required: false
+      argument :artifact_source_kind, DevelopmentArtifactSourceKindEnum, required: false
+      argument :first, Integer, required: false, default_value: 20
+      argument :repository_id, ID, required: true
+      argument :skill_name, String, required: false
+      argument :skills_after, String, required: false
+    end
+
+    field :project_skill, ProjectSkillType, null: true do
+      description "Current projected revision of one Skill in a project's exact scope."
+      argument :name, String, required: true
+      argument :repository_id, ID, required: true
+    end
+
+    field :project_skill_asset, ProjectSkillAssetType, null: true do
+      description "Current projected content of one Skill asset in a project's exact scope."
+      argument :name, String, required: true
+      argument :path, String, required: true
+      argument :repository_id, ID, required: true
+    end
+
+    field :project_artifact, ProjectArtifactType, null: true do
+      description "One project-scoped Artifact with passive content and active relationships."
+      argument :artifact_id, ID, required: true
+      argument :direction,
+               ArtifactRelationDirectionEnum,
+               required: false,
+               default_value: "both"
+      argument :first, Integer, required: false, default_value: 20
+      argument :relation, DevelopmentArtifactRelationKindEnum, required: false
+      argument :relations_after, String, required: false
+      argument :repository_id, ID, required: true
+    end
+
     def projects(scope:, first:, after: nil)
       query = Coordinator::Read::Queries::RepositoryList.new.call(
         scope:,
@@ -149,6 +187,111 @@ module Coordinator::Web::Graphql::Types
       )
     end
 
+    def project_knowledge(
+      repository_id:,
+      first:,
+      artifact_kind: nil,
+      artifact_labels: nil,
+      artifact_source_kind: nil,
+      artifacts_after: nil,
+      skill_name: nil,
+      skills_after: nil
+    )
+      labels = artifact_labels || []
+      catalog = knowledge_browser.catalog(
+        repository_id:,
+        first:,
+        skill_name:,
+        after_skill_id: Coordinator::Web::Graphql::KnowledgeBrowserCursor.decode_skills(
+          skills_after,
+          repository_id:,
+          skill_name:
+        ),
+        artifact_kind:,
+        artifact_labels: labels,
+        artifact_source_kind:,
+        after_artifact_global_position: Coordinator::Web::Graphql::KnowledgeBrowserCursor.decode_artifacts(
+          artifacts_after,
+          repository_id:,
+          artifact_kind:,
+          labels:,
+          source_kind: artifact_source_kind
+        )
+      )
+      return unless catalog
+
+      {
+        project: catalog.project,
+        skills: skill_connection(catalog.skills, repository_id:, skill_name:),
+        artifacts: artifact_connection(
+          catalog.artifacts,
+          repository_id:,
+          artifact_kind:,
+          labels:,
+          source_kind: artifact_source_kind
+        )
+      }
+    rescue Coordinator::Web::Graphql::InvalidCursor => error
+      raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::KnowledgeBrowserQueryError => error
+      raise_knowledge_query_error(error)
+    end
+
+    def project_skill(repository_id:, name:)
+      knowledge_browser.skill(repository_id:, name:)
+    rescue Coordinator::Read::Web::KnowledgeBrowserQueryError => error
+      raise_knowledge_query_error(error)
+    end
+
+    def project_skill_asset(repository_id:, name:, path:)
+      knowledge_browser.skill_asset(repository_id:, name:, path:)
+    rescue Coordinator::Read::Web::KnowledgeBrowserQueryError => error
+      raise_knowledge_query_error(error)
+    end
+
+    def project_artifact(
+      repository_id:,
+      artifact_id:,
+      first:,
+      direction:,
+      relation: nil,
+      relations_after: nil
+    )
+      cursor = Coordinator::Web::Graphql::KnowledgeBrowserCursor.decode_relations(
+        relations_after,
+        repository_id:,
+        artifact_id:,
+        direction:,
+        relation:
+      )
+      detail = knowledge_browser.artifact(
+        repository_id:,
+        artifact_id:,
+        first:,
+        direction:,
+        relation:,
+        cursor:
+      )
+      return unless detail
+
+      {
+        project: detail.project,
+        artifact: detail.artifact,
+        content: detail.content,
+        relationships: artifact_relation_connection(
+          detail.relationships,
+          repository_id:,
+          artifact_id:,
+          direction:,
+          relation:
+        )
+      }
+    rescue Coordinator::Web::Graphql::InvalidCursor => error
+      raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::KnowledgeBrowserQueryError => error
+      raise_knowledge_query_error(error)
+    end
+
     private
 
     def connection(page, kind)
@@ -189,6 +332,64 @@ module Coordinator::Web::Graphql::Types
           has_next_page: page.has_more
         }
       }
+    end
+
+    def skill_connection(page, repository_id:, skill_name:)
+      {
+        nodes: page.items,
+        page_info: {
+          end_cursor: page.next_skill_id && Coordinator::Web::Graphql::KnowledgeBrowserCursor.encode_skills(
+            repository_id:,
+            after_id: page.next_skill_id,
+            skill_name:
+          ),
+          has_next_page: page.has_more
+        }
+      }
+    end
+
+    def artifact_connection(page, repository_id:, artifact_kind:, labels:, source_kind:)
+      {
+        nodes: page.items,
+        page_info: {
+          end_cursor: page.next_global_position &&
+            Coordinator::Web::Graphql::KnowledgeBrowserCursor.encode_artifacts(
+              repository_id:,
+              after_position: page.next_global_position,
+              artifact_kind:,
+              labels:,
+              source_kind:
+            ),
+          has_next_page: page.has_more
+        }
+      }
+    end
+
+    def artifact_relation_connection(page, repository_id:, artifact_id:, direction:, relation:)
+      {
+        nodes: page.items,
+        page_info: {
+          end_cursor: page.has_more && Coordinator::Web::Graphql::KnowledgeBrowserCursor.encode_relations(
+            repository_id:,
+            artifact_id:,
+            direction:,
+            relation:,
+            cursor: page.continuation_cursor
+          ),
+          has_next_page: page.has_more
+        }
+      }
+    end
+
+    def knowledge_browser
+      @knowledge_browser ||= Coordinator::Read::Web::Queries::KnowledgeBrowser.new
+    end
+
+    def raise_knowledge_query_error(error)
+      raise GraphQL::ExecutionError.new(
+        error.message,
+        extensions: { code: "INVALID_INPUT", details: error.details }
+      )
     end
 
     def raise_query_error(result)

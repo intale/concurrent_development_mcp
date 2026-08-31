@@ -110,7 +110,7 @@ export function ProjectCatalogView(props: ProjectCatalogViewProps) {
                   <td>{row.paths || "—"}</td>
                   <td>{row.remotes || "—"}</td>
                   <td className="text-nowrap">{row.registeredAt}</td>
-                  <td><div className="btn-group btn-group-sm" role="group" aria-label={`Inspect ${row.name}`}><Link className="btn btn-outline-primary" to={`/projects/${row.id}/coordination`}>Coordination</Link><Link className="btn btn-outline-primary" to={`/projects/${row.id}/resources`}>Resources</Link></div></td>
+                  <td><div className="btn-group btn-group-sm" role="group" aria-label={`Inspect ${row.name}`}><Link className="btn btn-outline-primary" to={`/projects/${row.id}/coordination`}>Coordination</Link><Link className="btn btn-outline-primary" to={`/projects/${row.id}/resources`}>Resources</Link><Link className="btn btn-outline-primary" to={`/projects/${row.id}/knowledge`}>Knowledge</Link></div></td>
                 </tr>
               ))}
             </tbody>

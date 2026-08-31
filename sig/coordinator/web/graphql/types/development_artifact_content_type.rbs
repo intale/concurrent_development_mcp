@@ -1,0 +1,6 @@
+module Coordinator::Web::Graphql::Types
+  class DevelopmentArtifactContentType < BaseObject
+    def base64: () -> String?
+    def text: () -> String?
+  end
+end

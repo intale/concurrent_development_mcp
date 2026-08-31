@@ -1,0 +1,25 @@
+module Coordinator
+  module Read
+    module Web
+      module Queries
+        class KnowledgeBrowser
+          def initialize: (
+            ?catalog_contract: Contracts::KnowledgeBrowser::Catalog,
+            ?skill_contract: Contracts::KnowledgeBrowser::Skill,
+            ?skill_asset_contract: Contracts::KnowledgeBrowser::SkillAsset,
+            ?artifact_contract: Contracts::KnowledgeBrowser::Artifact,
+            ?repository: Repositories::KnowledgeBrowser
+          ) -> void
+          def catalog: (command_input input) -> KnowledgeBrowserV1::Catalog?
+          def skill: (command_input input) -> KnowledgeBrowserV1::SkillDetail?
+          def skill_asset: (command_input input) -> KnowledgeBrowserV1::SkillAssetDetail?
+          def artifact: (command_input input) -> KnowledgeBrowserV1::ArtifactDetail?
+
+          private
+
+          def validate: (Dry::Validation::Contract contract, command_input input) -> untyped
+        end
+      end
+    end
+  end
+end

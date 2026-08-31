@@ -19,6 +19,30 @@ module Coordinator::Web::Graphql::Types
       ?resource_lifecycle_status: String?,
       ?resources_after: String?
     ) -> Hash[Symbol, untyped]?
+    def project_knowledge: (
+      repository_id: String,
+      first: Integer,
+      ?artifact_kind: String?,
+      ?artifact_labels: Array[String]?,
+      ?artifact_source_kind: String?,
+      ?artifacts_after: String?,
+      ?skill_name: String?,
+      ?skills_after: String?
+    ) -> Hash[Symbol, untyped]?
+    def project_skill: (repository_id: String, name: String) -> Coordinator::Read::Web::KnowledgeBrowserV1::SkillDetail?
+    def project_skill_asset: (
+      repository_id: String,
+      name: String,
+      path: String
+    ) -> Coordinator::Read::Web::KnowledgeBrowserV1::SkillAssetDetail?
+    def project_artifact: (
+      repository_id: String,
+      artifact_id: String,
+      first: Integer,
+      direction: String,
+      ?relation: String?,
+      ?relations_after: String?
+    ) -> Hash[Symbol, untyped]?
 
     private
 
@@ -34,6 +58,23 @@ module Coordinator::Web::Graphql::Types
       repository_id: String,
       as_of: String
     ) -> Hash[Symbol, untyped]
+    def skill_connection: (untyped page, repository_id: String, skill_name: String?) -> Hash[Symbol, untyped]
+    def artifact_connection: (
+      untyped page,
+      repository_id: String,
+      artifact_kind: String?,
+      labels: Array[String],
+      source_kind: String?
+    ) -> Hash[Symbol, untyped]
+    def artifact_relation_connection: (
+      untyped page,
+      repository_id: String,
+      artifact_id: String,
+      direction: String,
+      relation: String?
+    ) -> Hash[Symbol, untyped]
+    def knowledge_browser: () -> Coordinator::Read::Web::Queries::KnowledgeBrowser
+    def raise_knowledge_query_error: (Coordinator::Read::Web::KnowledgeBrowserQueryError error) -> bot
     def raise_query_error: (Coordinator::Read::QueryResultV1 result) -> bot
   end
 end

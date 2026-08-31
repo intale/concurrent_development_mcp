@@ -1,0 +1,5 @@
+module Coordinator::Web::Graphql::Types
+  class SkillType < BaseObject
+    def published_at: () -> String
+  end
+end
