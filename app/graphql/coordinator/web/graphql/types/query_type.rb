@@ -24,6 +24,16 @@ module Coordinator::Web::Graphql::Types
       argument :work_items_after, String, required: false
     end
 
+    field :project_resources, ProjectResourcesType, null: true do
+      description "Latest available resource inventory and factual active leases for one project."
+      argument :active_leases_after, String, required: false
+      argument :first, Integer, required: false, default_value: 20
+      argument :repository_id, ID, required: true
+      argument :resource_kind, ResourceKindEnum, required: false
+      argument :resource_lifecycle_status, ResourceLifecycleStatusEnum, required: false
+      argument :resources_after, String, required: false
+    end
+
     def projects(scope:, first:, after: nil)
       query = Coordinator::Read::Queries::RepositoryList.new.call(
         scope:,
@@ -91,6 +101,54 @@ module Coordinator::Web::Graphql::Types
       )
     end
 
+    def project_resources(
+      repository_id:,
+      first:,
+      active_leases_after: nil,
+      resource_kind: nil,
+      resource_lifecycle_status: nil,
+      resources_after: nil
+    )
+      resource_after_id = Coordinator::Web::Graphql::ResourceBrowserCursor.decode_resources(
+        resources_after,
+        repository_id:,
+        resource_kind:,
+        lifecycle_status: resource_lifecycle_status
+      )
+      lease_cursor = Coordinator::Web::Graphql::ResourceBrowserCursor.decode_active_leases(
+        active_leases_after,
+        repository_id:
+      )
+      browser = Coordinator::Read::Web::Queries::ProjectResources.new.call(
+        repository_id:,
+        first:,
+        resource_after_id:,
+        lease_after_id: lease_cursor&.fetch(:after_id, nil),
+        lease_as_of: lease_cursor&.fetch(:as_of, nil),
+        resource_kind:,
+        resource_lifecycle_status:
+      )
+      return unless browser
+
+      {
+        project: browser.project,
+        resources: resource_connection(
+          browser.resources,
+          repository_id:,
+          resource_kind:,
+          lifecycle_status: resource_lifecycle_status
+        ),
+        active_leases: active_lease_connection(browser.active_leases, repository_id:, as_of: browser.lease_as_of)
+      }
+    rescue Coordinator::Web::Graphql::InvalidCursor => error
+      raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::ProjectResourcesQueryError => error
+      raise GraphQL::ExecutionError.new(
+        error.message,
+        extensions: { code: "INVALID_INPUT", details: error.details }
+      )
+    end
+
     private
 
     def connection(page, kind)
@@ -98,6 +156,36 @@ module Coordinator::Web::Graphql::Types
         nodes: page.items,
         page_info: {
           end_cursor: page.next_offset && Coordinator::Web::Graphql::DashboardCursor.encode(kind, page.next_offset),
+          has_next_page: page.has_more
+        }
+      }
+    end
+
+    def resource_connection(page, repository_id:, resource_kind:, lifecycle_status:)
+      {
+        nodes: page.items,
+        page_info: {
+          end_cursor: page.next_resource_id && Coordinator::Web::Graphql::ResourceBrowserCursor.encode_resources(
+            repository_id:,
+            after_id: page.next_resource_id,
+            resource_kind:,
+            lifecycle_status:
+          ),
+          has_next_page: page.has_more
+        }
+      }
+    end
+
+    def active_lease_connection(page, repository_id:, as_of:)
+      {
+        as_of:,
+        nodes: page.items,
+        page_info: {
+          end_cursor: page.next_lease_id && Coordinator::Web::Graphql::ResourceBrowserCursor.encode_active_leases(
+            repository_id:,
+            after_id: page.next_lease_id,
+            as_of:
+          ),
           has_next_page: page.has_more
         }
       }

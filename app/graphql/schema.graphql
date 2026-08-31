@@ -1,3 +1,34 @@
+type ActiveResourceLease {
+  agentId: String!
+  attemptId: ID!
+  baseBlobOid: String
+  changeSetId: ID!
+  expiresAt: String!
+  fencingToken: String!
+  id: ID!
+  lastExpandedAt: String
+  lastExpandedEventId: ID
+  lastProjectedAt: String!
+  lastRenewedAt: String
+  lastRenewedEventId: ID
+  leaseSetId: ID!
+  policyVersion: String!
+  previousExpiresAt: String
+  reservedAt: String!
+  reservedEventId: ID!
+  resourceId: ID!
+  resourceKind: ResourceKind!
+  resourceLifecycleStatus: ResourceLifecycleStatus
+  resourcePath: String!
+  workItemId: ID!
+}
+
+type ActiveResourceLeaseConnection {
+  asOf: String!
+  nodes: [ActiveResourceLease!]!
+  pageInfo: PageInfo!
+}
+
 type CoordinationChangeSet {
   acceptanceCriteria: [String!]!
   domainStatus: String!
@@ -108,6 +139,28 @@ type ProjectCoordination {
   workItems: CoordinationWorkItemConnection!
 }
 
+type ProjectResource {
+  id: ID!
+  kind: ResourceKind!
+  lastTransitionAt: String
+  lifecycleStatus: ResourceLifecycleStatus!
+  path: String!
+  registeredAt: String
+  repositoryId: ID!
+  unbindingReason: String
+}
+
+type ProjectResourceConnection {
+  nodes: [ProjectResource!]!
+  pageInfo: PageInfo!
+}
+
+type ProjectResources {
+  activeLeases: ActiveResourceLeaseConnection!
+  project: CoordinationProject!
+  resources: ProjectResourceConnection!
+}
+
 """
 Read-only access to the latest available coordination projections.
 """
@@ -118,9 +171,25 @@ type Query {
   projectCoordination(blocking: Boolean, changeSetsAfter: String, dependenciesAfter: String, first: Int = 20, presentationStatuses: [CoordinationPresentationStatus!], repositoryId: ID!, workItemSort: WorkItemSort = WORK_ITEM_ID_ASC, workItemsAfter: String): ProjectCoordination
 
   """
+  Latest available resource inventory and factual active leases for one project.
+  """
+  projectResources(activeLeasesAfter: String, first: Int = 20, repositoryId: ID!, resourceKind: ResourceKind, resourceLifecycleStatus: ResourceLifecycleStatus, resourcesAfter: String): ProjectResources
+
+  """
   List projects in one exact caller-chosen scope in stable Repository-ID order.
   """
   projects(after: String, first: Int = 20, scope: String!): ProjectConnection!
+}
+
+enum ResourceKind {
+  DIRECTORY
+  FILE
+}
+
+enum ResourceLifecycleStatus {
+  CURRENT
+  INACTIVE
+  REGISTERED
 }
 
 enum WorkItemSort {

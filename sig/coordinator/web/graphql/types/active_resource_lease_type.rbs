@@ -1,0 +1,5 @@
+module Coordinator::Web::Graphql::Types
+  class ActiveResourceLeaseType < BaseObject
+    def fencing_token: () -> String
+  end
+end

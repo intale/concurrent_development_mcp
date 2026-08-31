@@ -1,0 +1,29 @@
+module Coordinator::Web::Graphql
+  class ResourceBrowserCursor
+    PREFIX: String
+
+    def self.encode_resources: (
+      repository_id: String,
+      after_id: String,
+      resource_kind: String?,
+      lifecycle_status: String?
+    ) -> String
+    def self.decode_resources: (
+      String? cursor,
+      repository_id: String,
+      resource_kind: String?,
+      lifecycle_status: String?
+    ) -> String?
+    def self.encode_active_leases: (
+      repository_id: String,
+      after_id: String,
+      as_of: String
+    ) -> String
+    def self.decode_active_leases: (String? cursor, repository_id: String) -> Hash[Symbol, String]?
+
+    private
+
+    def self.encode: (Hash[String, String?] payload) -> String
+    def self.decode: (String cursor, String kind) -> Hash[String, untyped]
+  end
+end

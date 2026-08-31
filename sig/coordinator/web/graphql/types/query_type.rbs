@@ -11,10 +11,29 @@ module Coordinator::Web::Graphql::Types
       ?presentation_statuses: Array[String]?,
       ?work_items_after: String?
     ) -> Hash[Symbol, untyped]?
+    def project_resources: (
+      repository_id: String,
+      first: Integer,
+      ?active_leases_after: String?,
+      ?resource_kind: String?,
+      ?resource_lifecycle_status: String?,
+      ?resources_after: String?
+    ) -> Hash[Symbol, untyped]?
 
     private
 
     def connection: (untyped page, String kind) -> Hash[Symbol, untyped]
+    def resource_connection: (
+      untyped page,
+      repository_id: String,
+      resource_kind: String?,
+      lifecycle_status: String?
+    ) -> Hash[Symbol, untyped]
+    def active_lease_connection: (
+      untyped page,
+      repository_id: String,
+      as_of: String
+    ) -> Hash[Symbol, untyped]
     def raise_query_error: (Coordinator::Read::QueryResultV1 result) -> bot
   end
 end

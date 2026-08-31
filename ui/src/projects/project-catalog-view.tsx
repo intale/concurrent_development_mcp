@@ -99,16 +99,18 @@ export function ProjectCatalogView(props: ProjectCatalogViewProps) {
                 <th scope="col">Paths</th>
                 <th scope="col">Remotes</th>
                 <th scope="col">Registered</th>
+                <th scope="col">Inspect</th>
               </tr>
             </thead>
             <tbody>
               {props.rows.map((row) => (
                 <tr key={row.id}>
-                  <td className="fw-semibold"><Link to={`/projects/${row.id}/coordination`}>{row.name}</Link></td>
+                  <td className="fw-semibold">{row.name}</td>
                   <td><code>{row.scope}</code></td>
                   <td>{row.paths || "—"}</td>
                   <td>{row.remotes || "—"}</td>
                   <td className="text-nowrap">{row.registeredAt}</td>
+                  <td><div className="btn-group btn-group-sm" role="group" aria-label={`Inspect ${row.name}`}><Link className="btn btn-outline-primary" to={`/projects/${row.id}/coordination`}>Coordination</Link><Link className="btn btn-outline-primary" to={`/projects/${row.id}/resources`}>Resources</Link></div></td>
                 </tr>
               ))}
             </tbody>

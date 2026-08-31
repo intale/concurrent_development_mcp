@@ -1,0 +1,67 @@
+module Coordinator
+  module Read
+    module Web
+      class ProjectResourcesV1 < Shared::Value
+        class Project < Shared::Value
+          def repository_id: () -> String
+          def scope: () -> String
+          def display_name: () -> String?
+        end
+
+        class Resource < Shared::Value
+          def resource_id: () -> String
+          def repository_id: () -> String
+          def kind: () -> String
+          def path: () -> String
+          def lifecycle_status: () -> String
+          def unbinding_reason: () -> String?
+          def registered_at: () -> String?
+          def last_transition_at: () -> String?
+        end
+
+        class ActiveLease < Shared::Value
+          def lease_id: () -> String
+          def lease_set_id: () -> String
+          def resource_id: () -> String
+          def repository_id: () -> String
+          def resource_kind: () -> String
+          def resource_path: () -> String
+          def resource_lifecycle_status: () -> String?
+          def base_blob_oid: () -> String?
+          def fencing_token: () -> Integer
+          def policy_version: () -> String
+          def change_set_id: () -> String
+          def work_item_id: () -> String
+          def attempt_id: () -> String
+          def agent_id: () -> String
+          def reserved_event_id: () -> String
+          def last_expanded_event_id: () -> String?
+          def last_renewed_event_id: () -> String?
+          def reserved_at: () -> String
+          def last_expanded_at: () -> String?
+          def last_renewed_at: () -> String?
+          def previous_expires_at: () -> String?
+          def expires_at: () -> String
+          def last_projected_at: () -> String
+        end
+
+        class ResourcePage < Shared::Value
+          def items: () -> Array[Resource]
+          def next_resource_id: () -> String?
+          def has_more: () -> bool
+        end
+
+        class ActiveLeasePage < Shared::Value
+          def items: () -> Array[ActiveLease]
+          def next_lease_id: () -> String?
+          def has_more: () -> bool
+        end
+
+        def project: () -> Project
+        def resources: () -> ResourcePage
+        def active_leases: () -> ActiveLeasePage
+        def lease_as_of: () -> String
+      end
+    end
+  end
+end

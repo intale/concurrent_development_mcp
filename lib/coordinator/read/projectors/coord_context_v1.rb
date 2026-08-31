@@ -3,7 +3,7 @@
 module Coordinator::Read
   module Projectors
     class CoordContextV1
-      PROJECTION = ProjectionDefinition.new(name: "coord_context", version: 2)
+      PROJECTION = ProjectionDefinition.new(name: "coord_context", version: 3)
 
       def initialize(
         contract: Contracts::CoordContextSourceEvent.new,

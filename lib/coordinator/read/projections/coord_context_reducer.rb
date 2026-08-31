@@ -541,9 +541,21 @@ module Coordinator::Read
       end
 
       def bounded_attempts(attempts)
-        attempts.sort_by { [ _1.authorized_at, _1.attempt_id.b ] }
-                .last(CoordContextStateV1::RECENT_ATTEMPT_LIMIT)
-                .reverse
+        terminal, nonterminal = attempts.partition { terminal_attempt?(_1) }
+        terminal_capacity = CoordContextStateV1::RECENT_ATTEMPT_LIMIT - nonterminal.length
+        if terminal_capacity.negative?
+          raise ProjectionStateError, "nonterminal Attempt count exceeds the embedded projection bound"
+        end
+
+        retained_terminal = terminal.sort_by { [ _1.authorized_at, _1.attempt_id.b ] }
+                                    .last(terminal_capacity)
+        (nonterminal + retained_terminal)
+          .sort_by { [ _1.authorized_at, _1.attempt_id.b ] }
+          .reverse
+      end
+
+      def terminal_attempt?(attempt)
+        %w[abandoned completed].include?(attempt.status)
       end
     end
   end

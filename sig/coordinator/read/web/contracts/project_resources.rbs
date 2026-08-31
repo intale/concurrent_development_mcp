@@ -1,0 +1,10 @@
+module Coordinator
+  module Read
+    module Web
+      module Contracts
+        class ProjectResources < Dry::Validation::Contract
+        end
+      end
+    end
+  end
+end

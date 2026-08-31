@@ -16,6 +16,20 @@ module Coordinator
       def abandonment_reason: () -> String?
       def terminal_event: () -> Hash[String, untyped]?
       def terminal_at_domain: () -> Time?
+      def write_set_lease_set_id: () -> String?
+      def write_set_repository_id: () -> String?
+      def write_set_policy_version: () -> String?
+      def write_set_resources: () -> Array[Hash[String, untyped]]
+      def write_set_reserved_event: () -> Hash[String, untyped]?
+      def write_set_reserved_at_domain: () -> Time?
+      def write_set_last_expanded_event: () -> Hash[String, untyped]?
+      def write_set_last_expanded_at_domain: () -> Time?
+      def write_set_last_renewed_event: () -> Hash[String, untyped]?
+      def write_set_last_renewed_at_domain: () -> Time?
+      def write_set_previous_expires_at_domain: () -> Time?
+      def write_set_expires_at_domain: () -> Time?
+      def write_set_release_event: () -> Hash[String, untyped]?
+      def write_set_released_at_domain: () -> Time?
     end
   end
 end

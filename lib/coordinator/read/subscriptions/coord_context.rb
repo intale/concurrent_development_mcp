@@ -5,7 +5,7 @@ module Coordinator::Read
     class CoordContext < Coordinator::Shared::Subscriptions::Registration
       DEFINITION = ReadModelDefinition.new(
         set_name: ReadModelSet::SET_NAME,
-        subscription_name: "coord-context-v2",
+        subscription_name: "coord-context-v3",
         streams: [
           Coordinator::Shared::Subscriptions::StreamFilter.new(context: "DevelopmentPlanning", stream_name: "ChangeSet"),
           Coordinator::Shared::Subscriptions::StreamFilter.new(context: "DevelopmentExecution", stream_name: "WorkItem"),

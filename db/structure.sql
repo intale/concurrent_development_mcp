@@ -121,7 +121,21 @@ CREATE TABLE public.attempt_histories (
     terminal_at_domain timestamp(6) without time zone,
     terminal_event jsonb,
     updated_at timestamp(6) without time zone NOT NULL,
-    work_item_id character varying NOT NULL
+    work_item_id character varying NOT NULL,
+    write_set_lease_set_id character varying,
+    write_set_repository_id character varying,
+    write_set_policy_version character varying,
+    write_set_resources jsonb DEFAULT '[]'::jsonb NOT NULL,
+    write_set_reserved_event jsonb,
+    write_set_reserved_at_domain timestamp(6) without time zone,
+    write_set_last_expanded_event jsonb,
+    write_set_last_expanded_at_domain timestamp(6) without time zone,
+    write_set_last_renewed_event jsonb,
+    write_set_last_renewed_at_domain timestamp(6) without time zone,
+    write_set_previous_expires_at_domain timestamp(6) without time zone,
+    write_set_expires_at_domain timestamp(6) without time zone,
+    write_set_release_event jsonb,
+    write_set_released_at_domain timestamp(6) without time zone
 );
 
 
@@ -1008,6 +1022,47 @@ CREATE TABLE public.resources (
 
 
 --
+-- Name: resource_lease_browser_rows; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.resource_lease_browser_rows AS
+ SELECT (membership.value ->> 'lease_id'::text) AS lease_id,
+    (membership.value ->> 'resource_id'::text) AS resource_id,
+    attempt.write_set_lease_set_id AS lease_set_id,
+    attempt.write_set_repository_id AS repository_id,
+    repository.scope AS project_scope,
+    repository.display_name AS project_name,
+    COALESCE(resource.kind, ((membership.value ->> 'resource_kind'::text))::character varying) AS resource_kind,
+    COALESCE(resource.normalized_path, (membership.value ->> 'resource_path'::text)) AS resource_path,
+    resource.lifecycle_status AS resource_lifecycle_status,
+    (membership.value ->> 'base_blob_oid'::text) AS base_blob_oid,
+    ((membership.value ->> 'fencing_token'::text))::bigint AS fencing_token,
+    attempt.write_set_policy_version AS policy_version,
+    attempt.change_set_id,
+    attempt.work_item_id,
+    attempt.attempt_id,
+    attempt.agent_id,
+    attempt.write_set_reserved_event AS reserved_event,
+    attempt.write_set_reserved_at_domain AS reserved_at_domain,
+    attempt.write_set_last_expanded_event AS last_expanded_event,
+    attempt.write_set_last_expanded_at_domain AS last_expanded_at_domain,
+    attempt.write_set_last_renewed_event AS last_renewed_event,
+    attempt.write_set_last_renewed_at_domain AS last_renewed_at_domain,
+    attempt.write_set_previous_expires_at_domain AS previous_expires_at_domain,
+    attempt.write_set_expires_at_domain AS expires_at_domain,
+    attempt.write_set_release_event AS release_event,
+    attempt.write_set_released_at_domain AS released_at_domain,
+    attempt.terminal_event AS attempt_terminal_event,
+    attempt.terminal_at_domain AS attempt_terminal_at_domain,
+    attempt.updated_at AS last_projected_at
+   FROM (((public.attempt_histories attempt
+     JOIN public.repositories repository ON (((repository.repository_id)::text = (attempt.write_set_repository_id)::text)))
+     CROSS JOIN LATERAL jsonb_array_elements(attempt.write_set_resources) membership(value))
+     LEFT JOIN public.resources resource ON ((((resource.resource_id)::text = (membership.value ->> 'resource_id'::text)) AND ((resource.repository_id)::text = (attempt.write_set_repository_id)::text))))
+  WHERE (attempt.write_set_lease_set_id IS NOT NULL);
+
+
+--
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1542,10 +1597,24 @@ CREATE INDEX idx_artifact_observations_exact_locator ON public.development_artif
 
 
 --
+-- Name: idx_attempt_histories_current_write_sets; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_attempt_histories_current_write_sets ON public.attempt_histories USING btree (write_set_repository_id, write_set_expires_at_domain, attempt_id) WHERE ((write_set_lease_set_id IS NOT NULL) AND (write_set_released_at_domain IS NULL) AND (terminal_at_domain IS NULL));
+
+
+--
 -- Name: idx_attempt_histories_work_item_cursor; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX idx_attempt_histories_work_item_cursor ON public.attempt_histories USING btree (work_item_id, authorized_global_position, attempt_id);
+
+
+--
+-- Name: idx_attempt_histories_write_set_identity; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_attempt_histories_write_set_identity ON public.attempt_histories USING btree (write_set_lease_set_id, attempt_id) WHERE (write_set_lease_set_id IS NOT NULL);
 
 
 --
@@ -2294,6 +2363,7 @@ ALTER TABLE ONLY public.operation_batch_outcomes
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260831155000'),
 ('20260831135500'),
 ('20260829132000'),
 ('20260828104228'),

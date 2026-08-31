@@ -91,18 +91,30 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model do
     assert_abandoned_context
   end
 
-  it "keeps only the newest one hundred Attempts in embedded context" do
+  it "retains every nonterminal Attempt and fills the remaining bound with recent terminal Attempts" do
     reducer = Coordinator::Read::Projections::CoordContextReducer.new
     state = reducer.apply(
       Coordinator::Read::Projections::CoordContextStateV1.initial,
       Coordinator::Write::Events::WorkItemCreatedV1.new(
-        work_item_id: "W-WINDOW",
+        work_item_id: "W-WINDOW-ACTIVE",
         change_set_id: "CS-WINDOW",
         repository_id:,
-        goal: "Keep recent Attempts bounded",
-        acceptance_criteria: [ "Older Attempts remain separately pageable" ],
+        goal: "Keep an old active Attempt addressable",
+        acceptance_criteria: [ "Lease lifecycle events continue to reduce" ],
         competitive_mode: false,
         created_at: "2026-08-30T10:00:00.000000Z"
+      )
+    )
+    state = reducer.apply(
+      state,
+      Coordinator::Write::Events::WorkItemCreatedV1.new(
+        work_item_id: "W-WINDOW-HISTORY",
+        change_set_id: "CS-WINDOW",
+        repository_id:,
+        goal: "Accumulate terminal Attempt history",
+        acceptance_criteria: [ "Recent terminal Attempts remain embedded" ],
+        competitive_mode: false,
+        created_at: "2026-08-30T10:00:01.000000Z"
       )
     )
     snapshot = Coordinator::Write::RepositorySnapshotV1.new(
@@ -110,25 +122,52 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model do
       object_format: "sha1",
       commit_oid: "a" * 40
     )
+    state = reducer.apply(
+      state,
+      Coordinator::Write::Events::AttemptAuthorizedV1.new(
+        attempt_id: "A-WINDOW-ACTIVE",
+        change_set_id: "CS-WINDOW",
+        work_item_id: "W-WINDOW-ACTIVE",
+        agent_id: "agent-active",
+        base_snapshots: [ snapshot ],
+        authorized_at: "2026-08-30T10:01:00.000000Z"
+      )
+    )
 
-    101.times do |offset|
+    100.times do |offset|
+      attempt_id = format("A-WINDOW-TERMINAL-%03d", offset)
+      authorized_at = (Time.utc(2026, 8, 30, 10, 2) + offset).iso8601(6)
       state = reducer.apply(
         state,
         Coordinator::Write::Events::AttemptAuthorizedV1.new(
-          attempt_id: format("A-WINDOW-%03d", offset),
+          attempt_id:,
           change_set_id: "CS-WINDOW",
-          work_item_id: "W-WINDOW",
+          work_item_id: "W-WINDOW-HISTORY",
           agent_id: "agent-window",
           base_snapshots: [ snapshot ],
-          authorized_at: (Time.utc(2026, 8, 30, 10, 1) + offset).iso8601(6)
+          authorized_at:
+        )
+      )
+      state = reducer.apply(
+        state,
+        Coordinator::Write::Events::AttemptAbandonedV2.new(
+          change_set_id: "CS-WINDOW",
+          work_item_id: "W-WINDOW-HISTORY",
+          attempt_id:,
+          agent_id: "agent-window",
+          reason: "Exercise the bounded terminal window",
+          lease_set_id: nil,
+          released_leases: [],
+          untouched_resource_ids: [],
+          abandoned_at: (Time.iso8601(authorized_at) + 0.5).iso8601(6)
         )
       )
     end
 
     expect(state.attempts.length).to eq(100)
-    expect(state.attempts.first.attempt_id).to eq("A-WINDOW-100")
-    expect(state.attempts.last.attempt_id).to eq("A-WINDOW-001")
-    expect(state.attempts.map(&:attempt_id)).not_to include("A-WINDOW-000")
+    expect(state.attempts.map(&:attempt_id)).to include("A-WINDOW-ACTIVE")
+    expect(state.attempts.map(&:attempt_id)).not_to include("A-WINDOW-TERMINAL-000")
+    expect(state.attempts.count { %w[abandoned completed].include?(_1.status) }).to eq(99)
   end
 
   it "projects activation, ownership, exact Attempt bases, and observed write-set evidence" do
@@ -218,7 +257,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model do
       revision: 5,
       position: 800
     )
-    [ *events, reserved, expanded, renewed, released ].each { projector.call(_1) }
+    [ *events, reserved, expanded, expanded, renewed, renewed, released, released ].each { projector.call(_1) }
 
     snapshot = repository.resolve(scope_kind: "attempt", scope_id: "A-WRITE")
     expect(snapshot.state.change_set.status).to eq("active")
@@ -249,6 +288,26 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model do
       released_at: "2026-08-30T12:05:00.000000Z"
     )
     expect(write_set.to_h.keys & %i[active fresh pending]).to be_empty
+
+    history = Coordinator::Read::AttemptHistory.find("A-WRITE")
+    expect(history).to have_attributes(
+      write_set_lease_set_id: lease_set_id,
+      write_set_repository_id: repository_id,
+      write_set_policy_version: "coordinator-resource-lease/v2",
+      write_set_reserved_at_domain: Time.iso8601("2026-08-30T12:02:00.000000Z"),
+      write_set_last_expanded_at_domain: Time.iso8601("2026-08-30T12:03:00.000000Z"),
+      write_set_last_renewed_at_domain: Time.iso8601("2026-08-30T12:04:00.000000Z"),
+      write_set_previous_expires_at_domain: Time.iso8601("2026-08-30T12:10:00.000000Z"),
+      write_set_expires_at_domain: Time.iso8601("2026-08-30T12:20:00.000000Z"),
+      write_set_released_at_domain: Time.iso8601("2026-08-30T12:05:00.000000Z")
+    )
+    expect(history.write_set_resources.map { _1.fetch("resource_path") }).to contain_exactly(
+      "app/models/invoice.rb", "app/services/tax.rb", "db/schema.rb"
+    )
+    expect(history.write_set_reserved_event.fetch("event_id")).to eq(reserved.id)
+    expect(history.write_set_last_expanded_event.fetch("event_id")).to eq(expanded.id)
+    expect(history.write_set_last_renewed_event.fetch("event_id")).to eq(renewed.id)
+    expect(history.write_set_release_event.fetch("event_id")).to eq(released.id)
   end
 
   it "keeps the latest observed Candidate checkpoint per Attempt while history remains separate" do

@@ -25,6 +25,14 @@ module Coordinator::Read
           store_attempt_authorized(event:, payload:)
         when Coordinator::Write::Events::AttemptStartedV1
           update_attempt_started(payload)
+        when Coordinator::Write::Events::WriteSetReservedV2
+          store_write_set_reserved(event:, payload:)
+        when Coordinator::Write::Events::WriteSetExpandedV2
+          update_write_set_expanded(event:, payload:)
+        when Coordinator::Write::Events::WriteSetRenewedV2
+          update_write_set_renewed(event:, payload:)
+        when Coordinator::Write::Events::WriteSetReleasedV2
+          update_write_set_released(event:, payload:)
         when Coordinator::Write::Events::AttemptAbandonedV2
           update_attempt_abandoned(event:, payload:)
         when Coordinator::Write::Events::AttemptCompletedV1
@@ -80,6 +88,80 @@ module Coordinator::Read
         record.update!(
           status: terminal_status?(record.status) ? record.status : "started",
           started_at_domain: payload.started_at
+        )
+      end
+
+      def store_write_set_reserved(event:, payload:)
+        record = attempt_history!(payload)
+        if record.write_set_lease_set_id
+          verify_write_set_identity!(record, payload)
+          raise ProjectionStateError, "Attempt #{payload.attempt_id} has two write-set reservations"
+        end
+
+        record.update!(
+          write_set_lease_set_id: payload.lease_set_id,
+          write_set_repository_id: payload.repository_id,
+          write_set_policy_version: payload.policy_version,
+          write_set_resources: sorted_resources(payload.resources),
+          write_set_reserved_event: event_reference(event).to_h,
+          write_set_reserved_at_domain: payload.reserved_at,
+          write_set_expires_at_domain: payload.expires_at
+        )
+      end
+
+      def update_write_set_expanded(event:, payload:)
+        record = attempt_history!(payload)
+        verify_write_set_identity!(record, payload)
+        unless timestamp(record.write_set_expires_at_domain) == payload.expires_at
+          raise ProjectionStateError, "Attempt #{payload.attempt_id} expansion changed its lease deadline"
+        end
+
+        resources = merge_resources(record.write_set_resources, payload.added_resources)
+        if resources.length != payload.resource_count
+          raise ProjectionStateError, "Attempt #{payload.attempt_id} expanded write-set count changed"
+        end
+
+        record.update!(
+          write_set_resources: resources,
+          write_set_last_expanded_event: event_reference(event).to_h,
+          write_set_last_expanded_at_domain: payload.expanded_at
+        )
+      end
+
+      def update_write_set_renewed(event:, payload:)
+        record = attempt_history!(payload)
+        verify_write_set_identity!(record, payload)
+        unless sorted_resources(record.write_set_resources) == sorted_resources(payload.resources) &&
+               record.write_set_resources.length == payload.resource_count
+          raise ProjectionStateError, "Attempt #{payload.attempt_id} renewal changed write-set membership"
+        end
+        unless timestamp(record.write_set_expires_at_domain) == payload.previous_expires_at
+          raise ProjectionStateError, "Attempt #{payload.attempt_id} renewal deadline is not contiguous"
+        end
+
+        record.update!(
+          write_set_last_renewed_event: event_reference(event).to_h,
+          write_set_last_renewed_at_domain: payload.renewed_at,
+          write_set_previous_expires_at_domain: payload.previous_expires_at,
+          write_set_expires_at_domain: payload.expires_at
+        )
+      end
+
+      def update_write_set_released(event:, payload:)
+        record = attempt_history!(payload)
+        verify_write_set_identity!(record, payload)
+        unless sorted_resources(record.write_set_resources) == sorted_resources(payload.resources) &&
+               record.write_set_resources.length == payload.resource_count
+          raise ProjectionStateError, "Attempt #{payload.attempt_id} release changed write-set membership"
+        end
+        unless timestamp(record.write_set_expires_at_domain) == payload.previous_expires_at &&
+               record.write_set_released_at_domain.nil?
+          raise ProjectionStateError, "Attempt #{payload.attempt_id} release is not contiguous"
+        end
+
+        record.update!(
+          write_set_release_event: event_reference(event).to_h,
+          write_set_released_at_domain: payload.released_at
         )
       end
 
@@ -144,6 +226,32 @@ module Coordinator::Read
 
       def terminal_status?(status)
         %w[abandoned completed].include?(status)
+      end
+
+      def verify_write_set_identity!(record, payload)
+        matches = record.write_set_lease_set_id == payload.lease_set_id &&
+                  record.write_set_repository_id == payload.repository_id &&
+                  record.write_set_policy_version == payload.policy_version
+        return if matches
+
+        raise ProjectionStateError, "Attempt #{payload.attempt_id} write-set identity changed"
+      end
+
+      def merge_resources(existing, additions)
+        additions.reduce(sorted_resources(existing)) do |resources, addition|
+          replacement = addition.to_h
+          index = resources.index { _1.fetch(:resource_id) == replacement.fetch(:resource_id) }
+          index ? resources.each_with_index.map { |value, offset| offset == index ? replacement : value } : resources + [ replacement ]
+        end.sort_by { _1.fetch(:resource_id).b }
+      end
+
+      def sorted_resources(resources)
+        resources.map { _1.respond_to?(:to_h) ? deep_symbolize(_1.to_h) : deep_symbolize(_1) }
+                 .sort_by { _1.fetch(:resource_id).b }
+      end
+
+      def timestamp(value)
+        value&.utc&.iso8601(6)
       end
 
       def build_attempt_history(record)

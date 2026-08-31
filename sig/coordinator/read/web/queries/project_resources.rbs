@@ -1,0 +1,16 @@
+module Coordinator
+  module Read
+    module Web
+      module Queries
+        class ProjectResources
+          def initialize: (
+            ?contract: Contracts::ProjectResources,
+            ?repository: Repositories::ProjectResources,
+            ?clock: Shared::_Clock
+          ) -> void
+          def call: (command_input input) -> ProjectResourcesV1?
+        end
+      end
+    end
+  end
+end

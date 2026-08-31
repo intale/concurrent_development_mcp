@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    module Web
+      module Repositories
+        class ProjectResources
+          def fetch: (ProjectResourcesQueryV1 query) -> ProjectResourcesV1?
+        end
+      end
+    end
+  end
+end

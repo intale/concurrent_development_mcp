@@ -1,0 +1,4 @@
+module Coordinator::Web::Graphql::Types
+  class ResourceLifecycleStatusEnum < BaseEnum
+  end
+end

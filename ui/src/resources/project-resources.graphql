@@ -1,0 +1,70 @@
+query ProjectResources(
+  $repositoryId: ID!
+  $first: Int
+  $resourcesAfter: String
+  $activeLeasesAfter: String
+  $resourceKind: ResourceKind
+  $resourceLifecycleStatus: ResourceLifecycleStatus
+) {
+  projectResources(
+    repositoryId: $repositoryId
+    first: $first
+    resourcesAfter: $resourcesAfter
+    activeLeasesAfter: $activeLeasesAfter
+    resourceKind: $resourceKind
+    resourceLifecycleStatus: $resourceLifecycleStatus
+  ) {
+    project {
+      id
+      name
+      scope
+    }
+    resources {
+      nodes {
+        id
+        repositoryId
+        kind
+        path
+        lifecycleStatus
+        unbindingReason
+        registeredAt
+        lastTransitionAt
+      }
+      pageInfo {
+        endCursor
+        hasNextPage
+      }
+    }
+    activeLeases {
+      asOf
+      nodes {
+        id
+        leaseSetId
+        resourceId
+        resourceKind
+        resourcePath
+        resourceLifecycleStatus
+        baseBlobOid
+        fencingToken
+        policyVersion
+        changeSetId
+        workItemId
+        attemptId
+        agentId
+        reservedEventId
+        lastExpandedEventId
+        lastRenewedEventId
+        reservedAt
+        lastExpandedAt
+        lastRenewedAt
+        previousExpiresAt
+        expiresAt
+        lastProjectedAt
+      }
+      pageInfo {
+        endCursor
+        hasNextPage
+      }
+    }
+  }
+}

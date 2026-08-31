@@ -1,0 +1,4 @@
+module Coordinator::Web::Graphql::Types
+  class ActiveResourceLeaseConnectionType < BaseObject
+  end
+end

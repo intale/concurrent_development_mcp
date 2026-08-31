@@ -1,0 +1,15 @@
+module Coordinator
+  module Read
+    module Web
+      class ProjectResourcesQueryV1 < Shared::Value
+        def repository_id: () -> String
+        def first: () -> Integer
+        def resource_after_id: () -> String?
+        def lease_after_id: () -> String?
+        def lease_as_of: () -> String
+        def resource_kind: () -> String?
+        def resource_lifecycle_status: () -> String?
+      end
+    end
+  end
+end
