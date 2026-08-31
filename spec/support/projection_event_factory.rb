@@ -14,7 +14,6 @@ module ProjectionEventFactory
     actor_id: "projector-spec-agent",
     recorded_by: "coordinator",
     markers: [],
-    metadata: {},
     event_id: SecureRandom.uuid_v7,
     created_at: Time.utc(2026, 8, 30, 12),
     correlation_id: SecureRandom.uuid_v7,
@@ -24,18 +23,18 @@ module ProjectionEventFactory
     event = Coordinator::Write::EventFactory.new.build!(
       event: payload,
       event_id:,
-      metadata: {
+      metadata: Coordinator::Write::EventMetadata.new(
         command_id:,
         actor_kind:,
         actor_id:,
         recorded_by:,
         policy_version:
-      }.merge(metadata),
+      ),
       markers:,
       caused_by:,
       correlation_id:
     )
-    event.stream = stream
+    event.stream = Coordinator::Write::PgStreamFactory.new.call(stream)
     event.stream_revision = stream_revision
     event.global_position = global_position
     event.created_at = created_at
