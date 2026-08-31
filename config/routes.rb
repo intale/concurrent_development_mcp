@@ -1,8 +1,9 @@
 Rails.application.routes.draw do
   mount Coordinator::Container["mcp.transport"] => "/mcp"
   post "graphql" => "graphql#execute"
-  root "coordinator_ui#show"
-  get "projects" => "coordinator_ui#show"
+  root "projects#index"
+  get "projects" => "projects#index"
+  get "projects/:repository_id/coordination" => "projects#index"
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 

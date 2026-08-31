@@ -1,0 +1,82 @@
+module Coordinator
+  module Read
+    module Web
+      class CoordinationDashboardV1 < Shared::Value
+        class Project < Shared::Value
+          def repository_id: () -> String
+          def scope: () -> String
+          def display_name: () -> String?
+        end
+
+        class ChangeSet < Shared::Value
+          def change_set_id: () -> String
+          def goal: () -> String
+          def acceptance_criteria: () -> Array[String]
+          def domain_status: () -> String
+          def work_item_count: () -> Integer
+          def running_work_item_count: () -> Integer
+          def open_work_item_count: () -> Integer
+          def last_processed_at: () -> String
+        end
+
+        class WorkItem < Shared::Value
+          def work_item_id: () -> String
+          def change_set_id: () -> String
+          def repository_id: () -> String
+          def goal: () -> String
+          def acceptance_criteria: () -> Array[String]
+          def competitive_mode: () -> bool
+          def domain_status: () -> String
+          def presentation_status: () -> String
+          def active_attempt_id: () -> String?
+          def active_agent_id: () -> String?
+          def attempt_status: () -> String?
+          def attempt_authorized_at: () -> String?
+          def attempt_started_at: () -> String?
+          def attempt_terminal_at: () -> String?
+          def created_at: () -> String
+          def made_ready_at: () -> String?
+          def acquired_at: () -> String?
+          def completed_at: () -> String?
+          def last_processed_at: () -> String
+        end
+
+        class Dependency < Shared::Value
+          def dependency_id: () -> String
+          def producer_work_item_id: () -> String
+          def consumer_work_item_id: () -> String
+          def producer_repository_id: () -> String?
+          def consumer_repository_id: () -> String?
+          def dependency_kind: () -> String
+          def blocking: () -> bool
+          def declared_at: () -> String
+          def satisfied_at: () -> String?
+          def last_processed_at: () -> String
+        end
+
+        class ChangeSetPage < Shared::Value
+          def items: () -> Array[ChangeSet]
+          def next_offset: () -> Integer?
+          def has_more: () -> bool
+        end
+
+        class WorkItemPage < Shared::Value
+          def items: () -> Array[WorkItem]
+          def next_offset: () -> Integer?
+          def has_more: () -> bool
+        end
+
+        class DependencyPage < Shared::Value
+          def items: () -> Array[Dependency]
+          def next_offset: () -> Integer?
+          def has_more: () -> bool
+        end
+
+        def project: () -> Project
+        def change_sets: () -> ChangeSetPage
+        def work_items: () -> WorkItemPage
+        def dependencies: () -> DependencyPage
+      end
+    end
+  end
+end

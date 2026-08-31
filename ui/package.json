@@ -6,7 +6,7 @@
   "scripts": {
     "build": "yarn codegen && yarn typecheck && vite build",
     "codegen": "graphql-codegen --config codegen.ts",
-    "dev": "vite",
+    "dev": "yarn codegen && vite build --watch --mode development",
     "test": "yarn test:compile && node --test .test-dist/test/**/*.test.js",
     "test:compile": "tsc --project tsconfig.test.json --pretty false",
     "typecheck": "tsc --project tsconfig.json --pretty false"

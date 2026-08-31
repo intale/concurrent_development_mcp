@@ -1,0 +1,88 @@
+query ProjectCoordination(
+  $repositoryId: ID!
+  $first: Int
+  $changeSetsAfter: String
+  $workItemsAfter: String
+  $dependenciesAfter: String
+  $presentationStatuses: [CoordinationPresentationStatus!]
+  $workItemSort: WorkItemSort
+  $blocking: Boolean
+) {
+  projectCoordination(
+    repositoryId: $repositoryId
+    first: $first
+    changeSetsAfter: $changeSetsAfter
+    workItemsAfter: $workItemsAfter
+    dependenciesAfter: $dependenciesAfter
+    presentationStatuses: $presentationStatuses
+    workItemSort: $workItemSort
+    blocking: $blocking
+  ) {
+    project {
+      id
+      name
+      scope
+    }
+    changeSets {
+      nodes {
+        id
+        goal
+        acceptanceCriteria
+        domainStatus
+        workItemCount
+        runningWorkItemCount
+        openWorkItemCount
+        lastProcessedAt
+      }
+      pageInfo {
+        endCursor
+        hasNextPage
+      }
+    }
+    workItems {
+      nodes {
+        id
+        changeSetId
+        repositoryId
+        goal
+        acceptanceCriteria
+        competitiveMode
+        domainStatus
+        presentationStatus
+        activeAttemptId
+        activeAgentId
+        attemptStatus
+        attemptAuthorizedAt
+        attemptStartedAt
+        attemptTerminalAt
+        createdAt
+        madeReadyAt
+        acquiredAt
+        completedAt
+        lastProcessedAt
+      }
+      pageInfo {
+        endCursor
+        hasNextPage
+      }
+    }
+    dependencies {
+      nodes {
+        id
+        producerWorkItemId
+        consumerWorkItemId
+        producerRepositoryId
+        consumerRepositoryId
+        dependencyKind
+        blocking
+        declaredAt
+        satisfiedAt
+        lastProcessedAt
+      }
+      pageInfo {
+        endCursor
+        hasNextPage
+      }
+    }
+  }
+}

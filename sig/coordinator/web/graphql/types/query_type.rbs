@@ -1,9 +1,20 @@
 module Coordinator::Web::Graphql::Types
   class QueryType < BaseObject
     def projects: (scope: String, first: Integer, ?after: String?) -> Hash[Symbol, untyped]
+    def project_coordination: (
+      repository_id: String,
+      first: Integer,
+      work_item_sort: String,
+      ?blocking: bool?,
+      ?change_sets_after: String?,
+      ?dependencies_after: String?,
+      ?presentation_statuses: Array[String]?,
+      ?work_items_after: String?
+    ) -> Hash[Symbol, untyped]?
 
     private
 
+    def connection: (untyped page, String kind) -> Hash[Symbol, untyped]
     def raise_query_error: (Coordinator::Read::QueryResultV1 result) -> bot
   end
 end

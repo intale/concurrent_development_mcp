@@ -24,7 +24,23 @@ RSpec.describe "Read-only web boundaries" do
 
     query_source = GRAPHQL_ROOT.join("types/query_type.rb").read
     expect(query_source).to include("Coordinator::Read::Queries::RepositoryList")
+    expect(query_source).to include("Coordinator::Read::Web::Queries::CoordinationDashboard")
     expect(violations).to be_empty, violations.join("\n")
+  end
+
+  it "keeps dashboard reads on projections and UI scenarios on FactoryBot fixtures" do
+    semantic_sources = Rails.root.glob("lib/coordinator/read/web/**/*.rb").map(&:read).join("\n")
+    cucumber_steps = Rails.root.join("features/step_definitions/coordination_dashboard_steps.rb").read
+    schema = Rails.root.join("db/structure.sql").read
+
+    expect(semantic_sources).not_to include("Coordinator::Write", "Coordinator::Mcp", "PgEventstore")
+    expect(cucumber_steps).to include("FactoryBot.create", "FactoryBot.build")
+    expect(cucumber_steps).not_to match(/submit_and_(?:execute|await)|call_tool|event_store|subscription/i)
+    expect(schema).to include(
+      "CREATE VIEW public.coordination_dashboard_work_items",
+      "CREATE VIEW public.coordination_dashboard_change_sets",
+      "CREATE VIEW public.coordination_dashboard_dependencies"
+    )
   end
 
   it "mirrors every namespaced GraphQL implementation in RBS" do
@@ -73,25 +89,32 @@ RSpec.describe "Read-only web boundaries" do
     )
   end
 
-  it "mounts fingerprinted static production assets through a Rails-owned HTML shell" do
+  it "uses the official react-rails mount without a custom integration controller" do
     vite = UI_ROOT.join("vite.config.ts").read
-    layout = Rails.root.join("app/views/layouts/coordinator_ui.html.erb").read
-    view = Rails.root.join("app/views/coordinator_ui/show.html.erb").read
-    controller = Rails.root.join("app/controllers/coordinator_ui_controller.rb").read
+    layout = Rails.root.join("app/views/layouts/application.html.erb").read
+    view = Rails.root.join("app/views/projects/index.html.erb").read
     entrypoint = UI_ROOT.join("src/main.tsx").read
     package = JSON.parse(UI_ROOT.join("package.json").read)
 
     expect(Rails.application.config.api_only).to be(true)
-    expect(CoordinatorUiController.superclass).to eq(ActionController::Base)
-    expect(vite).to include('base: "/ui/"', "manifest: true", 'outDir: "../public/ui"')
-    expect(layout).to include('<script type="module"', '<link rel="stylesheet"')
+    expect(ProjectsController.superclass).to eq(ActionController::Base)
+    expect(vite).to include(
+      'base: "/ui/"',
+      'outDir: "../public/ui"',
+      'entryFileNames: "coordinator-ui.js"',
+      '? "coordinator-ui.css"'
+    )
+    expect(layout).to include(
+      'stylesheet_link_tag "/ui/coordinator-ui.css"',
+      'javascript_include_tag "/ui/coordinator-ui.js", type: "module"'
+    )
     expect(view).to include('react_component("CoordinatorApp"', "prerender: false")
     expect(view).not_to include('id="root"')
     expect(entrypoint).to include('from "react_ujs"', "ReactRailsUJS.getConstructor")
     expect(entrypoint).not_to include("createRoot")
     expect(package.fetch("dependencies")).to include("react_ujs" => "3.3.1")
     expect(Bundler.locked_gems.specs.map(&:name)).to include("react-rails")
-    expect(controller).to include('public/ui/.vite/manifest.json')
+    expect(Rails.root.join("app/controllers/coordinator_ui_controller.rb")).not_to exist
     expect(Rails.root.join(".gitignore").read).to include("/public/ui/")
   end
 end

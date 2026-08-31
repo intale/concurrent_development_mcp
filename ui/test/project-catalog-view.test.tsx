@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
+import { MemoryRouter } from "react-router-dom";
 import { preservePageForExactScope } from "../src/projects/project-catalog-model.js";
 import { ProjectCatalogView } from "../src/projects/project-catalog-view.js";
 import type { ProjectCatalogViewProps } from "../src/projects/project-catalog-view.js";
@@ -29,7 +30,9 @@ const defaults: ProjectCatalogViewProps = {
 };
 
 function render(overrides: Partial<ProjectCatalogViewProps>) {
-  return renderToStaticMarkup(<ProjectCatalogView {...defaults} {...overrides} />);
+  return renderToStaticMarkup(
+    <MemoryRouter><ProjectCatalogView {...defaults} {...overrides} /></MemoryRouter>
+  );
 }
 
 test("renders scope, loading, empty, and retryable error states", () => {

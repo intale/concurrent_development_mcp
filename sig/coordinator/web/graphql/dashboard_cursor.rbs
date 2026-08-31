@@ -1,0 +1,9 @@
+module Coordinator::Web::Graphql
+  class DashboardCursor
+    PREFIX: String
+    KINDS: Array[String]
+
+    def self.encode: (String kind, Integer offset) -> String
+    def self.decode: (String? cursor, String kind) -> Integer
+  end
+end

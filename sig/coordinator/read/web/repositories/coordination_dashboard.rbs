@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    module Web
+      module Repositories
+        class CoordinationDashboard
+          def fetch: (CoordinationDashboardQueryV1 query) -> CoordinationDashboardV1?
+        end
+      end
+    end
+  end
+end

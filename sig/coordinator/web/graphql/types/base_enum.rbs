@@ -1,0 +1,4 @@
+module Coordinator::Web::Graphql::Types
+  class BaseEnum < GraphQL::Schema::Enum
+  end
+end

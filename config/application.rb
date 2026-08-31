@@ -26,6 +26,11 @@ module ConcurrentDevelopmentMcp
     # Registers lib with both the main autoloader and the eager loader.
     config.autoload_lib(ignore: %w[assets tasks])
 
+    # PostgreSQL views are part of the read-side schema and must survive fresh
+    # database preparation. Ruby schema dumps omit views; SQL dumps preserve
+    # them alongside tables, indexes, and constraints.
+    config.active_record.schema_format = :sql
+
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files

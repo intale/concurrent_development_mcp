@@ -1,0 +1,4 @@
+module Coordinator::Web::Graphql::Types
+  class CoordinationWorkItemConnectionType < BaseObject
+  end
+end

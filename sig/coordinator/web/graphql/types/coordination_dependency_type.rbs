@@ -1,0 +1,4 @@
+module Coordinator::Web::Graphql::Types
+  class CoordinationDependencyType < BaseObject
+  end
+end

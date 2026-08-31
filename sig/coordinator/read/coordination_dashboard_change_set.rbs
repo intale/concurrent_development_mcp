@@ -1,0 +1,16 @@
+module Coordinator
+  module Read
+    class CoordinationDashboardChangeSet < ApplicationRecord
+      def change_set_id: () -> String
+      def repository_id: () -> String
+      def goal: () -> String
+      def acceptance_criteria: () -> Array[String]
+      def domain_status: () -> String
+      def work_item_count: () -> Integer
+      def running_work_item_count: () -> Integer
+      def open_work_item_count: () -> Integer
+      def last_processed_at: () -> Time
+      def readonly?: () -> bool
+    end
+  end
+end

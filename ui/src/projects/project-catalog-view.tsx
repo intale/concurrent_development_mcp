@@ -1,4 +1,5 @@
 import type { ProjectRow } from "./project-catalog-model.js";
+import { Link } from "react-router-dom";
 
 export interface ProjectCatalogViewProps {
   readonly canGoBack: boolean;
@@ -103,7 +104,7 @@ export function ProjectCatalogView(props: ProjectCatalogViewProps) {
             <tbody>
               {props.rows.map((row) => (
                 <tr key={row.id}>
-                  <td className="fw-semibold">{row.name}</td>
+                  <td className="fw-semibold"><Link to={`/projects/${row.id}/coordination`}>{row.name}</Link></td>
                   <td><code>{row.scope}</code></td>
                   <td>{row.paths || "—"}</td>
                   <td>{row.remotes || "—"}</td>

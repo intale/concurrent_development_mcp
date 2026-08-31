@@ -1,0 +1,18 @@
+module Coordinator
+  module Read
+    class CoordinationDashboardDependency < ApplicationRecord
+      def dependency_id: () -> String
+      def producer_work_item_id: () -> String
+      def consumer_work_item_id: () -> String
+      def producer_repository_id: () -> String?
+      def consumer_repository_id: () -> String?
+      def dependency_kind: () -> String
+      def required_output: () -> Hash[String, untyped]?
+      def declared_at_domain: () -> Time
+      def satisfied_at_domain: () -> Time?
+      def blocking: () -> bool
+      def last_processed_at: () -> Time
+      def readonly?: () -> bool
+    end
+  end
+end

@@ -1,5 +1,80 @@
+type CoordinationChangeSet {
+  acceptanceCriteria: [String!]!
+  domainStatus: String!
+  goal: String!
+  id: ID!
+  lastProcessedAt: String!
+  openWorkItemCount: Int!
+  runningWorkItemCount: Int!
+  workItemCount: Int!
+}
+
+type CoordinationChangeSetConnection {
+  nodes: [CoordinationChangeSet!]!
+  pageInfo: PageInfo!
+}
+
+type CoordinationDependency {
+  blocking: Boolean!
+  consumerRepositoryId: ID
+  consumerWorkItemId: ID!
+  declaredAt: String!
+  dependencyKind: String!
+  id: ID!
+  lastProcessedAt: String!
+  producerRepositoryId: ID
+  producerWorkItemId: ID!
+  satisfiedAt: String
+}
+
+type CoordinationDependencyConnection {
+  nodes: [CoordinationDependency!]!
+  pageInfo: PageInfo!
+}
+
+enum CoordinationPresentationStatus {
+  ASSIGNED
+  COMPLETED
+  PENDING
+  READY
+  RUNNING
+}
+
+type CoordinationProject {
+  id: ID!
+  name: String
+  scope: String!
+}
+
+type CoordinationWorkItem {
+  acceptanceCriteria: [String!]!
+  acquiredAt: String
+  activeAgentId: String
+  activeAttemptId: String
+  attemptAuthorizedAt: String
+  attemptStartedAt: String
+  attemptStatus: String
+  attemptTerminalAt: String
+  changeSetId: ID!
+  competitiveMode: Boolean!
+  completedAt: String
+  createdAt: String!
+  domainStatus: String!
+  goal: String!
+  id: ID!
+  lastProcessedAt: String!
+  madeReadyAt: String
+  presentationStatus: CoordinationPresentationStatus!
+  repositoryId: ID!
+}
+
+type CoordinationWorkItemConnection {
+  nodes: [CoordinationWorkItem!]!
+  pageInfo: PageInfo!
+}
+
 """
-Opaque forward-pagination state for one stable project-catalog window.
+Opaque forward-pagination state for one bounded read-model window.
 """
 type PageInfo {
   endCursor: String
@@ -26,12 +101,30 @@ type ProjectConnection {
   pageInfo: PageInfo!
 }
 
+type ProjectCoordination {
+  changeSets: CoordinationChangeSetConnection!
+  dependencies: CoordinationDependencyConnection!
+  project: CoordinationProject!
+  workItems: CoordinationWorkItemConnection!
+}
+
 """
 Read-only access to the latest available coordination projections.
 """
 type Query {
   """
+  Latest available coordination facts for one registered project.
+  """
+  projectCoordination(blocking: Boolean, changeSetsAfter: String, dependenciesAfter: String, first: Int = 20, presentationStatuses: [CoordinationPresentationStatus!], repositoryId: ID!, workItemSort: WorkItemSort = WORK_ITEM_ID_ASC, workItemsAfter: String): ProjectCoordination
+
+  """
   List projects in one exact caller-chosen scope in stable Repository-ID order.
   """
   projects(after: String, first: Int = 20, scope: String!): ProjectConnection!
+}
+
+enum WorkItemSort {
+  LATEST_ACTIVITY_DESC
+  STATUS_ASC
+  WORK_ITEM_ID_ASC
 }

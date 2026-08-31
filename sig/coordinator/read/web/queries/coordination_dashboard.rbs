@@ -1,0 +1,12 @@
+module Coordinator
+  module Read
+    module Web
+      module Queries
+        class CoordinationDashboard
+          def initialize: (?contract: Contracts::CoordinationDashboard, ?repository: Repositories::CoordinationDashboard) -> void
+          def call: (command_input input) -> CoordinationDashboardV1?
+        end
+      end
+    end
+  end
+end

@@ -18,5 +18,10 @@ module GraphQL
 
       def object: () -> untyped
     end
+
+    class Enum
+      def self.graphql_name: (String name) -> untyped
+      def self.value: (String name, ?value: untyped) -> untyped
+    end
   end
 end

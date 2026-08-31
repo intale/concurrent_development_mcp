@@ -1,0 +1,26 @@
+module Coordinator
+  module Read
+    class CoordinationDashboardWorkItem < ApplicationRecord
+      def work_item_id: () -> String
+      def change_set_id: () -> String
+      def repository_id: () -> String
+      def goal: () -> String
+      def acceptance_criteria: () -> Array[String]
+      def competitive_mode: () -> bool
+      def domain_status: () -> String
+      def presentation_status: () -> String
+      def active_attempt_id: () -> String?
+      def active_agent_id: () -> String?
+      def attempt_status: () -> String?
+      def attempt_authorized_at: () -> Time?
+      def attempt_started_at: () -> Time?
+      def attempt_terminal_at: () -> Time?
+      def created_at_domain: () -> Time
+      def made_ready_at_domain: () -> Time?
+      def acquired_at_domain: () -> Time?
+      def completed_at_domain: () -> Time?
+      def last_processed_at: () -> Time
+      def readonly?: () -> bool
+    end
+  end
+end

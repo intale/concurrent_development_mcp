@@ -5,14 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Read-only Concurrent Development Coordinator projections">
     <title>Concurrent Development Coordinator</title>
-    <% @coordinator_ui_stylesheets.each do |path| %>
-      <link rel="stylesheet" href="<%= path %>">
-    <% end %>
+    <%= stylesheet_link_tag "/ui/coordinator-ui.css", media: "all" %>
   </head>
   <body>
     <%= yield %>
-    <% @coordinator_ui_scripts.each do |path| %>
-      <script type="module" src="<%= path %>"></script>
-    <% end %>
+    <%= javascript_include_tag "/ui/coordinator-ui.js", type: "module" %>
   </body>
 </html>

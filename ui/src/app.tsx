@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { ProjectCatalogPage } from "./projects/project-catalog-page.js";
+import { ProjectCoordinationPage } from "./coordination/project-coordination-page.js";
 
 export function App() {
   const location = useLocation();
@@ -63,7 +64,7 @@ export function App() {
               <li className="nav-header">Coordination</li>
               <li className="nav-item">
                 <Link
-                  className={`nav-link ${location.pathname === "/projects" ? "active" : ""}`}
+                  className={`nav-link ${location.pathname.startsWith("/projects") ? "active" : ""}`}
                   to="/projects"
                 >
                   <i aria-hidden="true" className="nav-icon bi bi-folder2-open" />
@@ -78,6 +79,7 @@ export function App() {
       <main className="app-main">
         <Routes>
           <Route path="/projects" element={<ProjectCatalogPage />} />
+          <Route path="/projects/:repositoryId/coordination" element={<ProjectCoordinationPage />} />
           <Route path="*" element={<Navigate replace to="/projects" />} />
         </Routes>
       </main>
