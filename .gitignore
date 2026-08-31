@@ -40,3 +40,4 @@
 tmp/
 .build/
 .mcp-fallback/
+/public/ui/

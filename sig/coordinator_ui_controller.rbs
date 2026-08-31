@@ -1,0 +1,11 @@
+class CoordinatorUiController < ActionController::Base
+  @coordinator_ui_stylesheets: Array[String]
+  @coordinator_ui_scripts: Array[String]
+
+  def show: () -> [Array[String], Array[String]]
+
+  private
+
+  def production_assets: () -> [Array[String], Array[String]]
+  def development_assets: () -> [Array[String], Array[String]]
+end

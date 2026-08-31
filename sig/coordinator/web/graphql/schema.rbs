@@ -1,0 +1,8 @@
+module Coordinator
+  module Web
+    module Graphql
+      class Schema < GraphQL::Schema
+      end
+    end
+  end
+end

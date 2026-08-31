@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en" data-lte-print="plain">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Read-only Concurrent Development Coordinator projections">
+    <title>Concurrent Development Coordinator</title>
+    <% @coordinator_ui_stylesheets.each do |path| %>
+      <link rel="stylesheet" href="<%= path %>">
+    <% end %>
+  </head>
+  <body>
+    <%= yield %>
+    <% @coordinator_ui_scripts.each do |path| %>
+      <script type="module" src="<%= path %>"></script>
+    <% end %>
+  </body>
+</html>

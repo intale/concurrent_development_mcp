@@ -1,0 +1,7 @@
+class GraphqlController < ApplicationController
+  def execute: () -> untyped
+
+  private
+
+  def prepare_variables: (untyped raw_variables) -> Hash[untyped, untyped]
+end

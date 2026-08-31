@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
 
-RBS_TEST_TARGET='PgEventstore::*,ConcurrentDevelopmentMcp::*,Coordinator::*,ApplicationJob' RBS_TEST_LOGLEVEL='error' \
+RBS_TEST_TARGET='PgEventstore::*,ConcurrentDevelopmentMcp::*,Coordinator::*,ApplicationController,ApplicationJob,CoordinatorUiController,GraphqlController' RBS_TEST_LOGLEVEL='error' \
   RBS_TEST_OPT='-r forwardable -r optparse -r monitor -I sig' \
   RUBYOPT='-rbundler/setup -rrbs/test/setup' RBS_TEST_DOUBLE_SUITE='rspec' bundle exec rspec "$@"

@@ -1,0 +1,22 @@
+module GraphQL
+  class ExecutionError < StandardError
+    def initialize: (String message, ?extensions: untyped) -> void
+  end
+
+  class Schema
+    def self.query: (singleton(Schema::Object) query_type) -> untyped
+    def self.max_depth: (Integer depth) -> untyped
+    def self.max_complexity: (Integer complexity) -> untyped
+    def self.execute: (untyped query, ?variables: untyped, ?operation_name: untyped, ?context: untyped) -> untyped
+    def self.to_definition: () -> String
+
+    class Object
+      def self.graphql_name: (String name) -> untyped
+      def self.description: (String description) -> untyped
+      def self.field: (*untyped arguments, **untyped options) ?{ () -> untyped } -> untyped
+      def self.argument: (*untyped arguments, **untyped options) -> untyped
+
+      def object: () -> untyped
+    end
+  end
+end

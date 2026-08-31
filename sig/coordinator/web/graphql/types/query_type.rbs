@@ -1,0 +1,9 @@
+module Coordinator::Web::Graphql::Types
+  class QueryType < BaseObject
+    def projects: (scope: String, first: Integer, ?after: String?) -> Hash[Symbol, untyped]
+
+    private
+
+    def raise_query_error: (Coordinator::Read::QueryResultV1 result) -> bot
+  end
+end

@@ -88,7 +88,8 @@ RSpec.describe "CQRS source boundaries" do
   it "mirrors every Coordinator implementation file in the RBS tree" do
     implementation_signatures = (
       Rails.root.glob("lib/coordinator/**/*.rb").map { signature_path_for(_1, root: "lib") } +
-      Rails.root.glob("app/models/coordinator/**/*.rb").map { signature_path_for(_1, root: "app/models") }
+      Rails.root.glob("app/models/coordinator/**/*.rb").map { signature_path_for(_1, root: "app/models") } +
+      Rails.root.glob("app/graphql/coordinator/**/*.rb").map { signature_path_for(_1, root: "app/graphql") }
     ).uniq.sort
     declared_signatures = Rails.root.glob("sig/coordinator/**/*.rbs").map do
       _1.relative_path_from(Rails.root).to_s

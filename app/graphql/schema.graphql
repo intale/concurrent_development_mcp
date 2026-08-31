@@ -1,0 +1,37 @@
+"""
+Opaque forward-pagination state for one stable project-catalog window.
+"""
+type PageInfo {
+  endCursor: String
+  hasNextPage: Boolean!
+}
+
+"""
+One latest available projected repository registration in an exact project scope.
+"""
+type Project {
+  id: ID!
+  name: String
+  paths: [String!]!
+  registeredAt: String!
+  remotes: [String!]!
+  scope: String!
+}
+
+"""
+A bounded page of projects and its opaque continuation state.
+"""
+type ProjectConnection {
+  nodes: [Project!]!
+  pageInfo: PageInfo!
+}
+
+"""
+Read-only access to the latest available coordination projections.
+"""
+type Query {
+  """
+  List projects in one exact caller-chosen scope in stable Repository-ID order.
+  """
+  projects(after: String, first: Int = 20, scope: String!): ProjectConnection!
+}

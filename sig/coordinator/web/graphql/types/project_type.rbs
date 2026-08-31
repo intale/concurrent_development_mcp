@@ -1,0 +1,5 @@
+module Coordinator::Web::Graphql::Types
+  class ProjectType < BaseObject
+    def registered_at: () -> String
+  end
+end

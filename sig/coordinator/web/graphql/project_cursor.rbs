@@ -1,0 +1,8 @@
+module Coordinator::Web::Graphql
+  class ProjectCursor
+    PREFIX: String
+
+    def self.encode: (String repository_id) -> String
+    def self.decode: (String? cursor) -> String?
+  end
+end

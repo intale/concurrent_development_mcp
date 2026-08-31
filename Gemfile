@@ -37,6 +37,8 @@ gem "thruster", require: false
 # gem "rack-cors"
 
 gem "mcp", ">= 1.2"
+gem "graphql", "~> 2.6.10"
+gem "react-rails", "~> 3.3.1"
 gem "pg_eventstore", ">= 3.0", require: [ "pg_eventstore", "pg_eventstore/web" ]
 gem "niceql", "~> 0.5.1", require: false
 gem "json"

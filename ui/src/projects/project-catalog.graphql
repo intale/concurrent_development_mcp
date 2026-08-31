@@ -1,0 +1,16 @@
+query Projects($scope: String!, $first: Int, $after: String) {
+  projects(scope: $scope, first: $first, after: $after) {
+    nodes {
+      id
+      name
+      paths
+      registeredAt
+      remotes
+      scope
+    }
+    pageInfo {
+      endCursor
+      hasNextPage
+    }
+  }
+}

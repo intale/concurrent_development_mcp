@@ -1,0 +1,4 @@
+module Coordinator::Web::Graphql::Types
+  class PageInfoType < BaseObject
+  end
+end

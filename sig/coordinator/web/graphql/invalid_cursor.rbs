@@ -1,0 +1,4 @@
+module Coordinator::Web::Graphql
+  class InvalidCursor < StandardError
+  end
+end

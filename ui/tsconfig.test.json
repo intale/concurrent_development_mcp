@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": false,
+    "outDir": ".test-dist",
+    "rootDir": "."
+  },
+  "include": [
+    "test/**/*.test.tsx",
+    "src/projects/project-catalog-model.ts",
+    "src/projects/project-catalog-view.tsx"
+  ]
+}
