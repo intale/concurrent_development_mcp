@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-RSpec.describe "GraphQL project coordination", :read_model do
+module ProjectCoordinationGraphqlSpec
+  RSpec.describe "GraphQL project coordination", :read_model do
   let(:repository_id) { "018f0f4d-4e45-7abc-8def-000000000031" }
   QUERY = <<~GRAPHQL.freeze
     query ProjectCoordination($repositoryId: ID!, $first: Int, $workItemsAfter: String) {
@@ -80,5 +81,6 @@ RSpec.describe "GraphQL project coordination", :read_model do
     @graphql_session ||= ActionDispatch::Integration::Session.new(Rails.application).tap do |session|
       session.host! "localhost"
     end
+  end
   end
 end

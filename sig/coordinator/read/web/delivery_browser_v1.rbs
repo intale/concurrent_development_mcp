@@ -1,0 +1,233 @@
+module Coordinator
+  module Read
+    module Web
+      class DeliveryBrowserV1
+        class Project < Shared::Value
+          def repository_id: () -> String
+          def scope: () -> String
+          def display_name: () -> String?
+        end
+
+        class TimelineCursor < Shared::Value
+          def position: () -> Integer
+          def id: () -> String
+        end
+
+        class CandidatePage < Shared::Value
+          def items: () -> Array[Read::CandidateSummaryV1]
+          def next_cursor: () -> TimelineCursor?
+          def has_more: () -> bool
+        end
+
+        class VerificationSummary < Shared::Value
+          def obligation_id: () -> String
+          def kind: () -> String
+          def status: () -> String
+          def change_set_id: () -> String
+          def source_candidate_id: () -> String
+          def target_candidate_id: () -> String
+          def source_repository_id: () -> String
+          def target_repository_id: () -> String
+          def enforcement: () -> String
+          def claimant_id: () -> String?
+          def claim_expires_at: () -> String?
+          def evidence_count: () -> Integer
+          def passed_evidence_kinds: () -> Array[String]
+          def missing_evidence_kinds: () -> Array[String]
+          def created_at: () -> String
+        end
+
+        class VerificationPage < Shared::Value
+          def items: () -> Array[VerificationSummary]
+          def next_cursor: () -> TimelineCursor?
+          def has_more: () -> bool
+        end
+
+        class VerificationReason < Shared::Value
+          def kind: () -> String
+          def matches: () -> Array[String]
+        end
+
+        class VerificationEvidence < Shared::Value
+          def evidence_id: () -> String
+          def evidence_kind: () -> String
+          def conclusion: () -> String
+          def assessment_input_digest: () -> String
+          def result_digest: () -> String
+          def produced_at: () -> String
+          def submitted_at: () -> String
+          def global_position: () -> Integer
+        end
+
+        class EvidencePage < Shared::Value
+          def items: () -> Array[VerificationEvidence]
+          def next_cursor: () -> TimelineCursor?
+          def has_more: () -> bool
+        end
+
+        class MergeSummary < Shared::Value
+          def merge_snapshot_id: () -> String
+          def repository_id: () -> String
+          def target_branch: () -> String
+          def target_base_commit_oid: () -> String
+          def merge_commit_oid: () -> String
+          def candidate_count: () -> Integer
+          def verification_status: () -> String
+          def evidence_status: () -> String
+          def produced_at: () -> String
+        end
+
+        class MergePage < Shared::Value
+          def items: () -> Array[MergeSummary]
+          def next_cursor: () -> TimelineCursor?
+          def has_more: () -> bool
+        end
+
+        class AuthorizationSummary < Shared::Value
+          def authorization_id: () -> String
+          def merge_snapshot_id: () -> String
+          def outcome: () -> String
+          def policy_version: () -> String
+          def input_digest: () -> String
+          def decision_digest: () -> String
+          def reason_count: () -> Integer
+          def decided_at: () -> String
+        end
+
+        class AuthorizationPage < Shared::Value
+          def items: () -> Array[AuthorizationSummary]
+          def next_cursor: () -> TimelineCursor?
+          def has_more: () -> bool
+        end
+
+        class MergeCandidate < Shared::Value
+          def candidate_id: () -> String
+          def change_set_id: () -> String
+          def work_item_id: () -> String
+          def attempt_id: () -> String
+          def base_commit_oid: () -> String
+          def head_commit_oid: () -> String
+          def manifest_digest: () -> String
+        end
+
+        class ReleaseSummary < Shared::Value
+          def release_set_id: () -> String
+          def change_set_id: () -> String
+          def repository_ids: () -> Array[String]
+          def member_count: () -> Integer
+          def status: () -> String
+          def verification_status: () -> String
+          def release_digest: () -> String
+          def prepared_at: () -> String
+        end
+
+        class ReleasePage < Shared::Value
+          def items: () -> Array[ReleaseSummary]
+          def next_cursor: () -> TimelineCursor?
+          def has_more: () -> bool
+        end
+
+        class ReleaseMember < Shared::Value
+          def position: () -> Integer
+          def repository_id: () -> String
+          def target_branch: () -> String
+          def merge_snapshot_id: () -> String
+          def change_set_id: () -> String
+          def merge_commit_oid: () -> String
+          def candidate_count: () -> Integer
+        end
+
+        class ReleaseIntegration < Shared::Value
+          def repository_id: () -> String
+          def attempt_id: () -> String
+          def attempt_number: () -> Integer
+          def outcome: () -> String
+          def failure_code: () -> String?
+          def recorded_at: () -> String
+        end
+
+        class OperationBatchSummary < Shared::Value
+          def batch_id: () -> String
+          def target_tool: () -> String
+          def status: () -> String
+          def total: () -> Integer
+          def succeeded: () -> Integer
+          def rejected: () -> Integer
+          def pending: () -> Integer
+          def not_run: () -> Integer
+          def manifest_digest: () -> String
+          def created_at: () -> String
+        end
+
+        class OperationBatchPage < Shared::Value
+          def items: () -> Array[OperationBatchSummary]
+          def next_cursor: () -> TimelineCursor?
+          def has_more: () -> bool
+        end
+
+        class OperationBatchItem < Shared::Value
+          def index: () -> Integer
+          def target_tool: () -> String
+          def command_id: () -> String
+          def canonical_input_digest: () -> String
+          def status: () -> String
+          def outcome_status: () -> String?
+          def outcome_summary: () -> String?
+          def outcome_code: () -> String?
+          def finished_at: () -> String?
+        end
+
+        class OperationBatchItemPage < Shared::Value
+          def items: () -> Array[OperationBatchItem]
+          def next_index: () -> Integer?
+          def has_more: () -> bool
+        end
+
+        class Catalog < Shared::Value
+          def project: () -> Project
+          def candidates: () -> CandidatePage
+          def obligations: () -> VerificationPage
+          def merge_snapshots: () -> MergePage
+          def release_sets: () -> ReleasePage
+        end
+
+        class CandidateDetail < Shared::Value
+          def project: () -> Project
+          def candidate: () -> Read::CandidateViewV1
+          def impacts: () -> Read::CandidateImpactPageV1
+        end
+
+        class VerificationDetail < Shared::Value
+          def project: () -> Project
+          def obligation: () -> VerificationSummary
+          def required_evidence: () -> Array[String]
+          def reasons: () -> Array[VerificationReason]
+          def evidence: () -> EvidencePage
+        end
+
+        class MergeDetail < Shared::Value
+          def project: () -> Project
+          def snapshot: () -> MergeSummary
+          def candidates: () -> Array[MergeCandidate]
+          def authorizations: () -> AuthorizationPage
+        end
+
+        class ReleaseDetail < Shared::Value
+          def project: () -> Project
+          def release_set: () -> ReleaseSummary
+          def members: () -> Array[ReleaseMember]
+          def integrations: () -> Array[ReleaseIntegration]
+          def verification_attempt_count: () -> Integer
+          def activated: () -> bool
+          def compensation_requested: () -> bool
+          def completion_outcome: () -> String?
+        end
+
+        class OperationBatchDetail < Shared::Value
+          def batch: () -> OperationBatchSummary
+          def items: () -> OperationBatchItemPage
+        end
+      end
+    end
+  end
+end

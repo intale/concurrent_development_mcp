@@ -1,0 +1,24 @@
+module Coordinator
+  module Read
+    module Web
+      module Contracts
+        class DeliveryBrowser
+          class Catalog < Dry::Validation::Contract
+          end
+          class Candidate < Dry::Validation::Contract
+          end
+          class Verification < Dry::Validation::Contract
+          end
+          class Merge < Dry::Validation::Contract
+          end
+          class Release < Dry::Validation::Contract
+          end
+          class Batches < Dry::Validation::Contract
+          end
+          class Batch < Dry::Validation::Contract
+          end
+        end
+      end
+    end
+  end
+end

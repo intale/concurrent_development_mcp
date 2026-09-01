@@ -98,6 +98,62 @@ enum ArtifactRelationDirection {
   OUTGOING
 }
 
+"""
+Represents non-fractional signed whole numeric values. Since the value may
+exceed the size of a 32-bit integer, it's encoded as a string.
+"""
+scalar BigInt
+
+type CandidateCheckpoint {
+  attemptId: ID!
+  baseCommitOid: String!
+  buildContextDigest: String
+  buildContextObserved: Boolean!
+  changeSetId: ID!
+  checkpointKind: CandidateCheckpointKind!
+  evidenceStatus: String!
+  headCommitOid: String!
+  id: ID!
+  manifestDigest: String!
+  manifestObserved: Boolean!
+  repositoryId: ID!
+  submittedAt: String!
+  targetBranch: String!
+  workItemId: ID!
+}
+
+type CandidateCheckpointConnection {
+  nodes: [CandidateCheckpoint!]!
+  pageInfo: PageInfo!
+}
+
+enum CandidateCheckpointKind {
+  FINAL
+  HANDOFF
+  INTERMEDIATE
+}
+
+type CandidateImpactConnection {
+  nodes: [CandidateImpactRelationship!]!
+  pageInfo: PageInfo!
+}
+
+enum CandidateImpactDirection {
+  INCOMING
+  OUTGOING
+}
+
+type CandidateImpactReason {
+  kind: String!
+  matches: [String!]!
+}
+
+type CandidateImpactRelationship {
+  counterpart: CandidateCheckpoint!
+  reasons: [CandidateImpactReason!]!
+  relationshipKind: String!
+}
+
 type CommandReceipt {
   commandId: ID!
   completedAt: String!
@@ -266,6 +322,77 @@ type DecisionValue {
   schema: String!
   targetId: ID
   targetKind: String
+}
+
+type DeliveryMergeSnapshot {
+  candidateCount: Int!
+  evidenceStatus: String!
+  id: ID!
+  mergeCommitOid: String!
+  producedAt: String!
+  repositoryId: ID!
+  targetBaseCommitOid: String!
+  targetBranch: String!
+  verificationStatus: String!
+}
+
+type DeliveryOperationBatch {
+  createdAt: String!
+  id: ID!
+  manifestDigest: String!
+  notRun: Int!
+  pending: Int!
+  rejected: Int!
+  status: OperationBatchStatus!
+  succeeded: Int!
+  targetTool: OperationBatchTool!
+  total: Int!
+}
+
+type DeliveryOperationBatchItem {
+  canonicalInputDigest: String!
+  commandId: ID!
+  finishedAt: String
+  index: Int!
+  outcomeCode: String
+  outcomeStatus: String
+  outcomeSummary: String
+  status: OperationBatchItemStatus!
+  targetTool: OperationBatchTool!
+}
+
+type DeliveryReleaseSet {
+  changeSetId: ID!
+  id: ID!
+  memberCount: Int!
+  preparedAt: String!
+  releaseDigest: String!
+  repositoryIds: [ID!]!
+  status: ReleaseSetStatus!
+  verificationStatus: String!
+}
+
+enum DeliverySort {
+  NEWEST_FIRST
+  OLDEST_FIRST
+}
+
+type DeliveryVerificationObligation {
+  changeSetId: ID!
+  claimExpiresAt: String
+  claimantId: ID
+  createdAt: String!
+  enforcement: String!
+  evidenceCount: Int!
+  id: ID!
+  kind: String!
+  missingEvidenceKinds: [String!]!
+  passedEvidenceKinds: [String!]!
+  sourceCandidateId: ID!
+  sourceRepositoryId: ID!
+  status: VerificationObligationStatus!
+  targetCandidateId: ID!
+  targetRepositoryId: ID!
 }
 
 type DevelopmentArtifactConnection {
@@ -458,6 +585,73 @@ type InterpretationClarificationQuestion {
   prompt: String!
 }
 
+type MergeAuthorization {
+  decidedAt: String!
+  decisionDigest: String!
+  id: ID!
+  inputDigest: String!
+  mergeSnapshotId: ID!
+  outcome: String!
+  policyVersion: String!
+  reasonCount: Int!
+}
+
+type MergeAuthorizationConnection {
+  nodes: [MergeAuthorization!]!
+  pageInfo: PageInfo!
+}
+
+type MergeCandidate {
+  attemptId: ID!
+  baseCommitOid: String!
+  changeSetId: ID!
+  headCommitOid: String!
+  id: ID!
+  manifestDigest: String!
+  workItemId: ID!
+}
+
+type MergeSnapshotConnection {
+  nodes: [DeliveryMergeSnapshot!]!
+  pageInfo: PageInfo!
+}
+
+type OperationBatchConnection {
+  nodes: [DeliveryOperationBatch!]!
+  pageInfo: PageInfo!
+}
+
+type OperationBatchDetail {
+  batch: DeliveryOperationBatch!
+  items: OperationBatchItemConnection!
+}
+
+type OperationBatchItemConnection {
+  nodes: [DeliveryOperationBatchItem!]!
+  pageInfo: PageInfo!
+}
+
+enum OperationBatchItemStatus {
+  NOT_RUN
+  PENDING
+  REJECTED
+  SUCCEEDED
+}
+
+enum OperationBatchStatus {
+  CANCELLED
+  CANCELLING
+  COMPLETED
+  COMPLETED_WITH_ERRORS
+  RUNNING
+}
+
+enum OperationBatchTool {
+  DEVELOPMENT_ARTIFACT_CAPTURE
+  DEVELOPMENT_ARTIFACT_RELATION_DECLARE
+  SKILL_PUBLISH
+}
+
 """
 Opaque forward-pagination state for one bounded read-model window.
 """
@@ -491,6 +685,14 @@ type ProjectArtifact {
   relationships: DevelopmentArtifactRelationConnection!
 }
 
+type ProjectCandidateCheckpoint {
+  checkpoint: CandidateCheckpoint!
+  impactDirection: CandidateImpactDirection!
+  impactRelationships: CandidateImpactConnection!
+  impactSurfaceDigest: String
+  project: CoordinationProject!
+}
+
 """
 A bounded page of projects and its opaque continuation state.
 """
@@ -510,6 +712,14 @@ type ProjectDecision {
   decision: GovernanceDecision!
   membershipBases: [String!]!
   project: CoordinationProject!
+}
+
+type ProjectDelivery {
+  candidates: CandidateCheckpointConnection!
+  mergeSnapshots: MergeSnapshotConnection!
+  obligations: VerificationObligationConnection!
+  project: CoordinationProject!
+  releaseSets: ReleaseSetConnection!
 }
 
 type ProjectGovernance {
@@ -544,6 +754,24 @@ type ProjectKnowledge {
   skills: SkillConnection!
 }
 
+type ProjectMergeSnapshot {
+  authorizations: MergeAuthorizationConnection!
+  candidates: [MergeCandidate!]!
+  project: CoordinationProject!
+  snapshot: DeliveryMergeSnapshot!
+}
+
+type ProjectReleaseSet {
+  activated: Boolean!
+  compensationRequested: Boolean!
+  completionOutcome: String
+  integrations: [ReleaseIntegration!]!
+  members: [ReleaseMember!]!
+  project: CoordinationProject!
+  releaseSet: DeliveryReleaseSet!
+  verificationAttemptCount: Int!
+}
+
 type ProjectResource {
   id: ID!
   kind: ResourceKind!
@@ -576,6 +804,14 @@ type ProjectSkillAsset {
   project: CoordinationProject!
 }
 
+type ProjectVerificationObligation {
+  evidence: VerificationEvidenceConnection!
+  obligation: DeliveryVerificationObligation!
+  project: CoordinationProject!
+  reasons: [VerificationReason!]!
+  requiredEvidence: [String!]!
+}
+
 """
 Read-only access to the latest available coordination projections.
 """
@@ -591,6 +827,16 @@ type Query {
   commandReceipts(after: String, first: Int = 20, status: CommandReceiptStatus, toolName: String): CommandReceiptConnection!
 
   """
+  One global operation batch with bounded typed item outcomes.
+  """
+  operationBatch(batchId: ID!, first: Int = 50, itemsAfter: String): OperationBatchDetail
+
+  """
+  Global operation-batch progress without inferred project attribution.
+  """
+  operationBatches(after: String, first: Int = 20, sort: DeliverySort = NEWEST_FIRST, status: OperationBatchStatus, targetTool: OperationBatchTool): OperationBatchConnection!
+
+  """
   One project AgentChoice and its bounded decision-impact assessments.
   """
   projectAgentChoice(choiceId: ID!, impactsAfter: String, impactsFirst: Int = 20, repositoryId: ID!): ProjectAgentChoice
@@ -601,6 +847,11 @@ type Query {
   projectArtifact(artifactId: ID!, direction: ArtifactRelationDirection = BOTH, first: Int = 20, relation: DevelopmentArtifactRelationKind, relationsAfter: String, repositoryId: ID!): ProjectArtifact
 
   """
+  One project Candidate checkpoint and one bounded semantic impact direction.
+  """
+  projectCandidateCheckpoint(candidateId: ID!, direction: CandidateImpactDirection = OUTGOING, first: Int = 20, impactsAfter: String, repositoryId: ID!): ProjectCandidateCheckpoint
+
+  """
   Latest available coordination facts for one registered project.
   """
   projectCoordination(blocking: Boolean, changeSetsAfter: String, dependenciesAfter: String, first: Int = 20, presentationStatuses: [CoordinationPresentationStatus!], repositoryId: ID!, workItemSort: WorkItemSort = WORK_ITEM_ID_ASC, workItemsAfter: String): ProjectCoordination
@@ -609,6 +860,11 @@ type Query {
   One Decision deterministically associated with the exact project.
   """
   projectDecision(decisionId: ID!, repositoryId: ID!): ProjectDecision
+
+  """
+  Latest project-related Candidate, verification, merge, and ReleaseSet projections.
+  """
+  projectDelivery(afterCandidate: String, afterMergeSnapshot: String, afterObligation: String, afterReleaseSet: String, candidateChangeSetId: ID, candidateCheckpointKind: CandidateCheckpointKind, first: Int = 20, obligationChangeSetId: ID, obligationStatus: VerificationObligationStatus, releaseChangeSetId: ID, releaseStatus: ReleaseSetStatus, repositoryId: ID!, sort: DeliverySort = NEWEST_FIRST): ProjectDelivery
 
   """
   Project-scoped Decisions, guidance, AgentChoices, and decision impacts.
@@ -626,6 +882,16 @@ type Query {
   projectKnowledge(artifactKind: DevelopmentArtifactKind, artifactLabels: [String!], artifactSourceKind: DevelopmentArtifactSourceKind, artifactsAfter: String, first: Int = 20, repositoryId: ID!, skillName: String, skillsAfter: String): ProjectKnowledge
 
   """
+  One project merge snapshot with candidates and bounded authorization decisions.
+  """
+  projectMergeSnapshot(authorizationsAfter: String, authorizationsFirst: Int = 20, mergeSnapshotId: ID!, repositoryId: ID!): ProjectMergeSnapshot
+
+  """
+  One ReleaseSet whose persisted ordered members include the exact project.
+  """
+  projectReleaseSet(releaseSetId: ID!, repositoryId: ID!): ProjectReleaseSet
+
+  """
   Latest available resource inventory and factual active leases for one project.
   """
   projectResources(activeLeasesAfter: String, first: Int = 20, repositoryId: ID!, resourceKind: ResourceKind, resourceLifecycleStatus: ResourceLifecycleStatus, resourcesAfter: String): ProjectResources
@@ -641,9 +907,48 @@ type Query {
   projectSkillAsset(name: String!, path: String!, repositoryId: ID!): ProjectSkillAsset
 
   """
+  One project-related verification obligation with bounded evidence facts.
+  """
+  projectVerificationObligation(evidenceAfter: String, evidenceFirst: Int = 20, obligationId: ID!, repositoryId: ID!): ProjectVerificationObligation
+
+  """
   List projects in one exact caller-chosen scope in stable Repository-ID order.
   """
   projects(after: String, first: Int = 20, scope: String!): ProjectConnection!
+}
+
+type ReleaseIntegration {
+  attemptId: ID!
+  attemptNumber: Int!
+  failureCode: String
+  outcome: String!
+  recordedAt: String!
+  repositoryId: ID!
+}
+
+type ReleaseMember {
+  candidateCount: Int!
+  changeSetId: ID!
+  mergeCommitOid: String!
+  mergeSnapshotId: ID!
+  position: Int!
+  repositoryId: ID!
+  targetBranch: String!
+}
+
+type ReleaseSetConnection {
+  nodes: [DeliveryReleaseSet!]!
+  pageInfo: PageInfo!
+}
+
+enum ReleaseSetStatus {
+  ACTIVATED
+  COMPENSATION_REQUESTED
+  COMPLETED
+  INTEGRATING
+  PREPARED
+  VERIFIED
+  VERIFYING
 }
 
 enum ResourceKind {
@@ -703,6 +1008,40 @@ type SkillSummary {
   publishedAt: String!
   revision: Int!
   scope: String!
+}
+
+type VerificationEvidence {
+  assessmentInputDigest: String!
+  conclusion: String!
+  evidenceKind: String!
+  globalPosition: BigInt!
+  id: ID!
+  producedAt: String!
+  resultDigest: String!
+  submittedAt: String!
+}
+
+type VerificationEvidenceConnection {
+  nodes: [VerificationEvidence!]!
+  pageInfo: PageInfo!
+}
+
+type VerificationObligationConnection {
+  nodes: [DeliveryVerificationObligation!]!
+  pageInfo: PageInfo!
+}
+
+enum VerificationObligationStatus {
+  FAILED
+  INVALIDATED
+  OPEN
+  SATISFIED
+  WAIVED
+}
+
+type VerificationReason {
+  kind: String!
+  matches: [String!]!
 }
 
 enum WorkItemSort {

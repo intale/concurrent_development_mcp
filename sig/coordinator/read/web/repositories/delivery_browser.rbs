@@ -1,0 +1,46 @@
+module Coordinator
+  module Read
+    module Web
+      module Repositories
+        class DeliveryBrowser
+          def initialize: (
+            ?candidates: Read::Repositories::Candidates,
+            ?candidate_impacts: Read::Repositories::CandidateImpacts
+          ) -> void
+          def catalog: (DeliveryBrowserQueryV1::Catalog query) -> DeliveryBrowserV1::Catalog?
+          def candidate: (DeliveryBrowserQueryV1::Candidate query) -> DeliveryBrowserV1::CandidateDetail?
+          def verification: (DeliveryBrowserQueryV1::Verification query) -> DeliveryBrowserV1::VerificationDetail?
+          def merge: (DeliveryBrowserQueryV1::Merge query) -> DeliveryBrowserV1::MergeDetail?
+          def release: (DeliveryBrowserQueryV1::Release query) -> DeliveryBrowserV1::ReleaseDetail?
+          def batches: (DeliveryBrowserQueryV1::Batches query) -> DeliveryBrowserV1::OperationBatchPage
+          def batch: (DeliveryBrowserQueryV1::Batch query) -> DeliveryBrowserV1::OperationBatchDetail?
+
+          private
+
+          def find_project: (String repository_id) -> Read::Repository?
+          def build_project: (Read::Repository record) -> DeliveryBrowserV1::Project
+          def candidate_page: (DeliveryBrowserQueryV1::Catalog query) -> DeliveryBrowserV1::CandidatePage
+          def verification_page: (DeliveryBrowserQueryV1::Catalog query) -> DeliveryBrowserV1::VerificationPage
+          def merge_page: (DeliveryBrowserQueryV1::Catalog query) -> DeliveryBrowserV1::MergePage
+          def release_page: (DeliveryBrowserQueryV1::Catalog query) -> DeliveryBrowserV1::ReleasePage
+          def verification_for_repository: (String repository_id) -> ActiveRecord::Relation
+          def release_for_repository: (String repository_id) -> ActiveRecord::Relation
+          def evidence_page: (Read::VerificationObligation record, DeliveryBrowserQueryV1::Verification query) -> DeliveryBrowserV1::EvidencePage
+          def authorization_page: (Read::MergeSnapshot record, DeliveryBrowserQueryV1::Merge query) -> DeliveryBrowserV1::AuthorizationPage
+          def timeline_rows: (**untyped) -> [Array[untyped], bool]
+          def timeline_cursor: (untyped record, Symbol position_column, Symbol id_column, has_more: bool) -> DeliveryBrowserV1::TimelineCursor?
+          def build_verification_summary: (Read::VerificationObligation record) -> DeliveryBrowserV1::VerificationSummary
+          def build_evidence: (Read::VerificationObligationEvidenceItem record) -> DeliveryBrowserV1::VerificationEvidence
+          def build_merge_summary: (Read::MergeSnapshot record) -> DeliveryBrowserV1::MergeSummary
+          def build_authorization: (Read::MergeAuthorization record) -> DeliveryBrowserV1::AuthorizationSummary
+          def build_merge_candidate: (Hash[String, untyped] attributes) -> DeliveryBrowserV1::MergeCandidate
+          def build_release_summary: (Read::ReleaseSet record) -> DeliveryBrowserV1::ReleaseSummary
+          def build_release_member: (Hash[String, untyped] attributes) -> DeliveryBrowserV1::ReleaseMember
+          def build_release_integration: (Hash[String, untyped] attributes) -> DeliveryBrowserV1::ReleaseIntegration
+          def build_batch_summary: (Read::OperationBatch record) -> DeliveryBrowserV1::OperationBatchSummary
+          def build_batch_item: (Read::OperationBatchItem item, Read::OperationBatchOutcome? outcome, String? terminal_kind) -> DeliveryBrowserV1::OperationBatchItem
+        end
+      end
+    end
+  end
+end

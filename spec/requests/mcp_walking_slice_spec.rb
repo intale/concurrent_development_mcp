@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-RSpec.describe "D-053 MCP Tasks walking slice" do
+module McpWalkingSliceSpec
+  RSpec.describe "D-053 MCP Tasks walking slice" do
   PROTOCOL_VERSION = "2026-07-28"
   TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
 
@@ -818,5 +819,6 @@ RSpec.describe "D-053 MCP Tasks walking slice" do
         direction: :asc
       )
     )
+  end
   end
 end

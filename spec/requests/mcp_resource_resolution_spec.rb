@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-RSpec.describe "MCP server-owned Resource resolution", :event_store do
+module McpResourceResolutionSpec
+  RSpec.describe "MCP server-owned Resource resolution", :event_store do
   PROTOCOL_VERSION = "2026-07-28"
   TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
   RESOURCE_PATH = "app/models/account.rb"
@@ -326,5 +327,6 @@ RSpec.describe "MCP server-owned Resource resolution", :event_store do
 
   def command_events(command_id)
     event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+  end
   end
 end

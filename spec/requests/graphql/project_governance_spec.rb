@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-RSpec.describe "GraphQL project governance", :read_model do
+module ProjectGovernanceGraphqlSpec
+  RSpec.describe "GraphQL project governance", :read_model do
   CATALOG_QUERY = <<~GRAPHQL.freeze
     query ProjectGovernance(
       $repositoryId: ID!
@@ -424,5 +425,6 @@ RSpec.describe "GraphQL project governance", :read_model do
     @graphql_session ||= ActionDispatch::Integration::Session.new(Rails.application).tap do |session|
       session.host! "localhost"
     end
+  end
   end
 end

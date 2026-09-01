@@ -43,16 +43,12 @@ RSpec.describe "Read-only web boundaries" do
     )
   end
 
-  it "mirrors every namespaced GraphQL implementation in RBS" do
-    implementations = GRAPHQL_ROOT.glob("**/*.rb").map do |path|
-      relative = path.relative_path_from(Rails.root.join("app/graphql")).sub_ext(".rbs")
-      Rails.root.join("sig", relative).relative_path_from(Rails.root).to_s
-    end.sort
-    signatures = Rails.root.glob("sig/coordinator/web/graphql/**/*.rbs").map do |path|
-      path.relative_path_from(Rails.root).to_s
-    end.sort
+  it "keeps Rails GraphQL adapters outside runtime RBS assertions" do
+    typed_runner = Rails.root.join("bin/rspec").read
 
-    expect(signatures).to eq(implementations)
+    expect(typed_runner).not_to include("Coordinator::Web")
+    expect(Rails.root.join("sig/coordinator/web/graphql/delivery_browser_cursor.rbs")).not_to exist
+    expect(Rails.root.join("sig/coordinator/web/graphql/types/delivery_types.rbs")).not_to exist
   end
 
   it "keeps the browser on GraphQL and away from MCP and mutation operations" do

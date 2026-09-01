@@ -1,0 +1,205 @@
+query ProjectDelivery(
+  $repositoryId: ID!
+  $first: Int
+  $sort: DeliverySort
+  $candidateChangeSetId: ID
+  $candidateCheckpointKind: CandidateCheckpointKind
+  $afterCandidate: String
+  $obligationChangeSetId: ID
+  $obligationStatus: VerificationObligationStatus
+  $afterObligation: String
+  $afterMergeSnapshot: String
+  $releaseChangeSetId: ID
+  $releaseStatus: ReleaseSetStatus
+  $afterReleaseSet: String
+) {
+  projectDelivery(
+    repositoryId: $repositoryId
+    first: $first
+    sort: $sort
+    candidateChangeSetId: $candidateChangeSetId
+    candidateCheckpointKind: $candidateCheckpointKind
+    afterCandidate: $afterCandidate
+    obligationChangeSetId: $obligationChangeSetId
+    obligationStatus: $obligationStatus
+    afterObligation: $afterObligation
+    afterMergeSnapshot: $afterMergeSnapshot
+    releaseChangeSetId: $releaseChangeSetId
+    releaseStatus: $releaseStatus
+    afterReleaseSet: $afterReleaseSet
+  ) {
+    project { id name scope }
+    candidates {
+      nodes {
+        id changeSetId workItemId attemptId repositoryId targetBranch
+        baseCommitOid headCommitOid checkpointKind evidenceStatus manifestDigest
+        buildContextDigest manifestObserved buildContextObserved submittedAt
+      }
+      pageInfo { endCursor hasNextPage }
+    }
+    obligations {
+      nodes {
+        id kind status changeSetId sourceCandidateId targetCandidateId
+        sourceRepositoryId targetRepositoryId enforcement claimantId claimExpiresAt
+        evidenceCount passedEvidenceKinds missingEvidenceKinds createdAt
+      }
+      pageInfo { endCursor hasNextPage }
+    }
+    mergeSnapshots {
+      nodes {
+        id repositoryId targetBranch targetBaseCommitOid mergeCommitOid
+        candidateCount verificationStatus evidenceStatus producedAt
+      }
+      pageInfo { endCursor hasNextPage }
+    }
+    releaseSets {
+      nodes {
+        id changeSetId repositoryIds memberCount status verificationStatus
+        releaseDigest preparedAt
+      }
+      pageInfo { endCursor hasNextPage }
+    }
+  }
+}
+
+query ProjectDeliveryCandidate(
+  $repositoryId: ID!
+  $candidateId: ID!
+  $direction: CandidateImpactDirection
+  $first: Int
+  $impactsAfter: String
+) {
+  projectCandidateCheckpoint(
+    repositoryId: $repositoryId
+    candidateId: $candidateId
+    direction: $direction
+    first: $first
+    impactsAfter: $impactsAfter
+  ) {
+    project { id name scope }
+    checkpoint {
+      id changeSetId workItemId attemptId repositoryId targetBranch
+      baseCommitOid headCommitOid checkpointKind evidenceStatus manifestDigest
+      buildContextDigest manifestObserved buildContextObserved submittedAt
+    }
+    impactDirection
+    impactSurfaceDigest
+    impactRelationships {
+      nodes {
+        counterpart {
+          id changeSetId workItemId attemptId repositoryId targetBranch
+          baseCommitOid headCommitOid checkpointKind evidenceStatus manifestDigest
+          buildContextDigest manifestObserved buildContextObserved submittedAt
+        }
+        relationshipKind
+        reasons { kind matches }
+      }
+      pageInfo { endCursor hasNextPage }
+    }
+  }
+}
+
+query ProjectDeliveryVerification(
+  $repositoryId: ID!
+  $obligationId: ID!
+  $evidenceFirst: Int
+  $evidenceAfter: String
+) {
+  projectVerificationObligation(
+    repositoryId: $repositoryId
+    obligationId: $obligationId
+    evidenceFirst: $evidenceFirst
+    evidenceAfter: $evidenceAfter
+  ) {
+    project { id name scope }
+    obligation {
+      id kind status changeSetId sourceCandidateId targetCandidateId
+      sourceRepositoryId targetRepositoryId enforcement claimantId claimExpiresAt
+      evidenceCount passedEvidenceKinds missingEvidenceKinds createdAt
+    }
+    requiredEvidence
+    reasons { kind matches }
+    evidence {
+      nodes {
+        id evidenceKind conclusion assessmentInputDigest resultDigest
+        producedAt submittedAt globalPosition
+      }
+      pageInfo { endCursor hasNextPage }
+    }
+  }
+}
+
+query ProjectDeliveryMerge(
+  $repositoryId: ID!
+  $mergeSnapshotId: ID!
+  $authorizationsFirst: Int
+  $authorizationsAfter: String
+) {
+  projectMergeSnapshot(
+    repositoryId: $repositoryId
+    mergeSnapshotId: $mergeSnapshotId
+    authorizationsFirst: $authorizationsFirst
+    authorizationsAfter: $authorizationsAfter
+  ) {
+    project { id name scope }
+    snapshot {
+      id repositoryId targetBranch targetBaseCommitOid mergeCommitOid
+      candidateCount verificationStatus evidenceStatus producedAt
+    }
+    candidates { id changeSetId workItemId attemptId baseCommitOid headCommitOid manifestDigest }
+    authorizations {
+      nodes {
+        id mergeSnapshotId outcome policyVersion inputDigest decisionDigest reasonCount decidedAt
+      }
+      pageInfo { endCursor hasNextPage }
+    }
+  }
+}
+
+query ProjectDeliveryRelease($repositoryId: ID!, $releaseSetId: ID!) {
+  projectReleaseSet(repositoryId: $repositoryId, releaseSetId: $releaseSetId) {
+    project { id name scope }
+    releaseSet {
+      id changeSetId repositoryIds memberCount status verificationStatus
+      releaseDigest preparedAt
+    }
+    members {
+      position repositoryId targetBranch mergeSnapshotId changeSetId mergeCommitOid candidateCount
+    }
+    integrations { repositoryId attemptId attemptNumber outcome failureCode recordedAt }
+    verificationAttemptCount
+    activated
+    compensationRequested
+    completionOutcome
+  }
+}
+
+query DeliveryOperationBatches(
+  $first: Int
+  $after: String
+  $sort: DeliverySort
+  $status: OperationBatchStatus
+  $targetTool: OperationBatchTool
+) {
+  operationBatches(first: $first, after: $after, sort: $sort, status: $status, targetTool: $targetTool) {
+    nodes {
+      id targetTool status total succeeded rejected pending notRun manifestDigest createdAt
+    }
+    pageInfo { endCursor hasNextPage }
+  }
+}
+
+query DeliveryOperationBatch($batchId: ID!, $first: Int, $itemsAfter: String) {
+  operationBatch(batchId: $batchId, first: $first, itemsAfter: $itemsAfter) {
+    batch {
+      id targetTool status total succeeded rejected pending notRun manifestDigest createdAt
+    }
+    items {
+      nodes {
+        index targetTool commandId canonicalInputDigest status
+        outcomeStatus outcomeSummary outcomeCode finishedAt
+      }
+      pageInfo { endCursor hasNextPage }
+    }
+  }
+}

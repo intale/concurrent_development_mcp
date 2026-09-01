@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-RSpec.describe "GraphQL project catalog", :read_model do
+module ProjectCatalogGraphqlSpec
+  RSpec.describe "GraphQL project catalog", :read_model do
   PROJECTS_QUERY = <<~GRAPHQL.freeze
     query Projects($scope: String!, $first: Int, $after: String) {
       projects(scope: $scope, first: $first, after: $after) {
@@ -93,5 +94,6 @@ RSpec.describe "GraphQL project catalog", :read_model do
     @graphql_session ||= ActionDispatch::Integration::Session.new(Rails.application).tap do |session|
       session.host! "localhost"
     end
+  end
   end
 end

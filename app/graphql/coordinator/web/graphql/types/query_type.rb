@@ -123,6 +123,75 @@ module Coordinator::Web::Graphql::Types
       argument :command_id, ID, required: true
     end
 
+    field :project_delivery, DeliveryTypes::ProjectDeliveryType, null: true do
+      description "Latest project-related Candidate, verification, merge, and ReleaseSet projections."
+      argument :after_candidate, String, required: false
+      argument :after_merge_snapshot, String, required: false
+      argument :after_obligation, String, required: false
+      argument :after_release_set, String, required: false
+      argument :candidate_change_set_id, ID, required: false
+      argument :candidate_checkpoint_kind, DeliveryTypes::CandidateCheckpointKindEnum, required: false
+      argument :first, Integer, required: false, default_value: 20
+      argument :obligation_change_set_id, ID, required: false
+      argument :obligation_status, DeliveryTypes::VerificationObligationStatusEnum, required: false
+      argument :release_change_set_id, ID, required: false
+      argument :release_status, DeliveryTypes::ReleaseSetStatusEnum, required: false
+      argument :repository_id, ID, required: true
+      argument :sort, DeliveryTypes::DeliverySortEnum, required: false, default_value: "newest_first"
+    end
+
+    field :project_candidate_checkpoint, DeliveryTypes::ProjectCandidateCheckpointType, null: true do
+      description "One project Candidate checkpoint and one bounded semantic impact direction."
+      argument :candidate_id, ID, required: true
+      argument :direction, DeliveryTypes::CandidateImpactDirectionEnum, required: false, default_value: "outgoing"
+      argument :first, Integer, required: false, default_value: 20
+      argument :impacts_after, String, required: false
+      argument :repository_id, ID, required: true
+    end
+
+    field :project_verification_obligation,
+          DeliveryTypes::ProjectVerificationObligationType,
+          null: true do
+      description "One project-related verification obligation with bounded evidence facts."
+      argument :evidence_after, String, required: false
+      argument :evidence_first, Integer, required: false, default_value: 20
+      argument :obligation_id, ID, required: true
+      argument :repository_id, ID, required: true
+    end
+
+    field :project_merge_snapshot, DeliveryTypes::ProjectMergeSnapshotType, null: true do
+      description "One project merge snapshot with candidates and bounded authorization decisions."
+      argument :authorizations_after, String, required: false
+      argument :authorizations_first, Integer, required: false, default_value: 20
+      argument :merge_snapshot_id, ID, required: true
+      argument :repository_id, ID, required: true
+    end
+
+    field :project_release_set, DeliveryTypes::ProjectReleaseSetType, null: true do
+      description "One ReleaseSet whose persisted ordered members include the exact project."
+      argument :release_set_id, ID, required: true
+      argument :repository_id, ID, required: true
+    end
+
+    field :operation_batches,
+          DeliveryTypes::OperationBatchConnectionType,
+          null: false,
+          connection: false do
+      description "Global operation-batch progress without inferred project attribution."
+      argument :after, String, required: false
+      argument :first, Integer, required: false, default_value: 20
+      argument :sort, DeliveryTypes::DeliverySortEnum, required: false, default_value: "newest_first"
+      argument :status, DeliveryTypes::OperationBatchStatusEnum, required: false
+      argument :target_tool, DeliveryTypes::OperationBatchToolEnum, required: false
+    end
+
+    field :operation_batch, DeliveryTypes::OperationBatchDetailType, null: true do
+      description "One global operation batch with bounded typed item outcomes."
+      argument :batch_id, ID, required: true
+      argument :first, Integer, required: false, default_value: 50
+      argument :items_after, String, required: false
+    end
+
     def projects(scope:, first:, after: nil)
       query = Coordinator::Read::Queries::RepositoryList.new.call(
         scope:,
@@ -500,7 +569,262 @@ module Coordinator::Web::Graphql::Types
       raise_governance_query_error(error)
     end
 
+    def project_delivery(
+      repository_id:,
+      first:,
+      sort:,
+      after_candidate: nil,
+      after_merge_snapshot: nil,
+      after_obligation: nil,
+      after_release_set: nil,
+      candidate_change_set_id: nil,
+      candidate_checkpoint_kind: nil,
+      obligation_change_set_id: nil,
+      obligation_status: nil,
+      release_change_set_id: nil,
+      release_status: nil
+    )
+      candidate_filters = delivery_filters(
+        repository_id:,
+        change_set_id: candidate_change_set_id,
+        checkpoint_kind: candidate_checkpoint_kind,
+        sort:
+      )
+      obligation_filters = delivery_filters(
+        repository_id:,
+        change_set_id: obligation_change_set_id,
+        status: obligation_status,
+        sort:
+      )
+      merge_filters = delivery_filters(repository_id:, sort:)
+      release_filters = delivery_filters(
+        repository_id:,
+        change_set_id: release_change_set_id,
+        status: release_status,
+        sort:
+      )
+      candidate_cursor = delivery_cursor(after_candidate, "candidates", filters: candidate_filters)
+      obligation_cursor = delivery_cursor(after_obligation, "obligations", filters: obligation_filters)
+      merge_cursor = delivery_cursor(after_merge_snapshot, "merge-snapshots", filters: merge_filters)
+      release_cursor = delivery_cursor(after_release_set, "release-sets", filters: release_filters)
+      catalog = delivery_browser.catalog(
+        repository_id:,
+        first:,
+        sort:,
+        candidate_change_set_id:,
+        candidate_checkpoint_kind:,
+        candidate_after_position: candidate_cursor&.fetch("position", nil),
+        candidate_after_id: candidate_cursor&.fetch("id", nil),
+        obligation_change_set_id:,
+        obligation_status:,
+        obligation_after_position: obligation_cursor&.fetch("position", nil),
+        obligation_after_id: obligation_cursor&.fetch("id", nil),
+        merge_after_position: merge_cursor&.fetch("position", nil),
+        merge_after_id: merge_cursor&.fetch("id", nil),
+        release_change_set_id:,
+        release_status:,
+        release_after_position: release_cursor&.fetch("position", nil),
+        release_after_id: release_cursor&.fetch("id", nil)
+      )
+      return unless catalog
+
+      {
+        project: catalog.project,
+        candidates: delivery_timeline_connection(catalog.candidates, "candidates", filters: candidate_filters),
+        obligations: delivery_timeline_connection(catalog.obligations, "obligations", filters: obligation_filters),
+        merge_snapshots: delivery_timeline_connection(
+          catalog.merge_snapshots,
+          "merge-snapshots",
+          filters: merge_filters
+        ),
+        release_sets: delivery_timeline_connection(catalog.release_sets, "release-sets", filters: release_filters)
+      }
+    rescue Coordinator::Web::Graphql::InvalidCursor => error
+      raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::DeliveryBrowserQueryError => error
+      raise_delivery_query_error(error)
+    end
+
+    def project_candidate_checkpoint(repository_id:, candidate_id:, direction:, first:, impacts_after: nil)
+      filters = delivery_filters(repository_id:, candidate_id:, direction:)
+      detail = delivery_browser.candidate(
+        repository_id:,
+        candidate_id:,
+        direction:,
+        first:,
+        after_impact_position: delivery_cursor(
+          impacts_after,
+          "candidate-impacts",
+          filters:
+        )
+      )
+      return unless detail
+
+      {
+        project: detail.project,
+        checkpoint: detail.candidate,
+        impact_direction: detail.impacts.direction,
+        impact_surface_digest: detail.impacts.impact_surface&.surface_digest,
+        impact_relationships: {
+          nodes: detail.impacts.relationships,
+          page_info: {
+            end_cursor: detail.impacts.next_global_position &&
+              Coordinator::Web::Graphql::DeliveryBrowserCursor.encode(
+                "candidate-impacts",
+                filters:,
+                cursor: detail.impacts.next_global_position
+              ),
+            has_next_page: detail.impacts.has_more
+          }
+        }
+      }
+    rescue Coordinator::Web::Graphql::InvalidCursor => error
+      raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::DeliveryBrowserQueryError => error
+      raise_delivery_query_error(error)
+    end
+
+    def project_verification_obligation(
+      repository_id:,
+      obligation_id:,
+      evidence_first:,
+      evidence_after: nil
+    )
+      filters = delivery_filters(repository_id:, obligation_id:)
+      cursor = delivery_cursor(evidence_after, "evidence", filters:)
+      detail = delivery_browser.verification(
+        repository_id:,
+        obligation_id:,
+        first: evidence_first,
+        after_evidence_position: cursor&.fetch("position", nil),
+        after_evidence_id: cursor&.fetch("id", nil)
+      )
+      return unless detail
+
+      {
+        project: detail.project,
+        obligation: detail.obligation,
+        required_evidence: detail.required_evidence,
+        reasons: detail.reasons,
+        evidence: delivery_timeline_connection(detail.evidence, "evidence", filters:)
+      }
+    rescue Coordinator::Web::Graphql::InvalidCursor => error
+      raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::DeliveryBrowserQueryError => error
+      raise_delivery_query_error(error)
+    end
+
+    def project_merge_snapshot(
+      repository_id:,
+      merge_snapshot_id:,
+      authorizations_first:,
+      authorizations_after: nil
+    )
+      filters = delivery_filters(repository_id:, merge_snapshot_id:)
+      cursor = delivery_cursor(authorizations_after, "authorizations", filters:)
+      detail = delivery_browser.merge(
+        repository_id:,
+        merge_snapshot_id:,
+        first: authorizations_first,
+        after_authorization_position: cursor&.fetch("position", nil),
+        after_authorization_id: cursor&.fetch("id", nil)
+      )
+      return unless detail
+
+      {
+        project: detail.project,
+        snapshot: detail.snapshot,
+        candidates: detail.candidates,
+        authorizations: delivery_timeline_connection(
+          detail.authorizations,
+          "authorizations",
+          filters:
+        )
+      }
+    rescue Coordinator::Web::Graphql::InvalidCursor => error
+      raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::DeliveryBrowserQueryError => error
+      raise_delivery_query_error(error)
+    end
+
+    def project_release_set(repository_id:, release_set_id:)
+      delivery_browser.release(repository_id:, release_set_id:)
+    rescue Coordinator::Read::Web::DeliveryBrowserQueryError => error
+      raise_delivery_query_error(error)
+    end
+
+    def operation_batches(first:, sort:, after: nil, status: nil, target_tool: nil)
+      filters = delivery_filters(sort:, status:, target_tool:)
+      cursor = delivery_cursor(after, "operation-batches", filters:)
+      page = delivery_browser.batches(
+        first:,
+        sort:,
+        status:,
+        target_tool:,
+        after_position: cursor&.fetch("position", nil),
+        after_id: cursor&.fetch("id", nil)
+      )
+      delivery_timeline_connection(page, "operation-batches", filters:)
+    rescue Coordinator::Web::Graphql::InvalidCursor => error
+      raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::DeliveryBrowserQueryError => error
+      raise_delivery_query_error(error)
+    end
+
+    def operation_batch(batch_id:, first:, items_after: nil)
+      filters = delivery_filters(batch_id:)
+      detail = delivery_browser.batch(
+        batch_id:,
+        first:,
+        after_index: delivery_cursor(items_after, "operation-batch-items", filters:)
+      )
+      return unless detail
+
+      {
+        batch: detail.batch,
+        items: {
+          nodes: detail.items.items,
+          page_info: {
+            end_cursor: detail.items.next_index &&
+              Coordinator::Web::Graphql::DeliveryBrowserCursor.encode(
+                "operation-batch-items",
+                filters:,
+                cursor: detail.items.next_index
+              ),
+            has_next_page: detail.items.has_more
+          }
+        }
+      }
+    rescue Coordinator::Web::Graphql::InvalidCursor => error
+      raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::DeliveryBrowserQueryError => error
+      raise_delivery_query_error(error)
+    end
+
     private
+
+    def delivery_filters(**values)
+      values.compact.transform_keys(&:to_s)
+    end
+
+    def delivery_cursor(value, kind, filters:)
+      Coordinator::Web::Graphql::DeliveryBrowserCursor.decode(value, kind, filters:)
+    end
+
+    def delivery_timeline_connection(page, kind, filters:)
+      cursor = page.next_cursor
+      {
+        nodes: page.items,
+        page_info: {
+          end_cursor: cursor && Coordinator::Web::Graphql::DeliveryBrowserCursor.encode(
+            kind,
+            filters:,
+            cursor: { "position" => cursor.position, "id" => cursor.id }
+          ),
+          has_next_page: page.has_more
+        }
+      }
+    end
 
     def connection(page, kind)
       {
@@ -678,6 +1002,10 @@ module Coordinator::Web::Graphql::Types
       @governance_browser ||= Coordinator::Read::Web::Queries::GovernanceBrowser.new
     end
 
+    def delivery_browser
+      @delivery_browser ||= Coordinator::Read::Web::Queries::DeliveryBrowser.new
+    end
+
     def raise_knowledge_query_error(error)
       raise GraphQL::ExecutionError.new(
         error.message,
@@ -686,6 +1014,13 @@ module Coordinator::Web::Graphql::Types
     end
 
     def raise_governance_query_error(error)
+      raise GraphQL::ExecutionError.new(
+        error.message,
+        extensions: { code: "INVALID_INPUT", details: error.details }
+      )
+    end
+
+    def raise_delivery_query_error(error)
       raise GraphQL::ExecutionError.new(
         error.message,
         extensions: { code: "INVALID_INPUT", details: error.details }

@@ -12,6 +12,9 @@ const config: CodegenConfig = {
       config: {
         defaultScalarType: "unknown",
         immutableTypes: true,
+        scalars: {
+          BigInt: "string"
+        },
         strictScalars: true,
         useTypeImports: true
       }
