@@ -175,6 +175,24 @@ enum CommandReceiptStatus {
   OK
 }
 
+type CoordinationAttempt {
+  abandonmentReason: String
+  agentId: String!
+  authorizedAt: String!
+  baseSnapshots: [CoordinationBaseSnapshot!]!
+  id: ID!
+  selectedCandidateId: ID
+  startedAt: String
+  status: String!
+  terminalAt: String
+}
+
+type CoordinationBaseSnapshot {
+  commitOid: String!
+  objectFormat: String!
+  repositoryId: ID!
+}
+
 type CoordinationChangeSet {
   acceptanceCriteria: [String!]!
   domainStatus: String!
@@ -191,6 +209,16 @@ type CoordinationChangeSetConnection {
   pageInfo: PageInfo!
 }
 
+type CoordinationCheckpoint {
+  checkpointKind: String!
+  evidenceStatus: String!
+  headCommitOid: String!
+  id: ID!
+  manifestDigest: String!
+  submittedAt: String!
+  targetBranch: String!
+}
+
 type CoordinationDependency {
   blocking: Boolean!
   consumerRepositoryId: ID
@@ -201,6 +229,7 @@ type CoordinationDependency {
   lastProcessedAt: String!
   producerRepositoryId: ID
   producerWorkItemId: ID!
+  requiredOutput: CoordinationRequiredOutput
   satisfiedAt: String
 }
 
@@ -221,6 +250,11 @@ type CoordinationProject {
   id: ID!
   name: String
   scope: String!
+}
+
+type CoordinationRequiredOutput {
+  key: String!
+  kind: String!
 }
 
 type CoordinationWorkItem {
@@ -248,6 +282,12 @@ type CoordinationWorkItem {
 type CoordinationWorkItemConnection {
   nodes: [CoordinationWorkItem!]!
   pageInfo: PageInfo!
+}
+
+type CoordinationWorkItemDetail {
+  attempt: CoordinationAttempt
+  checkpoint: CoordinationCheckpoint
+  workItem: CoordinationWorkItem!
 }
 
 type DecisionAuthority {
@@ -700,13 +740,6 @@ type ProjectConnection {
   pageInfo: PageInfo!
 }
 
-type ProjectCoordination {
-  changeSets: CoordinationChangeSetConnection!
-  dependencies: CoordinationDependencyConnection!
-  project: CoordinationProject!
-  workItems: CoordinationWorkItemConnection!
-}
-
 type ProjectDecision {
   decision: GovernanceDecision!
   membershipBases: [String!]!
@@ -899,9 +932,14 @@ type Query {
   projectCandidateCheckpoint(candidateId: ID!, direction: CandidateImpactDirection = OUTGOING, first: Int = 20, impactsAfter: String, repositoryId: ID!): ProjectCandidateCheckpoint
 
   """
-  Latest available coordination facts for one registered project.
+  Resolve one ChangeSet only when it belongs to the exact Project scope.
   """
-  projectCoordination(blocking: Boolean, changeSetsAfter: String, dependenciesAfter: String, first: Int = 20, presentationStatuses: [CoordinationPresentationStatus!], repositoryId: ID!, workItemSort: WorkItemSort = WORK_ITEM_ID_ASC, workItemsAfter: String): ProjectCoordination
+  projectChangeSet(changeSetId: ID!, projectRef: ID!): CoordinationChangeSet
+
+  """
+  Page current ChangeSets whose WorkItems belong to the exact Project scope.
+  """
+  projectChangeSets(after: String, first: Int = 20, projectRef: ID!): CoordinationChangeSetConnection
 
   """
   One Decision deterministically associated with the exact project.
@@ -912,6 +950,16 @@ type Query {
   Latest project-related Candidate, verification, merge, and ReleaseSet projections.
   """
   projectDelivery(afterCandidate: String, afterMergeSnapshot: String, afterObligation: String, afterReleaseSet: String, candidateChangeSetId: ID, candidateCheckpointKind: CandidateCheckpointKind, first: Int = 20, obligationChangeSetId: ID, obligationStatus: VerificationObligationStatus, releaseChangeSetId: ID, releaseStatus: ReleaseSetStatus, repositoryId: ID!, sort: DeliverySort = NEWEST_FIRST): ProjectDelivery
+
+  """
+  Page current WorkItem dependencies touching the exact Project scope.
+  """
+  projectDependencies(after: String, blocking: Boolean, first: Int = 20, projectRef: ID!): CoordinationDependencyConnection
+
+  """
+  Resolve one dependency only when a producer or consumer belongs to the Project.
+  """
+  projectDependency(dependencyId: ID!, projectRef: ID!): CoordinationDependency
 
   """
   Project-scoped Decisions, guidance, AgentChoices, and decision impacts.
@@ -957,6 +1005,16 @@ type Query {
   One project-related verification obligation with bounded evidence facts.
   """
   projectVerificationObligation(evidenceAfter: String, evidenceFirst: Int = 20, obligationId: ID!, repositoryId: ID!): ProjectVerificationObligation
+
+  """
+  Resolve one project WorkItem with its current or latest Attempt and checkpoint.
+  """
+  projectWorkItem(projectRef: ID!, workItemId: ID!): CoordinationWorkItemDetail
+
+  """
+  Page current WorkItems in the exact Project scope with server-driven filters.
+  """
+  projectWorkItems(after: String, agentId: String, changeSetId: ID, first: Int = 20, presentationStatuses: [CoordinationPresentationStatus!], projectRef: ID!, sort: WorkItemSort = WORK_ITEM_ID_ASC): CoordinationWorkItemConnection
 
   """
   Discover exact Project scopes with bounded Repository-member previews.

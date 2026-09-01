@@ -3,8 +3,14 @@ module Coordinator
     module Web
       module Queries
         class CoordinationDashboard
-          def initialize: (?contract: Contracts::CoordinationDashboard, ?repository: Repositories::CoordinationDashboard) -> void
-          def call: (command_input input) -> CoordinationDashboardV1?
+          def initialize: (
+            ?page_contract: Contracts::CoordinationDashboard::Page,
+            ?detail_contract: Contracts::CoordinationDashboard::Detail,
+            ?repository: Repositories::CoordinationDashboard,
+            ?project_reference: ProjectReference
+          ) -> void
+          def page: (command_input input) -> (CoordinationDashboardV1::ChangeSetPage | CoordinationDashboardV1::WorkItemPage | CoordinationDashboardV1::DependencyPage)?
+          def detail: (command_input input) -> (CoordinationDashboardV1::ChangeSet | CoordinationDashboardV1::WorkItemDetail | CoordinationDashboardV1::Dependency)?
         end
       end
     end

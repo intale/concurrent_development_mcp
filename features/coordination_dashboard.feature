@@ -15,6 +15,11 @@ Feature: Inspect current project coordination
       When the browser queries the projected coordination dashboard
       Then both running agents retain their distinct Attempt attribution
 
+    Scenario: A selected WorkItem keeps its Attempt and checkpoint in one focused detail
+      Given projected dashboard rows contain a running WorkItem with a Candidate checkpoint
+      When the browser opens the projected WorkItem detail
+      Then the WorkItem detail presents its exact Attempt and checkpoint attribution
+
   Rule: Dependencies remain explicit and eventual consistency remains available
 
     @UI-GWT-07

@@ -2,7 +2,14 @@ module Coordinator
   module Read
     module Web
       module Contracts
-        class CoordinationDashboard < Dry::Validation::Contract
+        class CoordinationDashboard
+          PRESENTATION_STATUSES: Array[String]
+
+          class Page < Dry::Validation::Contract
+          end
+
+          class Detail < Dry::Validation::Contract
+          end
         end
       end
     end

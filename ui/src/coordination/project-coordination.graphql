@@ -1,88 +1,121 @@
-query ProjectCoordination(
-  $repositoryId: ID!
+fragment CoordinationChangeSetFields on CoordinationChangeSet {
+  id
+  goal
+  acceptanceCriteria
+  domainStatus
+  workItemCount
+  runningWorkItemCount
+  openWorkItemCount
+  lastProcessedAt
+}
+
+fragment CoordinationWorkItemFields on CoordinationWorkItem {
+  id
+  changeSetId
+  repositoryId
+  goal
+  acceptanceCriteria
+  competitiveMode
+  domainStatus
+  presentationStatus
+  activeAttemptId
+  activeAgentId
+  attemptStatus
+  attemptAuthorizedAt
+  attemptStartedAt
+  attemptTerminalAt
+  createdAt
+  madeReadyAt
+  acquiredAt
+  completedAt
+  lastProcessedAt
+}
+
+fragment CoordinationDependencyFields on CoordinationDependency {
+  id
+  producerWorkItemId
+  consumerWorkItemId
+  producerRepositoryId
+  consumerRepositoryId
+  dependencyKind
+  requiredOutput { kind key }
+  blocking
+  declaredAt
+  satisfiedAt
+  lastProcessedAt
+}
+
+query ProjectChangeSets($projectRef: ID!, $first: Int, $after: String) {
+  projectChangeSets(projectRef: $projectRef, first: $first, after: $after) {
+    nodes { ...CoordinationChangeSetFields }
+    pageInfo { endCursor hasNextPage }
+  }
+}
+
+query ProjectChangeSet($projectRef: ID!, $changeSetId: ID!) {
+  projectChangeSet(projectRef: $projectRef, changeSetId: $changeSetId) {
+    ...CoordinationChangeSetFields
+  }
+}
+
+query ProjectWorkItems(
+  $projectRef: ID!
   $first: Int
-  $changeSetsAfter: String
-  $workItemsAfter: String
-  $dependenciesAfter: String
+  $after: String
   $presentationStatuses: [CoordinationPresentationStatus!]
-  $workItemSort: WorkItemSort
-  $blocking: Boolean
+  $sort: WorkItemSort
+  $changeSetId: ID
+  $agentId: String
 ) {
-  projectCoordination(
-    repositoryId: $repositoryId
+  projectWorkItems(
+    projectRef: $projectRef
     first: $first
-    changeSetsAfter: $changeSetsAfter
-    workItemsAfter: $workItemsAfter
-    dependenciesAfter: $dependenciesAfter
+    after: $after
     presentationStatuses: $presentationStatuses
-    workItemSort: $workItemSort
-    blocking: $blocking
+    sort: $sort
+    changeSetId: $changeSetId
+    agentId: $agentId
   ) {
-    project {
+    nodes { ...CoordinationWorkItemFields }
+    pageInfo { endCursor hasNextPage }
+  }
+}
+
+query ProjectWorkItem($projectRef: ID!, $workItemId: ID!) {
+  projectWorkItem(projectRef: $projectRef, workItemId: $workItemId) {
+    workItem { ...CoordinationWorkItemFields }
+    attempt {
       id
-      name
-      scope
+      agentId
+      status
+      selectedCandidateId
+      abandonmentReason
+      authorizedAt
+      startedAt
+      terminalAt
+      baseSnapshots { repositoryId objectFormat commitOid }
     }
-    changeSets {
-      nodes {
-        id
-        goal
-        acceptanceCriteria
-        domainStatus
-        workItemCount
-        runningWorkItemCount
-        openWorkItemCount
-        lastProcessedAt
-      }
-      pageInfo {
-        endCursor
-        hasNextPage
-      }
+    checkpoint {
+      id
+      checkpointKind
+      targetBranch
+      headCommitOid
+      manifestDigest
+      evidenceStatus
+      submittedAt
     }
-    workItems {
-      nodes {
-        id
-        changeSetId
-        repositoryId
-        goal
-        acceptanceCriteria
-        competitiveMode
-        domainStatus
-        presentationStatus
-        activeAttemptId
-        activeAgentId
-        attemptStatus
-        attemptAuthorizedAt
-        attemptStartedAt
-        attemptTerminalAt
-        createdAt
-        madeReadyAt
-        acquiredAt
-        completedAt
-        lastProcessedAt
-      }
-      pageInfo {
-        endCursor
-        hasNextPage
-      }
-    }
-    dependencies {
-      nodes {
-        id
-        producerWorkItemId
-        consumerWorkItemId
-        producerRepositoryId
-        consumerRepositoryId
-        dependencyKind
-        blocking
-        declaredAt
-        satisfiedAt
-        lastProcessedAt
-      }
-      pageInfo {
-        endCursor
-        hasNextPage
-      }
-    }
+  }
+}
+
+query ProjectDependencies($projectRef: ID!, $first: Int, $after: String, $blocking: Boolean) {
+  projectDependencies(projectRef: $projectRef, first: $first, after: $after, blocking: $blocking) {
+    nodes { ...CoordinationDependencyFields }
+    pageInfo { endCursor hasNextPage }
+  }
+}
+
+query ProjectDependency($projectRef: ID!, $dependencyId: ID!) {
+  projectDependency(projectRef: $projectRef, dependencyId: $dependencyId) {
+    ...CoordinationDependencyFields
   }
 }

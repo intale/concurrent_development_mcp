@@ -1,40 +1,95 @@
-import { ProjectCoordinationDocument } from "../gql/graphql.js";
+import {
+  ProjectChangeSetDocument,
+  ProjectChangeSetsDocument,
+  ProjectDependenciesDocument,
+  ProjectDependencyDocument,
+  ProjectWorkItemDocument,
+  ProjectWorkItemsDocument
+} from "../gql/graphql.js";
 import type {
   CoordinationPresentationStatus,
-  ProjectCoordinationQuery,
-  ProjectCoordinationQueryVariables,
+  ProjectChangeSetQuery,
+  ProjectChangeSetsQuery,
+  ProjectDependenciesQuery,
+  ProjectDependencyQuery,
+  ProjectWorkItemQuery,
+  ProjectWorkItemsQuery,
   WorkItemSort
 } from "../gql/graphql.js";
 import { executeGraphql } from "../graphql-client.js";
 
 export const COORDINATION_PAGE_SIZE = 20;
 
-export interface CoordinationFilters {
-  readonly blocking?: boolean;
+export interface WorkItemFilters {
+  readonly agentId?: string;
+  readonly changeSetId?: string;
   readonly presentationStatuses: readonly CoordinationPresentationStatus[];
-  readonly workItemSort: WorkItemSort;
+  readonly sort: WorkItemSort;
 }
 
-export interface CoordinationCursors {
-  readonly changeSetsAfter?: string;
-  readonly dependenciesAfter?: string;
-  readonly workItemsAfter?: string;
-}
-
-export function fetchProjectCoordination(
-  repositoryId: string,
-  filters: CoordinationFilters,
-  cursors: CoordinationCursors,
+export function fetchProjectChangeSets(
+  projectRef: string,
+  after: string | undefined,
   signal?: AbortSignal
-): Promise<ProjectCoordinationQuery> {
-  const variables: ProjectCoordinationQueryVariables = {
-    repositoryId,
+): Promise<ProjectChangeSetsQuery> {
+  return executeGraphql(ProjectChangeSetsDocument, {
+    projectRef,
+    first: COORDINATION_PAGE_SIZE,
+    ...(after ? { after } : {})
+  }, signal);
+}
+
+export function fetchProjectChangeSet(
+  projectRef: string,
+  changeSetId: string,
+  signal?: AbortSignal
+): Promise<ProjectChangeSetQuery> {
+  return executeGraphql(ProjectChangeSetDocument, { projectRef, changeSetId }, signal);
+}
+
+export function fetchProjectWorkItems(
+  projectRef: string,
+  filters: WorkItemFilters,
+  after: string | undefined,
+  signal?: AbortSignal
+): Promise<ProjectWorkItemsQuery> {
+  return executeGraphql(ProjectWorkItemsDocument, {
+    projectRef,
     first: COORDINATION_PAGE_SIZE,
     presentationStatuses: filters.presentationStatuses,
-    workItemSort: filters.workItemSort,
-    ...(filters.blocking === undefined ? {} : { blocking: filters.blocking }),
-    ...cursors
-  };
+    sort: filters.sort,
+    ...(after ? { after } : {}),
+    ...(filters.changeSetId ? { changeSetId: filters.changeSetId } : {}),
+    ...(filters.agentId ? { agentId: filters.agentId } : {})
+  }, signal);
+}
 
-  return executeGraphql(ProjectCoordinationDocument, variables, signal);
+export function fetchProjectWorkItem(
+  projectRef: string,
+  workItemId: string,
+  signal?: AbortSignal
+): Promise<ProjectWorkItemQuery> {
+  return executeGraphql(ProjectWorkItemDocument, { projectRef, workItemId }, signal);
+}
+
+export function fetchProjectDependencies(
+  projectRef: string,
+  blocking: boolean | undefined,
+  after: string | undefined,
+  signal?: AbortSignal
+): Promise<ProjectDependenciesQuery> {
+  return executeGraphql(ProjectDependenciesDocument, {
+    projectRef,
+    first: COORDINATION_PAGE_SIZE,
+    ...(after ? { after } : {}),
+    ...(blocking === undefined ? {} : { blocking })
+  }, signal);
+}
+
+export function fetchProjectDependency(
+  projectRef: string,
+  dependencyId: string,
+  signal?: AbortSignal
+): Promise<ProjectDependencyQuery> {
+  return executeGraphql(ProjectDependencyDocument, { projectRef, dependencyId }, signal);
 }

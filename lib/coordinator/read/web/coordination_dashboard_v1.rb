@@ -1,11 +1,10 @@
 # frozen_string_literal: true
 
 module Coordinator::Read::Web
-  class CoordinationDashboardV1 < Coordinator::Shared::Value
-    class Project < Coordinator::Shared::Value
-      attribute :repository_id, Coordinator::Shared::Types::UuidV7
-      attribute :scope, Coordinator::Shared::Types::String
-      attribute :display_name, Coordinator::Shared::Types::String.optional
+  class CoordinationDashboardV1
+    class Cursor < Coordinator::Shared::Value
+      attribute :id, Coordinator::Shared::Types::String
+      attribute :sort_value, Coordinator::Shared::Types::String.optional
     end
 
     class ChangeSet < Coordinator::Shared::Value
@@ -38,7 +37,13 @@ module Coordinator::Read::Web
       attribute :made_ready_at, Coordinator::Shared::Types::String.optional
       attribute :acquired_at, Coordinator::Shared::Types::String.optional
       attribute :completed_at, Coordinator::Shared::Types::String.optional
+      attribute :latest_activity_at, Coordinator::Shared::Types::String
       attribute :last_processed_at, Coordinator::Shared::Types::String
+    end
+
+    class RequiredOutput < Coordinator::Shared::Value
+      attribute :kind, Coordinator::Shared::Types::String
+      attribute :key, Coordinator::Shared::Types::String
     end
 
     class Dependency < Coordinator::Shared::Value
@@ -48,33 +53,63 @@ module Coordinator::Read::Web
       attribute :producer_repository_id, Coordinator::Shared::Types::UuidV7.optional
       attribute :consumer_repository_id, Coordinator::Shared::Types::UuidV7.optional
       attribute :dependency_kind, Coordinator::Shared::Types::String
+      attribute :required_output, RequiredOutput.optional
       attribute :blocking, Coordinator::Shared::Types::Strict::Bool
       attribute :declared_at, Coordinator::Shared::Types::String
       attribute :satisfied_at, Coordinator::Shared::Types::String.optional
       attribute :last_processed_at, Coordinator::Shared::Types::String
     end
 
+    class BaseSnapshot < Coordinator::Shared::Value
+      attribute :repository_id, Coordinator::Shared::Types::UuidV7
+      attribute :object_format, Coordinator::Shared::Types::String
+      attribute :commit_oid, Coordinator::Shared::Types::String
+    end
+
+    class Attempt < Coordinator::Shared::Value
+      attribute :attempt_id, Coordinator::Shared::Types::String
+      attribute :agent_id, Coordinator::Shared::Types::String
+      attribute :status, Coordinator::Shared::Types::String
+      attribute :base_snapshots, Coordinator::Shared::Types::Array.of(BaseSnapshot)
+      attribute :selected_candidate_id, Coordinator::Shared::Types::String.optional
+      attribute :abandonment_reason, Coordinator::Shared::Types::String.optional
+      attribute :authorized_at, Coordinator::Shared::Types::String
+      attribute :started_at, Coordinator::Shared::Types::String.optional
+      attribute :terminal_at, Coordinator::Shared::Types::String.optional
+    end
+
+    class Checkpoint < Coordinator::Shared::Value
+      attribute :candidate_id, Coordinator::Shared::Types::String
+      attribute :checkpoint_kind, Coordinator::Shared::Types::String
+      attribute :target_branch, Coordinator::Shared::Types::String
+      attribute :head_commit_oid, Coordinator::Shared::Types::String
+      attribute :manifest_digest, Coordinator::Shared::Types::String
+      attribute :evidence_status, Coordinator::Shared::Types::String
+      attribute :submitted_at, Coordinator::Shared::Types::String
+    end
+
+    class WorkItemDetail < Coordinator::Shared::Value
+      attribute :work_item, WorkItem
+      attribute :attempt, Attempt.optional
+      attribute :checkpoint, Checkpoint.optional
+    end
+
     class ChangeSetPage < Coordinator::Shared::Value
       attribute :items, Coordinator::Shared::Types::Array.of(ChangeSet)
-      attribute :next_offset, Coordinator::Shared::Types::Integer.optional
+      attribute :next_cursor, Cursor.optional
       attribute :has_more, Coordinator::Shared::Types::Strict::Bool
     end
 
     class WorkItemPage < Coordinator::Shared::Value
       attribute :items, Coordinator::Shared::Types::Array.of(WorkItem)
-      attribute :next_offset, Coordinator::Shared::Types::Integer.optional
+      attribute :next_cursor, Cursor.optional
       attribute :has_more, Coordinator::Shared::Types::Strict::Bool
     end
 
     class DependencyPage < Coordinator::Shared::Value
       attribute :items, Coordinator::Shared::Types::Array.of(Dependency)
-      attribute :next_offset, Coordinator::Shared::Types::Integer.optional
+      attribute :next_cursor, Cursor.optional
       attribute :has_more, Coordinator::Shared::Types::Strict::Bool
     end
-
-    attribute :project, Project
-    attribute :change_sets, ChangeSetPage
-    attribute :work_items, WorkItemPage
-    attribute :dependencies, DependencyPage
   end
 end

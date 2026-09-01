@@ -1,15 +1,30 @@
 module Coordinator
   module Read
     module Web
-      class CoordinationDashboardQueryV1 < Shared::Value
-        def repository_id: () -> String
-        def first: () -> Integer
-        def change_set_offset: () -> Integer
-        def work_item_offset: () -> Integer
-        def dependency_offset: () -> Integer
-        def presentation_statuses: () -> Array[String]
-        def work_item_sort: () -> String
-        def blocking: () -> bool?
+      class CoordinationDashboardQueryV1
+        KINDS: Array[String]
+        WORK_ITEM_SORTS: Array[String]
+
+        class Page < Shared::Value
+          def project_ref: () -> String
+          def scope: () -> String
+          def kind: () -> String
+          def first: () -> Integer
+          def after_id: () -> String?
+          def after_sort_value: () -> String?
+          def presentation_statuses: () -> Array[String]
+          def work_item_sort: () -> String
+          def blocking: () -> bool?
+          def change_set_id: () -> String?
+          def agent_id: () -> String?
+        end
+
+        class Detail < Shared::Value
+          def project_ref: () -> String
+          def scope: () -> String
+          def kind: () -> String
+          def id: () -> String
+        end
       end
     end
   end

@@ -1,6 +1,13 @@
 # frozen_string_literal: true
 
 module Coordinator::Web::Graphql::Types
+  class CoordinationRequiredOutputType < BaseObject
+    graphql_name "CoordinationRequiredOutput"
+
+    field :key, String, null: false
+    field :kind, String, null: false
+  end
+
   class CoordinationDependencyType < BaseObject
     graphql_name "CoordinationDependency"
 
@@ -13,6 +20,7 @@ module Coordinator::Web::Graphql::Types
     field :last_processed_at, String, null: false
     field :producer_repository_id, ID, null: true
     field :producer_work_item_id, ID, null: false
+    field :required_output, CoordinationRequiredOutputType, null: true
     field :satisfied_at, String, null: true
   end
 end

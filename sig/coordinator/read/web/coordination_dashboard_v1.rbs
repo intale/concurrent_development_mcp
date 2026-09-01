@@ -1,11 +1,10 @@
 module Coordinator
   module Read
     module Web
-      class CoordinationDashboardV1 < Shared::Value
-        class Project < Shared::Value
-          def repository_id: () -> String
-          def scope: () -> String
-          def display_name: () -> String?
+      class CoordinationDashboardV1
+        class Cursor < Shared::Value
+          def id: () -> String
+          def sort_value: () -> String?
         end
 
         class ChangeSet < Shared::Value
@@ -38,7 +37,13 @@ module Coordinator
           def made_ready_at: () -> String?
           def acquired_at: () -> String?
           def completed_at: () -> String?
+          def latest_activity_at: () -> String
           def last_processed_at: () -> String
+        end
+
+        class RequiredOutput < Shared::Value
+          def kind: () -> String
+          def key: () -> String
         end
 
         class Dependency < Shared::Value
@@ -48,34 +53,64 @@ module Coordinator
           def producer_repository_id: () -> String?
           def consumer_repository_id: () -> String?
           def dependency_kind: () -> String
+          def required_output: () -> RequiredOutput?
           def blocking: () -> bool
           def declared_at: () -> String
           def satisfied_at: () -> String?
           def last_processed_at: () -> String
         end
 
+        class BaseSnapshot < Shared::Value
+          def repository_id: () -> String
+          def object_format: () -> String
+          def commit_oid: () -> String
+        end
+
+        class Attempt < Shared::Value
+          def attempt_id: () -> String
+          def agent_id: () -> String
+          def status: () -> String
+          def base_snapshots: () -> Array[BaseSnapshot]
+          def selected_candidate_id: () -> String?
+          def abandonment_reason: () -> String?
+          def authorized_at: () -> String
+          def started_at: () -> String?
+          def terminal_at: () -> String?
+        end
+
+        class Checkpoint < Shared::Value
+          def candidate_id: () -> String
+          def checkpoint_kind: () -> String
+          def target_branch: () -> String
+          def head_commit_oid: () -> String
+          def manifest_digest: () -> String
+          def evidence_status: () -> String
+          def submitted_at: () -> String
+        end
+
+        class WorkItemDetail < Shared::Value
+          def work_item: () -> WorkItem
+          def attempt: () -> Attempt?
+          def checkpoint: () -> Checkpoint?
+        end
+
         class ChangeSetPage < Shared::Value
           def items: () -> Array[ChangeSet]
-          def next_offset: () -> Integer?
+          def next_cursor: () -> Cursor?
           def has_more: () -> bool
         end
 
         class WorkItemPage < Shared::Value
           def items: () -> Array[WorkItem]
-          def next_offset: () -> Integer?
+          def next_cursor: () -> Cursor?
           def has_more: () -> bool
         end
 
         class DependencyPage < Shared::Value
           def items: () -> Array[Dependency]
-          def next_offset: () -> Integer?
+          def next_cursor: () -> Cursor?
           def has_more: () -> bool
         end
-
-        def project: () -> Project
-        def change_sets: () -> ChangeSetPage
-        def work_items: () -> WorkItemPage
-        def dependencies: () -> DependencyPage
       end
     end
   end

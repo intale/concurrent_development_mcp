@@ -3,7 +3,8 @@ module Coordinator
     module Web
       module Repositories
         class CoordinationDashboard
-          def fetch: (CoordinationDashboardQueryV1 query) -> CoordinationDashboardV1?
+          def page: (CoordinationDashboardQueryV1::Page query) -> (CoordinationDashboardV1::ChangeSetPage | CoordinationDashboardV1::WorkItemPage | CoordinationDashboardV1::DependencyPage)?
+          def detail: (CoordinationDashboardQueryV1::Detail query) -> (CoordinationDashboardV1::ChangeSet | CoordinationDashboardV1::WorkItemDetail | CoordinationDashboardV1::Dependency)?
         end
       end
     end

@@ -21,16 +21,48 @@ module Coordinator::Web::Graphql::Types
       argument :repositories_first, Integer, required: false, default_value: 20
     end
 
-    field :project_coordination, ProjectCoordinationType, null: true do
-      description "Latest available coordination facts for one registered project."
-      argument :blocking, Boolean, required: false
-      argument :change_sets_after, String, required: false
-      argument :dependencies_after, String, required: false
+    field :project_change_sets, CoordinationChangeSetConnectionType, null: true, connection: false do
+      description "Page current ChangeSets whose WorkItems belong to the exact Project scope."
+      argument :after, String, required: false
+      argument :first, Integer, required: false, default_value: 20
+      argument :project_ref, ID, required: true
+    end
+
+    field :project_change_set, CoordinationChangeSetType, null: true do
+      description "Resolve one ChangeSet only when it belongs to the exact Project scope."
+      argument :change_set_id, ID, required: true
+      argument :project_ref, ID, required: true
+    end
+
+    field :project_work_items, CoordinationWorkItemConnectionType, null: true, connection: false do
+      description "Page current WorkItems in the exact Project scope with server-driven filters."
+      argument :after, String, required: false
+      argument :agent_id, String, required: false
+      argument :change_set_id, ID, required: false
       argument :first, Integer, required: false, default_value: 20
       argument :presentation_statuses, [ CoordinationPresentationStatusEnum ], required: false
-      argument :repository_id, ID, required: true
-      argument :work_item_sort, WorkItemSortEnum, required: false, default_value: "work_item_id_asc"
-      argument :work_items_after, String, required: false
+      argument :project_ref, ID, required: true
+      argument :sort, WorkItemSortEnum, required: false, default_value: "work_item_id_asc"
+    end
+
+    field :project_work_item, ProjectCoordinationType, null: true do
+      description "Resolve one project WorkItem with its current or latest Attempt and checkpoint."
+      argument :project_ref, ID, required: true
+      argument :work_item_id, ID, required: true
+    end
+
+    field :project_dependencies, CoordinationDependencyConnectionType, null: true, connection: false do
+      description "Page current WorkItem dependencies touching the exact Project scope."
+      argument :after, String, required: false
+      argument :blocking, Boolean, required: false
+      argument :first, Integer, required: false, default_value: 20
+      argument :project_ref, ID, required: true
+    end
+
+    field :project_dependency, CoordinationDependencyType, null: true do
+      description "Resolve one dependency only when a producer or consumer belongs to the Project."
+      argument :dependency_id, ID, required: true
+      argument :project_ref, ID, required: true
     end
 
     field :project_resources, ProjectResourcesType, null: true do
@@ -259,50 +291,104 @@ module Coordinator::Web::Graphql::Types
       )
     end
 
-    def project_coordination(
-      repository_id:,
-      first:,
-      work_item_sort:,
-      blocking: nil,
-      change_sets_after: nil,
-      dependencies_after: nil,
-      presentation_statuses: nil,
-      work_items_after: nil
-    )
-      dashboard = Coordinator::Read::Web::Queries::CoordinationDashboard.new.call(
-        repository_id:,
+    def project_change_sets(project_ref:, first:, after: nil)
+      filters = coordination_filters(project_ref:, first:)
+      cursor = coordination_cursor(after, "change-sets", filters:)
+      page = coordination_dashboard.page(
+        project_ref:,
+        kind: "change_sets",
         first:,
-        change_set_offset: Coordinator::Web::Graphql::DashboardCursor.decode(
-          change_sets_after,
-          "change-sets"
-        ),
-        work_item_offset: Coordinator::Web::Graphql::DashboardCursor.decode(
-          work_items_after,
-          "work-items"
-        ),
-        dependency_offset: Coordinator::Web::Graphql::DashboardCursor.decode(
-          dependencies_after,
-          "dependencies"
-        ),
-        presentation_statuses: presentation_statuses || [],
-        work_item_sort:,
-        blocking:
+        after_id: cursor&.fetch("id", nil)
       )
-      return unless dashboard
-
-      {
-        project: dashboard.project,
-        change_sets: connection(dashboard.change_sets, "change-sets"),
-        work_items: connection(dashboard.work_items, "work-items"),
-        dependencies: connection(dashboard.dependencies, "dependencies")
-      }
+      coordination_connection(page, "change-sets", filters:)
     rescue Coordinator::Web::Graphql::InvalidCursor => error
       raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
+      raise_invalid_project_reference(error)
     rescue Coordinator::Read::Web::CoordinationDashboardQueryError => error
-      raise GraphQL::ExecutionError.new(
-        error.message,
-        extensions: { code: "INVALID_INPUT", details: error.details }
+      raise_coordination_query_error(error)
+    end
+
+    def project_change_set(project_ref:, change_set_id:)
+      coordination_dashboard.detail(project_ref:, kind: "change_sets", id: change_set_id)
+    rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
+      raise_invalid_project_reference(error)
+    rescue Coordinator::Read::Web::CoordinationDashboardQueryError => error
+      raise_coordination_query_error(error)
+    end
+
+    def project_work_items(
+      project_ref:,
+      first:,
+      sort:,
+      after: nil,
+      agent_id: nil,
+      change_set_id: nil,
+      presentation_statuses: nil
+    )
+      statuses = Array(presentation_statuses).uniq.sort
+      filters = coordination_filters(
+        project_ref:,
+        first:,
+        sort:,
+        presentation_statuses: statuses,
+        change_set_id:,
+        agent_id:
       )
+      cursor = coordination_cursor(after, "work-items", filters:)
+      page = coordination_dashboard.page(
+        project_ref:,
+        kind: "work_items",
+        first:,
+        after_id: cursor&.fetch("id", nil),
+        after_sort_value: cursor&.fetch("sort_value", nil),
+        presentation_statuses: statuses,
+        work_item_sort: sort,
+        change_set_id:,
+        agent_id:
+      )
+      coordination_connection(page, "work-items", filters:)
+    rescue Coordinator::Web::Graphql::InvalidCursor => error
+      raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
+      raise_invalid_project_reference(error)
+    rescue Coordinator::Read::Web::CoordinationDashboardQueryError => error
+      raise_coordination_query_error(error)
+    end
+
+    def project_work_item(project_ref:, work_item_id:)
+      coordination_dashboard.detail(project_ref:, kind: "work_items", id: work_item_id)
+    rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
+      raise_invalid_project_reference(error)
+    rescue Coordinator::Read::Web::CoordinationDashboardQueryError => error
+      raise_coordination_query_error(error)
+    end
+
+    def project_dependencies(project_ref:, first:, after: nil, blocking: nil)
+      filters = coordination_filters(project_ref:, first:, blocking:)
+      cursor = coordination_cursor(after, "dependencies", filters:)
+      page = coordination_dashboard.page(
+        project_ref:,
+        kind: "dependencies",
+        first:,
+        after_id: cursor&.fetch("id", nil),
+        blocking:
+      )
+      coordination_connection(page, "dependencies", filters:)
+    rescue Coordinator::Web::Graphql::InvalidCursor => error
+      raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
+      raise_invalid_project_reference(error)
+    rescue Coordinator::Read::Web::CoordinationDashboardQueryError => error
+      raise_coordination_query_error(error)
+    end
+
+    def project_dependency(project_ref:, dependency_id:)
+      coordination_dashboard.detail(project_ref:, kind: "dependencies", id: dependency_id)
+    rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
+      raise_invalid_project_reference(error)
+    rescue Coordinator::Read::Web::CoordinationDashboardQueryError => error
+      raise_coordination_query_error(error)
     end
 
     def project_resources(
@@ -904,14 +990,47 @@ module Coordinator::Web::Graphql::Types
       }
     end
 
-    def connection(page, kind)
+    def coordination_connection(page, kind, filters:)
+      return unless page
+
+      cursor = page.next_cursor
       {
         nodes: page.items,
         page_info: {
-          end_cursor: page.next_offset && Coordinator::Web::Graphql::DashboardCursor.encode(kind, page.next_offset),
+          end_cursor: cursor && Coordinator::Web::Graphql::DashboardCursor.encode(
+            kind,
+            filters:,
+            cursor: { "id" => cursor.id, "sort_value" => cursor.sort_value }
+          ),
           has_next_page: page.has_more
         }
       }
+    end
+
+    def coordination_filters(**values)
+      values.compact.transform_keys(&:to_s)
+    end
+
+    def coordination_cursor(value, kind, filters:)
+      Coordinator::Web::Graphql::DashboardCursor.decode(value, kind, filters:)
+    end
+
+    def coordination_dashboard
+      @coordination_dashboard ||= Coordinator::Read::Web::Queries::CoordinationDashboard.new
+    end
+
+    def raise_coordination_query_error(error)
+      raise GraphQL::ExecutionError.new(
+        error.message,
+        extensions: { code: "INVALID_INPUT", details: error.details }
+      )
+    end
+
+    def raise_invalid_project_reference(error)
+      raise GraphQL::ExecutionError.new(
+        error.message,
+        extensions: { code: "INVALID_PROJECT_REFERENCE" }
+      )
     end
 
     def resource_connection(page, repository_id:, resource_kind:, lifecycle_status:)

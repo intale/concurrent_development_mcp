@@ -2,29 +2,28 @@
 
 RSpec.describe Coordinator::Read::Web::Queries::CoordinationDashboard, :read_model do
   let(:repository_id) { "018f0f4d-4e45-7abc-8def-000000000021" }
+  let(:scope) { "project:dashboard" }
+  let(:project_ref) { Coordinator::Read::Web::ProjectReference.new.encode(scope:) }
 
   before do
     create(
       :coordinator_read_repository,
       repository_id:,
       repository_key: "dashboard",
-      scope: "project:dashboard",
+      scope:,
       display_name: "Dashboard"
     )
     seed_dashboard_projection
   end
 
   it "maps exact WorkItem and unbounded active Attempt facts to presentation states" do
-    dashboard = query
+    work_items = page("work_items")
+    change_sets = page("change_sets")
 
-    expect(dashboard.project).to have_attributes(
-      repository_id:,
-      display_name: "Dashboard"
-    )
-    expect(dashboard.work_items.items.map(&:presentation_status)).to eq(
+    expect(work_items.items.map(&:presentation_status)).to eq(
       %w[pending ready assigned running completed]
     )
-    running = dashboard.work_items.items.fetch(3)
+    running = work_items.items.fetch(3)
     expect(running).to have_attributes(
       work_item_id: "W-4-running",
       domain_status: "acquired",
@@ -33,44 +32,74 @@ RSpec.describe Coordinator::Read::Web::Queries::CoordinationDashboard, :read_mod
       attempt_status: "started",
       attempt_started_at: "2026-08-31T12:04:00.000000Z"
     )
-    expect(dashboard.change_sets.items.sole).to have_attributes(
+    expect(change_sets.items.sole).to have_attributes(
       work_item_count: 5,
       running_work_item_count: 1,
       open_work_item_count: 3
     )
   end
 
-  it "applies bounded filtering, sorting, and offsets in the semantic read query" do
-    first = query(first: 1, presentation_statuses: [ "running", "ready" ], work_item_sort: "status_asc")
-    second = query(
-      first: 1,
-      work_item_offset: first.work_items.next_offset,
-      presentation_statuses: [ "running", "ready" ],
+  it "applies bounded filtering and tuple-key continuation" do
+    first = page(
+      "work_items",
+      first: 3,
       work_item_sort: "status_asc"
     )
-    blockers = query(blocking: true)
+    second = page(
+      "work_items",
+      first: 2,
+      after_id: first.next_cursor.id,
+      after_sort_value: first.next_cursor.sort_value,
+      work_item_sort: "status_asc"
+    )
+    blockers = page("dependencies", blocking: true)
 
-    expect(first.work_items.items.map(&:presentation_status)).to eq([ "ready" ])
-    expect(first.work_items).to have_attributes(next_offset: 1, has_more: true)
-    expect(second.work_items.items.map(&:presentation_status)).to eq([ "running" ])
-    expect(blockers.dependencies.items.map(&:dependency_id)).to eq([ "D-blocking" ])
+    expect(first.items.map(&:presentation_status)).to eq(%w[pending ready assigned])
+    expect(first).to have_attributes(has_more: true)
+    expect(first.next_cursor).to have_attributes(id: "W-3-assigned", sort_value: "2")
+    expect(second.items.map(&:presentation_status)).to eq(%w[running completed])
+    expect(blockers.items.map(&:dependency_id)).to eq([ "D-blocking" ])
   end
 
-  it "returns nil for a repository absent from the latest read projection" do
-    result = described_class.new.call(repository_id: "018f0f4d-4e45-7abc-8def-000000000099")
+  it "returns project-bound details through the semantic query" do
+    detail = described_class.new.detail(project_ref:, kind: "work_items", id: "W-4-running")
 
-    expect(result).to be_nil
+    expect(detail.work_item).to have_attributes(
+      work_item_id: "W-4-running",
+      presentation_status: "running"
+    )
+    expect(detail.attempt).to have_attributes(
+      attempt_id: "A-running",
+      agent_id: "luna-two",
+      status: "started"
+    )
+  end
+
+  it "returns nil for a Project absent from the latest read projection" do
+    missing_ref = Coordinator::Read::Web::ProjectReference.new.encode(scope: "project:missing")
+
+    expect(described_class.new.page(project_ref: missing_ref, kind: "change_sets")).to be_nil
   end
 
   it "validates the public read contract with dry-validation" do
-    expect { described_class.new.call(repository_id: "not-a-repository", first: 101) }
+    expect { described_class.new.page(project_ref:, kind: "unsupported", first: 101) }
       .to raise_error(Coordinator::Read::Web::CoordinationDashboardQueryError) do |error|
-        expect(error.details.keys).to contain_exactly(:repository_id, :first)
+        expect(error.details.keys).to contain_exactly(:kind, :first)
       end
+    expect do
+      page(
+        "work_items",
+        after_id: "W-3-assigned",
+        after_sort_value: "assigned",
+        work_item_sort: "status_asc"
+      )
+    end.to raise_error(Coordinator::Read::Web::CoordinationDashboardQueryError) do |error|
+      expect(error.details).to include(after_sort_value: include("is invalid for this sort"))
+    end
   end
 
-  def query(**input)
-    described_class.new.call({ repository_id:, first: 20 }.merge(input))
+  def page(kind, **input)
+    described_class.new.page({ project_ref:, kind:, first: 20 }.merge(input))
   end
 
   def seed_dashboard_projection

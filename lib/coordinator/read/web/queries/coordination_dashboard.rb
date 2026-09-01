@@ -3,31 +3,58 @@
 module Coordinator::Read::Web::Queries
   class CoordinationDashboard
     def initialize(
-      contract: Coordinator::Read::Web::Contracts::CoordinationDashboard.new,
-      repository: Coordinator::Read::Web::Repositories::CoordinationDashboard.new
+      page_contract: Coordinator::Read::Web::Contracts::CoordinationDashboard::Page.new,
+      detail_contract: Coordinator::Read::Web::Contracts::CoordinationDashboard::Detail.new,
+      repository: Coordinator::Read::Web::Repositories::CoordinationDashboard.new,
+      project_reference: Coordinator::Read::Web::ProjectReference.new
     )
-      @contract = contract
+      @page_contract = page_contract
+      @detail_contract = detail_contract
       @repository = repository
+      @project_reference = project_reference
     end
 
-    def call(input)
-      validated = @contract.call(input)
-      if validated.failure?
-        raise Coordinator::Read::Web::CoordinationDashboardQueryError, validated.errors.to_h
-      end
+    def page(input)
+      validated = @page_contract.call(input)
+      raise_query_error(validated) if validated.failure?
 
-      @repository.fetch(
-        Coordinator::Read::Web::CoordinationDashboardQueryV1.new(
-          repository_id: validated[:repository_id],
+      project_ref = validated[:project_ref]
+      @repository.page(
+        Coordinator::Read::Web::CoordinationDashboardQueryV1::Page.new(
+          project_ref:,
+          scope: @project_reference.decode(project_ref),
+          kind: validated[:kind],
           first: validated[:first] || 20,
-          change_set_offset: validated[:change_set_offset] || 0,
-          work_item_offset: validated[:work_item_offset] || 0,
-          dependency_offset: validated[:dependency_offset] || 0,
+          after_id: validated[:after_id],
+          after_sort_value: validated[:after_sort_value],
           presentation_statuses: validated[:presentation_statuses] || [],
           work_item_sort: validated[:work_item_sort] || "work_item_id_asc",
-          blocking: validated[:blocking]
+          blocking: validated[:blocking],
+          change_set_id: validated[:change_set_id],
+          agent_id: validated[:agent_id]
         )
       )
+    end
+
+    def detail(input)
+      validated = @detail_contract.call(input)
+      raise_query_error(validated) if validated.failure?
+
+      project_ref = validated[:project_ref]
+      @repository.detail(
+        Coordinator::Read::Web::CoordinationDashboardQueryV1::Detail.new(
+          project_ref:,
+          scope: @project_reference.decode(project_ref),
+          kind: validated[:kind],
+          id: validated[:id]
+        )
+      )
+    end
+
+    private
+
+    def raise_query_error(result)
+      raise Coordinator::Read::Web::CoordinationDashboardQueryError, result.errors.to_h
     end
   end
 end

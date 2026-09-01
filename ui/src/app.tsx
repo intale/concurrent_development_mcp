@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { CommandReceiptsPage } from "./audit/command-receipts-page.js";
+import { CoordinationChangeSetsPage } from "./coordination/coordination-change-sets-page.js";
+import { CoordinationDependenciesPage } from "./coordination/coordination-dependencies-page.js";
+import { CoordinationWorkItemsPage } from "./coordination/coordination-work-items-page.js";
 import { OperationBatchesPage } from "./operations/operation-batches-page.js";
 import { ProjectCatalogPage } from "./projects/project-catalog-page.js";
 import { ProjectOverviewPage } from "./projects/project-overview-page.js";
@@ -111,15 +114,13 @@ export function App() {
           <Route path="/operations/batches/:batchId" element={<OperationBatchesPage />} />
           <Route path="/projects/:projectRef" element={<ProjectWorkspaceShell />}>
             <Route index element={<ProjectOverviewPage />} />
-            <Route
-              path="coordination"
-              element={(
-                <ProjectSectionPlaceholder
-                  description="Scheduled ChangeSets, WorkItems, dependencies, Attempts, and checkpoints belong in this focused Project route."
-                  title="Coordination"
-                />
-              )}
-            />
+            <Route path="coordination" element={<Navigate replace to="change-sets" />} />
+            <Route path="coordination/change-sets" element={<CoordinationChangeSetsPage />} />
+            <Route path="coordination/change-sets/:changeSetId" element={<CoordinationChangeSetsPage />} />
+            <Route path="coordination/work-items" element={<CoordinationWorkItemsPage />} />
+            <Route path="coordination/work-items/:workItemId" element={<CoordinationWorkItemsPage />} />
+            <Route path="coordination/dependencies" element={<CoordinationDependenciesPage />} />
+            <Route path="coordination/dependencies/:dependencyId" element={<CoordinationDependenciesPage />} />
             <Route
               path="resources"
               element={(

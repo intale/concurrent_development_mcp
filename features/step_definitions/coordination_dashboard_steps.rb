@@ -1,15 +1,27 @@
 # frozen_string_literal: true
 
-COORDINATION_DASHBOARD_QUERY = <<~GRAPHQL.freeze
-  query CoordinationDashboard($repositoryId: ID!) {
-    projectCoordination(repositoryId: $repositoryId, first: 100) {
-      project { id scope }
-      workItems {
-        nodes { id domainStatus presentationStatus activeAgentId activeAttemptId attemptStatus }
-      }
-      dependencies {
-        nodes { id producerWorkItemId consumerWorkItemId blocking }
-      }
+COORDINATION_WORK_ITEMS_QUERY = <<~GRAPHQL.freeze
+  query CoordinationWorkItems($projectRef: ID!) {
+    projectWorkItems(projectRef: $projectRef, first: 100) {
+      nodes { id domainStatus presentationStatus activeAgentId activeAttemptId attemptStatus }
+    }
+  }
+GRAPHQL
+
+COORDINATION_DEPENDENCIES_QUERY = <<~GRAPHQL.freeze
+  query CoordinationDependencies($projectRef: ID!) {
+    projectDependencies(projectRef: $projectRef, first: 100) {
+      nodes { id producerWorkItemId consumerWorkItemId blocking }
+    }
+  }
+GRAPHQL
+
+COORDINATION_WORK_ITEM_DETAIL_QUERY = <<~GRAPHQL.freeze
+  query CoordinationWorkItemDetail($projectRef: ID!, $workItemId: ID!) {
+    projectWorkItem(projectRef: $projectRef, workItemId: $workItemId) {
+      workItem { id presentationStatus activeAgentId }
+      attempt { id agentId status }
+      checkpoint { id checkpointKind }
     }
   }
 GRAPHQL
@@ -42,6 +54,25 @@ Given(
   create_dashboard_attempt("concurrent", "W-luna-two", "A-luna-two", second_agent)
 end
 
+Given("projected dashboard rows contain a running WorkItem with a Candidate checkpoint") do
+  create_dashboard_project
+  create_dashboard_context(
+    "detail",
+    [ dashboard_work_item_row("W-detail", "acquired", attempt_id: "A-detail") ]
+  )
+  create_dashboard_attempt("detail", "W-detail", "A-detail", "luna-detail")
+  FactoryBot.create(
+    :coordinator_read_candidate,
+    candidate_id: "CAND-detail",
+    change_set_id: @coordination_dashboard_change_sets.fetch("detail"),
+    work_item_id: "W-detail",
+    attempt_id: "A-detail",
+    agent_id: "luna-detail",
+    repository_id: @coordination_dashboard_repository_id,
+    checkpoint_kind: "intermediate"
+  )
+end
+
 Given("projected dashboard rows contain an unmet work-item dependency") do
   create_dashboard_project
   create_dashboard_context(
@@ -68,6 +99,7 @@ end
 Given("projected dashboard rows contain scheduled work for the selected and an unrelated project") do
   create_dashboard_project
   selected_repository_id = @coordination_dashboard_repository_id
+  selected_project_ref = @coordination_dashboard_project_ref
   create_dashboard_context(
     "isolation-selected",
     [ dashboard_work_item_row("W-selected", "ready", change_set_key: "isolation-selected") ]
@@ -79,6 +111,7 @@ Given("projected dashboard rows contain scheduled work for the selected and an u
     [ dashboard_work_item_row("W-unrelated", "ready", change_set_key: "isolation-unrelated") ]
   )
   @coordination_dashboard_repository_id = selected_repository_id
+  @coordination_dashboard_project_ref = selected_project_ref
 end
 
 Given("a dashboard work item is ready in the latest projected rows") do
@@ -91,6 +124,14 @@ end
 
 When("the browser queries the projected coordination dashboard") do
   @coordination_dashboard_payload = query_coordination_dashboard
+end
+
+When("the browser opens the projected WorkItem detail") do
+  @coordination_work_item_detail_payload = coordination_graphql_query(
+    COORDINATION_WORK_ITEM_DETAIL_QUERY,
+    projectRef: @coordination_dashboard_project_ref,
+    workItemId: "W-detail"
+  )
 end
 
 When("a newer acquisition has not reached the projected rows") do
@@ -136,6 +177,25 @@ Then("both running agents retain their distinct Attempt attribution") do
   )
 end
 
+Then("the WorkItem detail presents its exact Attempt and checkpoint attribution") do
+  detail = graphql_data(@coordination_work_item_detail_payload).fetch("projectWorkItem")
+  assert_acceptance_equal(
+    [ "W-detail", "RUNNING", "luna-detail" ],
+    detail.fetch("workItem").values_at("id", "presentationStatus", "activeAgentId"),
+    "Focused WorkItem"
+  )
+  assert_acceptance_equal(
+    [ "A-detail", "luna-detail", "started" ],
+    detail.fetch("attempt").values_at("id", "agentId", "status"),
+    "Focused Attempt"
+  )
+  assert_acceptance_equal(
+    [ "CAND-detail", "intermediate" ],
+    detail.fetch("checkpoint").values_at("id", "checkpointKind"),
+    "Focused checkpoint"
+  )
+end
+
 Then("the dashboard identifies the blocking producer and consumer") do
   dependency = coordination_dashboard_data(@coordination_dashboard_payload)
     .fetch("dependencies").fetch("nodes").sole
@@ -174,13 +234,15 @@ end
 
 def create_dashboard_project
   @coordination_dashboard_repository_id = SecureRandom.uuid_v7
+  scope = "project:test/dashboard-#{@coordination_dashboard_repository_id}"
   FactoryBot.create(
     :coordinator_read_repository,
     repository_id: @coordination_dashboard_repository_id,
     repository_key: "dashboard-#{@coordination_dashboard_repository_id}",
-    scope: "project:test/dashboard-#{@coordination_dashboard_repository_id}",
+    scope:,
     display_name: "Coordination dashboard"
   )
+  @coordination_dashboard_project_ref = Coordinator::Read::Web::ProjectReference.new.encode(scope:)
   @coordination_dashboard_change_sets = {}
 end
 
@@ -246,21 +308,38 @@ def dashboard_change_set_key(work_item_id)
   return "planning" if work_item_id == "W-pending"
   return "active" if %w[W-ready W-running].include?(work_item_id)
   return "concurrent" if work_item_id.start_with?("W-luna")
+  return "detail" if work_item_id == "W-detail"
   return "blocked" if %w[W-producer W-consumer].include?(work_item_id)
 
   "stale"
 end
 
 def query_coordination_dashboard
+  work_items = coordination_graphql_query(
+    COORDINATION_WORK_ITEMS_QUERY,
+    projectRef: @coordination_dashboard_project_ref
+  )
+  dependencies = coordination_graphql_query(
+    COORDINATION_DEPENDENCIES_QUERY,
+    projectRef: @coordination_dashboard_project_ref
+  )
+  {
+    "data" => {
+      "coordination" => {
+        "workItems" => graphql_data(work_items).fetch("projectWorkItems"),
+        "dependencies" => graphql_data(dependencies).fetch("projectDependencies")
+      }
+    }
+  }
+end
+
+def coordination_graphql_query(query, variables)
   @coordination_dashboard_graphql_session ||= ActionDispatch::Integration::Session.new(Rails.application).tap do |session|
     session.host! "localhost"
   end
   @coordination_dashboard_graphql_session.post(
     "/graphql",
-    params: {
-      query: COORDINATION_DASHBOARD_QUERY,
-      variables: { repositoryId: @coordination_dashboard_repository_id }
-    },
+    params: { query:, variables: },
     as: :json
   )
   response = @coordination_dashboard_graphql_session.response
@@ -271,7 +350,13 @@ end
 def coordination_dashboard_data(payload)
   errors = payload.fetch("errors", [])
   assert_acceptance(errors.empty?, "Dashboard GraphQL failed: #{errors.inspect}")
-  payload.dig("data", "projectCoordination")
+  payload.dig("data", "coordination")
+end
+
+def graphql_data(payload)
+  errors = payload.fetch("errors", [])
+  assert_acceptance(errors.empty?, "Focused coordination GraphQL failed: #{errors.inspect}")
+  payload.fetch("data")
 end
 
 def dashboard_work_items(dashboard)
