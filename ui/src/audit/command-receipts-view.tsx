@@ -183,12 +183,12 @@ export function CommandReceiptDetailView(props: CommandReceiptDetailViewProps) {
     <div className="vstack gap-3">
       <AvailableState errorMessage={props.errorMessage} onRetry={props.onRetry} />
       <article className="card card-outline card-secondary">
-        <div className="card-header d-flex flex-wrap justify-content-between gap-2">
-          <div>
+        <div className="card-header">
+          <div className="d-flex align-items-start justify-content-between gap-2">
             <h2 className="card-title fw-semibold mb-1">{receipt.toolName}</h2>
-            <div className="mt-2"><CopyIdentifier label="Command ID" value={receipt.commandId} /></div>
+            <span className="badge text-bg-success flex-shrink-0">{receipt.status.toLowerCase()}</span>
           </div>
-          <span className="badge text-bg-success align-self-start">{receipt.status.toLowerCase()}</span>
+          <div className="mt-2 w-100"><CopyIdentifier label="Command ID" value={receipt.commandId} /></div>
         </div>
         <div className="card-body vstack gap-4">
           <p className="fs-5 mb-0">{receipt.summary}</p>

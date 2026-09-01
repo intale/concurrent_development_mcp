@@ -95,7 +95,7 @@ test("presents one primary receipt action and a spatial detail route", () => {
   assert.doesNotMatch(detail, /Available receipts/);
 });
 
-test("gives long command identity a full-width wrapping row below the status header", () => {
+test("gives long command identities a full-width wrapping row below each status header", () => {
   const commandId = "adj.20260826.candidate.1.submit.with-a-long-coordination-identity";
   const markup = renderList({
     page: {
@@ -107,6 +107,11 @@ test("gives long command identity a full-width wrapping row below the status hea
   assert.match(markup, /card-title fw-semibold text-break/);
   assert.match(markup, /badge text-bg-success flex-shrink-0/);
   assert.match(markup, new RegExp(`text-break w-100"><code>${commandId}`));
+
+  const detail = renderDetail({ receipt: { ...receipt, commandId } });
+  assert.match(detail, /card-header"><div class="d-flex align-items-start justify-content-between gap-2"/);
+  assert.match(detail, /badge text-bg-success flex-shrink-0/);
+  assert.match(detail, new RegExp(`mt-2 w-100"><span[^>]*><code[^>]*>${commandId}`));
 });
 
 test("keeps stale facts visible and provides contextual initial states", () => {

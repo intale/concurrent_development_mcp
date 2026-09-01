@@ -299,6 +299,18 @@ When("the person follows the live global routes") do
 
   @global_browser_details = []
   @browser_receipt_card.click_link "Open receipt"
+  @browser_receipt_detail_layout = page.evaluate_script(<<~JAVASCRIPT)
+    (() => {
+      const header = document.querySelector("article .card-header").getBoundingClientRect();
+      const identity = document.querySelector("article .card-header code").getBoundingClientRect();
+      const badge = document.querySelector("article .card-header .badge").getBoundingClientRect();
+      return {
+        identityWithinHeader: identity.left >= header.left && identity.right <= header.right,
+        identityBelowBadge: identity.top >= badge.bottom,
+        identityHasReadableWidth: identity.width >= 300
+      };
+    })()
+  JAVASCRIPT
   @global_browser_details << browser_record_refreshable_detail("Command receipt", selector: "h1")
   click_link "Back to receipts", match: :first
 
@@ -311,6 +323,9 @@ end
 Then("the long command identity does not collide with its tool or status") do
   assert_acceptance(@browser_receipt_layout.fetch("identityWithinHeader"), "Command identity escaped its card header")
   assert_acceptance(@browser_receipt_layout.fetch("identityBelowBadge"), "Command identity collided with the status")
+  assert_acceptance(@browser_receipt_detail_layout.fetch("identityWithinHeader"), "Detail identity escaped its card header")
+  assert_acceptance(@browser_receipt_detail_layout.fetch("identityBelowBadge"), "Detail identity collided with the status")
+  assert_acceptance(@browser_receipt_detail_layout.fetch("identityHasReadableWidth"), "Detail identity was squeezed below readable width")
 end
 
 Then("receipt and batch details have predictable Back routes") do
