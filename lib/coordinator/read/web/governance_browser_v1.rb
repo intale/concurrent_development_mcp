@@ -2,16 +2,18 @@
 
 module Coordinator::Read::Web
   class GovernanceBrowserV1
-    class Project < Coordinator::Shared::Value
-      attribute :repository_id, Coordinator::Shared::Types::UuidV7
-      attribute :scope, Coordinator::Shared::Types::String
-      attribute :display_name, Coordinator::Shared::Types::String.optional
+    class DecisionPage < Coordinator::Shared::Value
+      attribute :items,
+                Coordinator::Shared::Types::Array.of(Coordinator::Read::DecisionViewV1)
+                  .constrained(max_size: 50)
+      attribute :next_decision_id, Coordinator::Shared::Types::Identifier.optional
+      attribute :has_more, Coordinator::Shared::Types::Strict::Bool
     end
 
     class GuidancePage < Coordinator::Shared::Value
       attribute :items,
                 Coordinator::Shared::Types::Array.of(Coordinator::Read::GuidanceUtteranceV1)
-                  .constrained(max_size: 100)
+                  .constrained(max_size: 50)
       attribute :next_message_id, Coordinator::Shared::Types::Identifier.optional
       attribute :has_more, Coordinator::Shared::Types::Strict::Bool
     end
@@ -19,7 +21,7 @@ module Coordinator::Read::Web
     class AgentChoicePage < Coordinator::Shared::Value
       attribute :items,
                 Coordinator::Shared::Types::Array.of(Coordinator::Read::AgentChoiceViewV1)
-                  .constrained(max_size: 100)
+                  .constrained(max_size: 50)
       attribute :next_choice_id, Coordinator::Shared::Types::Identifier.optional
       attribute :has_more, Coordinator::Shared::Types::Strict::Bool
     end
@@ -35,6 +37,27 @@ module Coordinator::Read::Web
                   .constrained(max_size: 100)
       attribute :next_cursor, ImpactCursor.optional
       attribute :has_more, Coordinator::Shared::Types::Strict::Bool
+    end
+
+    class DecisionDetail < Coordinator::Shared::Value
+      attribute :decision, Coordinator::Read::DecisionViewV1
+      attribute :membership_bases,
+                Coordinator::Shared::Types::Array.of(Coordinator::Shared::Types::String)
+                  .constrained(min_size: 1, max_size: 5)
+    end
+
+    class GuidanceDetail < Coordinator::Shared::Value
+      attribute :guidance, Coordinator::Read::GuidanceUtteranceV1
+      attribute :interpretations, Coordinator::Read::InterpretationPageV1
+    end
+
+    class ChoiceDetail < Coordinator::Shared::Value
+      attribute :choice, Coordinator::Read::AgentChoiceViewV1
+      attribute :impacts, ImpactPage
+    end
+
+    class ImpactDetail < Coordinator::Shared::Value
+      attribute :impact, Coordinator::Read::AgentChoiceImpactViewV1
     end
 
     class EventReference < Coordinator::Shared::Value
@@ -68,34 +91,6 @@ module Coordinator::Read::Web
                 Coordinator::Shared::Types::Array.of(CommandReceipt).constrained(max_size: 100)
       attribute :next_command_id, Coordinator::Shared::Types::Identifier.optional
       attribute :has_more, Coordinator::Shared::Types::Strict::Bool
-    end
-
-    class Catalog < Coordinator::Shared::Value
-      attribute :project, Project
-      attribute :decisions, Coordinator::Read::DecisionPageV1
-      attribute :guidance, GuidancePage
-      attribute :choices, AgentChoicePage
-      attribute :impacts, ImpactPage
-    end
-
-    class DecisionDetail < Coordinator::Shared::Value
-      attribute :project, Project
-      attribute :decision, Coordinator::Read::DecisionViewV1
-      attribute :membership_bases,
-                Coordinator::Shared::Types::Array.of(Coordinator::Shared::Types::String)
-                  .constrained(min_size: 1, max_size: 5)
-    end
-
-    class GuidanceDetail < Coordinator::Shared::Value
-      attribute :project, Project
-      attribute :guidance, Coordinator::Read::GuidanceUtteranceV1
-      attribute :interpretations, Coordinator::Read::InterpretationPageV1
-    end
-
-    class ChoiceDetail < Coordinator::Shared::Value
-      attribute :project, Project
-      attribute :choice, Coordinator::Read::AgentChoiceViewV1
-      attribute :impacts, ImpactPage
     end
 
     class ReceiptDetail < Coordinator::Shared::Value

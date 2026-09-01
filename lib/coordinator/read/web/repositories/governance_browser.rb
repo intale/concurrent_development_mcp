@@ -8,63 +8,110 @@ module Coordinator::Read::Web::Repositories
       interpretations: Coordinator::Read::Repositories::DecisionInterpretations.new,
       choices: Coordinator::Read::Repositories::AgentChoices.new,
       impacts: Coordinator::Read::Repositories::AgentChoiceImpacts.new,
-      schema_registry: Coordinator::Write::EventSchemaRegistry.new
+      completion_contract: Coordinator::Read::Web::Contracts::GovernanceBrowser::CommandCompletion.new
     )
       @decisions = decisions
       @utterances = utterances
       @interpretations = interpretations
       @choices = choices
       @impacts = impacts
-      @schema_registry = schema_registry
+      @completion_contract = completion_contract
     end
 
-    def catalog(query)
-      project = find_project(query.repository_id)
-      return unless project
+    def decisions(query)
+      repository_ids = project_repository_ids(query.project_scope)
+      return unless repository_ids
 
-      Coordinator::Read::Web::GovernanceBrowserV1::Catalog.new(
-        project: build_project(project),
-        decisions: @decisions.page(
-          Coordinator::Read::DecisionListQueryV1.new(
-            repository_id: query.repository_id,
-            topic_id: query.decision_topic_id,
-            policy_status: query.decision_policy_status,
-            after_decision_id: query.after_decision_id,
-            limit: query.first
-          )
-        ),
-        guidance: guidance_page(query),
-        choices: choice_page(query),
-        impacts: impact_page(
-          relation: impacts_for_repository(query.repository_id),
-          outcome: query.impact_outcome,
-          after_global_position: query.after_impact_global_position,
-          after_assessment_id: query.after_impact_assessment_id,
-          limit: query.first
-        )
+      relation = decisions_for_project(repository_ids)
+      if query.topic_id
+        relation = relation.where("definition #>> '{document,topic,topic_id}' = ?", query.topic_id)
+      end
+      relation = relation.where(policy_status: query.policy_status) if query.policy_status
+      relation = relation.where("decision_id > ?", query.after_decision_id) if query.after_decision_id
+      ids = relation.order(:decision_id).limit(query.first + 1).pluck(:decision_id)
+      has_more = ids.length > query.first
+      page_ids = ids.first(query.first)
+
+      Coordinator::Read::Web::GovernanceBrowserV1::DecisionPage.new(
+        items: @decisions.fetch_many(page_ids),
+        next_decision_id: has_more ? page_ids.last : nil,
+        has_more:
+      )
+    end
+
+    def guidance_list(query)
+      repository_ids = project_repository_ids(query.project_scope)
+      return unless repository_ids
+
+      relation = guidance_for_project(repository_ids)
+      relation = relation.where(source: query.source) if query.source
+      relation = relation.where("message_id > ?", query.after_message_id) if query.after_message_id
+      ids = relation.order(:message_id).limit(query.first + 1).pluck(:message_id)
+      has_more = ids.length > query.first
+      page_ids = ids.first(query.first)
+
+      Coordinator::Read::Web::GovernanceBrowserV1::GuidancePage.new(
+        items: @utterances.fetch_many(page_ids),
+        next_message_id: has_more ? page_ids.last : nil,
+        has_more:
+      )
+    end
+
+    def choices(query)
+      repository_ids = project_repository_ids(query.project_scope)
+      return unless repository_ids
+
+      relation = choices_for_project(repository_ids)
+      relation = relation.where(choice_type: query.choice_type) if query.choice_type
+      relation = relation.where(observation_status: query.status) if query.status
+      relation = relation.where("choice_id > ?", query.after_choice_id) if query.after_choice_id
+      ids = relation.order(:choice_id).limit(query.first + 1).pluck(:choice_id)
+      has_more = ids.length > query.first
+      page_ids = ids.first(query.first)
+
+      Coordinator::Read::Web::GovernanceBrowserV1::AgentChoicePage.new(
+        items: @choices.fetch_many(page_ids),
+        next_choice_id: has_more ? page_ids.last : nil,
+        has_more:
+      )
+    end
+
+    def impacts(query)
+      repository_ids = project_repository_ids(query.project_scope)
+      return unless repository_ids
+
+      impact_page(
+        relation: impacts_for_project(repository_ids),
+        outcome: query.outcome,
+        after_global_position: query.after_global_position,
+        after_assessment_id: query.after_assessment_id,
+        limit: query.first
       )
     end
 
     def decision(query)
-      project = find_project(query.repository_id)
-      membership = Coordinator::Read::DecisionRepositoryMembership.find_by(
-        repository_id: query.repository_id,
+      repository_ids = project_repository_ids(query.project_scope)
+      return unless repository_ids
+
+      memberships = Coordinator::Read::DecisionRepositoryMembership.where(
+        repository_id: repository_ids,
         decision_id: query.decision_id
-      )
-      return unless project && membership
+      ).to_a
+      return if memberships.empty?
 
       decision = @decisions.fetch(query.decision_id)
       decision && Coordinator::Read::Web::GovernanceBrowserV1::DecisionDetail.new(
-        project: build_project(project),
         decision:,
-        membership_bases: membership.membership_bases
+        membership_bases: memberships.flat_map(&:membership_bases).uniq.sort
       )
     end
 
     def guidance(query)
-      project = find_project(query.repository_id)
-      record = guidance_for_repository(query.repository_id).find_by(message_id: query.message_id)
-      return unless project && record
+      repository_ids = project_repository_ids(query.project_scope)
+      return unless repository_ids
+
+      record = guidance_for_project(repository_ids).find_by(message_id: query.message_id)
+      return unless record
 
       page = @interpretations.page(
         Coordinator::Read::InterpretationListQueryV1.new(
@@ -74,7 +121,6 @@ module Coordinator::Read::Web::Repositories
         )
       )
       Coordinator::Read::Web::GovernanceBrowserV1::GuidanceDetail.new(
-        project: build_project(project),
         guidance: @utterances.fetch(query.message_id),
         interpretations: Coordinator::Read::InterpretationPageV1.new(
           message_id: query.message_id,
@@ -85,20 +131,33 @@ module Coordinator::Read::Web::Repositories
     end
 
     def choice(query)
-      project = find_project(query.repository_id)
-      record = choices_for_repository(query.repository_id).find_by(choice_id: query.choice_id)
-      return unless project && record
+      repository_ids = project_repository_ids(query.project_scope)
+      return unless repository_ids
+
+      record = choices_for_project(repository_ids).find_by(choice_id: query.choice_id)
+      return unless record
 
       Coordinator::Read::Web::GovernanceBrowserV1::ChoiceDetail.new(
-        project: build_project(project),
         choice: @choices.fetch(query.choice_id),
         impacts: impact_page(
-          relation: impacts_for_repository(query.repository_id).where(choice_id: query.choice_id),
+          relation: impacts_for_project(repository_ids).where(choice_id: query.choice_id),
           outcome: nil,
           after_global_position: query.after_impact_global_position,
           after_assessment_id: query.after_impact_assessment_id,
           limit: query.first
         )
+      )
+    end
+
+    def impact(query)
+      repository_ids = project_repository_ids(query.project_scope)
+      return unless repository_ids
+
+      record = impacts_for_project(repository_ids).find_by(assessment_id: query.assessment_id)
+      return unless record
+
+      Coordinator::Read::Web::GovernanceBrowserV1::ImpactDetail.new(
+        impact: @impacts.fetch(query.assessment_id)
       )
     end
 
@@ -127,49 +186,15 @@ module Coordinator::Read::Web::Repositories
 
     private
 
-    def find_project(repository_id)
-      Coordinator::Read::Repository.find_by(repository_id:)
+    def project_repository_ids(project_scope)
+      ids = Coordinator::Read::Repository.where(scope: project_scope).order(:repository_id).pluck(:repository_id)
+      ids unless ids.empty?
     end
 
-    def build_project(record)
-      Coordinator::Read::Web::GovernanceBrowserV1::Project.new(
-        repository_id: record.repository_id,
-        scope: record.scope,
-        display_name: record.display_name
-      )
-    end
-
-    def guidance_page(query)
-      relation = guidance_for_repository(query.repository_id)
-      relation = relation.where(source: query.guidance_source) if query.guidance_source
-      if query.after_guidance_message_id
-        relation = relation.where("message_id > ?", query.after_guidance_message_id)
-      end
-      ids = relation.order(:message_id).limit(query.first + 1).pluck(:message_id)
-      has_more = ids.length > query.first
-      page_ids = ids.first(query.first)
-
-      Coordinator::Read::Web::GovernanceBrowserV1::GuidancePage.new(
-        items: @utterances.fetch_many(page_ids),
-        next_message_id: has_more ? page_ids.last : nil,
-        has_more:
-      )
-    end
-
-    def choice_page(query)
-      relation = choices_for_repository(query.repository_id)
-      relation = relation.where(choice_type: query.choice_type) if query.choice_type
-      relation = relation.where(observation_status: query.choice_status) if query.choice_status
-      relation = relation.where("choice_id > ?", query.after_choice_id) if query.after_choice_id
-      ids = relation.order(:choice_id).limit(query.first + 1).pluck(:choice_id)
-      has_more = ids.length > query.first
-      page_ids = ids.first(query.first)
-
-      Coordinator::Read::Web::GovernanceBrowserV1::AgentChoicePage.new(
-        items: @choices.fetch_many(page_ids),
-        next_choice_id: has_more ? page_ids.last : nil,
-        has_more:
-      )
+    def decisions_for_project(repository_ids)
+      decision_ids = Coordinator::Read::DecisionRepositoryMembership.where(repository_id: repository_ids)
+        .select(:decision_id)
+      Coordinator::Read::DecisionDefinition.where(decision_id: decision_ids)
     end
 
     def impact_page(relation:, outcome:, after_global_position:, after_assessment_id:, limit:)
@@ -198,19 +223,25 @@ module Coordinator::Read::Web::Repositories
       )
     end
 
-    def guidance_for_repository(repository_id)
+    def guidance_for_project(repository_ids)
       Coordinator::Read::UserUtterance.where(
         <<~SQL.squish,
-          COALESCE(anchors -> 'repository_ids', '[]'::jsonb) @> ?::jsonb
+          EXISTS (
+            SELECT 1
+            FROM jsonb_array_elements_text(
+              COALESCE(anchors -> 'repository_ids', '[]'::jsonb)
+            ) AS anchor_repository(value)
+            WHERE anchor_repository.value IN (?)
+          )
           OR anchors ->> 'change_set_id' IN (
             SELECT change_set_id
             FROM coordination_dashboard_work_items
-            WHERE repository_id = ?
+            WHERE repository_id IN (?)
           )
           OR anchors ->> 'work_item_id' IN (
             SELECT work_item_id
             FROM coordination_dashboard_work_items
-            WHERE repository_id = ?
+            WHERE repository_id IN (?)
           )
           OR anchors ->> 'attempt_id' IN (
             SELECT attempt.attempt_id
@@ -218,55 +249,53 @@ module Coordinator::Read::Web::Repositories
             JOIN coordination_dashboard_work_items AS work_item
               ON work_item.change_set_id = attempt.change_set_id
              AND work_item.work_item_id = attempt.work_item_id
-            WHERE work_item.repository_id = ?
+            WHERE work_item.repository_id IN (?)
           )
         SQL
-        JSON.generate([ repository_id ]),
-        repository_id,
-        repository_id,
-        repository_id
+        repository_ids,
+        repository_ids,
+        repository_ids,
+        repository_ids
       )
     end
 
-    def choices_for_repository(repository_id)
-      Coordinator::Read::AgentChoice.where("context ->> 'repository_id' = ?", repository_id)
+    def choices_for_project(repository_ids)
+      Coordinator::Read::AgentChoice.where("context ->> 'repository_id' IN (?)", repository_ids)
     end
 
-    def impacts_for_repository(repository_id)
+    def impacts_for_project(repository_ids)
       Coordinator::Read::AgentChoiceImpact.where(
-        attempt_id: attempts_for_repository(repository_id).select(:attempt_id)
+        attempt_id: attempts_for_project(repository_ids).select(:attempt_id)
       )
     end
 
-    def attempts_for_repository(repository_id)
+    def attempts_for_project(repository_ids)
       Coordinator::Read::AttemptHistory.joins(
         <<~SQL.squish
           INNER JOIN coordination_dashboard_work_items AS governance_work_item
             ON governance_work_item.change_set_id = attempt_histories.change_set_id
            AND governance_work_item.work_item_id = attempt_histories.work_item_id
         SQL
-      ).where("governance_work_item.repository_id = ?", repository_id)
+      ).where("governance_work_item.repository_id IN (?)", repository_ids)
     end
 
     def build_receipt(record)
       completion = load_completion(record)
       verify_projection!(record, completion)
       Coordinator::Read::Web::GovernanceBrowserV1::CommandReceipt.new(
-        command_id: completion.command_id,
-        tool_name: completion.tool_name,
-        status: completion.status,
-        summary: completion.summary,
-        receipt: completion.receipt,
-        warnings: completion.warnings,
-        next_action_tools: completion.next_actions.map(&:tool),
-        emitted_events: completion.emitted_events.map { build_event_reference(_1) },
-        completed_at: completion.completed_at
+        command_id: completion.fetch(:command_id),
+        tool_name: completion.fetch(:tool_name),
+        status: completion.fetch(:status),
+        summary: completion.fetch(:summary),
+        receipt: completion.fetch(:receipt),
+        warnings: completion.fetch(:warnings),
+        next_action_tools: completion.fetch(:next_actions).map { _1.fetch(:tool) },
+        emitted_events: completion.fetch(:emitted_events).map { build_event_reference(_1) },
+        completed_at: completion.fetch(:completed_at)
       )
     rescue Coordinator::Read::Web::GovernanceBrowserReadError
       raise
-    rescue Dry::Struct::Error,
-           Coordinator::Write::EventSchemaRegistry::UnknownSchema,
-           Coordinator::Write::EventSchemaRegistry::SchemaMismatch => error
+    rescue Dry::Struct::Error => error
       raise Coordinator::Read::Web::GovernanceBrowserReadError.new(
         command_id: record.command_id,
         reason: "invalid_completion"
@@ -274,10 +303,12 @@ module Coordinator::Read::Web::Repositories
     end
 
     def load_completion(record)
-      @schema_registry.load(
-        type: "CommandCompleted",
-        schema_version: 1,
-        data: record.completion
+      completion = @completion_contract.call(record.completion)
+      return completion.to_h if completion.success?
+
+      raise Coordinator::Read::Web::GovernanceBrowserReadError.new(
+        command_id: record.command_id,
+        reason: "invalid_completion"
       )
     end
 
@@ -290,7 +321,7 @@ module Coordinator::Read::Web::Repositories
         :summary,
         :receipt
       )
-      canonical = completion.to_h.slice(
+      canonical = completion.slice(
         :command_id,
         :tool_name,
         :canonical_input_digest,
@@ -308,12 +339,12 @@ module Coordinator::Read::Web::Repositories
 
     def build_event_reference(attributes)
       Coordinator::Read::Web::GovernanceBrowserV1::EventReference.new(
-        event_id: attributes.event_id,
-        type: attributes.type,
-        stream_context: attributes.stream_context,
-        stream_name: attributes.stream_name,
-        stream_id: attributes.stream_id,
-        stream_revision: attributes.stream_revision
+        event_id: attributes.fetch(:event_id),
+        type: attributes.fetch(:type),
+        stream_context: attributes.fetch(:stream_context),
+        stream_name: attributes.fetch(:stream_name),
+        stream_id: attributes.fetch(:stream_id),
+        stream_revision: attributes.fetch(:stream_revision)
       )
     end
   end

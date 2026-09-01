@@ -148,26 +148,47 @@ module Coordinator::Web::Graphql::Types
       argument :project_ref, ID, required: true
     end
 
-    field :project_governance, GovernanceTypes::ProjectGovernanceType, null: true do
-      description "Project-scoped Decisions, guidance, AgentChoices, and decision impacts."
-      argument :after_choice, String, required: false
-      argument :after_decision, String, required: false
-      argument :after_guidance, String, required: false
-      argument :after_impact, String, required: false
-      argument :choice_status, GovernanceTypes::AgentChoiceStatusEnum, required: false
-      argument :choice_type, GovernanceTypes::AgentChoiceTypeEnum, required: false
-      argument :decision_policy_status, GovernanceTypes::DecisionPolicyStatusEnum, required: false
-      argument :decision_topic_id, String, required: false
+    field :project_decisions, GovernanceTypes::DecisionConnectionType, null: true, connection: false do
+      description "Page Decisions associated with any Repository member of the exact Project scope."
+      argument :after, String, required: false
       argument :first, Integer, required: false, default_value: 20
-      argument :guidance_source, GovernanceTypes::GuidanceSourceEnum, required: false
-      argument :impact_outcome, GovernanceTypes::AgentChoiceImpactOutcomeEnum, required: false
-      argument :repository_id, ID, required: true
+      argument :policy_status, GovernanceTypes::DecisionPolicyStatusEnum, required: false
+      argument :project_ref, ID, required: true
+      argument :topic_id, String, required: false
+    end
+
+    field :project_guidance_messages, GovernanceTypes::GuidanceConnectionType, null: true, connection: false do
+      description "Page Guidance associated with any Repository member of the exact Project scope."
+      argument :after, String, required: false
+      argument :first, Integer, required: false, default_value: 20
+      argument :project_ref, ID, required: true
+      argument :source, GovernanceTypes::GuidanceSourceEnum, required: false
+    end
+
+    field :project_agent_choices, GovernanceTypes::AgentChoiceConnectionType, null: true, connection: false do
+      description "Page AgentChoices associated with any Repository member of the exact Project scope."
+      argument :after, String, required: false
+      argument :choice_type, GovernanceTypes::AgentChoiceTypeEnum, required: false
+      argument :first, Integer, required: false, default_value: 20
+      argument :project_ref, ID, required: true
+      argument :status, GovernanceTypes::AgentChoiceStatusEnum, required: false
+    end
+
+    field :project_decision_impacts,
+          GovernanceTypes::AgentChoiceImpactConnectionType,
+          null: true,
+          connection: false do
+      description "Page AgentChoice impact assessments associated with the exact Project scope."
+      argument :after, String, required: false
+      argument :first, Integer, required: false, default_value: 20
+      argument :outcome, GovernanceTypes::AgentChoiceImpactOutcomeEnum, required: false
+      argument :project_ref, ID, required: true
     end
 
     field :project_decision, GovernanceTypes::ProjectDecisionType, null: true do
-      description "One Decision deterministically associated with the exact project."
+      description "One Decision associated with the exact Project scope."
       argument :decision_id, ID, required: true
-      argument :repository_id, ID, required: true
+      argument :project_ref, ID, required: true
     end
 
     field :project_guidance, GovernanceTypes::ProjectGuidanceType, null: true do
@@ -175,7 +196,7 @@ module Coordinator::Web::Graphql::Types
       argument :interpretations_after, String, required: false
       argument :interpretations_first, Integer, required: false, default_value: 20
       argument :message_id, ID, required: true
-      argument :repository_id, ID, required: true
+      argument :project_ref, ID, required: true
     end
 
     field :project_agent_choice, GovernanceTypes::ProjectAgentChoiceType, null: true do
@@ -183,7 +204,13 @@ module Coordinator::Web::Graphql::Types
       argument :choice_id, ID, required: true
       argument :impacts_after, String, required: false
       argument :impacts_first, Integer, required: false, default_value: 20
-      argument :repository_id, ID, required: true
+      argument :project_ref, ID, required: true
+    end
+
+    field :project_decision_impact, GovernanceTypes::ProjectAgentChoiceImpactType, null: true do
+      description "One AgentChoice impact assessment associated with the exact Project scope."
+      argument :assessment_id, ID, required: true
+      argument :project_ref, ID, required: true
     end
 
     field :command_receipts, GovernanceTypes::CommandReceiptConnectionType, null: false, connection: false do
@@ -607,90 +634,102 @@ module Coordinator::Web::Graphql::Types
       raise_knowledge_query_error(error)
     end
 
-    def project_governance(
-      repository_id:,
-      first:,
-      after_choice: nil,
-      after_decision: nil,
-      after_guidance: nil,
-      after_impact: nil,
-      choice_status: nil,
-      choice_type: nil,
-      decision_policy_status: nil,
-      decision_topic_id: nil,
-      guidance_source: nil,
-      impact_outcome: nil
-    )
-      decision_filters = governance_filters(
-        repository_id:,
-        topic_id: decision_topic_id,
-        policy_status: decision_policy_status
-      )
-      guidance_filters = governance_filters(repository_id:, source: guidance_source)
-      choice_filters = governance_filters(repository_id:, choice_type:, choice_status:)
-      impact_filters = governance_filters(repository_id:, outcome: impact_outcome)
-      impact_cursor = Coordinator::Web::Graphql::GovernanceBrowserCursor.decode(
-        after_impact,
-        "impacts",
-        filters: impact_filters
-      )
-      catalog = governance_browser.catalog(
-        repository_id:,
+    def project_decisions(project_ref:, first:, after: nil, policy_status: nil, topic_id: nil)
+      filters = governance_filters(project_ref:, policy_status:, topic_id:)
+      page = governance_browser.decisions(
+        project_ref:,
         first:,
-        decision_topic_id:,
-        decision_policy_status:,
+        policy_status:,
+        topic_id:,
         after_decision_id: Coordinator::Web::Graphql::GovernanceBrowserCursor.decode(
-          after_decision,
+          after,
           "decisions",
-          filters: decision_filters
-        ),
-        guidance_source:,
-        after_guidance_message_id: Coordinator::Web::Graphql::GovernanceBrowserCursor.decode(
-          after_guidance,
-          "guidance",
-          filters: guidance_filters
-        ),
-        choice_type:,
-        choice_status:,
-        after_choice_id: Coordinator::Web::Graphql::GovernanceBrowserCursor.decode(
-          after_choice,
-          "choices",
-          filters: choice_filters
-        ),
-        impact_outcome:,
-        after_impact_global_position: impact_cursor&.fetch("global_position", nil),
-        after_impact_assessment_id: impact_cursor&.fetch("assessment_id", nil)
+          filters:
+        )
       )
-      return unless catalog
-
-      {
-        project: catalog.project,
-        decisions: governance_decision_connection(catalog.decisions, filters: decision_filters),
-        guidance: governance_guidance_connection(catalog.guidance, filters: guidance_filters),
-        choices: governance_choice_connection(catalog.choices, filters: choice_filters),
-        impacts: governance_impact_connection(catalog.impacts, filters: impact_filters)
-      }
+      governance_decision_connection(page, filters:) if page
     rescue Coordinator::Web::Graphql::InvalidCursor => error
       raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
+      raise_invalid_project_reference(error)
     rescue Coordinator::Read::Web::GovernanceBrowserQueryError => error
       raise_governance_query_error(error)
     end
 
-    def project_decision(repository_id:, decision_id:)
-      governance_browser.decision(repository_id:, decision_id:)
+    def project_guidance_messages(project_ref:, first:, after: nil, source: nil)
+      filters = governance_filters(project_ref:, source:)
+      page = governance_browser.guidance_list(
+        project_ref:,
+        first:,
+        source:,
+        after_message_id: Coordinator::Web::Graphql::GovernanceBrowserCursor.decode(
+          after,
+          "guidance",
+          filters:
+        )
+      )
+      governance_guidance_connection(page, filters:) if page
+    rescue Coordinator::Web::Graphql::InvalidCursor => error
+      raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
+      raise_invalid_project_reference(error)
     rescue Coordinator::Read::Web::GovernanceBrowserQueryError => error
       raise_governance_query_error(error)
     end
 
-    def project_guidance(
-      repository_id:,
-      message_id:,
-      interpretations_first:,
-      interpretations_after: nil
-    )
-      filters = governance_filters(repository_id:, message_id:)
+    def project_agent_choices(project_ref:, first:, after: nil, choice_type: nil, status: nil)
+      filters = governance_filters(project_ref:, choice_type:, status:)
+      page = governance_browser.choices(
+        project_ref:,
+        first:,
+        choice_type:,
+        status:,
+        after_choice_id: Coordinator::Web::Graphql::GovernanceBrowserCursor.decode(
+          after,
+          "choices",
+          filters:
+        )
+      )
+      governance_choice_connection(page, filters:) if page
+    rescue Coordinator::Web::Graphql::InvalidCursor => error
+      raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
+      raise_invalid_project_reference(error)
+    rescue Coordinator::Read::Web::GovernanceBrowserQueryError => error
+      raise_governance_query_error(error)
+    end
+
+    def project_decision_impacts(project_ref:, first:, after: nil, outcome: nil)
+      filters = governance_filters(project_ref:, outcome:)
+      cursor = Coordinator::Web::Graphql::GovernanceBrowserCursor.decode(after, "impacts", filters:)
+      page = governance_browser.impacts(
+        project_ref:,
+        first:,
+        outcome:,
+        after_global_position: cursor&.fetch("global_position", nil),
+        after_assessment_id: cursor&.fetch("assessment_id", nil)
+      )
+      governance_impact_connection(page, filters:) if page
+    rescue Coordinator::Web::Graphql::InvalidCursor => error
+      raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
+      raise_invalid_project_reference(error)
+    rescue Coordinator::Read::Web::GovernanceBrowserQueryError => error
+      raise_governance_query_error(error)
+    end
+
+    def project_decision(project_ref:, decision_id:)
+      governance_browser.decision(project_ref:, decision_id:)
+    rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
+      raise_invalid_project_reference(error)
+    rescue Coordinator::Read::Web::GovernanceBrowserQueryError => error
+      raise_governance_query_error(error)
+    end
+
+    def project_guidance(project_ref:, message_id:, interpretations_first:, interpretations_after: nil)
+      filters = governance_filters(project_ref:, message_id:)
       detail = governance_browser.guidance(
-        repository_id:,
+        project_ref:,
         message_id:,
         first: interpretations_first,
         after_revision: Coordinator::Web::Graphql::GovernanceBrowserCursor.decode(
@@ -702,25 +741,26 @@ module Coordinator::Web::Graphql::Types
       return unless detail
 
       {
-        project: detail.project,
         guidance: detail.guidance,
         interpretations: governance_interpretation_connection(detail.interpretations, filters:)
       }
     rescue Coordinator::Web::Graphql::InvalidCursor => error
       raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
+      raise_invalid_project_reference(error)
     rescue Coordinator::Read::Web::GovernanceBrowserQueryError => error
       raise_governance_query_error(error)
     end
 
-    def project_agent_choice(repository_id:, choice_id:, impacts_first:, impacts_after: nil)
-      filters = governance_filters(repository_id:, choice_id:)
+    def project_agent_choice(project_ref:, choice_id:, impacts_first:, impacts_after: nil)
+      filters = governance_filters(project_ref:, choice_id:)
       cursor = Coordinator::Web::Graphql::GovernanceBrowserCursor.decode(
         impacts_after,
         "impacts",
         filters:
       )
       detail = governance_browser.choice(
-        repository_id:,
+        project_ref:,
         choice_id:,
         first: impacts_first,
         after_impact_global_position: cursor&.fetch("global_position", nil),
@@ -729,12 +769,21 @@ module Coordinator::Web::Graphql::Types
       return unless detail
 
       {
-        project: detail.project,
         choice: detail.choice,
         impacts: governance_impact_connection(detail.impacts, filters:)
       }
     rescue Coordinator::Web::Graphql::InvalidCursor => error
       raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
+      raise_invalid_project_reference(error)
+    rescue Coordinator::Read::Web::GovernanceBrowserQueryError => error
+      raise_governance_query_error(error)
+    end
+
+    def project_decision_impact(project_ref:, assessment_id:)
+      governance_browser.impact(project_ref:, assessment_id:)
+    rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
+      raise_invalid_project_reference(error)
     rescue Coordinator::Read::Web::GovernanceBrowserQueryError => error
       raise_governance_query_error(error)
     end

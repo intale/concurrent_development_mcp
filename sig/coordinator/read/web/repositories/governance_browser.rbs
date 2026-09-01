@@ -9,36 +9,38 @@ module Coordinator
             ?interpretations: Read::Repositories::DecisionInterpretations,
             ?choices: Read::Repositories::AgentChoices,
             ?impacts: Read::Repositories::AgentChoiceImpacts,
-            ?schema_registry: Write::EventSchemaRegistry
+            ?completion_contract: Contracts::GovernanceBrowser::CommandCompletion
           ) -> void
-          def catalog: (GovernanceBrowserQueryV1::Catalog query) -> GovernanceBrowserV1::Catalog?
+          def decisions: (GovernanceBrowserQueryV1::Decisions query) -> GovernanceBrowserV1::DecisionPage?
+          def guidance_list: (GovernanceBrowserQueryV1::GuidanceList query) -> GovernanceBrowserV1::GuidancePage?
+          def choices: (GovernanceBrowserQueryV1::Choices query) -> GovernanceBrowserV1::AgentChoicePage?
+          def impacts: (GovernanceBrowserQueryV1::Impacts query) -> GovernanceBrowserV1::ImpactPage?
           def decision: (GovernanceBrowserQueryV1::Decision query) -> GovernanceBrowserV1::DecisionDetail?
           def guidance: (GovernanceBrowserQueryV1::Guidance query) -> GovernanceBrowserV1::GuidanceDetail?
           def choice: (GovernanceBrowserQueryV1::Choice query) -> GovernanceBrowserV1::ChoiceDetail?
+          def impact: (GovernanceBrowserQueryV1::Impact query) -> GovernanceBrowserV1::ImpactDetail?
           def receipts: (GovernanceBrowserQueryV1::Receipts query) -> GovernanceBrowserV1::ReceiptPage
           def receipt: (GovernanceBrowserQueryV1::Receipt query) -> GovernanceBrowserV1::ReceiptDetail?
 
           private
 
-          def find_project: (String repository_id) -> Read::Repository?
-          def build_project: (Read::Repository record) -> GovernanceBrowserV1::Project
-          def guidance_page: (GovernanceBrowserQueryV1::Catalog query) -> GovernanceBrowserV1::GuidancePage
-          def choice_page: (GovernanceBrowserQueryV1::Catalog query) -> GovernanceBrowserV1::AgentChoicePage
+          def project_repository_ids: (String project_scope) -> Array[String]?
+          def decisions_for_project: (Array[String] repository_ids) -> untyped
           def impact_page: (
-            relation: ActiveRecord::Relation,
+            relation: untyped,
             outcome: String?,
             after_global_position: Integer?,
             after_assessment_id: String?,
             limit: Integer
           ) -> GovernanceBrowserV1::ImpactPage
-          def guidance_for_repository: (String repository_id) -> ActiveRecord::Relation
-          def choices_for_repository: (String repository_id) -> ActiveRecord::Relation
-          def impacts_for_repository: (String repository_id) -> ActiveRecord::Relation
-          def attempts_for_repository: (String repository_id) -> ActiveRecord::Relation
-          def build_receipt: (Read::CommandReceipt record) -> GovernanceBrowserV1::CommandReceipt
-          def load_completion: (Read::CommandReceipt record) -> Write::Events::CommandCompletedV1
-          def verify_projection!: (Read::CommandReceipt record, Write::Events::CommandCompletedV1 completion) -> void
-          def build_event_reference: (Write::EventReference attributes) -> GovernanceBrowserV1::EventReference
+          def guidance_for_project: (Array[String] repository_ids) -> untyped
+          def choices_for_project: (Array[String] repository_ids) -> untyped
+          def impacts_for_project: (Array[String] repository_ids) -> untyped
+          def attempts_for_project: (Array[String] repository_ids) -> untyped
+          def build_receipt: (untyped record) -> GovernanceBrowserV1::CommandReceipt
+          def load_completion: (untyped record) -> Hash[Symbol, untyped]
+          def verify_projection!: (untyped record, Hash[Symbol, untyped] completion) -> void
+          def build_event_reference: (Hash[Symbol, untyped] attributes) -> GovernanceBrowserV1::EventReference
         end
       end
     end

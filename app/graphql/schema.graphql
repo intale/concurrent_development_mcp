@@ -683,7 +683,10 @@ type Project {
 type ProjectAgentChoice {
   choice: GovernanceAgentChoice!
   impacts: AgentChoiceImpactConnection!
-  project: CoordinationProject!
+}
+
+type ProjectAgentChoiceImpact {
+  impact: AgentChoiceImpact!
 }
 
 type ProjectArtifact {
@@ -715,7 +718,6 @@ type ProjectConnection {
 type ProjectDecision {
   decision: GovernanceDecision!
   membershipBases: [String!]!
-  project: CoordinationProject!
 }
 
 type ProjectDelivery {
@@ -724,14 +726,6 @@ type ProjectDelivery {
   obligations: VerificationObligationConnection!
   project: CoordinationProject!
   releaseSets: ReleaseSetConnection!
-}
-
-type ProjectGovernance {
-  choices: AgentChoiceConnection!
-  decisions: GovernanceDecisionConnection!
-  guidance: GuidanceConnection!
-  impacts: AgentChoiceImpactConnection!
-  project: CoordinationProject!
 }
 
 type ProjectGuidance {
@@ -749,7 +743,6 @@ type ProjectGuidance {
 type ProjectGuidanceDetail {
   guidance: ProjectGuidance!
   interpretations: DecisionInterpretationConnection!
-  project: CoordinationProject!
 }
 
 type ProjectMergeSnapshot {
@@ -886,7 +879,12 @@ type Query {
   """
   One project AgentChoice and its bounded decision-impact assessments.
   """
-  projectAgentChoice(choiceId: ID!, impactsAfter: String, impactsFirst: Int = 20, repositoryId: ID!): ProjectAgentChoice
+  projectAgentChoice(choiceId: ID!, impactsAfter: String, impactsFirst: Int = 20, projectRef: ID!): ProjectAgentChoice
+
+  """
+  Page AgentChoices associated with any Repository member of the exact Project scope.
+  """
+  projectAgentChoices(after: String, choiceType: AgentChoiceKind, first: Int = 20, projectRef: ID!, status: AgentChoiceStatus): AgentChoiceConnection
 
   """
   One Project-scoped Artifact with its passive projected content.
@@ -919,9 +917,24 @@ type Query {
   projectChangeSets(after: String, first: Int = 20, projectRef: ID!): CoordinationChangeSetConnection
 
   """
-  One Decision deterministically associated with the exact project.
+  One Decision associated with the exact Project scope.
   """
-  projectDecision(decisionId: ID!, repositoryId: ID!): ProjectDecision
+  projectDecision(decisionId: ID!, projectRef: ID!): ProjectDecision
+
+  """
+  One AgentChoice impact assessment associated with the exact Project scope.
+  """
+  projectDecisionImpact(assessmentId: ID!, projectRef: ID!): ProjectAgentChoiceImpact
+
+  """
+  Page AgentChoice impact assessments associated with the exact Project scope.
+  """
+  projectDecisionImpacts(after: String, first: Int = 20, outcome: AgentChoiceImpactOutcome, projectRef: ID!): AgentChoiceImpactConnection
+
+  """
+  Page Decisions associated with any Repository member of the exact Project scope.
+  """
+  projectDecisions(after: String, first: Int = 20, policyStatus: DecisionPolicyStatus, projectRef: ID!, topicId: String): GovernanceDecisionConnection
 
   """
   Latest project-related Candidate, verification, merge, and ReleaseSet projections.
@@ -939,14 +952,14 @@ type Query {
   projectDependency(dependencyId: ID!, projectRef: ID!): CoordinationDependency
 
   """
-  Project-scoped Decisions, guidance, AgentChoices, and decision impacts.
-  """
-  projectGovernance(afterChoice: String, afterDecision: String, afterGuidance: String, afterImpact: String, choiceStatus: AgentChoiceStatus, choiceType: AgentChoiceKind, decisionPolicyStatus: DecisionPolicyStatus, decisionTopicId: String, first: Int = 20, guidanceSource: GuidanceSource, impactOutcome: AgentChoiceImpactOutcome, repositoryId: ID!): ProjectGovernance
-
-  """
   One project-scoped guidance fact and its bounded interpretation proposals.
   """
-  projectGuidance(interpretationsAfter: String, interpretationsFirst: Int = 20, messageId: ID!, repositoryId: ID!): ProjectGuidanceDetail
+  projectGuidance(interpretationsAfter: String, interpretationsFirst: Int = 20, messageId: ID!, projectRef: ID!): ProjectGuidanceDetail
+
+  """
+  Page Guidance associated with any Repository member of the exact Project scope.
+  """
+  projectGuidanceMessages(after: String, first: Int = 20, projectRef: ID!, source: GuidanceSource): GuidanceConnection
 
   """
   One project merge snapshot with candidates and bounded authorization decisions.

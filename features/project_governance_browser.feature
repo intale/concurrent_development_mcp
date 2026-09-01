@@ -1,4 +1,4 @@
-Feature: Inspect project governance and global command receipts
+Feature: Inspect project governance
   The read-only browser presents latest available coordination policy facts without becoming command authority.
 
   Rule: Decision membership uses complete projected coordination history
@@ -6,21 +6,21 @@ Feature: Inspect project governance and global command receipts
     @UI-GWT-13
     Scenario: An Attempt-scoped Decision remains visible after the bounded context window advances
       Given projected governance rows retain an old Attempt Decision outside the bounded context window
-      When the browser queries the projected project governance
+      When the browser opens the focused Decision collection and detail
       Then the old Decision is presented with Attempt membership provenance
 
-  Rule: Related governance facts remain typed and project isolated
+  Rule: Governance is scoped to every Repository member of one exact Project
 
     @UI-GWT-14
-    Scenario: Guidance interpretations and AgentChoice impacts stay within the exact project
-      Given projected governance rows contain related and unrelated guidance choices and impacts
-      When the browser queries the projected project governance and related details
-      Then only typed governance facts associated with the exact project are presented
+    Scenario: Related Guidance AgentChoices and impacts have dedicated project-bound details
+      Given projected governance rows span two Project members and an unrelated Project
+      When the browser opens each focused Governance collection and detail
+      Then only typed Governance facts associated with the exact Project are presented
 
-  Rule: Command receipts are global audit facts
+  Rule: One collection failure does not suppress another available projection
 
     @UI-GWT-15
-    Scenario: Command receipts are not attributed to the project in the browser
-      Given projected governance rows contain command receipts from separate coordination contexts
-      When the browser queries global command receipts from the project governance route
-      Then both receipts are presented as typed global audit facts without intermediate command content
+    Scenario: A malformed Decision cursor leaves projected Guidance available
+      Given projected Governance rows contain available Guidance
+      When one Governance collection receives a malformed cursor
+      Then the failing collection is isolated and the available Guidance is returned

@@ -3,11 +3,19 @@ import type {
   AgentChoiceKind,
   AgentChoiceStatus,
   DecisionPolicyStatus,
+  GovernanceChoiceSummaryFragment,
+  GovernanceDecisionSummaryFragment,
+  GovernanceGuidanceSummaryFragment,
+  GovernanceImpactSummaryFragment,
   GuidanceSource,
   ProjectGovernanceAgentChoiceQuery,
+  ProjectGovernanceAgentChoicesQuery,
+  ProjectGovernanceDecisionImpactQuery,
+  ProjectGovernanceDecisionImpactsQuery,
   ProjectGovernanceDecisionQuery,
-  ProjectGovernanceGuidanceQuery,
-  ProjectGovernanceQuery
+  ProjectGovernanceDecisionsQuery,
+  ProjectGovernanceGuidanceMessagesQuery,
+  ProjectGovernanceGuidanceQuery
 } from "../gql/graphql.js";
 
 export const DECISION_POLICY_STATUSES: ReadonlyArray<{
@@ -52,44 +60,101 @@ export const IMPACT_OUTCOMES: ReadonlyArray<{
   { label: "Already invalidated", value: "ALREADY_INVALIDATED" }
 ];
 
-export interface GovernanceFilters {
-  readonly decisionPolicyStatus?: DecisionPolicyStatus;
-  readonly decisionTopicId?: string;
-  readonly guidanceSource?: GuidanceSource;
-  readonly choiceType?: AgentChoiceKind;
-  readonly choiceStatus?: AgentChoiceStatus;
-  readonly impactOutcome?: AgentChoiceImpactOutcome;
-}
+export const PAGE_START = "__governance_page_start__";
 
-export interface GovernanceCursors {
-  readonly afterDecision?: string;
-  readonly afterGuidance?: string;
-  readonly afterChoice?: string;
-  readonly afterImpact?: string;
-}
+export type DecisionSummary = GovernanceDecisionSummaryFragment;
+export type GuidanceSummary = GovernanceGuidanceSummaryFragment;
+export type ChoiceSummary = GovernanceChoiceSummaryFragment;
+export type ImpactSummary = GovernanceImpactSummaryFragment;
+export type DecisionConnection = NonNullable<ProjectGovernanceDecisionsQuery["projectDecisions"]>;
+export type GuidanceConnection = NonNullable<ProjectGovernanceGuidanceMessagesQuery["projectGuidanceMessages"]>;
+export type ChoiceConnection = NonNullable<ProjectGovernanceAgentChoicesQuery["projectAgentChoices"]>;
+export type ImpactConnection = NonNullable<ProjectGovernanceDecisionImpactsQuery["projectDecisionImpacts"]>;
+export type DecisionDetail = NonNullable<ProjectGovernanceDecisionQuery["projectDecision"]>;
+export type GuidanceDetail = NonNullable<ProjectGovernanceGuidanceQuery["projectGuidance"]>;
+export type ChoiceDetail = NonNullable<ProjectGovernanceAgentChoiceQuery["projectAgentChoice"]>;
+export type ImpactDetail = NonNullable<ProjectGovernanceDecisionImpactQuery["projectDecisionImpact"]>;
 
-export type ProjectGovernance = NonNullable<ProjectGovernanceQuery["projectGovernance"]>;
-export type GovernanceDecision = NonNullable<ProjectGovernanceDecisionQuery["projectDecision"]>;
-export type GovernanceGuidance = NonNullable<ProjectGovernanceGuidanceQuery["projectGuidance"]>;
-export type GovernanceAgentChoice = NonNullable<ProjectGovernanceAgentChoiceQuery["projectAgentChoice"]>;
-
-export function preserveGovernanceForProject(
-  previousData: ProjectGovernanceQuery | undefined,
-  previousQueryKey: readonly unknown[] | undefined,
-  repositoryId: string
-): ProjectGovernanceQuery | undefined {
-  return previousQueryKey?.[1] === repositoryId ? previousData : undefined;
-}
-
-export function preserveDetailForIdentity<T>(
+export function preserveCollection<T>(
   previousData: T | undefined,
   previousQueryKey: readonly unknown[] | undefined,
-  repositoryId: string,
-  identity: string
+  projectRef: string,
+  filterKey: string
 ): T | undefined {
-  return previousQueryKey?.[1] === repositoryId && previousQueryKey?.[2] === identity
+  return previousQueryKey?.[1] === projectRef && previousQueryKey?.[2] === filterKey
     ? previousData
     : undefined;
+}
+
+export function preserveDetail<T>(
+  previousData: T | undefined,
+  previousQueryKey: readonly unknown[] | undefined,
+  projectRef: string,
+  identity: string
+): T | undefined {
+  return previousQueryKey?.[1] === projectRef && previousQueryKey?.[2] === identity
+    ? previousData
+    : undefined;
+}
+
+export function applyFilters(
+  params: URLSearchParams,
+  filters: Readonly<Record<string, string>>
+): URLSearchParams {
+  const next = new URLSearchParams(params);
+  next.delete("after");
+  next.delete("trail");
+  Object.entries(filters).forEach(([key, value]) => {
+    const normalized = value.trim();
+    if (normalized) next.set(key, normalized);
+    else next.delete(key);
+  });
+  return next;
+}
+
+export function nextPageParams(params: URLSearchParams, cursor: string): URLSearchParams {
+  const next = new URLSearchParams(params);
+  next.append("trail", params.get("after") ?? PAGE_START);
+  next.set("after", cursor);
+  return next;
+}
+
+export function previousPageParams(params: URLSearchParams): URLSearchParams {
+  const next = new URLSearchParams(params);
+  const trail = next.getAll("trail");
+  const previous = trail.pop();
+  next.delete("trail");
+  trail.forEach((cursor) => next.append("trail", cursor));
+  if (!previous || previous === PAGE_START) next.delete("after");
+  else next.set("after", previous);
+  return next;
+}
+
+export function listLocation(pathname: string, params: URLSearchParams): string {
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}
+
+export function detailLocation(pathname: string, identity: string, returnTo: string): string {
+  const query = new URLSearchParams({ returnTo }).toString();
+  return `${pathname}/${encodeURIComponent(identity)}?${query}`;
+}
+
+export function safeGovernanceReturnTo(
+  value: string | null,
+  fallback: string,
+  governanceBasePath: string
+): string {
+  return value === governanceBasePath || value?.startsWith(`${governanceBasePath}/`)
+    ? value
+    : fallback;
+}
+
+export function matching<T extends string>(
+  requested: string | null,
+  options: ReadonlyArray<{ readonly value: T }>
+): T | undefined {
+  return options.some(({ value }) => value === requested) ? requested as T : undefined;
 }
 
 export function humanized(value: string): string {

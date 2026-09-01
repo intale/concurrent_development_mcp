@@ -3,7 +3,16 @@ module Coordinator
     module Web
       module Contracts
         class GovernanceBrowser
-          class Catalog < Dry::Validation::Contract
+          class Decisions < Dry::Validation::Contract
+          end
+
+          class GuidanceList < Dry::Validation::Contract
+          end
+
+          class Choices < Dry::Validation::Contract
+          end
+
+          class Impacts < Dry::Validation::Contract
           end
 
           class Decision < Dry::Validation::Contract
@@ -15,10 +24,16 @@ module Coordinator
           class Choice < Dry::Validation::Contract
           end
 
+          class Impact < Dry::Validation::Contract
+          end
+
           class Receipts < Dry::Validation::Contract
           end
 
           class Receipt < Dry::Validation::Contract
+          end
+
+          class CommandCompletion < Dry::Validation::Contract
           end
         end
       end

@@ -2,10 +2,10 @@ module Coordinator
   module Read
     module Web
       class GovernanceBrowserV1
-        class Project < Shared::Value
-          def repository_id: () -> String
-          def scope: () -> String
-          def display_name: () -> String?
+        class DecisionPage < Shared::Value
+          def items: () -> Array[Read::DecisionViewV1]
+          def next_decision_id: () -> String?
+          def has_more: () -> bool
         end
 
         class GuidancePage < Shared::Value
@@ -29,6 +29,25 @@ module Coordinator
           def items: () -> Array[Read::AgentChoiceImpactViewV1]
           def next_cursor: () -> ImpactCursor?
           def has_more: () -> bool
+        end
+
+        class DecisionDetail < Shared::Value
+          def decision: () -> Read::DecisionViewV1
+          def membership_bases: () -> Array[String]
+        end
+
+        class GuidanceDetail < Shared::Value
+          def guidance: () -> Read::GuidanceUtteranceV1
+          def interpretations: () -> Read::InterpretationPageV1
+        end
+
+        class ChoiceDetail < Shared::Value
+          def choice: () -> Read::AgentChoiceViewV1
+          def impacts: () -> ImpactPage
+        end
+
+        class ImpactDetail < Shared::Value
+          def impact: () -> Read::AgentChoiceImpactViewV1
         end
 
         class EventReference < Shared::Value
@@ -56,32 +75,6 @@ module Coordinator
           def items: () -> Array[CommandReceipt]
           def next_command_id: () -> String?
           def has_more: () -> bool
-        end
-
-        class Catalog < Shared::Value
-          def project: () -> Project
-          def decisions: () -> Read::DecisionPageV1
-          def guidance: () -> GuidancePage
-          def choices: () -> AgentChoicePage
-          def impacts: () -> ImpactPage
-        end
-
-        class DecisionDetail < Shared::Value
-          def project: () -> Project
-          def decision: () -> Read::DecisionViewV1
-          def membership_bases: () -> Array[String]
-        end
-
-        class GuidanceDetail < Shared::Value
-          def project: () -> Project
-          def guidance: () -> Read::GuidanceUtteranceV1
-          def interpretations: () -> Read::InterpretationPageV1
-        end
-
-        class ChoiceDetail < Shared::Value
-          def project: () -> Project
-          def choice: () -> Read::AgentChoiceViewV1
-          def impacts: () -> ImpactPage
         end
 
         class ReceiptDetail < Shared::Value

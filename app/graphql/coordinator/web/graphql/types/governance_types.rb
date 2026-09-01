@@ -364,34 +364,27 @@ module Coordinator::Web::Graphql::Types
     field :page_info, PageInfoType, null: false
   end
 
-  class ProjectGovernanceType < BaseObject
-    graphql_name "ProjectGovernance"
-    field :choices, AgentChoiceConnectionType, null: false, connection: false
-    field :decisions, DecisionConnectionType, null: false, connection: false
-    field :guidance, GuidanceConnectionType, null: false, connection: false
-    field :impacts, AgentChoiceImpactConnectionType, null: false, connection: false
-    field :project, CoordinationProjectType, null: false
-  end
-
   class ProjectDecisionType < BaseObject
     graphql_name "ProjectDecision"
     field :decision, DecisionType, null: false
     field :membership_bases, [ String ], null: false
-    field :project, CoordinationProjectType, null: false
   end
 
   class ProjectGuidanceType < BaseObject
     graphql_name "ProjectGuidanceDetail"
     field :guidance, GuidanceType, null: false
     field :interpretations, InterpretationConnectionType, null: false, connection: false
-    field :project, CoordinationProjectType, null: false
   end
 
-    class ProjectAgentChoiceType < BaseObject
+  class ProjectAgentChoiceType < BaseObject
     graphql_name "ProjectAgentChoice"
     field :choice, AgentChoiceType, null: false
     field :impacts, AgentChoiceImpactConnectionType, null: false, connection: false
-    field :project, CoordinationProjectType, null: false
-    end
+  end
+
+  class ProjectAgentChoiceImpactType < BaseObject
+    graphql_name "ProjectAgentChoiceImpact"
+    field :impact, AgentChoiceImpactType, null: false
+  end
   end
 end

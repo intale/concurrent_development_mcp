@@ -9,6 +9,12 @@ import {
   ProjectArtifactsPage,
   ProjectSkillsPage
 } from "./knowledge/project-knowledge-page.js";
+import {
+  ProjectGovernanceChoicesPage,
+  ProjectGovernanceDecisionsPage,
+  ProjectGovernanceGuidancePage,
+  ProjectGovernanceImpactsPage
+} from "./governance/project-governance-page.js";
 import { OperationBatchesPage } from "./operations/operation-batches-page.js";
 import { ProjectCatalogPage } from "./projects/project-catalog-page.js";
 import { ProjectOverviewPage } from "./projects/project-overview-page.js";
@@ -142,15 +148,15 @@ export function App() {
             <Route path="knowledge/artifacts" element={<ProjectArtifactsPage />} />
             <Route path="knowledge/artifacts/:artifactId" element={<ProjectArtifactsPage />} />
             <Route path="knowledge/artifacts/:artifactId/relationships" element={<ProjectArtifactRelationshipsPage />} />
-            <Route
-              path="governance"
-              element={(
-                <ProjectSectionPlaceholder
-                  description="Project Decisions, Guidance, and AgentChoices belong in focused Governance routes."
-                  title="Governance"
-                />
-              )}
-            />
+            <Route path="governance" element={<Navigate replace to="decisions" />} />
+            <Route path="governance/decisions" element={<ProjectGovernanceDecisionsPage />} />
+            <Route path="governance/decisions/:decisionId" element={<ProjectGovernanceDecisionsPage />} />
+            <Route path="governance/guidance" element={<ProjectGovernanceGuidancePage />} />
+            <Route path="governance/guidance/:messageId" element={<ProjectGovernanceGuidancePage />} />
+            <Route path="governance/choices" element={<ProjectGovernanceChoicesPage />} />
+            <Route path="governance/choices/:choiceId" element={<ProjectGovernanceChoicesPage />} />
+            <Route path="governance/impacts" element={<ProjectGovernanceImpactsPage />} />
+            <Route path="governance/impacts/:assessmentId" element={<ProjectGovernanceImpactsPage />} />
             <Route
               path="delivery"
               element={(

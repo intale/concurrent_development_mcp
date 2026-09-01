@@ -1,59 +1,135 @@
 import {
   ProjectGovernanceAgentChoiceDocument,
+  ProjectGovernanceAgentChoicesDocument,
   ProjectGovernanceDecisionDocument,
-  ProjectGovernanceDocument,
-  ProjectGovernanceGuidanceDocument
+  ProjectGovernanceDecisionImpactDocument,
+  ProjectGovernanceDecisionImpactsDocument,
+  ProjectGovernanceDecisionsDocument,
+  ProjectGovernanceGuidanceDocument,
+  ProjectGovernanceGuidanceMessagesDocument
 } from "../gql/graphql.js";
 import type {
+  AgentChoiceImpactOutcome,
+  AgentChoiceKind,
+  AgentChoiceStatus,
+  DecisionPolicyStatus,
+  GuidanceSource,
   ProjectGovernanceAgentChoiceQuery,
   ProjectGovernanceAgentChoiceQueryVariables,
+  ProjectGovernanceAgentChoicesQuery,
+  ProjectGovernanceAgentChoicesQueryVariables,
+  ProjectGovernanceDecisionImpactQuery,
+  ProjectGovernanceDecisionImpactQueryVariables,
+  ProjectGovernanceDecisionImpactsQuery,
+  ProjectGovernanceDecisionImpactsQueryVariables,
   ProjectGovernanceDecisionQuery,
   ProjectGovernanceDecisionQueryVariables,
+  ProjectGovernanceDecisionsQuery,
+  ProjectGovernanceDecisionsQueryVariables,
+  ProjectGovernanceGuidanceMessagesQuery,
+  ProjectGovernanceGuidanceMessagesQueryVariables,
   ProjectGovernanceGuidanceQuery,
-  ProjectGovernanceGuidanceQueryVariables,
-  ProjectGovernanceQuery,
-  ProjectGovernanceQueryVariables
+  ProjectGovernanceGuidanceQueryVariables
 } from "../gql/graphql.js";
 import { executeGraphql } from "../graphql-client.js";
-import type {
-  GovernanceCursors,
-  GovernanceFilters
-} from "./project-governance-model.js";
 
 export const GOVERNANCE_PAGE_SIZE = 20;
 
-export function fetchProjectGovernance(
-  repositoryId: string,
-  filters: GovernanceFilters,
-  cursors: GovernanceCursors,
+export interface DecisionFilters {
+  readonly policyStatus?: DecisionPolicyStatus;
+  readonly topicId?: string;
+}
+
+export interface GuidanceFilters {
+  readonly source?: GuidanceSource;
+}
+
+export interface ChoiceFilters {
+  readonly choiceType?: AgentChoiceKind;
+  readonly status?: AgentChoiceStatus;
+}
+
+export interface ImpactFilters {
+  readonly outcome?: AgentChoiceImpactOutcome;
+}
+
+export function fetchGovernanceDecisions(
+  projectRef: string,
+  filters: DecisionFilters,
+  after: string | null,
   signal?: AbortSignal
-): Promise<ProjectGovernanceQuery> {
-  const variables: ProjectGovernanceQueryVariables = {
-    repositoryId,
+): Promise<ProjectGovernanceDecisionsQuery> {
+  const variables: ProjectGovernanceDecisionsQueryVariables = {
+    projectRef,
     first: GOVERNANCE_PAGE_SIZE,
     ...filters,
-    ...cursors
+    ...(after ? { after } : {})
   };
-  return executeGraphql(ProjectGovernanceDocument, variables, signal);
+  return executeGraphql(ProjectGovernanceDecisionsDocument, variables, signal);
+}
+
+export function fetchGovernanceGuidanceMessages(
+  projectRef: string,
+  filters: GuidanceFilters,
+  after: string | null,
+  signal?: AbortSignal
+): Promise<ProjectGovernanceGuidanceMessagesQuery> {
+  const variables: ProjectGovernanceGuidanceMessagesQueryVariables = {
+    projectRef,
+    first: GOVERNANCE_PAGE_SIZE,
+    ...filters,
+    ...(after ? { after } : {})
+  };
+  return executeGraphql(ProjectGovernanceGuidanceMessagesDocument, variables, signal);
+}
+
+export function fetchGovernanceAgentChoices(
+  projectRef: string,
+  filters: ChoiceFilters,
+  after: string | null,
+  signal?: AbortSignal
+): Promise<ProjectGovernanceAgentChoicesQuery> {
+  const variables: ProjectGovernanceAgentChoicesQueryVariables = {
+    projectRef,
+    first: GOVERNANCE_PAGE_SIZE,
+    ...filters,
+    ...(after ? { after } : {})
+  };
+  return executeGraphql(ProjectGovernanceAgentChoicesDocument, variables, signal);
+}
+
+export function fetchGovernanceDecisionImpacts(
+  projectRef: string,
+  filters: ImpactFilters,
+  after: string | null,
+  signal?: AbortSignal
+): Promise<ProjectGovernanceDecisionImpactsQuery> {
+  const variables: ProjectGovernanceDecisionImpactsQueryVariables = {
+    projectRef,
+    first: GOVERNANCE_PAGE_SIZE,
+    ...filters,
+    ...(after ? { after } : {})
+  };
+  return executeGraphql(ProjectGovernanceDecisionImpactsDocument, variables, signal);
 }
 
 export function fetchGovernanceDecision(
-  repositoryId: string,
+  projectRef: string,
   decisionId: string,
   signal?: AbortSignal
 ): Promise<ProjectGovernanceDecisionQuery> {
-  const variables: ProjectGovernanceDecisionQueryVariables = { repositoryId, decisionId };
+  const variables: ProjectGovernanceDecisionQueryVariables = { projectRef, decisionId };
   return executeGraphql(ProjectGovernanceDecisionDocument, variables, signal);
 }
 
 export function fetchGovernanceGuidance(
-  repositoryId: string,
+  projectRef: string,
   messageId: string,
-  interpretationsAfter?: string,
+  interpretationsAfter: string | null,
   signal?: AbortSignal
 ): Promise<ProjectGovernanceGuidanceQuery> {
   const variables: ProjectGovernanceGuidanceQueryVariables = {
-    repositoryId,
+    projectRef,
     messageId,
     interpretationsFirst: GOVERNANCE_PAGE_SIZE,
     ...(interpretationsAfter ? { interpretationsAfter } : {})
@@ -62,16 +138,25 @@ export function fetchGovernanceGuidance(
 }
 
 export function fetchGovernanceAgentChoice(
-  repositoryId: string,
+  projectRef: string,
   choiceId: string,
-  impactsAfter?: string,
+  impactsAfter: string | null,
   signal?: AbortSignal
 ): Promise<ProjectGovernanceAgentChoiceQuery> {
   const variables: ProjectGovernanceAgentChoiceQueryVariables = {
-    repositoryId,
+    projectRef,
     choiceId,
     impactsFirst: GOVERNANCE_PAGE_SIZE,
     ...(impactsAfter ? { impactsAfter } : {})
   };
   return executeGraphql(ProjectGovernanceAgentChoiceDocument, variables, signal);
+}
+
+export function fetchGovernanceDecisionImpact(
+  projectRef: string,
+  assessmentId: string,
+  signal?: AbortSignal
+): Promise<ProjectGovernanceDecisionImpactQuery> {
+  const variables: ProjectGovernanceDecisionImpactQueryVariables = { projectRef, assessmentId };
+  return executeGraphql(ProjectGovernanceDecisionImpactDocument, variables, signal);
 }

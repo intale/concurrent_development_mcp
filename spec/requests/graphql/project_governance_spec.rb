@@ -2,311 +2,397 @@
 
 module ProjectGovernanceGraphqlSpec
   RSpec.describe "GraphQL project governance", :read_model do
-  CATALOG_QUERY = <<~GRAPHQL.freeze
-    query ProjectGovernance(
-      $repositoryId: ID!
-      $first: Int
-      $decisionTopicId: String
-      $decisionPolicyStatus: DecisionPolicyStatus
-      $afterDecision: String
-      $guidanceSource: GuidanceSource
-      $choiceStatus: AgentChoiceStatus
-      $impactOutcome: AgentChoiceImpactOutcome
-    ) {
-      projectGovernance(
-        repositoryId: $repositoryId
-        first: $first
-        decisionTopicId: $decisionTopicId
-        decisionPolicyStatus: $decisionPolicyStatus
-        afterDecision: $afterDecision
-        guidanceSource: $guidanceSource
-        choiceStatus: $choiceStatus
-        impactOutcome: $impactOutcome
+    COLLECTIONS_QUERY = <<~GRAPHQL.freeze
+      query ProjectGovernanceCollections(
+        $projectRef: ID!
+        $first: Int
+        $afterDecision: String
+        $decisionStatus: DecisionPolicyStatus
+        $decisionTopic: String
+        $guidanceSource: GuidanceSource
+        $choiceType: AgentChoiceKind
+        $choiceStatus: AgentChoiceStatus
+        $impactOutcome: AgentChoiceImpactOutcome
       ) {
-        project { id name scope }
-        decisions {
+        projectDecisions(
+          projectRef: $projectRef
+          first: $first
+          after: $afterDecision
+          policyStatus: $decisionStatus
+          topicId: $decisionTopic
+        ) {
           nodes {
-            id topicId policyStatus statementKind effect modality
+            id topicId policyStatus statementKind effect modality currentAt
             scope { repositoryIds attemptId }
+            value { schema name items action }
           }
           pageInfo { endCursor hasNextPage }
         }
-        guidance {
-          nodes { id conversationId text excerpt source policyStatus anchors { repositoryIds attemptId } }
+        projectGuidanceMessages(projectRef: $projectRef, first: $first, source: $guidanceSource) {
+          nodes { id excerpt source policyStatus recordedAt actor { kind id } }
           pageInfo { endCursor hasNextPage }
         }
-        choices {
+        projectAgentChoices(
+          projectRef: $projectRef
+          first: $first
+          choiceType: $choiceType
+          status: $choiceStatus
+        ) {
           nodes {
-            id choiceType observationStatus reasonSummary
+            id choiceType observationStatus reasonSummary recordedAt
             selected { id summary }
-            context { repositoryId attemptId }
+            context { repositoryId workItemId attemptId }
           }
           pageInfo { endCursor hasNextPage }
         }
-        impacts {
+        projectDecisionImpacts(projectRef: $projectRef, first: $first, outcome: $impactOutcome) {
           nodes {
             assessmentId choiceId attemptId outcome reason policyVersion
-            decisionId decisionChangeKind beforeStatus afterStatus beforeBasis afterBasis
-            beforeReasonCodes afterReasonCodes assessedAt
+            decisionId decisionChangeKind beforeStatus afterStatus assessedAt
           }
           pageInfo { endCursor hasNextPage }
         }
       }
-    }
-  GRAPHQL
+    GRAPHQL
 
-  DECISION_QUERY = <<~GRAPHQL.freeze
-    query ProjectDecision($repositoryId: ID!, $decisionId: ID!) {
-      projectDecision(repositoryId: $repositoryId, decisionId: $decisionId) {
-        project { id scope }
-        membershipBases
-        decision {
-          id topicId policyStatus rationaleSummary correctionCount correctionSummary
-          recordedAt currentAt currentBy { kind id }
-          conditions { phases languages tags environments }
-        }
-      }
-    }
-  GRAPHQL
-
-  GUIDANCE_QUERY = <<~GRAPHQL.freeze
-    query ProjectGuidance(
-      $repositoryId: ID!
-      $messageId: ID!
-      $interpretationsFirst: Int
-      $interpretationsAfter: String
-    ) {
-      projectGuidance(
-        repositoryId: $repositoryId
-        messageId: $messageId
-        interpretationsFirst: $interpretationsFirst
-        interpretationsAfter: $interpretationsAfter
-      ) {
-        project { id }
-        guidance { id text actor { kind id } }
-        interpretations {
-          nodes {
-            id messageId lifecycleStatus policyStatus statementKind topicId effect modality
-            sourceSpanText assessmentStatus assessmentReasons
-            clarificationQuestions { field prompt options }
-            value { schema name }
-            actor { kind id }
+    DECISION_QUERY = <<~GRAPHQL.freeze
+      query ProjectDecision($projectRef: ID!, $decisionId: ID!) {
+        projectDecision(projectRef: $projectRef, decisionId: $decisionId) {
+          membershipBases
+          decision {
+            id topicId policyStatus rationaleSummary correctionCount correctionSummary
+            recordedAt currentAt currentBy { kind id }
+            conditions { phases languages tags environments }
           }
-          pageInfo { endCursor hasNextPage }
         }
       }
-    }
-  GRAPHQL
+    GRAPHQL
 
-  CHOICE_QUERY = <<~GRAPHQL.freeze
-    query ProjectAgentChoice(
-      $repositoryId: ID!
-      $choiceId: ID!
-      $impactsFirst: Int
-      $impactsAfter: String
-    ) {
-      projectAgentChoice(
-        repositoryId: $repositoryId
-        choiceId: $choiceId
-        impactsFirst: $impactsFirst
-        impactsAfter: $impactsAfter
+    GUIDANCE_QUERY = <<~GRAPHQL.freeze
+      query ProjectGuidance(
+        $projectRef: ID!
+        $messageId: ID!
+        $interpretationsFirst: Int
+        $interpretationsAfter: String
       ) {
-        project { id }
-        choice {
-          id observationStatus acceptedAt acceptedBy { kind id }
-          assessmentBasis assessmentDecisionIds assessmentWarnings
-          invalidatedAt invalidationReason
-        }
-        impacts {
-          nodes { assessmentId choiceId outcome decisionId afterStatus }
-          pageInfo { endCursor hasNextPage }
+        projectGuidance(
+          projectRef: $projectRef
+          messageId: $messageId
+          interpretationsFirst: $interpretationsFirst
+          interpretationsAfter: $interpretationsAfter
+        ) {
+          guidance { id text actor { kind id } }
+          interpretations {
+            nodes {
+              id messageId lifecycleStatus topicId assessmentStatus assessmentReasons
+              value { schema name }
+            }
+            pageInfo { endCursor hasNextPage }
+          }
         }
       }
-    }
-  GRAPHQL
+    GRAPHQL
 
-  RECEIPTS_QUERY = <<~GRAPHQL.freeze
-    query CommandReceipts($first: Int, $after: String, $toolName: String) {
-      commandReceipts(first: $first, after: $after, toolName: $toolName) {
-        nodes {
+    CHOICE_QUERY = <<~GRAPHQL.freeze
+      query ProjectAgentChoice(
+        $projectRef: ID!
+        $choiceId: ID!
+        $impactsFirst: Int
+        $impactsAfter: String
+      ) {
+        projectAgentChoice(
+          projectRef: $projectRef
+          choiceId: $choiceId
+          impactsFirst: $impactsFirst
+          impactsAfter: $impactsAfter
+        ) {
+          choice {
+            id observationStatus acceptedAt assessmentBasis assessmentDecisionIds
+            invalidatedAt invalidationReason
+          }
+          impacts {
+            nodes { assessmentId choiceId outcome decisionId afterStatus }
+            pageInfo { endCursor hasNextPage }
+          }
+        }
+      }
+    GRAPHQL
+
+    IMPACT_QUERY = <<~GRAPHQL.freeze
+      query ProjectDecisionImpact($projectRef: ID!, $assessmentId: ID!) {
+        projectDecisionImpact(projectRef: $projectRef, assessmentId: $assessmentId) {
+          impact {
+            assessmentId choiceId attemptId outcome reason decisionId decisionChangeKind
+            beforeStatus beforeBasis beforeReasonCodes
+            afterStatus afterBasis afterReasonCodes assessedAt
+          }
+        }
+      }
+    GRAPHQL
+
+    ISOLATED_COLLECTION_QUERY = <<~GRAPHQL.freeze
+      query IsolatedGovernanceCollections($projectRef: ID!, $guidanceAfter: String!) {
+        projectDecisions(projectRef: $projectRef, first: 20) { nodes { id } }
+        projectGuidanceMessages(projectRef: $projectRef, first: 20, after: $guidanceAfter) {
+          nodes { id }
+        }
+      }
+    GRAPHQL
+
+    RECEIPT_ISOLATION_QUERY = <<~GRAPHQL.freeze
+      query ReceiptIsolation($projectRef: ID!, $commandId: ID!) {
+        projectDecisions(projectRef: $projectRef, first: 20) { nodes { id } }
+        commandReceipt(commandId: $commandId) { commandId nextActionTools }
+      }
+    GRAPHQL
+
+    RECEIPT_QUERY = <<~GRAPHQL.freeze
+      query CommandReceipt($commandId: ID!) {
+        commandReceipt(commandId: $commandId) {
           commandId toolName status summary receipt completedAt warnings nextActionTools
-          emittedEvents { id type streamContext streamName streamId streamRevision }
+          emittedEvents { id type streamId streamRevision }
         }
-        pageInfo { endCursor hasNextPage }
       }
-    }
-  GRAPHQL
+    GRAPHQL
 
-  RECEIPT_QUERY = <<~GRAPHQL.freeze
-    query CommandReceipt($commandId: ID!) {
-      commandReceipt(commandId: $commandId) {
-        commandId toolName status summary receipt completedAt warnings nextActionTools
-        emittedEvents { id type streamId streamRevision }
-      }
-    }
-  GRAPHQL
+    REPOSITORY_ID = "018f0f4d-4e45-7abc-8def-000000000081"
+    MEMBER_REPOSITORY_ID = "018f0f4d-4e45-7abc-8def-000000000083"
+    OTHER_REPOSITORY_ID = "018f0f4d-4e45-7abc-8def-000000000082"
+    PROJECT_SCOPE = "project:graphql-governance"
+    CHANGE_SET_ID = "CS-graphql-governance"
+    WORK_ITEM_ID = "W-graphql-governance"
+    ATTEMPT_ID = "A-graphql-governance-history"
+    IMPACT_ID = "choice-impact-v1:#{'1' * 64}"
 
-  RECEIPT_ISOLATION_QUERY = <<~GRAPHQL.freeze
-    query ReceiptIsolation($repositoryId: ID!, $commandId: ID!) {
-      projectGovernance(repositoryId: $repositoryId, first: 1) {
-        project { id scope }
-      }
-      commandReceipt(commandId: $commandId) {
-        commandId nextActionTools
-      }
-    }
-  GRAPHQL
+    before do
+      create_project(REPOSITORY_ID, PROJECT_SCOPE)
+      create_project(MEMBER_REPOSITORY_ID, PROJECT_SCOPE)
+      create_project(OTHER_REPOSITORY_ID, "project:other-governance")
+      create_coordination_context
+      create_governance_facts
+      create_receipt
+    end
 
-  REPOSITORY_ID = "018f0f4d-4e45-7abc-8def-000000000081"
-  OTHER_REPOSITORY_ID = "018f0f4d-4e45-7abc-8def-000000000082"
-  CHANGE_SET_ID = "CS-graphql-governance"
-  WORK_ITEM_ID = "W-graphql-governance"
-  ATTEMPT_ID = "A-graphql-governance-history"
-  IMPACT_ID = "choice-impact-v1:#{'1' * 64}"
-
-  before do
-    create_project(REPOSITORY_ID, "project:graphql-governance", "GraphQL governance")
-    create_project(OTHER_REPOSITORY_ID, "project:other-governance", "Other governance")
-    create_coordination_context
-    create_decisions
-    create_guidance
-    create_choices
-    create_receipts
-  end
-
-  it "serves typed, bounded governance facts for the exact project" do
-    response = execute(
-      CATALOG_QUERY,
-      repositoryId: REPOSITORY_ID,
-      first: 1,
-      decisionTopicId: "testing.framework",
-      decisionPolicyStatus: "RECORDED",
-      guidanceSource: "AGENT_FORWARDED",
-      choiceStatus: "ACCEPTED",
-      impactOutcome: "INVALIDATED"
-    )
-    expect(response.fetch("errors", [])).to be_empty, response.inspect
-    result = response.dig("data", "projectGovernance")
-
-    expect(result.fetch("project")).to include(
-      "id" => REPOSITORY_ID,
-      "name" => "GraphQL governance"
-    )
-    expect(result.dig("decisions", "nodes", 0)).to include(
-      "id" => "D-direct",
-      "topicId" => "testing.framework",
-      "policyStatus" => "RECORDED",
-      "effect" => "prefer"
-    )
-    expect(result.dig("decisions", "nodes", 0, "scope", "repositoryIds")).to eq([ REPOSITORY_ID ])
-    expect(result.dig("decisions", "pageInfo", "hasNextPage")).to be(true)
-    expect(result.dig("guidance", "nodes", 0)).to include(
-      "id" => "M-project-guidance",
-      "source" => "AGENT_FORWARDED"
-    )
-    expect(result.dig("choices", "nodes", 0)).to include(
-      "id" => "CHO-project",
-      "choiceType" => "TESTING_FRAMEWORK",
-      "observationStatus" => "ACCEPTED"
-    )
-    expect(result.dig("impacts", "nodes", 0)).to include(
-      "assessmentId" => IMPACT_ID,
-      "outcome" => "INVALIDATED",
-      "afterStatus" => "blocked"
-    )
-  end
-
-  it "uses unbounded Attempt history for Decision membership and exposes detail provenance" do
-    response = execute(CATALOG_QUERY, repositoryId: REPOSITORY_ID, first: 1)
-    expect(response.fetch("errors", [])).to be_empty, response.inspect
-    first = response.dig("data", "projectGovernance", "decisions")
-    cursor = first.dig("pageInfo", "endCursor")
-    second = execute(
-      CATALOG_QUERY,
-      repositoryId: REPOSITORY_ID,
-      first: 1,
-      afterDecision: cursor
-    ).dig("data", "projectGovernance", "decisions")
-    detail = execute(
-      DECISION_QUERY,
-      repositoryId: REPOSITORY_ID,
-      decisionId: "D-history"
-    ).dig("data", "projectDecision")
-
-    expect(cursor).not_to include("D-direct")
-    expect(second.dig("nodes", 0, "id")).to eq("D-history")
-    expect(detail.fetch("membershipBases")).to eq([ "attempt" ])
-    expect(detail.dig("decision", "id")).to eq("D-history")
-    expect(detail.dig("decision", "conditions", "languages")).to eq([ "ruby" ])
-  end
-
-  it "serves guidance interpretations, choice impacts, and global command receipts as typed facts" do
-    guidance = execute(
-      GUIDANCE_QUERY,
-      repositoryId: REPOSITORY_ID,
-      messageId: "M-project-guidance",
-      interpretationsFirst: 20
-    ).dig("data", "projectGuidance")
-    choice = execute(
-      CHOICE_QUERY,
-      repositoryId: REPOSITORY_ID,
-      choiceId: "CHO-project",
-      impactsFirst: 20
-    ).dig("data", "projectAgentChoice")
-    receipts = execute(RECEIPTS_QUERY, first: 1).dig("data", "commandReceipts")
-    receipt = execute(RECEIPT_QUERY, commandId: "cmd-a").dig("data", "commandReceipt")
-
-    expect(guidance.dig("interpretations", "nodes", 0)).to include(
-      "id" => "I-project-guidance",
-      "assessmentStatus" => "accepted_for_activation",
-      "topicId" => "testing.framework"
-    )
-    expect(choice.fetch("choice")).to include(
-      "id" => "CHO-project",
-      "observationStatus" => "ACCEPTED",
-      "assessmentBasis" => "no_policy"
-    )
-    expect(choice.dig("impacts", "nodes", 0)).to include(
-      "assessmentId" => IMPACT_ID,
-      "decisionId" => "D-CHO-project"
-    )
-    expect(receipts.dig("nodes", 0)).to include(
-      "commandId" => "cmd-a",
-      "toolName" => "change_set_create",
-      "status" => "OK"
-    )
-    expect(receipts.dig("pageInfo", "hasNextPage")).to be(true)
-    expect(receipt).to include("commandId" => "cmd-a", "nextActionTools" => [])
-    expect(receipt).not_to have_key("data")
-  end
-
-  it "isolates malformed receipt data as retryable field failure and serves corrected projected data" do
-    receipt = Coordinator::Read::CommandReceipt.find("cmd-a")
-    receipt.update!(
-      completion: receipt.completion.merge(
-        "next_actions" => [ { "tool" => "not a tool", "arguments" => {} } ]
+    it "serves independently bounded collections across the exact Project scope" do
+      response = execute(
+        COLLECTIONS_QUERY,
+        projectRef: project_ref,
+        first: 1,
+        decisionTopic: "testing.framework",
+        decisionStatus: "RECORDED",
+        guidanceSource: "AGENT_FORWARDED",
+        choiceType: "TESTING_FRAMEWORK",
+        choiceStatus: "ACCEPTED",
+        impactOutcome: "INVALIDATED"
       )
-    )
+      expect(response.fetch("errors", [])).to be_empty, response.inspect
 
-    failed = execute(
-      RECEIPT_ISOLATION_QUERY,
-      repositoryId: REPOSITORY_ID,
-      commandId: "cmd-a"
-    )
-    expect(failed.dig("data", "projectGovernance", "project", "id")).to eq(REPOSITORY_ID)
-    expect(failed.dig("data", "commandReceipt")).to be_nil
-    expect(failed.dig("errors", 0, "extensions")).to include(
-      "code" => "READ_MODEL_INVALID",
-      "retryable" => true,
-      "details" => {
-        "entity" => "command_receipt",
-        "command_id" => "cmd-a",
-        "reason" => "invalid_completion"
-      }
-    )
+      expect(response.dig("data", "projectDecisions", "nodes", 0)).to include(
+        "id" => "D-history",
+        "topicId" => "testing.framework",
+        "policyStatus" => "RECORDED"
+      )
+      expect(response.dig("data", "projectDecisions", "pageInfo", "hasNextPage")).to be(true)
+      expect(response.dig("data", "projectGuidanceMessages", "nodes", 0)).to include(
+        "id" => "M-project-guidance",
+        "source" => "AGENT_FORWARDED"
+      )
+      expect(response.dig("data", "projectAgentChoices", "nodes", 0)).to include(
+        "id" => "CHO-project",
+        "observationStatus" => "ACCEPTED"
+      )
+      expect(response.dig("data", "projectDecisionImpacts", "nodes", 0)).to include(
+        "assessmentId" => IMPACT_ID,
+        "outcome" => "INVALIDATED"
+      )
+    end
 
-    receipt.update!(
-      completion: receipt.completion.merge(
+    it "serves dedicated project-bound details for every substantial Governance fact" do
+      decision = execute(DECISION_QUERY, projectRef: project_ref, decisionId: "D-history")
+        .dig("data", "projectDecision")
+      guidance = execute(
+        GUIDANCE_QUERY,
+        projectRef: project_ref,
+        messageId: "M-project-guidance",
+        interpretationsFirst: 20
+      ).dig("data", "projectGuidance")
+      choice = execute(
+        CHOICE_QUERY,
+        projectRef: project_ref,
+        choiceId: "CHO-project",
+        impactsFirst: 20
+      ).dig("data", "projectAgentChoice")
+      impact = execute(IMPACT_QUERY, projectRef: project_ref, assessmentId: IMPACT_ID)
+        .dig("data", "projectDecisionImpact", "impact")
+
+      expect(decision.fetch("membershipBases")).to eq([ "attempt" ])
+      expect(decision.dig("decision", "conditions", "languages")).to eq([ "ruby" ])
+      expect(guidance.dig("interpretations", "nodes", 0)).to include(
+        "id" => "I-project-guidance",
+        "assessmentStatus" => "accepted_for_activation"
+      )
+      expect(choice.fetch("choice")).to include(
+        "id" => "CHO-project",
+        "observationStatus" => "ACCEPTED"
+      )
+      expect(choice.dig("impacts", "nodes", 0, "assessmentId")).to eq(IMPACT_ID)
+      expect(impact).to include(
+        "assessmentId" => IMPACT_ID,
+        "choiceId" => "CHO-project",
+        "afterStatus" => "blocked"
+      )
+    end
+
+    it "binds cursors to Project and filters and isolates one collection failure" do
+      first = execute(COLLECTIONS_QUERY, projectRef: project_ref, first: 1)
+      cursor = first.dig("data", "projectDecisions", "pageInfo", "endCursor")
+      mismatched = execute(
+        COLLECTIONS_QUERY,
+        projectRef: project_ref,
+        first: 1,
+        decisionStatus: "RECORDED",
+        afterDecision: cursor
+      )
+      isolated = execute(
+        ISOLATED_COLLECTION_QUERY,
+        projectRef: project_ref,
+        guidanceAfter: "not-a-cursor"
+      )
+      malformed = execute(COLLECTIONS_QUERY, projectRef: "not-a-reference", first: 20)
+      outside = execute(
+        DECISION_QUERY,
+        projectRef: other_project_ref,
+        decisionId: "D-history"
+      )
+
+      expect(cursor).not_to include("D-history")
+      expect(mismatched.dig("errors", 0, "extensions", "code")).to eq("INVALID_CURSOR")
+      expect(isolated.dig("data", "projectDecisions", "nodes")).not_to be_empty
+      expect(isolated.dig("data", "projectGuidanceMessages")).to be_nil
+      expect(isolated.dig("errors", 0, "extensions", "code")).to eq("INVALID_CURSOR")
+      expect(malformed.dig("errors", 0, "extensions", "code")).to eq("INVALID_PROJECT_REFERENCE")
+      expect(outside.dig("data", "projectDecision")).to be_nil
+    end
+
+    it "keeps malformed global receipts isolated from available Project Governance" do
+      receipt = Coordinator::Read::CommandReceipt.find("cmd-a")
+      receipt.update!(
+        completion: receipt.completion.merge(
+          "next_actions" => [ { "tool" => "not a tool", "arguments" => {} } ]
+        )
+      )
+
+      failed = execute(RECEIPT_ISOLATION_QUERY, projectRef: project_ref, commandId: "cmd-a")
+      expect(failed.dig("data", "projectDecisions", "nodes")).not_to be_empty
+      expect(failed.dig("data", "commandReceipt")).to be_nil
+      expect(failed.dig("errors", 0, "extensions")).to include(
+        "code" => "READ_MODEL_INVALID",
+        "retryable" => true
+      )
+
+      receipt.update!(completion: valid_completion(receipt))
+      retried = execute(RECEIPT_QUERY, commandId: "cmd-a")
+      expect(retried.fetch("errors", [])).to be_empty
+      expect(retried.dig("data", "commandReceipt", "nextActionTools"))
+        .to eq([ "development_artifact_get" ])
+      expect(retried.dig("data", "commandReceipt")).not_to have_key("data")
+    end
+
+    def project_ref
+      @project_ref ||= Coordinator::Read::Web::ProjectReference.new.encode(scope: PROJECT_SCOPE)
+    end
+
+    def other_project_ref
+      @other_project_ref ||= Coordinator::Read::Web::ProjectReference.new.encode(
+        scope: "project:other-governance"
+      )
+    end
+
+    def create_project(repository_id, scope)
+      create(
+        :coordinator_read_repository,
+        repository_id:,
+        repository_key: "governance-#{repository_id}",
+        scope:,
+        display_name: "GraphQL governance"
+      )
+    end
+
+    def create_coordination_context
+      context = create(
+        :coordinator_read_coord_context,
+        change_set_id: CHANGE_SET_ID,
+        work_item_id: WORK_ITEM_ID,
+        repository_id: REPOSITORY_ID
+      )
+      context.update!(document: context.document.merge("attempts" => []))
+      create(
+        :coordinator_read_attempt_history,
+        attempt_id: ATTEMPT_ID,
+        change_set_id: CHANGE_SET_ID,
+        work_item_id: WORK_ITEM_ID
+      )
+    end
+
+    def create_governance_facts
+      create(
+        :coordinator_read_decision_definition,
+        decision_id: "D-member",
+        repository_id: MEMBER_REPOSITORY_ID,
+        topic_id: "testing.framework"
+      )
+      create(
+        :coordinator_read_decision_definition,
+        decision_id: "D-history",
+        repository_id: nil,
+        attempt_id: ATTEMPT_ID,
+        topic_id: "testing.framework"
+      )
+      create(
+        :coordinator_read_decision_definition,
+        decision_id: "D-other",
+        repository_id: OTHER_REPOSITORY_ID,
+        topic_id: "testing.framework"
+      )
+      create(
+        :coordinator_read_user_utterance,
+        message_id: "M-project-guidance",
+        conversation_id: "C-project-guidance",
+        text: "Use the approved testing boundary.",
+        anchors: guidance_anchors(MEMBER_REPOSITORY_ID)
+      )
+      create(
+        :coordinator_read_decision_interpretation,
+        interpretation_id: "I-project-guidance",
+        message_id: "M-project-guidance",
+        stream_revision: 1
+      )
+      create(
+        :coordinator_read_agent_choice,
+        :accepted,
+        choice_id: "CHO-project",
+        context: choice_context(MEMBER_REPOSITORY_ID, ATTEMPT_ID)
+      )
+      create(
+        :coordinator_read_agent_choice_impact,
+        assessment_id: IMPACT_ID,
+        choice_id: "CHO-project",
+        attempt_id: ATTEMPT_ID,
+        event_global_position: 801
+      )
+    end
+
+    def create_receipt
+      receipt = create(
+        :coordinator_read_command_receipt,
+        command_id: "cmd-a",
+        tool_name: "change_set_create"
+      )
+      receipt.update!(completion: valid_completion(receipt))
+    end
+
+    def valid_completion(receipt)
+      receipt.completion.merge(
         "next_actions" => [
           {
             "tool" => "development_artifact_get",
@@ -314,169 +400,42 @@ module ProjectGovernanceGraphqlSpec
           }
         ]
       )
-    )
-    retried = execute(RECEIPT_QUERY, commandId: "cmd-a")
-    expect(retried.fetch("errors", [])).to be_empty
-    expect(retried.dig("data", "commandReceipt", "nextActionTools"))
-      .to eq([ "development_artifact_get" ])
-  end
-
-  it "binds opaque cursors to filters and isolates project-scoped details" do
-    response = execute(CATALOG_QUERY, repositoryId: REPOSITORY_ID, first: 1)
-    expect(response.fetch("errors", [])).to be_empty, response.inspect
-    cursor = response.dig("data", "projectGovernance", "decisions", "pageInfo", "endCursor")
-    mismatched = execute(
-      CATALOG_QUERY,
-      repositoryId: REPOSITORY_ID,
-      first: 1,
-      decisionPolicyStatus: "RECORDED",
-      afterDecision: cursor
-    )
-    malformed = execute(CATALOG_QUERY, repositoryId: "not-a-uuid", first: 20)
-    unbounded = execute(CATALOG_QUERY, repositoryId: REPOSITORY_ID, first: 51)
-    outside = execute(
-      DECISION_QUERY,
-      repositoryId: OTHER_REPOSITORY_ID,
-      decisionId: "D-direct"
-    )
-
-    expect(mismatched.dig("errors", 0, "extensions", "code")).to eq("INVALID_CURSOR")
-    expect(malformed.dig("errors", 0, "extensions", "code")).to eq("INVALID_INPUT")
-    expect(unbounded.dig("errors", 0, "extensions", "code")).to eq("INVALID_INPUT")
-    expect(outside.dig("data", "projectDecision")).to be_nil
-  end
-
-  def create_project(repository_id, scope, name)
-    create(
-      :coordinator_read_repository,
-      repository_id:,
-      repository_key: "governance-#{repository_id}",
-      scope:,
-      display_name: name
-    )
-  end
-
-  def create_coordination_context
-    context = create(
-      :coordinator_read_coord_context,
-      change_set_id: CHANGE_SET_ID,
-      work_item_id: WORK_ITEM_ID,
-      repository_id: REPOSITORY_ID
-    )
-    context.update!(document: context.document.merge("attempts" => []))
-    create(
-      :coordinator_read_attempt_history,
-      attempt_id: ATTEMPT_ID,
-      change_set_id: CHANGE_SET_ID,
-      work_item_id: WORK_ITEM_ID
-    )
-  end
-
-  def create_decisions
-    create(
-      :coordinator_read_decision_definition,
-      decision_id: "D-direct",
-      repository_id: REPOSITORY_ID,
-      topic_id: "testing.framework"
-    )
-    create(
-      :coordinator_read_decision_definition,
-      decision_id: "D-history",
-      repository_id: nil,
-      attempt_id: ATTEMPT_ID,
-      topic_id: "testing.framework"
-    )
-    create(
-      :coordinator_read_decision_definition,
-      decision_id: "D-other",
-      repository_id: OTHER_REPOSITORY_ID,
-      topic_id: "testing.framework"
-    )
-  end
-
-  def create_guidance
-    create(
-      :coordinator_read_user_utterance,
-      message_id: "M-project-guidance",
-      conversation_id: "C-project-guidance",
-      text: "Use the approved testing boundary.",
-      anchors: guidance_anchors(REPOSITORY_ID)
-    )
-    create(
-      :coordinator_read_decision_interpretation,
-      interpretation_id: "I-project-guidance",
-      message_id: "M-project-guidance",
-      stream_revision: 1
-    )
-    create(
-      :coordinator_read_user_utterance,
-      message_id: "M-other-guidance",
-      conversation_id: "C-other-guidance",
-      anchors: guidance_anchors(OTHER_REPOSITORY_ID)
-    )
-  end
-
-  def create_choices
-    create(
-      :coordinator_read_agent_choice,
-      :accepted,
-      choice_id: "CHO-project",
-      context: choice_context(REPOSITORY_ID, ATTEMPT_ID)
-    )
-    create(
-      :coordinator_read_agent_choice,
-      :accepted,
-      choice_id: "CHO-other",
-      context: choice_context(OTHER_REPOSITORY_ID, "A-other")
-    )
-    create(
-      :coordinator_read_agent_choice_impact,
-      assessment_id: IMPACT_ID,
-      choice_id: "CHO-project",
-      attempt_id: ATTEMPT_ID,
-      event_global_position: 801
-    )
-  end
-
-  def create_receipts
-    create(:coordinator_read_command_receipt, command_id: "cmd-a", tool_name: "change_set_create")
-    create(:coordinator_read_command_receipt, command_id: "cmd-b", tool_name: "work_item_create")
-  end
-
-  def guidance_anchors(repository_id)
-    {
-      "repository_ids" => [ repository_id ],
-      "change_set_id" => nil,
-      "work_item_id" => nil,
-      "attempt_id" => nil
-    }
-  end
-
-  def choice_context(repository_id, attempt_id)
-    {
-      "workspace_id" => nil,
-      "repository_id" => repository_id,
-      "change_set_id" => CHANGE_SET_ID,
-      "work_item_id" => WORK_ITEM_ID,
-      "attempt_id" => attempt_id,
-      "phase" => "implementation",
-      "language" => "ruby",
-      "paths" => [ "app/models/order.rb" ],
-      "environment" => "test",
-      "agent_role" => "implementer"
-    }
-  end
-
-  def execute(query, variables)
-    graphql_session.post "/graphql", params: { query:, variables: }, as: :json
-    expect(graphql_session.response.status).to eq(200), graphql_session.response.body
-    graphql_session.response.parsed_body
-  end
-
-  def graphql_session
-    @graphql_session ||= ActionDispatch::Integration::Session.new(Rails.application).tap do |session|
-      session.host! "localhost"
     end
-  end
+
+    def guidance_anchors(repository_id)
+      {
+        "repository_ids" => [ repository_id ],
+        "change_set_id" => nil,
+        "work_item_id" => nil,
+        "attempt_id" => nil
+      }
+    end
+
+    def choice_context(repository_id, attempt_id)
+      {
+        "workspace_id" => nil,
+        "repository_id" => repository_id,
+        "change_set_id" => CHANGE_SET_ID,
+        "work_item_id" => WORK_ITEM_ID,
+        "attempt_id" => attempt_id,
+        "phase" => "implementation",
+        "language" => "ruby",
+        "paths" => [ "app/models/order.rb" ],
+        "environment" => "test",
+        "agent_role" => "implementer"
+      }
+    end
+
+    def execute(query, variables)
+      graphql_session.post "/graphql", params: { query:, variables: }, as: :json
+      expect(graphql_session.response.status).to eq(200), graphql_session.response.body
+      graphql_session.response.parsed_body
+    end
+
+    def graphql_session
+      @graphql_session ||= ActionDispatch::Integration::Session.new(Rails.application).tap do |session|
+        session.host! "localhost"
+      end
+    end
   end
 end

@@ -4,23 +4,33 @@ module Coordinator
       module Queries
         class GovernanceBrowser
           def initialize: (
-            ?catalog_contract: Contracts::GovernanceBrowser::Catalog,
+            ?decisions_contract: Contracts::GovernanceBrowser::Decisions,
+            ?guidance_list_contract: Contracts::GovernanceBrowser::GuidanceList,
+            ?choices_contract: Contracts::GovernanceBrowser::Choices,
+            ?impacts_contract: Contracts::GovernanceBrowser::Impacts,
             ?decision_contract: Contracts::GovernanceBrowser::Decision,
             ?guidance_contract: Contracts::GovernanceBrowser::Guidance,
             ?choice_contract: Contracts::GovernanceBrowser::Choice,
+            ?impact_contract: Contracts::GovernanceBrowser::Impact,
             ?receipts_contract: Contracts::GovernanceBrowser::Receipts,
             ?receipt_contract: Contracts::GovernanceBrowser::Receipt,
+            ?project_reference: ProjectReference,
             ?repository: Repositories::GovernanceBrowser
           ) -> void
-          def catalog: (command_input input) -> GovernanceBrowserV1::Catalog?
+          def decisions: (command_input input) -> GovernanceBrowserV1::DecisionPage?
+          def guidance_list: (command_input input) -> GovernanceBrowserV1::GuidancePage?
+          def choices: (command_input input) -> GovernanceBrowserV1::AgentChoicePage?
+          def impacts: (command_input input) -> GovernanceBrowserV1::ImpactPage?
           def decision: (command_input input) -> GovernanceBrowserV1::DecisionDetail?
           def guidance: (command_input input) -> GovernanceBrowserV1::GuidanceDetail?
           def choice: (command_input input) -> GovernanceBrowserV1::ChoiceDetail?
+          def impact: (command_input input) -> GovernanceBrowserV1::ImpactDetail?
           def receipts: (command_input input) -> GovernanceBrowserV1::ReceiptPage
           def receipt: (command_input input) -> GovernanceBrowserV1::ReceiptDetail?
 
           private
 
+          def project_scope: (untyped values) -> String
           def validate: (Dry::Validation::Contract contract, command_input input) -> untyped
         end
       end

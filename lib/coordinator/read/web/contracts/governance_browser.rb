@@ -2,61 +2,93 @@
 
 module Coordinator::Read::Web::Contracts
   class GovernanceBrowser
-    class Catalog < Dry::Validation::Contract
+    class Decisions < Dry::Validation::Contract
       config.validate_keys = true
 
       params do
-        required(:repository_id).filled(:string)
+        required(:project_ref).filled(:string)
         optional(:first).filled(:integer, gteq?: 1, lteq?: 50)
-        optional(:decision_topic_id).maybe(:string)
-        optional(:decision_policy_status).maybe(
+        optional(:topic_id).maybe(:string)
+        optional(:policy_status).maybe(
           :string,
           included_in?: Coordinator::Shared::Types::DECISION_POLICY_STATUSES
         )
         optional(:after_decision_id).maybe(:string)
-        optional(:guidance_source).maybe(
-          :string,
-          included_in?: Coordinator::Shared::Types::GUIDANCE_SOURCES
-        )
-        optional(:after_guidance_message_id).maybe(:string)
-        optional(:choice_type).maybe(
-          :string,
-          included_in?: Coordinator::Shared::Types::AGENT_CHOICE_TYPES
-        )
-        optional(:choice_status).maybe(
-          :string,
-          included_in?: Coordinator::Shared::Types::AGENT_CHOICE_OBSERVATION_STATUSES
-        )
-        optional(:after_choice_id).maybe(:string)
-        optional(:impact_outcome).maybe(
-          :string,
-          included_in?: Coordinator::Shared::Types::AGENT_CHOICE_IMPACT_ASSESSMENT_OUTCOMES
-        )
-        optional(:after_impact_global_position).maybe(:integer, gteq?: 0)
-        optional(:after_impact_assessment_id).maybe(:string)
       end
 
-      rule(:repository_id) do
-        key.failure("must be a UUIDv7") unless Coordinator::Shared::Types::UUID_V7_PATTERN.match?(value)
-      end
-
-      %i[
-        decision_topic_id
-        after_decision_id
-        after_guidance_message_id
-        after_choice_id
-        after_impact_assessment_id
-      ].each do |name|
+      %i[topic_id after_decision_id].each do |name|
         rule(name) do
           next unless value
 
           key.failure("must be an identifier") unless Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
         end
       end
+    end
 
-      rule(:after_impact_global_position, :after_impact_assessment_id) do
-        position = values[:after_impact_global_position]
-        identifier = values[:after_impact_assessment_id]
+    class GuidanceList < Dry::Validation::Contract
+      config.validate_keys = true
+
+      params do
+        required(:project_ref).filled(:string)
+        optional(:first).filled(:integer, gteq?: 1, lteq?: 50)
+        optional(:source).maybe(:string, included_in?: Coordinator::Shared::Types::GUIDANCE_SOURCES)
+        optional(:after_message_id).maybe(:string)
+      end
+
+      rule(:after_message_id) do
+        next unless value
+
+        key.failure("must be an identifier") unless Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
+      end
+    end
+
+    class Choices < Dry::Validation::Contract
+      config.validate_keys = true
+
+      params do
+        required(:project_ref).filled(:string)
+        optional(:first).filled(:integer, gteq?: 1, lteq?: 50)
+        optional(:choice_type).maybe(
+          :string,
+          included_in?: Coordinator::Shared::Types::AGENT_CHOICE_TYPES
+        )
+        optional(:status).maybe(
+          :string,
+          included_in?: Coordinator::Shared::Types::AGENT_CHOICE_OBSERVATION_STATUSES
+        )
+        optional(:after_choice_id).maybe(:string)
+      end
+
+      rule(:after_choice_id) do
+        next unless value
+
+        key.failure("must be an identifier") unless Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
+      end
+    end
+
+    class Impacts < Dry::Validation::Contract
+      config.validate_keys = true
+
+      params do
+        required(:project_ref).filled(:string)
+        optional(:first).filled(:integer, gteq?: 1, lteq?: 50)
+        optional(:outcome).maybe(
+          :string,
+          included_in?: Coordinator::Shared::Types::AGENT_CHOICE_IMPACT_ASSESSMENT_OUTCOMES
+        )
+        optional(:after_global_position).maybe(:integer, gteq?: 0)
+        optional(:after_assessment_id).maybe(:string)
+      end
+
+      rule(:after_assessment_id) do
+        next unless value
+
+        key.failure("must be an identifier") unless Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
+      end
+
+      rule(:after_global_position, :after_assessment_id) do
+        position = values[:after_global_position]
+        identifier = values[:after_assessment_id]
         base.failure("impact cursor coordinates must both be present or absent") unless position.nil? == identifier.nil?
       end
     end
@@ -65,12 +97,8 @@ module Coordinator::Read::Web::Contracts
       config.validate_keys = true
 
       params do
-        required(:repository_id).filled(:string)
+        required(:project_ref).filled(:string)
         required(:decision_id).filled(:string)
-      end
-
-      rule(:repository_id) do
-        key.failure("must be a UUIDv7") unless Coordinator::Shared::Types::UUID_V7_PATTERN.match?(value)
       end
 
       rule(:decision_id) do
@@ -82,14 +110,10 @@ module Coordinator::Read::Web::Contracts
       config.validate_keys = true
 
       params do
-        required(:repository_id).filled(:string)
+        required(:project_ref).filled(:string)
         required(:message_id).filled(:string)
         optional(:first).filled(:integer, gteq?: 1, lteq?: 100)
         optional(:after_revision).filled(:integer, gteq?: -1)
-      end
-
-      rule(:repository_id) do
-        key.failure("must be a UUIDv7") unless Coordinator::Shared::Types::UUID_V7_PATTERN.match?(value)
       end
 
       rule(:message_id) do
@@ -101,15 +125,11 @@ module Coordinator::Read::Web::Contracts
       config.validate_keys = true
 
       params do
-        required(:repository_id).filled(:string)
+        required(:project_ref).filled(:string)
         required(:choice_id).filled(:string)
         optional(:first).filled(:integer, gteq?: 1, lteq?: 100)
         optional(:after_impact_global_position).maybe(:integer, gteq?: 0)
         optional(:after_impact_assessment_id).maybe(:string)
-      end
-
-      rule(:repository_id) do
-        key.failure("must be a UUIDv7") unless Coordinator::Shared::Types::UUID_V7_PATTERN.match?(value)
       end
 
       rule(:choice_id, :after_impact_assessment_id) do
@@ -122,6 +142,19 @@ module Coordinator::Read::Web::Contracts
         position = values[:after_impact_global_position]
         identifier = values[:after_impact_assessment_id]
         base.failure("impact cursor coordinates must both be present or absent") unless position.nil? == identifier.nil?
+      end
+    end
+
+    class Impact < Dry::Validation::Contract
+      config.validate_keys = true
+
+      params do
+        required(:project_ref).filled(:string)
+        required(:assessment_id).filled(:string)
+      end
+
+      rule(:assessment_id) do
+        key.failure("must be an identifier") unless Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
       end
     end
 
@@ -139,8 +172,7 @@ module Coordinator::Read::Web::Contracts
         rule(name) do
           next unless value
 
-          key.failure("must be an identifier") unless
-            Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
+          key.failure("must be an identifier") unless Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
         end
       end
     end
@@ -154,6 +186,106 @@ module Coordinator::Read::Web::Contracts
 
       rule(:command_id) do
         key.failure("must be an identifier") unless Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
+      end
+    end
+
+    class CommandCompletion < Dry::Validation::Contract
+      ROOT_KEYS = %i[
+        command_id
+        tool_name
+        canonical_input_digest
+        status
+        summary
+        receipt
+        data
+        warnings
+        next_actions
+        emitted_events
+        completed_at
+      ].freeze
+      NEXT_ACTION_KEYS = %i[tool arguments].freeze
+      EMITTED_EVENT_KEYS = %i[
+        event_id
+        type
+        stream_context
+        stream_name
+        stream_id
+        stream_revision
+      ].freeze
+
+      # `data` and `next_actions[].arguments` are intentionally open JSON
+      # objects. Dry Schema's global key validator recursively rejects their
+      # domain-specific keys, so this contract enforces the closed envelope
+      # explicitly while leaving only those two payloads open.
+      config.validate_keys = false
+
+      json do
+        required(:command_id).filled(:string)
+        required(:tool_name).filled(:string)
+        required(:canonical_input_digest).filled(:string)
+        required(:status).filled(:string, eql?: "ok")
+        required(:summary).filled(:string)
+        required(:receipt).filled(:string)
+        required(:data).value(:hash)
+        required(:warnings).array(:string)
+        required(:next_actions).array(:hash) do
+          required(:tool).filled(:string)
+          required(:arguments).value(:hash)
+        end
+        required(:emitted_events).array(:hash) do
+          required(:event_id).filled(:string)
+          required(:type).filled(:string)
+          required(:stream_context).filled(:string)
+          required(:stream_name).filled(:string)
+          required(:stream_id).filled(:string)
+          required(:stream_revision).filled(:integer, gteq?: 0)
+        end
+        required(:completed_at).filled(:string)
+      end
+
+      rule(:command_id, :tool_name, :receipt) do
+        key.failure("must be an identifier") unless Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
+      end
+
+      rule do
+        unexpected = values.to_h.keys - ROOT_KEYS
+        base.failure("contains unknown keys: #{unexpected.sort.join(', ')}") if unexpected.any?
+      end
+
+      rule(:canonical_input_digest) do
+        key.failure("must be a SHA-256 digest") unless Coordinator::Shared::Types::SHA256_DIGEST_PATTERN.match?(value)
+      end
+
+      rule(:completed_at) do
+        key.failure("must be a timestamp") unless Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(value)
+      end
+
+      rule(:warnings) do
+        key.failure("must contain at most 100 warnings") if value.length > 100
+      end
+
+      rule(:next_actions) do
+        key.failure("must contain at most 100 actions") if value.length > 100
+        value.each_with_index do |action, index|
+          unexpected = action.keys - NEXT_ACTION_KEYS
+          key([ index ]).failure("contains unknown keys: #{unexpected.sort.join(', ')}") if unexpected.any?
+          next if Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(action.fetch(:tool, ""))
+
+          key([ index, :tool ]).failure("must be an identifier")
+        end
+      end
+
+      rule(:emitted_events) do
+        key.failure("must contain at most 100 events") if value.length > 100
+        value.each_with_index do |event, index|
+          unexpected = event.keys - EMITTED_EVENT_KEYS
+          key([ index ]).failure("contains unknown keys: #{unexpected.sort.join(', ')}") if unexpected.any?
+          valid = Coordinator::Shared::Types::UUID_V7_PATTERN.match?(event.fetch(:event_id, "")) &&
+            %i[type stream_context stream_name stream_id].all? do |name|
+              Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(event.fetch(name, ""))
+            end
+          key([ index ]).failure("contains an invalid event reference") unless valid
+        end
       end
     end
   end

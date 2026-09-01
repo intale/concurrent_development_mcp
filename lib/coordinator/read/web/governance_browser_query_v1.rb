@@ -2,41 +2,60 @@
 
 module Coordinator::Read::Web
   class GovernanceBrowserQueryV1
-    class Catalog < Coordinator::Shared::Value
-      attribute :repository_id, Coordinator::Shared::Types::UuidV7
+    class Decisions < Coordinator::Shared::Value
+      attribute :project_scope, Coordinator::Shared::Types::String
       attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 50)
-      attribute :decision_topic_id, Coordinator::Shared::Types::Identifier.optional
-      attribute :decision_policy_status, Coordinator::Shared::Types::DecisionPolicyStatus.optional
+      attribute :topic_id, Coordinator::Shared::Types::Identifier.optional
+      attribute :policy_status, Coordinator::Shared::Types::DecisionPolicyStatus.optional
       attribute :after_decision_id, Coordinator::Shared::Types::Identifier.optional
-      attribute :guidance_source, Coordinator::Shared::Types::GuidanceSource.optional
-      attribute :after_guidance_message_id, Coordinator::Shared::Types::Identifier.optional
+    end
+
+    class GuidanceList < Coordinator::Shared::Value
+      attribute :project_scope, Coordinator::Shared::Types::String
+      attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 50)
+      attribute :source, Coordinator::Shared::Types::GuidanceSource.optional
+      attribute :after_message_id, Coordinator::Shared::Types::Identifier.optional
+    end
+
+    class Choices < Coordinator::Shared::Value
+      attribute :project_scope, Coordinator::Shared::Types::String
+      attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 50)
       attribute :choice_type, Coordinator::Shared::Types::AgentChoiceType.optional
-      attribute :choice_status, Coordinator::Shared::Types::AgentChoiceObservationStatus.optional
+      attribute :status, Coordinator::Shared::Types::AgentChoiceObservationStatus.optional
       attribute :after_choice_id, Coordinator::Shared::Types::Identifier.optional
-      attribute :impact_outcome,
-                Coordinator::Shared::Types::AgentChoiceImpactAssessmentOutcome.optional
-      attribute :after_impact_global_position, Coordinator::Shared::Types::GlobalPosition.optional
-      attribute :after_impact_assessment_id, Coordinator::Shared::Types::Identifier.optional
+    end
+
+    class Impacts < Coordinator::Shared::Value
+      attribute :project_scope, Coordinator::Shared::Types::String
+      attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 50)
+      attribute :outcome, Coordinator::Shared::Types::AgentChoiceImpactAssessmentOutcome.optional
+      attribute :after_global_position, Coordinator::Shared::Types::GlobalPosition.optional
+      attribute :after_assessment_id, Coordinator::Shared::Types::Identifier.optional
     end
 
     class Decision < Coordinator::Shared::Value
-      attribute :repository_id, Coordinator::Shared::Types::UuidV7
+      attribute :project_scope, Coordinator::Shared::Types::String
       attribute :decision_id, Coordinator::Shared::Types::Identifier
     end
 
     class Guidance < Coordinator::Shared::Value
-      attribute :repository_id, Coordinator::Shared::Types::UuidV7
+      attribute :project_scope, Coordinator::Shared::Types::String
       attribute :message_id, Coordinator::Shared::Types::Identifier
       attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 100)
       attribute :after_revision, Coordinator::Shared::Types::StreamRevisionCursor
     end
 
     class Choice < Coordinator::Shared::Value
-      attribute :repository_id, Coordinator::Shared::Types::UuidV7
+      attribute :project_scope, Coordinator::Shared::Types::String
       attribute :choice_id, Coordinator::Shared::Types::Identifier
       attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 100)
       attribute :after_impact_global_position, Coordinator::Shared::Types::GlobalPosition.optional
       attribute :after_impact_assessment_id, Coordinator::Shared::Types::Identifier.optional
+    end
+
+    class Impact < Coordinator::Shared::Value
+      attribute :project_scope, Coordinator::Shared::Types::String
+      attribute :assessment_id, Coordinator::Shared::Types::Identifier
     end
 
     class Receipts < Coordinator::Shared::Value
