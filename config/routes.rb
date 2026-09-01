@@ -5,6 +5,10 @@ Rails.application.routes.draw do
   get "projects" => "projects#index"
   get "projects/:project_ref" => "projects#index"
   get "projects/:project_ref/*client_path" => "projects#index"
+  get "audit/command-receipts" => "projects#index"
+  get "audit/command-receipts/:command_id" => "projects#index"
+  get "operations/batches" => "projects#index"
+  get "operations/batches/:batch_id" => "projects#index"
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
+import { CommandReceiptsPage } from "./audit/command-receipts-page.js";
+import { OperationBatchesPage } from "./operations/operation-batches-page.js";
 import { ProjectCatalogPage } from "./projects/project-catalog-page.js";
 import { ProjectOverviewPage } from "./projects/project-overview-page.js";
 import { ProjectSectionPlaceholder } from "./projects/project-section-placeholder.js";
@@ -76,6 +78,25 @@ export function App() {
                   <p>Projects</p>
                 </NavLink>
               </li>
+              <li className="nav-header">Global views</li>
+              <li className="nav-item">
+                <NavLink
+                  className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
+                  to="/audit/command-receipts"
+                >
+                  <i aria-hidden="true" className="nav-icon bi bi-receipt" />
+                  <p>Command receipts</p>
+                </NavLink>
+              </li>
+              <li className="nav-item">
+                <NavLink
+                  className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
+                  to="/operations/batches"
+                >
+                  <i aria-hidden="true" className="nav-icon bi bi-stack" />
+                  <p>Operation batches</p>
+                </NavLink>
+              </li>
             </ul>
           </nav>
         </div>
@@ -84,6 +105,10 @@ export function App() {
       <main className="app-main" id="main-content">
         <Routes>
           <Route path="/projects" element={<ProjectCatalogPage />} />
+          <Route path="/audit/command-receipts" element={<CommandReceiptsPage />} />
+          <Route path="/audit/command-receipts/:commandId" element={<CommandReceiptsPage />} />
+          <Route path="/operations/batches" element={<OperationBatchesPage />} />
+          <Route path="/operations/batches/:batchId" element={<OperationBatchesPage />} />
           <Route path="/projects/:projectRef" element={<ProjectWorkspaceShell />}>
             <Route index element={<ProjectOverviewPage />} />
             <Route

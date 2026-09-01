@@ -1,11 +1,7 @@
 import type {
   CandidateCheckpointKind,
   CandidateImpactDirection,
-  DeliveryOperationBatchQuery,
-  DeliveryOperationBatchesQuery,
   DeliverySort,
-  OperationBatchStatus,
-  OperationBatchTool,
   ProjectDeliveryCandidateQuery,
   ProjectDeliveryMergeQuery,
   ProjectDeliveryQuery,
@@ -40,19 +36,6 @@ export const RELEASE_STATUSES: ReadonlyArray<{ readonly label: string; readonly 
   { label: "Compensation requested", value: "COMPENSATION_REQUESTED" },
   { label: "Completed", value: "COMPLETED" }
 ];
-export const BATCH_STATUSES: ReadonlyArray<{ readonly label: string; readonly value: OperationBatchStatus }> = [
-  { label: "Running", value: "RUNNING" },
-  { label: "Cancelling", value: "CANCELLING" },
-  { label: "Completed", value: "COMPLETED" },
-  { label: "Completed with errors", value: "COMPLETED_WITH_ERRORS" },
-  { label: "Cancelled", value: "CANCELLED" }
-];
-export const BATCH_TOOLS: ReadonlyArray<{ readonly label: string; readonly value: OperationBatchTool }> = [
-  { label: "Skill publish", value: "SKILL_PUBLISH" },
-  { label: "Artifact capture", value: "DEVELOPMENT_ARTIFACT_CAPTURE" },
-  { label: "Artifact relation", value: "DEVELOPMENT_ARTIFACT_RELATION_DECLARE" }
-];
-
 export interface DeliveryFilters {
   readonly sort: DeliverySort;
   readonly candidateChangeSetId?: string;
@@ -70,19 +53,11 @@ export interface DeliveryCursors {
   readonly afterReleaseSet?: string;
 }
 
-export interface BatchFilters {
-  readonly sort: DeliverySort;
-  readonly status?: OperationBatchStatus;
-  readonly targetTool?: OperationBatchTool;
-}
-
 export type ProjectDelivery = NonNullable<ProjectDeliveryQuery["projectDelivery"]>;
 export type CandidateDetail = NonNullable<ProjectDeliveryCandidateQuery["projectCandidateCheckpoint"]>;
 export type VerificationDetail = NonNullable<ProjectDeliveryVerificationQuery["projectVerificationObligation"]>;
 export type MergeDetail = NonNullable<ProjectDeliveryMergeQuery["projectMergeSnapshot"]>;
 export type ReleaseDetail = NonNullable<ProjectDeliveryReleaseQuery["projectReleaseSet"]>;
-export type BatchPage = DeliveryOperationBatchesQuery["operationBatches"];
-export type BatchDetail = NonNullable<DeliveryOperationBatchQuery["operationBatch"]>;
 
 export function preserveForProject<T>(
   previousData: T | undefined,
@@ -101,14 +76,6 @@ export function preserveForIdentity<T>(
   return previousQueryKey?.[1] === repositoryId && previousQueryKey?.[2] === identity
     ? previousData
     : undefined;
-}
-
-export function preserveGlobalIdentity<T>(
-  previousData: T | undefined,
-  previousQueryKey: readonly unknown[] | undefined,
-  identity: string
-): T | undefined {
-  return previousQueryKey?.[1] === identity ? previousData : undefined;
 }
 
 export function humanized(value: string): string {

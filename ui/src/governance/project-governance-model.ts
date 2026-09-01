@@ -3,8 +3,6 @@ import type {
   AgentChoiceKind,
   AgentChoiceStatus,
   DecisionPolicyStatus,
-  GovernanceCommandReceiptQuery,
-  GovernanceCommandReceiptsQuery,
   GuidanceSource,
   ProjectGovernanceAgentChoiceQuery,
   ProjectGovernanceDecisionQuery,
@@ -70,20 +68,10 @@ export interface GovernanceCursors {
   readonly afterImpact?: string;
 }
 
-export interface ReceiptFilters {
-  readonly toolName?: string;
-}
-
-export interface ReceiptCursor {
-  readonly after?: string;
-}
-
 export type ProjectGovernance = NonNullable<ProjectGovernanceQuery["projectGovernance"]>;
 export type GovernanceDecision = NonNullable<ProjectGovernanceDecisionQuery["projectDecision"]>;
 export type GovernanceGuidance = NonNullable<ProjectGovernanceGuidanceQuery["projectGuidance"]>;
 export type GovernanceAgentChoice = NonNullable<ProjectGovernanceAgentChoiceQuery["projectAgentChoice"]>;
-export type CommandReceiptPage = GovernanceCommandReceiptsQuery["commandReceipts"];
-export type CommandReceipt = NonNullable<GovernanceCommandReceiptQuery["commandReceipt"]>;
 
 export function preserveGovernanceForProject(
   previousData: ProjectGovernanceQuery | undefined,

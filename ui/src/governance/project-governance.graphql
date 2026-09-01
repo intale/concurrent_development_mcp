@@ -234,39 +234,3 @@ query ProjectGovernanceAgentChoice(
     }
   }
 }
-
-query GovernanceCommandReceipts(
-  $first: Int
-  $after: String
-  $status: CommandReceiptStatus
-  $toolName: String
-) {
-  commandReceipts(first: $first, after: $after, status: $status, toolName: $toolName) {
-    nodes {
-      commandId
-      toolName
-      status
-      summary
-      receipt
-      completedAt
-      warnings
-      nextActionTools
-      emittedEvents { id type streamContext streamName streamId streamRevision }
-    }
-    pageInfo { endCursor hasNextPage }
-  }
-}
-
-query GovernanceCommandReceipt($commandId: ID!) {
-  commandReceipt(commandId: $commandId) {
-    commandId
-    toolName
-    status
-    summary
-    receipt
-    completedAt
-    warnings
-    nextActionTools
-    emittedEvents { id type streamContext streamName streamId streamRevision }
-  }
-}

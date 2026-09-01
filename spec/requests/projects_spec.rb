@@ -33,7 +33,13 @@ RSpec.describe "Projects UI shell", :read_model do
     project_path = "/projects/#{project_ref}"
     paths = [ "/", "/projects", project_path ] +
       %w[coordination resources knowledge governance delivery].map { "#{project_path}/#{_1}" } +
-      [ "#{project_path}/coordination/change-sets/CS-shell" ]
+      [
+        "#{project_path}/coordination/change-sets/CS-shell",
+        "/audit/command-receipts",
+        "/audit/command-receipts/CMD-shell",
+        "/operations/batches",
+        "/operations/batches/BATCH-shell"
+      ]
 
     paths.each do |path|
       session.get path

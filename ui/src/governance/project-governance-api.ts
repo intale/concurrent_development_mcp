@@ -1,16 +1,10 @@
 import {
-  GovernanceCommandReceiptDocument,
-  GovernanceCommandReceiptsDocument,
   ProjectGovernanceAgentChoiceDocument,
   ProjectGovernanceDecisionDocument,
   ProjectGovernanceDocument,
   ProjectGovernanceGuidanceDocument
 } from "../gql/graphql.js";
 import type {
-  GovernanceCommandReceiptQuery,
-  GovernanceCommandReceiptQueryVariables,
-  GovernanceCommandReceiptsQuery,
-  GovernanceCommandReceiptsQueryVariables,
   ProjectGovernanceAgentChoiceQuery,
   ProjectGovernanceAgentChoiceQueryVariables,
   ProjectGovernanceDecisionQuery,
@@ -23,9 +17,7 @@ import type {
 import { executeGraphql } from "../graphql-client.js";
 import type {
   GovernanceCursors,
-  GovernanceFilters,
-  ReceiptCursor,
-  ReceiptFilters
+  GovernanceFilters
 } from "./project-governance-model.js";
 
 export const GOVERNANCE_PAGE_SIZE = 20;
@@ -82,25 +74,4 @@ export function fetchGovernanceAgentChoice(
     ...(impactsAfter ? { impactsAfter } : {})
   };
   return executeGraphql(ProjectGovernanceAgentChoiceDocument, variables, signal);
-}
-
-export function fetchCommandReceipts(
-  filters: ReceiptFilters,
-  cursor: ReceiptCursor,
-  signal?: AbortSignal
-): Promise<GovernanceCommandReceiptsQuery> {
-  const variables: GovernanceCommandReceiptsQueryVariables = {
-    first: GOVERNANCE_PAGE_SIZE,
-    ...filters,
-    ...cursor
-  };
-  return executeGraphql(GovernanceCommandReceiptsDocument, variables, signal);
-}
-
-export function fetchCommandReceipt(
-  commandId: string,
-  signal?: AbortSignal
-): Promise<GovernanceCommandReceiptQuery> {
-  const variables: GovernanceCommandReceiptQueryVariables = { commandId };
-  return executeGraphql(GovernanceCommandReceiptDocument, variables, signal);
 }

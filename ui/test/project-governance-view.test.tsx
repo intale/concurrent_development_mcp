@@ -3,8 +3,6 @@ import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import type {
-  GovernanceCommandReceiptQuery,
-  GovernanceCommandReceiptsQuery,
   ProjectGovernanceAgentChoiceQuery,
   ProjectGovernanceDecisionQuery,
   ProjectGovernanceGuidanceQuery,
@@ -175,39 +173,24 @@ const choice = {
   impacts: { nodes: [detailedImpact], pageInfo: { endCursor: "next-choice-impact", hasNextPage: true } }
 } satisfies NonNullable<ProjectGovernanceAgentChoiceQuery["projectAgentChoice"]>;
 
-const receipt = {
-  commandId: "cmd-ui-05",
-  toolName: "work_item_acquire",
-  status: "OK" as const,
-  summary: "WorkItem acquired.",
-  receipt: "cmd-ui-05",
-  completedAt: timestamp,
-  warnings: [],
-  nextActionTools: ["lease_set_reserve"],
-  emittedEvents: [{ id: repositoryId, type: "WorkItemAcquired", streamContext: "DevelopmentPlanning", streamName: "WorkItem", streamId: "UI-05", streamRevision: 3 }]
-} satisfies NonNullable<GovernanceCommandReceiptQuery["commandReceipt"]>;
-const receipts = { nodes: [receipt], pageInfo: { endCursor: "next-receipt", hasNextPage: true } } satisfies GovernanceCommandReceiptsQuery["commandReceipts"];
-
 const callbacks = {
   hrefForChoice: (id: string) => `/governance?choice=${id}`,
   hrefForDecision: (id: string) => `/governance?decision=${id}`,
   hrefForGuidance: (id: string) => `/governance?guidance=${id}`,
-  hrefForReceipt: (id: string) => `/governance?receipt=${id}`,
   onNextChoices: () => undefined,
   onNextDecisions: () => undefined,
   onNextGuidance: () => undefined,
   onNextImpacts: () => undefined,
   onNextInterpretations: () => undefined,
-  onNextReceipts: () => undefined,
   onNextSelectedChoiceImpacts: () => undefined,
   onRetry: () => undefined
 };
 
 function render(overrides: Partial<Parameters<typeof ProjectGovernanceView>[0]> = {}) {
-  return renderToStaticMarkup(<MemoryRouter><ProjectGovernanceView browser={catalog} choice={choice} decision={decision} errorMessage={null} guidance={guidance} loading={false} receipt={receipt} receipts={receipts} refreshing={false} {...callbacks} {...overrides} /></MemoryRouter>);
+  return renderToStaticMarkup(<MemoryRouter><ProjectGovernanceView browser={catalog} choice={choice} decision={decision} errorMessage={null} guidance={guidance} loading={false} refreshing={false} {...callbacks} {...overrides} /></MemoryRouter>);
 }
 
-test("shows typed project governance details and labels receipts as global audit facts", () => {
+test("shows typed project governance details without global audit facts", () => {
   const markup = render();
   assert.match(markup, /testing\.framework/);
   assert.match(markup, /Membership/);
@@ -216,13 +199,9 @@ test("shows typed project governance details and labels receipts as global audit
   assert.match(markup, /accepted for activation/);
   assert.match(markup, /AgentChoice/);
   assert.match(markup, /blocking policy introduced/);
-  assert.match(markup, /Global command receipts/);
-  assert.match(markup, /Receipts do not have inferred project attribution/);
-  assert.match(markup, /WorkItemAcquired/);
   assert.match(markup, /Next Decisions page/);
-  assert.match(markup, /Next global receipts page/);
   assert.match(markup, /aria-label="Project Decisions"/);
-  assert.match(markup, /aria-label="Global command receipts"/);
+  assert.doesNotMatch(markup, /command receipts/i);
 });
 
 test("keeps the latest available governance view visible when refresh fails", () => {
@@ -233,7 +212,7 @@ test("keeps the latest available governance view visible when refresh fails", ()
 });
 
 test("renders loading, unavailable, and retryable initial errors", () => {
-  const emptyDetails = { browser: null, choice: null, decision: null, guidance: null, receipt: null, receipts: null };
+  const emptyDetails = { browser: null, choice: null, decision: null, guidance: null };
   assert.match(render({ ...emptyDetails, loading: true }), /Loading project governance/);
   assert.match(render(emptyDetails), /not available in the latest projection/);
   assert.match(render({ ...emptyDetails, errorMessage: "Network unavailable" }), /Retry/);

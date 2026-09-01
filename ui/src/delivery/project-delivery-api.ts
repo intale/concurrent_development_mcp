@@ -1,6 +1,4 @@
 import {
-  DeliveryOperationBatchDocument,
-  DeliveryOperationBatchesDocument,
   ProjectDeliveryCandidateDocument,
   ProjectDeliveryDocument,
   ProjectDeliveryMergeDocument,
@@ -9,10 +7,6 @@ import {
 } from "../gql/graphql.js";
 import type {
   CandidateImpactDirection,
-  DeliveryOperationBatchQuery,
-  DeliveryOperationBatchQueryVariables,
-  DeliveryOperationBatchesQuery,
-  DeliveryOperationBatchesQueryVariables,
   ProjectDeliveryCandidateQuery,
   ProjectDeliveryCandidateQueryVariables,
   ProjectDeliveryMergeQuery,
@@ -25,7 +19,7 @@ import type {
   ProjectDeliveryVerificationQueryVariables
 } from "../gql/graphql.js";
 import { executeGraphql } from "../graphql-client.js";
-import type { BatchFilters, DeliveryCursors, DeliveryFilters } from "./project-delivery-model.js";
+import type { DeliveryCursors, DeliveryFilters } from "./project-delivery-model.js";
 
 export const DELIVERY_PAGE_SIZE = 20;
 
@@ -98,30 +92,4 @@ export function fetchRelease(
 ): Promise<ProjectDeliveryReleaseQuery> {
   const variables: ProjectDeliveryReleaseQueryVariables = { repositoryId, releaseSetId };
   return executeGraphql(ProjectDeliveryReleaseDocument, variables, signal);
-}
-
-export function fetchBatches(
-  filters: BatchFilters,
-  after?: string,
-  signal?: AbortSignal
-): Promise<DeliveryOperationBatchesQuery> {
-  const variables: DeliveryOperationBatchesQueryVariables = {
-    first: DELIVERY_PAGE_SIZE,
-    ...filters,
-    ...(after ? { after } : {})
-  };
-  return executeGraphql(DeliveryOperationBatchesDocument, variables, signal);
-}
-
-export function fetchBatch(
-  batchId: string,
-  itemsAfter?: string,
-  signal?: AbortSignal
-): Promise<DeliveryOperationBatchQuery> {
-  const variables: DeliveryOperationBatchQueryVariables = {
-    batchId,
-    first: DELIVERY_PAGE_SIZE,
-    ...(itemsAfter ? { itemsAfter } : {})
-  };
-  return executeGraphql(DeliveryOperationBatchDocument, variables, signal);
 }

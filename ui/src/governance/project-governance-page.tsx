@@ -8,8 +8,6 @@ import type {
   GuidanceSource
 } from "../gql/graphql.js";
 import {
-  fetchCommandReceipt,
-  fetchCommandReceipts,
   fetchGovernanceAgentChoice,
   fetchGovernanceDecision,
   fetchGovernanceGuidance,
@@ -44,11 +42,9 @@ export function ProjectGovernancePage() {
   const choiceStatus = matching<AgentChoiceStatus>(searchParams.get("choiceStatus"), AGENT_CHOICE_STATUSES);
   const impactOutcome = matching<AgentChoiceImpactOutcome>(searchParams.get("impactOutcome"), IMPACT_OUTCOMES);
   const decisionTopicId = searchParams.get("decisionTopic")?.trim() || undefined;
-  const toolName = searchParams.get("receiptTool")?.trim() || undefined;
   const selectedDecision = searchParams.get("decision") ?? undefined;
   const selectedGuidance = searchParams.get("guidance") ?? undefined;
   const selectedChoice = searchParams.get("choice") ?? undefined;
-  const selectedReceipt = searchParams.get("receipt") ?? undefined;
 
   const filters = {
     ...(decisionPolicyStatus ? { decisionPolicyStatus } : {}),
@@ -120,26 +116,6 @@ export function ProjectGovernancePage() {
     ),
     refetchInterval: REFRESH_INTERVAL_MS
   });
-  const receipts = useQuery({
-    queryKey: ["governance-receipts", toolName, searchParams.get("receiptsAfter")],
-    queryFn: ({ signal }) => fetchCommandReceipts(
-      { ...(toolName ? { toolName } : {}) },
-      { ...(searchParams.get("receiptsAfter") ? { after: searchParams.get("receiptsAfter") as string } : {}) },
-      signal
-    ),
-    placeholderData: (previousData) => previousData,
-    refetchInterval: REFRESH_INTERVAL_MS
-  });
-  const receipt = useQuery({
-    queryKey: ["governance-receipt", selectedReceipt],
-    queryFn: ({ signal }) => fetchCommandReceipt(selectedReceipt ?? "", signal),
-    enabled: selectedReceipt !== undefined,
-    placeholderData: (previousData, previousQuery) => (
-      previousQuery?.queryKey[1] === selectedReceipt ? previousData : undefined
-    ),
-    refetchInterval: REFRESH_INTERVAL_MS
-  });
-
   const update = (changes: Readonly<Record<string, string | null>>) => {
     const next = new URLSearchParams(searchParams);
     Object.entries(changes).forEach(([name, value]) => value ? next.set(name, value) : next.delete(name));
@@ -150,15 +126,13 @@ export function ProjectGovernancePage() {
     Object.entries(changes).forEach(([name, value]) => value ? next.set(name, value) : next.delete(name));
     return `/projects/${repositoryId}/governance?${next.toString()}`;
   };
-  const queries = [catalog, decision, guidance, choice, receipts, receipt];
+  const queries = [catalog, decision, guidance, choice];
   const errors = queries.map((query) => query.error).filter((error): error is Error => error instanceof Error);
   const retry = () => {
     void catalog.refetch();
-    void receipts.refetch();
     if (selectedDecision) void decision.refetch();
     if (selectedGuidance) void guidance.refetch();
     if (selectedChoice) void choice.refetch();
-    if (selectedReceipt) void receipt.refetch();
   };
 
   return (
@@ -173,7 +147,6 @@ export function ProjectGovernancePage() {
             <div className="col-12 col-lg-4"><label className="form-label" htmlFor="choice-type">AgentChoice kind</label><select className="form-select" id="choice-type" onChange={(event) => update({ choiceType: event.target.value, choicesAfter: null })} value={choiceType ?? ""}><option value="">All kinds</option>{AGENT_CHOICE_KINDS.map(({ label, value }) => <option key={value} value={value}>{label}</option>)}</select></div>
             <div className="col-12 col-lg-4"><label className="form-label" htmlFor="choice-status">AgentChoice status</label><select className="form-select" id="choice-status" onChange={(event) => update({ choiceStatus: event.target.value, choicesAfter: null })} value={choiceStatus ?? ""}><option value="">All statuses</option>{AGENT_CHOICE_STATUSES.map(({ label, value }) => <option key={value} value={value}>{label}</option>)}</select></div>
             <div className="col-12 col-lg-4"><label className="form-label" htmlFor="impact-outcome">Impact outcome</label><select className="form-select" id="impact-outcome" onChange={(event) => update({ impactOutcome: event.target.value, impactsAfter: null })} value={impactOutcome ?? ""}><option value="">All outcomes</option>{IMPACT_OUTCOMES.map(({ label, value }) => <option key={value} value={value}>{label}</option>)}</select></div>
-            <div className="col-12"><label className="form-label" htmlFor="receipt-tool">Global receipt tool</label><input className="form-control" id="receipt-tool" onChange={(event) => update({ receiptTool: event.target.value, receiptsAfter: null })} placeholder="Exact MCP tool name; receipts remain global" value={searchParams.get("receiptTool") ?? ""} /></div>
           </div>
         </form>
         <ProjectGovernanceView
@@ -182,21 +155,17 @@ export function ProjectGovernancePage() {
           decision={decision.data?.projectDecision ?? null}
           errorMessage={errors.map((error) => error.message).join("; ") || null}
           guidance={guidance.data?.projectGuidance ?? null}
-          hrefForChoice={(choiceId) => href({ choice: choiceId, decision: null, guidance: null, receipt: null, choiceImpactsAfter: null })}
-          hrefForDecision={(decisionId) => href({ decision: decisionId, guidance: null, choice: null, receipt: null })}
-          hrefForGuidance={(messageId) => href({ guidance: messageId, decision: null, choice: null, receipt: null, interpretationsAfter: null })}
-          hrefForReceipt={(commandId) => href({ receipt: commandId, decision: null, guidance: null, choice: null })}
+          hrefForChoice={(choiceId) => href({ choice: choiceId, decision: null, guidance: null, choiceImpactsAfter: null })}
+          hrefForDecision={(decisionId) => href({ decision: decisionId, guidance: null, choice: null })}
+          hrefForGuidance={(messageId) => href({ guidance: messageId, decision: null, choice: null, interpretationsAfter: null })}
           loading={catalog.isPending}
           onNextChoices={(cursor) => update({ choicesAfter: cursor })}
           onNextDecisions={(cursor) => update({ decisionsAfter: cursor })}
           onNextGuidance={(cursor) => update({ guidanceAfter: cursor })}
           onNextImpacts={(cursor) => update({ impactsAfter: cursor })}
           onNextInterpretations={(cursor) => update({ interpretationsAfter: cursor })}
-          onNextReceipts={(cursor) => update({ receiptsAfter: cursor })}
           onNextSelectedChoiceImpacts={(cursor) => update({ choiceImpactsAfter: cursor })}
           onRetry={retry}
-          receipt={receipt.data?.commandReceipt ?? null}
-          receipts={receipts.data?.commandReceipts ?? null}
           refreshing={queries.some((query) => query.isFetching && query.data !== undefined)}
         />
       </div></div>

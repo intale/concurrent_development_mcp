@@ -173,33 +173,3 @@ query ProjectDeliveryRelease($repositoryId: ID!, $releaseSetId: ID!) {
     completionOutcome
   }
 }
-
-query DeliveryOperationBatches(
-  $first: Int
-  $after: String
-  $sort: DeliverySort
-  $status: OperationBatchStatus
-  $targetTool: OperationBatchTool
-) {
-  operationBatches(first: $first, after: $after, sort: $sort, status: $status, targetTool: $targetTool) {
-    nodes {
-      id targetTool status total succeeded rejected pending notRun manifestDigest createdAt
-    }
-    pageInfo { endCursor hasNextPage }
-  }
-}
-
-query DeliveryOperationBatch($batchId: ID!, $first: Int, $itemsAfter: String) {
-  operationBatch(batchId: $batchId, first: $first, itemsAfter: $itemsAfter) {
-    batch {
-      id targetTool status total succeeded rejected pending notRun manifestDigest createdAt
-    }
-    items {
-      nodes {
-        index targetTool commandId canonicalInputDigest status
-        outcomeStatus outcomeSummary outcomeCode finishedAt
-      }
-      pageInfo { endCursor hasNextPage }
-    }
-  }
-}

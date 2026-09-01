@@ -3,8 +3,6 @@ import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import type {
-  DeliveryOperationBatchQuery,
-  DeliveryOperationBatchesQuery,
   ProjectDeliveryCandidateQuery,
   ProjectDeliveryMergeQuery,
   ProjectDeliveryQuery,
@@ -13,8 +11,7 @@ import type {
 } from "../src/gql/graphql.js";
 import {
   preserveForIdentity,
-  preserveForProject,
-  preserveGlobalIdentity
+  preserveForProject
 } from "../src/delivery/project-delivery-model.js";
 import { ProjectDeliveryView } from "../src/delivery/project-delivery-view.js";
 
@@ -173,49 +170,12 @@ const release = {
   completionOutcome: null
 } satisfies NonNullable<ProjectDeliveryReleaseQuery["projectReleaseSet"]>;
 
-const batchSummary = {
-  id: "batch-ui-06",
-  targetTool: "DEVELOPMENT_ARTIFACT_CAPTURE" as const,
-  status: "COMPLETED" as const,
-  total: 1,
-  succeeded: 1,
-  rejected: 0,
-  pending: 0,
-  notRun: 0,
-  manifestDigest: `sha256:${"5".repeat(64)}`,
-  createdAt: timestamp
-};
-const batches = {
-  nodes: [batchSummary],
-  pageInfo: { endCursor: "next-batch", hasNextPage: true }
-} satisfies DeliveryOperationBatchesQuery["operationBatches"];
-const batch = {
-  batch: batchSummary,
-  items: {
-    nodes: [{
-      index: 0,
-      targetTool: "DEVELOPMENT_ARTIFACT_CAPTURE" as const,
-      commandId: "command-ui-06",
-      canonicalInputDigest: `sha256:${"6".repeat(64)}`,
-      status: "SUCCEEDED" as const,
-      outcomeStatus: "ok",
-      outcomeSummary: "Artifact captured.",
-      outcomeCode: null,
-      finishedAt: timestamp
-    }],
-    pageInfo: { endCursor: "next-batch-item", hasNextPage: true }
-  }
-} satisfies NonNullable<DeliveryOperationBatchQuery["operationBatch"]>;
-
 const callbacks = {
-  hrefForBatch: (id: string) => `/delivery?batch=${id}`,
   hrefForCandidate: (id: string) => `/delivery?candidate=${id}`,
   hrefForMerge: (id: string) => `/delivery?merge=${id}`,
   hrefForObligation: (id: string) => `/delivery?obligation=${id}`,
   hrefForRelease: (id: string) => `/delivery?release=${id}`,
   onNextAuthorizations: () => undefined,
-  onNextBatchItems: () => undefined,
-  onNextBatches: () => undefined,
   onNextCandidates: () => undefined,
   onNextEvidence: () => undefined,
   onNextImpacts: () => undefined,
@@ -229,8 +189,6 @@ function render(overrides: Partial<Parameters<typeof ProjectDeliveryView>[0]> = 
   return renderToStaticMarkup(
     <MemoryRouter>
       <ProjectDeliveryView
-        batch={batch}
-        batches={batches}
         browser={browser}
         candidate={candidate}
         errorMessage={null}
@@ -246,21 +204,17 @@ function render(overrides: Partial<Parameters<typeof ProjectDeliveryView>[0]> = 
   );
 }
 
-test("shows typed delivery facts while keeping operation batches explicitly global", () => {
+test("shows typed project delivery facts without global operation batches", () => {
   const markup = render();
   assert.match(markup, /candidate-ui-06/);
   assert.match(markup, /exact path/);
   assert.match(markup, /evidence-ui-06/);
   assert.match(markup, /authorization-ui-06/);
   assert.match(markup, /ReleaseSet members/);
-  assert.match(markup, /Global operation batches/);
-  assert.match(markup, /never attributed to a project from arbitrary input/);
-  assert.match(markup, /Artifact captured/);
   assert.doesNotMatch(markup, /raw arguments/i);
   assert.match(markup, /Next Candidate page/);
-  assert.match(markup, /Next batch items page/);
   assert.match(markup, /aria-label="Candidate checkpoints"/);
-  assert.match(markup, /aria-label="Global operation batches"/);
+  assert.doesNotMatch(markup, /operation batches/i);
 });
 
 test("keeps the latest available delivery view visible when refresh fails", () => {
@@ -271,18 +225,16 @@ test("keeps the latest available delivery view visible when refresh fails", () =
 });
 
 test("renders loading, unavailable, and retryable initial errors", () => {
-  const emptyDetails = { batch: null, batches: null, browser: null, candidate: null, merge: null, release: null, verification: null };
+  const emptyDetails = { browser: null, candidate: null, merge: null, release: null, verification: null };
   assert.match(render({ ...emptyDetails, loading: true }), /Loading project delivery/);
   assert.match(render(emptyDetails), /not available in the latest projection/);
   assert.match(render({ ...emptyDetails, errorMessage: "Network unavailable" }), /Retry/);
 });
 
-test("preserves available data only for the same project or selected identity", () => {
+test("preserves available data only for the same project and selected identity", () => {
   const page: ProjectDeliveryQuery = { projectDelivery: browser };
   assert.equal(preserveForProject(page, ["project-delivery", repositoryId], repositoryId), page);
   assert.equal(preserveForProject(page, ["project-delivery", "other"], repositoryId), undefined);
   assert.equal(preserveForIdentity(candidate, ["candidate", repositoryId, checkpoint.id], repositoryId, checkpoint.id), candidate);
   assert.equal(preserveForIdentity(candidate, ["candidate", repositoryId, "other"], repositoryId, checkpoint.id), undefined);
-  assert.equal(preserveGlobalIdentity(batch, ["batch", batchSummary.id], batchSummary.id), batch);
-  assert.equal(preserveGlobalIdentity(batch, ["batch", "other"], batchSummary.id), undefined);
 });

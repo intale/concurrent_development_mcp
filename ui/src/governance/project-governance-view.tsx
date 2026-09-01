@@ -1,7 +1,5 @@
 import { Link } from "react-router-dom";
 import type {
-  CommandReceipt,
-  CommandReceiptPage,
   GovernanceAgentChoice,
   GovernanceDecision,
   GovernanceGuidance,
@@ -18,18 +16,14 @@ export interface ProjectGovernanceViewProps {
   readonly hrefForChoice: (choiceId: string) => string;
   readonly hrefForDecision: (decisionId: string) => string;
   readonly hrefForGuidance: (messageId: string) => string;
-  readonly hrefForReceipt: (commandId: string) => string;
   readonly loading: boolean;
   readonly onNextChoices: (cursor: string) => void;
   readonly onNextDecisions: (cursor: string) => void;
   readonly onNextGuidance: (cursor: string) => void;
   readonly onNextImpacts: (cursor: string) => void;
   readonly onNextInterpretations: (cursor: string) => void;
-  readonly onNextReceipts: (cursor: string) => void;
   readonly onNextSelectedChoiceImpacts: (cursor: string) => void;
   readonly onRetry: () => void;
-  readonly receipt: CommandReceipt | null;
-  readonly receipts: CommandReceiptPage | null;
   readonly refreshing: boolean;
 }
 
@@ -166,19 +160,6 @@ function ChoiceDetail({
   );
 }
 
-function ReceiptDetail({ receipt }: { readonly receipt: CommandReceipt }) {
-  return (
-    <section aria-labelledby="receipt-detail-heading" className="card card-outline card-secondary">
-      <div className="card-header"><h2 className="card-title" id="receipt-detail-heading">Command receipt · {receipt.commandId}</h2></div>
-      <div className="card-body vstack gap-3">
-        <div><span className={`badge ${badgeClass(receipt.status)}`}>{humanized(receipt.status)}</span> <strong>{receipt.toolName}</strong> · {receipt.summary}</div>
-        <dl className="row mb-0"><dt className="col-sm-3">Receipt</dt><dd className="col-sm-9"><code>{receipt.receipt}</code></dd><dt className="col-sm-3">Completed</dt><dd className="col-sm-9">{formatted(receipt.completedAt)}</dd><dt className="col-sm-3">Next tools</dt><dd className="col-sm-9"><StringList values={receipt.nextActionTools} /></dd><dt className="col-sm-3">Warnings</dt><dd className="col-sm-9"><StringList values={receipt.warnings} /></dd></dl>
-        <div><h3 className="h6">Emitted event facts</h3><div className="list-group">{receipt.emittedEvents.map((event) => <div className="list-group-item" key={event.id}><strong>{event.type}</strong> · <code>{event.streamContext}/{event.streamName}/{event.streamId}</code> · revision {event.streamRevision}<div className="small text-body-secondary">{event.id}</div></div>)}</div></div>
-      </div>
-    </section>
-  );
-}
-
 export function ProjectGovernanceView(props: ProjectGovernanceViewProps) {
   if (props.loading && !props.browser) return <div className="card"><div className="card-body d-flex align-items-center gap-3" role="status"><span aria-hidden="true" className="spinner-border spinner-border-sm text-primary" /><span>Loading project governance…</span></div></div>;
   if (props.errorMessage && !props.browser) return <div className="alert alert-danger" role="alert"><h2 className="h5">Project governance could not be loaded</h2><p>{props.errorMessage}</p><button className="btn btn-outline-light btn-sm" onClick={props.onRetry} type="button">Retry</button></div>;
@@ -216,12 +197,6 @@ export function ProjectGovernanceView(props: ProjectGovernanceViewProps) {
       <section aria-labelledby="impacts-heading" className="card card-outline card-secondary"><div className="card-header"><h2 className="card-title" id="impacts-heading">Project decision impacts</h2></div><div className="card-body p-0"><div className="table-responsive"><table aria-label="Project AgentChoice impacts" className="table table-hover align-middle mb-0"><thead className="table-light"><tr><th>Choice</th><th>Decision</th><th>Outcome</th><th>Transition</th><th>Assessed</th></tr></thead><tbody>
         {impacts.nodes.length === 0 ? <tr><td className="text-center py-4" colSpan={5}>No decision-impact assessments match these filters.</td></tr> : impacts.nodes.map((item) => <tr key={item.assessmentId}><td><Link to={props.hrefForChoice(item.choiceId)}><code>{item.choiceId}</code></Link><div className="small">{item.attemptId}</div></td><td><code>{item.decisionId}</code><div className="small">{humanized(item.decisionChangeKind)}</div></td><td><span className={`badge ${badgeClass(item.outcome)}`}>{humanized(item.outcome)}</span><div className="small">{humanized(item.reason)}</div></td><td>{humanized(item.beforeStatus)} → {humanized(item.afterStatus)}</td><td>{formatted(item.assessedAt)}</td></tr>)}
       </tbody></table></div></div>{impacts.pageInfo.hasNextPage ? <div className="card-footer"><PageButton cursor={impacts.pageInfo.endCursor} label="Next impacts page" onNext={props.onNextImpacts} /></div> : null}</section>
-
-      <section aria-labelledby="receipts-heading" className="card card-outline card-dark"><div className="card-header"><h2 className="card-title" id="receipts-heading">Global command receipts</h2></div><div className="card-body"><div className="alert alert-secondary"><strong>Global audit view.</strong> Receipts do not have inferred project attribution and may describe commands from any project.</div><div className="table-responsive"><table aria-label="Global command receipts" className="table table-hover align-middle mb-0"><thead className="table-light"><tr><th>Command</th><th>Tool</th><th>Status</th><th>Summary</th><th>Completed</th></tr></thead><tbody>
-        {!props.receipts || props.receipts.nodes.length === 0 ? <tr><td className="text-center py-4" colSpan={5}>No global command receipts match this filter.</td></tr> : props.receipts.nodes.map((item) => <tr key={item.commandId}><td><Link to={props.hrefForReceipt(item.commandId)}><code>{item.commandId}</code></Link></td><td>{item.toolName}</td><td><span className={`badge ${badgeClass(item.status)}`}>{humanized(item.status)}</span></td><td>{item.summary}</td><td>{formatted(item.completedAt)}</td></tr>)}
-      </tbody></table></div></div>{props.receipts?.pageInfo.hasNextPage ? <div className="card-footer"><PageButton cursor={props.receipts.pageInfo.endCursor} label="Next global receipts page" onNext={props.onNextReceipts} /></div> : null}</section>
-
-      {props.receipt ? <ReceiptDetail receipt={props.receipt} /> : null}
 
       <p className="small text-body-secondary mb-0">Viewing latest available projections for <strong>{project.name ?? project.id}</strong> in <code>{project.scope}</code>. Projection freshness never gates availability.</p>
       <div className="d-flex flex-wrap gap-2"><Link className="btn btn-outline-primary" to={`/projects/${project.id}/coordination`}>View coordination</Link><Link className="btn btn-outline-primary" to={`/projects/${project.id}/resources`}>View resources</Link><Link className="btn btn-outline-primary" to={`/projects/${project.id}/knowledge`}>View knowledge</Link><Link className="btn btn-outline-secondary" to={`/projects?scope=${encodeURIComponent(project.scope)}`}>Back to project catalog</Link></div>

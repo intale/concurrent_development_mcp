@@ -1,7 +1,5 @@
 import { Link } from "react-router-dom";
 import type {
-  BatchDetail,
-  BatchPage,
   CandidateDetail,
   MergeDetail,
   ProjectDelivery,
@@ -11,12 +9,9 @@ import type {
 import { badgeClass, formatted, humanized } from "./project-delivery-model.js";
 
 export interface ProjectDeliveryViewProps {
-  readonly batch: BatchDetail | null;
-  readonly batches: BatchPage | null;
   readonly browser: ProjectDelivery | null;
   readonly candidate: CandidateDetail | null;
   readonly errorMessage: string | null;
-  readonly hrefForBatch: (id: string) => string;
   readonly hrefForCandidate: (id: string) => string;
   readonly hrefForMerge: (id: string) => string;
   readonly hrefForObligation: (id: string) => string;
@@ -24,8 +19,6 @@ export interface ProjectDeliveryViewProps {
   readonly loading: boolean;
   readonly merge: MergeDetail | null;
   readonly onNextAuthorizations: (cursor: string) => void;
-  readonly onNextBatchItems: (cursor: string) => void;
-  readonly onNextBatches: (cursor: string) => void;
   readonly onNextCandidates: (cursor: string) => void;
   readonly onNextEvidence: (cursor: string) => void;
   readonly onNextImpacts: (cursor: string) => void;
@@ -126,21 +119,6 @@ function ReleaseDetailCard({ detail }: { readonly detail: ReleaseDetail }) {
   );
 }
 
-function BatchDetailCard({ detail, onNext }: {
-  readonly detail: BatchDetail;
-  readonly onNext: (cursor: string) => void;
-}) {
-  return (
-    <section aria-labelledby="batch-detail-heading" className="card card-outline card-dark">
-      <div className="card-header"><h2 className="card-title" id="batch-detail-heading">Global operation batch · {detail.batch.id}</h2></div>
-      <div className="card-body p-0"><div className="table-responsive"><table aria-label="Operation batch items" className="table table-sm table-hover align-middle mb-0"><thead><tr><th>Index</th><th>Command</th><th>Status</th><th>Outcome</th></tr></thead><tbody>
-        {detail.items.nodes.map((item) => <tr key={item.index}><td>{item.index}</td><td><code>{item.commandId}</code><div className="small">{humanized(item.targetTool)}</div></td><td><span className={`badge ${badgeClass(item.status)}`}>{humanized(item.status)}</span></td><td>{item.outcomeSummary ?? "Not finished"}{item.outcomeCode ? <div className="small text-danger">{item.outcomeCode}</div> : null}</td></tr>)}
-      </tbody></table></div></div>
-      {detail.items.pageInfo.hasNextPage ? <div className="card-footer"><NextButton cursor={detail.items.pageInfo.endCursor} label="Next batch items page" onNext={onNext} /></div> : null}
-    </section>
-  );
-}
-
 export function ProjectDeliveryView(props: ProjectDeliveryViewProps) {
   if (props.loading && !props.browser) return <div className="card"><div className="card-body d-flex align-items-center gap-3" role="status"><span aria-hidden="true" className="spinner-border spinner-border-sm text-primary" /><span>Loading project delivery…</span></div></div>;
   if (props.errorMessage && !props.browser) return <div className="alert alert-danger" role="alert"><h2 className="h5">Project delivery could not be loaded</h2><p>{props.errorMessage}</p><button className="btn btn-outline-light btn-sm" onClick={props.onRetry} type="button">Retry</button></div>;
@@ -169,9 +147,6 @@ export function ProjectDeliveryView(props: ProjectDeliveryViewProps) {
 
       <section aria-labelledby="release-heading" className="card card-outline card-success"><div className="card-header"><h2 className="card-title" id="release-heading">ReleaseSets</h2></div><div className="card-body p-0"><div className="table-responsive"><table aria-label="ReleaseSets" className="table table-hover align-middle mb-0"><thead><tr><th>ReleaseSet</th><th>ChangeSet</th><th>Members</th><th>Status</th></tr></thead><tbody>{releaseSets.nodes.length === 0 ? <tr><td className="text-center" colSpan={4}>No ReleaseSets match these filters.</td></tr> : releaseSets.nodes.map((release) => <tr key={release.id}><td><Link to={props.hrefForRelease(release.id)}><code>{release.id}</code></Link><div className="small">{formatted(release.preparedAt)}</div></td><td><code>{release.changeSetId}</code></td><td>{release.memberCount}</td><td><span className={`badge ${badgeClass(release.status)}`}>{humanized(release.status)}</span></td></tr>)}</tbody></table></div></div>{releaseSets.pageInfo.hasNextPage ? <div className="card-footer"><NextButton cursor={releaseSets.pageInfo.endCursor} label="Next ReleaseSet page" onNext={props.onNextReleases} /></div> : null}</section>
       {props.release ? <ReleaseDetailCard detail={props.release} /> : null}
-
-      <section aria-labelledby="batches-heading" className="card card-outline card-dark"><div className="card-header"><h2 className="card-title" id="batches-heading">Global operation batches</h2></div><div className="card-body"><div className="alert alert-secondary"><strong>Global view.</strong> Batch commands are never attributed to a project from arbitrary input.</div><div className="table-responsive"><table aria-label="Global operation batches" className="table table-hover align-middle mb-0"><thead><tr><th>Batch</th><th>Tool</th><th>Status</th><th>Progress</th></tr></thead><tbody>{!props.batches || props.batches.nodes.length === 0 ? <tr><td className="text-center" colSpan={4}>No global batches match these filters.</td></tr> : props.batches.nodes.map((batch) => <tr key={batch.id}><td><Link to={props.hrefForBatch(batch.id)}><code>{batch.id}</code></Link><div className="small">{formatted(batch.createdAt)}</div></td><td>{humanized(batch.targetTool)}</td><td><span className={`badge ${badgeClass(batch.status)}`}>{humanized(batch.status)}</span></td><td>{batch.succeeded} succeeded · {batch.rejected} rejected · {batch.pending} pending · {batch.notRun} not run</td></tr>)}</tbody></table></div></div>{props.batches?.pageInfo.hasNextPage ? <div className="card-footer"><NextButton cursor={props.batches.pageInfo.endCursor} label="Next global batch page" onNext={props.onNextBatches} /></div> : null}</section>
-      {props.batch ? <BatchDetailCard detail={props.batch} onNext={props.onNextBatchItems} /> : null}
 
       <p className="small text-body-secondary mb-0">Viewing latest available projections for <strong>{project.name ?? project.id}</strong> in <code>{project.scope}</code>. Projection freshness never gates availability.</p>
       <div className="d-flex flex-wrap gap-2"><Link className="btn btn-outline-primary" to={`/projects/${project.id}/coordination`}>View coordination</Link><Link className="btn btn-outline-primary" to={`/projects/${project.id}/resources`}>View resources</Link><Link className="btn btn-outline-primary" to={`/projects/${project.id}/knowledge`}>View knowledge</Link><Link className="btn btn-outline-primary" to={`/projects/${project.id}/governance`}>View governance</Link><Link className="btn btn-outline-secondary" to={`/projects?scope=${encodeURIComponent(project.scope)}`}>Back to project catalog</Link></div>
