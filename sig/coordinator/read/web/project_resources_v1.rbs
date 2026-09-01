@@ -1,13 +1,7 @@
 module Coordinator
   module Read
     module Web
-      class ProjectResourcesV1 < Shared::Value
-        class Project < Shared::Value
-          def repository_id: () -> String
-          def scope: () -> String
-          def display_name: () -> String?
-        end
-
+      class ProjectResourcesV1
         class Resource < Shared::Value
           def resource_id: () -> String
           def repository_id: () -> String
@@ -15,11 +9,15 @@ module Coordinator
           def path: () -> String
           def lifecycle_status: () -> String
           def unbinding_reason: () -> String?
+          def registered_event_id: () -> String?
+          def registered_actor_id: () -> String?
           def registered_at: () -> String?
+          def latest_transition_event_id: () -> String?
+          def latest_transition_actor_id: () -> String?
           def last_transition_at: () -> String?
         end
 
-        class ActiveLease < Shared::Value
+        class Lease < Shared::Value
           def lease_id: () -> String
           def lease_set_id: () -> String
           def resource_id: () -> String
@@ -27,6 +25,7 @@ module Coordinator
           def resource_kind: () -> String
           def resource_path: () -> String
           def resource_lifecycle_status: () -> String?
+          def status: () -> String
           def base_blob_oid: () -> String?
           def fencing_token: () -> Integer
           def policy_version: () -> String
@@ -37,11 +36,15 @@ module Coordinator
           def reserved_event_id: () -> String
           def last_expanded_event_id: () -> String?
           def last_renewed_event_id: () -> String?
+          def release_event_id: () -> String?
+          def attempt_terminal_event_id: () -> String?
           def reserved_at: () -> String
           def last_expanded_at: () -> String?
           def last_renewed_at: () -> String?
           def previous_expires_at: () -> String?
           def expires_at: () -> String
+          def released_at: () -> String?
+          def attempt_terminal_at: () -> String?
           def last_projected_at: () -> String
         end
 
@@ -51,16 +54,12 @@ module Coordinator
           def has_more: () -> bool
         end
 
-        class ActiveLeasePage < Shared::Value
-          def items: () -> Array[ActiveLease]
+        class LeasePage < Shared::Value
+          def items: () -> Array[Lease]
           def next_lease_id: () -> String?
           def has_more: () -> bool
+          def as_of: () -> String
         end
-
-        def project: () -> Project
-        def resources: () -> ResourcePage
-        def active_leases: () -> ActiveLeasePage
-        def lease_as_of: () -> String
       end
     end
   end

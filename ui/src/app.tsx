@@ -9,6 +9,10 @@ import { ProjectCatalogPage } from "./projects/project-catalog-page.js";
 import { ProjectOverviewPage } from "./projects/project-overview-page.js";
 import { ProjectSectionPlaceholder } from "./projects/project-section-placeholder.js";
 import { ProjectWorkspaceShell } from "./projects/project-workspace-shell.js";
+import {
+  ProjectResourceInventoryPage,
+  ProjectResourceLeasesPage
+} from "./resources/project-resources-page.js";
 
 export function App() {
   const location = useLocation();
@@ -121,15 +125,11 @@ export function App() {
             <Route path="coordination/work-items/:workItemId" element={<CoordinationWorkItemsPage />} />
             <Route path="coordination/dependencies" element={<CoordinationDependenciesPage />} />
             <Route path="coordination/dependencies/:dependencyId" element={<CoordinationDependenciesPage />} />
-            <Route
-              path="resources"
-              element={(
-                <ProjectSectionPlaceholder
-                  description="Repository resources and factual active leases belong in this focused Project route."
-                  title="Resources"
-                />
-              )}
-            />
+            <Route path="resources" element={<Navigate replace to="inventory" />} />
+            <Route path="resources/inventory" element={<ProjectResourceInventoryPage />} />
+            <Route path="resources/inventory/:resourceId" element={<ProjectResourceInventoryPage />} />
+            <Route path="resources/leases" element={<ProjectResourceLeasesPage />} />
+            <Route path="resources/leases/:leaseId" element={<ProjectResourceLeasesPage />} />
             <Route
               path="knowledge"
               element={(

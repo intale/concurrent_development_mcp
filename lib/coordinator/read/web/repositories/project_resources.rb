@@ -2,58 +2,78 @@
 
 module Coordinator::Read::Web::Repositories
   class ProjectResources
-    def fetch(query)
-      project = Coordinator::Read::Repository.find_by(repository_id: query.repository_id)
-      return unless project
+    def resources(query)
+      repository_ids = project_repository_ids(query.scope)
+      return if repository_ids.empty?
 
-      Coordinator::Read::Web::ProjectResourcesV1.new(
-        project: build_project(project),
-        resources: resource_page(query),
-        active_leases: active_lease_page(query),
-        lease_as_of: query.lease_as_of
-      )
-    end
-
-    private
-
-    def build_project(record)
-      Coordinator::Read::Web::ProjectResourcesV1::Project.new(
-        repository_id: record.repository_id,
-        scope: record.scope,
-        display_name: record.display_name
-      )
-    end
-
-    def resource_page(query)
-      relation = Coordinator::Read::Resource.where(repository_id: query.repository_id)
+      relation = Coordinator::Read::Resource.where(repository_id: repository_ids)
       relation = relation.where(kind: query.resource_kind) if query.resource_kind
       if query.resource_lifecycle_status
         relation = relation.where(lifecycle_status: query.resource_lifecycle_status)
       end
-      relation = relation.where("resource_id > ?", query.resource_after_id) if query.resource_after_id
+      if query.path
+        pattern = ActiveRecord::Base.sanitize_sql_like(query.path)
+        relation = relation.where("normalized_path ILIKE ?", "%#{pattern}%")
+      end
+      relation = relation.where("resource_id > ?", query.after_id) if query.after_id
       records, has_more = bounded(relation.order(:resource_id), query.first)
 
       Coordinator::Read::Web::ProjectResourcesV1::ResourcePage.new(
-        items: records.map { build_resource(_1) },
+        items: records.map { build_resource_record(_1) },
         next_resource_id: has_more ? records.last.resource_id : nil,
         has_more:
       )
     end
 
-    def active_lease_page(query)
-      relation = Coordinator::Read::ResourceLeaseBrowserRow.where(
-        repository_id: query.repository_id,
-        released_at_domain: nil,
-        attempt_terminal_at_domain: nil
-      ).where("expires_at_domain > ?", Time.iso8601(query.lease_as_of))
-      relation = relation.where("lease_id > ?", query.lease_after_id) if query.lease_after_id
+    def resource(query, view)
+      return unless project_repository_ids(query.scope).include?(view.repository_id)
+
+      build_resource_view(view)
+    end
+
+    def active_leases(query)
+      repository_ids = project_repository_ids(query.scope)
+      return if repository_ids.empty?
+
+      relation = lease_relation(repository_ids)
+        .where(released_at_domain: nil, attempt_terminal_at_domain: nil)
+        .where("expires_at_domain > ?", Time.iso8601(query.as_of))
+      relation = apply_lease_filters(relation, query)
+      relation = relation.where("lease_id > ?", query.after_id) if query.after_id
       records, has_more = bounded(relation.order(:lease_id), query.first)
 
-      Coordinator::Read::Web::ProjectResourcesV1::ActiveLeasePage.new(
-        items: records.map { build_active_lease(_1) },
+      Coordinator::Read::Web::ProjectResourcesV1::LeasePage.new(
+        items: records.map { build_lease(_1, query.as_of) },
         next_lease_id: has_more ? records.last.lease_id : nil,
-        has_more:
+        has_more:,
+        as_of: query.as_of
       )
+    end
+
+    def lease(query)
+      repository_ids = project_repository_ids(query.scope)
+      return if repository_ids.empty?
+
+      record = lease_relation(repository_ids).find_by(lease_id: query.id)
+      build_lease(record, query.as_of) if record
+    end
+
+    private
+
+    def project_repository_ids(scope)
+      Coordinator::Read::Repository.where(scope:).pluck(:repository_id)
+    end
+
+    def lease_relation(repository_ids)
+      Coordinator::Read::ResourceLeaseBrowserRow.where(repository_id: repository_ids)
+    end
+
+    def apply_lease_filters(relation, query)
+      relation = relation.where(agent_id: query.agent_id) if query.agent_id
+      relation = relation.where(change_set_id: query.change_set_id) if query.change_set_id
+      relation = relation.where(work_item_id: query.work_item_id) if query.work_item_id
+      relation = relation.where(attempt_id: query.attempt_id) if query.attempt_id
+      relation
     end
 
     def bounded(relation, limit)
@@ -61,7 +81,7 @@ module Coordinator::Read::Web::Repositories
       [ records.first(limit), records.length > limit ]
     end
 
-    def build_resource(record)
+    def build_resource_record(record)
       Coordinator::Read::Web::ProjectResourcesV1::Resource.new(
         resource_id: record.resource_id,
         repository_id: record.repository_id,
@@ -69,13 +89,34 @@ module Coordinator::Read::Web::Repositories
         path: record.normalized_path,
         lifecycle_status: record.lifecycle_status,
         unbinding_reason: record.unbinding_reason,
+        registered_event_id: event_id(record.registered_event),
+        registered_actor_id: record.registered_actor&.fetch("id", nil),
         registered_at: timestamp(record.registered_at_domain),
+        latest_transition_event_id: event_id(record.latest_transition_event),
+        latest_transition_actor_id: record.latest_transition_actor&.fetch("id", nil),
         last_transition_at: timestamp(record.latest_transition_at_domain)
       )
     end
 
-    def build_active_lease(record)
-      Coordinator::Read::Web::ProjectResourcesV1::ActiveLease.new(
+    def build_resource_view(view)
+      Coordinator::Read::Web::ProjectResourcesV1::Resource.new(
+        resource_id: view.resource_id,
+        repository_id: view.repository_id,
+        kind: view.kind,
+        path: view.normalized_path,
+        lifecycle_status: view.lifecycle_status,
+        unbinding_reason: view.unbinding_reason,
+        registered_event_id: view.registered&.event&.event_id,
+        registered_actor_id: view.registered&.actor&.id,
+        registered_at: view.registered&.occurred_at,
+        latest_transition_event_id: view.latest_transition&.event&.event_id,
+        latest_transition_actor_id: view.latest_transition&.actor&.id,
+        last_transition_at: view.latest_transition&.occurred_at
+      )
+    end
+
+    def build_lease(record, as_of)
+      Coordinator::Read::Web::ProjectResourcesV1::Lease.new(
         lease_id: record.lease_id,
         lease_set_id: record.lease_set_id,
         resource_id: record.resource_id,
@@ -83,6 +124,7 @@ module Coordinator::Read::Web::Repositories
         resource_kind: record.resource_kind,
         resource_path: record.resource_path,
         resource_lifecycle_status: record.resource_lifecycle_status,
+        status: lease_status(record, as_of),
         base_blob_oid: record.base_blob_oid,
         fencing_token: record.fencing_token,
         policy_version: record.policy_version,
@@ -93,13 +135,25 @@ module Coordinator::Read::Web::Repositories
         reserved_event_id: record.reserved_event.fetch("event_id"),
         last_expanded_event_id: event_id(record.last_expanded_event),
         last_renewed_event_id: event_id(record.last_renewed_event),
-        reserved_at: record.reserved_at_domain.utc.iso8601(6),
+        release_event_id: event_id(record.release_event),
+        attempt_terminal_event_id: event_id(record.attempt_terminal_event),
+        reserved_at: timestamp(record.reserved_at_domain),
         last_expanded_at: timestamp(record.last_expanded_at_domain),
         last_renewed_at: timestamp(record.last_renewed_at_domain),
         previous_expires_at: timestamp(record.previous_expires_at_domain),
-        expires_at: record.expires_at_domain.utc.iso8601(6),
-        last_projected_at: record.last_projected_at.utc.iso8601(6)
+        expires_at: timestamp(record.expires_at_domain),
+        released_at: timestamp(record.released_at_domain),
+        attempt_terminal_at: timestamp(record.attempt_terminal_at_domain),
+        last_projected_at: timestamp(record.last_projected_at)
       )
+    end
+
+    def lease_status(record, as_of)
+      return "released" if record.released_at_domain
+      return "attempt_terminal" if record.attempt_terminal_at_domain
+      return "expired" if record.expires_at_domain <= Time.iso8601(as_of)
+
+      "active"
     end
 
     def event_id(event)

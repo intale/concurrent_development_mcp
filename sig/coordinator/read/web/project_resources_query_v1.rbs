@@ -1,14 +1,30 @@
 module Coordinator
   module Read
     module Web
-      class ProjectResourcesQueryV1 < Shared::Value
-        def repository_id: () -> String
-        def first: () -> Integer
-        def resource_after_id: () -> String?
-        def lease_after_id: () -> String?
-        def lease_as_of: () -> String
-        def resource_kind: () -> String?
-        def resource_lifecycle_status: () -> String?
+      class ProjectResourcesQueryV1
+        class Collection < Shared::Value
+          def project_ref: () -> String
+          def scope: () -> String
+          def kind: () -> String
+          def first: () -> Integer
+          def after_id: () -> String?
+          def as_of: () -> String
+          def path: () -> String?
+          def resource_kind: () -> String?
+          def resource_lifecycle_status: () -> String?
+          def agent_id: () -> String?
+          def change_set_id: () -> String?
+          def work_item_id: () -> String?
+          def attempt_id: () -> String?
+        end
+
+        class Detail < Shared::Value
+          def project_ref: () -> String
+          def scope: () -> String
+          def kind: () -> String
+          def id: () -> String
+          def as_of: () -> String
+        end
       end
     end
   end

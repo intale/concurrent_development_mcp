@@ -1,109 +1,272 @@
-import { Link } from "react-router-dom";
-import type { ProjectResourceBrowser } from "./project-resources-model.js";
-import { lifecycleBadgeClass } from "./project-resources-model.js";
+import { useEffect, useRef } from "react";
+import type { RefObject } from "react";
+import { Link, NavLink } from "react-router-dom";
+import type {
+  ProjectResource,
+  ProjectResourceConnection,
+  ResourceLease,
+  ResourceLeaseConnection
+} from "./project-resources-model.js";
+import { leaseBadgeClass, lifecycleBadgeClass } from "./project-resources-model.js";
 
-export interface ProjectResourcesViewProps {
-  readonly browser: ProjectResourceBrowser | null;
-  readonly errorMessage: string | null;
-  readonly loading: boolean;
-  readonly onNextActiveLeases: (cursor: string) => void;
-  readonly onNextResources: (cursor: string) => void;
+export function useResourceHeading(title: string, focusKey: string): RefObject<HTMLHeadingElement> {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    document.title = `${title} · Coordinator`;
+    headingRef.current?.focus();
+  }, [focusKey, title]);
+  return headingRef;
+}
+
+export function ResourceNavigation({ basePath }: { readonly basePath: string }) {
+  const navClassName = ({ isActive }: { readonly isActive: boolean }) => `nav-link${isActive ? " active" : ""}`;
+  return (
+    <nav aria-label="Resource views" className="mb-3">
+      <ul className="nav nav-pills flex-column flex-sm-row gap-2">
+        <li className="nav-item">
+          <NavLink className={navClassName} to={`${basePath}/inventory`}>Resource inventory</NavLink>
+        </li>
+        <li className="nav-item">
+          <NavLink className={navClassName} to={`${basePath}/leases`}>Active leases</NavLink>
+        </li>
+      </ul>
+    </nav>
+  );
+}
+
+export function LoadingState({ label }: { readonly label: string }) {
+  return (
+    <div aria-live="polite" className="card" role="status">
+      <div className="card-body d-flex align-items-center gap-3">
+        <span aria-hidden="true" className="spinner-border spinner-border-sm text-primary" />
+        <span>Loading {label}…</span>
+      </div>
+    </div>
+  );
+}
+
+export function InitialError({ label, message, onRetry }: {
+  readonly label: string;
+  readonly message: string;
   readonly onRetry: () => void;
-  readonly refreshing: boolean;
+}) {
+  return (
+    <div className="alert alert-danger" role="alert">
+      <h3 className="h5">{label} could not be loaded</h3>
+      <p>{message}</p>
+      <button className="btn btn-outline-light btn-sm" onClick={onRetry} type="button">Retry</button>
+    </div>
+  );
+}
+
+export function AvailableStale({ message, onRetry }: {
+  readonly message: string;
+  readonly onRetry: () => void;
+}) {
+  return (
+    <div className="alert alert-warning" role="alert">
+      The last available projection remains visible. {message}
+      <button className="btn btn-outline-dark btn-sm ms-3" onClick={onRetry} type="button">
+        Retry refresh
+      </button>
+    </div>
+  );
+}
+
+export function PaginationControls({ canPrevious, nextCursor, onNext, onPrevious }: {
+  readonly canPrevious: boolean;
+  readonly nextCursor: string | null;
+  readonly onNext: (cursor: string) => void;
+  readonly onPrevious: () => void;
+}) {
+  if (!canPrevious && !nextCursor) return null;
+  return (
+    <nav aria-label="Collection pages" className="d-flex justify-content-between gap-2">
+      <button className="btn btn-outline-secondary" disabled={!canPrevious} onClick={onPrevious} type="button">
+        Previous
+      </button>
+      <button
+        className="btn btn-outline-primary"
+        disabled={!nextCursor}
+        onClick={() => nextCursor && onNext(nextCursor)}
+        type="button"
+      >
+        Next
+      </button>
+    </nav>
+  );
+}
+
+export function ResourceCards({ connection, hrefFor }: {
+  readonly connection: ProjectResourceConnection;
+  readonly hrefFor: (id: string) => string;
+}) {
+  if (connection.nodes.length === 0) {
+    return <div className="alert alert-info" role="status">No Resources match these filters.</div>;
+  }
+  return (
+    <div aria-label="Project resources" className="row g-3">
+      {connection.nodes.map((resource) => (
+        <div className="col-12 col-xl-6" key={resource.id}>
+          <article className="card card-outline card-primary h-100">
+            <div className="card-body d-flex flex-column gap-2">
+              <div className="d-flex flex-wrap justify-content-between gap-2">
+                <h3 className="h5 text-break mb-0"><code>{resource.path}</code></h3>
+                <span className={`badge ${lifecycleBadgeClass(resource.lifecycleStatus)}`}>
+                  {resource.lifecycleStatus.toLowerCase()}
+                </span>
+              </div>
+              <div>{resource.kind.toLowerCase()}</div>
+              {resource.unbindingReason ? <div><strong>Reason:</strong> {resource.unbindingReason}</div> : null}
+              <div className="small text-body-secondary text-break">Repository {resource.repositoryId}</div>
+              <Link className="btn btn-primary align-self-start mt-auto" to={hrefFor(resource.id)}>
+                View Resource
+              </Link>
+            </div>
+          </article>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function LeaseCards({ connection, hrefFor }: {
+  readonly connection: ResourceLeaseConnection;
+  readonly hrefFor: (id: string) => string;
+}) {
+  if (connection.nodes.length === 0) {
+    return <div className="alert alert-info" role="status">No active lease facts match these filters.</div>;
+  }
+  return (
+    <div aria-label="Active resource leases" className="row g-3">
+      {connection.nodes.map((lease) => (
+        <div className="col-12 col-xl-6" key={lease.id}>
+          <article className="card card-outline card-warning h-100">
+            <div className="card-body d-flex flex-column gap-2">
+              <div className="d-flex flex-wrap justify-content-between gap-2">
+                <h3 className="h5 text-break mb-0"><code>{lease.resourcePath}</code></h3>
+                <span className={`badge ${leaseBadgeClass(lease.status)}`}>{lease.status.toLowerCase()}</span>
+              </div>
+              <div><strong>Holder:</strong> {lease.agentId}</div>
+              <div><strong>WorkItem:</strong> <code className="text-break">{lease.workItemId}</code></div>
+              <div className="small text-body-secondary text-break">Attempt {lease.attemptId}</div>
+              <Link className="btn btn-warning align-self-start mt-auto" to={hrefFor(lease.id)}>
+                View lease
+              </Link>
+            </div>
+          </article>
+        </div>
+      ))}
+      <p className="small text-body-secondary mb-0">
+        Active as of {formatted(connection.asOf)}. Ownership comes only from projected lease facts.
+      </p>
+    </div>
+  );
+}
+
+export function ResourceDetail({ resource, backTo }: {
+  readonly resource: ProjectResource;
+  readonly backTo: string;
+}) {
+  return (
+    <article className="card card-outline card-primary">
+      <div className="card-header d-flex flex-wrap justify-content-between gap-2">
+        <h3 className="card-title text-break"><code>{resource.path}</code></h3>
+        <span className={`badge ${lifecycleBadgeClass(resource.lifecycleStatus)}`}>
+          {resource.lifecycleStatus.toLowerCase()}
+        </span>
+      </div>
+      <div className="card-body vstack gap-4">
+        <DetailGroup title="Identity" rows={[
+          ["Resource", resource.id],
+          ["Repository", resource.repositoryId],
+          ["Kind", resource.kind.toLowerCase()],
+          ["Unbinding reason", resource.unbindingReason]
+        ]} />
+        <DetailGroup title="Registration" rows={[
+          ["Actor", resource.registeredActorId],
+          ["Event", resource.registeredEventId],
+          ["Occurred", formatted(resource.registeredAt)]
+        ]} />
+        <DetailGroup title="Latest lifecycle transition" rows={[
+          ["Actor", resource.latestTransitionActorId],
+          ["Event", resource.latestTransitionEventId],
+          ["Occurred", formatted(resource.lastTransitionAt)]
+        ]} />
+        <Link className="btn btn-outline-secondary align-self-start" to={backTo}>Back to Resource inventory</Link>
+      </div>
+    </article>
+  );
+}
+
+export function LeaseDetail({ lease, backTo, projectPath }: {
+  readonly lease: ResourceLease;
+  readonly backTo: string;
+  readonly projectPath: string;
+}) {
+  return (
+    <article className="card card-outline card-warning">
+      <div className="card-header d-flex flex-wrap justify-content-between gap-2">
+        <h3 className="card-title text-break"><code>{lease.resourcePath}</code></h3>
+        <span className={`badge ${leaseBadgeClass(lease.status)}`}>{lease.status.toLowerCase()}</span>
+      </div>
+      <div className="card-body vstack gap-4">
+        <DetailGroup title="Holder" rows={[
+          ["Agent", lease.agentId],
+          ["Attempt", lease.attemptId],
+          ["WorkItem", lease.workItemId],
+          ["ChangeSet", lease.changeSetId]
+        ]} />
+        <div className="d-flex flex-wrap gap-2">
+          <Link className="btn btn-outline-primary" to={`${projectPath}/coordination/work-items/${encodeURIComponent(lease.workItemId)}`}>
+            View WorkItem
+          </Link>
+          <Link className="btn btn-outline-primary" to={`${projectPath}/resources/inventory/${encodeURIComponent(lease.resourceId)}`}>
+            View Resource
+          </Link>
+        </div>
+        <DetailGroup title="Lease" rows={[
+          ["Lease", lease.id],
+          ["Lease set", lease.leaseSetId],
+          ["Fencing token", lease.fencingToken],
+          ["Policy", lease.policyVersion],
+          ["Reserved", formatted(lease.reservedAt)],
+          ["Expires", formatted(lease.expiresAt)],
+          ["Released", formatted(lease.releasedAt)],
+          ["Attempt terminal", formatted(lease.attemptTerminalAt)]
+        ]} />
+        <DetailGroup title="Event evidence" rows={[
+          ["Reserved event", lease.reservedEventId],
+          ["Expanded event", lease.lastExpandedEventId],
+          ["Renewed event", lease.lastRenewedEventId],
+          ["Release event", lease.releaseEventId],
+          ["Attempt terminal event", lease.attemptTerminalEventId]
+        ]} />
+        <Link className="btn btn-outline-secondary align-self-start" to={backTo}>Back to active leases</Link>
+      </div>
+    </article>
+  );
+}
+
+function DetailGroup({ title, rows }: {
+  readonly title: string;
+  readonly rows: ReadonlyArray<readonly [string, string | null | undefined]>;
+}) {
+  return (
+    <section>
+      <h4 className="h6 text-uppercase text-body-secondary">{title}</h4>
+      <dl className="row mb-0">
+        {rows.map(([label, value]) => (
+          <div className="col-12 col-lg-6 mb-3" key={label}>
+            <dt>{label}</dt>
+            <dd className="text-break mb-0"><code>{value || "—"}</code></dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
 }
 
 function formatted(value: string | null | undefined): string {
   return value ? new Date(value).toLocaleString() : "—";
-}
-
-export function ProjectResourcesView(props: ProjectResourcesViewProps) {
-  if (props.loading && !props.browser) {
-    return (
-      <div className="card"><div className="card-body d-flex align-items-center gap-3" role="status">
-        <span aria-hidden="true" className="spinner-border spinner-border-sm text-primary" />
-        <span>Loading project resources…</span>
-      </div></div>
-    );
-  }
-
-  if (props.errorMessage && !props.browser) {
-    return (
-      <div className="alert alert-danger" role="alert">
-        <h2 className="h5">Project resources could not be loaded</h2>
-        <p>{props.errorMessage}</p>
-        <button className="btn btn-outline-light btn-sm" onClick={props.onRetry} type="button">Retry</button>
-      </div>
-    );
-  }
-
-  if (!props.browser) {
-    return <div className="alert alert-warning" role="status">This project is not available in the latest projection.</div>;
-  }
-
-  const { activeLeases, project, resources } = props.browser;
-
-  return (
-    <div className="vstack gap-4">
-      {props.errorMessage ? (
-        <div className="alert alert-warning" role="alert">
-          The last available resource view remains visible. {props.errorMessage}
-          <button className="btn btn-outline-dark btn-sm ms-3" onClick={props.onRetry} type="button">Retry refresh</button>
-        </div>
-      ) : null}
-      {props.refreshing ? <div className="alert alert-info mb-0" role="status">Refreshing latest available resource facts…</div> : null}
-
-      <div aria-label="Resource summary" className="row g-3">
-        <div className="col-12 col-md-6"><div className="small-box text-bg-primary"><div className="inner"><h2>{resources.nodes.length}</h2><p>Resources on this page</p></div><span aria-hidden="true" className="small-box-icon"><i className="bi bi-files" /></span></div></div>
-        <div className="col-12 col-md-6"><div className="small-box text-bg-warning"><div className="inner"><h2>{activeLeases.nodes.length}</h2><p>Active leases on this page</p></div><span aria-hidden="true" className="small-box-icon"><i className="bi bi-lock" /></span></div></div>
-      </div>
-
-      <section aria-labelledby="resources-heading" className="card card-outline card-primary">
-        <div className="card-header"><h2 className="card-title" id="resources-heading">Resource inventory</h2></div>
-        <div className="card-body p-0"><div className="table-responsive">
-          <table aria-label="Project resources" className="table table-hover align-middle mb-0">
-            <thead className="table-light"><tr><th>Path</th><th>Kind</th><th>Lifecycle</th><th>Last transition</th></tr></thead>
-            <tbody>{resources.nodes.length === 0 ? <tr><td className="text-center py-4" colSpan={4}>No resources match these filters.</td></tr> : resources.nodes.map((resource) => (
-              <tr key={resource.id}>
-                <td><code>{resource.path}</code><div className="small text-body-secondary">{resource.id}</div></td>
-                <td>{resource.kind.toLowerCase()}</td>
-                <td><span className={`badge ${lifecycleBadgeClass(resource.lifecycleStatus)}`}>{resource.lifecycleStatus.toLowerCase()}</span>{resource.unbindingReason ? <div className="small mt-1">{resource.unbindingReason}</div> : null}</td>
-                <td className="text-nowrap">{formatted(resource.lastTransitionAt ?? resource.registeredAt)}</td>
-              </tr>
-            ))}</tbody>
-          </table>
-        </div></div>
-        {resources.pageInfo.hasNextPage && resources.pageInfo.endCursor ? <div className="card-footer"><button className="btn btn-outline-primary" onClick={() => props.onNextResources(resources.pageInfo.endCursor as string)} type="button">Next resources page</button></div> : null}
-      </section>
-
-      <section aria-labelledby="leases-heading" className="card card-outline card-warning">
-        <div className="card-header"><h2 className="card-title" id="leases-heading">Active resource leases</h2></div>
-        <div className="card-body p-0"><div className="table-responsive">
-          <table aria-label="Active resource leases" className="table table-hover align-middle mb-0">
-            <thead className="table-light"><tr><th>Resource</th><th>Owner</th><th>Coordination</th><th>Fence</th><th>Expires</th></tr></thead>
-            <tbody>{activeLeases.nodes.length === 0 ? <tr><td className="text-center py-4" colSpan={5}>No active lease facts are available.</td></tr> : activeLeases.nodes.map((lease) => (
-              <tr key={lease.id}>
-                <td><code>{lease.resourcePath}</code><div className="small text-body-secondary">{lease.resourceKind.toLowerCase()} · {lease.resourceId}</div></td>
-                <td><div className="fw-semibold">{lease.agentId}</div><code>{lease.attemptId}</code></td>
-                <td><div><code>{lease.workItemId}</code></div><div className="small text-body-secondary">{lease.changeSetId}</div></td>
-                <td><code>{lease.fencingToken}</code></td>
-                <td className="text-nowrap">{formatted(lease.expiresAt)}</td>
-              </tr>
-            ))}</tbody>
-          </table>
-        </div></div>
-        <div className="card-footer d-flex flex-wrap align-items-center justify-content-between gap-2">
-          <span className="small text-body-secondary">Active as of {formatted(activeLeases.asOf)}. Ownership is derived only from projected lease facts.</span>
-          {activeLeases.pageInfo.hasNextPage && activeLeases.pageInfo.endCursor ? <button className="btn btn-outline-warning" onClick={() => props.onNextActiveLeases(activeLeases.pageInfo.endCursor as string)} type="button">Next active leases page</button> : null}
-        </div>
-      </section>
-
-      <p className="small text-body-secondary mb-0">Viewing latest available projections for <strong>{project.name ?? project.id}</strong> in <code>{project.scope}</code>. Projection freshness never gates availability.</p>
-      <div className="d-flex flex-wrap gap-2">
-        <Link className="btn btn-outline-primary" to={`/projects/${project.id}/coordination`}>View coordination</Link>
-        <Link className="btn btn-outline-primary" to={`/projects/${project.id}/knowledge`}>View knowledge</Link>
-        <Link className="btn btn-outline-primary" to={`/projects/${project.id}/governance`}>View governance</Link>
-        <Link className="btn btn-outline-secondary" to={`/projects?scope=${encodeURIComponent(project.scope)}`}>Back to project catalog</Link>
-      </div>
-    </div>
-  );
 }

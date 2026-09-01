@@ -35,6 +35,10 @@ RSpec.describe "Projects UI shell", :read_model do
       %w[coordination resources knowledge governance delivery].map { "#{project_path}/#{_1}" } +
       [
         "#{project_path}/coordination/change-sets/CS-shell",
+        "#{project_path}/resources/inventory",
+        "#{project_path}/resources/inventory/018f0f4d-4e45-7abc-8def-000000000001",
+        "#{project_path}/resources/leases",
+        "#{project_path}/resources/leases/018f0f4d-4e45-7abc-8def-000000000002",
         "/audit/command-receipts",
         "/audit/command-receipts/CMD-shell",
         "/operations/batches",

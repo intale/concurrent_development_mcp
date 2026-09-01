@@ -3,7 +3,10 @@ module Coordinator
     module Web
       module Repositories
         class ProjectResources
-          def fetch: (ProjectResourcesQueryV1 query) -> ProjectResourcesV1?
+          def resources: (ProjectResourcesQueryV1::Collection query) -> ProjectResourcesV1::ResourcePage?
+          def resource: (ProjectResourcesQueryV1::Detail query, ResourceViewV1 view) -> ProjectResourcesV1::Resource?
+          def active_leases: (ProjectResourcesQueryV1::Collection query) -> ProjectResourcesV1::LeasePage?
+          def lease: (ProjectResourcesQueryV1::Detail query) -> ProjectResourcesV1::Lease?
         end
       end
     end

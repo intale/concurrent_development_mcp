@@ -1,34 +1,3 @@
-type ActiveResourceLease {
-  agentId: String!
-  attemptId: ID!
-  baseBlobOid: String
-  changeSetId: ID!
-  expiresAt: String!
-  fencingToken: String!
-  id: ID!
-  lastExpandedAt: String
-  lastExpandedEventId: ID
-  lastProjectedAt: String!
-  lastRenewedAt: String
-  lastRenewedEventId: ID
-  leaseSetId: ID!
-  policyVersion: String!
-  previousExpiresAt: String
-  reservedAt: String!
-  reservedEventId: ID!
-  resourceId: ID!
-  resourceKind: ResourceKind!
-  resourceLifecycleStatus: ResourceLifecycleStatus
-  resourcePath: String!
-  workItemId: ID!
-}
-
-type ActiveResourceLeaseConnection {
-  asOf: String!
-  nodes: [ActiveResourceLease!]!
-  pageInfo: PageInfo!
-}
-
 type AgentChoiceConnection {
   nodes: [GovernanceAgentChoice!]!
   pageInfo: PageInfo!
@@ -839,9 +808,13 @@ type ProjectResource {
   id: ID!
   kind: ResourceKind!
   lastTransitionAt: String
+  latestTransitionActorId: String
+  latestTransitionEventId: ID
   lifecycleStatus: ResourceLifecycleStatus!
   path: String!
+  registeredActorId: String
   registeredAt: String
+  registeredEventId: ID
   repositoryId: ID!
   unbindingReason: String
 }
@@ -849,12 +822,6 @@ type ProjectResource {
 type ProjectResourceConnection {
   nodes: [ProjectResource!]!
   pageInfo: PageInfo!
-}
-
-type ProjectResources {
-  activeLeases: ActiveResourceLeaseConnection!
-  project: CoordinationProject!
-  resources: ProjectResourceConnection!
 }
 
 type ProjectSkill {
@@ -915,6 +882,11 @@ type Query {
   Resolve one server-issued Project reference to its exact scope and Repository members.
   """
   project(projectRef: ID!, repositoriesAfter: String, repositoriesFirst: Int = 20): ProjectOverview
+
+  """
+  Page factual active Resource leases for the exact Project scope.
+  """
+  projectActiveResourceLeases(after: String, agentId: String, attemptId: ID, changeSetId: ID, first: Int = 20, projectRef: ID!, workItemId: ID): ResourceLeaseConnection
 
   """
   One project AgentChoice and its bounded decision-impact assessments.
@@ -987,9 +959,19 @@ type Query {
   projectReleaseSet(releaseSetId: ID!, repositoryId: ID!): ProjectReleaseSet
 
   """
-  Latest available resource inventory and factual active leases for one project.
+  Resolve one Resource only when its Repository belongs to the exact Project scope.
   """
-  projectResources(activeLeasesAfter: String, first: Int = 20, repositoryId: ID!, resourceKind: ResourceKind, resourceLifecycleStatus: ResourceLifecycleStatus, resourcesAfter: String): ProjectResources
+  projectResource(projectRef: ID!, resourceId: ID!): ProjectResource
+
+  """
+  Resolve one projected Resource lease, including released, terminal, or expired history.
+  """
+  projectResourceLease(leaseId: ID!, projectRef: ID!): ResourceLease
+
+  """
+  Page the latest available Resource inventory for the exact Project scope.
+  """
+  projectResources(after: String, first: Int = 20, path: String, projectRef: ID!, resourceKind: ResourceKind, resourceLifecycleStatus: ResourceLifecycleStatus): ProjectResourceConnection
 
   """
   Current projected revision of one Skill in a project's exact scope.
@@ -1059,6 +1041,50 @@ enum ReleaseSetStatus {
 enum ResourceKind {
   DIRECTORY
   FILE
+}
+
+type ResourceLease {
+  agentId: String!
+  attemptId: ID!
+  attemptTerminalAt: String
+  attemptTerminalEventId: ID
+  baseBlobOid: String
+  changeSetId: ID!
+  expiresAt: String!
+  fencingToken: String!
+  id: ID!
+  lastExpandedAt: String
+  lastExpandedEventId: ID
+  lastProjectedAt: String!
+  lastRenewedAt: String
+  lastRenewedEventId: ID
+  leaseSetId: ID!
+  policyVersion: String!
+  previousExpiresAt: String
+  releaseEventId: ID
+  releasedAt: String
+  repositoryId: ID!
+  reservedAt: String!
+  reservedEventId: ID!
+  resourceId: ID!
+  resourceKind: ResourceKind!
+  resourceLifecycleStatus: ResourceLifecycleStatus
+  resourcePath: String!
+  status: ResourceLeaseStatus!
+  workItemId: ID!
+}
+
+type ResourceLeaseConnection {
+  asOf: String!
+  nodes: [ResourceLease!]!
+  pageInfo: PageInfo!
+}
+
+enum ResourceLeaseStatus {
+  ACTIVE
+  ATTEMPT_TERMINAL
+  EXPIRED
+  RELEASED
 }
 
 enum ResourceLifecycleStatus {

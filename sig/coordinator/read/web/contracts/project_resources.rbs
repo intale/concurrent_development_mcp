@@ -2,7 +2,17 @@ module Coordinator
   module Read
     module Web
       module Contracts
-        class ProjectResources < Dry::Validation::Contract
+        class ProjectResources
+          RESOURCE_KINDS: Array[String]
+          RESOURCE_LIFECYCLES: Array[String]
+          COLLECTION_KINDS: Array[String]
+          DETAIL_KINDS: Array[String]
+
+          class Collection < Dry::Validation::Contract
+          end
+
+          class Detail < Dry::Validation::Contract
+          end
         end
       end
     end

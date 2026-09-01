@@ -3,32 +3,78 @@
 module Coordinator::Read::Web::Queries
   class ProjectResources
     def initialize(
-      contract: Coordinator::Read::Web::Contracts::ProjectResources.new,
+      collection_contract: Coordinator::Read::Web::Contracts::ProjectResources::Collection.new,
+      detail_contract: Coordinator::Read::Web::Contracts::ProjectResources::Detail.new,
       repository: Coordinator::Read::Web::Repositories::ProjectResources.new,
+      resource_get: Coordinator::Read::Queries::ResourceGet.new,
+      project_reference: Coordinator::Read::Web::ProjectReference.new,
       clock: Coordinator::Shared::SystemClock.new
     )
-      @contract = contract
+      @collection_contract = collection_contract
+      @detail_contract = detail_contract
       @repository = repository
+      @resource_get = resource_get
+      @project_reference = project_reference
       @clock = clock
     end
 
-    def call(input)
-      validated = @contract.call(input.merge(lease_as_of: input[:lease_as_of] || @clock.now))
-      if validated.failure?
-        raise Coordinator::Read::Web::ProjectResourcesQueryError, validated.errors.to_h
-      end
+    def resources(input)
+      @repository.resources(collection_query(input.merge(kind: "resources")))
+    end
 
-      @repository.fetch(
-        Coordinator::Read::Web::ProjectResourcesQueryV1.new(
-          repository_id: validated[:repository_id],
-          first: validated[:first] || 20,
-          resource_after_id: validated[:resource_after_id],
-          lease_after_id: validated[:lease_after_id],
-          lease_as_of: validated[:lease_as_of],
-          resource_kind: validated[:resource_kind],
-          resource_lifecycle_status: validated[:resource_lifecycle_status]
-        )
+    def resource(input)
+      query = detail_query(input.merge(kind: "resource"))
+      result = @resource_get.call(resource_id: query.id).value!
+      return unless result.status == "ok"
+
+      @repository.resource(query, result.data.resource)
+    end
+
+    def active_leases(input)
+      @repository.active_leases(collection_query(input.merge(kind: "active_leases")))
+    end
+
+    def lease(input)
+      @repository.lease(detail_query(input.merge(kind: "lease")))
+    end
+
+    private
+
+    def collection_query(input)
+      validated = @collection_contract.call(input.merge(as_of: input[:as_of] || @clock.now))
+      raise_query_error(validated) if validated.failure?
+
+      values = validated.to_h
+      project_ref = values.fetch(:project_ref)
+      Coordinator::Read::Web::ProjectResourcesQueryV1::Collection.new(
+        **values,
+        scope: @project_reference.decode(project_ref),
+        first: values[:first] || 20,
+        after_id: values[:after_id],
+        path: values[:path],
+        resource_kind: values[:resource_kind],
+        resource_lifecycle_status: values[:resource_lifecycle_status],
+        agent_id: values[:agent_id],
+        change_set_id: values[:change_set_id],
+        work_item_id: values[:work_item_id],
+        attempt_id: values[:attempt_id]
       )
+    end
+
+    def detail_query(input)
+      validated = @detail_contract.call(input.merge(as_of: input[:as_of] || @clock.now))
+      raise_query_error(validated) if validated.failure?
+
+      values = validated.to_h
+      project_ref = values.fetch(:project_ref)
+      Coordinator::Read::Web::ProjectResourcesQueryV1::Detail.new(
+        **values,
+        scope: @project_reference.decode(project_ref)
+      )
+    end
+
+    def raise_query_error(result)
+      raise Coordinator::Read::Web::ProjectResourcesQueryError, result.errors.to_h
     end
   end
 end

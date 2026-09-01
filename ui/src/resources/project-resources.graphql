@@ -1,70 +1,102 @@
+fragment ProjectResourceFields on ProjectResource {
+  id
+  repositoryId
+  kind
+  path
+  lifecycleStatus
+  unbindingReason
+  registeredEventId
+  registeredActorId
+  registeredAt
+  latestTransitionEventId
+  latestTransitionActorId
+  lastTransitionAt
+}
+
+fragment ResourceLeaseFields on ResourceLease {
+  id
+  leaseSetId
+  resourceId
+  repositoryId
+  resourceKind
+  resourcePath
+  resourceLifecycleStatus
+  status
+  baseBlobOid
+  fencingToken
+  policyVersion
+  changeSetId
+  workItemId
+  attemptId
+  agentId
+  reservedEventId
+  lastExpandedEventId
+  lastRenewedEventId
+  releaseEventId
+  attemptTerminalEventId
+  reservedAt
+  lastExpandedAt
+  lastRenewedAt
+  previousExpiresAt
+  expiresAt
+  releasedAt
+  attemptTerminalAt
+  lastProjectedAt
+}
+
 query ProjectResources(
-  $repositoryId: ID!
+  $projectRef: ID!
   $first: Int
-  $resourcesAfter: String
-  $activeLeasesAfter: String
+  $after: String
+  $path: String
   $resourceKind: ResourceKind
   $resourceLifecycleStatus: ResourceLifecycleStatus
 ) {
   projectResources(
-    repositoryId: $repositoryId
+    projectRef: $projectRef
     first: $first
-    resourcesAfter: $resourcesAfter
-    activeLeasesAfter: $activeLeasesAfter
+    after: $after
+    path: $path
     resourceKind: $resourceKind
     resourceLifecycleStatus: $resourceLifecycleStatus
   ) {
-    project {
-      id
-      name
-      scope
-    }
-    resources {
-      nodes {
-        id
-        repositoryId
-        kind
-        path
-        lifecycleStatus
-        unbindingReason
-        registeredAt
-        lastTransitionAt
-      }
-      pageInfo {
-        endCursor
-        hasNextPage
-      }
-    }
-    activeLeases {
-      asOf
-      nodes {
-        id
-        leaseSetId
-        resourceId
-        resourceKind
-        resourcePath
-        resourceLifecycleStatus
-        baseBlobOid
-        fencingToken
-        policyVersion
-        changeSetId
-        workItemId
-        attemptId
-        agentId
-        reservedEventId
-        lastExpandedEventId
-        lastRenewedEventId
-        reservedAt
-        lastExpandedAt
-        lastRenewedAt
-        previousExpiresAt
-        expiresAt
-        lastProjectedAt
-      }
-      pageInfo {
-        endCursor
-        hasNextPage
-      }
-    }
+    nodes { ...ProjectResourceFields }
+    pageInfo { endCursor hasNextPage }
+  }
+}
+
+query ProjectResource($projectRef: ID!, $resourceId: ID!) {
+  projectResource(projectRef: $projectRef, resourceId: $resourceId) {
+    ...ProjectResourceFields
+  }
+}
+
+query ProjectActiveResourceLeases(
+  $projectRef: ID!
+  $first: Int
+  $after: String
+  $agentId: String
+  $changeSetId: ID
+  $workItemId: ID
+  $attemptId: ID
+) {
+  projectActiveResourceLeases(
+    projectRef: $projectRef
+    first: $first
+    after: $after
+    agentId: $agentId
+    changeSetId: $changeSetId
+    workItemId: $workItemId
+    attemptId: $attemptId
+  ) {
+    asOf
+    nodes { ...ResourceLeaseFields }
+    pageInfo { endCursor hasNextPage }
+  }
+}
+
+query ProjectResourceLease($projectRef: ID!, $leaseId: ID!) {
+  projectResourceLease(projectRef: $projectRef, leaseId: $leaseId) {
+    ...ResourceLeaseFields
   }
 }

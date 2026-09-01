@@ -4,11 +4,17 @@ module Coordinator
       module Queries
         class ProjectResources
           def initialize: (
-            ?contract: Contracts::ProjectResources,
+            ?collection_contract: Contracts::ProjectResources::Collection,
+            ?detail_contract: Contracts::ProjectResources::Detail,
             ?repository: Repositories::ProjectResources,
+            ?resource_get: Read::Queries::ResourceGet,
+            ?project_reference: ProjectReference,
             ?clock: Shared::_Clock
           ) -> void
-          def call: (command_input input) -> ProjectResourcesV1?
+          def resources: (command_input input) -> ProjectResourcesV1::ResourcePage?
+          def resource: (command_input input) -> ProjectResourcesV1::Resource?
+          def active_leases: (command_input input) -> ProjectResourcesV1::LeasePage?
+          def lease: (command_input input) -> ProjectResourcesV1::Lease?
         end
       end
     end
