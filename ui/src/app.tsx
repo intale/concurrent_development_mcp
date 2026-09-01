@@ -15,10 +15,15 @@ import {
   ProjectGovernanceGuidancePage,
   ProjectGovernanceImpactsPage
 } from "./governance/project-governance-page.js";
+import {
+  ProjectDeliveryCandidatesPage,
+  ProjectDeliveryMergesPage,
+  ProjectDeliveryObligationsPage,
+  ProjectDeliveryReleasesPage
+} from "./delivery/project-delivery-page.js";
 import { OperationBatchesPage } from "./operations/operation-batches-page.js";
 import { ProjectCatalogPage } from "./projects/project-catalog-page.js";
 import { ProjectOverviewPage } from "./projects/project-overview-page.js";
-import { ProjectSectionPlaceholder } from "./projects/project-section-placeholder.js";
 import { ProjectWorkspaceShell } from "./projects/project-workspace-shell.js";
 import {
   ProjectResourceInventoryPage,
@@ -157,15 +162,15 @@ export function App() {
             <Route path="governance/choices/:choiceId" element={<ProjectGovernanceChoicesPage />} />
             <Route path="governance/impacts" element={<ProjectGovernanceImpactsPage />} />
             <Route path="governance/impacts/:assessmentId" element={<ProjectGovernanceImpactsPage />} />
-            <Route
-              path="delivery"
-              element={(
-                <ProjectSectionPlaceholder
-                  description="Project Candidates, verification, merge evidence, and releases belong in focused Delivery routes."
-                  title="Delivery"
-                />
-              )}
-            />
+            <Route path="delivery" element={<Navigate replace to="candidates" />} />
+            <Route path="delivery/candidates" element={<ProjectDeliveryCandidatesPage />} />
+            <Route path="delivery/candidates/:candidateId" element={<ProjectDeliveryCandidatesPage />} />
+            <Route path="delivery/obligations" element={<ProjectDeliveryObligationsPage />} />
+            <Route path="delivery/obligations/:obligationId" element={<ProjectDeliveryObligationsPage />} />
+            <Route path="delivery/merge-snapshots" element={<ProjectDeliveryMergesPage />} />
+            <Route path="delivery/merge-snapshots/:mergeSnapshotId" element={<ProjectDeliveryMergesPage />} />
+            <Route path="delivery/release-sets" element={<ProjectDeliveryReleasesPage />} />
+            <Route path="delivery/release-sets/:releaseSetId" element={<ProjectDeliveryReleasesPage />} />
           </Route>
           <Route path="*" element={<Navigate replace to="/projects" />} />
         </Routes>

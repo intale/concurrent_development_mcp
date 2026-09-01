@@ -2,12 +2,6 @@
 
 module Coordinator::Read::Web
   class DeliveryBrowserV1
-    class Project < Coordinator::Shared::Value
-      attribute :repository_id, Coordinator::Shared::Types::UuidV7
-      attribute :scope, Coordinator::Shared::Types::String
-      attribute :display_name, Coordinator::Shared::Types::String.optional
-    end
-
     class TimelineCursor < Coordinator::Shared::Value
       attribute :position, Coordinator::Shared::Types::GlobalPosition
       attribute :id, Coordinator::Shared::Types::Identifier
@@ -185,22 +179,12 @@ module Coordinator::Read::Web
       attribute :has_more, Coordinator::Shared::Types::Strict::Bool
     end
 
-    class Catalog < Coordinator::Shared::Value
-      attribute :project, Project
-      attribute :candidates, CandidatePage
-      attribute :obligations, VerificationPage
-      attribute :merge_snapshots, MergePage
-      attribute :release_sets, ReleasePage
-    end
-
     class CandidateDetail < Coordinator::Shared::Value
-      attribute :project, Project
       attribute :candidate, Coordinator::Read::CandidateViewV1
       attribute :impacts, Coordinator::Read::CandidateImpactPageV1
     end
 
     class VerificationDetail < Coordinator::Shared::Value
-      attribute :project, Project
       attribute :obligation, VerificationSummary
       attribute :required_evidence, Coordinator::Shared::Types::Array.of(Coordinator::Shared::Types::String)
       attribute :reasons, Coordinator::Shared::Types::Array.of(VerificationReason)
@@ -208,14 +192,12 @@ module Coordinator::Read::Web
     end
 
     class MergeDetail < Coordinator::Shared::Value
-      attribute :project, Project
       attribute :snapshot, MergeSummary
       attribute :candidates, Coordinator::Shared::Types::Array.of(MergeCandidate)
       attribute :authorizations, AuthorizationPage
     end
 
     class ReleaseDetail < Coordinator::Shared::Value
-      attribute :project, Project
       attribute :release_set, ReleaseSummary
       attribute :members, Coordinator::Shared::Types::Array.of(ReleaseMember)
       attribute :integrations, Coordinator::Shared::Types::Array.of(ReleaseIntegration)

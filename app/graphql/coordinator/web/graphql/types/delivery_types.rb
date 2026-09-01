@@ -146,7 +146,6 @@ module Coordinator::Web::Graphql::Types
       graphql_name "ProjectVerificationObligation"
       field :evidence, VerificationEvidenceConnectionType, null: false, connection: false
       field :obligation, VerificationObligationType, null: false
-      field :project, CoordinationProjectType, null: false
       field :reasons, [ VerificationReasonType ], null: false
       field :required_evidence, [ String ], null: false
     end
@@ -203,7 +202,6 @@ module Coordinator::Web::Graphql::Types
       graphql_name "ProjectMergeSnapshot"
       field :authorizations, MergeAuthorizationConnectionType, null: false, connection: false
       field :candidates, [ MergeCandidateType ], null: false
-      field :project, CoordinationProjectType, null: false
       field :snapshot, MergeSnapshotType, null: false
     end
 
@@ -253,7 +251,6 @@ module Coordinator::Web::Graphql::Types
       field :completion_outcome, String, null: true
       field :integrations, [ ReleaseIntegrationType ], null: false
       field :members, [ ReleaseMemberType ], null: false
-      field :project, CoordinationProjectType, null: false
       field :release_set, ReleaseSetType, null: false
       field :verification_attempt_count, Integer, null: false
     end
@@ -283,16 +280,6 @@ module Coordinator::Web::Graphql::Types
       field :impact_direction, CandidateImpactDirectionEnum, null: false
       field :impact_relationships, CandidateImpactConnectionType, null: false, connection: false
       field :impact_surface_digest, String, null: true
-      field :project, CoordinationProjectType, null: false
-    end
-
-    class ProjectDeliveryType < BaseObject
-      graphql_name "ProjectDelivery"
-      field :candidates, CandidateCheckpointConnectionType, null: false, connection: false
-      field :merge_snapshots, MergeSnapshotConnectionType, null: false, connection: false
-      field :obligations, VerificationObligationConnectionType, null: false, connection: false
-      field :project, CoordinationProjectType, null: false
-      field :release_sets, ReleaseSetConnectionType, null: false, connection: false
     end
 
     class OperationBatchType < BaseObject

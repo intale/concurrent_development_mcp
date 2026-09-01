@@ -2,12 +2,6 @@ module Coordinator
   module Read
     module Web
       class DeliveryBrowserV1
-        class Project < Shared::Value
-          def repository_id: () -> String
-          def scope: () -> String
-          def display_name: () -> String?
-        end
-
         class TimelineCursor < Shared::Value
           def position: () -> Integer
           def id: () -> String
@@ -183,22 +177,12 @@ module Coordinator
           def has_more: () -> bool
         end
 
-        class Catalog < Shared::Value
-          def project: () -> Project
-          def candidates: () -> CandidatePage
-          def obligations: () -> VerificationPage
-          def merge_snapshots: () -> MergePage
-          def release_sets: () -> ReleasePage
-        end
-
         class CandidateDetail < Shared::Value
-          def project: () -> Project
           def candidate: () -> Read::CandidateViewV1
           def impacts: () -> Read::CandidateImpactPageV1
         end
 
         class VerificationDetail < Shared::Value
-          def project: () -> Project
           def obligation: () -> VerificationSummary
           def required_evidence: () -> Array[String]
           def reasons: () -> Array[VerificationReason]
@@ -206,14 +190,12 @@ module Coordinator
         end
 
         class MergeDetail < Shared::Value
-          def project: () -> Project
           def snapshot: () -> MergeSummary
           def candidates: () -> Array[MergeCandidate]
           def authorizations: () -> AuthorizationPage
         end
 
         class ReleaseDetail < Shared::Value
-          def project: () -> Project
           def release_set: () -> ReleaseSummary
           def members: () -> Array[ReleaseMember]
           def integrations: () -> Array[ReleaseIntegration]

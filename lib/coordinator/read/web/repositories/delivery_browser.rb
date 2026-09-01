@@ -10,26 +10,43 @@ module Coordinator::Read::Web::Repositories
       @candidate_impacts = candidate_impacts
     end
 
-    def catalog(query)
-      project = find_project(query.repository_id)
-      return unless project
+    def candidates(query)
+      repository_ids = project_repository_ids(query.project_scope)
+      return unless repository_ids
 
-      Coordinator::Read::Web::DeliveryBrowserV1::Catalog.new(
-        project: build_project(project),
-        candidates: candidate_page(query),
-        obligations: verification_page(query),
-        merge_snapshots: merge_page(query),
-        release_sets: release_page(query)
-      )
+      candidate_page(query, repository_ids)
+    end
+
+    def obligations(query)
+      repository_ids = project_repository_ids(query.project_scope)
+      return unless repository_ids
+
+      verification_page(query, repository_ids)
+    end
+
+    def merges(query)
+      repository_ids = project_repository_ids(query.project_scope)
+      return unless repository_ids
+
+      merge_page(query, repository_ids)
+    end
+
+    def releases(query)
+      repository_ids = project_repository_ids(query.project_scope)
+      return unless repository_ids
+
+      release_page(query, repository_ids)
     end
 
     def candidate(query)
-      project = find_project(query.repository_id)
+      repository_ids = project_repository_ids(query.project_scope)
+      return unless repository_ids
+
       record = Coordinator::Read::Candidate.find_by(
-        repository_id: query.repository_id,
+        repository_id: repository_ids,
         candidate_id: query.candidate_id
       )
-      return unless project && record
+      return unless record
 
       impacts = @candidate_impacts.page(
         Coordinator::Read::CandidateImpactGetQueryV1.new(
@@ -40,21 +57,21 @@ module Coordinator::Read::Web::Repositories
         )
       )
       Coordinator::Read::Web::DeliveryBrowserV1::CandidateDetail.new(
-        project: build_project(project),
         candidate: @candidates.fetch(query.candidate_id),
         impacts:
       )
     end
 
     def verification(query)
-      project = find_project(query.repository_id)
-      record = verification_for_repository(query.repository_id)
+      repository_ids = project_repository_ids(query.project_scope)
+      return unless repository_ids
+
+      record = verification_for_project(repository_ids)
         .find_by(obligation_id: query.obligation_id)
-      return unless project && record
+      return unless record
 
       obligation = record.obligation
       Coordinator::Read::Web::DeliveryBrowserV1::VerificationDetail.new(
-        project: build_project(project),
         obligation: build_verification_summary(record),
         required_evidence: obligation.fetch("required_evidence"),
         reasons: obligation.fetch("reasons").map do |reason|
@@ -68,15 +85,16 @@ module Coordinator::Read::Web::Repositories
     end
 
     def merge(query)
-      project = find_project(query.repository_id)
+      repository_ids = project_repository_ids(query.project_scope)
+      return unless repository_ids
+
       record = Coordinator::Read::MergeSnapshot.find_by(
-        repository_id: query.repository_id,
+        repository_id: repository_ids,
         merge_snapshot_id: query.merge_snapshot_id
       )
-      return unless project && record
+      return unless record
 
       Coordinator::Read::Web::DeliveryBrowserV1::MergeDetail.new(
-        project: build_project(project),
         snapshot: build_merge_summary(record),
         candidates: record.ordered_candidates.map { build_merge_candidate(_1) },
         authorizations: authorization_page(record, query)
@@ -84,13 +102,14 @@ module Coordinator::Read::Web::Repositories
     end
 
     def release(query)
-      project = find_project(query.repository_id)
-      record = release_for_repository(query.repository_id)
+      repository_ids = project_repository_ids(query.project_scope)
+      return unless repository_ids
+
+      record = release_for_project(repository_ids)
         .find_by(release_set_id: query.release_set_id)
-      return unless project && record
+      return unless record
 
       Coordinator::Read::Web::DeliveryBrowserV1::ReleaseDetail.new(
-        project: build_project(project),
         release_set: build_release_summary(record),
         members: record.ordered_members.map { build_release_member(_1) },
         integrations: record.integrations.map { build_release_integration(_1) },
@@ -151,30 +170,21 @@ module Coordinator::Read::Web::Repositories
 
     private
 
-    def find_project(repository_id)
-      Coordinator::Read::Repository.find_by(repository_id:)
+    def project_repository_ids(project_scope)
+      ids = Coordinator::Read::Repository.where(scope: project_scope).order(:repository_id).pluck(:repository_id)
+      ids unless ids.empty?
     end
 
-    def build_project(record)
-      Coordinator::Read::Web::DeliveryBrowserV1::Project.new(
-        repository_id: record.repository_id,
-        scope: record.scope,
-        display_name: record.display_name
-      )
-    end
-
-    def candidate_page(query)
-      relation = Coordinator::Read::Candidate.where(repository_id: query.repository_id)
-      relation = relation.where(change_set_id: query.candidate_change_set_id) if query.candidate_change_set_id
-      if query.candidate_checkpoint_kind
-        relation = relation.where(checkpoint_kind: query.candidate_checkpoint_kind)
-      end
+    def candidate_page(query, repository_ids)
+      relation = Coordinator::Read::Candidate.where(repository_id: repository_ids)
+      relation = relation.where(change_set_id: query.change_set_id) if query.change_set_id
+      relation = relation.where(checkpoint_kind: query.checkpoint_kind) if query.checkpoint_kind
       rows, has_more = timeline_rows(
         relation:,
         position_column: :submitted_global_position,
         id_column: :candidate_id,
-        after_position: query.candidate_after_position,
-        after_id: query.candidate_after_id,
+        after_position: query.after_position,
+        after_id: query.after_id,
         sort: query.sort,
         limit: query.first
       )
@@ -186,16 +196,16 @@ module Coordinator::Read::Web::Repositories
       )
     end
 
-    def verification_page(query)
-      relation = verification_for_repository(query.repository_id)
-      relation = relation.where(change_set_id: query.obligation_change_set_id) if query.obligation_change_set_id
-      relation = relation.where(status: query.obligation_status) if query.obligation_status
+    def verification_page(query, repository_ids)
+      relation = verification_for_project(repository_ids)
+      relation = relation.where(change_set_id: query.change_set_id) if query.change_set_id
+      relation = relation.where(status: query.status) if query.status
       rows, has_more = timeline_rows(
         relation:,
         position_column: :event_global_position,
         id_column: :obligation_id,
-        after_position: query.obligation_after_position,
-        after_id: query.obligation_after_id,
+        after_position: query.after_position,
+        after_id: query.after_id,
         sort: query.sort,
         limit: query.first
       )
@@ -206,13 +216,13 @@ module Coordinator::Read::Web::Repositories
       )
     end
 
-    def merge_page(query)
+    def merge_page(query, repository_ids)
       rows, has_more = timeline_rows(
-        relation: Coordinator::Read::MergeSnapshot.where(repository_id: query.repository_id),
+        relation: Coordinator::Read::MergeSnapshot.where(repository_id: repository_ids),
         position_column: :registered_global_position,
         id_column: :merge_snapshot_id,
-        after_position: query.merge_after_position,
-        after_id: query.merge_after_id,
+        after_position: query.after_position,
+        after_id: query.after_id,
         sort: query.sort,
         limit: query.first
       )
@@ -223,16 +233,16 @@ module Coordinator::Read::Web::Repositories
       )
     end
 
-    def release_page(query)
-      relation = release_for_repository(query.repository_id)
-      relation = relation.where(change_set_id: query.release_change_set_id) if query.release_change_set_id
-      relation = relation.where(status: query.release_status) if query.release_status
+    def release_page(query, repository_ids)
+      relation = release_for_project(repository_ids)
+      relation = relation.where(change_set_id: query.change_set_id) if query.change_set_id
+      relation = relation.where(status: query.status) if query.status
       rows, has_more = timeline_rows(
         relation:,
         position_column: :prepared_global_position,
         id_column: :release_set_id,
-        after_position: query.release_after_position,
-        after_id: query.release_after_id,
+        after_position: query.after_position,
+        after_id: query.after_id,
         sort: query.sort,
         limit: query.first
       )
@@ -243,23 +253,23 @@ module Coordinator::Read::Web::Repositories
       )
     end
 
-    def verification_for_repository(repository_id)
+    def verification_for_project(repository_ids)
       Coordinator::Read::VerificationObligation.where(
-        "source_repository_id = :repository_id OR target_repository_id = :repository_id",
-        repository_id:
+        "source_repository_id IN (:repository_ids) OR target_repository_id IN (:repository_ids)",
+        repository_ids:
       )
     end
 
-    def release_for_repository(repository_id)
+    def release_for_project(repository_ids)
       Coordinator::Read::ReleaseSet.where(
         <<~SQL.squish,
           EXISTS (
             SELECT 1
             FROM jsonb_array_elements(release_sets.ordered_members) AS member
-            WHERE member ->> 'repository_id' = ?
+            WHERE member ->> 'repository_id' IN (?)
           )
         SQL
-        repository_id
+        repository_ids
       )
     end
 

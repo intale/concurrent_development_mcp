@@ -4,16 +4,23 @@ module Coordinator
       module Queries
         class DeliveryBrowser
           def initialize: (
-            ?catalog_contract: Contracts::DeliveryBrowser::Catalog,
+            ?candidates_contract: Contracts::DeliveryBrowser::Candidates,
+            ?obligations_contract: Contracts::DeliveryBrowser::Obligations,
+            ?merges_contract: Contracts::DeliveryBrowser::Merges,
+            ?releases_contract: Contracts::DeliveryBrowser::Releases,
             ?candidate_contract: Contracts::DeliveryBrowser::Candidate,
             ?verification_contract: Contracts::DeliveryBrowser::Verification,
             ?merge_contract: Contracts::DeliveryBrowser::Merge,
             ?release_contract: Contracts::DeliveryBrowser::Release,
             ?batches_contract: Contracts::DeliveryBrowser::Batches,
             ?batch_contract: Contracts::DeliveryBrowser::Batch,
+            ?project_reference: ProjectReference,
             ?repository: Repositories::DeliveryBrowser
           ) -> void
-          def catalog: (command_input input) -> DeliveryBrowserV1::Catalog?
+          def candidates: (command_input input) -> DeliveryBrowserV1::CandidatePage?
+          def obligations: (command_input input) -> DeliveryBrowserV1::VerificationPage?
+          def merges: (command_input input) -> DeliveryBrowserV1::MergePage?
+          def releases: (command_input input) -> DeliveryBrowserV1::ReleasePage?
           def candidate: (command_input input) -> DeliveryBrowserV1::CandidateDetail?
           def verification: (command_input input) -> DeliveryBrowserV1::VerificationDetail?
           def merge: (command_input input) -> DeliveryBrowserV1::MergeDetail?
@@ -23,6 +30,7 @@ module Coordinator
 
           private
 
+          def project_scope: (untyped values) -> String
           def validate: (Dry::Validation::Contract contract, command_input input) -> untyped
         end
       end

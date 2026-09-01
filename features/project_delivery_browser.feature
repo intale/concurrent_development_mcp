@@ -1,21 +1,21 @@
-Feature: Inspect checkpointed delivery and global operation batches
-  The read-only browser presents latest delivery projections without becoming write authority.
+Feature: Inspect focused checkpointed delivery views
+  The read-only browser exposes independent Project collections and details without becoming write authority.
 
   Rule: Project attribution comes only from persisted coordination relationships
 
     @UI-GWT-16
-    Scenario: Candidates, obligations, merge snapshots, and ReleaseSets stay within the exact project
-      Given projected delivery rows contain exact and unrelated project facts
-      When the browser queries the projected project delivery
-      Then only delivery facts with persisted relationships to the exact project are presented
+    Scenario: Every focused delivery collection covers all exact Project members
+      Given a projected Project has delivery facts in two member Repositories and an unrelated Repository
+      When the browser queries each focused delivery collection
+      Then Candidates, obligations, merge snapshots, and ReleaseSets stay within the exact Project
 
-  Rule: Delivery detail remains semantic and typed
+  Rule: Nested evidence has its own bounded detail route
 
     @UI-GWT-17
-    Scenario: Verification evidence and merge authorization decisions are navigable
-      Given projected delivery rows contain verification evidence and merge authorization history
-      When the browser queries the related delivery details
-      Then typed evidence and authorization facts are presented without normalized support rows
+    Scenario: Candidate impacts, verification evidence, and merge authorizations page independently
+      Given projected delivery details contain multiple supporting facts
+      When the browser queries each focused delivery detail with a one-item evidence page
+      Then every detail stays typed and advertises only its own next evidence page
 
   Rule: Operation batches remain global
 

@@ -7,7 +7,10 @@ module Coordinator
             ?candidates: Read::Repositories::Candidates,
             ?candidate_impacts: Read::Repositories::CandidateImpacts
           ) -> void
-          def catalog: (DeliveryBrowserQueryV1::Catalog query) -> DeliveryBrowserV1::Catalog?
+          def candidates: (DeliveryBrowserQueryV1::Candidates query) -> DeliveryBrowserV1::CandidatePage?
+          def obligations: (DeliveryBrowserQueryV1::Obligations query) -> DeliveryBrowserV1::VerificationPage?
+          def merges: (DeliveryBrowserQueryV1::Merges query) -> DeliveryBrowserV1::MergePage?
+          def releases: (DeliveryBrowserQueryV1::Releases query) -> DeliveryBrowserV1::ReleasePage?
           def candidate: (DeliveryBrowserQueryV1::Candidate query) -> DeliveryBrowserV1::CandidateDetail?
           def verification: (DeliveryBrowserQueryV1::Verification query) -> DeliveryBrowserV1::VerificationDetail?
           def merge: (DeliveryBrowserQueryV1::Merge query) -> DeliveryBrowserV1::MergeDetail?
@@ -17,14 +20,13 @@ module Coordinator
 
           private
 
-          def find_project: (String repository_id) -> Read::Repository?
-          def build_project: (Read::Repository record) -> DeliveryBrowserV1::Project
-          def candidate_page: (DeliveryBrowserQueryV1::Catalog query) -> DeliveryBrowserV1::CandidatePage
-          def verification_page: (DeliveryBrowserQueryV1::Catalog query) -> DeliveryBrowserV1::VerificationPage
-          def merge_page: (DeliveryBrowserQueryV1::Catalog query) -> DeliveryBrowserV1::MergePage
-          def release_page: (DeliveryBrowserQueryV1::Catalog query) -> DeliveryBrowserV1::ReleasePage
-          def verification_for_repository: (String repository_id) -> ActiveRecord::Relation
-          def release_for_repository: (String repository_id) -> ActiveRecord::Relation
+          def project_repository_ids: (String project_scope) -> Array[String]?
+          def candidate_page: (DeliveryBrowserQueryV1::Candidates query, Array[String] repository_ids) -> DeliveryBrowserV1::CandidatePage
+          def verification_page: (DeliveryBrowserQueryV1::Obligations query, Array[String] repository_ids) -> DeliveryBrowserV1::VerificationPage
+          def merge_page: (DeliveryBrowserQueryV1::Merges query, Array[String] repository_ids) -> DeliveryBrowserV1::MergePage
+          def release_page: (DeliveryBrowserQueryV1::Releases query, Array[String] repository_ids) -> DeliveryBrowserV1::ReleasePage
+          def verification_for_project: (Array[String] repository_ids) -> ActiveRecord::Relation
+          def release_for_project: (Array[String] repository_ids) -> ActiveRecord::Relation
           def evidence_page: (Read::VerificationObligation record, DeliveryBrowserQueryV1::Verification query) -> DeliveryBrowserV1::EvidencePage
           def authorization_page: (Read::MergeSnapshot record, DeliveryBrowserQueryV1::Merge query) -> DeliveryBrowserV1::AuthorizationPage
           def timeline_rows: (**untyped) -> [Array[untyped], bool]

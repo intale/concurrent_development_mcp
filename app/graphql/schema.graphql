@@ -215,12 +215,6 @@ enum CoordinationPresentationStatus {
   RUNNING
 }
 
-type CoordinationProject {
-  id: ID!
-  name: String
-  scope: String!
-}
-
 type CoordinationRequiredOutput {
   key: String!
   kind: String!
@@ -704,7 +698,6 @@ type ProjectCandidateCheckpoint {
   impactDirection: CandidateImpactDirection!
   impactRelationships: CandidateImpactConnection!
   impactSurfaceDigest: String
-  project: CoordinationProject!
 }
 
 """
@@ -718,14 +711,6 @@ type ProjectConnection {
 type ProjectDecision {
   decision: GovernanceDecision!
   membershipBases: [String!]!
-}
-
-type ProjectDelivery {
-  candidates: CandidateCheckpointConnection!
-  mergeSnapshots: MergeSnapshotConnection!
-  obligations: VerificationObligationConnection!
-  project: CoordinationProject!
-  releaseSets: ReleaseSetConnection!
 }
 
 type ProjectGuidance {
@@ -748,7 +733,6 @@ type ProjectGuidanceDetail {
 type ProjectMergeSnapshot {
   authorizations: MergeAuthorizationConnection!
   candidates: [MergeCandidate!]!
-  project: CoordinationProject!
   snapshot: DeliveryMergeSnapshot!
 }
 
@@ -769,7 +753,6 @@ type ProjectReleaseSet {
   completionOutcome: String
   integrations: [ReleaseIntegration!]!
   members: [ReleaseMember!]!
-  project: CoordinationProject!
   releaseSet: DeliveryReleaseSet!
   verificationAttemptCount: Int!
 }
@@ -837,7 +820,6 @@ enum ProjectSort {
 type ProjectVerificationObligation {
   evidence: VerificationEvidenceConnection!
   obligation: DeliveryVerificationObligation!
-  project: CoordinationProject!
   reasons: [VerificationReason!]!
   requiredEvidence: [String!]!
 }
@@ -904,7 +886,12 @@ type Query {
   """
   One project Candidate checkpoint and one bounded semantic impact direction.
   """
-  projectCandidateCheckpoint(candidateId: ID!, direction: CandidateImpactDirection = OUTGOING, first: Int = 20, impactsAfter: String, repositoryId: ID!): ProjectCandidateCheckpoint
+  projectCandidateCheckpoint(candidateId: ID!, direction: CandidateImpactDirection = OUTGOING, first: Int = 20, impactsAfter: String, projectRef: ID!): ProjectCandidateCheckpoint
+
+  """
+  Page Candidate checkpoints submitted by any Repository member of the exact Project scope.
+  """
+  projectCandidateCheckpoints(after: String, changeSetId: ID, checkpointKind: CandidateCheckpointKind, first: Int = 20, projectRef: ID!, sort: DeliverySort = NEWEST_FIRST): CandidateCheckpointConnection
 
   """
   Resolve one ChangeSet only when it belongs to the exact Project scope.
@@ -937,11 +924,6 @@ type Query {
   projectDecisions(after: String, first: Int = 20, policyStatus: DecisionPolicyStatus, projectRef: ID!, topicId: String): GovernanceDecisionConnection
 
   """
-  Latest project-related Candidate, verification, merge, and ReleaseSet projections.
-  """
-  projectDelivery(afterCandidate: String, afterMergeSnapshot: String, afterObligation: String, afterReleaseSet: String, candidateChangeSetId: ID, candidateCheckpointKind: CandidateCheckpointKind, first: Int = 20, obligationChangeSetId: ID, obligationStatus: VerificationObligationStatus, releaseChangeSetId: ID, releaseStatus: ReleaseSetStatus, repositoryId: ID!, sort: DeliverySort = NEWEST_FIRST): ProjectDelivery
-
-  """
   Page current WorkItem dependencies touching the exact Project scope.
   """
   projectDependencies(after: String, blocking: Boolean, first: Int = 20, projectRef: ID!): CoordinationDependencyConnection
@@ -964,12 +946,22 @@ type Query {
   """
   One project merge snapshot with candidates and bounded authorization decisions.
   """
-  projectMergeSnapshot(authorizationsAfter: String, authorizationsFirst: Int = 20, mergeSnapshotId: ID!, repositoryId: ID!): ProjectMergeSnapshot
+  projectMergeSnapshot(authorizationsAfter: String, authorizationsFirst: Int = 20, mergeSnapshotId: ID!, projectRef: ID!): ProjectMergeSnapshot
+
+  """
+  Page merge snapshots produced by any Repository member of the exact Project scope.
+  """
+  projectMergeSnapshots(after: String, first: Int = 20, projectRef: ID!, sort: DeliverySort = NEWEST_FIRST): MergeSnapshotConnection
 
   """
   One ReleaseSet whose persisted ordered members include the exact project.
   """
-  projectReleaseSet(releaseSetId: ID!, repositoryId: ID!): ProjectReleaseSet
+  projectReleaseSet(projectRef: ID!, releaseSetId: ID!): ProjectReleaseSet
+
+  """
+  Page ReleaseSets with at least one ordered member in the exact Project scope.
+  """
+  projectReleaseSets(after: String, changeSetId: ID, first: Int = 20, projectRef: ID!, sort: DeliverySort = NEWEST_FIRST, status: ReleaseSetStatus): ReleaseSetConnection
 
   """
   Resolve one Resource only when its Repository belongs to the exact Project scope.
@@ -1004,7 +996,12 @@ type Query {
   """
   One project-related verification obligation with bounded evidence facts.
   """
-  projectVerificationObligation(evidenceAfter: String, evidenceFirst: Int = 20, obligationId: ID!, repositoryId: ID!): ProjectVerificationObligation
+  projectVerificationObligation(evidenceAfter: String, evidenceFirst: Int = 20, obligationId: ID!, projectRef: ID!): ProjectVerificationObligation
+
+  """
+  Page verification obligations whose source or target belongs to the exact Project scope.
+  """
+  projectVerificationObligations(after: String, changeSetId: ID, first: Int = 20, projectRef: ID!, sort: DeliverySort = NEWEST_FIRST, status: VerificationObligationStatus): VerificationObligationConnection
 
   """
   Resolve one project WorkItem with its current or latest Attempt and checkpoint.

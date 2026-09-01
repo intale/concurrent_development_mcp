@@ -226,21 +226,54 @@ module Coordinator::Web::Graphql::Types
       argument :command_id, ID, required: true
     end
 
-    field :project_delivery, DeliveryTypes::ProjectDeliveryType, null: true do
-      description "Latest project-related Candidate, verification, merge, and ReleaseSet projections."
-      argument :after_candidate, String, required: false
-      argument :after_merge_snapshot, String, required: false
-      argument :after_obligation, String, required: false
-      argument :after_release_set, String, required: false
-      argument :candidate_change_set_id, ID, required: false
-      argument :candidate_checkpoint_kind, DeliveryTypes::CandidateCheckpointKindEnum, required: false
+    field :project_candidate_checkpoints,
+          DeliveryTypes::CandidateCheckpointConnectionType,
+          null: true,
+          connection: false do
+      description "Page Candidate checkpoints submitted by any Repository member of the exact Project scope."
+      argument :after, String, required: false
+      argument :change_set_id, ID, required: false
+      argument :checkpoint_kind, DeliveryTypes::CandidateCheckpointKindEnum, required: false
       argument :first, Integer, required: false, default_value: 20
-      argument :obligation_change_set_id, ID, required: false
-      argument :obligation_status, DeliveryTypes::VerificationObligationStatusEnum, required: false
-      argument :release_change_set_id, ID, required: false
-      argument :release_status, DeliveryTypes::ReleaseSetStatusEnum, required: false
-      argument :repository_id, ID, required: true
+      argument :project_ref, ID, required: true
       argument :sort, DeliveryTypes::DeliverySortEnum, required: false, default_value: "newest_first"
+    end
+
+    field :project_verification_obligations,
+          DeliveryTypes::VerificationObligationConnectionType,
+          null: true,
+          connection: false do
+      description "Page verification obligations whose source or target belongs to the exact Project scope."
+      argument :after, String, required: false
+      argument :change_set_id, ID, required: false
+      argument :first, Integer, required: false, default_value: 20
+      argument :project_ref, ID, required: true
+      argument :sort, DeliveryTypes::DeliverySortEnum, required: false, default_value: "newest_first"
+      argument :status, DeliveryTypes::VerificationObligationStatusEnum, required: false
+    end
+
+    field :project_merge_snapshots,
+          DeliveryTypes::MergeSnapshotConnectionType,
+          null: true,
+          connection: false do
+      description "Page merge snapshots produced by any Repository member of the exact Project scope."
+      argument :after, String, required: false
+      argument :first, Integer, required: false, default_value: 20
+      argument :project_ref, ID, required: true
+      argument :sort, DeliveryTypes::DeliverySortEnum, required: false, default_value: "newest_first"
+    end
+
+    field :project_release_sets,
+          DeliveryTypes::ReleaseSetConnectionType,
+          null: true,
+          connection: false do
+      description "Page ReleaseSets with at least one ordered member in the exact Project scope."
+      argument :after, String, required: false
+      argument :change_set_id, ID, required: false
+      argument :first, Integer, required: false, default_value: 20
+      argument :project_ref, ID, required: true
+      argument :sort, DeliveryTypes::DeliverySortEnum, required: false, default_value: "newest_first"
+      argument :status, DeliveryTypes::ReleaseSetStatusEnum, required: false
     end
 
     field :project_candidate_checkpoint, DeliveryTypes::ProjectCandidateCheckpointType, null: true do
@@ -249,7 +282,7 @@ module Coordinator::Web::Graphql::Types
       argument :direction, DeliveryTypes::CandidateImpactDirectionEnum, required: false, default_value: "outgoing"
       argument :first, Integer, required: false, default_value: 20
       argument :impacts_after, String, required: false
-      argument :repository_id, ID, required: true
+      argument :project_ref, ID, required: true
     end
 
     field :project_verification_obligation,
@@ -259,7 +292,7 @@ module Coordinator::Web::Graphql::Types
       argument :evidence_after, String, required: false
       argument :evidence_first, Integer, required: false, default_value: 20
       argument :obligation_id, ID, required: true
-      argument :repository_id, ID, required: true
+      argument :project_ref, ID, required: true
     end
 
     field :project_merge_snapshot, DeliveryTypes::ProjectMergeSnapshotType, null: true do
@@ -267,13 +300,13 @@ module Coordinator::Web::Graphql::Types
       argument :authorizations_after, String, required: false
       argument :authorizations_first, Integer, required: false, default_value: 20
       argument :merge_snapshot_id, ID, required: true
-      argument :repository_id, ID, required: true
+      argument :project_ref, ID, required: true
     end
 
     field :project_release_set, DeliveryTypes::ProjectReleaseSetType, null: true do
       description "One ReleaseSet whose persisted ordered members include the exact project."
+      argument :project_ref, ID, required: true
       argument :release_set_id, ID, required: true
-      argument :repository_id, ID, required: true
     end
 
     field :operation_batches,
@@ -817,86 +850,92 @@ module Coordinator::Web::Graphql::Types
       raise_governance_read_error(error)
     end
 
-    def project_delivery(
-      repository_id:,
-      first:,
-      sort:,
-      after_candidate: nil,
-      after_merge_snapshot: nil,
-      after_obligation: nil,
-      after_release_set: nil,
-      candidate_change_set_id: nil,
-      candidate_checkpoint_kind: nil,
-      obligation_change_set_id: nil,
-      obligation_status: nil,
-      release_change_set_id: nil,
-      release_status: nil
-    )
-      candidate_filters = delivery_filters(
-        repository_id:,
-        change_set_id: candidate_change_set_id,
-        checkpoint_kind: candidate_checkpoint_kind,
-        sort:
-      )
-      obligation_filters = delivery_filters(
-        repository_id:,
-        change_set_id: obligation_change_set_id,
-        status: obligation_status,
-        sort:
-      )
-      merge_filters = delivery_filters(repository_id:, sort:)
-      release_filters = delivery_filters(
-        repository_id:,
-        change_set_id: release_change_set_id,
-        status: release_status,
-        sort:
-      )
-      candidate_cursor = delivery_cursor(after_candidate, "candidates", filters: candidate_filters)
-      obligation_cursor = delivery_cursor(after_obligation, "obligations", filters: obligation_filters)
-      merge_cursor = delivery_cursor(after_merge_snapshot, "merge-snapshots", filters: merge_filters)
-      release_cursor = delivery_cursor(after_release_set, "release-sets", filters: release_filters)
-      catalog = delivery_browser.catalog(
-        repository_id:,
+    def project_candidate_checkpoints(project_ref:, first:, sort:, after: nil, change_set_id: nil, checkpoint_kind: nil)
+      filters = delivery_filters(project_ref:, change_set_id:, checkpoint_kind:, sort:)
+      cursor = delivery_cursor(after, "candidates", filters:)
+      page = delivery_browser.candidates(
+        project_ref:,
         first:,
         sort:,
-        candidate_change_set_id:,
-        candidate_checkpoint_kind:,
-        candidate_after_position: candidate_cursor&.fetch("position", nil),
-        candidate_after_id: candidate_cursor&.fetch("id", nil),
-        obligation_change_set_id:,
-        obligation_status:,
-        obligation_after_position: obligation_cursor&.fetch("position", nil),
-        obligation_after_id: obligation_cursor&.fetch("id", nil),
-        merge_after_position: merge_cursor&.fetch("position", nil),
-        merge_after_id: merge_cursor&.fetch("id", nil),
-        release_change_set_id:,
-        release_status:,
-        release_after_position: release_cursor&.fetch("position", nil),
-        release_after_id: release_cursor&.fetch("id", nil)
+        change_set_id:,
+        checkpoint_kind:,
+        after_position: cursor&.fetch("position", nil),
+        after_id: cursor&.fetch("id", nil)
       )
-      return unless catalog
-
-      {
-        project: catalog.project,
-        candidates: delivery_timeline_connection(catalog.candidates, "candidates", filters: candidate_filters),
-        obligations: delivery_timeline_connection(catalog.obligations, "obligations", filters: obligation_filters),
-        merge_snapshots: delivery_timeline_connection(
-          catalog.merge_snapshots,
-          "merge-snapshots",
-          filters: merge_filters
-        ),
-        release_sets: delivery_timeline_connection(catalog.release_sets, "release-sets", filters: release_filters)
-      }
+      delivery_timeline_connection(page, "candidates", filters:)
     rescue Coordinator::Web::Graphql::InvalidCursor => error
       raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
+      raise_invalid_project_reference(error)
     rescue Coordinator::Read::Web::DeliveryBrowserQueryError => error
       raise_delivery_query_error(error)
     end
 
-    def project_candidate_checkpoint(repository_id:, candidate_id:, direction:, first:, impacts_after: nil)
-      filters = delivery_filters(repository_id:, candidate_id:, direction:)
+    def project_verification_obligations(project_ref:, first:, sort:, after: nil, change_set_id: nil, status: nil)
+      filters = delivery_filters(project_ref:, change_set_id:, status:, sort:)
+      cursor = delivery_cursor(after, "obligations", filters:)
+      page = delivery_browser.obligations(
+        project_ref:,
+        first:,
+        sort:,
+        change_set_id:,
+        status:,
+        after_position: cursor&.fetch("position", nil),
+        after_id: cursor&.fetch("id", nil)
+      )
+      delivery_timeline_connection(page, "obligations", filters:)
+    rescue Coordinator::Web::Graphql::InvalidCursor => error
+      raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
+      raise_invalid_project_reference(error)
+    rescue Coordinator::Read::Web::DeliveryBrowserQueryError => error
+      raise_delivery_query_error(error)
+    end
+
+    def project_merge_snapshots(project_ref:, first:, sort:, after: nil)
+      filters = delivery_filters(project_ref:, sort:)
+      cursor = delivery_cursor(after, "merge-snapshots", filters:)
+      page = delivery_browser.merges(
+        project_ref:,
+        first:,
+        sort:,
+        after_position: cursor&.fetch("position", nil),
+        after_id: cursor&.fetch("id", nil)
+      )
+      delivery_timeline_connection(page, "merge-snapshots", filters:)
+    rescue Coordinator::Web::Graphql::InvalidCursor => error
+      raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
+      raise_invalid_project_reference(error)
+    rescue Coordinator::Read::Web::DeliveryBrowserQueryError => error
+      raise_delivery_query_error(error)
+    end
+
+    def project_release_sets(project_ref:, first:, sort:, after: nil, change_set_id: nil, status: nil)
+      filters = delivery_filters(project_ref:, change_set_id:, status:, sort:)
+      cursor = delivery_cursor(after, "release-sets", filters:)
+      page = delivery_browser.releases(
+        project_ref:,
+        first:,
+        sort:,
+        change_set_id:,
+        status:,
+        after_position: cursor&.fetch("position", nil),
+        after_id: cursor&.fetch("id", nil)
+      )
+      delivery_timeline_connection(page, "release-sets", filters:)
+    rescue Coordinator::Web::Graphql::InvalidCursor => error
+      raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
+      raise_invalid_project_reference(error)
+    rescue Coordinator::Read::Web::DeliveryBrowserQueryError => error
+      raise_delivery_query_error(error)
+    end
+
+    def project_candidate_checkpoint(project_ref:, candidate_id:, direction:, first:, impacts_after: nil)
+      filters = delivery_filters(project_ref:, candidate_id:, direction:)
       detail = delivery_browser.candidate(
-        repository_id:,
+        project_ref:,
         candidate_id:,
         direction:,
         first:,
@@ -909,7 +948,6 @@ module Coordinator::Web::Graphql::Types
       return unless detail
 
       {
-        project: detail.project,
         checkpoint: detail.candidate,
         impact_direction: detail.impacts.direction,
         impact_surface_digest: detail.impacts.impact_surface&.surface_digest,
@@ -928,20 +966,22 @@ module Coordinator::Web::Graphql::Types
       }
     rescue Coordinator::Web::Graphql::InvalidCursor => error
       raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
+      raise_invalid_project_reference(error)
     rescue Coordinator::Read::Web::DeliveryBrowserQueryError => error
       raise_delivery_query_error(error)
     end
 
     def project_verification_obligation(
-      repository_id:,
+      project_ref:,
       obligation_id:,
       evidence_first:,
       evidence_after: nil
     )
-      filters = delivery_filters(repository_id:, obligation_id:)
+      filters = delivery_filters(project_ref:, obligation_id:)
       cursor = delivery_cursor(evidence_after, "evidence", filters:)
       detail = delivery_browser.verification(
-        repository_id:,
+        project_ref:,
         obligation_id:,
         first: evidence_first,
         after_evidence_position: cursor&.fetch("position", nil),
@@ -950,7 +990,6 @@ module Coordinator::Web::Graphql::Types
       return unless detail
 
       {
-        project: detail.project,
         obligation: detail.obligation,
         required_evidence: detail.required_evidence,
         reasons: detail.reasons,
@@ -958,20 +997,22 @@ module Coordinator::Web::Graphql::Types
       }
     rescue Coordinator::Web::Graphql::InvalidCursor => error
       raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
+      raise_invalid_project_reference(error)
     rescue Coordinator::Read::Web::DeliveryBrowserQueryError => error
       raise_delivery_query_error(error)
     end
 
     def project_merge_snapshot(
-      repository_id:,
+      project_ref:,
       merge_snapshot_id:,
       authorizations_first:,
       authorizations_after: nil
     )
-      filters = delivery_filters(repository_id:, merge_snapshot_id:)
+      filters = delivery_filters(project_ref:, merge_snapshot_id:)
       cursor = delivery_cursor(authorizations_after, "authorizations", filters:)
       detail = delivery_browser.merge(
-        repository_id:,
+        project_ref:,
         merge_snapshot_id:,
         first: authorizations_first,
         after_authorization_position: cursor&.fetch("position", nil),
@@ -980,7 +1021,6 @@ module Coordinator::Web::Graphql::Types
       return unless detail
 
       {
-        project: detail.project,
         snapshot: detail.snapshot,
         candidates: detail.candidates,
         authorizations: delivery_timeline_connection(
@@ -991,12 +1031,16 @@ module Coordinator::Web::Graphql::Types
       }
     rescue Coordinator::Web::Graphql::InvalidCursor => error
       raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
+      raise_invalid_project_reference(error)
     rescue Coordinator::Read::Web::DeliveryBrowserQueryError => error
       raise_delivery_query_error(error)
     end
 
-    def project_release_set(repository_id:, release_set_id:)
-      delivery_browser.release(repository_id:, release_set_id:)
+    def project_release_set(project_ref:, release_set_id:)
+      delivery_browser.release(project_ref:, release_set_id:)
+    rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
+      raise_invalid_project_reference(error)
     rescue Coordinator::Read::Web::DeliveryBrowserQueryError => error
       raise_delivery_query_error(error)
     end
@@ -1088,6 +1132,8 @@ module Coordinator::Web::Graphql::Types
     end
 
     def delivery_timeline_connection(page, kind, filters:)
+      return unless page
+
       cursor = page.next_cursor
       {
         nodes: page.items,

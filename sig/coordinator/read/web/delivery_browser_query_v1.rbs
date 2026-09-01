@@ -2,28 +2,46 @@ module Coordinator
   module Read
     module Web
       class DeliveryBrowserQueryV1
-        class Catalog < Shared::Value
-          def repository_id: () -> String
+        class Candidates < Shared::Value
+          def project_scope: () -> String
           def first: () -> Integer
           def sort: () -> String
-          def candidate_change_set_id: () -> String?
-          def candidate_checkpoint_kind: () -> String?
-          def candidate_after_position: () -> Integer?
-          def candidate_after_id: () -> String?
-          def obligation_change_set_id: () -> String?
-          def obligation_status: () -> String?
-          def obligation_after_position: () -> Integer?
-          def obligation_after_id: () -> String?
-          def merge_after_position: () -> Integer?
-          def merge_after_id: () -> String?
-          def release_change_set_id: () -> String?
-          def release_status: () -> String?
-          def release_after_position: () -> Integer?
-          def release_after_id: () -> String?
+          def change_set_id: () -> String?
+          def checkpoint_kind: () -> String?
+          def after_position: () -> Integer?
+          def after_id: () -> String?
+        end
+
+        class Obligations < Shared::Value
+          def project_scope: () -> String
+          def first: () -> Integer
+          def sort: () -> String
+          def change_set_id: () -> String?
+          def status: () -> String?
+          def after_position: () -> Integer?
+          def after_id: () -> String?
+        end
+
+        class Merges < Shared::Value
+          def project_scope: () -> String
+          def first: () -> Integer
+          def sort: () -> String
+          def after_position: () -> Integer?
+          def after_id: () -> String?
+        end
+
+        class Releases < Shared::Value
+          def project_scope: () -> String
+          def first: () -> Integer
+          def sort: () -> String
+          def change_set_id: () -> String?
+          def status: () -> String?
+          def after_position: () -> Integer?
+          def after_id: () -> String?
         end
 
         class Candidate < Shared::Value
-          def repository_id: () -> String
+          def project_scope: () -> String
           def candidate_id: () -> String
           def direction: () -> String
           def first: () -> Integer
@@ -31,7 +49,7 @@ module Coordinator
         end
 
         class Verification < Shared::Value
-          def repository_id: () -> String
+          def project_scope: () -> String
           def obligation_id: () -> String
           def first: () -> Integer
           def after_evidence_position: () -> Integer?
@@ -39,7 +57,7 @@ module Coordinator
         end
 
         class Merge < Shared::Value
-          def repository_id: () -> String
+          def project_scope: () -> String
           def merge_snapshot_id: () -> String
           def first: () -> Integer
           def after_authorization_position: () -> Integer?
@@ -47,7 +65,7 @@ module Coordinator
         end
 
         class Release < Shared::Value
-          def repository_id: () -> String
+          def project_scope: () -> String
           def release_set_id: () -> String
         end
 

@@ -4,28 +4,46 @@ module Coordinator::Read::Web
   class DeliveryBrowserQueryV1
     Sort = Coordinator::Shared::Types::String.enum("oldest_first", "newest_first")
 
-    class Catalog < Coordinator::Shared::Value
-      attribute :repository_id, Coordinator::Shared::Types::UuidV7
+    class Candidates < Coordinator::Shared::Value
+      attribute :project_scope, Coordinator::Shared::Types::String
       attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 50)
       attribute :sort, Sort
-      attribute :candidate_change_set_id, Coordinator::Shared::Types::Identifier.optional
-      attribute :candidate_checkpoint_kind, Coordinator::Shared::Types::CandidateCheckpointKind.optional
-      attribute :candidate_after_position, Coordinator::Shared::Types::GlobalPosition.optional
-      attribute :candidate_after_id, Coordinator::Shared::Types::Identifier.optional
-      attribute :obligation_change_set_id, Coordinator::Shared::Types::Identifier.optional
-      attribute :obligation_status, Coordinator::Shared::Types::VerificationObligationStatus.optional
-      attribute :obligation_after_position, Coordinator::Shared::Types::GlobalPosition.optional
-      attribute :obligation_after_id, Coordinator::Shared::Types::Identifier.optional
-      attribute :merge_after_position, Coordinator::Shared::Types::GlobalPosition.optional
-      attribute :merge_after_id, Coordinator::Shared::Types::Identifier.optional
-      attribute :release_change_set_id, Coordinator::Shared::Types::Identifier.optional
-      attribute :release_status, Coordinator::Shared::Types::String.optional
-      attribute :release_after_position, Coordinator::Shared::Types::GlobalPosition.optional
-      attribute :release_after_id, Coordinator::Shared::Types::Identifier.optional
+      attribute :change_set_id, Coordinator::Shared::Types::Identifier.optional
+      attribute :checkpoint_kind, Coordinator::Shared::Types::CandidateCheckpointKind.optional
+      attribute :after_position, Coordinator::Shared::Types::GlobalPosition.optional
+      attribute :after_id, Coordinator::Shared::Types::Identifier.optional
+    end
+
+    class Obligations < Coordinator::Shared::Value
+      attribute :project_scope, Coordinator::Shared::Types::String
+      attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 50)
+      attribute :sort, Sort
+      attribute :change_set_id, Coordinator::Shared::Types::Identifier.optional
+      attribute :status, Coordinator::Shared::Types::VerificationObligationStatus.optional
+      attribute :after_position, Coordinator::Shared::Types::GlobalPosition.optional
+      attribute :after_id, Coordinator::Shared::Types::Identifier.optional
+    end
+
+    class Merges < Coordinator::Shared::Value
+      attribute :project_scope, Coordinator::Shared::Types::String
+      attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 50)
+      attribute :sort, Sort
+      attribute :after_position, Coordinator::Shared::Types::GlobalPosition.optional
+      attribute :after_id, Coordinator::Shared::Types::Identifier.optional
+    end
+
+    class Releases < Coordinator::Shared::Value
+      attribute :project_scope, Coordinator::Shared::Types::String
+      attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 50)
+      attribute :sort, Sort
+      attribute :change_set_id, Coordinator::Shared::Types::Identifier.optional
+      attribute :status, Coordinator::Shared::Types::String.optional
+      attribute :after_position, Coordinator::Shared::Types::GlobalPosition.optional
+      attribute :after_id, Coordinator::Shared::Types::Identifier.optional
     end
 
     class Candidate < Coordinator::Shared::Value
-      attribute :repository_id, Coordinator::Shared::Types::UuidV7
+      attribute :project_scope, Coordinator::Shared::Types::String
       attribute :candidate_id, Coordinator::Shared::Types::Identifier
       attribute :direction, Coordinator::Shared::Types::CandidateImpactQueryDirection
       attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 50)
@@ -33,7 +51,7 @@ module Coordinator::Read::Web
     end
 
     class Verification < Coordinator::Shared::Value
-      attribute :repository_id, Coordinator::Shared::Types::UuidV7
+      attribute :project_scope, Coordinator::Shared::Types::String
       attribute :obligation_id, Coordinator::Shared::Types::Identifier
       attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 50)
       attribute :after_evidence_position, Coordinator::Shared::Types::GlobalPosition.optional
@@ -41,7 +59,7 @@ module Coordinator::Read::Web
     end
 
     class Merge < Coordinator::Shared::Value
-      attribute :repository_id, Coordinator::Shared::Types::UuidV7
+      attribute :project_scope, Coordinator::Shared::Types::String
       attribute :merge_snapshot_id, Coordinator::Shared::Types::Identifier
       attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 50)
       attribute :after_authorization_position, Coordinator::Shared::Types::GlobalPosition.optional
@@ -49,7 +67,7 @@ module Coordinator::Read::Web
     end
 
     class Release < Coordinator::Shared::Value
-      attribute :repository_id, Coordinator::Shared::Types::UuidV7
+      attribute :project_scope, Coordinator::Shared::Types::String
       attribute :release_set_id, Coordinator::Shared::Types::Identifier
     end
 

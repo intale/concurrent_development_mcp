@@ -25,6 +25,7 @@ RSpec.describe "Read-only web boundaries" do
     query_source = GRAPHQL_ROOT.join("types/query_type.rb").read
     expect(query_source).to include("Coordinator::Read::Web::Queries::ProjectCatalog")
     expect(query_source).to include("Coordinator::Read::Web::Queries::GovernanceBrowser")
+    expect(query_source).to include("Coordinator::Read::Web::Queries::DeliveryBrowser")
     expect(query_source).to include("Coordinator::Read::Web::Queries::CoordinationDashboard")
     expect(violations).to be_empty, violations.join("\n")
   end
@@ -74,6 +75,7 @@ RSpec.describe "Read-only web boundaries" do
     expect(Rails.root.join("sig/coordinator/web/graphql/types/governance_types.rbs")).not_to exist
     expect(Rails.root.join("sig/coordinator/web/graphql/delivery_browser_cursor.rbs")).not_to exist
     expect(Rails.root.join("sig/coordinator/web/graphql/types/delivery_types.rbs")).not_to exist
+    expect(Rails.root.join("sig/coordinator/web/graphql/types/query_type.rbs")).not_to exist
   end
 
   it "keeps the browser on GraphQL and away from MCP and mutation operations" do

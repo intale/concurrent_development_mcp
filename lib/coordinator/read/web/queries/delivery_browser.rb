@@ -3,46 +3,87 @@
 module Coordinator::Read::Web::Queries
   class DeliveryBrowser
     def initialize(
-      catalog_contract: Coordinator::Read::Web::Contracts::DeliveryBrowser::Catalog.new,
+      candidates_contract: Coordinator::Read::Web::Contracts::DeliveryBrowser::Candidates.new,
+      obligations_contract: Coordinator::Read::Web::Contracts::DeliveryBrowser::Obligations.new,
+      merges_contract: Coordinator::Read::Web::Contracts::DeliveryBrowser::Merges.new,
+      releases_contract: Coordinator::Read::Web::Contracts::DeliveryBrowser::Releases.new,
       candidate_contract: Coordinator::Read::Web::Contracts::DeliveryBrowser::Candidate.new,
       verification_contract: Coordinator::Read::Web::Contracts::DeliveryBrowser::Verification.new,
       merge_contract: Coordinator::Read::Web::Contracts::DeliveryBrowser::Merge.new,
       release_contract: Coordinator::Read::Web::Contracts::DeliveryBrowser::Release.new,
       batches_contract: Coordinator::Read::Web::Contracts::DeliveryBrowser::Batches.new,
       batch_contract: Coordinator::Read::Web::Contracts::DeliveryBrowser::Batch.new,
+      project_reference: Coordinator::Read::Web::ProjectReference.new,
       repository: Coordinator::Read::Web::Repositories::DeliveryBrowser.new
     )
-      @catalog_contract = catalog_contract
+      @candidates_contract = candidates_contract
+      @obligations_contract = obligations_contract
+      @merges_contract = merges_contract
+      @releases_contract = releases_contract
       @candidate_contract = candidate_contract
       @verification_contract = verification_contract
       @merge_contract = merge_contract
       @release_contract = release_contract
       @batches_contract = batches_contract
       @batch_contract = batch_contract
+      @project_reference = project_reference
       @repository = repository
     end
 
-    def catalog(input)
-      values = validate(@catalog_contract, input)
-      @repository.catalog(
-        Coordinator::Read::Web::DeliveryBrowserQueryV1::Catalog.new(
-          repository_id: values[:repository_id],
+    def candidates(input)
+      values = validate(@candidates_contract, input)
+      @repository.candidates(
+        Coordinator::Read::Web::DeliveryBrowserQueryV1::Candidates.new(
+          project_scope: project_scope(values),
           first: values[:first] || 20,
           sort: values[:sort] || "newest_first",
-          candidate_change_set_id: values[:candidate_change_set_id],
-          candidate_checkpoint_kind: values[:candidate_checkpoint_kind],
-          candidate_after_position: values[:candidate_after_position],
-          candidate_after_id: values[:candidate_after_id],
-          obligation_change_set_id: values[:obligation_change_set_id],
-          obligation_status: values[:obligation_status],
-          obligation_after_position: values[:obligation_after_position],
-          obligation_after_id: values[:obligation_after_id],
-          merge_after_position: values[:merge_after_position],
-          merge_after_id: values[:merge_after_id],
-          release_change_set_id: values[:release_change_set_id],
-          release_status: values[:release_status],
-          release_after_position: values[:release_after_position],
-          release_after_id: values[:release_after_id]
+          change_set_id: values[:change_set_id],
+          checkpoint_kind: values[:checkpoint_kind],
+          after_position: values[:after_position],
+          after_id: values[:after_id]
+        )
+      )
+    end
+
+    def obligations(input)
+      values = validate(@obligations_contract, input)
+      @repository.obligations(
+        Coordinator::Read::Web::DeliveryBrowserQueryV1::Obligations.new(
+          project_scope: project_scope(values),
+          first: values[:first] || 20,
+          sort: values[:sort] || "newest_first",
+          change_set_id: values[:change_set_id],
+          status: values[:status],
+          after_position: values[:after_position],
+          after_id: values[:after_id]
+        )
+      )
+    end
+
+    def merges(input)
+      values = validate(@merges_contract, input)
+      @repository.merges(
+        Coordinator::Read::Web::DeliveryBrowserQueryV1::Merges.new(
+          project_scope: project_scope(values),
+          first: values[:first] || 20,
+          sort: values[:sort] || "newest_first",
+          after_position: values[:after_position],
+          after_id: values[:after_id]
+        )
+      )
+    end
+
+    def releases(input)
+      values = validate(@releases_contract, input)
+      @repository.releases(
+        Coordinator::Read::Web::DeliveryBrowserQueryV1::Releases.new(
+          project_scope: project_scope(values),
+          first: values[:first] || 20,
+          sort: values[:sort] || "newest_first",
+          change_set_id: values[:change_set_id],
+          status: values[:status],
+          after_position: values[:after_position],
+          after_id: values[:after_id]
         )
       )
     end
@@ -51,7 +92,7 @@ module Coordinator::Read::Web::Queries
       values = validate(@candidate_contract, input)
       @repository.candidate(
         Coordinator::Read::Web::DeliveryBrowserQueryV1::Candidate.new(
-          repository_id: values[:repository_id],
+          project_scope: project_scope(values),
           candidate_id: values[:candidate_id],
           direction: values[:direction] || "outgoing",
           first: values[:first] || 20,
@@ -64,7 +105,7 @@ module Coordinator::Read::Web::Queries
       values = validate(@verification_contract, input)
       @repository.verification(
         Coordinator::Read::Web::DeliveryBrowserQueryV1::Verification.new(
-          repository_id: values[:repository_id],
+          project_scope: project_scope(values),
           obligation_id: values[:obligation_id],
           first: values[:first] || 20,
           after_evidence_position: values[:after_evidence_position],
@@ -77,7 +118,7 @@ module Coordinator::Read::Web::Queries
       values = validate(@merge_contract, input)
       @repository.merge(
         Coordinator::Read::Web::DeliveryBrowserQueryV1::Merge.new(
-          repository_id: values[:repository_id],
+          project_scope: project_scope(values),
           merge_snapshot_id: values[:merge_snapshot_id],
           first: values[:first] || 20,
           after_authorization_position: values[:after_authorization_position],
@@ -89,7 +130,10 @@ module Coordinator::Read::Web::Queries
     def release(input)
       values = validate(@release_contract, input)
       @repository.release(
-        Coordinator::Read::Web::DeliveryBrowserQueryV1::Release.new(values.to_h)
+        Coordinator::Read::Web::DeliveryBrowserQueryV1::Release.new(
+          project_scope: project_scope(values),
+          release_set_id: values[:release_set_id]
+        )
       )
     end
 
@@ -119,6 +163,10 @@ module Coordinator::Read::Web::Queries
     end
 
     private
+
+    def project_scope(values)
+      @project_reference.decode(values[:project_ref])
+    end
 
     def validate(contract, input)
       validated = contract.call(input)

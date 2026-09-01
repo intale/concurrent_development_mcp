@@ -3,7 +3,13 @@ module Coordinator
     module Web
       module Contracts
         class DeliveryBrowser
-          class Catalog < Dry::Validation::Contract
+          class Candidates < Dry::Validation::Contract
+          end
+          class Obligations < Dry::Validation::Contract
+          end
+          class Merges < Dry::Validation::Contract
+          end
+          class Releases < Dry::Validation::Contract
           end
           class Candidate < Dry::Validation::Contract
           end

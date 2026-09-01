@@ -11,56 +11,103 @@ module Coordinator::Read::Web::Contracts
       skill_publish development_artifact_capture development_artifact_relation_declare
     ].freeze
 
-    class Catalog < Dry::Validation::Contract
+    class Candidates < Dry::Validation::Contract
       config.validate_keys = true
 
       params do
-        required(:repository_id).filled(:string)
+        required(:project_ref).filled(:string)
         optional(:first).filled(:integer, gteq?: 1, lteq?: 50)
         optional(:sort).filled(:string, included_in?: SORTS)
-        optional(:candidate_change_set_id).maybe(:string)
-        optional(:candidate_checkpoint_kind).maybe(
+        optional(:change_set_id).maybe(:string)
+        optional(:checkpoint_kind).maybe(
           :string,
           included_in?: Coordinator::Shared::Types::CANDIDATE_CHECKPOINT_KINDS
         )
-        optional(:candidate_after_position).maybe(:integer, gteq?: 0)
-        optional(:candidate_after_id).maybe(:string)
-        optional(:obligation_change_set_id).maybe(:string)
-        optional(:obligation_status).maybe(
+        optional(:after_position).maybe(:integer, gteq?: 0)
+        optional(:after_id).maybe(:string)
+      end
+
+      rule(:change_set_id, :after_id) do
+        next unless value
+
+        key.failure("must be an identifier") unless Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
+      end
+
+      rule(:after_position, :after_id) do
+        base.failure("cursor coordinates must both be present or absent") unless values[:after_position].nil? == values[:after_id].nil?
+      end
+    end
+
+    class Obligations < Dry::Validation::Contract
+      config.validate_keys = true
+
+      params do
+        required(:project_ref).filled(:string)
+        optional(:first).filled(:integer, gteq?: 1, lteq?: 50)
+        optional(:sort).filled(:string, included_in?: SORTS)
+        optional(:change_set_id).maybe(:string)
+        optional(:status).maybe(
           :string,
           included_in?: Coordinator::Shared::Types::VERIFICATION_OBLIGATION_STATUSES
         )
-        optional(:obligation_after_position).maybe(:integer, gteq?: 0)
-        optional(:obligation_after_id).maybe(:string)
-        optional(:merge_after_position).maybe(:integer, gteq?: 0)
-        optional(:merge_after_id).maybe(:string)
-        optional(:release_change_set_id).maybe(:string)
-        optional(:release_status).maybe(:string, included_in?: RELEASE_STATUSES)
-        optional(:release_after_position).maybe(:integer, gteq?: 0)
-        optional(:release_after_id).maybe(:string)
+        optional(:after_position).maybe(:integer, gteq?: 0)
+        optional(:after_id).maybe(:string)
       end
 
-      rule(:repository_id) do
-        key.failure("must be a UUIDv7") unless Coordinator::Shared::Types::UUID_V7_PATTERN.match?(value)
+      rule(:change_set_id, :after_id) do
+        next unless value
+
+        key.failure("must be an identifier") unless Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
       end
 
-      %i[
-        candidate_change_set_id candidate_after_id obligation_change_set_id obligation_after_id
-        merge_after_id release_change_set_id release_after_id
-      ].each do |name|
-        rule(name) do
-          next unless value
+      rule(:after_position, :after_id) do
+        base.failure("cursor coordinates must both be present or absent") unless values[:after_position].nil? == values[:after_id].nil?
+      end
+    end
 
-          key.failure("must be an identifier") unless Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
-        end
+    class Merges < Dry::Validation::Contract
+      config.validate_keys = true
+
+      params do
+        required(:project_ref).filled(:string)
+        optional(:first).filled(:integer, gteq?: 1, lteq?: 50)
+        optional(:sort).filled(:string, included_in?: SORTS)
+        optional(:after_position).maybe(:integer, gteq?: 0)
+        optional(:after_id).maybe(:string)
       end
 
-      %i[candidate obligation merge release].each do |kind|
-        rule("#{kind}_after_position".to_sym, "#{kind}_after_id".to_sym) do
-          position = values["#{kind}_after_position".to_sym]
-          identifier = values["#{kind}_after_id".to_sym]
-          base.failure("#{kind} cursor coordinates must both be present or absent") unless position.nil? == identifier.nil?
-        end
+      rule(:after_id) do
+        next unless value
+
+        key.failure("must be an identifier") unless Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
+      end
+
+      rule(:after_position, :after_id) do
+        base.failure("cursor coordinates must both be present or absent") unless values[:after_position].nil? == values[:after_id].nil?
+      end
+    end
+
+    class Releases < Dry::Validation::Contract
+      config.validate_keys = true
+
+      params do
+        required(:project_ref).filled(:string)
+        optional(:first).filled(:integer, gteq?: 1, lteq?: 50)
+        optional(:sort).filled(:string, included_in?: SORTS)
+        optional(:change_set_id).maybe(:string)
+        optional(:status).maybe(:string, included_in?: RELEASE_STATUSES)
+        optional(:after_position).maybe(:integer, gteq?: 0)
+        optional(:after_id).maybe(:string)
+      end
+
+      rule(:change_set_id, :after_id) do
+        next unless value
+
+        key.failure("must be an identifier") unless Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
+      end
+
+      rule(:after_position, :after_id) do
+        base.failure("cursor coordinates must both be present or absent") unless values[:after_position].nil? == values[:after_id].nil?
       end
     end
 
@@ -68,7 +115,7 @@ module Coordinator::Read::Web::Contracts
       config.validate_keys = true
 
       params do
-        required(:repository_id).filled(:string)
+        required(:project_ref).filled(:string)
         required(:candidate_id).filled(:string)
         optional(:direction).filled(
           :string,
@@ -76,10 +123,6 @@ module Coordinator::Read::Web::Contracts
         )
         optional(:first).filled(:integer, gteq?: 1, lteq?: 50)
         optional(:after_impact_position).maybe(:integer, gteq?: 0)
-      end
-
-      rule(:repository_id) do
-        key.failure("must be a UUIDv7") unless Coordinator::Shared::Types::UUID_V7_PATTERN.match?(value)
       end
 
       rule(:candidate_id) do
@@ -91,14 +134,14 @@ module Coordinator::Read::Web::Contracts
       config.validate_keys = true
 
       params do
-        required(:repository_id).filled(:string)
+        required(:project_ref).filled(:string)
         required(:obligation_id).filled(:string)
         optional(:first).filled(:integer, gteq?: 1, lteq?: 50)
         optional(:after_evidence_position).maybe(:integer, gteq?: 0)
         optional(:after_evidence_id).maybe(:string)
       end
 
-      rule(:repository_id, :after_evidence_id) do
+      rule(:after_evidence_id) do
         next unless value
 
         key.failure("must be a UUIDv7") unless Coordinator::Shared::Types::UUID_V7_PATTERN.match?(value)
@@ -119,14 +162,14 @@ module Coordinator::Read::Web::Contracts
       config.validate_keys = true
 
       params do
-        required(:repository_id).filled(:string)
+        required(:project_ref).filled(:string)
         required(:merge_snapshot_id).filled(:string)
         optional(:first).filled(:integer, gteq?: 1, lteq?: 50)
         optional(:after_authorization_position).maybe(:integer, gteq?: 0)
         optional(:after_authorization_id).maybe(:string)
       end
 
-      rule(:repository_id, :after_authorization_id) do
+      rule(:after_authorization_id) do
         next unless value
 
         key.failure("must be a UUIDv7") unless Coordinator::Shared::Types::UUID_V7_PATTERN.match?(value)
@@ -147,12 +190,8 @@ module Coordinator::Read::Web::Contracts
       config.validate_keys = true
 
       params do
-        required(:repository_id).filled(:string)
+        required(:project_ref).filled(:string)
         required(:release_set_id).filled(:string)
-      end
-
-      rule(:repository_id) do
-        key.failure("must be a UUIDv7") unless Coordinator::Shared::Types::UUID_V7_PATTERN.match?(value)
       end
 
       rule(:release_set_id) do

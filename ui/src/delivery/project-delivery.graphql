@@ -1,96 +1,152 @@
-query ProjectDelivery(
-  $repositoryId: ID!
+fragment DeliveryCandidateSummary on CandidateCheckpoint {
+  id
+  changeSetId
+  workItemId
+  attemptId
+  repositoryId
+  targetBranch
+  baseCommitOid
+  headCommitOid
+  checkpointKind
+  evidenceStatus
+  manifestDigest
+  buildContextDigest
+  manifestObserved
+  buildContextObserved
+  submittedAt
+}
+
+fragment DeliveryObligationSummary on DeliveryVerificationObligation {
+  id
+  kind
+  status
+  changeSetId
+  sourceCandidateId
+  targetCandidateId
+  sourceRepositoryId
+  targetRepositoryId
+  enforcement
+  claimantId
+  claimExpiresAt
+  evidenceCount
+  passedEvidenceKinds
+  missingEvidenceKinds
+  createdAt
+}
+
+fragment DeliveryMergeSummary on DeliveryMergeSnapshot {
+  id
+  repositoryId
+  targetBranch
+  targetBaseCommitOid
+  mergeCommitOid
+  candidateCount
+  verificationStatus
+  evidenceStatus
+  producedAt
+}
+
+fragment DeliveryReleaseSummary on DeliveryReleaseSet {
+  id
+  changeSetId
+  repositoryIds
+  memberCount
+  status
+  verificationStatus
+  releaseDigest
+  preparedAt
+}
+
+query ProjectDeliveryCandidates(
+  $projectRef: ID!
   $first: Int
   $sort: DeliverySort
-  $candidateChangeSetId: ID
-  $candidateCheckpointKind: CandidateCheckpointKind
-  $afterCandidate: String
-  $obligationChangeSetId: ID
-  $obligationStatus: VerificationObligationStatus
-  $afterObligation: String
-  $afterMergeSnapshot: String
-  $releaseChangeSetId: ID
-  $releaseStatus: ReleaseSetStatus
-  $afterReleaseSet: String
+  $changeSetId: ID
+  $checkpointKind: CandidateCheckpointKind
+  $after: String
 ) {
-  projectDelivery(
-    repositoryId: $repositoryId
+  projectCandidateCheckpoints(
+    projectRef: $projectRef
     first: $first
     sort: $sort
-    candidateChangeSetId: $candidateChangeSetId
-    candidateCheckpointKind: $candidateCheckpointKind
-    afterCandidate: $afterCandidate
-    obligationChangeSetId: $obligationChangeSetId
-    obligationStatus: $obligationStatus
-    afterObligation: $afterObligation
-    afterMergeSnapshot: $afterMergeSnapshot
-    releaseChangeSetId: $releaseChangeSetId
-    releaseStatus: $releaseStatus
-    afterReleaseSet: $afterReleaseSet
+    changeSetId: $changeSetId
+    checkpointKind: $checkpointKind
+    after: $after
   ) {
-    project { id name scope }
-    candidates {
-      nodes {
-        id changeSetId workItemId attemptId repositoryId targetBranch
-        baseCommitOid headCommitOid checkpointKind evidenceStatus manifestDigest
-        buildContextDigest manifestObserved buildContextObserved submittedAt
-      }
-      pageInfo { endCursor hasNextPage }
-    }
-    obligations {
-      nodes {
-        id kind status changeSetId sourceCandidateId targetCandidateId
-        sourceRepositoryId targetRepositoryId enforcement claimantId claimExpiresAt
-        evidenceCount passedEvidenceKinds missingEvidenceKinds createdAt
-      }
-      pageInfo { endCursor hasNextPage }
-    }
-    mergeSnapshots {
-      nodes {
-        id repositoryId targetBranch targetBaseCommitOid mergeCommitOid
-        candidateCount verificationStatus evidenceStatus producedAt
-      }
-      pageInfo { endCursor hasNextPage }
-    }
-    releaseSets {
-      nodes {
-        id changeSetId repositoryIds memberCount status verificationStatus
-        releaseDigest preparedAt
-      }
-      pageInfo { endCursor hasNextPage }
-    }
+    nodes { ...DeliveryCandidateSummary }
+    pageInfo { endCursor hasNextPage }
+  }
+}
+
+query ProjectDeliveryObligations(
+  $projectRef: ID!
+  $first: Int
+  $sort: DeliverySort
+  $changeSetId: ID
+  $status: VerificationObligationStatus
+  $after: String
+) {
+  projectVerificationObligations(
+    projectRef: $projectRef
+    first: $first
+    sort: $sort
+    changeSetId: $changeSetId
+    status: $status
+    after: $after
+  ) {
+    nodes { ...DeliveryObligationSummary }
+    pageInfo { endCursor hasNextPage }
+  }
+}
+
+query ProjectDeliveryMerges($projectRef: ID!, $first: Int, $sort: DeliverySort, $after: String) {
+  projectMergeSnapshots(projectRef: $projectRef, first: $first, sort: $sort, after: $after) {
+    nodes { ...DeliveryMergeSummary }
+    pageInfo { endCursor hasNextPage }
+  }
+}
+
+query ProjectDeliveryReleases(
+  $projectRef: ID!
+  $first: Int
+  $sort: DeliverySort
+  $changeSetId: ID
+  $status: ReleaseSetStatus
+  $after: String
+) {
+  projectReleaseSets(
+    projectRef: $projectRef
+    first: $first
+    sort: $sort
+    changeSetId: $changeSetId
+    status: $status
+    after: $after
+  ) {
+    nodes { ...DeliveryReleaseSummary }
+    pageInfo { endCursor hasNextPage }
   }
 }
 
 query ProjectDeliveryCandidate(
-  $repositoryId: ID!
+  $projectRef: ID!
   $candidateId: ID!
   $direction: CandidateImpactDirection
   $first: Int
   $impactsAfter: String
 ) {
   projectCandidateCheckpoint(
-    repositoryId: $repositoryId
+    projectRef: $projectRef
     candidateId: $candidateId
     direction: $direction
     first: $first
     impactsAfter: $impactsAfter
   ) {
-    project { id name scope }
-    checkpoint {
-      id changeSetId workItemId attemptId repositoryId targetBranch
-      baseCommitOid headCommitOid checkpointKind evidenceStatus manifestDigest
-      buildContextDigest manifestObserved buildContextObserved submittedAt
-    }
+    checkpoint { ...DeliveryCandidateSummary }
     impactDirection
     impactSurfaceDigest
     impactRelationships {
       nodes {
-        counterpart {
-          id changeSetId workItemId attemptId repositoryId targetBranch
-          baseCommitOid headCommitOid checkpointKind evidenceStatus manifestDigest
-          buildContextDigest manifestObserved buildContextObserved submittedAt
-        }
+        counterpart { ...DeliveryCandidateSummary }
         relationshipKind
         reasons { kind matches }
       }
@@ -100,29 +156,30 @@ query ProjectDeliveryCandidate(
 }
 
 query ProjectDeliveryVerification(
-  $repositoryId: ID!
+  $projectRef: ID!
   $obligationId: ID!
   $evidenceFirst: Int
   $evidenceAfter: String
 ) {
   projectVerificationObligation(
-    repositoryId: $repositoryId
+    projectRef: $projectRef
     obligationId: $obligationId
     evidenceFirst: $evidenceFirst
     evidenceAfter: $evidenceAfter
   ) {
-    project { id name scope }
-    obligation {
-      id kind status changeSetId sourceCandidateId targetCandidateId
-      sourceRepositoryId targetRepositoryId enforcement claimantId claimExpiresAt
-      evidenceCount passedEvidenceKinds missingEvidenceKinds createdAt
-    }
+    obligation { ...DeliveryObligationSummary }
     requiredEvidence
     reasons { kind matches }
     evidence {
       nodes {
-        id evidenceKind conclusion assessmentInputDigest resultDigest
-        producedAt submittedAt globalPosition
+        id
+        evidenceKind
+        conclusion
+        assessmentInputDigest
+        resultDigest
+        producedAt
+        submittedAt
+        globalPosition
       }
       pageInfo { endCursor hasNextPage }
     }
@@ -130,41 +187,37 @@ query ProjectDeliveryVerification(
 }
 
 query ProjectDeliveryMerge(
-  $repositoryId: ID!
+  $projectRef: ID!
   $mergeSnapshotId: ID!
   $authorizationsFirst: Int
   $authorizationsAfter: String
 ) {
   projectMergeSnapshot(
-    repositoryId: $repositoryId
+    projectRef: $projectRef
     mergeSnapshotId: $mergeSnapshotId
     authorizationsFirst: $authorizationsFirst
     authorizationsAfter: $authorizationsAfter
   ) {
-    project { id name scope }
-    snapshot {
-      id repositoryId targetBranch targetBaseCommitOid mergeCommitOid
-      candidateCount verificationStatus evidenceStatus producedAt
-    }
+    snapshot { ...DeliveryMergeSummary }
     candidates { id changeSetId workItemId attemptId baseCommitOid headCommitOid manifestDigest }
     authorizations {
-      nodes {
-        id mergeSnapshotId outcome policyVersion inputDigest decisionDigest reasonCount decidedAt
-      }
+      nodes { id mergeSnapshotId outcome policyVersion inputDigest decisionDigest reasonCount decidedAt }
       pageInfo { endCursor hasNextPage }
     }
   }
 }
 
-query ProjectDeliveryRelease($repositoryId: ID!, $releaseSetId: ID!) {
-  projectReleaseSet(repositoryId: $repositoryId, releaseSetId: $releaseSetId) {
-    project { id name scope }
-    releaseSet {
-      id changeSetId repositoryIds memberCount status verificationStatus
-      releaseDigest preparedAt
-    }
+query ProjectDeliveryRelease($projectRef: ID!, $releaseSetId: ID!) {
+  projectReleaseSet(projectRef: $projectRef, releaseSetId: $releaseSetId) {
+    releaseSet { ...DeliveryReleaseSummary }
     members {
-      position repositoryId targetBranch mergeSnapshotId changeSetId mergeCommitOid candidateCount
+      position
+      repositoryId
+      targetBranch
+      mergeSnapshotId
+      changeSetId
+      mergeCommitOid
+      candidateCount
     }
     integrations { repositoryId attemptId attemptNumber outcome failureCode recordedAt }
     verificationAttemptCount
