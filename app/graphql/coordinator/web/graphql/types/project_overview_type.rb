@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
 module Coordinator::Web::Graphql::Types
-  class ProjectType < BaseObject
-    graphql_name "Project"
-    description "One exact coordination scope with a bounded preview of explicit Repository members."
+  class ProjectOverviewType < BaseObject
+    graphql_name "ProjectOverview"
+    description "Latest available overview of one exact Project scope and its Repository members."
 
     field :project_ref, ID, null: false
     field :scope, String, null: false

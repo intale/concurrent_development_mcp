@@ -1,6 +1,17 @@
 module Coordinator::Web::Graphql::Types
   class QueryType < BaseObject
-    def projects: (scope: String, first: Integer, ?after: String?) -> Hash[Symbol, untyped]
+    def projects: (
+      first: Integer,
+      repositories_first: Integer,
+      sort: String,
+      ?after: String?,
+      ?search: String?
+    ) -> Hash[Symbol, untyped]
+    def project: (
+      project_ref: String,
+      repositories_first: Integer,
+      ?repositories_after: String?
+    ) -> Hash[Symbol, untyped]?
     def project_coordination: (
       repository_id: String,
       first: Integer,
@@ -83,6 +94,14 @@ module Coordinator::Web::Graphql::Types
 
     private
 
+    def project_catalog: () -> Coordinator::Read::Web::Queries::ProjectCatalog
+    def project_payload: (
+      Coordinator::Read::Web::ProjectCatalogV1::ProjectSummary | Coordinator::Read::Web::ProjectCatalogV1::ProjectOverview project
+    ) -> Hash[Symbol, untyped]
+    def project_repository_connection: (
+      Coordinator::Read::Web::ProjectCatalogV1::RepositoryPage page,
+      project_ref: String
+    ) -> Hash[Symbol, untyped]
     def connection: (untyped page, String kind) -> Hash[Symbol, untyped]
     def resource_connection: (
       untyped page,

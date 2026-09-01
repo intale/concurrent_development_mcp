@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    module Web
+      class ProjectCatalogQueryError < StandardError
+        attr_reader details: Hash[Symbol, untyped]
+
+        def initialize: (Hash[Symbol, untyped] details) -> void
+      end
+    end
+  end
+end

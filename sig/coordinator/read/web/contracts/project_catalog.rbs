@@ -1,0 +1,15 @@
+module Coordinator
+  module Read
+    module Web
+      module Contracts
+        class ProjectCatalog
+          class Discovery < Dry::Validation::Contract
+          end
+
+          class Overview < Dry::Validation::Contract
+          end
+        end
+      end
+    end
+  end
+end

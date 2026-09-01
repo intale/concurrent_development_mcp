@@ -1,0 +1,18 @@
+module Coordinator
+  module Read
+    module Web
+      module Queries
+        class ProjectCatalog
+          def initialize: (
+            ?discovery_contract: Contracts::ProjectCatalog::Discovery,
+            ?overview_contract: Contracts::ProjectCatalog::Overview,
+            ?repository: Repositories::ProjectCatalog,
+            ?project_reference: ProjectReference
+          ) -> void
+          def page: (command_input input) -> ProjectCatalogV1::ProjectPage
+          def overview: (command_input input) -> ProjectCatalogV1::ProjectOverview?
+        end
+      end
+    end
+  end
+end

@@ -1,0 +1,15 @@
+module Coordinator
+  module Read
+    module Web
+      module Repositories
+        class ProjectCatalog
+          SEARCH_SQL: String
+
+          def initialize: (?project_reference: ProjectReference) -> void
+          def page: (ProjectCatalogQueriesV1::Discovery query) -> ProjectCatalogV1::ProjectPage
+          def overview: (ProjectCatalogQueriesV1::Overview query) -> ProjectCatalogV1::ProjectOverview?
+        end
+      end
+    end
+  end
+end

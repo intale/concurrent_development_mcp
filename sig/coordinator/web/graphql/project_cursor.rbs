@@ -2,7 +2,15 @@ module Coordinator::Web::Graphql
   class ProjectCursor
     PREFIX: String
 
-    def self.encode: (String repository_id) -> String
-    def self.decode: (String? cursor) -> String?
+    class ProjectsPayloadContract < Dry::Validation::Contract
+    end
+
+    class RepositoriesPayloadContract < Dry::Validation::Contract
+    end
+
+    def self.encode_projects: (after_scope: String, search: String?, sort: String) -> String
+    def self.decode_projects: (String? cursor, search: String?, sort: String) -> String?
+    def self.encode_repositories: (project_ref: String, after_repository_id: String) -> String
+    def self.decode_repositories: (String? cursor, project_ref: String) -> String?
   end
 end

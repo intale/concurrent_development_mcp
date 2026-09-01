@@ -31,8 +31,8 @@ module GraphqlQueryLimitsSpec
     it "rejects queries more expensive than the committed schema limit" do
       selections = 40.times.map do |index|
         <<~GRAPHQL
-          projects#{index}: projects(scope: "project:query-limits", first: 1) {
-            nodes { id name scope }
+          projects#{index}: projects(first: 1) {
+            nodes { projectRef displayLabel scope }
             pageInfo { endCursor hasNextPage }
           }
         GRAPHQL

@@ -1,4 +1,4 @@
 module Coordinator::Web::Graphql::Types
-  class ProjectType < BaseObject
+  class ProjectOverviewType < BaseObject
   end
 end

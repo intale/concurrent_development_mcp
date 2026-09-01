@@ -6,10 +6,19 @@ module Coordinator::Web::Graphql::Types
     description "Read-only access to the latest available coordination projections."
 
     field :projects, ProjectConnectionType, null: false, connection: false do
-      description "List projects in one exact caller-chosen scope in stable Repository-ID order."
+      description "Discover exact Project scopes with bounded Repository-member previews."
       argument :after, String, required: false
       argument :first, Integer, required: false, default_value: 20
-      argument :scope, String, required: true
+      argument :repositories_first, Integer, required: false, default_value: 3
+      argument :search, String, required: false
+      argument :sort, ProjectSortEnum, required: false, default_value: "scope_asc"
+    end
+
+    field :project, ProjectOverviewType, null: true do
+      description "Resolve one server-issued Project reference to its exact scope and Repository members."
+      argument :project_ref, ID, required: true
+      argument :repositories_after, String, required: false
+      argument :repositories_first, Integer, required: false, default_value: 20
     end
 
     field :project_coordination, ProjectCoordinationType, null: true do
@@ -192,25 +201,62 @@ module Coordinator::Web::Graphql::Types
       argument :items_after, String, required: false
     end
 
-    def projects(scope:, first:, after: nil)
-      query = Coordinator::Read::Queries::RepositoryList.new.call(
-        scope:,
-        after_repository_id: Coordinator::Web::Graphql::ProjectCursor.decode(after),
-        limit: first
-      ).value!
-      raise_query_error(query) unless query.status == "ok"
-
-      page = query.data.page
+    def projects(first:, repositories_first:, sort:, after: nil, search: nil)
+      after_scope = Coordinator::Web::Graphql::ProjectCursor.decode_projects(
+        after,
+        search:,
+        sort:
+      )
+      page = project_catalog.page(
+        search:,
+        sort:,
+        after_scope:,
+        first:,
+        repositories_first:
+      )
       {
-        nodes: page.items,
+        nodes: page.items.map { project_payload(_1) },
         page_info: {
-          end_cursor: page.next_repository_id &&
-            Coordinator::Web::Graphql::ProjectCursor.encode(page.next_repository_id),
+          end_cursor: page.next_scope && Coordinator::Web::Graphql::ProjectCursor.encode_projects(
+            after_scope: page.next_scope,
+            search:,
+            sort:
+          ),
           has_next_page: page.has_more
         }
       }
     rescue Coordinator::Web::Graphql::InvalidCursor => error
       raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::ProjectCatalogQueryError => error
+      raise GraphQL::ExecutionError.new(
+        error.message,
+        extensions: { code: "INVALID_INPUT", details: error.details }
+      )
+    end
+
+    def project(project_ref:, repositories_first:, repositories_after: nil)
+      after_repository_id = Coordinator::Web::Graphql::ProjectCursor.decode_repositories(
+        repositories_after,
+        project_ref:
+      )
+      overview = project_catalog.overview(
+        project_ref:,
+        after_repository_id:,
+        repositories_first:
+      )
+      project_payload(overview) if overview
+    rescue Coordinator::Web::Graphql::InvalidCursor => error
+      raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
+    rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
+      raise GraphQL::ExecutionError.new(
+        error.message,
+        extensions: { code: "INVALID_PROJECT_REFERENCE" }
+      )
+    rescue Coordinator::Read::Web::ProjectCatalogQueryError => error
+      raise GraphQL::ExecutionError.new(
+        error.message,
+        extensions: { code: "INVALID_INPUT", details: error.details }
+      )
     end
 
     def project_coordination(
@@ -806,6 +852,34 @@ module Coordinator::Web::Graphql::Types
     end
 
     private
+
+    def project_catalog
+      @project_catalog ||= Coordinator::Read::Web::Queries::ProjectCatalog.new
+    end
+
+    def project_payload(project)
+      {
+        project_ref: project.project_ref,
+        scope: project.scope,
+        display_label: project.display_label,
+        repository_count: project.repository_count,
+        repositories: project_repository_connection(project.repositories, project_ref: project.project_ref)
+      }
+    end
+
+    def project_repository_connection(page, project_ref:)
+      {
+        nodes: page.items,
+        total_count: page.total_count,
+        page_info: {
+          end_cursor: page.next_repository_id && Coordinator::Web::Graphql::ProjectCursor.encode_repositories(
+            project_ref:,
+            after_repository_id: page.next_repository_id
+          ),
+          has_next_page: page.has_more
+        }
+      }
+    end
 
     def delivery_filters(**values)
       values.compact.transform_keys(&:to_s)

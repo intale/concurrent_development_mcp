@@ -1,4 +1,4 @@
 module Coordinator::Web::Graphql::Types
-  class ProjectType < BaseObject
+  class ProjectSortEnum < BaseEnum
   end
 end

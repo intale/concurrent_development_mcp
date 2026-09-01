@@ -1,0 +1,44 @@
+module Coordinator
+  module Read
+    module Web
+      class ProjectCatalogV1
+        class RepositoryMember < Shared::Value
+          def repository_id: () -> String
+          def display_name: () -> String?
+          def paths: () -> Array[String]
+          def remotes: () -> Array[String]
+          def registered_at: () -> String
+        end
+
+        class RepositoryPage < Shared::Value
+          def items: () -> Array[RepositoryMember]
+          def next_repository_id: () -> String?
+          def has_more: () -> bool
+          def total_count: () -> Integer
+        end
+
+        class ProjectSummary < Shared::Value
+          def project_ref: () -> String
+          def scope: () -> String
+          def display_label: () -> String
+          def repository_count: () -> Integer
+          def repositories: () -> RepositoryPage
+        end
+
+        class ProjectPage < Shared::Value
+          def items: () -> Array[ProjectSummary]
+          def next_scope: () -> String?
+          def has_more: () -> bool
+        end
+
+        class ProjectOverview < Shared::Value
+          def project_ref: () -> String
+          def scope: () -> String
+          def display_label: () -> String
+          def repository_count: () -> Integer
+          def repositories: () -> RepositoryPage
+        end
+      end
+    end
+  end
+end

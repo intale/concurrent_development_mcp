@@ -661,14 +661,13 @@ type PageInfo {
 }
 
 """
-One latest available projected repository registration in an exact project scope.
+One exact coordination scope with a bounded preview of explicit Repository members.
 """
 type Project {
-  id: ID!
-  name: String
-  paths: [String!]!
-  registeredAt: String!
-  remotes: [String!]!
+  displayLabel: String!
+  projectRef: ID!
+  repositories: ProjectRepositoryConnection!
+  repositoryCount: Int!
   scope: String!
 }
 
@@ -761,6 +760,17 @@ type ProjectMergeSnapshot {
   snapshot: DeliveryMergeSnapshot!
 }
 
+"""
+Latest available overview of one exact Project scope and its Repository members.
+"""
+type ProjectOverview {
+  displayLabel: String!
+  projectRef: ID!
+  repositories: ProjectRepositoryConnection!
+  repositoryCount: Int!
+  scope: String!
+}
+
 type ProjectReleaseSet {
   activated: Boolean!
   compensationRequested: Boolean!
@@ -770,6 +780,26 @@ type ProjectReleaseSet {
   project: CoordinationProject!
   releaseSet: DeliveryReleaseSet!
   verificationAttemptCount: Int!
+}
+
+"""
+One latest available registered Repository member of an exact Project scope.
+"""
+type ProjectRepository {
+  displayName: String
+  id: ID!
+  paths: [String!]!
+  registeredAt: String!
+  remotes: [String!]!
+}
+
+"""
+A bounded page of explicit Repository members for one Project.
+"""
+type ProjectRepositoryConnection {
+  nodes: [ProjectRepository!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
 }
 
 type ProjectResource {
@@ -804,6 +834,18 @@ type ProjectSkillAsset {
   project: CoordinationProject!
 }
 
+enum ProjectSort {
+  """
+  Exact Project scope ascending.
+  """
+  SCOPE_ASC
+
+  """
+  Exact Project scope descending.
+  """
+  SCOPE_DESC
+}
+
 type ProjectVerificationObligation {
   evidence: VerificationEvidenceConnection!
   obligation: DeliveryVerificationObligation!
@@ -835,6 +877,11 @@ type Query {
   Global operation-batch progress without inferred project attribution.
   """
   operationBatches(after: String, first: Int = 20, sort: DeliverySort = NEWEST_FIRST, status: OperationBatchStatus, targetTool: OperationBatchTool): OperationBatchConnection!
+
+  """
+  Resolve one server-issued Project reference to its exact scope and Repository members.
+  """
+  project(projectRef: ID!, repositoriesAfter: String, repositoriesFirst: Int = 20): ProjectOverview
 
   """
   One project AgentChoice and its bounded decision-impact assessments.
@@ -912,9 +959,9 @@ type Query {
   projectVerificationObligation(evidenceAfter: String, evidenceFirst: Int = 20, obligationId: ID!, repositoryId: ID!): ProjectVerificationObligation
 
   """
-  List projects in one exact caller-chosen scope in stable Repository-ID order.
+  Discover exact Project scopes with bounded Repository-member previews.
   """
-  projects(after: String, first: Int = 20, scope: String!): ProjectConnection!
+  projects(after: String, first: Int = 20, repositoriesFirst: Int = 3, search: String, sort: ProjectSort = SCOPE_ASC): ProjectConnection!
 }
 
 type ReleaseIntegration {
