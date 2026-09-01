@@ -125,6 +125,8 @@ test("shows current Skill content, assets, Artifact provenance, and active navig
   assert.match(markup, /Next Artifacts page/);
   assert.match(markup, /Next relationships page/);
   assert.match(markup, /Historical Skill revisions and superseded Artifact edges are intentionally absent/);
+  assert.match(markup, /aria-label="Current Skills"/);
+  assert.match(markup, /aria-label="Development Artifacts"/);
 });
 
 test("keeps latest available knowledge visible when a refresh fails", () => {

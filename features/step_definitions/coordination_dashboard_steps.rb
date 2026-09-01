@@ -65,6 +65,22 @@ Given("projected dashboard rows contain an unmet work-item dependency") do
   )
 end
 
+Given("projected dashboard rows contain scheduled work for the selected and an unrelated project") do
+  create_dashboard_project
+  selected_repository_id = @coordination_dashboard_repository_id
+  create_dashboard_context(
+    "isolation-selected",
+    [ dashboard_work_item_row("W-selected", "ready", change_set_key: "isolation-selected") ]
+  )
+
+  create_dashboard_project
+  create_dashboard_context(
+    "isolation-unrelated",
+    [ dashboard_work_item_row("W-unrelated", "ready", change_set_key: "isolation-unrelated") ]
+  )
+  @coordination_dashboard_repository_id = selected_repository_id
+end
+
 Given("a dashboard work item is ready in the latest projected rows") do
   create_dashboard_project
   @stale_dashboard_context = create_dashboard_context(
@@ -135,6 +151,13 @@ Then("the dashboard identifies the blocking producer and consumer") do
   )
 end
 
+Then("only the selected project's scheduled work is presented") do
+  ids = dashboard_work_items(coordination_dashboard_data(@coordination_dashboard_payload)).map do |item|
+    item.fetch("id")
+  end
+  assert_acceptance_equal([ "W-selected" ], ids, "Project-isolated scheduled work")
+end
+
 Then("the dashboard remains available with the ready state") do
   item = dashboard_work_item(coordination_dashboard_data(@coordination_dashboard_stale_payload), "W-stale")
   assert_acceptance_equal("READY", item&.fetch("presentationStatus"), "Available stale dashboard state")
@@ -196,11 +219,11 @@ def create_dashboard_attempt(change_set_key, work_item_id, attempt_id, agent_id)
   )
 end
 
-def dashboard_work_item_row(work_item_id, status, attempt_id: nil)
+def dashboard_work_item_row(work_item_id, status, attempt_id: nil, change_set_key: nil)
   timestamp = "2026-08-31T12:00:00.000000Z"
   {
     "work_item_id" => work_item_id,
-    "change_set_id" => "CS-#{dashboard_change_set_key(work_item_id)}",
+    "change_set_id" => "CS-#{change_set_key || dashboard_change_set_key(work_item_id)}",
     "repository_id" => @coordination_dashboard_repository_id,
     "goal" => "Coordinate #{work_item_id}",
     "acceptance_criteria" => [ "The dashboard presents #{work_item_id}" ],

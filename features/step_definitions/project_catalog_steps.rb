@@ -60,6 +60,25 @@ Then("Rails serves the standalone project browser shell") do
   )
 end
 
+Then("every project browser route serves the same standalone shell") do
+  repository_id = @project_catalog_repositories.fetch("ui-catalog-a")
+  paths = %w[coordination resources knowledge governance delivery].map do |section|
+    "/projects/#{repository_id}/#{section}"
+  end
+  session = ActionDispatch::Integration::Session.new(Rails.application).tap do |browser|
+    browser.host! "localhost"
+  end
+
+  paths.each do |path|
+    session.get(path)
+    assert_acceptance(session.response.status == 200, "#{path} returned HTTP #{session.response.status}")
+    assert_acceptance(
+      session.response.body.include?('data-react-class="CoordinatorApp"'),
+      "#{path} did not expose the react-rails component mount"
+    )
+  end
+end
+
 Then("the browser-facing GraphQL schema exposes Query without Mutation or Subscription") do
   payload = project_catalog_graphql_request(
     <<~GRAPHQL,

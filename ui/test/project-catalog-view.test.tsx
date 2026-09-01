@@ -53,6 +53,8 @@ test("keeps project rows visible during a stale-preserving refresh", () => {
 
   assert.match(refreshing, /last available project page remains visible/);
   assert.match(refreshing, /Showing 1 project/);
+  assert.match(refreshing, /aria-label="Projects"/);
+  assert.match(refreshing, />Delivery<\/a>/);
 });
 
 test("keeps project rows visible when a background refresh fails", () => {

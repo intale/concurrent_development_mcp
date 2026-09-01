@@ -28,19 +28,41 @@ RSpec.describe "Read-only web boundaries" do
     expect(violations).to be_empty, violations.join("\n")
   end
 
-  it "keeps dashboard reads on projections and UI scenarios on FactoryBot fixtures" do
+  it "keeps browser reads on projections and UI scenarios on FactoryBot fixtures" do
     semantic_sources = Rails.root.glob("lib/coordinator/read/web/**/*.rb").map(&:read).join("\n")
-    cucumber_steps = Rails.root.join("features/step_definitions/coordination_dashboard_steps.rb").read
+    cucumber_step_paths = %w[
+      coordination_dashboard_steps.rb
+      project_resource_browser_steps.rb
+      project_knowledge_browser_steps.rb
+      project_governance_browser_steps.rb
+      project_delivery_browser_steps.rb
+    ].map { Rails.root.join("features/step_definitions", _1) }
     schema = Rails.root.join("db/structure.sql").read
 
     expect(semantic_sources).not_to include("Coordinator::Write", "Coordinator::Mcp", "PgEventstore")
-    expect(cucumber_steps).to include("FactoryBot.create", "FactoryBot.build")
-    expect(cucumber_steps).not_to match(/submit_and_(?:execute|await)|call_tool|event_store|subscription/i)
+    cucumber_step_paths.each do |path|
+      source = path.read
+      expect(source).to include("FactoryBot.")
+      expect(source).to include("/graphql")
+      expect(source).not_to match(
+        /submit_and_(?:execute|await)|call_tool|event_store|subscription|\bmock\b|\bstub\b/i
+      )
+    end
     expect(schema).to include(
       "CREATE VIEW public.coordination_dashboard_work_items",
       "CREATE VIEW public.coordination_dashboard_change_sets",
-      "CREATE VIEW public.coordination_dashboard_dependencies"
+      "CREATE VIEW public.coordination_dashboard_dependencies",
+      "CREATE VIEW public.decision_repository_memberships",
+      "CREATE VIEW public.resource_lease_browser_rows"
     )
+  end
+
+  it "keeps the complete committed web acceptance matrix executable" do
+    tags = Rails.root.glob("features/*.feature").flat_map do |path|
+      path.read.scan(/@UI-GWT-\d{2}/)
+    end
+
+    expect(tags.sort).to eq((1..18).map { format("@UI-GWT-%02d", _1) })
   end
 
   it "keeps Rails GraphQL adapters outside runtime RBS assertions" do

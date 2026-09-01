@@ -96,6 +96,8 @@ test("shows concurrent running agents, attempts, blockers, and bounded-page cont
   assert.match(markup, /Next ChangeSets page/);
   assert.match(markup, /Next work-items page/);
   assert.match(markup, /Next dependencies page/);
+  assert.match(markup, /aria-label="Scheduled work items"/);
+  assert.match(markup, /aria-label="Work item dependencies"/);
 });
 
 test("keeps the latest available dashboard visible when refresh fails", () => {

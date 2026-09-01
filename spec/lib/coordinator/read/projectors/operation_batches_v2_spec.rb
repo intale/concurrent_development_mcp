@@ -8,7 +8,7 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
   let(:stream) { Coordinator::Write::StreamFactory.new.operation_batch(batch_id) }
   let(:correlation_id) { SecureRandom.uuid_v7 }
 
-  it "converges under reversed delivery and serves the immutable manifest in bounded pages" do
+  it "converges idempotently under reversed delivery and serves the immutable manifest in bounded pages" do
     created, succeeded, rejected, completed = completed_events
     events = [ created, succeeded, rejected, completed ]
 

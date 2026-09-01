@@ -87,6 +87,8 @@ test("shows projected resources and only factual active lease ownership", () => 
   assert.match(markup, /Next resources page/);
   assert.match(markup, /Next active leases page/);
   assert.match(markup, /Ownership is derived only from projected lease facts/);
+  assert.match(markup, /aria-label="Project resources"/);
+  assert.match(markup, /aria-label="Active resource leases"/);
 });
 
 test("keeps the latest available resource view visible when refresh fails", () => {

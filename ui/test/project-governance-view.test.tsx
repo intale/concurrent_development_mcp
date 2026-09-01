@@ -221,6 +221,8 @@ test("shows typed project governance details and labels receipts as global audit
   assert.match(markup, /WorkItemAcquired/);
   assert.match(markup, /Next Decisions page/);
   assert.match(markup, /Next global receipts page/);
+  assert.match(markup, /aria-label="Project Decisions"/);
+  assert.match(markup, /aria-label="Global command receipts"/);
 });
 
 test("keeps the latest available governance view visible when refresh fails", () => {

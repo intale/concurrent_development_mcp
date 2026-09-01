@@ -23,6 +23,12 @@ Feature: Inspect current project coordination
       When the browser queries the projected coordination dashboard
       Then the dashboard identifies the blocking producer and consumer
 
+    @UI-GWT-11
+    Scenario: Scheduled work from another project does not cross the exact project boundary
+      Given projected dashboard rows contain scheduled work for the selected and an unrelated project
+      When the browser queries the projected coordination dashboard
+      Then only the selected project's scheduled work is presented
+
     @UI-GWT-12 @stale-view
     Scenario: A prior scheduled-work view remains available before a projection catches up
       Given a dashboard work item is ready in the latest projected rows

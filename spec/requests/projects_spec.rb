@@ -23,11 +23,17 @@ RSpec.describe "Projects UI shell" do
     expect(response.body).not_to include("data-hydrate", "@vite/client", ".vite/manifest.json")
   end
 
-  it "serves the same client shell at the root and coordination routes" do
-    [ "/", "/projects/018f0f4d-4e45-7abc-8def-000000000011/coordination" ].each do |path|
+  it "serves the same client shell at every client-side project route" do
+    repository_id = "018f0f4d-4e45-7abc-8def-000000000011"
+    paths = [ "/", "/projects" ] +
+      %w[coordination resources knowledge governance delivery].map do |section|
+        "/projects/#{repository_id}/#{section}"
+      end
+
+    paths.each do |path|
       session.get path
 
-      expect(session.response.status).to eq(200)
+      expect(session.response.status).to eq(200), "#{path} returned #{session.response.status}"
       expect(session.response.body).to include('data-react-class="CoordinatorApp"')
     end
   end

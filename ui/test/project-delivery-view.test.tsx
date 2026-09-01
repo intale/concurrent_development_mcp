@@ -259,6 +259,8 @@ test("shows typed delivery facts while keeping operation batches explicitly glob
   assert.doesNotMatch(markup, /raw arguments/i);
   assert.match(markup, /Next Candidate page/);
   assert.match(markup, /Next batch items page/);
+  assert.match(markup, /aria-label="Candidate checkpoints"/);
+  assert.match(markup, /aria-label="Global operation batches"/);
 });
 
 test("keeps the latest available delivery view visible when refresh fails", () => {

@@ -15,6 +15,7 @@ Feature: Browse the latest available project catalog
       When the browser queries the project catalog for "project:test/ui-catalog-a"
       Then the project catalog contains only repository "ui-catalog-a"
       And Rails serves the standalone project browser shell
+      And every project browser route serves the same standalone shell
       And the browser-facing GraphQL schema exposes Query without Mutation or Subscription
 
   Rule: An available project page remains readable while projection delivery catches up
