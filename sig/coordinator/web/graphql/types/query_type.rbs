@@ -43,6 +43,43 @@ module Coordinator::Web::Graphql::Types
       ?relation: String?,
       ?relations_after: String?
     ) -> Hash[Symbol, untyped]?
+    def project_governance: (
+      repository_id: String,
+      first: Integer,
+      ?after_choice: String?,
+      ?after_decision: String?,
+      ?after_guidance: String?,
+      ?after_impact: String?,
+      ?choice_status: String?,
+      ?choice_type: String?,
+      ?decision_policy_status: String?,
+      ?decision_topic_id: String?,
+      ?guidance_source: String?,
+      ?impact_outcome: String?
+    ) -> Hash[Symbol, untyped]?
+    def project_decision: (
+      repository_id: String,
+      decision_id: String
+    ) -> Coordinator::Read::Web::GovernanceBrowserV1::DecisionDetail?
+    def project_guidance: (
+      repository_id: String,
+      message_id: String,
+      interpretations_first: Integer,
+      ?interpretations_after: String?
+    ) -> Hash[Symbol, untyped]?
+    def project_agent_choice: (
+      repository_id: String,
+      choice_id: String,
+      impacts_first: Integer,
+      ?impacts_after: String?
+    ) -> Hash[Symbol, untyped]?
+    def command_receipts: (
+      first: Integer,
+      ?after: String?,
+      ?status: String?,
+      ?tool_name: String?
+    ) -> Hash[Symbol, untyped]
+    def command_receipt: (command_id: String) -> Coordinator::Read::Web::GovernanceBrowserV1::CommandReceipt?
 
     private
 
@@ -73,8 +110,24 @@ module Coordinator::Web::Graphql::Types
       direction: String,
       relation: String?
     ) -> Hash[Symbol, untyped]
+    def governance_filters: (**untyped filters) -> Hash[String, untyped]
+    def governance_decision_connection: (untyped page, filters: Hash[String, untyped]) -> Hash[Symbol, untyped]
+    def governance_guidance_connection: (untyped page, filters: Hash[String, untyped]) -> Hash[Symbol, untyped]
+    def governance_choice_connection: (untyped page, filters: Hash[String, untyped]) -> Hash[Symbol, untyped]
+    def governance_impact_connection: (untyped page, filters: Hash[String, untyped]) -> Hash[Symbol, untyped]
+    def governance_interpretation_connection: (untyped page, filters: Hash[String, untyped]) -> Hash[Symbol, untyped]
+    def governance_receipt_connection: (untyped page, filters: Hash[String, untyped]) -> Hash[Symbol, untyped]
+    def governance_connection: (
+      Array[untyped] nodes,
+      bool has_more,
+      untyped cursor,
+      String kind,
+      filters: Hash[String, untyped]
+    ) -> Hash[Symbol, untyped]
     def knowledge_browser: () -> Coordinator::Read::Web::Queries::KnowledgeBrowser
+    def governance_browser: () -> Coordinator::Read::Web::Queries::GovernanceBrowser
     def raise_knowledge_query_error: (Coordinator::Read::Web::KnowledgeBrowserQueryError error) -> bot
+    def raise_governance_query_error: (Coordinator::Read::Web::GovernanceBrowserQueryError error) -> bot
     def raise_query_error: (Coordinator::Read::QueryResultV1 result) -> bot
   end
 end

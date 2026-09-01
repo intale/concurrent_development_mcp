@@ -1,0 +1,27 @@
+module Coordinator
+  module Read
+    module Web
+      module Contracts
+        class GovernanceBrowser
+          class Catalog < Dry::Validation::Contract
+          end
+
+          class Decision < Dry::Validation::Contract
+          end
+
+          class Guidance < Dry::Validation::Contract
+          end
+
+          class Choice < Dry::Validation::Contract
+          end
+
+          class Receipts < Dry::Validation::Contract
+          end
+
+          class Receipt < Dry::Validation::Contract
+          end
+        end
+      end
+    end
+  end
+end

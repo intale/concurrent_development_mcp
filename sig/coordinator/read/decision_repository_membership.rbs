@@ -1,0 +1,7 @@
+module Coordinator
+  module Read
+    class DecisionRepositoryMembership < ApplicationRecord
+      def readonly?: () -> bool
+    end
+  end
+end

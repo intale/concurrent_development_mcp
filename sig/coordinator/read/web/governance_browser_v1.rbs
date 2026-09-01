@@ -1,0 +1,93 @@
+module Coordinator
+  module Read
+    module Web
+      class GovernanceBrowserV1
+        class Project < Shared::Value
+          def repository_id: () -> String
+          def scope: () -> String
+          def display_name: () -> String?
+        end
+
+        class GuidancePage < Shared::Value
+          def items: () -> Array[Read::GuidanceUtteranceV1]
+          def next_message_id: () -> String?
+          def has_more: () -> bool
+        end
+
+        class AgentChoicePage < Shared::Value
+          def items: () -> Array[Read::AgentChoiceViewV1]
+          def next_choice_id: () -> String?
+          def has_more: () -> bool
+        end
+
+        class ImpactCursor < Shared::Value
+          def global_position: () -> Integer
+          def assessment_id: () -> String
+        end
+
+        class ImpactPage < Shared::Value
+          def items: () -> Array[Read::AgentChoiceImpactViewV1]
+          def next_cursor: () -> ImpactCursor?
+          def has_more: () -> bool
+        end
+
+        class EventReference < Shared::Value
+          def event_id: () -> String
+          def type: () -> String
+          def stream_context: () -> String
+          def stream_name: () -> String
+          def stream_id: () -> String
+          def stream_revision: () -> Integer
+        end
+
+        class CommandReceipt < Shared::Value
+          def command_id: () -> String
+          def tool_name: () -> String
+          def status: () -> String
+          def summary: () -> String
+          def receipt: () -> String
+          def warnings: () -> Array[String]
+          def next_action_tools: () -> Array[String]
+          def emitted_events: () -> Array[EventReference]
+          def completed_at: () -> String
+        end
+
+        class ReceiptPage < Shared::Value
+          def items: () -> Array[CommandReceipt]
+          def next_command_id: () -> String?
+          def has_more: () -> bool
+        end
+
+        class Catalog < Shared::Value
+          def project: () -> Project
+          def decisions: () -> Read::DecisionPageV1
+          def guidance: () -> GuidancePage
+          def choices: () -> AgentChoicePage
+          def impacts: () -> ImpactPage
+        end
+
+        class DecisionDetail < Shared::Value
+          def project: () -> Project
+          def decision: () -> Read::DecisionViewV1
+          def membership_bases: () -> Array[String]
+        end
+
+        class GuidanceDetail < Shared::Value
+          def project: () -> Project
+          def guidance: () -> Read::GuidanceUtteranceV1
+          def interpretations: () -> Read::InterpretationPageV1
+        end
+
+        class ChoiceDetail < Shared::Value
+          def project: () -> Project
+          def choice: () -> Read::AgentChoiceViewV1
+          def impacts: () -> ImpactPage
+        end
+
+        class ReceiptDetail < Shared::Value
+          def receipt: () -> CommandReceipt
+        end
+      end
+    end
+  end
+end

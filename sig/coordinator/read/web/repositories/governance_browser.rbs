@@ -1,0 +1,43 @@
+module Coordinator
+  module Read
+    module Web
+      module Repositories
+        class GovernanceBrowser
+          def initialize: (
+            ?decisions: Read::Repositories::DecisionGovernance,
+            ?utterances: Read::Repositories::UserUtterances,
+            ?interpretations: Read::Repositories::DecisionInterpretations,
+            ?choices: Read::Repositories::AgentChoices,
+            ?impacts: Read::Repositories::AgentChoiceImpacts
+          ) -> void
+          def catalog: (GovernanceBrowserQueryV1::Catalog query) -> GovernanceBrowserV1::Catalog?
+          def decision: (GovernanceBrowserQueryV1::Decision query) -> GovernanceBrowserV1::DecisionDetail?
+          def guidance: (GovernanceBrowserQueryV1::Guidance query) -> GovernanceBrowserV1::GuidanceDetail?
+          def choice: (GovernanceBrowserQueryV1::Choice query) -> GovernanceBrowserV1::ChoiceDetail?
+          def receipts: (GovernanceBrowserQueryV1::Receipts query) -> GovernanceBrowserV1::ReceiptPage
+          def receipt: (GovernanceBrowserQueryV1::Receipt query) -> GovernanceBrowserV1::ReceiptDetail?
+
+          private
+
+          def find_project: (String repository_id) -> Read::Repository?
+          def build_project: (Read::Repository record) -> GovernanceBrowserV1::Project
+          def guidance_page: (GovernanceBrowserQueryV1::Catalog query) -> GovernanceBrowserV1::GuidancePage
+          def choice_page: (GovernanceBrowserQueryV1::Catalog query) -> GovernanceBrowserV1::AgentChoicePage
+          def impact_page: (
+            relation: ActiveRecord::Relation,
+            outcome: String?,
+            after_global_position: Integer?,
+            after_assessment_id: String?,
+            limit: Integer
+          ) -> GovernanceBrowserV1::ImpactPage
+          def guidance_for_repository: (String repository_id) -> ActiveRecord::Relation
+          def choices_for_repository: (String repository_id) -> ActiveRecord::Relation
+          def impacts_for_repository: (String repository_id) -> ActiveRecord::Relation
+          def attempts_for_repository: (String repository_id) -> ActiveRecord::Relation
+          def build_receipt: (Read::CommandReceipt record) -> GovernanceBrowserV1::CommandReceipt
+          def build_event_reference: (Hash[String, untyped] attributes) -> GovernanceBrowserV1::EventReference
+        end
+      end
+    end
+  end
+end

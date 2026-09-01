@@ -1,0 +1,117 @@
+module Coordinator::Web::Graphql::Types
+  module GovernanceTypes
+  class DecisionPolicyStatusEnum < BaseEnum
+  end
+  class GuidanceSourceEnum < BaseEnum
+  end
+  class AgentChoiceTypeEnum < BaseEnum
+  end
+  class AgentChoiceStatusEnum < BaseEnum
+  end
+  class AgentChoiceImpactOutcomeEnum < BaseEnum
+  end
+  class CommandReceiptStatusEnum < BaseEnum
+  end
+  class ActorType < BaseObject
+  end
+  class EventReferenceType < BaseObject
+  end
+  class DecisionValueType < BaseObject
+  end
+  class DecisionScopeType < BaseObject
+  end
+  class DecisionConditionsType < BaseObject
+  end
+  class DecisionAuthorityType < BaseObject
+  end
+  class DecisionEnforcementType < BaseObject
+  end
+  class DecisionType < BaseObject
+    def authority: () -> Coordinator::Write::Interpretations::DecisionAuthorityV1
+    def conditions: () -> Coordinator::Write::Interpretations::DecisionConditionsV1
+    def correction_summary: () -> String?
+    def current_at: () -> String
+    def current_by: () -> Coordinator::Read::AttributedActorV1
+    def current_event: () -> Coordinator::Write::EventReference
+    def definition_digest: () -> String
+    def effect: () -> String
+    def enforcement: () -> Coordinator::Write::Interpretations::DecisionEnforcementV1
+    def modality: () -> String
+    def rationale_summary: () -> String?
+    def recorded_at: () -> String
+    def recorded_by: () -> Coordinator::Read::AttributedActorV1
+    def scope: () -> Coordinator::Write::Interpretations::DecisionScopeV1
+    def statement_kind: () -> String
+    def topic_id: () -> String
+    def value: () -> Coordinator::Write::Interpretations::DecisionValueV1
+  end
+  class GuidanceAnchorsType < BaseObject
+  end
+  class ClarificationQuestionType < BaseObject
+  end
+  class InterpretationType < BaseObject
+    def assessment_reasons: () -> Array[String]
+    def assessment_status: () -> String
+    def clarification_questions: () -> Array[Coordinator::Write::Interpretations::ClarificationQuestionV1]
+    def effect: () -> String?
+    def modality: () -> String?
+    def source_span_text: () -> String?
+    def statement_kind: () -> String
+    def topic_id: () -> String
+    def value: () -> Coordinator::Write::Interpretations::DecisionValueV1
+  end
+  class GuidanceType < BaseObject
+    def excerpt: () -> String
+  end
+  class AgentChoiceOptionType < BaseObject
+  end
+  class AgentChoiceContextType < BaseObject
+  end
+  class AgentChoiceType < BaseObject
+    def accepted_at: () -> String?
+    def accepted_by: () -> Coordinator::Read::AttributedActorV1?
+    def assessment_basis: () -> String?
+    def assessment_decision_ids: () -> Array[String]
+    def assessment_warnings: () -> Array[String]
+    def choice_context: () -> Coordinator::Write::DecisionContexts::QueryContextV1
+    def invalidation_reason: () -> String?
+    def invalidated_at: () -> String?
+    def recorded_at: () -> String
+    def recorded_by: () -> Coordinator::Read::AttributedActorV1
+  end
+  class AgentChoiceImpactType < BaseObject
+    def after_basis: () -> String
+    def after_reason_codes: () -> Array[String]
+    def after_status: () -> String
+    def assessed_at: () -> String
+    def before_basis: () -> String
+    def before_reason_codes: () -> Array[String]
+    def before_status: () -> String
+    def decision_change_kind: () -> String
+    def decision_changed_at: () -> String
+    def decision_id: () -> String
+  end
+  class CommandReceiptType < BaseObject
+  end
+  class DecisionConnectionType < BaseObject
+  end
+  class GuidanceConnectionType < BaseObject
+  end
+  class AgentChoiceConnectionType < BaseObject
+  end
+  class AgentChoiceImpactConnectionType < BaseObject
+  end
+  class InterpretationConnectionType < BaseObject
+  end
+  class CommandReceiptConnectionType < BaseObject
+  end
+  class ProjectGovernanceType < BaseObject
+  end
+  class ProjectDecisionType < BaseObject
+  end
+  class ProjectGuidanceType < BaseObject
+  end
+    class ProjectAgentChoiceType < BaseObject
+    end
+  end
+end

@@ -11,11 +11,12 @@ module Coordinator::Read
         record = Coordinator::Read::CommandReceipt.find_by(command_id:)
         return unless record
 
-        @schema_registry.load(
-          type: "CommandCompleted",
-          schema_version: 1,
-          data: record.completion
-        )
+        build(record)
+      end
+
+      def fetch_many(command_ids)
+        records = Coordinator::Read::CommandReceipt.where(command_id: command_ids).index_by(&:command_id)
+        command_ids.filter_map { |command_id| records[command_id] && build(records.fetch(command_id)) }
       end
 
       def store(event:, completion:)
@@ -29,6 +30,16 @@ module Coordinator::Read
           receipt: completion.receipt,
           completion: completion.to_h,
           completed_at_domain: completion.completed_at
+        )
+      end
+
+      private
+
+      def build(record)
+        @schema_registry.load(
+          type: "CommandCompleted",
+          schema_version: 1,
+          data: record.completion
         )
       end
     end

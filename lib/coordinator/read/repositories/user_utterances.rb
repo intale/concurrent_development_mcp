@@ -8,6 +8,11 @@ module Coordinator::Read
         build(record)
       end
 
+      def fetch_many(message_ids)
+        records = Coordinator::Read::UserUtterance.where(message_id: message_ids).index_by(&:message_id)
+        message_ids.filter_map { build(records[_1]) }
+      end
+
       def store(event:, utterance:)
         Coordinator::Read::UserUtterance.create!(
           message_id: utterance.message_id,

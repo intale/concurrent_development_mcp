@@ -29,10 +29,94 @@ type ActiveResourceLeaseConnection {
   pageInfo: PageInfo!
 }
 
+type AgentChoiceConnection {
+  nodes: [GovernanceAgentChoice!]!
+  pageInfo: PageInfo!
+}
+
+type AgentChoiceContext {
+  agentRole: String!
+  attemptId: ID!
+  changeSetId: ID!
+  environment: String
+  language: String!
+  paths: [String!]!
+  phase: String!
+  repositoryId: ID!
+  workItemId: ID!
+}
+
+type AgentChoiceImpact {
+  afterBasis: String!
+  afterReasonCodes: [String!]!
+  afterStatus: String!
+  assessedAt: String!
+  assessmentId: ID!
+  attemptId: ID!
+  beforeBasis: String!
+  beforeReasonCodes: [String!]!
+  beforeStatus: String!
+  choiceId: ID!
+  decisionChangeKind: String!
+  decisionChangedAt: String!
+  decisionId: ID!
+  outcome: AgentChoiceImpactOutcome!
+  policyVersion: String!
+  reason: String!
+}
+
+type AgentChoiceImpactConnection {
+  nodes: [AgentChoiceImpact!]!
+  pageInfo: PageInfo!
+}
+
+enum AgentChoiceImpactOutcome {
+  ALREADY_INVALIDATED
+  INVALIDATED
+  NOT_APPLICABLE
+  STILL_VALID
+}
+
+enum AgentChoiceKind {
+  TESTING_FRAMEWORK
+}
+
+type AgentChoiceOption {
+  id: ID!
+  summary: String!
+}
+
+enum AgentChoiceStatus {
+  ACCEPTED
+  INVALIDATED
+  RECORDED
+}
+
 enum ArtifactRelationDirection {
   BOTH
   INCOMING
   OUTGOING
+}
+
+type CommandReceipt {
+  commandId: ID!
+  completedAt: String!
+  emittedEvents: [GovernanceEventReference!]!
+  nextActionTools: [String!]!
+  receipt: ID!
+  status: CommandReceiptStatus!
+  summary: String!
+  toolName: String!
+  warnings: [String!]!
+}
+
+type CommandReceiptConnection {
+  nodes: [CommandReceipt!]!
+  pageInfo: PageInfo!
+}
+
+enum CommandReceiptStatus {
+  OK
 }
 
 type CoordinationChangeSet {
@@ -108,6 +192,80 @@ type CoordinationWorkItem {
 type CoordinationWorkItemConnection {
   nodes: [CoordinationWorkItem!]!
   pageInfo: PageInfo!
+}
+
+type DecisionAuthority {
+  actorId: ID!
+  role: String!
+}
+
+type DecisionConditions {
+  artifactKinds: [String!]!
+  environments: [String!]!
+  languages: [String!]!
+  phases: [String!]!
+  repositoryKinds: [String!]!
+  tags: [String!]!
+}
+
+type DecisionEnforcement {
+  level: String!
+  onViolation: String!
+  retroactivity: String!
+}
+
+type DecisionInterpretation {
+  actor: GovernanceActor!
+  assessmentReasons: [String!]!
+  assessmentStatus: String!
+  clarificationQuestions: [InterpretationClarificationQuestion!]!
+  clarificationRequiredAt: String
+  effect: String
+  id: ID!
+  lifecycleStatus: String!
+  messageId: ID!
+  modality: String
+  policyStatus: String!
+  proposedAt: String!
+  sourceSpanText: String
+  statementKind: String!
+  topicId: String!
+  value: DecisionValue!
+}
+
+type DecisionInterpretationConnection {
+  nodes: [DecisionInterpretation!]!
+  pageInfo: PageInfo!
+}
+
+enum DecisionPolicyStatus {
+  ACTIVE
+  RECORDED
+}
+
+type DecisionScope {
+  agentRoles: [String!]!
+  attemptId: ID
+  branchSelectors: [String!]!
+  candidateId: ID
+  changeSetId: ID
+  contractSelectors: [String!]!
+  environments: [String!]!
+  pathSelectors: [String!]!
+  repositoryIds: [ID!]!
+  schemaSelectors: [String!]!
+  symbolSelectors: [String!]!
+  workItemId: ID
+  workspaceId: ID
+}
+
+type DecisionValue {
+  action: String
+  items: [String!]
+  name: String
+  schema: String!
+  targetId: ID
+  targetKind: String
 }
 
 type DevelopmentArtifactConnection {
@@ -214,6 +372,92 @@ type DevelopmentArtifactSummary {
   title: String!
 }
 
+type GovernanceActor {
+  id: ID!
+  kind: String!
+}
+
+type GovernanceAgentChoice {
+  acceptedAt: String
+  acceptedBy: GovernanceActor
+  alternatives: [AgentChoiceOption!]!
+  assessmentBasis: String
+  assessmentDecisionIds: [ID!]!
+  assessmentWarnings: [String!]!
+  choiceType: AgentChoiceKind!
+  context: AgentChoiceContext!
+  id: ID!
+  invalidatedAt: String
+  invalidationReason: String
+  observationStatus: AgentChoiceStatus!
+  reasonSummary: String!
+  recordedAt: String!
+  recordedBy: GovernanceActor!
+  selected: AgentChoiceOption!
+}
+
+type GovernanceDecision {
+  authority: DecisionAuthority!
+  conditions: DecisionConditions!
+  correctionCount: Int!
+  correctionSummary: String
+  currentAt: String!
+  currentBy: GovernanceActor!
+  currentEvent: GovernanceEventReference!
+  definitionDigest: String!
+  effect: String!
+  enforcement: DecisionEnforcement!
+  id: ID!
+  interpretationId: ID!
+  modality: String!
+  policyStatus: DecisionPolicyStatus!
+  rationaleSummary: String
+  recordedAt: String!
+  recordedBy: GovernanceActor!
+  scope: DecisionScope!
+  sourceMessageId: ID!
+  statementKind: String!
+  topicId: String!
+  value: DecisionValue!
+}
+
+type GovernanceDecisionConnection {
+  nodes: [GovernanceDecision!]!
+  pageInfo: PageInfo!
+}
+
+type GovernanceEventReference {
+  id: ID!
+  streamContext: String!
+  streamId: ID!
+  streamName: String!
+  streamRevision: Int!
+  type: String!
+}
+
+type GuidanceAnchors {
+  attemptId: ID
+  changeSetId: ID
+  repositoryIds: [ID!]!
+  workItemId: ID
+}
+
+type GuidanceConnection {
+  nodes: [ProjectGuidance!]!
+  pageInfo: PageInfo!
+}
+
+enum GuidanceSource {
+  AGENT_FORWARDED
+  MCP_CLIENT
+}
+
+type InterpretationClarificationQuestion {
+  field: String!
+  options: [String!]!
+  prompt: String!
+}
+
 """
 Opaque forward-pagination state for one bounded read-model window.
 """
@@ -232,6 +476,12 @@ type Project {
   registeredAt: String!
   remotes: [String!]!
   scope: String!
+}
+
+type ProjectAgentChoice {
+  choice: GovernanceAgentChoice!
+  impacts: AgentChoiceImpactConnection!
+  project: CoordinationProject!
 }
 
 type ProjectArtifact {
@@ -254,6 +504,38 @@ type ProjectCoordination {
   dependencies: CoordinationDependencyConnection!
   project: CoordinationProject!
   workItems: CoordinationWorkItemConnection!
+}
+
+type ProjectDecision {
+  decision: GovernanceDecision!
+  membershipBases: [String!]!
+  project: CoordinationProject!
+}
+
+type ProjectGovernance {
+  choices: AgentChoiceConnection!
+  decisions: GovernanceDecisionConnection!
+  guidance: GuidanceConnection!
+  impacts: AgentChoiceImpactConnection!
+  project: CoordinationProject!
+}
+
+type ProjectGuidance {
+  actor: GovernanceActor!
+  anchors: GuidanceAnchors!
+  conversationId: ID!
+  excerpt: String!
+  id: ID!
+  policyStatus: String!
+  recordedAt: String!
+  source: GuidanceSource!
+  text: String!
+}
+
+type ProjectGuidanceDetail {
+  guidance: ProjectGuidance!
+  interpretations: DecisionInterpretationConnection!
+  project: CoordinationProject!
 }
 
 type ProjectKnowledge {
@@ -299,6 +581,21 @@ Read-only access to the latest available coordination projections.
 """
 type Query {
   """
+  One command-completion audit fact.
+  """
+  commandReceipt(commandId: ID!): CommandReceipt
+
+  """
+  Global command-completion audit facts without inferred project attribution.
+  """
+  commandReceipts(after: String, first: Int = 20, status: CommandReceiptStatus, toolName: String): CommandReceiptConnection!
+
+  """
+  One project AgentChoice and its bounded decision-impact assessments.
+  """
+  projectAgentChoice(choiceId: ID!, impactsAfter: String, impactsFirst: Int = 20, repositoryId: ID!): ProjectAgentChoice
+
+  """
   One project-scoped Artifact with passive content and active relationships.
   """
   projectArtifact(artifactId: ID!, direction: ArtifactRelationDirection = BOTH, first: Int = 20, relation: DevelopmentArtifactRelationKind, relationsAfter: String, repositoryId: ID!): ProjectArtifact
@@ -307,6 +604,21 @@ type Query {
   Latest available coordination facts for one registered project.
   """
   projectCoordination(blocking: Boolean, changeSetsAfter: String, dependenciesAfter: String, first: Int = 20, presentationStatuses: [CoordinationPresentationStatus!], repositoryId: ID!, workItemSort: WorkItemSort = WORK_ITEM_ID_ASC, workItemsAfter: String): ProjectCoordination
+
+  """
+  One Decision deterministically associated with the exact project.
+  """
+  projectDecision(decisionId: ID!, repositoryId: ID!): ProjectDecision
+
+  """
+  Project-scoped Decisions, guidance, AgentChoices, and decision impacts.
+  """
+  projectGovernance(afterChoice: String, afterDecision: String, afterGuidance: String, afterImpact: String, choiceStatus: AgentChoiceStatus, choiceType: AgentChoiceKind, decisionPolicyStatus: DecisionPolicyStatus, decisionTopicId: String, first: Int = 20, guidanceSource: GuidanceSource, impactOutcome: AgentChoiceImpactOutcome, repositoryId: ID!): ProjectGovernance
+
+  """
+  One project-scoped guidance fact and its bounded interpretation proposals.
+  """
+  projectGuidance(interpretationsAfter: String, interpretationsFirst: Int = 20, messageId: ID!, repositoryId: ID!): ProjectGuidanceDetail
 
   """
   Current Skills and Development Artifacts for one registered project.

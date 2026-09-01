@@ -8,6 +8,11 @@ module Coordinator::Read
         record && build(record)
       end
 
+      def fetch_many(choice_ids)
+        records = Coordinator::Read::AgentChoice.where(choice_id: choice_ids).index_by(&:choice_id)
+        choice_ids.filter_map { |choice_id| records[choice_id] && build(records.fetch(choice_id)) }
+      end
+
       def store_recorded(event:, choice:)
         Coordinator::Read::AgentChoice.create!(
           choice_id: choice.choice_id,

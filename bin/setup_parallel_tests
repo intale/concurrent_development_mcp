@@ -15,7 +15,7 @@ export PARALLEL_TEST_PROCESSORS="$parallel_test_processes"
 export PARALLEL_TEST_FIRST_IS_1=true
 
 bundle exec rake "parallel:create[$parallel_test_processes]"
-bundle exec rake "parallel:migrate[$parallel_test_processes]"
+SCHEMA=/dev/null bundle exec rake "parallel:migrate[$parallel_test_processes]"
 
 parallel_test_worker=1
 while [ "$parallel_test_worker" -le "$parallel_test_processes" ]; do

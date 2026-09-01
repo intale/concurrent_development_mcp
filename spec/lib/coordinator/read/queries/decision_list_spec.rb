@@ -72,6 +72,30 @@ RSpec.describe Coordinator::Read::Queries::DecisionList, :read_model do
     expect(result.to_h.keys & %i[fresh pending projection_status stream_revision]).to be_empty
   end
 
+  it "resolves attempt-scoped Decisions through unbounded Attempt history" do
+    change_set_id = "CS-decision-history"
+    work_item_id = "W-decision-history"
+    attempt_id = "A-decision-history"
+    context = create(
+      :coordinator_read_coord_context,
+      change_set_id:,
+      work_item_id:,
+      repository_id: DECISION_LIST_REPOSITORY_ID
+    )
+    context.update!(document: context.document.merge("attempts" => []))
+    create(:coordinator_read_attempt_history, attempt_id:, change_set_id:, work_item_id:)
+    create(
+      :coordinator_read_decision_definition,
+      decision_id: "D-attempt-history",
+      repository_id: nil,
+      attempt_id:
+    )
+
+    result = query.call(repository_id: DECISION_LIST_REPOSITORY_ID).value!
+
+    expect(result.data.page.items.map(&:decision_id)).to eq([ "D-attempt-history" ])
+  end
+
   it "returns typed invalid filters and an empty available page" do
     invalid = query.call(
       repository_id: "0198f5b8-57ab-7def-8abc-1234567890ab",

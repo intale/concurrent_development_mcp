@@ -1,0 +1,54 @@
+module Coordinator
+  module Read
+    module Web
+      class GovernanceBrowserQueryV1
+        class Catalog < Shared::Value
+          def repository_id: () -> String
+          def first: () -> Integer
+          def decision_topic_id: () -> String?
+          def decision_policy_status: () -> String?
+          def after_decision_id: () -> String?
+          def guidance_source: () -> String?
+          def after_guidance_message_id: () -> String?
+          def choice_type: () -> String?
+          def choice_status: () -> String?
+          def after_choice_id: () -> String?
+          def impact_outcome: () -> String?
+          def after_impact_global_position: () -> Integer?
+          def after_impact_assessment_id: () -> String?
+        end
+
+        class Decision < Shared::Value
+          def repository_id: () -> String
+          def decision_id: () -> String
+        end
+
+        class Guidance < Shared::Value
+          def repository_id: () -> String
+          def message_id: () -> String
+          def first: () -> Integer
+          def after_revision: () -> Integer
+        end
+
+        class Choice < Shared::Value
+          def repository_id: () -> String
+          def choice_id: () -> String
+          def first: () -> Integer
+          def after_impact_global_position: () -> Integer?
+          def after_impact_assessment_id: () -> String?
+        end
+
+        class Receipts < Shared::Value
+          def first: () -> Integer
+          def tool_name: () -> String?
+          def status: () -> String?
+          def after_command_id: () -> String?
+        end
+
+        class Receipt < Shared::Value
+          def command_id: () -> String
+        end
+      end
+    end
+  end
+end

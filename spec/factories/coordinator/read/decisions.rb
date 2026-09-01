@@ -5,6 +5,9 @@ FactoryBot.define do
     transient do
       repository_id { "018f0f4d-4e45-7abc-8def-000000000099" }
       change_set_id { nil }
+      work_item_id { nil }
+      attempt_id { nil }
+      candidate_id { nil }
       topic_id { "testing.framework" }
       enforcement_level { "implementation_gate" }
       required_evidence { %w[combined_tests] }
@@ -19,12 +22,12 @@ FactoryBot.define do
       candidate_policy = topic_id == "candidate.impact_policy"
       scope = {
         "workspace_id" => nil,
-        "repository_ids" => candidate_policy ? [] : [ repository_id ],
+        "repository_ids" => candidate_policy || repository_id.nil? ? [] : [ repository_id ],
         "branch_selectors" => [],
         "change_set_id" => candidate_policy ? change_set_id : nil,
-        "work_item_id" => nil,
-        "attempt_id" => nil,
-        "candidate_id" => nil,
+        "work_item_id" => work_item_id,
+        "attempt_id" => attempt_id,
+        "candidate_id" => candidate_id,
         "path_selectors" => [],
         "symbol_selectors" => [],
         "contract_selectors" => [],

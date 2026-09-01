@@ -3,6 +3,19 @@
 module Coordinator::Read
   module Repositories
     class AgentChoiceImpacts
+      def fetch(assessment_id)
+        record = Coordinator::Read::AgentChoiceImpact.find_by(assessment_id:)
+        record && build(record)
+      end
+
+      def fetch_many(assessment_ids)
+        records = Coordinator::Read::AgentChoiceImpact.where(assessment_id: assessment_ids)
+          .index_by(&:assessment_id)
+        assessment_ids.filter_map do |assessment_id|
+          records[assessment_id] && build(records.fetch(assessment_id))
+        end
+      end
+
       def store_assessment(event:, impact:)
         assessment = impact.assessment
         Coordinator::Read::AgentChoiceImpact.create!(

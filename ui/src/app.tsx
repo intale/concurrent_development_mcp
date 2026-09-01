@@ -4,6 +4,7 @@ import { ProjectCatalogPage } from "./projects/project-catalog-page.js";
 import { ProjectCoordinationPage } from "./coordination/project-coordination-page.js";
 import { ProjectResourcesPage } from "./resources/project-resources-page.js";
 import { ProjectKnowledgePage } from "./knowledge/project-knowledge-page.js";
+import { ProjectGovernancePage } from "./governance/project-governance-page.js";
 
 export function App() {
   const location = useLocation();
@@ -84,6 +85,7 @@ export function App() {
           <Route path="/projects/:repositoryId/coordination" element={<ProjectCoordinationPage />} />
           <Route path="/projects/:repositoryId/resources" element={<ProjectResourcesPage />} />
           <Route path="/projects/:repositoryId/knowledge" element={<ProjectKnowledgePage />} />
+          <Route path="/projects/:repositoryId/governance" element={<ProjectGovernancePage />} />
           <Route path="*" element={<Navigate replace to="/projects" />} />
         </Routes>
       </main>

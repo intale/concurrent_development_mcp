@@ -57,6 +57,27 @@ RSpec.describe "parallel test executables" do
     expect(plain).to include("unset RBS_TEST_TARGET RBS_TEST_LOGLEVEL RBS_TEST_OPT")
   end
 
+  it "runtime-checks isolated coordinator logic without wrapping Rails adapters" do
+    typed = Rails.root.join("bin/rspec").read
+
+    expect(typed).to include("PgEventstore::*")
+    expect(typed).to include("Coordinator::Write::*")
+    expect(typed).to include("Coordinator::Read::Queries::*")
+    expect(typed).to include("Coordinator::Read::Web::*")
+    expect(typed).to include("::Coordinator::Processes::Jobs::*")
+    expect(typed).to include("::Coordinator::Read::Repositories::*")
+    expect(typed).to include("::Coordinator::Read::Web::Repositories::*")
+    expect(typed).not_to include("Coordinator::*'")
+    expect(typed).not_to include("ApplicationController,ApplicationJob")
+  end
+
+  it "installs only the approved external RBS collections" do
+    collection = YAML.safe_load_file(Rails.root.join("rbs_collection.yaml"))
+    enabled = collection.fetch("gems").reject { _1.fetch("ignore", false) }.map { _1.fetch("name") }
+
+    expect(enabled).to contain_exactly("connection_pool", "pg_eventstore")
+  end
+
   it "uses a quiet strict Cucumber profile that excludes future scenarios" do
     cucumber_config = Rails.root.join("config/cucumber.yml").read
 
@@ -70,7 +91,7 @@ RSpec.describe "parallel test executables" do
 
     expect(setup).to include('PARALLEL_TEST_PROCESSORS:-15')
     expect(setup).to include('parallel:create[$parallel_test_processes]')
-    expect(setup).to include('parallel:migrate[$parallel_test_processes]')
+    expect(setup).to include('SCHEMA=/dev/null bundle exec rake "parallel:migrate[$parallel_test_processes]"')
     expect(setup).to include('eventstore${parallel_test_worker}_test')
   end
 end

@@ -487,6 +487,47 @@ CREATE TABLE public.decision_partition_heads (
 
 
 --
+-- Name: decision_repository_memberships; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.decision_repository_memberships AS
+ SELECT decision_id,
+    repository_id,
+    to_jsonb(array_agg(DISTINCT basis ORDER BY basis)) AS membership_bases
+   FROM ( SELECT decision.decision_id,
+            repository_id.value AS repository_id,
+            'explicit_repository'::text AS basis
+           FROM (public.decision_definitions decision
+             CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE((decision.definition #> '{document,scope,repository_ids}'::text[]), '[]'::jsonb)) repository_id(value))
+        UNION ALL
+         SELECT decision.decision_id,
+            work_item.repository_id,
+            'change_set'::text AS basis
+           FROM (public.decision_definitions decision
+             JOIN public.coordination_dashboard_work_items work_item ON ((work_item.change_set_id = (decision.definition #>> '{document,scope,change_set_id}'::text[]))))
+        UNION ALL
+         SELECT decision.decision_id,
+            work_item.repository_id,
+            'work_item'::text AS basis
+           FROM (public.decision_definitions decision
+             JOIN public.coordination_dashboard_work_items work_item ON ((work_item.work_item_id = (decision.definition #>> '{document,scope,work_item_id}'::text[]))))
+        UNION ALL
+         SELECT decision.decision_id,
+            work_item.repository_id,
+            'attempt'::text AS basis
+           FROM ((public.decision_definitions decision
+             JOIN public.attempt_histories attempt ON (((attempt.attempt_id)::text = (decision.definition #>> '{document,scope,attempt_id}'::text[]))))
+             JOIN public.coordination_dashboard_work_items work_item ON (((work_item.change_set_id = (attempt.change_set_id)::text) AND (work_item.work_item_id = (attempt.work_item_id)::text))))
+        UNION ALL
+         SELECT decision.decision_id,
+            candidate.repository_id,
+            'candidate'::text AS basis
+           FROM (public.decision_definitions decision
+             JOIN public.candidates candidate ON (((candidate.candidate_id)::text = (decision.definition #>> '{document,scope,candidate_id}'::text[]))))) membership
+  GROUP BY decision_id, repository_id;
+
+
+--
 -- Name: decision_slot_heads; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2363,6 +2404,7 @@ ALTER TABLE ONLY public.operation_batch_outcomes
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260901063000'),
 ('20260831155000'),
 ('20260831135500'),
 ('20260829132000'),

@@ -8,8 +8,6 @@
     "rootDir": "."
   },
   "include": [
-    "test/**/*.test.tsx",
-    "src/projects/project-catalog-model.ts",
-    "src/projects/project-catalog-view.tsx"
+    "test/**/*.test.tsx"
   ]
 }

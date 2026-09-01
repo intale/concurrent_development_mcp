@@ -14,15 +14,141 @@ sources:
 path: .gem_rbs_collection
 
 gems:
-  - name: sinatra
+  - name: actioncable
     ignore: true
-  - name: monitor
-  - name: forwardable
-  - name: pg_eventstore
+  - name: actionmailer
+    ignore: true
+  - name: actionpack
+    ignore: true
+  - name: actiontext
+    ignore: true
+  - name: actionview
+    ignore: true
+  - name: activejob
+    ignore: true
+  - name: activemodel
+    ignore: true
   - name: activerecord
     ignore: true
-
-# gems:
-#   # If you want to avoid installing rbs files for gems, you can specify them here.
-#   - name: GEM_NAME
-#     ignore: true
+  - name: activestorage
+    ignore: true
+  - name: activesupport
+    ignore: true
+  - name: base64
+    ignore: true
+  - name: bigdecimal
+    ignore: true
+  - name: cgi
+    ignore: true
+  - name: concurrent-ruby
+    ignore: true
+  - name: connection_pool
+  - name: date
+    ignore: true
+  - name: dbm
+    ignore: true
+  - name: delegate
+    ignore: true
+  - name: diff-lcs
+    ignore: true
+  - name: digest
+    ignore: true
+  - name: erb
+    ignore: true
+  - name: fileutils
+    ignore: true
+  - name: forwardable
+    ignore: true
+  - name: globalid
+    ignore: true
+  - name: graphql
+    ignore: true
+  - name: i18n
+    ignore: true
+  - name: io-console
+    ignore: true
+  - name: json
+    ignore: true
+  - name: kaminari-actionview
+    ignore: true
+  - name: kaminari-activerecord
+    ignore: true
+  - name: kaminari-core
+    ignore: true
+  - name: logger
+    ignore: true
+  - name: mail
+    ignore: true
+  - name: marcel
+    ignore: true
+  - name: mini_mime
+    ignore: true
+  - name: minitest
+    ignore: true
+  - name: monitor
+    ignore: true
+  - name: net-protocol
+    ignore: true
+  - name: net-smtp
+    ignore: true
+  - name: nokogiri
+    ignore: true
+  - name: openssl
+    ignore: true
+  - name: parallel
+    ignore: true
+  - name: pathname
+    ignore: true
+  - name: pg_eventstore
+  - name: pp
+    ignore: true
+  - name: prettyprint
+    ignore: true
+  - name: prism
+    ignore: true
+  - name: pstore
+    ignore: true
+  - name: psych
+    ignore: true
+  - name: rack
+    ignore: true
+  - name: rails-dom-testing
+    ignore: true
+  - name: rails-html-sanitizer
+    ignore: true
+  - name: railties
+    ignore: true
+  - name: rake
+    ignore: true
+  - name: random-formatter
+    ignore: true
+  - name: rdoc
+    ignore: true
+  - name: regexp_parser
+    ignore: true
+  - name: securerandom
+    ignore: true
+  - name: singleton
+    ignore: true
+  - name: sinatra
+    ignore: true
+  - name: socket
+    ignore: true
+  - name: stringio
+    ignore: true
+  - name: tempfile
+    ignore: true
+  - name: thor
+    ignore: true
+  - name: time
+    ignore: true
+  - name: timeout
+    ignore: true
+  - name: tmpdir
+    ignore: true
+  - name: tsort
+    ignore: true
+  - name: tzinfo
+    ignore: true
+  - name: uri
+    ignore: true

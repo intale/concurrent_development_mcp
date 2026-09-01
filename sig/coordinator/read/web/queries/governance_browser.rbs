@@ -1,0 +1,29 @@
+module Coordinator
+  module Read
+    module Web
+      module Queries
+        class GovernanceBrowser
+          def initialize: (
+            ?catalog_contract: Contracts::GovernanceBrowser::Catalog,
+            ?decision_contract: Contracts::GovernanceBrowser::Decision,
+            ?guidance_contract: Contracts::GovernanceBrowser::Guidance,
+            ?choice_contract: Contracts::GovernanceBrowser::Choice,
+            ?receipts_contract: Contracts::GovernanceBrowser::Receipts,
+            ?receipt_contract: Contracts::GovernanceBrowser::Receipt,
+            ?repository: Repositories::GovernanceBrowser
+          ) -> void
+          def catalog: (command_input input) -> GovernanceBrowserV1::Catalog?
+          def decision: (command_input input) -> GovernanceBrowserV1::DecisionDetail?
+          def guidance: (command_input input) -> GovernanceBrowserV1::GuidanceDetail?
+          def choice: (command_input input) -> GovernanceBrowserV1::ChoiceDetail?
+          def receipts: (command_input input) -> GovernanceBrowserV1::ReceiptPage
+          def receipt: (command_input input) -> GovernanceBrowserV1::ReceiptDetail?
+
+          private
+
+          def validate: (Dry::Validation::Contract contract, command_input input) -> untyped
+        end
+      end
+    end
+  end
+end

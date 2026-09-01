@@ -1,0 +1,272 @@
+query ProjectGovernance(
+  $repositoryId: ID!
+  $first: Int
+  $decisionTopicId: String
+  $decisionPolicyStatus: DecisionPolicyStatus
+  $afterDecision: String
+  $guidanceSource: GuidanceSource
+  $afterGuidance: String
+  $choiceType: AgentChoiceKind
+  $choiceStatus: AgentChoiceStatus
+  $afterChoice: String
+  $impactOutcome: AgentChoiceImpactOutcome
+  $afterImpact: String
+) {
+  projectGovernance(
+    repositoryId: $repositoryId
+    first: $first
+    decisionTopicId: $decisionTopicId
+    decisionPolicyStatus: $decisionPolicyStatus
+    afterDecision: $afterDecision
+    guidanceSource: $guidanceSource
+    afterGuidance: $afterGuidance
+    choiceType: $choiceType
+    choiceStatus: $choiceStatus
+    afterChoice: $afterChoice
+    impactOutcome: $impactOutcome
+    afterImpact: $afterImpact
+  ) {
+    project { id name scope }
+    decisions {
+      nodes {
+        id
+        topicId
+        policyStatus
+        statementKind
+        effect
+        modality
+        recordedAt
+        currentAt
+        correctionCount
+        scope { repositoryIds changeSetId workItemId attemptId candidateId }
+        value { schema name items targetKind targetId action }
+      }
+      pageInfo { endCursor hasNextPage }
+    }
+    guidance {
+      nodes {
+        id
+        conversationId
+        excerpt
+        source
+        policyStatus
+        recordedAt
+        actor { kind id }
+        anchors { repositoryIds changeSetId workItemId attemptId }
+      }
+      pageInfo { endCursor hasNextPage }
+    }
+    choices {
+      nodes {
+        id
+        choiceType
+        observationStatus
+        reasonSummary
+        recordedAt
+        selected { id summary }
+        context { repositoryId changeSetId workItemId attemptId phase language paths environment agentRole }
+      }
+      pageInfo { endCursor hasNextPage }
+    }
+    impacts {
+      nodes {
+        assessmentId
+        choiceId
+        attemptId
+        outcome
+        reason
+        policyVersion
+        decisionId
+        decisionChangeKind
+        decisionChangedAt
+        beforeStatus
+        afterStatus
+        assessedAt
+      }
+      pageInfo { endCursor hasNextPage }
+    }
+  }
+}
+
+query ProjectGovernanceDecision($repositoryId: ID!, $decisionId: ID!) {
+  projectDecision(repositoryId: $repositoryId, decisionId: $decisionId) {
+    project { id name scope }
+    membershipBases
+    decision {
+      id
+      topicId
+      policyStatus
+      statementKind
+      effect
+      modality
+      interpretationId
+      sourceMessageId
+      definitionDigest
+      rationaleSummary
+      correctionCount
+      correctionSummary
+      recordedAt
+      currentAt
+      value { schema name items targetKind targetId action }
+      scope {
+        repositoryIds
+        changeSetId
+        workItemId
+        attemptId
+        candidateId
+        workspaceId
+        pathSelectors
+        symbolSelectors
+        contractSelectors
+        schemaSelectors
+        branchSelectors
+        environments
+        agentRoles
+      }
+      conditions { phases languages tags repositoryKinds artifactKinds environments }
+      authority { actorId role }
+      enforcement { level retroactivity onViolation }
+      recordedBy { kind id }
+      currentBy { kind id }
+      currentEvent { id type streamContext streamName streamId streamRevision }
+    }
+  }
+}
+
+query ProjectGovernanceGuidance(
+  $repositoryId: ID!
+  $messageId: ID!
+  $interpretationsFirst: Int
+  $interpretationsAfter: String
+) {
+  projectGuidance(
+    repositoryId: $repositoryId
+    messageId: $messageId
+    interpretationsFirst: $interpretationsFirst
+    interpretationsAfter: $interpretationsAfter
+  ) {
+    project { id name scope }
+    guidance {
+      id
+      conversationId
+      text
+      source
+      policyStatus
+      recordedAt
+      actor { kind id }
+      anchors { repositoryIds changeSetId workItemId attemptId }
+    }
+    interpretations {
+      nodes {
+        id
+        messageId
+        lifecycleStatus
+        policyStatus
+        statementKind
+        topicId
+        effect
+        modality
+        sourceSpanText
+        assessmentStatus
+        assessmentReasons
+        clarificationRequiredAt
+        clarificationQuestions { field prompt options }
+        proposedAt
+        actor { kind id }
+        value { schema name items targetKind targetId action }
+      }
+      pageInfo { endCursor hasNextPage }
+    }
+  }
+}
+
+query ProjectGovernanceAgentChoice(
+  $repositoryId: ID!
+  $choiceId: ID!
+  $impactsFirst: Int
+  $impactsAfter: String
+) {
+  projectAgentChoice(
+    repositoryId: $repositoryId
+    choiceId: $choiceId
+    impactsFirst: $impactsFirst
+    impactsAfter: $impactsAfter
+  ) {
+    project { id name scope }
+    choice {
+      id
+      choiceType
+      observationStatus
+      reasonSummary
+      recordedAt
+      acceptedAt
+      invalidatedAt
+      invalidationReason
+      assessmentBasis
+      assessmentDecisionIds
+      assessmentWarnings
+      selected { id summary }
+      alternatives { id summary }
+      context { repositoryId changeSetId workItemId attemptId phase language paths environment agentRole }
+      recordedBy { kind id }
+      acceptedBy { kind id }
+    }
+    impacts {
+      nodes {
+        assessmentId
+        choiceId
+        attemptId
+        outcome
+        reason
+        policyVersion
+        decisionId
+        decisionChangeKind
+        decisionChangedAt
+        beforeStatus
+        beforeBasis
+        beforeReasonCodes
+        afterStatus
+        afterBasis
+        afterReasonCodes
+        assessedAt
+      }
+      pageInfo { endCursor hasNextPage }
+    }
+  }
+}
+
+query GovernanceCommandReceipts(
+  $first: Int
+  $after: String
+  $status: CommandReceiptStatus
+  $toolName: String
+) {
+  commandReceipts(first: $first, after: $after, status: $status, toolName: $toolName) {
+    nodes {
+      commandId
+      toolName
+      status
+      summary
+      receipt
+      completedAt
+      warnings
+      nextActionTools
+      emittedEvents { id type streamContext streamName streamId streamRevision }
+    }
+    pageInfo { endCursor hasNextPage }
+  }
+}
+
+query GovernanceCommandReceipt($commandId: ID!) {
+  commandReceipt(commandId: $commandId) {
+    commandId
+    toolName
+    status
+    summary
+    receipt
+    completedAt
+    warnings
+    nextActionTools
+    emittedEvents { id type streamContext streamName streamId streamRevision }
+  }
+}

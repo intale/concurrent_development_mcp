@@ -3,6 +3,7 @@ module Coordinator
     module Repositories
       class AgentChoices
         def fetch: (String choice_id) -> AgentChoiceViewV1?
+        def fetch_many: (Array[String] choice_ids) -> Array[AgentChoiceViewV1]
         def store_recorded: (event: PgEventstore::Event, choice: Write::Events::AgentChoiceRecordedV1) -> AgentChoice
         def accept: (event: PgEventstore::Event, acceptance: Write::Events::AgentChoiceAcceptedV1) -> AgentChoice
         def invalidate: (event: PgEventstore::Event, invalidation: Write::Events::AgentChoiceInvalidatedByDecisionV1) -> AgentChoice
