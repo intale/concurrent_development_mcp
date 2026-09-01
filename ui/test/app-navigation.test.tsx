@@ -9,6 +9,7 @@ import {
   navigationIsExpanded
 } from "../src/app.js";
 import { PROJECT_REPOSITORY_PREVIEW_SIZE, projectWorkspaceQueryKey } from "../src/projects/project-catalog-api.js";
+import { projectHeadingOwnsFocus } from "../src/projects/project-workspace-shell.js";
 
 function renderApp(path: string, queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } }
@@ -53,6 +54,13 @@ test("contains keyboard focus inside an open compact navigation", () => {
   assert.equal(containedNavigationAction("Tab", false, -1, 4), "focus-first");
   assert.equal(containedNavigationAction("Tab", false, 1, 4), null);
   assert.equal(containedNavigationAction("ArrowDown", false, 1, 4), null);
+});
+
+test("lets a nested Project route own focus after a deep-link refresh", () => {
+  const basePath = "/projects/opaque-project-reference";
+
+  assert.equal(projectHeadingOwnsFocus(basePath, basePath), true);
+  assert.equal(projectHeadingOwnsFocus(`${basePath}/delivery/candidates/CAN-1`, basePath), false);
 });
 
 test("renders Project identity and persistent section navigation from an opaque Project route", () => {

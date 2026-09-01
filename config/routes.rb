@@ -4,11 +4,19 @@ Rails.application.routes.draw do
   root "projects#index"
   get "projects" => "projects#index"
   get "projects/:project_ref" => "projects#index"
-  get "projects/:project_ref/*client_path" => "projects#index", format: false
+  get "projects/:project_ref/*client_path" => "projects#index",
+      format: false,
+      defaults: { format: :html }
   get "audit/command-receipts" => "projects#index"
-  get "audit/command-receipts/:command_id" => "projects#index"
+  get "audit/command-receipts/:command_id" => "projects#index",
+      constraints: { command_id: /[^\/]+/ },
+      format: false,
+      defaults: { format: :html }
   get "operations/batches" => "projects#index"
-  get "operations/batches/:batch_id" => "projects#index"
+  get "operations/batches/:batch_id" => "projects#index",
+      constraints: { batch_id: /[^\/]+/ },
+      format: false,
+      defaults: { format: :html }
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 

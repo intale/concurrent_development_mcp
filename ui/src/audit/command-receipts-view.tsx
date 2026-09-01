@@ -100,12 +100,12 @@ export function CommandReceiptListView(props: CommandReceiptListViewProps) {
         {props.page.nodes.map((receipt) => (
           <div className="col" key={receipt.commandId}>
             <article className="card card-outline card-secondary h-100">
-              <div className="card-header d-flex flex-wrap align-items-start justify-content-between gap-2">
-                <div>
-                  <h3 className="card-title fw-semibold mb-1">{receipt.toolName}</h3>
-                  <div className="small text-body-secondary text-break"><code>{receipt.commandId}</code></div>
+              <div className="card-header">
+                <div className="d-flex align-items-start justify-content-between gap-2">
+                  <h3 className="card-title fw-semibold text-break mb-1">{receipt.toolName}</h3>
+                  <span className="badge text-bg-success flex-shrink-0">{receipt.status.toLowerCase()}</span>
                 </div>
-                <span className="badge text-bg-success">{receipt.status.toLowerCase()}</span>
+                <div className="small text-body-secondary text-break w-100"><code>{receipt.commandId}</code></div>
               </div>
               <div className="card-body vstack gap-2">
                 <p className="mb-0">{receipt.summary}</p>

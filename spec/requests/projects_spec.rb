@@ -62,15 +62,16 @@ RSpec.describe "Projects UI shell", :read_model do
         "#{project_path}/delivery/release-sets",
         "#{project_path}/delivery/release-sets/RS-shell",
         "/audit/command-receipts",
-        "/audit/command-receipts/CMD-shell",
+        "/audit/command-receipts/adj.20260826.candidate.1.submit",
         "/operations/batches",
         "/operations/batches/BATCH-shell"
       ]
 
     paths.each do |path|
-      session.get path, headers: { "ACCEPT" => "text/html" }
+      session.get path
 
       expect(session.response.status).to eq(200), "#{path} returned #{session.response.status}"
+      expect(session.response.media_type).to eq("text/html"), "#{path} was not served as HTML"
       expect(session.response.body).to include('data-react-class="CoordinatorApp"')
     end
   end

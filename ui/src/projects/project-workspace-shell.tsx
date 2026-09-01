@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, NavLink, Outlet, useParams } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useParams } from "react-router-dom";
 import type { ProjectWorkspaceQuery } from "../gql/graphql.js";
 import {
   fetchProjectWorkspace,
@@ -27,7 +27,9 @@ export function useProjectWorkspace(): ProjectWorkspaceContextValue {
 
 export function ProjectWorkspaceShell() {
   const { projectRef = "" } = useParams<{ projectRef: string }>();
+  const location = useLocation();
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const basePath = `/projects/${projectRef}`;
   const workspace = useQuery({
     queryKey: projectWorkspaceQueryKey(projectRef, PROJECT_REPOSITORY_PREVIEW_SIZE, null),
     queryFn: ({ signal }) => fetchProjectWorkspace(
@@ -43,10 +45,10 @@ export function ProjectWorkspaceShell() {
   const project = workspace.data?.project;
 
   useEffect(() => {
-    if (!project) return;
+    if (!project || !projectHeadingOwnsFocus(location.pathname, basePath)) return;
     document.title = `${project.displayLabel} · Coordinator`;
     headingRef.current?.focus();
-  }, [project?.projectRef]);
+  }, [basePath, location.pathname, project?.projectRef]);
 
   if (workspace.isPending) {
     return (
@@ -91,7 +93,6 @@ export function ProjectWorkspaceShell() {
     );
   }
 
-  const basePath = `/projects/${projectRef}`;
   const context = { project, projectRef } satisfies ProjectWorkspaceContextValue;
 
   return (
@@ -146,6 +147,10 @@ export function ProjectWorkspaceShell() {
       </div>
     </ProjectWorkspaceContext.Provider>
   );
+}
+
+export function projectHeadingOwnsFocus(pathname: string, basePath: string): boolean {
+  return pathname === basePath;
 }
 
 interface ProjectNavigationItemProps {

@@ -50,6 +50,13 @@ RSpec.describe "Read-only web boundaries" do
         /submit_and_(?:execute|await)|call_tool|event_store|subscription|\bmock\b|\bstub\b/i
       )
     end
+    browser_journey_source = Rails.root.join(
+      "features/step_definitions/project_workspace_journey_steps.rb"
+    ).read
+    expect(browser_journey_source).to include("FactoryBot.", "visit")
+    expect(browser_journey_source).not_to match(
+      /submit_and_(?:execute|await)|call_tool|event_store|subscription|\bmock\b|\bstub\b/i
+    )
     expect(schema).to include(
       "CREATE VIEW public.coordination_dashboard_work_items",
       "CREATE VIEW public.coordination_dashboard_change_sets",
@@ -64,7 +71,7 @@ RSpec.describe "Read-only web boundaries" do
       path.read.scan(/@UI-GWT-\d{2}/)
     end
 
-    expect(tags.sort).to eq((1..18).map { format("@UI-GWT-%02d", _1) })
+    expect(tags.sort).to eq((1..25).map { format("@UI-GWT-%02d", _1) })
   end
 
   it "keeps Rails GraphQL adapters outside runtime RBS assertions" do
