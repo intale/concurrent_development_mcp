@@ -689,7 +689,10 @@ type ProjectAgentChoice {
 type ProjectArtifact {
   artifact: DevelopmentArtifactSummary!
   content: DevelopmentArtifactContent!
-  project: CoordinationProject!
+}
+
+type ProjectArtifactRelationships {
+  artifact: DevelopmentArtifactSummary!
   relationships: DevelopmentArtifactRelationConnection!
 }
 
@@ -747,12 +750,6 @@ type ProjectGuidanceDetail {
   guidance: ProjectGuidance!
   interpretations: DecisionInterpretationConnection!
   project: CoordinationProject!
-}
-
-type ProjectKnowledge {
-  artifacts: DevelopmentArtifactConnection!
-  project: CoordinationProject!
-  skills: SkillConnection!
 }
 
 type ProjectMergeSnapshot {
@@ -825,13 +822,11 @@ type ProjectResourceConnection {
 }
 
 type ProjectSkill {
-  project: CoordinationProject!
   skill: Skill!
 }
 
 type ProjectSkillAsset {
   asset: SkillAssetContent!
-  project: CoordinationProject!
 }
 
 enum ProjectSort {
@@ -894,9 +889,19 @@ type Query {
   projectAgentChoice(choiceId: ID!, impactsAfter: String, impactsFirst: Int = 20, repositoryId: ID!): ProjectAgentChoice
 
   """
-  One project-scoped Artifact with passive content and active relationships.
+  One Project-scoped Artifact with its passive projected content.
   """
-  projectArtifact(artifactId: ID!, direction: ArtifactRelationDirection = BOTH, first: Int = 20, relation: DevelopmentArtifactRelationKind, relationsAfter: String, repositoryId: ID!): ProjectArtifact
+  projectArtifact(artifactId: ID!, projectRef: ID!): ProjectArtifact
+
+  """
+  Page active semantic relationships for one Project-scoped Artifact.
+  """
+  projectArtifactRelationships(after: String, artifactId: ID!, direction: ArtifactRelationDirection = BOTH, first: Int = 20, projectRef: ID!, relation: DevelopmentArtifactRelationKind): ProjectArtifactRelationships
+
+  """
+  Page current Development Artifacts shared by the exact Project scope.
+  """
+  projectArtifacts(after: String, first: Int = 20, kind: DevelopmentArtifactKind, labels: [String!], projectRef: ID!, sourceKind: DevelopmentArtifactSourceKind): DevelopmentArtifactConnection
 
   """
   One project Candidate checkpoint and one bounded semantic impact direction.
@@ -944,11 +949,6 @@ type Query {
   projectGuidance(interpretationsAfter: String, interpretationsFirst: Int = 20, messageId: ID!, repositoryId: ID!): ProjectGuidanceDetail
 
   """
-  Current Skills and Development Artifacts for one registered project.
-  """
-  projectKnowledge(artifactKind: DevelopmentArtifactKind, artifactLabels: [String!], artifactSourceKind: DevelopmentArtifactSourceKind, artifactsAfter: String, first: Int = 20, repositoryId: ID!, skillName: String, skillsAfter: String): ProjectKnowledge
-
-  """
   One project merge snapshot with candidates and bounded authorization decisions.
   """
   projectMergeSnapshot(authorizationsAfter: String, authorizationsFirst: Int = 20, mergeSnapshotId: ID!, repositoryId: ID!): ProjectMergeSnapshot
@@ -974,14 +974,19 @@ type Query {
   projectResources(after: String, first: Int = 20, path: String, projectRef: ID!, resourceKind: ResourceKind, resourceLifecycleStatus: ResourceLifecycleStatus): ProjectResourceConnection
 
   """
-  Current projected revision of one Skill in a project's exact scope.
+  Current projected revision of one Skill in the exact Project scope.
   """
-  projectSkill(name: String!, repositoryId: ID!): ProjectSkill
+  projectSkill(name: String!, projectRef: ID!): ProjectSkill
 
   """
-  Current projected content of one Skill asset in a project's exact scope.
+  Current projected content of one Skill asset in the exact Project scope.
   """
-  projectSkillAsset(name: String!, path: String!, repositoryId: ID!): ProjectSkillAsset
+  projectSkillAsset(name: String!, path: String!, projectRef: ID!): ProjectSkillAsset
+
+  """
+  Page current Skills shared by the exact Project scope.
+  """
+  projectSkills(after: String, first: Int = 20, name: String, projectRef: ID!): SkillConnection
 
   """
   One project-related verification obligation with bounded evidence facts.

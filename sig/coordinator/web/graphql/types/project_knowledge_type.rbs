@@ -1,4 +1,0 @@
-module Coordinator::Web::Graphql::Types
-  class ProjectKnowledgeType < BaseObject
-  end
-end

@@ -2,25 +2,17 @@
 
 module Coordinator::Read::Web::Contracts
   class KnowledgeBrowser
-    class Catalog < Dry::Validation::Contract
+    class Skills < Dry::Validation::Contract
       config.validate_keys = true
 
       params do
-        required(:repository_id).filled(:string)
+        required(:project_ref).filled(:string)
         optional(:first).filled(:integer, gteq?: 1, lteq?: 100)
-        optional(:skill_name).maybe(:string)
+        optional(:name).maybe(:string)
         optional(:after_skill_id).maybe(:string)
-        optional(:artifact_kind).maybe(:string)
-        optional(:artifact_labels).array(:string)
-        optional(:artifact_source_kind).maybe(:string)
-        optional(:after_artifact_global_position).maybe(:integer, gteq?: 0)
       end
 
-      rule(:repository_id) do
-        key.failure("must be a UUIDv7") unless Coordinator::Shared::Types::UUID_V7_PATTERN.match?(value)
-      end
-
-      rule(:skill_name) do
+      rule(:name) do
         next unless value
 
         key.failure("is too long") if value.bytesize > Coordinator::Shared::Types::SKILL_NAME_MAXIMUM_BYTES
@@ -31,27 +23,41 @@ module Coordinator::Read::Web::Contracts
 
         key.failure("must be a Skill ID") unless Coordinator::Shared::Types::SKILL_ID_PATTERN.match?(value)
       end
+    end
 
-      rule(:artifact_kind) do
+    class Artifacts < Dry::Validation::Contract
+      config.validate_keys = true
+
+      params do
+        required(:project_ref).filled(:string)
+        optional(:first).filled(:integer, gteq?: 1, lteq?: 100)
+        optional(:kind).maybe(:string)
+        optional(:labels).array(:string)
+        optional(:source_kind).maybe(:string)
+        optional(:after_global_position).maybe(:integer, gteq?: 0)
+      end
+
+      rule(:kind) do
         next unless value
 
         key.failure("is unsupported") unless Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_KINDS.include?(value)
       end
 
-      rule(:artifact_source_kind) do
+      rule(:source_kind) do
         next unless value
 
-        key.failure("is unsupported") unless Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_SOURCE_KINDS.include?(value)
+        key.failure("is unsupported") unless
+          Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_SOURCE_KINDS.include?(value)
       end
 
-      rule(:artifact_labels) do
+      rule(:labels) do
         next unless value
 
         maximum = Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_LABEL_MAXIMUM_COUNT
         key.failure("contains too many labels") if value.length > maximum
         key.failure("must contain unique labels") unless value.uniq.length == value.length
         value.each_with_index do |label, index|
-          label_key = key([ :artifact_labels, index ])
+          label_key = key([ :labels, index ])
           label_key.failure("must be valid UTF-8") unless label.encoding == Encoding::UTF_8 && label.valid_encoding?
           label_key.failure("is too long") if
             label.bytesize > Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_LABEL_MAXIMUM_BYTES
@@ -65,12 +71,8 @@ module Coordinator::Read::Web::Contracts
       config.validate_keys = true
 
       params do
-        required(:repository_id).filled(:string)
+        required(:project_ref).filled(:string)
         required(:name).filled(:string)
-      end
-
-      rule(:repository_id) do
-        key.failure("must be a UUIDv7") unless Coordinator::Shared::Types::UUID_V7_PATTERN.match?(value)
       end
 
       rule(:name) do
@@ -82,13 +84,9 @@ module Coordinator::Read::Web::Contracts
       config.validate_keys = true
 
       params do
-        required(:repository_id).filled(:string)
+        required(:project_ref).filled(:string)
         required(:name).filled(:string)
         required(:path).filled(:string)
-      end
-
-      rule(:repository_id) do
-        key.failure("must be a UUIDv7") unless Coordinator::Shared::Types::UUID_V7_PATTERN.match?(value)
       end
 
       rule(:name) do
@@ -104,7 +102,21 @@ module Coordinator::Read::Web::Contracts
       config.validate_keys = true
 
       params do
-        required(:repository_id).filled(:string)
+        required(:project_ref).filled(:string)
+        required(:artifact_id).filled(:string)
+      end
+
+      rule(:artifact_id) do
+        key.failure("must be an Artifact ID") unless
+          Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_ID_PATTERN.match?(value)
+      end
+    end
+
+    class Relationships < Dry::Validation::Contract
+      config.validate_keys = true
+
+      params do
+        required(:project_ref).filled(:string)
         required(:artifact_id).filled(:string)
         optional(:first).filled(:integer, gteq?: 1, lteq?: 100)
         optional(:direction).filled(:string)
@@ -115,10 +127,6 @@ module Coordinator::Read::Web::Contracts
           required(:after_declared_global_position).maybe(:integer, gteq?: 0)
           required(:after_relation_id).maybe(:string)
         end
-      end
-
-      rule(:repository_id) do
-        key.failure("must be a UUIDv7") unless Coordinator::Shared::Types::UUID_V7_PATTERN.match?(value)
       end
 
       rule(:artifact_id) do
@@ -148,9 +156,7 @@ module Coordinator::Read::Web::Contracts
         end
         after = value.fetch(:after_observed_sequence)
         through = value[:through_observed_sequence]
-        if through && through < after
-          key.failure("has an observation window preceding its lower bound")
-        end
+        key.failure("has an observation window preceding its lower bound") if through && through < after
         key.failure("requires a fixed observation window for declaration coordinates") if position && through.nil?
       end
     end

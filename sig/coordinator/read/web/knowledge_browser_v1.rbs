@@ -2,32 +2,21 @@ module Coordinator
   module Read
     module Web
       class KnowledgeBrowserV1
-        class Project < Shared::Value
-          def repository_id: () -> String
-          def scope: () -> String
-          def display_name: () -> String?
-        end
-
-        class Catalog < Shared::Value
-          def project: () -> Project
-          def skills: () -> Read::SkillPageV1
-          def artifacts: () -> Read::DevelopmentArtifactPageV1
-        end
-
         class SkillDetail < Shared::Value
-          def project: () -> Project
           def skill: () -> Read::SkillViewV1
         end
 
         class SkillAssetDetail < Shared::Value
-          def project: () -> Project
           def asset: () -> (Read::SkillTextAssetViewV2 | Read::SkillBinaryAssetViewV2)
         end
 
         class ArtifactDetail < Shared::Value
-          def project: () -> Project
           def artifact: () -> Read::DevelopmentArtifactSummaryV1
           def content: () -> (Read::DevelopmentArtifactTextContentViewV2 | Read::DevelopmentArtifactBinaryContentViewV2)
+        end
+
+        class ArtifactRelationships < Shared::Value
+          def artifact: () -> Read::DevelopmentArtifactSummaryV1
           def relationships: () -> Read::DevelopmentArtifactRelationPageV1
         end
       end

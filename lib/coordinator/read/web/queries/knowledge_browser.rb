@@ -3,71 +3,97 @@
 module Coordinator::Read::Web::Queries
   class KnowledgeBrowser
     def initialize(
-      catalog_contract: Coordinator::Read::Web::Contracts::KnowledgeBrowser::Catalog.new,
+      skills_contract: Coordinator::Read::Web::Contracts::KnowledgeBrowser::Skills.new,
+      artifacts_contract: Coordinator::Read::Web::Contracts::KnowledgeBrowser::Artifacts.new,
       skill_contract: Coordinator::Read::Web::Contracts::KnowledgeBrowser::Skill.new,
       skill_asset_contract: Coordinator::Read::Web::Contracts::KnowledgeBrowser::SkillAsset.new,
       artifact_contract: Coordinator::Read::Web::Contracts::KnowledgeBrowser::Artifact.new,
-      repository: Coordinator::Read::Web::Repositories::KnowledgeBrowser.new
+      relationships_contract: Coordinator::Read::Web::Contracts::KnowledgeBrowser::Relationships.new,
+      repository: Coordinator::Read::Web::Repositories::KnowledgeBrowser.new,
+      project_reference: Coordinator::Read::Web::ProjectReference.new
     )
-      @catalog_contract = catalog_contract
+      @skills_contract = skills_contract
+      @artifacts_contract = artifacts_contract
       @skill_contract = skill_contract
       @skill_asset_contract = skill_asset_contract
       @artifact_contract = artifact_contract
+      @relationships_contract = relationships_contract
       @repository = repository
+      @project_reference = project_reference
     end
 
-    def catalog(input)
-      validated = validate(@catalog_contract, input)
-      @repository.catalog(
-        Coordinator::Read::Web::KnowledgeBrowserQueryV1::Catalog.new(
-          repository_id: validated[:repository_id],
-          first: validated[:first] || 20,
-          skill_name: validated[:skill_name],
-          after_skill_id: validated[:after_skill_id],
-          artifact_kind: validated[:artifact_kind],
-          artifact_labels: validated[:artifact_labels] || [],
-          artifact_source_kind: validated[:artifact_source_kind],
-          after_artifact_global_position: validated[:after_artifact_global_position]
+    def skills(input)
+      values = validate(@skills_contract, input)
+      @repository.skills(
+        Coordinator::Read::Web::KnowledgeBrowserQueryV1::Skills.new(
+          **project(values),
+          first: values[:first] || 20,
+          name: values[:name],
+          after_skill_id: values[:after_skill_id]
+        )
+      )
+    end
+
+    def artifacts(input)
+      values = validate(@artifacts_contract, input)
+      @repository.artifacts(
+        Coordinator::Read::Web::KnowledgeBrowserQueryV1::Artifacts.new(
+          **project(values),
+          first: values[:first] || 20,
+          kind: values[:kind],
+          labels: values[:labels] || [],
+          source_kind: values[:source_kind],
+          after_global_position: values[:after_global_position]
         )
       )
     end
 
     def skill(input)
-      validated = validate(@skill_contract, input)
+      values = validate(@skill_contract, input)
       @repository.skill(
         Coordinator::Read::Web::KnowledgeBrowserQueryV1::Skill.new(
-          repository_id: validated[:repository_id],
-          name: validated[:name]
+          **project(values),
+          name: values[:name]
         )
       )
     end
 
     def skill_asset(input)
-      validated = validate(@skill_asset_contract, input)
+      values = validate(@skill_asset_contract, input)
       @repository.skill_asset(
         Coordinator::Read::Web::KnowledgeBrowserQueryV1::SkillAsset.new(
-          repository_id: validated[:repository_id],
-          name: validated[:name],
-          path: validated[:path]
+          **project(values),
+          name: values[:name],
+          path: values[:path]
         )
       )
     end
 
     def artifact(input)
-      validated = validate(@artifact_contract, input)
-      cursor = validated[:cursor] || {
+      values = validate(@artifact_contract, input)
+      @repository.artifact(
+        Coordinator::Read::Web::KnowledgeBrowserQueryV1::Artifact.new(
+          **project(values),
+          artifact_id: values[:artifact_id]
+        )
+      )
+    end
+
+    def relationships(input)
+      values = validate(@relationships_contract, input)
+      cursor = values[:cursor] || {
         after_observed_sequence: 0,
         through_observed_sequence: nil,
         after_declared_global_position: nil,
         after_relation_id: nil
       }
-      @repository.artifact(
-        Coordinator::Read::Web::KnowledgeBrowserQueryV1::Artifact.new(
-          repository_id: validated[:repository_id],
-          artifact_id: validated[:artifact_id],
-          first: validated[:first] || 20,
-          direction: validated[:direction] || "both",
-          relation: validated[:relation],
+      @repository.relationships(
+        Coordinator::Read::Web::KnowledgeBrowserQueryV1::Relationships.new(
+          **project(values),
+          artifact_id: values[:artifact_id],
+          first: values[:first] || 20,
+          direction: values[:direction] || "both",
+          relation: values[:relation],
           cursor: Coordinator::Read::DevelopmentArtifactRelationPageV1::Cursor.new(cursor)
         )
       )
@@ -75,11 +101,16 @@ module Coordinator::Read::Web::Queries
 
     private
 
+    def project(values)
+      project_ref = values[:project_ref]
+      { project_ref:, scope: @project_reference.decode(project_ref) }
+    end
+
     def validate(contract, input)
       validated = contract.call(input)
       raise Coordinator::Read::Web::KnowledgeBrowserQueryError, validated.errors.to_h if validated.failure?
 
-      validated
+      validated.to_h
     end
   end
 end

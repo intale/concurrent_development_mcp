@@ -2,116 +2,77 @@
 
 module Coordinator::Web::Graphql
   class KnowledgeBrowserCursor
-    PREFIX = "project-knowledge:v1"
+    SCHEMA = "project-knowledge-cursor/v2"
+    KINDS = %w[skills artifacts relationships].freeze
 
-    def self.encode_skills(repository_id:, after_id:, skill_name:)
-      encode(
-        "kind" => "skills",
-        "repository_id" => repository_id,
-        "after_id" => after_id,
-        "skill_name" => skill_name
+    def self.encode(kind, filters:, cursor:)
+      validate_kind!(kind)
+      Base64.urlsafe_encode64(
+        JSON.generate(canonical("schema" => SCHEMA, "kind" => kind, "filters" => filters, "cursor" => cursor)),
+        padding: false
       )
     end
 
-    def self.decode_skills(cursor, repository_id:, skill_name:)
-      return unless cursor
+    def self.decode(value, kind, filters:)
+      return unless value
 
-      payload = decode(cursor, "skills")
-      valid = payload.values_at("repository_id", "skill_name") == [ repository_id, skill_name ]
-      raise InvalidCursor, "skill cursor does not match this query" unless valid
-
-      payload.fetch("after_id")
-    end
-
-    def self.encode_artifacts(repository_id:, after_position:, artifact_kind:, labels:, source_kind:)
-      encode(
-        "kind" => "artifacts",
-        "repository_id" => repository_id,
-        "after_position" => after_position,
-        "artifact_kind" => artifact_kind,
-        "labels" => labels,
-        "source_kind" => source_kind
-      )
-    end
-
-    def self.decode_artifacts(cursor, repository_id:, artifact_kind:, labels:, source_kind:)
-      return unless cursor
-
-      payload = decode(cursor, "artifacts")
-      valid = payload.values_at("repository_id", "artifact_kind", "labels", "source_kind") ==
-        [ repository_id, artifact_kind, labels, source_kind ]
-      raise InvalidCursor, "artifact cursor does not match this query" unless valid
-
-      payload.fetch("after_position")
-    end
-
-    def self.encode_relations(repository_id:, artifact_id:, direction:, relation:, cursor:)
-      encode(
-        "kind" => "relations",
-        "repository_id" => repository_id,
-        "artifact_id" => artifact_id,
-        "direction" => direction,
-        "relation" => relation,
-        "cursor" => cursor.to_h
-      )
-    end
-
-    def self.decode_relations(cursor, repository_id:, artifact_id:, direction:, relation:)
-      return unless cursor
-
-      payload = decode(cursor, "relations")
-      valid = payload.values_at("repository_id", "artifact_id", "direction", "relation") ==
-        [ repository_id, artifact_id, direction, relation ]
-      raise InvalidCursor, "artifact relation cursor does not match this query" unless valid
-
-      payload.fetch("cursor").transform_keys(&:to_sym)
-    end
-
-    def self.encode(payload)
-      Base64.urlsafe_encode64(JSON.generate(payload.merge("prefix" => PREFIX)), padding: false)
-    end
-    private_class_method :encode
-
-    def self.decode(cursor, kind)
-      payload = JSON.parse(Base64.urlsafe_decode64(cursor))
-      valid = payload.is_a?(Hash) && payload.fetch("prefix", nil) == PREFIX &&
-        payload.fetch("kind", nil) == kind &&
-        Coordinator::Shared::Types::UUID_V7_PATTERN.match?(payload.fetch("repository_id", ""))
-      valid &&= valid_kind_payload?(payload, kind)
+      validate_kind!(kind)
+      payload = JSON.parse(Base64.urlsafe_decode64(value))
+      cursor = payload.fetch("cursor")
+      valid = payload.keys.sort == %w[cursor filters kind schema] &&
+        payload.fetch("schema") == SCHEMA &&
+        payload.fetch("kind") == kind &&
+        payload.fetch("filters") == canonical(filters) &&
+        valid_cursor?(cursor, kind) &&
+        encode(kind, filters:, cursor:) == value
       raise InvalidCursor, "#{kind.tr('-', ' ')} cursor is invalid" unless valid
 
-      payload
-    rescue ArgumentError, JSON::ParserError, TypeError
+      cursor
+    rescue JSON::ParserError, ArgumentError, TypeError, KeyError, NoMethodError
       raise InvalidCursor, "#{kind.tr('-', ' ')} cursor is invalid"
     end
-    private_class_method :decode
 
-    def self.valid_kind_payload?(payload, kind)
+    def self.valid_cursor?(cursor, kind)
       case kind
       when "skills"
-        Coordinator::Shared::Types::SKILL_ID_PATTERN.match?(payload.fetch("after_id", ""))
+        cursor.keys.sort == [ "after_id" ] &&
+          Coordinator::Shared::Types::SKILL_ID_PATTERN.match?(cursor.fetch("after_id", ""))
       when "artifacts"
-        payload.fetch("after_position", nil).is_a?(Integer) && payload.fetch("after_position") >= 0 &&
-          payload.fetch("labels", nil).is_a?(Array)
-      when "relations"
-        valid_relation_payload?(payload)
+        cursor.keys.sort == [ "after_position" ] &&
+          cursor.fetch("after_position", nil).is_a?(Integer) && cursor.fetch("after_position") >= 0
+      when "relationships"
+        valid_relationship_cursor?(cursor)
       else
         false
       end
     end
-    private_class_method :valid_kind_payload?
+    private_class_method :valid_cursor?
 
-    def self.valid_relation_payload?(payload)
-      cursor = payload.fetch("cursor", nil)
-      Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_ID_PATTERN.match?(payload.fetch("artifact_id", "")) &&
-        cursor.is_a?(Hash) && cursor.fetch("after_observed_sequence", nil).is_a?(Integer) &&
-        cursor.keys.sort == %w[
-          after_declared_global_position
-          after_observed_sequence
-          after_relation_id
-          through_observed_sequence
-        ]
+    def self.valid_relationship_cursor?(cursor)
+      cursor.is_a?(Hash) && cursor.keys.sort == %w[
+        after_declared_global_position
+        after_observed_sequence
+        after_relation_id
+        through_observed_sequence
+      ] && cursor.fetch("after_observed_sequence", nil).is_a?(Integer)
     end
-    private_class_method :valid_relation_payload?
+    private_class_method :valid_relationship_cursor?
+
+    def self.canonical(value)
+      case value
+      when Hash
+        value.to_h { |key, nested| [ key.to_s, canonical(nested) ] }.sort.to_h
+      when Array
+        value.map { canonical(_1) }
+      else
+        value
+      end
+    end
+    private_class_method :canonical
+
+    def self.validate_kind!(kind)
+      raise InvalidCursor, "#{kind} cursor is invalid" unless KINDS.include?(kind)
+    end
+    private_class_method :validate_kind!
   end
 end

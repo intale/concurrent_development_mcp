@@ -3,7 +3,10 @@ module Coordinator
     module Web
       module Contracts
         class KnowledgeBrowser
-          class Catalog < Dry::Validation::Contract
+          class Skills < Dry::Validation::Contract
+          end
+
+          class Artifacts < Dry::Validation::Contract
           end
 
           class Skill < Dry::Validation::Contract
@@ -13,6 +16,9 @@ module Coordinator
           end
 
           class Artifact < Dry::Validation::Contract
+          end
+
+          class Relationships < Dry::Validation::Contract
           end
         end
       end

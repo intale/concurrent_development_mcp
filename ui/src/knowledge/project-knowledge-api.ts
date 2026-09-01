@@ -1,8 +1,10 @@
 import {
   ProjectArtifactDocument,
-  ProjectKnowledgeDocument,
+  ProjectArtifactRelationshipsDocument,
+  ProjectArtifactsDocument,
   ProjectSkillAssetDocument,
-  ProjectSkillDocument
+  ProjectSkillDocument,
+  ProjectSkillsDocument
 } from "../gql/graphql.js";
 import type {
   ArtifactRelationDirection,
@@ -11,86 +13,99 @@ import type {
   DevelopmentArtifactSourceKind,
   ProjectArtifactQuery,
   ProjectArtifactQueryVariables,
-  ProjectKnowledgeQuery,
-  ProjectKnowledgeQueryVariables,
+  ProjectArtifactRelationshipsQuery,
+  ProjectArtifactRelationshipsQueryVariables,
+  ProjectArtifactsQuery,
+  ProjectArtifactsQueryVariables,
   ProjectSkillAssetQuery,
   ProjectSkillAssetQueryVariables,
   ProjectSkillQuery,
-  ProjectSkillQueryVariables
+  ProjectSkillQueryVariables,
+  ProjectSkillsQuery,
+  ProjectSkillsQueryVariables
 } from "../gql/graphql.js";
 import { executeGraphql } from "../graphql-client.js";
 
-export const KNOWLEDGE_PAGE_SIZE = 20;
-
-export interface KnowledgeFilters {
-  readonly artifactKind?: DevelopmentArtifactKind;
-  readonly artifactLabels: readonly string[];
-  readonly artifactSourceKind?: DevelopmentArtifactSourceKind;
-  readonly skillName?: string;
+export interface ArtifactFilters {
+  readonly kind?: DevelopmentArtifactKind;
+  readonly labels: readonly string[];
+  readonly sourceKind?: DevelopmentArtifactSourceKind;
 }
 
-export interface KnowledgeCursors {
-  readonly artifactsAfter?: string;
-  readonly skillsAfter?: string;
-}
-
-export interface ArtifactRelationFilters {
+export interface RelationshipFilters {
   readonly direction: ArtifactRelationDirection;
   readonly relation?: DevelopmentArtifactRelationKind;
-  readonly relationsAfter?: string;
 }
 
-export function fetchProjectKnowledge(
-  repositoryId: string,
-  filters: KnowledgeFilters,
-  cursors: KnowledgeCursors,
-  signal?: AbortSignal
-): Promise<ProjectKnowledgeQuery> {
-  const variables: ProjectKnowledgeQueryVariables = {
-    repositoryId,
-    first: KNOWLEDGE_PAGE_SIZE,
-    artifactLabels: filters.artifactLabels,
-    ...(filters.artifactKind ? { artifactKind: filters.artifactKind } : {}),
-    ...(filters.artifactSourceKind ? { artifactSourceKind: filters.artifactSourceKind } : {}),
-    ...(filters.skillName ? { skillName: filters.skillName } : {}),
-    ...cursors
-  };
-
-  return executeGraphql(ProjectKnowledgeDocument, variables, signal);
+export function fetchProjectSkills(
+  projectRef: string,
+  name: string | undefined,
+  after: string | null,
+  signal: AbortSignal
+): Promise<ProjectSkillsQuery> {
+  const variables: ProjectSkillsQueryVariables = { projectRef, first: 20, name, after };
+  return executeGraphql(ProjectSkillsDocument, variables, signal);
 }
 
 export function fetchProjectSkill(
-  repositoryId: string,
+  projectRef: string,
   name: string,
-  signal?: AbortSignal
+  signal: AbortSignal
 ): Promise<ProjectSkillQuery> {
-  const variables: ProjectSkillQueryVariables = { repositoryId, name };
+  const variables: ProjectSkillQueryVariables = { projectRef, name };
   return executeGraphql(ProjectSkillDocument, variables, signal);
 }
 
 export function fetchProjectSkillAsset(
-  repositoryId: string,
+  projectRef: string,
   name: string,
   path: string,
-  signal?: AbortSignal
+  signal: AbortSignal
 ): Promise<ProjectSkillAssetQuery> {
-  const variables: ProjectSkillAssetQueryVariables = { repositoryId, name, path };
+  const variables: ProjectSkillAssetQueryVariables = { projectRef, name, path };
   return executeGraphql(ProjectSkillAssetDocument, variables, signal);
 }
 
-export function fetchProjectArtifact(
-  repositoryId: string,
-  artifactId: string,
-  filters: ArtifactRelationFilters,
-  signal?: AbortSignal
-): Promise<ProjectArtifactQuery> {
-  const variables: ProjectArtifactQueryVariables = {
-    repositoryId,
-    artifactId,
-    first: KNOWLEDGE_PAGE_SIZE,
-    direction: filters.direction,
-    ...(filters.relation ? { relation: filters.relation } : {}),
-    ...(filters.relationsAfter ? { relationsAfter: filters.relationsAfter } : {})
+export function fetchProjectArtifacts(
+  projectRef: string,
+  filters: ArtifactFilters,
+  after: string | null,
+  signal: AbortSignal
+): Promise<ProjectArtifactsQuery> {
+  const variables: ProjectArtifactsQueryVariables = {
+    projectRef,
+    first: 20,
+    kind: filters.kind,
+    labels: [...filters.labels],
+    sourceKind: filters.sourceKind,
+    after
   };
+  return executeGraphql(ProjectArtifactsDocument, variables, signal);
+}
+
+export function fetchProjectArtifact(
+  projectRef: string,
+  artifactId: string,
+  signal: AbortSignal
+): Promise<ProjectArtifactQuery> {
+  const variables: ProjectArtifactQueryVariables = { projectRef, artifactId };
   return executeGraphql(ProjectArtifactDocument, variables, signal);
+}
+
+export function fetchProjectArtifactRelationships(
+  projectRef: string,
+  artifactId: string,
+  filters: RelationshipFilters,
+  after: string | null,
+  signal: AbortSignal
+): Promise<ProjectArtifactRelationshipsQuery> {
+  const variables: ProjectArtifactRelationshipsQueryVariables = {
+    projectRef,
+    artifactId,
+    first: 20,
+    direction: filters.direction,
+    relation: filters.relation,
+    after
+  };
+  return executeGraphql(ProjectArtifactRelationshipsDocument, variables, signal);
 }

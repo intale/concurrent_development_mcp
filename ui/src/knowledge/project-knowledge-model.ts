@@ -1,12 +1,16 @@
 import type {
   ArtifactRelationDirection,
+  ArtifactSummaryFieldsFragment,
   DevelopmentArtifactKind,
   DevelopmentArtifactRelationKind,
   DevelopmentArtifactSourceKind,
   ProjectArtifactQuery,
-  ProjectKnowledgeQuery,
+  ProjectArtifactRelationshipsQuery,
+  ProjectArtifactsQuery,
   ProjectSkillAssetQuery,
-  ProjectSkillQuery
+  ProjectSkillQuery,
+  ProjectSkillsQuery,
+  SkillSummaryFieldsFragment
 } from "../gql/graphql.js";
 
 export const ARTIFACT_KINDS: ReadonlyArray<{
@@ -60,17 +64,102 @@ export const RELATION_DIRECTIONS: readonly ArtifactRelationDirection[] = [
   "OUTGOING"
 ];
 
-export type ProjectKnowledge = NonNullable<ProjectKnowledgeQuery["projectKnowledge"]>;
+export const PAGE_START = "__knowledge_page_start__";
+
+export type SkillSummary = SkillSummaryFieldsFragment;
+export type ArtifactSummary = ArtifactSummaryFieldsFragment;
+export type SkillConnection = NonNullable<ProjectSkillsQuery["projectSkills"]>;
 export type ProjectSkill = NonNullable<ProjectSkillQuery["projectSkill"]>;
 export type ProjectSkillAsset = NonNullable<ProjectSkillAssetQuery["projectSkillAsset"]>;
+export type ArtifactConnection = NonNullable<ProjectArtifactsQuery["projectArtifacts"]>;
 export type ProjectArtifact = NonNullable<ProjectArtifactQuery["projectArtifact"]>;
+export type ProjectArtifactRelationships = NonNullable<
+  ProjectArtifactRelationshipsQuery["projectArtifactRelationships"]
+>;
 
-export function preserveKnowledgeForProject(
-  previousData: ProjectKnowledgeQuery | undefined,
+export function preserveCollection<T>(
+  previousData: T | undefined,
   previousQueryKey: readonly unknown[] | undefined,
-  repositoryId: string
-): ProjectKnowledgeQuery | undefined {
-  return previousQueryKey?.[1] === repositoryId ? previousData : undefined;
+  projectRef: string,
+  filterKey: string
+): T | undefined {
+  return previousQueryKey?.[1] === projectRef && previousQueryKey?.[2] === filterKey
+    ? previousData
+    : undefined;
+}
+
+export function preserveDetail<T>(
+  previousData: T | undefined,
+  previousQueryKey: readonly unknown[] | undefined,
+  projectRef: string,
+  identity: string
+): T | undefined {
+  return previousQueryKey?.[1] === projectRef && previousQueryKey?.[2] === identity
+    ? previousData
+    : undefined;
+}
+
+export function resetPagination(params: URLSearchParams): URLSearchParams {
+  const next = new URLSearchParams(params);
+  next.delete("after");
+  next.delete("trail");
+  return next;
+}
+
+export function nextPageParams(params: URLSearchParams, cursor: string): URLSearchParams {
+  const next = new URLSearchParams(params);
+  next.append("trail", params.get("after") ?? PAGE_START);
+  next.set("after", cursor);
+  return next;
+}
+
+export function previousPageParams(params: URLSearchParams): URLSearchParams {
+  const next = new URLSearchParams(params);
+  const trail = next.getAll("trail");
+  const previous = trail.pop();
+  next.delete("trail");
+  trail.forEach((cursor) => next.append("trail", cursor));
+  if (!previous || previous === PAGE_START) next.delete("after");
+  else next.set("after", previous);
+  return next;
+}
+
+export function applyFilters(
+  params: URLSearchParams,
+  filters: Readonly<Record<string, string>>
+): URLSearchParams {
+  const next = resetPagination(params);
+  Object.entries(filters).forEach(([key, value]) => {
+    const normalized = value.trim();
+    if (normalized) next.set(key, normalized);
+    else next.delete(key);
+  });
+  return next;
+}
+
+export function listLocation(pathname: string, params: URLSearchParams): string {
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}
+
+export function detailLocation(pathname: string, identity: string, returnTo: string): string {
+  const query = new URLSearchParams({ returnTo }).toString();
+  return `${pathname}/${encodeURIComponent(identity)}?${query}`;
+}
+
+export function childLocation(pathname: string, segment: string, identity: string, returnTo: string): string {
+  const query = new URLSearchParams({ returnTo }).toString();
+  return `${pathname}/${segment}/${encodeURIComponent(identity)}?${query}`;
+}
+
+export function safeKnowledgeReturnTo(
+  value: string | null,
+  fallback: string,
+  knowledgeBasePath: string
+): string {
+  return value === knowledgeBasePath || value?.startsWith(`${knowledgeBasePath}/`)
+    ? value
+    : fallback;
 }
 
 export function humanized(value: string): string {

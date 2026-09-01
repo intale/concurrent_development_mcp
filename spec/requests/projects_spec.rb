@@ -39,6 +39,12 @@ RSpec.describe "Projects UI shell", :read_model do
         "#{project_path}/resources/inventory/018f0f4d-4e45-7abc-8def-000000000001",
         "#{project_path}/resources/leases",
         "#{project_path}/resources/leases/018f0f4d-4e45-7abc-8def-000000000002",
+        "#{project_path}/knowledge/skills",
+        "#{project_path}/knowledge/skills/event-modeling",
+        "#{project_path}/knowledge/skills/event-modeling/assets/references/example.md",
+        "#{project_path}/knowledge/artifacts",
+        "#{project_path}/knowledge/artifacts/artifact:v1:#{'a' * 64}",
+        "#{project_path}/knowledge/artifacts/artifact:v1:#{'a' * 64}/relationships",
         "/audit/command-receipts",
         "/audit/command-receipts/CMD-shell",
         "/operations/batches",
@@ -46,7 +52,7 @@ RSpec.describe "Projects UI shell", :read_model do
       ]
 
     paths.each do |path|
-      session.get path
+      session.get path, headers: { "ACCEPT" => "text/html" }
 
       expect(session.response.status).to eq(200), "#{path} returned #{session.response.status}"
       expect(session.response.body).to include('data-react-class="CoordinatorApp"')

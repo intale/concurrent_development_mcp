@@ -4,7 +4,7 @@ Rails.application.routes.draw do
   root "projects#index"
   get "projects" => "projects#index"
   get "projects/:project_ref" => "projects#index"
-  get "projects/:project_ref/*client_path" => "projects#index"
+  get "projects/:project_ref/*client_path" => "projects#index", format: false
   get "audit/command-receipts" => "projects#index"
   get "audit/command-receipts/:command_id" => "projects#index"
   get "operations/batches" => "projects#index"

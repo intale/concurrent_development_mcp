@@ -4,6 +4,11 @@ import { CommandReceiptsPage } from "./audit/command-receipts-page.js";
 import { CoordinationChangeSetsPage } from "./coordination/coordination-change-sets-page.js";
 import { CoordinationDependenciesPage } from "./coordination/coordination-dependencies-page.js";
 import { CoordinationWorkItemsPage } from "./coordination/coordination-work-items-page.js";
+import {
+  ProjectArtifactRelationshipsPage,
+  ProjectArtifactsPage,
+  ProjectSkillsPage
+} from "./knowledge/project-knowledge-page.js";
 import { OperationBatchesPage } from "./operations/operation-batches-page.js";
 import { ProjectCatalogPage } from "./projects/project-catalog-page.js";
 import { ProjectOverviewPage } from "./projects/project-overview-page.js";
@@ -130,15 +135,13 @@ export function App() {
             <Route path="resources/inventory/:resourceId" element={<ProjectResourceInventoryPage />} />
             <Route path="resources/leases" element={<ProjectResourceLeasesPage />} />
             <Route path="resources/leases/:leaseId" element={<ProjectResourceLeasesPage />} />
-            <Route
-              path="knowledge"
-              element={(
-                <ProjectSectionPlaceholder
-                  description="Project-scoped Skills and Development Artifacts belong in focused Knowledge routes."
-                  title="Knowledge"
-                />
-              )}
-            />
+            <Route path="knowledge" element={<Navigate replace to="skills" />} />
+            <Route path="knowledge/skills" element={<ProjectSkillsPage />} />
+            <Route path="knowledge/skills/:skillName" element={<ProjectSkillsPage />} />
+            <Route path="knowledge/skills/:skillName/assets/*" element={<ProjectSkillsPage />} />
+            <Route path="knowledge/artifacts" element={<ProjectArtifactsPage />} />
+            <Route path="knowledge/artifacts/:artifactId" element={<ProjectArtifactsPage />} />
+            <Route path="knowledge/artifacts/:artifactId/relationships" element={<ProjectArtifactRelationshipsPage />} />
             <Route
               path="governance"
               element={(

@@ -5,6 +5,5 @@ module Coordinator::Web::Graphql::Types
     graphql_name "ProjectSkillAsset"
 
     field :asset, SkillAssetContentType, null: false
-    field :project, CoordinationProjectType, null: false
   end
 end

@@ -2,30 +2,46 @@ module Coordinator
   module Read
     module Web
       class KnowledgeBrowserQueryV1
-        class Catalog < Shared::Value
-          def repository_id: () -> String
+        class Skills < Shared::Value
+          def project_ref: () -> String
+          def scope: () -> String
           def first: () -> Integer
-          def skill_name: () -> String?
+          def name: () -> String?
           def after_skill_id: () -> String?
-          def artifact_kind: () -> String?
-          def artifact_labels: () -> Array[String]
-          def artifact_source_kind: () -> String?
-          def after_artifact_global_position: () -> Integer?
+        end
+
+        class Artifacts < Shared::Value
+          def project_ref: () -> String
+          def scope: () -> String
+          def first: () -> Integer
+          def kind: () -> String?
+          def labels: () -> Array[String]
+          def source_kind: () -> String?
+          def after_global_position: () -> Integer?
         end
 
         class Skill < Shared::Value
-          def repository_id: () -> String
+          def project_ref: () -> String
+          def scope: () -> String
           def name: () -> String
         end
 
         class SkillAsset < Shared::Value
-          def repository_id: () -> String
+          def project_ref: () -> String
+          def scope: () -> String
           def name: () -> String
           def path: () -> String
         end
 
         class Artifact < Shared::Value
-          def repository_id: () -> String
+          def project_ref: () -> String
+          def scope: () -> String
+          def artifact_id: () -> String
+        end
+
+        class Relationships < Shared::Value
+          def project_ref: () -> String
+          def scope: () -> String
           def artifact_id: () -> String
           def first: () -> Integer
           def direction: () -> String

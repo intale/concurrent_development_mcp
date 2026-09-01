@@ -3,6 +3,7 @@
 RSpec.describe Coordinator::Read::Web::Queries::KnowledgeBrowser, :read_model do
   let(:repository_id) { "018f0f4d-4e45-7abc-8def-000000000071" }
   let(:scope) { "project:knowledge-browser" }
+  let(:project_ref) { Coordinator::Read::Web::ProjectReference.new.encode(scope:) }
   let(:skill_id) { "skill:v1:#{'1' * 64}" }
   let(:parent_id) { artifact_id("a") }
   let(:child_id) { artifact_id("b") }
@@ -14,6 +15,13 @@ RSpec.describe Coordinator::Read::Web::Queries::KnowledgeBrowser, :read_model do
       repository_key: "knowledge-browser",
       scope:,
       display_name: "Knowledge browser"
+    )
+    create(
+      :coordinator_read_repository,
+      repository_id: "018f0f4d-4e45-7abc-8def-000000000072",
+      repository_key: "knowledge-browser-docs",
+      scope:,
+      display_name: "Knowledge browser docs"
     )
     skill = create(:coordinator_read_skill, skill_id:, name: "event-modeling", scope:, revision: 2)
     create(
@@ -45,13 +53,7 @@ RSpec.describe Coordinator::Read::Web::Queries::KnowledgeBrowser, :read_model do
       path: "references/current.md",
       content_text: "current reference"
     )
-    create(
-      :coordinator_read_skill_asset,
-      :binary,
-      skill:,
-      revision: 2,
-      path: "assets/template.bin"
-    )
+    create(:coordinator_read_skill_asset, :binary, skill:, revision: 2, path: "assets/template.bin")
     other = create(:coordinator_read_skill, name: "event-modeling", scope: "project:other")
     create(:coordinator_read_skill_revision, skill: other)
 
@@ -67,27 +69,27 @@ RSpec.describe Coordinator::Read::Web::Queries::KnowledgeBrowser, :read_model do
     )
   end
 
-  it "serves bounded current Skills and Artifact observations for the exact project scope" do
-    catalog = query.catalog(repository_id:, first: 1)
+  it "serves separate bounded Skill and Artifact collections for the exact Project scope" do
+    skills = query.skills(project_ref:, first: 1)
+    artifacts = query.artifacts(project_ref:, first: 1)
 
-    expect(catalog.project).to have_attributes(repository_id:, scope:, display_name: "Knowledge browser")
-    expect(catalog.skills.items.map(&:skill_id)).to eq([ skill_id ])
-    expect(catalog.skills.items.first).to have_attributes(revision: 2, asset_count: 2)
-    expect(catalog.artifacts.items.map(&:artifact_id)).to eq([ parent_id ])
-    expect(catalog.artifacts).to have_attributes(has_more: true, next_global_position: 801)
+    expect(skills.items.map(&:skill_id)).to eq([ skill_id ])
+    expect(skills.items.first).to have_attributes(revision: 2, asset_count: 2)
+    expect(artifacts.items.map(&:artifact_id)).to eq([ parent_id ])
+    expect(artifacts).to have_attributes(has_more: true, next_global_position: 801)
 
-    second = query.catalog(
-      repository_id:,
+    second = query.artifacts(
+      project_ref:,
       first: 1,
-      after_artifact_global_position: catalog.artifacts.next_global_position
+      after_global_position: artifacts.next_global_position
     )
-    expect(second.artifacts.items.map(&:artifact_id)).to eq([ child_id ])
+    expect(second.items.map(&:artifact_id)).to eq([ child_id ])
   end
 
   it "returns only the latest Skill revision and its current text or binary assets" do
-    detail = query.skill(repository_id:, name: "event-modeling")
-    text = query.skill_asset(repository_id:, name: "event-modeling", path: "references/current.md")
-    binary = query.skill_asset(repository_id:, name: "event-modeling", path: "assets/template.bin")
+    detail = query.skill(project_ref:, name: "event-modeling")
+    text = query.skill_asset(project_ref:, name: "event-modeling", path: "references/current.md")
+    binary = query.skill_asset(project_ref:, name: "event-modeling", path: "assets/template.bin")
 
     expect(detail.skill).to have_attributes(revision: 2, instructions: "Current instructions")
     expect(detail.skill.assets.map(&:path)).to contain_exactly(
@@ -97,15 +99,16 @@ RSpec.describe Coordinator::Read::Web::Queries::KnowledgeBrowser, :read_model do
     expect(text.asset).to have_attributes(revision: 2, text: "current reference")
     expect(binary.asset).to have_attributes(revision: 2, base64: "ZmFjdG9yeQ==")
     expect(query.skill_asset(
-      repository_id:,
+      project_ref:,
       name: "event-modeling",
       path: "references/obsolete.md"
     )).to be_nil
   end
 
-  it "navigates parent and child Artifacts in both directions without superseded edges" do
-    parent = query.artifact(repository_id:, artifact_id: parent_id, first: 20)
-    child = query.artifact(repository_id:, artifact_id: child_id, first: 20)
+  it "separates Artifact content from active relationship traversal" do
+    parent = query.artifact(project_ref:, artifact_id: parent_id)
+    parent_relationships = query.relationships(project_ref:, artifact_id: parent_id, first: 20)
+    child_relationships = query.relationships(project_ref:, artifact_id: child_id, first: 20)
 
     expect(parent.artifact).to have_attributes(
       observation_id: observation_id("a"),
@@ -113,24 +116,24 @@ RSpec.describe Coordinator::Read::Web::Queries::KnowledgeBrowser, :read_model do
       scope:
     )
     expect(parent.content).to have_attributes(text: "# Parent README")
-    expect(parent.relationships.items.map { [ _1.direction, _1.relation, _1.peer_id ] }).to eq(
+    expect(parent_relationships.relationships.items.map { [ _1.direction, _1.relation, _1.peer_id ] }).to eq(
       [ [ "outgoing", "contains", child_id ] ]
     )
-    expect(child.relationships.items.map { [ _1.direction, _1.display_relation, _1.peer_id ] }).to eq(
+    expect(child_relationships.relationships.items.map { [ _1.direction, _1.display_relation, _1.peer_id ] }).to eq(
       [ [ "incoming", "contained_by", parent_id ] ]
     )
   end
 
-  it "rejects malformed input and isolates project-scoped details" do
+  it "rejects malformed input and isolates Project-scoped details" do
     expect do
-      query.catalog(repository_id: "invalid")
+      query.skills(project_ref: "invalid")
+    end.to raise_error(Coordinator::Read::Web::ProjectReference::InvalidReference)
+    expect do
+      query.artifacts(project_ref:, labels: [ " padded" ])
     end.to raise_error(Coordinator::Read::Web::KnowledgeBrowserQueryError)
     expect do
-      query.catalog(repository_id:, artifact_labels: [ " padded" ])
-    end.to raise_error(Coordinator::Read::Web::KnowledgeBrowserQueryError)
-    expect do
-      query.artifact(
-        repository_id:,
+      query.relationships(
+        project_ref:,
         artifact_id: parent_id,
         cursor: {
           after_observed_sequence: 2,
@@ -142,7 +145,7 @@ RSpec.describe Coordinator::Read::Web::Queries::KnowledgeBrowser, :read_model do
     end.to raise_error(Coordinator::Read::Web::KnowledgeBrowserQueryError)
 
     outside = create_artifact(artifact_id("c"), "Outside", "outside.md", 803, artifact_scope: "project:other")
-    expect(query.artifact(repository_id:, artifact_id: outside.artifact_id)).to be_nil
+    expect(query.artifact(project_ref:, artifact_id: outside.artifact_id)).to be_nil
   end
 
   def query

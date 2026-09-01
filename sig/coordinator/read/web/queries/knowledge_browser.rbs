@@ -4,20 +4,26 @@ module Coordinator
       module Queries
         class KnowledgeBrowser
           def initialize: (
-            ?catalog_contract: Contracts::KnowledgeBrowser::Catalog,
+            ?skills_contract: Contracts::KnowledgeBrowser::Skills,
+            ?artifacts_contract: Contracts::KnowledgeBrowser::Artifacts,
             ?skill_contract: Contracts::KnowledgeBrowser::Skill,
             ?skill_asset_contract: Contracts::KnowledgeBrowser::SkillAsset,
             ?artifact_contract: Contracts::KnowledgeBrowser::Artifact,
-            ?repository: Repositories::KnowledgeBrowser
+            ?relationships_contract: Contracts::KnowledgeBrowser::Relationships,
+            ?repository: Repositories::KnowledgeBrowser,
+            ?project_reference: ProjectReference
           ) -> void
-          def catalog: (command_input input) -> KnowledgeBrowserV1::Catalog?
+          def skills: (command_input input) -> Read::SkillPageV1?
+          def artifacts: (command_input input) -> Read::DevelopmentArtifactPageV1?
           def skill: (command_input input) -> KnowledgeBrowserV1::SkillDetail?
           def skill_asset: (command_input input) -> KnowledgeBrowserV1::SkillAssetDetail?
           def artifact: (command_input input) -> KnowledgeBrowserV1::ArtifactDetail?
+          def relationships: (command_input input) -> KnowledgeBrowserV1::ArtifactRelationships?
 
           private
 
-          def validate: (Dry::Validation::Contract contract, command_input input) -> untyped
+          def project: (Hash[Symbol, untyped] values) -> { project_ref: String, scope: String }
+          def validate: (Dry::Validation::Contract contract, command_input input) -> Hash[Symbol, untyped]
         end
       end
     end

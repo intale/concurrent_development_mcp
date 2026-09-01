@@ -7,15 +7,17 @@ module Coordinator
             ?skills: Read::Repositories::Skills,
             ?artifacts: Read::Repositories::DevelopmentArtifacts
           ) -> void
-          def catalog: (KnowledgeBrowserQueryV1::Catalog query) -> KnowledgeBrowserV1::Catalog?
+          def skills: (KnowledgeBrowserQueryV1::Skills query) -> Read::SkillPageV1?
+          def artifacts: (KnowledgeBrowserQueryV1::Artifacts query) -> Read::DevelopmentArtifactPageV1?
           def skill: (KnowledgeBrowserQueryV1::Skill query) -> KnowledgeBrowserV1::SkillDetail?
           def skill_asset: (KnowledgeBrowserQueryV1::SkillAsset query) -> KnowledgeBrowserV1::SkillAssetDetail?
           def artifact: (KnowledgeBrowserQueryV1::Artifact query) -> KnowledgeBrowserV1::ArtifactDetail?
+          def relationships: (KnowledgeBrowserQueryV1::Relationships query) -> KnowledgeBrowserV1::ArtifactRelationships?
 
           private
 
-          def find_project: (String repository_id) -> Read::Repository?
-          def build_project: (Read::Repository record) -> KnowledgeBrowserV1::Project
+          def project_exists?: (String scope) -> bool
+          def project_artifact: (String scope, String artifact_id) -> Read::DevelopmentArtifactSummaryV1?
         end
       end
     end

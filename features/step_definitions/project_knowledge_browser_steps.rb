@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 PROJECT_KNOWLEDGE_SKILL_QUERY = <<~GRAPHQL.freeze
-  query ProjectKnowledgeSkill($repositoryId: ID!, $name: String!) {
-    projectSkill(repositoryId: $repositoryId, name: $name) {
+  query ProjectKnowledgeSkill($projectRef: ID!, $name: String!) {
+    projectSkill(projectRef: $projectRef, name: $name) {
       skill {
         revision
         instructions
@@ -13,12 +13,12 @@ PROJECT_KNOWLEDGE_SKILL_QUERY = <<~GRAPHQL.freeze
 GRAPHQL
 
 PROJECT_KNOWLEDGE_ARTIFACT_QUERY = <<~GRAPHQL.freeze
-  query ProjectKnowledgeArtifact($repositoryId: ID!, $parentId: ID!, $childId: ID!) {
-    parent: projectArtifact(repositoryId: $repositoryId, artifactId: $parentId, direction: BOTH) {
+  query ProjectKnowledgeArtifact($projectRef: ID!, $parentId: ID!, $childId: ID!) {
+    parent: projectArtifactRelationships(projectRef: $projectRef, artifactId: $parentId, direction: BOTH) {
       artifact { id title }
       relationships { nodes { direction relation displayRelation peerId status } }
     }
-    child: projectArtifact(repositoryId: $repositoryId, artifactId: $childId, direction: BOTH) {
+    child: projectArtifactRelationships(projectRef: $projectRef, artifactId: $childId, direction: BOTH) {
       artifact { id title }
       relationships { nodes { direction relation displayRelation peerId status } }
     }
@@ -70,10 +70,10 @@ Given("projected knowledge rows contain current and obsolete revisions of one Sk
   )
 end
 
-When("the browser queries the projected project Skill") do
+When("the browser opens the focused projected Skill detail") do
   @knowledge_browser_payload = query_project_knowledge(
     PROJECT_KNOWLEDGE_SKILL_QUERY,
-    repositoryId: @knowledge_browser_repository_id,
+    projectRef: @knowledge_browser_project_ref,
     name: "event-modeling"
   )
 end
@@ -104,10 +104,10 @@ Given("projected knowledge rows contain related parent and child artifacts with 
   )
 end
 
-When("the browser queries both projected artifacts") do
+When("the browser opens the focused relationship views for both projected Artifacts") do
   @knowledge_browser_payload = query_project_knowledge(
     PROJECT_KNOWLEDGE_ARTIFACT_QUERY,
-    repositoryId: @knowledge_browser_repository_id,
+    projectRef: @knowledge_browser_project_ref,
     parentId: knowledge_browser_parent_id,
     childId: knowledge_browser_child_id
   )
@@ -134,6 +134,9 @@ end
 def create_knowledge_browser_project
   @knowledge_browser_repository_id ||= SecureRandom.uuid_v7
   @knowledge_browser_scope ||= "project:test/knowledge-browser-#{@knowledge_browser_repository_id}"
+  @knowledge_browser_project_ref ||= Coordinator::Read::Web::ProjectReference.new.encode(
+    scope: @knowledge_browser_scope
+  )
   return if Coordinator::Read::Repository.exists?(repository_id: @knowledge_browser_repository_id)
 
   FactoryBot.create(

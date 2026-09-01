@@ -1,23 +1,78 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import type {
-  ProjectArtifactQuery,
-  ProjectKnowledgeQuery,
-  ProjectSkillAssetQuery,
-  ProjectSkillQuery
-} from "../src/gql/graphql.js";
-import { preserveKnowledgeForProject } from "../src/knowledge/project-knowledge-model.js";
-import { ProjectKnowledgeView } from "../src/knowledge/project-knowledge-view.js";
+  ArtifactSummary,
+  ProjectArtifact,
+  ProjectArtifactRelationships,
+  ProjectSkill,
+  ProjectSkillAsset,
+  SkillSummary
+} from "../src/knowledge/project-knowledge-model.js";
+import {
+  applyFilters,
+  detailLocation,
+  nextPageParams,
+  previousPageParams,
+  safeKnowledgeReturnTo
+} from "../src/knowledge/project-knowledge-model.js";
+import {
+  ArtifactCards,
+  ArtifactDetail,
+  AvailableStale,
+  KnowledgeNavigation,
+  PaginationControls,
+  RelationshipCards,
+  SkillAssetDetail,
+  SkillCards,
+  SkillDetail
+} from "../src/knowledge/project-knowledge-view.js";
 
+const projectRef = "project-ref";
+const scope = "project:knowledge";
 const timestamp = "2026-08-31T12:00:00.000000Z";
-const project = { id: "018f0f4d-4e45-7abc-8def-000000000081", name: "Knowledge", scope: "project:knowledge" };
-const source = { kind: "LOCAL_FILE" as const, locator: "README.md", revision: "a".repeat(40), observedAt: timestamp, collector: "agent/v1" };
+const skillSummary = {
+  id: `skill:v1:${"1".repeat(64)}`,
+  name: "event-modeling",
+  scope,
+  revision: 2,
+  description: "Model coordination facts",
+  assetCount: 1,
+  contentDigest: `sha256:${"1".repeat(64)}`,
+  publishedAt: timestamp
+} satisfies SkillSummary;
+const skill = {
+  skill: {
+    ...skillSummary,
+    instructions: "Given facts, when a command runs, then emit events.",
+    assets: [{
+      path: "references/example.md",
+      mediaType: "text/markdown",
+      executable: false,
+      contentDigest: `sha256:${"2".repeat(64)}`,
+      byteSize: 42
+    }]
+  }
+} satisfies ProjectSkill;
+const asset = {
+  asset: {
+    path: "references/example.md",
+    revision: 2,
+    encoding: "utf-8",
+    mediaType: "text/markdown",
+    executable: false,
+    text: "Example content",
+    base64: null,
+    contentDigest: `sha256:${"2".repeat(64)}`,
+    byteSize: 42
+  }
+} satisfies ProjectSkillAsset;
 const artifactSummary = {
   id: `artifact:v1:${"a".repeat(64)}`,
   observationId: `artifact-observation:v1:${"a".repeat(64)}`,
-  scope: project.scope,
+  scope,
   title: "Parent README",
   kind: "DOCUMENTATION" as const,
   labels: ["docs"],
@@ -31,50 +86,21 @@ const artifactSummary = {
   capturedAt: timestamp,
   observedAt: timestamp,
   classifiedAt: timestamp,
-  source
-};
-const catalog = {
-  project,
-  skills: {
-    nodes: [{
-      id: `skill:v1:${"1".repeat(64)}`,
-      name: "event-modeling",
-      scope: project.scope,
-      revision: 2,
-      description: "Model events",
-      assetCount: 1,
-      contentDigest: `sha256:${"1".repeat(64)}`,
-      publishedAt: timestamp
-    }],
-    pageInfo: { endCursor: "next-skill", hasNextPage: true }
-  },
-  artifacts: {
-    nodes: [artifactSummary],
-    pageInfo: { endCursor: "next-artifact", hasNextPage: true }
-  }
-} satisfies NonNullable<ProjectKnowledgeQuery["projectKnowledge"]>;
-const skill = {
-  project,
-  skill: {
-    id: `skill:v1:${"1".repeat(64)}`,
-    name: "event-modeling",
-    scope: project.scope,
-    revision: 2,
-    description: "Model events",
-    instructions: "Given facts, when a command runs, then emit events.",
-    contentDigest: `sha256:${"1".repeat(64)}`,
-    publishedAt: timestamp,
-    assets: [{ path: "references/example.md", mediaType: "text/markdown", executable: false, contentDigest: `sha256:${"2".repeat(64)}`, byteSize: 42 }]
-  }
-} satisfies NonNullable<ProjectSkillQuery["projectSkill"]>;
-const asset = {
-  project,
-  asset: { path: "references/example.md", revision: 2, encoding: "utf-8", mediaType: "text/markdown", executable: false, text: "Example content", base64: null, contentDigest: `sha256:${"2".repeat(64)}`, byteSize: 42 }
-} satisfies NonNullable<ProjectSkillAssetQuery["projectSkillAsset"]>;
+  source: { kind: "LOCAL_FILE" as const, locator: "README.md", revision: "a".repeat(40), observedAt: timestamp, collector: "agent/v1" }
+} satisfies ArtifactSummary;
 const artifact = {
-  project,
   artifact: artifactSummary,
-  content: { encoding: "utf-8", mediaType: "text/markdown", text: "# Parent README", base64: null, contentDigest: artifactSummary.contentDigest, byteSize: 15 },
+  content: {
+    encoding: "utf-8",
+    mediaType: "text/markdown",
+    text: "# Parent README",
+    base64: null,
+    contentDigest: artifactSummary.contentDigest,
+    byteSize: 15
+  }
+} satisfies ProjectArtifact;
+const relationships = {
+  artifact: artifactSummary,
   relationships: {
     nodes: [{
       id: `artifact-relation:v1:${"3".repeat(64)}`,
@@ -91,59 +117,85 @@ const artifact = {
       fragment: null,
       normalizedLocator: null,
       declaredAt: timestamp,
-      peerArtifact: { ...artifactSummary, id: `artifact:v1:${"b".repeat(64)}`, observationId: `artifact-observation:v1:${"b".repeat(64)}`, title: "Child guide", source: { ...source, locator: "docs/guide.md" } }
+      peerArtifact: {
+        ...artifactSummary,
+        id: `artifact:v1:${"b".repeat(64)}`,
+        observationId: `artifact-observation:v1:${"b".repeat(64)}`,
+        title: "Child guide",
+        source: { ...artifactSummary.source, locator: "docs/guide.md" }
+      }
     }],
     pageInfo: { endCursor: "next-relation", hasNextPage: true }
   }
-} satisfies NonNullable<ProjectArtifactQuery["projectArtifact"]>;
+} satisfies ProjectArtifactRelationships;
 
-const callbacks = {
-  hrefForArtifact: (id: string) => `/knowledge?artifact=${id}`,
-  hrefForAsset: (path: string) => `/knowledge?asset=${path}`,
-  hrefForSkill: (name: string) => `/knowledge?skill=${name}`,
-  onDirection: () => undefined,
-  onNextArtifacts: () => undefined,
-  onNextRelations: () => undefined,
-  onNextSkills: () => undefined,
-  onRelation: () => undefined,
-  onRetry: () => undefined
-};
-
-function render(overrides: Partial<Parameters<typeof ProjectKnowledgeView>[0]> = {}) {
-  return renderToStaticMarkup(<MemoryRouter><ProjectKnowledgeView artifact={artifact} asset={asset} catalog={catalog} direction="BOTH" errorMessage={null} loading={false} refreshing={false} relation={undefined} skill={skill} {...callbacks} {...overrides} /></MemoryRouter>);
+function render(node: ReactNode, route = "/") {
+  return renderToStaticMarkup(<MemoryRouter initialEntries={[route]}>{node}</MemoryRouter>);
 }
 
-test("shows current Skill content, assets, Artifact provenance, and active navigation", () => {
-  const markup = render();
+test("focused Skill and Artifact collections lead with meaning and adjacent primary actions", () => {
+  const skillsMarkup = render(<SkillCards connection={{ nodes: [skillSummary], pageInfo: { endCursor: "next", hasNextPage: true } }} hrefFor={(name) => `/skills/${name}`} />);
+  const artifactsMarkup = render(<ArtifactCards connection={{ nodes: [artifactSummary], pageInfo: { endCursor: "next", hasNextPage: true } }} hrefFor={(id) => `/artifacts/${id}`} />);
+
+  assert.match(skillsMarkup, /Model coordination facts/);
+  assert.match(skillsMarkup, /View Skill/);
+  assert.match(skillsMarkup, /col-12 col-xl-6/);
+  assert.match(artifactsMarkup, /Parent README/);
+  assert.match(artifactsMarkup, /README.md/);
+  assert.match(artifactsMarkup, /View Artifact/);
+});
+
+test("Skill, asset, Artifact, and relationship details stay on focused pages", () => {
+  const skillMarkup = render(<SkillDetail assetHref={(path) => `/asset/${path}`} backTo="/skills?name=event" detail={skill} />);
+  const assetMarkup = render(<SkillAssetDetail backTo="/skills/event-modeling" detail={asset} />);
+  const artifactMarkup = render(<ArtifactDetail backTo="/artifacts?kind=docs" detail={artifact} relationshipsHref="/artifact/relationships" />);
+  const relationshipMarkup = render(<RelationshipCards detail={relationships} peerHref={(id) => `/artifacts/${id}`} />);
+
+  assert.match(skillMarkup, /Given facts/);
+  assert.match(skillMarkup, /View asset/);
+  assert.match(skillMarkup, /Back to Skills/);
+  assert.match(assetMarkup, /Example content/);
+  assert.match(assetMarkup, /Back to Skill/);
+  assert.match(artifactMarkup, /View 1 relationships/);
+  assert.match(artifactMarkup, /# Parent README/);
+  assert.doesNotMatch(artifactMarkup, /Child guide/);
+  assert.match(relationshipMarkup, /Child guide/);
+  assert.match(relationshipMarkup, /View related Artifact/);
+});
+
+test("Knowledge subnavigation and recoverable pagination are explicit", () => {
+  const markup = render(
+    <><KnowledgeNavigation basePath={`/projects/${projectRef}/knowledge`} /><PaginationControls canPrevious nextCursor="next" onNext={() => undefined} onPrevious={() => undefined} /></>,
+    `/projects/${projectRef}/knowledge/skills`
+  );
+  assert.match(markup, /aria-label="Knowledge views"/);
+  assert.match(markup, /Skills/);
+  assert.match(markup, /Development Artifacts/);
+  assert.match(markup, /Previous/);
+  assert.match(markup, /Next/);
+});
+
+test("filters, paging, details, and Back state remain URL-backed and Project-bounded", () => {
+  const filtered = applyFilters(new URLSearchParams("after=old&trail=start"), { kind: " DOCUMENTATION ", labels: "docs", source: "" });
+  const next = nextPageParams(filtered, "next-cursor");
+  const previous = previousPageParams(next);
+  const listPath = `/projects/${projectRef}/knowledge/artifacts`;
+  const detail = detailLocation(listPath, artifactSummary.id, `${listPath}?${filtered.toString()}`);
+
+  assert.equal(filtered.get("kind"), "DOCUMENTATION");
+  assert.equal(filtered.has("after"), false);
+  assert.equal(next.get("after"), "next-cursor");
+  assert.equal(previous.get("after"), null);
+  assert.match(detail, /returnTo=/);
+  assert.equal(safeKnowledgeReturnTo(`${listPath}?kind=DOCUMENTATION`, listPath, `/projects/${projectRef}/knowledge`), `${listPath}?kind=DOCUMENTATION`);
+  assert.equal(safeKnowledgeReturnTo("https://example.test", listPath, `/projects/${projectRef}/knowledge`), listPath);
+});
+
+test("available knowledge remains visible beside a localized refresh failure", () => {
+  const markup = render(
+    <><AvailableStale message="Projection endpoint unavailable" onRetry={() => undefined} /><SkillCards connection={{ nodes: [skillSummary], pageInfo: { endCursor: null, hasNextPage: false } }} hrefFor={() => "/skill"} /></>
+  );
+  assert.match(markup, /last available projection remains visible/);
+  assert.match(markup, /Projection endpoint unavailable/);
   assert.match(markup, /event-modeling/);
-  assert.match(markup, /revision 2/);
-  assert.match(markup, /references\/example.md/);
-  assert.match(markup, /Example content/);
-  assert.match(markup, /Parent README/);
-  assert.match(markup, /docs\/guide.md/);
-  assert.match(markup, /Next Skills page/);
-  assert.match(markup, /Next Artifacts page/);
-  assert.match(markup, /Next relationships page/);
-  assert.match(markup, /Historical Skill revisions and superseded Artifact edges are intentionally absent/);
-  assert.match(markup, /aria-label="Current Skills"/);
-  assert.match(markup, /aria-label="Development Artifacts"/);
-});
-
-test("keeps latest available knowledge visible when a refresh fails", () => {
-  const markup = render({ errorMessage: "Projection endpoint unavailable", refreshing: true });
-  assert.match(markup, /last available knowledge view remains visible/);
-  assert.match(markup, /Refreshing latest available knowledge facts/);
-  assert.match(markup, /event-modeling/);
-});
-
-test("renders loading, unavailable, and retryable initial errors", () => {
-  assert.match(render({ artifact: null, asset: null, catalog: null, skill: null, loading: true }), /Loading project knowledge/);
-  assert.match(render({ artifact: null, asset: null, catalog: null, skill: null }), /not available in the latest projection/);
-  assert.match(render({ artifact: null, asset: null, catalog: null, skill: null, errorMessage: "Network unavailable" }), /Retry/);
-});
-
-test("preserves an available catalog only for the same project", () => {
-  const page: ProjectKnowledgeQuery = { projectKnowledge: catalog };
-  assert.equal(preserveKnowledgeForProject(page, ["project-knowledge", project.id], project.id), page);
-  assert.equal(preserveKnowledgeForProject(page, ["project-knowledge", "another-project"], project.id), undefined);
 });
