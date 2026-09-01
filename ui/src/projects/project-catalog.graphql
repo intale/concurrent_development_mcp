@@ -1,12 +1,33 @@
-query Projects($scope: String!, $first: Int, $after: String) {
-  projects(scope: $scope, first: $first, after: $after) {
+query Projects(
+  $search: String
+  $sort: ProjectSort
+  $first: Int
+  $after: String
+  $repositoriesFirst: Int
+) {
+  projects(
+    search: $search
+    sort: $sort
+    first: $first
+    after: $after
+    repositoriesFirst: $repositoriesFirst
+  ) {
     nodes {
-      id
-      name
-      paths
-      registeredAt
-      remotes
+      projectRef
+      displayLabel
+      repositoryCount
       scope
+      repositories {
+        nodes {
+          id
+          displayName
+          paths
+        }
+        totalCount
+        pageInfo {
+          hasNextPage
+        }
+      }
     }
     pageInfo {
       endCursor

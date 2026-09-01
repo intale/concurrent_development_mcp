@@ -3,9 +3,8 @@ Rails.application.routes.draw do
   post "graphql" => "graphql#execute"
   root "projects#index"
   get "projects" => "projects#index"
-  %w[coordination resources knowledge governance delivery].each do |section|
-    get "projects/:repository_id/#{section}" => "projects#index"
-  end
+  get "projects/:project_ref" => "projects#index"
+  get "projects/:project_ref/*client_path" => "projects#index"
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 

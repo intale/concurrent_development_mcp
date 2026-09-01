@@ -1,0 +1,22 @@
+query ProjectWorkspace($projectRef: ID!, $first: Int, $after: String) {
+  project(projectRef: $projectRef, repositoriesFirst: $first, repositoriesAfter: $after) {
+    projectRef
+    displayLabel
+    repositoryCount
+    scope
+    repositories {
+      nodes {
+        id
+        displayName
+        paths
+        registeredAt
+        remotes
+      }
+      totalCount
+      pageInfo {
+        endCursor
+        hasNextPage
+      }
+    }
+  }
+}

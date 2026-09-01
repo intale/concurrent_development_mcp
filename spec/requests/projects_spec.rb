@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe "Projects UI shell" do
+RSpec.describe "Projects UI shell", :read_model do
   let(:session) do
     ActionDispatch::Integration::Session.new(Rails.application).tap do |integration|
       integration.host! "localhost"
@@ -24,11 +24,16 @@ RSpec.describe "Projects UI shell" do
   end
 
   it "serves the same client shell at every client-side project route" do
-    repository_id = "018f0f4d-4e45-7abc-8def-000000000011"
-    paths = [ "/", "/projects" ] +
-      %w[coordination resources knowledge governance delivery].map do |section|
-        "/projects/#{repository_id}/#{section}"
-      end
+    repository = create(
+      :coordinator_read_repository,
+      scope: "project:ui-shell",
+      repository_key: "ui-shell"
+    )
+    project_ref = Coordinator::Read::Web::ProjectReference.new.encode(scope: repository.scope)
+    project_path = "/projects/#{project_ref}"
+    paths = [ "/", "/projects", project_path ] +
+      %w[coordination resources knowledge governance delivery].map { "#{project_path}/#{_1}" } +
+      [ "#{project_path}/coordination/change-sets/CS-shell" ]
 
     paths.each do |path|
       session.get path

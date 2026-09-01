@@ -1,5 +1,5 @@
-import type { ProjectRow } from "./project-catalog-model.js";
 import { Link } from "react-router-dom";
+import type { ProjectRow } from "./project-catalog-model.js";
 
 export interface ProjectCatalogViewProps {
   readonly canGoBack: boolean;
@@ -9,30 +9,20 @@ export interface ProjectCatalogViewProps {
   readonly onNext: () => void;
   readonly onPrevious: () => void;
   readonly onRetry: () => void;
+  readonly pageNumber: number;
   readonly refreshing: boolean;
   readonly rows: readonly ProjectRow[];
-  readonly scopeRequired: boolean;
+  readonly searchApplied: boolean;
   readonly showingPreviousData: boolean;
 }
 
 export function ProjectCatalogView(props: ProjectCatalogViewProps) {
-  if (props.scopeRequired) {
-    return (
-      <div className="card card-outline card-primary">
-        <div className="card-header"><h2 className="card-title">Select a project scope</h2></div>
-        <div className="card-body text-body-secondary">
-          Enter an exact project scope to load its latest available catalog.
-        </div>
-      </div>
-    );
-  }
-
   if (props.loading && props.rows.length === 0) {
     return (
-      <div className="card">
-        <div className="card-body d-flex align-items-center gap-3" aria-live="polite" role="status">
-          <span className="spinner-border spinner-border-sm text-primary" aria-hidden="true" />
-          <span>Loading projects…</span>
+      <div aria-live="polite" className="card" role="status">
+        <div className="card-body d-flex align-items-center gap-3">
+          <span aria-hidden="true" className="spinner-border spinner-border-sm text-primary" />
+          <span>Loading available projects…</span>
         </div>
       </div>
     );
@@ -41,11 +31,12 @@ export function ProjectCatalogView(props: ProjectCatalogViewProps) {
   if (props.errorMessage && props.rows.length === 0) {
     return (
       <div className="alert alert-danger" role="alert">
-        <h2 className="h5"><i aria-hidden="true" className="bi bi-exclamation-triangle me-2" />Projects could not be loaded</h2>
-        <div className="d-flex align-items-center justify-content-between gap-3">
-          <span>{props.errorMessage}</span>
-          <button className="btn btn-outline-light btn-sm" onClick={props.onRetry} type="button">Retry</button>
-        </div>
+        <h2 className="h5">
+          <i aria-hidden="true" className="bi bi-exclamation-triangle me-2" />
+          Projects could not be loaded
+        </h2>
+        <p>{props.errorMessage}</p>
+        <button className="btn btn-outline-light" onClick={props.onRetry} type="button">Retry</button>
       </div>
     );
   }
@@ -54,78 +45,101 @@ export function ProjectCatalogView(props: ProjectCatalogViewProps) {
     return (
       <div className="card">
         <div className="card-header"><h2 className="card-title">No available projects</h2></div>
-        <div className="card-body">No projects are currently available for this exact scope.</div>
+        <div className="card-body">
+          {props.searchApplied
+            ? "No Project scope or Repository member matches this search. Clear or change the refinement."
+            : "No Project scopes are currently available in the Repository projection."}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="vstack gap-3">
+    <section aria-labelledby="available-projects-heading" className="vstack gap-3">
       {props.errorMessage ? (
         <div className="alert alert-warning" role="alert">
-          <h2 className="h5"><i aria-hidden="true" className="bi bi-arrow-clockwise me-2" />Refresh failed</h2>
-          <div className="d-flex align-items-center justify-content-between gap-3">
-            <span>The last available projects remain visible. {props.errorMessage}</span>
-            <button className="btn btn-outline-dark btn-sm" onClick={props.onRetry} type="button">
-              Retry refresh
-            </button>
-          </div>
+          <h2 className="h5">
+            <i aria-hidden="true" className="bi bi-arrow-clockwise me-2" />
+            Refresh failed
+          </h2>
+          <p>The last available Project page remains visible. {props.errorMessage}</p>
+          <button className="btn btn-outline-dark" onClick={props.onRetry} type="button">
+            Retry refresh
+          </button>
         </div>
       ) : null}
-      {props.refreshing ? (
-        <div className="alert alert-info mb-0">
-          <i aria-hidden="true" className="bi bi-arrow-repeat me-2" />
-          <span aria-live="polite" role="status">
-            {props.showingPreviousData
-              ? "Refreshing while the last available project page remains visible…"
-              : "Refreshing latest available projects…"}
+      <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div>
+          <h2 className="h4 mb-1" id="available-projects-heading">Available projects</h2>
+          <p className="small text-body-secondary mb-0">
+            Page {props.pageNumber} · {props.rows.length} {props.rows.length === 1 ? "Project" : "Projects"}
+          </p>
+        </div>
+        {props.refreshing ? (
+          <span className="small text-body-secondary">
+            <i aria-hidden="true" className="bi bi-arrow-repeat me-1" />
+            {props.showingPreviousData ? "Loading the requested page…" : "Refreshing…"}
           </span>
-        </div>
-      ) : null}
-      <p className="small text-body-secondary mb-0">
-        Showing {props.rows.length} {props.rows.length === 1 ? "project" : "projects"} from this available page.
-      </p>
-      <div className="card card-outline card-primary">
-        <div className="card-header">
-          <h2 className="card-title"><i aria-hidden="true" className="bi bi-folder2-open me-2" />Available projects</h2>
-        </div>
-        <div className="card-body p-0">
-          <div className="table-responsive">
-            <table className="table table-hover align-middle mb-0" aria-label="Projects">
-            <thead className="table-light">
-              <tr>
-                <th scope="col">Project</th>
-                <th scope="col">Exact scope</th>
-                <th scope="col">Paths</th>
-                <th scope="col">Remotes</th>
-                <th scope="col">Registered</th>
-                <th scope="col">Inspect</th>
-              </tr>
-            </thead>
-            <tbody>
-              {props.rows.map((row) => (
-                <tr key={row.id}>
-                  <td className="fw-semibold">{row.name}</td>
-                  <td><code>{row.scope}</code></td>
-                  <td>{row.paths || "—"}</td>
-                  <td>{row.remotes || "—"}</td>
-                  <td className="text-nowrap">{row.registeredAt}</td>
-                  <td><div className="btn-group btn-group-sm" role="group" aria-label={`Inspect ${row.name}`}><Link className="btn btn-outline-primary" to={`/projects/${row.id}/coordination`}>Coordination</Link><Link className="btn btn-outline-primary" to={`/projects/${row.id}/resources`}>Resources</Link><Link className="btn btn-outline-primary" to={`/projects/${row.id}/knowledge`}>Knowledge</Link><Link className="btn btn-outline-primary" to={`/projects/${row.id}/governance`}>Governance</Link><Link className="btn btn-outline-primary" to={`/projects/${row.id}/delivery`}>Delivery</Link></div></td>
-                </tr>
-              ))}
-            </tbody>
-            </table>
-          </div>
-        </div>
+        ) : null}
       </div>
-      <div className="d-flex justify-content-between">
-        <button className="btn btn-outline-secondary" disabled={!props.canGoBack} onClick={props.onPrevious} type="button">
+      <div className="row row-cols-1 row-cols-xl-2 g-3">
+        {props.rows.map((project) => (
+          <div className="col" key={project.projectRef}>
+            <article className="card card-outline card-primary h-100">
+              <div className="card-header d-flex align-items-start justify-content-between gap-3">
+                <div>
+                  <h3 className="card-title fw-semibold mb-1">{project.displayLabel}</h3>
+                  <div className="small text-body-secondary text-break"><code>{project.scope}</code></div>
+                </div>
+                <span className="badge text-bg-secondary text-nowrap">
+                  {project.repositoryCount} {project.repositoryCount === 1 ? "Repository" : "Repositories"}
+                </span>
+              </div>
+              <div className="card-body">
+                <h4 className="h6">Repository members</h4>
+                <ul className="list-group list-group-flush">
+                  {project.repositories.map((repository) => (
+                    <li className="list-group-item px-0" key={repository.id}>
+                      <div className="fw-medium">{repository.displayName}</div>
+                      <div className="small text-body-secondary text-break">
+                        {repository.paths[0] ?? "No projected path"}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                {project.hasMoreRepositories ? (
+                  <p className="small text-body-secondary mt-2 mb-0">
+                    More Repository members are available in the Project overview.
+                  </p>
+                ) : null}
+              </div>
+              <div className="card-footer d-grid">
+                <Link className="btn btn-primary" to={`/projects/${project.projectRef}`}>
+                  Open project <i aria-hidden="true" className="bi bi-arrow-right ms-1" />
+                </Link>
+              </div>
+            </article>
+          </div>
+        ))}
+      </div>
+      <nav aria-label="Project catalog pagination" className="d-flex align-items-center justify-content-between gap-3">
+        <button
+          className="btn btn-outline-secondary"
+          disabled={!props.canGoBack}
+          onClick={props.onPrevious}
+          type="button"
+        >
           Previous page
         </button>
-        <button className="btn btn-outline-primary" disabled={!props.hasNextPage} onClick={props.onNext} type="button">
+        <button
+          className="btn btn-outline-primary"
+          disabled={!props.hasNextPage}
+          onClick={props.onNext}
+          type="button"
+        >
           Next page
         </button>
-      </div>
-    </div>
+      </nav>
+    </section>
   );
 }

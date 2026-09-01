@@ -2,17 +2,33 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
-import { preservePageForExactScope } from "../src/projects/project-catalog-model.js";
+import {
+  nextProjectPageParameters,
+  parseProjectSort,
+  preservePageForCatalogFilters,
+  previousProjectPageParameters
+} from "../src/projects/project-catalog-model.js";
 import { ProjectCatalogView } from "../src/projects/project-catalog-view.js";
 import type { ProjectCatalogViewProps } from "../src/projects/project-catalog-view.js";
 
 const project = {
-  id: "018f0f4d-4e45-7abc-8def-000000000011",
-  name: "Catalog",
-  paths: "/workspace/catalog",
-  registeredAt: "2026-08-31T10:00:00.000000Z",
-  remotes: "https://example.test/catalog.git",
-  scope: "project:catalog"
+  projectRef: "eyJzY2hlbWEiOiJwcm9qZWN0LXJlZmVyZW5jZS92MSIsInNjb3BlIjoicHJvamVjdDpjYXRhbG9nIn0",
+  displayLabel: "Catalog",
+  repositoryCount: 2,
+  scope: "project:catalog",
+  hasMoreRepositories: false,
+  repositories: [
+    {
+      id: "018f0f4d-4e45-7abc-8def-000000000011",
+      displayName: "Catalog API",
+      paths: [ "/workspace/catalog-api" ]
+    },
+    {
+      id: "018f0f4d-4e45-7abc-8def-000000000012",
+      displayName: "Catalog UI",
+      paths: [ "/workspace/catalog-ui" ]
+    }
+  ]
 } as const;
 
 const defaults: ProjectCatalogViewProps = {
@@ -23,9 +39,10 @@ const defaults: ProjectCatalogViewProps = {
   onNext: () => undefined,
   onPrevious: () => undefined,
   onRetry: () => undefined,
+  pageNumber: 1,
   refreshing: false,
   rows: [],
-  scopeRequired: false,
+  searchApplied: false,
   showingPreviousData: false
 };
 
@@ -35,48 +52,55 @@ function render(overrides: Partial<ProjectCatalogViewProps>) {
   );
 }
 
-test("renders scope, loading, empty, and retryable error states", () => {
-  assert.match(render({ scopeRequired: true }), /Enter an exact project scope/);
-  assert.match(render({ loading: true }), /Loading projects/);
-  assert.match(render({}), /No projects are currently available/);
+test("renders loading, unrefined empty, refined empty, and retryable error states", () => {
+  assert.match(render({ loading: true }), /Loading available projects/);
+  assert.match(render({}), /No Project scopes are currently available/);
+  assert.match(render({ searchApplied: true }), /matches this search/);
   const error = render({ errorMessage: "Network unavailable" });
   assert.match(error, /Network unavailable/);
   assert.match(error, /Retry/);
 });
 
-test("keeps project rows visible during a stale-preserving refresh", () => {
-  const refreshing = render({
-    refreshing: true,
-    rows: [project],
-    showingPreviousData: true
-  });
+test("shows explicit Repository membership and one visible primary Project action", () => {
+  const markup = render({ rows: [project] });
 
-  assert.match(refreshing, /last available project page remains visible/);
-  assert.match(refreshing, /Showing 1 project/);
-  assert.match(refreshing, /aria-label="Projects"/);
-  assert.match(refreshing, />Delivery<\/a>/);
+  assert.match(markup, /Catalog API/);
+  assert.match(markup, /Catalog UI/);
+  assert.match(markup, /2 Repositories/);
+  assert.match(markup, />Open project/);
+  assert.doesNotMatch(markup, />Coordination<\/a>.*>Resources<\/a>/);
+  assert.match(markup, new RegExp(`/projects/${project.projectRef}`));
 });
 
-test("keeps project rows visible when a background refresh fails", () => {
-  const failedRefresh = render({
+test("keeps available rows visible during refresh failure without a remote detail panel", () => {
+  const markup = render({
     errorMessage: "GraphQL request failed",
+    refreshing: true,
     rows: [project]
   });
 
-  assert.match(failedRefresh, /last available projects remain visible/);
-  assert.match(failedRefresh, /Showing 1 project/);
-  assert.match(failedRefresh, /Retry refresh/);
+  assert.match(markup, /last available Project page remains visible/);
+  assert.match(markup, /Refreshing/);
+  assert.match(markup, /Retry refresh/);
 });
 
-test("preserves an available page only within the same exact scope", () => {
+test("binds placeholder preservation and URL cursor history to catalog filters", () => {
   const page = { projects: [project] } as const;
-
   assert.equal(
-    preservePageForExactScope(page, ["projects", "project:catalog", null], "project:catalog"),
+    preservePageForCatalogFilters(page, ["projects", "catalog", "SCOPE_ASC", null], "catalog", "SCOPE_ASC"),
     page
   );
   assert.equal(
-    preservePageForExactScope(page, ["projects", "project:other", null], "project:catalog"),
+    preservePageForCatalogFilters(page, ["projects", "other", "SCOPE_ASC", null], "catalog", "SCOPE_ASC"),
     undefined
   );
+  assert.equal(parseProjectSort("unexpected"), "SCOPE_ASC");
+
+  const first = new URLSearchParams("q=catalog");
+  const second = nextProjectPageParameters(first, "cursor-1");
+  const third = nextProjectPageParameters(second, "cursor-2");
+  assert.equal(third.get("after"), "cursor-2");
+  assert.deepEqual(third.getAll("trail"), ["", "cursor-1"]);
+  assert.equal(previousProjectPageParameters(third).get("after"), "cursor-1");
+  assert.equal(previousProjectPageParameters(second).has("after"), false);
 });
