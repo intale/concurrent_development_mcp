@@ -130,18 +130,18 @@ module Coordinator::Read::Web::Contracts
 
       params do
         optional(:first).filled(:integer, gteq?: 1, lteq?: 100)
-        optional(:tool_name).maybe(
-          :string,
-          included_in?: Coordinator::Shared::Types::COORDINATION_TOOL_NAMES
-        )
+        optional(:tool_name).maybe(:string)
         optional(:status).maybe(:string, included_in?: [ "ok" ])
         optional(:after_command_id).maybe(:string)
       end
 
-      rule(:after_command_id) do
-        next unless value
+      %i[tool_name after_command_id].each do |name|
+        rule(name) do
+          next unless value
 
-        key.failure("must be an identifier") unless Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
+          key.failure("must be an identifier") unless
+            Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
+        end
       end
     end
 

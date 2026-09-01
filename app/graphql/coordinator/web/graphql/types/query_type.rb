@@ -561,12 +561,16 @@ module Coordinator::Web::Graphql::Types
       raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
     rescue Coordinator::Read::Web::GovernanceBrowserQueryError => error
       raise_governance_query_error(error)
+    rescue Coordinator::Read::Web::GovernanceBrowserReadError => error
+      raise_governance_read_error(error)
     end
 
     def command_receipt(command_id:)
       governance_browser.receipt(command_id:)&.receipt
     rescue Coordinator::Read::Web::GovernanceBrowserQueryError => error
       raise_governance_query_error(error)
+    rescue Coordinator::Read::Web::GovernanceBrowserReadError => error
+      raise_governance_read_error(error)
     end
 
     def project_delivery(
@@ -1017,6 +1021,13 @@ module Coordinator::Web::Graphql::Types
       raise GraphQL::ExecutionError.new(
         error.message,
         extensions: { code: "INVALID_INPUT", details: error.details }
+      )
+    end
+
+    def raise_governance_read_error(error)
+      raise GraphQL::ExecutionError.new(
+        error.message,
+        extensions: { code: "READ_MODEL_INVALID", details: error.details, retryable: true }
       )
     end
 

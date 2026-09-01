@@ -499,51 +499,6 @@ module Coordinator::Shared
       implementation.dependencies.forbidden
       delivery.merge
     ].freeze
-    COORDINATION_TOOL_NAMES = %w[
-      repository_register
-      resource_resolve
-      resource_remove
-      change_set_create
-      work_item_create
-      work_item_dependency_declare
-      change_set_activate
-      work_item_acquire
-      work_item_complete
-      attempt_abandon
-      write_set_reserve
-      write_set_expand
-      lease_renew
-      lease_release
-      guidance_record
-      decision_interpretation_propose
-      decision_interpretation_adjudicate
-      decision_activate
-      decision_correct
-      agent_choice_record
-      candidate_submit
-      candidate_impact_surface_submit
-      verification_obligation_claim
-      compatibility_assessment_submit
-      verification_obligation_waive
-      merge_snapshot_register
-      merge_verification_submit
-      merge_authorization_request
-      merge_observation_record
-      release_set_prepare
-      release_repository_integration_record
-      release_verification_record
-      release_activation_record
-      release_compensation_complete
-      skill_publish
-      skill_publish_batch
-      development_artifact_capture
-      development_artifact_capture_batch
-      development_artifact_classification_correct
-      development_artifact_relation_declare
-      development_artifact_relation_declare_batch
-      operation_batch_cancel
-    ].freeze
-
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)
     PublicCommandId = String.constrained(format: PUBLIC_COMMAND_ID_PATTERN)
     InternalCommandId = String.constrained(format: INTERNAL_COMMAND_ID_PATTERN)
@@ -565,7 +520,7 @@ module Coordinator::Shared
     WriteSetSize = Integer.constrained(gteq: 1, lteq: 32)
     ExpandedWriteSetSize = Integer.constrained(gteq: 2, lteq: 32)
     FencingToken = Integer.constrained(gteq: 1)
-    CoordinationToolName = String.enum(*COORDINATION_TOOL_NAMES)
+    CoordinationToolName = Identifier
     SkillId = String.constrained(format: SKILL_ID_PATTERN)
     SkillName = String.constrained(min_size: 1, max_size: SKILL_NAME_MAXIMUM_BYTES)
     SkillScope = String.constrained(min_size: 1, max_size: SKILL_SCOPE_MAXIMUM_BYTES)

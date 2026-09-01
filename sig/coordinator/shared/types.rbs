@@ -171,7 +171,6 @@ module Coordinator
       MERGE_TARGET_KINDS: Array[String]
       MERGE_ACTIONS: Array[String]
       SUPPORTED_INTERPRETATION_TOPICS: Array[String]
-      COORDINATION_TOOL_NAMES: Array[String]
       DEVELOPMENT_ARTIFACT_KINDS: Array[String]
       DEVELOPMENT_ARTIFACT_SOURCE_KINDS: Array[String]
       DEVELOPMENT_ARTIFACT_RELATION_KINDS: Array[String]

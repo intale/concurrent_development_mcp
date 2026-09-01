@@ -7,13 +7,15 @@ module Coordinator::Read::Web::Repositories
       utterances: Coordinator::Read::Repositories::UserUtterances.new,
       interpretations: Coordinator::Read::Repositories::DecisionInterpretations.new,
       choices: Coordinator::Read::Repositories::AgentChoices.new,
-      impacts: Coordinator::Read::Repositories::AgentChoiceImpacts.new
+      impacts: Coordinator::Read::Repositories::AgentChoiceImpacts.new,
+      schema_registry: Coordinator::Write::EventSchemaRegistry.new
     )
       @decisions = decisions
       @utterances = utterances
       @interpretations = interpretations
       @choices = choices
       @impacts = impacts
+      @schema_registry = schema_registry
     end
 
     def catalog(query)
@@ -247,28 +249,71 @@ module Coordinator::Read::Web::Repositories
     end
 
     def build_receipt(record)
-      completion = record.completion
+      completion = load_completion(record)
+      verify_projection!(record, completion)
       Coordinator::Read::Web::GovernanceBrowserV1::CommandReceipt.new(
+        command_id: completion.command_id,
+        tool_name: completion.tool_name,
+        status: completion.status,
+        summary: completion.summary,
+        receipt: completion.receipt,
+        warnings: completion.warnings,
+        next_action_tools: completion.next_actions.map(&:tool),
+        emitted_events: completion.emitted_events.map { build_event_reference(_1) },
+        completed_at: completion.completed_at
+      )
+    rescue Coordinator::Read::Web::GovernanceBrowserReadError
+      raise
+    rescue Dry::Struct::Error,
+           Coordinator::Write::EventSchemaRegistry::UnknownSchema,
+           Coordinator::Write::EventSchemaRegistry::SchemaMismatch => error
+      raise Coordinator::Read::Web::GovernanceBrowserReadError.new(
         command_id: record.command_id,
-        tool_name: record.tool_name,
-        status: record.status,
-        summary: record.summary,
-        receipt: record.receipt,
-        warnings: completion.fetch("warnings"),
-        next_action_tools: completion.fetch("next_actions").map { _1.fetch("tool") },
-        emitted_events: completion.fetch("emitted_events").map { build_event_reference(_1) },
-        completed_at: completion.fetch("completed_at")
+        reason: "invalid_completion"
+      ), cause: error
+    end
+
+    def load_completion(record)
+      @schema_registry.load(
+        type: "CommandCompleted",
+        schema_version: 1,
+        data: record.completion
+      )
+    end
+
+    def verify_projection!(record, completion)
+      projected = record.attributes.symbolize_keys.slice(
+        :command_id,
+        :tool_name,
+        :canonical_input_digest,
+        :status,
+        :summary,
+        :receipt
+      )
+      canonical = completion.to_h.slice(
+        :command_id,
+        :tool_name,
+        :canonical_input_digest,
+        :status,
+        :summary,
+        :receipt
+      )
+      return if projected == canonical
+
+      raise Coordinator::Read::Web::GovernanceBrowserReadError.new(
+        command_id: record.command_id,
+        reason: "projection_mismatch"
       )
     end
 
     def build_event_reference(attributes)
       Coordinator::Read::Web::GovernanceBrowserV1::EventReference.new(
-        event_id: attributes.fetch("event_id"),
-        type: attributes.fetch("type"),
-        stream_context: attributes.fetch("stream_context"),
-        stream_name: attributes.fetch("stream_name"),
-        stream_id: attributes.fetch("stream_id"),
-        stream_revision: attributes.fetch("stream_revision")
+        event_id: attributes.event_id,
+        type: attributes.type,
+        stream_context: attributes.stream_context,
+        stream_name: attributes.stream_name,
+        stream_id: attributes.stream_id,
+        stream_revision: attributes.stream_revision
       )
     end
   end

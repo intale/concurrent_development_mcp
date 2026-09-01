@@ -56,7 +56,7 @@ module Coordinator::Read::Web
                 Coordinator::Shared::Types::Array.of(Coordinator::Shared::Types::String)
                   .constrained(max_size: 100)
       attribute :next_action_tools,
-                Coordinator::Shared::Types::Array.of(Coordinator::Shared::Types::CoordinationToolName)
+                Coordinator::Shared::Types::Array.of(Coordinator::Shared::Types::Identifier)
                   .constrained(max_size: 100)
       attribute :emitted_events,
                 Coordinator::Shared::Types::Array.of(EventReference).constrained(max_size: 100)

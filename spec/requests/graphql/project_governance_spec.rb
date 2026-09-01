@@ -146,6 +146,17 @@ module ProjectGovernanceGraphqlSpec
     }
   GRAPHQL
 
+  RECEIPT_ISOLATION_QUERY = <<~GRAPHQL.freeze
+    query ReceiptIsolation($repositoryId: ID!, $commandId: ID!) {
+      projectGovernance(repositoryId: $repositoryId, first: 1) {
+        project { id scope }
+      }
+      commandReceipt(commandId: $commandId) {
+        commandId nextActionTools
+      }
+    }
+  GRAPHQL
+
   REPOSITORY_ID = "018f0f4d-4e45-7abc-8def-000000000081"
   OTHER_REPOSITORY_ID = "018f0f4d-4e45-7abc-8def-000000000082"
   CHANGE_SET_ID = "CS-graphql-governance"
@@ -267,6 +278,47 @@ module ProjectGovernanceGraphqlSpec
     expect(receipts.dig("pageInfo", "hasNextPage")).to be(true)
     expect(receipt).to include("commandId" => "cmd-a", "nextActionTools" => [])
     expect(receipt).not_to have_key("data")
+  end
+
+  it "isolates malformed receipt data as retryable field failure and serves corrected projected data" do
+    receipt = Coordinator::Read::CommandReceipt.find("cmd-a")
+    receipt.update!(
+      completion: receipt.completion.merge(
+        "next_actions" => [ { "tool" => "not a tool", "arguments" => {} } ]
+      )
+    )
+
+    failed = execute(
+      RECEIPT_ISOLATION_QUERY,
+      repositoryId: REPOSITORY_ID,
+      commandId: "cmd-a"
+    )
+    expect(failed.dig("data", "projectGovernance", "project", "id")).to eq(REPOSITORY_ID)
+    expect(failed.dig("data", "commandReceipt")).to be_nil
+    expect(failed.dig("errors", 0, "extensions")).to include(
+      "code" => "READ_MODEL_INVALID",
+      "retryable" => true,
+      "details" => {
+        "entity" => "command_receipt",
+        "command_id" => "cmd-a",
+        "reason" => "invalid_completion"
+      }
+    )
+
+    receipt.update!(
+      completion: receipt.completion.merge(
+        "next_actions" => [
+          {
+            "tool" => "development_artifact_get",
+            "arguments" => { "artifact_id" => "artifact:v1:#{'a' * 64}" }
+          }
+        ]
+      )
+    )
+    retried = execute(RECEIPT_QUERY, commandId: "cmd-a")
+    expect(retried.fetch("errors", [])).to be_empty
+    expect(retried.dig("data", "commandReceipt", "nextActionTools"))
+      .to eq([ "development_artifact_get" ])
   end
 
   it "binds opaque cursors to filters and isolates project-scoped details" do

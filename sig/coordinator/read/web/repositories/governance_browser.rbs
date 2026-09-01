@@ -8,7 +8,8 @@ module Coordinator
             ?utterances: Read::Repositories::UserUtterances,
             ?interpretations: Read::Repositories::DecisionInterpretations,
             ?choices: Read::Repositories::AgentChoices,
-            ?impacts: Read::Repositories::AgentChoiceImpacts
+            ?impacts: Read::Repositories::AgentChoiceImpacts,
+            ?schema_registry: Write::EventSchemaRegistry
           ) -> void
           def catalog: (GovernanceBrowserQueryV1::Catalog query) -> GovernanceBrowserV1::Catalog?
           def decision: (GovernanceBrowserQueryV1::Decision query) -> GovernanceBrowserV1::DecisionDetail?
@@ -35,7 +36,9 @@ module Coordinator
           def impacts_for_repository: (String repository_id) -> ActiveRecord::Relation
           def attempts_for_repository: (String repository_id) -> ActiveRecord::Relation
           def build_receipt: (Read::CommandReceipt record) -> GovernanceBrowserV1::CommandReceipt
-          def build_event_reference: (Hash[String, untyped] attributes) -> GovernanceBrowserV1::EventReference
+          def load_completion: (Read::CommandReceipt record) -> Write::Events::CommandCompletedV1
+          def verify_projection!: (Read::CommandReceipt record, Write::Events::CommandCompletedV1 completion) -> void
+          def build_event_reference: (Write::EventReference attributes) -> GovernanceBrowserV1::EventReference
         end
       end
     end

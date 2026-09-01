@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    module Web
+      class GovernanceBrowserReadError < StandardError
+        attr_reader details: Hash[Symbol, String]
+
+        def initialize: (command_id: String, reason: String) -> void
+      end
+    end
+  end
+end

@@ -79,6 +79,15 @@ RSpec.describe "MCP public contract parity" do
     end
   end
 
+  it "keeps the public registry unique while persisted tool names remain identifier-compatible" do
+    tool_names = Coordinator::Mcp::ToolRegistry.all.map(&:tool_name)
+
+    expect(tool_names).to eq(tool_names.uniq)
+    expect(tool_names).to all(match(Coordinator::Shared::Types::IDENTIFIER_PATTERN))
+    expect(Coordinator::Shared::Types::CoordinationToolName["retired_tool_name"])
+      .to eq("retired_tool_name")
+  end
+
   it "limits documented dry-operation runtime exemptions to generated call wrappers" do
     query_signatures = Dir[Rails.root.join("sig/coordinator/read/queries/*.rbs")]
 

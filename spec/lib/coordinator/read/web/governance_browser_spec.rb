@@ -84,7 +84,21 @@ RSpec.describe Coordinator::Read::Web::Queries::GovernanceBrowser, :read_model d
       event_global_position: 801
     )
 
-    create(:coordinator_read_command_receipt, command_id: "cmd-a", tool_name: "change_set_create")
+    receipt = create(
+      :coordinator_read_command_receipt,
+      command_id: "cmd-a",
+      tool_name: "change_set_create"
+    )
+    receipt.update!(
+      completion: receipt.completion.merge(
+        "next_actions" => [
+          {
+            "tool" => "development_artifact_get",
+            "arguments" => { "artifact_id" => "artifact:v1:#{'a' * 64}" }
+          }
+        ]
+      )
+    )
     create(:coordinator_read_command_receipt, command_id: "cmd-b", tool_name: "work_item_create")
   end
 
@@ -126,8 +140,37 @@ RSpec.describe Coordinator::Read::Web::Queries::GovernanceBrowser, :read_model d
     expect(receipt.receipt).to have_attributes(
       command_id: "cmd-a",
       tool_name: "change_set_create",
-      summary: "ChangeSet created."
+      summary: "ChangeSet created.",
+      next_action_tools: [ "development_artifact_get" ]
     )
+  end
+
+  it "bounds malformed projected receipts without affecting project governance availability" do
+    record = Coordinator::Read::CommandReceipt.find("cmd-a")
+    record.update!(
+      completion: record.completion.merge(
+        "next_actions" => [ { "tool" => "not a tool", "arguments" => {} } ]
+      )
+    )
+
+    expect(query.catalog(repository_id:, first: 20).project.repository_id).to eq(repository_id)
+    expect { query.receipt(command_id: "cmd-a") }
+      .to raise_error(Coordinator::Read::Web::GovernanceBrowserReadError) do |error|
+        expect(error.details).to eq(
+          entity: "command_receipt",
+          command_id: "cmd-a",
+          reason: "invalid_completion"
+        )
+      end
+  end
+
+  it "detects divergence between searchable receipt columns and canonical completion data" do
+    Coordinator::Read::CommandReceipt.find("cmd-a").update_column(:summary, "Diverged summary")
+
+    expect { query.receipt(command_id: "cmd-a") }
+      .to raise_error(Coordinator::Read::Web::GovernanceBrowserReadError) do |error|
+        expect(error.details.fetch(:reason)).to eq("projection_mismatch")
+      end
   end
 
   it "rejects malformed cursors and isolates project-scoped details" do
