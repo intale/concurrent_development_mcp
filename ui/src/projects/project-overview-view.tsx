@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom";
+import { CopyIdentifier } from "../copy-identifier.js";
+import { RetryRefresh } from "../retry-refresh.js";
 
 export interface ProjectOverviewRepository {
   readonly displayName: string;
@@ -18,7 +20,7 @@ export interface ProjectOverviewViewProps {
   readonly onRetry: () => void;
   readonly pageNumber: number;
   readonly projectRef: string;
-  readonly refreshing: boolean;
+  readonly loadingRequestedPage: boolean;
   readonly repositories: readonly ProjectOverviewRepository[];
   readonly repositoryCount: number;
 }
@@ -40,7 +42,13 @@ export function ProjectOverviewView(props: ProjectOverviewViewProps) {
       <div className="alert alert-danger" role="alert">
         <h3 className="h5">Project overview could not be loaded</h3>
         <p>{props.errorMessage}</p>
-        <button className="btn btn-outline-light" onClick={props.onRetry} type="button">Retry</button>
+        <RetryRefresh
+          announcementLabel="Project overview"
+          buttonClassName="btn btn-outline-light"
+          onRetry={props.onRetry}
+        >
+          Retry
+        </RetryRefresh>
       </div>
     );
   }
@@ -49,14 +57,21 @@ export function ProjectOverviewView(props: ProjectOverviewViewProps) {
     <>
       {props.errorMessage ? (
         <div className="alert alert-warning" role="alert">
-          The last available Repository page remains visible. {props.errorMessage}
+          <p>The last available Repository page remains visible. {props.errorMessage}</p>
+          <RetryRefresh
+            announcementLabel="Project overview"
+            buttonClassName="btn btn-outline-dark"
+            onRetry={props.onRetry}
+          >
+            Retry refresh
+          </RetryRefresh>
         </div>
       ) : null}
       <div className="row g-3">
         <div className="col-12 col-lg-6">
           <div className="small-box text-bg-primary h-100">
             <div className="inner">
-              <h3>{props.repositoryCount}</h3>
+              <div className="fs-1 fw-semibold">{props.repositoryCount}</div>
               <p>Registered {props.repositoryCount === 1 ? "Repository member" : "Repository members"}</p>
             </div>
             <i aria-hidden="true" className="small-box-icon bi bi-git" />
@@ -82,7 +97,13 @@ export function ProjectOverviewView(props: ProjectOverviewViewProps) {
             <h3 className="h4 mb-1" id="repository-members-heading">Repository members</h3>
             <p className="small text-body-secondary mb-0">Page {props.pageNumber}</p>
           </div>
-          {props.refreshing ? <span className="small text-body-secondary">Refreshing…</span> : null}
+          <span
+            aria-atomic="true"
+            aria-live="polite"
+            className="small text-body-secondary"
+          >
+            {props.loadingRequestedPage ? "Loading the requested page…" : "\u00a0"}
+          </span>
         </div>
         {props.repositories.length === 0 ? (
           <div className="card"><div className="card-body">No Repository members are available on this page.</div></div>
@@ -106,11 +127,11 @@ export function ProjectOverviewView(props: ProjectOverviewViewProps) {
                         : <span className="text-body-secondary">No projected remotes</span>}
                     </div>
                     <div className="small text-body-secondary">
-                      Registered <time dateTime={repository.registeredAt}>{repository.registeredAt}</time>
+                      Registered <time dateTime={repository.registeredAt}>{formatted(repository.registeredAt)}</time>
                     </div>
                   </div>
-                  <div className="card-footer small text-body-secondary text-break">
-                    Repository ID <code>{repository.id}</code>
+                  <div className="card-footer">
+                    <CopyIdentifier label="Repository ID" value={repository.id} />
                   </div>
                 </article>
               </div>
@@ -128,4 +149,8 @@ export function ProjectOverviewView(props: ProjectOverviewViewProps) {
       </section>
     </>
   );
+}
+
+function formatted(value: string): string {
+  return new Date(value).toLocaleString();
 }

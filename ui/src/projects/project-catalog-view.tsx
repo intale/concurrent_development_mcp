@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { RetryRefresh } from "../retry-refresh.js";
 import type { ProjectRow } from "./project-catalog-model.js";
 
 export interface ProjectCatalogViewProps {
@@ -10,7 +11,6 @@ export interface ProjectCatalogViewProps {
   readonly onPrevious: () => void;
   readonly onRetry: () => void;
   readonly pageNumber: number;
-  readonly refreshing: boolean;
   readonly rows: readonly ProjectRow[];
   readonly searchApplied: boolean;
   readonly showingPreviousData: boolean;
@@ -36,7 +36,13 @@ export function ProjectCatalogView(props: ProjectCatalogViewProps) {
           Projects could not be loaded
         </h2>
         <p>{props.errorMessage}</p>
-        <button className="btn btn-outline-light" onClick={props.onRetry} type="button">Retry</button>
+        <RetryRefresh
+          announcementLabel="Project catalog"
+          buttonClassName="btn btn-outline-light"
+          onRetry={props.onRetry}
+        >
+          Retry
+        </RetryRefresh>
       </div>
     );
   }
@@ -63,9 +69,13 @@ export function ProjectCatalogView(props: ProjectCatalogViewProps) {
             Refresh failed
           </h2>
           <p>The last available Project page remains visible. {props.errorMessage}</p>
-          <button className="btn btn-outline-dark" onClick={props.onRetry} type="button">
+          <RetryRefresh
+            announcementLabel="Project catalog"
+            buttonClassName="btn btn-outline-dark"
+            onRetry={props.onRetry}
+          >
             Retry refresh
-          </button>
+          </RetryRefresh>
         </div>
       ) : null}
       <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
@@ -75,12 +85,13 @@ export function ProjectCatalogView(props: ProjectCatalogViewProps) {
             Page {props.pageNumber} · {props.rows.length} {props.rows.length === 1 ? "Project" : "Projects"}
           </p>
         </div>
-        {props.refreshing ? (
-          <span className="small text-body-secondary">
-            <i aria-hidden="true" className="bi bi-arrow-repeat me-1" />
-            {props.showingPreviousData ? "Loading the requested page…" : "Refreshing…"}
-          </span>
-        ) : null}
+        <span
+          aria-atomic="true"
+          aria-live="polite"
+          className="small text-body-secondary"
+        >
+          {props.showingPreviousData ? <><i aria-hidden="true" className="bi bi-arrow-repeat me-1" />Loading the requested page…</> : "\u00a0"}
+        </span>
       </div>
       <div className="row row-cols-1 row-cols-xl-2 g-3">
         {props.rows.map((project) => (

@@ -185,7 +185,7 @@ function ResourceDetailPage({ projectRef, resourceId }: {
     <div className="vstack gap-3">
       <ResourceNavigation basePath={`/projects/${projectRef}/resources`} />
       <div>
-        <Link className="small" to={backTo}>← Back to Resource inventory</Link>
+        <Link className="btn btn-outline-secondary mb-3" to={backTo}>← Back to Resource inventory</Link>
         <h2 className="h3 mt-2 mb-1" ref={headingRef} tabIndex={-1}>Resource detail</h2>
         <p className="text-body-secondary mb-0">Projected identity and lifecycle evidence from ResourceGet.</p>
       </div>
@@ -313,7 +313,7 @@ function LeaseDetailPage({ projectRef, leaseId }: {
     <div className="vstack gap-3">
       <ResourceNavigation basePath={`/projects/${projectRef}/resources`} />
       <div>
-        <Link className="small" to={backTo}>← Back to active leases</Link>
+        <Link className="btn btn-outline-secondary mb-3" to={backTo}>← Back to active leases</Link>
         <h2 className="h3 mt-2 mb-1" ref={headingRef} tabIndex={-1}>Resource lease detail</h2>
         <p className="text-body-secondary mb-0">Historical lease facts remain available after release, expiry, or Attempt completion.</p>
       </div>

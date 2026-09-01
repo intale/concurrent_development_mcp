@@ -106,6 +106,7 @@ export function OperationBatchesPage() {
               canGoBack={searchParams.has("itemsTrail")}
               errorMessage={errorMessage}
               loading={batch.isPending}
+              loadingRequestedPage={batch.isPlaceholderData}
               onNext={() => {
                 const cursor = batch.data?.operationBatch?.items.pageInfo.endCursor;
                 if (cursor) setSearchParams(nextBatchPageParameters(searchParams, cursor, "itemsAfter", "itemsTrail"));
@@ -113,7 +114,6 @@ export function OperationBatchesPage() {
               onPrevious={() => setSearchParams(previousBatchPageParameters(searchParams, "itemsAfter", "itemsTrail"))}
               onRetry={() => { void batch.refetch(); }}
               pageNumber={itemPageNumber}
-              refreshing={batch.isFetching && batch.data !== undefined}
             />
           ) : (
             <>
@@ -148,6 +148,7 @@ export function OperationBatchesPage() {
                 errorMessage={errorMessage}
                 hasFilters={status !== undefined || targetTool !== undefined}
                 loading={batches.isPending}
+                loadingRequestedPage={batches.isPlaceholderData}
                 onNext={() => {
                   const cursor = batches.data?.operationBatches.pageInfo.endCursor;
                   if (cursor) setSearchParams(nextBatchPageParameters(searchParams, cursor));
@@ -156,7 +157,6 @@ export function OperationBatchesPage() {
                 onRetry={() => { void batches.refetch(); }}
                 page={batches.data?.operationBatches ?? null}
                 pageNumber={pageNumber}
-                refreshing={batches.isFetching && batches.data !== undefined}
               />
             </>
           )}

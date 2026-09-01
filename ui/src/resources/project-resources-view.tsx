@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import { Link, NavLink } from "react-router-dom";
+import { CopyIdentifier } from "../copy-identifier.js";
+import { RetryRefresh } from "../retry-refresh.js";
 import type {
   ProjectResource,
   ProjectResourceConnection,
@@ -54,7 +56,9 @@ export function InitialError({ label, message, onRetry }: {
     <div className="alert alert-danger" role="alert">
       <h3 className="h5">{label} could not be loaded</h3>
       <p>{message}</p>
-      <button className="btn btn-outline-light btn-sm" onClick={onRetry} type="button">Retry</button>
+      <RetryRefresh announcementLabel={label} buttonClassName="btn btn-outline-light" onRetry={onRetry}>
+        Retry
+      </RetryRefresh>
     </div>
   );
 }
@@ -65,10 +69,14 @@ export function AvailableStale({ message, onRetry }: {
 }) {
   return (
     <div className="alert alert-warning" role="alert">
-      The last available projection remains visible. {message}
-      <button className="btn btn-outline-dark btn-sm ms-3" onClick={onRetry} type="button">
+      <p>The last available projection remains visible. {message}</p>
+      <RetryRefresh
+        announcementLabel="Resource view"
+        buttonClassName="btn btn-outline-dark"
+        onRetry={onRetry}
+      >
         Retry refresh
-      </button>
+      </RetryRefresh>
     </div>
   );
 }
@@ -177,6 +185,8 @@ export function ResourceDetail({ resource, backTo }: {
         </span>
       </div>
       <div className="card-body vstack gap-4">
+        <CopyIdentifier label="Resource path" value={resource.path} />
+        <CopyIdentifier label="Resource ID" value={resource.id} />
         <DetailGroup title="Identity" rows={[
           ["Resource", resource.id],
           ["Repository", resource.repositoryId],
@@ -211,6 +221,8 @@ export function LeaseDetail({ lease, backTo, projectPath }: {
         <span className={`badge ${leaseBadgeClass(lease.status)}`}>{lease.status.toLowerCase()}</span>
       </div>
       <div className="card-body vstack gap-4">
+        <CopyIdentifier label="Resource path" value={lease.resourcePath} />
+        <CopyIdentifier label="Lease ID" value={lease.id} />
         <DetailGroup title="Holder" rows={[
           ["Agent", lease.agentId],
           ["Attempt", lease.attemptId],

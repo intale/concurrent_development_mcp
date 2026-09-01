@@ -18,12 +18,12 @@ const defaults: ProjectOverviewViewProps = {
   errorMessage: null,
   hasNextPage: false,
   loading: false,
+  loadingRequestedPage: false,
   onNext: () => undefined,
   onPrevious: () => undefined,
   onRetry: () => undefined,
   pageNumber: 1,
   projectRef: "opaque-project-reference",
-  refreshing: false,
   repositories: [repository],
   repositoryCount: 1
 };
@@ -37,12 +37,13 @@ function render(overrides: Partial<ProjectOverviewViewProps>) {
 test("renders useful summary actions and Repository details in the overview", () => {
   const markup = render({});
 
-  assert.match(markup, /1<\/h3>/);
+  assert.match(markup, /fs-1 fw-semibold">1<\/div>/);
   assert.match(markup, /Open coordination/);
   assert.match(markup, /Inspect resources/);
   assert.match(markup, /Coordinator/);
   assert.match(markup, /\/workspace\/coordinator/);
-  assert.match(markup, /Repository ID/);
+  assert.match(markup, /row row-cols-1 row-cols-lg-2/);
+  assert.match(markup, /aria-label="Copy Repository ID"/);
 });
 
 test("renders bounded contextual loading, failure, and available-data refresh states", () => {
@@ -57,10 +58,16 @@ test("renders bounded contextual loading, failure, and available-data refresh st
 });
 
 test("keeps member paging controls explicit and adjacent to the member collection", () => {
-  const markup = render({ canGoBack: true, hasNextPage: true, pageNumber: 2 });
+  const markup = render({
+    canGoBack: true,
+    hasNextPage: true,
+    loadingRequestedPage: true,
+    pageNumber: 2
+  });
 
   assert.match(markup, /Repository member pagination/);
   assert.match(markup, /Page 2/);
   assert.doesNotMatch(markup, /Previous page" disabled/);
   assert.doesNotMatch(markup, /Next page" disabled/);
+  assert.match(markup, /Loading the requested page/);
 });

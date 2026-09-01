@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import { Link, NavLink } from "react-router-dom";
+import { CopyIdentifier } from "../copy-identifier.js";
+import { RetryRefresh } from "../retry-refresh.js";
 import type {
   ChoiceConnection,
   ChoiceDetail,
@@ -57,7 +59,9 @@ export function InitialError({ label, message, onRetry }: {
     <div className="alert alert-danger" role="alert">
       <h3 className="h5">{label} could not be loaded</h3>
       <p>{message}</p>
-      <button className="btn btn-outline-light btn-sm" onClick={onRetry} type="button">Retry</button>
+      <RetryRefresh announcementLabel={label} buttonClassName="btn btn-outline-light" onRetry={onRetry}>
+        Retry
+      </RetryRefresh>
     </div>
   );
 }
@@ -68,8 +72,14 @@ export function AvailableStale({ message, onRetry }: {
 }) {
   return (
     <div className="alert alert-warning" role="alert">
-      The last available projection remains visible. {message}
-      <button className="btn btn-outline-dark btn-sm ms-3" onClick={onRetry} type="button">Retry refresh</button>
+      <p>The last available projection remains visible. {message}</p>
+      <RetryRefresh
+        announcementLabel="Governance view"
+        buttonClassName="btn btn-outline-dark"
+        onRetry={onRetry}
+      >
+        Retry refresh
+      </RetryRefresh>
     </div>
   );
 }
@@ -198,6 +208,7 @@ export function DecisionDetailCard({ detail, backTo }: {
         <span className={`badge ${badgeClass(decision.policyStatus)}`}>{humanized(decision.policyStatus)}</span>
       </div>
       <div className="card-body vstack gap-4">
+        <CopyIdentifier label="Decision ID" value={decision.id} />
         <section><h4 className="h6">Decision</h4><p className="mb-1">{decision.modality} {humanized(decision.effect)} · {decisionValue(decision.value)}</p><p className="mb-0">{decision.rationaleSummary ?? "No rationale summary was recorded."}</p></section>
         {decision.correctionSummary ? <div className="alert alert-info mb-0"><strong>Current correction:</strong> {decision.correctionSummary}</div> : null}
         <DetailGroup title="Scope and conditions" rows={[
@@ -240,6 +251,7 @@ export function GuidanceDetailCard({ detail, backTo }: {
     <article className="card card-outline card-info">
       <div className="card-header d-flex flex-wrap justify-content-between gap-2"><h3 className="card-title">Guidance</h3><span className="badge text-bg-info">{humanized(guidance.source)}</span></div>
       <div className="card-body vstack gap-4">
+        <CopyIdentifier label="Guidance ID" value={guidance.id} />
         <blockquote className="blockquote mb-0"><p className="text-break">{guidance.text}</p><footer className="blockquote-footer mb-0">{guidance.actor.kind}/{guidance.actor.id} · {formatted(guidance.recordedAt)}</footer></blockquote>
         <DetailGroup title="Anchors" rows={[
           ["Repositories", guidance.anchors.repositoryIds.join(", ")],
@@ -275,6 +287,7 @@ export function ChoiceDetailCard({ detail, backTo, impactHref }: {
     <article className="card card-outline card-warning">
       <div className="card-header d-flex flex-wrap justify-content-between gap-2"><h3 className="card-title">{humanized(choice.choiceType)}</h3><span className={`badge ${badgeClass(choice.observationStatus)}`}>{humanized(choice.observationStatus)}</span></div>
       <div className="card-body vstack gap-4">
+        <CopyIdentifier label="AgentChoice ID" value={choice.id} />
         <section><h4 className="h6">Selected option</h4><p className="h5 mb-1">{choice.selected.summary}</p><code>{choice.selected.id}</code><p className="mt-2 mb-0">{choice.reasonSummary}</p></section>
         <section><h4 className="h6">Alternatives considered</h4>{choice.alternatives.length === 0 ? <p className="text-body-secondary mb-0">No alternatives recorded.</p> : <ul className="mb-0">{choice.alternatives.map((option) => <li key={option.id}>{option.summary} (<code>{option.id}</code>)</li>)}</ul>}</section>
         <DetailGroup title="Coordination context" rows={[
@@ -314,6 +327,7 @@ export function ImpactDetailCard({ detail, backTo, choiceHref, decisionHref }: {
     <article className="card card-outline card-secondary">
       <div className="card-header d-flex flex-wrap justify-content-between gap-2"><h3 className="card-title">Decision impact</h3><span className={`badge ${badgeClass(impact.outcome)}`}>{humanized(impact.outcome)}</span></div>
       <div className="card-body vstack gap-4">
+        <CopyIdentifier label="Impact assessment ID" value={impact.assessmentId} />
         <section><h4 className="h6">Assessment</h4><p className="mb-1">{humanized(impact.reason)}</p><p className="text-body-secondary mb-0">Assessed {formatted(impact.assessedAt)} under {impact.policyVersion}</p></section>
         <div className="row g-3">
           <div className="col-12 col-lg-6"><div className="border rounded p-3 h-100"><h4 className="h6">Before</h4><div className={`badge ${badgeClass(impact.beforeStatus)}`}>{humanized(impact.beforeStatus)}</div><p className="mt-2 mb-1">{humanized(impact.beforeBasis)}</p><div className="small text-body-secondary">{impact.beforeReasonCodes.map(humanized).join(", ") || "No reason codes"}</div></div></div>

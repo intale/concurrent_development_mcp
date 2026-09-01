@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom";
+import { CopyIdentifier } from "../copy-identifier.js";
+import { RetryRefresh } from "../retry-refresh.js";
 import type { OperationBatch, OperationBatchPage } from "./operation-batches-model.js";
 import {
   batchStatusClass,
@@ -16,7 +18,13 @@ function AvailableState({ errorMessage, onRetry }: AvailableStateProps) {
     <div className="alert alert-warning" role="alert">
       <h2 className="h5">Refresh failed</h2>
       <p>The last available operation facts remain visible. {errorMessage}</p>
-      <button className="btn btn-outline-dark" onClick={onRetry} type="button">Retry refresh</button>
+      <RetryRefresh
+        announcementLabel="Operation batches"
+        buttonClassName="btn btn-outline-dark"
+        onRetry={onRetry}
+      >
+        Retry refresh
+      </RetryRefresh>
     </div>
   ) : null;
 }
@@ -30,7 +38,7 @@ export interface OperationBatchListViewProps extends AvailableStateProps {
   readonly onPrevious: () => void;
   readonly page: OperationBatchPage | null;
   readonly pageNumber: number;
-  readonly refreshing: boolean;
+  readonly loadingRequestedPage: boolean;
 }
 
 export function OperationBatchListView(props: OperationBatchListViewProps) {
@@ -42,7 +50,13 @@ export function OperationBatchListView(props: OperationBatchListViewProps) {
       <div className="alert alert-danger" role="alert">
         <h2 className="h5">Operation batches could not be loaded</h2>
         <p>{props.errorMessage}</p>
-        <button className="btn btn-outline-light" onClick={props.onRetry} type="button">Retry</button>
+        <RetryRefresh
+          announcementLabel="Operation batches"
+          buttonClassName="btn btn-outline-light"
+          onRetry={props.onRetry}
+        >
+          Retry
+        </RetryRefresh>
       </div>
     );
   }
@@ -67,7 +81,13 @@ export function OperationBatchListView(props: OperationBatchListViewProps) {
           <h2 className="h4 mb-1" id="operation-batches-heading">Available batches</h2>
           <p className="small text-body-secondary mb-0">Page {props.pageNumber} · {props.page.nodes.length} on this page</p>
         </div>
-        {props.refreshing ? <span className="small text-body-secondary">Refreshing…</span> : null}
+        <span
+          aria-atomic="true"
+          aria-live="polite"
+          className="small text-body-secondary"
+        >
+          {props.loadingRequestedPage ? "Loading the requested page…" : "\u00a0"}
+        </span>
       </div>
       <div className="row row-cols-1 row-cols-xl-2 g-3">
         {props.page.nodes.map((batch) => (
@@ -117,7 +137,7 @@ export interface OperationBatchDetailViewProps extends AvailableStateProps {
   readonly onNext: () => void;
   readonly onPrevious: () => void;
   readonly pageNumber: number;
-  readonly refreshing: boolean;
+  readonly loadingRequestedPage: boolean;
 }
 
 export function OperationBatchDetailView(props: OperationBatchDetailViewProps) {
@@ -130,7 +150,13 @@ export function OperationBatchDetailView(props: OperationBatchDetailViewProps) {
         <h2 className="h5">Operation batch could not be loaded</h2>
         <p>{props.errorMessage}</p>
         <div className="d-flex flex-wrap gap-2">
-          <button className="btn btn-outline-light" onClick={props.onRetry} type="button">Retry</button>
+          <RetryRefresh
+            announcementLabel="Operation batch"
+            buttonClassName="btn btn-outline-light"
+            onRetry={props.onRetry}
+          >
+            Retry
+          </RetryRefresh>
           <Link className="btn btn-outline-light" to={props.backHref}>Back to batches</Link>
         </div>
       </div>
@@ -150,12 +176,11 @@ export function OperationBatchDetailView(props: OperationBatchDetailViewProps) {
   return (
     <div className="vstack gap-3">
       <AvailableState errorMessage={props.errorMessage} onRetry={props.onRetry} />
-      {props.refreshing ? <span className="small text-body-secondary">Refreshing…</span> : null}
       <article className="card card-outline card-dark">
         <div className="card-header d-flex flex-wrap align-items-start justify-content-between gap-2">
           <div>
             <h2 className="card-title fw-semibold mb-1">{humanizedOperation(batch.targetTool)}</h2>
-            <div className="small text-body-secondary text-break"><code>{batch.id}</code></div>
+            <div className="mt-2"><CopyIdentifier label="Operation batch ID" value={batch.id} /></div>
           </div>
           <span className={`badge ${batchStatusClass(batch.status)}`}>{humanizedOperation(batch.status)}</span>
         </div>
@@ -169,13 +194,20 @@ export function OperationBatchDetailView(props: OperationBatchDetailViewProps) {
           </div>
           <dl className="row mb-0">
             <dt className="col-sm-3">Created</dt><dd className="col-sm-9"><time dateTime={batch.createdAt}>{formattedTimestamp(batch.createdAt)}</time></dd>
-            <dt className="col-sm-3">Manifest</dt><dd className="col-sm-9 text-break"><code>{batch.manifestDigest}</code></dd>
+            <dt className="col-sm-3">Manifest</dt><dd className="col-sm-9"><CopyIdentifier label="Manifest digest" value={batch.manifestDigest} /></dd>
           </dl>
           <section aria-labelledby="batch-items-heading" className="vstack gap-3">
             <div>
               <h3 className="h5 mb-1" id="batch-items-heading">Batch items</h3>
               <p className="small text-body-secondary mb-0">Page {props.pageNumber}</p>
             </div>
+            <span
+              aria-atomic="true"
+              aria-live="polite"
+              className="small text-body-secondary"
+            >
+              {props.loadingRequestedPage ? "Loading the requested item page…" : "\u00a0"}
+            </span>
             {items.nodes.length === 0 ? (
               <p className="text-body-secondary mb-0">No item outcomes are available on this page.</p>
             ) : (

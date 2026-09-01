@@ -1,12 +1,20 @@
 # frozen_string_literal: true
 
 PROJECT_CATALOG_QUERY = <<~GRAPHQL.freeze
-  query Projects($scope: String!, $first: Int, $after: String) {
-    projects(scope: $scope, first: $first, after: $after) {
+  query Projects($search: String, $first: Int, $repositoriesFirst: Int) {
+    projects(search: $search, first: $first, repositoriesFirst: $repositoriesFirst) {
       nodes {
-        id
-        name
+        projectRef
+        displayLabel
         scope
+        repositoryCount
+        repositories {
+          nodes {
+            id
+            displayName
+            paths
+          }
+        }
       }
       pageInfo {
         endCursor
@@ -17,15 +25,9 @@ PROJECT_CATALOG_QUERY = <<~GRAPHQL.freeze
 GRAPHQL
 
 Given(
-  "exact project scope {string} has registered repository {string}"
+  "exact project scope {string} has projected repository {string}"
 ) do |scope, repository_key|
-  @project_catalog_repositories ||= {}
-  repository_id = register_project_catalog_repository(scope:, repository_key:)
-  @project_catalog_repositories[repository_key] = repository_id
-  await_read_model("Repository #{repository_key} to reach GraphQL") do
-    payload = query_project_catalog(scope)
-    [ project_catalog_ids(payload).include?(repository_id), payload ]
-  end
+  project_catalog_create_repository(scope:, repository_key:)
 end
 
 When("the browser queries the project catalog for {string}") do |scope|
@@ -34,11 +36,15 @@ When("the browser queries the project catalog for {string}") do |scope|
 end
 
 Then("the project catalog contains only repository {string}") do |repository_key|
-  expected_id = @project_catalog_repositories.fetch(repository_key)
-  assert_acceptance_equal([ expected_id ], project_catalog_ids(@project_catalog_payload), "Scoped project catalog")
+  expected_id = @project_catalog_repositories.fetch(repository_key).repository_id
+  assert_acceptance_equal(
+    [ expected_id ],
+    project_catalog_repository_ids(@project_catalog_payload),
+    "Scoped project catalog"
+  )
   assert_acceptance_equal(
     [ @project_catalog_scope ],
-    @project_catalog_payload.dig("data", "projects", "nodes").map { _1.fetch("scope") }.uniq,
+    project_catalog_projects(@project_catalog_payload).map { _1.fetch("scope") }.uniq,
     "Exact project scopes"
   )
 end
@@ -61,9 +67,9 @@ Then("Rails serves the standalone project browser shell") do
 end
 
 Then("every project browser route serves the same standalone shell") do
-  repository_id = @project_catalog_repositories.fetch("ui-catalog-a")
+  project_ref = project_catalog_projects(@project_catalog_payload).fetch(0).fetch("projectRef")
   paths = %w[coordination resources knowledge governance delivery].map do |section|
-    "/projects/#{repository_id}/#{section}"
+    "/projects/#{project_ref}/#{section}"
   end
   session = ActionDispatch::Integration::Session.new(Rails.application).tap do |browser|
     browser.host! "localhost"
@@ -98,77 +104,60 @@ Then("the browser-facing GraphQL schema exposes Query without Mutation or Subscr
   assert_acceptance_equal(nil, schema.fetch("subscriptionType"), "GraphQL Subscription root")
 end
 
-When(
-  "project-catalog projection delivery pauses and repository {string} registers in that scope"
-) do |repository_key|
-  @project_catalog_scope = "project:test/ui-catalog-stale"
-  stop_read_model_subscriptions
-  @project_catalog_repositories ||= {}
-  repository_id = register_project_catalog_repository(
-    scope: @project_catalog_scope,
-    repository_key:
-  )
-  @project_catalog_repositories[repository_key] = repository_id
+When("the browser reads that project before repository {string} is projected") do |repository_key|
+  @project_catalog_scope = @project_catalog_repositories.values.fetch(0).scope
+  @project_catalog_pending_repository_key = repository_key
   @project_catalog_stale_payload = query_project_catalog(@project_catalog_scope)
 end
 
 Then("the project catalog remains available with repository {string}") do |repository_key|
-  expected_id = @project_catalog_repositories.fetch(repository_key)
+  expected_id = @project_catalog_repositories.fetch(repository_key).repository_id
   assert_acceptance_equal(
     [ expected_id ],
-    project_catalog_ids(@project_catalog_stale_payload),
-    "Available stale project catalog"
+    project_catalog_repository_ids(@project_catalog_stale_payload),
+    "Available prior project catalog"
   )
 end
 
 Then("the unprojected repository {string} is not presented as current") do |repository_key|
-  repository_id = @project_catalog_repositories.fetch(repository_key)
+  assert_acceptance_equal(@project_catalog_pending_repository_key, repository_key, "Pending Repository")
   assert_acceptance(
-    !project_catalog_ids(@project_catalog_stale_payload).include?(repository_id),
-    "Unprojected repository was presented as current"
+    @project_catalog_stale_payload.to_s.exclude?(repository_key),
+    "Unprojected Repository was presented as current"
   )
 end
 
-When("project-catalog projection delivery restarts") do
-  restart_read_model_subscriptions
+When("repository {string} becomes available in that Project projection") do |repository_key|
+  project_catalog_create_repository(scope: @project_catalog_scope, repository_key:)
 end
 
 Then(
-  "the project catalog eventually contains repositories {string} and {string}"
+  "the project catalog contains repositories {string} and {string}"
 ) do |first_key, second_key|
-  expected_ids = [ first_key, second_key ].map { @project_catalog_repositories.fetch(_1) }.sort
-  @project_catalog_converged_payload = eventually("project catalog to converge") do
-    payload = query_project_catalog(@project_catalog_scope)
-    [ project_catalog_ids(payload).sort == expected_ids, payload ]
-  end
+  expected_ids = [ first_key, second_key ].map do |key|
+    @project_catalog_repositories.fetch(key).repository_id
+  end.sort
+  payload = query_project_catalog(@project_catalog_scope)
   assert_acceptance_equal(
     expected_ids,
-    project_catalog_ids(@project_catalog_converged_payload).sort,
-    "Converged project catalog"
+    project_catalog_repository_ids(payload).sort,
+    "Latest available project catalog"
   )
 end
 
-def register_project_catalog_repository(scope:, repository_key:)
-  repository_id = SecureRandom.uuid_v7
-  submit_and_execute(
-    "repository_register",
-    client_id: "project-catalog-browser",
-    command_id: "cuc-ui-project-register-#{repository_id}",
-    actor: { kind: "agent", id: "project-catalog-agent" },
-    repository_id:,
+def project_catalog_create_repository(scope:, repository_key:)
+  @project_catalog_repositories ||= {}
+  @project_catalog_repositories[repository_key] = FactoryBot.create(
+    :coordinator_read_repository,
     scope:,
-    repository_key:,
-    display_name: repository_key.titleize,
-    paths: [],
-    remotes: []
+    repository_key:
   )
-  repository_id
 end
 
-def query_project_catalog(scope)
+def query_project_catalog(search)
   project_catalog_graphql_request(
     PROJECT_CATALOG_QUERY,
-    { scope:, first: 20 }
+    { search:, first: 20, repositoriesFirst: 20 }
   )
 end
 
@@ -186,8 +175,14 @@ def project_catalog_graphql_request(query, variables)
   JSON.parse(response.body)
 end
 
-def project_catalog_ids(payload)
+def project_catalog_projects(payload)
   errors = payload.fetch("errors", [])
   assert_acceptance(errors.empty?, "GraphQL project catalog failed: #{errors.inspect}")
-  payload.dig("data", "projects", "nodes").map { _1.fetch("id") }
+  payload.dig("data", "projects", "nodes")
+end
+
+def project_catalog_repository_ids(payload)
+  project_catalog_projects(payload).flat_map do |project|
+    project.dig("repositories", "nodes").map { _1.fetch("id") }
+  end
 end

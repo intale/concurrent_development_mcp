@@ -129,7 +129,7 @@ function SkillPage({ projectRef, skillName }: { readonly projectRef: string; rea
   return (
     <div className="vstack gap-3">
       <KnowledgeNavigation basePath={basePath} />
-      <div><Link className="small" to={backTo}>← Back to Skills</Link><h2 className="h3 mt-2 mb-1" ref={headingRef} tabIndex={-1}>Skill detail</h2><p className="text-body-secondary mb-0">Current instructions and the current asset manifest.</p></div>
+      <div><Link className="btn btn-outline-secondary mb-3" to={backTo}>← Back to Skills</Link><h2 className="h3 mb-1" ref={headingRef} tabIndex={-1}>Skill detail</h2><p className="text-body-secondary mb-0">Current instructions and the current asset manifest.</p></div>
       {query.isPending ? <LoadingState label="Skill detail" /> : null}
       {errorMessage && !detail ? <InitialError label="Skill detail" message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
       {!query.isPending && !errorMessage && !detail ? <div className="alert alert-info" role="status">This Skill is not available inside the Project.</div> : null}
@@ -162,7 +162,7 @@ function AssetPage({ projectRef, skillName, assetPath }: {
   return (
     <div className="vstack gap-3">
       <KnowledgeNavigation basePath={basePath} />
-      <div><Link className="small" to={backTo}>← Back to Skill</Link><h2 className="h3 mt-2 mb-1" ref={headingRef} tabIndex={-1}>Skill asset</h2><p className="text-body-secondary mb-0">Exact current content and projection evidence for one asset.</p></div>
+      <div><Link className="btn btn-outline-secondary mb-3" to={backTo}>← Back to Skill</Link><h2 className="h3 mb-1" ref={headingRef} tabIndex={-1}>Skill asset</h2><p className="text-body-secondary mb-0">Exact current content and projection evidence for one asset.</p></div>
       {query.isPending ? <LoadingState label="Skill asset" /> : null}
       {errorMessage && !detail ? <InitialError label="Skill asset" message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
       {!query.isPending && !errorMessage && !detail ? <div className="alert alert-info" role="status">This asset is not available in the current Skill revision.</div> : null}
@@ -237,7 +237,7 @@ function ArtifactPage({ projectRef, artifactId }: { readonly projectRef: string;
   return (
     <div className="vstack gap-3">
       <KnowledgeNavigation basePath={basePath} />
-      <div><Link className="small" to={backTo}>← Back to Development Artifacts</Link><h2 className="h3 mt-2 mb-1" ref={headingRef} tabIndex={-1}>Artifact detail</h2><p className="text-body-secondary mb-0">Classification, provenance, and exact current content.</p></div>
+      <div><Link className="btn btn-outline-secondary mb-3" to={backTo}>← Back to Development Artifacts</Link><h2 className="h3 mb-1" ref={headingRef} tabIndex={-1}>Artifact detail</h2><p className="text-body-secondary mb-0">Classification, provenance, and exact current content.</p></div>
       {query.isPending ? <LoadingState label="Artifact detail" /> : null}
       {errorMessage && !detail ? <InitialError label="Artifact detail" message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
       {!query.isPending && !errorMessage && !detail ? <div className="alert alert-info" role="status">This Artifact is not available inside the Project.</div> : null}
@@ -272,7 +272,7 @@ function RelationshipsPage({ projectRef, artifactId }: { readonly projectRef: st
   return (
     <div className="vstack gap-3">
       <KnowledgeNavigation basePath={basePath} />
-      <div><Link className="small" to={backTo}>← Back to Artifact</Link><h2 className="h3 mt-2 mb-1" ref={headingRef} tabIndex={-1}>Artifact relationships</h2><p className="text-body-secondary mb-0">Active incoming and outgoing semantic links with explicit direction and provenance.</p></div>
+      <div><Link className="btn btn-outline-secondary mb-3" to={backTo}>← Back to Artifact</Link><h2 className="h3 mb-1" ref={headingRef} tabIndex={-1}>Artifact relationships</h2><p className="text-body-secondary mb-0">Active incoming and outgoing semantic links with explicit direction and provenance.</p></div>
       <form aria-label="Relationship filters" className="card card-body">
         <div className="row g-3">
           <div className="col-12 col-md-6"><label className="form-label" htmlFor="relationship-direction">Direction</label><select className="form-select" id="relationship-direction" onChange={(event) => setSearchParams(applyFilters(searchParams, { direction: event.target.value, relation: relation ?? "" }))} value={direction}>{RELATION_DIRECTIONS.map((value) => <option key={value} value={value}>{value.toLowerCase()}</option>)}</select></div>

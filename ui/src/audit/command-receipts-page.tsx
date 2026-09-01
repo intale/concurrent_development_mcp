@@ -111,7 +111,6 @@ export function CommandReceiptsPage() {
               loading={receipt.isPending}
               onRetry={() => { void receipt.refetch(); }}
               receipt={receipt.data?.commandReceipt ?? null}
-              refreshing={receipt.isFetching && receipt.data !== undefined}
             />
           ) : (
             <>
@@ -139,6 +138,7 @@ export function CommandReceiptsPage() {
                 errorMessage={errorMessage}
                 hasFilters={toolName.length > 0 || status !== undefined}
                 loading={receipts.isPending}
+                loadingRequestedPage={receipts.isPlaceholderData}
                 onNext={() => {
                   const cursor = receipts.data?.commandReceipts.pageInfo.endCursor;
                   if (cursor) setSearchParams(nextReceiptPageParameters(searchParams, cursor));
@@ -148,7 +148,6 @@ export function CommandReceiptsPage() {
                 page={receipts.data?.commandReceipts ?? null}
                 pageNumber={pageNumber}
                 receiptHref={(id) => `/audit/command-receipts/${encodeURIComponent(id)}${searchParams.size > 0 ? `?${searchParams}` : ""}`}
-                refreshing={receipts.isFetching && receipts.data !== undefined}
               />
             </>
           )}

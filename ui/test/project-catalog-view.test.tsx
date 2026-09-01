@@ -40,7 +40,6 @@ const defaults: ProjectCatalogViewProps = {
   onPrevious: () => undefined,
   onRetry: () => undefined,
   pageNumber: 1,
-  refreshing: false,
   rows: [],
   searchApplied: false,
   showingPreviousData: false
@@ -67,6 +66,8 @@ test("shows explicit Repository membership and one visible primary Project actio
   assert.match(markup, /Catalog API/);
   assert.match(markup, /Catalog UI/);
   assert.match(markup, /2 Repositories/);
+  assert.match(markup, /row row-cols-1 row-cols-xl-2/);
+  assert.match(markup, /card-footer d-grid/);
   assert.match(markup, />Open project/);
   assert.doesNotMatch(markup, />Coordination<\/a>.*>Resources<\/a>/);
   assert.match(markup, new RegExp(`/projects/${project.projectRef}`));
@@ -75,13 +76,14 @@ test("shows explicit Repository membership and one visible primary Project actio
 test("keeps available rows visible during refresh failure without a remote detail panel", () => {
   const markup = render({
     errorMessage: "GraphQL request failed",
-    refreshing: true,
     rows: [project]
   });
 
   assert.match(markup, /last available Project page remains visible/);
-  assert.match(markup, /Refreshing/);
   assert.match(markup, /Retry refresh/);
+  assert.match(markup, /aria-live="polite"/);
+  assert.doesNotMatch(markup, />Refreshing/);
+  assert.match(render({ rows: [project], showingPreviousData: true }), /Loading the requested page/);
 });
 
 test("binds placeholder preservation and URL cursor history to catalog filters", () => {

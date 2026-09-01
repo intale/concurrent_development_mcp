@@ -53,21 +53,20 @@ const listDefaults: CommandReceiptListViewProps = {
   errorMessage: null,
   hasFilters: false,
   loading: false,
+  loadingRequestedPage: false,
   onNext: () => undefined,
   onPrevious: () => undefined,
   onRetry: () => undefined,
   page,
   pageNumber: 1,
-  receiptHref: (commandId) => `/audit/command-receipts/${encodeURIComponent(commandId)}?tool=work_item_acquire`,
-  refreshing: false
+  receiptHref: (commandId) => `/audit/command-receipts/${encodeURIComponent(commandId)}?tool=work_item_acquire`
 };
 const detailDefaults: CommandReceiptDetailViewProps = {
   backHref: "/audit/command-receipts?tool=work_item_acquire",
   errorMessage: null,
   loading: false,
   onRetry: () => undefined,
-  receipt,
-  refreshing: false
+  receipt
 };
 
 function renderList(overrides: Partial<CommandReceiptListViewProps> = {}) {
@@ -97,10 +96,11 @@ test("presents one primary receipt action and a spatial detail route", () => {
 });
 
 test("keeps stale facts visible and provides contextual initial states", () => {
-  const stale = renderList({ errorMessage: "GraphQL unavailable", refreshing: true });
+  const stale = renderList({ errorMessage: "GraphQL unavailable" });
   assert.match(stale, /last available audit facts remain visible/);
   assert.match(stale, /Retry refresh/);
-  assert.match(stale, /Refreshing/);
+  assert.doesNotMatch(stale, />Refreshing/);
+  assert.match(renderList({ loadingRequestedPage: true }), /Loading the requested page/);
 
   assert.match(renderList({ loading: true, page: null }), /Loading command receipts/);
   assert.match(renderList({ errorMessage: "Network unavailable", page: null }), /could not be loaded/);

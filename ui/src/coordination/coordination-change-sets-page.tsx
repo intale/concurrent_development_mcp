@@ -86,7 +86,7 @@ function ChangeSetDetailPage({ changeSetId }: { readonly changeSetId: string }) 
   return (
     <div className="vstack gap-3">
       <CoordinationNavigation basePath={basePath} />
-      <div><Link className="btn btn-sm btn-outline-secondary mb-3" to={backTo}>← Back to ChangeSets</Link><h2 className="h3 mb-0" ref={headingRef} tabIndex={-1}>ChangeSet detail</h2></div>
+      <div><Link className="btn btn-outline-secondary mb-3" to={backTo}>← Back to ChangeSets</Link><h2 className="h3 mb-0" ref={headingRef} tabIndex={-1}>ChangeSet detail</h2></div>
       {query.isPending ? <LoadingState label="ChangeSet detail" /> : null}
       {errorMessage && !item ? <InitialError label="ChangeSet detail" message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
       {!query.isPending && !errorMessage && !item ? <div className="alert alert-info" role="status">This ChangeSet is not available in this Project.</div> : null}

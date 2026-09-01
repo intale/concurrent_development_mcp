@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom";
+import { CopyIdentifier } from "../copy-identifier.js";
+import { RetryRefresh } from "../retry-refresh.js";
 import type { CommandReceipt, CommandReceiptPage } from "./command-receipts-model.js";
 import { formattedTimestamp } from "./command-receipts-model.js";
 
@@ -12,7 +14,13 @@ function AvailableState({ errorMessage, onRetry }: AvailableStateProps) {
     <div className="alert alert-warning" role="alert">
       <h2 className="h5">Refresh failed</h2>
       <p>The last available audit facts remain visible. {errorMessage}</p>
-      <button className="btn btn-outline-dark" onClick={onRetry} type="button">Retry refresh</button>
+      <RetryRefresh
+        announcementLabel="Command receipts"
+        buttonClassName="btn btn-outline-dark"
+        onRetry={onRetry}
+      >
+        Retry refresh
+      </RetryRefresh>
     </div>
   ) : null;
 }
@@ -25,7 +33,7 @@ export interface CommandReceiptListViewProps extends AvailableStateProps {
   readonly onPrevious: () => void;
   readonly page: CommandReceiptPage | null;
   readonly pageNumber: number;
-  readonly refreshing: boolean;
+  readonly loadingRequestedPage: boolean;
   readonly receiptHref: (commandId: string) => string;
 }
 
@@ -46,7 +54,13 @@ export function CommandReceiptListView(props: CommandReceiptListViewProps) {
       <div className="alert alert-danger" role="alert">
         <h2 className="h5">Command receipts could not be loaded</h2>
         <p>{props.errorMessage}</p>
-        <button className="btn btn-outline-light" onClick={props.onRetry} type="button">Retry</button>
+        <RetryRefresh
+          announcementLabel="Command receipts"
+          buttonClassName="btn btn-outline-light"
+          onRetry={props.onRetry}
+        >
+          Retry
+        </RetryRefresh>
       </div>
     );
   }
@@ -74,7 +88,13 @@ export function CommandReceiptListView(props: CommandReceiptListViewProps) {
             Page {props.pageNumber} · {props.page.nodes.length} on this page
           </p>
         </div>
-        {props.refreshing ? <span className="small text-body-secondary">Refreshing…</span> : null}
+        <span
+          aria-atomic="true"
+          aria-live="polite"
+          className="small text-body-secondary"
+        >
+          {props.loadingRequestedPage ? "Loading the requested page…" : "\u00a0"}
+        </span>
       </div>
       <div className="row row-cols-1 row-cols-xl-2 g-3">
         {props.page.nodes.map((receipt) => (
@@ -122,7 +142,6 @@ export interface CommandReceiptDetailViewProps extends AvailableStateProps {
   readonly backHref: string;
   readonly loading: boolean;
   readonly receipt: CommandReceipt | null;
-  readonly refreshing: boolean;
 }
 
 export function CommandReceiptDetailView(props: CommandReceiptDetailViewProps) {
@@ -136,7 +155,13 @@ export function CommandReceiptDetailView(props: CommandReceiptDetailViewProps) {
         <h2 className="h5">Command receipt could not be loaded</h2>
         <p>{props.errorMessage}</p>
         <div className="d-flex flex-wrap gap-2">
-          <button className="btn btn-outline-light" onClick={props.onRetry} type="button">Retry</button>
+          <RetryRefresh
+            announcementLabel="Command receipt"
+            buttonClassName="btn btn-outline-light"
+            onRetry={props.onRetry}
+          >
+            Retry
+          </RetryRefresh>
           <Link className="btn btn-outline-light" to={props.backHref}>Back to receipts</Link>
         </div>
       </div>
@@ -157,19 +182,18 @@ export function CommandReceiptDetailView(props: CommandReceiptDetailViewProps) {
   return (
     <div className="vstack gap-3">
       <AvailableState errorMessage={props.errorMessage} onRetry={props.onRetry} />
-      {props.refreshing ? <span className="small text-body-secondary">Refreshing…</span> : null}
       <article className="card card-outline card-secondary">
         <div className="card-header d-flex flex-wrap justify-content-between gap-2">
           <div>
             <h2 className="card-title fw-semibold mb-1">{receipt.toolName}</h2>
-            <div className="small text-body-secondary text-break"><code>{receipt.commandId}</code></div>
+            <div className="mt-2"><CopyIdentifier label="Command ID" value={receipt.commandId} /></div>
           </div>
           <span className="badge text-bg-success align-self-start">{receipt.status.toLowerCase()}</span>
         </div>
         <div className="card-body vstack gap-4">
           <p className="fs-5 mb-0">{receipt.summary}</p>
           <dl className="row mb-0">
-            <dt className="col-sm-3">Receipt</dt><dd className="col-sm-9 text-break"><code>{receipt.receipt}</code></dd>
+            <dt className="col-sm-3">Receipt</dt><dd className="col-sm-9"><CopyIdentifier label="Receipt ID" value={receipt.receipt} /></dd>
             <dt className="col-sm-3">Completed</dt><dd className="col-sm-9"><time dateTime={receipt.completedAt}>{formattedTimestamp(receipt.completedAt)}</time></dd>
             <dt className="col-sm-3">Next tools</dt><dd className="col-sm-9">{receipt.nextActionTools.join(", ") || "None"}</dd>
             <dt className="col-sm-3">Warnings</dt><dd className="col-sm-9">{receipt.warnings.join(" · ") || "None"}</dd>

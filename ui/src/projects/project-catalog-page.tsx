@@ -94,9 +94,11 @@ export function ProjectCatalogPage() {
               <h1 className="mb-0" ref={headingRef} tabIndex={-1}>Projects</h1>
             </div>
             <div className="col-sm-6">
-              <ol className="breadcrumb float-sm-end mb-0">
-                <li aria-current="page" className="breadcrumb-item active">Projects</li>
-              </ol>
+              <nav aria-label="Breadcrumb">
+                <ol className="breadcrumb float-sm-end mb-0">
+                  <li aria-current="page" className="breadcrumb-item active">Projects</li>
+                </ol>
+              </nav>
             </div>
           </div>
         </div>
@@ -148,7 +150,6 @@ export function ProjectCatalogPage() {
             onPrevious={() => setSearchParams(previousProjectPageParameters(searchParams))}
             onRetry={() => { void projects.refetch(); }}
             pageNumber={pageNumber}
-            refreshing={projects.isFetching && projects.data !== undefined}
             rows={rows}
             searchApplied={search.length > 0}
             showingPreviousData={projects.isPlaceholderData}

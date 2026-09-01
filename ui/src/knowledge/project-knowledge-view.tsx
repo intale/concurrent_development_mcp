@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import { Link, NavLink } from "react-router-dom";
+import { CopyIdentifier } from "../copy-identifier.js";
+import { RetryRefresh } from "../retry-refresh.js";
 import type {
   ArtifactConnection,
   ProjectArtifact,
@@ -52,7 +54,9 @@ export function InitialError({ label, message, onRetry }: {
     <div className="alert alert-danger" role="alert">
       <h3 className="h5">{label} could not be loaded</h3>
       <p>{message}</p>
-      <button className="btn btn-outline-light btn-sm" onClick={onRetry} type="button">Retry</button>
+      <RetryRefresh announcementLabel={label} buttonClassName="btn btn-outline-light" onRetry={onRetry}>
+        Retry
+      </RetryRefresh>
     </div>
   );
 }
@@ -63,8 +67,14 @@ export function AvailableStale({ message, onRetry }: {
 }) {
   return (
     <div className="alert alert-warning" role="alert">
-      The last available projection remains visible. {message}
-      <button className="btn btn-outline-dark btn-sm ms-3" onClick={onRetry} type="button">Retry refresh</button>
+      <p>The last available projection remains visible. {message}</p>
+      <RetryRefresh
+        announcementLabel="Knowledge view"
+        buttonClassName="btn btn-outline-dark"
+        onRetry={onRetry}
+      >
+        Retry refresh
+      </RetryRefresh>
     </div>
   );
 }
@@ -124,6 +134,7 @@ export function SkillDetail({ detail, assetHref, backTo }: {
         <span className="badge text-bg-primary">revision {skill.revision}</span>
       </div>
       <div className="card-body vstack gap-4">
+        <CopyIdentifier label="Skill name" value={skill.name} />
         <div><h4 className="h6">Purpose</h4><p className="mb-0">{skill.description}</p></div>
         <Content text={skill.instructions} />
         <section aria-labelledby="skill-assets-heading">
@@ -158,6 +169,7 @@ export function SkillAssetDetail({ detail, backTo }: {
         <span className="badge text-bg-secondary">revision {asset.revision}</span>
       </div>
       <div className="card-body vstack gap-4">
+        <CopyIdentifier label="Skill asset path" value={asset.path} />
         <Content base64={asset.base64} text={asset.text} />
         <DetailEvidence rows={[
           ["Media type", asset.mediaType],
@@ -212,6 +224,8 @@ export function ArtifactDetail({ detail, relationshipsHref, backTo }: {
         <span className="badge text-bg-info">{humanized(artifact.kind)}</span>
       </div>
       <div className="card-body vstack gap-4">
+        <CopyIdentifier label="Artifact ID" value={artifact.id} />
+        <CopyIdentifier label="Artifact source" value={artifact.source.locator} />
         <div className="d-flex flex-wrap gap-2">
           <Link className="btn btn-info" to={relationshipsHref}>View {artifact.relationshipCount} relationships</Link>
           <Link className="btn btn-outline-secondary" to={backTo}>Back to Artifacts</Link>

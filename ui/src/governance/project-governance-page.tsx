@@ -307,7 +307,7 @@ function DetailPage({ basePath, backLabel, backTo, children, description, detail
   return (
     <div className="vstack gap-3">
       <GovernanceNavigation basePath={basePath} />
-      <div><Link className="small" to={backTo}>← Back to {backLabel}</Link><h2 className="h3 mt-2 mb-1" ref={headingRef} tabIndex={-1}>{label}</h2><p className="text-body-secondary mb-0">{description}</p></div>
+      <div><Link className="btn btn-outline-secondary mb-3" to={backTo}>← Back to {backLabel}</Link><h2 className="h3 mb-1" ref={headingRef} tabIndex={-1}>{label}</h2><p className="text-body-secondary mb-0">{description}</p></div>
       {loading && !detail ? <LoadingState label={label} /> : null}
       {errorMessage && !detail ? <InitialError label={label} message={errorMessage} onRetry={retry} /> : null}
       {!loading && !errorMessage && !detail ? <div className="alert alert-info" role="status">This item is not available inside the Project.</div> : null}

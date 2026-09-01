@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { CommandReceiptsPage } from "./audit/command-receipts-page.js";
 import { CoordinationChangeSetsPage } from "./coordination/coordination-change-sets-page.js";
@@ -30,10 +30,56 @@ import {
   ProjectResourceLeasesPage
 } from "./resources/project-resources-page.js";
 
+const COMPACT_NAVIGATION_QUERY = "(max-width: 991.98px)";
+const FOCUSABLE_NAVIGATION_SELECTOR = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  "[tabindex]:not([tabindex='-1'])"
+].join(",");
+
+export type ContainedNavigationAction = "close" | "focus-first" | "focus-last" | null;
+
+export function navigationIsExpanded(
+  compact: boolean,
+  sidebarOpen: boolean,
+  sidebarCollapsed: boolean
+): boolean {
+  return compact ? sidebarOpen : !sidebarCollapsed;
+}
+
+export function containedNavigationAction(
+  key: string,
+  shiftKey: boolean,
+  activeIndex: number,
+  itemCount: number
+): ContainedNavigationAction {
+  if (key === "Escape") return "close";
+  if (key !== "Tab" || itemCount === 0) return null;
+  if (activeIndex < 0) return "focus-first";
+  if (shiftKey && activeIndex === 0) return "focus-last";
+  if (!shiftKey && activeIndex === itemCount - 1) return "focus-first";
+  return null;
+}
+
+function compactNavigationMatches(): boolean {
+  return typeof window !== "undefined" && window.matchMedia(COMPACT_NAVIGATION_QUERY).matches;
+}
+
 export function App() {
   const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [compactNavigation, setCompactNavigation] = useState(compactNavigationMatches);
+  const headerRef = useRef<HTMLElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const footerRef = useRef<HTMLElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const restoreFocusRef = useRef(false);
 
   useEffect(() => {
     const body = document.body;
@@ -48,30 +94,111 @@ export function App() {
   }, [sidebarCollapsed, sidebarOpen]);
 
   useEffect(() => {
+    const query = window.matchMedia(COMPACT_NAVIGATION_QUERY);
+    const updateNavigationMode = (event: MediaQueryListEvent) => {
+      setCompactNavigation(event.matches);
+      if (!event.matches) {
+        restoreFocusRef.current = false;
+        setSidebarOpen(false);
+      }
+    };
+    setCompactNavigation(query.matches);
+    query.addEventListener("change", updateNavigationMode);
+    return () => query.removeEventListener("change", updateNavigationMode);
+  }, []);
+
+  useEffect(() => {
     setSidebarOpen(false);
+    restoreFocusRef.current = false;
   }, [location.pathname]);
 
+  useEffect(() => {
+    const sidebar = sidebarRef.current;
+    const header = headerRef.current;
+    const main = mainRef.current;
+    const footer = footerRef.current;
+    if (!sidebar || !header || !main || !footer) return;
+
+    if (compactNavigation && sidebarOpen) {
+      returnFocusRef.current = document.activeElement instanceof HTMLElement &&
+        document.activeElement !== document.body
+        ? document.activeElement
+        : toggleRef.current;
+    }
+    sidebar.inert = compactNavigation && !sidebarOpen;
+    header.inert = compactNavigation && sidebarOpen;
+    main.inert = compactNavigation && sidebarOpen;
+    footer.inert = compactNavigation && sidebarOpen;
+
+    if (!compactNavigation || !sidebarOpen) {
+      if (restoreFocusRef.current) {
+        (returnFocusRef.current ?? toggleRef.current)?.focus();
+        restoreFocusRef.current = false;
+      }
+      return;
+    }
+
+    const focusable = Array.from(
+      sidebar.querySelectorAll<HTMLElement>(FOCUSABLE_NAVIGATION_SELECTOR)
+    );
+    const currentLink = sidebar.querySelector<HTMLElement>("[aria-current='page']");
+    (currentLink ?? focusable[0])?.focus();
+
+    const containFocus = (event: KeyboardEvent) => {
+      const items = Array.from(
+        sidebar.querySelectorAll<HTMLElement>(FOCUSABLE_NAVIGATION_SELECTOR)
+      );
+      const action = containedNavigationAction(
+        event.key,
+        event.shiftKey,
+        items.indexOf(document.activeElement as HTMLElement),
+        items.length
+      );
+      if (action === "close") {
+        event.preventDefault();
+        restoreFocusRef.current = true;
+        setSidebarOpen(false);
+      } else if (action === "focus-first" || action === "focus-last") {
+        event.preventDefault();
+        items[action === "focus-first" ? 0 : items.length - 1]?.focus();
+      }
+    };
+    document.addEventListener("keydown", containFocus);
+    return () => document.removeEventListener("keydown", containFocus);
+  }, [compactNavigation, sidebarOpen]);
+
   const toggleSidebar = () => {
-    if (window.matchMedia("(max-width: 991.98px)").matches) {
+    if (compactNavigation) {
+      if (sidebarOpen) restoreFocusRef.current = true;
       setSidebarOpen((current) => !current);
     } else {
       setSidebarCollapsed((current) => !current);
     }
   };
 
+  const closeCompactNavigation = () => {
+    restoreFocusRef.current = true;
+    setSidebarOpen(false);
+  };
+
   return (
     <div className="app-wrapper">
       <a className="visually-hidden-focusable" href="#main-content">Skip to main content</a>
-      <nav className="app-header navbar navbar-expand bg-body">
+      <nav aria-label="Application controls" className="app-header navbar navbar-expand bg-body" ref={headerRef}>
         <div className="container-fluid">
           <ul className="navbar-nav">
             <li className="nav-item">
               <button
                 aria-controls="primary-sidebar"
-                aria-expanded={sidebarOpen || !sidebarCollapsed}
+                aria-expanded={navigationIsExpanded(
+                  compactNavigation,
+                  sidebarOpen,
+                  sidebarCollapsed
+                )}
                 aria-label="Toggle navigation"
                 className="nav-link"
                 onClick={toggleSidebar}
+                ref={toggleRef}
                 type="button"
               >
                 <i aria-hidden="true" className="bi bi-list" />
@@ -82,7 +209,13 @@ export function App() {
         </div>
       </nav>
 
-      <aside className="app-sidebar bg-body-secondary shadow" data-bs-theme="dark" id="primary-sidebar">
+      <aside
+        aria-hidden={compactNavigation && !sidebarOpen ? true : undefined}
+        className="app-sidebar bg-body-secondary shadow"
+        data-bs-theme="dark"
+        id="primary-sidebar"
+        ref={sidebarRef}
+      >
         <div className="sidebar-brand">
           <Link className="brand-link" to="/projects">
             <span className="brand-text fw-semibold">Coordinator</span>
@@ -125,7 +258,7 @@ export function App() {
         </div>
       </aside>
 
-      <main className="app-main" id="main-content">
+      <main className="app-main" id="main-content" ref={mainRef}>
         <Routes>
           <Route path="/projects" element={<ProjectCatalogPage />} />
           <Route path="/audit/command-receipts" element={<CommandReceiptsPage />} />
@@ -176,13 +309,15 @@ export function App() {
         </Routes>
       </main>
 
-      <footer className="app-footer">
+      <footer className="app-footer" ref={footerRef}>
         <strong>Coordinator</strong> read-only projection browser
       </footer>
       <button
         aria-label="Close navigation"
+        aria-hidden={!compactNavigation || !sidebarOpen}
         className="sidebar-overlay border-0"
-        onClick={() => setSidebarOpen(false)}
+        onClick={closeCompactNavigation}
+        tabIndex={compactNavigation && sidebarOpen ? 0 : -1}
         type="button"
       />
     </div>

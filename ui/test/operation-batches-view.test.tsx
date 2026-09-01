@@ -63,12 +63,12 @@ const listDefaults: OperationBatchListViewProps = {
   errorMessage: null,
   hasFilters: false,
   loading: false,
+  loadingRequestedPage: false,
   onNext: () => undefined,
   onPrevious: () => undefined,
   onRetry: () => undefined,
   page,
-  pageNumber: 1,
-  refreshing: false
+  pageNumber: 1
 };
 const detailDefaults: OperationBatchDetailViewProps = {
   backHref: "/operations/batches?status=RUNNING&after=batch-cursor",
@@ -76,11 +76,11 @@ const detailDefaults: OperationBatchDetailViewProps = {
   canGoBack: true,
   errorMessage: null,
   loading: false,
+  loadingRequestedPage: false,
   onNext: () => undefined,
   onPrevious: () => undefined,
   onRetry: () => undefined,
-  pageNumber: 2,
-  refreshing: false
+  pageNumber: 2
 };
 
 function renderList(overrides: Partial<OperationBatchListViewProps> = {}) {
@@ -110,10 +110,12 @@ test("presents progress, one primary batch action, and a spatial item detail", (
 });
 
 test("keeps stale batches visible and provides contextual initial states", () => {
-  const stale = renderList({ errorMessage: "GraphQL unavailable", refreshing: true });
+  const stale = renderList({ errorMessage: "GraphQL unavailable" });
   assert.match(stale, /last available operation facts remain visible/);
   assert.match(stale, /Retry refresh/);
-  assert.match(stale, /Refreshing/);
+  assert.doesNotMatch(stale, />Refreshing/);
+  assert.match(renderList({ loadingRequestedPage: true }), /Loading the requested page/);
+  assert.match(renderDetail({ loadingRequestedPage: true }), /Loading the requested item page/);
 
   assert.match(renderList({ loading: true, page: null }), /Loading operation batches/);
   assert.match(renderList({ errorMessage: "Network unavailable", page: null }), /could not be loaded/);

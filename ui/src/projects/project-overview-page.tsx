@@ -78,12 +78,12 @@ export function ProjectOverviewPage() {
         errorMessage={overview.error instanceof Error ? overview.error.message : null}
         hasNextPage={project?.repositories.pageInfo.hasNextPage ?? false}
         loading={overview.isPending}
+        loadingRequestedPage={overview.isPlaceholderData}
         onNext={goNext}
         onPrevious={goPrevious}
         onRetry={() => { void overview.refetch(); }}
         pageNumber={pageNumber}
         projectRef={projectRef}
-        refreshing={overview.isFetching && overview.data !== undefined}
         repositories={repositories}
         repositoryCount={project?.repositoryCount ?? shellProject.repositoryCount}
       />

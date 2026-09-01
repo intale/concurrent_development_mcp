@@ -1,7 +1,9 @@
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import { Link, NavLink } from "react-router-dom";
+import { CopyIdentifier } from "../copy-identifier.js";
 import type { CoordinationPresentationStatus } from "../gql/graphql.js";
+import { RetryRefresh } from "../retry-refresh.js";
 import type {
   CoordinationChangeSet,
   CoordinationDependency,
@@ -51,9 +53,11 @@ export function InitialError({ label, message, onRetry }: {
 }) {
   return (
     <div className="alert alert-danger" role="alert">
-      <h2 className="h5">{label} could not be loaded</h2>
+      <h3 className="h5">{label} could not be loaded</h3>
       <p>{message}</p>
-      <button className="btn btn-outline-light btn-sm" onClick={onRetry} type="button">Retry</button>
+      <RetryRefresh announcementLabel={label} buttonClassName="btn btn-outline-light" onRetry={onRetry}>
+        Retry
+      </RetryRefresh>
     </div>
   );
 }
@@ -64,8 +68,14 @@ export function AvailableStale({ message, onRetry }: {
 }) {
   return (
     <div className="alert alert-warning" role="alert">
-      The last available projection remains visible. {message}
-      <button className="btn btn-outline-dark btn-sm ms-3" onClick={onRetry} type="button">Retry refresh</button>
+      <p>The last available projection remains visible. {message}</p>
+      <RetryRefresh
+        announcementLabel="Coordination view"
+        buttonClassName="btn btn-outline-dark"
+        onRetry={onRetry}
+      >
+        Retry refresh
+      </RetryRefresh>
     </div>
   );
 }
@@ -186,7 +196,7 @@ export function ChangeSetDetail({ item }: { readonly item: CoordinationChangeSet
           <h3 className="h4 mb-0">{item.goal}</h3>
           <span className="badge text-bg-secondary">{item.domainStatus}</span>
         </div>
-        <code className="text-break">{item.id}</code>
+        <CopyIdentifier label="ChangeSet ID" value={item.id} />
         <div>{item.runningWorkItemCount} running · {item.openWorkItemCount} open · {item.workItemCount} total</div>
         <section aria-labelledby="change-set-criteria"><h4 className="h5" id="change-set-criteria">Acceptance criteria</h4><ul className="mb-0">{item.acceptanceCriteria.map((criterion) => <li key={criterion}>{criterion}</li>)}</ul></section>
         <p className="small text-body-secondary mb-0">Last projected {formatted(item.lastProcessedAt)}</p>
@@ -201,16 +211,16 @@ export function WorkItemDetail({ detail }: { readonly detail: CoordinationWorkIt
     <div className="vstack gap-3">
       <article className="card card-outline card-primary"><div className="card-body vstack gap-2">
         <div className="d-flex flex-wrap justify-content-between gap-2"><h3 className="h4 mb-0">{workItem.goal}</h3><StatusBadge status={workItem.presentationStatus} /></div>
-        <code className="text-break">{workItem.id}</code>
+        <CopyIdentifier label="WorkItem ID" value={workItem.id} />
         <div><strong>Domain state:</strong> {workItem.domainStatus}</div>
         <div><strong>ChangeSet:</strong> <code className="text-break">{workItem.changeSetId}</code></div>
         <section aria-labelledby="work-item-criteria"><h4 className="h5" id="work-item-criteria">Acceptance criteria</h4><ul className="mb-0">{workItem.acceptanceCriteria.map((criterion) => <li key={criterion}>{criterion}</li>)}</ul></section>
       </div></article>
       <section className="card" aria-labelledby="attempt-heading"><div className="card-header"><h3 className="card-title" id="attempt-heading">Current or latest Attempt</h3></div><div className="card-body">
-        {attempt ? <div className="vstack gap-2"><div><strong>Agent:</strong> {attempt.agentId}</div><div><strong>Status:</strong> {attempt.status}</div><code className="text-break">{attempt.id}</code><div className="small text-body-secondary">Authorized {formatted(attempt.authorizedAt)}</div>{attempt.abandonmentReason ? <div className="alert alert-warning mb-0">{attempt.abandonmentReason}</div> : null}</div> : <p className="mb-0">No Attempt has been projected.</p>}
+        {attempt ? <div className="vstack gap-2"><div><strong>Agent:</strong> {attempt.agentId}</div><div><strong>Status:</strong> {attempt.status}</div><CopyIdentifier label="Attempt ID" value={attempt.id} /><div className="small text-body-secondary">Authorized {formatted(attempt.authorizedAt)}</div>{attempt.abandonmentReason ? <div className="alert alert-warning mb-0">{attempt.abandonmentReason}</div> : null}</div> : <p className="mb-0">No Attempt has been projected.</p>}
       </div></section>
       <section className="card" aria-labelledby="checkpoint-heading"><div className="card-header"><h3 className="card-title" id="checkpoint-heading">Latest checkpoint</h3></div><div className="card-body">
-        {checkpoint ? <div className="vstack gap-2"><div><strong>Kind:</strong> {checkpoint.checkpointKind}</div><div><strong>Evidence:</strong> {checkpoint.evidenceStatus}</div><div><strong>Branch:</strong> {checkpoint.targetBranch}</div><code className="text-break">{checkpoint.id}</code><code className="small text-break">{checkpoint.headCommitOid}</code></div> : <p className="mb-0">No Candidate checkpoint has been projected.</p>}
+        {checkpoint ? <div className="vstack gap-2"><div><strong>Kind:</strong> {checkpoint.checkpointKind}</div><div><strong>Evidence:</strong> {checkpoint.evidenceStatus}</div><div><strong>Branch:</strong> {checkpoint.targetBranch}</div><CopyIdentifier label="Candidate checkpoint ID" value={checkpoint.id} /><CopyIdentifier label="Head commit" value={checkpoint.headCommitOid} /></div> : <p className="mb-0">No Candidate checkpoint has been projected.</p>}
       </div></section>
     </div>
   );
@@ -221,7 +231,7 @@ export function DependencyDetail({ item }: { readonly item: CoordinationDependen
     <article className={`card card-outline ${item.blocking ? "card-warning" : "card-success"}`}>
       <div className="card-body vstack gap-3">
         <div className="d-flex flex-wrap justify-content-between gap-2"><h3 className="h4 mb-0">{item.dependencyKind.replaceAll("_", " ")}</h3><span className={`badge ${item.blocking ? "text-bg-warning" : "text-bg-success"}`}>{item.blocking ? "blocking" : "satisfied"}</span></div>
-        <code className="text-break">{item.id}</code>
+        <CopyIdentifier label="Dependency ID" value={item.id} />
         <div><strong>Producer WorkItem:</strong> <code className="text-break">{item.producerWorkItemId}</code></div>
         <div><strong>Consumer WorkItem:</strong> <code className="text-break">{item.consumerWorkItemId}</code></div>
         {item.requiredOutput ? <div><strong>Required output:</strong> {item.requiredOutput.kind} · <code>{item.requiredOutput.key}</code></div> : null}
