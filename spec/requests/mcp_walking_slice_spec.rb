@@ -162,7 +162,7 @@ module McpWalkingSliceSpec
     expect(registration.markers).to include("repository:#{repository_id}")
     expect(
       registration.markers.grep(
-        /\Acompound:(?:repository-scope|scoped-repository|scoped-repository-key):v1:/
+        /\Acompound:(?:repository-scope|scoped-repository|scoped-repository-key):v2\|/
       ).length
     ).to eq(3)
     expect(registration.metadata).not_to have_key("correlation_id")

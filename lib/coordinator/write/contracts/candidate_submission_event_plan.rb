@@ -107,7 +107,7 @@ module Coordinator::Write
       end
 
       def head_registered(command:, head_identity:, candidate_event:, submitted_at:)
-        Events::CandidateHeadRegisteredV1.new(
+        Events::CandidateHeadRegisteredV2.new(
           registry_id: head_identity.registry_id,
           candidate_id: command.candidate_id,
           attempt_id: command.attempt_id,

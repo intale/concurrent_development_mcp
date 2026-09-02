@@ -70,7 +70,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpireResourceLease, :even
 
   def expiry_command(reference, receipt, source:)
     Coordinator::Write::Commands::ExpireResourceLease.new(
-      command_id: "internal:lease-expiry:v1:#{source.id}",
+      command_id: SecureRandom.uuid_v7,
       actor: Coordinator::Write::Commands::Actor.new(kind: "system", id: "lease-expiry-policy-v1"),
       resource_id: reference.resource_id,
       lease_id: reference.lease_id,

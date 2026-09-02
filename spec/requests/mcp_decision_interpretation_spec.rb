@@ -134,7 +134,7 @@ RSpec.describe "GDN-02/03 MCP interpretation lifecycle" do
         "policy_status" => "proposal_only",
         "slot" => include(
           "compound_marker" => include(
-            "marker" => a_string_starting_with("compound:interpretation-slot:v1:sha256:")
+            "marker" => a_string_starting_with("compound:interpretation-slot:v2|")
           )
         )
       )
@@ -151,7 +151,7 @@ RSpec.describe "GDN-02/03 MCP interpretation lifecycle" do
     )
     expect(acceptance.markers).to include(
       "resolution-strategy:single_choice",
-      a_string_starting_with("compound:interpretation-slot:v1:sha256:")
+      a_string_starting_with("compound:interpretation-slot:v2|")
     )
 
   end

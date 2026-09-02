@@ -3,6 +3,7 @@ module Coordinator::Processes::ReleaseSetLifecycle
     ACTOR: Coordinator::Write::Commands::Actor
     COMPENSATION_RULE_VERSION: String
     COMPLETION_RULE_VERSION: String
-    def call: (SourceV1 source) -> (Coordinator::Write::Commands::RequestReleaseSetCompensation | Coordinator::Write::Commands::CompleteActivatedReleaseSet)?
+    def rule_version: (SourceV1 source) -> String?
+    def call: (SourceV1 source, command_id: String) -> (Coordinator::Write::Commands::RequestReleaseSetCompensation | Coordinator::Write::Commands::CompleteActivatedReleaseSet)?
   end
 end

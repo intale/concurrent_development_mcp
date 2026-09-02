@@ -7,7 +7,6 @@ module Coordinator::Write
       Asset = Types.Instance(AssetV2)
 
       attribute :schema, Types::String.enum(SCHEMA)
-      attribute :skill_id, Types::SkillId
       attribute :name, Types::SkillName
       attribute :scope, Types::SkillScope
       attribute :description, Types::SkillDescription

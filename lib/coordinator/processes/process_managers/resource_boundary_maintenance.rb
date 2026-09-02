@@ -39,11 +39,13 @@ module Coordinator::Processes
         contract: SourceContract.new,
         schema_registry: Coordinator::Write::EventSchemaRegistry.new,
         marker_builder: Coordinator::Write::RepositoryMarkerBuilder.new,
+        process_step_planner: Coordinator::Processes::ProcessStepPlanner.new(event_store:),
         operation: Coordinator::Write::Operations::ExecuteRollResourceBoundaryEpoch.new(event_store:)
       )
         @contract = contract
         @schema_registry = schema_registry
         @marker_builder = marker_builder
+        @process_step_planner = process_step_planner
         @operation = operation
       end
 
@@ -57,9 +59,23 @@ module Coordinator::Processes
           data: event.data
         )
         boundary_markers(payload).each_with_index do |marker, boundary_index|
+          process_step = @process_step_planner.call(
+            source_event: event,
+            process_name: "resource-boundary-maintenance",
+            step_name: "roll-resource-boundary-epoch",
+            subject_kind: "boundary-index",
+            subject_id: boundary_index.to_s,
+            rule_version: "resource-boundary-rollover/v2",
+            allocate_target_entity: false
+          )
           result = @operation.call_command(
-            command(event:, payload:, marker:, boundary_index:),
-            caused_by: event
+            command(
+              event:,
+              payload:,
+              marker:,
+              command_id: process_step.target_command_id
+            ),
+            caused_by: process_step.event
           )
           next if result.success?
 
@@ -83,11 +99,9 @@ module Coordinator::Processes
         ).sort_by(&:b)
       end
 
-      def command(event:, payload:, marker:, boundary_index:)
+      def command(event:, payload:, marker:, command_id:)
         Coordinator::Write::Commands::RollResourceBoundaryEpoch.new(
-          command_id: InternalCommandIdBuilder.call(
-            "resource-boundary-rollover:v2:#{event.id}:#{boundary_index}"
-          ),
+          command_id:,
           actor: SYSTEM_ACTOR,
           repository_id: payload.repository_id,
           boundary_marker: marker,

@@ -17,6 +17,7 @@ module Coordinator::Write
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
         completion_builder: CommandCompletionBuilder.new,
+        natural_key_registry: NaturalKeys::Registry.new(event_store:),
         event_plan_contract: Contracts::DecisionCorrectionEventPlan.new
       )
         @event_store = event_store
@@ -30,6 +31,7 @@ module Coordinator::Write
         @schema_registry = schema_registry
         @stream_factory = stream_factory
         @completion_builder = completion_builder
+        @natural_key_registry = natural_key_registry
         @event_plan_contract = event_plan_contract
       end
 
@@ -82,6 +84,9 @@ module Coordinator::Write
         )
         return candidate if candidate.failure?
 
+        candidate = resolve_candidate_slot(candidate.value!)
+        return candidate if candidate.failure?
+
         state = load_correction_state(current:, candidate: candidate.value!, command:)
         return state if state.failure?
 
@@ -110,6 +115,60 @@ module Coordinator::Write
         )
 
         Success(completion)
+      end
+
+      def resolve_candidate_slot(candidate)
+        proposed = candidate.slot
+        return Success(candidate) unless proposed
+
+        result = @natural_key_registry.find(
+          selector: NaturalKeys::Registry::SelectorV1.new(
+            stream_context: "HumanGuidance",
+            stream_name: "DecisionSlot",
+            event_type: "DecisionSlotOpened",
+            marker: proposed.compound_marker.marker
+          ),
+          identity_from: ->(event) { decision_slot_identity_from(event, proposed) }
+        )
+        return slot_registry_failure(result.failure) if result.failure?
+        return Success(candidate) unless result.value!
+
+        slot = Decisions::DecisionSlotV1.new(
+          slot_id: result.value!.identity,
+          document: proposed.document,
+          compound_marker: proposed.compound_marker
+        )
+        Success(
+          Decisions::DecisionCorrectionCandidateV1.new(
+            proposal: candidate.proposal,
+            acceptance: candidate.acceptance,
+            definition: candidate.definition,
+            slot:,
+            partitions: candidate.partitions,
+            correction_event: candidate.correction_event
+          )
+        )
+      end
+
+      def decision_slot_identity_from(event, proposed)
+        opening = load_event(event)
+        return unless opening.is_a?(Events::DecisionSlotOpenedV1)
+        return unless opening.slot.document == proposed.document
+
+        opening.slot.slot_id
+      rescue EventSchemaRegistry::UnknownSchema, EventSchemaRegistry::SchemaMismatch,
+             Dry::Struct::Error, KeyError, ArgumentError
+        nil
+      end
+
+      def slot_registry_failure(error)
+        Failure(
+          OutcomeError.new(
+            code: :decision_slot_registry_invalid,
+            message: error.message,
+            details: error.to_h
+          )
+        )
       end
 
       def replay_result(command:, input_digest:)

@@ -1,0 +1,7 @@
+module Coordinator::Write::CandidateObligations
+  class NaturalKeyV1 < Coordinator::Shared::Value
+    def document: () -> IdentityDocumentV1
+    def digest: () -> String
+    def marker: () -> String
+  end
+end

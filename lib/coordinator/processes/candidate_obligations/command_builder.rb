@@ -10,32 +10,31 @@ module Coordinator::Processes
       REGISTRY_RULE_VERSION = "candidate-impact-registry-sweep/v1"
       PAIR_RULE_VERSION = "candidate-impact-pair-scan/v1"
       OBLIGATION_RULE_VERSION = "candidate-compatibility-obligation/v1"
-      INDEX_POLICY_VERSION = "candidate-impact-bucket-index/v1"
+      INDEX_POLICY_VERSION = "candidate-impact-exact-index/v2"
       PAGE_SIZE = 50
 
       def initialize(
         event_store:,
-        identity_builder: Coordinator::Write::CandidateObligationScans::IdentityBuilder.new,
-        obligation_identity_builder: Coordinator::Write::CandidateObligations::IdentityBuilder.new,
-        candidate_loader: Coordinator::Write::CandidateObligations::CandidateEvidenceLoader.new(event_store:),
+        process_step_planner: Coordinator::Processes::ProcessStepPlanner.new(event_store:),
         reference_builder: EventReferenceBuilder.new
       )
-        @identity_builder = identity_builder
-        @obligation_identity_builder = obligation_identity_builder
-        @candidate_loader = candidate_loader
+        @process_step_planner = process_step_planner
         @reference_builder = reference_builder
       end
 
       def registry_start(trigger:, source:)
-        scan_id = @identity_builder.registry_sweep(
-          policy_partition_event: trigger.partition_event,
-          policy_head: trigger.head,
-          rule_version: REGISTRY_RULE_VERSION
+        process_step = plan(
+          source_event: source.event,
+          step_name: "start-registry-sweep",
+          subject_kind: "candidate-policy-partition",
+          subject_id: trigger.partition_event.event_id,
+          rule_version: REGISTRY_RULE_VERSION,
+          allocate_target_entity: true
         )
         command = Coordinator::Write::Commands::StartCandidateImpactRegistrySweep.new(
-          command_id: scan_id,
+          command_id: process_step.target_command_id,
           actor: ACTOR,
-          scan_id:,
+          scan_id: process_step.target_entity_id!,
           change_set_id: trigger.change_set_id,
           policy_partition_event: trigger.partition_event,
           policy_head: trigger.head,
@@ -46,23 +45,25 @@ module Coordinator::Processes
         Coordinator::Write::CandidateImpactRegistrySweepInvocation.new(
           command:,
           source_event: source.event,
-          source_reference: source.reference
+          source_reference: source.reference,
+          caused_by: process_step.event
         )
       end
 
       def pair_start(registration:, direction:, trigger:, caused_by:)
         registration_reference = @reference_builder.call(registration)
-        scan_id = @identity_builder.pair_scan(
-          source_registration: registration_reference,
-          direction:,
-          policy_partition_event: trigger.partition_event,
-          policy_head: trigger.head,
-          rule_version: PAIR_RULE_VERSION
+        process_step = plan(
+          source_event: caused_by.event,
+          step_name: "start-#{direction}-pair-scan",
+          subject_kind: "candidate-impact-registration",
+          subject_id: registration_reference.event_id,
+          rule_version: PAIR_RULE_VERSION,
+          allocate_target_entity: true
         )
         command = Coordinator::Write::Commands::StartCandidateImpactPairScan.new(
-          command_id: scan_id,
+          command_id: process_step.target_command_id,
           actor: ACTOR,
-          scan_id:,
+          scan_id: process_step.target_entity_id!,
           change_set_id: trigger.change_set_id,
           source_registration: registration_reference,
           direction:,
@@ -77,14 +78,23 @@ module Coordinator::Processes
         Coordinator::Write::CandidateImpactPairScanInvocation.new(
           command:,
           source_event: caused_by.event,
-          source_reference: caused_by.reference
+          source_reference: caused_by.reference,
+          caused_by: process_step.event
         )
       end
 
       def registry_progress(checkpoint:, page:)
         state = checkpoint.state
+        process_step = plan(
+          source_event: checkpoint.event,
+          step_name: "progress-registry-sweep",
+          subject_kind: "candidate-impact-registry-sweep",
+          subject_id: state.scan_id,
+          rule_version: state.rule_version,
+          allocate_target_entity: false
+        )
         command = Coordinator::Write::Commands::ProgressCandidateImpactRegistrySweep.new(
-          command_id: progress_id(checkpoint.reference, state.rule_version),
+          command_id: process_step.target_command_id,
           actor: ACTOR,
           scan_id: state.scan_id,
           change_set_id: state.change_set_id,
@@ -101,14 +111,23 @@ module Coordinator::Processes
         Coordinator::Write::CandidateImpactRegistrySweepProgressInvocation.new(
           command:,
           checkpoint_event: checkpoint.event,
-          checkpoint_reference: checkpoint.reference
+          checkpoint_reference: checkpoint.reference,
+          caused_by: process_step.event
         )
       end
 
       def pair_progress(checkpoint:, page:)
         state = checkpoint.state
+        process_step = plan(
+          source_event: checkpoint.event,
+          step_name: "progress-#{state.direction}-pair-scan",
+          subject_kind: "candidate-impact-pair-scan",
+          subject_id: state.scan_id,
+          rule_version: state.rule_version,
+          allocate_target_entity: false
+        )
         command = Coordinator::Write::Commands::ProgressCandidateImpactPairScan.new(
-          command_id: progress_id(checkpoint.reference, state.rule_version),
+          command_id: process_step.target_command_id,
           actor: ACTOR,
           scan_id: state.scan_id,
           change_set_id: state.change_set_id,
@@ -128,7 +147,8 @@ module Coordinator::Processes
         Coordinator::Write::CandidateImpactPairScanProgressInvocation.new(
           command:,
           checkpoint_event: checkpoint.event,
-          checkpoint_reference: checkpoint.reference
+          checkpoint_reference: checkpoint.reference,
+          caused_by: process_step.event
         )
       end
 
@@ -140,19 +160,18 @@ module Coordinator::Processes
           target_reference,
           state.direction
         )
-        source = @candidate_loader.call(source_reference)
-        target = @candidate_loader.call(destination_reference)
-        identity = @obligation_identity_builder.call(
-          source:,
-          target:,
-          policy_partition_event: state.policy_partition_event,
-          policy_head: state.policy_head,
-          rule_version: OBLIGATION_RULE_VERSION
+        process_step = plan(
+          source_event: checkpoint.event,
+          step_name: "create-compatibility-obligation",
+          subject_kind: "candidate-registration-pair",
+          subject_id: "#{source_reference.event_id}:#{destination_reference.event_id}",
+          rule_version: OBLIGATION_RULE_VERSION,
+          allocate_target_entity: true
         )
         command = Coordinator::Write::Commands::CreateCandidateCompatibilityObligation.new(
-          command_id: identity.obligation_id,
+          command_id: process_step.target_command_id,
           actor: ACTOR,
-          obligation_id: identity.obligation_id,
+          obligation_id: process_step.target_entity_id!,
           source_registration: source_reference,
           target_registration: destination_reference,
           policy_partition_event: state.policy_partition_event,
@@ -161,19 +180,27 @@ module Coordinator::Processes
         )
         Coordinator::Write::CandidateCompatibilityObligationInvocation.new(
           command:,
-          caused_by: checkpoint.event,
-          caused_by_reference: checkpoint.reference
+          caused_by: process_step.event,
+          caused_by_reference: process_step.reference
         )
       end
 
       private
 
-      def progress_id(checkpoint, rule_version)
-        @identity_builder.progress(checkpoint_event: checkpoint, rule_version:)
-      end
-
       def ordered_pair(source, target, direction)
         direction == "outgoing" ? [ source, target ] : [ target, source ]
+      end
+
+      def plan(source_event:, step_name:, subject_kind:, subject_id:, rule_version:, allocate_target_entity:)
+        @process_step_planner.call(
+          source_event:,
+          process_name: "candidate-impact-obligation-policy",
+          step_name:,
+          subject_kind:,
+          subject_id:,
+          rule_version:,
+          allocate_target_entity:
+        )
       end
     end
   end

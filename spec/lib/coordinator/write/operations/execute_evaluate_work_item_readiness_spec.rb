@@ -32,7 +32,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteEvaluateWorkItemReadiness,
         "command:#{command.command_id}"
       ]).uniq.sort
     )
-    expect(made_ready.causation_id).to eq(activation.id)
+    expect(made_ready.causation_id).to eq(invocation.caused_by.id)
     expect(made_ready.correlation_id).to eq(activation.correlation_id)
     expect(made_ready.metadata).to include(
       "command_id" => command.command_id,
@@ -139,13 +139,27 @@ RSpec.describe Coordinator::Write::Operations::ExecuteEvaluateWorkItemReadiness,
 
   def invocation_for(activation, work_item_id:)
     source = Coordinator::Processes::ChangeSetActivationSourceBuilder.new.call(activation)
-    command = Coordinator::Processes::ReadinessCommandBuilder.new.call(source:, work_item_id:)
+    process_step = Coordinator::Processes::ProcessStepPlanner.new(event_store:).call(
+      source_event: source.event,
+      process_name: "change-set-readiness",
+      step_name: "evaluate-work-item-readiness",
+      subject_kind: "work-item",
+      subject_id: work_item_id,
+      rule_version: "change-set-readiness/v1",
+      allocate_target_entity: false
+    )
+    command = Coordinator::Processes::ReadinessCommandBuilder.new.call(
+      source:,
+      work_item_id:,
+      command_id: process_step.target_command_id
+    )
 
     Coordinator::Write::ReadinessInvocation.new(
       command:,
       source_event: source.event,
       source_reference: source.reference,
-      source_change_set_id: source.payload.change_set_id
+      source_change_set_id: source.payload.change_set_id,
+      caused_by: process_step.event
     )
   end
 

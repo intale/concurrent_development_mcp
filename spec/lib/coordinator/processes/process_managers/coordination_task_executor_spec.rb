@@ -219,7 +219,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
           filter: {
             streams: [ { context: "CoordinatorControl", stream_name: "CoordinationTask" } ],
             event_types: [
-              { type: "CoordinationTaskSubmitted", markers: [ "task-execution-lane:v1:#{lane}" ] }
+              { type: "CoordinationTaskSubmitted", markers: [ "task-execution-lane:v2:#{lane}" ] }
             ]
           }
         }

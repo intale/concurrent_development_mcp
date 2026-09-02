@@ -3,7 +3,6 @@
 RSpec.describe "CHO-02 AgentChoice impact scan operations", :event_store do
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
-  let(:identity_builder) { Coordinator::Write::AgentChoiceImpacts::ScanIdentityBuilder.new }
 
   it "starts one active-Attempt scan from exact activation evidence and replays without duplicate facts" do
     source = seed_activation(retroactivity: "active_attempts", suffix: "active")
@@ -28,7 +27,7 @@ RSpec.describe "CHO-02 AgentChoice impact scan operations", :event_store do
       )
     )
     expect(original.value!).to have_attributes(
-      causation_id: source.id,
+      causation_id: invocation.caused_by.id,
       correlation_id: source.correlation_id
     )
     expect(scan_events(invocation.command.scan_id).map(&:type)).to eq([ "AgentChoiceImpactScanStarted" ])
@@ -85,23 +84,22 @@ RSpec.describe "CHO-02 AgentChoice impact scan operations", :event_store do
     expect(progressed).to be_success
     expect(replay.failure).to have_attributes(code: :agent_choice_impact_scan_checkpoint_changed)
     expect(progressed.value!).to have_attributes(
-      causation_id: started.id,
+      causation_id: first.caused_by.id,
       correlation_id: started.correlation_id
     )
 
-    completed = progress_operation.call(
-      progress_invocation(
-        progressed.value!,
-        previous_from_position: source.global_position,
-        last_processed_position: nil,
-        page_choice_count: 0,
-        has_more: false
-      )
+    completion_invocation = progress_invocation(
+      progressed.value!,
+      previous_from_position: source.global_position,
+      last_processed_position: nil,
+      page_choice_count: 0,
+      has_more: false
     )
+    completed = progress_operation.call(completion_invocation)
 
     expect(completed).to be_success
     expect(completed.value!).to have_attributes(
-      causation_id: progressed.value!.id,
+      causation_id: completion_invocation.caused_by.id,
       correlation_id: started.correlation_id
     )
     expect(load(completed.value!)).to have_attributes(
@@ -151,14 +149,19 @@ RSpec.describe "CHO-02 AgentChoice impact scan operations", :event_store do
 
   def start_invocation(source)
     source_reference = reference(source)
-    scan_id = identity_builder.start(
-      source_event: source_reference,
-      policy_version: "agent-choice-decision-impact/v1"
+    process_step = Coordinator::Processes::ProcessStepPlanner.new(event_store:).call(
+      source_event: source,
+      process_name: "agent-choice-decision-impact",
+      step_name: "start-impact-scan",
+      subject_kind: "decision-change",
+      subject_id: source_reference.event_id,
+      rule_version: "agent-choice-decision-impact/v1",
+      allocate_target_entity: true
     )
     command = Coordinator::Write::Commands::StartAgentChoiceImpactScan.new(
-      command_id: scan_id,
+      command_id: process_step.target_command_id,
       actor: { kind: "system", id: "agent-choice-decision-impact" },
-      scan_id:,
+      scan_id: process_step.target_entity_id!,
       source_event: source_reference,
       source_global_position: source.global_position,
       policy_version: "agent-choice-decision-impact/v1"
@@ -166,7 +169,8 @@ RSpec.describe "CHO-02 AgentChoice impact scan operations", :event_store do
     Coordinator::Write::AgentChoiceImpactScanInvocation.new(
       command:,
       source_event: source,
-      source_reference:
+      source_reference:,
+      caused_by: process_step.event
     )
   end
 
@@ -178,12 +182,17 @@ RSpec.describe "CHO-02 AgentChoice impact scan operations", :event_store do
     has_more:
   )
     checkpoint_reference = reference(checkpoint)
-    command_id = identity_builder.progress(
-      checkpoint_event: checkpoint_reference,
-      policy_version: "agent-choice-decision-impact/v1"
+    process_step = Coordinator::Processes::ProcessStepPlanner.new(event_store:).call(
+      source_event: checkpoint,
+      process_name: "agent-choice-decision-impact",
+      step_name: "progress-impact-scan",
+      subject_kind: "impact-scan",
+      subject_id: checkpoint.stream.stream_id,
+      rule_version: "agent-choice-decision-impact/v1",
+      allocate_target_entity: false
     )
     command = Coordinator::Write::Commands::ProgressAgentChoiceImpactScan.new(
-      command_id:,
+      command_id: process_step.target_command_id,
       actor: { kind: "system", id: "agent-choice-decision-impact" },
       scan_id: checkpoint.stream.stream_id,
       expected_checkpoint: checkpoint_reference,
@@ -196,7 +205,8 @@ RSpec.describe "CHO-02 AgentChoice impact scan operations", :event_store do
     Coordinator::Write::AgentChoiceImpactScanProgressInvocation.new(
       command:,
       checkpoint_event: checkpoint,
-      checkpoint_reference:
+      checkpoint_reference:,
+      caused_by: process_step.event
     )
   end
 

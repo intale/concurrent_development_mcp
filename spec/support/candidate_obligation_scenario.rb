@@ -304,30 +304,31 @@ module CandidateObligationScenario
     source = pair.fetch(:source)
     target = pair.fetch(:target)
     parent = caused_by || source.fetch(:registration)
-    loader = Coordinator::Write::CandidateObligations::CandidateEvidenceLoader.new(event_store:)
-    source_evidence = loader.call(reference(source.fetch(:registration)))
-    target_evidence = loader.call(reference(target.fetch(:registration)))
-    identity = Coordinator::Write::CandidateObligations::IdentityBuilder.new.call(
-      source: source_evidence,
-      target: target_evidence,
-      policy_partition_event: reference(policy.fetch(:partition_event)),
-      policy_head: policy.fetch(:head),
-      rule_version: RULE_VERSION
+    source_reference = reference(source.fetch(:registration))
+    target_reference = reference(target.fetch(:registration))
+    process_step = Coordinator::Processes::ProcessStepPlanner.new(event_store:).call(
+      source_event: parent,
+      process_name: "candidate-impact-obligation-policy",
+      step_name: "create-compatibility-obligation",
+      subject_kind: "candidate-registration-pair",
+      subject_id: "#{source_reference.event_id}:#{target_reference.event_id}",
+      rule_version: RULE_VERSION,
+      allocate_target_entity: true
     )
     command = Coordinator::Write::Commands::CreateCandidateCompatibilityObligation.new(
-      command_id: identity.obligation_id,
+      command_id: process_step.target_command_id,
       actor: { kind: "system", id: "candidate-impact-obligation-policy" },
-      obligation_id: identity.obligation_id,
-      source_registration: source_evidence.registration_event,
-      target_registration: target_evidence.registration_event,
+      obligation_id: process_step.target_entity_id!,
+      source_registration: source_reference,
+      target_registration: target_reference,
       policy_partition_event: reference(policy.fetch(:partition_event)),
       policy_head: policy.fetch(:head),
       rule_version: RULE_VERSION
     )
     Coordinator::Write::CandidateCompatibilityObligationInvocation.new(
       command:,
-      caused_by: parent,
-      caused_by_reference: reference(parent)
+      caused_by: process_step.event,
+      caused_by_reference: process_step.reference
     )
   end
 

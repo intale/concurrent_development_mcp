@@ -43,8 +43,27 @@ RSpec.describe Coordinator::Processes::ProcessManagers::AgentChoiceDecisionImpac
     expect(choice_events(choice).map(&:type)).to eq(
       [ "AgentChoiceRecorded", "AgentChoiceAccepted", "AgentChoiceInvalidatedByDecision" ]
     )
-    expect(started.causation_id).to eq(source.id)
-    expect([ assessment, invalidation, completed ].map(&:causation_id).uniq).to eq([ started.id ])
+    start_step = process_step(
+      source_event: source,
+      step_name: "start-impact-scan",
+      subject_kind: "decision-change",
+      subject_id: source.id
+    )
+    assessment_step = process_step(
+      source_event: started,
+      step_name: "assess-choice-impact",
+      subject_kind: "choice-decision-change",
+      subject_id: "#{choice.fetch(:accepted).id}:#{source.id}"
+    )
+    progress_step = process_step(
+      source_event: started,
+      step_name: "progress-impact-scan",
+      subject_kind: "impact-scan",
+      subject_id: started.stream.stream_id
+    )
+    expect(started.causation_id).to eq(start_step.id)
+    expect([ assessment, invalidation ].map(&:causation_id).uniq).to eq([ assessment_step.id ])
+    expect(completed.causation_id).to eq(progress_step.id)
     expect([ source, started, assessment, invalidation, completed ].map(&:correlation_id).uniq).to eq(
       [ source.correlation_id ]
     )
@@ -74,7 +93,13 @@ RSpec.describe Coordinator::Processes::ProcessManagers::AgentChoiceDecisionImpac
     payload = load(assessment)
     expect(payload.decision_change.source_event).to eq(reference(source))
     expect(payload.assessment.outcome).to eq("invalidated")
-    expect(assessment.causation_id).to eq(choice.fetch(:accepted).id)
+    step = process_step(
+      source_event: choice.fetch(:accepted),
+      step_name: "assess-choice-impact",
+      subject_kind: "choice-decision-change",
+      subject_id: "#{choice.fetch(:accepted).id}:#{source.id}"
+    )
+    expect(assessment.causation_id).to eq(step.id)
     expect(assessment.correlation_id).to eq(choice.fetch(:accepted).correlation_id)
     expect(scan_events(source)).to be_empty
     expect(choice_events(choice).count { _1.type == "AgentChoiceInvalidatedByDecision" }).to eq(1)
@@ -220,18 +245,42 @@ RSpec.describe Coordinator::Processes::ProcessManagers::AgentChoiceDecisionImpac
     InterpretationInput.scope(repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ])
   end
 
-  def scan_id(source)
-    Coordinator::Write::AgentChoiceImpacts::ScanIdentityBuilder.new.start(
-      source_event: reference(source),
-      policy_version: AgentChoiceImpactScenario::POLICY_VERSION
+  def process_step(source_event:, step_name:, subject_kind:, subject_id:)
+    ProcessStepExamples.event(
+      event_store:,
+      source_event:,
+      process_name: "agent-choice-decision-impact",
+      step_name:,
+      subject_kind:,
+      subject_id:
     )
   end
 
+  def scan_id(source)
+    scan_start(source).stream.stream_id
+  end
+
   def scan_events(source)
+    started = scan_start(source)
+    return [] unless started
+
     event_store.read_grouped(
-      streams.agent_choice_impact_scan(scan_id(source)),
+      streams.agent_choice_impact_scan(started.stream.stream_id),
       Coordinator::Write::EventQueries::AGENT_CHOICE_IMPACT_SCAN_STATE
     )
+  end
+
+  def scan_start(source)
+    event_store.read_global_marked(
+      Coordinator::Write::GlobalMarkedEventReadCriteria.new(
+        stream_context: "AgentGovernance",
+        stream_name: "AgentChoiceImpactScan",
+        event_types: [ "AgentChoiceImpactScanStarted" ],
+        markers: [ "decision-change:#{source.id}" ],
+        maximum_count: 1,
+        direction: :asc
+      )
+    ).first
   end
 
   def scan_event(source, type, required: true)
@@ -242,17 +291,23 @@ RSpec.describe Coordinator::Processes::ProcessManagers::AgentChoiceDecisionImpac
   end
 
   def assessment_id(choice, source)
-    Coordinator::Write::AgentChoiceImpacts::AssessmentIdentityBuilder.new.call(
-      accepted_choice: reference(choice.fetch(:accepted)),
-      decision_change: reference(source),
-      policy_version: AgentChoiceImpactScenario::POLICY_VERSION
-    )
+    assessment_events(choice, source).sole.stream.stream_id
   end
 
   def assessment_events(choice, source)
-    event_store.read(
-      streams.agent_choice_impact(assessment_id(choice, source)),
-      Coordinator::Write::EventQueries::AGENT_CHOICE_IMPACT_ASSESSMENT
+    marker = Coordinator::Write::AgentChoiceImpacts::AssessmentMarkerBuilder.new.call(
+      accepted_choice: reference(choice.fetch(:accepted)),
+      decision_change: reference(source)
+    )
+    event_store.read_global_marked(
+      Coordinator::Write::GlobalMarkedEventReadCriteria.new(
+        stream_context: "AgentGovernance",
+        stream_name: "AgentChoiceImpact",
+        event_types: [ "AgentChoiceImpactAssessed" ],
+        markers: [ marker ],
+        maximum_count: 1,
+        direction: :asc
+      )
     )
   end
 

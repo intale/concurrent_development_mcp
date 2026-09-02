@@ -129,6 +129,34 @@ module McpAcceptanceWorld
     client_ids.each { mcp_session(_1) }
   end
 
+  def submit_tasks_in_distinct_execution_lanes(client_ids:, maximum_rounds: 8)
+    candidates = []
+    selected = nil
+
+    maximum_rounds.times do |round|
+      client_ids.each do |client_id|
+        candidate = yield(client_id, round)
+        task_id = candidate.fetch(:task_id)
+        candidates << candidate.merge(
+          client_id:,
+          worker_lane: Coordinator::Write::Tasks::ExecutionLane.new.index(task_id)
+        )
+      end
+      selected = candidates.combination(2).find do |left, right|
+        left.fetch(:client_id) != right.fetch(:client_id) &&
+          left.fetch(:worker_lane) != right.fetch(:worker_lane)
+      end
+      break if selected
+    end
+
+    assert_acceptance(selected, "Could not allocate Tasks in distinct execution lanes")
+    selected_task_ids = selected.map { _1.fetch(:task_id) }.to_set
+    candidates.reject { selected_task_ids.include?(_1.fetch(:task_id)) }.each do |candidate|
+      task_request("tasks/cancel", candidate.fetch(:task_id), client_id: candidate.fetch(:client_id))
+    end
+    selected.sort_by { _1.fetch(:worker_lane) }
+  end
+
   def project_change_set(change_set_id)
     await_read_model("ChangeSet #{change_set_id} to become available") do
       payload = coordination_context(change_set_id:)
@@ -560,12 +588,17 @@ module McpAcceptanceWorld
   end
 
   def impact_scan_events(source)
-    scan_id = Coordinator::Write::AgentChoiceImpacts::ScanIdentityBuilder.new.start(
-      source_event: impact_event_reference(source),
-      policy_version: IMPACT_POLICY_VERSION
-    )
+    started = read_global_marked_events(
+      stream_context: "AgentGovernance",
+      stream_name: "AgentChoiceImpactScan",
+      event_types: [ "AgentChoiceImpactScanStarted" ],
+      marker: "decision-change:#{source.id}",
+      maximum_count: 1
+    ).first
+    return [] unless started
+
     event_store.read_grouped(
-      streams.agent_choice_impact_scan(scan_id),
+      streams.agent_choice_impact_scan(started.stream.stream_id),
       Coordinator::Write::EventQueries::AGENT_CHOICE_IMPACT_SCAN_STATE
     )
   end
@@ -580,14 +613,49 @@ module McpAcceptanceWorld
   def impact_assessment_event(choice_id, source = @impact_source)
     accepted = impact_choice_events(choice_id).find { _1.type == "AgentChoiceAccepted" }
     assert_acceptance(accepted, "AgentChoice #{choice_id} has no accepted source")
-    assessment_id = Coordinator::Write::AgentChoiceImpacts::AssessmentIdentityBuilder.new.call(
+    marker = Coordinator::Write::AgentChoiceImpacts::AssessmentMarkerBuilder.new.call(
       accepted_choice: impact_event_reference(accepted),
-      decision_change: impact_event_reference(source),
-      policy_version: IMPACT_POLICY_VERSION
+      decision_change: impact_event_reference(source)
     )
-    event_store.read(
-      streams.agent_choice_impact(assessment_id),
-      Coordinator::Write::EventQueries::AGENT_CHOICE_IMPACT_ASSESSMENT
+    read_global_marked_events(
+      stream_context: "AgentGovernance",
+      stream_name: "AgentChoiceImpact",
+      event_types: [ "AgentChoiceImpactAssessed" ],
+      marker:,
+      maximum_count: 1
+    ).first
+  end
+
+  def read_global_marked_events(stream_context:, stream_name:, event_types:, marker:, maximum_count:)
+    event_store.read_global_marked(
+      Coordinator::Write::GlobalMarkedEventReadCriteria.new(
+        stream_context:,
+        stream_name:,
+        event_types:,
+        markers: [ marker ],
+        maximum_count:,
+        direction: :asc
+      )
+    )
+  end
+
+  def process_step_event(source_event:, process_name:, step_name:, subject_kind:, subject_id:)
+    marker = Coordinator::Shared::Markers::CodecV2.new.call(
+      purpose: "process-step",
+      components: [
+        { dimension: "process-name", value: process_name },
+        { dimension: "source-event-id", value: source_event.id },
+        { dimension: "step-name", value: step_name },
+        { dimension: "subject-kind", value: subject_kind },
+        { dimension: "subject-id", value: subject_id }
+      ]
+    ).value!.marker
+    read_global_marked_events(
+      stream_context: "CoordinatorControl",
+      stream_name: "ProcessStep",
+      event_types: [ "ProcessStepPlanned" ],
+      marker:,
+      maximum_count: 1
     ).first
   end
 

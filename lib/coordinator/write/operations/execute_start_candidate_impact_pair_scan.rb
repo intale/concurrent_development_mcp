@@ -15,7 +15,6 @@ module Coordinator::Write
         marker_builder: Candidates::ImpactIndexMarkerBuilder.new,
         loader: CandidateObligationScans::PairScanLoader.new(event_store:),
         decider: Domain::CandidateObligationScans::StartPairScan.new,
-        identity_builder: CandidateObligationScans::IdentityBuilder.new,
         clock: SystemClock.new,
         id_generator: IdGenerator.new,
         event_factory: EventFactory.new,
@@ -30,7 +29,6 @@ module Coordinator::Write
         @marker_builder = marker_builder
         @loader = loader
         @decider = decider
-        @identity_builder = identity_builder
         @clock = clock
         @id_generator = id_generator
         @event_factory = event_factory
@@ -102,7 +100,7 @@ module Coordinator::Write
           event_id: preparation.event_id,
           metadata: metadata(command),
           markers: event_markers(command),
-          caused_by: source.event
+          caused_by: invocation.caused_by
         )
         persisted = @event_store.append(stream, [ physical ]).sole
 
@@ -110,15 +108,7 @@ module Coordinator::Write
       end
 
       def verify_input!(invocation, evidence)
-        command = invocation.command
-        expected_identity = @identity_builder.pair_scan(
-          source_registration: command.source_registration,
-          direction: command.direction,
-          policy_partition_event: command.policy_partition_event,
-          policy_head: command.policy_head,
-          rule_version: command.rule_version
-        )
-        result = @input_contract.call(invocation:, evidence:, expected_identity:)
+        result = @input_contract.call(invocation:, evidence:)
         return if result.success?
 
         raise ArgumentError, "pair scan input violates its dry-rb contract: #{result.errors.to_h.inspect}"
@@ -146,6 +136,7 @@ module Coordinator::Write
           "candidate-impact-pair-scan:#{command.scan_id}",
           "change-set:#{command.change_set_id}",
           "candidate-impact-direction:#{command.direction}",
+          "source-registration:#{command.source_registration.event_id}",
           "decision:#{command.policy_head.decision_id}",
           "command:#{command.command_id}"
         ].freeze

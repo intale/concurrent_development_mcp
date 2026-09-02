@@ -6,10 +6,12 @@ module Coordinator::Write
       def initialize(
         topic_registry: TopicRegistry.new,
         canonical_json: CanonicalJson.new,
+        marker_component_builder: Coordinator::Shared::CanonicalMarkerComponentBuilder.new,
         compound_marker_builder: CompoundMarkerBuilder.new
       )
         @topic_registry = topic_registry
         @canonical_json = canonical_json
+        @marker_component_builder = marker_component_builder
         @compound_marker_builder = compound_marker_builder
       end
 
@@ -34,10 +36,9 @@ module Coordinator::Write
             components: [
               "message:#{proposal.source_message_id}",
               "topic:#{decision.topic_id}",
-              "scope:v1:#{scope_digest}",
               "conflict-dimension:#{definition.conflict_dimension}",
               "resolution-strategy:#{definition.resolution_strategy}"
-            ]
+            ] + @marker_component_builder.call(dimension: "scope", value: scope.to_h)
           )
         )
 

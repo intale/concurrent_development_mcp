@@ -2,8 +2,8 @@ module Coordinator
   module Write
     module DevelopmentArtifacts
       class RelationIdentityBuilder
-        def initialize: (?canonical_json: Shared::CanonicalJson) -> void
-        def call: (source_artifact_id: String, relation: String, target: RelationTargetV1, attributes: RelationAttributesV1) -> String
+        def initialize: (?id_generator: Shared::IdGenerator) -> void
+        def call: () -> String
       end
     end
   end

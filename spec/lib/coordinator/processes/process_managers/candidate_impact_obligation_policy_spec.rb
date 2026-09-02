@@ -6,7 +6,6 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CandidateImpactObligatio
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
   let(:schemas) { Coordinator::Write::EventSchemaRegistry.new }
-  let(:identities) { Coordinator::Write::CandidateObligationScans::IdentityBuilder.new }
 
   it "IMP-02-POLICY-LATE-01 AUD-SCAN-REPLAY-03 converges duplicate delivery on one scan and obligation" do
     pair = CandidateObligationScenario.submit_pair(prefix: "obligation-process-policy-late")
@@ -21,8 +20,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CandidateImpactObligatio
     process_manager.call(sweep_started)
     drive_pair_scans(pair:, policy:)
 
-    invocation = CandidateObligationScenario.invocation(pair:, policy:)
-    obligation = CandidateObligationScenario.obligation_events(invocation.command.obligation_id).sole
+    obligation = obligation_event(pair, policy)
     incoming_started = pair_scan_events(
       pair.dig(:target, :registration),
       "incoming",
@@ -32,11 +30,17 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CandidateImpactObligatio
       "CandidateImpactRegistrySweepStarted",
       "CandidateImpactRegistrySweepCompleted"
     )
-    expect(obligation.causation_id).to eq(incoming_started.id)
+    obligation_step = process_step(
+      source_event: incoming_started,
+      step_name: "create-compatibility-obligation",
+      subject_kind: "candidate-registration-pair",
+      subject_id: "#{pair.dig(:source, :registration).id}:#{pair.dig(:target, :registration).id}"
+    )
+    expect(obligation.causation_id).to eq(obligation_step.id)
     expect([ policy.fetch(:partition_event), sweep_started, incoming_started, obligation ].map(&:correlation_id).uniq).to eq(
       [ policy.fetch(:partition_event).correlation_id ]
     )
-    expect(CandidateObligationScenario.obligation_events(invocation.command.obligation_id).length).to eq(1)
+    expect(CandidateObligationScenario.obligation_events(obligation.stream.stream_id).length).to eq(1)
   end
 
   it "IMP-02-SURFACE-LATE-01 starts reciprocal scans from a registration under the current gate" do
@@ -47,15 +51,26 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CandidateImpactObligatio
     process_manager.call(target_registration)
     drive_pair_scans(pair:, policy:, registrations: [ target_registration ])
 
-    invocation = CandidateObligationScenario.invocation(pair:, policy:)
-    obligation = CandidateObligationScenario.obligation_events(invocation.command.obligation_id).sole
+    obligation = obligation_event(pair, policy)
     incoming_started = pair_scan_events(target_registration, "incoming", policy).find do
       _1.type == "CandidateImpactPairScanStarted"
     end
-    expect(incoming_started.causation_id).to eq(target_registration.id)
-    expect(obligation.causation_id).to eq(incoming_started.id)
+    pair_step = process_step(
+      source_event: target_registration,
+      step_name: "start-incoming-pair-scan",
+      subject_kind: "candidate-impact-registration",
+      subject_id: target_registration.id
+    )
+    obligation_step = process_step(
+      source_event: incoming_started,
+      step_name: "create-compatibility-obligation",
+      subject_kind: "candidate-registration-pair",
+      subject_id: "#{pair.dig(:source, :registration).id}:#{pair.dig(:target, :registration).id}"
+    )
+    expect(incoming_started.causation_id).to eq(pair_step.id)
+    expect(obligation.causation_id).to eq(obligation_step.id)
     expect(obligation.correlation_id).to eq(target_registration.correlation_id)
-    expect(command_events(invocation.command.command_id)).to be_empty
+    expect(command_events(obligation.metadata.fetch("command_id"))).to be_empty
   end
 
   it "publishes one unique multi-stream registration in the shared process-manager set" do
@@ -100,28 +115,71 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CandidateImpactObligatio
   end
 
   def registry_sweep_events(policy)
-    scan_id = identities.registry_sweep(
-      policy_partition_event: reference(policy.fetch(:partition_event)),
-      policy_head: policy.fetch(:head),
-      rule_version: Coordinator::Processes::CandidateObligations::CommandBuilder::REGISTRY_RULE_VERSION
-    )
+    started = event_store.read_global_marked(
+      Coordinator::Write::GlobalMarkedEventReadCriteria.new(
+        stream_context: "DevelopmentIntegration",
+        stream_name: "CandidateImpactRegistrySweep",
+        event_types: [ "CandidateImpactRegistrySweepStarted" ],
+        markers: [ "policy-partition-event:#{policy.fetch(:partition_event).id}" ],
+        maximum_count: 1,
+        direction: :asc
+      )
+    ).sole
     event_store.read_grouped(
-      streams.candidate_impact_registry_sweep(scan_id),
+      streams.candidate_impact_registry_sweep(started.stream.stream_id),
       Coordinator::Write::EventQueries::CANDIDATE_IMPACT_REGISTRY_SWEEP_STATE
     )
   end
 
   def pair_scan_events(registration, direction, policy)
-    scan_id = identities.pair_scan(
-      source_registration: reference(registration),
-      direction:,
+    started = event_store.read_global_marked(
+      Coordinator::Write::GlobalMarkedEventReadCriteria.new(
+        stream_context: "DevelopmentIntegration",
+        stream_name: "CandidateImpactPairScan",
+        event_types: [ "CandidateImpactPairScanStarted" ],
+        markers: [ "source-registration:#{registration.id}" ],
+        maximum_count: 2,
+        direction: :asc
+      )
+    ).find { payload(_1).direction == direction }
+    return [] unless started
+
+    event_store.read_grouped(
+      streams.candidate_impact_pair_scan(started.stream.stream_id),
+      Coordinator::Write::EventQueries::CANDIDATE_IMPACT_PAIR_SCAN_STATE
+    )
+  end
+
+  def obligation_event(pair, policy)
+    loader = Coordinator::Write::CandidateObligations::CandidateEvidenceLoader.new(event_store:)
+    source = loader.call(reference(pair.dig(:source, :registration)))
+    target = loader.call(reference(pair.dig(:target, :registration)))
+    natural_key = Coordinator::Write::CandidateObligations::NaturalKeyBuilder.new.call(
+      source:,
+      target:,
       policy_partition_event: reference(policy.fetch(:partition_event)),
       policy_head: policy.fetch(:head),
-      rule_version: Coordinator::Processes::CandidateObligations::CommandBuilder::PAIR_RULE_VERSION
+      rule_version: Coordinator::Processes::CandidateObligations::CommandBuilder::OBLIGATION_RULE_VERSION
     )
-    event_store.read_grouped(
-      streams.candidate_impact_pair_scan(scan_id),
-      Coordinator::Write::EventQueries::CANDIDATE_IMPACT_PAIR_SCAN_STATE
+    Coordinator::Write::CandidateObligations::ObligationLoader.new(event_store:).find(natural_key).event
+  end
+
+  def payload(event)
+    schemas.load(
+      type: event.type,
+      schema_version: event.metadata.fetch("schema_version"),
+      data: event.data
+    )
+  end
+
+  def process_step(source_event:, step_name:, subject_kind:, subject_id:)
+    ProcessStepExamples.event(
+      event_store:,
+      source_event:,
+      process_name: "candidate-impact-obligation-policy",
+      step_name:,
+      subject_kind:,
+      subject_id:
     )
   end
 

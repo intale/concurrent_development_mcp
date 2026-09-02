@@ -3,7 +3,7 @@
 module Coordinator::Write
   module Commands
     class RollResourceBoundaryEpoch < Value
-      attribute :command_id, Types::InternalCommandId
+      attribute :command_id, Types::UuidV7
       attribute :actor, Actor
       attribute :repository_id, Types::RepositoryId
       attribute :boundary_marker, Types::ResourceMarker

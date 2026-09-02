@@ -7,7 +7,18 @@ module Coordinator::Write
     end
 
     def call(command)
-      @canonical_json.sha256(document(command).to_h)
+      @canonical_json.sha256(canonical_document(command).to_h)
+    end
+
+    def canonical_document(command)
+      case command
+      when Commands::PublishSkillRevision then skill_publish_canonical_document(command)
+      when Commands::CaptureDevelopmentArtifact then development_artifact_capture_canonical_document(command)
+      when Commands::DeclareDevelopmentArtifactRelation
+        development_artifact_relation_declare_canonical_document(command)
+      else
+        document(command)
+      end
     end
 
     def document(command)
@@ -799,7 +810,7 @@ module Coordinator::Write
     end
 
     def skill_publish(command)
-      @canonical_json.sha256(skill_publish_document(command).to_h)
+      @canonical_json.sha256(skill_publish_canonical_document(command).to_h)
     end
 
     def skill_publish_document(command)
@@ -823,8 +834,28 @@ module Coordinator::Write
       )
     end
 
+    def skill_publish_canonical_document(command)
+      CommandInputDocuments::PublishSkillRevisionCanonicalV2.new(
+        schema: "command-input/v2",
+        command_id: command.command_id,
+        tool_name: "skill_publish",
+        input: CommandInputDocuments::PublishSkillRevisionCanonicalInputV2.new(
+          actor: actor_document(command.actor),
+          name: command.name,
+          scope: command.scope,
+          expected_revision: command.expected_revision,
+          description: command.description,
+          instructions: command.instructions,
+          assets: command.assets.map do |asset|
+            CommandInputDocuments::SkillAssetV2.new(asset.to_h)
+          end,
+          content_digest: command.content_digest
+        )
+      )
+    end
+
     def development_artifact_capture(command)
-      @canonical_json.sha256(development_artifact_capture_document(command).to_h)
+      @canonical_json.sha256(development_artifact_capture_canonical_document(command).to_h)
     end
 
     def development_artifact_capture_document(command)
@@ -838,6 +869,32 @@ module Coordinator::Write
           artifact: CommandInputDocuments::DevelopmentArtifactV2.new(
             artifact_id: artifact.artifact_id,
             observation_id: command.observation.observation_id,
+            scope: artifact.scope,
+            title: artifact.title,
+            kind: artifact.kind,
+            labels: artifact.labels,
+            content: artifact.content,
+            source: CommandInputDocuments::DevelopmentArtifactSourceV1.new(
+              kind: artifact.source.kind,
+              locator: artifact.source.locator,
+              revision: artifact.source.revision,
+              observed_at: artifact.source.observed_at,
+              collector: artifact.source.collector
+            )
+          )
+        )
+      )
+    end
+
+    def development_artifact_capture_canonical_document(command)
+      artifact = command.artifact
+      CommandInputDocuments::CaptureDevelopmentArtifactCanonicalV2.new(
+        schema: "command-input/v2",
+        command_id: command.command_id,
+        tool_name: "development_artifact_capture",
+        input: CommandInputDocuments::CaptureDevelopmentArtifactCanonicalInputV2.new(
+          actor: actor_document(command.actor),
+          artifact: CommandInputDocuments::DevelopmentArtifactCanonicalV2.new(
             scope: artifact.scope,
             title: artifact.title,
             kind: artifact.kind,
@@ -877,7 +934,7 @@ module Coordinator::Write
     end
 
     def development_artifact_relation_declare(command)
-      @canonical_json.sha256(development_artifact_relation_declare_document(command).to_h)
+      @canonical_json.sha256(development_artifact_relation_declare_canonical_document(command).to_h)
     end
 
     def development_artifact_relation_declare_document(command)
@@ -888,30 +945,59 @@ module Coordinator::Write
       if relation_attributes.normalized_locator
         attribute_values[:normalized_locator] = relation_attributes.normalized_locator
       end
-      input_values = {
-        actor: actor_document(command.actor),
-        artifact_relation: CommandInputDocuments::DevelopmentArtifactRelationV1.new(
-          relation_id: artifact_relation.relation_id,
-          source_artifact_id: artifact_relation.source_artifact_id,
-          relation: artifact_relation.relation,
-          target: CommandInputDocuments::DevelopmentArtifactRelationTargetV1.new(
-            kind: artifact_relation.target.kind,
-            id: artifact_relation.target.id
-          ),
-          attributes: CommandInputDocuments::DevelopmentArtifactRelationAttributesV1.new(
-            **attribute_values
-          )
-        )
-      }
-      if command.supersedes_relation_id
-        input_values[:supersedes_relation_id] = command.supersedes_relation_id
-        input_values[:supersession_reason] = command.supersession_reason
-      end
       CommandInputDocuments::DeclareDevelopmentArtifactRelationV1.new(
         schema: "command-input/v1",
         command_id: command.command_id,
         tool_name: "development_artifact_relation_declare",
-        input: CommandInputDocuments::DeclareDevelopmentArtifactRelationInputV1.new(**input_values)
+        input: CommandInputDocuments::DeclareDevelopmentArtifactRelationInputV1.new(
+          actor: actor_document(command.actor),
+          artifact_relation: CommandInputDocuments::DevelopmentArtifactRelationV1.new(
+            relation_id: artifact_relation.relation_id,
+            source_artifact_id: artifact_relation.source_artifact_id,
+            relation: artifact_relation.relation,
+            target: CommandInputDocuments::DevelopmentArtifactRelationTargetV1.new(
+              kind: artifact_relation.target.kind,
+              id: artifact_relation.target.id
+            ),
+            attributes: CommandInputDocuments::DevelopmentArtifactRelationAttributesV1.new(
+              **attribute_values
+            )
+          ),
+          supersedes_relation_id: command.supersedes_relation_id,
+          supersession_reason: command.supersession_reason
+        )
+      )
+    end
+
+    def development_artifact_relation_declare_canonical_document(command)
+      artifact_relation = command.artifact_relation
+      relation_attributes = artifact_relation.relation_attributes
+      attribute_values = { path: relation_attributes.path }
+      attribute_values[:fragment] = relation_attributes.fragment if relation_attributes.fragment
+      if relation_attributes.normalized_locator
+        attribute_values[:normalized_locator] = relation_attributes.normalized_locator
+      end
+
+      CommandInputDocuments::DeclareDevelopmentArtifactRelationCanonicalV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "development_artifact_relation_declare",
+        input: CommandInputDocuments::DeclareDevelopmentArtifactRelationCanonicalInputV1.new(
+          actor: actor_document(command.actor),
+          artifact_relation: CommandInputDocuments::DevelopmentArtifactRelationCanonicalV1.new(
+            source_artifact_id: artifact_relation.source_artifact_id,
+            relation: artifact_relation.relation,
+            target: CommandInputDocuments::DevelopmentArtifactRelationTargetV1.new(
+              kind: artifact_relation.target.kind,
+              id: artifact_relation.target.id
+            ),
+            attributes: CommandInputDocuments::DevelopmentArtifactRelationAttributesV1.new(
+              **attribute_values
+            )
+          ),
+          supersedes_relation_id: command.supersedes_relation_id,
+          supersession_reason: command.supersession_reason
+        )
       )
     end
 

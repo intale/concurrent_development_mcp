@@ -5,5 +5,6 @@ module Coordinator::Write
     attribute :command, Types.Instance(Commands::StartCandidateImpactRegistrySweep)
     attribute :source_event, Types.Instance(PgEventstore::Event)
     attribute :source_reference, EventReference
+    attribute :caused_by, Types.Instance(PgEventstore::Event)
   end
 end

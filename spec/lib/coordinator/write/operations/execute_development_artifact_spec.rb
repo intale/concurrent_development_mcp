@@ -13,7 +13,7 @@ RSpec.describe "Development Artifact write operations", :event_store do
   end
   let(:streams) { Coordinator::Write::StreamFactory.new }
 
-  it "captures canonical bytes atomically with its command and replays exact Artifact identity" do
+  it "captures canonical bytes once and records a new observation for the same natural Artifact" do
     first = capture.call(capture_input)
     replay = capture.call(capture_input(command_id: "cmd-artifact-replay"))
 
@@ -26,9 +26,10 @@ RSpec.describe "Development Artifact write operations", :event_store do
     expect(replay).to be_success
     expect(replay.value!.data).to have_attributes(
       artifact_id: first.value!.data.artifact_id,
-      outcome: "existing"
+      outcome: "observed"
     )
-    expect(replay.value!.emitted_events).to be_empty
+    expect(replay.value!.data.observation_id).not_to eq(first.value!.data.observation_id)
+    expect(replay.value!.emitted_events.map(&:type)).to eq([ "DevelopmentArtifactObserved" ])
     persisted = artifact_events(first.value!.data.artifact_id).sole
     expect(persisted.type).to eq("DevelopmentArtifactCaptured")
     expect(persisted.metadata.fetch("schema_version")).to eq(2)
@@ -38,15 +39,19 @@ RSpec.describe "Development Artifact write operations", :event_store do
     expect(command_events("cmd-artifact-replay").map(&:type)).to eq([ "CommandCompleted" ])
   end
 
-  it "assigns changed source bytes a different Artifact identity" do
+  it "keeps one natural Artifact identity and rejects content changes until content facts are introduced" do
     first = capture.call(capture_input)
     changed = capture.call(capture_input(command_id: "cmd-artifact-changed", text: "second"))
 
-    expect([ first, changed ]).to all(be_success)
-    expect(changed.value!.data.artifact_id).not_to eq(first.value!.data.artifact_id)
+    expect(first).to be_success
+    expect(changed).to be_failure
+    expect(changed.failure).to have_attributes(
+      code: :development_artifact_identity_conflict,
+      details: include(artifact_id: first.value!.data.artifact_id)
+    )
   end
 
-  it "corrects observation classification without changing content identity or provenance" do
+  it "keeps classification corrections scoped to one observation" do
     first = capture.call(capture_input)
     capture_with_changed_classification = capture.call(
       capture_input(command_id: "cmd-artifact-reclassify", title: "Other title")
@@ -70,10 +75,12 @@ RSpec.describe "Development Artifact write operations", :event_store do
     )
 
     expect(first).to be_success
-    expect(capture_with_changed_classification).to be_failure
-    expect(capture_with_changed_classification.failure.code).to eq(
-      :development_artifact_classification_correction_required
+    expect(capture_with_changed_classification).to be_success
+    expect(capture_with_changed_classification.value!.data).to have_attributes(
+      artifact_id: first.value!.data.artifact_id,
+      outcome: "observed"
     )
+    expect(capture_with_changed_classification.value!.data.observation_id).not_to eq(first.value!.data.observation_id)
     expect(correction).to be_success
     expect(correction.value!.data).to have_attributes(
       artifact_id: first.value!.data.artifact_id,
@@ -89,7 +96,7 @@ RSpec.describe "Development Artifact write operations", :event_store do
     expect(existing.value!.data.outcome).to eq("existing")
     expect(existing.value!.emitted_events).to be_empty
     expect(stale.failure.code).to eq(:development_artifact_classification_revision_conflict)
-    expect(command_events("cmd-artifact-reclassify")).to be_empty
+    expect(command_events("cmd-artifact-reclassify").map(&:type)).to eq([ "CommandCompleted" ])
     expect(command_events("cmd-classification-stale")).to be_empty
     expect(observation_events(first.value!.data.observation_id).map(&:type)).to eq(
       %w[DevelopmentArtifactObserved DevelopmentArtifactClassificationCorrected]
@@ -136,7 +143,7 @@ RSpec.describe "Development Artifact write operations", :event_store do
       relation_input(
         command_id: "cmd-relation-missing",
         source:,
-        target: "artifact:v1:#{'f' * 64}"
+        target: "018f0f4d-4e45-7abc-8def-000000000181"
       )
     )
 
@@ -152,7 +159,7 @@ RSpec.describe "Development Artifact write operations", :event_store do
     expect(missing.failure.code).to eq(:development_artifact_target_not_found)
     expect(missing.failure.details).to include(
       target_kind: "artifact",
-      target_id: "artifact:v1:#{'f' * 64}"
+      target_id: "018f0f4d-4e45-7abc-8def-000000000181"
     )
     expect(artifact_events(source).map(&:type)).to eq(
       [ "DevelopmentArtifactCaptured", "DevelopmentArtifactRelationDeclared" ]
@@ -243,7 +250,7 @@ RSpec.describe "Development Artifact write operations", :event_store do
         source:,
         target: third_target,
         supersedes: {
-          relation_id: "artifact-relation:v1:#{'f' * 64}",
+          relation_id: "018f0f4d-4e45-7abc-8def-000000000182",
           reason: "unknown"
         }
       )

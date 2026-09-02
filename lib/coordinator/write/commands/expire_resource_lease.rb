@@ -3,7 +3,7 @@
 module Coordinator::Write
   module Commands
     class ExpireResourceLease < Value
-      attribute :command_id, Types::InternalCommandId
+      attribute :command_id, Types::UuidV7
       attribute :actor, Actor
       attribute :resource_id, Types::ResourceId
       attribute :lease_id, Types::UuidV7

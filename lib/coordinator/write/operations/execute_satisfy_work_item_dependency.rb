@@ -31,11 +31,11 @@ module Coordinator::Write
         @event_plan_contract = event_plan_contract
       end
 
-      def call(command)
-        step call_command(command)
+      def call(command, caused_by:)
+        step call_command(command, caused_by:)
       end
 
-      def call_command(command)
+      def call_command(command, caused_by:)
         steps do
           preparation = PreparedDependencySatisfactionV1.new(
             occurred_at: @clock.now,
@@ -45,13 +45,13 @@ module Coordinator::Write
             completion_event_id: @id_generator.uuid_v7
           )
 
-          step @event_store.multiple { execute_attempt(command:, preparation:) }
+          step @event_store.multiple { execute_attempt(command:, preparation:, caused_by:) }
         end
       end
 
       private
 
-      def execute_attempt(command:, preparation:)
+      def execute_attempt(command:, preparation:, caused_by:)
         replay = replay_result(command:, input_digest: preparation.input_digest)
         return replay if replay
 
@@ -81,7 +81,7 @@ module Coordinator::Write
           source:,
           satisfied_at: preparation.occurred_at
         )
-        persisted = persist_domain(plan, command:, source:, preparation:)
+        persisted = persist_domain(plan, command:, caused_by:, preparation:)
         satisfaction = plan.events.fetch(0)
         completion = @completion_builder.dependency_satisfaction_policy(
           command:,
@@ -90,7 +90,7 @@ module Coordinator::Write
           persisted_events: persisted,
           completed_at: preparation.occurred_at
         )
-        persist_completion(completion, command:, source:, event_id: preparation.completion_event_id)
+        persist_completion(completion, command:, caused_by:, event_id: preparation.completion_event_id)
         Success(completion)
       end
 
@@ -125,7 +125,7 @@ module Coordinator::Write
         raise InvalidDependencySatisfactionEventPlan, result.errors.to_h.inspect
       end
 
-      def persist_domain(plan, command:, source:, preparation:)
+      def persist_domain(plan, command:, caused_by:, preparation:)
         event_ids = [ preparation.satisfaction_event_id, preparation.readiness_event_id ]
         plan.writes.each_with_index.map do |write, index|
           event = @event_factory.build!(
@@ -133,19 +133,19 @@ module Coordinator::Write
             event_id: event_ids.fetch(index),
             metadata: command_metadata(command),
             markers: event_markers(write.event, command:),
-            caused_by: source.event
+            caused_by:
           )
           @event_store.append(write.stream, [ event ]).sole
         end.freeze
       end
 
-      def persist_completion(completion, command:, source:, event_id:)
+      def persist_completion(completion, command:, caused_by:, event_id:)
         event = @event_factory.build!(
           event: completion,
           event_id:,
           metadata: command_metadata(command),
           markers: [ "command:#{command.command_id}" ],
-          caused_by: source.event
+          caused_by:
         )
         @event_store.append(@stream_factory.command(command.command_id), [ event ])
       end

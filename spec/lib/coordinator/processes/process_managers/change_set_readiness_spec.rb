@@ -25,7 +25,19 @@ RSpec.describe Coordinator::Processes::ProcessManagers::ChangeSetReadiness, :eve
       "actor_id" => "change-set-readiness",
       "policy_version" => "change-set-readiness/v1"
     )
-    expect(made_ready.causation_id).to eq(activation.id)
+    process_step = ProcessStepExamples.event(
+      event_store:,
+      source_event: activation,
+      process_name: "change-set-readiness",
+      step_name: "evaluate-work-item-readiness",
+      subject_kind: "work-item",
+      subject_id: "W-100"
+    )
+    expect(made_ready.causation_id).to eq(process_step.id)
+    expect(process_step).to have_attributes(
+      causation_id: activation.id,
+      correlation_id: activation.correlation_id
+    )
   end
 
   it "stacks every registration for the set on one subscriptions manager" do

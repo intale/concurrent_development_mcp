@@ -1,9 +1,0 @@
-module Coordinator::Write
-  module CandidateObligationScans
-    class ProgressIdentityDocumentV1 < Coordinator::Shared::Value
-      def schema: () -> String
-      def checkpoint_event: () -> Coordinator::Write::EventReference
-      def rule_version: () -> String
-    end
-  end
-end

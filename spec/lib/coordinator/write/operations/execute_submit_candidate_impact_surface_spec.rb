@@ -44,7 +44,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidateImpactSurfa
     expect(registration.data).to include(
       "candidate_id" => input.fetch(:candidate_id),
       "surface_event" => completion.data.surface_event.to_h.stringify_keys,
-      "index_policy_version" => "candidate-impact-bucket-index/v1"
+      "index_policy_version" => "candidate-impact-exact-index/v2"
     )
     expect(registration.markers.grep(/compound:candidate-impact-index/)).not_to be_empty
     expect(registration.causation_id).to eq(parent.id)

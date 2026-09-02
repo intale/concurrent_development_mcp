@@ -3,6 +3,8 @@
 module Coordinator::Write
   module Contracts
     class AgentChoiceImpactScanInvocation < Dry::Validation::Contract
+      include ProcessStepCausation
+
       params do
         required(:invocation).value(Types.Instance(Coordinator::Write::AgentChoiceImpactScanInvocation))
       end
@@ -21,6 +23,9 @@ module Coordinator::Write
           key.failure("source event envelope must match its exact reference")
         end
         key.failure("impact scan actor must be the system policy") unless command.actor.kind == "system"
+        unless process_step_matches?(value.caused_by, command_id: command.command_id, target_entity_id: command.scan_id)
+          key.failure("causal parent must be the ProcessStep that allocated the scan command and identity")
+        end
       end
     end
   end

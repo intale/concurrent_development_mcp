@@ -341,32 +341,39 @@ module CandidateImpactObligationAcceptanceWorld
         )
       end
     )
-    loader = Coordinator::Write::CandidateObligations::CandidateEvidenceLoader.new(
+    evidence_loader = Coordinator::Write::CandidateObligations::CandidateEvidenceLoader.new(
       event_store:
     )
-    identity = Coordinator::Write::CandidateObligations::IdentityBuilder.new.call(
-      source: loader.call(source_reference),
-      target: loader.call(target_reference),
+    natural_key = Coordinator::Write::CandidateObligations::NaturalKeyBuilder.new.call(
+      source: evidence_loader.call(source_reference),
+      target: evidence_loader.call(target_reference),
       policy_partition_event: candidate_obligation_event_reference(
         @obligation_policy.fetch(:partition_event)
       ),
       policy_head: @obligation_policy.fetch(:head),
       rule_version: OBLIGATION_RULE_VERSION
     )
-    @obligation_id = identity.obligation_id
+    obligation_loader = Coordinator::Write::CandidateObligations::ObligationLoader.new(event_store:)
+    persisted = eventually("Candidate compatibility obligation identity to be allocated") do
+      obligation = obligation_loader.find(natural_key)
+      [ !obligation.nil?, obligation ]
+    end
+    @obligation_id = persisted.payload.obligation_id
   end
 
   def candidate_registry_sweep_events
-    identity = Coordinator::Write::CandidateObligationScans::IdentityBuilder.new
-    scan_id = identity.registry_sweep(
-      policy_partition_event: candidate_obligation_event_reference(
-        @obligation_policy.fetch(:partition_event)
-      ),
-      policy_head: @obligation_policy.fetch(:head),
-      rule_version: REGISTRY_RULE_VERSION
-    )
+    partition_event = @obligation_policy.fetch(:partition_event)
+    started = read_global_marked_events(
+      stream_context: "DevelopmentIntegration",
+      stream_name: "CandidateImpactRegistrySweep",
+      event_types: [ "CandidateImpactRegistrySweepStarted" ],
+      marker: "policy-partition-event:#{partition_event.id}",
+      maximum_count: 1
+    ).first
+    return [] unless started
+
     event_store.read_grouped(
-      streams.candidate_impact_registry_sweep(scan_id),
+      streams.candidate_impact_registry_sweep(started.stream.stream_id),
       Coordinator::Write::EventQueries::CANDIDATE_IMPACT_REGISTRY_SWEEP_STATE
     )
   end
@@ -397,18 +404,17 @@ module CandidateImpactObligationAcceptanceWorld
   end
 
   def candidate_pair_scan_events(registration, direction)
-    identity = Coordinator::Write::CandidateObligationScans::IdentityBuilder.new
-    scan_id = identity.pair_scan(
-      source_registration: candidate_obligation_event_reference(registration),
-      direction:,
-      policy_partition_event: candidate_obligation_event_reference(
-        @obligation_policy.fetch(:partition_event)
-      ),
-      policy_head: @obligation_policy.fetch(:head),
-      rule_version: PAIR_RULE_VERSION
-    )
+    started = read_global_marked_events(
+      stream_context: "DevelopmentIntegration",
+      stream_name: "CandidateImpactPairScan",
+      event_types: [ "CandidateImpactPairScanStarted" ],
+      marker: "source-registration:#{registration.id}",
+      maximum_count: 2
+    ).find { _1.data.fetch("direction") == direction }
+    return [] unless started
+
     event_store.read_grouped(
-      streams.candidate_impact_pair_scan(scan_id),
+      streams.candidate_impact_pair_scan(started.stream.stream_id),
       Coordinator::Write::EventQueries::CANDIDATE_IMPACT_PAIR_SCAN_STATE
     )
   end

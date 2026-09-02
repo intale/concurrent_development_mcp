@@ -21,7 +21,6 @@ module Coordinator::Write
         built_assets = built_assets.sort_by { _1.path.b }.freeze
         document = RevisionDocumentV2.new(
           schema: RevisionDocumentV2::SCHEMA,
-          skill_id: identity.skill_id,
           name: identity.name,
           scope: identity.scope,
           description:,

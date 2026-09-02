@@ -1,0 +1,13 @@
+module Coordinator::Write
+  module Events
+    class MergeSnapshotCommitRegisteredV2 < Base
+      def registry_id: () -> String
+      def merge_snapshot_id: () -> String
+      def repository_id: () -> String
+      def object_format: () -> String
+      def merge_commit_oid: () -> String
+      def snapshot_event: () -> EventReference
+      def registered_at: () -> String
+    end
+  end
+end

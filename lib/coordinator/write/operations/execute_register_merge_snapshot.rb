@@ -18,6 +18,7 @@ module Coordinator::Write
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
         completion_builder: CommandCompletionBuilder.new,
+        natural_key_registry: NaturalKeys::Registry.new(event_store:),
         event_plan_contract: Contracts::MergeSnapshotRegistrationEventPlan.new
       )
         @event_store = event_store
@@ -32,6 +33,7 @@ module Coordinator::Write
         @schema_registry = schema_registry
         @stream_factory = stream_factory
         @completion_builder = completion_builder
+        @natural_key_registry = natural_key_registry
         @event_plan_contract = event_plan_contract
       end
 
@@ -69,7 +71,13 @@ module Coordinator::Write
         replay = replay_result(command:, input_digest: preparation.input_digest)
         return replay if replay
 
-        state = load_state(command, preparation.commit_identity)
+        commit_resolution = resolve_commit_identity(preparation.commit_identity)
+        return commit_resolution if commit_resolution.failure?
+
+        commit_identity, existing_commit = commit_resolution.value!
+        preparation = preparation.with_commit_identity(commit_identity)
+
+        state = load_state(command, existing_commit:)
         snapshot_event = future_snapshot_reference(command, preparation.snapshot_event_id)
         decision = @decider.call(
           state:,
@@ -94,16 +102,57 @@ module Coordinator::Write
         Success(completion)
       end
 
-      def load_state(command, commit_identity)
+      def resolve_commit_identity(proposed)
+        result = @natural_key_registry.find(
+          selector: NaturalKeys::Registry::SelectorV1.new(
+            stream_context: "DevelopmentIntegration",
+            stream_name: "MergeSnapshotCommit",
+            event_type: "MergeSnapshotCommitRegistered",
+            marker: proposed.marker
+          ),
+          identity_from: ->(event) { merge_commit_identity_from(event, proposed) }
+        )
+        return registry_failure(result.failure) if result.failure?
+        return Success([ proposed, nil ]) unless result.value!
+
+        persisted = result.value!
+        identity = MergeSnapshots::CommitIdentityV1.new(
+          document: proposed.document,
+          registry_id: persisted.identity,
+          marker: proposed.marker
+        )
+        Success([ identity, event_reference(persisted.event) ])
+      end
+
+      def merge_commit_identity_from(event, proposed)
+        registration = load_event(event)
+        return unless registration.is_a?(Events::MergeSnapshotCommitRegisteredV2)
+        return unless [ registration.repository_id, registration.object_format, registration.merge_commit_oid ] ==
+                      [ proposed.document.repository_id, proposed.document.object_format, proposed.document.merge_commit_oid ]
+
+        registration.registry_id
+      rescue EventSchemaRegistry::UnknownSchema, EventSchemaRegistry::SchemaMismatch,
+             Dry::Struct::Error, KeyError, ArgumentError
+        nil
+      end
+
+      def registry_failure(error)
+        Failure(
+          OutcomeError.new(
+            code: :merge_snapshot_commit_registry_invalid,
+            message: error.message,
+            details: error.to_h
+          )
+        )
+      end
+
+      def load_state(command, existing_commit:)
         Domain::MergeSnapshots::RegistrationState.new(
           existing_snapshot: existing_reference(
             @stream_factory.merge_snapshot(command.merge_snapshot_id),
             EventQueries::MERGE_SNAPSHOT_REGISTRATION
           ),
-          existing_commit: existing_reference(
-            @stream_factory.merge_snapshot_commit(commit_identity.registry_id),
-            EventQueries::MERGE_SNAPSHOT_COMMIT_REGISTRATION
-          ),
+          existing_commit:,
           candidates: command.ordered_candidates.map { @candidate_loader.call(_1) }
         )
       end

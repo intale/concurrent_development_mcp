@@ -17,6 +17,7 @@ module Coordinator::Write
         publication_loader: Skills::PersistedPublicationLoader.new(schema_registry:),
         stream_factory: StreamFactory.new,
         marker_builder: Skills::MarkerBuilder.new,
+        natural_key_registry: NaturalKeys::Registry.new(event_store:),
         completion_builder: CommandCompletionBuilder.new
       )
         @event_store = event_store
@@ -30,6 +31,7 @@ module Coordinator::Write
         @publication_loader = publication_loader
         @stream_factory = stream_factory
         @marker_builder = marker_builder
+        @natural_key_registry = natural_key_registry
         @completion_builder = completion_builder
       end
 
@@ -59,6 +61,11 @@ module Coordinator::Write
       def execute_attempt(command:, preparation:, caused_by:)
         replay = replay_result(command:, input_digest: preparation.input_digest)
         return replay if replay
+
+        resolved = resolve_skill(command)
+        return resolved if resolved.failure?
+
+        command = resolved.value!
 
         state_result = load_skill_state(command.skill_id)
         return state_result if state_result.failure?
@@ -94,6 +101,58 @@ module Coordinator::Write
         )
 
         Success(completion)
+      end
+
+      def resolve_skill(command)
+        result = @natural_key_registry.find(
+          selector: NaturalKeys::Registry::SelectorV1.new(
+            stream_context: "AgentKnowledge",
+            stream_name: "Skill",
+            event_type: "SkillRevisionPublished",
+            marker: @marker_builder.natural_key(name: command.name, scope: command.scope)
+          ),
+          identity_from: ->(event) { skill_identity_from(event, command) }
+        )
+        return registry_failure(result.failure) if result.failure?
+        return Success(command) unless result.value!
+
+        Success(with_skill_id(command, result.value!.identity))
+      end
+
+      def skill_identity_from(event, command)
+        publication = load_event(event)
+        return unless publication.is_a?(Events::SkillRevisionPublishedV2)
+        return unless publication.revision == 1 && publication.name == command.name && publication.scope == command.scope
+
+        publication.skill_id
+      rescue EventSchemaRegistry::UnknownSchema, EventSchemaRegistry::SchemaMismatch,
+             Dry::Struct::Error, KeyError, ArgumentError
+        nil
+      end
+
+      def with_skill_id(command, skill_id)
+        Commands::PublishSkillRevision.new(
+          command_id: command.command_id,
+          actor: command.actor,
+          skill_id:,
+          name: command.name,
+          scope: command.scope,
+          expected_revision: command.expected_revision,
+          description: command.description,
+          instructions: command.instructions,
+          assets: command.assets,
+          content_digest: command.content_digest
+        )
+      end
+
+      def registry_failure(error)
+        Failure(
+          OutcomeError.new(
+            code: :skill_identity_registry_invalid,
+            message: error.message,
+            details: error.to_h
+          )
+        )
       end
 
       def replay_result(command:, input_digest:)
@@ -158,11 +217,16 @@ module Coordinator::Write
           name: command.name,
           scope: command.scope
         )
+        publication = plan.writes.first.event
         persisted = @event_factory.build!(
-          event: plan.writes.first.event,
+          event: publication,
           event_id:,
           metadata: command_metadata(command),
-          markers: @marker_builder.call(identity:, command_id: command.command_id),
+          markers: @marker_builder.call(
+            identity:,
+            command_id: command.command_id,
+            register_natural_key: publication.revision == 1
+          ),
           caused_by:
         )
         @event_store.append(expected_stream, [ persisted ])

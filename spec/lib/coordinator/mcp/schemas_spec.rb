@@ -67,7 +67,7 @@ RSpec.describe Coordinator::Mcp::Schemas do
     end
   end
 
-  it "reserves the internal command namespace in every public mutation schema" do
+  it "reserves internal labels and coordinator-owned UUIDv7 identities in every public mutation schema" do
     mutation_tools = Coordinator::Mcp::ToolRegistry.all.select do |tool|
       tool < Coordinator::Mcp::MutationTool
     end
@@ -80,6 +80,7 @@ RSpec.describe Coordinator::Mcp::Schemas do
         pattern = Regexp.new(schema.fetch(:pattern))
         expect("cmd-public").to match(pattern), tool.tool_name
         expect("internal:lease-expiry:v1:client-supplied").not_to match(pattern), tool.tool_name
+        expect("0198c000-0000-7000-8000-000000000001").not_to match(pattern), tool.tool_name
       end
     end
   end

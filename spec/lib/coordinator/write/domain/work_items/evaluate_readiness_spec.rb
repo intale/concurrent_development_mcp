@@ -150,7 +150,7 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::EvaluateReadiness do
         components: document.component_markers
       )
     )
-    command_id = "readiness-v1:#{marker.digest.delete_prefix("sha256:")}"
+    command_id = SecureRandom.uuid_v7
 
     Coordinator::Write::Commands::EvaluateWorkItemReadiness.new(
       command_id:,

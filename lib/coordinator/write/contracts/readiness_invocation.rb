@@ -3,6 +3,8 @@
 module Coordinator::Write
   module Contracts
     class ReadinessInvocation < Dry::Validation::Contract
+      include ProcessStepCausation
+
       params do
         required(:invocation).value(Types.Instance(Coordinator::Write::ReadinessInvocation))
       end
@@ -21,6 +23,9 @@ module Coordinator::Write
         key.failure("decision policy must match the command") unless identity.policy_version == command.policy_version
         unless command.command_id == command.readiness_decision_id
           key.failure("command and readiness decision identities must match")
+        end
+        unless process_step_matches?(value.caused_by, command_id: command.command_id)
+          key.failure("causal parent must be the ProcessStep that allocated the readiness command")
         end
       end
     end

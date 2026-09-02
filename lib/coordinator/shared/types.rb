@@ -5,8 +5,8 @@ module Coordinator::Shared
     include Dry.Types()
 
     IDENTIFIER_PATTERN = /\A[A-Za-z0-9][A-Za-z0-9._:-]{0,199}\z/
-    PUBLIC_COMMAND_ID_PATTERN = /\A(?!internal:)[A-Za-z0-9][A-Za-z0-9._:-]{0,199}\z/
-    INTERNAL_COMMAND_ID_PATTERN = /\Ainternal:[A-Za-z0-9][A-Za-z0-9._:-]{0,190}\z/
+    PUBLIC_COMMAND_ID_PATTERN =
+      /\A(?!(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\z)(?!internal:)[A-Za-z0-9][A-Za-z0-9._:-]{0,199}\z/
     GIT_OID_PATTERN = /\A(?:[0-9a-f]{40}|[0-9a-f]{64})\z/
     SHA256_DIGEST_PATTERN = /\Asha256:[0-9a-f]{64}\z/
     TIMESTAMP_PATTERN = /\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z\z/
@@ -17,11 +17,11 @@ module Coordinator::Shared
     MARKER_PURPOSE_PATTERN = /\A[a-z][a-z0-9-]{0,63}\z/
     MARKER_DIMENSION_PATTERN = /\A[a-z][a-z0-9-]{0,63}\z/
     MARKER_COMPONENT_PATTERN = /\A(?!compound:)[^\u0000\r\n]{1,512}\z/
-    SKILL_ID_PATTERN = /\Askill:v1:[0-9a-f]{64}\z/
     SKILL_MEDIA_TYPE_PATTERN = /\A[\x21-\x7e]{1,255}\z/
-    DEVELOPMENT_ARTIFACT_ID_PATTERN = /\Aartifact:v1:[0-9a-f]{64}\z/
-    DEVELOPMENT_ARTIFACT_OBSERVATION_ID_PATTERN = /\Aartifact-observation:v1:[0-9a-f]{64}\z/
-    DEVELOPMENT_ARTIFACT_RELATION_ID_PATTERN = /\Aartifact-relation:v1:[0-9a-f]{64}\z/
+    SKILL_ID_PATTERN = UUID_V7_PATTERN
+    DEVELOPMENT_ARTIFACT_ID_PATTERN = UUID_V7_PATTERN
+    DEVELOPMENT_ARTIFACT_OBSERVATION_ID_PATTERN = UUID_V7_PATTERN
+    DEVELOPMENT_ARTIFACT_RELATION_ID_PATTERN = UUID_V7_PATTERN
 
     COMPOUND_MARKER_MAXIMUM_BYTES = 2_048
     COMPOUND_MARKER_MAXIMUM_COMPONENTS = 32
@@ -322,7 +322,10 @@ module Coordinator::Shared
     CANDIDATE_COMPATIBILITY_OBLIGATION_RULE_VERSIONS = %w[
       candidate-compatibility-obligation/v1
     ].freeze
-    CANDIDATE_IMPACT_INDEX_POLICY_VERSIONS = %w[candidate-impact-bucket-index/v1].freeze
+    CANDIDATE_IMPACT_INDEX_POLICY_VERSIONS = %w[
+      candidate-impact-bucket-index/v1
+      candidate-impact-exact-index/v2
+    ].freeze
     CANDIDATE_IMPACT_REGISTRY_SWEEP_RULE_VERSIONS = %w[candidate-impact-registry-sweep/v1].freeze
     CANDIDATE_IMPACT_PAIR_SCAN_RULE_VERSIONS = %w[candidate-impact-pair-scan/v1].freeze
     CANDIDATE_IMPACT_SCAN_STATUSES = %w[absent running skipped completed].freeze
@@ -504,7 +507,6 @@ module Coordinator::Shared
     ].freeze
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)
     PublicCommandId = String.constrained(format: PUBLIC_COMMAND_ID_PATTERN)
-    InternalCommandId = String.constrained(format: INTERNAL_COMMAND_ID_PATTERN)
     RepositoryId = String.constrained(format: REPOSITORY_ID_PATTERN)
     GitOid = String.constrained(format: GIT_OID_PATTERN)
     GitObjectFormat = String.enum(*GIT_OBJECT_FORMATS)
@@ -524,7 +526,7 @@ module Coordinator::Shared
     ExpandedWriteSetSize = Integer.constrained(gteq: 2, lteq: 32)
     FencingToken = Integer.constrained(gteq: 1)
     CoordinationToolName = Identifier
-    SkillId = String.constrained(format: SKILL_ID_PATTERN)
+    SkillId = UuidV7
     SkillName = String.constrained(min_size: 1, max_size: SKILL_NAME_MAXIMUM_BYTES)
     SkillScope = String.constrained(min_size: 1, max_size: SKILL_SCOPE_MAXIMUM_BYTES)
     SkillDescription = String.constrained(max_size: SKILL_DESCRIPTION_MAXIMUM_BYTES)
@@ -535,11 +537,9 @@ module Coordinator::Shared
     SkillAssetMediaType = String.constrained(format: SKILL_MEDIA_TYPE_PATTERN)
     SkillAssetContentBase64 = String.constrained(max_size: SKILL_ASSET_BASE64_MAXIMUM_BYTES)
     SkillAssetByteSize = Integer.constrained(gteq: 0, lteq: SKILL_ASSET_MAXIMUM_BYTES)
-    DevelopmentArtifactId = String.constrained(format: DEVELOPMENT_ARTIFACT_ID_PATTERN)
-    DevelopmentArtifactObservationId = String.constrained(
-      format: DEVELOPMENT_ARTIFACT_OBSERVATION_ID_PATTERN
-    )
-    DevelopmentArtifactRelationId = String.constrained(format: DEVELOPMENT_ARTIFACT_RELATION_ID_PATTERN)
+    DevelopmentArtifactId = UuidV7
+    DevelopmentArtifactObservationId = UuidV7
+    DevelopmentArtifactRelationId = UuidV7
     DevelopmentArtifactScope = String.constrained(
       min_size: 1,
       max_size: DEVELOPMENT_ARTIFACT_SCOPE_MAXIMUM_BYTES

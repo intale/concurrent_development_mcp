@@ -67,14 +67,13 @@ module SkillRepositoryAcceptanceWorld
   end
 
   def skill_events(name:, scope:)
-    identity = Coordinator::Write::Skills::IdentityBuilder.new.call(name:, scope:)
-    event_store.read(
-      streams.skill(identity.skill_id),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "SkillRevisionPublished" ],
-        maximum_count: 100,
-        direction: :asc
-      )
+    marker = Coordinator::Write::Skills::MarkerBuilder.new.natural_key(name:, scope:)
+    read_global_marked_events(
+      stream_context: "AgentKnowledge",
+      stream_name: "Skill",
+      event_types: [ "SkillRevisionPublished" ],
+      marker:,
+      maximum_count: 100
     )
   end
 

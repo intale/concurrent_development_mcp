@@ -46,6 +46,7 @@ RSpec.describe "DEC-02A MCP Decision correction" do
 
     execute_task(task_id)
     completed = task_request("tasks/get", task_id, id: 2)
+    expect(completed["error"]).to be_nil, completed.inspect
     result = completed.dig("result", "result", "structuredContent")
     expect(completed.dig("result", "status")).to eq("completed")
     expect(completed.dig("result", "result", "isError")).to be(false)
@@ -268,7 +269,14 @@ RSpec.describe "DEC-02A MCP Decision correction" do
   end
 
   def task_request(method, task_id, id:)
-    mcp_request(id:, method:, name: task_id, params: { taskId: task_id })
+    collector = ReportedErrorCollector.new
+    Rails.error.subscribe(collector)
+    response = mcp_request(id:, method:, name: task_id, params: { taskId: task_id })
+    raise collector.errors.first if collector.errors.any?
+
+    response
+  ensure
+    Rails.error.unsubscribe(collector) if collector
   end
 
   def mcp_request(id:, method:, params:, name:)
@@ -301,7 +309,12 @@ RSpec.describe "DEC-02A MCP Decision correction" do
 
   def execute_task(task_id)
     submitted = task_events(task_id).find { _1.type == "CoordinationTaskSubmitted" }
+    collector = ReportedErrorCollector.new
+    Rails.error.subscribe(collector)
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
+    raise collector.errors.first if collector.errors.any?
+  ensure
+    Rails.error.unsubscribe(collector) if collector
   end
 
   def task_events(task_id)

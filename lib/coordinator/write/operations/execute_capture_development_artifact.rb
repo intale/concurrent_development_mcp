@@ -17,6 +17,7 @@ module Coordinator::Write
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
         marker_builder: DevelopmentArtifacts::MarkerBuilder.new,
+        natural_key_registry: NaturalKeys::Registry.new(event_store:),
         completion_builder: CommandCompletionBuilder.new
       )
         @event_store = event_store
@@ -30,6 +31,7 @@ module Coordinator::Write
         @schema_registry = schema_registry
         @stream_factory = stream_factory
         @marker_builder = marker_builder
+        @natural_key_registry = natural_key_registry
         @completion_builder = completion_builder
       end
 
@@ -61,6 +63,11 @@ module Coordinator::Write
         replay = replay_result(command:, input_digest: preparation.input_digest)
         return replay if replay
 
+        resolved = resolve_artifact(command)
+        return resolved if resolved.failure?
+
+        command = resolved.value!
+
         decision_result = @decider.call(
           state: @loader.load(command.artifact.artifact_id),
           observation_state: @loader.load_observation(command.observation.observation_id),
@@ -91,6 +98,60 @@ module Coordinator::Write
         )
 
         Success(completion)
+      end
+
+      def resolve_artifact(command)
+        artifact = command.artifact
+        result = @natural_key_registry.find(
+          selector: NaturalKeys::Registry::SelectorV1.new(
+            stream_context: "DevelopmentMemory",
+            stream_name: "DevelopmentArtifact",
+            event_type: "DevelopmentArtifactCaptured",
+            marker: @marker_builder.natural_key(artifact)
+          ),
+          identity_from: ->(event) { artifact_identity_from(event, artifact) }
+        )
+        return registry_failure(result.failure) if result.failure?
+        return Success(command) unless result.value!
+
+        Success(with_artifact_id(command, result.value!.identity))
+      end
+
+      def artifact_identity_from(event, expected)
+        payload = load_event(event)
+        return unless payload.is_a?(Events::DevelopmentArtifactCapturedV2)
+
+        artifact = payload.artifact
+        return unless [ artifact.scope, artifact.source.kind, artifact.source.locator ] ==
+                      [ expected.scope, expected.source.kind, expected.source.locator ]
+
+        artifact.artifact_id
+      rescue EventSchemaRegistry::UnknownSchema, EventSchemaRegistry::SchemaMismatch,
+             Dry::Struct::Error, KeyError, ArgumentError
+        nil
+      end
+
+      def with_artifact_id(command, artifact_id)
+        artifact = DevelopmentArtifacts::ArtifactV2.new(command.artifact.to_h.merge(artifact_id:))
+        observation = DevelopmentArtifacts::ArtifactObservationV1.new(
+          command.observation.to_h.merge(artifact_id:)
+        )
+        Commands::CaptureDevelopmentArtifact.new(
+          command_id: command.command_id,
+          actor: command.actor,
+          artifact:,
+          observation:
+        )
+      end
+
+      def registry_failure(error)
+        Failure(
+          OutcomeError.new(
+            code: :development_artifact_identity_registry_invalid,
+            message: error.message,
+            details: error.to_h
+          )
+        )
       end
 
       def replay_result(command:, input_digest:)

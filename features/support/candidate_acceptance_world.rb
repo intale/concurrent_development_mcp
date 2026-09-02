@@ -191,9 +191,12 @@ module CandidateAcceptanceWorld
       object_format: "sha1",
       head_commit_oid:
     )
-    event_store.read(
-      streams.candidate_head(identity.registry_id),
-      Coordinator::Write::EventQueries::CANDIDATE_HEAD_REGISTRATION
+    read_global_marked_events(
+      stream_context: "DevelopmentIntegration",
+      stream_name: "CandidateHead",
+      event_types: [ "CandidateHeadRegistered" ],
+      marker: identity.marker,
+      maximum_count: 1
     )
   end
 

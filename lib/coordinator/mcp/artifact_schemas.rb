@@ -611,15 +611,15 @@ module Coordinator::Mcp
     end
 
     def artifact_id
-      { type: "string", pattern: "^artifact:v1:[0-9a-f]{64}$" }
+      uuid_v7
     end
 
     def observation_id
-      { type: "string", pattern: "^artifact-observation:v1:[0-9a-f]{64}$" }
+      uuid_v7
     end
 
     def relation_id
-      { type: "string", pattern: "^artifact-relation:v1:[0-9a-f]{64}$" }
+      uuid_v7
     end
 
     def artifact_byte_size

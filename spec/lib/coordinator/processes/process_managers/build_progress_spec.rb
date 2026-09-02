@@ -28,7 +28,15 @@ RSpec.describe Coordinator::Processes::ProcessManagers::BuildProgress, :event_st
       "required_output" => { "kind" => "artifact", "key" => "billing-gem" }
     )
     expect(readiness.data).to include("reason" => "dependencies_satisfied")
-    expect([ satisfaction.causation_id, readiness.causation_id ]).to eq([ source.id, source.id ])
+    step = ProcessStepExamples.event(
+      event_store:,
+      source_event: source,
+      process_name: "build-progress",
+      step_name: "satisfy-work-item-dependency",
+      subject_kind: "work-item-dependency",
+      subject_id: satisfaction.data.fetch("dependency_id")
+    )
+    expect([ satisfaction.causation_id, readiness.causation_id ]).to eq([ step.id, step.id ])
     expect([ satisfaction, readiness ].map(&:correlation_id).uniq).to eq([ source.correlation_id ])
     expect(satisfaction.metadata).not_to have_key("correlation_id")
 
@@ -37,7 +45,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::BuildProgress, :event_st
       streams.command(command_id),
       Coordinator::Write::EventQueries::COMMAND_COMPLETION
     ).sole
-    expect(command_completion.causation_id).to eq(source.id)
+    expect(command_completion.causation_id).to eq(step.id)
     expect(command_completion.correlation_id).to eq(source.correlation_id)
   end
 
@@ -162,7 +170,15 @@ RSpec.describe Coordinator::Processes::ProcessManagers::BuildProgress, :event_st
       completed.dig(:input, :work_item_id)
     ])
     expect(payload.release_set_completion_event).to be_nil
-    expect(completion.causation_id).to eq(source.id)
+    step = ProcessStepExamples.event(
+      event_store:,
+      source_event: source,
+      process_name: "build-progress",
+      step_name: "complete-change-set",
+      subject_kind: "change-set",
+      subject_id: completed.dig(:input, :change_set_id)
+    )
+    expect(completion.causation_id).to eq(step.id)
     expect(completion.correlation_id).to eq(source.correlation_id)
   end
 

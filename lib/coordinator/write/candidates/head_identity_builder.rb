@@ -4,10 +4,10 @@ module Coordinator::Write
   module Candidates
     class HeadIdentityBuilder
       def initialize(
-        canonical_json: CanonicalJson.new,
+        id_generator: IdGenerator.new,
         compound_marker_builder: CompoundMarkerBuilder.new
       )
-        @canonical_json = canonical_json
+        @id_generator = id_generator
         @compound_marker_builder = compound_marker_builder
       end
 
@@ -31,7 +31,7 @@ module Coordinator::Write
 
         HeadIdentityV1.new(
           document:,
-          registry_id: @canonical_json.sha256(document.to_h),
+          registry_id: @id_generator.uuid_v7,
           marker: marker.marker
         )
       end

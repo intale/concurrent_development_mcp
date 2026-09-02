@@ -9,7 +9,7 @@ module Coordinator::Write
 
       def call(scope:, title:, kind:, labels:, content:, source:)
         ArtifactV2.new(
-          artifact_id: @identity_builder.call(content:),
+          artifact_id: @identity_builder.call,
           scope:,
           title:,
           kind:,

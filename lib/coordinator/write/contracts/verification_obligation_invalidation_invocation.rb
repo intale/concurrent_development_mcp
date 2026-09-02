@@ -3,17 +3,19 @@
 module Coordinator::Write
   module Contracts
     class VerificationObligationInvalidationInvocation < Dry::Validation::Contract
+      include ProcessStepCausation
+
       params do
         required(:invocation).value(Types.Instance(Coordinator::Write::VerificationObligationInvalidationInvocation))
-        required(:expected_identity).filled(:string)
       end
 
-      rule(:invocation, :expected_identity) do
+      rule(:invocation) do
         invocation = values[:invocation]
         command = invocation.command
         failures = []
         failures << "causation event must match its exact reference" unless physical_reference(invocation.caused_by_event) == invocation.caused_by_reference
-        failures << "command and canonical identities must match" unless command.command_id == values[:expected_identity]
+        failures << "command ID must be UUIDv7" unless Types::UUID_V7_PATTERN.match?(command.command_id)
+        failures << "causal parent must be the ProcessStep that allocated the invalidation command" unless process_step_matches?(invocation.caused_by_event, command_id: command.command_id)
         failures << "actor must be the validity policy" unless command.actor.kind == "system" && command.actor.id == "verification-obligation-validity-policy"
         failures << "obligation stream identity must match" unless obligation_reference?(command)
         failures.each { key(:invocation).failure(_1) }

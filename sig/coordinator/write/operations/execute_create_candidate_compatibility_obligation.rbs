@@ -6,7 +6,7 @@ module Coordinator::Write
         ?candidate_loader: Coordinator::Write::CandidateObligations::CandidateEvidenceLoader,
         ?policy_loader: Coordinator::Write::CandidateObligations::ImpactPolicyLoader,
         ?obligation_loader: Coordinator::Write::CandidateObligations::ObligationLoader,
-        ?identity_builder: Coordinator::Write::CandidateObligations::IdentityBuilder,
+        ?natural_key_builder: Coordinator::Write::CandidateObligations::NaturalKeyBuilder,
         ?decider: Coordinator::Write::Domain::CandidateObligations::Create,
         ?clock: Coordinator::Shared::_Clock,
         ?id_generator: Coordinator::Shared::_IdGenerator,

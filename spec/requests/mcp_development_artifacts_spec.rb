@@ -180,7 +180,7 @@ RSpec.describe "ART-01 MCP Development Artifacts" do
       "type" => "DevelopmentArtifactClassificationCorrected",
       "stream_context" => "DevelopmentMemory",
       "stream_name" => "DevelopmentArtifactObservation",
-      "stream_id" => "artifact-observation:v1:#{'c' * 64}",
+      "stream_id" => SecureRandom.uuid_v7,
       "stream_revision" => 1
     }
     observation = create(

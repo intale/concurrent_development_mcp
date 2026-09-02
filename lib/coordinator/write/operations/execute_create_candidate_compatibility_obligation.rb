@@ -10,7 +10,7 @@ module Coordinator::Write
         candidate_loader: CandidateObligations::CandidateEvidenceLoader.new(event_store:),
         policy_loader: CandidateObligations::ImpactPolicyLoader.new(event_store:),
         obligation_loader: CandidateObligations::ObligationLoader.new(event_store:),
-        identity_builder: CandidateObligations::IdentityBuilder.new,
+        natural_key_builder: CandidateObligations::NaturalKeyBuilder.new,
         decider: Domain::CandidateObligations::Create.new,
         clock: SystemClock.new,
         id_generator: IdGenerator.new,
@@ -24,7 +24,7 @@ module Coordinator::Write
         @candidate_loader = candidate_loader
         @policy_loader = policy_loader
         @obligation_loader = obligation_loader
-        @identity_builder = identity_builder
+        @natural_key_builder = natural_key_builder
         @decider = decider
         @clock = clock
         @id_generator = id_generator
@@ -53,26 +53,29 @@ module Coordinator::Write
         command = invocation.command
         source = @candidate_loader.call(command.source_registration)
         target = @candidate_loader.call(command.target_registration)
-        identity = @identity_builder.call(
+        natural_key = @natural_key_builder.call(
           source:,
           target:,
           policy_partition_event: command.policy_partition_event,
           policy_head: command.policy_head,
           rule_version: command.rule_version
         )
-        verify_command!(command, source:, target:, identity:)
+        verify_command!(command, source:, target:, natural_key:)
+        existing = @obligation_loader.find(natural_key)
+        if existing
+          return Success(result("replayed", existing.payload.obligation_id, existing.reference))
+        end
         policy = @policy_loader.call(
           policy_partition_event: command.policy_partition_event,
           policy_head: command.policy_head,
           change_set_id: source.subject.change_set_id,
           observed_at: preparation.created_at
         )
-        existing = @obligation_loader.call(identity) if policy.status == "gating"
         state = Domain::CandidateObligations::State.new(
           source:,
           target:,
           policy:,
-          existing: existing&.payload
+          existing: nil
         )
         decision = @decider.call(
           state:,
@@ -86,11 +89,12 @@ module Coordinator::Write
           command:,
           invocation:,
           preparation:,
-          existing:
+          existing:,
+          natural_key:
         )
       end
 
-      def result_for(decision:, state:, command:, invocation:, preparation:, existing:)
+      def result_for(decision:, state:, command:, invocation:, preparation:, existing:, natural_key:)
         case decision.outcome
         when "created"
           event = persist_creation(
@@ -98,7 +102,8 @@ module Coordinator::Write
             state:,
             command:,
             invocation:,
-            preparation:
+            preparation:,
+            natural_key:
           )
           Success(result(decision.outcome, command.obligation_id, event_reference(event)))
         when "replayed"
@@ -108,7 +113,7 @@ module Coordinator::Write
         end
       end
 
-      def persist_creation(decision:, state:, command:, invocation:, preparation:)
+      def persist_creation(decision:, state:, command:, invocation:, preparation:, natural_key:)
         plan = decision.plan
         verify_event_plan!(
           plan,
@@ -120,7 +125,7 @@ module Coordinator::Write
           event: decision.obligation,
           event_id: preparation.obligation_event_id,
           metadata: event_metadata(command),
-          markers: event_markers(decision.obligation, command),
+          markers: event_markers(decision.obligation, command, natural_key),
           caused_by: invocation.caused_by
         )
         @event_store.append(plan.writes.sole.stream, [ physical ]).sole
@@ -135,12 +140,12 @@ module Coordinator::Write
               "#{validation.errors.to_h.inspect}"
       end
 
-      def verify_command!(command, source:, target:, identity:)
+      def verify_command!(command, source:, target:, natural_key:)
         validation = @command_contract.call(
           command:,
           source:,
           target:,
-          expected_identity: identity
+          natural_key:
         )
         return if validation.success?
 
@@ -168,7 +173,7 @@ module Coordinator::Write
         )
       end
 
-      def event_markers(obligation, command)
+      def event_markers(obligation, command, natural_key)
         source = obligation.source_candidate
         target = obligation.target_candidate
         [
@@ -186,7 +191,8 @@ module Coordinator::Write
           "repository:#{target.repository_id}",
           "enforcement:#{obligation.enforcement}",
           "decision:#{obligation.policy.head.decision_id}",
-          "command:#{command.command_id}"
+          "command:#{command.command_id}",
+          natural_key.marker
         ].freeze
       end
 

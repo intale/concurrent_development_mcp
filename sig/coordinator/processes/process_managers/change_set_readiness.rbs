@@ -9,6 +9,7 @@ module Coordinator
           ?source_builder: ChangeSetActivationSourceBuilder,
           ?targets_builder: ReadinessTargetsBuilder,
           ?command_builder: ReadinessCommandBuilder,
+          ?process_step_planner: Coordinator::Processes::ProcessStepPlanner,
           ?operation: Write::Operations::ExecuteEvaluateWorkItemReadiness,
           ?schema_registry: Write::EventSchemaRegistry,
           ?stream_factory: Write::StreamFactory

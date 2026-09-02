@@ -112,7 +112,7 @@ module Coordinator::Write
           event_id: prepared.event_id,
           metadata: event_metadata(invocation),
           markers: event_markers(command, repository_id:),
-          caused_by: invocation.source_event
+          caused_by: invocation.caused_by
         )
 
         @event_store.append(write.stream, [ event ]).sole

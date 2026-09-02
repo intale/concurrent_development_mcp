@@ -50,14 +50,14 @@ RSpec.describe Coordinator::Shared::Contracts::SubscriptionSetRegistrations do
       stream_context: "CoordinatorControl",
       stream_name: "CoordinationTask",
       event_types: [ "CoordinationTaskSubmitted" ],
-      event_markers: [ "task-execution-lane:v1:1" ]
+      event_markers: [ "task-execution-lane:v2:1" ]
     )
 
     expect(definition.options).to eq(
       filter: {
         streams: [ { context: "CoordinatorControl", stream_name: "CoordinationTask" } ],
         event_types: [
-          { type: "CoordinationTaskSubmitted", markers: [ "task-execution-lane:v1:1" ] }
+          { type: "CoordinationTaskSubmitted", markers: [ "task-execution-lane:v2:1" ] }
         ]
       }
     )

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 RSpec.describe Coordinator::Processes::LeaseExpiryCommandBuilder do
-  it "derives one deterministic system command from a schema-v2 parent event" do
+  it "builds the system command with the persisted process-step command identity" do
     payload = ResourceLeaseExamples.acquisition
     event = PgEventstore::Event.new(
       id: "06919191-9191-7191-8191-919191919191",
@@ -20,9 +20,11 @@ RSpec.describe Coordinator::Processes::LeaseExpiryCommandBuilder do
       payload:
     )
 
-    command = described_class.new.call(source)
+    command_id = "06919191-9192-7191-8191-919191919191"
+    command = described_class.new.call(source, command_id:)
 
     expect(command).to have_attributes(
+      command_id:,
       actor: have_attributes(kind: "system", id: "lease-expiry-policy-v1"),
       resource_id: payload.resource_id,
       lease_id: payload.lease_id,
@@ -30,7 +32,6 @@ RSpec.describe Coordinator::Processes::LeaseExpiryCommandBuilder do
       fencing_token: payload.fencing_token,
       expected_expires_at: payload.expires_at
     )
-    expect(command.command_id).to start_with("internal:lease-expiry:v1:")
-    expect(described_class.new.call(source)).to eq(command)
+    expect(described_class.new.call(source, command_id:)).to eq(command)
   end
 end

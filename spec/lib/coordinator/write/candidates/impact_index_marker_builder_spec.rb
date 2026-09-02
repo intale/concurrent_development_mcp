@@ -3,16 +3,29 @@
 RSpec.describe Coordinator::Write::Candidates::ImpactIndexMarkerBuilder do
   subject(:builder) { described_class.new }
 
-  it "derives the frozen version-1 compound bucket markers" do
+  it "derives the exact readable version-2 compound bucket markers" do
     markers = builder.call(evidence:, surface:)
+    definitions = markers.map do |marker|
+      Coordinator::Shared::Markers::CodecV2.new.decode(marker).value!.definition
+    end
+    component_maps = definitions.map do |definition|
+      definition.components.to_h { [ _1.dimension, _1.value ] }
+    end
 
-    expect(markers).to eq([
-      "compound:candidate-impact-index:v1:sha256:53fbd53f3730517edcd37911a443c5e529491392a39db07342b583935fb5cb5b",
-      "compound:candidate-impact-index:v1:sha256:a9a69deab5c6a7b1d5cf382348fa32d35eb274b1c071f8c9b9be4ce7c7e7d7ac",
-      "compound:candidate-impact-index:v1:sha256:e3a21b6088a85288ef518da68be0bc5dc3ff6615a2d1217ff9f07b620f1ee77d",
-      "compound:candidate-impact-index:v1:sha256:b005e9c416b1208116f731009da03251680aff69094277e7c8db27693ca138a5",
-      "compound:candidate-impact-index:v1:sha256:a05c9eff9000ea9c540b7eb482bd459b96867d577c04c56e477f97b8165b6fa4"
-    ].sort_by(&:b))
+    expect(markers).to eq(markers.uniq.sort_by(&:b))
+    expect(markers).to all(start_with("compound:candidate-impact-index:v2|"))
+    expect(component_maps).to contain_exactly(
+      marker_components(role: "source", kind: "path", value: "Gemfile", repository: true),
+      marker_components(role: "target", kind: "path", value: "Gemfile", repository: true),
+      marker_components(
+        role: "target",
+        kind: "path",
+        value: "config/database.yml",
+        repository: true
+      ),
+      marker_components(role: "source", kind: "semantic", value: "dependency:rubygems:rails"),
+      marker_components(role: "target", kind: "semantic", value: "schema:orders")
+    )
   end
 
   it "derives reciprocal counterpart roles from the same exact evidence" do
@@ -37,6 +50,17 @@ RSpec.describe Coordinator::Write::Candidates::ImpactIndexMarkerBuilder do
       build_context:,
       build_context_event: reference("CandidateBuildContextCaptured", 2)
     )
+  end
+
+  def marker_components(role:, kind:, value:, repository: false)
+    components = {
+      "index-policy" => "candidate-impact-exact-index/v2",
+      "kind" => kind,
+      "role" => role,
+      "value" => value
+    }
+    components["repository"] = RepositoryScenario::DEFAULT_REPOSITORY_ID if repository
+    components
   end
 
   def submission

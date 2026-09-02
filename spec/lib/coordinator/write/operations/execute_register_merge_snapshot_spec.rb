@@ -111,9 +111,15 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRegisterMergeSnapshot, :ev
       object_format: "sha1",
       merge_commit_oid: oid
     )
-    event_store.read(
-      streams.merge_snapshot_commit(identity.registry_id),
-      Coordinator::Write::EventQueries::MERGE_SNAPSHOT_COMMIT_REGISTRATION
+    event_store.read_global_marked(
+      Coordinator::Write::GlobalMarkedEventReadCriteria.new(
+        stream_context: "DevelopmentIntegration",
+        stream_name: "MergeSnapshotCommit",
+        event_types: [ "MergeSnapshotCommitRegistered" ],
+        markers: [ identity.marker ],
+        maximum_count: 1,
+        direction: :asc
+      )
     )
   end
 

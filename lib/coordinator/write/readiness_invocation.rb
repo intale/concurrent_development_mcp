@@ -6,5 +6,6 @@ module Coordinator::Write
     attribute :source_event, Types.Instance(PgEventstore::Event)
     attribute :source_reference, Types.Instance(EventReference)
     attribute :source_change_set_id, Types::Identifier
+    attribute :caused_by, Types.Instance(PgEventstore::Event)
   end
 end

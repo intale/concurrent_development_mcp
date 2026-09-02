@@ -92,9 +92,19 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
       "OperationBatchCompleted"
     ])
     outcome = history.fetch(1)
-    expect(outcome.causation_id).to eq(created.id)
+    step = ProcessStepExamples.event(
+      event_store:,
+      source_event: created,
+      process_name: "operation-batch-runner",
+      step_name: "record-item-outcome",
+      subject_kind: "operation-batch-item",
+      subject_id: "#{command.batch_id}:0"
+    )
+    expect(outcome.causation_id).to eq(step.id)
     expect(history.map(&:correlation_id).uniq).to eq([ created.correlation_id ])
-    expect(history.drop(1).map { _1.metadata.fetch("command_id") }).to all(start_with("internal:"))
+    expect(history.drop(1).map { _1.metadata.fetch("command_id") }).to all(
+      match(Coordinator::Shared::Types::UUID_V7_PATTERN)
+    )
     expect(skill_events.length).to eq(1)
     expect(command_events(target.command_id).map(&:type)).to eq([ "CommandCompleted" ])
   end
@@ -145,11 +155,16 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
   end
 
   def skill_events
-    identity = Coordinator::Write::Skills::IdentityBuilder.new.call(name: "review", scope: "project:alpha")
-    event_store.read(
-      streams.skill(identity.skill_id),
-      Coordinator::Write::EventReadCriteria.new(
+    marker = Coordinator::Write::Skills::MarkerBuilder.new.natural_key(
+      name: "review",
+      scope: "project:alpha"
+    )
+    event_store.read_global_marked(
+      Coordinator::Write::GlobalMarkedEventReadCriteria.new(
+        stream_context: "AgentKnowledge",
+        stream_name: "Skill",
         event_types: [ "SkillRevisionPublished" ],
+        markers: [ marker ],
         maximum_count: 10,
         direction: :asc
       )

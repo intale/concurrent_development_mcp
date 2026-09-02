@@ -23,7 +23,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAdjudicateDecisionInterpre
       "message:M-1",
       "interpretation-lifecycle:I-1",
       "command:cmd-adjudication-1",
-      a_string_starting_with("compound:interpretation-slot:v1:sha256:")
+      a_string_starting_with("compound:interpretation-slot:v2|")
     )
     expect(accepted.data.fetch("proposal_event")).to include(
       "type" => "DecisionInterpretationProposed",

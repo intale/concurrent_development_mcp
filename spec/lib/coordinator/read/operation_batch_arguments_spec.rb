@@ -57,16 +57,16 @@ RSpec.describe Coordinator::Read::OperationBatchArguments do
     input = {
       command_id: "relation-command",
       actor: { kind: "agent", id: "agent-1" },
-      source_artifact_id: "artifact:v1:#{'a' * 64}",
+      source_artifact_id: "018f0f4d-4e45-7abc-8def-000000000171",
       relation: "references",
-      target: { kind: "artifact", id: "artifact:v1:#{'b' * 64}" },
+      target: { kind: "artifact", id: "018f0f4d-4e45-7abc-8def-000000000172" },
       attributes: {
         path: "docs/guide.md",
         fragment: "install",
         normalized_locator: "docs/guide.md"
       },
       supersedes: {
-        relation_id: "artifact-relation:v1:#{'c' * 64}",
+        relation_id: "018f0f4d-4e45-7abc-8def-000000000173",
         reason: "wrong link"
       }
     }

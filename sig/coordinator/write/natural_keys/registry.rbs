@@ -30,6 +30,10 @@ module Coordinator
           build_event: ^() -> PgEventstore::Event,
           identity_from: ^(PgEventstore::Event) -> String?
         ) -> Dry::Monads::Result
+        def find: (
+          selector: SelectorV1,
+          identity_from: ^(PgEventstore::Event) -> String?
+        ) -> Dry::Monads::Result
       end
     end
   end

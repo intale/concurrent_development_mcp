@@ -4,6 +4,7 @@ module Coordinator
       def initialize: (?canonical_json: Shared::CanonicalJson) -> void
       def call: (write_command command) -> String
       def document: (write_command command) -> CommandInputDocuments::digest_value
+      def canonical_document: (write_command command) -> CommandInputDocuments::canonical_digest_value
       def create_change_set: (Commands::CreateChangeSet command) -> String
       def create_change_set_document: (Commands::CreateChangeSet command) -> CommandInputDocuments::CreateChangeSetV1
       def work_item_create: (Commands::CreateWorkItem command) -> String
@@ -42,12 +43,15 @@ module Coordinator
       def candidate_submit_document: (Commands::SubmitCandidate command) -> CommandInputDocuments::SubmitCandidateV1
       def skill_publish: (Commands::PublishSkillRevision command) -> String
       def skill_publish_document: (Commands::PublishSkillRevision command) -> CommandInputDocuments::PublishSkillRevisionV2
+      def skill_publish_canonical_document: (Commands::PublishSkillRevision command) -> CommandInputDocuments::PublishSkillRevisionCanonicalV2
       def development_artifact_capture: (Commands::CaptureDevelopmentArtifact command) -> String
       def development_artifact_capture_document: (Commands::CaptureDevelopmentArtifact command) -> CommandInputDocuments::CaptureDevelopmentArtifactV2
+      def development_artifact_capture_canonical_document: (Commands::CaptureDevelopmentArtifact command) -> CommandInputDocuments::CaptureDevelopmentArtifactCanonicalV2
       def development_artifact_classification_correct: (Commands::CorrectDevelopmentArtifactClassification command) -> String
       def development_artifact_classification_correct_document: (Commands::CorrectDevelopmentArtifactClassification command) -> CommandInputDocuments::CorrectDevelopmentArtifactClassificationV1
       def development_artifact_relation_declare: (Commands::DeclareDevelopmentArtifactRelation command) -> String
       def development_artifact_relation_declare_document: (Commands::DeclareDevelopmentArtifactRelation command) -> CommandInputDocuments::DeclareDevelopmentArtifactRelationV1
+      def development_artifact_relation_declare_canonical_document: (Commands::DeclareDevelopmentArtifactRelation command) -> CommandInputDocuments::DeclareDevelopmentArtifactRelationCanonicalV1
       def operation_batch_create: (Commands::CreateOperationBatch command) -> String
       def operation_batch_create_document: (Commands::CreateOperationBatch command) -> CommandInputDocuments::CreateOperationBatchV1
       def operation_batch_cancel: (Commands::CancelOperationBatch command) -> String

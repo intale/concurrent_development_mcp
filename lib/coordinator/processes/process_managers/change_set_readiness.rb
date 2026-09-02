@@ -15,6 +15,7 @@ module Coordinator::Processes
         source_builder: ChangeSetActivationSourceBuilder.new,
         targets_builder: ReadinessTargetsBuilder.new,
         command_builder: ReadinessCommandBuilder.new,
+        process_step_planner: Coordinator::Processes::ProcessStepPlanner.new(event_store:),
         operation: Coordinator::Write::Operations::ExecuteEvaluateWorkItemReadiness.new(event_store:),
         schema_registry: Coordinator::Write::EventSchemaRegistry.new,
         stream_factory: Coordinator::Write::StreamFactory.new
@@ -23,6 +24,7 @@ module Coordinator::Processes
         @source_builder = source_builder
         @targets_builder = targets_builder
         @command_builder = command_builder
+        @process_step_planner = process_step_planner
         @operation = operation
         @schema_registry = schema_registry
         @stream_factory = stream_factory
@@ -36,13 +38,27 @@ module Coordinator::Processes
         )
 
         targets.work_item_ids.each do |work_item_id|
-          command = @command_builder.call(source:, work_item_id:)
+          process_step = @process_step_planner.call(
+            source_event: source.event,
+            process_name: "change-set-readiness",
+            step_name: "evaluate-work-item-readiness",
+            subject_kind: "work-item",
+            subject_id: work_item_id,
+            rule_version: "change-set-readiness/v1",
+            allocate_target_entity: false
+          )
+          command = @command_builder.call(
+            source:,
+            work_item_id:,
+            command_id: process_step.target_command_id
+          )
           result = @operation.call(
             Coordinator::Write::ReadinessInvocation.new(
               command:,
               source_event: source.event,
               source_reference: source.reference,
-              source_change_set_id: source.payload.change_set_id
+              source_change_set_id: source.payload.change_set_id,
+              caused_by: process_step.event
             )
           )
           handle_result!(result, command:)

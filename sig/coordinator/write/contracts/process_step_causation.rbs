@@ -1,0 +1,11 @@
+module Coordinator::Write::Contracts
+  module ProcessStepCausation
+    private
+    def process_step_matches?: (
+      PgEventstore::Event event,
+      command_id: String,
+      ?target_entity_id: String?
+    ) -> bool
+    def value: (Hash[String | Symbol, untyped] data, String key) -> untyped
+  end
+end

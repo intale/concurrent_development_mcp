@@ -1,0 +1,8 @@
+module Coordinator::Shared
+  class CanonicalMarkerComponentBuilder
+    MAXIMUM_VALUE_BYTES: Integer
+
+    def initialize: (?canonical_json: CanonicalJson) -> void
+    def call: (dimension: String, value: untyped) -> Array[String]
+  end
+end

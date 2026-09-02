@@ -3,7 +3,9 @@
 RSpec.describe Coordinator::Write::Operations::ExecuteInvalidateVerificationObligation, :event_store do
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
-  let(:builder) { Coordinator::Processes::VerificationObligationValidity::CommandBuilder.new }
+  let(:builder) do
+    Coordinator::Processes::VerificationObligationValidity::CommandBuilder.new(event_store:)
+  end
 
   it "atomically invalidates an open obligation from an exact later policy partition" do
     created = CandidateObligationScenario.create_obligation(prefix: "invalidate-open")
@@ -13,10 +15,16 @@ RSpec.describe Coordinator::Write::Operations::ExecuteInvalidateVerificationObli
     result = described_class.new(event_store:).call(invocation)
     replay = described_class.new(event_store:).call(invocation)
     event = invalidation_events(created).sole
+    process_step = invocation.caused_by_event
 
     expect(result).to be_success
     expect(replay.failure.code).to eq(:verification_obligation_already_invalidated)
     expect(event).to have_attributes(
+      causation_id: process_step.id,
+      correlation_id: corrected.fetch(:partition_event).correlation_id
+    )
+    expect(process_step).to have_attributes(
+      type: "ProcessStepPlanned",
       causation_id: corrected.fetch(:partition_event).id,
       correlation_id: corrected.fetch(:partition_event).correlation_id
     )

@@ -5,21 +5,38 @@ module Coordinator::Write
     class AssessmentLoader
       def initialize(
         event_store:,
-        stream_factory: StreamFactory.new,
         schema_registry: EventSchemaRegistry.new,
+        marker_builder: AssessmentMarkerBuilder.new,
         assessment_contract: Contracts::AgentChoiceImpactAssessment.new
       )
         @event_store = event_store
-        @stream_factory = stream_factory
         @schema_registry = schema_registry
+        @marker_builder = marker_builder
         @assessment_contract = assessment_contract
       end
 
       def call(command)
-        event = @event_store.read(
-          @stream_factory.agent_choice_impact(command.assessment_id),
-          EventQueries::AGENT_CHOICE_IMPACT_ASSESSMENT
-        ).first
+        marker = @marker_builder.call(
+          accepted_choice: command.accepted_choice,
+          decision_change: command.decision_change.source_event
+        )
+        events = @event_store.read_global_marked(
+          GlobalMarkedEventReadCriteria.new(
+            stream_context: "AgentGovernance",
+            stream_name: "AgentChoiceImpact",
+            event_types: [ "AgentChoiceImpactAssessed" ],
+            markers: [ marker ],
+            maximum_count: 2,
+            direction: :asc
+          )
+        )
+        if events.length > 1
+          raise InvalidHistory.new(
+            reason: "assessment_natural_key_duplicated",
+            evidence: { marker:, event_ids: events.map(&:id) }
+          )
+        end
+        event = events.first
         return unless event
 
         payload = @schema_registry.load(
@@ -29,7 +46,7 @@ module Coordinator::Write
         )
         valid = payload.is_a?(Events::AgentChoiceImpactAssessedV1) &&
                 event.stream_revision == 0 &&
-                payload.assessment_id == command.assessment_id &&
+                payload.assessment_id == event.stream.stream_id &&
                 payload.choice_id == command.choice_id &&
                 payload.accepted_choice == command.accepted_choice &&
                 payload.decision_change == command.decision_change &&
@@ -40,7 +57,7 @@ module Coordinator::Write
         unless valid
           raise InvalidHistory.new(
             reason: "assessment_replay_invalid",
-            evidence: { assessment_id: command.assessment_id, event_id: event.id }
+            evidence: { assessment_id: event.stream.stream_id, event_id: event.id }
           )
         end
 

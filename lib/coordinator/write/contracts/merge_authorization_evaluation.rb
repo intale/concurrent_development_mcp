@@ -41,7 +41,7 @@ module Coordinator::Write
 
         candidate_ids = evaluation.candidates.map(&:candidate_id)
         key(:evaluation).failure("must not repeat Candidate evidence") unless candidate_ids.uniq.length == candidate_ids.length
-        obligation_ids = evaluation.obligations.map(&:obligation_id)
+        obligation_ids = evaluation.obligations.map(&:obligation_id).compact
         key(:evaluation).failure("must not repeat obligation checks") unless obligation_ids.uniq.length == obligation_ids.length
         progress_ids = evaluation.work_item_progress.map { [ _1.work_item_id, _1.candidate_id ] }
         key(:evaluation).failure("must not repeat WorkItem progress evidence") unless progress_ids.uniq.length == progress_ids.length

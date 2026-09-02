@@ -86,12 +86,8 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::ProgressScan do
     count:,
     has_more:
   )
-    identity = Coordinator::Write::AgentChoiceImpacts::ScanIdentityBuilder.new.progress(
-      checkpoint_event: checkpoint,
-      policy_version: "agent-choice-decision-impact/v1"
-    )
     Coordinator::Write::Commands::ProgressAgentChoiceImpactScan.new(
-      command_id: identity,
+      command_id: "018f0000-0000-7000-8000-000000000003",
       actor: { kind: "system", id: "agent-choice-decision-impact" },
       scan_id:,
       expected_checkpoint: checkpoint,
@@ -170,10 +166,7 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::ProgressScan do
   end
 
   def scan_id
-    @scan_id ||= Coordinator::Write::AgentChoiceImpacts::ScanIdentityBuilder.new.start(
-      source_event:,
-      policy_version: "agent-choice-decision-impact/v1"
-    )
+    "018f0000-0000-7000-8000-000000000004"
   end
 
   def occurred_at

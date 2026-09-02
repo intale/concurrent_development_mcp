@@ -3,12 +3,10 @@
 module Coordinator::Processes
   class LeaseExpiryCommandBuilder
     POLICY_ID = "lease-expiry-policy-v1"
-    COMMAND_ID_PREFIX = "internal:lease-expiry:v1:"
-
-    def call(source)
+    def call(source, command_id:)
       payload = source.payload
       Coordinator::Write::Commands::ExpireResourceLease.new(
-        command_id: InternalCommandIdBuilder.call("lease-expiry:v1:#{source.reference.event_id}"),
+        command_id:,
         actor: Coordinator::Write::Commands::Actor.new(kind: "system", id: POLICY_ID),
         resource_id: payload.resource_id,
         lease_id: payload.lease_id,

@@ -22,7 +22,7 @@ RSpec.describe Coordinator::Write::Operations::PrepareAndSubmitCoordinationTask,
     expect(events.map(&:type)).to eq([ "CoordinationTaskSubmitted" ])
     expect(events.sole.metadata.fetch("command_id")).to eq("cmd-public-create")
     expect(events.sole.markers).to include(
-      Coordinator::Write::Tasks::ExecutionLane.new.marker("cmd-public-create")
+      Coordinator::Write::Tasks::ExecutionLane.new.marker(task_id)
     )
   end
 
@@ -37,6 +37,17 @@ RSpec.describe Coordinator::Write::Operations::PrepareAndSubmitCoordinationTask,
       message: "Public command ID is invalid"
     )
     expect(result.failure.details).to have_key(:command_id)
+    expect(task_submissions(command_id)).to be_empty
+  end
+
+
+  it "rejects coordinator-owned UUIDv7 command identities before allocating a Task" do
+    command_id = SecureRandom.uuid_v7
+
+    result = operation.call(input(command_id:))
+
+    expect(result).to be_failure
+    expect(result.failure.code).to eq(:invalid_input)
     expect(task_submissions(command_id)).to be_empty
   end
 

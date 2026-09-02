@@ -42,7 +42,7 @@ module Coordinator::Write::ProcessSteps
         proposed_stream: @stream_factory.process_step(command.process_step_id),
         build_event: -> { build_event(command, marker:, source_event:) },
         identity_from: ->(event) { identity_from(event, command) }
-      )
+      ).fmap { build_planned(_1) }
     end
 
     private
@@ -130,6 +130,33 @@ module Coordinator::Write::ProcessSteps
       payload.process_step_id
     rescue KeyError, ArgumentError
       nil
+    end
+
+    def build_planned(resolution)
+      payload = @event_schema_registry.load(
+        type: resolution.event.type,
+        schema_version: resolution.event.metadata.fetch("schema_version"),
+        data: resolution.event.data
+      )
+      PlannedV1.new(
+        process_step_id: payload.process_step_id,
+        target_command_id: payload.target_command_id,
+        target_entity_id: payload.target_entity_id,
+        event: resolution.event,
+        reference: event_reference(resolution.event),
+        outcome: resolution.outcome
+      )
+    end
+
+    def event_reference(event)
+      Coordinator::Write::EventReference.new(
+        event_id: event.id,
+        type: event.type,
+        stream_context: event.stream.context,
+        stream_name: event.stream.stream_name,
+        stream_id: event.stream.stream_id,
+        stream_revision: event.stream_revision
+      )
     end
 
     def natural_tuple(value)

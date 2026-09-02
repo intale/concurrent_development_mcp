@@ -3,5 +3,6 @@ module Coordinator::Write
     def command: () -> Coordinator::Write::Commands::ProgressCandidateImpactRegistrySweep
     def checkpoint_event: () -> PgEventstore::Event
     def checkpoint_reference: () -> Coordinator::Write::EventReference
+    def caused_by: () -> PgEventstore::Event
   end
 end

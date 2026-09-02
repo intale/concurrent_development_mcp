@@ -42,7 +42,7 @@ RSpec.describe Coordinator::Read::Projectors::DecisionInterpretationsV1, :read_m
       actor: include(kind: "orchestrator", id: "guidance-host", authenticated: false)
     )
     expect(projected.adjudication.slot.compound_marker.marker).to start_with(
-      "compound:interpretation-slot:v1:sha256:"
+      "compound:interpretation-slot:v2|"
     )
     expect(projected.adjudication.correlation_id).to eq(acceptance.correlation_id)
     expect(projected.actor.to_h).to eq(

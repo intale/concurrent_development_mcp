@@ -6,10 +6,12 @@ module Coordinator::Write
       EXCLUSIVE_STRATEGIES = %w[single_choice manual_resolution].freeze
 
       def initialize(
-        canonical_json: CanonicalJson.new,
+        id_generator: IdGenerator.new,
+        marker_component_builder: Coordinator::Shared::CanonicalMarkerComponentBuilder.new,
         compound_marker_builder: CompoundMarkerBuilder.new
       )
-        @canonical_json = canonical_json
+        @id_generator = id_generator
+        @marker_component_builder = marker_component_builder
         @compound_marker_builder = compound_marker_builder
       end
 
@@ -26,23 +28,21 @@ module Coordinator::Write
           conflict_dimension: topic.conflict_dimension,
           resolution_strategy: topic.resolution_strategy
         )
-        scope_digest = @canonical_json.sha256(document.scope.to_h)
-        conditions_digest = @canonical_json.sha256(document.conditions.to_h)
         compound_marker = @compound_marker_builder.call(
           CompoundMarkerDefinitionV1.new(
             purpose: "decision-slot",
             components: [
               "topic:#{topic.topic_id}",
-              "scope:v1:#{scope_digest}",
-              "conditions:v1:#{conditions_digest}",
               "conflict-dimension:#{topic.conflict_dimension}",
               "resolution-strategy:#{topic.resolution_strategy}"
-            ]
+            ] +
+              @marker_component_builder.call(dimension: "scope", value: document.scope.to_h) +
+              @marker_component_builder.call(dimension: "conditions", value: document.conditions.to_h)
           )
         )
 
         DecisionSlotV1.new(
-          slot_id: compound_marker.marker,
+          slot_id: @id_generator.uuid_v7,
           document: slot_document,
           compound_marker:
         )

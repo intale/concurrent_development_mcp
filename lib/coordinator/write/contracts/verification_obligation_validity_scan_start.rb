@@ -3,13 +3,14 @@
 module Coordinator::Write
   module Contracts
     class VerificationObligationValidityScanStart < Dry::Validation::Contract
+      include ProcessStepCausation
+
       params do
         required(:invocation).value(Types.Instance(VerificationObligationValidityScanInvocation))
         required(:source).value(Types.Instance(CandidateObligations::PersistedEventV1))
-        required(:expected_identity).filled(:string)
       end
 
-      rule(:invocation, :source, :expected_identity) do
+      rule(:invocation, :source) do
         invocation = values[:invocation]
         command = invocation.command
         source = values[:source]
@@ -20,7 +21,11 @@ module Coordinator::Write
         failures << "source global position must match" unless command.source_global_position == source.event.global_position
         failures << "source must be a DecisionPartitionAdvanced event" unless payload.is_a?(Events::DecisionPartitionAdvancedV1)
         failures << "source must be the Candidate partition for the ChangeSet" unless candidate_partition?(payload, command.change_set_id)
-        failures << "scan and command IDs must match the canonical identity" unless command.scan_id == values[:expected_identity] && command.command_id == values[:expected_identity]
+        failures << "scan ID must be UUIDv7" unless Types::UUID_V7_PATTERN.match?(command.scan_id)
+        failures << "command ID must be UUIDv7" unless Types::UUID_V7_PATTERN.match?(command.command_id)
+        unless process_step_matches?(invocation.caused_by, command_id: command.command_id, target_entity_id: command.scan_id)
+          failures << "causal parent must be the ProcessStep that allocated the scan command and identity"
+        end
         failures << "actor must be the validity policy" unless command.actor.kind == "system" && command.actor.id == "verification-obligation-validity-policy"
         failures.each { key(:invocation).failure(_1) }
       end

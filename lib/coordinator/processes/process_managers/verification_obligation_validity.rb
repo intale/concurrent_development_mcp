@@ -19,7 +19,7 @@ module Coordinator::Processes
         partition_loader: Coordinator::Processes::VerificationObligationValidity::CurrentPartitionLoader.new(event_store:),
         checkpoint_loader: Coordinator::Processes::VerificationObligationValidity::CheckpointLoader.new(event_store:),
         page_reader: Coordinator::Processes::VerificationObligationValidity::PageReader.new(event_store:),
-        command_builder: Coordinator::Processes::VerificationObligationValidity::CommandBuilder.new,
+        command_builder: Coordinator::Processes::VerificationObligationValidity::CommandBuilder.new(event_store:),
         start_scan: Coordinator::Write::Operations::ExecuteStartVerificationObligationValidityScan.new(event_store:),
         progress_scan: Coordinator::Write::Operations::ExecuteProgressVerificationObligationValidityScan.new(event_store:),
         invalidate: Coordinator::Write::Operations::ExecuteInvalidateVerificationObligation.new(event_store:)

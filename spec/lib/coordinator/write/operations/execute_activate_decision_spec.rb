@@ -26,7 +26,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
       "topic:testing.framework",
       "topic-root:testing",
       "command:cmd-decision-activation-1",
-      a_string_starting_with("compound:decision-slot:v1:sha256:")
+        a_string_starting_with("compound:decision-slot:v2|")
     )
     expect(activation.data.fetch("recorded_event")).to include(
       "type" => "DecisionRecorded",

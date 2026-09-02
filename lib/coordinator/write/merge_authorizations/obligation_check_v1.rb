@@ -3,7 +3,7 @@
 module Coordinator::Write
   module MergeAuthorizations
     class ObligationCheckV1 < Value
-      attribute :obligation_id, Types::Identifier
+      attribute :obligation_id, Types::Identifier.optional
       attribute :source_candidate_id, Types::Identifier
       attribute :target_candidate_id, Types::Identifier
       attribute :enforcement, Types::CandidateImpactPolicyEnforcementLevel

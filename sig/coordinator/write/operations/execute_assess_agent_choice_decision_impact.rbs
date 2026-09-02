@@ -9,7 +9,6 @@ module Coordinator
           ?assessment_loader: AgentChoiceImpacts::AssessmentLoader,
           ?attempt_loader: AgentChoiceImpacts::AttemptLoader,
           ?reconstructor: AgentChoiceImpacts::HistoricalContextReconstructor,
-          ?identity_builder: AgentChoiceImpacts::AssessmentIdentityBuilder,
           ?decider: Domain::AgentChoiceImpacts::Assess,
           ?clock: Shared::_Clock,
           ?id_generator: Shared::_IdGenerator,

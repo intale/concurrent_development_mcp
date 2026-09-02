@@ -3,7 +3,6 @@ module Coordinator
     module Types
       IDENTIFIER_PATTERN: Regexp
       PUBLIC_COMMAND_ID_PATTERN: Regexp
-      INTERNAL_COMMAND_ID_PATTERN: Regexp
       REPOSITORY_ID_PATTERN: Regexp
       GIT_OID_PATTERN: Regexp
       SHA256_DIGEST_PATTERN: Regexp
@@ -183,7 +182,6 @@ module Coordinator
 
       Identifier: untyped
       PublicCommandId: untyped
-      InternalCommandId: untyped
       RepositoryId: untyped
       GitOid: untyped
       GitObjectFormat: untyped

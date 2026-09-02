@@ -11,7 +11,6 @@ module Coordinator::Write
         loader: VerificationObligationValidityScans::ScanLoader.new(event_store:),
         decider: Domain::VerificationObligationValidityScans::Progress.new,
         retry_policy: VerificationObligationValidityScans::ExpectedRevisionRetry.new,
-        identity_builder: VerificationObligationValidityScans::IdentityBuilder.new,
         clock: SystemClock.new,
         id_generator: IdGenerator.new,
         event_factory: EventFactory.new,
@@ -24,7 +23,6 @@ module Coordinator::Write
         @loader = loader
         @decider = decider
         @retry_policy = retry_policy
-        @identity_builder = identity_builder
         @clock = clock
         @id_generator = id_generator
         @event_factory = event_factory
@@ -61,7 +59,7 @@ module Coordinator::Write
           event_id: preparation.event_id,
           metadata: metadata(command),
           markers: markers(command),
-          caused_by: invocation.checkpoint_event
+          caused_by: invocation.caused_by
         )
         Success(
           @event_store.append(stream, [ physical ], expected_revision: snapshot.latest_revision).sole
@@ -69,12 +67,7 @@ module Coordinator::Write
       end
 
       def verify_input!(invocation)
-        command = invocation.command
-        expected_identity = @identity_builder.progress(
-          checkpoint_event: command.expected_checkpoint,
-          rule_version: command.rule_version
-        )
-        result = @input_contract.call(invocation:, expected_identity:)
+        result = @input_contract.call(invocation:)
         return if result.success?
 
         raise ArgumentError, "validity scan progress violates its dry-rb contract: #{result.errors.to_h.inspect}"

@@ -775,6 +775,14 @@ When("the expired predecessor timer is handled") do
 end
 
 Then("the timer is superseded and cannot affect the successor") do
+  process_step = process_step_event(
+    source_event: @expiry_source,
+    process_name: "lease-expiry-policy",
+    step_name: "expire-resource-lease",
+    subject_kind: "resource-lease",
+    subject_id: @expiry_source.data.fetch("lease_id")
+  )
+  assert_acceptance(process_step, "The superseded timer has no persisted process step")
   assert_acceptance_equal(
     [ "ResourceLeaseAcquired", "ResourceLeaseAcquired" ],
     lease_events(@expiry_path).map(&:type),
@@ -782,9 +790,7 @@ Then("the timer is superseded and cannot affect the successor") do
   )
   assert_acceptance_equal(
     [],
-    command_events(
-      "#{Coordinator::Processes::LeaseExpiryCommandBuilder::COMMAND_ID_PREFIX}#{@expiry_source.id}"
-    ),
+    command_events(process_step.data.fetch("target_command_id")),
     "Superseded expiry command completion"
   )
 end
@@ -1887,8 +1893,6 @@ When("a public client uses the acquisition event ID for an unrelated mutation") 
 end
 
 When("the real lease-expiry job handles the due source") do
-  @internal_expiry_command_id =
-    "#{Coordinator::Processes::LeaseExpiryCommandBuilder::COMMAND_ID_PREFIX}#{@system_identity_source.id}"
   deadline = Time.iso8601(@system_identity_source.data.fetch("expires_at"))
 
   eventually("the real lease deadline", timeout_seconds: 35) do
@@ -1896,6 +1900,15 @@ When("the real lease-expiry job handles the due source") do
     [ observed_at >= deadline, observed_at ]
   end
   perform_scheduled_lease_expiry(@system_identity_source)
+  @lease_expiry_process_step = process_step_event(
+    source_event: @system_identity_source,
+    process_name: "lease-expiry-policy",
+    step_name: "expire-resource-lease",
+    subject_kind: "resource-lease",
+    subject_id: @system_identity_source.data.fetch("lease_id")
+  )
+  assert_acceptance(@lease_expiry_process_step, "Lease expiry has no persisted process step")
+  @internal_expiry_command_id = @lease_expiry_process_step.data.fetch("target_command_id")
 end
 
 Then("the lease expires under a distinct deterministic internal command") do
@@ -1907,13 +1920,12 @@ Then("the lease expires under a distinct deterministic internal command") do
     lifecycle.map(&:type),
     "Expired lifecycle"
   )
-  assert_acceptance_equal(
-    "internal:lease-expiry:v1:#{acquisition.id}",
-    @internal_expiry_command_id,
-    "Internal command identity"
+  assert_acceptance(
+    Coordinator::Shared::Types::UUID_V7_PATTERN.match?(@internal_expiry_command_id),
+    "Internal command identity is not UUIDv7"
   )
   assert_acceptance(@internal_expiry_command_id != @public_collision_command_id, "Command namespaces collided")
-  assert_acceptance_equal(acquisition.id, expiration.causation_id, "Expiry causation")
+  assert_acceptance_equal(@lease_expiry_process_step.id, expiration.causation_id, "Expiry causation")
   assert_acceptance_equal(acquisition.correlation_id, expiration.correlation_id, "Expiry correlation")
   assert_acceptance_equal(
     @internal_expiry_command_id,
@@ -1980,7 +1992,6 @@ end
 
 class ResourceBoundaryRolloverGate
   EVENT_NAME = "coordinator.command_boundary"
-  ROLLOVER_COMMAND_PREFIX = "internal:resource-boundary-rollover:v2:"
 
   def initialize(reservation_command_id:)
     @reservation_command_id = reservation_command_id
@@ -2026,7 +2037,7 @@ class ResourceBoundaryRolloverGate
 
     command_id = payload.fetch(:command_id).to_s
     return :reservation if command_id == @reservation_command_id
-    :rollover if command_id.start_with?(ROLLOVER_COMMAND_PREFIX)
+    :rollover if Coordinator::Shared::Types::UUID_V7_PATTERN.match?(command_id)
   end
 
   def arrive(role, payload)
@@ -2265,9 +2276,15 @@ module ResourceBoundaryRolloverAcceptance
       resource_path: source.data.fetch("resource_path")
     ).sort_by(&:b)
     boundary_index = markers.index(marker) || raise("Source event does not carry the boundary marker")
-    Coordinator::Processes::InternalCommandIdBuilder.call(
-      "resource-boundary-rollover:v2:#{source.id}:#{boundary_index}"
+    @rollover_race_process_step = process_step_event(
+      source_event: source,
+      process_name: "resource-boundary-maintenance",
+      step_name: "roll-resource-boundary-epoch",
+      subject_kind: "boundary-index",
+      subject_id: boundary_index.to_s
     )
+    assert_acceptance(@rollover_race_process_step, "Rollover has no persisted process step")
+    @rollover_race_process_step.data.fetch("target_command_id")
   end
 
   def submit_rollover_contender(kind:, path:, await_terminal: true)
@@ -2472,6 +2489,6 @@ Then("every retry retains its logical event identities") do
     "Reservation identities"
   )
   assert_acceptance_equal(@rollover_race_command_id, snapshot.metadata.fetch("command_id"), "Rollover command")
-  assert_acceptance_equal(@rollover_race_source.id, snapshot.causation_id, "Rollover causation")
+  assert_acceptance_equal(@rollover_race_process_step.id, snapshot.causation_id, "Rollover causation")
   assert_acceptance_equal(@rollover_race_source.correlation_id, snapshot.correlation_id, "Rollover correlation")
 end

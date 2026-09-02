@@ -12,8 +12,9 @@ class AcceptanceContentionBarrier
     @released_command_ids = Set.new
     @completed_command_ids = Set.new
     @thread_commands = {}
+    @task_ids = {}
     @subscriber = ActiveSupport::Notifications.subscribe(EVENT_NAME) do |_name, _start, _finish, _id, payload|
-      arrive(payload) if matches?(payload)
+      observe(payload)
     end
     @completion_trace = TracePoint.new(:return) { command_completed(_1) }
     @completion_trace.enable
@@ -66,6 +67,15 @@ class AcceptanceContentionBarrier
 
   private
 
+  def observe(payload)
+    command_id = payload.fetch(:command_id).to_s
+    if payload.fetch(:operation).to_s == "coordination_task_execute" && @command_ids.include?(command_id)
+      @mutex.synchronize { @task_ids[command_id] = payload.fetch(:task_id).to_s }
+    end
+
+    arrive(payload) if matches?(payload)
+  end
+
   def matches?(payload)
     payload.fetch(:operation).to_s == @operation && @command_ids.include?(payload.fetch(:command_id).to_s)
   end
@@ -73,6 +83,7 @@ class AcceptanceContentionBarrier
   def arrive(payload)
     command_id = payload.fetch(:command_id).to_s
     @mutex.synchronize do
+      lane_identity = payload[:task_id] || @task_ids[command_id] || payload[:process_command_id]
       @thread_commands[Thread.current.object_id] = command_id
       @arrivals[command_id] ||= {
         operation: @operation,
@@ -81,7 +92,7 @@ class AcceptanceContentionBarrier
         process_command_id: payload[:process_command_id],
         source_event_id: payload[:source_event_id],
         thread_id: Thread.current.object_id,
-        worker_lane: Coordinator::Write::Tasks::ExecutionLane.new.index(command_id),
+        worker_lane: lane_identity && Coordinator::Write::Tasks::ExecutionLane.new.index(lane_identity),
         arrived_at: Process.clock_gettime(Process::CLOCK_MONOTONIC)
       }.freeze
       @condition.broadcast

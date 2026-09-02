@@ -139,16 +139,19 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateCandidateCompatibili
     current_invocation = CandidateObligationScenario.invocation(pair:, policy: corrected)
 
     stale = operation.call(stale_invocation)
-    current = operation.call(current_invocation)
 
     expect(stale.value!).to have_attributes(outcome: "stale_policy", event: nil)
+    expect(obligation_events(stale_invocation.command.obligation_id)).to be_empty
+
+    current = operation.call(current_invocation)
+
     expect(current.value!).to have_attributes(outcome: "created")
+    expect(current_invocation.command.obligation_id).to eq(stale_invocation.command.obligation_id)
     expect(CandidateObligationScenario.load(obligation_events(current_invocation.command.obligation_id).sole)).to have_attributes(
       enforcement: "verification_gate",
       required_evidence: [ "combined_tests" ],
       policy: have_attributes(head: corrected.fetch(:head))
     )
-    expect(obligation_events(stale_invocation.command.obligation_id)).to be_empty
   end
 
   it "serializes a concurrent duplicate command to one creation and one replay" do

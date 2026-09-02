@@ -76,7 +76,7 @@ RSpec.describe "Candidate impact obligation scan checkpoints" do
 
   it "starts a marker-routed predecessor scan and completes its final page" do
     source_registration = reference("CandidateImpactSurfaceRegistered", "CS-obligation", 3)
-    markers = [ "compound:candidate-impact-index:v1:sha256:route" ]
+    markers = [ "compound:candidate-impact-index:v2|8:route=in" ]
     start_command = Coordinator::Write::Commands::StartCandidateImpactPairScan.new(
       command_id: "pair-scan",
       actor:,
@@ -89,7 +89,7 @@ RSpec.describe "Candidate impact obligation scan checkpoints" do
       from_revision: 0,
       to_revision: 2,
       page_size: 50,
-      index_policy_version: "candidate-impact-bucket-index/v1",
+      index_policy_version: "candidate-impact-exact-index/v2",
       rule_version: "candidate-impact-pair-scan/v1"
     )
     start = Coordinator::Write::Domain::CandidateObligationScans::StartPairScan.new.call(
@@ -116,7 +116,7 @@ RSpec.describe "Candidate impact obligation scan checkpoints" do
       page_size: 50,
       page_count: 0,
       total_registration_count: 0,
-      index_policy_version: "candidate-impact-bucket-index/v1",
+      index_policy_version: "candidate-impact-exact-index/v2",
       rule_version: "candidate-impact-pair-scan/v1",
       skip_reason: nil
     )
@@ -135,7 +135,7 @@ RSpec.describe "Candidate impact obligation scan checkpoints" do
       page_registration_count: 2,
       has_more: false,
       page_size: 50,
-      index_policy_version: "candidate-impact-bucket-index/v1",
+      index_policy_version: "candidate-impact-exact-index/v2",
       rule_version: "candidate-impact-pair-scan/v1"
     )
     completed = Coordinator::Write::Domain::CandidateObligationScans::ProgressPairScan.new.call(

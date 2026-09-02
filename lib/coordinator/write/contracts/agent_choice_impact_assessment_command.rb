@@ -6,19 +6,16 @@ module Coordinator::Write
       params do
         required(:command).value(Types.Instance(Commands::AssessAgentChoiceDecisionImpact))
         required(:authoritative_change).value(Types.Instance(AgentChoiceImpacts::DecisionChangeEvidenceV1))
-        required(:expected_identity).filled(:string)
       end
 
-      rule(:command, :authoritative_change, :expected_identity) do
+      rule(:command, :authoritative_change) do
         command = values[:command]
         change = values[:authoritative_change]
         accepted = command.accepted_choice
         source = change.source_event
 
-        unless command.command_id == values[:expected_identity] &&
-               command.assessment_id == values[:expected_identity]
-          key(:command).failure("command and assessment IDs must match the canonical identity")
-        end
+        key(:command).failure("command ID must be UUIDv7") unless Types::UUID_V7_PATTERN.match?(command.command_id)
+        key(:command).failure("assessment ID must be UUIDv7") unless Types::UUID_V7_PATTERN.match?(command.assessment_id)
         unless command.choice_id == accepted.stream_id &&
                accepted.type == "AgentChoiceAccepted" &&
                accepted.stream_context == "AgentGovernance" &&

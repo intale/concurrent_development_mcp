@@ -84,7 +84,7 @@ FactoryBot.define do
         "receipt" => "command:#{command_id}",
         "context_token" => nil,
         "data" => {
-          "skill_id" => "skill:v1:#{'c' * 64}",
+          "skill_id" => "018f0f4d-4e45-7abc-8def-000000000131",
           "name" => "review",
           "scope" => "project:alpha",
           "revision" => 1,
@@ -95,7 +95,7 @@ FactoryBot.define do
             "type" => "SkillRevisionPublished",
             "stream_context" => "AgentKnowledge",
             "stream_name" => "Skill",
-            "stream_id" => "skill:v1:#{'c' * 64}",
+            "stream_id" => "018f0f4d-4e45-7abc-8def-000000000131",
             "stream_revision" => 0
           },
           "published_at" => "2026-08-30T12:01:00.000000Z"
@@ -134,7 +134,7 @@ FactoryBot.define do
             "code" => "skill_revision_conflict",
             "message" => "Skill revision changed",
             "details" => {
-              "skill_id" => "skill:v1:#{'c' * 64}",
+              "skill_id" => "018f0f4d-4e45-7abc-8def-000000000131",
               "name" => "review",
               "scope" => "project:alpha",
               "expected_revision" => 0,

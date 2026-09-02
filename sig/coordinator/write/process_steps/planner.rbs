@@ -21,7 +21,7 @@ module Coordinator
           subject_id: String,
           rule_version: String,
           allocate_target_entity: bool
-        ) -> Dry::Monads::Result
+      ) -> Dry::Monads::Result
       end
     end
   end

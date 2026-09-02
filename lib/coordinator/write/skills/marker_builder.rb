@@ -3,28 +3,32 @@
 module Coordinator::Write
   module Skills
     class MarkerBuilder
-      def initialize(canonical_json: CanonicalJson.new)
-        @canonical_json = canonical_json
+      NATURAL_KEY_PURPOSE = "skill-natural-key"
+
+      def initialize(marker_codec: Coordinator::Shared::Markers::CodecV2.new)
+        @marker_codec = marker_codec
       end
 
-      def call(identity:, command_id:)
-        [
+      def call(identity:, command_id:, register_natural_key: false)
+        markers = [
           "skill:#{identity.skill_id}",
-          dimension_marker("name", identity.name),
-          dimension_marker("scope", identity.scope),
           "command:#{command_id}"
-        ].freeze
+        ]
+        markers << natural_key(name: identity.name, scope: identity.scope) if register_natural_key
+        markers.freeze
       end
 
-      private
+      def natural_key(name:, scope:)
+        result = @marker_codec.call(
+          purpose: NATURAL_KEY_PURPOSE,
+          components: [
+            { dimension: "name", value: name },
+            { dimension: "scope", value: scope }
+          ]
+        )
+        raise ArgumentError, "Skill natural key is invalid: #{result.failure.errors.inspect}" if result.failure?
 
-      def dimension_marker(dimension, value)
-        digest = @canonical_json.sha256(
-          schema: "skill-marker/v1",
-          dimension:,
-          value:
-        ).delete_prefix("sha256:")
-        "skill-#{dimension}:v1:#{digest}"
+        result.value!.marker
       end
     end
   end

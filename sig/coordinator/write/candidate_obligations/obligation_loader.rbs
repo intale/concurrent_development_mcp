@@ -3,10 +3,9 @@ module Coordinator::Write
     class ObligationLoader
       def initialize: (
         event_store: Coordinator::Write::_EventStore,
-        ?stream_factory: Coordinator::Write::StreamFactory,
         ?schema_registry: Coordinator::Write::EventSchemaRegistry
       ) -> void
-      def call: (IdentityV1 identity) -> PersistedEventV1?
+      def find: (NaturalKeyV1 natural_key) -> PersistedEventV1?
     end
   end
 end

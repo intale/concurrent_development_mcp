@@ -5,5 +5,6 @@ module Coordinator::Write
     attribute :command, Types.Instance(Commands::ProgressVerificationObligationValidityScan)
     attribute :checkpoint_event, Types.Instance(PgEventstore::Event)
     attribute :checkpoint_reference, EventReference
+    attribute :caused_by, Types.Instance(PgEventstore::Event)
   end
 end

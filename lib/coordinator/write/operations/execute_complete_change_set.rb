@@ -35,11 +35,11 @@ module Coordinator::Write
         @event_plan_contract = event_plan_contract
       end
 
-      def call(command)
-        step call_command(command)
+      def call(command, caused_by:)
+        step call_command(command, caused_by:)
       end
 
-      def call_command(command)
+      def call_command(command, caused_by:)
         steps do
           preparation = PreparedChangeSetCompletionV1.new(
             occurred_at: @clock.now,
@@ -48,13 +48,13 @@ module Coordinator::Write
             command_completion_event_id: @id_generator.uuid_v7
           )
 
-          step @event_store.multiple { execute_attempt(command:, preparation:) }
+          step @event_store.multiple { execute_attempt(command:, preparation:, caused_by:) }
         end
       end
 
       private
 
-      def execute_attempt(command:, preparation:)
+      def execute_attempt(command:, preparation:, caused_by:)
         replay = replay_result(command:, input_digest: preparation.input_digest)
         return replay if replay
 
@@ -88,7 +88,7 @@ module Coordinator::Write
         persisted = persist_completion_fact(
           plan.events.sole,
           command:,
-          source:,
+          caused_by:,
           event_id: preparation.completion_event_id
         )
         completion = @completion_builder.change_set_completion_policy(
@@ -101,7 +101,7 @@ module Coordinator::Write
         persist_command_completion(
           completion,
           command:,
-          source:,
+          caused_by:,
           event_id: preparation.command_completion_event_id
         )
         Success(completion)
@@ -128,24 +128,24 @@ module Coordinator::Write
         raise InvalidChangeSetCompletionEventPlan, result.errors.to_h.inspect
       end
 
-      def persist_completion_fact(completion, command:, source:, event_id:)
+      def persist_completion_fact(completion, command:, caused_by:, event_id:)
         physical = @event_factory.build!(
           event: completion,
           event_id:,
           metadata: command_metadata(command),
           markers: completion_markers(completion, command:),
-          caused_by: source.event
+          caused_by:
         )
         @event_store.append(@stream_factory.change_set(command.change_set_id), [ physical ]).sole
       end
 
-      def persist_command_completion(completion, command:, source:, event_id:)
+      def persist_command_completion(completion, command:, caused_by:, event_id:)
         physical = @event_factory.build!(
           event: completion,
           event_id:,
           metadata: command_metadata(command),
           markers: [ "command:#{command.command_id}" ],
-          caused_by: source.event
+          caused_by:
         )
         @event_store.append(@stream_factory.command(command.command_id), [ physical ])
       end

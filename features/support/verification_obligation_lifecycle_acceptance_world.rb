@@ -128,13 +128,17 @@ module VerificationObligationLifecycleAcceptanceWorld
   end
 
   def verification_obligation_validity_scan_events
-    identity = Coordinator::Write::VerificationObligationValidityScans::IdentityBuilder.new
-    scan_id = identity.scan(
-      superseding_partition_event: candidate_obligation_event_reference(@corrected_partition_event),
-      rule_version: "verification-obligation-validity/v1"
-    )
+    started = read_global_marked_events(
+      stream_context: "DevelopmentIntegration",
+      stream_name: "VerificationObligationValidityScan",
+      event_types: [ "VerificationObligationValidityScanStarted" ],
+      marker: "superseding-partition-event:#{@corrected_partition_event.id}",
+      maximum_count: 1
+    ).first
+    return [] unless started
+
     event_store.read_grouped(
-      streams.verification_obligation_validity_scan(scan_id),
+      streams.verification_obligation_validity_scan(started.stream.stream_id),
       Coordinator::Write::EventQueries::VERIFICATION_OBLIGATION_VALIDITY_SCAN_STATE
     )
   end

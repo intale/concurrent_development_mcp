@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Skills
       class IdentityBuilder
-        def initialize: (?canonical_json: Shared::CanonicalJson) -> void
+        def initialize: (?id_generator: Shared::IdGenerator) -> void
         def call: (name: String, scope: String) -> IdentityV1
       end
     end

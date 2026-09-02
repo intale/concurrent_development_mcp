@@ -8,13 +8,11 @@ module Coordinator::Read
       def initialize(
         contract: Contracts::SkillSourceEvent.new,
         publication_loader: Coordinator::Write::Skills::PersistedPublicationLoader.new,
-        identity_builder: Coordinator::Write::Skills::IdentityBuilder.new,
         skills: Repositories::Skills.new,
         processed_events: Repositories::ProcessedProjectionEvents.new
       )
         @contract = contract
         @publication_loader = publication_loader
-        @identity_builder = identity_builder
         @skills = skills
         @processed_events = processed_events
       end
@@ -63,9 +61,7 @@ module Coordinator::Read
       end
 
       def verify_stream_identity!(event, publication)
-        identity = @identity_builder.call(name: publication.name, scope: publication.scope)
         matches = event.stream.stream_id == publication.skill_id &&
-                  identity.skill_id == publication.skill_id &&
                   event.stream_revision + 1 == publication.revision
         return if matches
 

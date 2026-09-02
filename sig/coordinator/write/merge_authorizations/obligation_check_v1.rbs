@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module MergeAuthorizations
       class ObligationCheckV1 < Shared::Value
-        def obligation_id: () -> String
+        def obligation_id: () -> String?
         def source_candidate_id: () -> String
         def target_candidate_id: () -> String
         def enforcement: () -> String

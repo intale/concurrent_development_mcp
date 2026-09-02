@@ -214,7 +214,7 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
       Coordinator::Write::Commands::CorrectDevelopmentArtifactClassification.new(
         command_id: "cmd-task-build-17",
         actor:,
-        observation_id: "artifact-observation:v1:" + ("a" * 64),
+        observation_id: "018f0f4d-4e45-7abc-8def-000000000151",
         expected_revision: 1,
         title: "Correct classification",
         kind: "documentation",

@@ -73,7 +73,11 @@ RSpec.describe Coordinator::Write::EventStore, :event_store do
   it "uses one compound marker as a bounded conjunctive event selector" do
     target = build_event(
       type: "RealStoreProbe",
-      markers: [ "locale:en", "resource:description", "compound:description:v1:sha256:target" ]
+      markers: [
+        "locale:en",
+        "resource:description",
+        "compound:description:v2|9:locale=en|20:resource=description"
+      ]
     )
     event_store.append(
       stream,
@@ -85,7 +89,7 @@ RSpec.describe Coordinator::Write::EventStore, :event_store do
     )
     criteria = Coordinator::Write::MarkedEventReadCriteria.new(
       event_type: "RealStoreProbe",
-      marker: "compound:description:v1:sha256:target",
+      marker: "compound:description:v2|9:locale=en|20:resource=description",
       maximum_count: 1,
       direction: :desc
     )
@@ -173,16 +177,16 @@ RSpec.describe Coordinator::Write::EventStore, :event_store do
     events = Array.new(55) do |index|
       build_event(
         type: "CandidateImpactSurfaceRegistered",
-        markers: [ index.even? ? "compound:candidate-impact-index:v1:sha256:a" :
-          "compound:candidate-impact-index:v1:sha256:b" ]
+        markers: [ index.even? ? "compound:candidate-impact-index:v2|5:key=a" :
+          "compound:candidate-impact-index:v2|5:key=b" ]
       )
     end
     event_store.append(registry, events)
     criteria = Coordinator::Write::StreamMarkedEventPageCriteria.new(
       event_type: "CandidateImpactSurfaceRegistered",
       markers: [
-        "compound:candidate-impact-index:v1:sha256:a",
-        "compound:candidate-impact-index:v1:sha256:b"
+        "compound:candidate-impact-index:v2|5:key=a",
+        "compound:candidate-impact-index:v2|5:key=b"
       ],
       from_revision: 2,
       to_revision: 53,

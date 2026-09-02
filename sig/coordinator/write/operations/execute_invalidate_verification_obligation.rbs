@@ -6,7 +6,6 @@ module Coordinator
           event_store: _EventStore,
           ?exact_loader: CandidateObligations::ExactEventLoader,
           ?decider: Domain::VerificationObligationInvalidations::Invalidate,
-          ?identity_builder: VerificationObligationInvalidations::IdentityBuilder,
           ?digest_builder: VerificationObligationInvalidations::DigestBuilder,
           ?clock: Shared::_Clock,
           ?id_generator: Shared::_IdGenerator,

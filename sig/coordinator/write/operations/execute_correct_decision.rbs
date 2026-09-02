@@ -4,7 +4,7 @@ module Coordinator
       class ExecuteCorrectDecision < Dry::Operation
         TOOL_NAME: String
 
-        def initialize: (event_store: _EventStore, ?preparer: PrepareCorrectDecision, ?candidate_preparer: Domain::Decisions::PrepareCorrection, ?decider: Domain::Decisions::Correct, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?completion_builder: CommandCompletionBuilder, ?event_plan_contract: Contracts::DecisionCorrectionEventPlan) -> void
+        def initialize: (event_store: _EventStore, ?preparer: PrepareCorrectDecision, ?candidate_preparer: Domain::Decisions::PrepareCorrection, ?decider: Domain::Decisions::Correct, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?completion_builder: CommandCompletionBuilder, ?natural_key_registry: NaturalKeys::Registry, ?event_plan_contract: Contracts::DecisionCorrectionEventPlan) -> void
         %a{rbs:test:skip}
         def call: (command_input input) -> Dry::Monads::Result
         def call_command: (Commands::CorrectDecision command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result

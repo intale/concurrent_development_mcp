@@ -3,19 +3,24 @@
 module Coordinator::Write
   module Contracts
     class CandidateImpactPairScanStart < Dry::Validation::Contract
+      include ProcessStepCausation
+
       params do
         required(:invocation).value(Types.Instance(CandidateImpactPairScanInvocation))
         required(:evidence).value(Types.Instance(CandidateObligations::CandidateEvidenceV1))
-        required(:expected_identity).filled(:string)
       end
 
-      rule(:invocation, :evidence, :expected_identity) do
+      rule(:invocation, :evidence) do
         invocation = values[:invocation]
         command = invocation.command
         evidence = values[:evidence]
         failures = []
         failures << "source event must be the exact supplied reference" unless physical_reference(invocation.source_event) == invocation.source_reference
-        failures << "scan and command IDs must match the canonical identity" unless command.scan_id == values[:expected_identity] && command.command_id == values[:expected_identity]
+        failures << "scan ID must be UUIDv7" unless Types::UUID_V7_PATTERN.match?(command.scan_id)
+        failures << "command ID must be UUIDv7" unless Types::UUID_V7_PATTERN.match?(command.command_id)
+        unless process_step_matches?(invocation.caused_by, command_id: command.command_id, target_entity_id: command.scan_id)
+          failures << "causal parent must be the ProcessStep that allocated the scan command and identity"
+        end
         failures << "actor must be the candidate-impact obligation policy" unless command.actor.kind == "system" && command.actor.id == "candidate-impact-obligation-policy"
         failures << "registration must match exact Candidate evidence" unless command.source_registration == evidence.registration_event
         failures << "ChangeSet must match exact Candidate evidence" unless command.change_set_id == evidence.subject.change_set_id

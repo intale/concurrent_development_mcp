@@ -15,6 +15,7 @@ module Coordinator::Write::Operations
       ?schema_registry: Coordinator::Write::EventSchemaRegistry,
       ?stream_factory: Coordinator::Write::StreamFactory,
       ?completion_builder: Coordinator::Write::CommandCompletionBuilder,
+      ?natural_key_registry: Coordinator::Write::NaturalKeys::Registry,
       ?event_plan_contract: Coordinator::Write::Contracts::MergeSnapshotRegistrationEventPlan
     ) -> void
     %a{rbs:test:skip}

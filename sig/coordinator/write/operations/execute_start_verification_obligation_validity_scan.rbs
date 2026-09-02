@@ -8,7 +8,6 @@ module Coordinator
           ?loader: VerificationObligationValidityScans::ScanLoader,
           ?decider: Domain::VerificationObligationValidityScans::Start,
           ?retry_policy: VerificationObligationValidityScans::ExpectedRevisionRetry,
-          ?identity_builder: VerificationObligationValidityScans::IdentityBuilder,
           ?clock: Shared::_Clock,
           ?id_generator: Shared::_IdGenerator,
           ?event_factory: EventFactory,

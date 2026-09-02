@@ -6,15 +6,17 @@ module RepositoryScenario
 
   module_function
 
+  @repository_ids_mutex = Thread::Mutex.new
+
   def repository_id(key = "billing")
     value = key.to_s
     return value if Coordinator::Shared::Types::UUID_V7_PATTERN.match?(value)
     return DEFAULT_REPOSITORY_ID if value == "billing"
 
-    digest = Coordinator::Shared::CanonicalJson.new.sha256(
-      { "test_repository" => value }
-    ).delete_prefix("sha256:")
-    "01a03deb-#{digest[0, 4]}-7#{digest[4, 3]}-8#{digest[7, 3]}-#{digest[10, 12]}"
+    @repository_ids_mutex.synchronize do
+      @repository_ids ||= {}
+      @repository_ids[value] ||= SecureRandom.uuid_v7
+    end
   end
 
   def scope(key = "billing")

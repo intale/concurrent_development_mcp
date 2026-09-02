@@ -5,13 +5,10 @@ module Coordinator::Write
     class AgentChoiceImpactScanProgressCommand < Dry::Validation::Contract
       params do
         required(:command).value(Types.Instance(Commands::ProgressAgentChoiceImpactScan))
-        required(:expected_identity).filled(:string)
       end
 
-      rule(:command, :expected_identity) do
-        unless values[:command].command_id == values[:expected_identity]
-          key(:command).failure("command ID must match the canonical checkpoint identity")
-        end
+      rule(:command) do
+        key.failure("command ID must be UUIDv7") unless Types::UUID_V7_PATTERN.match?(value.command_id)
       end
     end
   end

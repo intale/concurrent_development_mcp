@@ -54,7 +54,7 @@ module Coordinator::Processes
       def matching_markers?(event)
         event.markers == [
           "command:#{event.data['command_id']}",
-          @execution_lane.marker(event.data["command_id"]),
+          @execution_lane.marker(event.data["task_id"]),
           "task:#{event.data['task_id']}",
           "tool:#{event.data['tool_name']}"
         ].sort

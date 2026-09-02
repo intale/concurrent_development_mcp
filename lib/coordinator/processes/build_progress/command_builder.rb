@@ -10,7 +10,7 @@ module Coordinator::Processes
         @compound_marker_builder = compound_marker_builder
       end
 
-      def call(source:, dependency:)
+      def call(source:, dependency:, command_id:)
         document = Coordinator::Write::ProcessDecisions::DependencySatisfactionV1.new(
           schema: "process-decision/dependency-satisfaction/v1",
           process_manager: "build-progress",
@@ -25,9 +25,6 @@ module Coordinator::Processes
             purpose: "process-decision",
             components: document.component_markers
           )
-        )
-        command_id = InternalCommandIdBuilder.call(
-          "dependency-satisfaction:v1:#{compound_marker.digest.delete_prefix("sha256:")}"
         )
         identity = Coordinator::Write::DependencySatisfactionDecisionIdentity.new(
           document:,
@@ -46,7 +43,7 @@ module Coordinator::Processes
         )
       end
 
-      def completion(source:)
+      def completion(source:, command_id:)
         release_set_id = source.payload.release_set_id if
           source.payload.is_a?(Coordinator::Write::Events::ReleaseSetCompletedV1)
         document = Coordinator::Write::ProcessDecisions::ChangeSetCompletionV1.new(
@@ -63,9 +60,6 @@ module Coordinator::Processes
             purpose: "process-decision",
             components: document.component_markers
           )
-        )
-        command_id = InternalCommandIdBuilder.call(
-          "change-set-completion:v1:#{compound_marker.digest.delete_prefix("sha256:")}"
         )
         identity = Coordinator::Write::ChangeSetCompletionDecisionIdentity.new(
           document:,

@@ -161,7 +161,8 @@ def create_knowledge_browser_artifact(identifier, title, locator, position)
   FactoryBot.create(
     :coordinator_read_development_artifact_observation,
     artifact:,
-    observation_id: "artifact-observation:v1:#{identifier.delete_prefix('artifact:v1:')}",
+    observation_id: identifier == knowledge_browser_parent_id ?
+      knowledge_browser_parent_observation_id : knowledge_browser_child_observation_id,
     scope: @knowledge_browser_scope,
     title:,
     source_locator: locator,
@@ -175,7 +176,7 @@ def create_knowledge_browser_relation(relation, position)
   FactoryBot.create(
     :coordinator_read_development_artifact_relation,
     source_artifact: Coordinator::Read::DevelopmentArtifact.find(knowledge_browser_parent_id),
-    relation_id: "artifact-relation:v1:#{format('%064x', position)}",
+    relation_id: format("018f0f50-4e45-7abc-8def-%012x", position),
     relation:,
     target_id: knowledge_browser_child_id,
     declared_global_position: position
@@ -197,13 +198,21 @@ def knowledge_browser_data
 end
 
 def knowledge_browser_skill_id
-  "skill:v1:#{'8' * 64}"
+  "018f0f4d-4e45-7abc-8def-000000000088"
 end
 
 def knowledge_browser_parent_id
-  "artifact:v1:#{'8' * 64}"
+  "018f0f4d-4e45-7abc-8def-000000000089"
 end
 
 def knowledge_browser_child_id
-  "artifact:v1:#{'9' * 64}"
+  "018f0f4d-4e45-7abc-8def-000000000090"
+end
+
+def knowledge_browser_parent_observation_id
+  "018f0f4d-4e45-7abc-8def-000000000091"
+end
+
+def knowledge_browser_child_observation_id
+  "018f0f4d-4e45-7abc-8def-000000000092"
 end

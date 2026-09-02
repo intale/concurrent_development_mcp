@@ -784,7 +784,7 @@ module Coordinator
             },
             after_skill_id: {
               anyOf: [
-                { type: "string", pattern: "^skill:v1:[0-9a-f]{64}$" },
+                uuid_v7,
                 { type: "null" }
               ]
             },
@@ -931,8 +931,7 @@ module Coordinator
           properties: common_mutation_properties.merge(
             actor: attributed_actor(enum: %w[agent user]),
             observation_id: {
-              type: "string",
-              pattern: "^artifact-observation:v1:[0-9a-f]{64}$",
+              **uuid_v7,
               description: "Exact immutable source observation whose semantic classification is being corrected."
             },
             expected_revision: {
@@ -1013,8 +1012,7 @@ module Coordinator
         supersedes = object_schema(
           properties: {
             relation_id: {
-              type: "string",
-              pattern: "^artifact-relation:v1:[0-9a-f]{64}$",
+              **uuid_v7,
               description: "Exact active relation being immutably corrected by this replacement."
             },
             reason: {
@@ -1029,8 +1027,7 @@ module Coordinator
           properties: common_mutation_properties.merge(
             actor: attributed_actor(enum: %w[agent user]),
             source_artifact_id: {
-              type: "string",
-              pattern: "^artifact:v1:[0-9a-f]{64}$",
+              **uuid_v7,
               description: "Captured Artifact from which the directed relationship originates."
             },
             relation: {
@@ -1055,10 +1052,10 @@ module Coordinator
       def development_artifact_get
         object_schema(
           properties: {
-            artifact_id: { type: "string", pattern: "^artifact:v1:[0-9a-f]{64}$" },
+            artifact_id: uuid_v7,
             observation_id: {
               anyOf: [
-                { type: "string", pattern: "^artifact-observation:v1:[0-9a-f]{64}$" },
+                uuid_v7,
                 { type: "null" }
               ],
               description: "Optional exact immutable observation; omit to receive the latest available observation."
@@ -1071,7 +1068,7 @@ module Coordinator
       def development_artifact_content_get
         object_schema(
           properties: {
-            artifact_id: { type: "string", pattern: "^artifact:v1:[0-9a-f]{64}$" }
+            artifact_id: uuid_v7
           },
           required: %w[artifact_id]
         )
@@ -1089,7 +1086,7 @@ module Coordinator
             },
             after_relation_id: {
               anyOf: [
-                { type: "string", pattern: "^artifact-relation:v1:[0-9a-f]{64}$" },
+                uuid_v7,
                 { type: "null" }
               ]
             }
@@ -1103,7 +1100,7 @@ module Coordinator
         )
         object_schema(
           properties: {
-            artifact_id: { type: "string", pattern: "^artifact:v1:[0-9a-f]{64}$" },
+            artifact_id: uuid_v7,
             direction: {
               anyOf: [ { type: "string", enum: %w[incoming outgoing both] }, { type: "null" } ]
             },
@@ -1148,7 +1145,7 @@ module Coordinator
             },
             after_observation_id: {
               anyOf: [
-                { type: "string", pattern: "^artifact-observation:v1:[0-9a-f]{64}$" },
+                uuid_v7,
                 { type: "null" }
               ],
               description: "Immutable observation tie-breaker inside a fixed observation window."
@@ -2386,7 +2383,7 @@ module Coordinator
       def public_command_id
         {
           type: "string",
-          pattern: "^(?!internal:)[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"
+          pattern: "^(?!(?:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$)(?!internal:)[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$"
         }
       end
 

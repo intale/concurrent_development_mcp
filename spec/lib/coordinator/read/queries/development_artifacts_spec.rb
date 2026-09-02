@@ -35,7 +35,7 @@ RSpec.describe "Development Artifact queries", :read_model do
 
   it "reports invalid and unavailable projected artifacts without consulting the write side" do
     invalid = Coordinator::Read::Queries::DevelopmentArtifactGet.new.call(artifact_id: "invalid").value!
-    missing_id = "artifact:v1:#{'f' * 64}"
+    missing_id = "018f0f4d-4e45-7abc-8def-000000000191"
     missing = Coordinator::Read::Queries::DevelopmentArtifactGet.new.call(
       artifact_id: missing_id
     ).value!
@@ -223,7 +223,7 @@ RSpec.describe "Development Artifact queries", :read_model do
       include_superseded: true,
       limit: 10
     ).value!.data.page
-    replacement_id = "artifact-relation:v1:#{'e' * 64}"
+    replacement_id = "018f0f4d-4e45-7abc-8def-000000000192"
     create(
       :coordinator_read_development_artifact_relation_supersession,
       relation: original,

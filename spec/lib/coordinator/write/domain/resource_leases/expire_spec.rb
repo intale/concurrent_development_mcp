@@ -8,7 +8,7 @@ RSpec.describe Coordinator::Write::Domain::ResourceLeases::Expire do
   let(:state) { ResourceLeaseExamples.lease_state(resource:, reference:) }
   let(:command) do
     Coordinator::Write::Commands::ExpireResourceLease.new(
-      command_id: "internal:lease-expiry:v1:test",
+      command_id: "0198c000-0000-7000-8000-000000000004",
       actor: Coordinator::Write::Commands::Actor.new(kind: "system", id: "lease-expiry-policy-v1"),
       resource_id: resource.resource_id,
       lease_id: reference.lease_id,

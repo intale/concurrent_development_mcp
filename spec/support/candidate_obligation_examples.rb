@@ -155,17 +155,11 @@ module CandidateObligationExamples
   end
 
   def command(source:, target:, head: decision_head)
-    identity = Coordinator::Write::CandidateObligations::IdentityBuilder.new.call(
-      source:,
-      target:,
-      policy_partition_event: partition_reference,
-      policy_head: head,
-      rule_version: RULE_VERSION
-    )
+    ids = Coordinator::Shared::IdGenerator.new
     Coordinator::Write::Commands::CreateCandidateCompatibilityObligation.new(
-      command_id: identity.obligation_id,
+      command_id: ids.uuid_v7,
       actor: { kind: "system", id: "candidate-impact-obligation-policy" },
-      obligation_id: identity.obligation_id,
+      obligation_id: ids.uuid_v7,
       source_registration: source.registration_event,
       target_registration: target.registration_event,
       policy_partition_event: partition_reference,
@@ -374,7 +368,7 @@ module CandidateObligationExamples
       build_context_event: context_reference,
       surface_event: surface_reference,
       surface_digest:,
-      index_policy_version: "candidate-impact-bucket-index/v1",
+      index_policy_version: "candidate-impact-exact-index/v2",
       registered_at: TIMESTAMP
     )
   end

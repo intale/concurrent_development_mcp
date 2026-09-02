@@ -12,7 +12,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
     expect(plan.events.map(&:class)).to eq([
       Coordinator::Write::Events::CandidateSubmittedV2,
       Coordinator::Write::Events::CandidateChangeManifestCapturedV1,
-      Coordinator::Write::Events::CandidateHeadRegisteredV1,
+      Coordinator::Write::Events::CandidateHeadRegisteredV2,
       Coordinator::Write::Events::CandidateAttachedToAttemptV1
     ])
     expect(plan.writes.map(&:stream)).to eq([
@@ -39,7 +39,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
       Coordinator::Write::Events::CandidateSubmittedV2,
       Coordinator::Write::Events::CandidateChangeManifestCapturedV1,
       Coordinator::Write::Events::CandidateBuildContextCapturedV1,
-      Coordinator::Write::Events::CandidateHeadRegisteredV1,
+      Coordinator::Write::Events::CandidateHeadRegisteredV2,
       Coordinator::Write::Events::CandidateAttachedToAttemptV1
     ])
     expect(events.first.build_context_digest).to eq(command.build_context.digest)

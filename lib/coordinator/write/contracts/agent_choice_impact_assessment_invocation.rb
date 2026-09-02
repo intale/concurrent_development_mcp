@@ -3,11 +3,7 @@
 module Coordinator::Write
   module Contracts
     class AgentChoiceImpactAssessmentInvocation < Dry::Validation::Contract
-      PARENT_TYPES = %w[
-        AgentChoiceAccepted
-        AgentChoiceImpactScanStarted
-        AgentChoiceImpactScanProgressed
-      ].freeze
+      include ProcessStepCausation
 
       params do
         required(:invocation).value(Types.Instance(Coordinator::Write::AgentChoiceImpactAssessmentInvocation))
@@ -26,8 +22,11 @@ module Coordinator::Write
                 reference.stream_id == parent.stream&.stream_id &&
                 reference.stream_revision == parent.stream_revision
 
-        key.failure("causal parent must be a persisted scan checkpoint or accepted Choice") unless persisted && PARENT_TYPES.include?(parent.type)
+        key.failure("causal parent must be persisted") unless persisted
         key.failure("causal parent must match its exact reference") unless exact
+        unless process_step_matches?(parent, command_id: command.command_id, target_entity_id: command.assessment_id)
+          key.failure("causal parent must be the ProcessStep that allocated the assessment command and identity")
+        end
         unless command.actor.kind == "system" && command.actor.id == "agent-choice-decision-impact"
           key.failure("impact assessment actor must be the system policy")
         end

@@ -50,13 +50,9 @@ module McpResourceResolutionSpec
   end
 
   it "converges two simultaneous MCP commands on one Resource UUID through the real serializable store" do
-    commands = distinct_lane_command_ids
-    responses = commands.map.with_index do |command_id, index|
-      call_tool(
-        "resource_resolve",
-        resource_arguments(command_id:, actor_id: "agent-#{index}")
-      )
-    end
+    submissions = distinct_lane_submissions
+    commands = submissions.map(&:first)
+    responses = submissions.map(&:last)
     task_ids = responses.map { _1.dig("result", "taskId") }
     submitted = task_ids.map { task_events(_1).find { |event| event.type == "CoordinationTaskSubmitted" } }
     barrier = install_contention_barrier(commands)
@@ -257,12 +253,17 @@ module McpResourceResolutionSpec
     event_store.append(streams.resource(resource_id), [ event ])
   end
 
-  def distinct_lane_command_ids
+  def distinct_lane_submissions
     lane = Coordinator::Write::Tasks::ExecutionLane.new
     by_lane = {}
     64.times do |index|
       command_id = "cmd-resource-race-#{index}"
-      by_lane[lane.index(command_id)] ||= command_id
+      response = call_tool(
+        "resource_resolve",
+        resource_arguments(command_id:, actor_id: "agent-#{index}")
+      )
+      task_id = response.dig("result", "taskId")
+      by_lane[lane.index(task_id)] ||= [ command_id, response ]
       break if by_lane.length == Coordinator::Write::Tasks::ExecutionLane::COUNT
     end
     by_lane.sort.map(&:last)

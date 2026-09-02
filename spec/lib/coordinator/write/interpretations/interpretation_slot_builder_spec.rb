@@ -114,9 +114,11 @@ RSpec.describe Coordinator::Write::Interpretations::InterpretationSlotBuilder do
       "message:M-1",
       "topic:testing.framework",
       "conflict-dimension:primary_test_framework",
-      "resolution-strategy:single_choice",
-      "scope:v1:#{first.scope_digest}"
+      "resolution-strategy:single_choice"
     )
+    scope_components = first.compound_marker.components.grep(/\Ascope-[0-9]{3}:/).sort
+    encoded_scope = scope_components.map { _1.partition(":").last }.join
+    expect(encoded_scope).to eq(Coordinator::Shared::CanonicalJson.new.encode(first.document.exact_scope.to_h))
   end
 
   it "keeps different messages and scopes in distinct slots" do

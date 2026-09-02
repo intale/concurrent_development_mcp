@@ -11,19 +11,31 @@ module Coordinator::Processes
     ].freeze
 
     def initialize(
+      event_store:,
       source_loader:,
       command_builder: LeaseExpiryCommandBuilder.new,
+      process_step_planner: ProcessStepPlanner.new(event_store:),
       operation:
     )
       @source_loader = source_loader
       @command_builder = command_builder
+      @process_step_planner = process_step_planner
       @operation = operation
     end
 
     def call(locator)
       source = @source_loader.call(locator)
-      command = @command_builder.call(source)
-      result = @operation.call(command, caused_by: source.event)
+      process_step = @process_step_planner.call(
+        source_event: source.event,
+        process_name: "lease-expiry-policy",
+        step_name: "expire-resource-lease",
+        subject_kind: "resource-lease",
+        subject_id: source.payload.lease_id,
+        rule_version: "lease-expiry/v1",
+        allocate_target_entity: false
+      )
+      command = @command_builder.call(source, command_id: process_step.target_command_id)
+      result = @operation.call(command, caused_by: process_step.event)
       return Success(LeaseExpiryHandledV1.new(outcome: "expired_or_replayed")) if result.success?
 
       map_failure(result.failure)

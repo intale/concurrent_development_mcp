@@ -10,6 +10,7 @@ module Coordinator
       def head_registration_event_id: () -> String
       def attachment_event_id: () -> String
       def completion_event_id: () -> String
+      def with_head_identity: (Candidates::HeadIdentityV1 value) -> PreparedCandidateSubmission
     end
   end
 end

@@ -4,6 +4,9 @@ RSpec.describe Coordinator::Write::Domain::Skills::Publish do
   subject(:decider) { described_class.new }
 
   let(:published_at) { "2026-08-25T09:30:00.000000Z" }
+  let(:identity) do
+    Coordinator::Write::Skills::IdentityBuilder.new.call(name: "review", scope: "project:alpha")
+  end
   let(:command) { build_command }
 
   it "given an absent tuple and expected revision zero, emits revision one" do
@@ -52,10 +55,6 @@ RSpec.describe Coordinator::Write::Domain::Skills::Publish do
   end
 
   def build_command(expected_revision: 0)
-    identity = Coordinator::Write::Skills::IdentityBuilder.new.call(
-      name: "review",
-      scope: "project:alpha"
-    )
     content = Coordinator::Write::Skills::RevisionBuilder.new.call(
       identity:,
       description: "Review changes",

@@ -9,10 +9,7 @@ module RepositoryAcceptance
     return value if Coordinator::Shared::Types::UUID_V7_PATTERN.match?(value)
     return DEFAULT_REPOSITORY_ID if value == "billing"
 
-    digest = Coordinator::Shared::CanonicalJson.new.sha256(
-      { "test_repository" => value }
-    ).delete_prefix("sha256:")
-    "01a03deb-#{digest[0, 4]}-7#{digest[4, 3]}-8#{digest[7, 3]}-#{digest[10, 12]}"
+    RepositoryScenario.repository_id(value)
   end
 
   def acceptance_repository_scope(key = "billing")
@@ -61,22 +58,6 @@ module RepositoryAcceptance
 
   def reset_acceptance_repositories!
     @registered_acceptance_repositories = []
-  end
-
-  def repository_distinct_lane_command_ids(prefix)
-    lane = Coordinator::Write::Tasks::ExecutionLane.new
-    by_lane = {}
-    64.times do |index|
-      command_id = "#{prefix}.#{index}"
-      by_lane[lane.index(command_id)] ||= command_id
-      break if by_lane.length == Coordinator::Write::Tasks::ExecutionLane::COUNT
-    end
-    assert_acceptance_equal(
-      Coordinator::Write::Tasks::ExecutionLane::COUNT,
-      by_lane.length,
-      "Distinct repository-registration execution lanes"
-    )
-    by_lane.sort.map(&:last)
   end
 
   def prepare_shared_repository_lease_attempts(repository_id)

@@ -84,7 +84,7 @@ module Coordinator::Write
           markers: [
             "task:#{event.task_id}",
             "command:#{target_command.command_id}",
-            @execution_lane.marker(target_command.command_id),
+            @execution_lane.marker(event.task_id),
             "tool:#{event.tool_name}"
           ],
           correlation_id:

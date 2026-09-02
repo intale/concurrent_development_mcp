@@ -8,6 +8,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
   end
   let(:policy) do
     Coordinator::Processes::LeaseExpiryPolicy.new(
+      event_store:,
       source_loader:,
       operation: Coordinator::Write::Operations::ExecuteExpireResourceLease.new(event_store:)
     )
@@ -197,7 +198,15 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
   end
 
   def expiry_command_id(event)
-    "#{Coordinator::Processes::LeaseExpiryCommandBuilder::COMMAND_ID_PREFIX}#{event.id}"
+    step = ProcessStepExamples.event(
+      event_store:,
+      source_event: event,
+      process_name: "lease-expiry-policy",
+      step_name: "expire-resource-lease",
+      subject_kind: "resource-lease",
+      subject_id: event.data.fetch("lease_id")
+    )
+    step.data.fetch("target_command_id")
   end
 
   def wait_for_expiration(reservation)

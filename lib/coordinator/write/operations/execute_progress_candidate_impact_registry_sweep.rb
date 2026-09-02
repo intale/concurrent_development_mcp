@@ -11,7 +11,6 @@ module Coordinator::Write
         loader: CandidateObligationScans::RegistrySweepLoader.new(event_store:),
         decider: Domain::CandidateObligationScans::ProgressRegistrySweep.new,
         revision_guard: CandidateObligationScans::ExpectedRevisionGuard.new,
-        identity_builder: CandidateObligationScans::IdentityBuilder.new,
         clock: SystemClock.new,
         id_generator: IdGenerator.new,
         event_factory: EventFactory.new,
@@ -24,7 +23,6 @@ module Coordinator::Write
         @loader = loader
         @decider = decider
         @revision_guard = revision_guard
-        @identity_builder = identity_builder
         @clock = clock
         @id_generator = id_generator
         @event_factory = event_factory
@@ -66,7 +64,7 @@ module Coordinator::Write
           event_id: preparation.event_id,
           metadata: metadata(command),
           markers: markers(command),
-          caused_by: checkpoint.event
+          caused_by: invocation.caused_by
         )
         persisted = @event_store.append(
           stream,
@@ -78,12 +76,7 @@ module Coordinator::Write
       end
 
       def verify_input!(invocation)
-        command = invocation.command
-        expected_identity = @identity_builder.progress(
-          checkpoint_event: command.expected_checkpoint,
-          rule_version: command.rule_version
-        )
-        result = @input_contract.call(invocation:, expected_identity:)
+        result = @input_contract.call(invocation:)
         return if result.success?
 
         raise ArgumentError, "registry sweep progress violates its dry-rb contract: #{result.errors.to_h.inspect}"

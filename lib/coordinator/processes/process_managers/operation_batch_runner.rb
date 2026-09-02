@@ -18,6 +18,7 @@ module Coordinator::Processes
         result_mapper: Coordinator::Write::Tasks::ToolResultMapper.new,
         completion_loader: OperationBatches::TargetCompletionLoader.new(event_store:),
         command_builder: OperationBatches::CommandBuilder.new,
+        process_step_planner: Coordinator::Processes::ProcessStepPlanner.new(event_store:),
         batch_executor: Coordinator::Write::Operations::ExecuteOperationBatchCommand.new(event_store:)
       )
         @source_builder = source_builder
@@ -27,6 +28,7 @@ module Coordinator::Processes
         @result_mapper = result_mapper
         @completion_loader = completion_loader
         @command_builder = command_builder
+        @process_step_planner = process_step_planner
         @batch_executor = batch_executor
       end
 
@@ -71,16 +73,29 @@ module Coordinator::Processes
           tool_name: item.command_input.tool_name
         )
         completion = target_result.success? ? @completion_loader.call(command.command_id) : nil
-        caused_by = outcome_parent(source, completion)
+        parent = outcome_parent(source, completion)
+        process_step = plan(
+          source_event: parent,
+          step_name: "record-item-outcome",
+          subject_kind: "operation-batch-item",
+          subject_id: "#{source.payload.batch_id}:#{item.index}",
+          rule_version: "operation-batch-item-outcome/v1"
+        )
+        instrument_page_boundary(
+          "operation_batch_item_outcome",
+          source,
+          process_command_id: process_step.target_command_id
+        )
         execute!(
           @batch_executor.call_command(
             @command_builder.record_outcome(
               source:,
               item:,
               result: public_result,
-              completion:
+              completion:,
+              command_id: process_step.target_command_id
             ),
-            caused_by:
+            caused_by: process_step.event
           )
         )
       end
@@ -92,7 +107,19 @@ module Coordinator::Processes
 
         pending = snapshot.state.pending_indexes
         if pending.empty?
-          execute!(@batch_executor.call_command(@command_builder.complete(source:), caused_by: source.event))
+          process_step = plan(
+            source_event: source.event,
+            step_name: "complete-batch",
+            subject_kind: "operation-batch",
+            subject_id: source.payload.batch_id,
+            rule_version: "operation-batch-completion/v1"
+          )
+          execute!(
+            @batch_executor.call_command(
+              @command_builder.complete(source:, command_id: process_step.target_command_id),
+              caused_by: process_step.event
+            )
+          )
           return
         end
 
@@ -101,10 +128,22 @@ module Coordinator::Processes
           page_start + snapshot.state.creation.page_size - 1,
           snapshot.state.creation.total - 1
         ].min
+        process_step = plan(
+          source_event: source.event,
+          step_name: "request-page-continuation",
+          subject_kind: "operation-batch-page",
+          subject_id: "#{source.payload.batch_id}:#{page_start}",
+          rule_version: "operation-batch-continuation/v1"
+        )
         execute!(
           @batch_executor.call_command(
-            @command_builder.continuation(source:, page_start:, page_end:),
-            caused_by: source.event
+            @command_builder.continuation(
+              source:,
+              page_start:,
+              page_end:,
+              command_id: process_step.target_command_id
+            ),
+            caused_by: process_step.event
           )
         )
       end
@@ -125,10 +164,20 @@ module Coordinator::Processes
       end
 
       def complete_cancellation(source)
+        process_step = plan(
+          source_event: source.event,
+          step_name: "complete-cancellation",
+          subject_kind: "operation-batch",
+          subject_id: source.payload.batch_id,
+          rule_version: "operation-batch-cancellation/v1"
+        )
         execute!(
           @batch_executor.call_command(
-            @command_builder.complete_cancellation(source:),
-            caused_by: source.event
+            @command_builder.complete_cancellation(
+              source:,
+              command_id: process_step.target_command_id
+            ),
+            caused_by: process_step.event
           )
         )
       end
@@ -151,11 +200,24 @@ module Coordinator::Processes
               "Batch process rejected: #{failure.code} - #{failure.message}"
       end
 
-      def instrument_page_boundary(operation, source)
+      def plan(source_event:, step_name:, subject_kind:, subject_id:, rule_version:)
+        @process_step_planner.call(
+          source_event:,
+          process_name: "operation-batch-runner",
+          step_name:,
+          subject_kind:,
+          subject_id:,
+          rule_version:,
+          allocate_target_entity: false
+        )
+      end
+
+      def instrument_page_boundary(operation, source, process_command_id: nil)
         ActiveSupport::Notifications.instrument(
           "coordinator.command_boundary",
           operation:,
           command_id: source.event.metadata.fetch("command_id"),
+          process_command_id:,
           batch_id: source.payload.batch_id,
           source_event_id: source.event.id
         )

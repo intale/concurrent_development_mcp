@@ -4,7 +4,7 @@ RSpec.describe Coordinator::Read::Web::Queries::KnowledgeBrowser, :read_model do
   let(:repository_id) { "018f0f4d-4e45-7abc-8def-000000000071" }
   let(:scope) { "project:knowledge-browser" }
   let(:project_ref) { Coordinator::Read::Web::ProjectReference.new.encode(scope:) }
-  let(:skill_id) { "skill:v1:#{'1' * 64}" }
+  let(:skill_id) { "018f0f4d-4e45-7abc-8def-000000000111" }
   let(:parent_id) { artifact_id("a") }
   let(:child_id) { artifact_id("b") }
 
@@ -153,11 +153,11 @@ RSpec.describe Coordinator::Read::Web::Queries::KnowledgeBrowser, :read_model do
   end
 
   def artifact_id(hex)
-    "artifact:v1:#{hex * 64}"
+    format("018f0f52-4e45-7abc-8def-%012x", hex.to_i(16))
   end
 
   def observation_id(hex)
-    "artifact-observation:v1:#{hex * 64}"
+    format("018f0f53-4e45-7abc-8def-%012x", hex.to_i(16))
   end
 
   def create_artifact(identifier, title, locator, position, artifact_scope: scope)
@@ -173,7 +173,7 @@ RSpec.describe Coordinator::Read::Web::Queries::KnowledgeBrowser, :read_model do
     create(
       :coordinator_read_development_artifact_observation,
       artifact:,
-      observation_id: observation_id(identifier.delete_prefix("artifact:v1:").first),
+      observation_id: observation_id(identifier[-1]),
       scope: artifact_scope,
       title:,
       source_locator: locator,
@@ -189,7 +189,7 @@ RSpec.describe Coordinator::Read::Web::Queries::KnowledgeBrowser, :read_model do
     create(
       :coordinator_read_development_artifact_relation,
       source_artifact: source,
-      relation_id: "artifact-relation:v1:#{format('%064x', position)}",
+      relation_id: format("018f0f54-4e45-7abc-8def-%012x", position),
       relation:,
       target_id:,
       declared_global_position: position

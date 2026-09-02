@@ -3,13 +3,11 @@
 module Coordinator::Write
   module Candidates
     class ImpactIndexMarkerBuilder
-      POLICY_VERSION = "candidate-impact-bucket-index/v1"
+      POLICY_VERSION = "candidate-impact-exact-index/v2"
 
       def initialize(
-        canonical_json: CanonicalJson.new,
         compound_marker_builder: CompoundMarkerBuilder.new
       )
-        @canonical_json = canonical_json
         @compound_marker_builder = compound_marker_builder
       end
 
@@ -52,11 +50,11 @@ module Coordinator::Write
       end
 
       def build_markers(role:, kind:, values:, repository_id:)
-        values.uniq.map { bucket(kind:, value: _1) }.uniq.map do |bucket|
+        values.uniq.map do |value|
           components = [
             "role:#{role}",
             "kind:#{kind}",
-            "bucket:#{bucket}",
+            "value:#{value}",
             "index-policy:#{POLICY_VERSION}"
           ]
           components << "repository:#{repository_id}" if repository_id
@@ -67,15 +65,6 @@ module Coordinator::Write
             )
           ).marker
         end
-      end
-
-      def bucket(kind:, value:)
-        document = ImpactIndexValueDocumentV1.new(
-          schema: ImpactIndexValueDocumentV1::SCHEMA,
-          kind:,
-          value:
-        )
-        @canonical_json.sha256(document.to_h).delete_prefix("sha256:").slice(0)
       end
 
       def changed_paths(manifest)

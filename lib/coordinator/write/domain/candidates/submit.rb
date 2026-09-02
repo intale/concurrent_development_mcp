@@ -240,7 +240,7 @@ module Coordinator::Write
           writes.concat([
             EventWrite.new(
               stream: @stream_factory.candidate_head(head_identity.registry_id),
-              event: Events::CandidateHeadRegisteredV1.new(
+              event: Events::CandidateHeadRegisteredV2.new(
                 registry_id: head_identity.registry_id,
                 candidate_id: command.candidate_id,
                 attempt_id: command.attempt_id,

@@ -110,14 +110,19 @@ module AgentChoiceImpactScenario
 
   def start_scan(source)
     source_reference = reference(source)
-    identity = Coordinator::Write::AgentChoiceImpacts::ScanIdentityBuilder.new.start(
-      source_event: source_reference,
-      policy_version: POLICY_VERSION
+    process_step = Coordinator::Processes::ProcessStepPlanner.new(event_store:).call(
+      source_event: source,
+      process_name: "agent-choice-decision-impact",
+      step_name: "start-impact-scan",
+      subject_kind: "decision-change",
+      subject_id: source_reference.event_id,
+      rule_version: POLICY_VERSION,
+      allocate_target_entity: true
     )
     command = Coordinator::Write::Commands::StartAgentChoiceImpactScan.new(
-      command_id: identity,
+      command_id: process_step.target_command_id,
       actor: { kind: "system", id: "agent-choice-decision-impact" },
-      scan_id: identity,
+      scan_id: process_step.target_entity_id!,
       source_event: source_reference,
       source_global_position: source.global_position,
       policy_version: POLICY_VERSION
@@ -125,7 +130,8 @@ module AgentChoiceImpactScenario
     invocation = Coordinator::Write::AgentChoiceImpactScanInvocation.new(
       command:,
       source_event: source,
-      source_reference:
+      source_reference:,
+      caused_by: process_step.event
     )
     Coordinator::Write::Operations::ExecuteStartAgentChoiceImpactScan.new(event_store:).call(invocation).value!
   end
@@ -133,15 +139,19 @@ module AgentChoiceImpactScenario
   def assessment_invocation(choice:, source:, caused_by: start_scan(source))
     accepted_reference = reference(choice.fetch(:accepted))
     change = Coordinator::Write::AgentChoiceImpacts::DecisionChangeEvidenceBuilder.new(event_store:).call(source).value!
-    assessment_id = Coordinator::Write::AgentChoiceImpacts::AssessmentIdentityBuilder.new.call(
-      accepted_choice: accepted_reference,
-      decision_change: change.source_event,
-      policy_version: POLICY_VERSION
+    process_step = Coordinator::Processes::ProcessStepPlanner.new(event_store:).call(
+      source_event: caused_by,
+      process_name: "agent-choice-decision-impact",
+      step_name: "assess-choice-impact",
+      subject_kind: "choice-decision-change",
+      subject_id: "#{accepted_reference.event_id}:#{change.source_event.event_id}",
+      rule_version: POLICY_VERSION,
+      allocate_target_entity: true
     )
     command = Coordinator::Write::Commands::AssessAgentChoiceDecisionImpact.new(
-      command_id: assessment_id,
+      command_id: process_step.target_command_id,
       actor: { kind: "system", id: "agent-choice-decision-impact" },
-      assessment_id:,
+      assessment_id: process_step.target_entity_id!,
       choice_id: choice.fetch(:identifiers).fetch(:choice_id),
       accepted_choice: accepted_reference,
       decision_change: change,
@@ -149,8 +159,8 @@ module AgentChoiceImpactScenario
     )
     Coordinator::Write::AgentChoiceImpactAssessmentInvocation.new(
       command:,
-      caused_by:,
-      caused_by_reference: reference(caused_by)
+      caused_by: process_step.event,
+      caused_by_reference: process_step.reference
     )
   end
 

@@ -3,6 +3,8 @@
 module Coordinator::Write
   module Contracts
     class CandidateCompatibilityObligationInvocation < Dry::Validation::Contract
+      include ProcessStepCausation
+
       params do
         required(:invocation).value(Types.Instance(Coordinator::Write::CandidateCompatibilityObligationInvocation))
       end
@@ -21,6 +23,9 @@ module Coordinator::Write
 
         key.failure("causal parent must be a persisted event") unless persisted
         key.failure("causal parent must match its exact reference") unless exact
+        unless process_step_matches?(parent, command_id: invocation.command.command_id, target_entity_id: invocation.command.obligation_id)
+          key.failure("causal parent must be the ProcessStep that allocated the obligation command and identity")
+        end
       end
     end
   end

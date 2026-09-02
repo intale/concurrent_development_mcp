@@ -35,7 +35,7 @@ module Coordinator::Write
             evidence_status: "attributed_unverified",
             registered_at:
           )
-          registration = Events::MergeSnapshotCommitRegisteredV1.new(
+          registration = Events::MergeSnapshotCommitRegisteredV2.new(
             registry_id: commit_identity.registry_id,
             merge_snapshot_id: command.merge_snapshot_id,
             repository_id: command.repository_id,

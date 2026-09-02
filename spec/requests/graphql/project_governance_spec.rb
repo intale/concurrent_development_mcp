@@ -396,7 +396,7 @@ module ProjectGovernanceGraphqlSpec
         "next_actions" => [
           {
             "tool" => "development_artifact_get",
-            "arguments" => { "artifact_id" => "artifact:v1:#{'a' * 64}" }
+            "arguments" => { "artifact_id" => "018f0f4d-4e45-7abc-8def-000000000211" }
           }
         ]
       )

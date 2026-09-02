@@ -6,7 +6,6 @@ RSpec.describe Coordinator::Processes::ProcessManagers::VerificationObligationVa
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
   let(:schemas) { Coordinator::Write::EventSchemaRegistry.new }
-  let(:identities) { Coordinator::Write::VerificationObligationValidityScans::IdentityBuilder.new }
 
   it "scans prior obligation creations and converges redelivery on one invalidation" do
     created = CandidateObligationScenario.create_obligation(prefix: "validity-process-scan")
@@ -29,8 +28,28 @@ RSpec.describe Coordinator::Processes::ProcessManagers::VerificationObligationVa
       "VerificationObligationValidityScanStarted",
       "VerificationObligationValidityScanCompleted"
     )
-    expect(started.causation_id).to eq(corrected.fetch(:partition_event).id)
-    expect([ invalidated, completed ].map(&:causation_id).uniq).to eq([ started.id ])
+    partition_event = corrected.fetch(:partition_event)
+    start_step = process_step(
+      source_event: partition_event,
+      step_name: "start-validity-scan",
+      subject_kind: "candidate-policy-partition",
+      subject_id: partition_event.id
+    )
+    invalidation_step = process_step(
+      source_event: started,
+      step_name: "invalidate-obligation",
+      subject_kind: "obligation-policy-pair",
+      subject_id: "#{created.fetch(:event).id}:#{partition_event.id}"
+    )
+    progress_step = process_step(
+      source_event: started,
+      step_name: "progress-validity-scan",
+      subject_kind: "verification-obligation-validity-scan",
+      subject_id: started.stream.stream_id
+    )
+    expect(started.causation_id).to eq(start_step.id)
+    expect(invalidated.causation_id).to eq(invalidation_step.id)
+    expect(completed.causation_id).to eq(progress_step.id)
     expect(
       [ corrected.fetch(:partition_event), started, invalidated, completed ].map(&:correlation_id).uniq
     ).to eq([ corrected.fetch(:partition_event).correlation_id ])
@@ -46,7 +65,13 @@ RSpec.describe Coordinator::Processes::ProcessManagers::VerificationObligationVa
     invalidated = invalidation_events(created).sole
     expect(load(invalidated).superseding_partition_event)
       .to eq(reference(corrected.fetch(:partition_event)))
-    expect(invalidated.causation_id).to eq(created.fetch(:event).id)
+    step = process_step(
+      source_event: created.fetch(:event),
+      step_name: "invalidate-obligation",
+      subject_kind: "obligation-policy-pair",
+      subject_id: "#{created.fetch(:event).id}:#{corrected.fetch(:partition_event).id}"
+    )
+    expect(invalidated.causation_id).to eq(step.id)
     expect(invalidated.correlation_id).to eq(created.fetch(:event).correlation_id)
     expect(scan_events(corrected)).to be_empty
   end
@@ -114,15 +139,24 @@ RSpec.describe Coordinator::Processes::ProcessManagers::VerificationObligationVa
   end
 
   def scan_id(corrected)
-    identities.scan(
-      superseding_partition_event: reference(corrected.fetch(:partition_event)),
-      rule_version: "verification-obligation-validity/v1"
-    )
+    event_store.read_global_marked(
+      Coordinator::Write::GlobalMarkedEventReadCriteria.new(
+        stream_context: "DevelopmentIntegration",
+        stream_name: "VerificationObligationValidityScan",
+        event_types: [ "VerificationObligationValidityScanStarted" ],
+        markers: [ "superseding-partition-event:#{corrected.fetch(:partition_event).id}" ],
+        maximum_count: 1,
+        direction: :asc
+      )
+    ).first&.stream&.stream_id
   end
 
   def scan_events(corrected)
+    id = scan_id(corrected)
+    return [] unless id
+
     event_store.read_grouped(
-      streams.verification_obligation_validity_scan(scan_id(corrected)),
+      streams.verification_obligation_validity_scan(id),
       Coordinator::Write::EventQueries::VERIFICATION_OBLIGATION_VALIDITY_SCAN_STATE
     )
   end
@@ -182,5 +216,16 @@ RSpec.describe Coordinator::Processes::ProcessManagers::VerificationObligationVa
 
   def reference(event)
     Coordinator::Processes::CandidateObligations::EventReferenceBuilder.new.call(event)
+  end
+
+  def process_step(source_event:, step_name:, subject_kind:, subject_id:)
+    ProcessStepExamples.event(
+      event_store:,
+      source_event:,
+      process_name: "verification-obligation-validity-policy",
+      step_name:,
+      subject_kind:,
+      subject_id:
+    )
   end
 end

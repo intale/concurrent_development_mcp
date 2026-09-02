@@ -4,6 +4,7 @@ module Coordinator
       TARGET_TYPES: Array[Class]
       type value = RegisterRepositoryV1 | ResolveResourceV1 | RemoveResourceV1 | CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | CompleteWorkItemV1 | AbandonAttemptV1 | ReserveWriteSetV1 | ExpandWriteSetV1 | RenewLeaseSetV1 | ReleaseLeaseSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1 | SubmitCandidateV1 | SubmitCandidateImpactSurfaceV1 | ClaimVerificationObligationV1 | SubmitCompatibilityAssessmentV1 | WaiveVerificationObligationV1 | RegisterMergeSnapshotV1 | SubmitMergeSnapshotVerificationV1 | RequestMergeAuthorizationV1 | RecordMergeObservationV1 | PrepareReleaseSetV1 | RecordRepositoryIntegrationV1 | RecordReleaseSetVerificationV1 | RecordReleaseSetActivationV1 | CompleteCompensatedReleaseSetV1 | PublishSkillRevisionV2 | CaptureDevelopmentArtifactV2 | CorrectDevelopmentArtifactClassificationV1 | DeclareDevelopmentArtifactRelationV1 | CreateOperationBatchV1 | CancelOperationBatchV1
       type digest_value = value | ExpireResourceLeaseV1 | RequestReleaseSetCompensationV1 | CompleteActivatedReleaseSetV1 | SatisfyWorkItemDependencyV1 | CompleteChangeSetV1 | RecordOperationBatchItemOutcomeV1 | RequestOperationBatchContinuationV1 | CompleteOperationBatchV1 | CompleteOperationBatchCancellationV1
+      type canonical_digest_value = digest_value | PublishSkillRevisionCanonicalV2 | CaptureDevelopmentArtifactCanonicalV2 | DeclareDevelopmentArtifactRelationCanonicalV1
 
       class ActorV1 < Shared::Value
         def actor_kind: () -> String
@@ -637,9 +638,8 @@ module Coordinator
         def tool_name: () -> String
       end
 
-      class PublishSkillRevisionInputV2 < Shared::Value
+      class PublishSkillRevisionCanonicalInputV2 < Shared::Value
         def actor: () -> ActorV1
-        def skill_id: () -> String
         def name: () -> String
         def scope: () -> String
         def expected_revision: () -> Integer
@@ -647,6 +647,14 @@ module Coordinator
         def instructions: () -> String
         def assets: () -> Array[SkillAssetV2]
         def content_digest: () -> String
+      end
+
+      class PublishSkillRevisionInputV2 < PublishSkillRevisionCanonicalInputV2
+        def skill_id: () -> String
+      end
+
+      class PublishSkillRevisionCanonicalV2 < PublishSkillRevisionBase
+        def input: () -> PublishSkillRevisionCanonicalInputV2
       end
 
       class PublishSkillRevisionV2 < PublishSkillRevisionBase
@@ -661,15 +669,18 @@ module Coordinator
         def collector: () -> String
       end
 
-      class DevelopmentArtifactV2 < Shared::Value
-        def artifact_id: () -> String
-        def observation_id: () -> String
+      class DevelopmentArtifactCanonicalV2 < Shared::Value
         def scope: () -> String
         def title: () -> String
         def kind: () -> String
         def labels: () -> Array[String]
         def content: () -> (Content::TextV1 | Content::BinaryV1)
         def source: () -> DevelopmentArtifactSourceV1
+      end
+
+      class DevelopmentArtifactV2 < DevelopmentArtifactCanonicalV2
+        def artifact_id: () -> String
+        def observation_id: () -> String
       end
 
       class CaptureDevelopmentArtifactBase < Shared::Value
@@ -681,6 +692,15 @@ module Coordinator
       class CaptureDevelopmentArtifactInputV2 < Shared::Value
         def actor: () -> ActorV1
         def artifact: () -> DevelopmentArtifactV2
+      end
+
+      class CaptureDevelopmentArtifactCanonicalInputV2 < Shared::Value
+        def actor: () -> ActorV1
+        def artifact: () -> DevelopmentArtifactCanonicalV2
+      end
+
+      class CaptureDevelopmentArtifactCanonicalV2 < CaptureDevelopmentArtifactBase
+        def input: () -> CaptureDevelopmentArtifactCanonicalInputV2
       end
 
       class CaptureDevelopmentArtifactV2 < CaptureDevelopmentArtifactBase
@@ -713,13 +733,16 @@ module Coordinator
         def normalized_locator: () -> String?
       end
 
-      class DevelopmentArtifactRelationV1 < Shared::Value
-        def relation_id: () -> String
+      class DevelopmentArtifactRelationCanonicalV1 < Shared::Value
         def source_artifact_id: () -> String
         def relation: () -> String
         def target: () -> DevelopmentArtifactRelationTargetV1
         def attributes: () -> Hash[Symbol, untyped]
         def relation_attributes: () -> DevelopmentArtifactRelationAttributesV1
+      end
+
+      class DevelopmentArtifactRelationV1 < DevelopmentArtifactRelationCanonicalV1
+        def relation_id: () -> String
       end
 
       class DeclareDevelopmentArtifactRelationInputV1 < Shared::Value
@@ -732,6 +755,18 @@ module Coordinator
       class DeclareDevelopmentArtifactRelationV1 < BaseV1
         def tool_name: () -> String
         def input: () -> DeclareDevelopmentArtifactRelationInputV1
+      end
+
+      class DeclareDevelopmentArtifactRelationCanonicalInputV1 < Shared::Value
+        def actor: () -> ActorV1
+        def artifact_relation: () -> DevelopmentArtifactRelationCanonicalV1
+        def supersedes_relation_id: () -> String?
+        def supersession_reason: () -> String?
+      end
+
+      class DeclareDevelopmentArtifactRelationCanonicalV1 < BaseV1
+        def tool_name: () -> String
+        def input: () -> DeclareDevelopmentArtifactRelationCanonicalInputV1
       end
 
       class CreateOperationBatchInputV1 < Shared::Value

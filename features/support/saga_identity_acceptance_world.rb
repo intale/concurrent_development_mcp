@@ -5,16 +5,15 @@ module SagaIdentityAcceptanceWorld
     @saga_identity_kind = :batch
     @operation_batch_id = SecureRandom.uuid_v7
     item = batch_skill_item(index: 0, name: "reserved-batch-process-command")
-    submit_skill_batch([ item ], pause_at: "operation_batch_page_start")
-    await_contention_evidence
+    submit_skill_batch([ item ], pause_at: "operation_batch_item_outcome")
+    evidence = await_contention_evidence.sole
     creation = operation_batch_events.find { _1.type == "OperationBatchCreated" }
     assert_acceptance(creation, "The accepted Batch has no creation fact")
-    @reserved_internal_command_id = [
-      "internal:batch:outcome",
-      @operation_batch_id,
-      creation.id,
-      0
-    ].join(":")
+    @reserved_internal_command_id = evidence.fetch(:process_command_id)
+    assert_acceptance(
+      Coordinator::Shared::Types::UUID_V7_PATTERN.match?(@reserved_internal_command_id),
+      "Operation Batch exposed no UUIDv7 process command: #{evidence.inspect}"
+    )
   end
 
   def prepare_prior_target_for_batch_replay
@@ -134,8 +133,8 @@ module SagaIdentityAcceptanceWorld
     evidence = await_contention_evidence.sole
     @reserved_internal_command_id = evidence.fetch(:process_command_id)
     assert_acceptance(
-      @reserved_internal_command_id&.start_with?("internal:release-compensation:v1:"),
-      "ReleaseSet lifecycle exposed no reserved process command: #{evidence.inspect}"
+      Coordinator::Shared::Types::UUID_V7_PATTERN.match?(@reserved_internal_command_id),
+      "ReleaseSet lifecycle exposed no UUIDv7 process command: #{evidence.inspect}"
     )
   end
 

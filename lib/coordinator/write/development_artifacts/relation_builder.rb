@@ -9,12 +9,7 @@ module Coordinator::Write
 
       def call(source_artifact_id:, relation:, target:, attributes:)
         RelationV1.new(
-          relation_id: @identity_builder.call(
-            source_artifact_id:,
-            relation:,
-            target:,
-            attributes:
-          ),
+          relation_id: @identity_builder.call,
           source_artifact_id:,
           relation:,
           target:,

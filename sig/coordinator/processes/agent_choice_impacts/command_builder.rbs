@@ -8,8 +8,7 @@ module Coordinator
         def initialize: (
           event_store: Write::_EventStore,
           ?decision_change_builder: Write::AgentChoiceImpacts::DecisionChangeEvidenceBuilder,
-          ?scan_identity_builder: Write::AgentChoiceImpacts::ScanIdentityBuilder,
-          ?assessment_identity_builder: Write::AgentChoiceImpacts::AssessmentIdentityBuilder,
+          ?process_step_planner: Coordinator::Processes::ProcessStepPlanner,
           ?reference_builder: EventReferenceBuilder
         ) -> void
         def start: (SourceV1 source) -> Write::AgentChoiceImpactScanInvocation

@@ -11,7 +11,6 @@ module Coordinator::Write
         loader: VerificationObligationValidityScans::ScanLoader.new(event_store:),
         decider: Domain::VerificationObligationValidityScans::Start.new,
         retry_policy: VerificationObligationValidityScans::ExpectedRevisionRetry.new,
-        identity_builder: VerificationObligationValidityScans::IdentityBuilder.new,
         clock: SystemClock.new,
         id_generator: IdGenerator.new,
         event_factory: EventFactory.new,
@@ -24,7 +23,6 @@ module Coordinator::Write
         @loader = loader
         @decider = decider
         @retry_policy = retry_policy
-        @identity_builder = identity_builder
         @clock = clock
         @id_generator = id_generator
         @event_factory = event_factory
@@ -61,19 +59,14 @@ module Coordinator::Write
           event_id: preparation.event_id,
           metadata: metadata(command),
           markers: markers(command),
-          caused_by: invocation.source_event
+          caused_by: invocation.caused_by
         )
         expected_revision = snapshot.latest_revision || :no_stream
         Success(@event_store.append(stream, [ physical ], expected_revision:).sole)
       end
 
       def verify_input!(invocation, source)
-        command = invocation.command
-        expected_identity = @identity_builder.scan(
-          superseding_partition_event: command.superseding_partition_event,
-          rule_version: command.rule_version
-        )
-        result = @input_contract.call(invocation:, source:, expected_identity:)
+        result = @input_contract.call(invocation:, source:)
         return if result.success?
 
         raise ArgumentError, "validity scan start violates its dry-rb contract: #{result.errors.to_h.inspect}"
@@ -100,6 +93,7 @@ module Coordinator::Write
         [
           "verification-obligation-validity-scan:#{command.scan_id}",
           "change-set:#{command.change_set_id}",
+          "superseding-partition-event:#{command.superseding_partition_event.event_id}",
           "command:#{command.command_id}"
         ].freeze
       end

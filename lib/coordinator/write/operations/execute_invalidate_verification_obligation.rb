@@ -9,7 +9,6 @@ module Coordinator::Write
         event_store:,
         exact_loader: CandidateObligations::ExactEventLoader.new(event_store:),
         decider: Domain::VerificationObligationInvalidations::Invalidate.new,
-        identity_builder: VerificationObligationInvalidations::IdentityBuilder.new,
         digest_builder: VerificationObligationInvalidations::DigestBuilder.new,
         clock: SystemClock.new,
         id_generator: IdGenerator.new,
@@ -24,7 +23,6 @@ module Coordinator::Write
         @event_store = event_store
         @exact_loader = exact_loader
         @decider = decider
-        @identity_builder = identity_builder
         @digest_builder = digest_builder
         @clock = clock
         @id_generator = id_generator
@@ -104,13 +102,7 @@ module Coordinator::Write
       end
 
       def verify_invocation!(invocation)
-        command = invocation.command
-        identity = @identity_builder.call(
-          obligation_event: command.obligation_event,
-          superseding_partition_event: command.superseding_partition_event,
-          rule_version: command.rule_version
-        )
-        result = @invocation_contract.call(invocation:, expected_identity: identity)
+        result = @invocation_contract.call(invocation:)
         return if result.success?
 
         raise ArgumentError, "invalidation invocation violates its dry-rb contract: #{result.errors.to_h.inspect}"

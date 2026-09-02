@@ -2,9 +2,15 @@ module Coordinator
   module Write
     module DevelopmentArtifacts
       class MarkerBuilder
+        NATURAL_KEY_PURPOSE: String
+        RELATION_NATURAL_KEY_PURPOSE: String
+
+        def initialize: (?marker_codec: Coordinator::Shared::Markers::CodecV2, ?marker_component_builder: Coordinator::Shared::CanonicalMarkerComponentBuilder, ?compound_marker_builder: Coordinator::Shared::CompoundMarkerBuilder) -> void
         def capture: (event: Events::DevelopmentArtifactCapturedV2 | Events::DevelopmentArtifactObservedV1, command_id: String) -> Array[String]
+        def natural_key: (ArtifactV2 artifact) -> String
         def classification: (event: Events::DevelopmentArtifactClassificationCorrectedV1, command_id: String) -> Array[String]
         def relation: (artifact_relation: RelationV1, command_id: String) -> Array[String]
+        def relation_natural_key: (RelationV1 artifact_relation) -> String
         def supersession: (event: Events::DevelopmentArtifactRelationSupersededV1, command_id: String) -> Array[String]
       end
     end

@@ -10,7 +10,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
       code: :development_artifact_relation_limit_reached,
       message: "Development Artifact relation limit reached",
       details: {
-        artifact_id: "artifact:v1:#{'a' * 64}",
+        artifact_id: "018f0f4d-4e45-7abc-8def-000000000141",
         limit_kind: "lifetime",
         active_count: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_ACTIVE_RELATION_MAXIMUM_COUNT,
         active_maximum: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_ACTIVE_RELATION_MAXIMUM_COUNT,
@@ -32,7 +32,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
   end
 
   it "keeps Artifact observation and classification failures typed across the Task boundary" do
-    observation_id = "artifact-observation:v1:#{'a' * 64}"
+    observation_id = "018f0f4d-4e45-7abc-8def-000000000142"
     examples = [
       [
         :development_artifact_observation_identity_conflict,
@@ -364,7 +364,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
       [
         :decision_slot_occupied,
         {
-          slot_id: "compound:decision-slot:v1:sha256:#{'a' * 64}",
+          slot_id: "018f0f4d-4e45-7abc-8def-000000000091",
           decision_id: "D-task-result",
           event_id: "0198e03a-d112-7000-8000-000000000001"
         },
@@ -483,7 +483,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
       [
         :decision_slot_state_invalid,
         {
-          slot_id: "compound:decision-slot:v1:sha256:#{'a' * 64}",
+          slot_id: "018f0f4d-4e45-7abc-8def-000000000092",
           head: nil
         },
         Coordinator::Write::Tasks::DomainErrorV1::DecisionSlotStateInvalidError,

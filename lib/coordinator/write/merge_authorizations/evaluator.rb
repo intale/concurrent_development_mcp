@@ -12,7 +12,8 @@ module Coordinator::Write
         candidate_loader: CandidateObligations::CandidateEvidenceLoader.new(event_store:),
         definition_loader: CandidateObligations::DecisionDefinitionLoader.new(event_store:),
         matcher: CandidateObligations::Matcher.new,
-        identity_builder: CandidateObligations::IdentityBuilder.new,
+        natural_key_builder: CandidateObligations::NaturalKeyBuilder.new,
+        obligation_loader: CandidateObligations::ObligationLoader.new(event_store:),
         validity_builder: CandidateObligations::ValidityBuilder.new,
         canonical_json: CanonicalJson.new,
         policy_contract: Contracts::CandidateImpactPolicyDefinition.new
@@ -23,7 +24,8 @@ module Coordinator::Write
         @candidate_loader = candidate_loader
         @definition_loader = definition_loader
         @matcher = matcher
-        @identity_builder = identity_builder
+        @natural_key_builder = natural_key_builder
+        @obligation_loader = obligation_loader
         @validity_builder = validity_builder
         @canonical_json = canonical_json
         @policy_contract = policy_contract
@@ -463,7 +465,7 @@ module Coordinator::Write
             impact_reasons = @matcher.call(source:, target:)
             next if impact_reasons.empty?
 
-            identity = @identity_builder.call(
+            natural_key = @natural_key_builder.call(
               source:,
               target:,
               policy_partition_event: current_policy.partition_event,
@@ -471,7 +473,7 @@ module Coordinator::Write
               rule_version: RULE_VERSION
             )
             check = load_obligation_check(
-              identity:,
+              natural_key:,
               source:,
               target:,
               impact_reasons:,
@@ -497,13 +499,17 @@ module Coordinator::Write
         )
       end
 
-      def load_obligation_check(identity:, source:, target:, impact_reasons:, policy:)
+      def load_obligation_check(natural_key:, source:, target:, impact_reasons:, policy:)
+        persisted_creation = @obligation_loader.find(natural_key)
+        return missing_obligation(natural_key, source, target, policy) unless persisted_creation
+
+        obligation_id = persisted_creation.payload.obligation_id
         grouped = @event_store.read_grouped(
-          @stream_factory.verification_obligation(identity.obligation_id),
+          @stream_factory.verification_obligation(obligation_id),
           EventQueries::VERIFICATION_OBLIGATION_LIFECYCLE
         ).to_h { [ _1.type, _1 ] }
         creation_event = grouped["VerificationObligationCreated"]
-        return missing_obligation(identity, source, target, policy) unless creation_event
+        return missing_obligation(natural_key, source, target, policy) unless creation_event
 
         creation = load_event(creation_event)
         expected_validity = @validity_builder.call(
@@ -513,18 +519,18 @@ module Coordinator::Write
           policy:,
           rule_version: RULE_VERSION
         )
-        unless valid_creation?(creation, identity, source, target, policy, expected_validity.digest)
-          return invalid_obligation(identity, source, target, policy, event_reference(creation_event))
+        unless valid_creation?(creation, obligation_id, source, target, policy, expected_validity.digest)
+          return invalid_obligation(natural_key, obligation_id, source, target, policy, event_reference(creation_event))
         end
 
         status, terminal = obligation_status(grouped)
         ObligationCheckV1.new(
-          obligation_id: identity.obligation_id,
+          obligation_id:,
           source_candidate_id: source.subject.candidate_id,
           target_candidate_id: target.subject.candidate_id,
           enforcement: policy.enforcement,
           required_evidence: policy.required_evidence,
-          identity_digest: identity.digest,
+          identity_digest: natural_key.digest,
           status:,
           validity_input_digest: creation.validity_input_digest,
           creation_event: event_reference(creation_event),
@@ -532,14 +538,14 @@ module Coordinator::Write
         )
       end
 
-      def missing_obligation(identity, source, target, policy)
+      def missing_obligation(natural_key, source, target, policy)
         ObligationCheckV1.new(
-          obligation_id: identity.obligation_id,
+          obligation_id: nil,
           source_candidate_id: source.subject.candidate_id,
           target_candidate_id: target.subject.candidate_id,
           enforcement: policy.enforcement,
           required_evidence: policy.required_evidence,
-          identity_digest: identity.digest,
+          identity_digest: natural_key.digest,
           status: "missing",
           validity_input_digest: nil,
           creation_event: nil,
@@ -547,14 +553,14 @@ module Coordinator::Write
         )
       end
 
-      def invalid_obligation(identity, source, target, policy, creation_event)
+      def invalid_obligation(natural_key, obligation_id, source, target, policy, creation_event)
         ObligationCheckV1.new(
-          obligation_id: identity.obligation_id,
+          obligation_id:,
           source_candidate_id: source.subject.candidate_id,
           target_candidate_id: target.subject.candidate_id,
           enforcement: policy.enforcement,
           required_evidence: policy.required_evidence,
-          identity_digest: identity.digest,
+          identity_digest: natural_key.digest,
           status: "invalidated",
           validity_input_digest: nil,
           creation_event:,
@@ -562,9 +568,9 @@ module Coordinator::Write
         )
       end
 
-      def valid_creation?(creation, identity, source, target, policy, validity_digest)
+      def valid_creation?(creation, obligation_id, source, target, policy, validity_digest)
         creation.is_a?(Events::VerificationObligationCreatedV1) &&
-          creation.obligation_id == identity.obligation_id &&
+          creation.obligation_id == obligation_id &&
           creation.source_candidate == source.subject &&
           creation.target_candidate == target.subject &&
           creation.policy == policy &&

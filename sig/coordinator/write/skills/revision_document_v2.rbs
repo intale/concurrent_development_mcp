@@ -5,7 +5,6 @@ module Coordinator
         SCHEMA: String
 
         def schema: () -> String
-        def skill_id: () -> String
         def name: () -> String
         def scope: () -> String
         def description: () -> String

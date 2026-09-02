@@ -16,6 +16,7 @@ module Coordinator
           ?contract: SourceContract,
           ?schema_registry: Write::EventSchemaRegistry,
           ?marker_builder: Write::RepositoryMarkerBuilder,
+          ?process_step_planner: Coordinator::Processes::ProcessStepPlanner,
           ?operation: Write::Operations::ExecuteRollResourceBoundaryEpoch
         ) -> void
         def call: (PgEventstore::Event event) -> nil

@@ -102,9 +102,11 @@ module ProjectKnowledgeGraphqlSpec
     OTHER_REPOSITORY_ID = "018f0f4d-4e45-7abc-8def-000000000082"
     SCOPE = "project:graphql-knowledge"
     OTHER_SCOPE = "project:other-knowledge"
-    SKILL_ID = "skill:v1:#{'1' * 64}"
-    PARENT_ID = "artifact:v1:#{'a' * 64}"
-    CHILD_ID = "artifact:v1:#{'b' * 64}"
+    SKILL_ID = "018f0f4d-4e45-7abc-8def-000000000101"
+    PARENT_ID = "018f0f4d-4e45-7abc-8def-000000000102"
+    CHILD_ID = "018f0f4d-4e45-7abc-8def-000000000103"
+    PARENT_OBSERVATION_ID = "018f0f4d-4e45-7abc-8def-000000000104"
+    CHILD_OBSERVATION_ID = "018f0f4d-4e45-7abc-8def-000000000105"
 
     before do
       create_project(REPOSITORY_ID, SCOPE, "GraphQL knowledge")
@@ -311,7 +313,7 @@ module ProjectKnowledgeGraphqlSpec
       create(
         :coordinator_read_development_artifact_observation,
         artifact:,
-        observation_id: "artifact-observation:v1:#{identifier.delete_prefix('artifact:v1:')}",
+        observation_id: identifier == PARENT_ID ? PARENT_OBSERVATION_ID : CHILD_OBSERVATION_ID,
         scope: SCOPE,
         title:,
         labels:,
@@ -326,7 +328,7 @@ module ProjectKnowledgeGraphqlSpec
       create(
         :coordinator_read_development_artifact_relation,
         source_artifact: Coordinator::Read::DevelopmentArtifact.find(PARENT_ID),
-        relation_id: "artifact-relation:v1:#{format('%064x', position)}",
+        relation_id: format("018f0f51-4e45-7abc-8def-%012x", position),
         relation:,
         target_id: CHILD_ID,
         declared_global_position: position

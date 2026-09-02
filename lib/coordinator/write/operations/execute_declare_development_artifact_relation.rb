@@ -62,6 +62,11 @@ module Coordinator::Write
         replay = replay_result(command:, input_digest: preparation.input_digest)
         return replay if replay
 
+        resolved = resolve_relation(command)
+        return resolved if resolved.failure?
+
+        command = resolved.value!
+
         artifact_relation = command.artifact_relation
         target = @target_resolver.call(
           source_artifact_id: artifact_relation.source_artifact_id,
@@ -99,6 +104,69 @@ module Coordinator::Write
         )
 
         Success(completion)
+      end
+
+      def resolve_relation(command)
+        proposed = command.artifact_relation
+        events = @event_store.read_global_marked(
+          GlobalMarkedEventReadCriteria.new(
+            stream_context: "DevelopmentMemory",
+            stream_name: "DevelopmentArtifact",
+            event_types: [ "DevelopmentArtifactRelationDeclared" ],
+            markers: [ @marker_builder.relation_natural_key(proposed) ],
+            maximum_count: 1,
+            direction: :asc
+          )
+        )
+        return Success(command) if events.empty?
+
+        declaration = load_event(events.sole)
+        existing = declaration.artifact_relation
+        return relation_registry_invalid(proposed) unless relation_tuple(existing) == relation_tuple(proposed)
+
+        Success(with_relation_id(command, existing.relation_id))
+      rescue EventHistoryLimitExceeded, EventSchemaRegistry::UnknownSchema,
+             EventSchemaRegistry::SchemaMismatch, Dry::Struct::Error, KeyError, ArgumentError
+        relation_registry_invalid(proposed)
+      end
+
+      def relation_tuple(relation)
+        [
+          relation.source_artifact_id,
+          relation.relation,
+          relation.target.kind,
+          relation.target.id,
+          relation.relation_attributes
+        ]
+      end
+
+      def with_relation_id(command, relation_id)
+        original = command.artifact_relation
+        relation = DevelopmentArtifacts::RelationV1.new(
+          relation_id:,
+          source_artifact_id: original.source_artifact_id,
+          relation: original.relation,
+          target: original.target,
+          attributes: original.relation_attributes
+        )
+        values = {
+          command_id: command.command_id,
+          actor: command.actor,
+          artifact_relation: relation
+        }
+        values[:supersedes_relation_id] = command.supersedes_relation_id if command.supersedes_relation_id
+        values[:supersession_reason] = command.supersession_reason if command.supersession_reason
+        Commands::DeclareDevelopmentArtifactRelation.new(**values)
+      end
+
+      def relation_registry_invalid(relation)
+        Failure(
+          OutcomeError.new(
+            code: :development_artifact_relation_registry_invalid,
+            message: "Development Artifact relation natural key is inconsistent",
+            details: { relation_id: relation.relation_id }
+          )
+        )
       end
 
       def replay_result(command:, input_digest:)

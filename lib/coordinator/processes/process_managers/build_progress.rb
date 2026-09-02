@@ -29,6 +29,7 @@ module Coordinator::Processes
         event_store:,
         source_builder: Coordinator::Processes::BuildProgress::SourceBuilder.new,
         command_builder: Coordinator::Processes::BuildProgress::CommandBuilder.new,
+        process_step_planner: Coordinator::Processes::ProcessStepPlanner.new(event_store:),
         satisfy_dependency: Coordinator::Write::Operations::ExecuteSatisfyWorkItemDependency.new(event_store:),
         complete_change_set: Coordinator::Write::Operations::ExecuteCompleteChangeSet.new(event_store:),
         schema_registry: Coordinator::Write::EventSchemaRegistry.new,
@@ -37,6 +38,7 @@ module Coordinator::Processes
         @event_store = event_store
         @source_builder = source_builder
         @command_builder = command_builder
+        @process_step_planner = process_step_planner
         @satisfy_dependency = satisfy_dependency
         @complete_change_set = complete_change_set
         @schema_registry = schema_registry
@@ -46,8 +48,17 @@ module Coordinator::Processes
       def call(event)
         source = @source_builder.call(event)
         dependencies_for(source).each do |dependency|
-          command = @command_builder.call(source:, dependency:)
-          result = @satisfy_dependency.call_command(command)
+          process_step = @process_step_planner.call(
+            source_event: source.event,
+            process_name: "build-progress",
+            step_name: "satisfy-work-item-dependency",
+            subject_kind: "work-item-dependency",
+            subject_id: dependency.dependency_id,
+            rule_version: Coordinator::Processes::BuildProgress::CommandBuilder::RULE_VERSION,
+            allocate_target_entity: false
+          )
+          command = @command_builder.call(source:, dependency:, command_id: process_step.target_command_id)
+          result = @satisfy_dependency.call_command(command, caused_by: process_step.event)
           handle_result!(result, identifier: command.dependency_id)
         end
         complete(source) if completion_source?(source)
@@ -62,8 +73,17 @@ module Coordinator::Processes
       end
 
       def complete(source)
-        command = @command_builder.completion(source:)
-        result = @complete_change_set.call_command(command)
+        process_step = @process_step_planner.call(
+          source_event: source.event,
+          process_name: "build-progress",
+          step_name: "complete-change-set",
+          subject_kind: "change-set",
+          subject_id: source.change_set_id,
+          rule_version: "change-set-completion/v1",
+          allocate_target_entity: false
+        )
+        command = @command_builder.completion(source:, command_id: process_step.target_command_id)
+        result = @complete_change_set.call_command(command, caused_by: process_step.event)
         handle_result!(result, identifier: command.change_set_id)
       end
 

@@ -11,6 +11,7 @@ FactoryBot.define do
       topic_id { "testing.framework" }
       enforcement_level { "implementation_gate" }
       required_evidence { %w[combined_tests] }
+      decision_slot_id { SecureRandom.uuid_v7 }
     end
 
     sequence(:decision_id) { "D-factory-#{_1}" }
@@ -193,9 +194,14 @@ FactoryBot.define do
       slot do
         scope = definition.fetch("document").fetch("scope")
         conditions = definition.fetch("document").fetch("conditions")
-        marker_digest = "sha256:#{'e' * 64}"
+        compound_marker = Coordinator::Shared::CompoundMarkerBuilder.new.call(
+          Coordinator::Shared::CompoundMarkerDefinitionV1.new(
+            purpose: "decision-slot",
+            components: [ "topic:#{topic_id}", "decision:#{decision_id}" ]
+          )
+        )
         {
-          "slot_id" => "slot-#{decision_id}",
+          "slot_id" => decision_slot_id,
           "document" => {
             "schema" => "decision-slot/v1",
             "topic_id" => topic_id,
@@ -205,12 +211,7 @@ FactoryBot.define do
               "candidate_impact_policy" : "primary_test_framework",
             "resolution_strategy" => "single_choice"
           },
-          "compound_marker" => {
-            "purpose" => "decision-slot",
-            "components" => [ "topic:#{topic_id}", "decision:#{decision_id}" ],
-            "digest" => marker_digest,
-            "marker" => "compound:decision-slot:v1:#{marker_digest}"
-          }
+          "compound_marker" => JSON.parse(JSON.generate(compound_marker.to_h))
         }
       end
       rationale { { "code" => "user_confirmed", "summary" => "Activate the accepted policy." } }

@@ -10,7 +10,6 @@ module Coordinator::Write
         loader: AgentChoiceImpacts::ScanLoader.new(event_store:),
         decider: Domain::AgentChoiceImpacts::ProgressScan.new,
         retry_policy: AgentChoiceImpacts::ExpectedRevisionRetry.new,
-        identity_builder: AgentChoiceImpacts::ScanIdentityBuilder.new,
         clock: SystemClock.new,
         id_generator: IdGenerator.new,
         event_factory: EventFactory.new,
@@ -24,7 +23,6 @@ module Coordinator::Write
         @loader = loader
         @decider = decider
         @retry_policy = retry_policy
-        @identity_builder = identity_builder
         @clock = clock
         @id_generator = id_generator
         @event_factory = event_factory
@@ -67,7 +65,7 @@ module Coordinator::Write
           event_id: preparation.event_id,
           metadata: metadata(command),
           markers: markers(command),
-          caused_by: invocation.checkpoint_event
+          caused_by: invocation.caused_by
         )
         persisted = @event_store.append(
           stream,
@@ -82,13 +80,7 @@ module Coordinator::Write
         results = [
           @progress_contract.call(command: invocation.command),
           @invocation_contract.call(invocation:),
-          @command_contract.call(
-            command: invocation.command,
-            expected_identity: @identity_builder.progress(
-              checkpoint_event: invocation.command.expected_checkpoint,
-              policy_version: invocation.command.policy_version
-            )
-          )
+          @command_contract.call(command: invocation.command)
         ]
         errors = results.filter_map { _1.errors.to_h if _1.failure? }
         return if errors.empty?

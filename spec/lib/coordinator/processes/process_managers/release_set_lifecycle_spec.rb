@@ -25,9 +25,14 @@ RSpec.describe Coordinator::Processes::ProcessManagers::ReleaseSetLifecycle, :ev
 
     expect(payload.successful_integrations.length).to eq(1)
     expect(payload.trigger_event).to eq(ReleaseSetScenario.reference(failure.fetch(:event)))
-    expect(request.causation_id).to eq(failure.fetch(:event).id)
+    step = process_step(
+      source_event: failure.fetch(:event),
+      step_name: "request-compensation",
+      subject_id: prepared.dig(:input, :release_set_id)
+    )
+    expect(request.causation_id).to eq(step.id)
     expect(request.correlation_id).to eq(prepared.fetch(:event).correlation_id)
-    expect(request.metadata.fetch("command_id")).to start_with("internal:release-compensation:v1:")
+    expect(request.metadata.fetch("command_id")).to eq(step.data.fetch("target_command_id"))
   end
 
   it "completes an activated ReleaseSet exactly once under redelivery" do
@@ -48,9 +53,14 @@ RSpec.describe Coordinator::Processes::ProcessManagers::ReleaseSetLifecycle, :ev
       outcome: "activated",
       source_event: ReleaseSetScenario.reference(activation.fetch(:event))
     )
-    expect(completion.causation_id).to eq(activation.fetch(:event).id)
+    step = process_step(
+      source_event: activation.fetch(:event),
+      step_name: "complete-activated-release-set",
+      subject_id: prepared.dig(:input, :release_set_id)
+    )
+    expect(completion.causation_id).to eq(step.id)
     expect(completion.correlation_id).to eq(prepared.fetch(:event).correlation_id)
-    expect(completion.metadata.fetch("command_id")).to start_with("internal:release-completion:v1:")
+    expect(completion.metadata.fetch("command_id")).to eq(step.data.fetch("target_command_id"))
   end
 
   it "requests compensation when exact composite verification fails after all integrations" do
@@ -110,6 +120,17 @@ RSpec.describe Coordinator::Processes::ProcessManagers::ReleaseSetLifecycle, :ev
 
   def lifecycle(prepared)
     ReleaseSetScenario.release_lifecycle_events(prepared.dig(:input, :release_set_id))
+  end
+
+  def process_step(source_event:, step_name:, subject_id:)
+    ProcessStepExamples.event(
+      event_store:,
+      source_event:,
+      process_name: "release-set-lifecycle",
+      step_name:,
+      subject_kind: "release-set",
+      subject_id:
+    )
   end
 
   def failure_evidence(prefix)

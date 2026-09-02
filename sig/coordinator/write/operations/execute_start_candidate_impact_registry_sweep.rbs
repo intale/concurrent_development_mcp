@@ -9,7 +9,6 @@ module Coordinator::Write
         ?policy_loader: Coordinator::Write::CandidateObligations::ImpactPolicyLoader,
         ?loader: Coordinator::Write::CandidateObligationScans::RegistrySweepLoader,
         ?decider: Coordinator::Write::Domain::CandidateObligationScans::StartRegistrySweep,
-        ?identity_builder: Coordinator::Write::CandidateObligationScans::IdentityBuilder,
         ?clock: Coordinator::Shared::_Clock,
         ?id_generator: Coordinator::Shared::_IdGenerator,
         ?event_factory: Coordinator::Write::EventFactory,

@@ -680,11 +680,10 @@ module Coordinator::Write
       attribute :tool_name, Types::String.enum("skill_publish")
     end
 
-    class PublishSkillRevisionInputV2 < Value
+    class PublishSkillRevisionCanonicalInputV2 < Value
       Asset = SkillAssetV2
 
       attribute :actor, ActorV1
-      attribute :skill_id, Types::SkillId
       attribute :name, Types::SkillName
       attribute :scope, Types::SkillScope
       attribute :expected_revision, Types::SkillExpectedRevision
@@ -693,6 +692,14 @@ module Coordinator::Write
       attribute :assets,
                 Types::Array.of(Asset).constrained(max_size: Types::SKILL_ASSET_MAXIMUM_COUNT)
       attribute :content_digest, Types::Sha256Digest
+    end
+
+    class PublishSkillRevisionInputV2 < PublishSkillRevisionCanonicalInputV2
+      attribute :skill_id, Types::SkillId
+    end
+
+    class PublishSkillRevisionCanonicalV2 < PublishSkillRevisionBase
+      attribute :input, PublishSkillRevisionCanonicalInputV2
     end
 
     class PublishSkillRevisionV2 < PublishSkillRevisionBase
@@ -707,17 +714,20 @@ module Coordinator::Write
       attribute :collector, Types::DevelopmentArtifactCollector
     end
 
-    class DevelopmentArtifactV2 < Value
+    class DevelopmentArtifactCanonicalV2 < Value
       Content = Coordinator::Write::Content::TextV1 | Coordinator::Write::Content::BinaryV1
 
-      attribute :artifact_id, Types::DevelopmentArtifactId
-      attribute :observation_id, Types::DevelopmentArtifactObservationId
       attribute :scope, Types::DevelopmentArtifactScope
       attribute :title, Types::DevelopmentArtifactTitle
       attribute :kind, Types::DevelopmentArtifactKind
       attribute :labels, Types::DevelopmentArtifactLabels
       attribute :content, Content
       attribute :source, DevelopmentArtifactSourceV1
+    end
+
+    class DevelopmentArtifactV2 < DevelopmentArtifactCanonicalV2
+      attribute :artifact_id, Types::DevelopmentArtifactId
+      attribute :observation_id, Types::DevelopmentArtifactObservationId
     end
 
     class CaptureDevelopmentArtifactBase < Value
@@ -729,6 +739,15 @@ module Coordinator::Write
     class CaptureDevelopmentArtifactInputV2 < Value
       attribute :actor, ActorV1
       attribute :artifact, DevelopmentArtifactV2
+    end
+
+    class CaptureDevelopmentArtifactCanonicalInputV2 < Value
+      attribute :actor, ActorV1
+      attribute :artifact, DevelopmentArtifactCanonicalV2
+    end
+
+    class CaptureDevelopmentArtifactCanonicalV2 < CaptureDevelopmentArtifactBase
+      attribute :input, CaptureDevelopmentArtifactCanonicalInputV2
     end
 
     class CaptureDevelopmentArtifactV2 < CaptureDevelopmentArtifactBase
@@ -761,8 +780,7 @@ module Coordinator::Write
       attribute? :normalized_locator, Types::DevelopmentArtifactSourceLocator.optional
     end
 
-    class DevelopmentArtifactRelationV1 < Value
-      attribute :relation_id, Types::DevelopmentArtifactRelationId
+    class DevelopmentArtifactRelationCanonicalV1 < Value
       attribute :source_artifact_id, Types::DevelopmentArtifactId
       attribute :relation, Types::DevelopmentArtifactRelationKind
       attribute :target, DevelopmentArtifactRelationTargetV1
@@ -771,6 +789,10 @@ module Coordinator::Write
       def relation_attributes
         self[:attributes]
       end
+    end
+
+    class DevelopmentArtifactRelationV1 < DevelopmentArtifactRelationCanonicalV1
+      attribute :relation_id, Types::DevelopmentArtifactRelationId
     end
 
     class DeclareDevelopmentArtifactRelationInputV1 < Value
@@ -783,6 +805,18 @@ module Coordinator::Write
     class DeclareDevelopmentArtifactRelationV1 < BaseV1
       attribute :tool_name, Types::String.enum("development_artifact_relation_declare")
       attribute :input, DeclareDevelopmentArtifactRelationInputV1
+    end
+
+    class DeclareDevelopmentArtifactRelationCanonicalInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :artifact_relation, DevelopmentArtifactRelationCanonicalV1
+      attribute? :supersedes_relation_id, Types::DevelopmentArtifactRelationId.optional
+      attribute? :supersession_reason, Types::DevelopmentArtifactRelationSupersessionReason.optional
+    end
+
+    class DeclareDevelopmentArtifactRelationCanonicalV1 < BaseV1
+      attribute :tool_name, Types::String.enum("development_artifact_relation_declare")
+      attribute :input, DeclareDevelopmentArtifactRelationCanonicalInputV1
     end
 
     class CreateOperationBatchInputV1 < Value
@@ -967,5 +1001,10 @@ module Coordinator::Write
                  RequestOperationBatchContinuationV1 |
                  CompleteOperationBatchV1 |
                  CompleteOperationBatchCancellationV1
+
+    CanonicalDigestType = DigestType |
+                          PublishSkillRevisionCanonicalV2 |
+                          CaptureDevelopmentArtifactCanonicalV2 |
+                          DeclareDevelopmentArtifactRelationCanonicalV1
   end
 end

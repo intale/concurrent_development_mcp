@@ -4,7 +4,6 @@ module Coordinator::Write
       POLICY_VERSION: String
 
       def initialize: (
-        ?canonical_json: Coordinator::Shared::CanonicalJson,
         ?compound_marker_builder: Coordinator::Shared::CompoundMarkerBuilder
       ) -> void
       def call: (

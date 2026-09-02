@@ -1,0 +1,17 @@
+module Coordinator::Processes
+  class ProcessStepPlanner
+    def initialize: (
+      event_store: Coordinator::Write::_EventStore,
+      ?planner: Coordinator::Write::ProcessSteps::Planner
+    ) -> void
+    def call: (
+      source_event: PgEventstore::Event,
+      process_name: String,
+      step_name: String,
+      subject_kind: String,
+      subject_id: String,
+      rule_version: String,
+      allocate_target_entity: bool
+    ) -> Coordinator::Write::ProcessSteps::PlannedV1
+  end
+end

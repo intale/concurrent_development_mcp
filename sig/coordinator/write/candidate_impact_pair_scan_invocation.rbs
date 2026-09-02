@@ -3,5 +3,6 @@ module Coordinator::Write
     def command: () -> Coordinator::Write::Commands::StartCandidateImpactPairScan
     def source_event: () -> PgEventstore::Event
     def source_reference: () -> Coordinator::Write::EventReference
+    def caused_by: () -> PgEventstore::Event
   end
 end

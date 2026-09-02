@@ -11,7 +11,6 @@ module Coordinator::Write
         ?marker_builder: Coordinator::Write::Candidates::ImpactIndexMarkerBuilder,
         ?loader: Coordinator::Write::CandidateObligationScans::PairScanLoader,
         ?decider: Coordinator::Write::Domain::CandidateObligationScans::StartPairScan,
-        ?identity_builder: Coordinator::Write::CandidateObligationScans::IdentityBuilder,
         ?clock: Coordinator::Shared::_Clock,
         ?id_generator: Coordinator::Shared::_IdGenerator,
         ?event_factory: Coordinator::Write::EventFactory,

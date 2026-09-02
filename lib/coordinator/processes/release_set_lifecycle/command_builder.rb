@@ -7,22 +7,29 @@ module Coordinator::Processes
       COMPENSATION_RULE_VERSION = "release-set-compensation/v1"
       COMPLETION_RULE_VERSION = "release-set-completion/v1"
 
-      def call(source)
+      def rule_version(source)
         case source.payload
         when Coordinator::Write::Events::RepositoryIntegrationRecordedV1
-          compensation(source) if source.payload.outcome == "failed"
+          COMPENSATION_RULE_VERSION if source.payload.outcome == "failed"
         when Coordinator::Write::Events::ReleaseSetVerificationRecordedV1
-          compensation(source) if source.payload.evidence.outcome == "failed"
+          COMPENSATION_RULE_VERSION if source.payload.evidence.outcome == "failed"
         when Coordinator::Write::Events::ReleaseSetActivatedV1
-          activated_completion(source)
+          COMPLETION_RULE_VERSION
+        end
+      end
+
+      def call(source, command_id:)
+        case rule_version(source)
+        when COMPENSATION_RULE_VERSION then compensation(source, command_id:)
+        when COMPLETION_RULE_VERSION then activated_completion(source, command_id:)
         end
       end
 
       private
 
-      def compensation(source)
+      def compensation(source, command_id:)
         Coordinator::Write::Commands::RequestReleaseSetCompensation.new(
-          command_id: InternalCommandIdBuilder.call("release-compensation:v1:#{source.event.id}"),
+          command_id:,
           actor: ACTOR,
           release_set_id: source.payload.release_set_id,
           trigger_event: source.reference,
@@ -30,9 +37,9 @@ module Coordinator::Processes
         )
       end
 
-      def activated_completion(source)
+      def activated_completion(source, command_id:)
         Coordinator::Write::Commands::CompleteActivatedReleaseSet.new(
-          command_id: InternalCommandIdBuilder.call("release-completion:v1:#{source.event.id}"),
+          command_id:,
           actor: ACTOR,
           release_set_id: source.payload.release_set_id,
           activation_event: source.reference,

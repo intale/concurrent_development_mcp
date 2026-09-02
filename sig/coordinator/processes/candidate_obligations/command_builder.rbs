@@ -10,9 +10,7 @@ module Coordinator::Processes
 
       def initialize: (
         event_store: Coordinator::Write::_EventStore,
-        ?identity_builder: Coordinator::Write::CandidateObligationScans::IdentityBuilder,
-        ?obligation_identity_builder: Coordinator::Write::CandidateObligations::IdentityBuilder,
-        ?candidate_loader: Coordinator::Write::CandidateObligations::CandidateEvidenceLoader,
+        ?process_step_planner: Coordinator::Processes::ProcessStepPlanner,
         ?reference_builder: EventReferenceBuilder
       ) -> void
       def registry_start: (

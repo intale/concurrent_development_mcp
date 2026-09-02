@@ -3,19 +3,12 @@
 module Coordinator::Write
   module Skills
     class IdentityBuilder
-      def initialize(canonical_json: CanonicalJson.new)
-        @canonical_json = canonical_json
+      def initialize(id_generator: IdGenerator.new)
+        @id_generator = id_generator
       end
 
       def call(name:, scope:)
-        document = IdentityDocumentV1.new(
-          schema: IdentityDocumentV1::SCHEMA,
-          name:,
-          scope:
-        )
-        digest = @canonical_json.sha256(document.to_h).delete_prefix("sha256:")
-
-        IdentityV1.new(skill_id: "skill:v1:#{digest}", name:, scope:)
+        IdentityV1.new(skill_id: @id_generator.uuid_v7, name:, scope:)
       end
     end
   end

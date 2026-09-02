@@ -323,16 +323,13 @@ module CoordinationDiscoveryAcceptanceWorld
   end
 
   def discovery_repository_id(scope)
-    digest = Coordinator::Shared::CanonicalJson.new.sha256(
-      { "coordination_discovery_scope" => scope }
-    ).delete_prefix("sha256:")
-    "01a04733-#{digest[0, 4]}-7#{digest[4, 3]}-8#{digest[7, 3]}-#{digest[10, 12]}"
+    @discovery_repository_ids ||= {}
+    @discovery_repository_ids[scope] ||= SecureRandom.uuid_v7
   end
 
   def discovery_suffix(scope, label)
-    Coordinator::Shared::CanonicalJson.new.sha256(
-      { "scope" => scope, "label" => label }
-    ).delete_prefix("sha256:")[0, 10]
+    @discovery_suffixes ||= {}
+    @discovery_suffixes[[ scope, label ]] ||= SecureRandom.uuid_v7
   end
 
   def discovery_path(suffix)

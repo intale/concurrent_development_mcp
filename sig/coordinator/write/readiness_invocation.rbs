@@ -5,6 +5,7 @@ module Coordinator
       def source_event: () -> PgEventstore::Event
       def source_reference: () -> EventReference
       def source_change_set_id: () -> String
+      def caused_by: () -> PgEventstore::Event
     end
   end
 end

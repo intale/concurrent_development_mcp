@@ -13,7 +13,6 @@ module Coordinator::Write
         policy_loader: CandidateObligations::ImpactPolicyLoader.new(event_store:),
         loader: CandidateObligationScans::RegistrySweepLoader.new(event_store:),
         decider: Domain::CandidateObligationScans::StartRegistrySweep.new,
-        identity_builder: CandidateObligationScans::IdentityBuilder.new,
         clock: SystemClock.new,
         id_generator: IdGenerator.new,
         event_factory: EventFactory.new,
@@ -26,7 +25,6 @@ module Coordinator::Write
         @policy_loader = policy_loader
         @loader = loader
         @decider = decider
-        @identity_builder = identity_builder
         @clock = clock
         @id_generator = id_generator
         @event_factory = event_factory
@@ -85,7 +83,7 @@ module Coordinator::Write
           event_id: preparation.event_id,
           metadata: metadata(command),
           markers: markers(command),
-          caused_by: source.event
+          caused_by: invocation.caused_by
         )
         persisted = @event_store.append(stream, [ physical ]).sole
 
@@ -100,13 +98,7 @@ module Coordinator::Write
       end
 
       def verify_input!(invocation)
-        command = invocation.command
-        expected_identity = @identity_builder.registry_sweep(
-          policy_partition_event: command.policy_partition_event,
-          policy_head: command.policy_head,
-          rule_version: command.rule_version
-        )
-        result = @input_contract.call(invocation:, expected_identity:)
+        result = @input_contract.call(invocation:)
         return if result.success?
 
         raise ArgumentError, "registry sweep input violates its dry-rb contract: #{result.errors.to_h.inspect}"
@@ -134,6 +126,7 @@ module Coordinator::Write
           "candidate-impact-registry-sweep:#{command.scan_id}",
           "change-set:#{command.change_set_id}",
           "decision:#{command.policy_head.decision_id}",
+          "policy-partition-event:#{command.policy_partition_event.event_id}",
           "command:#{command.command_id}"
         ].freeze
       end

@@ -148,7 +148,8 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
       locator: "same.md",
       revision: "commit-b",
       observed_at: "2026-08-30T12:01:00.000000Z",
-      text: "same bytes\n"
+      text: "same bytes\n",
+      artifact_id: first.artifact_id
     )
     correction = observation_stream_event(
       Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectedV1.new(
@@ -201,7 +202,8 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
     text: nil,
     binary: false,
     revision: nil,
-    observed_at: "2026-08-30T12:00:00.000000Z"
+    observed_at: "2026-08-30T12:00:00.000000Z",
+    artifact_id: nil
   )
     content_input = binary ?
       { encoding: "binary", media_type: "application/octet-stream", base64: "AP8=" } :
@@ -222,6 +224,11 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
       content:,
       source:
     )
+    if artifact_id
+      artifact = Coordinator::Write::DevelopmentArtifacts::ArtifactV2.new(
+        artifact.to_h.merge(artifact_id:)
+      )
+    end
     observation = Coordinator::Write::DevelopmentArtifacts::ObservationBuilder.new.call(artifact:)
     [ artifact, observation ]
   end

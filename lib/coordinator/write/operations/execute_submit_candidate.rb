@@ -19,6 +19,7 @@ module Coordinator::Write
         completion_builder: CommandCompletionBuilder.new,
         repository_registration_loader: RepositoryRegistrationLoader.new(event_store:),
         repository_marker_builder: RepositoryMarkerBuilder.new,
+        natural_key_registry: NaturalKeys::Registry.new(event_store:),
         event_plan_contract: Contracts::CandidateSubmissionEventPlan.new
       )
         @event_store = event_store
@@ -34,6 +35,7 @@ module Coordinator::Write
         @completion_builder = completion_builder
         @repository_registration_loader = repository_registration_loader
         @repository_marker_builder = repository_marker_builder
+        @natural_key_registry = natural_key_registry
         @event_plan_contract = event_plan_contract
       end
 
@@ -85,7 +87,13 @@ module Coordinator::Write
         replay = replay_result(command:, input_digest: prepared.input_digest)
         return replay if replay
 
-        state_result = load_submission_state(command, prepared.head_identity)
+        head_resolution = resolve_head_identity(prepared.head_identity)
+        return head_resolution if head_resolution.failure?
+
+        head_identity, existing_head = head_resolution.value!
+        prepared = prepared.with_head_identity(head_identity)
+
+        state_result = load_submission_state(command, existing_head:)
         return state_result if state_result.failure?
 
         state = state_result.value!
@@ -131,6 +139,50 @@ module Coordinator::Write
         Success(completion)
       end
 
+      def resolve_head_identity(proposed)
+        result = @natural_key_registry.find(
+          selector: NaturalKeys::Registry::SelectorV1.new(
+            stream_context: "DevelopmentIntegration",
+            stream_name: "CandidateHead",
+            event_type: "CandidateHeadRegistered",
+            marker: proposed.marker
+          ),
+          identity_from: ->(event) { candidate_head_identity_from(event, proposed) }
+        )
+        return registry_failure(result.failure) if result.failure?
+        return Success([ proposed, nil ]) unless result.value!
+
+        persisted = result.value!
+        identity = Candidates::HeadIdentityV1.new(
+          document: proposed.document,
+          registry_id: persisted.identity,
+          marker: proposed.marker
+        )
+        Success([ identity, event_reference(persisted.event) ])
+      end
+
+      def candidate_head_identity_from(event, proposed)
+        registration = load_event(event)
+        return unless registration.is_a?(Events::CandidateHeadRegisteredV2)
+        return unless [ registration.repository_id, registration.object_format, registration.head_commit_oid ] ==
+                      [ proposed.document.repository_id, proposed.document.object_format, proposed.document.head_commit_oid ]
+
+        registration.registry_id
+      rescue EventSchemaRegistry::UnknownSchema, EventSchemaRegistry::SchemaMismatch,
+             Dry::Struct::Error, KeyError, ArgumentError
+        nil
+      end
+
+      def registry_failure(error)
+        Failure(
+          OutcomeError.new(
+            code: :candidate_head_registry_invalid,
+            message: error.message,
+            details: error.to_h
+          )
+        )
+      end
+
       def replay_result(command:, input_digest:)
         completion = load_completion(command.command_id)
         return unless completion
@@ -162,7 +214,7 @@ module Coordinator::Write
         event && load_event(event)
       end
 
-      def load_submission_state(command, head_identity)
+      def load_submission_state(command, existing_head:)
         attempt = load_attempt_state(command.attempt_id)
         current_leases = attempt.lease_resources.map do |reference|
           CurrentLeaseObservationV2.new(
@@ -176,10 +228,7 @@ module Coordinator::Write
             @stream_factory.candidate(command.candidate_id),
             EventQueries::CANDIDATE_EXISTENCE
           ),
-          existing_head: load_existing_reference(
-            @stream_factory.candidate_head(head_identity.registry_id),
-            EventQueries::CANDIDATE_HEAD_REGISTRATION
-          ),
+          existing_head:,
           attempt:,
           current_leases:
         ))

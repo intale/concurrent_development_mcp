@@ -5,6 +5,7 @@ module Coordinator
         def initialize: (
           ?topic_registry: TopicRegistry,
           ?canonical_json: Shared::CanonicalJson,
+          ?marker_component_builder: Shared::CanonicalMarkerComponentBuilder,
           ?compound_marker_builder: Shared::CompoundMarkerBuilder
         ) -> void
 

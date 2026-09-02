@@ -11,7 +11,6 @@ module Coordinator::Write
         loader: AgentChoiceImpacts::ScanLoader.new(event_store:),
         decider: Domain::AgentChoiceImpacts::StartScan.new,
         retry_policy: AgentChoiceImpacts::ExpectedRevisionRetry.new,
-        identity_builder: AgentChoiceImpacts::ScanIdentityBuilder.new,
         clock: SystemClock.new,
         id_generator: IdGenerator.new,
         event_factory: EventFactory.new,
@@ -25,7 +24,6 @@ module Coordinator::Write
         @loader = loader
         @decider = decider
         @retry_policy = retry_policy
-        @identity_builder = identity_builder
         @clock = clock
         @id_generator = id_generator
         @event_factory = event_factory
@@ -73,7 +71,7 @@ module Coordinator::Write
           event_id: preparation.event_id,
           metadata: metadata(command),
           markers: markers(command, decision_change),
-          caused_by: invocation.source_event
+          caused_by: invocation.caused_by
         )
         expected_revision = snapshot.latest_revision || :no_stream
         persisted = @event_store.append(stream, [ event ], expected_revision:).sole
@@ -89,11 +87,7 @@ module Coordinator::Write
       end
 
       def verify_command!(command, decision_change)
-        expected_identity = @identity_builder.start(
-          source_event: decision_change.source_event,
-          policy_version: command.policy_version
-        )
-        result = @command_contract.call(command:, decision_change:, expected_identity:)
+        result = @command_contract.call(command:, decision_change:)
         return if result.success?
 
         raise ArgumentError, "impact scan command violates its dry-rb contract: #{result.errors.to_h.inspect}"

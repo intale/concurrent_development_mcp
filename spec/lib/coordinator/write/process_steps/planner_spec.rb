@@ -56,7 +56,7 @@ RSpec.describe Coordinator::Write::ProcessSteps::Planner, :event_store do
     expect(replay.outcome).to eq("existing")
     expect(replay.event.id).to eq(first.event.id)
     expect(replay_payload).to eq(first_payload)
-    expect(first_payload.process_step_id).to eq(first.identity)
+    expect(first_payload.process_step_id).to eq(first.process_step_id)
     expect([
       first_payload.process_step_id,
       first_payload.target_command_id,

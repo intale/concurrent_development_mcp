@@ -137,10 +137,7 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::StartScan do
   end
 
   def scan_id
-    @scan_id ||= Coordinator::Write::AgentChoiceImpacts::ScanIdentityBuilder.new.start(
-      source_event:,
-      policy_version: "agent-choice-decision-impact/v1"
-    )
+    "018f0000-0000-7000-8000-000000000004"
   end
 
   def streams

@@ -11,7 +11,7 @@ module Coordinator
     register("stream_factory", memoize: true) { Write::StreamFactory.new }
     register("event_schema_registry", memoize: true) { Write::EventSchemaRegistry.new }
     register("skills.identity_builder", memoize: true) do
-      Write::Skills::IdentityBuilder.new(canonical_json: self["canonical_json"])
+      Write::Skills::IdentityBuilder.new(id_generator: self["id_generator"])
     end
     register("skills.revision_builder", memoize: true) do
       Write::Skills::RevisionBuilder.new(canonical_json: self["canonical_json"])
@@ -22,13 +22,13 @@ module Coordinator
       )
     end
     register("skills.marker_builder", memoize: true) do
-      Write::Skills::MarkerBuilder.new(canonical_json: self["canonical_json"])
+      Write::Skills::MarkerBuilder.new
     end
     register("development_artifacts.content_builder", memoize: true) do
       Write::DevelopmentArtifacts::ContentBuilder.new
     end
     register("development_artifacts.identity_builder", memoize: true) do
-      Write::DevelopmentArtifacts::IdentityBuilder.new(canonical_json: self["canonical_json"])
+      Write::DevelopmentArtifacts::IdentityBuilder.new(id_generator: self["id_generator"])
     end
     register("development_artifacts.artifact_builder", memoize: true) do
       Write::DevelopmentArtifacts::ArtifactBuilder.new(
@@ -37,7 +37,7 @@ module Coordinator
     end
     register("development_artifacts.relation_identity_builder", memoize: true) do
       Write::DevelopmentArtifacts::RelationIdentityBuilder.new(
-        canonical_json: self["canonical_json"]
+        id_generator: self["id_generator"]
       )
     end
     register("development_artifacts.relation_builder", memoize: true) do
@@ -369,7 +369,7 @@ module Coordinator
 
     register("decisions.slot_builder", memoize: true) do
       Write::Decisions::DecisionSlotBuilder.new(
-        canonical_json: self["canonical_json"],
+        id_generator: self["id_generator"],
         compound_marker_builder: self["compound_marker_builder"]
       )
     end
@@ -466,7 +466,7 @@ module Coordinator
 
     register("merge_snapshots.commit_identity_builder", memoize: true) do
       Write::MergeSnapshots::CommitIdentityBuilder.new(
-        canonical_json: self["canonical_json"],
+        id_generator: self["id_generator"],
         compound_marker_builder: self["compound_marker_builder"]
       )
     end
@@ -889,7 +889,6 @@ module Coordinator
     register("projectors.skills_v1", memoize: true) do
       Read::Projectors::SkillsV1.new(
         publication_loader: self["skills.persisted_publication_loader"],
-        identity_builder: self["skills.identity_builder"],
         skills: self["repositories.skills"],
         processed_events: self["repositories.processed_projection_events"]
       )
@@ -1956,6 +1955,7 @@ module Coordinator
 
     register("lease_expiry_policy", memoize: true) do
       Processes::LeaseExpiryPolicy.new(
+        event_store: self["event_store"],
         source_loader: self["lease_expiry_source_loader"],
         command_builder: self["lease_expiry_command_builder"],
         operation: self["operations.execute_expire_resource_lease"]

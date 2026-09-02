@@ -11,7 +11,8 @@ module Coordinator
           ?candidate_loader: CandidateObligations::CandidateEvidenceLoader,
           ?definition_loader: CandidateObligations::DecisionDefinitionLoader,
           ?matcher: CandidateObligations::Matcher,
-          ?identity_builder: CandidateObligations::IdentityBuilder,
+          ?natural_key_builder: CandidateObligations::NaturalKeyBuilder,
+          ?obligation_loader: CandidateObligations::ObligationLoader,
           ?validity_builder: CandidateObligations::ValidityBuilder,
           ?canonical_json: Shared::CanonicalJson,
           ?policy_contract: Contracts::CandidateImpactPolicyDefinition

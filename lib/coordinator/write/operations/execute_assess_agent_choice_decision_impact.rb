@@ -12,12 +12,12 @@ module Coordinator::Write
         assessment_loader: AgentChoiceImpacts::AssessmentLoader.new(event_store:),
         attempt_loader: AgentChoiceImpacts::AttemptLoader.new(event_store:),
         reconstructor: AgentChoiceImpacts::HistoricalContextReconstructor.new(event_store:),
-        identity_builder: AgentChoiceImpacts::AssessmentIdentityBuilder.new,
         decider: Domain::AgentChoiceImpacts::Assess.new,
         clock: SystemClock.new,
         id_generator: IdGenerator.new,
         event_factory: EventFactory.new,
         stream_factory: StreamFactory.new,
+        assessment_marker_builder: AgentChoiceImpacts::AssessmentMarkerBuilder.new,
         invocation_contract: Contracts::AgentChoiceImpactAssessmentInvocation.new,
         command_contract: Contracts::AgentChoiceImpactAssessmentCommand.new,
         event_plan_contract: Contracts::AgentChoiceImpactAssessmentEventPlan.new
@@ -28,12 +28,12 @@ module Coordinator::Write
         @assessment_loader = assessment_loader
         @attempt_loader = attempt_loader
         @reconstructor = reconstructor
-        @identity_builder = identity_builder
         @decider = decider
         @clock = clock
         @id_generator = id_generator
         @event_factory = event_factory
         @stream_factory = stream_factory
+        @assessment_marker_builder = assessment_marker_builder
         @invocation_contract = invocation_contract
         @command_contract = command_contract
         @event_plan_contract = event_plan_contract
@@ -124,15 +124,9 @@ module Coordinator::Write
       end
 
       def verify_command!(command, authoritative_change)
-        expected_identity = @identity_builder.call(
-          accepted_choice: command.accepted_choice,
-          decision_change: authoritative_change.source_event,
-          policy_version: command.policy_version
-        )
         result = @command_contract.call(
           command:,
-          authoritative_change:,
-          expected_identity:
+          authoritative_change:
         )
         return if result.success?
 
@@ -194,7 +188,11 @@ module Coordinator::Write
           "attempt:#{state.choice.recorded.context.attempt_id}",
           "decision:#{command.decision_change.decision_id}",
           "decision-change:#{command.decision_change.source_event.event_id}",
-          "command:#{command.command_id}"
+          "command:#{command.command_id}",
+          @assessment_marker_builder.call(
+            accepted_choice: command.accepted_choice,
+            decision_change: command.decision_change.source_event
+          )
         ].freeze
       end
 

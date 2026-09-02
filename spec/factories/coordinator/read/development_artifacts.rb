@@ -3,7 +3,7 @@
 FactoryBot.define do
   factory :coordinator_read_development_artifact,
           class: "Coordinator::Read::DevelopmentArtifact" do
-    sequence(:artifact_id) { "artifact:v1:#{format('%064x', _1)}" }
+    artifact_id { SecureRandom.uuid_v7 }
     scope { "project:factory" }
     sequence(:title) { "Factory artifact #{_1}" }
     kind { "documentation" }
@@ -48,7 +48,7 @@ FactoryBot.define do
   factory :coordinator_read_development_artifact_observation,
           class: "Coordinator::Read::DevelopmentArtifactObservation" do
     association :artifact, factory: :coordinator_read_development_artifact
-    sequence(:observation_id) { "artifact-observation:v1:#{format('%064x', _1)}" }
+    observation_id { SecureRandom.uuid_v7 }
     artifact_id { artifact.artifact_id }
     scope { artifact.scope }
     title { artifact.title }
@@ -90,11 +90,11 @@ FactoryBot.define do
   factory :coordinator_read_development_artifact_relation,
           class: "Coordinator::Read::DevelopmentArtifactRelation" do
     association :source_artifact, factory: :coordinator_read_development_artifact
-    sequence(:relation_id) { "artifact-relation:v1:#{format('%064x', _1)}" }
+    relation_id { SecureRandom.uuid_v7 }
     source_artifact_id { source_artifact.artifact_id }
     relation { "references" }
     target_kind { "artifact" }
-    sequence(:target_id) { "artifact:v1:#{format('%064x', 10_000 + _1)}" }
+    target_id { SecureRandom.uuid_v7 }
     target_status { "verified" }
     target_name { nil }
     target_scope { nil }
@@ -124,7 +124,7 @@ FactoryBot.define do
     association :relation, factory: :coordinator_read_development_artifact_relation
     superseded_relation_id { relation.relation_id }
     source_artifact_id { relation.source_artifact_id }
-    sequence(:replacement_relation_id) { "artifact-relation:v1:#{format('%064x', 20_000 + _1)}" }
+    replacement_relation_id { SecureRandom.uuid_v7 }
     reason { "A more precise relation replaced this one." }
     superseded_event do
       {

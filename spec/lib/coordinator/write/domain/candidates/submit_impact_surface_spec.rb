@@ -27,7 +27,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::SubmitImpactSurface do
       manifest_event: manifest_event,
       build_context_event: nil,
       surface_event: surface_event,
-      index_policy_version: "candidate-impact-bucket-index/v1"
+      index_policy_version: "candidate-impact-exact-index/v2"
     )
   end
 

@@ -27,8 +27,8 @@ RSpec.describe "Development Artifact contracts" do
   end
 
   it "enforces graph semantics, link evidence, target compatibility, and supersession input" do
-    source_id = "artifact:v1:#{'a' * 64}"
-    target_id = "artifact:v1:#{'b' * 64}"
+    source_id = "018f0f4d-4e45-7abc-8def-000000000161"
+    target_id = "018f0f4d-4e45-7abc-8def-000000000162"
     valid = relation_input(source_id:, target_id:)
 
     expect(relation.call(valid)).to be_success
@@ -41,7 +41,7 @@ RSpec.describe "Development Artifact contracts" do
             normalized_locator: "guide.md"
           },
           supersedes: {
-            relation_id: "artifact-relation:v1:#{'c' * 64}",
+            relation_id: "018f0f4d-4e45-7abc-8def-000000000163",
             reason: "wrong target"
           }
         )
@@ -90,8 +90,8 @@ RSpec.describe "Development Artifact contracts" do
 
   it "accepts the complete single-relation contract in each batch item" do
     item = relation_input(
-      source_id: "artifact:v1:#{'a' * 64}",
-      target_id: "artifact:v1:#{'b' * 64}"
+      source_id: "018f0f4d-4e45-7abc-8def-000000000161",
+      target_id: "018f0f4d-4e45-7abc-8def-000000000162"
     ).merge(
       attributes: {
         path: "../guide.md",
@@ -99,7 +99,7 @@ RSpec.describe "Development Artifact contracts" do
         normalized_locator: "guide.md"
       },
       supersedes: {
-        relation_id: "artifact-relation:v1:#{'c' * 64}",
+        relation_id: "018f0f4d-4e45-7abc-8def-000000000163",
         reason: "wrong target"
       }
     )
@@ -123,8 +123,8 @@ RSpec.describe "Development Artifact contracts" do
       items: [ capture_item ]
     }
     relation_item = relation_input(
-      source_id: "artifact:v1:#{'a' * 64}",
-      target_id: "artifact:v1:#{'b' * 64}"
+      source_id: "018f0f4d-4e45-7abc-8def-000000000161",
+      target_id: "018f0f4d-4e45-7abc-8def-000000000162"
     ).merge(command_id: "internal:relation:item")
     relation_input_batch = {
       command_id: "cmd-contract-relation-batch",

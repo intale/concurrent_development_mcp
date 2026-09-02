@@ -1,7 +1,10 @@
 module Coordinator
   module Shared
     class CompoundMarkerBuilder
-      def initialize: (?canonical_json: CanonicalJson) -> void
+      def initialize: (
+        ?canonical_json: CanonicalJson,
+        ?marker_codec: Markers::CodecV2
+      ) -> void
       def call: (CompoundMarkerDefinitionV1 definition) -> CompoundMarker
     end
   end

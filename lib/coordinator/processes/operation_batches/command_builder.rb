@@ -8,9 +8,9 @@ module Coordinator::Processes
         id: "operation-batch-runner"
       )
 
-      def record_outcome(source:, item:, result:, completion:)
+      def record_outcome(source:, item:, result:, completion:, command_id:)
         Coordinator::Write::Commands::RecordOperationBatchItemOutcome.new(
-          command_id: command_id("outcome", source:, suffix: item.index),
+          command_id:,
           actor: SYSTEM_ACTOR,
           batch_id: source.payload.batch_id,
           index: item.index,
@@ -22,9 +22,9 @@ module Coordinator::Processes
         )
       end
 
-      def continuation(source:, page_start:, page_end:)
+      def continuation(source:, page_start:, page_end:, command_id:)
         Coordinator::Write::Commands::RequestOperationBatchContinuation.new(
-          command_id: command_id("continue", source:, suffix: page_start),
+          command_id:,
           actor: SYSTEM_ACTOR,
           batch_id: source.payload.batch_id,
           page_start:,
@@ -34,9 +34,9 @@ module Coordinator::Processes
         )
       end
 
-      def complete(source:)
+      def complete(source:, command_id:)
         Coordinator::Write::Commands::CompleteOperationBatch.new(
-          command_id: command_id("complete", source:),
+          command_id:,
           actor: SYSTEM_ACTOR,
           batch_id: source.payload.batch_id,
           source_event: source.reference,
@@ -44,9 +44,9 @@ module Coordinator::Processes
         )
       end
 
-      def complete_cancellation(source:)
+      def complete_cancellation(source:, command_id:)
         Coordinator::Write::Commands::CompleteOperationBatchCancellation.new(
-          command_id: command_id("cancel", source:),
+          command_id:,
           actor: SYSTEM_ACTOR,
           batch_id: source.payload.batch_id,
           source_event: source.reference,
@@ -55,11 +55,6 @@ module Coordinator::Processes
       end
 
       private
-
-      def command_id(kind, source:, suffix: nil)
-        components = [ "batch", kind, source.payload.batch_id, source.reference.event_id, suffix ]
-        InternalCommandIdBuilder.call(components.compact.join(":"))
-      end
 
       def timestamp(event)
         event.created_at.utc.iso8601(6)

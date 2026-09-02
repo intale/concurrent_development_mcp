@@ -106,7 +106,7 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
     )
     expect(batch.items.sole.arguments).to include(
       command_id: "relation-item-1",
-      source_artifact_id: "artifact:v1:#{'a' * 64}",
+      source_artifact_id: "018f0f4d-4e45-7abc-8def-000000000201",
       relation: "references",
       target: { kind: "external", id: "https://example.test/reference" }
     )
@@ -193,8 +193,8 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
   end
 
   def relation_item
-    source_id = "artifact:v1:#{'a' * 64}"
-    relation_id = "artifact-relation:v1:#{'b' * 64}"
+    source_id = "018f0f4d-4e45-7abc-8def-000000000201"
+    relation_id = "018f0f4d-4e45-7abc-8def-000000000202"
     document = Coordinator::Write::CommandInputDocuments::DeclareDevelopmentArtifactRelationV1.new(
       schema: "command-input/v1",
       command_id: "relation-item-1",

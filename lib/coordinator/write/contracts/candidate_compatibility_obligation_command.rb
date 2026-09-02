@@ -9,21 +9,19 @@ module Coordinator::Write
         required(:command).value(Types.Instance(Commands::CreateCandidateCompatibilityObligation))
         required(:source).value(Types.Instance(CandidateObligations::CandidateEvidenceV1))
         required(:target).value(Types.Instance(CandidateObligations::CandidateEvidenceV1))
-        required(:expected_identity).value(Types.Instance(CandidateObligations::IdentityV1))
+        required(:natural_key).value(Types.Instance(CandidateObligations::NaturalKeyV1))
       end
 
-      rule(:command, :source, :target, :expected_identity) do
+      rule(:command, :source, :target, :natural_key) do
         command = values[:command]
         source = values[:source]
         target = values[:target]
-        identity = values[:expected_identity]
+        natural_key = values[:natural_key]
         unless command.actor.kind == "system" && command.actor.id == ACTOR_ID
           key(:command).failure("actor must be the Candidate-impact obligation policy")
         end
-        unless command.command_id == identity.obligation_id &&
-               command.obligation_id == identity.obligation_id
-          key(:command).failure("command and obligation IDs must match the canonical identity")
-        end
+        key(:command).failure("command ID must be UUIDv7") unless Types::UUID_V7_PATTERN.match?(command.command_id)
+        key(:command).failure("obligation ID must be UUIDv7") unless Types::UUID_V7_PATTERN.match?(command.obligation_id)
         unless command.source_registration == source.registration_event &&
                command.target_registration == target.registration_event
           key(:command).failure("registration references must match the exact Candidate evidence")
@@ -34,9 +32,9 @@ module Coordinator::Write
         end
         validate_partition_reference(command, source.subject.change_set_id)
         validate_head(command)
-        unless identity.document.rule_version == command.rule_version &&
-               identity.document.policy_head == command.policy_head
-          key(:command).failure("canonical identity must retain the command policy and rule")
+        unless natural_key.document.rule_version == command.rule_version &&
+               natural_key.document.policy_head == command.policy_head
+          key(:command).failure("natural key must retain the command policy and rule")
         end
       end
 

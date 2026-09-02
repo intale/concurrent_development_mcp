@@ -19,5 +19,5 @@ export PARALLEL_TESTS_EXECUTABLE="bundle exec rspec"
 
 exec bundle exec parallel_rspec \
   --runtime-log "$parallel_rspec_runtime_log" \
-  --test-options "--format ParallelTests::RSpec::RuntimeLogger --out $parallel_rspec_runtime_log" \
+  --test-options "--format progress --format ParallelTests::RSpec::RuntimeLogger --out $parallel_rspec_runtime_log" \
   "$@"

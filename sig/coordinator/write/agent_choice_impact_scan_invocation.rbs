@@ -4,6 +4,7 @@ module Coordinator
       def command: () -> Commands::StartAgentChoiceImpactScan
       def source_event: () -> PgEventstore::Event
       def source_reference: () -> EventReference
+      def caused_by: () -> PgEventstore::Event
     end
   end
 end

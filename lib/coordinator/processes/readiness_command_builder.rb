@@ -6,7 +6,7 @@ module Coordinator::Processes
       @compound_marker_builder = compound_marker_builder
     end
 
-    def call(source:, work_item_id:)
+    def call(source:, work_item_id:, command_id:)
       document = Coordinator::Write::ProcessDecisions::ReadinessV1.new(
         schema: "process-decision/readiness/v1",
         process_manager: "change-set-readiness",
@@ -20,9 +20,6 @@ module Coordinator::Processes
           purpose: "process-decision",
           components: document.component_markers
         )
-      )
-      command_id = InternalCommandIdBuilder.call(
-        "readiness-v1:#{compound_marker.digest.delete_prefix("sha256:")}"
       )
       identity = Coordinator::Write::ReadinessDecisionIdentity.new(document:, compound_marker:, command_id:)
 

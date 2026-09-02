@@ -67,9 +67,14 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAssessAgentChoiceDecisionI
     )
     expect([ assessment_event, invalidation_event ]).to all(
       have_attributes(
-        causation_id: parent.id,
+        causation_id: invocation.caused_by.id,
         correlation_id: parent.correlation_id
       )
+    )
+    expect(invocation.caused_by).to have_attributes(
+      type: "ProcessStepPlanned",
+      causation_id: parent.id,
+      correlation_id: parent.correlation_id
     )
     expect(assessment_event.markers).to include(
       "impact-assessment:#{invocation.command.assessment_id}",
@@ -222,15 +227,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAssessAgentChoiceDecisionI
     malformed_change = Coordinator::Write::AgentChoiceImpacts::DecisionChangeEvidenceV1.new(
       valid.command.decision_change.to_h.merge(source_event: malformed_reference.to_h)
     )
-    assessment_id = Coordinator::Write::AgentChoiceImpacts::AssessmentIdentityBuilder.new.call(
-      accepted_choice: valid.command.accepted_choice,
-      decision_change: malformed_reference,
-      policy_version: valid.command.policy_version
-    )
     command = Coordinator::Write::Commands::AssessAgentChoiceDecisionImpact.new(
-      command_id: assessment_id,
+      command_id: valid.command.command_id,
       actor: valid.command.actor,
-      assessment_id:,
+      assessment_id: valid.command.assessment_id,
       choice_id: valid.command.choice_id,
       accepted_choice: valid.command.accepted_choice,
       decision_change: malformed_change,
@@ -246,7 +246,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAssessAgentChoiceDecisionI
       Coordinator::Write::AgentChoiceImpacts::InvalidHistory,
       /decision_change_source_missing/
     )
-    expect(AgentChoiceImpactScenario.assessment_events(assessment_id)).to be_empty
+    expect(AgentChoiceImpactScenario.assessment_events(valid.command.assessment_id)).to be_empty
     expect(AgentChoiceImpactScenario.choice_events(choice_id(choice)).length).to eq(2)
   end
 

@@ -7,7 +7,6 @@ module Coordinator
           ?loader: AgentChoiceImpacts::ScanLoader,
           ?decider: Domain::AgentChoiceImpacts::ProgressScan,
           ?retry_policy: AgentChoiceImpacts::ExpectedRevisionRetry,
-          ?identity_builder: AgentChoiceImpacts::ScanIdentityBuilder,
           ?clock: Shared::_Clock,
           ?id_generator: Shared::_IdGenerator,
           ?event_factory: EventFactory,

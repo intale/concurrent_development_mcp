@@ -2,7 +2,7 @@
 
 FactoryBot.define do
   factory :coordinator_read_skill, class: "Coordinator::Read::Skill" do
-    sequence(:skill_id) { "skill:v1:#{format('%064x', _1)}" }
+    skill_id { SecureRandom.uuid_v7 }
     sequence(:name) { "factory-skill-#{_1}" }
     scope { "project:factory" }
     revision { 1 }

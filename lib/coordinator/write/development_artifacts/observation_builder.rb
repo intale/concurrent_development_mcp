@@ -9,11 +9,7 @@ module Coordinator::Write
 
       def call(artifact:)
         ArtifactObservationV1.new(
-          observation_id: @identity_builder.call(
-            artifact_id: artifact.artifact_id,
-            scope: artifact.scope,
-            source: artifact.source
-          ),
+          observation_id: @identity_builder.call,
           artifact_id: artifact.artifact_id,
           scope: artifact.scope,
           title: artifact.title,

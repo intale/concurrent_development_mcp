@@ -49,6 +49,25 @@ module Coordinator::Write::NaturalKeys
       Failure(integrity_error(:duplicate_registration, selector:, event_ids: [], proposed_stream:))
     end
 
+    def find(selector:, identity_from:)
+      events = @event_store.read_global_marked(criteria(selector))
+      if events.length > 1
+        return Failure(
+          integrity_error(
+            :duplicate_registration,
+            selector:,
+            event_ids: events.map(&:id),
+            proposed_stream: nil
+          )
+        )
+      end
+      return Success(nil) if events.empty?
+
+      resolve_existing(events.sole, selector:, proposed_stream: nil, identity_from:)
+    rescue Coordinator::Write::EventHistoryLimitExceeded
+      Failure(integrity_error(:duplicate_registration, selector:, event_ids: [], proposed_stream: nil))
+    end
+
     private
 
     def resolve(selector:, proposed_stream:, build_event:, identity_from:)
@@ -150,7 +169,7 @@ module Coordinator::Write::NaturalKeys
         message: integrity_message(code),
         marker: selector.marker,
         event_ids:,
-        proposed_stream_id: normalized_identity(proposed_stream.stream_id)
+        proposed_stream_id: proposed_stream && normalized_identity(proposed_stream.stream_id)
       )
     end
 

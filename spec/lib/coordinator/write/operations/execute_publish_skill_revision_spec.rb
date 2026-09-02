@@ -5,7 +5,7 @@ RSpec.describe Coordinator::Write::Operations::ExecutePublishSkillRevision, :eve
 
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
-  let(:identity_builder) { Coordinator::Write::Skills::IdentityBuilder.new }
+  let(:marker_builder) { Coordinator::Write::Skills::MarkerBuilder.new }
 
   it "atomically publishes a complete immutable revision and its command completion" do
     result = operation.call(input)
@@ -112,9 +112,20 @@ RSpec.describe Coordinator::Write::Operations::ExecutePublishSkillRevision, :eve
   end
 
   def skill_events(name, scope)
-    identity = identity_builder.call(name:, scope:)
+    registration = event_store.read_global_marked(
+      Coordinator::Write::GlobalMarkedEventReadCriteria.new(
+        stream_context: "AgentKnowledge",
+        stream_name: "Skill",
+        event_types: [ "SkillRevisionPublished" ],
+        markers: [ marker_builder.natural_key(name:, scope:) ],
+        maximum_count: 1,
+        direction: :asc
+      )
+    ).first
+    return [] unless registration
+
     event_store.read(
-      streams.skill(identity.skill_id),
+      streams.skill(registration.stream.stream_id),
       Coordinator::Write::EventReadCriteria.new(
         event_types: [ "SkillRevisionPublished" ],
         maximum_count: 100,

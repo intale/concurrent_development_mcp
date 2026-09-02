@@ -3,6 +3,8 @@
 module Coordinator::Write
   module Contracts
     class AgentChoiceImpactScanProgressInvocation < Dry::Validation::Contract
+      include ProcessStepCausation
+
       params do
         required(:invocation).value(Types.Instance(Coordinator::Write::AgentChoiceImpactScanProgressInvocation))
       end
@@ -28,6 +30,9 @@ module Coordinator::Write
           key.failure("checkpoint must be a running scan fact")
         end
         key.failure("impact scan actor must be the system policy") unless command.actor.kind == "system"
+        unless process_step_matches?(value.caused_by, command_id: command.command_id)
+          key.failure("causal parent must be the ProcessStep that allocated the progress command")
+        end
       end
     end
   end

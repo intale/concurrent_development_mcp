@@ -4,9 +4,9 @@ RSpec.describe Coordinator::Read::Queries::SkillList, :read_model do
   subject(:query) { described_class.new }
 
   SKILL_IDS = %w[
-    skill:v1:0000000000000000000000000000000000000000000000000000000000000021
-    skill:v1:0000000000000000000000000000000000000000000000000000000000000022
-    skill:v1:0000000000000000000000000000000000000000000000000000000000000023
+    018f0f4d-4e45-7abc-8def-000000000121
+    018f0f4d-4e45-7abc-8def-000000000122
+    018f0f4d-4e45-7abc-8def-000000000123
   ].freeze
 
   it "pages by deterministic Skill ID and applies exact optional filters" do

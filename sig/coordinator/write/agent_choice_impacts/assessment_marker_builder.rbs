@@ -1,0 +1,9 @@
+module Coordinator::Write::AgentChoiceImpacts
+  class AssessmentMarkerBuilder
+    def initialize: (?compound_marker_builder: Coordinator::Shared::CompoundMarkerBuilder) -> void
+    def call: (
+      accepted_choice: Coordinator::Write::EventReference,
+      decision_change: Coordinator::Write::EventReference
+    ) -> String
+  end
+end

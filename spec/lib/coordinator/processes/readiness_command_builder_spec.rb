@@ -29,12 +29,12 @@ RSpec.describe Coordinator::Processes::ReadinessCommandBuilder do
     )
   end
 
-  it "derives the deterministic internal command and compound marker from the complete tuple" do
-    command = builder.call(source:, work_item_id: "W-200")
+  it "uses the persisted process-step command ID and a readable compound marker" do
+    command_id = "0198c000-0000-7000-8000-000000000002"
+    command = builder.call(source:, work_item_id: "W-200", command_id:)
 
-    expect(command.command_id).to match(/\Ainternal:readiness-v1:[0-9a-f]{64}\z/)
-    expect(Coordinator::Shared::Types::InternalCommandId[command.command_id]).to eq(command.command_id)
-    expect(command.readiness_decision_id).to eq(command.command_id)
+    expect(command.command_id).to eq(command_id)
+    expect(command.readiness_decision_id).to eq(command_id)
     expect(command.actor.to_h).to eq(kind: "system", id: "change-set-readiness")
     expect(command.source_activation_event_id).to eq(source_reference.event_id)
     expect(command.source_activation_revision).to eq(4)
@@ -49,17 +49,15 @@ RSpec.describe Coordinator::Processes::ReadinessCommandBuilder do
       "target-work-item:W-200",
       "process-step:evaluate-work-item-readiness"
     )
-    expect(command.process_decision_marker).to eq(
-      "compound:process-decision:v1:sha256:#{command.command_id.delete_prefix("internal:readiness-v1:")}"
-    )
+    expect(command.process_decision_marker).to start_with("compound:process-decision:v2|")
+    expect(command.process_decision_marker).not_to match(/sha|md5/i)
   end
 
-  it "is stable for redelivery and distinct for another target" do
-    first = builder.call(source:, work_item_id: "W-200")
-    redelivery = builder.call(source:, work_item_id: "W-200")
-    another_target = builder.call(source:, work_item_id: "W-201")
+  it "is stable when the persisted process-step identity is replayed" do
+    command_id = "0198c000-0000-7000-8000-000000000003"
+    first = builder.call(source:, work_item_id: "W-200", command_id:)
+    redelivery = builder.call(source:, work_item_id: "W-200", command_id:)
 
     expect(redelivery).to eq(first)
-    expect(another_target.command_id).not_to eq(first.command_id)
   end
 end

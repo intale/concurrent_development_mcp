@@ -6,10 +6,9 @@ module Coordinator::Write
       params do
         required(:command).value(Types.Instance(Commands::StartAgentChoiceImpactScan))
         required(:decision_change).value(Types.Instance(AgentChoiceImpacts::DecisionChangeEvidenceV1))
-        required(:expected_identity).filled(:string)
       end
 
-      rule(:command, :decision_change, :expected_identity) do
+      rule(:command, :decision_change) do
         command = values[:command]
         change = values[:decision_change]
 
@@ -17,9 +16,8 @@ module Coordinator::Write
         unless command.source_global_position == change.source_global_position
           key(:command).failure("source position must match authoritative evidence")
         end
-        unless command.scan_id == values[:expected_identity] && command.command_id == values[:expected_identity]
-          key(:command).failure("scan and command IDs must match the canonical source identity")
-        end
+        key(:command).failure("scan ID must be UUIDv7") unless Types::UUID_V7_PATTERN.match?(command.scan_id)
+        key(:command).failure("command ID must be UUIDv7") unless Types::UUID_V7_PATTERN.match?(command.command_id)
       end
     end
   end
