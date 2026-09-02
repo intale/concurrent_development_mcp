@@ -78,5 +78,4 @@ RBS target.
 ## Development coordination
 
 Repository development instructions and coordination state are provided by the
-configured Concurrent Development Coordinator MCP server. Start with
-`AGENTS.md`.
+configured Concurrent Development Coordinator MCP server. Start with `AGENTS.md`.
