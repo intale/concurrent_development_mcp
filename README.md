@@ -1,14 +1,13 @@
 # MCP server for concurrent development
 
-The purpose of this project is to provide an ability for AI agents to coordinate their work. This implementation is not
-supposed to spawn and orchestrate AI agents. It only provides a set of functions to record a work AI agents is either
-finished or is going to start. It also acts as a repo for various development artifacts, such as AI skills, user
-decisions, documentation, urls and other assets that could potentially appear during the development. It also provides
-an ability to checkpoint the development process which makes the development process resumable. As an option - you can
-also import your AI-related assets, build state, etc, and fully rely on this MCP server in your agentic development.
-Because implementation persists its state in PostgreSQL - you can easily setup it in a cloud and access from everywhere.
-You can also use it as the only hub in your company to coordinate work across multiple agents and projects in your
-company.
+This project enables AI agents to coordinate their work. It does not spawn or orchestrate agents; instead, it provides
+functions for recording work that agents plan, start, and finish. It also acts as a repository for development artifacts
+such as AI skills, user decisions, documentation, URLs, and other assets produced during development. Checkpointed
+development state makes work resumable.
+
+You can import existing AI-related assets and build state, then rely on this MCP server throughout agentic development.
+Because the application persists its state in PostgreSQL, it can run in a shared environment and coordinate work across
+multiple agents, projects, and locations.
 
 **Attention!** This tool was prompted using AI agent, so treat it accordingly.
 
