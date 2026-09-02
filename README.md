@@ -15,7 +15,7 @@ multiple agents, projects, and locations.
 
 ### Environment setup
 
-Steps to setup the environment(containerization is on its way after I fix major issues):
+Steps to set up the environment (containerization will follow after the major issues are resolved):
 
 - start docker compose first via `docker compose up`
 - run `./bin/setup_db` to create rails and pg_eventstore databases if this is your initial run
@@ -26,13 +26,13 @@ Steps to setup the environment(containerization is on its way after I fix major 
 
 ### Import your development environment
 
-MCP can complete take a role of the repo of all your development assets, such as AI skills, use decisions, build state,
-etc. In order to do so, start you agent and point it to import your dev environment into MCP(assuming you are running
-MCP at `http://localhost:3000`):
+MCP can act as the repository for your development assets, such as AI skills, user decisions, and build state. To import
+them, start your agent and ask it to migrate your development environment into MCP (assuming the server is running at
+`http://localhost:3000`):
 
 ```
-Investigate tooling at http://localhost:3000/mcp server and import the agentic development environment of this project
-into it. After that adjust AGENTS.md to rely on this MCP serve to coordinate agentic development.
+Investigate the tools exposed by the MCP server at http://localhost:3000/mcp and import this project's agentic
+development environment. Then adjust AGENTS.md to rely on this MCP server for agentic development coordination.
 ```
 
 Optionally you can ask your agent to create an archived backup of your current agentic dev env, so you can revert it in
