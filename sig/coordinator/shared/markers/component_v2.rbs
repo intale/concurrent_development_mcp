@@ -1,0 +1,10 @@
+module Coordinator
+  module Shared
+    module Markers
+      class ComponentV2 < Coordinator::Shared::Value
+        def dimension: () -> String
+        def value: () -> String
+      end
+    end
+  end
+end

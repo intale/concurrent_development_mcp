@@ -1,0 +1,28 @@
+module Coordinator
+  module Write
+    module ProcessSteps
+      class Planner
+        MARKER_PURPOSE: String
+
+        def initialize: (
+          event_store: _EventStore,
+          ?natural_key_registry: Coordinator::Write::NaturalKeys::Registry,
+          ?marker_codec: Coordinator::Shared::Markers::CodecV2,
+          ?id_generator: Coordinator::Shared::_IdGenerator,
+          ?stream_factory: Coordinator::Write::StreamFactory,
+          ?event_factory: Coordinator::Write::EventFactory,
+          ?event_schema_registry: Coordinator::Write::EventSchemaRegistry
+        ) -> void
+        def call: (
+          source_event: PgEventstore::Event,
+          process_name: String,
+          step_name: String,
+          subject_kind: String,
+          subject_id: String,
+          rule_version: String,
+          allocate_target_entity: bool
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

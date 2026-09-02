@@ -51,8 +51,14 @@ Feature: Stable coordinator identities with readable natural selectors
       Examples:
         | first_name | first_scope | second_name | second_scope |
         | a:b        | c           | a           | b:c          |
-        | café       | home        | café        | home         |
         | work       | home:team   | work:home   | team         |
+
+    Scenario: Canonically equivalent Unicode values share one selector
+      Given one agent registers a Skill using a composed Unicode name
+      And another agent registers the same Skill using its decomposed Unicode name
+      When both Skills are resolved through MCP
+      Then both natural tuples normalize to the same readable compound selector
+      And both Tasks complete with the same Skill UUIDv7
 
     Scenario: An oversized natural selector fails without a digest fallback
       Given an agent supplies a valid UTF-8 natural tuple whose encoded selector exceeds the limit

@@ -13,6 +13,7 @@ module Coordinator::Write
       [ "ChangeSetCreated", 1 ] => Events::ChangeSetCreatedV1,
       [ "ChangeSetAcceptanceCriteriaDefined", 1 ] => Events::ChangeSetAcceptanceCriteriaDefinedV1,
       [ "CommandCompleted", 1 ] => Events::CommandCompletedV1,
+      [ "ProcessStepPlanned", 1 ] => Events::ProcessStepPlannedV1,
       [ "SkillRevisionPublished", 2 ] => Events::SkillRevisionPublishedV2,
       [ "DevelopmentArtifactCaptured", 2 ] => Events::DevelopmentArtifactCapturedV2,
       [ "DevelopmentArtifactObserved", 1 ] => Events::DevelopmentArtifactObservedV1,

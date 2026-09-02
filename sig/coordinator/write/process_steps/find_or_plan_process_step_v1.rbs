@@ -1,0 +1,19 @@
+module Coordinator
+  module Write
+    module ProcessSteps
+      class FindOrPlanProcessStepV1 < Coordinator::Shared::Value
+        def command_id: () -> String
+        def event_id: () -> String
+        def process_step_id: () -> String
+        def process_name: () -> String
+        def step_name: () -> String
+        def source_event_id: () -> String
+        def subject_kind: () -> String
+        def subject_id: () -> String
+        def target_command_id: () -> String
+        def target_entity_id: () -> String?
+        def rule_version: () -> String
+      end
+    end
+  end
+end

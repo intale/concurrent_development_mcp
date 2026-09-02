@@ -15,6 +15,7 @@ module Coordinator::Shared
     RESOURCE_PATH_PATTERN = /\A[^\u0000-\u001f\u007f]{1,1024}\z/
     CANDIDATE_IMPACT_KEY_PATTERN = /\A[a-z][a-z0-9_.-]*(?::[a-z0-9][a-z0-9_.-]*)+\z/
     MARKER_PURPOSE_PATTERN = /\A[a-z][a-z0-9-]{0,63}\z/
+    MARKER_DIMENSION_PATTERN = /\A[a-z][a-z0-9-]{0,63}\z/
     MARKER_COMPONENT_PATTERN = /\A(?!compound:)[^\u0000\r\n]{1,512}\z/
     SKILL_ID_PATTERN = /\Askill:v1:[0-9a-f]{64}\z/
     SKILL_MEDIA_TYPE_PATTERN = /\A[\x21-\x7e]{1,255}\z/
@@ -22,7 +23,9 @@ module Coordinator::Shared
     DEVELOPMENT_ARTIFACT_OBSERVATION_ID_PATTERN = /\Aartifact-observation:v1:[0-9a-f]{64}\z/
     DEVELOPMENT_ARTIFACT_RELATION_ID_PATTERN = /\Aartifact-relation:v1:[0-9a-f]{64}\z/
 
-    RESOURCE_MARKER_MAXIMUM_BYTES = 1_200
+    COMPOUND_MARKER_MAXIMUM_BYTES = 2_048
+    COMPOUND_MARKER_MAXIMUM_COMPONENTS = 32
+    RESOURCE_MARKER_MAXIMUM_BYTES = COMPOUND_MARKER_MAXIMUM_BYTES
     CONTENT_MAXIMUM_BYTES = 2_097_152
     CONTENT_BASE64_MAXIMUM_BYTES = 2_796_204
 
@@ -626,8 +629,10 @@ module Coordinator::Shared
     )
     OperationBatchItemStatus = String.enum("pending", "not_run", "succeeded", "rejected")
     OperationBatchStatus = String.enum("running", "cancelling", "completed", "completed_with_errors", "cancelled")
-    Marker = String.constrained(min_size: 1, max_size: 512)
+    Marker = String.constrained(min_size: 1, max_size: COMPOUND_MARKER_MAXIMUM_BYTES)
     MarkerPurpose = String.constrained(format: MARKER_PURPOSE_PATTERN)
+    MarkerDimension = String.constrained(format: MARKER_DIMENSION_PATTERN)
+    CompoundMarkerValue = String.constrained(max_size: COMPOUND_MARKER_MAXIMUM_BYTES)
     MarkerComponent = String.constrained(format: MARKER_COMPONENT_PATTERN)
     MarkerComponents = Array.of(MarkerComponent).constrained(min_size: 2, max_size: 32)
     ActorKind = String.enum(*ACTOR_KINDS)

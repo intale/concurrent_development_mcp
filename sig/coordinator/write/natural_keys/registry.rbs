@@ -1,0 +1,36 @@
+module Coordinator
+  module Write
+    module NaturalKeys
+      class Registry
+        class SelectorV1 < Coordinator::Shared::Value
+          def stream_context: () -> String
+          def stream_name: () -> String
+          def event_type: () -> String
+          def marker: () -> String
+        end
+
+        class ResolutionV1 < Coordinator::Shared::Value
+          def identity: () -> String
+          def event: () -> PgEventstore::Event
+          def outcome: () -> String
+        end
+
+        class IntegrityErrorV1 < Coordinator::Shared::Value
+          def code: () -> Symbol
+          def message: () -> String
+          def marker: () -> String
+          def event_ids: () -> Array[String]
+          def proposed_stream_id: () -> String?
+        end
+
+        def initialize: (event_store: _EventStore) -> void
+        def call: (
+          selector: SelectorV1,
+          proposed_stream: StreamReference,
+          build_event: ^() -> PgEventstore::Event,
+          identity_from: ^(PgEventstore::Event) -> String?
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

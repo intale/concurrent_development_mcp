@@ -1,0 +1,10 @@
+module Coordinator
+  module Shared
+    module Markers
+      class DefinitionV2 < Coordinator::Shared::Value
+        def purpose: () -> String
+        def components: () -> Array[ComponentV2]
+      end
+    end
+  end
+end

@@ -1,0 +1,28 @@
+module Coordinator
+  module Shared
+    module Markers
+      type component_input = Hash[Symbol, String]
+
+      class CodecV2
+        PREFIX: String
+        VERSION: String
+
+        class ErrorV2 < Coordinator::Shared::Value
+          def code: () -> Symbol
+          def message: () -> String
+          def errors: () -> Hash[Symbol, untyped]
+        end
+
+        class ParseError < StandardError
+        end
+
+        def self.normalize_components: (Array[component_input] components) -> Array[component_input]
+        def self.encode: (purpose: String, components: Array[component_input]) -> String
+
+        def initialize: (?contract: ContractV2) -> void
+        def call: (purpose: String, components: Array[component_input]) -> Dry::Monads::Result
+        def decode: (String marker) -> Dry::Monads::Result
+      end
+    end
+  end
+end

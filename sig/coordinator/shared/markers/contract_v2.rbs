@@ -1,0 +1,9 @@
+module Coordinator
+  module Shared
+    module Markers
+      class ContractV2 < Dry::Validation::Contract
+        def call: (Hash[Symbol, untyped] input) -> Dry::Validation::Result
+      end
+    end
+  end
+end

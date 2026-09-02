@@ -3,6 +3,7 @@ module Coordinator
     class StreamFactory
       def command: (String command_id) -> StreamReference
       def coordination_task: (String task_id) -> StreamReference
+      def process_step: (String process_step_id) -> StreamReference
       def skill: (String skill_id) -> StreamReference
       def development_artifact: (String artifact_id) -> StreamReference
       def development_artifact_observation: (String observation_id) -> StreamReference

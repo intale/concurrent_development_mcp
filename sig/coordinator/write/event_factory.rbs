@@ -2,7 +2,7 @@ module Coordinator
   module Write
     class EventFactory
       def initialize: (?registry: EventSchemaRegistry) -> void
-      def build!: (event: Events::Base, event_id: String, metadata: EventMetadata, markers: Array[String], ?caused_by: PgEventstore::Event?, ?correlation_id: String?) -> PgEventstore::Event
+      def build!: (event: Events::Base, event_id: String, metadata: EventMetadata | ProcessSteps::MetadataV1, markers: Array[String], ?caused_by: PgEventstore::Event?, ?correlation_id: String?) -> PgEventstore::Event
     end
   end
 end

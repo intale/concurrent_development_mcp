@@ -10,6 +10,10 @@ module Coordinator::Write
       StreamReference.new(context: "CoordinatorControl", stream_name: "CoordinationTask", stream_id: task_id)
     end
 
+    def process_step(process_step_id)
+      StreamReference.new(context: "CoordinatorControl", stream_name: "ProcessStep", stream_id: process_step_id)
+    end
+
     def skill(skill_id)
       StreamReference.new(context: "AgentKnowledge", stream_name: "Skill", stream_id: skill_id)
     end
