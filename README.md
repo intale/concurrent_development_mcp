@@ -74,3 +74,9 @@ Each suite keeps its own smart-runtime timing file. Paths and relevant
 `parallel_tests` options may be passed to its runner. The runtime-RBS workers
 delegate their file groups to `bin/rspec`, preserving the complete repository
 RBS target.
+
+## Development coordination
+
+Repository development instructions and coordination state are provided by the
+configured Concurrent Development Coordinator MCP server. Start with
+`AGENTS.md`.
