@@ -1,0 +1,25 @@
+module Coordinator
+  module Write
+    module Operations
+      class ApplyCommandTransition
+        def initialize: (
+          event_store: _EventStore,
+          ?loader: CommandLifecycle::Loader,
+          ?stream_factory: StreamFactory,
+          ?event_factory: EventFactory,
+          ?id_generator: ::Coordinator::Shared::IdGenerator
+        ) -> void
+
+        def call: (
+          command: Commands::SucceedCommand | Commands::RejectCommand,
+          decider: Domain::CommandLifecycles::Succeed | Domain::CommandLifecycles::Reject,
+          actor: Commands::Actor,
+          tool_name: String,
+          caused_by: PgEventstore::Event,
+          ?emitted_events: Array[EventReference],
+          ?rejection: Tasks::DomainErrorV1::domain_error?
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

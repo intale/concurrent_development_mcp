@@ -5,10 +5,10 @@ module Coordinator::Read
     class OperationGet < Dry::Operation
       def initialize(
         contract: Contracts::OperationGet.new,
-        completions: CommandCompletionLookup.new
+        results: CommandResultLookup.new
       )
         @contract = contract
-        @completions = completions
+        @results = results
       end
 
       def call(input)
@@ -16,25 +16,44 @@ module Coordinator::Read
         return invalid_result(validated.errors.to_h) if validated.failure?
 
         query = OperationGetQueryV1.new(command_id: validated[:command_id])
-        completion = @completions.fetch(query.command_id)
-        return not_found_result(query.command_id) unless completion
+        result = @results.fetch(query.command_id)
+        return not_found_result(query.command_id) unless result
+        return rejected_result(result) unless result.status == "ok"
 
         QueryResultV1.new(
           status: "ok",
-          summary: completion.summary,
-          command_id: completion.command_id,
-          receipt: completion.receipt,
+          summary: result.summary,
+          command_id: result.command_id,
+          receipt: result.receipt,
           context_token: nil,
           data: QueryResultV1::OperationData.new(
-            result: completion.data,
-            emitted_events: completion.emitted_events
+            result: result.data,
+            emitted_events: result.emitted_events
           ),
-          warnings: completion.warnings,
-          next_actions: completion.next_actions
+          warnings: result.warnings,
+          next_actions: result.next_actions
         )
       end
 
       private
+
+      def rejected_result(result)
+        error = Coordinator::Write::Tasks::DomainErrorV1::Type[result.data]
+        QueryResultV1.new(
+          status: result.status,
+          summary: result.summary,
+          command_id: result.command_id,
+          receipt: nil,
+          context_token: nil,
+          data: QueryResultV1::DomainError.new(
+            code: error.code,
+            message: error.message,
+            details: error.details.to_h
+          ),
+          warnings: result.warnings,
+          next_actions: result.next_actions
+        )
+      end
 
       def not_found_result(command_id)
         QueryResultV1.new(

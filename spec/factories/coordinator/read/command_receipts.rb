@@ -3,21 +3,22 @@
 FactoryBot.define do
   factory :coordinator_read_command_receipt, class: "Coordinator::Read::CommandReceipt" do
     sequence(:command_id) { "cmd-factory-#{_1}" }
+    request_id { command_id }
     command_stream_revision { 1 }
     tool_name { "change_set_create" }
     canonical_input_digest { "sha256:#{'f' * 64}" }
     status { "ok" }
     summary { "ChangeSet created." }
-    receipt { command_id }
+    receipt { request_id }
     completion do
       {
-        "command_id" => command_id,
+        "command_id" => request_id,
         "tool_name" => tool_name,
         "canonical_input_digest" => canonical_input_digest,
         "status" => status,
         "summary" => summary,
         "receipt" => receipt,
-        "data" => { "change_set_id" => "CS-#{command_id}" },
+        "data" => { "change_set_id" => "CS-#{request_id}" },
         "warnings" => [],
         "next_actions" => [],
         "emitted_events" => [
@@ -26,7 +27,7 @@ FactoryBot.define do
             "type" => "ChangeSetCreated",
             "stream_context" => "DevelopmentPlanning",
             "stream_name" => "ChangeSet",
-            "stream_id" => "CS-#{command_id}",
+            "stream_id" => "CS-#{request_id}",
             "stream_revision" => 0
           }
         ],

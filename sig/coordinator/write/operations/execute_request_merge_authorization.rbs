@@ -16,7 +16,7 @@ module Coordinator
           ?event_factory: EventFactory,
           ?schema_registry: EventSchemaRegistry,
           ?stream_factory: StreamFactory,
-          ?completion_builder: CommandCompletionBuilder,
+          ?completion_builder: CommandResultBuilder,
           ?evaluation_contract: Contracts::MergeAuthorizationEvaluation,
           ?event_plan_contract: Contracts::MergeAuthorizationEventPlan
         ) -> void

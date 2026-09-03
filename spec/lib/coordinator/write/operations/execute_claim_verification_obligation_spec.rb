@@ -14,7 +14,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteClaimVerificationObligatio
     }
   end
 
-  it "VER-CLAIM-SUCCESS-01 atomically persists a fenced claim and its exact receipt" do
+  it "VER-CLAIM-SUCCESS-01 atomically persists a fenced claim" do
     created = create_obligation("claim-success")
 
     result = Timecop.freeze(Time.utc(2026, 8, 24, 7, 0, 0)) { operation.call(input) }
@@ -49,20 +49,21 @@ RSpec.describe Coordinator::Write::Operations::ExecuteClaimVerificationObligatio
       fencing_token: 1,
       claim_event: have_attributes(event_id: claim.id, stream_revision: 1)
     )
-    expect(command_events("cmd-claim-1").length).to eq(1)
+    expect(command_events("cmd-claim-1")).to be_empty
   end
 
-  it "VER-CLAIM-REPLAY-05 replays exact input and rejects changed command-ID reuse" do
+  it "VER-CLAIM-REPLAY-05 leaves replay ownership to the registered Command lifecycle" do
     create_obligation("claim-replay")
-    original = operation.call(input)
-    event_ids = claim_events.map(&:id) + command_events("cmd-claim-1").map(&:id)
+    expect(operation.call(input)).to be_success
+    event_ids = claim_events.map(&:id)
 
     replay = operation.call(input)
     reused = operation.call(input.merge(claim_duration_seconds: 301))
 
-    expect(replay.value!).to eq(original.value!)
-    expect(reused.failure.code).to eq(:command_id_reused)
-    expect(claim_events.map(&:id) + command_events("cmd-claim-1").map(&:id)).to eq(event_ids)
+    expect(replay.failure.code).to eq(:verification_obligation_already_claimed)
+    expect(reused.failure.code).to eq(:verification_obligation_already_claimed)
+    expect(claim_events.map(&:id)).to eq(event_ids)
+    expect(command_events("cmd-claim-1")).to be_empty
   end
 
   it "VER-CLAIM-NOT-FOUND-07 returns a typed zero-fact denial" do
@@ -95,7 +96,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteClaimVerificationObligatio
     expect(claim_events.map { _1.data.values_at("claimant_id", "fencing_token") }).to eq(
       [ [ "agent-blue", 1 ], [ "agent-green", 2 ] ]
     )
-    expect(command_events("cmd-claim-2").length).to eq(1)
+    expect(command_events("cmd-claim-2")).to be_empty
   end
 
   it "VER-CLAIM-RACE-04 serializes two contenders so exactly one receives token 1" do
@@ -114,7 +115,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteClaimVerificationObligatio
     expect(results.find(&:failure?).failure.code).to eq(:verification_obligation_already_claimed)
     expect(claim_events.length).to eq(1)
     expect(claim_events.sole.data.fetch("fencing_token")).to eq(1)
-    expect(contenders.sum { command_events(_1.fetch(:command_id)).length }).to eq(1)
+    expect(contenders.flat_map { command_events(_1.fetch(:command_id)) }).to be_empty
   end
 
   def create_obligation(prefix)
@@ -139,7 +140,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteClaimVerificationObligatio
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 
   def event_reference(event)

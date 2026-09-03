@@ -393,8 +393,8 @@ RSpec.describe "ART-01 MCP Development Artifacts" do
     )
     execute_task(created.dig("result", "taskId"))
     run_batch(batch_id)
-    artifact_ids = %w[cmd-artifact-batch-1 cmd-artifact-batch-2].map do |command_id|
-      load_completion(command_id).data.artifact_id
+    artifact_ids = %w[cmd-artifact-batch-1 cmd-artifact-batch-2].map do |request_id|
+      load_result(batch_item_command_id(batch_id, request_id:)).data.artifact_id
     end
 
     relation_batch_id = SecureRandom.uuid_v7
@@ -424,7 +424,11 @@ RSpec.describe "ART-01 MCP Development Artifacts" do
     execute_task(related.dig("result", "taskId"))
     run_batch(relation_batch_id)
 
-    expect(load_completion("cmd-artifact-batch-relation-1").data).to have_attributes(
+    relation_command_id = batch_item_command_id(
+      relation_batch_id,
+      request_id: "cmd-artifact-batch-relation-1"
+    )
+    expect(load_result(relation_command_id).data).to have_attributes(
       source_artifact_id: artifact_ids.first,
       outcome: "declared"
     )
@@ -689,6 +693,7 @@ RSpec.describe "ART-01 MCP Development Artifacts" do
   def execute_task(task_id)
     submitted = task_events(task_id).find { _1.type == "CoordinationTaskSubmitted" }
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
+    CommandResultFixture.project(task_id, event_store:)
   end
 
   def run_batch(batch_id)
@@ -724,15 +729,24 @@ RSpec.describe "ART-01 MCP Development Artifacts" do
     )
   end
 
-  def load_completion(command_id)
-    event = event_store.read(
+  def batch_item_command_id(batch_id, request_id:)
+    created = batch_events(batch_id).find { _1.type == "OperationBatchCreated" }
+    payload = Coordinator::Write::EventSchemaRegistry.new.load(
+      type: created.type,
+      schema_version: created.metadata.fetch("schema_version"),
+      data: created.data
+    )
+    payload.items.find { _1.request_id == request_id }.command_id
+  end
+
+  def load_result(command_id)
+    terminal = event_store.read(
       streams.command(command_id),
-      Coordinator::Write::EventQueries::COMMAND_COMPLETION
-    ).sole
-    Coordinator::Write::EventSchemaRegistry.new.load(
-      type: event.type,
-      schema_version: event.metadata.fetch("schema_version"),
-      data: event.data
+      Coordinator::Write::EventQueries::COMMAND_HISTORY
+    ).last
+    source = Coordinator::Read::CommandResults::SourceLoader.new(event_store:).call(terminal)
+    Coordinator::Read::CommandResults::Assembler.new(event_store:).call(
+      source
     )
   end
 end

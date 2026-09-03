@@ -16,7 +16,7 @@ Feature: Attributed potential impact between Candidate checkpoints
         | direction | impact_key              | value     |
         | produces  | contract:payments-api:v2 | available |
       Then the impact Task completes with attributed unverified evidence
-      And the surface and command completion preserve the Task trace
+      And the surface and successful command lifecycle preserve the Task trace
       And the previously observed Candidate is still served without the new surface or a freshness gate
       When the "source" impact fact reaches the read side
       Then the available "source" surface preserves attributed evidence without a freshness claim
@@ -39,16 +39,16 @@ Feature: Attributed potential impact between Candidate checkpoints
 
   Rule: Command replay and concurrent decisions cannot duplicate a Candidate surface
 
-    Scenario: Exact retry returns the original surface through a second Task
+    Scenario: Exact retry returns the original surface through its original Task
       Given impact ChangeSet "REPLAY" has these projected Candidate checkpoints:
         | role   | candidate_id       | repository | head | path          | observes_path |
         | source | CAN-CUC-IMP-REPLAY | billing    | b    | lib/replay.rb | no            |
       When analyzer "analyzer-7" submits this impact evidence for "source":
         | direction | impact_key               | value     |
         | produces  | contract:payments-api:v2 | available |
-      And the exact impact command is retried through another Task
-      Then both impact Tasks expose the same result
-      And "source" has one impact fact and one command completion
+      And the exact impact command is retried through its original Task
+      Then the replayed impact Task exposes the same result
+      And "source" has one impact fact and one successful command lifecycle
 
     Scenario: Two analyzers race to publish the initial surface
       Given impact ChangeSet "RACE" has these projected Candidate checkpoints:
@@ -66,4 +66,4 @@ Feature: Attributed potential impact between Candidate checkpoints
         | source | CAN-CUC-IMP-INVALID | billing    | b    | lib/invalid.rb | no            |
       When the analyzer attempts to submit an empty impact surface for "source"
       Then the impact request is rejected before Task allocation
-      And "source" has no impact facts or command completion
+      And "source" has no impact facts or command lifecycle

@@ -18,7 +18,7 @@ module Coordinator::Write
         stream_factory: StreamFactory.new,
         marker_builder: DevelopmentArtifacts::MarkerBuilder.new,
         natural_key_registry: NaturalKeys::Registry.new(event_store:),
-        completion_builder: CommandCompletionBuilder.new
+        completion_builder: CommandResultBuilder.new
       )
         @event_store = event_store
         @preparer = preparer
@@ -55,14 +55,10 @@ module Coordinator::Write
           input_digest: @input_digest.development_artifact_capture(command),
           capture_event_id: @id_generator.uuid_v7,
           observation_event_id: @id_generator.uuid_v7,
-          completion_event_id: @id_generator.uuid_v7
         )
       end
 
       def execute_attempt(command:, preparation:, caused_by:)
-        replay = replay_result(command:, input_digest: preparation.input_digest)
-        return replay if replay
-
         resolved = resolve_artifact(command)
         return resolved if resolved.failure?
 
@@ -89,12 +85,6 @@ module Coordinator::Write
           input_digest: preparation.input_digest,
           persisted_events:,
           completed_at: preparation.captured_at
-        )
-        persist_completion(
-          completion,
-          command:,
-          event_id: preparation.completion_event_id,
-          caused_by:
         )
 
         Success(completion)
@@ -154,17 +144,6 @@ module Coordinator::Write
         )
       end
 
-      def replay_result(command:, input_digest:)
-        completion = load_completion(command.command_id)
-        return unless completion
-
-        if completion.tool_name == TOOL_NAME && completion.canonical_input_digest == input_digest
-          Success(completion)
-        else
-          Failure(command_id_reused(command, completion:, input_digest:))
-        end
-      end
-
       def command_id_reused(command, completion:, input_digest:)
         OutcomeError.new(
           code: :command_id_reused,
@@ -177,14 +156,6 @@ module Coordinator::Write
             requested_input_digest: input_digest
           }
         )
-      end
-
-      def load_completion(command_id)
-        event = @event_store.read(
-          @stream_factory.command(command_id),
-          EventQueries::COMMAND_COMPLETION
-        ).first
-        event && load_event(event)
       end
 
       def load_event(event)
@@ -228,17 +199,6 @@ module Coordinator::Write
         when Events::DevelopmentArtifactObservedV1 then preparation.observation_event_id
         else raise "Unexpected Development Artifact capture event #{event.class.name}"
         end
-      end
-
-      def persist_completion(completion, command:, event_id:, caused_by:)
-        persisted = @event_factory.build!(
-          event: completion,
-          event_id:,
-          metadata: command_metadata(command),
-          markers: [ "command:#{command.command_id}" ],
-          caused_by:
-        )
-        @event_store.append(@stream_factory.command(command.command_id), [ persisted ])
       end
 
       def command_metadata(command)

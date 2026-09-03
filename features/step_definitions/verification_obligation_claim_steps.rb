@@ -27,9 +27,9 @@ Then("a checkpointed Task exists before any claim fact") do
   )
   assert_acceptance_equal([], verification_obligation_claim_events, "Pre-execution claim facts")
   assert_acceptance_equal(
-    [],
-    command_events(@current_claim_attempt.fetch(:command_id)),
-    "Pre-execution command receipts"
+    [ "CommandRegistered" ],
+    command_events(@current_claim_attempt.fetch(:command_id)).map(&:type),
+    "Pre-execution command lifecycle"
   )
 end
 
@@ -73,13 +73,14 @@ Then("the durable claim carries exact Task tracing") do
   attempt = @last_successful_claim
   submitted, started, task_completed = task_events(attempt.fetch(:task_id))
   claim = verification_obligation_claim_events.sole
-  completion = command_events(attempt.fetch(:command_id)).sole
+  command_terminal = command_terminal_event(attempt.fetch(:command_id))
+  assert_acceptance_equal("CommandSucceeded", command_terminal&.type, "Claim command terminal")
   assert_acceptance_equal(started.id, claim.causation_id, "Claim immediate parent")
-  assert_acceptance_equal(started.id, completion.causation_id, "Receipt immediate parent")
-  assert_acceptance_equal(completion.id, task_completed.causation_id, "Task completion parent")
+  assert_acceptance_equal(started.id, command_terminal.causation_id, "Command terminal immediate parent")
+  assert_acceptance_equal(command_terminal.id, task_completed.causation_id, "Task completion parent")
   assert_acceptance_equal(
     [ submitted.correlation_id ],
-    [ submitted, started, claim, completion, task_completed ].map(&:correlation_id).uniq,
+    [ submitted, started, claim, command_terminal, task_completed ].map(&:correlation_id).uniq,
     "Claim Task correlation"
   )
   assert_acceptance(!claim.metadata.key?("correlation_id"), "Claim metadata duplicates correlation")
@@ -95,7 +96,7 @@ Then("the claim result describes coordination without claiming work or verificat
   assert_acceptance_equal([], content.fetch("data").keys & forbidden, "Unsupported claim semantics")
 end
 
-When("the same claim command is submitted as another Task") do
+When("the same claim command is submitted again") do
   original = @last_successful_claim
   response = call_tool("verification_obligation_claim", original.fetch(:arguments))
   @current_claim_attempt = {
@@ -111,11 +112,16 @@ end
 Then("replay returns the original claim without another claim fact") do
   replay = @current_claim_attempt
   original = replay.fetch(:replay_of)
+  assert_acceptance_equal(original.fetch(:task_id), replay.fetch(:task_id), "Replayed Task identity")
   assert_acceptance_equal("completed", replay.dig(:state, "result", "status"), "Replay Task status")
   assert_acceptance_equal(false, replay.dig(:result, "isError"), "Replay Task error")
-  assert_acceptance_equal(original.fetch(:content), replay.fetch(:content), "Replayed claim receipt")
+  assert_acceptance_equal(original.fetch(:content), replay.fetch(:content), "Replayed claim result")
   assert_acceptance_equal(1, verification_obligation_claim_events.length, "Replayed claim events")
-  assert_acceptance_equal(1, command_events(replay.fetch(:command_id)).length, "Replayed command receipts")
+  assert_acceptance_equal(
+    %w[CommandRegistered CommandSucceeded],
+    command_events(replay.fetch(:command_id)).map(&:type),
+    "Replayed command lifecycle"
+  )
 end
 
 Then("the claim Task reports the active {string} claim as a conflict") do |claimant_id|
@@ -134,12 +140,12 @@ Then("the claim Task reports the active {string} claim as a conflict") do |claim
   @last_denied_claim = attempt
 end
 
-Then("the denied command has no receipt or claim fact") do
+Then("the denied command records rejection without another claim fact") do
   assert_acceptance_equal(1, verification_obligation_claim_events.length, "Claims after denial")
   assert_acceptance_equal(
-    [],
-    command_events(@last_denied_claim.fetch(:command_id)),
-    "Denied command receipts"
+    %w[CommandRegistered CommandRejected],
+    command_events(@last_denied_claim.fetch(:command_id)).map(&:type),
+    "Denied command lifecycle"
   )
 end
 
@@ -176,10 +182,10 @@ Then("exactly one Task wins token 1 and the other reports an active-claim confli
     "Concurrent conflict"
   )
   assert_acceptance_equal(1, verification_obligation_claim_events.length, "Concurrent claim facts")
-  receipts = @concurrent_claim_attempts.sum do |attempt|
+  lifecycle_facts = @concurrent_claim_attempts.sum do |attempt|
     command_events(attempt.fetch(:command_id)).length
   end
-  assert_acceptance_equal(1, receipts, "Concurrent command receipts")
+  assert_acceptance_equal(4, lifecycle_facts, "Concurrent command lifecycle facts")
 end
 
 Then("both immutable claim facts retain their distinct fences") do

@@ -39,7 +39,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
     end
   end
 
-  it "replays exact input and rejects changed command reuse without duplicate facts" do
+  it "leaves replay ownership to the registered Command lifecycle without duplicate facts" do
     seed_active_attempts([ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ])
     resource_id = resolve("app/replay.rb")
     input = reserve_input(
@@ -54,10 +54,11 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
     replay = operation.call(input)
     changed = operation.call(input.merge(lease_duration_seconds: 901))
 
-    expect(replay.value!).to eq(original.value!)
-    expect(changed.failure.code).to eq(:command_id_reused)
+    expect(original).to be_success
+    expect(replay.failure.code).to eq(:write_set_already_reserved)
+    expect(changed.failure.code).to eq(:write_set_already_reserved)
     expect(lease_events(resource_id).length).to eq(1)
-    expect(command_events("cmd-reserve-replay").length).to eq(1)
+    expect(command_events("cmd-reserve-replay")).to be_empty
   end
 
   it "rejects missing, cross-repository, and inactive Resources from write-side facts" do
@@ -127,7 +128,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
     expect(results.count(&:success?)).to eq(1)
     expect(results.find(&:failure?).failure.code).to eq(:lease_busy)
     expect(lease_events(shared).length).to eq(1)
-    expect(%w[cmd-race-a cmd-race-b].sum { command_events(_1).length }).to eq(1)
+    expect(%w[cmd-race-a cmd-race-b].flat_map { command_events(_1) }).to be_empty
   end
 
   it "blocks directory descendants across distinct UUIDs but does not treat a file prefix as an ancestor" do
@@ -245,6 +246,6 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 end

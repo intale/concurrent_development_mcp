@@ -91,10 +91,9 @@ RSpec.describe "Coordination Task command transitions" do
   end
 
   it "Given a running Task, when a domain rejection is recorded, then it emits one semantic fact" do
-    result = domain_rejection
     command = Coordinator::Write::Commands::RecordCoordinationTaskOutcome.new(
       task_id:,
-      outcome: Coordinator::Write::Tasks::OutcomeV2::Completed.new(result:)
+      outcome: Coordinator::Write::Tasks::OutcomeV3::Completed.new
     )
 
     event = Coordinator::Write::Domain::CoordinationTasks::RecordOutcome.new.call(
@@ -108,8 +107,10 @@ RSpec.describe "Coordination Task command transitions" do
   it "Given a running Task, when a JSON-RPC failure is recorded, then it emits TaskFailed" do
     command = Coordinator::Write::Commands::RecordCoordinationTaskOutcome.new(
       task_id:,
-      outcome: Coordinator::Write::Tasks::OutcomeV2::Failed.new(
-        error: Coordinator::Write::Tasks::JsonRpcErrorV1.new(code: -32_603, message: "Internal error")
+      outcome: Coordinator::Write::Tasks::OutcomeV3::Failed.new(
+        code: "internal_error",
+        reason: "Internal error",
+        retryable: false
       )
     )
 
@@ -172,21 +173,4 @@ RSpec.describe "Coordination Task command transitions" do
     )
   end
 
-  def domain_rejection
-    error = Coordinator::Write::Tasks::DomainErrorV1::ChangeSetError.new(
-      code: "change_set_already_exists",
-      message: "ChangeSet already exists",
-      details: Coordinator::Write::Tasks::DomainErrorV1::ChangeSetDetails.new(
-        change_set_id: "CS-101"
-      )
-    )
-    Coordinator::Write::Tasks::SemanticResultV1::DomainRejection.new(
-      kind: "domain_rejection",
-      status: "denied",
-      summary: error.message,
-      command_id: "01919191-9191-7192-8191-919191919191",
-      error:,
-      next_actions: []
-    )
-  end
 end

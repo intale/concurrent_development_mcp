@@ -2,14 +2,15 @@ module Coordinator
   module Read
     module Repositories
       class CommandReceipts
-        def initialize: (?schema_registry: Write::EventSchemaRegistry) -> void
-        def fetch: (String command_id) -> Write::Events::CommandCompletedV1?
-        def fetch_many: (Array[String] command_ids) -> Array[Write::Events::CommandCompletedV1]
-        def store: (event: PgEventstore::Event, completion: Write::Events::CommandCompletedV1) -> CommandReceipt
+        def fetch: (String command_id) -> CommandResults::ResultV1?
+        def fetch_by_request_id: (String request_id) -> CommandResults::ResultV1?
+        def fetch_many: (Array[String] command_ids) -> Array[CommandResults::ResultV1]
+        def fetch_index: (Array[String] command_ids) -> Hash[String, CommandResults::ResultV1]
+        def store: (event: PgEventstore::Event, result: CommandResults::ResultV1) -> CommandReceipt
 
         private
 
-        def build: (CommandReceipt record) -> Write::Events::CommandCompletedV1
+        def build: (CommandReceipt record) -> CommandResults::ResultV1
       end
     end
   end

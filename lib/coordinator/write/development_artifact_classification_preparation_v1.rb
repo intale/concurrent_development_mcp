@@ -5,6 +5,5 @@ module Coordinator::Write
     attribute :corrected_at, Types::Timestamp
     attribute :input_digest, Types::Sha256Digest
     attribute :correction_event_id, Types::UuidV7
-    attribute :completion_event_id, Types::UuidV7
   end
 end

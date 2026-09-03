@@ -45,7 +45,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
       "ResourceLeaseAcquired",
       "ResourceLeaseExpired"
     )
-    expect(command_events(expiry_command_id(source)).length).to eq(1)
+    expect(command_events(expiry_command_id(source))).to be_empty
   end
 
   it "treats an acquisition timer superseded by renewal as a handled policy outcome" do
@@ -89,7 +89,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
       "ResourceLeaseAcquired",
       "ResourceLeaseExpired"
     )
-    expect(command_events(expiry_command_id(source)).length).to eq(1)
+    expect(command_events(expiry_command_id(source))).to be_empty
   end
 
   it "publishes one unique multi-event registration in the shared process-manager set" do
@@ -193,7 +193,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
   def command_events(command_id)
     event_store.read(
       Coordinator::Write::StreamFactory.new.command(command_id),
-      Coordinator::Write::EventQueries::COMMAND_COMPLETION
+      Coordinator::Write::EventQueries::COMMAND_HISTORY
     )
   end
 

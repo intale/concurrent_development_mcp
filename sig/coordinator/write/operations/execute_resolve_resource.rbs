@@ -12,7 +12,6 @@ module Coordinator
           def proposed_resource_id: () -> String
           def registration_event_id: () -> String
           def binding_event_id: () -> String
-          def completion_event_id: () -> String
         end
 
         def initialize: (

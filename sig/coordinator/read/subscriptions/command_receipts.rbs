@@ -4,7 +4,7 @@ module Coordinator
       class CommandReceipts < Shared::Subscriptions::Registration
         DEFINITION: ReadModelDefinition
 
-        def initialize: (handler: Projectors::CommandReceiptsV1, ?pull_interval: Integer | Float) -> void
+        def initialize: (handler: Projectors::CommandReceiptsV2, ?pull_interval: Integer | Float) -> void
       end
     end
   end

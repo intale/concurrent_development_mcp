@@ -61,11 +61,11 @@ RSpec.describe "CHO-01 MCP agent choice recording" do
 
     submitted, started, task_completed = task_events(task_id)
     choice_facts = choice_events("CHO-mcp-choice")
-    completion = command_events("cmd-mcp-choice").sole
+    command_terminal = CommandTraceFixture.terminal(task_id, event_store:)
     expect(choice_facts.map(&:type)).to eq(%w[AgentChoiceRecorded AgentChoiceAccepted])
-    expect([ *choice_facts, completion ].map(&:causation_id).uniq).to eq([ started.id ])
-    expect(task_completed.causation_id).to eq(completion.id)
-    expect([ submitted, started, *choice_facts, completion, task_completed ].map(&:correlation_id).uniq).to eq(
+    expect([ *choice_facts, command_terminal ].map(&:causation_id).uniq).to eq([ started.id ])
+    expect(task_completed.causation_id).to eq(command_terminal.id)
+    expect([ submitted, started, *choice_facts, command_terminal, task_completed ].map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
     )
   end
@@ -314,6 +314,7 @@ RSpec.describe "CHO-01 MCP agent choice recording" do
   def execute_task(task_id)
     submitted = task_events(task_id).find { _1.type == "CoordinationTaskSubmitted" }
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
+    CommandResultFixture.project(task_id, event_store:)
   end
 
   def task_events(task_id)
@@ -343,6 +344,6 @@ RSpec.describe "CHO-01 MCP agent choice recording" do
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 end

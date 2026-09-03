@@ -14,13 +14,15 @@ module McpAcceptanceWorld
   end
 
   def call_tool(name, arguments, expected_status: 200, client_id: "default")
-    mcp_request(
+    response = mcp_request(
       method: "tools/call",
       params: { name:, arguments: },
       name:,
       expected_status:,
       client_id:
     )
+    remember_task_request(arguments, response)
+    response
   end
 
   def task_request(method, task_id, params = {}, client_id: "default")
@@ -140,7 +142,8 @@ module McpAcceptanceWorld
         task_id = candidate.fetch(:task_id)
         candidates << candidate.merge(
           client_id:,
-          worker_lane: Coordinator::Write::Tasks::ExecutionLane.new.index(task_id)
+          worker_lane: Coordinator::Write::Tasks::ExecutionLane.new.index(task_id),
+          internal_command_id: task_command_id(task_id)
         )
       end
       selected = candidates.combination(2).find do |left, right|
@@ -194,7 +197,14 @@ module McpAcceptanceWorld
     )
   end
 
+  def task_command_id(task_id)
+    submitted = task_events(task_id).find { _1.type == "CoordinationTaskSubmitted" }
+    assert_acceptance(submitted, "Task #{task_id} has no submission fact")
+    submitted.data.fetch("command_id")
+  end
+
   def task_events_for_command(command_id)
+    command_id = resolve_command_id(command_id)
     PgEventstore.client.read(
       PgEventstore::Stream.all_stream,
       options: {
@@ -212,11 +222,54 @@ module McpAcceptanceWorld
     )
   end
 
+  def task_events_for_request(request_id, actor:)
+    actor_value = Coordinator::Write::Commands::Actor.new(
+      kind: actor.fetch(:kind),
+      id: actor.fetch(:id)
+    )
+    marker = Coordinator::Write::CommandLifecycle::RequestMarker.new.call(
+      actor: actor_value,
+      request_id:
+    )
+    registration = event_store.read_global_marked(
+      Coordinator::Write::GlobalMarkedEventReadCriteria.new(
+        stream_context: "CoordinatorControl",
+        stream_name: "Command",
+        event_types: [ "CommandRegistered" ],
+        markers: [ marker ],
+        maximum_count: 1,
+        direction: :asc
+      )
+    ).first
+    return [] unless registration
+
+    task_events_for_command(registration.data.fetch("command_id"))
+  end
+
   def command_events(command_id)
+    command_id = resolve_command_id(command_id)
     event_store.read(
       streams.command(command_id),
-      Coordinator::Write::EventQueries::COMMAND_COMPLETION
+      Coordinator::Write::EventQueries::COMMAND_HISTORY
     )
+  end
+
+  def assert_command_registered(command_id, context: "Command lifecycle")
+    assert_command_lifecycle(command_id, %w[CommandRegistered], context:)
+  end
+
+  def assert_command_succeeded(command_id, context: "Command lifecycle")
+    assert_command_lifecycle(command_id, %w[CommandRegistered CommandSucceeded], context:)
+  end
+
+  def assert_command_rejected(command_id, context: "Command lifecycle")
+    assert_command_lifecycle(command_id, %w[CommandRegistered CommandRejected], context:)
+  end
+
+  def command_terminal_event(command_id)
+    command_events(command_id).find do |event|
+      %w[CommandSucceeded CommandRejected].include?(event.type)
+    end
   end
 
   def change_set_events(change_set_id)
@@ -795,6 +848,27 @@ module McpAcceptanceWorld
     state
   end
 
+  def remember_task_request(arguments, response)
+    request_id = arguments[:command_id] || arguments["command_id"]
+    task_id = response.dig("result", "taskId")
+    return unless request_id && task_id
+
+    @task_ids_by_request ||= Hash.new { |index, key| index[key] = [] }
+    @task_ids_by_request[request_id.to_s] << task_id
+  end
+
+  def resolve_command_id(request_or_command_id)
+    identifier = request_or_command_id.to_s
+    return identifier if Coordinator::Shared::Types::UUID_V7_PATTERN.match?(identifier)
+
+    task_ids = (@task_ids_by_request || {}).fetch(identifier, []).uniq
+    return identifier if task_ids.empty?
+
+    command_ids = task_ids.map { task_command_id(_1) }.uniq
+    assert_acceptance_equal(1, command_ids.length, "Command identity for request #{identifier}")
+    command_ids.sole
+  end
+
   def choice_option_summary(option_id)
     option_id == "rspec" ? "RSpec" : option_id.capitalize
   end
@@ -932,8 +1006,7 @@ module McpAcceptanceWorld
     }
   end
 
-  def assert_no_current_coordination_facts
-    assert_acceptance_equal([], command_events(@current_arguments.fetch(:command_id)), "Command facts")
+  def assert_no_current_target_facts
     assert_acceptance_equal([], change_set_events(@current_arguments.fetch(:change_set_id)), "ChangeSet facts")
     return unless @current_arguments[:work_item_id]
 
@@ -948,6 +1021,12 @@ module McpAcceptanceWorld
     return if expected == actual
 
     raise "#{context}: expected #{expected.inspect}, got #{actual.inspect}"
+  end
+
+  def assert_command_lifecycle(command_id, expected_types, context:)
+    events = command_events(command_id)
+    assert_acceptance_equal(expected_types, events.map(&:type), context)
+    events
   end
 
   def coordination_context(**scope)

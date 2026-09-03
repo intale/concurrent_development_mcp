@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Events
+      class OperationBatchCancelledV2 < Base
+        def batch_id: () -> String
+      end
+    end
+  end
+end

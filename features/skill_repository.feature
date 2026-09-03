@@ -21,7 +21,7 @@ Feature: Scoped AI Skill repository
       When the agent publishes revision 2 without projecting it
       Then Skill "deploy" remains available at projected revision 1
       When the agent attempts another publication from stale revision 1
-      Then the stale Skill Task completes with revision conflict and no command fact
+      Then the stale Skill Task completes with revision conflict and a rejected command lifecycle
       When Skill revision 2 reaches the read side
       Then Skill "deploy" is available at revision 2 without a freshness field
 

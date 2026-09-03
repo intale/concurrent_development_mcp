@@ -3,7 +3,7 @@ module Coordinator
     module Domain
       module OperationBatches
         class Complete
-          def initialize: (?stream_factory: StreamFactory, ?canonical_json: Shared::CanonicalJson) -> void
+          def initialize: (?stream_factory: StreamFactory) -> void
           def call: (state: Write::OperationBatches::State, command: Commands::CompleteOperationBatch) -> Dry::Monads::Result
         end
       end

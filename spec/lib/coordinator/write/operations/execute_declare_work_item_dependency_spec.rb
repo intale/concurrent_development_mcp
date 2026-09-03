@@ -24,7 +24,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteDeclareWorkItemDependency,
     create_work_item("W-200", "ledger")
   end
 
-  it "persists the dependency fact and durable completion through the real store" do
+  it "persists the dependency fact and returns a transient typed result" do
     result = operation.call(input)
 
     expect(result).to be_success
@@ -44,7 +44,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteDeclareWorkItemDependency,
         "WorkItemDependencyDeclared"
       ]
     )
-    expect(command_events("cmd-230").map(&:type)).to eq([ "CommandCompleted" ])
+    expect(command_events("cmd-230")).to be_empty
     expect(completion.emitted_events.map { [ _1.stream_name, _1.stream_revision ] }).to eq(
       [ [ "ChangeSet", 4 ] ]
     )
@@ -65,25 +65,24 @@ RSpec.describe Coordinator::Write::Operations::ExecuteDeclareWorkItemDependency,
     )
   end
 
-  it "replays the exact persisted completion without another real append" do
-    original = operation.call(input)
+  it "leaves replay ownership to the registered Command lifecycle" do
+    expect(operation.call(input)).to be_success
     original_ids = persisted_ids
 
     replay = operation.call(input)
 
-    expect(replay).to be_success
-    expect(replay.value!).to eq(original.value!)
+    expect(replay.failure.code).to eq(:dependency_id_reused)
     expect(persisted_ids).to eq(original_ids)
   end
 
-  it "rejects changed-input reuse of a completed command ID" do
+  it "enforces the dependency identity independently of public request identity" do
     operation.call(input)
 
     result = operation.call(input.merge(dependency_kind: "requires_completion"))
 
     expect(result).to be_failure
-    expect(result.failure.code).to eq(:command_id_reused)
-    expect(command_events("cmd-230").length).to eq(1)
+    expect(result.failure.code).to eq(:dependency_id_reused)
+    expect(command_events("cmd-230")).to be_empty
   end
 
   it "returns a zero-event cycle denial without completing the command" do
@@ -111,7 +110,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteDeclareWorkItemDependency,
     expect(results.count(&:failure?)).to eq(1)
     expect(results.find(&:failure?).failure.code).to eq(:dependency_id_reused)
     expect(dependency_events.length).to eq(1)
-    expect(competing_inputs.count { command_events(_1.fetch(:command_id)).one? }).to eq(1)
+    expect(competing_inputs.flat_map { command_events(_1.fetch(:command_id)) }).to be_empty
   end
 
   def create_change_set
@@ -162,7 +161,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteDeclareWorkItemDependency,
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 
   def persisted_ids

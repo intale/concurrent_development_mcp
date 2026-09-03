@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module OperationBatches
+      class ItemV2 < Shared::Value
+        def index: () -> Integer
+        def request_id: () -> (String | Integer)
+        def command_input: () -> (CommandInputDocuments::PublishSkillRevisionV2 | CommandInputDocuments::CaptureDevelopmentArtifactV2 | CommandInputDocuments::DeclareDevelopmentArtifactRelationV1)
+        def canonical_input_digest: () -> String
+        def command_id: () -> String
+      end
+    end
+  end
+end

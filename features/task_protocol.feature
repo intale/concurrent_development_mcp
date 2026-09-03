@@ -9,24 +9,24 @@ Feature: Durable MCP Task protocol
   Rule: Retrying a lost request cannot duplicate coordination facts
 
     @CDM-TASK-001 @live-subscriptions
-    Scenario: An agent retries a completed ChangeSet command through a new Task
+    Scenario: An agent retries a completed ChangeSet command through its original Task
       When agent "planner-1" submits ChangeSet "CS-CUC-RETRY" with command "cmd-cuc-retry"
       Then the Task is durable before coordination begins
       When the current Task completes through live subscriptions
       Then the current Task completes successfully
-      And the completed Task persists one semantic success without MCP wire copies
-      When the same command is retried through another live Task
-      Then both Task handles expose the same result
+      And the completed Task has a lean terminal linked to one successful command
+      When the same command is retried through its original live Task
+      Then the replayed Task exposes the same result
       And the command and ChangeSet facts exist only once
 
     @AUD-TASK-POST-COMMIT-01 @TASK-SEMANTIC-01 @live-subscriptions
-    Scenario: A working Task recovers the result of an already committed target command
+    Scenario: An exact retry recovers the result of its already completed Task
       Given agent "planner-1" completed ChangeSet "CS-AUD-TASK-RECOVERY" with command "cmd-aud-task-recovery" through live subscriptions
       And the Task workers are interrupted
-      When the exact completed command is submitted through a new Task
-      Then the replacement Task remains working without duplicate coordination facts
+      When the exact completed command request is retried
+      Then the retry returns the original completed Task without duplicate coordination facts
       When the Task workers restart
-      Then the replacement Task exposes the original completed result
+      Then the replayed Task exposes the original completed result
       And an independent MCP client reconstructs the same terminal result
       And the recovered command and ChangeSet facts exist only once
 
@@ -44,8 +44,7 @@ Feature: Durable MCP Task protocol
       And the Task executor processes the current Task
       Then the current Task completes successfully
       When the completed command identity is submitted with a changed ChangeSet goal
-      And the Task executor processes the current Task
-      Then the current Task completes with coordination denial "command_id_reused"
+      Then the changed request is rejected immediately with command identity conflict
       And only the original command and ChangeSet facts remain
 
     @CDM-OP-001 @stale-view
@@ -63,14 +62,14 @@ Feature: Durable MCP Task protocol
       When agent "planner-1" submits WorkItem "W-CUC-DENIED" to missing ChangeSet "CS-CUC-MISSING" with command "cmd-cuc-denied"
       And the Task executor processes the current Task
       Then the current Task completes with coordination denial "change_set_not_found"
-      And the denied command writes no coordination facts
+      And the denied command writes no target coordination facts
 
     @AUD-TASK-DOMAIN-DENIAL-03 @TASK-DENIAL-01 @live-subscriptions
     Scenario: A live Task represents a domain denial as a completed tool error
       Given agent "planner-1" completed ChangeSet "CS-AUD-TASK-DENIAL" with command "cmd-aud-task-denial-seed" through live subscriptions
       When agent "planner-2" submits the same ChangeSet with command "cmd-aud-task-denial"
       Then the current Task eventually completes with coordination denial "change_set_already_exists"
-      And the completed Task persists one semantic domain rejection without MCP wire copies
+      And the completed Task has a lean terminal linked to one rejected command
 
   Rule: Queued work can be cancelled cooperatively
 
@@ -80,7 +79,7 @@ Feature: Durable MCP Task protocol
       And the agent cancels the current Task before execution
       And the Task executor later receives the cancelled Task
       Then the current Task is cancelled
-      And the cancelled command writes no coordination facts
+      And the cancelled command writes no target coordination facts
 
     @AUD-TASK-CANCEL-RACE-04 @live-subscriptions
     Scenario: Cancellation racing execution preserves one terminal Task state

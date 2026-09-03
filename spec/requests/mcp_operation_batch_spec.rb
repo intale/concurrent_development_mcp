@@ -40,13 +40,34 @@ RSpec.describe "BAT-01 MCP Operation Batches" do
     )
 
     created_event = batch_events(batch_id).sole
+    created_payload = load_event(created_event)
+    expect(created_event.metadata.fetch("schema_version")).to eq(2)
+    expect(created_event.data.keys).to match_array(%w[batch_id items page_size target_tool])
+    expect(created_payload.items.map(&:request_id)).to eq(%w[item-1 item-2])
+    expect(created_payload.items.map(&:command_id)).to all(match(Coordinator::Write::Types::UUID_V7_PATTERN))
+    created_payload.items.each do |item|
+      expect(command_events(item.command_id).map(&:type)).to eq([ "CommandRegistered" ])
+    end
+
     Coordinator::Container["process_managers.operation_batch_runner"].call(created_event)
-    expect(batch_events(batch_id).map(&:type)).to eq(%w[
+    persisted_batch_events = batch_events(batch_id)
+    expect(persisted_batch_events.map(&:type)).to eq(%w[
       OperationBatchCreated
       OperationBatchItemSucceeded
       OperationBatchItemRejected
       OperationBatchCompleted
     ])
+    expect(persisted_batch_events.map(&:correlation_id).uniq).to contain_exactly(created_event.correlation_id)
+
+    outcomes = persisted_batch_events.select { _1.type.start_with?("OperationBatchItem") }
+    expect(outcomes.map { _1.data.keys }).to all(match_array(%w[batch_id command_id index]))
+    expect(persisted_batch_events.last.data.keys).to eq([ "batch_id" ])
+    expect(command_events(created_payload.items.fetch(0).command_id).map(&:type)).to eq(
+      %w[CommandRegistered CommandSucceeded]
+    )
+    expect(command_events(created_payload.items.fetch(1).command_id).map(&:type)).to eq(
+      %w[CommandRegistered CommandRejected]
+    )
   end
 
   it "serves directly persisted stale-available batch progress", :read_model do
@@ -168,7 +189,13 @@ RSpec.describe "BAT-01 MCP Operation Batches" do
 
   def execute_task(task_id)
     submitted = task_events(task_id).find { _1.type == "CoordinationTaskSubmitted" }
+    collector = ReportedErrorCollector.new
+    Rails.error.subscribe(collector)
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
+    raise collector.errors.first if collector.errors.any?
+    CommandResultFixture.project(task_id, event_store:)
+  ensure
+    Rails.error.unsubscribe(collector) if collector
   end
 
   def task_events(task_id)
@@ -192,5 +219,17 @@ RSpec.describe "BAT-01 MCP Operation Batches" do
 
   def batch_events(batch_id)
     event_store.read(streams.operation_batch(batch_id), Coordinator::Write::EventQueries::OPERATION_BATCH_HISTORY)
+  end
+
+  def command_events(command_id)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
+  end
+
+  def load_event(event)
+    Coordinator::Write::EventSchemaRegistry.new.load(
+      type: event.type,
+      schema_version: event.metadata.fetch("schema_version"),
+      data: event.data
+    )
   end
 end

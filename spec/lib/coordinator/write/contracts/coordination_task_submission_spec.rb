@@ -5,7 +5,7 @@ RSpec.describe Coordinator::Write::Contracts::CoordinationTaskSubmission do
 
   let(:target_command) do
     Coordinator::Write::Commands::CreateChangeSet.new(
-      command_id: "cmd-task-101",
+      command_id: "01919191-9191-7191-8191-919191919192",
       actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "agent-a"),
       change_set_id: "CS-101",
       goal: "Coordinate billing changes",
@@ -14,12 +14,11 @@ RSpec.describe Coordinator::Write::Contracts::CoordinationTaskSubmission do
   end
   let(:input_builder) { Coordinator::Write::CommandInputDigest.new }
   let(:event) do
-    Coordinator::Write::Events::CoordinationTaskSubmittedV2.new(
+    Coordinator::Write::Events::CoordinationTaskSubmittedV3.new(
       task_id: "01919191-9191-7191-8191-919191919191",
       tool_name: "change_set_create",
       command_id: target_command.command_id,
       command_input: input_builder.document(target_command),
-      submitted_at: "2026-08-22T06:30:00.000000Z",
       ttl_ms: nil,
       poll_interval_ms: 500
     )
@@ -34,7 +33,7 @@ RSpec.describe Coordinator::Write::Contracts::CoordinationTaskSubmission do
   end
 
   it "rejects a public identity that disagrees with the nested command document" do
-    changed = described_event(command_id: "cmd-task-other")
+    changed = described_event(command_id: "01919191-9191-7191-8191-919191919193")
 
     expect(contract.call(event: changed).errors.to_h).to include(:event)
   end
@@ -45,13 +44,13 @@ RSpec.describe Coordinator::Write::Contracts::CoordinationTaskSubmission do
     expect do
       Coordinator::Write::EventSchemaRegistry.new.load(
         type: "CoordinationTaskSubmitted",
-        schema_version: 2,
+        schema_version: 3,
         data: payload
       )
     end.to raise_error(Coordinator::Write::InvalidCoordinationTaskSubmission)
   end
 
   def described_event(overrides)
-    Coordinator::Write::Events::CoordinationTaskSubmittedV2.new(event.to_h.merge(overrides))
+    Coordinator::Write::Events::CoordinationTaskSubmittedV3.new(event.to_h.merge(overrides))
   end
 end

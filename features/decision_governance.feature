@@ -28,7 +28,7 @@ Feature: Decision governance
       Then acceptance has emitted no Decision facts
       When the host concurrently activates all accepted interpretations through Tasks
       Then one activation Task succeeds and the other reports an occupied Decision slot
-      And the losing activation writes no Decision or command facts
+      And the losing activation writes no Decision facts and records its command rejection
 
   Rule: An active Decision is corrected from accepted evidence against its authoritative head
 

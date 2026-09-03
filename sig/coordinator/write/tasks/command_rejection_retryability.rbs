@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Tasks
+      class CommandRejectionRetryability
+        RETRYABLE_CODES: Array[Symbol]
+        def call: (OutcomeError error) -> bool
+      end
+    end
+  end
+end

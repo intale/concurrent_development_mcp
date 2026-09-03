@@ -74,15 +74,15 @@ RSpec.describe "DEC-02A MCP Decision correction" do
       *slot_events(result.dig("data", "slot", "slot_id")).select { _1.causation_id == started.id },
       *partition_events.select { _1.causation_id == started.id }
     ]
-    completion = command_events(arguments.fetch(:command_id)).sole
+    command_terminal = CommandTraceFixture.terminal(task_id, event_store:)
     expect(correction_facts.map(&:type)).to eq(%w[
       DecisionDefinitionCorrected
       DecisionSlotHeadChanged
       DecisionPartitionAdvanced
     ])
-    expect([ *correction_facts, completion ].map(&:causation_id).uniq).to eq([ started.id ])
-    expect(task_completed.causation_id).to eq(completion.id)
-    expect([ submitted, started, *correction_facts, completion, task_completed ].map(&:correlation_id).uniq).to eq(
+    expect([ *correction_facts, command_terminal ].map(&:causation_id).uniq).to eq([ started.id ])
+    expect(task_completed.causation_id).to eq(command_terminal.id)
+    expect([ submitted, started, *correction_facts, command_terminal, task_completed ].map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
     )
 
@@ -107,7 +107,9 @@ RSpec.describe "DEC-02A MCP Decision correction" do
         )
       )
     )
-    expect(command_events(stale_arguments.fetch(:command_id))).to be_empty
+    expect(CommandTraceFixture.events(stale_task_id, event_store:).map(&:type)).to eq(
+      [ "CommandRegistered", "CommandRejected" ]
+    )
     expect(decision_events.count { _1.type == "DecisionDefinitionCorrected" }).to eq(1)
   end
 
@@ -312,6 +314,7 @@ RSpec.describe "DEC-02A MCP Decision correction" do
     Rails.error.subscribe(collector)
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
     raise collector.errors.first if collector.errors.any?
+    CommandResultFixture.project(task_id, event_store:)
   ensure
     Rails.error.unsubscribe(collector) if collector
   end
@@ -372,7 +375,7 @@ RSpec.describe "DEC-02A MCP Decision correction" do
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 
   def event_reference_hash(event)

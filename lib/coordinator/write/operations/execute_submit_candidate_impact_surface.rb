@@ -16,7 +16,7 @@ module Coordinator::Write
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
         index_marker_builder: Candidates::ImpactIndexMarkerBuilder.new,
-        completion_builder: CommandCompletionBuilder.new,
+        completion_builder: CommandResultBuilder.new,
         event_plan_contract: Contracts::CandidateImpactSurfaceEventPlan.new
       )
         @event_store = event_store
@@ -53,14 +53,10 @@ module Coordinator::Write
           input_digest: @input_digest.candidate_impact_surface_submit(command),
           surface_event_id: @id_generator.uuid_v7,
           registration_event_id: @id_generator.uuid_v7,
-          completion_event_id: @id_generator.uuid_v7
         )
       end
 
       def execute_attempt(command:, prepared:, caused_by:)
-        replay = replay_result(command:, input_digest: prepared.input_digest)
-        return replay if replay
-
         state = load_state(command.candidate_id)
         surface_event = future_surface_reference(command, state, prepared.surface_event_id)
         decision = @decider.call(
@@ -86,45 +82,8 @@ module Coordinator::Write
           persisted_events:,
           completed_at: prepared.derived_at
         )
-        persist_completion(
-          completion,
-          command:,
-          event_id: prepared.completion_event_id,
-          caused_by:
-        )
 
         Success(completion)
-      end
-
-      def replay_result(command:, input_digest:)
-        completion = load_completion(command.command_id)
-        return unless completion
-
-        if completion.tool_name == TOOL_NAME && completion.canonical_input_digest == input_digest
-          Success(completion)
-        else
-          Failure(
-            OutcomeError.new(
-              code: :command_id_reused,
-              message: "Command ID is already bound to another tool or input",
-              details: {
-                command_id: command.command_id,
-                existing_tool_name: completion.tool_name,
-                existing_input_digest: completion.canonical_input_digest,
-                requested_tool_name: TOOL_NAME,
-                requested_input_digest: input_digest
-              }
-            )
-          )
-        end
-      end
-
-      def load_completion(command_id)
-        event = @event_store.read(
-          @stream_factory.command(command_id),
-          EventQueries::COMMAND_COMPLETION
-        ).first
-        event && load_event(event)
       end
 
       def load_state(candidate_id)
@@ -203,17 +162,6 @@ module Coordinator::Write
           )
           @event_store.append(write.stream, [ event ]).sole
         end
-      end
-
-      def persist_completion(completion, command:, event_id:, caused_by:)
-        event = @event_factory.build!(
-          event: completion,
-          event_id:,
-          metadata: command_metadata(command),
-          markers: [ "command:#{command.command_id}" ],
-          caused_by:
-        )
-        @event_store.append(@stream_factory.command(command.command_id), [ event ])
       end
 
       def markers_for(event, command:, state:, surface:)

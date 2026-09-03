@@ -97,6 +97,7 @@ RSpec.configure do |config|
   config.before(:each, event_store: true) do
     EventStoreTestSafety.verify!
     PgEventstore::TestHelpers.clean_up_db
+    ReadModelTestSafety.clean!
   end
 
   config.before(:each, read_model: true) do

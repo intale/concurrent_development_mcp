@@ -109,15 +109,15 @@ module Coordinator::Write
       end
     end
 
-    COMMAND_COMPLETION = EventReadCriteria.new(
-      event_types: [ "CommandCompleted" ],
-      maximum_count: 1,
-      direction: :desc
-    )
-
     COMMAND_REGISTRATION = EventReadCriteria.new(
       event_types: [ "CommandRegistered" ],
       maximum_count: 1,
+      direction: :asc
+    )
+
+    COMMAND_HISTORY = EventReadCriteria.new(
+      event_types: [ "CommandRegistered", "CommandSucceeded", "CommandRejected" ],
+      maximum_count: 2,
       direction: :asc
     )
 

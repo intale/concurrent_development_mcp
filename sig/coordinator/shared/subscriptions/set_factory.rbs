@@ -9,7 +9,8 @@ module Coordinator::Shared
 
       def call: (?manager: PgEventstore::SubscriptionsManager?) -> (
         Coordinator::Processes::Subscriptions::ProcessManagerSet |
-        Coordinator::Read::Subscriptions::ReadModelSet
+        Coordinator::Read::Subscriptions::ReadModelSet |
+        Coordinator::Read::Subscriptions::TaskResultSet
       )
     end
   end

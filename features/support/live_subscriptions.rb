@@ -12,6 +12,7 @@ module LiveSubscriptions
 
   def start_live_subscriptions
     start_process_subscriptions
+    start_task_result_subscriptions
     start_read_model_subscriptions
   end
 
@@ -23,8 +24,13 @@ module LiveSubscriptions
     start_subscription_set(:read_models, "subscription_set_factories.read_models")
   end
 
+  def start_task_result_subscriptions
+    start_subscription_set(:task_results, "subscription_set_factories.task_results")
+  end
+
   def stop_live_subscriptions
     stop_read_model_subscriptions
+    stop_task_result_subscriptions
     stop_process_subscriptions
   end
 
@@ -34,6 +40,10 @@ module LiveSubscriptions
 
   def stop_read_model_subscriptions
     stop_subscription_set(:read_models)
+  end
+
+  def stop_task_result_subscriptions
+    stop_subscription_set(:task_results)
   end
 
   def restart_process_subscriptions
@@ -63,16 +73,20 @@ module LiveSubscriptions
   end
 
   def await_task_terminal(task_id, client_id: "default")
+    start_task_result_subscriptions
     eventually("Task #{task_id} to reach a terminal state") do
       state = task_request("tasks/get", task_id, client_id:)
       [ TERMINAL_TASK_STATUSES.include?(state.dig("result", "status")), state ]
     end
   rescue RuntimeError => error
-    subscription_set = @live_subscription_sets&.fetch(:process_managers, nil)
-    diagnostics = subscription_set&.subscription_names&.to_h do |name|
-      [ name, subscription_set.processed_event_count(name) ]
+    diagnostics = %i[process_managers task_results].to_h do |set_name|
+      subscription_set = @live_subscription_sets&.fetch(set_name, nil)
+      counts = subscription_set&.subscription_names&.to_h do |name|
+        [ name, subscription_set.processed_event_count(name) ]
+      end
+      [ set_name, counts ]
     end
-    raise "#{error.message}; Task executor subscriptions: #{diagnostics.inspect}"
+    raise "#{error.message}; Task subscriptions: #{diagnostics.inspect}"
   end
 
   def await_read_model(label, timeout_seconds: DEFAULT_TIMEOUT_SECONDS, &predicate)

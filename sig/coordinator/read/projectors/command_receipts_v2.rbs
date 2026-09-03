@@ -1,0 +1,17 @@
+module Coordinator
+  module Read
+    module Projectors
+      class CommandReceiptsV2
+        PROJECTION: ProjectionDefinition
+
+        def initialize: (
+          source_loader: CommandResults::SourceLoader,
+          assembler: CommandResults::Assembler,
+          ?receipts: Repositories::CommandReceipts,
+          ?processed_events: Repositories::ProcessedProjectionEvents
+        ) -> void
+        def call: (PgEventstore::Event event) -> void
+      end
+    end
+  end
+end

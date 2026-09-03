@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Events
+      class OperationBatchItemRejectedV2 < Base
+        def batch_id: () -> String
+        def index: () -> Integer
+        def command_id: () -> String
+      end
+    end
+  end
+end

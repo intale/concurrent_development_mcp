@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module CommandLifecycle
+      class Loader
+        def initialize: (event_store: _EventStore, ?stream_factory: StreamFactory, ?schema_registry: EventSchemaRegistry) -> void
+        def call: (String command_id) -> Snapshot
+      end
+    end
+  end
+end

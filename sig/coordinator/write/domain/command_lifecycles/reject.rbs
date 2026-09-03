@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Domain
+      module CommandLifecycles
+        class Reject
+          def call: (state: State, command: Write::Commands::RejectCommand) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

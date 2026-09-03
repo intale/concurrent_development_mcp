@@ -144,9 +144,9 @@ Then("only the first Conversation owns the forwarded evidence") do
     "Duplicate Conversation facts"
   )
   assert_acceptance_equal(
-    [],
-    command_events(@duplicate_guidance_command_id),
-    "Duplicate guidance completion"
+    %w[CommandRegistered CommandRejected],
+    command_events(@duplicate_guidance_command_id).map(&:type),
+    "Duplicate guidance command lifecycle"
   )
 end
 
@@ -298,9 +298,9 @@ Then("the hard proposal and its clarification are persisted atomically") do
     "Hard proposal event-plan revisions"
   )
   assert_acceptance_equal(
-    1,
-    command_events("cmd-cuc-interpretation-b").length,
-    "Hard proposal completion"
+    %w[CommandRegistered CommandSucceeded],
+    command_events("cmd-cuc-interpretation-b").map(&:type),
+    "Hard proposal command lifecycle"
   )
 end
 

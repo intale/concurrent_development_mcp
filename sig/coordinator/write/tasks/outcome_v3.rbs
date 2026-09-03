@@ -1,0 +1,18 @@
+module Coordinator
+  module Write
+    module Tasks
+      module OutcomeV3
+        class Completed < Shared::Value
+        end
+
+        class Failed < Shared::Value
+          def code: () -> String
+          def reason: () -> String
+          def retryable: () -> bool
+        end
+
+        type value = Completed | Failed
+      end
+    end
+  end
+end

@@ -19,12 +19,10 @@ module Coordinator::Write
             return Failure(error(:operation_batch_continuation_invalid, "Continuation page does not match pending items", command))
           end
 
-          event = Events::OperationBatchContinuationRequestedV1.new(
+          event = Events::OperationBatchContinuationRequestedV2.new(
             batch_id: command.batch_id,
             page_start: command.page_start,
-            page_end: command.page_end,
-            source_event: command.source_event,
-            requested_at: command.requested_at
+            page_end: command.page_end
           )
           Success(
             EventPlan.new(
@@ -37,7 +35,7 @@ module Coordinator::Write
 
         def valid_page?(state, command)
           first = state.pending_indexes.min
-          expected_end = [ first + state.creation.page_size - 1, state.creation.total - 1 ].min
+          expected_end = [ first + state.creation.page_size - 1, state.creation.items.length - 1 ].min
           command.page_start == first && command.page_end == expected_end
         end
 

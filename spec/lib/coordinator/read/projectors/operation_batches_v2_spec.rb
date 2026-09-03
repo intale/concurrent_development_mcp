@@ -48,11 +48,7 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
   it "exposes accepted cancellation before terminal completion and marks only terminal remainder not run" do
     created = batch_event(created_payload(skill_items), revision: 0, position: 100)
     cancellation = batch_event(
-      Coordinator::Write::Events::OperationBatchCancellationRequestedV1.new(
-        batch_id:,
-        requester: batch_actor,
-        requested_at: "2026-08-30T12:01:00.000000Z"
-      ),
+      Coordinator::Write::Events::OperationBatchCancellationRequestedV2.new(batch_id:),
       revision: 1,
       position: 200,
       causation_id: created.id
@@ -67,14 +63,7 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
     expect(cancelling.terminal).to be_nil
 
     cancelled = batch_event(
-      Coordinator::Write::Events::OperationBatchCancelledV1.new(
-        batch_id:,
-        succeeded: 0,
-        rejected: 0,
-        not_run: 2,
-        cancellation_event: event_reference(cancellation),
-        cancelled_at: "2026-08-30T12:02:00.000000Z"
-      ),
+      Coordinator::Write::Events::OperationBatchCancelledV2.new(batch_id:),
       revision: 2,
       position: 300,
       causation_id: cancellation.id
@@ -116,40 +105,27 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
     items = skill_items
     created = batch_event(created_payload(items), revision: 0, position: 100)
     succeeded = batch_event(
-      Coordinator::Write::Events::OperationBatchItemSucceededV1.new(
+      Coordinator::Write::Events::OperationBatchItemSucceededV2.new(
         batch_id:,
         index: 0,
-        command_id: "item-1",
-        canonical_input_digest: items.fetch(0).canonical_input_digest,
-        target_completion: source_reference("CommandCompleted", "item-1", 0),
-        result: success_result,
-        finished_at: "2026-08-30T12:01:00.000000Z"
+        command_id: items.fetch(0).command_id
       ),
       revision: 1,
       position: 200,
       causation_id: created.id
     )
     rejected = batch_event(
-      Coordinator::Write::Events::OperationBatchItemRejectedV1.new(
+      Coordinator::Write::Events::OperationBatchItemRejectedV2.new(
         batch_id:,
         index: 1,
-        command_id: "item-2",
-        canonical_input_digest: items.fetch(1).canonical_input_digest,
-        result: rejection_result,
-        finished_at: "2026-08-30T12:02:00.000000Z"
+        command_id: items.fetch(1).command_id
       ),
       revision: 2,
       position: 300,
       causation_id: created.id
     )
     completed = batch_event(
-      Coordinator::Write::Events::OperationBatchCompletedV1.new(
-        batch_id:,
-        succeeded: 1,
-        rejected: 1,
-        outcome_manifest_digest: "sha256:#{'f' * 64}",
-        completed_at: "2026-08-30T12:03:00.000000Z"
-      ),
+      Coordinator::Write::Events::OperationBatchCompletedV2.new(batch_id:),
       revision: 3,
       position: 400,
       causation_id: created.id
@@ -169,9 +145,10 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
       name: "review",
       scope: "project:alpha"
     )
+    target_command_id = SecureRandom.uuid_v7
     document = Coordinator::Write::CommandInputDocuments::PublishSkillRevisionV2.new(
       schema: "command-input/v2",
-      command_id:,
+      command_id: target_command_id,
       tool_name: "skill_publish",
       input: {
         actor: { actor_kind: "agent", actor_id: "agent-1" },
@@ -185,8 +162,9 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
         content_digest: "sha256:#{digest_character * 64}"
       }
     )
-    Coordinator::Write::OperationBatches::ItemV1.new(
+    Coordinator::Write::OperationBatches::ItemV2.new(
       index: command_id == "item-1" ? 0 : 1,
+      request_id: command_id,
       command_input: document,
       canonical_input_digest: "sha256:#{digest_character * 64}"
     )
@@ -197,7 +175,7 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
     relation_id = "018f0f4d-4e45-7abc-8def-000000000202"
     document = Coordinator::Write::CommandInputDocuments::DeclareDevelopmentArtifactRelationV1.new(
       schema: "command-input/v1",
-      command_id: "relation-item-1",
+      command_id: SecureRandom.uuid_v7,
       tool_name: "development_artifact_relation_declare",
       input: {
         actor: { actor_kind: "agent", actor_id: "agent-1" },
@@ -212,81 +190,20 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
         supersession_reason: nil
       }
     )
-    Coordinator::Write::OperationBatches::ItemV1.new(
+    Coordinator::Write::OperationBatches::ItemV2.new(
       index: 0,
+      request_id: "relation-item-1",
       command_input: document,
       canonical_input_digest: "sha256:#{'c' * 64}"
     )
   end
 
   def created_payload(items, target_tool: "skill_publish")
-    Coordinator::Write::Events::OperationBatchCreatedV1.new(
+    Coordinator::Write::Events::OperationBatchCreatedV2.new(
       batch_id:,
       target_tool:,
-      total: items.length,
       page_size: Coordinator::Shared::Types::OPERATION_BATCH_PAGE_SIZE,
-      items:,
-      manifest_digest: "sha256:#{'d' * 64}",
-      encoded_byte_size: 1_000,
-      requester: batch_actor,
-      created_at: "2026-08-30T12:00:00.000000Z"
-    )
-  end
-
-  def batch_actor
-    Coordinator::Write::OperationBatches::ActorV1.new(kind: "agent", id: "agent-1")
-  end
-
-  def success_result
-    identity = Coordinator::Write::Skills::IdentityBuilder.new.call(
-      name: "review",
-      scope: "project:alpha"
-    )
-    Coordinator::Write::Tasks::StructuredContentV1.new(
-      status: "ok",
-      summary: "Skill revision published.",
-      command_id: "item-1",
-      receipt: "command:item-1",
-      context_token: nil,
-      data: Coordinator::Write::CommandReceiptData::SkillPublication.new(
-        skill_id: identity.skill_id,
-        name: identity.name,
-        scope: identity.scope,
-        revision: 1,
-        content_digest: "sha256:#{'a' * 64}",
-        asset_count: 0,
-        publication_event: source_reference("SkillRevisionPublished", identity.skill_id, 0),
-        published_at: "2026-08-30T12:01:00.000000Z"
-      ),
-      warnings: [],
-      next_actions: []
-    )
-  end
-
-  def rejection_result
-    identity = Coordinator::Write::Skills::IdentityBuilder.new.call(
-      name: "review",
-      scope: "project:alpha"
-    )
-    Coordinator::Write::Tasks::StructuredContentV1.new(
-      status: "conflict",
-      summary: "Skill revision changed.",
-      command_id: "item-2",
-      receipt: nil,
-      context_token: nil,
-      data: Coordinator::Write::Tasks::DomainErrorV1::SkillRevisionConflictError.new(
-        code: "skill_revision_conflict",
-        message: "Skill revision changed",
-        details: {
-          skill_id: identity.skill_id,
-          name: identity.name,
-          scope: identity.scope,
-          expected_revision: 0,
-          current_revision: 1
-        }
-      ),
-      warnings: [],
-      next_actions: []
+      items:
     )
   end
 
@@ -297,7 +214,8 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
       stream_revision: revision,
       global_position: position,
       command_id: "cmd-batch-projector-#{revision}",
-      policy_version: "operation-batch/v1",
+      policy_version: "operation-batch/v2",
+      metadata: batch_metadata(payload, revision:),
       actor_id: "agent-1",
       correlation_id:,
       causation_id:,
@@ -305,25 +223,23 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
     )
   end
 
-  def source_reference(type, stream_id, revision)
-    Coordinator::Write::EventReference.new(
-      event_id: SecureRandom.uuid_v7,
-      type:,
-      stream_context: type == "SkillRevisionPublished" ? "AgentKnowledge" : "CoordinatorControl",
-      stream_name: type == "SkillRevisionPublished" ? "Skill" : "Command",
-      stream_id:,
-      stream_revision: revision
+  def batch_metadata(payload, revision:)
+    common = {
+      command_id: "cmd-batch-projector-#{revision}",
+      actor_kind: "agent",
+      actor_id: "agent-1",
+      recorded_by: "coordinator",
+      policy_version: "operation-batch/v2"
+    }
+    return Coordinator::Write::EventMetadata.new(common) unless payload.is_a?(
+      Coordinator::Write::Events::OperationBatchCreatedV2
     )
-  end
 
-  def event_reference(event)
-    Coordinator::Write::EventReference.new(
-      event_id: event.id,
-      type: event.type,
-      stream_context: event.stream.context,
-      stream_name: event.stream.stream_name,
-      stream_id: event.stream.stream_id,
-      stream_revision: event.stream_revision
+    Coordinator::Write::Metadata::OperationBatchCreationV2.new(
+      **common,
+      canonical_input_digest: "sha256:#{'c' * 64}",
+      manifest_digest: "sha256:#{'d' * 64}",
+      encoded_byte_size: 1_000
     )
   end
 

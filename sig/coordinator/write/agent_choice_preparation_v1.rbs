@@ -5,7 +5,6 @@ module Coordinator
       def input_digest: () -> String
       def recorded_event_id: () -> String
       def accepted_event_id: () -> String
-      def completion_event_id: () -> String
     end
   end
 end

@@ -6,7 +6,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCompleteWorkItem, :event_s
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
 
-  it "atomically selects the final Candidate and completes its Attempt, WorkItem, and command" do
+  it "atomically selects the final Candidate and completes its Attempt and WorkItem" do
     candidate = CandidateScenario.submit(prefix: "complete-success")
     CandidateScenario.release(candidate)
     input = CandidateScenario.completion_input(
@@ -44,10 +44,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCompleteWorkItem, :event_s
       "WorkItemCompleted"
     ])
     expect(attempt_terminal_events(candidate).map(&:type)).to eq([ "AttemptCompleted" ])
-    expect(command_events(input.fetch(:command_id)).map(&:type)).to eq([ "CommandCompleted" ])
+    expect(command_events(input.fetch(:command_id))).to be_empty
   end
 
-  it "replays the same canonical input and rejects changed command reuse" do
+  it "leaves replay ownership to the registered Command lifecycle" do
     candidate = CandidateScenario.submit(prefix: "complete-replay")
     CandidateScenario.release(candidate)
     input = CandidateScenario.completion_input(candidate)
@@ -59,9 +59,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCompleteWorkItem, :event_s
       input.merge(produced_outputs: [ { kind: "artifact", key: "changed" } ])
     )
 
-    expect(replay).to be_success
-    expect(replay.value!).to eq(original.value!)
-    expect(changed.failure.code).to eq(:command_id_reused)
+    expect(replay.failure.code).to eq(:work_item_already_completed)
+    expect(changed.failure.code).to eq(:work_item_already_completed)
     expect(terminal_event_ids(candidate, input)).to eq(event_ids)
   end
 
@@ -110,7 +109,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCompleteWorkItem, :event_s
       "WorkItemCompleted"
     ])
     expect(attempt_terminal_events(candidate).map(&:type)).to eq([ "AttemptCompleted" ])
-    expect(inputs.sum { command_events(_1.fetch(:command_id)).length }).to eq(1)
+    expect(inputs.flat_map { command_events(_1.fetch(:command_id)) }).to be_empty
   end
 
   def work_item_terminal_events(candidate)
@@ -136,7 +135,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCompleteWorkItem, :event_s
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 
   def recovered_candidate(prefix:, interruption_count:)

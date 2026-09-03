@@ -71,8 +71,8 @@ module Coordinator
       Write::CommandInputDigest.new(canonical_json: self["canonical_json"])
     end
 
-    register("command_completion_builder", memoize: true) do
-      Write::CommandCompletionBuilder.new
+    register("command_result_builder", memoize: true) do
+      Write::CommandResultBuilder.new
     end
 
     register("operations.prepare_register_repository", memoize: true) do
@@ -699,16 +699,26 @@ module Coordinator
       )
     end
 
-    register("tasks.target_command_builder", memoize: true) do
-      Write::Tasks::TargetCommandBuilder.new
+    register("commands.loader", memoize: true) do
+      Write::CommandLifecycle::Loader.new(
+        event_store: self["event_store"],
+        stream_factory: self["stream_factory"],
+        schema_registry: self["event_schema_registry"]
+      )
     end
 
-    register("tasks.target_completion_loader", memoize: true) do
-      Write::Tasks::TargetCompletionLoader.new(
+    register("operations.apply_command_transition", memoize: true) do
+      Write::Operations::ApplyCommandTransition.new(
         event_store: self["event_store"],
-        schema_registry: self["event_schema_registry"],
-        stream_factory: self["stream_factory"]
+        loader: self["commands.loader"],
+        stream_factory: self["stream_factory"],
+        event_factory: self["event_factory"],
+        id_generator: self["id_generator"]
       )
+    end
+
+    register("tasks.target_command_builder", memoize: true) do
+      Write::Tasks::TargetCommandBuilder.new
     end
 
     register("tasks.tool_result_mapper", memoize: true) do
@@ -724,7 +734,7 @@ module Coordinator
     end
 
     register("repositories.command_receipts", memoize: true) do
-      Read::Repositories::CommandReceipts.new(schema_registry: self["event_schema_registry"])
+      Read::Repositories::CommandReceipts.new
     end
 
     register("repositories.coord_contexts", memoize: true) do
@@ -812,9 +822,28 @@ module Coordinator
       )
     end
 
-    register("projectors.command_receipts_v1", memoize: true) do
-      Read::Projectors::CommandReceiptsV1.new(
+    register("command_results.source_loader", memoize: true) do
+      Read::CommandResults::SourceLoader.new(
+        event_store: self["event_store"],
         schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        target_command_builder: self["tasks.target_command_builder"]
+      )
+    end
+
+    register("command_results.assembler", memoize: true) do
+      Read::CommandResults::Assembler.new(
+        event_store: self["event_store"],
+        semantic_result_mapper: self["tasks.semantic_result_mapper"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("projectors.command_receipts_v2", memoize: true) do
+      Read::Projectors::CommandReceiptsV2.new(
+        source_loader: self["command_results.source_loader"],
+        assembler: self["command_results.assembler"],
         receipts: self["repositories.command_receipts"],
         processed_events: self["repositories.processed_projection_events"]
       )
@@ -935,15 +964,15 @@ module Coordinator
       )
     end
 
-    register("command_completion_lookup", memoize: true) do
-      Read::CommandCompletionLookup.new(
+    register("command_result_lookup", memoize: true) do
+      Read::CommandResultLookup.new(
         receipts: self["repositories.command_receipts"]
       )
     end
 
     register("queries.operation_get") do
       Read::Queries::OperationGet.new(
-        completions: self["command_completion_lookup"]
+        results: self["command_result_lookup"]
       )
     end
 
@@ -1103,8 +1132,7 @@ module Coordinator
     register("mcp.tasks.result_mapper", memoize: true) { Mcp::Tasks::ResultMapper.new }
     register("mcp.tasks.projected_result_resolver", memoize: true) do
       Mcp::Tasks::ProjectedResultResolver.new(
-        receipts: self["repositories.command_receipts"],
-        mapper: self["tasks.semantic_result_mapper"]
+        receipts: self["repositories.command_receipts"]
       )
     end
     register("mcp.tasks.extension", memoize: true) do
@@ -1175,7 +1203,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1191,7 +1219,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1207,7 +1235,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1222,7 +1250,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1249,7 +1277,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1266,7 +1294,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1281,7 +1309,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1296,7 +1324,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1326,7 +1354,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1341,7 +1369,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1356,7 +1384,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1371,7 +1399,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1385,7 +1413,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1409,7 +1437,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1424,7 +1452,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1440,7 +1468,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1456,7 +1484,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1472,7 +1500,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1490,7 +1518,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1505,7 +1533,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1522,7 +1550,7 @@ module Coordinator
         publication_loader: self["skills.persisted_publication_loader"],
         stream_factory: self["stream_factory"],
         marker_builder: self["skills.marker_builder"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1547,7 +1575,7 @@ module Coordinator
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
         marker_builder: self["development_artifacts.marker_builder"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1564,7 +1592,7 @@ module Coordinator
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
         marker_builder: self["development_artifacts.marker_builder"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1581,7 +1609,7 @@ module Coordinator
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
         marker_builder: self["development_artifacts.marker_builder"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1598,12 +1626,11 @@ module Coordinator
         event_store: self["event_store"],
         loader: self["operation_batches.loader"],
         input_digest: self["command_input_digest"],
-        clock: self["clock"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1618,7 +1645,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1635,7 +1662,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1651,7 +1678,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1668,7 +1695,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1685,7 +1712,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1701,7 +1728,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1717,7 +1744,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1733,7 +1760,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1749,7 +1776,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1764,7 +1791,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1779,7 +1806,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1795,7 +1822,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1810,7 +1837,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1828,7 +1855,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1844,7 +1871,7 @@ module Coordinator
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
-        completion_builder: self["command_completion_builder"]
+        completion_builder: self["command_result_builder"]
       )
     end
 
@@ -1971,6 +1998,9 @@ module Coordinator
     register("tasks.target_executor", memoize: true) do
       Write::Tasks::TargetExecutor.new(
         event_store: self["event_store"],
+        command_loader: self["commands.loader"],
+        command_transition: self["operations.apply_command_transition"],
+        input_digest: self["command_input_digest"],
         remove_resource: self["operations.execute_remove_resource"],
         create_change_set: self["operations.execute_create_change_set"],
         create_work_item: self["operations.execute_create_work_item"],
@@ -2398,23 +2428,13 @@ module Coordinator
         start_task: self["operations.start_coordination_task"],
         record_outcome: self["operations.record_coordination_task_outcome"],
         target_command_builder: self["tasks.target_command_builder"],
-        target_executor: self["tasks.target_executor"],
-        target_completion_loader: self["tasks.target_completion_loader"],
-        semantic_result_mapper: self["tasks.semantic_result_mapper"]
+        target_executor: self["tasks.target_executor"]
       )
     end
 
     register("operation_batches.source_builder", memoize: true) do
       Processes::OperationBatches::SourceBuilder.new(
         schema_registry: self["event_schema_registry"]
-      )
-    end
-
-    register("operation_batches.target_completion_loader", memoize: true) do
-      Processes::OperationBatches::TargetCompletionLoader.new(
-        event_store: self["event_store"],
-        schema_registry: self["event_schema_registry"],
-        stream_factory: self["stream_factory"]
       )
     end
 
@@ -2425,8 +2445,6 @@ module Coordinator
         loader: self["operation_batches.loader"],
         target_builder: self["tasks.target_command_builder"],
         target_executor: self["tasks.target_executor"],
-        result_mapper: self["tasks.tool_result_mapper"],
-        completion_loader: self["operation_batches.target_completion_loader"],
         batch_executor: self["operations.execute_operation_batch_command"]
       )
     end
@@ -2564,7 +2582,7 @@ module Coordinator
     end
 
     register("subscriptions.command_receipts", memoize: true) do
-      Read::Subscriptions::CommandReceipts.new(handler: self["projectors.command_receipts_v1"])
+      Read::Subscriptions::CommandReceipts.new(handler: self["projectors.command_receipts_v2"])
     end
 
     register("subscriptions.user_utterances", memoize: true) do
@@ -2681,10 +2699,33 @@ module Coordinator
       )
     end
 
+    register("subscription_managers.task_results", memoize: true) do
+      PgEventstore.subscriptions_manager(
+        subscription_set: Read::Subscriptions::TaskResultSet::SET_NAME
+      )
+    end
+
+    register("subscription_registrations.task_results", memoize: true) do
+      [ self["subscriptions.command_receipts"] ].freeze
+    end
+
+    register("subscription_set_factories.task_results", memoize: true) do
+      Shared::Subscriptions::SetFactory.new(
+        set_class: Read::Subscriptions::TaskResultSet,
+        set_name: Read::Subscriptions::TaskResultSet::SET_NAME,
+        registrations: self["subscription_registrations.task_results"]
+      )
+    end
+
+    register("subscription_sets.task_results", memoize: true) do
+      self["subscription_set_factories.task_results"].call(
+        manager: self["subscription_managers.task_results"]
+      )
+    end
+
     register("subscription_registrations.read_models", memoize: true) do
       [
         self["subscriptions.coord_context"],
-        self["subscriptions.command_receipts"],
         self["subscriptions.user_utterances"],
         self["subscriptions.decision_governance"],
         self["subscriptions.decision_interpretations"],

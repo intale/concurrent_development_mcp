@@ -6,10 +6,9 @@ module Coordinator
           def registered_at: () -> String
           def input_digest: () -> String
           def domain_event_id: () -> String
-          def completion_event_id: () -> String
         end
 
-        def initialize: (event_store: _EventStore, ?contract: Contracts::RegisterRepository, ?decider: Domain::Repositories::Register, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?compound_marker_builder: Shared::CompoundMarkerBuilder) -> void
+        def initialize: (event_store: _EventStore, ?contract: Contracts::RegisterRepository, ?decider: Domain::Repositories::Register, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?compound_marker_builder: Shared::CompoundMarkerBuilder, ?natural_key_marker: Repositories::NaturalKeyMarker) -> void
         %a{rbs:test:skip}
         def prepare: (command_input input) -> Dry::Monads::Result
         %a{rbs:test:skip}

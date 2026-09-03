@@ -3,8 +3,19 @@
 module Coordinator::Write
   module Tasks
     class TargetExecutor
+      include Dry::Monads[:result]
+
       def initialize(
         event_store:,
+        command_loader: CommandLifecycle::Loader.new(event_store:),
+        command_transition: Operations::ApplyCommandTransition.new(
+          event_store:,
+          loader: command_loader
+        ),
+        succeed_command: Domain::CommandLifecycles::Succeed.new,
+        reject_command: Domain::CommandLifecycles::Reject.new,
+        input_digest: CommandInputDigest.new,
+        rejection_retryability: CommandRejectionRetryability.new,
         remove_resource: Operations::ExecuteRemoveResource.new(event_store:),
         create_change_set: Operations::ExecuteCreateChangeSet.new(event_store:),
         create_work_item: Operations::ExecuteCreateWorkItem.new(event_store:),
@@ -60,6 +71,13 @@ module Coordinator::Write
         operation_batch_command:
           Operations::ExecuteOperationBatchCommand.new(event_store:)
       )
+        @event_store = event_store
+        @command_loader = command_loader
+        @command_transition = command_transition
+        @succeed_command = succeed_command
+        @reject_command = reject_command
+        @input_digest = input_digest
+        @rejection_retryability = rejection_retryability
         @register_repository = Operations::ExecuteRegisterRepository.new(event_store:)
         @resolve_resource = Operations::ExecuteResolveResource.new(event_store:)
         @remove_resource = remove_resource
@@ -103,14 +121,99 @@ module Coordinator::Write
       end
 
       def call(command, caused_by:)
-        contract = TargetContractRegistry.fetch_by_command_class(command.class)
-        contract.command_type[command]
-        handler = instance_variable_get(contract.executor_variable)
-        result = handler.call_command(command, caused_by:)
-        result.fmap do |completion|
-          contract.receipt_type[completion.data]
-          completion
+        @event_store.multiple do
+          contract = TargetContractRegistry.fetch_for(command)
+          contract.command_type[command]
+          snapshot = @command_loader.call(command.command_id)
+          validate_registration!(snapshot.state, command:, contract:)
+          next Success(target_execution(snapshot)) if snapshot.state.terminal?
+
+          handler = instance_variable_get(contract.executor_variable)
+          result = handler.call_command(command, caused_by:)
+          contract.receipt_type[result.value!.data] if result.success?
+
+          transition = if result.success?
+                         succeed(
+                           command,
+                           completion: result.value!,
+                           actor: command.actor,
+                           tool_name: contract.tool_name,
+                           caused_by:
+                         )
+                       else
+                         reject(
+                           command,
+                           error: result.failure,
+                           actor: command.actor,
+                           tool_name: contract.tool_name,
+                           caused_by:
+                         )
+                       end
+          next transition if transition.failure?
+
+          Success(
+            TargetExecution.new(
+              command_state: transition.value!.state,
+              terminal_event: transition.value!.terminal_event
+            )
+          )
         end
+      end
+
+      private
+
+      def target_execution(snapshot)
+        TargetExecution.new(
+          command_state: snapshot.state,
+          terminal_event: snapshot.persisted_events.last
+        )
+      end
+
+      def validate_registration!(state, command:, contract:)
+        requested_digest = @input_digest.request(command)
+        unless state.command_id == command.command_id &&
+               state.tool_name == contract.tool_name &&
+               state.canonical_input_digest == requested_digest
+          raise InvalidCommandHistory,
+                "Command registration does not match its submitted target input"
+        end
+      end
+
+      def succeed(command, completion:, actor:, tool_name:, caused_by:)
+        @command_transition.call(
+          command: Commands::SucceedCommand.new(command_id: command.command_id),
+          decider: @succeed_command,
+          actor:,
+          tool_name:,
+          caused_by:,
+          emitted_events: completion.emitted_events
+        )
+      end
+
+      def reject(command, error:, actor:, tool_name:, caused_by:)
+        @command_transition.call(
+          command: Commands::RejectCommand.new(
+            command_id: command.command_id,
+            code: error.code.to_s,
+            reason: error.message,
+            retryable: @rejection_retryability.call(error)
+          ),
+          decider: @reject_command,
+          actor:,
+          tool_name:,
+          caused_by:,
+          rejection: domain_error(error)
+        )
+      end
+
+      def domain_error(error)
+        DomainErrorV1::Type[
+          {
+            code: error.code.to_s,
+            message: error.message,
+            details: error.details
+          }
+        ]
       end
     end
   end

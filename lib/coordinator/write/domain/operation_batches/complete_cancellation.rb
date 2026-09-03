@@ -17,14 +17,7 @@ module Coordinator::Write
             return Failure(error(:operation_batch_cancellation_not_requested, "Batch cancellation was not requested", command))
           end
 
-          event = Events::OperationBatchCancelledV1.new(
-            batch_id: command.batch_id,
-            succeeded: state.succeeded_count,
-            rejected: state.rejected_count,
-            not_run: state.creation.total - state.outcomes.length,
-            cancellation_event: command.source_event,
-            cancelled_at: command.cancelled_at
-          )
+          event = Events::OperationBatchCancelledV2.new(batch_id: command.batch_id)
           Success(
             EventPlan.new(
               writes: [ EventWrite.new(stream: @stream_factory.operation_batch(command.batch_id), event:) ]

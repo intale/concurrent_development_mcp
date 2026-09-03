@@ -1,0 +1,28 @@
+module Coordinator
+  module Read
+    module CommandResults
+      class ResultV1 < Shared::Value
+        def self.from_semantic: (
+          semantic_result: Write::Tasks::SemanticResultV1::value,
+          tool_name: String,
+          canonical_input_digest: String,
+          emitted_events: Array[Write::EventReference],
+          completed_at: String
+        ) -> ResultV1
+
+        def command_id: () -> String
+        def tool_name: () -> String
+        def canonical_input_digest: () -> String
+        def status: () -> String
+        def summary: () -> String
+        def receipt: () -> String?
+        def data: () -> (Write::CommandReceiptData::value | Write::Tasks::DomainErrorV1::domain_error)
+        def warnings: () -> Array[String]
+        def next_actions: () -> Array[Write::NextAction]
+        def emitted_events: () -> Array[Write::EventReference]
+        def completed_at: () -> String
+        def semantic_result: () -> Write::Tasks::SemanticResultV1::value
+      end
+    end
+  end
+end

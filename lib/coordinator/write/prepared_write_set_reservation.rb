@@ -10,6 +10,5 @@ module Coordinator::Write
     attribute :lease_set_id, Types::UuidV7
     attribute :resources, Types::Array.of(Resource).constrained(min_size: 1, max_size: 32)
     attribute :reservation_event_id, Types::UuidV7
-    attribute :completion_event_id, Types::UuidV7
   end
 end

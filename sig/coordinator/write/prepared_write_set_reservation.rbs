@@ -7,7 +7,6 @@ module Coordinator
       def lease_set_id: () -> String
       def resources: () -> Array[PreparedLeaseTargetV1]
       def reservation_event_id: () -> String
-      def completion_event_id: () -> String
     end
   end
 end

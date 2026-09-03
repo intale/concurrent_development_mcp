@@ -24,7 +24,7 @@ RSpec.describe "VER-02 MCP compatibility assessments", :event_store do
     submitted_result = call_tool(arguments, id: 1)
     task_id = submitted_result.dig("result", "taskId")
     expect(task_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
-    expect(command_events(arguments.fetch(:command_id))).to be_empty
+    expect(CommandTraceFixture.events(task_id, event_store:).map(&:type)).to eq([ "CommandRegistered" ])
 
     execute_task(task_id)
     completed = task_request(task_id, id: 2)
@@ -44,11 +44,11 @@ RSpec.describe "VER-02 MCP compatibility assessments", :event_store do
 
     submitted, started, task_completed = task_events(task_id)
     evidence = evidence_events(created).sole
-    completion = command_events(arguments.fetch(:command_id)).sole
+    command_terminal = CommandTraceFixture.terminal(task_id, event_store:)
     expect(evidence.causation_id).to eq(started.id)
-    expect(completion.causation_id).to eq(started.id)
-    expect(task_completed.causation_id).to eq(completion.id)
-    expect([ submitted, started, evidence, completion, task_completed ].map(&:correlation_id).uniq).to eq(
+    expect(command_terminal.causation_id).to eq(started.id)
+    expect(task_completed.causation_id).to eq(command_terminal.id)
+    expect([ submitted, started, evidence, command_terminal, task_completed ].map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
     )
     expect(evidence.metadata).not_to have_key("correlation_id")
@@ -167,6 +167,7 @@ RSpec.describe "VER-02 MCP compatibility assessments", :event_store do
     Rails.error.subscribe(collector)
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
     raise collector.errors.first if collector.errors.any?
+    CommandResultFixture.project(task_id, event_store:)
   ensure
     Rails.error.unsubscribe(collector) if collector
   end
@@ -207,6 +208,6 @@ RSpec.describe "VER-02 MCP compatibility assessments", :event_store do
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 end

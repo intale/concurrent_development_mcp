@@ -9,14 +9,14 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
   let(:proposals) { Coordinator::Write::Operations::ExecuteProposeDecisionInterpretation.new(event_store:) }
   let(:adjudications) { Coordinator::Write::Operations::ExecuteAdjudicateDecisionInterpretation.new(event_store:) }
 
-  it "implements DEC-01-ACTIVATE-01 and exact replay atomically" do
+  it "implements DEC-01-ACTIVATE-01 atomically" do
     seed_accepted_interpretation
 
     original = operation.call(InterpretationInput.activation)
     replay = operation.call(InterpretationInput.activation)
 
     expect(original).to be_success
-    expect(replay.value!).to eq(original.value!)
+    expect(replay.failure.code).to eq(:decision_already_exists)
     expect(decision_events("D-1").map(&:type)).to eq(%w[DecisionRecorded DecisionActivated])
     expect(decision_events("D-1").map(&:stream_revision)).to eq([ 0, 1 ])
     activation = decision_events("D-1").last
@@ -50,7 +50,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
     expect(load(partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing").sole).active_decisions).to contain_exactly(
       have_attributes(decision_id: "D-1", decision_revision: 1)
     )
-    expect(command_events("cmd-decision-activation-1").length).to eq(1)
+    expect(command_events("cmd-decision-activation-1")).to be_empty
   end
 
   it "implements DEC-01-NOT-ACCEPTED-01 without facts" do
@@ -359,7 +359,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 
   def load(event)

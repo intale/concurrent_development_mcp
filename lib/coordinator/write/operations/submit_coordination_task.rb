@@ -15,7 +15,7 @@ module Coordinator::Write
         event_factory: EventFactory.new,
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
-        compound_marker_builder: CompoundMarkerBuilder.new,
+        request_marker: CommandLifecycle::RequestMarker.new,
         execution_lane: Tasks::ExecutionLane.new,
         correlation_resolver: Tasks::CorrelationResolver.new(
           release_set_correlation_loader: ReleaseSets::CorrelationLoader.new(event_store:)
@@ -28,7 +28,7 @@ module Coordinator::Write
         @event_factory = event_factory
         @schema_registry = schema_registry
         @stream_factory = stream_factory
-        @compound_marker_builder = compound_marker_builder
+        @request_marker = request_marker
         @execution_lane = execution_lane
         @correlation_resolver = correlation_resolver
       end
@@ -188,16 +188,7 @@ module Coordinator::Write
       end
 
       def request_marker(actor, request_id)
-        @compound_marker_builder.call(
-          CompoundMarkerDefinitionV1.new(
-            purpose: "command-request",
-            components: [
-              "actor-kind:#{actor.kind}",
-              "actor-id:#{actor.id}",
-              "request-id:#{request_id}"
-            ]
-          )
-        ).marker
+        @request_marker.call(actor:, request_id:)
       end
 
       def request_registration_criteria(marker)

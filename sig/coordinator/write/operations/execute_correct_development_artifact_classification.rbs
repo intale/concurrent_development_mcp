@@ -4,7 +4,7 @@ module Coordinator
       class ExecuteCorrectDevelopmentArtifactClassification
         TOOL_NAME: String
 
-        def initialize: (event_store: _EventStore, ?preparer: PrepareCorrectDevelopmentArtifactClassification, ?loader: DevelopmentArtifacts::Loader, ?decider: Domain::DevelopmentArtifacts::CorrectClassification, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?marker_builder: DevelopmentArtifacts::MarkerBuilder, ?completion_builder: CommandCompletionBuilder) -> void
+        def initialize: (event_store: _EventStore, ?preparer: PrepareCorrectDevelopmentArtifactClassification, ?loader: DevelopmentArtifacts::Loader, ?decider: Domain::DevelopmentArtifacts::CorrectClassification, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?marker_builder: DevelopmentArtifacts::MarkerBuilder, ?completion_builder: CommandResultBuilder) -> void
         %a{rbs:test:skip}
         def call: (command_input input) -> Dry::Monads::Result
         def call_command: (Commands::CorrectDevelopmentArtifactClassification command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result

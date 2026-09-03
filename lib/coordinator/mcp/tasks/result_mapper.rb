@@ -54,6 +54,16 @@ module Coordinator::Mcp
         ResultV1::Acknowledgement.new(resultType: "complete")
       end
 
+      def projection_pending(state)
+        ResultV1::WorkingWithMessage.new(
+          common_attributes(state).merge(
+            resultType: "complete",
+            status: "working",
+            statusMessage: "Command completed; its result projection is catching up."
+          )
+        )
+      end
+
       private
 
       def working(state)
@@ -85,8 +95,6 @@ module Coordinator::Mcp
       end
 
       def failed_error(state)
-        return state.error if state.error
-
         Coordinator::Write::Tasks::JsonRpcErrorV1.new(
           code: -32_603,
           message: state.status_message

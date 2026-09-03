@@ -122,14 +122,11 @@ RSpec.describe "Coordination Task lifecycle operations", :event_store do
     start.call(task_id:).value!
     cancel.call(task_id:).value!
 
-    result = domain_rejection
-    outcome = Coordinator::Write::Tasks::OutcomeV2::Completed.new(result:)
+    outcome = Coordinator::Write::Tasks::OutcomeV3::Completed.new
     completed = record_outcome.call(task_id:, outcome:)
 
     expect(completed).to be_success
     expect(completed.value!.status).to eq("completed")
-    expect(completed.value!.semantic_result).to be_nil
-    expect(get_task.call(task_id:).value!.semantic_result).to be_nil
     expect(acknowledge_input.call(task_id:)).to be_success
     expect(task_events(task_id).map(&:type)).to eq(
       [
@@ -151,17 +148,19 @@ RSpec.describe "Coordination Task lifecycle operations", :event_store do
 
     result = record_outcome.call(
       task_id:,
-      outcome: Coordinator::Write::Tasks::OutcomeV2::Failed.new(error:)
+      outcome: Coordinator::Write::Tasks::OutcomeV3::Failed.new(
+        code: "internal_error",
+        reason: error.message,
+        retryable: false
+      )
     )
 
     expect(result).to be_success
     persisted = get_task.call(task_id:).value!
     expect(persisted.status).to eq("failed")
-    expect(persisted.error).to be_nil
     expect(persisted.failure_code).to eq("internal_error")
     expect(persisted.failure_retryable).to be(false)
     expect(persisted.status_message).to eq(error.message)
-    expect(persisted.semantic_result).to be_nil
   end
 
   it "returns task-not-found without appending for get, update, and cancel" do
@@ -192,22 +191,4 @@ RSpec.describe "Coordination Task lifecycle operations", :event_store do
     )
   end
 
-  def domain_rejection
-    error = Coordinator::Write::Tasks::DomainErrorV1::ChangeSetError.new(
-      code: "change_set_already_exists",
-      message: "ChangeSet already exists",
-      details: Coordinator::Write::Tasks::DomainErrorV1::ChangeSetDetails.new(
-        change_set_id: target_command.change_set_id
-      )
-    )
-
-    Coordinator::Write::Tasks::SemanticResultV1::DomainRejection.new(
-      kind: "domain_rejection",
-      status: "denied",
-      summary: error.message,
-      command_id: target_command.command_id,
-      error:,
-      next_actions: []
-    )
-  end
 end

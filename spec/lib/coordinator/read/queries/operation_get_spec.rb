@@ -6,7 +6,11 @@ RSpec.describe Coordinator::Read::Queries::OperationGet, :read_model do
   it "serves the latest available receipt projection without a write-store fallback" do
     expect(query.call(command_id: "cmd-100").value!.status).to eq("not_found")
 
-    receipt = create(:coordinator_read_command_receipt, command_id: "cmd-100")
+    receipt = create(
+      :coordinator_read_command_receipt,
+      command_id: SecureRandom.uuid_v7,
+      request_id: "cmd-100"
+    )
     observed = query.call(command_id: "cmd-100").value!
 
     expect(observed.status).to eq("ok")
@@ -17,7 +21,11 @@ RSpec.describe Coordinator::Read::Queries::OperationGet, :read_model do
   end
 
   it "does not depend on unrelated coordination projections" do
-    create(:coordinator_read_command_receipt, command_id: "cmd-200")
+    create(
+      :coordinator_read_command_receipt,
+      command_id: SecureRandom.uuid_v7,
+      request_id: "cmd-200"
+    )
 
     expect(query.call(command_id: "cmd-200").value!.status).to eq("ok")
     expect(Coordinator::Read::CoordContext.count).to eq(0)

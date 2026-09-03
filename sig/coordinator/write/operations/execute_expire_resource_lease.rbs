@@ -13,7 +13,7 @@ module Coordinator
           ?event_factory: EventFactory,
           ?schema_registry: EventSchemaRegistry,
           ?stream_factory: StreamFactory,
-          ?completion_builder: CommandCompletionBuilder,
+          ?completion_builder: CommandResultBuilder,
           ?repository_registration_loader: RepositoryRegistrationLoader,
           ?repository_marker_builder: RepositoryMarkerBuilder,
           ?event_plan_contract: Contracts::ResourceLeaseExpiryEventPlan

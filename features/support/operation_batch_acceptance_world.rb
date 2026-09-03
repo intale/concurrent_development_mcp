@@ -4,15 +4,12 @@ module OperationBatchAcceptanceWorld
   def submit_skill_batch(items, pause_at: nil)
     @operation_batch_id ||= SecureRandom.uuid_v7
     @submitted_operation_batch_items = JSON.parse(JSON.generate(items))
-    @operation_batch_command_id = "cmd-cuc-batch-#{@operation_batch_id}"
-    install_contention_barrier(
-      operation: pause_at,
-      command_ids: [ @operation_batch_command_id ]
-    ) if pause_at
+    @operation_batch_request_id = "cmd-cuc-batch-#{@operation_batch_id}"
+    stop_process_subscriptions if pause_at
     response = call_tool(
       "skill_publish_batch",
       {
-        command_id: @operation_batch_command_id,
+        command_id: @operation_batch_request_id,
         actor: { kind: "agent", id: "import-agent" },
         batch_id: @operation_batch_id,
         items:
@@ -21,6 +18,11 @@ module OperationBatchAcceptanceWorld
     )
     @operation_batch_task_id = response.dig("result", "taskId")
     assert_acceptance(@operation_batch_task_id, "skill_publish_batch returned no Task: #{response.inspect}")
+    @operation_batch_command_id = task_command_id(@operation_batch_task_id)
+    install_contention_barrier(
+      operation: pause_at,
+      command_ids: [ @operation_batch_command_id ]
+    ) if pause_at
     start_process_subscriptions
     @operation_batch_task = await_task_terminal(
       @operation_batch_task_id,
@@ -127,29 +129,46 @@ module OperationBatchAcceptanceWorld
     terminal = events.reverse.find do |event|
       %w[OperationBatchCompleted OperationBatchCancelled].include?(event.type)
     end
-    return terminal_expectation(terminal) if terminal
+    return terminal_expectation(events, terminal:) if terminal
+
+    counts = operation_batch_outcome_counts(events)
 
     {
       status: "running",
-      succeeded: events.count { _1.type == "OperationBatchItemSucceeded" },
-      rejected: events.count { _1.type == "OperationBatchItemRejected" }
+      succeeded: counts.fetch(:succeeded),
+      rejected: counts.fetch(:rejected)
     }
   end
 
-  def terminal_expectation(event)
+  def terminal_expectation(events, terminal:)
+    counts = operation_batch_outcome_counts(events)
     status =
-      if event.type == "OperationBatchCancelled"
+      if terminal.type == "OperationBatchCancelled"
         "cancelled"
-      elsif event.data.fetch("rejected").positive?
+      elsif counts.fetch(:rejected).positive?
         "completed_with_errors"
       else
         "completed"
       end
     {
       status:,
-      succeeded: event.data.fetch("succeeded"),
-      rejected: event.data.fetch("rejected"),
-      not_run: event.type == "OperationBatchCancelled" ? event.data.fetch("not_run") : 0
+      succeeded: counts.fetch(:succeeded),
+      rejected: counts.fetch(:rejected),
+      not_run: terminal.type == "OperationBatchCancelled" ? counts.fetch(:remaining) : 0
+    }
+  end
+
+  def operation_batch_outcome_counts(events)
+    creation = events.find { _1.type == "OperationBatchCreated" }
+    total = creation ? creation.data.fetch("items").length : 0
+    succeeded = events.count { _1.type == "OperationBatchItemSucceeded" }
+    rejected = events.count { _1.type == "OperationBatchItemRejected" }
+
+    {
+      total:,
+      succeeded:,
+      rejected:,
+      remaining: total - succeeded - rejected
     }
   end
 end

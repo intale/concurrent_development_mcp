@@ -50,7 +50,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitMergeSnapshotVerific
     )
   end
 
-  it "replays the same command and rejects duplicate evidence under another command" do
+  it "leaves replay ownership to the registered Command lifecycle and rejects duplicate evidence" do
     registration = MergeSnapshotScenario.register(prefix: "verify-replay")
     input = MergeSnapshotScenario.verification_input(
       registration,
@@ -63,7 +63,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitMergeSnapshotVerific
     replay = operation.call(input)
     duplicate = operation.call(input.merge(command_id: "cmd-verify-replay-duplicate"))
 
-    expect(replay.value!).to eq(first.value!)
+    expect(first).to be_success
+    expect(replay.failure.code).to eq(:merge_snapshot_verification_already_submitted)
     expect(duplicate.failure.code).to eq(:merge_snapshot_verification_already_submitted)
     expect(verification_events(input.fetch(:merge_snapshot_id)).length).to eq(1)
   end

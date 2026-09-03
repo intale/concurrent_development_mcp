@@ -54,12 +54,12 @@ RSpec.describe "MCP lease_renew Task boundary", :event_store do
     )
 
     submitted, started, task_completed = task_events(task_id)
-    target_events = resource_renewal_events + write_set_renewal_events + command_events("cmd-mcp-renew")
-    command_completion = command_events("cmd-mcp-renew").sole
+    command_terminal = CommandTraceFixture.terminal(task_id, event_store:)
+    target_events = resource_renewal_events + write_set_renewal_events + [ command_terminal ]
 
     expect(started.causation_id).to eq(submitted.id)
     expect(target_events.map(&:causation_id).uniq).to eq([ started.id ])
-    expect(task_completed.causation_id).to eq(command_completion.id)
+    expect(task_completed.causation_id).to eq(command_terminal.id)
     expect(([ submitted, started, task_completed ] + target_events).map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
     )
@@ -92,7 +92,9 @@ RSpec.describe "MCP lease_renew Task boundary", :event_store do
         "data" => include("code" => "lease_reference_mismatch")
       )
     )
-    expect(command_events("cmd-mcp-renew-stale")).to be_empty
+    expect(CommandTraceFixture.events(task_id, event_store:).map(&:type)).to eq(
+      [ "CommandRegistered", "CommandRejected" ]
+    )
     expect(resource_renewal_events).to be_empty
     expect(write_set_renewal_events).to be_empty
 
@@ -182,6 +184,7 @@ RSpec.describe "MCP lease_renew Task boundary", :event_store do
     Rails.error.subscribe(collector)
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
     raise collector.errors.first if collector.errors.any?
+    CommandResultFixture.project(task_id, event_store:)
   ensure
     Rails.error.unsubscribe(collector) if collector
   end
@@ -262,7 +265,7 @@ RSpec.describe "MCP lease_renew Task boundary", :event_store do
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 
   def write_set_renewal_events

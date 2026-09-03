@@ -86,7 +86,7 @@ When("the agent attempts another publication from stale revision 1") do
   )
 end
 
-Then("the stale Skill Task completes with revision conflict and no command fact") do
+Then("the stale Skill Task completes with revision conflict and a rejected command lifecycle") do
   state = @stale_skill_publication.fetch(:state)
   outcome = @stale_skill_publication.fetch(:outcome)
   assert_acceptance_equal("completed", state.dig("result", "status"), "Stale Task status")
@@ -102,8 +102,8 @@ Then("the stale Skill Task completes with revision conflict and no command fact"
     "Revision conflict recovery action"
   )
   assert_acceptance_equal(
-    [],
-    command_events(@stale_skill_publication.fetch(:command_id)),
+    %w[CommandRegistered CommandRejected],
+    command_events(@stale_skill_publication.fetch(:command_id)).map(&:type),
     "Stale command facts"
   )
 end
@@ -358,7 +358,7 @@ When("both agents submit expected revision 0 and reach the Skill decision bounda
       client_id:
     )
   end
-  @concurrent_skill_commands = @concurrent_skill_publications.map { _1.fetch(:command_id) }
+  @concurrent_skill_commands = @concurrent_skill_publications.map { _1.fetch(:internal_command_id) }
   install_contention_barrier(
     operation: "skill_publish",
     command_ids: @concurrent_skill_commands

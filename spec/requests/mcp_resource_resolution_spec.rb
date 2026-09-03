@@ -46,7 +46,11 @@ module McpResourceResolutionSpec
     )
     expect(replayed).to eq(first)
     expect(resource_events(resource_id).length).to eq(2)
-    expect(command_events("cmd-resource-new").length).to eq(1)
+    task_id = call_tool("resource_resolve", resource_arguments(command_id: "cmd-resource-new"))
+      .dig("result", "taskId")
+    expect(CommandTraceFixture.events(task_id, event_store:).map(&:type)).to eq(
+      [ "CommandRegistered", "CommandSucceeded" ]
+    )
   end
 
   it "converges two simultaneous MCP commands on one Resource UUID through the real serializable store" do
@@ -68,6 +72,7 @@ module McpResourceResolutionSpec
     threads.each(&:join)
     raise errors.pop unless errors.empty?
 
+    task_ids.each { CommandResultFixture.project(_1, event_store:) }
     results = task_ids.map { task_request(_1).dig("result", "result") }
     resource_ids = results.map { _1.dig("structuredContent", "data", "resource_id") }
 
@@ -160,7 +165,9 @@ module McpResourceResolutionSpec
     ).value!
     2.times { seed_registration(identity, resource_id: SecureRandom.uuid_v7) }
 
-    result = resolve_resource(command_id: "cmd-resource-corrupt")
+    response = call_tool("resource_resolve", resource_arguments(command_id: "cmd-resource-corrupt"))
+    task_id = response.dig("result", "taskId")
+    result = execute_task(response)
 
     expect(result).to include(
       "isError" => true,
@@ -172,7 +179,9 @@ module McpResourceResolutionSpec
         )
       )
     )
-    expect(command_events("cmd-resource-corrupt")).to be_empty
+    expect(CommandTraceFixture.events(task_id, event_store:).map(&:type)).to eq(
+      [ "CommandRegistered", "CommandRejected" ]
+    )
   end
 
   private
@@ -203,6 +212,7 @@ module McpResourceResolutionSpec
     Rails.error.subscribe(collector)
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
     raise collector.errors.first if collector.errors.any?
+    CommandResultFixture.project(task_id, event_store:)
 
     task_request(task_id).dig("result", "result")
   ensure
@@ -326,8 +336,5 @@ module McpResourceResolutionSpec
     event_store.read(streams.coordination_task(task_id), Coordinator::Write::EventQueries::COORDINATION_TASK_HISTORY)
   end
 
-  def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
-  end
   end
 end

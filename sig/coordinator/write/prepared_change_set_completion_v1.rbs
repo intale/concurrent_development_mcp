@@ -3,6 +3,5 @@ module Coordinator::Write
     def occurred_at: () -> String
     def input_digest: () -> String
     def completion_event_id: () -> String
-    def command_completion_event_id: () -> String
   end
 end

@@ -1,7 +1,7 @@
 module Coordinator
   module Processes
     module OperationBatches
-      type source_payload = Write::Events::OperationBatchCreatedV1 | Write::Events::OperationBatchContinuationRequestedV1 | Write::Events::OperationBatchCancellationRequestedV1
+      type source_payload = Write::Events::OperationBatchCreatedV2 | Write::Events::OperationBatchContinuationRequestedV2 | Write::Events::OperationBatchCancellationRequestedV2
 
       class SourceV1 < Shared::Value
         def event: () -> PgEventstore::Event

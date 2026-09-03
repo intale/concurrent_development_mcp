@@ -10,7 +10,6 @@ module Coordinator
           def removed_at: () -> String
           def input_digest: () -> String
           def unbinding_event_id: () -> String
-          def completion_event_id: () -> String
         end
 
         class RegisteredIdentityV1 < Shared::Value

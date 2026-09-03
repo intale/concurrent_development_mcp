@@ -20,16 +20,16 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
     expect(attempt_events.count { _1.type == "CandidateAttachedToAttempt" }).to eq(1)
   end
 
-  it "replays exact submission and keeps an existing Candidate immutable" do
+  it "leaves replay ownership to the registered Command lifecycle and keeps an existing Candidate immutable" do
     reservation = setup_reservation
     input = candidate_input(reservation, command_id: "cmd-candidate-replay", candidate_id: "CAN-REPLAY")
 
-    original = operation.call(input)
+    expect(operation.call(input)).to be_success
     replay = operation.call(input)
     changed = operation.call(input.merge(head_commit_oid: "e" * 40))
 
-    expect(replay.value!).to eq(original.value!)
-    expect(changed.failure.code).to eq(:command_id_reused)
+    expect(replay.failure.code).to eq(:candidate_id_already_used)
+    expect(changed.failure.code).to eq(:candidate_id_already_used)
     expect(candidate_events("CAN-REPLAY").count { _1.type == "CandidateSubmitted" }).to eq(1)
   end
 

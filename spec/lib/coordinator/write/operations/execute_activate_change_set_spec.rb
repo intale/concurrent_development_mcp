@@ -17,7 +17,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateChangeSet, :event_
     seed_activatable_change_set
   end
 
-  it "persists activation and its durable typed completion through the real store" do
+  it "persists activation and returns a transient typed result" do
     result = operation.call(input)
 
     expect(result).to be_success
@@ -35,7 +35,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateChangeSet, :event_
     expect(completion.emitted_events.map { [ _1.stream_name, _1.stream_revision ] }).to eq(
       [ [ "ChangeSet", 5 ] ]
     )
-    expect(command_events("cmd-250").map(&:type)).to eq([ "CommandCompleted" ])
+    expect(command_events("cmd-250")).to be_empty
   end
 
   it "returns a typed coord_context next action after the activation receipt" do
@@ -57,26 +57,24 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateChangeSet, :event_
     )
   end
 
-  it "replays the exact typed completion without another real append" do
-    original = operation.call(input)
+  it "leaves replay ownership to the registered Command lifecycle" do
+    expect(operation.call(input)).to be_success
     original_ids = persisted_ids
 
     replay = operation.call(input)
 
-    expect(replay).to be_success
-    expect(replay.value!).to eq(original.value!)
-    expect(replay.value!.data).to be_a(Coordinator::Write::CommandReceiptData::ChangeSet)
+    expect(replay.failure.code).to eq(:change_set_already_active)
     expect(persisted_ids).to eq(original_ids)
   end
 
-  it "rejects changed-input reuse of the completed command ID" do
+  it "enforces active state independently of public request identity" do
     operation.call(input)
 
     result = operation.call(input.merge(actor: { kind: "agent", id: "planner-2" }))
 
     expect(result).to be_failure
-    expect(result.failure.code).to eq(:command_id_reused)
-    expect(command_events("cmd-250").length).to eq(1)
+    expect(result.failure.code).to eq(:change_set_already_active)
+    expect(command_events("cmd-250")).to be_empty
   end
 
   it "returns a zero-event invalid-plan denial without a receipt" do
@@ -105,7 +103,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateChangeSet, :event_
     expect(results.count(&:failure?)).to eq(1)
     expect(results.find(&:failure?).failure.code).to eq(:change_set_already_active)
     expect(activation_events("CS-100").length).to eq(1)
-    expect(competing_inputs.count { command_events(_1.fetch(:command_id)).one? }).to eq(1)
+    expect(competing_inputs.flat_map { command_events(_1.fetch(:command_id)) }).to be_empty
   end
 
   def seed_activatable_change_set
@@ -165,7 +163,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateChangeSet, :event_
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 
   def persisted_ids

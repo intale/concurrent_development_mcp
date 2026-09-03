@@ -32,7 +32,7 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
     task_id = submitted_response.dig("result", "taskId")
 
     expect(task_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
-    expect(command_events("cmd-mcp-expand")).to be_empty
+    expect(CommandTraceFixture.events(task_id, event_store:).map(&:type)).to eq([ "CommandRegistered" ])
 
     execute_task(task_id)
     completed = task_request(task_id, request_id: 2)
@@ -57,14 +57,14 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
     )
 
     submitted, started, task_completed = task_events(task_id)
+    command_terminal = CommandTraceFixture.terminal(task_id, event_store:)
     target_events = lease_events(added_resource_id) +
                     expansion_events +
-                    command_events("cmd-mcp-expand")
-    command_completion = command_events("cmd-mcp-expand").sole
+                    [ command_terminal ]
 
     expect(started.causation_id).to eq(submitted.id)
     expect(target_events.map(&:causation_id).uniq).to eq([ started.id ])
-    expect(task_completed.causation_id).to eq(command_completion.id)
+    expect(task_completed.causation_id).to eq(command_terminal.id)
     expect(([ submitted, started, task_completed ] + target_events).map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
     )
@@ -96,7 +96,9 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
         "data" => include("code" => "write_set_unchanged")
       )
     )
-    expect(command_events("cmd-mcp-unchanged")).to be_empty
+    expect(CommandTraceFixture.events(task_id, event_store:).map(&:type)).to eq(
+      [ "CommandRegistered", "CommandRejected" ]
+    )
     expect(expansion_events).to be_empty
 
     malformed = submit_expansion(
@@ -177,6 +179,7 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
     Rails.error.subscribe(collector)
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
     raise collector.errors.first if collector.errors.any?
+    CommandResultFixture.project(task_id, event_store:)
   ensure
     Rails.error.unsubscribe(collector) if collector
   end
@@ -257,7 +260,7 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 
   def expansion_events

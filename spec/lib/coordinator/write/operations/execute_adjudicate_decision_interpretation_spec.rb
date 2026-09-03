@@ -36,9 +36,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAdjudicateDecisionInterpre
       policy_status: "proposal_only"
     )
     expect(result.value!.data.slot.compound_marker.marker).to be_in(accepted.markers)
-    expect(command_events("cmd-adjudication-1")).to contain_exactly(
-      have_attributes(type: "CommandCompleted")
-    )
+    expect(command_events("cmd-adjudication-1")).to be_empty
   end
 
   it "records rejection and explicit clarification as distinct command results" do
@@ -74,8 +72,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAdjudicateDecisionInterpre
     )
   end
 
-  it "replays exactly and denies missing or terminal proposals without new facts" do
-    original = operation.call(InterpretationInput.adjudication)
+  it "leaves replay ownership to the registered Command lifecycle" do
+    expect(operation.call(InterpretationInput.adjudication)).to be_success
     replay = operation.call(InterpretationInput.adjudication)
     missing = operation.call(
       InterpretationInput.adjudication(
@@ -90,7 +88,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAdjudicateDecisionInterpre
       )
     )
 
-    expect(replay.value!).to eq(original.value!)
+    expect(replay.failure.code).to eq(:interpretation_already_accepted)
     expect(missing.failure.code).to eq(:interpretation_not_found)
     expect(terminal.failure.code).to eq(:interpretation_already_accepted)
     expect(lifecycle_events("M-1").length).to eq(1)
@@ -180,6 +178,6 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAdjudicateDecisionInterpre
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 end

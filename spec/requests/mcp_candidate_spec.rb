@@ -41,15 +41,15 @@ RSpec.describe "CAN-01 MCP Candidate coordination" do
 
     submitted, started, task_completed = task_events(task_id)
     candidate_facts = CandidateScenario.candidate_events("CAN-mcp-candidate")
-    completion = command_events("cmd-mcp-candidate").sole
+    command_terminal = command_events_for_task(task_id).last
     expect(candidate_facts.map(&:type)).to eq(%w[
       CandidateSubmitted
       CandidateChangeManifestCaptured
       CandidateBuildContextCaptured
     ])
-    expect([ *candidate_facts, completion ].map(&:causation_id).uniq).to eq([ started.id ])
-    expect(task_completed.causation_id).to eq(completion.id)
-    expect([ submitted, started, *candidate_facts, completion, task_completed ].map(&:correlation_id).uniq).to eq(
+    expect([ *candidate_facts, command_terminal ].map(&:causation_id).uniq).to eq([ started.id ])
+    expect(task_completed.causation_id).to eq(command_terminal.id)
+    expect([ submitted, started, *candidate_facts, command_terminal, task_completed ].map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
     )
   end
@@ -189,6 +189,7 @@ RSpec.describe "CAN-01 MCP Candidate coordination" do
     Rails.error.subscribe(collector)
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
     raise collector.errors.first if collector.errors.any?
+    CommandResultFixture.project(task_id, event_store:)
   ensure
     Rails.error.unsubscribe(collector) if collector
   end
@@ -216,6 +217,14 @@ RSpec.describe "CAN-01 MCP Candidate coordination" do
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
+  end
+
+  def command_events_for_task(task_id)
+    task = Coordinator::Write::Tasks::Loader.new(event_store:).call(task_id).state
+    event_store.read(
+      streams.command(task.command_id),
+      Coordinator::Write::EventQueries::COMMAND_HISTORY
+    )
   end
 end

@@ -1,0 +1,17 @@
+module Coordinator
+  module Write
+    class CommandResultV1 < Shared::Value
+      def command_id: () -> String
+      def tool_name: () -> String
+      def canonical_input_digest: () -> String
+      def status: () -> String
+      def summary: () -> String
+      def receipt: () -> String
+      def data: () -> CommandReceiptData::value
+      def warnings: () -> Array[String]
+      def next_actions: () -> Array[NextAction]
+      def emitted_events: () -> Array[EventReference]
+      def completed_at: () -> String
+    end
+  end
+end

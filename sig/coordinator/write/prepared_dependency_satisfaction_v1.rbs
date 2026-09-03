@@ -4,6 +4,5 @@ module Coordinator::Write
     def input_digest: () -> String
     def satisfaction_event_id: () -> String
     def readiness_event_id: () -> String
-    def completion_event_id: () -> String
   end
 end

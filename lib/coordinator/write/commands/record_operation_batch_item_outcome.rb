@@ -7,11 +7,9 @@ module Coordinator::Write
       attribute :actor, Actor
       attribute :batch_id, Types::OperationBatchId
       attribute :index, Types::OperationBatchItemIndex
-      attribute :item_command_id, Types::Identifier
-      attribute :canonical_input_digest, Types::Sha256Digest
-      attribute :result, Tasks::ToolResultV1
-      attribute :target_completion, EventReference.optional
-      attribute :finished_at, Types::Timestamp
+      attribute :item_command_id, Types::CommandId
+      attribute :outcome, Types::String.enum("succeeded", "rejected")
+      attribute :target_event, EventReference
     end
   end
 end

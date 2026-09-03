@@ -885,7 +885,7 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
   end
 
   it "rejects a success receipt that belongs to another originating tool" do
-    completion = Coordinator::Write::Events::CommandCompletedV1.new(
+    completion = Coordinator::Write::CommandResultV1.new(
       command_id: "cmd-cross-tool-receipt",
       tool_name: "change_set_create",
       canonical_input_digest: "sha256:#{'a' * 64}",

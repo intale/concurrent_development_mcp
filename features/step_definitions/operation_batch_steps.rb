@@ -37,7 +37,8 @@ Then("the Batch has {int} successes, no rejection, and one terminal completion")
   events = operation_batch_events
   assert_acceptance_equal(count, events.count { _1.type == "OperationBatchItemSucceeded" }, "Success facts")
   assert_acceptance_equal(0, events.count { _1.type == "OperationBatchItemRejected" }, "Rejected facts")
-  assert_acceptance_equal(1, events.count { _1.type == "OperationBatchCompleted" }, "Completion facts")
+  completed = events.select { _1.type == "OperationBatchCompleted" }.sole
+  assert_acceptance_equal({ "batch_id" => @operation_batch_id }, completed.data, "Lean completion fact")
   assert_acceptance_equal(1, events.count { _1.type == "OperationBatchContinuationRequested" }, "Continuation facts")
 end
 
@@ -146,13 +147,19 @@ When("the pending Batch continuation observes cancellation") do
   await_operation_batch_terminal
 end
 
-Then("the Batch is cancelled with {int} successes and one item not run") do |count|
+Then("the Batch history derives {int} successes and one item not run after cancellation") do |count|
   events = operation_batch_events
   cancelled = events.find { _1.type == "OperationBatchCancelled" }
   assert_acceptance(cancelled, "The Batch has no terminal cancellation fact")
-  assert_acceptance_equal(count, cancelled.data.fetch("succeeded"), "Cancelled successes")
-  assert_acceptance_equal(0, cancelled.data.fetch("rejected"), "Cancelled rejections")
-  assert_acceptance_equal(1, cancelled.data.fetch("not_run"), "Cancelled remainder")
+  assert_acceptance_equal(
+    { "batch_id" => @operation_batch_id },
+    cancelled.data,
+    "Lean cancellation fact"
+  )
+  counts = operation_batch_outcome_counts(events)
+  assert_acceptance_equal(count, counts.fetch(:succeeded), "Cancelled successes")
+  assert_acceptance_equal(0, counts.fetch(:rejected), "Cancelled rejections")
+  assert_acceptance_equal(1, counts.fetch(:remaining), "Cancelled remainder")
   project_operation_batch(
     events,
     timeout_seconds: LiveSubscriptions::HIGH_VOLUME_TIMEOUT_SECONDS
@@ -171,7 +178,12 @@ Then("the resumed Batch succeeds once without replaying the completed prefix") d
   resumed = operation_batch_events(batch_id: @resumed_operation_batch_id)
   assert_acceptance_equal(1, resumed.count { _1.type == "OperationBatchItemSucceeded" }, "Resumed success facts")
   assert_acceptance_equal(0, resumed.count { _1.type == "OperationBatchItemRejected" }, "Resumed rejection facts")
-  assert_acceptance_equal(1, resumed.count { _1.type == "OperationBatchCompleted" }, "Resumed terminal facts")
+  completed = resumed.select { _1.type == "OperationBatchCompleted" }.sole
+  assert_acceptance_equal(
+    { "batch_id" => @resumed_operation_batch_id },
+    completed.data,
+    "Lean resumed terminal fact"
+  )
 
   resumed_manifest = operation_batch_manifest(batch_id: @resumed_operation_batch_id)
   resumed_command_ids = resumed_manifest.fetch(:items).map { _1.fetch("command_id") }

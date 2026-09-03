@@ -8,7 +8,7 @@ Feature: Agents claim verification obligations through checkpointed Tasks
 
   Rule: A successful claim is durable, traced, fenced, and replayable
 
-    Scenario: A first claim completes through a Task and exact replay returns its receipt
+    Scenario: A first claim completes through a Task and exact replay returns its result
       Given an open Rails verification obligation "CLAIM-FIRST"
       When agent "agent-blue" submits claim command "cmd-cuc-claim-first" for 300 seconds
       Then a checkpointed Task exists before any claim fact
@@ -16,13 +16,13 @@ Feature: Agents claim verification obligations through checkpointed Tasks
       Then the claim Task completes for "agent-blue" with fencing token 1
       And the durable claim carries exact Task tracing
       And the claim result describes coordination without claiming work or verification
-      When the same claim command is submitted as another Task
+      When the same claim command is submitted again
       And the claim Task executes
       Then replay returns the original claim without another claim fact
 
   Rule: Active ownership and concurrent races grant only one token
 
-    Scenario: An active claim denies another agent without a target command receipt
+    Scenario: An active claim rejects another agent without writing another claim
       Given an open Rails verification obligation "CLAIM-ACTIVE"
       When agent "agent-blue" submits claim command "cmd-cuc-claim-active-blue" for 300 seconds
       And the claim Task executes
@@ -30,7 +30,7 @@ Feature: Agents claim verification obligations through checkpointed Tasks
       When agent "agent-green" submits claim command "cmd-cuc-claim-active-green" for 300 seconds
       And the claim Task executes while the first claim is active
       Then the claim Task reports the active "agent-blue" claim as a conflict
-      And the denied command has no receipt or claim fact
+      And the denied command records rejection without another claim fact
 
     Scenario: Two concurrent Task executions produce one token-one winner
       Given an open Rails verification obligation "CLAIM-RACE"

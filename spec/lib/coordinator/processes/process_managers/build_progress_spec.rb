@@ -41,12 +41,11 @@ RSpec.describe Coordinator::Processes::ProcessManagers::BuildProgress, :event_st
     expect(satisfaction.metadata).not_to have_key("correlation_id")
 
     command_id = satisfaction.metadata.fetch("command_id")
-    command_completion = event_store.read(
+    command_history = event_store.read(
       streams.command(command_id),
-      Coordinator::Write::EventQueries::COMMAND_COMPLETION
-    ).sole
-    expect(command_completion.causation_id).to eq(step.id)
-    expect(command_completion.correlation_id).to eq(source.correlation_id)
+      Coordinator::Write::EventQueries::COMMAND_HISTORY
+    )
+    expect(command_history).to be_empty
   end
 
   it "treats a nonmatching output as an expected zero-event decision" do

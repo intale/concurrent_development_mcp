@@ -22,7 +22,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAcquireWorkItem, :event_st
     }
   end
 
-  it "atomically persists acquisition, authorization, start, and the durable receipt" do
+  it "atomically persists acquisition, authorization, and start and returns a transient result" do
     seed_ready_work_items("CS-100", [ [ "W-200", repository_id ] ])
 
     result = operation.call(input)
@@ -40,7 +40,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAcquireWorkItem, :event_st
       [ "WorkItemCreated", "WorkItemMadeReady", "WorkItemAcquired" ]
     )
     expect(attempt_events("A-300").map(&:type)).to eq([ "AttemptAuthorized", "AttemptStarted" ])
-    expect(command_events("cmd-300").map(&:type)).to eq([ "CommandCompleted" ])
+    expect(command_events("cmd-300")).to be_empty
 
     authorized = attempt_events("A-300").first
     expect(authorized.data.fetch("base_snapshots")).to eq(
@@ -80,28 +80,27 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAcquireWorkItem, :event_st
     expect(attempt_events("A-300").map(&:markers)).to all(eq(expected_markers))
   end
 
-  it "replays the exact persisted completion without another append" do
+  it "leaves replay ownership to the registered Command lifecycle" do
     seed_ready_work_items("CS-100", [ [ "W-200", repository_id ] ])
     original = operation.call(input)
     original_ids = acquisition_event_ids
 
     replay = operation.call(input)
 
-    expect(replay).to be_success
-    expect(replay.value!).to eq(original.value!)
+    expect(replay.failure.code).to eq(:work_item_unavailable)
     expect(acquisition_event_ids).to eq(original_ids)
   end
 
-  it "rejects changed-input reuse of an accepted command ID" do
+  it "enforces active-attempt ownership independently of public request identity" do
     seed_ready_work_items("CS-100", [ [ "W-200", repository_id ] ])
     operation.call(input)
 
     result = operation.call(input.merge(actor: { kind: "agent", id: "agent-b" }))
 
     expect(result).to be_failure
-    expect(result.failure.code).to eq(:command_id_reused)
+    expect(result.failure.code).to eq(:work_item_unavailable)
     expect(work_item_events("W-200").count { _1.type == "WorkItemAcquired" }).to eq(1)
-    expect(command_events("cmd-300").length).to eq(1)
+    expect(command_events("cmd-300")).to be_empty
   end
 
   it "returns invalid_git_oid before opening a domain decision or receipt" do
@@ -181,7 +180,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAcquireWorkItem, :event_st
     expect(results.find(&:failure?).failure.code).to eq(:work_item_unavailable)
     expect(work_item_events("W-200").count { _1.type == "WorkItemAcquired" }).to eq(1)
     expect(competing_inputs.sum { attempt_events(_1.fetch(:attempt_id)).length }).to eq(2)
-    expect(competing_inputs.sum { command_events(_1.fetch(:command_id)).length }).to eq(1)
+    expect(competing_inputs.flat_map { command_events(_1.fetch(:command_id)) }).to be_empty
   end
 
   def seed_ready_work_items(change_set_id, work_items)
@@ -244,7 +243,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAcquireWorkItem, :event_st
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 
   def acquisition_event_ids

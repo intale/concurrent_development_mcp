@@ -7,7 +7,6 @@ module Coordinator::Write
     attribute :commit_identity, MergeSnapshots::CommitIdentityV1
     attribute :snapshot_event_id, Types::UuidV7
     attribute :commit_registration_event_id, Types::UuidV7
-    attribute :completion_event_id, Types::UuidV7
     attribute :correlation_id, Types::UuidV7
 
     def with_commit_identity(value)
@@ -17,7 +16,6 @@ module Coordinator::Write
         commit_identity: value,
         snapshot_event_id:,
         commit_registration_event_id:,
-        completion_event_id:,
         correlation_id:
       )
     end

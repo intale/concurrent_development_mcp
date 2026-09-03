@@ -1,9 +1,0 @@
-module Coordinator
-  module Read
-    module Contracts
-      class CommandReceiptSourceEvent
-        def call: (command_input input) -> Dry::Validation::Result
-      end
-    end
-  end
-end

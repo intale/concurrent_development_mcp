@@ -6,7 +6,7 @@ RSpec.describe Coordinator::Write::Tasks::SemanticResultMapper do
   subject(:mapper) { described_class.new }
 
   it "maps a durable command completion into one semantic success" do
-    completion = Coordinator::Write::Events::CommandCompletedV1.new(
+    completion = Coordinator::Write::CommandResultV1.new(
       command_id: "cmd-semantic-success",
       tool_name: "change_set_create",
       canonical_input_digest: "sha256:#{'a' * 64}",

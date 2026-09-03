@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module OperationBatches
+      class ItemAllocationV1 < Shared::Value
+        def command_id: () -> String
+        def event_id: () -> String
+      end
+    end
+  end
+end

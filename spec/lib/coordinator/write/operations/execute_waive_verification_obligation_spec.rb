@@ -4,7 +4,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteWaiveVerificationObligatio
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
 
-  it "waives an exact open obligation atomically with its command receipt and replays it" do
+  it "waives an exact open obligation and leaves replay ownership to the registered Command lifecycle" do
     created = CandidateObligationScenario.create_obligation(prefix: "waiver-open")
     input = CandidateObligationScenario.waiver_arguments(
       created:,
@@ -12,10 +12,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteWaiveVerificationObligatio
     )
 
     completion = execute(input).value!
-    replay = execute(input).value!
+    replay = execute(input)
     event = waiver_events(created).sole
 
-    expect(replay).to eq(completion)
+    expect(replay.failure.code).to eq(:verification_obligation_already_waived)
     expect(completion.data).to have_attributes(
       obligation_id: created.fetch(:payload).obligation_id,
       previous_status: "open",
@@ -27,8 +27,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteWaiveVerificationObligatio
       "verification-obligation-status:waived",
       "command:cmd-waiver-open"
     )
-    expect(command_events("cmd-waiver-open").length).to eq(1)
-    expect([ event, command_events("cmd-waiver-open").sole ].map(&:correlation_id).uniq.length).to eq(1)
+    expect(command_events("cmd-waiver-open")).to be_empty
   end
 
   it "allows an exact failed obligation to be waived while preserving its failure fact" do
@@ -93,7 +92,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteWaiveVerificationObligatio
     expect(%w[cmd-waiver-agent cmd-waiver-binding cmd-waiver-policy].flat_map { command_events(_1) }).to be_empty
   end
 
-  it "rejects a satisfied obligation and changed reuse of a completed command ID" do
+  it "rejects a satisfied obligation and a second direct waiver" do
     satisfied = CandidateObligationScenario.create_obligation(
       prefix: "waiver-satisfied",
       required_evidence: [ "combined_tests" ]
@@ -129,8 +128,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteWaiveVerificationObligatio
     )
 
     expect(denied.failure.code).to eq(:verification_obligation_terminal)
-    expect(changed.failure.code).to eq(:command_id_reused)
+    expect(changed.failure.code).to eq(:verification_obligation_already_waived)
     expect(waiver_events(created).length).to eq(1)
+    expect(command_events("cmd-waiver-reuse")).to be_empty
   end
 
   private
@@ -164,6 +164,6 @@ RSpec.describe Coordinator::Write::Operations::ExecuteWaiveVerificationObligatio
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 end

@@ -71,6 +71,19 @@ RSpec.describe Coordinator::Mcp::Tasks::ResultMapper do
     )
   end
 
+  it "keeps polling available while an immutable terminal result projection catches up" do
+    completed = Coordinator::Write::Events::CoordinationTaskCompletedV3.new(task_id:)
+
+    result = mapper.projection_pending(state(submitted, started, completed)).to_h
+
+    expect(result).to include(
+      resultType: "complete",
+      status: "working",
+      statusMessage: "Command completed; its result projection is catching up."
+    )
+    expect(result).not_to have_key(:result)
+  end
+
   it "keeps JSON-RPC failure and cancellation as distinct terminal wire variants" do
     failed = Coordinator::Write::Events::CoordinationTaskFailedV2.new(
       task_id:,

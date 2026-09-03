@@ -5,7 +5,6 @@ module Coordinator::Write
     attr_reader commit_identity: MergeSnapshots::CommitIdentityV1
     attr_reader snapshot_event_id: String
     attr_reader commit_registration_event_id: String
-    attr_reader completion_event_id: String
     attr_reader correlation_id: String
     def with_commit_identity: (MergeSnapshots::CommitIdentityV1 value) -> MergeSnapshotRegistrationPreparationV1
   end

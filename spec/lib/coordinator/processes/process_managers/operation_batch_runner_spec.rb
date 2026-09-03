@@ -32,7 +32,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
     ])
     expect(batch_events(command.batch_id).map(&:id)).to eq(first_history.map(&:id))
     completed = load(first_history.last)
-    expect(completed).to have_attributes(succeeded: 1, rejected: 1)
+    expect(completed.to_h).to eq(batch_id: command.batch_id)
     first_history.select { %w[OperationBatchItemSucceeded OperationBatchItemRejected].include?(_1.type) }
       .each do |event|
         expect(event.markers).to include("batch-item:#{command.batch_id}:#{event.data.fetch("index")}")
@@ -74,13 +74,13 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
     ).value!
     expect(batch_executor.call_command(unrelated_command)).to be_success
     unrelated_created = batch_events(unrelated_command.batch_id).sole
-    target = Coordinator::Write::Tasks::TargetCommandBuilder.new.call(command.items.sole.command_input)
+    target = Coordinator::Write::Tasks::TargetCommandBuilder.new.call(load(created).items.sole.command_input)
     target_executor = Coordinator::Write::Tasks::TargetExecutor.new(event_store:)
 
     expect(target_executor.call(target, caused_by: unrelated_created)).to be_success
-    target_completion = command_events(target.command_id).sole
-    expect(target_completion.type).to eq("CommandCompleted")
-    expect(target_completion.correlation_id).to eq(unrelated_created.correlation_id)
+    target_terminal = command_events(target.command_id).last
+    expect(target_terminal.type).to eq("CommandSucceeded")
+    expect(target_terminal.correlation_id).to eq(unrelated_created.correlation_id)
 
     runner.call(created)
     runner.call(created)
@@ -106,7 +106,9 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
       match(Coordinator::Shared::Types::UUID_V7_PATTERN)
     )
     expect(skill_events.length).to eq(1)
-    expect(command_events(target.command_id).map(&:type)).to eq([ "CommandCompleted" ])
+    expect(command_events(target.command_id).map(&:type)).to eq(
+      [ "CommandRegistered", "CommandSucceeded" ]
+    )
   end
 
   it "publishes one unique multi-event registration in the shared process-manager set" do
@@ -172,7 +174,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 
   def load(event)

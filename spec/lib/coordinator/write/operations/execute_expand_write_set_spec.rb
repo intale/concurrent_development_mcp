@@ -121,6 +121,6 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_sto
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 end

@@ -63,6 +63,6 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRenewLeaseSet, :event_stor
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 end

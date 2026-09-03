@@ -3,7 +3,7 @@ module Coordinator
     module OperationBatches
       class Decider
         def initialize: (?create: Domain::OperationBatches::Create, ?record_item_outcome: Domain::OperationBatches::RecordItemOutcome, ?request_continuation: Domain::OperationBatches::RequestContinuation, ?complete: Domain::OperationBatches::Complete, ?request_cancellation: Domain::OperationBatches::RequestCancellation, ?complete_cancellation: Domain::OperationBatches::CompleteCancellation) -> void
-        def call: (state: State, command: Commands::CreateOperationBatch | Commands::RecordOperationBatchItemOutcome | Commands::RequestOperationBatchContinuation | Commands::CompleteOperationBatch | Commands::CancelOperationBatch | Commands::CompleteOperationBatchCancellation, occurred_at: String) -> Dry::Monads::Result
+        def call: (state: State, command: Commands::CreateOperationBatch | Commands::RecordOperationBatchItemOutcome | Commands::RequestOperationBatchContinuation | Commands::CompleteOperationBatch | Commands::CancelOperationBatch | Commands::CompleteOperationBatchCancellation, ?items: Array[ItemV2]?) -> Dry::Monads::Result
       end
     end
   end

@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module OperationBatches
+      class RegistrationPlanV2 < Shared::Value
+        def item: () -> ItemV2
+        def actor: () -> Commands::Actor
+        def register: () -> bool
+        def event_id: () -> String
+      end
+    end
+  end
+end

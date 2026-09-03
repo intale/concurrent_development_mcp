@@ -22,7 +22,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCompleteCompensatedRelease
 
     expect(denied.failure.code).to eq(:release_compensation_evidence_mismatch)
     expect(completed).to be_success
-    expect(replay.value!).to eq(completed.value!)
+    expect(replay.failure.code).to eq(:release_set_already_completed)
     expect(ReleaseSetScenario.load(completion_events.sole)).to have_attributes(
       outcome: "compensated",
       source_event: ReleaseSetScenario.reference(request.fetch(:event)),

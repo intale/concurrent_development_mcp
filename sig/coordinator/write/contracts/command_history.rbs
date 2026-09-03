@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Contracts
+      class CommandHistory
+        def call: (events: Array[Events::Base]) -> untyped
+      end
+    end
+  end
+end

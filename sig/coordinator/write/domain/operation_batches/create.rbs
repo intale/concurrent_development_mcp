@@ -4,7 +4,7 @@ module Coordinator
       module OperationBatches
         class Create
           def initialize: (?stream_factory: StreamFactory) -> void
-          def call: (state: Write::OperationBatches::State, command: Commands::CreateOperationBatch, occurred_at: String) -> Dry::Monads::Result
+          def call: (state: Write::OperationBatches::State, command: Commands::CreateOperationBatch, items: Array[Write::OperationBatches::ItemV2]) -> Dry::Monads::Result
         end
       end
     end

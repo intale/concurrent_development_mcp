@@ -50,16 +50,15 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidateImpactSurfa
     expect(registration.causation_id).to eq(parent.id)
     expect(registration.correlation_id).to eq(parent.correlation_id)
     expect(completion.data.registration_event).to eq(completion.emitted_events.fetch(1))
-    expect(command_events(input.fetch(:command_id)).map(&:type)).to eq([ "CommandCompleted" ])
+    expect(command_events(input.fetch(:command_id))).to be_empty
   end
 
-  it "IMP-01-REPLAY-01 replays exact canonical input and rejects changed reuse" do
+  it "IMP-01-REPLAY-01 leaves replay ownership to the registered Command lifecycle" do
     candidate = CandidateScenario.submit(prefix: "impact-replay")
     input = impact_input(candidate)
-    original = operation.call(input)
+    expect(operation.call(input)).to be_success
     ids = impact_events(input.fetch(:candidate_id)).map(&:id) +
-      registry_events(candidate.fetch(:input).fetch(:change_set_id)).map(&:id) +
-      command_events(input.fetch(:command_id)).map(&:id)
+      registry_events(candidate.fetch(:input).fetch(:change_set_id)).map(&:id)
     reordered = input.merge(
       surface: input.fetch(:surface).merge(
         produces: input.dig(:surface, :produces).reverse
@@ -75,14 +74,13 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidateImpactSurfa
       )
     )
 
-    expect(replay).to be_success
-    expect(replay.value!).to eq(original.value!)
-    expect(changed.failure.code).to eq(:command_id_reused)
+    expect(replay.failure.code).to eq(:candidate_impact_surface_already_recorded)
+    expect(changed.failure.code).to eq(:candidate_impact_surface_already_recorded)
     expect(
       impact_events(input.fetch(:candidate_id)).map(&:id) +
-        registry_events(candidate.fetch(:input).fetch(:change_set_id)).map(&:id) +
-        command_events(input.fetch(:command_id)).map(&:id)
+        registry_events(candidate.fetch(:input).fetch(:change_set_id)).map(&:id)
     ).to eq(ids)
+    expect(command_events(input.fetch(:command_id))).to be_empty
   end
 
   it "denies absent, identity-mismatched, and stale source evidence without target facts" do
@@ -132,9 +130,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidateImpactSurfa
     registrations = registry_events(candidate.fetch(:input).fetch(:change_set_id))
     expect(registrations.length).to eq(1)
     expect(registrations.sole.data.fetch("candidate_id")).to eq(first.fetch(:candidate_id))
-    expect(
-      [ first, second ].sum { command_events(_1.fetch(:command_id)).length }
-    ).to eq(1)
+    expect([ first, second ].flat_map { command_events(_1.fetch(:command_id)) }).to be_empty
   end
 
   def impact_input(candidate)
@@ -180,7 +176,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidateImpactSurfa
   def command_events(command_id)
     event_store.read(
       streams.command(command_id),
-      Coordinator::Write::EventQueries::COMMAND_COMPLETION
+      Coordinator::Write::EventQueries::COMMAND_HISTORY
     )
   end
 

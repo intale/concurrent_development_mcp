@@ -6,6 +6,5 @@ module Coordinator::Write
     attribute :input_digest, Types::Sha256Digest
     attribute :recorded_event_id, Types::UuidV7
     attribute :accepted_event_id, Types::UuidV7
-    attribute :completion_event_id, Types::UuidV7
   end
 end

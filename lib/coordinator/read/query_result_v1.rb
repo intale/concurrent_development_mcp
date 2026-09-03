@@ -207,7 +207,12 @@ module Coordinator::Read
       "not_found",
       "invalid",
       "not_modified",
+      "command_id_reused",
+      "denied",
       "conflict",
+      "busy",
+      "stale_context",
+      "confirmation_required",
       "limit_reached"
     )
     attribute :summary, Types::String

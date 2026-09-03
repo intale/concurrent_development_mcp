@@ -63,7 +63,11 @@ Then(
   attachment_facts = candidate_attachment_events(
     @candidate_arguments.fetch(:attempt_id)
   ).select { _1.data.fetch("candidate_id") == candidate_id }
-  completion_facts = command_events(@candidate_arguments.fetch(:command_id))
+  command_lifecycle = assert_command_succeeded(
+    @candidate_arguments.fetch(:command_id),
+    context: "Candidate command lifecycle"
+  )
+  terminal = command_lifecycle.last
   started = task_events(@candidate_task_id).find do |event|
     event.type == "CoordinationTaskExecutionStarted"
   end
@@ -76,9 +80,8 @@ Then(
   )
   assert_acceptance_equal(1, head_facts.length, "Candidate head registrations")
   assert_acceptance_equal(1, attachment_facts.length, "Candidate Attempt attachments")
-  assert_acceptance_equal(1, completion_facts.length, "Candidate command completions")
 
-  target_facts = [ *candidate_facts, *head_facts, *attachment_facts, *completion_facts ]
+  target_facts = [ *candidate_facts, *head_facts, *attachment_facts, terminal ]
   assert_acceptance_equal([ started.id ], target_facts.map(&:causation_id).uniq, "Candidate causation")
   assert_acceptance_equal(
     [ started.correlation_id ],
@@ -159,16 +162,13 @@ Then(
   )
 end
 
-When("the exact Candidate command is retried through another Task") do
+When("the exact Candidate command is retried through its original Task") do
   @candidate_retry_task_id = submit_candidate_task(@candidate_arguments)
   @candidate_retry_state = candidate_task_state(@candidate_retry_task_id)
 end
 
-Then("both Candidate Tasks complete with the same result") do
-  assert_acceptance(
-    @candidate_task_id != @candidate_retry_task_id,
-    "Exact Candidate retry must receive another Task handle"
-  )
+Then("the replayed Candidate Task exposes the same result") do
+  assert_acceptance_equal(@candidate_task_id, @candidate_retry_task_id, "Replayed Candidate Task identity")
   assert_acceptance_equal("completed", @candidate_task_state.dig("result", "status"), "First Task")
   assert_acceptance_equal("completed", @candidate_retry_state.dig("result", "status"), "Retry Task")
   assert_acceptance_equal(
@@ -179,7 +179,7 @@ Then("both Candidate Tasks complete with the same result") do
 end
 
 Then(
-  "Candidate {string} has one submission, manifest, head registration, attachment, and command completion"
+  "Candidate {string} has one submission, manifest, head registration, attachment, and successful command lifecycle"
 ) do |candidate_id|
   assert_acceptance_equal(
     %w[CandidateSubmitted CandidateChangeManifestCaptured],
@@ -198,11 +198,7 @@ Then(
     event.data.fetch("candidate_id") == candidate_id
   end
   assert_acceptance_equal(1, attachments.length, "Replayed Candidate attachments")
-  assert_acceptance_equal(
-    1,
-    command_events(@candidate_arguments.fetch(:command_id)).length,
-    "Replayed command completions"
-  )
+  assert_command_succeeded(@candidate_arguments.fetch(:command_id), context: "Replayed Candidate command lifecycle")
 end
 
 When("the agent submits Candidate {string} with stale fencing evidence") do |candidate_id|
@@ -226,6 +222,7 @@ Then("the Candidate Task completes with conflict {string}") do |code|
   assert_acceptance_equal(true, result.fetch("isError"), "Denied Candidate error flag")
   assert_acceptance_equal("conflict", content.fetch("status"), "Denied Candidate status")
   assert_acceptance_equal(code, content.dig("data", "code"), "Denied Candidate code")
+  assert_command_rejected(@candidate_arguments.fetch(:command_id), context: "Denied Candidate command lifecycle")
 end
 
 Then("denied Candidate {string} writes no target facts") do |candidate_id|
@@ -251,6 +248,7 @@ Then("the Candidate request is rejected before Task allocation") do
     task_events_for_command(@candidate_arguments.fetch(:command_id)),
     "Invalid Candidate Task submissions"
   )
+  assert_acceptance_equal([], command_events(@candidate_arguments.fetch(:command_id)), "Invalid command lifecycle")
 end
 
 Then("invalid Candidate {string} writes no target facts") do |candidate_id|
@@ -279,6 +277,7 @@ Then("the Candidate request is rejected and its schema directs the agent to spli
     task_events_for_command(@candidate_arguments.fetch(:command_id)),
     "Invalid Candidate Task submissions"
   )
+  assert_acceptance_equal([], command_events(@candidate_arguments.fetch(:command_id)), "Invalid command lifecycle")
 
   catalog = mcp_request(method: "tools/list", params: {})
   tool = catalog.dig("result", "tools").find { _1.fetch("name") == "candidate_submit" }
@@ -439,7 +438,8 @@ Then("the winning Candidate owns one complete checkpoint while the loser owns no
     "Winning Candidate facts"
   )
   assert_acceptance_equal(1, winner_attachments.length, "Winning Candidate attachment")
-  assert_acceptance_equal(1, command_events(winner.fetch(:command_id)).length, "Winning completion")
+  assert_command_succeeded(winner.fetch(:command_id), context: "Winning Candidate command lifecycle")
+  assert_command_rejected(loser.fetch(:command_id), context: "Losing Candidate command lifecycle")
   assert_acceptance_equal(1, head_facts.length, "Head ownership facts")
   assert_acceptance_equal(
     winner.fetch(:candidate_id),

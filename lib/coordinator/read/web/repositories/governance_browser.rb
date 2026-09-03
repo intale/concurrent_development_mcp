@@ -178,7 +178,7 @@ module Coordinator::Read::Web::Repositories
     end
 
     def receipt(query)
-      record = Coordinator::Read::CommandReceipt.find_by(command_id: query.command_id)
+      record = Coordinator::Read::CommandReceipt.find_by(request_id: query.command_id)
       record && Coordinator::Read::Web::GovernanceBrowserV1::ReceiptDetail.new(
         receipt: build_receipt(record)
       )
@@ -314,13 +314,12 @@ module Coordinator::Read::Web::Repositories
 
     def verify_projection!(record, completion)
       projected = record.attributes.symbolize_keys.slice(
-        :command_id,
         :tool_name,
         :canonical_input_digest,
         :status,
         :summary,
         :receipt
-      )
+      ).merge(command_id: record.request_id)
       canonical = completion.slice(
         :command_id,
         :tool_name,

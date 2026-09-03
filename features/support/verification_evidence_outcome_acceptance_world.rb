@@ -199,31 +199,34 @@ module VerificationEvidenceOutcomeAcceptanceWorld
   end
 
   def evidence_event_for(attempt)
+    command_id = task_command_id(attempt.fetch(:task_id))
     compatibility_evidence_events.find do |event|
-      event.metadata.fetch("command_id") == attempt.fetch(:command_id)
+      event.metadata.fetch("command_id") == command_id
     end
   end
 
   def assert_evidence_task_tracing(attempt)
     submitted, started, task_completed = task_events(attempt.fetch(:task_id))
     evidence = evidence_event_for(attempt)
-    completion = command_events(attempt.fetch(:command_id)).sole
+    command_id = task_command_id(attempt.fetch(:task_id))
+    command_terminal = command_terminal_event(command_id)
     outcome = verification_terminal_events.find do |event|
-      event.metadata.fetch("command_id") == attempt.fetch(:command_id)
+      event.metadata.fetch("command_id") == command_id
     end
     assert_acceptance(evidence, "Traced evidence fact is missing")
     assert_acceptance(outcome, "Traced outcome fact is missing")
+    assert_acceptance_equal("CommandSucceeded", command_terminal&.type, "Evidence command terminal")
     assert_acceptance_equal(started.id, evidence.causation_id, "Evidence immediate parent")
     assert_acceptance_equal(started.id, outcome.causation_id, "Outcome immediate parent")
-    assert_acceptance_equal(started.id, completion.causation_id, "Receipt immediate parent")
-    assert_acceptance_equal(completion.id, task_completed.causation_id, "Task completion parent")
+    assert_acceptance_equal(started.id, command_terminal.causation_id, "Command terminal immediate parent")
+    assert_acceptance_equal(command_terminal.id, task_completed.causation_id, "Task completion parent")
     assert_acceptance_equal(
       [ submitted.correlation_id ],
-      [ submitted, started, evidence, outcome, completion, task_completed ].map(&:correlation_id).uniq,
+      [ submitted, started, evidence, outcome, command_terminal, task_completed ].map(&:correlation_id).uniq,
       "Evidence Task correlation"
     )
     assert_acceptance(
-      [ evidence, outcome, completion ].none? { _1.metadata.key?("correlation_id") },
+      [ evidence, outcome, command_terminal ].none? { _1.metadata.key?("correlation_id") },
       "Application metadata duplicates correlation"
     )
   end

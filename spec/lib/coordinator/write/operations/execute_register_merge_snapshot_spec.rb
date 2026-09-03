@@ -5,7 +5,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRegisterMergeSnapshot, :ev
   let(:operation) { described_class.new(event_store:) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
 
-  it "registers exact ordered Candidate evidence and replays the same command" do
+  it "registers exact ordered Candidate evidence and leaves replay ownership to the Command lifecycle" do
     candidates = seed_candidates("merge-register")
     input = registration_input("merge-register", candidates:)
 
@@ -13,8 +13,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRegisterMergeSnapshot, :ev
     replay = operation.call(input)
 
     expect(first).to be_success
-    expect(replay).to be_success
-    expect(replay.value!).to eq(first.value!)
+    expect(replay.failure.code).to eq(:merge_snapshot_id_already_used)
     snapshot = snapshot_events("MS-merge-register").sole
     registry = commit_events(input.fetch(:merge_commit_oid)).sole
     expect(snapshot.data.fetch("ordered_candidates").map { _1.fetch("candidate_id") }).to eq(
@@ -23,7 +22,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRegisterMergeSnapshot, :ev
     expect(snapshot.data.fetch("evidence_status")).to eq("attributed_unverified")
     expect(registry.data.fetch("snapshot_event").fetch("event_id")).to eq(snapshot.id)
     expect(snapshot.correlation_id).to eq(registry.correlation_id)
-    expect(snapshot.correlation_id).to eq(command_events(input.fetch(:command_id)).sole.correlation_id)
+    expect(command_events(input.fetch(:command_id))).to be_empty
   end
 
   it "denies missing, mismatched, and competing immutable evidence without partial facts" do
@@ -124,6 +123,6 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRegisterMergeSnapshot, :ev
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 end

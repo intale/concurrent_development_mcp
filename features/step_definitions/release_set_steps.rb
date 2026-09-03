@@ -27,9 +27,15 @@ Then("the ReleaseSet Task completes with the exact repository order") do
   )
 end
 
-Then("one prepared fact and command completion preserve the Task trace") do
+Then("one prepared fact and command success fact preserve the Task trace") do
   prepared = release_set_events(@release_set_arguments.fetch(:release_set_id)).sole
-  completion = command_events(@release_set_arguments.fetch(:command_id)).sole
+  lifecycle = command_events(@release_set_arguments.fetch(:command_id))
+  assert_acceptance_equal(
+    %w[CommandRegistered CommandSucceeded],
+    lifecycle.map(&:type),
+    "Command lifecycle"
+  )
+  completion = lifecycle.last
   started = task_events(@release_set_task_id).find do |event|
     event.type == "CoordinationTaskExecutionStarted"
   end

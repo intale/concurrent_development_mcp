@@ -7,12 +7,6 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
       pull_interval: 0.2
     )
   end
-  let(:receipt_registration) do
-    Coordinator::Read::Subscriptions::CommandReceipts.new(
-      handler: Coordinator::Read::Projectors::CommandReceiptsV1.new,
-      pull_interval: 0.2
-    )
-  end
   let(:utterance_registration) do
     Coordinator::Read::Subscriptions::UserUtterances.new(
       handler: Coordinator::Read::Projectors::UserUtterancesV1.new,
@@ -52,6 +46,12 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
   let(:repository_registration) do
     Coordinator::Read::Subscriptions::Repositories.new(
       handler: Coordinator::Read::Projectors::RepositoriesV1.new,
+      pull_interval: 0.2
+    )
+  end
+  let(:resource_registration) do
+    Coordinator::Read::Subscriptions::Resources.new(
+      handler: Coordinator::Container["projectors.resources_v1"],
       pull_interval: 0.2
     )
   end
@@ -100,7 +100,6 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
         "agent-choice-impacts-v1",
         "agent-choices-v1",
         "candidates-v1",
-        "command-receipts-v1",
         "coord-context-v3",
         "decision-governance-v1",
         "decision-interpretations-v1",
@@ -109,6 +108,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
         "operation-batches-v2",
         "release-sets-v1",
         "repositories-v1",
+        "resources-v1",
         "skills-v2",
         "user-utterances-v1",
         "verification-obligations-v1"
@@ -124,10 +124,6 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
       "WorkItemCompleted",
       "WorkItemDependencySatisfied",
       "ChangeSetCompleted"
-    )
-    expect(receipt_registration.definition.identity.to_h).to eq(
-      set_name: "coordinator-read-models-v1",
-      subscription_name: "command-receipts-v1"
     )
     expect(utterance_registration.definition.identity.to_h).to eq(
       set_name: "coordinator-read-models-v1",
@@ -156,6 +152,10 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
     expect(repository_registration.definition.identity.to_h).to eq(
       set_name: "coordinator-read-models-v1",
       subscription_name: "repositories-v1"
+    )
+    expect(resource_registration.definition.identity.to_h).to eq(
+      set_name: "coordinator-read-models-v1",
+      subscription_name: "resources-v1"
     )
     expect(skill_registration.definition.identity.to_h).to eq(
       set_name: "coordinator-read-models-v1",
@@ -191,7 +191,6 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
       manager:,
       registrations: [
         context_registration,
-        receipt_registration,
         utterance_registration,
         interpretation_registration,
         decision_registration,
@@ -199,6 +198,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
         agent_choice_impact_registration,
         candidate_registration,
         repository_registration,
+        resource_registration,
         skill_registration,
         development_artifact_registration,
         operation_batch_registration,

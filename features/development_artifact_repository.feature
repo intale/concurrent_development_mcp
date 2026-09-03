@@ -71,10 +71,10 @@ Feature: Development Artifact repository
     @linked-artifacts @event-contract
     Scenario: Exact relationship replay remains one edge after a read-subscription restart
       Given a captured parent and child are available for relationship replay
-      When the same relationship command is executed through two Tasks
+      When the same relationship command is submitted twice
       And its relation fact reaches the read side after a subscription restart
-      Then both Tasks expose one logical relation result
-      And one relation fact, command receipt, and projected edge exist
+      Then both responses expose the original Task and one logical relation result
+      And one relation fact, command lifecycle, and projected edge exist
 
   Rule: Source observations are immutable while classification is explicitly correctable
 

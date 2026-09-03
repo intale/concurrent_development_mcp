@@ -30,20 +30,23 @@ Then("the impact Task completes with attributed unverified evidence") do
   )
 end
 
-Then("the surface and command completion preserve the Task trace") do
+Then("the surface and successful command lifecycle preserve the Task trace") do
   candidate = @impact_candidates.fetch(@impact_role)
   surface = impact_events(candidate).sole
-  completion = command_events(@impact_arguments.fetch(:command_id)).sole
+  terminal = assert_command_succeeded(
+    @impact_arguments.fetch(:command_id),
+    context: "Impact command lifecycle"
+  ).last
   started = task_events(@impact_task_id).find { _1.type == "CoordinationTaskExecutionStarted" }
   completed = task_events(@impact_task_id).find { _1.type == "CoordinationTaskCompleted" }
   assert_acceptance(started, "Impact Task has no execution-started fact")
   assert_acceptance(completed, "Impact Task has no completion fact")
   assert_acceptance_equal(started.id, surface.causation_id, "Impact surface causation")
-  assert_acceptance_equal(started.id, completion.causation_id, "Impact command causation")
-  assert_acceptance_equal(completion.id, completed.causation_id, "Impact Task completion causation")
+  assert_acceptance_equal(started.id, terminal.causation_id, "Impact command causation")
+  assert_acceptance_equal(terminal.id, completed.causation_id, "Impact Task completion causation")
   assert_acceptance_equal(
     [ started.correlation_id ],
-    [ surface, completion, completed ].map(&:correlation_id).uniq,
+    [ surface, terminal, completed ].map(&:correlation_id).uniq,
     "Impact correlation"
   )
 end
@@ -181,13 +184,13 @@ Then(
   )
 end
 
-When("the exact impact command is retried through another Task") do
+When("the exact impact command is retried through its original Task") do
   @impact_retry_task_id = submit_impact_task(@impact_arguments)
   @impact_retry_state = candidate_task_state(@impact_retry_task_id)
 end
 
-Then("both impact Tasks expose the same result") do
-  assert_acceptance(@impact_task_id != @impact_retry_task_id, "Impact replay must use another Task")
+Then("the replayed impact Task exposes the same result") do
+  assert_acceptance_equal(@impact_task_id, @impact_retry_task_id, "Replayed impact Task identity")
   assert_acceptance_equal(
     @impact_task_state.dig("result", "result"),
     @impact_retry_state.dig("result", "result"),
@@ -195,10 +198,10 @@ Then("both impact Tasks expose the same result") do
   )
 end
 
-Then("{string} has one impact fact and one command completion") do |role|
+Then("{string} has one impact fact and one successful command lifecycle") do |role|
   candidate = @impact_candidates.fetch(role)
   assert_acceptance_equal(1, impact_events(candidate).length, "Impact facts")
-  assert_acceptance_equal(1, command_events(@impact_arguments.fetch(:command_id)).length, "Impact completions")
+  assert_command_succeeded(@impact_arguments.fetch(:command_id), context: "Impact command lifecycle")
 end
 
 When("two analyzers concurrently submit different initial surfaces for {string}") do |role|
@@ -257,8 +260,8 @@ Then("only the winning impact command has target facts") do
   winner_command = @impact_race_winner.dig(:arguments, :command_id)
   loser_command = @impact_race_loser.dig(:arguments, :command_id)
   assert_acceptance_equal(1, impact_events(candidate).length, "Race impact facts")
-  assert_acceptance_equal(1, command_events(winner_command).length, "Winning impact completion")
-  assert_acceptance_equal([], command_events(loser_command), "Losing impact completion")
+  assert_command_succeeded(winner_command, context: "Winning impact command lifecycle")
+  assert_command_rejected(loser_command, context: "Losing impact command lifecycle")
 end
 
 When("the analyzer attempts to submit an empty impact surface for {string}") do |role|
@@ -291,7 +294,7 @@ Then("the impact request is rejected before Task allocation") do
   )
 end
 
-Then("{string} has no impact facts or command completion") do |role|
+Then("{string} has no impact facts or command lifecycle") do |role|
   assert_acceptance_equal([], impact_events(@impact_candidates.fetch(role)), "Invalid impact facts")
   assert_acceptance_equal([], command_events(@impact_arguments.fetch(:command_id)), "Invalid impact completion")
 end

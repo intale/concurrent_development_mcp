@@ -152,9 +152,9 @@ Then("the activation Task succeeds with one complete consistency boundary") do
     "Decision partition event plan"
   )
   assert_acceptance_equal(
-    1,
-    command_events(@decision_activation.fetch(:activation_command_id)).length,
-    "Decision activation completion"
+    %w[CommandRegistered CommandSucceeded],
+    command_events(@decision_activation.fetch(:activation_command_id)).map(&:type),
+    "Decision activation command lifecycle"
   )
 end
 
@@ -242,16 +242,16 @@ Then("one activation Task succeeds and the other reports an occupied Decision sl
   assert_acceptance_equal(1, decision_partition_events.length, "Winning partition fact")
 end
 
-Then("the losing activation writes no Decision or command facts") do
+Then("the losing activation writes no Decision facts and records its command rejection") do
   assert_acceptance_equal(
     [],
     decision_events(@losing_activation.fetch(:decision_id)),
     "Losing Decision facts"
   )
   assert_acceptance_equal(
-    [],
-    command_events(@losing_activation.fetch(:activation_command_id)),
-    "Losing command facts"
+    %w[CommandRegistered CommandRejected],
+    command_events(@losing_activation.fetch(:activation_command_id)).map(&:type),
+    "Losing command lifecycle"
   )
   assert_acceptance_equal(
     2,
@@ -259,9 +259,9 @@ Then("the losing activation writes no Decision or command facts") do
     "Winning Decision facts"
   )
   assert_acceptance_equal(
-    1,
-    command_events(@winning_activation.fetch(:activation_command_id)).length,
-    "Winning command facts"
+    %w[CommandRegistered CommandSucceeded],
+    command_events(@winning_activation.fetch(:activation_command_id)).map(&:type),
+    "Winning command lifecycle"
   )
 end
 
@@ -326,9 +326,9 @@ Then("the correction Task succeeds while the previous Decision view remains avai
     "Decision correction partition plan"
   )
   assert_acceptance_equal(
-    1,
-    command_events(@decision_correction.fetch(:command_id)).length,
-    "Decision correction completion"
+    %w[CommandRegistered CommandSucceeded],
+    command_events(@decision_correction.fetch(:command_id)).map(&:type),
+    "Decision correction command lifecycle"
   )
 
   view = decision_view(decision_id)
@@ -378,8 +378,8 @@ Then("the stale correction Task reports a Decision revision conflict without new
   assert_acceptance_equal("conflict", content.fetch("status"), "Stale correction status")
   assert_acceptance_equal("decision_revision_changed", content.dig("data", "code"), "Stale correction denial")
   assert_acceptance_equal(
-    [],
-    command_events(@stale_decision_correction.fetch(:command_id)),
+    %w[CommandRegistered CommandRejected],
+    command_events(@stale_decision_correction.fetch(:command_id)).map(&:type),
     "Denied correction command facts"
   )
   assert_acceptance_equal(

@@ -29,7 +29,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordGuidance, :event_sto
     }
   end
 
-  it "atomically persists direct evidence and its non-normative receipt" do
+  it "atomically persists direct evidence and returns a non-normative result" do
     result = operation.call(input)
 
     expect(result).to be_success
@@ -52,7 +52,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordGuidance, :event_sto
         recorded_at: fact.data.fetch("recorded_at")
       )
     )
-    expect(command_events("cmd-guidance-1").length).to eq(1)
+    expect(command_events("cmd-guidance-1")).to be_empty
   end
 
   it "persists forwarded evidence under the same strict message boundary" do
@@ -64,13 +64,13 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordGuidance, :event_sto
     expect(conversation_events("C-1").sole.type).to eq("UserUtteranceForwardedByAgent")
   end
 
-  it "replays the exact command without duplicating evidence" do
-    original = operation.call(input)
+  it "leaves replay ownership to the registered Command lifecycle" do
+    expect(operation.call(input)).to be_success
     original_ids = conversation_events("C-1").map(&:id) + command_events("cmd-guidance-1").map(&:id)
 
     replay = operation.call(input)
 
-    expect(replay.value!).to eq(original.value!)
+    expect(replay.failure.code).to eq(:message_already_recorded)
     expect(conversation_events("C-1").map(&:id) + command_events("cmd-guidance-1").map(&:id)).to eq(original_ids)
   end
 
@@ -109,7 +109,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordGuidance, :event_sto
     expect(results.count(&:failure?)).to eq(1)
     expect(results.find(&:failure?).failure.code).to eq(:message_already_recorded)
     expect(global_message_events("M-1").length).to eq(1)
-    expect(inputs.count { command_events(_1.fetch(:command_id)).one? }).to eq(1)
+    expect(inputs.flat_map { command_events(_1.fetch(:command_id)) }).to be_empty
   end
 
   def conversation_events(conversation_id)
@@ -125,7 +125,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordGuidance, :event_sto
   def command_events(command_id)
     event_store.read(
       streams.command(command_id),
-      Coordinator::Write::EventQueries::COMMAND_COMPLETION
+      Coordinator::Write::EventQueries::COMMAND_HISTORY
     )
   end
 end

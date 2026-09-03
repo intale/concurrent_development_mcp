@@ -8,6 +8,5 @@ module Coordinator::Write
     attribute :input_digest, Types::Sha256Digest
     attribute :releases, Types::Array.of(Release).constrained(min_size: 1, max_size: 32)
     attribute :write_set_event_id, Types::UuidV7
-    attribute :completion_event_id, Types::UuidV7
   end
 end

@@ -1,0 +1,14 @@
+module Coordinator
+  module Read
+    module CommandResults
+      class Source < Shared::Value
+        def terminal_event: () -> PgEventstore::Event
+        def command_state: () -> CommandState
+        def command: () -> Write::coordination_command
+        def persisted_events: () -> Array[PgEventstore::Event]
+        def payloads: () -> Array[Write::Events::Base]
+        def completed_at: () -> String
+      end
+    end
+  end
+end

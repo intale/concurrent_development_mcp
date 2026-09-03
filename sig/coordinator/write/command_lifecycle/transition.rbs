@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module CommandLifecycle
+      class Transition < Shared::Value
+        def state: () -> Domain::CommandLifecycles::State
+        def terminal_event: () -> PgEventstore::Event
+      end
+    end
+  end
+end

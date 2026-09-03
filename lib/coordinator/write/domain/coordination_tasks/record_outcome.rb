@@ -18,14 +18,14 @@ module Coordinator::Write
 
         def build_event(command)
           case command.outcome
-          when Tasks::OutcomeV2::Completed
+          when Tasks::OutcomeV3::Completed
             Events::CoordinationTaskCompletedV3.new(task_id: command.task_id)
-          when Tasks::OutcomeV2::Failed
+          when Tasks::OutcomeV3::Failed
             Events::CoordinationTaskFailedV2.new(
               task_id: command.task_id,
-              code: "internal_error",
-              reason: command.outcome.error.message,
-              retryable: false
+              code: command.outcome.code,
+              reason: command.outcome.reason,
+              retryable: command.outcome.retryable
             )
           end
         end

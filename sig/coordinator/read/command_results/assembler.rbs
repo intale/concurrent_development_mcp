@@ -1,0 +1,10 @@
+module Coordinator
+  module Read
+    module CommandResults
+      class Assembler
+        def initialize: (event_store: Write::_EventStore, **untyped) -> void
+        def call: (Source source) -> ResultV1
+      end
+    end
+  end
+end

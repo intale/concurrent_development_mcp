@@ -13,7 +13,6 @@ module Coordinator::Write
                   Types::Array.of(Types::UuidV7).constrained(min_size: 32, max_size: 32)
         attribute :attempt_event_id, Types::UuidV7
         attribute :work_item_event_id, Types::UuidV7
-        attribute :completion_event_id, Types::UuidV7
       end
 
       class InvalidEventPlan < StandardError; end
@@ -90,14 +89,10 @@ module Coordinator::Write
           resource_event_ids: 32.times.map { @id_generator.uuid_v7 },
           attempt_event_id: @id_generator.uuid_v7,
           work_item_event_id: @id_generator.uuid_v7,
-          completion_event_id: @id_generator.uuid_v7
         )
       end
 
       def execute_attempt(command:, prepared:, caused_by:)
-        replay = replay_result(command:, input_digest: prepared.input_digest)
-        return replay if replay
-
         attempt_state = load_attempt_state(command.attempt_id)
         current_observations = load_current_observations(attempt_state)
         decision = @decider.call(
@@ -128,47 +123,8 @@ module Coordinator::Write
           persisted_events:,
           abandoned_at: prepared.abandoned_at
         )
-        persist_completion(
-          completion,
-          command:,
-          event_id: prepared.completion_event_id,
-          caused_by:
-        )
 
         Success(completion)
-      end
-
-      def replay_result(command:, input_digest:)
-        completion = load_completion(command.command_id)
-        return unless completion
-
-        if completion.tool_name == TOOL_NAME && completion.canonical_input_digest == input_digest
-          Success(completion)
-        else
-          Failure(
-            OutcomeError.new(
-              code: :command_id_reused,
-              message: "Command ID is already bound to another tool or input",
-              details: {
-                command_id: command.command_id,
-                existing_tool_name: completion.tool_name,
-                existing_input_digest: completion.canonical_input_digest,
-                requested_tool_name: TOOL_NAME,
-                requested_input_digest: input_digest
-              }
-            )
-          )
-        end
-      end
-
-      def load_completion(command_id)
-        event = @event_store.read(
-          @stream_factory.command(command_id),
-          EventQueries::COMMAND_COMPLETION
-        ).first
-        return unless event
-
-        load_event(event)
       end
 
       def load_attempt_state(attempt_id)
@@ -311,7 +267,7 @@ module Coordinator::Write
           warnings << "#{untouched_count} recorded lease fence(s) were already inactive or superseded and were left untouched."
         end
 
-        Events::CommandCompletedV1.new(
+        CommandResultV1.new(
           command_id: command.command_id,
           tool_name: TOOL_NAME,
           canonical_input_digest: input_digest,
@@ -339,18 +295,6 @@ module Coordinator::Write
           stream_id: event.stream.stream_id,
           stream_revision: event.stream_revision
         )
-      end
-
-      def persist_completion(completion, command:, event_id:, caused_by:)
-        event = @event_factory.build!(
-          event: completion,
-          event_id:,
-          metadata: command_metadata(command),
-          markers: [ "command:#{command.command_id}" ],
-          caused_by:
-        )
-
-        @event_store.append(@stream_factory.command(command.command_id), [ event ])
       end
 
       def command_metadata(command)

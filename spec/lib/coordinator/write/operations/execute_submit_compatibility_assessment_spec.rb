@@ -28,7 +28,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCompatibilityAssessm
       "claim:#{claim.claim_id}",
       "claimant:agent-blue"
     )
-    expect(command_events(input.fetch(:command_id)).sole.type).to eq("CommandCompleted")
+    expect(command_events(input.fetch(:command_id))).to be_empty
   end
 
   it "emits immediate satisfied and failed sibling outcomes from the same command" do
@@ -81,7 +81,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCompatibilityAssessm
     ])
   end
 
-  it "records inconclusive evidence, replays exact commands, and rejects changed command reuse or duplicate assessments" do
+  it "records inconclusive evidence and leaves replay ownership to the registered Command lifecycle" do
     created, claim = claimed_obligation("evidence-idempotency")
     input = assessment_input(
       created:,
@@ -90,15 +90,18 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCompatibilityAssessm
       conclusion: "inconclusive"
     )
 
-    first = execute(input).value!
-    replay = execute(input).value!
+    expect(execute(input)).to be_success
+    replay = execute(input)
     changed = execute(input.merge(assessment: input.fetch(:assessment).merge(run_id: "changed-run")))
     duplicate = execute(input.merge(command_id: "cmd-evidence-duplicate"))
 
-    expect(replay).to eq(first)
-    expect(changed.failure.code).to eq(:command_id_reused)
+    expect(replay.failure.code).to eq(:verification_evidence_already_submitted)
+    expect(changed).to be_success
     expect(duplicate.failure.code).to eq(:verification_evidence_already_submitted)
-    expect(evidence_events(created).map(&:type)).to eq([ "VerificationEvidenceSubmitted" ])
+    expect(evidence_events(created).map(&:type)).to eq(
+      [ "VerificationEvidenceSubmitted", "VerificationEvidenceSubmitted" ]
+    )
+    expect(command_events(input.fetch(:command_id))).to be_empty
   end
 
   it "denies stale policy, claim fences, owners, candidate bindings, terminal histories, and expired claims without receipts" do
@@ -153,7 +156,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCompatibilityAssessm
     end
   end
 
-  it "serializes concurrent final evidence so exactly one terminal outcome and receipt are written" do
+  it "serializes concurrent final evidence so exactly one terminal outcome is written" do
     created, claim = claimed_obligation(
       "evidence-race",
       required_evidence: [ "combined_tests" ]
@@ -178,7 +181,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCompatibilityAssessm
       "VerificationEvidenceSubmitted",
       "VerificationObligationSatisfied"
     )
-    expect(inputs.flat_map { command_events(_1.fetch(:command_id)) }.length).to eq(1)
+    expect(inputs.flat_map { command_events(_1.fetch(:command_id)) }).to be_empty
   end
 
   it "denies absent, unclaimed, non-required, and already-terminal obligations without receipts" do
@@ -301,6 +304,6 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCompatibilityAssessm
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 end

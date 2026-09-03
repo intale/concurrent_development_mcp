@@ -8,7 +8,6 @@ module Coordinator
           def resource_event_ids: () -> Array[String]
           def attempt_event_id: () -> String
           def work_item_event_id: () -> String
-          def completion_event_id: () -> String
         end
 
         class InvalidEventPlan < StandardError

@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Operations
       class ExecuteAcquireWorkItem
-        def initialize: (event_store: _EventStore, ?preparer: PrepareAcquireWorkItem, ?decider: Domain::WorkItems::Acquire, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?completion_builder: CommandCompletionBuilder, ?event_plan_contract: Contracts::AcquisitionEventPlan) -> void
+        def initialize: (event_store: _EventStore, ?preparer: PrepareAcquireWorkItem, ?decider: Domain::WorkItems::Acquire, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?completion_builder: CommandResultBuilder, ?event_plan_contract: Contracts::AcquisitionEventPlan) -> void
         %a{rbs:test:skip}
         def call: (command_input input) -> Dry::Monads::Result
         def call_command: (Commands::AcquireWorkItem command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result

@@ -20,7 +20,7 @@ RSpec.describe "VER-01 MCP verification-obligation claims", :event_store do
     submitted_result = call_tool(arguments, id: 1)
     task_id = submitted_result.dig("result", "taskId")
     expect(task_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
-    expect(command_events(arguments.fetch(:command_id))).to be_empty
+    expect(CommandTraceFixture.events(task_id, event_store:).map(&:type)).to eq([ "CommandRegistered" ])
 
     execute_task(task_id)
     completed = task_request(task_id, id: 2)
@@ -39,11 +39,11 @@ RSpec.describe "VER-01 MCP verification-obligation claims", :event_store do
 
     submitted, started, task_completed = task_events(task_id)
     claim = claim_events(obligation_id).sole
-    completion = command_events(arguments.fetch(:command_id)).sole
+    command_terminal = CommandTraceFixture.terminal(task_id, event_store:)
     expect(claim.causation_id).to eq(started.id)
-    expect(completion.causation_id).to eq(started.id)
-    expect(task_completed.causation_id).to eq(completion.id)
-    expect([ submitted, started, claim, completion, task_completed ].map(&:correlation_id).uniq).to eq(
+    expect(command_terminal.causation_id).to eq(started.id)
+    expect(task_completed.causation_id).to eq(command_terminal.id)
+    expect([ submitted, started, claim, command_terminal, task_completed ].map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
     )
     expect(claim.metadata).not_to have_key("correlation_id")
@@ -77,7 +77,9 @@ RSpec.describe "VER-01 MCP verification-obligation claims", :event_store do
       )
     )
     expect(claim_events(obligation_id).length).to eq(1)
-    expect(command_events(second.fetch(:command_id))).to be_empty
+    expect(CommandTraceFixture.events(second_task, event_store:).map(&:type)).to eq(
+      [ "CommandRegistered", "CommandRejected" ]
+    )
   end
 
   it "requires Tasks and rejects an invalid duration before allocating one" do
@@ -156,6 +158,7 @@ RSpec.describe "VER-01 MCP verification-obligation claims", :event_store do
     Rails.error.subscribe(collector)
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
     raise collector.errors.first if collector.errors.any?
+    CommandResultFixture.project(task_id, event_store:)
   ensure
     Rails.error.unsubscribe(collector) if collector
   end
@@ -194,6 +197,6 @@ RSpec.describe "VER-01 MCP verification-obligation claims", :event_store do
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 end

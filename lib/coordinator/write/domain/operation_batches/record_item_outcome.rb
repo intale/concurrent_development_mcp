@@ -16,7 +16,7 @@ module Coordinator::Write
           return Failure(item_not_found(command)) unless state.item(command.index)
           return Failure(already_recorded(command)) if state.outcome(command.index)
 
-          event = if command.result.is_error
+          event = if command.outcome == "rejected"
                     rejected_event(command)
           else
                     succeeded_event(command)
@@ -31,25 +31,18 @@ module Coordinator::Write
         private
 
         def succeeded_event(command)
-          Events::OperationBatchItemSucceededV1.new(
+          Events::OperationBatchItemSucceededV2.new(
             batch_id: command.batch_id,
             index: command.index,
-            command_id: command.item_command_id,
-            canonical_input_digest: command.canonical_input_digest,
-            target_completion: command.target_completion,
-            result: command.result.structured_content,
-            finished_at: command.finished_at
+            command_id: command.item_command_id
           )
         end
 
         def rejected_event(command)
-          Events::OperationBatchItemRejectedV1.new(
+          Events::OperationBatchItemRejectedV2.new(
             batch_id: command.batch_id,
             index: command.index,
-            command_id: command.item_command_id,
-            canonical_input_digest: command.canonical_input_digest,
-            result: command.result.structured_content,
-            finished_at: command.finished_at
+            command_id: command.item_command_id
           )
         end
 

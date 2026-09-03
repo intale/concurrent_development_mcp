@@ -4,7 +4,7 @@ module Coordinator
       module OperationBatches
         class RequestCancellation
           def initialize: (?stream_factory: StreamFactory) -> void
-          def call: (state: Write::OperationBatches::State, command: Commands::CancelOperationBatch, occurred_at: String) -> Dry::Monads::Result
+          def call: (state: Write::OperationBatches::State, command: Commands::CancelOperationBatch) -> Dry::Monads::Result
         end
       end
     end

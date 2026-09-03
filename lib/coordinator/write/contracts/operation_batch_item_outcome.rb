@@ -5,51 +5,39 @@ module Coordinator::Write
     class OperationBatchItemOutcome < Dry::Validation::Contract
       params do
         required(:command).value(Types.Instance(Commands::RecordOperationBatchItemOutcome))
-        required(:item).value(Types.Instance(OperationBatches::ItemV1))
-        optional(:completion).maybe(Types.Instance(Events::CommandCompletedV1))
-        optional(:physical_completion).maybe(:any)
+        required(:item).value(Types.Instance(OperationBatches::ItemV2))
+        required(:command_state).value(Types.Instance(Domain::CommandLifecycles::State))
+        required(:physical_target_event).value(:any)
       end
 
       rule(:command, :item) do
         command = values[:command]
         item = values[:item]
-        matches = command.item_command_id == item.command_input.command_id &&
-                  command.canonical_input_digest == item.canonical_input_digest
-        base.failure("outcome identity must match the manifest item") unless matches
+        base.failure("outcome identity must match the Batch item") unless command.item_command_id == item.command_id
       end
 
-      rule(:command, :item, :completion, :physical_completion) do
+      rule(:command, :item, :command_state) do
         command = values[:command]
         item = values[:item]
-        completion = values[:completion]
-        physical = values[:physical_completion]
+        state = values[:command_state]
+        matches = state.command_id == item.command_id &&
+                  state.tool_name == item.command_input.tool_name &&
+                  state.canonical_input_digest == item.canonical_input_digest &&
+                  state.status == command.outcome
+        base.failure("target Command terminal state must match the Batch item outcome") unless matches
+      end
 
-        if command.result.is_error
-          if command.target_completion || completion || physical
-            base.failure("a rejected result must not cite a target completion")
-          end
-          next
-        end
-
-        unless command.target_completion && completion && physical
-          base.failure("a successful result must cite its exact target completion")
-          next
-        end
-
-        matches = completion.command_id == item.command_input.command_id &&
-                  completion.tool_name == item.command_input.tool_name &&
-                  completion.canonical_input_digest == item.canonical_input_digest &&
-                  completion.status == "ok"
-        base.failure("target completion does not match the manifest item") unless matches
-
-        reference = command.target_completion
-        exact_physical = physical.id == reference.event_id &&
-                         physical.type == reference.type &&
-                         physical.stream.context == reference.stream_context &&
-                         physical.stream.stream_name == reference.stream_name &&
-                         physical.stream.stream_id == reference.stream_id &&
-                         physical.stream_revision == reference.stream_revision
-        base.failure("target completion reference is not exact") unless exact_physical
+      rule(:command, :physical_target_event) do
+        reference = values[:command].target_event
+        physical = values[:physical_target_event]
+        exact = physical &&
+                physical.id == reference.event_id &&
+                physical.type == reference.type &&
+                physical.stream.context == reference.stream_context &&
+                physical.stream.stream_name == reference.stream_name &&
+                physical.stream.stream_id == reference.stream_id &&
+                physical.stream_revision == reference.stream_revision
+        base.failure("target Command terminal reference must be exact") unless exact
       end
     end
   end

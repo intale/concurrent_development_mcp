@@ -34,11 +34,11 @@ RSpec.describe "IMP-01 MCP Candidate impact evidence" do
     submitted, started, task_completed = task_events(task_id)
     candidate_events = CandidateScenario.candidate_events("CAN-mcp-impact")
     surface = candidate_events.find { _1.type == "CandidateImpactSurfaceDerived" }
-    completion = command_events(arguments.fetch(:command_id)).sole
+    command_terminal = CommandTraceFixture.terminal(task_id, event_store:)
     expect(surface.causation_id).to eq(started.id)
-    expect(completion.causation_id).to eq(started.id)
-    expect(task_completed.causation_id).to eq(completion.id)
-    expect([ submitted, started, surface, completion, task_completed ].map(&:correlation_id).uniq).to eq(
+    expect(command_terminal.causation_id).to eq(started.id)
+    expect(task_completed.causation_id).to eq(command_terminal.id)
+    expect([ submitted, started, surface, command_terminal, task_completed ].map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
     )
   end
@@ -143,6 +143,7 @@ RSpec.describe "IMP-01 MCP Candidate impact evidence" do
     Rails.error.subscribe(collector)
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
     raise collector.errors.first if collector.errors.any?
+    CommandResultFixture.project(task_id, event_store:)
   ensure
     Rails.error.unsubscribe(collector) if collector
   end
@@ -172,7 +173,7 @@ RSpec.describe "IMP-01 MCP Candidate impact evidence" do
   def command_events(command_id)
     event_store.read(
       streams.command(command_id),
-      Coordinator::Write::EventQueries::COMMAND_COMPLETION
+      Coordinator::Write::EventQueries::COMMAND_HISTORY
     )
   end
 end

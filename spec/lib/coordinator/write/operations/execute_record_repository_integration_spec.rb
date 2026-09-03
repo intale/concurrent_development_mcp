@@ -6,18 +6,19 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordRepositoryIntegratio
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
 
-  it "records exact external observations in member order, preserves the ReleaseSet trace, and replays" do
+  it "records exact external observations in member order and preserves the ReleaseSet trace" do
     prepared = ReleaseSetScenario.prepare(prefix: "integration-success")
     first_observation = ReleaseSetScenario.observe_member(prepared, index: 0, prefix: "integration-success")
     input = successful_input(prepared, first_observation, index: 0, prefix: "integration-success")
 
     first = operation.call(input).value!
-    replay = operation.call(input).value!
+    replay = operation.call(input)
     events = lifecycle_events(prepared)
     integration = events.last
     payload = ReleaseSetScenario.load(integration)
 
-    expect(replay).to eq(first)
+    expect(first).to be_a(Coordinator::Write::CommandResultV1)
+    expect(replay.failure.code).to eq(:release_integration_attempt_reused)
     expect(payload).to have_attributes(
       repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       member_position: 1,

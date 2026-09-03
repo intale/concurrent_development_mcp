@@ -49,9 +49,9 @@ Then("one attributed evidence fact and no terminal fact are durable") do
   )
   assert_acceptance_equal([], verification_terminal_events, "Partial terminal facts")
   assert_acceptance_equal(
-    1,
-    command_events(@current_evidence_attempt.fetch(:command_id)).length,
-    "Partial command receipts"
+    %w[CommandRegistered CommandSucceeded],
+    command_events(@current_evidence_attempt.fetch(:command_id)).map(&:type),
+    "Partial command lifecycle"
   )
 end
 
@@ -70,13 +70,13 @@ Then("two attributed evidence facts and one satisfied fact are durable") do
     "Satisfied terminal fact"
   )
   assert_acceptance_equal(
-    @current_evidence_attempt.fetch(:command_id),
+    task_command_id(@current_evidence_attempt.fetch(:task_id)),
     terminal.metadata.fetch("command_id"),
     "Satisfied command"
   )
 end
 
-Then("the final evidence, outcome, receipt, and Task carry exact tracing") do
+Then("the final evidence, outcome, command terminal, and Task carry exact tracing") do
   assert_evidence_task_tracing(@current_evidence_attempt)
 end
 
@@ -170,13 +170,13 @@ Then("the stale evidence Task reports {string} without target facts") do |code|
   assert_acceptance_equal([], compatibility_evidence_events, "Stale evidence facts")
   assert_acceptance_equal([], verification_terminal_events, "Stale terminal facts")
   assert_acceptance_equal(
-    [],
-    command_events(@stale_evidence_attempt.fetch(:command_id)),
-    "Stale command receipts"
+    %w[CommandRegistered CommandRejected],
+    command_events(@stale_evidence_attempt.fetch(:command_id)).map(&:type),
+    "Stale command lifecycle"
   )
 end
 
-When("the exact evidence command is submitted through another Task") do
+When("the exact evidence command is submitted again") do
   original = @original_evidence_attempt
   response = call_tool("compatibility_assessment_submit", original.fetch(:arguments))
   @replayed_evidence_attempt = {
@@ -189,14 +189,19 @@ When("the exact evidence command is submitted through another Task") do
   execute_evidence_attempt(@replayed_evidence_attempt)
 end
 
-Then("both evidence Tasks expose the same receipt and one evidence fact") do
+Then("both evidence responses expose the same Task result and one evidence fact") do
   original = @original_evidence_attempt
   replay = @replayed_evidence_attempt
+  assert_acceptance_equal(original.fetch(:task_id), replay.fetch(:task_id), "Replayed Task identity")
   assert_evidence_task_status(original, "open")
   assert_evidence_task_status(replay, "open")
-  assert_acceptance_equal(original.fetch(:content), replay.fetch(:content), "Evidence replay receipt")
+  assert_acceptance_equal(original.fetch(:content), replay.fetch(:content), "Evidence replay result")
   assert_acceptance_equal(1, compatibility_evidence_events.length, "Replayed evidence facts")
-  assert_acceptance_equal(1, command_events(original.fetch(:command_id)).length, "Replayed receipts")
+  assert_acceptance_equal(
+    %w[CommandRegistered CommandSucceeded],
+    command_events(original.fetch(:command_id)).map(&:type),
+    "Replayed command lifecycle"
+  )
 end
 
 When("the same assessment is submitted as new command {string}") do |command_id|
@@ -212,13 +217,13 @@ When("the same assessment is submitted as new command {string}") do |command_id|
   execute_evidence_attempt(@duplicate_evidence_attempt)
 end
 
-Then("the duplicate evidence Task reports {string} without a new receipt") do |code|
+Then("the duplicate evidence Task reports {string} with a rejected command lifecycle") do |code|
   assert_evidence_task_error(@duplicate_evidence_attempt, code)
   assert_acceptance_equal(1, compatibility_evidence_events.length, "Duplicate evidence facts")
   assert_acceptance_equal(
-    [],
-    command_events(@duplicate_evidence_attempt.fetch(:command_id)),
-    "Duplicate command receipt"
+    %w[CommandRegistered CommandRejected],
+    command_events(@duplicate_evidence_attempt.fetch(:command_id)).map(&:type),
+    "Duplicate command lifecycle"
   )
 end
 
@@ -257,10 +262,10 @@ Then("exactly two evidence facts and one satisfied fact are durable") do
   assert_acceptance_equal(2, compatibility_evidence_events.length, "Concurrent evidence facts")
   terminal = verification_terminal_events.sole
   assert_acceptance_equal("VerificationObligationSatisfied", terminal.type, "Concurrent outcome")
-  receipts = @concurrent_evidence_attempts.sum do |attempt|
+  lifecycle_facts = @concurrent_evidence_attempts.sum do |attempt|
     command_events(attempt.fetch(:command_id)).length
   end
-  assert_acceptance_equal(2, receipts, "Concurrent receipts")
+  assert_acceptance_equal(4, lifecycle_facts, "Concurrent command lifecycle facts")
 end
 
 When("both passed assessments commit without projecting their evidence") do

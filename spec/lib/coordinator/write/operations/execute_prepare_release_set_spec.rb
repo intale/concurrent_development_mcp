@@ -7,15 +7,15 @@ RSpec.describe Coordinator::Write::Operations::ExecutePrepareReleaseSet, :event_
   let(:streams) { Coordinator::Write::StreamFactory.new }
   let(:registry) { Coordinator::Write::EventSchemaRegistry.new }
 
-  it "prepares one immutable ordered set from current exact grants and replays its Command" do
+  it "prepares one immutable ordered set and leaves replay ownership to the registered Command lifecycle" do
     input = ReleaseSetScenario.prepare_input(prefix: "success")
 
     first = operation.call(input).value!
-    replay = operation.call(input).value!
+    replay = operation.call(input)
     physical = preparation_events(input.fetch(:release_set_id)).sole
     payload = load(physical)
 
-    expect(first).to eq(replay)
+    expect(replay.failure.code).to eq(:release_set_id_already_used)
     expect(payload).to have_attributes(
       release_set_id: input.fetch(:release_set_id),
       change_set_id: "CS-release-success",
@@ -30,7 +30,7 @@ RSpec.describe Coordinator::Write::Operations::ExecutePrepareReleaseSet, :event_
       "change-set:CS-release-success",
       *repository_ids.map { "repository:#{_1}" }
     )
-    expect(command_events(input.fetch(:command_id)).length).to eq(1)
+    expect(command_events(input.fetch(:command_id))).to be_empty
   end
 
   it "rejects a grant after its authoritative policy context changes" do
@@ -63,7 +63,7 @@ RSpec.describe Coordinator::Write::Operations::ExecutePrepareReleaseSet, :event_
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 
   def load(event)

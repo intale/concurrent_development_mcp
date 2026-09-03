@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Commands
+      class SucceedCommand < Shared::Value
+        def command_id: () -> String
+      end
+    end
+  end
+end

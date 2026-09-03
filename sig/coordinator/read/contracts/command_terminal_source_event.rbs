@@ -1,0 +1,9 @@
+module Coordinator
+  module Read
+    module Contracts
+      class CommandTerminalSourceEvent
+        def call: (**untyped) -> untyped
+      end
+    end
+  end
+end

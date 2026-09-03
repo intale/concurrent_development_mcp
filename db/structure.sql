@@ -258,11 +258,12 @@ CREATE TABLE public.command_receipts (
     completed_at_domain timestamp(6) without time zone NOT NULL,
     completion jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp(6) without time zone NOT NULL,
-    receipt character varying NOT NULL,
+    receipt character varying,
     status character varying NOT NULL,
     summary character varying NOT NULL,
     tool_name character varying NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    request_id character varying NOT NULL
 );
 
 
@@ -839,7 +840,8 @@ CREATE TABLE public.operation_batch_items (
     created_at timestamp(6) without time zone NOT NULL,
     item_index integer NOT NULL,
     target_tool character varying NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    target_command_id character varying
 );
 
 
@@ -869,8 +871,8 @@ ALTER SEQUENCE public.operation_batch_items_id_seq OWNED BY public.operation_bat
 CREATE TABLE public.operation_batch_outcomes (
     id bigint NOT NULL,
     batch_id character varying NOT NULL,
-    canonical_input_digest character varying NOT NULL,
-    command_id character varying NOT NULL,
+    canonical_input_digest character varying,
+    command_id character varying,
     created_at timestamp(6) without time zone NOT NULL,
     finished_at_domain timestamp(6) without time zone NOT NULL,
     finished_at_store timestamp(6) without time zone NOT NULL,
@@ -884,7 +886,8 @@ CREATE TABLE public.operation_batch_outcomes (
     outcome_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     result jsonb NOT NULL,
     status character varying NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    target_command_id character varying
 );
 
 
@@ -2009,6 +2012,13 @@ CREATE UNIQUE INDEX index_command_receipts_on_receipt ON public.command_receipts
 
 
 --
+-- Name: index_command_receipts_on_request_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_command_receipts_on_request_id ON public.command_receipts USING btree (request_id);
+
+
+--
 -- Name: index_coordinator_context_scopes_on_change_set_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2240,6 +2250,13 @@ CREATE INDEX index_operation_batch_items_on_command_id ON public.operation_batch
 
 
 --
+-- Name: index_operation_batch_items_on_target_command_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_operation_batch_items_on_target_command_id ON public.operation_batch_items USING btree (target_command_id);
+
+
+--
 -- Name: index_operation_batch_outcomes_on_batch_id_and_item_index; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2251,6 +2268,13 @@ CREATE UNIQUE INDEX index_operation_batch_outcomes_on_batch_id_and_item_index ON
 --
 
 CREATE INDEX index_operation_batch_outcomes_on_outcome_global_position ON public.operation_batch_outcomes USING btree (outcome_global_position);
+
+
+--
+-- Name: index_operation_batch_outcomes_on_target_command_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_operation_batch_outcomes_on_target_command_id ON public.operation_batch_outcomes USING btree (target_command_id);
 
 
 --
@@ -2404,6 +2428,9 @@ ALTER TABLE ONLY public.operation_batch_outcomes
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260903134500'),
+('20260903123000'),
+('20260903120500'),
 ('20260901063000'),
 ('20260831155000'),
 ('20260831135500'),

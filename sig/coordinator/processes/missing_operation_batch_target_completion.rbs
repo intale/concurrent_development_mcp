@@ -1,6 +1,0 @@
-module Coordinator
-  module Processes
-    class MissingOperationBatchTargetCompletion < StandardError
-    end
-  end
-end

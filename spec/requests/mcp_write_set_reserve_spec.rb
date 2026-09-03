@@ -65,14 +65,14 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
     )
 
     submitted, started, task_completed = task_events(winner_task_id)
+    command_terminal = command_events_for_task(winner_task_id).last
     target_events = lease_events(invoice_resource_id) +
                     lease_events(schema_resource_id) +
                     write_set_events("A-MCP-LSE-A") +
-                    command_events("cmd-mcp-lse-a")
-    command_completion = command_events("cmd-mcp-lse-a").sole
+                    [ command_terminal ]
     expect(started.causation_id).to eq(submitted.id)
     expect(target_events.map(&:causation_id).uniq).to eq([ started.id ])
-    expect(task_completed.causation_id).to eq(command_completion.id)
+    expect(task_completed.causation_id).to eq(command_terminal.id)
     expect(([ submitted, started, task_completed ] + target_events).map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
     )
@@ -194,6 +194,7 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
   def execute_task(task_id)
     submitted = task_events(task_id).find { _1.type == "CoordinationTaskSubmitted" }
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
+    CommandResultFixture.project(task_id, event_store:)
   end
 
   def seed_active_attempts(attempts)
@@ -263,7 +264,15 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
   def command_events(command_id)
     event_store.read(
       streams.command(command_id),
-      Coordinator::Write::EventQueries::COMMAND_COMPLETION
+      Coordinator::Write::EventQueries::COMMAND_HISTORY
+    )
+  end
+
+  def command_events_for_task(task_id)
+    task = Coordinator::Write::Tasks::Loader.new(event_store:).call(task_id).state
+    event_store.read(
+      streams.command(task.command_id),
+      Coordinator::Write::EventQueries::COMMAND_HISTORY
     )
   end
 

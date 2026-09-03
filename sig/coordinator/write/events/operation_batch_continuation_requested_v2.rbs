@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Events
+      class OperationBatchContinuationRequestedV2 < Base
+        def batch_id: () -> String
+        def page_start: () -> Integer
+        def page_end: () -> Integer
+      end
+    end
+  end
+end

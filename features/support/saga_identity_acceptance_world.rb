@@ -22,12 +22,13 @@ module SagaIdentityAcceptanceWorld
       index: 0,
       name: "prior-command-batch-replay"
     ).merge(command_id: "cmd-cuc-prior-target-#{@operation_batch_id}")
-    state = complete_saga_task(
+    task_id = submit_and_execute(
       "skill_publish",
       client_id: "prior-target-agent",
       **@prior_batch_item
     )
-    @prior_target_completion = command_events(@prior_batch_item.fetch(:command_id)).sole
+    state = assert_successful_task(task_id, "Prior target command")
+    @prior_target_terminal = command_events(task_command_id(task_id)).last
     assert_acceptance_equal(
       false,
       state.dig("result", "result", "isError"),
@@ -107,29 +108,39 @@ module SagaIdentityAcceptanceWorld
     record_successful_release_integration(prefix:, member: members.first)
 
     failure_command_id = "cmd-cuc-saga-rel-#{prefix}-failure"
+    stop_process_subscriptions
+    response = call_tool(
+      "release_repository_integration_record",
+      {
+        command_id: failure_command_id,
+        actor: { kind: "agent", id: "saga-integrator" },
+        release_set_id: @release_set_id,
+        repository_id: members.fetch(1).dig(:release_member, :repository_id),
+        attempt_id: "release-attempt-#{prefix}-2",
+        outcome: "failed",
+        merge_observation_event: nil,
+        observation_digest: nil,
+        failure: {
+          code: "integration-failed",
+          summary: "The second repository integration failed.",
+          producer: { name: "saga-release-adapter", version: "1.0.0" },
+          run_id: "saga-release-failure-#{prefix}",
+          result_digest: "sha256:#{'f' * 64}",
+          occurred_at: "2026-08-27T12:30:00.000000Z"
+        }
+      },
+      client_id: "saga-agent"
+    )
+    failure_task_id = response.dig("result", "taskId")
+    assert_acceptance(failure_task_id, "Release integration failure returned no Task: #{response.inspect}")
+    failure_internal_command_id = task_command_id(failure_task_id)
     install_contention_barrier(
       operation: "release_set_lifecycle",
-      command_ids: [ failure_command_id ]
+      command_ids: [ failure_internal_command_id ]
     )
-    complete_saga_task(
-      "release_repository_integration_record",
-      command_id: failure_command_id,
-      actor: { kind: "agent", id: "saga-integrator" },
-      release_set_id: @release_set_id,
-      repository_id: members.fetch(1).dig(:release_member, :repository_id),
-      attempt_id: "release-attempt-#{prefix}-2",
-      outcome: "failed",
-      merge_observation_event: nil,
-      observation_digest: nil,
-      failure: {
-        code: "integration-failed",
-        summary: "The second repository integration failed.",
-        producer: { name: "saga-release-adapter", version: "1.0.0" },
-        run_id: "saga-release-failure-#{prefix}",
-        result_digest: "sha256:#{'f' * 64}",
-        occurred_at: "2026-08-27T12:30:00.000000Z"
-      }
-    )
+    start_process_subscriptions
+    await_task_terminal(failure_task_id, client_id: "saga-agent")
+    assert_successful_task(failure_task_id, "Saga setup release_repository_integration_record")
     evidence = await_contention_evidence.sole
     @reserved_internal_command_id = evidence.fetch(:process_command_id)
     assert_acceptance(

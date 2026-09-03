@@ -5,23 +5,15 @@ module Coordinator::Mcp
     class ProjectedResultResolver
       include Dry::Monads[:result]
 
-      def initialize(
-        receipts: Coordinator::Read::Repositories::CommandReceipts.new,
-        mapper: Coordinator::Write::Tasks::SemanticResultMapper.new
-      )
+      def initialize(receipts: Coordinator::Read::Repositories::CommandReceipts.new)
         @receipts = receipts
-        @mapper = mapper
       end
 
       def call(state)
-        completion = @receipts.fetch(state.command_id)
-        return unless completion
+        result = @receipts.fetch(state.command_id)
+        return unless result
 
-        @mapper.call(
-          Success(completion),
-          command_id: state.command_id,
-          tool_name: state.tool_name
-        )
+        result.semantic_result
       end
     end
   end

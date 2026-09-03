@@ -6,8 +6,6 @@ module Coordinator::Write
       attribute :command_id, Types::Identifier
       attribute :actor, Actor
       attribute :batch_id, Types::OperationBatchId
-      attribute :source_event, EventReference
-      attribute :cancelled_at, Types::Timestamp
     end
   end
 end

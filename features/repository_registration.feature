@@ -24,7 +24,7 @@ Feature: Scoped repository registration
       Then the retry exposes the original result without another Repository fact
       When the agent tries to bind that Repository identity to scope "project:other/workspace:primary"
       Then the conflicting Task completes with Repository identity conflict
-      And the rejected command writes no command fact
+      And the rejected command records one rejected command lifecycle
 
   Rule: Exact scope is sufficient for clean agents to discover coordination identity
 

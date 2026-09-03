@@ -10,7 +10,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
   let(:adjudications) { Coordinator::Write::Operations::ExecuteAdjudicateDecisionInterpretation.new(event_store:) }
   let(:activations) { Coordinator::Write::Operations::ExecuteActivateDecision.new(event_store:) }
 
-  it "implements DEC-02A-CORRECT-SAME-SLOT-01 and exact replay atomically" do
+  it "implements DEC-02A-CORRECT-SAME-SLOT-01 atomically" do
     activation = seed_active_decision
     seed_correction(value: InterpretationInput.named_choice("minitest"))
     input = InterpretationInput.correction(expected_head: reference(activation))
@@ -19,7 +19,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
     replay = operation.call(input)
 
     expect(original).to be_success
-    expect(replay.value!).to eq(original.value!)
+    expect(replay.failure.code).to eq(:decision_revision_changed)
     expect(decision_events("D-1").map(&:type)).to eq(
       %w[DecisionRecorded DecisionActivated DecisionDefinitionCorrected]
     )
@@ -55,7 +55,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
       policy_status: "active",
       correction_event: have_attributes(type: "DecisionDefinitionCorrected", stream_revision: 2)
     )
-    expect(command_events("cmd-decision-correction-1").length).to eq(1)
+    expect(command_events("cmd-decision-correction-1")).to be_empty
   end
 
   it "implements DEC-02A-CORRECT-NARROW-SCOPE-01 by moving the slot and advancing both partitions" do
@@ -384,7 +384,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 
   def reference(event)

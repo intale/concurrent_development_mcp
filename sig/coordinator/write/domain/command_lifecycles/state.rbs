@@ -1,0 +1,26 @@
+module Coordinator
+  module Write
+    module Domain
+      module CommandLifecycles
+        class State < Shared::Value
+          def self.initial: () -> State
+          def self.reduce: (Array[Events::Base] events, ?canonical_input_digests: Array[String?], ?contract: Contracts::CommandHistory) -> State
+
+          def command_id: () -> String?
+          def request_id: () -> (String | Integer)?
+          def tool_name: () -> String?
+          def canonical_input_digest: () -> String?
+          def status: () -> String
+          def rejection_code: () -> String?
+          def rejection_reason: () -> String?
+          def rejection_retryable: () -> bool?
+          def absent?: () -> bool
+          def terminal?: () -> bool
+          def succeeded?: () -> bool
+          def rejected?: () -> bool
+          def apply: (Events::Base event, ?canonical_input_digest: String?) -> State
+        end
+      end
+    end
+  end
+end

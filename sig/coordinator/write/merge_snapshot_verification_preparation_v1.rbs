@@ -5,7 +5,6 @@ module Coordinator::Write
     attr_reader input_digest: String
     attr_reader submission_event_id: String
     attr_reader verified_event_id: String
-    attr_reader completion_event_id: String
     attr_reader correlation_id: String
   end
 end

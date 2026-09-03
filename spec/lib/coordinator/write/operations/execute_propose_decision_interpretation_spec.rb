@@ -9,7 +9,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteProposeDecisionInterpretat
 
   before { record_guidance }
 
-  it "atomically persists a source-bound proposal and its receipt" do
+  it "atomically persists a source-bound proposal and returns a transient result" do
     result = operation.call(InterpretationInput.build)
 
     expect(result).to be_success
@@ -31,7 +31,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteProposeDecisionInterpretat
       "stream_name" => "Conversation"
     )
     expect(result.value!.data.assessment.status).to eq("accepted_for_activation")
-    expect(command_events("cmd-interpretation-1").one?).to be(true)
+    expect(command_events("cmd-interpretation-1")).to be_empty
   end
 
   it "atomically persists a hard proposal and its clarification requirement" do
@@ -58,8 +58,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteProposeDecisionInterpretat
     expect(result.value!.emitted_events.map(&:type)).to eq(facts.map(&:type))
   end
 
-  it "replays exactly and denies source or proposal identity violations without facts" do
-    original = operation.call(InterpretationInput.build)
+  it "leaves replay ownership to the registered Command lifecycle" do
+    expect(operation.call(InterpretationInput.build)).to be_success
     replay = operation.call(InterpretationInput.build)
     missing = operation.call(
       InterpretationInput.build(
@@ -79,8 +79,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteProposeDecisionInterpretat
       InterpretationInput.build(command_id: "cmd-interpretation-duplicate")
     )
 
-    expect(replay.value!).to eq(original.value!)
-    expect([ missing, mismatch, duplicate ].map { _1.failure.code }).to eq(%i[
+    expect([ replay, missing, mismatch, duplicate ].map { _1.failure.code }).to eq(%i[
+      interpretation_already_proposed
       guidance_message_not_found
       source_span_mismatch
       interpretation_already_proposed
@@ -110,7 +110,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteProposeDecisionInterpretat
 
     expect(results).to all(be_success)
     expect(interpretation_events("M-1").count { _1.type == "DecisionInterpretationProposed" }).to eq(2)
-    expect(inputs.all? { command_events(_1.fetch(:command_id)).one? }).to be(true)
+    expect(inputs.flat_map { command_events(_1.fetch(:command_id)) }).to be_empty
   end
 
   it "accepts every exact Candidate impact policy level through the public preparer" do
@@ -131,7 +131,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteProposeDecisionInterpretat
     proposals = interpretation_events("M-1").select { _1.type == "DecisionInterpretationProposed" }
     expect(proposals.map { _1.data.dig("proposed_decision", "enforcement", "level") }).to eq(levels)
     expect(proposals.map { _1.data.dig("assessment", "status") }.uniq).to eq([ "confirmation_required" ])
-    expect(levels.each_index.all? { command_events("cmd-impact-policy-#{_1}").one? }).to be(true)
+    expect(levels.each_index.flat_map { command_events("cmd-impact-policy-#{_1}") }).to be_empty
   end
 
   it "serializes a concurrent global interpretation ID claim" do
@@ -194,7 +194,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteProposeDecisionInterpretat
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 
   def global_proposals(interpretation_id)

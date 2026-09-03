@@ -35,7 +35,6 @@ module Coordinator::Write
         attribute :proposed_resource_id, Types::ResourceId
         attribute :registration_event_id, Types::UuidV7
         attribute :binding_event_id, Types::UuidV7
-        attribute :completion_event_id, Types::UuidV7
       end
 
       def initialize(
@@ -101,7 +100,6 @@ module Coordinator::Write
             proposed_resource_id: @resource_id_generator.call,
             registration_event_id: @id_generator.uuid_v7,
             binding_event_id: @id_generator.uuid_v7,
-            completion_event_id: @id_generator.uuid_v7
           )
 
           step @event_store.multiple { execute_attempt(command:, preparation:, caused_by:) }
@@ -121,9 +119,6 @@ module Coordinator::Write
       end
 
       def execute_attempt(command:, preparation:, caused_by:)
-        replay = replay_result(command:, input_digest: preparation.input_digest)
-        return replay if replay
-
         repository = @repository_registration_loader.call(command.repository_id)
         return repository_not_registered(command) unless repository
 
@@ -159,45 +154,8 @@ module Coordinator::Write
           persisted_events: persisted,
           completed_at: preparation.resolved_at
         )
-        persist_completion(
-          completion,
-          command:,
-          event_id: preparation.completion_event_id,
-          caused_by:
-        )
 
         Success(completion)
-      end
-
-      def replay_result(command:, input_digest:)
-        completion = load_completion(command.command_id)
-        return unless completion
-
-        if completion.tool_name == TOOL_NAME && completion.canonical_input_digest == input_digest
-          Success(completion)
-        else
-          Failure(
-            OutcomeError.new(
-              code: :command_id_reused,
-              message: "Command ID is already bound to another tool or input",
-              details: {
-                command_id: command.command_id,
-                existing_tool_name: completion.tool_name,
-                existing_input_digest: completion.canonical_input_digest,
-                requested_tool_name: TOOL_NAME,
-                requested_input_digest: input_digest
-              }
-            )
-          )
-        end
-      end
-
-      def load_completion(command_id)
-        event = @event_store.read(
-          @stream_factory.command(command_id),
-          EventQueries::COMMAND_COMPLETION
-        ).first
-        deserialize(event)
       end
 
       def load_registration(identity)
@@ -340,7 +298,7 @@ module Coordinator::Write
       end
 
       def build_completion(command:, resolution:, input_digest:, persisted_events:, completed_at:)
-        Events::CommandCompletedV1.new(
+        CommandResultV1.new(
           command_id: command.command_id,
           tool_name: TOOL_NAME,
           canonical_input_digest: input_digest,
@@ -369,17 +327,6 @@ module Coordinator::Write
         when "reactivated" then "Existing Resource identity reactivated."
         else "Existing Resource identity resolved."
         end
-      end
-
-      def persist_completion(completion, command:, event_id:, caused_by:)
-        event = @event_factory.build!(
-          event: completion,
-          event_id:,
-          metadata: command_metadata(command),
-          markers: [ "command:#{command.command_id}" ],
-          caused_by:
-        )
-        @event_store.append(@stream_factory.command(command.command_id), [ event ])
       end
 
       def event_reference(event)

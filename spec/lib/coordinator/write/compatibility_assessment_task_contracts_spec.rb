@@ -36,22 +36,22 @@ RSpec.describe "compatibility assessment Task contracts" do
   end
 
   it "round-trips the persisted Task command document into the exact typed command" do
-    submitted = Coordinator::Write::Events::CoordinationTaskSubmittedV2.new(
+    persisted_command = command.class.new(command.attributes.merge(command_id: SecureRandom.uuid_v7))
+    submitted = Coordinator::Write::Events::CoordinationTaskSubmittedV3.new(
       task_id: "0198e03a-d112-7000-8000-000000000001",
       tool_name: "compatibility_assessment_submit",
-      command_id: command.command_id,
-      command_input: command_digest.document(command),
-      submitted_at: "2026-08-24T08:00:00.000000Z",
+      command_id: persisted_command.command_id,
+      command_input: command_digest.document(persisted_command),
       ttl_ms: nil,
       poll_interval_ms: 500
     )
     reloaded = Coordinator::Write::EventSchemaRegistry.new.load(
       type: "CoordinationTaskSubmitted",
-      schema_version: 2,
+      schema_version: 3,
       data: JSON.parse(JSON.generate(submitted.to_h))
     )
 
-    expect(Coordinator::Write::Tasks::TargetCommandBuilder.new.call(reloaded.command_input)).to eq(command)
+    expect(Coordinator::Write::Tasks::TargetCommandBuilder.new.call(reloaded.command_input)).to eq(persisted_command)
   end
 
   it "maps every evidence denial into a strict persisted Task result" do

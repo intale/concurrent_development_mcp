@@ -28,21 +28,21 @@ Then("the Task is durable before coordination begins") do
   )
   submitted = task_events(@current_task_id).sole
   assert_acceptance_equal("CoordinationTaskSubmitted", submitted.type, "Persisted Task fact")
-  assert_acceptance_equal(2, submitted.metadata.fetch("schema_version"), "Task submission schema")
+  assert_acceptance_equal(3, submitted.metadata.fetch("schema_version"), "Task submission schema")
   assert_acceptance(
     !submitted.data.key?("canonical_input_digest"),
     "Task submission must not duplicate a digest derivable from command_input"
   )
   assert_acceptance(submitted.data.key?("command_input"), "Task submission command input is missing")
-  assert_acceptance_equal([], command_events(@current_arguments.fetch(:command_id)), "Command facts")
+  assert_command_registered(@current_arguments.fetch(:command_id), context: "Durable command registration")
   assert_acceptance_equal([], change_set_events(@current_arguments.fetch(:change_set_id)), "ChangeSet facts")
 end
 
-Then("the completed Task persists one semantic success without MCP wire copies") do
+Then("the completed Task has a lean terminal linked to one successful command") do
   assert_semantic_task_completion(@current_task_id, kind: "success")
 end
 
-Then("the completed Task persists one semantic domain rejection without MCP wire copies") do
+Then("the completed Task has a lean terminal linked to one rejected command") do
   assert_semantic_task_completion(@current_task_id, kind: "domain_rejection")
 end
 
@@ -63,16 +63,15 @@ Then("the current Task completes successfully") do
   @first_task_result ||= @current_task_state.dig("result", "result")
 end
 
-When("the same command is retried and processed through another Task") do
+When("the same command is retried and resolves to its original Task") do
   @retry_response = call_tool(@current_tool, @current_arguments)
   @retry_task_id = @retry_response.dig("result", "taskId")
-  assert_acceptance(@retry_task_id != @first_task_id, "A retry should receive a new Task handle")
-  execute_task(@retry_task_id)
+  assert_acceptance_equal(@first_task_id, @retry_task_id, "Replayed Task identity")
 end
 
-When("the same command is retried through another live Task") do
+When("the same command is retried through its original live Task") do
   @retry_task_id = submit_and_await(@current_tool, **@current_arguments)
-  assert_acceptance(@retry_task_id != @first_task_id, "A retry should receive a new Task handle")
+  assert_acceptance_equal(@first_task_id, @retry_task_id, "Replayed Task identity")
 end
 
 Given(
@@ -96,16 +95,17 @@ Given("the Task workers are interrupted") do
   stop_live_subscriptions
 end
 
-When("the exact completed command is submitted through a new Task") do
+When("the exact completed command request is retried") do
   response = call_tool(@current_tool, @current_arguments)
-  @replacement_task_id = response.dig("result", "taskId")
-  @current_task_id = @replacement_task_id
+  @replayed_task_id = response.dig("result", "taskId")
+  @current_task_id = @replayed_task_id
 end
 
-Then("the replacement Task remains working without duplicate coordination facts") do
-  state = task_request("tasks/get", @replacement_task_id)
-  assert_acceptance_equal("working", state.dig("result", "status"), "Replacement Task status")
-  assert_acceptance_equal(1, command_events(@current_arguments.fetch(:command_id)).length, "Command facts")
+Then("the retry returns the original completed Task without duplicate coordination facts") do
+  state = task_request("tasks/get", @replayed_task_id)
+  assert_acceptance_equal(@original_task_id, @replayed_task_id, "Replayed Task identity")
+  assert_acceptance_equal("completed", state.dig("result", "status"), "Replayed Task status")
+  assert_command_succeeded(@current_arguments.fetch(:command_id), context: "Recovered command lifecycle")
   assert_acceptance_equal(
     2,
     change_set_events(@current_arguments.fetch(:change_set_id)).length,
@@ -117,12 +117,12 @@ When("the Task workers restart") do
   start_live_subscriptions
 end
 
-Then("the replacement Task exposes the original completed result") do
-  replacement = await_task_terminal(@replacement_task_id)
-  assert_acceptance_equal("completed", replacement.dig("result", "status"), "Replacement status")
+Then("the replayed Task exposes the original completed result") do
+  replayed = await_task_terminal(@replayed_task_id)
+  assert_acceptance_equal("completed", replayed.dig("result", "status"), "Replayed status")
   assert_acceptance_equal(
     @original_task_state.dig("result", "result"),
-    replacement.dig("result", "result"),
+    replayed.dig("result", "result"),
     "Recovered Task result"
   )
 end
@@ -131,10 +131,10 @@ Then("an independent MCP client reconstructs the same terminal result") do
   prepare_mcp_clients("semantic-task-reader")
   independent = task_request(
     "tasks/get",
-    @replacement_task_id,
+    @replayed_task_id,
     client_id: "semantic-task-reader"
   )
-  expected = task_request("tasks/get", @replacement_task_id)
+  expected = task_request("tasks/get", @replayed_task_id)
 
   assert_acceptance_equal(
     expected.dig("result", "result"),
@@ -144,7 +144,7 @@ Then("an independent MCP client reconstructs the same terminal result") do
 end
 
 Then("the recovered command and ChangeSet facts exist only once") do
-  assert_acceptance_equal(1, command_events(@current_arguments.fetch(:command_id)).length, "Command facts")
+  assert_command_succeeded(@current_arguments.fetch(:command_id), context: "Recovered command lifecycle")
   assert_acceptance_equal(
     2,
     change_set_events(@current_arguments.fetch(:change_set_id)).length,
@@ -163,7 +163,7 @@ Then("the current Task eventually completes successfully") do
   assert_acceptance_equal(false, state.dig("result", "result", "isError"), "Tool error flag")
 end
 
-Then("both Task handles expose the same result") do
+Then("the replayed Task exposes the same result") do
   retry_state = task_request("tasks/get", @retry_task_id)
   assert_acceptance_equal("completed", retry_state.dig("result", "status"), "Retry Task status")
   assert_acceptance_equal(
@@ -174,18 +174,26 @@ Then("both Task handles expose the same result") do
 end
 
 Then("the command and ChangeSet facts exist only once") do
-  assert_acceptance_equal(1, command_events(@current_arguments.fetch(:command_id)).length, "Command completions")
+  assert_command_succeeded(@current_arguments.fetch(:command_id), context: "Command lifecycle")
   assert_acceptance_equal(2, change_set_events(@current_arguments.fetch(:change_set_id)).length, "ChangeSet facts")
 end
 
 When("the completed command identity is submitted with a changed ChangeSet goal") do
   changed = @current_arguments.merge(goal: "A different goal for the same command identity")
-  @current_response = call_tool(@current_tool, changed)
-  @current_task_id = @current_response.dig("result", "taskId")
+  @current_response = call_tool(@current_tool, changed, expected_status: 400)
+end
+
+Then("the changed request is rejected immediately with command identity conflict") do
+  assert_acceptance_equal(-32_602, @current_response.dig("error", "code"), "JSON-RPC error")
+  assert_acceptance_equal(
+    "command_id_reused",
+    @current_response.dig("error", "data", "code"),
+    "Command identity conflict"
+  )
 end
 
 Then("only the original command and ChangeSet facts remain") do
-  assert_acceptance_equal(1, command_events(@current_arguments.fetch(:command_id)).length, "Command completions")
+  assert_command_succeeded(@current_arguments.fetch(:command_id), context: "Original command lifecycle")
   assert_acceptance_equal(2, change_set_events(@current_arguments.fetch(:change_set_id)).length, "ChangeSet facts")
 end
 
@@ -254,8 +262,9 @@ Then("the current Task eventually completes with coordination denial {string}") 
   )
 end
 
-Then("the denied command writes no coordination facts") do
-  assert_no_current_coordination_facts
+Then("the denied command writes no target coordination facts") do
+  assert_command_rejected(@current_arguments.fetch(:command_id), context: "Denied command lifecycle")
+  assert_no_current_target_facts
 end
 
 When("the agent cancels the current Task before execution") do
@@ -272,14 +281,15 @@ Then("the current Task is cancelled") do
   assert_acceptance_equal("cancelled", state.dig("result", "status"), "Cancelled Task status")
 end
 
-Then("the cancelled command writes no coordination facts") do
-  assert_no_current_coordination_facts
+Then("the cancelled command writes no target coordination facts") do
+  assert_command_registered(@current_arguments.fetch(:command_id), context: "Cancelled command lifecycle")
+  assert_no_current_target_facts
 end
 
 When("a Task worker restarts and reaches the durable execution boundary") do
   install_contention_barrier(
     operation: "coordination_task_execute",
-    command_ids: [ @current_arguments.fetch(:command_id) ]
+    command_ids: [ task_command_id(@current_task_id) ]
   )
   start_process_subscriptions
   await_contention_evidence
@@ -287,7 +297,7 @@ end
 
 Then("the Task race has deterministic execution evidence") do
   evidence = @contention_evidence.sole
-  assert_acceptance_equal(@current_arguments.fetch(:command_id), evidence.fetch(:command_id), "Task command")
+  assert_acceptance_equal(task_command_id(@current_task_id), evidence.fetch(:command_id), "Task command")
   assert_acceptance_equal(@current_task_id, evidence.fetch(:task_id), "Task identity")
   assert_acceptance(evidence.fetch(:thread_id), "Task worker thread evidence is missing")
 end
@@ -391,23 +401,30 @@ end
 Then("the rejected request writes no coordination facts") do
   assert_acceptance_equal(
     [],
-    task_events_for_command(@current_arguments.fetch(:command_id)),
+    task_events_for_request(
+      @current_arguments.fetch(:command_id),
+      actor: @current_arguments.fetch(:actor)
+    ),
     "Rejected Task submissions"
   )
-  assert_no_current_coordination_facts
+  assert_acceptance_equal([], command_events(@current_arguments.fetch(:command_id)), "Command facts")
+  assert_no_current_target_facts
 end
 
 
 def assert_semantic_task_completion(task_id, kind:)
   completion = task_events(task_id).find { _1.type == "CoordinationTaskCompleted" }
   assert_acceptance(completion, "Task #{task_id} has no completion fact")
-  assert_acceptance_equal(2, completion.metadata.fetch("schema_version"), "Task completion schema")
-  semantic = completion.data.fetch("result")
-  assert_acceptance_equal(kind, semantic.fetch("kind"), "Semantic Task outcome kind")
+  assert_acceptance_equal(3, completion.metadata.fetch("schema_version"), "Task completion schema")
+  assert_acceptance_equal({ "task_id" => task_id }, completion.data, "Lean Task terminal payload")
+  terminal = command_terminal_event(task_command_id(task_id))
+  assert_acceptance(terminal, "Task #{task_id} has no terminal command fact")
+  expected_type = kind == "success" ? "CommandSucceeded" : "CommandRejected"
+  assert_acceptance_equal(expected_type, terminal.type, "Semantic command outcome")
   forbidden = %w[content structured_content structuredContent is_error isError]
   assert_acceptance_equal(
     [],
-    semantic.keys & forbidden,
+    completion.data.keys & forbidden,
     "Persisted MCP wire fields"
   )
 end

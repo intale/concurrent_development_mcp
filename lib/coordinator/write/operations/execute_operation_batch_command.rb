@@ -8,32 +8,35 @@ module Coordinator::Write
         loader: OperationBatches::Loader.new(event_store:),
         decider: OperationBatches::Decider.new,
         input_digest: CommandInputDigest.new,
-        clock: SystemClock.new,
         id_generator: IdGenerator.new,
         event_factory: EventFactory.new,
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
-        completion_builder: CommandCompletionBuilder.new,
-        outcome_contract: Contracts::OperationBatchItemOutcome.new
+        completion_builder: CommandResultBuilder.new,
+        outcome_contract: Contracts::OperationBatchItemOutcome.new,
+        command_loader: CommandLifecycle::Loader.new(event_store:),
+        request_marker: CommandLifecycle::RequestMarker.new,
+        target_builder: Tasks::TargetCommandBuilder.new
       )
         @event_store = event_store
         @loader = loader
         @decider = decider
         @input_digest = input_digest
-        @clock = clock
         @id_generator = id_generator
         @event_factory = event_factory
         @schema_registry = schema_registry
         @stream_factory = stream_factory
         @completion_builder = completion_builder
         @outcome_contract = outcome_contract
+        @command_loader = command_loader
+        @request_marker = request_marker
+        @target_builder = target_builder
       end
 
       def call_command(command, caused_by: nil)
         input_digest = @input_digest.call(command)
         domain_event_id = @id_generator.uuid_v7
-        completion_event_id = @id_generator.uuid_v7
-        occurred_at = logical_time(command) || @clock.now
+        allocations = item_allocations(command)
 
         steps do
           step @event_store.multiple {
@@ -41,8 +44,7 @@ module Coordinator::Write
               command:,
               input_digest:,
               domain_event_id:,
-              completion_event_id:,
-              occurred_at:,
+              allocations:,
               caused_by:
             )
           }
@@ -51,112 +53,107 @@ module Coordinator::Write
 
       private
 
-      def execute_attempt(command:, input_digest:, domain_event_id:, completion_event_id:, occurred_at:, caused_by:)
-        replay = replay_result(command:, input_digest:)
-        return replay if replay
-
+      def execute_attempt(command:, input_digest:, domain_event_id:, allocations:, caused_by:)
         snapshot = @loader.call(command.batch_id)
         verify_outcome!(snapshot.state, command) if command.is_a?(Commands::RecordOperationBatchItemOutcome)
-        decision = @decider.call(state: snapshot.state, command:, occurred_at:)
+        registrations = step registration_plans(command, state: snapshot.state, allocations:)
+        decision = @decider.call(
+          state: snapshot.state,
+          command:,
+          items: registrations.map(&:item)
+        )
         return decision if decision.failure?
 
         domain_event = decision.value!.events.sole
-        persisted = persist_domain(
+        batch_event = persist_domain(
           decision.value!,
           command:,
           event_id: domain_event_id,
-          caused_by:
-        )
-        completion = build_completion(
-          command:,
-          event: domain_event,
           input_digest:,
-          persisted_events: persisted,
-          completed_at: occurred_at
-        )
-        persist_completion(
-          completion,
-          command:,
-          event_id: completion_event_id,
           caused_by:
+        ).sole
+        persist_registrations(registrations, batch_event:)
+        Success(
+          build_completion(
+            command:,
+            event: domain_event,
+            input_digest:,
+            persisted_events: [ batch_event ],
+            completed_at: batch_event.created_at.utc.iso8601(6)
+          )
         )
-        Success(completion)
+      end
+
+      def registration_plans(command, state:, allocations:)
+        return Success([]) unless command.is_a?(Commands::CreateOperationBatch)
+        return Success([]) if state.creation
+
+        plans = command.items.zip(allocations).map do |requested_item, allocation|
+          plan = registration_plan(requested_item, allocation:)
+          return plan if plan.failure?
+
+          plan.value!
+        end
+        Success(plans)
+      end
+
+      def registration_plan(requested_item, allocation:)
+        requested_command = @target_builder.call(requested_item.command_input)
+        request_id = requested_command.command_id
+        marker = @request_marker.call(actor: requested_command.actor, request_id:)
+        existing_event = @event_store.read_global_marked(registration_criteria(marker)).first
+
+        if existing_event
+          existing = load(existing_event)
+          existing_digest = existing_event.metadata.fetch("canonical_input_digest")
+          unless existing.tool_name == requested_item.command_input.tool_name &&
+                 existing_digest == requested_item.canonical_input_digest
+            return Failure(request_reused(request_id:, existing:, existing_digest:, requested_item:))
+          end
+          command_id = existing.command_id
+          register = false
+        else
+          command_id = allocation.command_id
+          ensure_command_id_available!(command_id)
+          register = true
+        end
+
+        document = requested_item.command_input.class.new(
+          requested_item.command_input.attributes.merge(command_id:)
+        )
+        Success(
+          OperationBatches::RegistrationPlanV2.new(
+            item: OperationBatches::ItemV2.new(
+              index: requested_item.index,
+              request_id:,
+              command_input: document,
+              canonical_input_digest: requested_item.canonical_input_digest
+            ),
+            actor: requested_command.actor,
+            register:,
+            event_id: allocation.event_id
+          )
+        )
       end
 
       def verify_outcome!(state, command)
         item = state.item(command.index)
         return unless item
 
-        physical, completion = load_target_completion(command.target_completion)
+        command_snapshot = @command_loader.call(item.command_id)
+        physical = command_snapshot.persisted_events.last
         result = @outcome_contract.call(
           command:,
           item:,
-          completion:,
-          physical_completion: physical
+          command_state: command_snapshot.state,
+          physical_target_event: physical
         )
         return if result.success?
 
         raise InvalidOperationBatchItemOutcome, result.errors.to_h.inspect
       end
 
-      def load_target_completion(reference)
-        return [ nil, nil ] unless reference
-
-        stream = StreamReference.new(
-          context: reference.stream_context,
-          stream_name: reference.stream_name,
-          stream_id: reference.stream_id
-        )
-        physical = @event_store.read_at(stream, reference.stream_revision)
-        return [ nil, nil ] unless physical
-
-        completion = @schema_registry.load(
-          type: physical.type,
-          schema_version: physical.metadata.fetch("schema_version"),
-          data: physical.data
-        )
-        [ physical, completion ]
-      end
-
-      def replay_result(command:, input_digest:)
-        completion = load_completion(command.command_id)
-        return unless completion
-
-        requested_tool = @input_digest.document(command).tool_name
-        if completion.tool_name == requested_tool && completion.canonical_input_digest == input_digest
-          Success(completion)
-        else
-          Failure(
-            OutcomeError.new(
-              code: :command_id_reused,
-              message: "Command ID is already bound to another tool or input",
-              details: {
-                command_id: command.command_id,
-                existing_tool_name: completion.tool_name,
-                existing_input_digest: completion.canonical_input_digest,
-                requested_tool_name: requested_tool,
-                requested_input_digest: input_digest
-              }
-            )
-          )
-        end
-      end
-
-      def load_completion(command_id)
-        event = @event_store.read(
-          @stream_factory.command(command_id),
-          EventQueries::COMMAND_COMPLETION
-        ).first
-        return unless event
-
-        @schema_registry.load(
-          type: event.type,
-          schema_version: event.metadata.fetch("schema_version"),
-          data: event.data
-        )
-      end
-
-      def persist_domain(plan, command:, event_id:, caused_by:)
+      def persist_domain(plan, command:, event_id:, input_digest:, caused_by:)
         expected_stream = @stream_factory.operation_batch(command.batch_id)
         unless plan.writes.length == 1 && plan.writes.first.stream == expected_stream
           raise InvalidOperationBatchEventPlan, "Batch command must emit once to its own static stream"
@@ -165,22 +162,44 @@ module Coordinator::Write
         event = @event_factory.build!(
           event: plan.events.sole,
           event_id:,
-          metadata: command_metadata(command),
+          metadata: domain_metadata(command, input_digest:),
           markers: markers(command),
           caused_by:
         )
         @event_store.append(expected_stream, [ event ])
       end
 
-      def persist_completion(completion, command:, event_id:, caused_by:)
-        event = @event_factory.build!(
-          event: completion,
-          event_id:,
-          metadata: command_metadata(command),
-          markers: markers(command),
-          caused_by:
-        )
-        @event_store.append(@stream_factory.command(command.command_id), [ event ])
+      def persist_registrations(plans, batch_event:)
+        plans.filter_map do |plan|
+          next unless plan.register
+
+          item = plan.item
+          event = @event_factory.build!(
+            event: Events::CommandRegisteredV1.new(
+              command_id: item.command_id,
+              request_id: item.request_id,
+              tool_name: item.command_input.tool_name
+            ),
+            event_id: plan.event_id,
+            metadata: Metadata::CanonicalCommandV1.new(
+              command_id: item.command_id,
+              actor_kind: plan.actor.kind,
+              actor_id: plan.actor.id,
+              recorded_by: "coordinator",
+              policy_version: "operation-batch/v2",
+              canonical_input_digest: item.canonical_input_digest
+            ),
+            markers: [
+              "command:#{item.command_id}",
+              "operation-batch:#{batch_event.stream.stream_id}",
+              "batch-item:#{batch_event.stream.stream_id}:#{item.index}",
+              "tool:#{item.command_input.tool_name}",
+              @request_marker.call(actor: plan.actor, request_id: item.request_id)
+            ],
+            caused_by: batch_event
+          )
+          @event_store.append(@stream_factory.command(item.command_id), [ event ]).sole
+        end
       end
 
       def build_completion(command:, event:, input_digest:, persisted_events:, completed_at:)
@@ -210,32 +229,83 @@ module Coordinator::Write
         end
       end
 
-      def logical_time(command)
-        case command
-        when Commands::CreateOperationBatch, Commands::CancelOperationBatch then nil
-        when Commands::RecordOperationBatchItemOutcome then command.finished_at
-        when Commands::RequestOperationBatchContinuation then command.requested_at
-        when Commands::CompleteOperationBatch then command.completed_at
-        when Commands::CompleteOperationBatchCancellation then command.cancelled_at
+      def item_allocations(command)
+        return [] unless command.is_a?(Commands::CreateOperationBatch)
+
+        command.items.map do
+          OperationBatches::ItemAllocationV1.new(
+            command_id: @id_generator.uuid_v7,
+            event_id: @id_generator.uuid_v7
+          )
         end
       end
 
-      def command_metadata(command)
-        EventMetadata.new(
+      def domain_metadata(command, input_digest:)
+        common = {
           command_id: command.command_id,
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
-          policy_version: "operation-batch/v1"
+          policy_version: "operation-batch/v2"
+        }
+        return EventMetadata.new(common) unless command.is_a?(Commands::CreateOperationBatch)
+
+        Metadata::OperationBatchCreationV2.new(
+          **common,
+          canonical_input_digest: input_digest,
+          manifest_digest: command.manifest_digest,
+          encoded_byte_size: command.encoded_byte_size
         )
       end
 
       def markers(command)
-        markers = [ "operation-batch:#{command.batch_id}", "command:#{command.command_id}" ]
+        values = [ "operation-batch:#{command.batch_id}", "command:#{command.command_id}" ]
         if command.is_a?(Commands::RecordOperationBatchItemOutcome)
-          markers << "batch-item:#{command.batch_id}:#{command.index}"
+          values << "batch-item:#{command.batch_id}:#{command.index}"
         end
-        markers
+        values
+      end
+
+      def registration_criteria(marker)
+        GlobalMarkedEventReadCriteria.new(
+          stream_context: "CoordinatorControl",
+          stream_name: "Command",
+          event_types: [ "CommandRegistered" ],
+          markers: [ marker ],
+          maximum_count: 1,
+          direction: :asc
+        )
+      end
+
+      def load(event)
+        @schema_registry.load(
+          type: event.type,
+          schema_version: event.metadata.fetch("schema_version"),
+          data: event.data
+        )
+      end
+
+      def ensure_command_id_available!(command_id)
+        return if @event_store.read(
+          @stream_factory.command(command_id),
+          EventQueries::COMMAND_REGISTRATION
+        ).empty?
+
+        raise InvalidCommandHistory, "Generated batch-item Command ID is already in use"
+      end
+
+      def request_reused(request_id:, existing:, existing_digest:, requested_item:)
+        OutcomeError.new(
+          code: :command_id_reused,
+          message: "Batch item request ID is already bound to another tool or input",
+          details: {
+            request_id:,
+            existing_tool_name: existing.tool_name,
+            existing_input_digest: existing_digest,
+            requested_tool_name: requested_item.command_input.tool_name,
+            requested_input_digest: requested_item.canonical_input_digest
+          }
+        )
       end
     end
   end

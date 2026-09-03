@@ -259,7 +259,6 @@ module CandidateAcceptanceWorld
     end
     assert_acceptance_equal([], candidate_events(candidate_id), "Denied Candidate facts")
     assert_acceptance_equal([], attachments, "Denied Candidate attachments")
-    assert_acceptance_equal([], command_events(arguments.fetch(:command_id)), "Denied Candidate completion")
     return unless expect_head_absent
 
     assert_acceptance_equal(

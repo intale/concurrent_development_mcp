@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module CommandLifecycle
+      class RequestMarker
+        def initialize: (?compound_marker_builder: Shared::CompoundMarkerBuilder) -> void
+        def call: (actor: Commands::Actor, request_id: String | Integer) -> String
+      end
+    end
+  end
+end

@@ -8,14 +8,14 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordAgentChoice, :event_
 
   before { seed_active_attempt }
 
-  it "records and accepts an exact no-policy choice atomically and replays it" do
+  it "records and accepts an exact no-policy choice atomically" do
     input = choice_input(decision_context: authoritative_context)
 
     original = operation.call(input)
     replay = operation.call(input)
 
     expect(original).to be_success
-    expect(replay.value!).to eq(original.value!)
+    expect(replay.failure.code).to eq(:agent_choice_already_exists)
     expect(original.value!.data).to have_attributes(
       choice_id: "CHO-1",
       choice_type: "testing.framework",
@@ -41,7 +41,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordAgentChoice, :event_
         )
       )
     )
-    expect(command_events("cmd-choice-1").length).to eq(1)
+    expect(command_events("cmd-choice-1")).to be_empty
   end
 
   it "accepts an advisory violation with exact Decision evidence" do
@@ -138,7 +138,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordAgentChoice, :event_
     expect(results.count(&:failure?)).to eq(1)
     expect(results.find(&:failure?).failure.code).to eq(:agent_choice_already_exists)
     expect(choice_events.map(&:type)).to eq(%w[AgentChoiceRecorded AgentChoiceAccepted])
-    expect(inputs.sum { command_events(_1.fetch(:command_id)).length }).to eq(1)
+    expect(inputs.flat_map { command_events(_1.fetch(:command_id)) }).to be_empty
   end
 
   def choice_input(
@@ -328,7 +328,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordAgentChoice, :event_
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 
   def reference(event)

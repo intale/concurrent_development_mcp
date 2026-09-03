@@ -7,15 +7,15 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordMergeObservation, :e
   let(:streams) { Coordinator::Write::StreamFactory.new }
   let(:registry) { Coordinator::Write::EventSchemaRegistry.new }
 
-  it "records one exact attributed external transition and replays its Command" do
+  it "records one exact attributed external transition and leaves replay ownership to the Command lifecycle" do
     registration, authorization, input = scenario("observation-success")
 
     first = operation.call(input).value!
-    replay = operation.call(input).value!
+    replay = operation.call(input)
     physical = observation_event(registration.dig(:input, :merge_snapshot_id))
     payload = load(physical)
 
-    expect(first).to eq(replay)
+    expect(replay.failure.code).to eq(:merge_already_observed)
     expect(payload).to have_attributes(
       authorization_event: authorization.fetch(:completion).data.decision_event,
       target_before_commit_oid: registration.dig(:input, :target_base_commit_oid),
@@ -23,7 +23,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordMergeObservation, :e
       evidence_status: "attributed_unverified"
     )
     expect(first.summary).to include("coordinator did not perform or verify it")
-    expect(command_events(input.fetch(:command_id)).length).to eq(1)
+    expect(command_events(input.fetch(:command_id))).to be_empty
   end
 
   it "rejects a result OID that differs from the verified registered snapshot" do
@@ -82,7 +82,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordMergeObservation, :e
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 
   def load(event)

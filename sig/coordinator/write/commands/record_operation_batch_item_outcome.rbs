@@ -7,10 +7,8 @@ module Coordinator
         def batch_id: () -> String
         def index: () -> Integer
         def item_command_id: () -> String
-        def canonical_input_digest: () -> String
-        def result: () -> Tasks::ToolResultV1
-        def target_completion: () -> EventReference?
-        def finished_at: () -> String
+        def outcome: () -> String
+        def target_event: () -> EventReference
       end
     end
   end

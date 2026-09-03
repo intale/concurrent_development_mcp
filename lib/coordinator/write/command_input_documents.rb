@@ -857,11 +857,9 @@ module Coordinator::Write
       attribute :actor, ActorV1
       attribute :batch_id, Types::OperationBatchId
       attribute :index, Types::OperationBatchItemIndex
-      attribute :item_command_id, Types::Identifier
-      attribute :canonical_input_digest, Types::Sha256Digest
-      attribute :result, Tasks::ToolResultV1
-      attribute :target_completion, EventReferenceV1.optional
-      attribute :finished_at, Types::Timestamp
+      attribute :item_command_id, Types::CommandId
+      attribute :outcome, Types::String.enum("succeeded", "rejected")
+      attribute :target_event, EventReferenceV1
     end
 
     class RecordOperationBatchItemOutcomeV1 < BaseV1
@@ -874,8 +872,6 @@ module Coordinator::Write
       attribute :batch_id, Types::OperationBatchId
       attribute :page_start, Types::OperationBatchItemIndex
       attribute :page_end, Types::OperationBatchItemIndex
-      attribute :source_event, EventReferenceV1
-      attribute :requested_at, Types::Timestamp
     end
 
     class RequestOperationBatchContinuationV1 < BaseV1
@@ -886,8 +882,6 @@ module Coordinator::Write
     class CompleteOperationBatchInputV1 < Value
       attribute :actor, ActorV1
       attribute :batch_id, Types::OperationBatchId
-      attribute :source_event, EventReferenceV1
-      attribute :completed_at, Types::Timestamp
     end
 
     class CompleteOperationBatchV1 < BaseV1
@@ -898,8 +892,6 @@ module Coordinator::Write
     class CompleteOperationBatchCancellationInputV1 < Value
       attribute :actor, ActorV1
       attribute :batch_id, Types::OperationBatchId
-      attribute :source_event, EventReferenceV1
-      attribute :cancelled_at, Types::Timestamp
     end
 
     class CompleteOperationBatchCancellationV1 < BaseV1

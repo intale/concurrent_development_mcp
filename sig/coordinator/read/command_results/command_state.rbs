@@ -1,0 +1,17 @@
+module Coordinator
+  module Read
+    module CommandResults
+      class CommandState < Shared::Value
+        def self.reduce: (events: Array[PgEventstore::Event], payloads: Array[Write::Events::Base], ?contract: Write::Contracts::CommandHistory) -> CommandState
+
+        def command_id: () -> String
+        def request_id: () -> (String | Integer)
+        def tool_name: () -> String
+        def canonical_input_digest: () -> String
+        def status: () -> String
+        def terminal?: () -> bool
+        def rejected?: () -> bool
+      end
+    end
+  end
+end

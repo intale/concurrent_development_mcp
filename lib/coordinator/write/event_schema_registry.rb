@@ -15,7 +15,6 @@ module Coordinator::Write
       [ "CommandRegistered", 1 ] => Events::CommandRegisteredV1,
       [ "CommandSucceeded", 1 ] => Events::CommandSucceededV1,
       [ "CommandRejected", 1 ] => Events::CommandRejectedV1,
-      [ "CommandCompleted", 1 ] => Events::CommandCompletedV1,
       [ "ProcessStepPlanned", 1 ] => Events::ProcessStepPlannedV1,
       [ "SkillRevisionPublished", 2 ] => Events::SkillRevisionPublishedV2,
       [ "DevelopmentArtifactCaptured", 2 ] => Events::DevelopmentArtifactCapturedV2,
@@ -24,13 +23,13 @@ module Coordinator::Write
         Events::DevelopmentArtifactClassificationCorrectedV1,
       [ "DevelopmentArtifactRelationDeclared", 1 ] => Events::DevelopmentArtifactRelationDeclaredV1,
       [ "DevelopmentArtifactRelationSuperseded", 1 ] => Events::DevelopmentArtifactRelationSupersededV1,
-      [ "OperationBatchCreated", 1 ] => Events::OperationBatchCreatedV1,
-      [ "OperationBatchItemSucceeded", 1 ] => Events::OperationBatchItemSucceededV1,
-      [ "OperationBatchItemRejected", 1 ] => Events::OperationBatchItemRejectedV1,
-      [ "OperationBatchContinuationRequested", 1 ] => Events::OperationBatchContinuationRequestedV1,
-      [ "OperationBatchCancellationRequested", 1 ] => Events::OperationBatchCancellationRequestedV1,
-      [ "OperationBatchCancelled", 1 ] => Events::OperationBatchCancelledV1,
-      [ "OperationBatchCompleted", 1 ] => Events::OperationBatchCompletedV1,
+      [ "OperationBatchCreated", 2 ] => Events::OperationBatchCreatedV2,
+      [ "OperationBatchItemSucceeded", 2 ] => Events::OperationBatchItemSucceededV2,
+      [ "OperationBatchItemRejected", 2 ] => Events::OperationBatchItemRejectedV2,
+      [ "OperationBatchContinuationRequested", 2 ] => Events::OperationBatchContinuationRequestedV2,
+      [ "OperationBatchCancellationRequested", 2 ] => Events::OperationBatchCancellationRequestedV2,
+      [ "OperationBatchCancelled", 2 ] => Events::OperationBatchCancelledV2,
+      [ "OperationBatchCompleted", 2 ] => Events::OperationBatchCompletedV2,
       [ "WorkItemCreated", 1 ] => Events::WorkItemCreatedV1,
       [ "WorkItemAddedToChangeSet", 1 ] => Events::WorkItemAddedToChangeSetV1,
       [ "WorkItemDependencyDeclared", 1 ] => Events::WorkItemDependencyDeclaredV1,
@@ -115,22 +114,15 @@ module Coordinator::Write
       [ "ReleaseSetActivated", 1 ] => Events::ReleaseSetActivatedV1,
       [ "ReleaseSetCompensationRequested", 1 ] => Events::ReleaseSetCompensationRequestedV1,
       [ "ReleaseSetCompleted", 1 ] => Events::ReleaseSetCompletedV1,
-      [ "CoordinationTaskSubmitted", 2 ] => Events::CoordinationTaskSubmittedV2,
       [ "CoordinationTaskSubmitted", 3 ] => Events::CoordinationTaskSubmittedV3,
-      [ "CoordinationTaskExecutionStarted", 1 ] => Events::CoordinationTaskExecutionStartedV1,
       [ "CoordinationTaskExecutionStarted", 2 ] => Events::CoordinationTaskExecutionStartedV2,
-      [ "CoordinationTaskCompleted", 2 ] => Events::CoordinationTaskCompletedV2,
       [ "CoordinationTaskCompleted", 3 ] => Events::CoordinationTaskCompletedV3,
-      [ "CoordinationTaskFailed", 1 ] => Events::CoordinationTaskFailedV1,
       [ "CoordinationTaskFailed", 2 ] => Events::CoordinationTaskFailedV2,
-      [ "CoordinationTaskCancellationRequested", 1 ] => Events::CoordinationTaskCancellationRequestedV1,
       [ "CoordinationTaskCancellationRequested", 2 ] => Events::CoordinationTaskCancellationRequestedV2,
-      [ "CoordinationTaskCancelled", 1 ] => Events::CoordinationTaskCancelledV1,
       [ "CoordinationTaskCancelled", 2 ] => Events::CoordinationTaskCancelledV2
     }.freeze
 
     DEFAULT_VALIDATORS = {
-      Events::CoordinationTaskSubmittedV2 => Contracts::CoordinationTaskSubmission.new,
       Events::CoordinationTaskSubmittedV3 => Contracts::CoordinationTaskSubmission.new
     }.freeze
 

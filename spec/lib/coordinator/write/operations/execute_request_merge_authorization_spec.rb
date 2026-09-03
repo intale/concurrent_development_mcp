@@ -7,17 +7,19 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRequestMergeAuthorization,
   let(:streams) { Coordinator::Write::StreamFactory.new }
   let(:registry) { Coordinator::Write::EventSchemaRegistry.new }
 
-  it "grants exact verified evidence without a Candidate policy and replays exactly" do
+  it "grants exact verified evidence without a Candidate policy and permits a later reevaluation" do
     registration = MergeSnapshotScenario.register(prefix: "auth-grant")
     verification = MergeSnapshotScenario.verify(registration, prefix: "auth-grant")
     input = MergeSnapshotScenario.authorization_input(registration, verification, prefix: "auth-grant")
 
     first = operation.call(input).value!
-    replay = operation.call(input).value!
+    reevaluation = operation.call(input).value!
     event = authorization_events(first.data.authorization_id).sole
     payload = load(event)
 
-    expect(first).to eq(replay)
+    expect(reevaluation.data.outcome).to eq("granted")
+    expect(reevaluation.data.authorization_id).not_to eq(first.data.authorization_id)
+    expect(authorization_events(reevaluation.data.authorization_id).length).to eq(1)
     expect(first.data.outcome).to eq("granted")
     expect(payload).to be_a(Coordinator::Write::Events::MergeAuthorizationGrantedV1)
     expect(payload.evaluation).to be_granted
@@ -26,7 +28,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRequestMergeAuthorization,
     expect(payload.evaluation.work_item_progress.map(&:candidate_id)).to eq([
       registration.dig(:input, :ordered_candidates, 0, :candidate_id)
     ])
-    expect(command_events(input.fetch(:command_id)).map(&:type)).to eq([ "CommandCompleted" ])
+    expect(command_events(input.fetch(:command_id))).to be_empty
   end
 
   it "durably denies a verified Candidate whose WorkItem has not selected or completed it" do
@@ -169,7 +171,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRequestMergeAuthorization,
     expect(grant.data.obligations.sole.status).to eq("satisfied")
   end
 
-  it "rejects changed Command reuse without writing another decision" do
+  it "leaves Command replay ownership to the lifecycle while recording a fresh reevaluation" do
     registration = MergeSnapshotScenario.register(prefix: "auth-reuse")
     verification = MergeSnapshotScenario.verify(registration, prefix: "auth-reuse")
     input = MergeSnapshotScenario.authorization_input(registration, verification, prefix: "auth-reuse")
@@ -178,10 +180,12 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRequestMergeAuthorization,
     changed = input.merge(
       target_base_observation: input.fetch(:target_base_observation).merge(run_id: "another-run")
     )
-    reused = operation.call(changed)
+    reevaluation = operation.call(changed).value!
 
-    expect(reused.failure.code).to eq(:command_id_reused)
+    expect(reevaluation.data.authorization_id).not_to eq(first.data.authorization_id)
     expect(authorization_events(first.data.authorization_id).length).to eq(1)
+    expect(authorization_events(reevaluation.data.authorization_id).length).to eq(1)
+    expect(command_events(input.fetch(:command_id))).to be_empty
   end
 
   def authorization_events(authorization_id)
@@ -198,7 +202,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRequestMergeAuthorization,
   def command_events(command_id)
     event_store.read(
       streams.command(command_id),
-      Coordinator::Write::EventQueries::COMMAND_COMPLETION
+      Coordinator::Write::EventQueries::COMMAND_HISTORY
     )
   end
 

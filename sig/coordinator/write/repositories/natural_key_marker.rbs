@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Repositories
+      class NaturalKeyMarker
+        def initialize: (?compound_marker_builder: Shared::CompoundMarkerBuilder) -> void
+        def call: (scope: String, repository_key: String) -> Shared::CompoundMarker
+      end
+    end
+  end
+end

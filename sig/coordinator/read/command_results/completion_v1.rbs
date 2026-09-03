@@ -1,0 +1,19 @@
+module Coordinator
+  module Read
+    module CommandResults
+      class CompletionV1 < Shared::Value
+        def command_id: () -> String
+        def tool_name: () -> String
+        def canonical_input_digest: () -> String
+        def status: () -> String
+        def summary: () -> String
+        def receipt: () -> String
+        def data: () -> Write::CommandReceiptData::value
+        def warnings: () -> Array[String]
+        def next_actions: () -> Array[Write::NextAction]
+        def emitted_events: () -> Array[Write::EventReference]
+        def completed_at: () -> String
+      end
+    end
+  end
+end

@@ -14,7 +14,7 @@ module Coordinator::Write
         ?schema_registry: Coordinator::Write::EventSchemaRegistry,
         ?stream_factory: Coordinator::Write::StreamFactory,
         ?index_marker_builder: Coordinator::Write::Candidates::ImpactIndexMarkerBuilder,
-        ?completion_builder: Coordinator::Write::CommandCompletionBuilder,
+        ?completion_builder: Coordinator::Write::CommandResultBuilder,
         ?event_plan_contract: Coordinator::Write::Contracts::CandidateImpactSurfaceEventPlan
       ) -> void
       %a{rbs:test:skip}

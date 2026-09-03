@@ -3,8 +3,12 @@
 module Coordinator::Read
   module Repositories
     class OperationBatches
-      def initialize(arguments_builder: OperationBatchArguments.new)
+      def initialize(
+        arguments_builder: OperationBatchArguments.new,
+        command_receipts: CommandReceipts.new
+      )
         @arguments_builder = arguments_builder
+        @command_receipts = command_receipts
       end
 
       def fetch(query)
@@ -15,8 +19,17 @@ module Coordinator::Read
         has_more = rows.length > query.limit
         selected = rows.first(query.limit)
         outcomes = outcomes_by_index(record, selected)
+        receipts = receipts_by_command_id(outcomes.values)
         unprocessed = record.total - record.succeeded_count - record.rejected_count
-        items = selected.map { build_item(_1, outcomes[_1.item_index], terminal_kind: record.terminal_kind) }
+        items = selected.map do |item|
+          outcome = outcomes[item.item_index]
+          build_item(
+            item,
+            outcome,
+            receipt: outcome && receipts[outcome.target_command_id],
+            terminal_kind: record.terminal_kind
+          )
+        end
 
         OperationBatchViewV1.new(
           batch_id: record.batch_id,
@@ -41,17 +54,17 @@ module Coordinator::Read
       def store(event:, payload:)
         record = Coordinator::Read::OperationBatch.lock.find_or_create_by!(batch_id: payload.batch_id)
         case payload
-        when Coordinator::Write::Events::OperationBatchCreatedV1
+        when Coordinator::Write::Events::OperationBatchCreatedV2
           store_creation(record, event, payload)
-        when Coordinator::Write::Events::OperationBatchItemSucceededV1
+        when Coordinator::Write::Events::OperationBatchItemSucceededV2
           store_outcome(record, event, payload, status: "succeeded")
-        when Coordinator::Write::Events::OperationBatchItemRejectedV1
+        when Coordinator::Write::Events::OperationBatchItemRejectedV2
           store_outcome(record, event, payload, status: "rejected")
-        when Coordinator::Write::Events::OperationBatchCancellationRequestedV1
+        when Coordinator::Write::Events::OperationBatchCancellationRequestedV2
           store_cancellation(record, event, payload)
-        when Coordinator::Write::Events::OperationBatchCompletedV1
+        when Coordinator::Write::Events::OperationBatchCompletedV2
           store_terminal(record, event, payload, kind: "completed")
-        when Coordinator::Write::Events::OperationBatchCancelledV1
+        when Coordinator::Write::Events::OperationBatchCancelledV2
           store_terminal(record, event, payload, kind: "cancelled")
         end
         refresh_summary(record)
@@ -73,17 +86,23 @@ module Coordinator::Read
         ).index_by(&:item_index)
       end
 
+      def receipts_by_command_id(outcomes)
+        command_ids = outcomes.map(&:target_command_id).compact
+        @command_receipts.fetch_index(command_ids)
+      end
+
       def store_creation(record, event, payload)
-        if record.created_event && record.manifest_digest != payload.manifest_digest
+        manifest_digest = event.metadata.fetch("manifest_digest")
+        if record.created_event && record.manifest_digest != manifest_digest
           raise ProjectionStateError, "Operation Batch creation changed for one stream"
         end
 
         record.update!(
           target_tool: payload.target_tool,
-          total: payload.total,
+          total: payload.items.length,
           page_size: payload.page_size,
-          manifest_digest: payload.manifest_digest,
-          encoded_byte_size: payload.encoded_byte_size,
+          manifest_digest:,
+          encoded_byte_size: event.metadata.fetch("encoded_byte_size"),
           created_event: event_reference(event).to_h,
           created_actor: actor(event).to_h,
           created_markers: event.markers,
@@ -91,7 +110,7 @@ module Coordinator::Read
           created_causation_id: event.causation_id,
           created_correlation_id: event.correlation_id,
           created_global_position: event.global_position,
-          created_at_domain: payload.created_at,
+          created_at_domain: event.created_at,
           created_at_store: event.created_at
         )
         payload.items.each { store_item(record, _1) }
@@ -104,26 +123,34 @@ module Coordinator::Read
         )
         attributes = {
           target_tool: item.command_input.tool_name,
-          command_id: item.command_input.command_id,
+          command_id: item.request_id,
+          target_command_id: item.command_id,
           canonical_input_digest: item.canonical_input_digest,
-          arguments: @arguments_builder.call(item.command_input)
+          arguments: @arguments_builder.call(item.command_input).merge(command_id: item.request_id)
         }
         if record.persisted?
           matches = record.target_tool == attributes.fetch(:target_tool) &&
                     record.command_id == attributes.fetch(:command_id) &&
+                    record.target_command_id == attributes.fetch(:target_command_id) &&
                     record.canonical_input_digest == attributes.fetch(:canonical_input_digest) &&
                     record.arguments == attributes.fetch(:arguments).deep_stringify_keys
           unless matches
             raise ProjectionStateError, "Operation Batch manifest item changed for one stream"
           end
+          backfill_outcome(record)
           return
         end
 
         record.assign_attributes(attributes)
         record.save!
+        backfill_outcome(record)
       end
 
       def store_outcome(record, event, payload, status:)
+        item = Coordinator::Read::OperationBatchItem.find_by(
+          batch_id: record.batch_id,
+          item_index: payload.index
+        )
         outcome = Coordinator::Read::OperationBatchOutcome.find_or_initialize_by(
           batch_id: record.batch_id,
           item_index: payload.index
@@ -134,10 +161,11 @@ module Coordinator::Read
         end
 
         outcome.assign_attributes(
-          command_id: payload.command_id,
-          canonical_input_digest: payload.canonical_input_digest,
+          command_id: item&.command_id,
+          target_command_id: payload.command_id,
+          canonical_input_digest: item&.canonical_input_digest,
           status:,
-          result: payload.result.to_h,
+          result: {},
           outcome_event: event_reference(event).to_h,
           outcome_actor: actor(event).to_h,
           outcome_markers: event.markers,
@@ -145,20 +173,33 @@ module Coordinator::Read
           outcome_causation_id: event.causation_id,
           outcome_correlation_id: event.correlation_id,
           outcome_global_position: event.global_position,
-          finished_at_domain: payload.finished_at,
+          finished_at_domain: event.created_at,
           finished_at_store: event.created_at
         )
         outcome.save!
       end
 
       def verify_outcome!(outcome, payload, status:)
-        matches = outcome.command_id == payload.command_id &&
-                  outcome.canonical_input_digest == payload.canonical_input_digest &&
-                  outcome.status == status &&
-                  outcome.result == payload.result.to_h.deep_stringify_keys
+        matches = outcome.target_command_id == payload.command_id && outcome.status == status
         return if matches
 
         raise ProjectionStateError, "Operation Batch item has conflicting outcomes"
+      end
+
+      def backfill_outcome(item)
+        outcome = Coordinator::Read::OperationBatchOutcome.find_by(
+          batch_id: item.batch_id,
+          item_index: item.item_index
+        )
+        return unless outcome
+        unless outcome.target_command_id == item.target_command_id
+          raise ProjectionStateError, "Operation Batch outcome targets another Command"
+        end
+
+        outcome.update!(
+          command_id: item.command_id,
+          canonical_input_digest: item.canonical_input_digest
+        )
       end
 
       def store_cancellation(record, event, payload)
@@ -171,7 +212,7 @@ module Coordinator::Read
           cancellation_causation_id: event.causation_id,
           cancellation_correlation_id: event.correlation_id,
           cancellation_global_position: event.global_position,
-          cancellation_at_domain: payload.requested_at,
+          cancellation_at_domain: event.created_at,
           cancellation_at_store: event.created_at
         )
       end
@@ -190,7 +231,7 @@ module Coordinator::Read
           terminal_causation_id: event.causation_id,
           terminal_correlation_id: event.correlation_id,
           terminal_global_position: event.global_position,
-          terminal_at_domain: kind == "completed" ? payload.completed_at : payload.cancelled_at,
+          terminal_at_domain: event.created_at,
           terminal_at_store: event.created_at
         )
       end
@@ -207,7 +248,7 @@ module Coordinator::Read
         record.update!(succeeded_count: succeeded, rejected_count: rejected, status:)
       end
 
-      def build_item(item, outcome, terminal_kind:)
+      def build_item(item, outcome, receipt:, terminal_kind:)
         OperationBatchItemViewV1.new(
           index: item.item_index,
           target_tool: item.target_tool,
@@ -215,9 +256,22 @@ module Coordinator::Read
           canonical_input_digest: item.canonical_input_digest,
           arguments: symbolize(item.arguments),
           status: item_status(outcome, terminal_kind:),
-          result: outcome && Coordinator::Write::Tasks::StructuredContentV1.new(symbolize(outcome.result)),
+          result: receipt && structured_content(receipt),
           finished_at: outcome&.finished_at_domain&.utc&.iso8601(6),
           source: outcome && outcome_source_evidence(outcome)
+        )
+      end
+
+      def structured_content(receipt)
+        Coordinator::Write::Tasks::StructuredContentV1.new(
+          status: receipt.status,
+          summary: receipt.summary,
+          command_id: receipt.command_id,
+          receipt: receipt.receipt,
+          context_token: nil,
+          data: receipt.data,
+          warnings: receipt.warnings,
+          next_actions: receipt.next_actions
         )
       end
 

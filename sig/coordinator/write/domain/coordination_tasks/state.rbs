@@ -18,8 +18,6 @@ module Coordinator
           def poll_interval_ms: () -> Integer?
           def started: () -> bool
           def cancellation_requested: () -> bool
-          def semantic_result: () -> Tasks::SemanticResultV1::value?
-          def error: () -> Tasks::JsonRpcErrorV1?
           def failure_code: () -> String?
           def failure_retryable: () -> bool?
           def absent?: () -> bool

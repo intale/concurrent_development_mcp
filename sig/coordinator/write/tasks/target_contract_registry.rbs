@@ -24,6 +24,7 @@ module Coordinator
         def self.fetch: (String tool_name) -> TargetContractV1
         def self.tool_names: () -> Array[String]
         def self.fetch_by_command_class: (Class command_class) -> TargetContractV1
+        def self.fetch_for: (coordination_command command) -> TargetContractV1
         def self.input_document_classes: () -> Array[Class]
         def self.command_classes: () -> Array[Class]
       end

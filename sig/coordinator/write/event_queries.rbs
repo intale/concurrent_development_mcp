@@ -23,7 +23,8 @@ module Coordinator
         maximum_count: Integer
       ) -> Array[GlobalMarkedEventPageCriteria]
 
-      COMMAND_COMPLETION: EventReadCriteria
+      COMMAND_REGISTRATION: EventReadCriteria
+      COMMAND_HISTORY: EventReadCriteria
       REPOSITORY_REGISTRATION: EventReadCriteria
       SKILL_LATEST_REVISION: GroupedEventReadCriteria
       DEVELOPMENT_ARTIFACT_HISTORY: EventReadCriteria

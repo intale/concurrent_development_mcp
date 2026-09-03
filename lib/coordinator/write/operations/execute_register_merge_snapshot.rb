@@ -17,7 +17,7 @@ module Coordinator::Write
         event_factory: EventFactory.new,
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
-        completion_builder: CommandCompletionBuilder.new,
+        completion_builder: CommandResultBuilder.new,
         natural_key_registry: NaturalKeys::Registry.new(event_store:),
         event_plan_contract: Contracts::MergeSnapshotRegistrationEventPlan.new
       )
@@ -62,15 +62,11 @@ module Coordinator::Write
           ),
           snapshot_event_id: @id_generator.uuid_v7,
           commit_registration_event_id: @id_generator.uuid_v7,
-          completion_event_id: @id_generator.uuid_v7,
           correlation_id: @id_generator.uuid_v7
         )
       end
 
       def execute_attempt(command:, preparation:, caused_by:)
-        replay = replay_result(command:, input_digest: preparation.input_digest)
-        return replay if replay
-
         commit_resolution = resolve_commit_identity(preparation.commit_identity)
         return commit_resolution if commit_resolution.failure?
 
@@ -98,7 +94,6 @@ module Coordinator::Write
           persisted_events: persisted,
           completed_at: preparation.registered_at
         )
-        persist_completion(completion, command:, preparation:, caused_by:)
         Success(completion)
       end
 
@@ -203,18 +198,6 @@ module Coordinator::Write
         end
       end
 
-      def persist_completion(completion, command:, preparation:, caused_by:)
-        physical = @event_factory.build!(
-          event: completion,
-          event_id: preparation.completion_event_id,
-          metadata: command_metadata(command),
-          markers: [ "command:#{command.command_id}" ],
-          caused_by:,
-          correlation_id: root_correlation_id(preparation, caused_by)
-        )
-        @event_store.append(@stream_factory.command(command.command_id), [ physical ])
-      end
-
       def event_markers(command, identity, snapshot)
         markers = [
           "merge-snapshot:#{command.merge_snapshot_id}",
@@ -234,34 +217,6 @@ module Coordinator::Write
           ])
         end
         markers
-      end
-
-      def replay_result(command:, input_digest:)
-        completion = load_completion(command.command_id)
-        return unless completion
-
-        if completion.tool_name == TOOL_NAME && completion.canonical_input_digest == input_digest
-          Success(completion)
-        else
-          Failure(
-            OutcomeError.new(
-              code: :command_id_reused,
-              message: "Command ID is already bound to another tool or input",
-              details: {
-                command_id: command.command_id,
-                existing_tool_name: completion.tool_name,
-                existing_input_digest: completion.canonical_input_digest,
-                requested_tool_name: TOOL_NAME,
-                requested_input_digest: input_digest
-              }
-            )
-          )
-        end
-      end
-
-      def load_completion(command_id)
-        event = @event_store.read(@stream_factory.command(command_id), EventQueries::COMMAND_COMPLETION).first
-        event && load_event(event)
       end
 
       def load_event(event)

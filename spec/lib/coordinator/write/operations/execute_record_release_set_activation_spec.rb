@@ -5,7 +5,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordReleaseSetActivation
 
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
 
-  it "records an exact attributed activation and replays without duplicate facts" do
+  it "records an exact attributed activation and rejects a second direct execution" do
     prepared = ReleaseSetScenario.prepare(prefix: "activation-success")
     integrations = ReleaseSetScenario.integrate_all(prepared, prefix: "activation-success")
     verification = ReleaseSetScenario.record_verification(
@@ -20,7 +20,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordReleaseSetActivation
     activation = events.select { _1.type == "ReleaseSetActivated" }.sole
     payload = ReleaseSetScenario.load(activation)
 
-    expect(replay).to be_success
+    expect(replay.failure.code).to eq(:release_set_already_activated)
     expect(payload).to have_attributes(
       verification_event: verification.fetch(:completion).data.verification_event,
       verification_digest: verification.fetch(:payload).verification_digest,

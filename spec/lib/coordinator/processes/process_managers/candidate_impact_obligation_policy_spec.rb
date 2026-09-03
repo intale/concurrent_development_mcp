@@ -250,7 +250,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CandidateImpactObligatio
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 
   def reference(event)

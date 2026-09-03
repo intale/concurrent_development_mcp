@@ -5,7 +5,6 @@ module Coordinator
       def input_digest: () -> String
       def resources: () -> Array[PreparedLeaseTargetV1]
       def expansion_event_id: () -> String
-      def completion_event_id: () -> String
     end
   end
 end

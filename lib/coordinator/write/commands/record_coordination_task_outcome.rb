@@ -4,7 +4,7 @@ module Coordinator::Write
   module Commands
     class RecordCoordinationTaskOutcome < Value
       attribute :task_id, Types::TaskId
-      attribute :outcome, Tasks::OutcomeV2::Type
+      attribute :outcome, Tasks::OutcomeV3::Type
     end
   end
 end

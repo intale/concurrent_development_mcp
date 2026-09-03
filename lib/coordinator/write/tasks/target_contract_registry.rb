@@ -305,6 +305,14 @@ module Coordinator::Write
         BY_COMMAND_CLASS.fetch(command_class)
       end
 
+      def fetch_for(command)
+        if command.is_a?(Commands::CreateOperationBatch)
+          return fetch("#{command.target_tool}_batch")
+        end
+
+        fetch_by_command_class(command.class)
+      end
+
       def input_document_classes
         accepted_classes = CONTRACTS.map(&:input_document_class)
 

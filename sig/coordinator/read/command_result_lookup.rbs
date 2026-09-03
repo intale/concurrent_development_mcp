@@ -1,0 +1,8 @@
+module Coordinator
+  module Read
+    class CommandResultLookup
+      def initialize: (?receipts: Repositories::CommandReceipts) -> void
+      def fetch: (String request_id) -> CommandResults::ResultV1?
+    end
+  end
+end

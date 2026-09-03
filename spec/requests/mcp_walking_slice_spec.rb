@@ -172,7 +172,9 @@ module McpWalkingSliceSpec
     replay = task_request("tasks/get", task_id: replay_task_id, id: 4)
     expect(replay.dig("result", "result")).to eq(result)
     expect(repository_events(repository_id).length).to eq(1)
-    expect(command_events(arguments.fetch(:command_id)).length).to eq(1)
+    expect(command_events_for_task(task_id).map(&:type)).to eq(
+      [ "CommandRegistered", "CommandSucceeded" ]
+    )
 
     conflict_task_id = call_tool(
       "repository_register",
@@ -343,11 +345,13 @@ module McpWalkingSliceSpec
 
     replay = call_tool("change_set_create", arguments, id: 4)
     replay_task_id = replay.dig("result", "taskId")
-    expect(replay_task_id).not_to eq(task_id)
+    expect(replay_task_id).to eq(task_id)
     execute_task(replay_task_id)
     replayed = task_request("tasks/get", task_id: replay_task_id, id: 5)
     expect(replayed.dig("result", "result")).to eq(tool_result)
-    expect(command_events(arguments.fetch(:command_id)).length).to eq(1)
+    expect(command_events_for_task(task_id).map(&:type)).to eq(
+      [ "CommandRegistered", "CommandSucceeded" ]
+    )
     expect(change_set_events(arguments.fetch(:change_set_id)).length).to eq(2)
   end
 
@@ -442,7 +446,9 @@ module McpWalkingSliceSpec
       "candidate_id" => candidate.dig(:input, :candidate_id),
       "produced_outputs" => [ { "kind" => "contract", "key" => "payments-v2" } ]
     )
-    expect(command_events(arguments.fetch(:command_id)).map(&:type)).to eq([ "CommandCompleted" ])
+    expect(command_events_for_task(task_id).map(&:type)).to eq(
+      [ "CommandRegistered", "CommandSucceeded" ]
+    )
   ensure
     Rails.error.unsubscribe(collector) if collector
   end
@@ -769,6 +775,7 @@ module McpWalkingSliceSpec
   def execute_task(task_id)
     submitted = task_events(task_id).find { _1.type == "CoordinationTaskSubmitted" }
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
+    CommandResultFixture.project(task_id, event_store:)
   end
 
   def task_events(task_id)
@@ -799,7 +806,15 @@ module McpWalkingSliceSpec
   def command_events(command_id)
     event_store.read(
       streams.command(command_id),
-      Coordinator::Write::EventQueries::COMMAND_COMPLETION
+      Coordinator::Write::EventQueries::COMMAND_HISTORY
+    )
+  end
+
+  def command_events_for_task(task_id)
+    task = Coordinator::Write::Tasks::Loader.new(event_store:).call(task_id).state
+    event_store.read(
+      streams.command(task.command_id),
+      Coordinator::Write::EventQueries::COMMAND_HISTORY
     )
   end
 

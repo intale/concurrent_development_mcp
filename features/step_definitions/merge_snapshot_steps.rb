@@ -189,9 +189,9 @@ Then(
   assert_acceptance_equal(code, result.dig("structuredContent", "data", "code"), "Denial code")
   assert_acceptance_equal([], merge_verification_events, "Denied verification facts")
   assert_acceptance_equal(
-    [],
-    command_events(@merge_verification_arguments.fetch(:command_id)),
-    "Denied verification receipt"
+    %w[CommandRegistered CommandRejected],
+    command_events(@merge_verification_arguments.fetch(:command_id)).map(&:type),
+    "Denied verification command lifecycle"
   )
 end
 
@@ -265,7 +265,11 @@ Then("the merge authorization Task completes with durable outcome {string}") do 
     "Authorization outcome"
   )
   assert_acceptance_equal(1, merge_authorization_events.length, "Authorization decisions")
-  assert_acceptance_equal(1, command_events(@merge_authorization_arguments.fetch(:command_id)).length, "Receipt")
+  assert_acceptance_equal(
+    %w[CommandRegistered CommandSucceeded],
+    command_events(@merge_authorization_arguments.fetch(:command_id)).map(&:type),
+    "Command lifecycle"
+  )
 end
 
 Then("the authorization explains {string}") do |code|

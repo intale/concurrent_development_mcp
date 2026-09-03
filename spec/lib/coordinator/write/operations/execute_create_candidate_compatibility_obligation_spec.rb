@@ -178,7 +178,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateCandidateCompatibili
   def command_events(command_id)
     event_store.read(
       streams.command(command_id),
-      Coordinator::Write::EventQueries::COMMAND_COMPLETION
+      Coordinator::Write::EventQueries::COMMAND_HISTORY
     )
   end
 end

@@ -5,7 +5,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReleaseLeaseSet, :event_st
   let(:streams) { Coordinator::Write::StreamFactory.new }
   subject(:operation) { described_class.new(event_store:) }
 
-  it "atomically releases the complete UUID set and replays without duplicate release facts" do
+  it "atomically releases the complete UUID set without duplicate release facts" do
     reservation = setup_reservation
     input = release_input(reservation, command_id: "cmd-release-v2")
 
@@ -13,11 +13,14 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReleaseLeaseSet, :event_st
     replay = operation.call(input)
 
     expect(first).to be_success
-    expect(replay.value!).to eq(first.value!)
+    expect(replay).to be_success
+    expect(replay.value!.data).to eq(first.value!.data)
+    expect(replay.value!.emitted_events).to eq(first.value!.emitted_events)
     receipt = first.value!.data
     expect(receipt).to be_a(Coordinator::Write::CommandReceiptData::LeaseSetRelease)
     expect(receipt.resources.map(&:resource_id)).to eq(reservation.receipt.resources.map(&:resource_id))
     expect(reservation.resource_ids.flat_map { lease_events(_1) }.count { _1.type == "ResourceLeaseReleased" }).to eq(2)
+    expect(command_events(input.fetch(:command_id))).to be_empty
   end
 
   it "makes released Resources immediately acquirable by another agent with greater fences" do
@@ -87,6 +90,6 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReleaseLeaseSet, :event_st
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 end

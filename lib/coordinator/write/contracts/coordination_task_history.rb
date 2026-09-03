@@ -15,8 +15,7 @@ module Coordinator::Write
         end
         next if events.empty?
 
-        unless events.first.is_a?(Events::CoordinationTaskSubmittedV2) ||
-               events.first.is_a?(Events::CoordinationTaskSubmittedV3)
+        unless events.first.is_a?(Events::CoordinationTaskSubmittedV3)
           key.failure("must start with CoordinationTaskSubmitted")
           next
         end
@@ -30,25 +29,20 @@ module Coordinator::Write
 
         events.drop(1).each do |event|
           valid = case event
-          when Events::CoordinationTaskExecutionStartedV1,
-               Events::CoordinationTaskExecutionStartedV2
+          when Events::CoordinationTaskExecutionStartedV2
                     allowed = !started && !cancellation_requested && !terminal
                     started = true if allowed
                     allowed
-          when Events::CoordinationTaskCancellationRequestedV1,
-               Events::CoordinationTaskCancellationRequestedV2
+          when Events::CoordinationTaskCancellationRequestedV2
                     allowed = started && !cancellation_requested && !terminal
                     cancellation_requested = true if allowed
                     allowed
-          when Events::CoordinationTaskCompletedV2,
-               Events::CoordinationTaskCompletedV3,
-               Events::CoordinationTaskFailedV1,
+          when Events::CoordinationTaskCompletedV3,
                Events::CoordinationTaskFailedV2
                     allowed = started && !terminal
                     terminal = true if allowed
                     allowed
-          when Events::CoordinationTaskCancelledV1,
-               Events::CoordinationTaskCancelledV2
+          when Events::CoordinationTaskCancelledV2
                     allowed = !started && !terminal
                     terminal = true if allowed
                     allowed

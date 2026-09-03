@@ -56,10 +56,7 @@ RSpec.describe Coordinator::Write::Operations::ExpectedRevisionGuard, :event_sto
     task_state = submit.call(target_command).value!
     task_id = task_state.task_id
     snapshot = loader.call(task_id)
-    command = Coordinator::Write::Commands::StartCoordinationTask.new(
-      task_id:,
-      started_at: Coordinator::Shared::SystemClock.new.now
-    )
+    command = Coordinator::Write::Commands::StartCoordinationTask.new(task_id:)
     planned_event = Coordinator::Write::Domain::CoordinationTasks::Start.new.call(
       state: snapshot.state,
       command:

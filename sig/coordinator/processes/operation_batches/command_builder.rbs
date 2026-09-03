@@ -4,7 +4,7 @@ module Coordinator
       class CommandBuilder
         SYSTEM_ACTOR: Write::Commands::Actor
 
-        def record_outcome: (source: SourceV1, item: Write::OperationBatches::ItemV1, result: Write::Tasks::ToolResultV1, completion: TargetCompletionV1?, command_id: String) -> Write::Commands::RecordOperationBatchItemOutcome
+        def record_outcome: (source: SourceV1, item: Write::OperationBatches::ItemV2, execution: Write::Tasks::TargetExecution, command_id: String) -> Write::Commands::RecordOperationBatchItemOutcome
         def continuation: (source: SourceV1, page_start: Integer, page_end: Integer, command_id: String) -> Write::Commands::RequestOperationBatchContinuation
         def complete: (source: SourceV1, command_id: String) -> Write::Commands::CompleteOperationBatch
         def complete_cancellation: (source: SourceV1, command_id: String) -> Write::Commands::CompleteOperationBatchCancellation

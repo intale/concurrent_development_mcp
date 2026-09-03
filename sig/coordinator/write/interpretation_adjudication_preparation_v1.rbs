@@ -4,7 +4,6 @@ module Coordinator
       def adjudicated_at: () -> String
       def input_digest: () -> String
       def lifecycle_event_id: () -> String
-      def completion_event_id: () -> String
     end
   end
 end

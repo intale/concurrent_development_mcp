@@ -20,9 +20,9 @@ Feature: Attributed Candidate checkpoints
     Scenario: Exact command replay returns the original checkpoint without duplicate facts
       Given Candidate coordination "REPLAY" gives agent "agent-a" an active lease on "lib/replay.rb"
       When the agent submits Candidate "CAN-CUC-REPLAY" with command "cmd-cuc-can-replay" at head "b" without build context
-      And the exact Candidate command is retried through another Task
-      Then both Candidate Tasks complete with the same result
-      And Candidate "CAN-CUC-REPLAY" has one submission, manifest, head registration, attachment, and command completion
+      And the exact Candidate command is retried through its original Task
+      Then the replayed Candidate Task exposes the same result
+      And Candidate "CAN-CUC-REPLAY" has one submission, manifest, head registration, attachment, and successful command lifecycle
 
   Rule: Invalid observations never create partial Candidate authority
 

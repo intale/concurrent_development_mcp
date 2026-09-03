@@ -6,6 +6,7 @@ module Coordinator
         def created: (Coordinator::Write::Domain::CoordinationTasks::State state) -> ResultV1::Created
         def detailed: (Coordinator::Write::Domain::CoordinationTasks::State state, ?projected_result: Coordinator::Write::Tasks::SemanticResultV1::value?) -> ResultV1::detailed
         def acknowledgement: () -> ResultV1::Acknowledgement
+        def projection_pending: (Coordinator::Write::Domain::CoordinationTasks::State state) -> ResultV1::WorkingWithMessage
       end
     end
   end

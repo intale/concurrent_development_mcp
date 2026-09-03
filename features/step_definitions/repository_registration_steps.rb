@@ -92,10 +92,10 @@ Then("the retry exposes the original result without another Repository fact") do
     )
   )
 
-  assert_acceptance(@repository_retry_task_id != @repository_task_id, "Retry must have its own Task")
+  assert_acceptance_equal(@repository_task_id, @repository_retry_task_id, "Replayed Task identity")
   assert_acceptance_equal(@original_repository_result, retry_result, "Replay result")
   assert_acceptance_equal(1, events.length, "Repository facts")
-  assert_acceptance_equal(1, command_events(@repository_arguments.fetch(:command_id)).length, "Command facts")
+  assert_command_succeeded(@repository_arguments.fetch(:command_id), context: "Repository command lifecycle")
 end
 
 When("the agent tries to bind that Repository identity to scope {string}") do |scope|
@@ -117,8 +117,8 @@ Then("the conflicting Task completes with Repository identity conflict") do
   assert_acceptance_equal("repository_identity_conflict", content.dig("data", "code"), "Conflict code")
 end
 
-Then("the rejected command writes no command fact") do
-  assert_acceptance_equal([], command_events(@repository_conflict_command_id), "Rejected command facts")
+Then("the rejected command records one rejected command lifecycle") do
+  assert_command_rejected(@repository_conflict_command_id, context: "Rejected Repository command lifecycle")
 end
 
 Given("the Repository registration reaches scoped discovery") do
@@ -205,7 +205,7 @@ When("both registrations reach the deterministic database barrier with different
   @repository_race_tasks = @repository_race_requests
   install_contention_barrier(
     operation: "repository_register_dcb",
-    command_ids: @repository_race_tasks.map { _1.fetch(:command_id) }
+    command_ids: @repository_race_tasks.map { _1.fetch(:internal_command_id) }
   )
   start_process_subscriptions
   await_contention_evidence

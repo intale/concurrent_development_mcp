@@ -4,7 +4,6 @@ module Coordinator
       def corrected_at: () -> String
       def input_digest: () -> String
       def correction_event_id: () -> String
-      def completion_event_id: () -> String
     end
   end
 end

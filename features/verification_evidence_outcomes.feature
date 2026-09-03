@@ -16,7 +16,7 @@ Feature: Agents submit attributed compatibility evidence through checkpointed Ta
       When the claimant submits "passed" "contract_compatibility_review" evidence as command "cmd-cuc-evidence-contract"
       Then the evidence Task completes with obligation status "satisfied"
       And two attributed evidence facts and one satisfied fact are durable
-      And the final evidence, outcome, receipt, and Task carry exact tracing
+      And the final evidence, outcome, command terminal, and Task carry exact tracing
 
     Scenario: Failed required evidence immediately fails the obligation
       Given agent "agent-blue" actively claims Rails verification obligation "EVIDENCE-FAILED"
@@ -40,13 +40,13 @@ Feature: Agents submit attributed compatibility evidence through checkpointed Ta
       And the prior claimant submits evidence with the stale fence
       Then the stale evidence Task reports "verification_obligation_claim_stale" without target facts
 
-    Scenario: Command replay returns the receipt while a new command cannot duplicate its assessment
+    Scenario: Command replay returns the result while a new command cannot duplicate its assessment
       Given agent "agent-blue" actively claims Rails verification obligation "EVIDENCE-REPLAY"
       When the claimant submits "inconclusive" "combined_tests" evidence as command "cmd-cuc-evidence-replay"
-      And the exact evidence command is submitted through another Task
-      Then both evidence Tasks expose the same receipt and one evidence fact
+      And the exact evidence command is submitted again
+      Then both evidence responses expose the same Task result and one evidence fact
       When the same assessment is submitted as new command "cmd-cuc-evidence-duplicate"
-      Then the duplicate evidence Task reports "verification_evidence_already_submitted" without a new receipt
+      Then the duplicate evidence Task reports "verification_evidence_already_submitted" with a rejected command lifecycle
 
   Rule: Concurrent commands serialize and available reads converge without a freshness gate
 

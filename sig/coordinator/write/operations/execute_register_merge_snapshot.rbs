@@ -14,7 +14,7 @@ module Coordinator::Write::Operations
       ?event_factory: Coordinator::Write::EventFactory,
       ?schema_registry: Coordinator::Write::EventSchemaRegistry,
       ?stream_factory: Coordinator::Write::StreamFactory,
-      ?completion_builder: Coordinator::Write::CommandCompletionBuilder,
+      ?completion_builder: Coordinator::Write::CommandResultBuilder,
       ?natural_key_registry: Coordinator::Write::NaturalKeys::Registry,
       ?event_plan_contract: Coordinator::Write::Contracts::MergeSnapshotRegistrationEventPlan
     ) -> void

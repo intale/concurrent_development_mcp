@@ -10,22 +10,14 @@ module Coordinator::Write
           @stream_factory = stream_factory
         end
 
-        def call(state:, command:, occurred_at:)
+        def call(state:, command:, items:)
           return Failure(conflict(command)) if state.creation
 
-          event = Events::OperationBatchCreatedV1.new(
+          event = Events::OperationBatchCreatedV2.new(
             batch_id: command.batch_id,
             target_tool: command.target_tool,
-            total: command.items.length,
             page_size: command.page_size,
-            items: command.items,
-            manifest_digest: command.manifest_digest,
-            encoded_byte_size: command.encoded_byte_size,
-            requester: Coordinator::Write::OperationBatches::ActorV1.new(
-              kind: command.actor.kind,
-              id: command.actor.id
-            ),
-            created_at: occurred_at
+            items:
           )
           Success(
             EventPlan.new(

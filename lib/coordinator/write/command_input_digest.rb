@@ -1057,11 +1057,8 @@ module Coordinator::Write
           batch_id: command.batch_id,
           index: command.index,
           item_command_id: command.item_command_id,
-          canonical_input_digest: command.canonical_input_digest,
-          result: command.result,
-          target_completion: command.target_completion &&
-            CommandInputDocuments::EventReferenceV1.new(command.target_completion.to_h),
-          finished_at: command.finished_at
+          outcome: command.outcome,
+          target_event: CommandInputDocuments::EventReferenceV1.new(command.target_event.to_h)
         )
       )
     end
@@ -1079,9 +1076,7 @@ module Coordinator::Write
           actor: actor_document(command.actor),
           batch_id: command.batch_id,
           page_start: command.page_start,
-          page_end: command.page_end,
-          source_event: CommandInputDocuments::EventReferenceV1.new(command.source_event.to_h),
-          requested_at: command.requested_at
+          page_end: command.page_end
         )
       )
     end
@@ -1097,9 +1092,7 @@ module Coordinator::Write
         tool_name: "operation_batch_completion_policy",
         input: CommandInputDocuments::CompleteOperationBatchInputV1.new(
           actor: actor_document(command.actor),
-          batch_id: command.batch_id,
-          source_event: CommandInputDocuments::EventReferenceV1.new(command.source_event.to_h),
-          completed_at: command.completed_at
+          batch_id: command.batch_id
         )
       )
     end
@@ -1115,9 +1108,7 @@ module Coordinator::Write
         tool_name: "operation_batch_cancellation_completion_policy",
         input: CommandInputDocuments::CompleteOperationBatchCancellationInputV1.new(
           actor: actor_document(command.actor),
-          batch_id: command.batch_id,
-          source_event: CommandInputDocuments::EventReferenceV1.new(command.source_event.to_h),
-          cancelled_at: command.cancelled_at
+          batch_id: command.batch_id
         )
       )
     end

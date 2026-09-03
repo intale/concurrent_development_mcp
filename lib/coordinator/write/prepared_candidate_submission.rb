@@ -10,7 +10,6 @@ module Coordinator::Write
     attribute :build_context_event_id, Types::UuidV7.optional
     attribute :head_registration_event_id, Types::UuidV7
     attribute :attachment_event_id, Types::UuidV7
-    attribute :completion_event_id, Types::UuidV7
 
     def with_head_identity(value)
       self.class.new(
@@ -22,7 +21,6 @@ module Coordinator::Write
         build_context_event_id:,
         head_registration_event_id:,
         attachment_event_id:,
-        completion_event_id:
       )
     end
   end

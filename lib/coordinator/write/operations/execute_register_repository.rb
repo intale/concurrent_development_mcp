@@ -9,7 +9,6 @@ module Coordinator::Write
         attribute :registered_at, Types::Timestamp
         attribute :input_digest, Types::Sha256Digest
         attribute :domain_event_id, Types::UuidV7
-        attribute :completion_event_id, Types::UuidV7
       end
 
       def initialize(
@@ -22,7 +21,8 @@ module Coordinator::Write
         event_factory: EventFactory.new,
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
-        compound_marker_builder: CompoundMarkerBuilder.new
+        compound_marker_builder: CompoundMarkerBuilder.new,
+        natural_key_marker: Repositories::NaturalKeyMarker.new
       )
         @event_store = event_store
         @contract = contract
@@ -34,6 +34,7 @@ module Coordinator::Write
         @schema_registry = schema_registry
         @stream_factory = stream_factory
         @compound_marker_builder = compound_marker_builder
+        @natural_key_marker = natural_key_marker
       end
 
       def prepare(input)
@@ -66,7 +67,6 @@ module Coordinator::Write
           registered_at: @clock.now,
           input_digest: @input_digest.call(command),
           domain_event_id: @id_generator.uuid_v7,
-          completion_event_id: @id_generator.uuid_v7
         )
 
         @event_store.multiple { execute_attempt(command:, preparation:, caused_by:) }
@@ -85,9 +85,6 @@ module Coordinator::Write
       end
 
       def execute_attempt(command:, preparation:, caused_by:)
-        replay = replay_result(command:, input_digest: preparation.input_digest)
-        return replay if replay
-
         registration_by_key = load_registration_by_key(command)
         registration_by_id = load_registration(command.repository_id)
         ActiveSupport::Notifications.instrument(
@@ -120,42 +117,8 @@ module Coordinator::Write
           persisted_event: persisted,
           completed_at: preparation.registered_at
         )
-        persist_completion(
-          completion,
-          command:,
-          event_id: preparation.completion_event_id,
-          caused_by:
-        )
 
         Success(completion)
-      end
-
-      def replay_result(command:, input_digest:)
-        completion = load_completion(command.command_id)
-        return unless completion
-
-        if completion.tool_name == TOOL_NAME && completion.canonical_input_digest == input_digest
-          Success(completion)
-        else
-          Failure(
-            OutcomeError.new(
-              code: :command_id_reused,
-              message: "Command ID is already bound to another tool or input",
-              details: {
-                command_id: command.command_id,
-                existing_tool_name: completion.tool_name,
-                existing_input_digest: completion.canonical_input_digest,
-                requested_tool_name: TOOL_NAME,
-                requested_input_digest: input_digest
-              }
-            )
-          )
-        end
-      end
-
-      def load_completion(command_id)
-        event = @event_store.read(@stream_factory.command(command_id), EventQueries::COMMAND_COMPLETION).first
-        deserialize(event)
       end
 
       def load_registration(repository_id)
@@ -234,16 +197,14 @@ module Coordinator::Write
       end
 
       def scoped_repository_key_marker(command)
-        @compound_marker_builder.call(
-          CompoundMarkerDefinitionV1.new(
-            purpose: "scoped-repository-key",
-            components: [ "scope:#{command.scope}", "repository-key:#{command.repository_key}" ]
-          )
+        @natural_key_marker.call(
+          scope: command.scope,
+          repository_key: command.repository_key
         )
       end
 
       def build_completion(command:, input_digest:, registration:, outcome:, persisted_event:, completed_at:)
-        Events::CommandCompletedV1.new(
+        CommandResultV1.new(
           command_id: command.command_id,
           tool_name: TOOL_NAME,
           canonical_input_digest: input_digest,
@@ -276,17 +237,6 @@ module Coordinator::Write
           stream_id: event.stream.stream_id,
           stream_revision: event.stream_revision
         )
-      end
-
-      def persist_completion(completion, command:, event_id:, caused_by:)
-        event = @event_factory.build!(
-          event: completion,
-          event_id:,
-          metadata: command_metadata(command),
-          markers: [ "command:#{command.command_id}" ],
-          caused_by:
-        )
-        @event_store.append(@stream_factory.command(command.command_id), [ event ])
       end
 
       def command_metadata(command)

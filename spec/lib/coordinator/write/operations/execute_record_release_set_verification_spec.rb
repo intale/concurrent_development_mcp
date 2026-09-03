@@ -11,11 +11,12 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordReleaseSetVerificati
     input = verification_input(prepared, integrations, prefix: "verification-pass")
 
     first = operation.call(input).value!
-    replay = operation.call(input).value!
+    replay = operation.call(input)
     event = ReleaseSetScenario.release_lifecycle_events(input.fetch(:release_set_id)).last
     payload = ReleaseSetScenario.load(event)
 
-    expect(replay).to eq(first)
+    expect(first).to be_a(Coordinator::Write::CommandResultV1)
+    expect(replay.failure.code).to eq(:release_set_already_verified)
     expect(payload).to have_attributes(attempt_number: 1, evidence_status: "attributed_unverified")
     expect(payload.evidence.outcome).to eq("passed")
     expect(payload.integration_events).to eq(integrations.map { _1.fetch(:completion).data.integration_event })

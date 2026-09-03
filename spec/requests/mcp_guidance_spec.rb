@@ -50,14 +50,14 @@ RSpec.describe "GDN-01 MCP guidance evidence" do
 
     submitted, started, task_completed = task_events(task_id)
     utterance = conversation_events(arguments.fetch(:conversation_id)).sole
-    completion = command_events(arguments.fetch(:command_id)).sole
+    command_terminal = CommandTraceFixture.terminal(task_id, event_store:)
     expect(utterance.type).to eq("UserUtteranceRecorded")
-    expect([ utterance, completion ].map(&:causation_id).uniq).to eq([ started.id ])
-    expect(task_completed.causation_id).to eq(completion.id)
+    expect([ utterance, command_terminal ].map(&:causation_id).uniq).to eq([ started.id ])
+    expect(task_completed.causation_id).to eq(command_terminal.id)
     expect(
-      ([ submitted, started, utterance, completion, task_completed ]).map(&:correlation_id).uniq
+      ([ submitted, started, utterance, command_terminal, task_completed ]).map(&:correlation_id).uniq
     ).to eq([ submitted.correlation_id ])
-    expect([ utterance, completion ]).to all(
+    expect([ utterance, command_terminal ]).to all(
       satisfy { !_1.metadata.key?("causation_id") && !_1.metadata.key?("correlation_id") }
     )
   end
@@ -119,7 +119,9 @@ RSpec.describe "GDN-01 MCP guidance evidence" do
       denied.dig("result", "result", "structuredContent", "data", "code")
     ).to eq("message_already_recorded")
     expect(conversation_events("C-mcp-guidance-other")).to be_empty
-    expect(command_events("cmd-mcp-guidance-duplicate")).to be_empty
+    expect(CommandTraceFixture.events(duplicate_task, event_store:).map(&:type)).to eq(
+      [ "CommandRegistered", "CommandRejected" ]
+    )
   end
 
   def call_tool(name, tool_arguments, id:)
@@ -175,6 +177,7 @@ RSpec.describe "GDN-01 MCP guidance evidence" do
   def execute_task(task_id)
     submitted = task_events(task_id).find { _1.type == "CoordinationTaskSubmitted" }
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
+    CommandResultFixture.project(task_id, event_store:)
   end
 
   def task_events(task_id)
@@ -198,7 +201,7 @@ RSpec.describe "GDN-01 MCP guidance evidence" do
   def command_events(command_id)
     event_store.read(
       streams.command(command_id),
-      Coordinator::Write::EventQueries::COMMAND_COMPLETION
+      Coordinator::Write::EventQueries::COMMAND_HISTORY
     )
   end
 end

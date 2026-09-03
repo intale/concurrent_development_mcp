@@ -8,17 +8,15 @@ module Coordinator::Processes
         id: "operation-batch-runner"
       )
 
-      def record_outcome(source:, item:, result:, completion:, command_id:)
+      def record_outcome(source:, item:, execution:, command_id:)
         Coordinator::Write::Commands::RecordOperationBatchItemOutcome.new(
           command_id:,
           actor: SYSTEM_ACTOR,
           batch_id: source.payload.batch_id,
           index: item.index,
-          item_command_id: item.command_input.command_id,
-          canonical_input_digest: item.canonical_input_digest,
-          result:,
-          target_completion: completion&.reference,
-          finished_at: timestamp(completion&.event || source.event)
+          item_command_id: item.command_id,
+          outcome: execution.command_state.status,
+          target_event: event_reference(execution.terminal_event)
         )
       end
 
@@ -28,9 +26,7 @@ module Coordinator::Processes
           actor: SYSTEM_ACTOR,
           batch_id: source.payload.batch_id,
           page_start:,
-          page_end:,
-          source_event: source.reference,
-          requested_at: timestamp(source.event)
+          page_end:
         )
       end
 
@@ -38,9 +34,7 @@ module Coordinator::Processes
         Coordinator::Write::Commands::CompleteOperationBatch.new(
           command_id:,
           actor: SYSTEM_ACTOR,
-          batch_id: source.payload.batch_id,
-          source_event: source.reference,
-          completed_at: timestamp(source.event)
+          batch_id: source.payload.batch_id
         )
       end
 
@@ -48,16 +42,21 @@ module Coordinator::Processes
         Coordinator::Write::Commands::CompleteOperationBatchCancellation.new(
           command_id:,
           actor: SYSTEM_ACTOR,
-          batch_id: source.payload.batch_id,
-          source_event: source.reference,
-          cancelled_at: timestamp(source.event)
+          batch_id: source.payload.batch_id
         )
       end
 
       private
 
-      def timestamp(event)
-        event.created_at.utc.iso8601(6)
+      def event_reference(event)
+        Coordinator::Write::EventReference.new(
+          event_id: event.id,
+          type: event.type,
+          stream_context: event.stream.context,
+          stream_name: event.stream.stream_name,
+          stream_id: event.stream.stream_id,
+          stream_revision: event.stream_revision
+        )
       end
     end
   end

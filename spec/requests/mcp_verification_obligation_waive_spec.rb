@@ -39,11 +39,11 @@ RSpec.describe "VER-03 MCP verification-obligation waiver", :event_store do
     )
     submitted_event, started, task_completed = task_events(task_id)
     waiver = waiver_events(created).sole
-    completion = command_events(arguments.fetch(:command_id)).sole
+    command_terminal = CommandTraceFixture.terminal(task_id, event_store:)
     expect(waiver.causation_id).to eq(started.id)
-    expect(completion.causation_id).to eq(started.id)
-    expect(task_completed.causation_id).to eq(completion.id)
-    expect([ submitted_event, started, waiver, completion, task_completed ].map(&:correlation_id).uniq)
+    expect(command_terminal.causation_id).to eq(started.id)
+    expect(task_completed.causation_id).to eq(command_terminal.id)
+    expect([ submitted_event, started, waiver, command_terminal, task_completed ].map(&:correlation_id).uniq)
       .to eq([ submitted_event.correlation_id ])
   end
 
@@ -74,7 +74,9 @@ RSpec.describe "VER-03 MCP verification-obligation waiver", :event_store do
         "data" => include("code" => "verification_obligation_terminal")
       )
     )
-    expect(command_events(arguments.fetch(:command_id))).to be_empty
+    expect(CommandTraceFixture.events(task_id, event_store:).map(&:type)).to eq(
+      [ "CommandRegistered", "CommandRejected" ]
+    )
   end
 
   it "requires Tasks and validates user attribution before allocating one" do
@@ -143,6 +145,7 @@ RSpec.describe "VER-03 MCP verification-obligation waiver", :event_store do
     Rails.error.subscribe(collector)
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
     raise collector.errors.first if collector.errors.any?
+    CommandResultFixture.project(task_id, event_store:)
   ensure
     Rails.error.unsubscribe(collector) if collector
   end
@@ -181,6 +184,6 @@ RSpec.describe "VER-03 MCP verification-obligation waiver", :event_store do
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 end

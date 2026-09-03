@@ -29,7 +29,7 @@ Feature: Agent choice governance
       And the older Decision context remains available without a freshness claim
       When the agent records testing-framework choice "rspec" as "CHO-CUC-STALE" through a Task
       Then the choice Task reports stale context and explains how to refresh
-      And the stale choice writes no AgentChoice or command facts
+      And the stale choice writes no AgentChoice facts and records its command rejection
       When the agent follows the refresh action for the current Decision context
       Then the current testing-framework policy is available
       When the agent records testing-framework choice "rspec" as "CHO-CUC-REFRESHED" through a Task

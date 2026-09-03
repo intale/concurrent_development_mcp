@@ -3,7 +3,7 @@ module Coordinator
     module Commands
       class SubmitCoordinationTask < Shared::Value
         def task_id: () -> String
-        def request_id: () -> String | Integer
+        def request_id: () -> (String | Integer)
         def tool_name: () -> String
         def command_id: () -> String
         def command_input: () -> CommandInputDocuments::value

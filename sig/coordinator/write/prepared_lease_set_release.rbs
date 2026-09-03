@@ -5,7 +5,6 @@ module Coordinator
       def input_digest: () -> String
       def releases: () -> Array[PreparedLeaseReleaseV1]
       def write_set_event_id: () -> String
-      def completion_event_id: () -> String
     end
   end
 end

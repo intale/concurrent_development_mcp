@@ -6,6 +6,5 @@ module Coordinator::Write
     attribute :claimed_at, Types::Timestamp
     attribute :input_digest, Types::Sha256Digest
     attribute :claim_event_id, Types::UuidV7
-    attribute :completion_event_id, Types::UuidV7
   end
 end

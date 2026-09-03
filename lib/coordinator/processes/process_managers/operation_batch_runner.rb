@@ -15,8 +15,6 @@ module Coordinator::Processes
         loader: Coordinator::Write::OperationBatches::Loader.new(event_store:),
         target_builder: Coordinator::Write::Tasks::TargetCommandBuilder.new,
         target_executor: Coordinator::Write::Tasks::TargetExecutor.new(event_store:),
-        result_mapper: Coordinator::Write::Tasks::ToolResultMapper.new,
-        completion_loader: OperationBatches::TargetCompletionLoader.new(event_store:),
         command_builder: OperationBatches::CommandBuilder.new,
         process_step_planner: Coordinator::Processes::ProcessStepPlanner.new(event_store:),
         batch_executor: Coordinator::Write::Operations::ExecuteOperationBatchCommand.new(event_store:)
@@ -25,8 +23,6 @@ module Coordinator::Processes
         @loader = loader
         @target_builder = target_builder
         @target_executor = target_executor
-        @result_mapper = result_mapper
-        @completion_loader = completion_loader
         @command_builder = command_builder
         @process_step_planner = process_step_planner
         @batch_executor = batch_executor
@@ -35,10 +31,10 @@ module Coordinator::Processes
       def call(event)
         source = @source_builder.call(event)
         case source.payload
-        when Coordinator::Write::Events::OperationBatchCreatedV1,
-             Coordinator::Write::Events::OperationBatchContinuationRequestedV1
+        when Coordinator::Write::Events::OperationBatchCreatedV2,
+             Coordinator::Write::Events::OperationBatchContinuationRequestedV2
           process_page(source)
-        when Coordinator::Write::Events::OperationBatchCancellationRequestedV1
+        when Coordinator::Write::Events::OperationBatchCancellationRequestedV2
           complete_cancellation(source)
         end
         nil
@@ -67,13 +63,8 @@ module Coordinator::Processes
       def execute_item(source:, item:)
         command = @target_builder.call(item.command_input)
         target_result = @target_executor.call(command, caused_by: source.event)
-        public_result = @result_mapper.call(
-          target_result,
-          command_id: command.command_id,
-          tool_name: item.command_input.tool_name
-        )
-        completion = target_result.success? ? @completion_loader.call(command.command_id) : nil
-        parent = outcome_parent(source, completion)
+        execution = target_result.value!
+        parent = outcome_parent(source, execution)
         process_step = plan(
           source_event: parent,
           step_name: "record-item-outcome",
@@ -91,8 +82,7 @@ module Coordinator::Processes
             @command_builder.record_outcome(
               source:,
               item:,
-              result: public_result,
-              completion:,
+              execution:,
               command_id: process_step.target_command_id
             ),
             caused_by: process_step.event
@@ -126,7 +116,7 @@ module Coordinator::Processes
         page_start = pending.min
         page_end = [
           page_start + snapshot.state.creation.page_size - 1,
-          snapshot.state.creation.total - 1
+          snapshot.state.creation.items.length - 1
         ].min
         process_step = plan(
           source_event: source.event,
@@ -148,12 +138,11 @@ module Coordinator::Processes
         )
       end
 
-      def outcome_parent(source, completion)
-        completion_event = completion&.event
-        return source.event unless completion_event
-        return source.event unless completion_event.correlation_id == source.event.correlation_id
+      def outcome_parent(source, execution)
+        terminal_event = execution.terminal_event
+        return source.event unless terminal_event.correlation_id == source.event.correlation_id
 
-        completion_event
+        terminal_event
       end
 
       def complete_observed_cancellation(snapshot)
@@ -184,8 +173,8 @@ module Coordinator::Processes
 
       def bounds(source)
         payload = source.payload
-        if payload.is_a?(Coordinator::Write::Events::OperationBatchCreatedV1)
-          0..([ payload.page_size - 1, payload.total - 1 ].min)
+        if payload.is_a?(Coordinator::Write::Events::OperationBatchCreatedV2)
+          0..([ payload.page_size - 1, payload.items.length - 1 ].min)
         else
           payload.page_start..payload.page_end
         end

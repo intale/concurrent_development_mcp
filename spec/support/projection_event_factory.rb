@@ -13,6 +13,7 @@ module ProjectionEventFactory
     actor_kind: "agent",
     actor_id: "projector-spec-agent",
     recorded_by: "coordinator",
+    metadata: nil,
     markers: [],
     event_id: SecureRandom.uuid_v7,
     created_at: Time.utc(2026, 8, 30, 12),
@@ -23,7 +24,7 @@ module ProjectionEventFactory
     event = Coordinator::Write::EventFactory.new.build!(
       event: payload,
       event_id:,
-      metadata: Coordinator::Write::EventMetadata.new(
+      metadata: metadata || Coordinator::Write::EventMetadata.new(
         command_id:,
         actor_kind:,
         actor_id:,

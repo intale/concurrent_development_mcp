@@ -92,7 +92,11 @@ Then("the choice Task succeeds with accepted authoritative facts") do
     agent_choice_events(@choice_id).map(&:type),
     "AgentChoice event plan"
   )
-  assert_acceptance_equal(1, command_events(@choice_command_id).length, "Choice command completion")
+  assert_acceptance_equal(
+    %w[CommandRegistered CommandSucceeded],
+    command_events(@choice_command_id).map(&:type),
+    "Choice command lifecycle"
+  )
 end
 
 Then("AgentChoice {string} is honestly not observed before projection") do |choice_id|
@@ -169,9 +173,13 @@ Then("the choice Task reports stale context and explains how to refresh") do
   assert_acceptance(refresh, "Stale choice result must explain how to refresh Decision context")
 end
 
-Then("the stale choice writes no AgentChoice or command facts") do
+Then("the stale choice writes no AgentChoice facts and records its command rejection") do
   assert_acceptance_equal([], agent_choice_events(@choice_id), "Denied AgentChoice facts")
-  assert_acceptance_equal([], command_events(@choice_command_id), "Denied choice command facts")
+  assert_acceptance_equal(
+    %w[CommandRegistered CommandRejected],
+    command_events(@choice_command_id).map(&:type),
+    "Denied choice command lifecycle"
+  )
   assert_acceptance_equal("not_found", agent_choice_view(@choice_id).fetch("status"), "Denied Choice view")
 end
 

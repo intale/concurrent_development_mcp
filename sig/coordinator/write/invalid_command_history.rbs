@@ -1,0 +1,6 @@
+module Coordinator
+  module Write
+    class InvalidCommandHistory < StandardError
+    end
+  end
+end

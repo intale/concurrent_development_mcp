@@ -115,7 +115,7 @@ When("two agents concurrently resolve file {string} through MCP") do |path|
   end
   install_contention_barrier(
     operation: "resource_resolve_dcb",
-    command_ids: @resource_race_tasks.map { _1.fetch(:command_id) }
+    command_ids: @resource_race_tasks.map { _1.fetch(:internal_command_id) }
   )
   start_process_subscriptions
   await_contention_evidence

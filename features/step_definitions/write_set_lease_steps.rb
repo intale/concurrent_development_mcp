@@ -141,9 +141,9 @@ Then("the loser owns no partial write set") do
     "Losing unique resource lease"
   )
   assert_acceptance_equal(
-    [],
-    command_events(@losing_reservation.dig(:arguments, :command_id)),
-    "Losing command completion"
+    %w[CommandRegistered CommandRejected],
+    command_events(@losing_reservation.dig(:arguments, :command_id)).map(&:type),
+    "Losing command lifecycle"
   )
 end
 
@@ -791,7 +791,7 @@ Then("the timer is superseded and cannot affect the successor") do
   assert_acceptance_equal(
     [],
     command_events(process_step.data.fetch("target_command_id")),
-    "Superseded expiry command completion"
+    "Superseded expiry command lifecycle"
   )
 end
 
@@ -950,7 +950,11 @@ Then("the cancelled reservation writes no lease fact") do
     write_set_events(@cancelled_reservation_owner.fetch(:attempt_id)),
     "Cancelled Attempt write set"
   )
-  assert_acceptance_equal([], command_events(@cancelled_reservation_command_id), "Cancelled command facts")
+  assert_acceptance_equal(
+    [ "CommandRegistered" ],
+    command_events(@cancelled_reservation_command_id).map(&:type),
+    "Cancelled command facts"
+  )
 end
 
 When("agent {string} deliberately reserves {string}") do |agent_id, path|
@@ -1052,7 +1056,7 @@ Then("the contender remains busy with the renewed deadline") do
   assert_acceptance_equal([], write_set_events(@lease_participants.last.fetch(:attempt_id)), "Contender write set")
 end
 
-When("the exact release command is retried through another Task") do
+When("the exact release command is submitted again") do
   arguments = {
     command_id: "cmd-cuc-release-set",
     actor: { kind: "agent", id: @release_agent_id },
@@ -1069,14 +1073,19 @@ When("the exact release command is retried through another Task") do
   @release_retry_task_state = task_request("tasks/get", @release_retry_task_id)
 end
 
-Then("both release Task handles expose one logical result") do
+Then("both release responses expose the original Task and one logical result") do
+  assert_acceptance_equal(@release_task_id, @release_retry_task_id, "Release replay Task identity")
   assert_acceptance_equal(
     @release_task_state.dig("result", "result"),
     @release_retry_task_state.dig("result", "result"),
     "Release replay result"
   )
   assert_acceptance_equal(1, write_set_release_events(@release_attempt_id).length, "Write-set releases")
-  assert_acceptance_equal(1, command_events("cmd-cuc-release-set").length, "Release command completions")
+  assert_acceptance_equal(
+    %w[CommandRegistered CommandSucceeded],
+    command_events("cmd-cuc-release-set").map(&:type),
+    "Release command lifecycle"
+  )
 end
 
 When("the predecessor releases its exact lease set") do
@@ -1251,10 +1260,14 @@ Then("the abandonment Task releases current fences and requeues the WorkItem") d
       "Abandoned lease lifecycle for #{path}"
     )
   end
-  assert_acceptance_equal(1, command_events(@abandonment_arguments.fetch(:command_id)).length, "Command receipt")
+  assert_acceptance_equal(
+    %w[CommandRegistered CommandSucceeded],
+    command_events(@abandonment_arguments.fetch(:command_id)).map(&:type),
+    "Command lifecycle"
+  )
 end
 
-When("the exact abandonment command is retried through another Task") do
+When("the exact abandonment command is submitted again") do
   @abandonment_retry_task_id = call_tool(
     "attempt_abandon",
     @abandonment_arguments
@@ -1263,16 +1276,21 @@ When("the exact abandonment command is retried through another Task") do
   @abandonment_retry_task_state = task_request("tasks/get", @abandonment_retry_task_id)
 end
 
-Then("both abandonment Task handles expose one logical result") do
+Then("both abandonment responses expose the original Task and one logical result") do
+  assert_acceptance_equal(
+    @abandonment_task_id,
+    @abandonment_retry_task_id,
+    "Abandonment replay Task identity"
+  )
   assert_acceptance_equal(
     @abandonment_task_state.dig("result", "result"),
     @abandonment_retry_task_state.dig("result", "result"),
     "Abandonment replay result"
   )
   assert_acceptance_equal(
-    1,
-    command_events(@abandonment_arguments.fetch(:command_id)).length,
-    "Abandonment command completions"
+    %w[CommandRegistered CommandSucceeded],
+    command_events(@abandonment_arguments.fetch(:command_id)).map(&:type),
+    "Abandonment command lifecycle"
   )
   assert_acceptance_equal(
     1,
@@ -1482,7 +1500,11 @@ Then("abandonment is denied without releasing leases or requeueing the WorkItem"
     lease_events(coordination.fetch(:path)).map(&:type),
     "Candidate lease lifecycle"
   )
-  assert_acceptance_equal([], command_events(@candidate_abandonment_command_id), "Denied command receipt")
+  assert_acceptance_equal(
+    %w[CommandRegistered CommandRejected],
+    command_events(@candidate_abandonment_command_id).map(&:type),
+    "Denied command lifecycle"
+  )
 end
 
 Then("the checkpoint remains recorded while the Attempt is abandoned and requeued") do
@@ -1521,7 +1543,11 @@ Then("the checkpoint remains recorded while the Attempt is abandoned and requeue
     lease_events(coordination.fetch(:path)).map(&:type),
     "Intermediate Candidate lease lifecycle"
   )
-  assert_acceptance_equal(1, command_events(@candidate_abandonment_command_id).length, "Command receipt")
+  assert_acceptance_equal(
+    %w[CommandRegistered CommandSucceeded],
+    command_events(@candidate_abandonment_command_id).map(&:type),
+    "Command lifecycle"
+  )
 end
 
 module HierarchicalWriteSetAcceptance
@@ -1774,7 +1800,7 @@ When("both agents submit public reservation Tasks for disjoint resources and rea
   end
   install_contention_barrier(
     operation: "write_set_reserve",
-    command_ids: @hierarchical_reservations.map { _1.fetch(:command_id) }
+    command_ids: @hierarchical_reservations.map { _1.fetch(:internal_command_id) }
   )
   start_process_subscriptions
   await_contention_evidence
@@ -1783,7 +1809,7 @@ end
 Then("both reservation operations have deterministic contention evidence") do
   assert_acceptance_equal(2, @contention_evidence.length, "Reservation boundary arrivals")
   assert_acceptance_equal(
-    @hierarchical_reservations.map { _1.fetch(:command_id) }.sort,
+    @hierarchical_reservations.map { _1.fetch(:internal_command_id) }.sort,
     @contention_evidence.map { _1.fetch(:command_id) }.sort,
     "Reservation boundary commands"
   )
@@ -1934,8 +1960,8 @@ Then("the lease expires under a distinct deterministic internal command") do
     "Expiry command metadata"
   )
   assert_acceptance_equal([], task_events_for_command(@public_collision_command_id), "Public Task facts")
-  assert_acceptance_equal([], command_events(@public_collision_command_id), "Public completion facts")
-  assert_acceptance_equal(1, command_events(@internal_expiry_command_id).length, "Internal completion")
+  assert_acceptance_equal([], command_events(@public_collision_command_id), "Public command lifecycle")
+  assert_acceptance_equal([], command_events(@internal_expiry_command_id), "Internal command lifecycle")
 end
 
 When("agent {string} reserves the expired file through a public Task") do |agent_id|
@@ -1995,8 +2021,7 @@ end
 class ResourceBoundaryRolloverGate
   EVENT_NAME = "coordinator.command_boundary"
 
-  def initialize(reservation_command_id:)
-    @reservation_command_id = reservation_command_id
+  def initialize
     @mutex = Thread::Mutex.new
     @condition = Thread::ConditionVariable.new
     @arrivals = {}
@@ -2037,9 +2062,8 @@ class ResourceBoundaryRolloverGate
   def role_for(payload)
     return unless payload.fetch(:operation).to_s == "resource_boundary_dcb"
 
-    command_id = payload.fetch(:command_id).to_s
-    return :reservation if command_id == @reservation_command_id
-    :rollover if Coordinator::Shared::Types::UUID_V7_PATTERN.match?(command_id)
+    return :rollover if payload.key?(:source_event_id)
+    :reservation if payload.key?(:event_ids)
   end
 
   def arrive(role, payload)
@@ -2412,10 +2436,7 @@ Given("two independent agents can reach the same resource-boundary decision conc
   )
   @rollover_receipt = renew_rollover_resources(receipt, count: 2)
   assert_acceptance_equal(127, rollover_boundary_events(@rollover_race_marker).length, "Pre-race facts")
-  @rollover_reservation_command_id = "audit2-rollover.reserve.contender"
-  @resource_boundary_rollover_gate = ResourceBoundaryRolloverGate.new(
-    reservation_command_id: @rollover_reservation_command_id
-  )
+  @resource_boundary_rollover_gate = ResourceBoundaryRolloverGate.new
 end
 
 When("the rollover command and conflicting reservation reach the deterministic database barrier") do

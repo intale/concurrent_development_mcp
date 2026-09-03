@@ -12,7 +12,7 @@ module Coordinator
           ?event_factory: EventFactory,
           ?schema_registry: EventSchemaRegistry,
           ?stream_factory: StreamFactory,
-          ?compound_marker_builder: Shared::CompoundMarkerBuilder,
+          ?request_marker: CommandLifecycle::RequestMarker,
           ?execution_lane: Tasks::ExecutionLane,
           ?correlation_resolver: Tasks::CorrelationResolver
         ) -> void

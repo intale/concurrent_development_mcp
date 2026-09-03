@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Tasks
+      class TargetExecution < Shared::Value
+        def command_state: () -> Domain::CommandLifecycles::State
+        def terminal_event: () -> PgEventstore::Event
+      end
+    end
+  end
+end

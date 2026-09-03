@@ -24,7 +24,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateWorkItem, :event_sto
     create_change_set("CS-100")
   end
 
-  it "persists both cross-stream facts and the durable completion through the real store" do
+  it "persists both cross-stream facts and returns a transient typed result" do
     result = operation.call(input)
 
     expect(result).to be_success
@@ -39,7 +39,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateWorkItem, :event_sto
     expect(change_set_events("CS-100").map(&:type)).to eq(
       [ "ChangeSetCreated", "ChangeSetAcceptanceCriteriaDefined", "WorkItemAddedToChangeSet" ]
     )
-    expect(command_events("cmd-200").map(&:type)).to eq([ "CommandCompleted" ])
+    expect(command_events("cmd-200")).to be_empty
     expect(completion.emitted_events.map { [ _1.stream_name, _1.stream_revision ] }).to eq(
       [ [ "WorkItem", 0 ], [ "ChangeSet", 2 ] ]
     )
@@ -58,26 +58,25 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateWorkItem, :event_sto
     expect(membership.markers).to contain_exactly(*common)
   end
 
-  it "replays the exact persisted result without another real append" do
-    original = operation.call(input)
+  it "leaves replay ownership to the registered Command lifecycle" do
+    expect(operation.call(input)).to be_success
     original_ids = persisted_ids
 
     replay = operation.call(input)
 
-    expect(replay).to be_success
-    expect(replay.value!).to eq(original.value!)
+    expect(replay.failure.code).to eq(:work_item_already_exists)
     expect(persisted_ids).to eq(original_ids)
   end
 
-  it "rejects reuse of the command ID with changed accepted input" do
+  it "enforces the WorkItem identity independently of public request identity" do
     operation.call(input)
 
     result = operation.call(input.merge(goal: "A different goal"))
 
     expect(result).to be_failure
-    expect(result.failure.code).to eq(:command_id_reused)
+    expect(result.failure.code).to eq(:work_item_already_exists)
     expect(work_item_events("W-200").length).to eq(1)
-    expect(command_events("cmd-200").length).to eq(1)
+    expect(command_events("cmd-200")).to be_empty
   end
 
   it "returns a zero-event duplicate denial without completing the losing command" do
@@ -139,7 +138,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateWorkItem, :event_sto
     expect(results.find(&:failure?).failure.code).to eq(:work_item_already_exists)
     expect(work_item_events("W-200").length).to eq(1)
     expect(change_set_events("CS-100").count { _1.type == "WorkItemAddedToChangeSet" }).to eq(1)
-    expect(competing_inputs.count { command_events(_1.fetch(:command_id)).one? }).to eq(1)
+    expect(competing_inputs.flat_map { command_events(_1.fetch(:command_id)) }).to be_empty
   end
 
   def create_change_set(change_set_id)
@@ -184,7 +183,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateWorkItem, :event_sto
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 
   def persisted_ids

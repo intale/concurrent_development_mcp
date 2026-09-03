@@ -223,25 +223,27 @@ RSpec.describe Coordinator::Write::Tasks::TargetCommandBuilder do
       )
     ]
 
-    rebuilt = commands.map do |command|
-      submitted = Coordinator::Write::Events::CoordinationTaskSubmittedV2.new(
+    expected_commands = commands.map do |command|
+      command.class.new(command.attributes.merge(command_id: SecureRandom.uuid_v7))
+    end
+    rebuilt = expected_commands.map do |command|
+      submitted = Coordinator::Write::Events::CoordinationTaskSubmittedV3.new(
         task_id: "0198e03a-d112-7000-8000-000000000001",
         tool_name: digest.document(command).tool_name,
         command_id: command.command_id,
         command_input: digest.document(command),
-        submitted_at: "2026-08-22T10:30:00.000000Z",
         ttl_ms: nil,
         poll_interval_ms: 500
       )
       reloaded = schemas.load(
         type: "CoordinationTaskSubmitted",
-        schema_version: 2,
+        schema_version: 3,
         data: JSON.parse(JSON.generate(submitted.to_h))
       )
       builder.call(reloaded.command_input)
     end
 
-    expect(rebuilt).to eq(commands)
+    expect(rebuilt).to eq(expected_commands)
   end
 
   def agent_choice_query_context

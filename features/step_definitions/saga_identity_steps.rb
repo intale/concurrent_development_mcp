@@ -16,7 +16,14 @@ Then("MCP rejects the input before allocating a Task") do
   result = @reserved_internal_response.fetch("result")
   assert_acceptance_equal("complete", result.fetch("resultType"), "Immediate result type")
   assert_acceptance_equal(true, result.fetch("isError"), "Reserved command identity")
-  assert_acceptance_equal([], task_events_for_command(@reserved_internal_command_id), "Task facts")
+  assert_acceptance_equal(
+    [],
+    task_events_for_request(
+      @reserved_internal_command_id,
+      actor: { kind: "agent", id: "identity-preemption-agent" }
+    ),
+    "Task facts"
+  )
   assert_acceptance_equal([], command_events(@reserved_internal_command_id), "Premature command facts")
 end
 
@@ -25,7 +32,8 @@ Then("the live Batch Saga eventually completes normally") do
   events = operation_batch_events
   assert_acceptance_equal(1, events.count { _1.type == "OperationBatchItemSucceeded" }, "Batch outcome")
   assert_acceptance_equal(1, events.count { _1.type == "OperationBatchCompleted" }, "Batch completion")
-  assert_acceptance_equal(1, command_events(@reserved_internal_command_id).length, "Process command")
+  outcome = events.find { _1.type == "OperationBatchItemSucceeded" }
+  assert_acceptance_equal(@reserved_internal_command_id, outcome.metadata.fetch("command_id"), "Process command")
 end
 
 Then("the live ReleaseSet Saga eventually reaches its valid terminal outcome") do
@@ -33,7 +41,8 @@ Then("the live ReleaseSet Saga eventually reaches its valid terminal outcome") d
   events = release_set_lifecycle_events(@release_set_id)
   completion = events.select { _1.type == "ReleaseSetCompleted" }.sole
   assert_acceptance_equal("compensated", release_set_payload(completion).outcome, "ReleaseSet outcome")
-  assert_acceptance_equal(1, command_events(@reserved_internal_command_id).length, "Process command")
+  request = events.find { _1.type == "ReleaseSetCompensationRequested" }
+  assert_acceptance_equal(@reserved_internal_command_id, request.metadata.fetch("command_id"), "Process command")
   assert_acceptance_equal([ events.first.correlation_id ], events.map(&:correlation_id).uniq, "Saga correlation")
 end
 
@@ -62,7 +71,7 @@ Then("the item has one successful outcome") do
   assert_acceptance_equal(process_step.id, outcomes.sole.causation_id, "Replayed item causation")
   assert_acceptance_equal(creation.id, process_step.causation_id, "Replayed ProcessStep causation")
   assert_acceptance(
-    @prior_target_completion.correlation_id != creation.correlation_id,
+    @prior_target_terminal.correlation_id != creation.correlation_id,
     "The prior target and Batch unexpectedly share one correlation"
   )
 end

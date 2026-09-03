@@ -4,7 +4,6 @@ module Coordinator
       def expired_at: () -> String
       def input_digest: () -> String
       def expiration_event_id: () -> String
-      def completion_event_id: () -> String
     end
   end
 end

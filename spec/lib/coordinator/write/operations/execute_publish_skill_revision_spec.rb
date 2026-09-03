@@ -7,7 +7,7 @@ RSpec.describe Coordinator::Write::Operations::ExecutePublishSkillRevision, :eve
   let(:streams) { Coordinator::Write::StreamFactory.new }
   let(:marker_builder) { Coordinator::Write::Skills::MarkerBuilder.new }
 
-  it "atomically publishes a complete immutable revision and its command completion" do
+  it "atomically publishes a complete immutable revision" do
     result = operation.call(input)
 
     expect(result).to be_success
@@ -30,19 +30,18 @@ RSpec.describe Coordinator::Write::Operations::ExecutePublishSkillRevision, :eve
       "byte_size" => 17
     )
     expect(persisted_asset.fetch("content")).not_to have_key("base64")
-    expect(command_events("cmd-skill-1").map(&:type)).to eq([ "CommandCompleted" ])
+    expect(command_events("cmd-skill-1")).to be_empty
   end
 
-  it "replays an identical command and rejects changed command reuse" do
-    original = operation.call(input)
+  it "leaves replay ownership to the registered Command lifecycle" do
+    expect(operation.call(input)).to be_success
     event_ids = skill_events("review", "project:alpha").map(&:id)
 
     replay = operation.call(input)
     changed = operation.call(input.merge(instructions: "Use a different process."))
 
-    expect(replay).to be_success
-    expect(replay.value!).to eq(original.value!)
-    expect(changed.failure.code).to eq(:command_id_reused)
+    expect(replay.failure.code).to eq(:skill_revision_conflict)
+    expect(changed.failure.code).to eq(:skill_revision_conflict)
     expect(skill_events("review", "project:alpha").map(&:id)).to eq(event_ids)
   end
 
@@ -135,6 +134,6 @@ RSpec.describe Coordinator::Write::Operations::ExecutePublishSkillRevision, :eve
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 end

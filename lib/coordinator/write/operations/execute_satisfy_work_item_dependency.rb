@@ -15,7 +15,7 @@ module Coordinator::Write
         event_factory: EventFactory.new,
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
-        completion_builder: CommandCompletionBuilder.new,
+        completion_builder: CommandResultBuilder.new,
         event_plan_contract: Contracts::DependencySatisfactionEventPlan.new
       )
         @event_store = event_store
@@ -42,7 +42,6 @@ module Coordinator::Write
             input_digest: @input_digest.dependency_satisfaction_policy(command),
             satisfaction_event_id: @id_generator.uuid_v7,
             readiness_event_id: @id_generator.uuid_v7,
-            completion_event_id: @id_generator.uuid_v7
           )
 
           step @event_store.multiple { execute_attempt(command:, preparation:, caused_by:) }
@@ -52,9 +51,6 @@ module Coordinator::Write
       private
 
       def execute_attempt(command:, preparation:, caused_by:)
-        replay = replay_result(command:, input_digest: preparation.input_digest)
-        return replay if replay
-
         change_set_state = load_change_set(command.change_set_id)
         dependency = change_set_state.dependencies.find { _1.dependency_id == command.dependency_id }
         return dependency_not_found(command) unless dependency
@@ -90,7 +86,6 @@ module Coordinator::Write
           persisted_events: persisted,
           completed_at: preparation.occurred_at
         )
-        persist_completion(completion, command:, caused_by:, event_id: preparation.completion_event_id)
         Success(completion)
       end
 
@@ -139,17 +134,6 @@ module Coordinator::Write
         end.freeze
       end
 
-      def persist_completion(completion, command:, caused_by:, event_id:)
-        event = @event_factory.build!(
-          event: completion,
-          event_id:,
-          metadata: command_metadata(command),
-          markers: [ "command:#{command.command_id}" ],
-          caused_by:
-        )
-        @event_store.append(@stream_factory.command(command.command_id), [ event ])
-      end
-
       def event_markers(event, command:)
         common = command.process_decision_components + [
           command.process_decision_marker,
@@ -165,25 +149,6 @@ module Coordinator::Write
           "consumer-work-item:#{event.consumer_work_item_id}",
           "dependency-kind:#{event.dependency_kind}"
         ]
-      end
-
-      def replay_result(command:, input_digest:)
-        completion = load_completion(command.command_id)
-        return unless completion
-        return Success(completion) if completion.tool_name == TOOL_NAME && completion.canonical_input_digest == input_digest
-
-        Failure(
-          OutcomeError.new(
-            code: :command_id_reused,
-            message: "Command ID is already bound to another tool or input",
-            details: {}
-          )
-        )
-      end
-
-      def load_completion(command_id)
-        event = @event_store.read(@stream_factory.command(command_id), EventQueries::COMMAND_COMPLETION).first
-        event && load_event(event)
       end
 
       def dependency_not_found(command)

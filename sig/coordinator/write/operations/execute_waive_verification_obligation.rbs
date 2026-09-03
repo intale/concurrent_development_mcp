@@ -14,7 +14,7 @@ module Coordinator
           ?event_factory: EventFactory,
           ?schema_registry: EventSchemaRegistry,
           ?stream_factory: StreamFactory,
-          ?completion_builder: CommandCompletionBuilder,
+          ?completion_builder: CommandResultBuilder,
           ?policy_loader: CandidateObligations::ImpactPolicyLoader,
           ?history_contract: Contracts::VerificationObligationWaiverHistory,
           ?event_plan_contract: Contracts::VerificationObligationWaiverEventPlan

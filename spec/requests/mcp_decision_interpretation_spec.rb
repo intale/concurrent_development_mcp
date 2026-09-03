@@ -64,17 +64,17 @@ RSpec.describe "GDN-02/03 MCP interpretation lifecycle" do
 
     submitted, started, task_completed = task_events(task_id)
     proposal, clarification = interpretation_events
-    completion = command_events(arguments.fetch(:command_id)).sole
+    command_terminal = CommandTraceFixture.terminal(task_id, event_store:)
     source = guidance_events.sole
     expect([ proposal, clarification ].map(&:type)).to eq(%w[
       DecisionInterpretationProposed
       DecisionClarificationRequired
     ])
     expect([ proposal, clarification ].map(&:stream_revision)).to eq([ 0, 1 ])
-    expect([ proposal, clarification, completion ].map(&:causation_id).uniq).to eq([ started.id ])
-    expect(task_completed.causation_id).to eq(completion.id)
+    expect([ proposal, clarification, command_terminal ].map(&:causation_id).uniq).to eq([ started.id ])
+    expect(task_completed.causation_id).to eq(command_terminal.id)
     expect(
-      [ submitted, started, proposal, clarification, completion, task_completed ]
+      [ submitted, started, proposal, clarification, command_terminal, task_completed ]
         .map(&:correlation_id).uniq
     ).to eq([ submitted.correlation_id ])
     expect(proposal.correlation_id).not_to eq(source.correlation_id)
@@ -83,7 +83,7 @@ RSpec.describe "GDN-02/03 MCP interpretation lifecycle" do
       "type" => source.type,
       "stream_revision" => source.stream_revision
     )
-    expect([ proposal, clarification, completion ]).to all(
+    expect([ proposal, clarification, command_terminal ]).to all(
       satisfy { !_1.metadata.key?("causation_id") && !_1.metadata.key?("correlation_id") }
     )
 
@@ -142,11 +142,11 @@ RSpec.describe "GDN-02/03 MCP interpretation lifecycle" do
 
     submitted, started, task_completed = task_events(task_id)
     acceptance = interpretation_events.find { _1.type == "DecisionInterpretationAccepted" }
-    completion = command_events(adjudication.fetch(:command_id)).sole
+    command_terminal = CommandTraceFixture.terminal(task_id, event_store:)
     expect(acceptance).not_to be_nil
-    expect([ acceptance, completion ].map(&:causation_id).uniq).to eq([ started.id ])
-    expect(task_completed.causation_id).to eq(completion.id)
-    expect([ submitted, started, acceptance, completion, task_completed ].map(&:correlation_id).uniq).to eq(
+    expect([ acceptance, command_terminal ].map(&:causation_id).uniq).to eq([ started.id ])
+    expect(task_completed.causation_id).to eq(command_terminal.id)
+    expect([ submitted, started, acceptance, command_terminal, task_completed ].map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
     )
     expect(acceptance.markers).to include(
@@ -223,7 +223,9 @@ RSpec.describe "GDN-02/03 MCP interpretation lifecycle" do
         )
       )
     )
-    expect(command_events(missing_arguments.fetch(:command_id))).to be_empty
+    expect(CommandTraceFixture.events(missing_task_id, event_store:).map(&:type)).to eq(
+      [ "CommandRegistered", "CommandRejected" ]
+    )
 
     malformed_arguments = InterpretationInput.adjudication(
       command_id: "cmd-mcp-interpretation-malformed",
@@ -321,6 +323,7 @@ RSpec.describe "GDN-02/03 MCP interpretation lifecycle" do
   def execute_task(task_id)
     submitted = task_events(task_id).find { _1.type == "CoordinationTaskSubmitted" }
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
+    CommandResultFixture.project(task_id, event_store:)
   end
 
   def task_events(task_id)
@@ -378,7 +381,7 @@ RSpec.describe "GDN-02/03 MCP interpretation lifecycle" do
   def command_events(command_id)
     event_store.read(
       streams.command(command_id),
-      Coordinator::Write::EventQueries::COMMAND_COMPLETION
+      Coordinator::Write::EventQueries::COMMAND_HISTORY
     )
   end
 end

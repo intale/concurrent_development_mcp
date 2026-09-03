@@ -16,7 +16,7 @@ module Coordinator::Write
         event_factory: EventFactory.new,
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
-        completion_builder: CommandCompletionBuilder.new,
+        completion_builder: CommandResultBuilder.new,
         history_contract: Contracts::MergeSnapshotVerificationHistory.new,
         event_plan_contract: Contracts::MergeSnapshotVerificationEventPlan.new
       )
@@ -56,15 +56,11 @@ module Coordinator::Write
           input_digest: @input_digest.merge_verification_submit(command),
           submission_event_id: @id_generator.uuid_v7,
           verified_event_id: @id_generator.uuid_v7,
-          completion_event_id: @id_generator.uuid_v7,
           correlation_id: @id_generator.uuid_v7
         )
       end
 
       def execute_attempt(command:, preparation:, caused_by:)
-        replay = replay_result(command:, input_digest: preparation.input_digest)
-        return replay if replay
-
         history = load_history(command.merge_snapshot_id)
         evidence = snapshot_evidence(history)
         verification_digest = if evidence
@@ -110,7 +106,6 @@ module Coordinator::Write
           persisted_events: persisted,
           completed_at: preparation.submitted_at
         )
-        persist_completion(completion, command:, preparation:, caused_by:)
         Success(completion)
       end
 
@@ -200,46 +195,6 @@ module Coordinator::Write
           )
         end
         @event_store.append(plan.writes.first.stream, physical)
-      end
-
-      def persist_completion(completion, command:, preparation:, caused_by:)
-        physical = @event_factory.build!(
-          event: completion,
-          event_id: preparation.completion_event_id,
-          metadata: command_metadata(command),
-          markers: [ "command:#{command.command_id}" ],
-          caused_by:,
-          correlation_id: root_correlation_id(preparation, caused_by)
-        )
-        @event_store.append(@stream_factory.command(command.command_id), [ physical ])
-      end
-
-      def replay_result(command:, input_digest:)
-        completion = load_completion(command.command_id)
-        return unless completion
-
-        if completion.tool_name == TOOL_NAME && completion.canonical_input_digest == input_digest
-          Success(completion)
-        else
-          Failure(
-            OutcomeError.new(
-              code: :command_id_reused,
-              message: "Command ID is already bound to another tool or input",
-              details: {
-                command_id: command.command_id,
-                existing_tool_name: completion.tool_name,
-                existing_input_digest: completion.canonical_input_digest,
-                requested_tool_name: TOOL_NAME,
-                requested_input_digest: input_digest
-              }
-            )
-          )
-        end
-      end
-
-      def load_completion(command_id)
-        event = @event_store.read(@stream_factory.command(command_id), EventQueries::COMMAND_COMPLETION).first
-        event && load_event(event)
       end
 
       def load_event(event)

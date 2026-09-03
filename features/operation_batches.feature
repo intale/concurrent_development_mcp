@@ -40,7 +40,7 @@ Feature: Bounded command batches for checkpointed agent imports
       Then the cancellation Task succeeds without undoing completed items
       And the available Batch exposes accepted cancellation before terminal completion
       When the pending Batch continuation observes cancellation
-      Then the Batch is cancelled with 50 successes and one item not run
+      Then the Batch history derives 50 successes and one item not run after cancellation
       When the agent resubmits only the not-run manifest items
       Then the resumed Batch succeeds once without replaying the completed prefix
 

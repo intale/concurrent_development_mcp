@@ -6,7 +6,6 @@ module Coordinator
       def correction_event_id: () -> String
       def slot_event_ids: () -> Array[String]
       def partition_event_ids: () -> Array[String]
-      def completion_event_id: () -> String
     end
   end
 end

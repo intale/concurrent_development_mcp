@@ -5,7 +5,6 @@ module Coordinator
       def decided_at: () -> String
       def input_digest: () -> String
       def decision_event_id: () -> String
-      def completion_event_id: () -> String
       def correlation_id: () -> String
     end
   end

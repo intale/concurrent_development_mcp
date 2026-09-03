@@ -125,8 +125,8 @@ Feature: Dynamic write-set leases
       Given agent "agent-a" has reserved "app/a.rb" and "app/b.rb" for releasable Attempt "A-CUC-RELEASE-REPLAY" in ChangeSet "CS-CUC-RELEASE-REPLAY"
       When the agent releases the complete observed lease set
       Then the release Task succeeds without changing lease identities or fencing tokens
-      When the exact release command is retried through another Task
-      Then both release Task handles expose one logical result
+      When the exact release command is submitted again
+      Then both release responses expose the original Task and one logical result
 
     @CDM-LEASE-005 @stale-view
     Scenario: A deliberate reservation succeeds after authoritative release
@@ -144,8 +144,8 @@ Feature: Dynamic write-set leases
       Given agent "agent-a" has reserved "app/a.rb" and "app/b.rb" for releasable Attempt "A-CUC-ABANDON" in ChangeSet "CS-CUC-ABANDON"
       When the agent abandons the Attempt because its execution was interrupted
       Then the abandonment Task releases current fences and requeues the WorkItem
-      When the exact abandonment command is retried through another Task
-      Then both abandonment Task handles expose one logical result
+      When the exact abandonment command is submitted again
+      Then both abandonment responses expose the original Task and one logical result
       When the agent reacquires the requeued WorkItem as fresh Attempt "A-CUC-ABANDON-NEXT"
       Then the fresh Attempt starts from a new base declaration while the old Attempt remains terminal
 

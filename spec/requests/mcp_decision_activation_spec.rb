@@ -60,7 +60,7 @@ RSpec.describe "DEC-01 MCP Decision activation" do
     slot = result.dig("data", "slot")
     slot_facts = slot_events(slot.fetch("slot_id"))
     partition = partition_events.sole
-    completion = command_events(arguments.fetch(:command_id)).sole
+    command_terminal = CommandTraceFixture.terminal(task_id, event_store:)
     domain_facts = [ recorded, activated, *slot_facts, partition ]
 
     expect(domain_facts.map(&:type)).to eq(%w[
@@ -70,12 +70,12 @@ RSpec.describe "DEC-01 MCP Decision activation" do
       DecisionSlotHeadChanged
       DecisionPartitionAdvanced
     ])
-    expect([ *domain_facts, completion ].map(&:causation_id).uniq).to eq([ started.id ])
-    expect(task_completed.causation_id).to eq(completion.id)
-    expect([ submitted, started, *domain_facts, completion, task_completed ].map(&:correlation_id).uniq).to eq(
+    expect([ *domain_facts, command_terminal ].map(&:causation_id).uniq).to eq([ started.id ])
+    expect(task_completed.causation_id).to eq(command_terminal.id)
+    expect([ submitted, started, *domain_facts, command_terminal, task_completed ].map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
     )
-    expect([ *domain_facts, completion ]).to all(
+    expect([ *domain_facts, command_terminal ]).to all(
       satisfy { !_1.metadata.key?("causation_id") && !_1.metadata.key?("correlation_id") }
     )
   end
@@ -142,7 +142,9 @@ RSpec.describe "DEC-01 MCP Decision activation" do
         "data" => include("code" => "interpretation_not_accepted")
       )
     )
-    expect(command_events(missing.fetch(:command_id))).to be_empty
+    expect(CommandTraceFixture.events(task_id, event_store:).map(&:type)).to eq(
+      [ "CommandRegistered", "CommandRejected" ]
+    )
     expect(decision_events("D-missing")).to be_empty
 
     malformed = arguments.merge(command_id: "cmd-mcp-decision-malformed", unexpected: true)
@@ -237,6 +239,7 @@ RSpec.describe "DEC-01 MCP Decision activation" do
   def execute_task(task_id)
     submitted = task_events(task_id).find { _1.type == "CoordinationTaskSubmitted" }
     Coordinator::Container["process_managers.coordination_task_executor"].call(submitted)
+    CommandResultFixture.project(task_id, event_store:)
   end
 
   def task_events(task_id)
@@ -288,6 +291,6 @@ RSpec.describe "DEC-01 MCP Decision activation" do
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 end

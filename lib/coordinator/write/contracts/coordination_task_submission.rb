@@ -4,10 +4,7 @@ module Coordinator::Write
   module Contracts
     class CoordinationTaskSubmission < Dry::Validation::Contract
       params do
-        required(:event).value(
-          Types.Instance(Events::CoordinationTaskSubmittedV2) |
-          Types.Instance(Events::CoordinationTaskSubmittedV3)
-        )
+        required(:event).value(Types.Instance(Events::CoordinationTaskSubmittedV3))
       end
 
       rule(:event) do

@@ -47,6 +47,8 @@ module Coordinator::Mcp
         )
 
         projected_result = @projected_result_resolver.call(state) if state.status == "completed"
+        return @result_mapper.projection_pending(state).to_h if state.status == "completed" && !projected_result
+
         @terminal_result_validator.call(state, projected_result:)
         @result_mapper.detailed(state, projected_result:).to_h
       end

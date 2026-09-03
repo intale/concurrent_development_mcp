@@ -130,8 +130,12 @@ module LiveTwoAgentAcceptanceWorld
         client_id:
       ).merge(key:, command_id:)
     end
-    @luna_contention_command_ids = candidates.to_h { [ _1.fetch(:key), _1.fetch(:command_id) ] }.freeze
-    @luna_contention_handles = candidates.to_h { [ _1.fetch(:key), _1.except(:key, :command_id, :worker_lane) ] }
+    @luna_contention_command_ids = candidates.to_h do
+      [ _1.fetch(:key), _1.fetch(:internal_command_id) ]
+    end.freeze
+    @luna_contention_handles = candidates.to_h do
+      [ _1.fetch(:key), _1.except(:key, :command_id, :internal_command_id, :worker_lane) ]
+    end
     install_contention_barrier(
       operation: "write_set_reserve",
       command_ids: @luna_contention_command_ids.values

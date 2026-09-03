@@ -4,7 +4,7 @@ module Coordinator
       class OperationBatches
         def initialize: (?arguments_builder: OperationBatchArguments) -> void
         def fetch: (OperationBatchGetQueryV1 query) -> OperationBatchViewV1?
-        def store: (event: PgEventstore::Event, payload: Write::Events::OperationBatchCreatedV1 | Write::Events::OperationBatchItemSucceededV1 | Write::Events::OperationBatchItemRejectedV1 | Write::Events::OperationBatchContinuationRequestedV1 | Write::Events::OperationBatchCancellationRequestedV1 | Write::Events::OperationBatchCancelledV1 | Write::Events::OperationBatchCompletedV1) -> untyped
+        def store: (event: PgEventstore::Event, payload: Write::Events::OperationBatchCreatedV2 | Write::Events::OperationBatchItemSucceededV2 | Write::Events::OperationBatchItemRejectedV2 | Write::Events::OperationBatchContinuationRequestedV2 | Write::Events::OperationBatchCancellationRequestedV2 | Write::Events::OperationBatchCancelledV2 | Write::Events::OperationBatchCompletedV2) -> untyped
       end
     end
   end

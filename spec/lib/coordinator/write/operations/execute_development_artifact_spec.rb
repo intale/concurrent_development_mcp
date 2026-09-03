@@ -36,7 +36,7 @@ RSpec.describe "Development Artifact write operations", :event_store do
     persisted_content = persisted.data.dig("artifact", "content")
     expect(persisted_content).to include("encoding" => "utf-8", "text" => "hello\n")
     expect(persisted_content).not_to have_key("base64")
-    expect(command_events("cmd-artifact-replay").map(&:type)).to eq([ "CommandCompleted" ])
+    expect(command_events("cmd-artifact-replay")).to be_empty
   end
 
   it "keeps one natural Artifact identity and rejects content changes until content facts are introduced" do
@@ -96,7 +96,7 @@ RSpec.describe "Development Artifact write operations", :event_store do
     expect(existing.value!.data.outcome).to eq("existing")
     expect(existing.value!.emitted_events).to be_empty
     expect(stale.failure.code).to eq(:development_artifact_classification_revision_conflict)
-    expect(command_events("cmd-artifact-reclassify").map(&:type)).to eq([ "CommandCompleted" ])
+    expect(command_events("cmd-artifact-reclassify")).to be_empty
     expect(command_events("cmd-classification-stale")).to be_empty
     expect(observation_events(first.value!.data.observation_id).map(&:type)).to eq(
       %w[DevelopmentArtifactObserved DevelopmentArtifactClassificationCorrected]
@@ -197,7 +197,14 @@ RSpec.describe "Development Artifact write operations", :event_store do
     expect(correction.value!.emitted_events.map(&:type)).to eq(
       %w[DevelopmentArtifactRelationDeclared DevelopmentArtifactRelationSuperseded]
     )
-    expect(replay.value!.data).to eq(correction.value!.data)
+    expect(replay.value!.data).to have_attributes(
+      relation_id: correction.value!.data.relation_id,
+      superseded_relation_id: old.relation_id,
+      outcome: "existing",
+      declared_at: correction.value!.data.declared_at,
+      superseded_at: correction.value!.data.superseded_at
+    )
+    expect(replay.value!.emitted_events).to be_empty
     expect(semantic_retry.value!.data.outcome).to eq("existing")
     expect(semantic_retry.value!.emitted_events).to be_empty
     expect(artifact_events(source).map(&:type)).to eq(
@@ -455,6 +462,6 @@ RSpec.describe "Development Artifact write operations", :event_store do
   end
 
   def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
+    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 end

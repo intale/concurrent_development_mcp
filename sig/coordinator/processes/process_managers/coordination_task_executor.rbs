@@ -2,7 +2,7 @@ module Coordinator
   module Processes
     module ProcessManagers
       class CoordinationTaskExecutor
-        def initialize: (event_store: Write::_EventStore, ?source_builder: CoordinationTaskSourceBuilder, ?task_loader: Write::Tasks::Loader, ?transition: Write::Operations::ApplyCoordinationTaskTransition, ?start_task: Write::Operations::StartCoordinationTask, ?record_outcome: Write::Operations::RecordCoordinationTaskOutcome, ?target_command_builder: Write::Tasks::TargetCommandBuilder, ?target_executor: Write::Tasks::TargetExecutor, ?target_completion_loader: Write::Tasks::TargetCompletionLoader, ?semantic_result_mapper: Write::Tasks::SemanticResultMapper) -> void
+        def initialize: (event_store: Write::_EventStore, ?source_builder: CoordinationTaskSourceBuilder, ?task_loader: Write::Tasks::Loader, ?transition: Write::Operations::ApplyCoordinationTaskTransition, ?start_task: Write::Operations::StartCoordinationTask, ?record_outcome: Write::Operations::RecordCoordinationTaskOutcome, ?target_command_builder: Write::Tasks::TargetCommandBuilder, ?target_executor: Write::Tasks::TargetExecutor) -> void
         def call: (PgEventstore::Event event) -> nil
       end
     end

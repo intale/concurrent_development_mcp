@@ -527,7 +527,7 @@ Given("a captured parent and child are available for relationship replay") do
   project_artifact(@replay_child)
 end
 
-When("the same relationship command is executed through two Tasks") do
+When("the same relationship command is submitted twice") do
   arguments = {
     command_id: "cmd-cuc-relation-exact-replay",
     actor: { kind: "agent", id: "artifact-agent" },
@@ -551,7 +551,8 @@ When("its relation fact reaches the read side after a subscription restart") do
   project_artifact_event(event)
 end
 
-Then("both Tasks expose one logical relation result") do
+Then("both responses expose the original Task and one logical relation result") do
+  assert_acceptance_equal(1, @relation_replay_task_ids.uniq.length, "Replay Task identity")
   assert_acceptance_equal(
     1,
     @relation_replay_results.map { _1.fetch("data") }.uniq.length,
@@ -559,15 +560,15 @@ Then("both Tasks expose one logical relation result") do
   )
 end
 
-Then("one relation fact, command receipt, and projected edge exist") do
+Then("one relation fact, command lifecycle, and projected edge exist") do
   relations = artifact_events(@replay_parent).count do |event|
     event.type == "DevelopmentArtifactRelationDeclared"
   end
   assert_acceptance_equal(1, relations, "Durable replay relation facts")
   assert_acceptance_equal(
-    1,
-    command_events("cmd-cuc-relation-exact-replay").length,
-    "Replay command receipts"
+    %w[CommandRegistered CommandSucceeded],
+    command_events("cmd-cuc-relation-exact-replay").map(&:type),
+    "Replay command lifecycle"
   )
   page = artifact_relation_page(@replay_parent, direction: "outgoing")
   assert_acceptance_equal(1, page.fetch("items").length, "Projected replay relationships")

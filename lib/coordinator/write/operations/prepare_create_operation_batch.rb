@@ -74,7 +74,7 @@ module Coordinator::Write
             OperationBatches::ItemV1.new(
               index:,
               command_input: @input_digest.document(command),
-              canonical_input_digest: @input_digest.call(command)
+              canonical_input_digest: @input_digest.request(command)
             )
           end
         )

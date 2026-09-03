@@ -55,15 +55,11 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
     expect(change_set_events.map(&:type)).to eq(
       [ "ChangeSetCreated", "ChangeSetAcceptanceCriteriaDefined" ]
     )
-    expect(command_events.map(&:type)).to eq([ "CommandCompleted" ])
+    expect(command_events(task_id).map(&:type)).to eq([ "CommandRegistered", "CommandSucceeded" ])
 
     state = loader.call(task_id).state
     expect(state.status).to eq("completed")
-    expect(state.semantic_result).to have_attributes(
-      kind: "success",
-      command_id: "cmd-task-executor"
-    )
-    expect(task_events(task_id).last.metadata.fetch("schema_version")).to eq(2)
+    expect(task_events(task_id).last.metadata.fetch("schema_version")).to eq(3)
   end
 
   it "reconciles a working Task from its already committed target outcome" do
@@ -74,12 +70,11 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
       caused_by: source
     ).value!
     started = task_events(task_id).last
-    committed = Coordinator::Write::Operations::ExecuteCreateChangeSet.new(
-      event_store:,
-      schema_registry: schemas,
-      stream_factory: streams,
-      event_factory: Coordinator::Write::EventFactory.new(registry: schemas)
-    ).call_command(command, caused_by: started).value!
+    target = stored_target(task_id)
+    execution = Coordinator::Write::Tasks::TargetExecutor.new(event_store:).call(
+      target,
+      caused_by: started
+    ).value!
 
     expect(loader.call(task_id).state.status).to eq("working")
 
@@ -87,22 +82,13 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
 
     state = loader.call(task_id).state
     completed = task_events(task_id).last
-    target_completion = command_events.sole
+    target_terminal = execution.terminal_event
     expect(state.status).to eq("completed")
-    expect(state.semantic_result.to_h).to eq(
-      Coordinator::Write::Tasks::SemanticResultMapper.new
-        .call(
-          Dry::Monads::Success(committed),
-          command_id: command.command_id,
-          tool_name: "change_set_create"
-        )
-        .to_h
-    )
-    expect(completed.causation_id).to eq(target_completion.id)
+    expect(completed.causation_id).to eq(target_terminal.id)
     expect(change_set_events.map(&:type)).to eq(
       [ "ChangeSetCreated", "ChangeSetAcceptanceCriteriaDefined" ]
     )
-    expect(command_events.map(&:type)).to eq([ "CommandCompleted" ])
+    expect(command_events(task_id).map(&:type)).to eq([ "CommandRegistered", "CommandSucceeded" ])
   end
 
   it "persists immediate causation and one correlation ID across the Saga" do
@@ -111,32 +97,33 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
     process_manager.call(source)
 
     submitted, started, completed = task_events(task_id)
-    target_events = change_set_events + command_events
-    completion = command_events.sole
+    registration, command_terminal = command_events(task_id)
+    target_events = change_set_events + [ command_terminal ]
 
-    expect(submitted.causation_id).to be_nil
+    expect(registration.causation_id).to be_nil
+    expect(submitted.causation_id).to eq(registration.id)
     expect(started.causation_id).to eq(submitted.id)
     expect(target_events.map(&:causation_id).uniq).to eq([ started.id ])
-    expect(completed.causation_id).to eq(completion.id)
-    expect(([ submitted, started, completed ] + target_events).map(&:correlation_id).uniq).to eq(
+    expect(completed.causation_id).to eq(command_terminal.id)
+    expect(([ registration, submitted, started, completed ] + target_events).map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
     )
   end
 
-  it "keeps an exact command replay inside the new Task Saga correlation" do
+  it "keeps an exact request replay bound to the original Task Saga" do
     first_task_id, first_source = submit_task(create_change_set_command)
     process_manager.call(first_source)
     replay_task_id, replay_source = submit_task(create_change_set_command)
 
     process_manager.call(replay_source)
 
-    replay_submitted, replay_started, replay_completed = task_events(replay_task_id)
-    expect(replay_task_id).not_to eq(first_task_id)
-    expect(replay_completed.causation_id).to eq(replay_started.id)
-    expect([ replay_submitted, replay_started, replay_completed ].map(&:correlation_id).uniq).to eq(
-      [ replay_submitted.correlation_id ]
+    expect(replay_task_id).to eq(first_task_id)
+    expect(task_events(replay_task_id).map(&:type)).to eq(
+      %w[CoordinationTaskSubmitted CoordinationTaskExecutionStarted CoordinationTaskCompleted]
     )
-    expect(command_events.length).to eq(1)
+    expect(command_events(replay_task_id).map(&:type)).to eq(
+      %w[CommandRegistered CommandSucceeded]
+    )
   end
 
   it "completes a domain denial as an error CallToolResult without target facts" do
@@ -150,14 +137,11 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
     submitted, started, completed = task_events(task_id)
     state = loader.call(task_id).state
     expect(state.status).to eq("completed")
-    expect(state.semantic_result).to have_attributes(
-      kind: "domain_rejection",
-      status: "denied",
-      error: have_attributes(code: "change_set_already_exists")
-    )
-    expect(command_events).to be_empty
-    expect(completed.causation_id).to eq(started.id)
-    expect([ submitted, started, completed ].map(&:correlation_id).uniq).to eq(
+    rejected = command_events(task_id).last
+    expect(rejected).to have_attributes(type: "CommandRejected")
+    expect(rejected.data).to include("code" => "change_set_already_exists")
+    expect(completed.causation_id).to eq(rejected.id)
+    expect([ submitted, started, rejected, completed ].map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
     )
   end
@@ -176,14 +160,11 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
 
       state = loader.call(task_id).state
       expect(state).to have_attributes(status: "completed")
-      expect(state.semantic_result).to have_attributes(
-        kind: "domain_rejection",
-        error: have_attributes(code:)
-      )
       expect(task_events(task_id).map(&:type)).to eq(
         %w[CoordinationTaskSubmitted CoordinationTaskExecutionStarted CoordinationTaskCompleted]
       )
-      expect(command_events_for(command.command_id)).to be_empty
+      terminal = command_events(task_id).last
+      expect(terminal.data).to include("code" => code)
     end
   end
 
@@ -196,7 +177,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
     submitted, cancelled = task_events(task_id)
     expect(loader.call(task_id).state.status).to eq("cancelled")
     expect(change_set_events).to be_empty
-    expect(command_events).to be_empty
+    expect(command_events(task_id).map(&:type)).to eq([ "CommandRegistered" ])
     expect(cancelled.causation_id).to eq(submitted.id)
     expect(cancelled.correlation_id).to eq(submitted.correlation_id)
   end
@@ -287,7 +268,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
 
   def submit_task(command)
     task_id = submit.call(command).value!.task_id
-    [ task_id, task_events(task_id).sole ]
+    [ task_id, task_events(task_id).first ]
   end
 
   def task_events(task_id)
@@ -308,17 +289,17 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
     )
   end
 
-  def command_events
+  def command_events(task_id)
+    command_id = loader.call(task_id).state.command_id
     event_store.read(
-      streams.command("cmd-task-executor"),
-      Coordinator::Write::EventQueries::COMMAND_COMPLETION
+      streams.command(command_id),
+      Coordinator::Write::EventQueries::COMMAND_HISTORY
     )
   end
 
-  def command_events_for(command_id)
-    event_store.read(
-      streams.command(command_id),
-      Coordinator::Write::EventQueries::COMMAND_COMPLETION
+  def stored_target(task_id)
+    Coordinator::Write::Tasks::TargetCommandBuilder.new.call(
+      loader.call(task_id).state.command_input
     )
   end
 end
