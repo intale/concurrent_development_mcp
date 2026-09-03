@@ -3,6 +3,7 @@ module Coordinator
     class CommandInputDigest
       def initialize: (?canonical_json: Shared::CanonicalJson) -> void
       def call: (write_command command) -> String
+      def request: (write_command command) -> String
       def document: (write_command command) -> CommandInputDocuments::digest_value
       def canonical_document: (write_command command) -> CommandInputDocuments::canonical_digest_value
       def create_change_set: (Commands::CreateChangeSet command) -> String

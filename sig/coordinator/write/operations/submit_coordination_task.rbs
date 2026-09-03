@@ -2,20 +2,19 @@ module Coordinator
   module Write
     module Operations
       class SubmitCoordinationTask
-        MAX_ATTEMPTS: Integer
         POLL_INTERVAL_MS: Integer
 
         def initialize: (
           event_store: _EventStore,
           ?decider: Domain::CoordinationTasks::Submit,
           ?input_digest: CommandInputDigest,
-          ?clock: Shared::SystemClock,
           ?id_generator: Shared::IdGenerator,
           ?event_factory: EventFactory,
+          ?schema_registry: EventSchemaRegistry,
           ?stream_factory: StreamFactory,
+          ?compound_marker_builder: Shared::CompoundMarkerBuilder,
           ?execution_lane: Tasks::ExecutionLane,
-          ?correlation_resolver: Tasks::CorrelationResolver,
-          ?maximum_attempts: Integer
+          ?correlation_resolver: Tasks::CorrelationResolver
         ) -> void
 
         def call: (coordination_command target_command) -> Dry::Monads::Result

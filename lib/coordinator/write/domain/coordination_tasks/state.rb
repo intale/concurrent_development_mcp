@@ -38,11 +38,13 @@ module Coordinator::Write
           )
         end
 
-        def self.reduce(events, contract: Contracts::CoordinationTaskHistory.new)
+        def self.reduce(events, occurred_at: [], contract: Contracts::CoordinationTaskHistory.new)
           validation = contract.call(events:)
           raise InvalidCoordinationTaskHistory, validation.errors.to_h.inspect if validation.failure?
 
-          events.reduce(initial) { |state, event| state.apply(event) }
+          events.each_with_index.reduce(initial) do |state, (event, index)|
+            state.apply(event, occurred_at: occurred_at[index])
+          end
         end
 
         def absent?
@@ -53,7 +55,7 @@ module Coordinator::Write
           %w[completed failed cancelled].include?(status)
         end
 
-        def apply(event)
+        def apply(event, occurred_at: nil)
           attributes = case event
           when Events::CoordinationTaskSubmittedV2
                          {
@@ -65,6 +67,19 @@ module Coordinator::Write
                            command_input: event.command_input,
                            created_at: event.submitted_at,
                            last_updated_at: event.submitted_at,
+                           ttl_ms: event.ttl_ms,
+                           poll_interval_ms: event.poll_interval_ms
+                         }
+          when Events::CoordinationTaskSubmittedV3
+                         {
+                           task_id: event.task_id,
+                           status: "working",
+                           status_message: nil,
+                           tool_name: event.tool_name,
+                           command_id: event.command_id,
+                           command_input: event.command_input,
+                           created_at: occurred_at,
+                           last_updated_at: occurred_at,
                            ttl_ms: event.ttl_ms,
                            poll_interval_ms: event.poll_interval_ms
                          }

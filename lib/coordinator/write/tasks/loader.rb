@@ -27,7 +27,10 @@ module Coordinator::Write
         end
 
         Snapshot.new(
-          state: Domain::CoordinationTasks::State.reduce(payloads),
+          state: Domain::CoordinationTasks::State.reduce(
+            payloads,
+            occurred_at: events.map { _1.created_at.utc.iso8601(6) }
+          ),
           latest_revision: events.last&.stream_revision,
           persisted_events: events
         )

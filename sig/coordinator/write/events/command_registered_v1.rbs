@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Events
+      class CommandRegisteredV1 < Base
+        def command_id: () -> String
+        def request_id: () -> String | Integer
+        def tool_name: () -> String
+      end
+    end
+  end
+end

@@ -6,16 +6,34 @@ RSpec.describe "Coordination Task command transitions" do
   let(:initial) { Coordinator::Write::Domain::CoordinationTasks::State.initial }
 
   it "Given an unused Task ID, when SubmitCoordinationTask runs, then it emits TaskSubmitted" do
-    command = Coordinator::Write::Commands::SubmitCoordinationTask.new(submitted.to_h)
+    command = Coordinator::Write::Commands::SubmitCoordinationTask.new(
+      task_id:,
+      request_id: "request-task-101",
+      tool_name: submitted.tool_name,
+      command_id: submitted.command_id,
+      command_input: submitted.command_input,
+      canonical_input_digest: "sha256:#{'a' * 64}",
+      ttl_ms: nil,
+      poll_interval_ms: 500
+    )
 
     result = Coordinator::Write::Domain::CoordinationTasks::Submit.new.call(state: initial, command:)
 
     expect(result).to be_success
-    expect(result.value!).to eq(submitted)
+    expect(result.value!).to eq(
+      [
+        Coordinator::Write::Events::CommandRegisteredV1.new(
+          command_id: submitted.command_id,
+          request_id: "request-task-101",
+          tool_name: submitted.tool_name
+        ),
+        submitted
+      ]
+    )
   end
 
   it "Given a queued Task, when StartCoordinationTask runs, then it emits one start fact" do
-    state = Coordinator::Write::Domain::CoordinationTasks::State.reduce([ submitted ])
+    state = submitted_state
     command = Coordinator::Write::Commands::StartCoordinationTask.new(
       task_id:,
       started_at: "2026-08-22T06:30:01.000000Z"
@@ -36,6 +54,10 @@ RSpec.describe "Coordination Task command transitions" do
           task_id:,
           started_at: "2026-08-22T06:30:01.000000Z"
         )
+      ],
+      occurred_at: [
+        "2026-08-22T06:30:00.000000Z",
+        "2026-08-22T06:30:01.000000Z"
       ]
     )
     command = Coordinator::Write::Commands::StartCoordinationTask.new(
@@ -47,7 +69,7 @@ RSpec.describe "Coordination Task command transitions" do
   end
 
   it "Given a queued Task, when Cancel runs, then it immediately cancels" do
-    state = Coordinator::Write::Domain::CoordinationTasks::State.reduce([ submitted ])
+    state = submitted_state
     command = Coordinator::Write::Commands::CancelCoordinationTask.new(
       task_id:,
       requested_at: "2026-08-22T06:30:01.000000Z"
@@ -116,7 +138,18 @@ RSpec.describe "Coordination Task command transitions" do
           task_id:,
           started_at: "2026-08-22T06:30:01.000000Z"
         )
+      ],
+      occurred_at: [
+        "2026-08-22T06:30:00.000000Z",
+        "2026-08-22T06:30:01.000000Z"
       ]
+    )
+  end
+
+  def submitted_state
+    Coordinator::Write::Domain::CoordinationTasks::State.reduce(
+      [ submitted ],
+      occurred_at: [ "2026-08-22T06:30:00.000000Z" ]
     )
   end
 
@@ -124,12 +157,11 @@ RSpec.describe "Coordination Task command transitions" do
     command = target_command
     digest = Coordinator::Write::CommandInputDigest.new
 
-    Coordinator::Write::Events::CoordinationTaskSubmittedV2.new(
+    Coordinator::Write::Events::CoordinationTaskSubmittedV3.new(
       task_id:,
       tool_name: "change_set_create",
       command_id: command.command_id,
       command_input: digest.document(command),
-      submitted_at: "2026-08-22T06:30:00.000000Z",
       ttl_ms: nil,
       poll_interval_ms: 500
     )
@@ -137,7 +169,7 @@ RSpec.describe "Coordination Task command transitions" do
 
   def target_command
     Coordinator::Write::Commands::CreateChangeSet.new(
-      command_id: "cmd-task-101",
+      command_id: "01919191-9191-7192-8191-919191919191",
       actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "agent-a"),
       change_set_id: "CS-101",
       goal: "Coordinate billing changes",
@@ -157,7 +189,7 @@ RSpec.describe "Coordination Task command transitions" do
       kind: "domain_rejection",
       status: "denied",
       summary: error.message,
-      command_id: "cmd-task-101",
+      command_id: "01919191-9191-7192-8191-919191919191",
       error:,
       next_actions: []
     )

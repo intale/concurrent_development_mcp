@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Metadata
+      class CanonicalCommandV1 < EventMetadata
+        def canonical_input_digest: () -> String
+      end
+    end
+  end
+end

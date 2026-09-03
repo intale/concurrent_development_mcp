@@ -10,6 +10,11 @@ module Coordinator::Write
       @canonical_json.sha256(canonical_document(command).to_h)
     end
 
+    def request(command)
+      document = canonical_document(command).to_h
+      @canonical_json.sha256(document.reject { |key, _value| key == :command_id })
+    end
+
     def canonical_document(command)
       case command
       when Commands::PublishSkillRevision then skill_publish_canonical_document(command)

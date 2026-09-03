@@ -1,15 +1,13 @@
 module Coordinator
   module Write
-    module Commands
-      class SubmitCoordinationTask < Shared::Value
+    module Events
+      class CoordinationTaskSubmittedV3 < Base
         def task_id: () -> String
-        def request_id: () -> String | Integer
-        def tool_name: () -> String
         def command_id: () -> String
+        def tool_name: () -> String
         def command_input: () -> CommandInputDocuments::value
-        def canonical_input_digest: () -> String
-        def ttl_ms: () -> nil
         def poll_interval_ms: () -> Integer
+        def ttl_ms: () -> nil
       end
     end
   end

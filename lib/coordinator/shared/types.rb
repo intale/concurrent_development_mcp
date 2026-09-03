@@ -507,6 +507,7 @@ module Coordinator::Shared
     ].freeze
     Identifier = String.constrained(format: IDENTIFIER_PATTERN)
     PublicCommandId = String.constrained(format: PUBLIC_COMMAND_ID_PATTERN)
+    RequestId = PublicCommandId | Integer
     RepositoryId = String.constrained(format: REPOSITORY_ID_PATTERN)
     GitOid = String.constrained(format: GIT_OID_PATTERN)
     GitObjectFormat = String.enum(*GIT_OBJECT_FORMATS)
@@ -514,6 +515,7 @@ module Coordinator::Shared
     Sha256Digest = String.constrained(format: SHA256_DIGEST_PATTERN)
     Timestamp = String.constrained(format: TIMESTAMP_PATTERN)
     UuidV7 = String.constrained(format: UUID_V7_PATTERN)
+    CommandId = UuidV7
     TaskId = UuidV7
     ResourceId = UuidV7
     ResourcePath = String.constrained(format: RESOURCE_PATH_PATTERN)

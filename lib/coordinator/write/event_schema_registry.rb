@@ -12,6 +12,7 @@ module Coordinator::Write
       [ "ResourceUnbound", 1 ] => Events::ResourceIdentityV1::Unbound,
       [ "ChangeSetCreated", 1 ] => Events::ChangeSetCreatedV1,
       [ "ChangeSetAcceptanceCriteriaDefined", 1 ] => Events::ChangeSetAcceptanceCriteriaDefinedV1,
+      [ "CommandRegistered", 1 ] => Events::CommandRegisteredV1,
       [ "CommandCompleted", 1 ] => Events::CommandCompletedV1,
       [ "ProcessStepPlanned", 1 ] => Events::ProcessStepPlannedV1,
       [ "SkillRevisionPublished", 2 ] => Events::SkillRevisionPublishedV2,
@@ -113,6 +114,7 @@ module Coordinator::Write
       [ "ReleaseSetCompensationRequested", 1 ] => Events::ReleaseSetCompensationRequestedV1,
       [ "ReleaseSetCompleted", 1 ] => Events::ReleaseSetCompletedV1,
       [ "CoordinationTaskSubmitted", 2 ] => Events::CoordinationTaskSubmittedV2,
+      [ "CoordinationTaskSubmitted", 3 ] => Events::CoordinationTaskSubmittedV3,
       [ "CoordinationTaskExecutionStarted", 1 ] => Events::CoordinationTaskExecutionStartedV1,
       [ "CoordinationTaskCompleted", 2 ] => Events::CoordinationTaskCompletedV2,
       [ "CoordinationTaskFailed", 1 ] => Events::CoordinationTaskFailedV1,
@@ -121,7 +123,8 @@ module Coordinator::Write
     }.freeze
 
     DEFAULT_VALIDATORS = {
-      Events::CoordinationTaskSubmittedV2 => Contracts::CoordinationTaskSubmission.new
+      Events::CoordinationTaskSubmittedV2 => Contracts::CoordinationTaskSubmission.new,
+      Events::CoordinationTaskSubmittedV3 => Contracts::CoordinationTaskSubmission.new
     }.freeze
 
     def initialize(definitions: DEFAULT_DEFINITIONS, validators: DEFAULT_VALIDATORS)

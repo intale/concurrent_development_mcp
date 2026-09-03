@@ -115,6 +115,12 @@ module Coordinator::Write
       direction: :desc
     )
 
+    COMMAND_REGISTRATION = EventReadCriteria.new(
+      event_types: [ "CommandRegistered" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+
     REPOSITORY_REGISTRATION = EventReadCriteria.new(
       event_types: [ "RepositoryRegistered" ],
       maximum_count: 1,
@@ -408,7 +414,7 @@ module Coordinator::Write
         "CoordinationTaskCancellationRequested",
         "CoordinationTaskCancelled"
       ],
-      maximum_count: 4,
+      maximum_count: 8,
       direction: :asc
     )
 

@@ -1138,7 +1138,6 @@ module Coordinator
       Write::Operations::ExecuteResolveResource.new(
         event_store: self["event_store"],
         input_digest: self["command_input_digest"],
-        clock: self["clock"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
@@ -2036,7 +2035,6 @@ module Coordinator
       Write::Operations::SubmitCoordinationTask.new(
         event_store: self["event_store"],
         input_digest: self["command_input_digest"],
-        clock: self["clock"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
         stream_factory: self["stream_factory"],

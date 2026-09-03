@@ -54,18 +54,27 @@ RSpec.describe "Coordination Task lifecycle operations", :event_store do
     expect(state.task_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
     expect(get_task.call(task_id: state.task_id).value!).to eq(state)
 
+    registration = command_events(state.command_id).sole
     event = task_events(state.task_id).sole
-    expect(event.type).to eq("CoordinationTaskSubmitted")
-    expect(event.metadata.fetch("schema_version")).to eq(2)
-    expect(event.data).not_to have_key("canonical_input_digest")
-    expect(event.markers).to eq(
-      [
-        "command:cmd-task-201",
-        Coordinator::Write::Tasks::ExecutionLane.new.marker(state.task_id),
-        "task:#{state.task_id}",
-        "tool:change_set_create"
-      ]
+    expect(registration).to have_attributes(type: "CommandRegistered", stream_revision: 0)
+    expect(registration.data).to include(
+      "command_id" => state.command_id,
+      "request_id" => "cmd-task-201",
+      "tool_name" => "change_set_create"
     )
+    expect(event.type).to eq("CoordinationTaskSubmitted")
+    expect(event.metadata.fetch("schema_version")).to eq(3)
+    expect(event.data).not_to have_key("submitted_at")
+    expect(event.metadata.fetch("canonical_input_digest")).to match(/\Asha256:[0-9a-f]{64}\z/)
+    expect(event.markers).to include(
+      "command:#{state.command_id}",
+      Coordinator::Write::Tasks::ExecutionLane.new.marker(state.task_id),
+      "task:#{state.task_id}",
+      "tool:change_set_create"
+    )
+    expect(event.markers.grep(/\Acompound:command-request:v2\|/).length).to eq(1)
+    expect(event.causation_id).to eq(registration.id)
+    expect(event.correlation_id).to eq(registration.correlation_id)
   end
 
   it "serializes simultaneous starts into one start fact and successful rereads" do
@@ -170,6 +179,13 @@ RSpec.describe "Coordination Task lifecycle operations", :event_store do
     event_store.read(
       streams.coordination_task(task_id),
       Coordinator::Write::EventQueries::COORDINATION_TASK_HISTORY
+    )
+  end
+
+  def command_events(command_id)
+    event_store.read(
+      streams.command(command_id),
+      Coordinator::Write::EventQueries::COMMAND_REGISTRATION
     )
   end
 

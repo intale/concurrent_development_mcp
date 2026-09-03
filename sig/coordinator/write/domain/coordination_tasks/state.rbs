@@ -4,7 +4,7 @@ module Coordinator
       module CoordinationTasks
         class State < Shared::Value
           def self.initial: () -> State
-          def self.reduce: (Array[Events::Base] events, ?contract: Contracts::CoordinationTaskHistory) -> State
+          def self.reduce: (Array[Events::Base] events, ?occurred_at: Array[String?], ?contract: Contracts::CoordinationTaskHistory) -> State
 
           def task_id: () -> String?
           def status: () -> String
@@ -22,7 +22,7 @@ module Coordinator
           def error: () -> Tasks::JsonRpcErrorV1?
           def absent?: () -> bool
           def terminal?: () -> bool
-          def apply: (Events::Base event) -> State
+          def apply: (Events::Base event, ?occurred_at: String?) -> State
         end
       end
     end

@@ -17,17 +17,21 @@ module Coordinator::Write
             )
           end
 
-          Success(
-            Events::CoordinationTaskSubmittedV2.new(
-              task_id: command.task_id,
-              tool_name: command.tool_name,
+          Success([
+            Events::CommandRegisteredV1.new(
               command_id: command.command_id,
+              request_id: command.request_id,
+              tool_name: command.tool_name
+            ),
+            Events::CoordinationTaskSubmittedV3.new(
+              task_id: command.task_id,
+              command_id: command.command_id,
+              tool_name: command.tool_name,
               command_input: command.command_input,
-              submitted_at: command.submitted_at,
-              ttl_ms: command.ttl_ms,
-              poll_interval_ms: command.poll_interval_ms
+              poll_interval_ms: command.poll_interval_ms,
+              ttl_ms: command.ttl_ms
             )
-          )
+          ])
         end
       end
     end

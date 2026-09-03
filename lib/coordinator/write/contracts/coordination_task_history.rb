@@ -9,13 +9,14 @@ module Coordinator::Write
 
       rule(:events) do
         events = value
-        if events.length > 4
-          key.failure("must contain at most four lifecycle facts")
+        if events.length > 8
+          key.failure("must contain at most eight lifecycle facts")
           next
         end
         next if events.empty?
 
-        unless events.first.is_a?(Events::CoordinationTaskSubmittedV2)
+        unless events.first.is_a?(Events::CoordinationTaskSubmittedV2) ||
+               events.first.is_a?(Events::CoordinationTaskSubmittedV3)
           key.failure("must start with CoordinationTaskSubmitted")
           next
         end
