@@ -21,7 +21,7 @@ module Coordinator::Read
       end
 
       rule(:stream_id) do
-        key.failure("must be a valid Skill ID") unless Types::SKILL_ID_PATTERN.match?(value)
+        key.failure("must be a valid projected Skill ID") unless ProjectedSkillId.valid?(value)
       end
 
       rule(:command_id, :actor_id) do

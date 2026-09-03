@@ -6,7 +6,9 @@ module Coordinator::Write
       contract type: "SkillRevisionPublished", version: 2
       Asset = Skills::AssetV2
 
-      attribute :skill_id, Types::SkillId
+      # Schema v2 is retained only to replay pre-MIGRATION-01 history. Current
+      # commands emit the granular v3 facts and require a UUIDv7 Skill ID.
+      attribute :skill_id, Types::Identifier
       attribute :name, Types::SkillName
       attribute :scope, Types::SkillScope
       attribute :revision, Types::SkillRevision

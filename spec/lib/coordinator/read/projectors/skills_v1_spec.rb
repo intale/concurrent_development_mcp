@@ -83,7 +83,25 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model do
     expect(processed_events.count).to eq(2)
   end
 
-  def publication_event(revision:, instructions:, path:, content:)
+  it "replays a pre-cutover publication until MIGRATION-01 transforms history" do
+    legacy_skill_id = "skill:v1:#{'a' * 64}"
+    event = publication_event(
+      revision: 1,
+      instructions: "Model cohesive facts.",
+      path: "SKILL.md",
+      content: "Legacy source.\n",
+      skill_id: legacy_skill_id
+    )
+
+    projector.call(event)
+
+    expect(repository.fetch(name: "review", scope: "project:alpha")).to have_attributes(
+      skill_id: legacy_skill_id,
+      instructions: "Model cohesive facts."
+    )
+  end
+
+  def publication_event(revision:, instructions:, path:, content:, skill_id: identity.skill_id)
     asset_input = {
       path:,
       executable: false,
@@ -100,7 +118,7 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model do
       assets: [ asset_input ]
     ).value!
     payload = Coordinator::Write::Events::SkillRevisionPublishedV2.new(
-      skill_id: identity.skill_id,
+      skill_id:,
       name: identity.name,
       scope: identity.scope,
       revision:,
@@ -112,7 +130,11 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model do
     )
     ProjectionEventFactory.build(
       payload:,
-      stream: Coordinator::Write::StreamFactory.new.skill(identity.skill_id),
+      stream: Coordinator::Write::StreamReference.new(
+        context: "AgentKnowledge",
+        stream_name: "Skill",
+        stream_id: skill_id
+      ),
       stream_revision: revision - 1,
       global_position: 100 * revision,
       command_id: "cmd-skill-#{revision}",
