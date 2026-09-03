@@ -1,15 +1,17 @@
 # MCP server for concurrent development
 
-This project enables AI agents to coordinate their work. It does not spawn or orchestrate agents; instead, it provides
-functions for recording work that agents plan, start, and finish. It also acts as a repository for development artifacts
-such as AI skills, user decisions, documentation, URLs, and other assets produced during development. Checkpointed
-development state makes work resumable.
+This project enables distributed AI agents to coordinate their work. It does not spawn or orchestrate agents; instead,
+it provides functions for recording work that agents plan, start, and finish. It also acts as a repository for
+development artifacts such as AI skills, user decisions, documentation, URLs, and other assets produced during
+development. Checkpointed development state makes work resumable.
 
 You can import existing AI-related assets and build state, then rely on this MCP server throughout agentic development.
 Because the application persists its state in PostgreSQL, it can run in a shared environment and coordinate work across
 multiple agents, projects, and locations.
 
 **Attention!** This tool was prompted using AI agent, so treat it accordingly.
+
+**Attention!** The implementation is under development right now. No promises of compatibility between commits.
 
 ## Usage
 
@@ -27,12 +29,11 @@ Steps to set up the environment (containerization will follow after the major is
 ### Import your development environment
 
 MCP can act as the repository for your development assets, such as AI skills, user decisions, and build state. To import
-them, start your agent and ask it to migrate your development environment into MCP (assuming the server is running at
-`http://localhost:3000`):
+them, and this mcp server to your agent, and ask it to move all development into it:
 
 ```
-Investigate the tools exposed by the MCP server at http://localhost:3000/mcp and import this project's agentic
-development environment. Then adjust AGENTS.md to rely on this MCP server for agentic development coordination.
+Investigate the tools exposed by the <server name> MCP server and import this project's agentic development environment.
+Then adjust AGENTS.md to rely on this MCP server for agentic development coordination.
 ```
 
 Optionally you can ask your agent to create an archived backup of your current agentic dev env, so you can revert it in
