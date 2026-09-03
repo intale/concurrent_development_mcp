@@ -245,9 +245,18 @@ Then(
   assert_acceptance_equal("invalidated", payload.assessment.outcome, "Impact outcome")
   assert_acceptance_equal("blocking_policy_introduced", payload.assessment.reason, "Impact reason")
   assert_acceptance_equal(1, invalidations.length, "Terminal invalidation count")
-  assert_acceptance_equal(@impact_saga.fetch(:started).id, assessment.causation_id, "Assessment parent")
+  accepted = impact_choice_events(choice_id).find { _1.type == "AgentChoiceAccepted" }
+  process_step = process_step_event(
+    source_event: @impact_saga.fetch(:started),
+    process_name: "agent-choice-decision-impact",
+    step_name: "assess-choice-impact",
+    subject_kind: "choice-decision-change",
+    subject_id: "#{accepted.id}:#{@impact_source.id}"
+  )
+  assert_acceptance(process_step, "Impact assessment ProcessStep is missing")
+  assert_acceptance_equal(process_step.id, assessment.causation_id, "Assessment parent")
   assert_acceptance_equal(
-    @impact_saga.fetch(:started).id,
+    process_step.id,
     invalidations.sole.causation_id,
     "Invalidation parent"
   )

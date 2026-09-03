@@ -52,7 +52,6 @@ RSpec.describe "CAN-01 MCP Candidate coordination" do
     expect([ submitted, started, *candidate_facts, completion, task_completed ].map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
     )
-
   end
 
   it "serves directly persisted partial and complete Candidate views", :read_model do

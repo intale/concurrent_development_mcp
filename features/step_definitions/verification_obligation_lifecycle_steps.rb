@@ -67,7 +67,16 @@ Then("one policy invalidation is durable with exact Saga tracing") do
   started = verification_obligation_validity_scan_events.find do
     _1.type == "VerificationObligationValidityScanStarted"
   end
-  assert_acceptance_equal(started.id, invalidation.causation_id, "Invalidation immediate parent")
+  creation = candidate_obligation_events.find { _1.type == "VerificationObligationCreated" }
+  process_step = process_step_event(
+    source_event: started,
+    process_name: "verification-obligation-validity-policy",
+    step_name: "invalidate-obligation",
+    subject_kind: "obligation-policy-pair",
+    subject_id: "#{creation.id}:#{@corrected_partition_event.id}"
+  )
+  assert_acceptance(process_step, "Obligation invalidation ProcessStep is missing")
+  assert_acceptance_equal(process_step.id, invalidation.causation_id, "Invalidation immediate parent")
   assert_acceptance_equal(
     @corrected_partition_event.correlation_id,
     invalidation.correlation_id,

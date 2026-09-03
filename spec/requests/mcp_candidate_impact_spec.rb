@@ -41,7 +41,6 @@ RSpec.describe "IMP-01 MCP Candidate impact evidence" do
     expect([ submitted, started, surface, completion, task_completed ].map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
     )
-
   end
 
   it "serves a directly persisted attributed surface without a freshness gate", :read_model do

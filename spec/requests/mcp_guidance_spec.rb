@@ -60,7 +60,6 @@ RSpec.describe "GDN-01 MCP guidance evidence" do
     expect([ utterance, completion ]).to all(
       satisfy { !_1.metadata.key?("causation_id") && !_1.metadata.key?("correlation_id") }
     )
-
   end
 
   it "serves a directly persisted available guidance projection", :read_model do

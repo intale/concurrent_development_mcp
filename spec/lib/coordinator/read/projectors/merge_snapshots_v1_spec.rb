@@ -202,29 +202,30 @@ RSpec.describe Coordinator::Read::Projectors::MergeSnapshotsV1, :read_model do
     payload_class = outcome == "granted" ?
       Coordinator::Write::Events::MergeAuthorizationGrantedV1 :
       Coordinator::Write::Events::MergeAuthorizationDeniedV1
-    reasons = if outcome == "granted"
-                []
-              else
-                [
-                  Coordinator::Write::MergeAuthorizations::ReasonV1.new(
-                    code: "target_base_binding_stale",
-                    message: "The target branch no longer matches the snapshot base.",
-                    candidate_id: nil,
-                    work_item_id: nil,
-                    dependency_id: nil,
-                    source_candidate_id: nil,
-                    target_candidate_id: nil,
-                    obligation_id: nil,
-                    obligation_status: nil,
-                    expected_reference: nil,
-                    observed_reference: nil,
-                    expected_digest: nil,
-                    observed_digest: nil,
-                    expected_oid: "a" * 40,
-                    observed_oid: "c" * 40
-                  )
-                ]
-              end
+    reasons =
+      if outcome == "granted"
+        []
+      else
+        [
+          Coordinator::Write::MergeAuthorizations::ReasonV1.new(
+            code: "target_base_binding_stale",
+            message: "The target branch no longer matches the snapshot base.",
+            candidate_id: nil,
+            work_item_id: nil,
+            dependency_id: nil,
+            source_candidate_id: nil,
+            target_candidate_id: nil,
+            obligation_id: nil,
+            obligation_status: nil,
+            expected_reference: nil,
+            observed_reference: nil,
+            expected_digest: nil,
+            observed_digest: nil,
+            expected_oid: "a" * 40,
+            observed_oid: "c" * 40
+          )
+        ]
+      end
     payload = payload_class.new(
       authorization_id:,
       merge_snapshot_id:,

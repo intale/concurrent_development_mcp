@@ -46,7 +46,7 @@ Then("one scoped Repository fact is durable without a server-derived location") 
 
   assert_acceptance_equal(@repository_arguments.fetch(:scope), event.data.fetch("scope"), "Persisted scope")
   assert_acceptance_equal(@repository_arguments.fetch(:paths), event.data.fetch("paths"), "Persisted paths")
-  scope_markers = event.markers.grep(/\Acompound:(?:repository-scope|scoped-repository|scoped-repository-key):v1:/)
+  scope_markers = event.markers.grep(/\Acompound:(?:repository-scope|scoped-repository|scoped-repository-key):v2\|/)
   assert_acceptance_equal(3, scope_markers.length, "Scope markers")
 end
 
@@ -179,11 +179,14 @@ Given(
   @repository_race_key = "shared-project"
   @repository_race_agents = [ first_agent, second_agent ]
   prepare_mcp_clients(*@repository_race_agents)
-  command_ids = repository_distinct_lane_command_ids("audit2.repository-register")
-  @repository_race_requests = @repository_race_agents.each_with_index.map do |agent_id, index|
-    {
-      client_id: agent_id,
-      command_id: command_ids.fetch(index),
+end
+
+When("both registrations reach the deterministic database barrier with different proposed UUIDs") do
+  @repository_race_requests = submit_tasks_in_distinct_execution_lanes(
+    client_ids: @repository_race_agents
+  ) do |agent_id, round|
+    request = {
+      command_id: "audit2.repository-register.#{agent_id}.#{round}",
       actor: { kind: "agent", id: agent_id },
       repository_id: SecureRandom.uuid_v7,
       scope: @repository_race_scope,
@@ -192,26 +195,18 @@ Given(
       paths: [ "/caller-visible/shared-project" ],
       remotes: [ "https://example.test/shared-project.git" ]
     }
-  end
-  install_contention_barrier(
-    operation: "repository_register_dcb",
-    command_ids: @repository_race_requests.map { _1.fetch(:command_id) }
-  )
-end
-
-When("both registrations reach the deterministic database barrier with different proposed UUIDs") do
-  proposed_ids = @repository_race_requests.map { _1.fetch(:repository_id) }
-  assert_acceptance_equal(2, proposed_ids.uniq.length, "Distinct proposed Repository UUIDs")
-  @repository_race_tasks = @repository_race_requests.map do |request|
-    response = call_tool(
-      "repository_register",
-      request.except(:client_id),
-      client_id: request.fetch(:client_id)
-    )
+    response = call_tool("repository_register", request, client_id: agent_id)
     task_id = response.dig("result", "taskId")
     assert_acceptance(task_id, "repository_register did not return a Task: #{response.inspect}")
     request.merge(task_id:)
   end
+  proposed_ids = @repository_race_requests.map { _1.fetch(:repository_id) }
+  assert_acceptance_equal(2, proposed_ids.uniq.length, "Distinct proposed Repository UUIDs")
+  @repository_race_tasks = @repository_race_requests
+  install_contention_barrier(
+    operation: "repository_register_dcb",
+    command_ids: @repository_race_tasks.map { _1.fetch(:command_id) }
+  )
   start_process_subscriptions
   await_contention_evidence
   assert_acceptance_equal(2, @contention_evidence.map { _1.fetch(:thread_id) }.uniq.length, "Worker threads")

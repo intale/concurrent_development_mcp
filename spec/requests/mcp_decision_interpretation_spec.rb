@@ -153,7 +153,6 @@ RSpec.describe "GDN-02/03 MCP interpretation lifecycle" do
       "resolution-strategy:single_choice",
       a_string_starting_with("compound:interpretation-slot:v2|")
     )
-
   end
 
   it "serves a directly persisted accepted interpretation", :read_model do

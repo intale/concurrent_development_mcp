@@ -4,7 +4,8 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1, :read_m
   subject(:projector) { described_class.new }
 
   let(:repository) { Coordinator::Read::Repositories::VerificationObligations.new }
-  let(:obligation_id) { "OBL-obligation-projection" }
+  let(:obligation_id) { SecureRandom.uuid_v7 }
+  let(:creation_command_id) { SecureRandom.uuid_v7 }
   let(:change_set_id) { "CS-obligation-projection" }
   let(:correlation_id) { SecureRandom.uuid_v7 }
 
@@ -296,7 +297,7 @@ RSpec.describe Coordinator::Read::Projectors::VerificationObligationsV1, :read_m
       revision: 0,
       position: 100,
       policy_version: "candidate-compatibility-obligation/v1",
-      command_id: obligation_id,
+      command_id: creation_command_id,
       actor_kind: "system",
       actor_id: "candidate-impact-obligation-policy"
     )

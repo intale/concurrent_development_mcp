@@ -96,13 +96,12 @@ When("two agents concurrently resolve file {string} through MCP") do |path|
   @resource_path = path
   agent_ids = %w[resource-agent-a resource-agent-b]
   prepare_mcp_clients(*agent_ids)
-  command_ids = repository_distinct_lane_command_ids("cuc.resource-race")
-  install_contention_barrier(operation: "resource_resolve_dcb", command_ids:)
-  @resource_race_tasks = agent_ids.each_with_index.map do |agent_id, index|
+  @resource_race_tasks = submit_tasks_in_distinct_execution_lanes(client_ids: agent_ids) do |agent_id, round|
+    command_id = "cuc.resource-race.#{agent_id}.#{round}"
     response = call_tool(
       "resource_resolve",
       {
-        command_id: command_ids.fetch(index),
+        command_id:,
         actor: { kind: "agent", id: agent_id },
         repository_id: @resource_repository_id,
         kind: "file",
@@ -110,8 +109,14 @@ When("two agents concurrently resolve file {string} through MCP") do |path|
       },
       client_id: agent_id
     )
-    { client_id: agent_id, task_id: response.dig("result", "taskId") }
+    task_id = response.dig("result", "taskId")
+    assert_acceptance(task_id, "resource_resolve did not return a Task: #{response.inspect}")
+    { command_id:, task_id: }
   end
+  install_contention_barrier(
+    operation: "resource_resolve_dcb",
+    command_ids: @resource_race_tasks.map { _1.fetch(:command_id) }
+  )
   start_process_subscriptions
   await_contention_evidence
   release_contention_barrier

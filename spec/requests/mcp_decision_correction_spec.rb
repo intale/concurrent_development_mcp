@@ -109,7 +109,6 @@ RSpec.describe "DEC-02A MCP Decision correction" do
     )
     expect(command_events(stale_arguments.fetch(:command_id))).to be_empty
     expect(decision_events.count { _1.type == "DecisionDefinitionCorrected" }).to eq(1)
-
   end
 
   it "serves a directly persisted corrected Decision projection", :read_model do

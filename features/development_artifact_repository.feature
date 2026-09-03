@@ -34,7 +34,7 @@ Feature: Development Artifact repository
 
     @CONTENT-BINARY-01
     Scenario: A changed binary profile supersedes its earlier capture
-      When the agent captures two binary profile versions from one source
+      When the agent captures two binary profile versions from distinct source locations
       Then the changed profile has a different immutable Artifact ID
       When the agent declares that the changed profile supersedes the earlier profile
       And the binary Artifact facts reach the read side
@@ -57,7 +57,7 @@ Feature: Development Artifact repository
 
     @linked-artifacts @stale-view @AUD-ART-LOCATOR-ACTION-01 @AUD-ART-LOCATOR-PAGE-02
     Scenario: Locator resolution reports lag and immutable revision ambiguity without choosing latest
-      Given two immutable revisions at one exact locator are captured but not projected
+      Given two source revisions at one exact locator are captured but not projected
       When the clean agent resolves that locator before projection
       Then the locator is absent with a bounded projection-lag retry action
       When both locator revisions reach the read side

@@ -78,7 +78,6 @@ RSpec.describe "DEC-01 MCP Decision activation" do
     expect([ *domain_facts, completion ]).to all(
       satisfy { !_1.metadata.key?("causation_id") && !_1.metadata.key?("correlation_id") }
     )
-
   end
 
   it "serves directly persisted recorded and active Decision views", :read_model do
@@ -291,5 +290,4 @@ RSpec.describe "DEC-01 MCP Decision activation" do
   def command_events(command_id)
     event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_COMPLETION)
   end
-
 end

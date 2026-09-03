@@ -340,37 +340,30 @@ end
 Given("two independent MCP agents will publish Skill {string} in scope {string}") do |name, scope|
   @concurrent_skill_name = name
   @concurrent_skill_scope = scope
-  lane = Coordinator::Write::Tasks::ExecutionLane.new
-  by_lane = {}
-  32.times do |index|
-    command_id = "cmd-cuc-skill-concurrent-#{index}"
-    by_lane[lane.index(command_id)] ||= command_id
-    break if by_lane.length == Coordinator::Write::Tasks::ExecutionLane::COUNT
-  end
-  assert_acceptance_equal(2, by_lane.length, "Distinct Skill execution lanes")
-  @concurrent_skill_commands = by_lane.sort.map(&:last)
-  prepare_mcp_clients("skill-agent-a", "skill-agent-b")
+  @concurrent_skill_agents = [ "skill-agent-a", "skill-agent-b" ]
+  prepare_mcp_clients(*@concurrent_skill_agents)
 end
 
 When("both agents submit expected revision 0 and reach the Skill decision boundary") do
+  @concurrent_skill_publications = submit_tasks_in_distinct_execution_lanes(
+    client_ids: @concurrent_skill_agents
+  ) do |client_id, round|
+    submit_skill_task(
+      name: @concurrent_skill_name,
+      scope: @concurrent_skill_scope,
+      command_id: "cmd-cuc-skill-concurrent-#{client_id}-#{round}",
+      expected_revision: 0,
+      instructions: "Instructions proposed by #{client_id}.",
+      assets: [],
+      client_id:
+    )
+  end
+  @concurrent_skill_commands = @concurrent_skill_publications.map { _1.fetch(:command_id) }
   install_contention_barrier(
     operation: "skill_publish",
     command_ids: @concurrent_skill_commands
   )
   start_process_subscriptions
-  @concurrent_skill_publications = [ "skill-agent-a", "skill-agent-b" ].map.with_index do |client_id, index|
-    Thread.new do
-      submit_skill_task(
-        name: @concurrent_skill_name,
-        scope: @concurrent_skill_scope,
-        command_id: @concurrent_skill_commands.fetch(index),
-        expected_revision: 0,
-        instructions: "Instructions proposed by #{client_id}.",
-        assets: [],
-        client_id:
-      )
-    end
-  end.map(&:value)
   await_contention_evidence
 end
 

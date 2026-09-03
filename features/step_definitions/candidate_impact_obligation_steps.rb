@@ -111,9 +111,26 @@ Then("one exact open Rails obligation is durable under {string}") do |level|
     payload.policy.head,
     "Exact policy head"
   )
-  parent = candidate_obligation_pair_scan_events.find { _1.id == event.causation_id }
-  assert_acceptance(parent, "Obligation immediate Saga parent is missing")
-  assert_acceptance_equal(parent.correlation_id, event.correlation_id, "Obligation Saga correlation")
+  source_registration = @obligation_candidates.dig("source", :registration)
+  target_registration = @obligation_candidates.dig("target", :registration)
+  subject_id = "#{source_registration.id}:#{target_registration.id}"
+  scan_and_step = candidate_obligation_pair_scan_events
+    .select { _1.type == "CandidateImpactPairScanStarted" }
+    .filter_map do |scan_started|
+      process_step = process_step_event(
+        source_event: scan_started,
+        process_name: "candidate-impact-obligation-policy",
+        step_name: "create-compatibility-obligation",
+        subject_kind: "candidate-registration-pair",
+        subject_id:
+      )
+      [ scan_started, process_step ] if process_step&.id == event.causation_id
+    end
+    .first
+  assert_acceptance(scan_and_step, "Obligation ProcessStep Saga parent is missing")
+  scan_started, process_step = scan_and_step
+  assert_acceptance_equal(process_step.id, event.causation_id, "Obligation immediate Saga parent")
+  assert_acceptance_equal(scan_started.correlation_id, event.correlation_id, "Obligation Saga correlation")
   assert_acceptance(
     !event.metadata.key?("correlation_id"),
     "Correlation must not be duplicated in event metadata"

@@ -156,7 +156,7 @@ Then("the external-reference content contains no binary or fetched representatio
   assert_acceptance_equal("text/uri-list", projected.fetch("media_type"), "Reference media type")
 end
 
-When("the agent captures two binary profile versions from one source") do
+When("the agent captures two binary profile versions from distinct source locations") do
   @profile_contents = [ "\x00\x01".b, "\x00\x02".b ]
   @profile_outcomes = @profile_contents.each_with_index.map do |bytes, index|
     capture_artifact_task(
@@ -164,7 +164,7 @@ When("the agent captures two binary profile versions from one source") do
       title: "Profile #{index}",
       kind: "performance_profile",
       labels: %w[profile binary],
-      locator: "tmp/profile.dump",
+      locator: "tmp/profile-#{index}.dump",
       source_kind: "local_file",
       content: {
         encoding: "binary",
@@ -391,7 +391,7 @@ Then("the README edge preserves its literal parent-segment, fragment, and normal
   )
 end
 
-Given("two immutable revisions at one exact locator are captured but not projected") do
+Given("two source revisions at one exact locator are captured but not projected") do
   @locator_artifacts = %w[commit-a commit-b].to_h do |revision|
     outcome = capture_artifact_task(
       command_id: "cmd-cuc-locator-#{revision}",
@@ -404,10 +404,16 @@ Given("two immutable revisions at one exact locator are captured but not project
       content: {
         encoding: "utf-8",
         media_type: "text/markdown",
-        text: "#{revision}\n"
+        text: "stable content\n"
       }
     )
-    [ revision, outcome.dig("data", "artifact_id") ]
+    [
+      revision,
+      {
+        artifact_id: outcome.dig("data", "artifact_id"),
+        observation_id: outcome.dig("data", "observation_id")
+      }
+    ]
   end
 end
 
@@ -428,7 +434,12 @@ Then("the locator is absent with a bounded projection-lag retry action") do
 end
 
 When("both locator revisions reach the read side") do
-  @locator_artifacts.each_value { project_artifact(_1) }
+  @locator_artifacts.each_value do |artifact|
+    project_artifact(
+      artifact.fetch(:artifact_id),
+      observation_id: artifact.fetch(:observation_id)
+    )
+  end
   @ambiguous_locator_pages = []
   response = artifact_locator_page("docs/versioned.md", limit: 1)
   loop do
@@ -447,7 +458,7 @@ Then("the locator is ambiguous and offers both exact revisions without choosing 
   pages = @ambiguous_locator_pages.map { _1.dig("data", "page") }
   assert_acceptance(pages.all? { _1.fetch("resolution") == "ambiguous" }, "Version ambiguity")
   assert_acceptance_equal(
-    @locator_artifacts.values.sort,
+    @locator_artifacts.values.map { _1.fetch(:artifact_id) }.sort,
     pages.flat_map { _1.fetch("items") }.map { _1.fetch("artifact_id") }.sort,
     "Ambiguous immutable Artifacts"
   )
@@ -480,7 +491,7 @@ Then("exactly that immutable Artifact and its content action are returned") do
   page = @exact_locator.dig("data", "page")
   assert_acceptance_equal("unique", page.fetch("resolution"), "Exact revision resolution")
   assert_acceptance_equal(
-    @locator_artifacts.fetch("commit-b"),
+    @locator_artifacts.fetch("commit-b").fetch(:artifact_id),
     page.fetch("items").sole.fetch("artifact_id"),
     "Exact revision Artifact"
   )

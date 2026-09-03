@@ -1629,22 +1629,6 @@ module HierarchicalWriteSetAcceptance
     }
   end
 
-  def distinct_lane_command_ids(prefix)
-    lane = Coordinator::Write::Tasks::ExecutionLane.new
-    by_lane = {}
-    32.times do |index|
-      command_id = "#{prefix}.#{index}"
-      by_lane[lane.index(command_id)] ||= command_id
-      break if by_lane.length == Coordinator::Write::Tasks::ExecutionLane::COUNT
-    end
-    assert_acceptance_equal(
-      Coordinator::Write::Tasks::ExecutionLane::COUNT,
-      by_lane.length,
-      "Distinct Task execution lanes"
-    )
-    by_lane.sort.map(&:last)
-  end
-
   def hierarchical_lease_events(kind, path)
     resource_id = (@acceptance_resource_ids || {}).fetch(
       [ acceptance_repository_id, kind, path ]
@@ -1762,23 +1746,37 @@ Then("only the {word} resource has a durable lease acquisition") do |winning_kin
 end
 
 When("both agents submit public reservation Tasks for disjoint resources and reach the reservation decision boundary") do
-  command_ids = distinct_lane_command_ids("#{@hierarchical_change_set_id.downcase}.reserve.disjoint")
-  install_contention_barrier(operation: "write_set_reserve", command_ids:)
-  prepare_mcp_clients("agent-a", "agent-b")
+  agent_ids = [ "agent-a", "agent-b" ]
+  prepare_mcp_clients(*agent_ids)
   requests = [
-    { agent_id: "agent-a", kind: "directory", path: "app/models", command_id: command_ids.fetch(0) },
+    { agent_id: "agent-a", kind: "directory", path: "app/models" },
     {
       agent_id: "agent-b",
       kind: "file",
-      path: "spec/services/user_spec.rb",
-      command_id: command_ids.fetch(1)
+      path: "spec/services/user_spec.rb"
     }
   ]
-  @hierarchical_reservations = requests.map do |arguments|
-    Thread.new do
-      submit_live_hierarchical_reservation(**arguments, await_terminal: false)
-    end
-  end.map(&:value)
+  requests.each do |arguments|
+    resource_target(
+      kind: arguments.fetch(:kind),
+      path: arguments.fetch(:path),
+      client_id: arguments.fetch(:agent_id),
+      actor_id: arguments.fetch(:agent_id)
+    )
+  end
+  @hierarchical_reservations = submit_tasks_in_distinct_execution_lanes(client_ids: agent_ids) do |agent_id, round|
+    arguments = requests.find { _1.fetch(:agent_id) == agent_id }
+    submit_live_hierarchical_reservation(
+      **arguments,
+      command_id: "#{@hierarchical_change_set_id.downcase}.reserve.disjoint.#{agent_id}.#{round}",
+      await_terminal: false
+    )
+  end
+  install_contention_barrier(
+    operation: "write_set_reserve",
+    command_ids: @hierarchical_reservations.map { _1.fetch(:command_id) }
+  )
+  start_process_subscriptions
   await_contention_evidence
 end
 
@@ -1880,16 +1878,19 @@ end
 
 When("a public client uses the acquisition event ID for an unrelated mutation") do
   @public_collision_command_id = @system_identity_source.id
-  task_id = submit_and_await(
+  @public_collision_response = call_tool(
     "change_set_create",
-    command_id: @public_collision_command_id,
-    actor: { kind: "agent", id: "agent-a" },
-    change_set_id: "CS-AUD-LSE-PUBLIC-COLLISION",
-    goal: "Prove public and internal command identities cannot collide",
-    acceptance_criteria: [ "The unrelated public command remains independently replayable" ]
+    {
+      command_id: @public_collision_command_id,
+      actor: { kind: "agent", id: "agent-a" },
+      change_set_id: "CS-AUD-LSE-PUBLIC-COLLISION",
+      goal: "Prove public and internal command identities cannot collide",
+      acceptance_criteria: [ "The unrelated public command is rejected before Task allocation" ]
+    }
   )
-  state = task_request("tasks/get", task_id)
-  assert_acceptance_equal(false, state.dig("result", "result", "isError"), "Public collision command")
+  result = @public_collision_response.fetch("result")
+  assert_acceptance_equal("complete", result.fetch("resultType"), "Immediate result type")
+  assert_acceptance_equal(true, result.fetch("isError"), "UUIDv7 public command-ID error flag")
 end
 
 When("the real lease-expiry job handles the due source") do
@@ -1932,7 +1933,8 @@ Then("the lease expires under a distinct deterministic internal command") do
     expiration.metadata.fetch("command_id"),
     "Expiry command metadata"
   )
-  assert_acceptance_equal(1, command_events(@public_collision_command_id).length, "Public completion")
+  assert_acceptance_equal([], task_events_for_command(@public_collision_command_id), "Public Task facts")
+  assert_acceptance_equal([], command_events(@public_collision_command_id), "Public completion facts")
   assert_acceptance_equal(1, command_events(@internal_expiry_command_id).length, "Internal completion")
 end
 
@@ -2276,14 +2278,16 @@ module ResourceBoundaryRolloverAcceptance
       resource_path: source.data.fetch("resource_path")
     ).sort_by(&:b)
     boundary_index = markers.index(marker) || raise("Source event does not carry the boundary marker")
-    @rollover_race_process_step = process_step_event(
-      source_event: source,
-      process_name: "resource-boundary-maintenance",
-      step_name: "roll-resource-boundary-epoch",
-      subject_kind: "boundary-index",
-      subject_id: boundary_index.to_s
-    )
-    assert_acceptance(@rollover_race_process_step, "Rollover has no persisted process step")
+    @rollover_race_process_step = eventually("Rollover ProcessStep to become durable") do
+      process_step = process_step_event(
+        source_event: source,
+        process_name: "resource-boundary-maintenance",
+        step_name: "roll-resource-boundary-epoch",
+        subject_kind: "boundary-index",
+        subject_id: boundary_index.to_s
+      )
+      [ !process_step.nil?, process_step ]
+    end
     @rollover_race_process_step.data.fetch("target_command_id")
   end
 

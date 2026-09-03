@@ -231,9 +231,17 @@ Then("the activation Task and Saga completion preserve the ReleaseSet trace") do
     event.type == "CoordinationTaskExecutionStarted"
   end
   state = task_request("tasks/get", @release_activation_task_id)
+  process_step = process_step_event(
+    source_event: activation,
+    process_name: "release-set-lifecycle",
+    step_name: "complete-activated-release-set",
+    subject_kind: "release-set",
+    subject_id: @release_set_arguments.fetch(:release_set_id)
+  )
   assert_acceptance_equal("completed", state.dig("result", "status"), "Activation Task")
   assert_acceptance_equal(started.id, activation.causation_id, "Activation causation")
-  assert_acceptance_equal(activation.id, completion.causation_id, "Completion causation")
+  assert_acceptance(process_step, "Release completion ProcessStep is missing")
+  assert_acceptance_equal(process_step.id, completion.causation_id, "Completion causation")
   assert_acceptance_equal(
     [ lifecycle.first.correlation_id ],
     lifecycle.map(&:correlation_id).uniq,
@@ -330,9 +338,17 @@ Then("one exact compensation request is durable with Saga tracing") do
   lifecycle = release_set_lifecycle_events(@release_set_arguments.fetch(:release_set_id))
   request = release_set_payload(@release_compensation_request_event)
   failure = lifecycle.select { _1.type == "RepositoryIntegrationRecorded" }.last
+  process_step = process_step_event(
+    source_event: failure,
+    process_name: "release-set-lifecycle",
+    step_name: "request-compensation",
+    subject_kind: "release-set",
+    subject_id: @release_set_arguments.fetch(:release_set_id)
+  )
   assert_acceptance_equal(1, request.successful_integrations.length, "Compensation members")
   assert_acceptance_equal(release_event_reference(failure), request.trigger_event, "Compensation trigger")
-  assert_acceptance_equal(failure.id, @release_compensation_request_event.causation_id, "Saga causation")
+  assert_acceptance(process_step, "Compensation ProcessStep is missing")
+  assert_acceptance_equal(process_step.id, @release_compensation_request_event.causation_id, "Saga causation")
   assert_acceptance_equal(lifecycle.first.correlation_id, @release_compensation_request_event.correlation_id, "Saga correlation")
 end
 

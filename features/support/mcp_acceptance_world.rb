@@ -130,6 +130,7 @@ module McpAcceptanceWorld
   end
 
   def submit_tasks_in_distinct_execution_lanes(client_ids:, maximum_rounds: 8)
+    stop_process_subscriptions
     candidates = []
     selected = nil
 

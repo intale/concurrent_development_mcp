@@ -51,7 +51,16 @@ Then("the item has one successful outcome") do
   end
   assert_acceptance_equal(1, outcomes.length, "Batch item outcomes")
   creation = @batch_history_after_redelivery.find { _1.type == "OperationBatchCreated" }
-  assert_acceptance_equal(creation.id, outcomes.sole.causation_id, "Replayed item causation")
+  process_step = process_step_event(
+    source_event: creation,
+    process_name: "operation-batch-runner",
+    step_name: "record-item-outcome",
+    subject_kind: "operation-batch-item",
+    subject_id: "#{@operation_batch_id}:0"
+  )
+  assert_acceptance(process_step, "Replayed Batch item ProcessStep is missing")
+  assert_acceptance_equal(process_step.id, outcomes.sole.causation_id, "Replayed item causation")
+  assert_acceptance_equal(creation.id, process_step.causation_id, "Replayed ProcessStep causation")
   assert_acceptance(
     @prior_target_completion.correlation_id != creation.correlation_id,
     "The prior target and Batch unexpectedly share one correlation"

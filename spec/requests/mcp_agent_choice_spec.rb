@@ -68,7 +68,6 @@ RSpec.describe "CHO-01 MCP agent choice recording" do
     expect([ submitted, started, *choice_facts, completion, task_completed ].map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
     )
-
   end
 
   it "serves directly persisted recorded and accepted Choice views", :read_model do

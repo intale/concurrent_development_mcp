@@ -110,33 +110,33 @@ module LiveTwoAgentAcceptanceWorld
         { kind: "file", path: "lib/integration_adapter.rb", base_blob_oid: BASE_BLOB }
       )
     }
-    command_ids = luna_distinct_lane_command_ids("two-luna.reserve.overlap")
-    @luna_contention_command_ids = {
-      agent_a: command_ids.fetch(0),
-      agent_b: command_ids.fetch(1)
-    }.freeze
-    install_contention_barrier(operation: "write_set_reserve", command_ids:)
-
     requests = {
       agent_a: [ agent_a, { kind: "directory", path: "app/models" } ],
       agent_b: [ agent_b, { kind: "file", path: "app/models/order.rb", base_blob_oid: BASE_BLOB } ]
     }.transform_values do |entry, resource|
       [ entry, luna_resource_target(entry, resource) ]
     end
-    @luna_contention_handles = requests.to_h do |key, (entry, resource)|
-      handle = Thread.new do
-        luna_task_handle(
-          "write_set_reserve",
-          reservation_arguments(
-            entry,
-            command_id: @luna_contention_command_ids.fetch(key),
-            resources: [ resource ]
-          ),
-          client_id: entry.fetch(:client_id)
-        )
-      end.value
-      [ key, handle ]
+    participants_by_client = requests.to_h do |key, (entry, resource)|
+      [ entry.fetch(:client_id), [ key, entry, resource ] ]
     end
+    candidates = submit_tasks_in_distinct_execution_lanes(
+      client_ids: participants_by_client.keys
+    ) do |client_id, round|
+      key, entry, resource = participants_by_client.fetch(client_id)
+      command_id = "two-luna.reserve.overlap.#{key}.#{round}"
+      luna_task_handle(
+        "write_set_reserve",
+        reservation_arguments(entry, command_id:, resources: [ resource ]),
+        client_id:
+      ).merge(key:, command_id:)
+    end
+    @luna_contention_command_ids = candidates.to_h { [ _1.fetch(:key), _1.fetch(:command_id) ] }.freeze
+    @luna_contention_handles = candidates.to_h { [ _1.fetch(:key), _1.except(:key, :command_id, :worker_lane) ] }
+    install_contention_barrier(
+      operation: "write_set_reserve",
+      command_ids: @luna_contention_command_ids.values
+    )
+    start_process_subscriptions
     await_contention_evidence
 
     release_contention_command(@luna_contention_command_ids.fetch(:agent_a))
@@ -612,22 +612,6 @@ module LiveTwoAgentAcceptanceWorld
       context = payload.dig("data", "context")
       [ context && yield(context), payload ]
     end
-  end
-
-  def luna_distinct_lane_command_ids(prefix)
-    lane = Coordinator::Write::Tasks::ExecutionLane.new
-    by_lane = {}
-    64.times do |index|
-      command_id = "#{prefix}.#{index}"
-      by_lane[lane.index(command_id)] ||= command_id
-      break if by_lane.length == Coordinator::Write::Tasks::ExecutionLane::COUNT
-    end
-    assert_acceptance_equal(
-      Coordinator::Write::Tasks::ExecutionLane::COUNT,
-      by_lane.length,
-      "Distinct Task lanes"
-    )
-    by_lane.sort.map(&:last)
   end
 
   def reservation_arguments(entry, command_id:, resources:)

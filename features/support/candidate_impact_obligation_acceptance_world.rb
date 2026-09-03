@@ -61,7 +61,7 @@ module CandidateImpactObligationAcceptanceWorld
   def submit_candidate_obligation_pair
     submit_candidate_obligation_surface("source")
     submit_candidate_obligation_surface("target")
-    derive_candidate_obligation_id if @obligation_policy
+    derive_candidate_obligation_id if candidate_obligation_gating_policy?
   end
 
   def activate_candidate_obligation_policy(level:)
@@ -135,7 +135,7 @@ module CandidateImpactObligationAcceptanceWorld
         event: candidate_obligation_event_reference(decision_event)
       )
     }
-    derive_candidate_obligation_id if candidate_obligation_registrations.length == 2
+    derive_candidate_obligation_id if candidate_obligation_gating_policy? && candidate_obligation_registrations.length == 2
     @obligation_policy
   end
 
@@ -212,6 +212,10 @@ module CandidateImpactObligationAcceptanceWorld
   end
 
   private
+
+  def candidate_obligation_gating_policy?
+    @obligation_policy && %w[verification_gate merge_gate].include?(@obligation_policy.fetch(:level))
+  end
 
   def candidate_obligation_surface(role)
     empty = { produces: [], consumes: [], may_affect: [], assumes: [] }
@@ -366,7 +370,7 @@ module CandidateImpactObligationAcceptanceWorld
     started = read_global_marked_events(
       stream_context: "DevelopmentIntegration",
       stream_name: "CandidateImpactRegistrySweep",
-      event_types: [ "CandidateImpactRegistrySweepStarted" ],
+      event_types: %w[CandidateImpactRegistrySweepStarted CandidateImpactRegistrySweepSkipped],
       marker: "policy-partition-event:#{partition_event.id}",
       maximum_count: 1
     ).first

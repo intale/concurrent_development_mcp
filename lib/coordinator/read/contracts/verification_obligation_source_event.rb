@@ -41,7 +41,9 @@ module Coordinator::Read
         valid = case values[:event_type]
         when "VerificationObligationCreated"
           values[:stream_revision].zero? &&
-            values[:stream_id] == values[:command_id] &&
+            Types::UUID_V7_PATTERN.match?(values[:stream_id]) &&
+            Types::UUID_V7_PATTERN.match?(values[:command_id]) &&
+            values[:stream_id] != values[:command_id] &&
             values[:actor_kind] == "system" &&
             values[:actor_id] == "candidate-impact-obligation-policy" &&
             values[:policy_version] == "candidate-compatibility-obligation/v1"
