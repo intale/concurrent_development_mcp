@@ -5,20 +5,15 @@ module Coordinator::Write
     class StartCoordinationTask
       def initialize(
         transition:,
-        decider: Domain::CoordinationTasks::Start.new,
-        clock: SystemClock.new
+        decider: Domain::CoordinationTasks::Start.new
       )
         @transition = transition
         @decider = decider
-        @clock = clock
       end
 
       def call(task_id:, caused_by: nil)
         @transition.call(
-          command: Commands::StartCoordinationTask.new(
-            task_id:,
-            started_at: @clock.now
-          ),
+          command: Commands::StartCoordinationTask.new(task_id:),
           decider: @decider,
           transition_name: "start",
           caused_by:

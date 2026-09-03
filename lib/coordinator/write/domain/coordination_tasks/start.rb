@@ -11,10 +11,7 @@ module Coordinator::Write
           return Success(nil) if state.terminal? || state.started || state.cancellation_requested
 
           Success(
-            Events::CoordinationTaskExecutionStartedV1.new(
-              task_id: command.task_id,
-              started_at: command.started_at
-            )
+            Events::CoordinationTaskExecutionStartedV2.new(task_id: command.task_id)
           )
         end
 

@@ -5,21 +5,17 @@ RSpec.describe Coordinator::Write::Domain::CoordinationTasks::State do
   let(:submitted) { task_submitted(task_id:) }
 
   it "folds a completed Task from its bounded authoritative history" do
-    started = Coordinator::Write::Events::CoordinationTaskExecutionStartedV1.new(
-      task_id:,
-      started_at: "2026-08-22T06:30:01.000000Z"
-    )
-    completed = Coordinator::Write::Events::CoordinationTaskCompletedV2.new(
-      task_id:,
-      result: successful_semantic_result,
-      completed_at: "2026-08-22T06:30:02.000000Z"
-    )
+    started = Coordinator::Write::Events::CoordinationTaskExecutionStartedV2.new(task_id:)
+    completed = Coordinator::Write::Events::CoordinationTaskCompletedV3.new(task_id:)
 
-    state = described_class.reduce([ submitted, started, completed ])
+    state = described_class.reduce(
+      [ submitted, started, completed ],
+      occurred_at: timestamps(3)
+    )
 
     expect(state.status).to eq("completed")
     expect(state.started).to be(true)
-    expect(state.semantic_result).to eq(successful_semantic_result)
+    expect(state.semantic_result).to be_nil
     expect(state.last_updated_at).to eq("2026-08-22T06:30:02.000000Z")
   end
 
@@ -27,15 +23,13 @@ RSpec.describe Coordinator::Write::Domain::CoordinationTasks::State do
     state = described_class.reduce(
       [
         submitted,
-        Coordinator::Write::Events::CoordinationTaskExecutionStartedV1.new(
+        Coordinator::Write::Events::CoordinationTaskExecutionStartedV2.new(task_id:),
+        Coordinator::Write::Events::CoordinationTaskCancellationRequestedV2.new(
           task_id:,
-          started_at: "2026-08-22T06:30:01.000000Z"
-        ),
-        Coordinator::Write::Events::CoordinationTaskCancellationRequestedV1.new(
-          task_id:,
-          requested_at: "2026-08-22T06:30:02.000000Z"
+          reason: nil
         )
-      ]
+      ],
+      occurred_at: timestamps(3)
     )
 
     expect(state.status).to eq("working")
@@ -44,20 +38,16 @@ RSpec.describe Coordinator::Write::Domain::CoordinationTasks::State do
   end
 
   it "rejects a terminal outcome before execution starts" do
-    completed = Coordinator::Write::Events::CoordinationTaskCompletedV2.new(
-      task_id:,
-      result: successful_semantic_result,
-      completed_at: "2026-08-22T06:30:02.000000Z"
-    )
+    completed = Coordinator::Write::Events::CoordinationTaskCompletedV3.new(task_id:)
 
     expect do
-      described_class.reduce([ submitted, completed ])
+      described_class.reduce([ submitted, completed ], occurred_at: timestamps(2))
     end.to raise_error(Coordinator::Write::InvalidCoordinationTaskHistory)
   end
 
   def task_submitted(task_id:)
     command = Coordinator::Write::Commands::CreateChangeSet.new(
-      command_id: "cmd-task-101",
+      command_id: "01919191-9191-7192-8191-919191919191",
       actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "agent-a"),
       change_set_id: "CS-101",
       goal: "Coordinate billing changes",
@@ -65,26 +55,17 @@ RSpec.describe Coordinator::Write::Domain::CoordinationTasks::State do
     )
     digest = Coordinator::Write::CommandInputDigest.new
 
-    Coordinator::Write::Events::CoordinationTaskSubmittedV2.new(
+    Coordinator::Write::Events::CoordinationTaskSubmittedV3.new(
       task_id:,
       tool_name: "change_set_create",
       command_id: command.command_id,
       command_input: digest.document(command),
-      submitted_at: "2026-08-22T06:30:00.000000Z",
       ttl_ms: nil,
       poll_interval_ms: 500
     )
   end
 
-  def successful_semantic_result
-    @successful_semantic_result ||= Coordinator::Write::Tasks::SemanticResultV1::Success.new(
-      kind: "success",
-      summary: "ChangeSet created",
-      command_id: "cmd-task-101",
-      receipt: "cmd-task-101",
-      data: Coordinator::Write::CommandReceiptData::ChangeSet.new(change_set_id: "CS-101"),
-      warnings: [],
-      next_actions: []
-    )
+  def timestamps(count)
+    count.times.map { |index| "2026-08-22T06:30:0#{index}.000000Z" }
   end
 end

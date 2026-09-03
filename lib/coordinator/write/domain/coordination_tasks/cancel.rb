@@ -11,15 +11,14 @@ module Coordinator::Write
           return Success(nil) if state.terminal? || state.cancellation_requested
 
           event = if state.started
-                    Events::CoordinationTaskCancellationRequestedV1.new(
+                    Events::CoordinationTaskCancellationRequestedV2.new(
                       task_id: command.task_id,
-                      requested_at: command.requested_at
+                      reason: command.reason
                     )
           else
-                    Events::CoordinationTaskCancelledV1.new(
+                    Events::CoordinationTaskCancelledV2.new(
                       task_id: command.task_id,
-                      reason: "cancelled_before_execution",
-                      cancelled_at: command.requested_at
+                      reason: command.reason || "Cancelled before execution"
                     )
           end
 

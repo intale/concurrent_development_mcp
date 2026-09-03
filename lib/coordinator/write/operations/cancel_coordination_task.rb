@@ -5,19 +5,17 @@ module Coordinator::Write
     class CancelCoordinationTask
       def initialize(
         transition:,
-        decider: Domain::CoordinationTasks::Cancel.new,
-        clock: SystemClock.new
+        decider: Domain::CoordinationTasks::Cancel.new
       )
         @transition = transition
         @decider = decider
-        @clock = clock
       end
 
-      def call(task_id:)
+      def call(task_id:, reason: nil)
         @transition.call(
           command: Commands::CancelCoordinationTask.new(
             task_id:,
-            requested_at: @clock.now
+            reason:
           ),
           decider: @decider,
           transition_name: "cancel"

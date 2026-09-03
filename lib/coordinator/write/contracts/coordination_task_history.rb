@@ -30,20 +30,25 @@ module Coordinator::Write
 
         events.drop(1).each do |event|
           valid = case event
-          when Events::CoordinationTaskExecutionStartedV1
+          when Events::CoordinationTaskExecutionStartedV1,
+               Events::CoordinationTaskExecutionStartedV2
                     allowed = !started && !cancellation_requested && !terminal
                     started = true if allowed
                     allowed
-          when Events::CoordinationTaskCancellationRequestedV1
+          when Events::CoordinationTaskCancellationRequestedV1,
+               Events::CoordinationTaskCancellationRequestedV2
                     allowed = started && !cancellation_requested && !terminal
                     cancellation_requested = true if allowed
                     allowed
           when Events::CoordinationTaskCompletedV2,
-               Events::CoordinationTaskFailedV1
+               Events::CoordinationTaskCompletedV3,
+               Events::CoordinationTaskFailedV1,
+               Events::CoordinationTaskFailedV2
                     allowed = started && !terminal
                     terminal = true if allowed
                     allowed
-          when Events::CoordinationTaskCancelledV1
+          when Events::CoordinationTaskCancelledV1,
+               Events::CoordinationTaskCancelledV2
                     allowed = !started && !terminal
                     terminal = true if allowed
                     allowed

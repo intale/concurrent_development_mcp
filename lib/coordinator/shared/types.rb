@@ -517,6 +517,8 @@ module Coordinator::Shared
     UuidV7 = String.constrained(format: UUID_V7_PATTERN)
     CommandId = UuidV7
     TaskId = UuidV7
+    TaskCancellationReason = String.constrained(min_size: 1, max_size: 2_000)
+    TaskFailureReason = String.constrained(min_size: 1, max_size: 4_000)
     ResourceId = UuidV7
     ResourcePath = String.constrained(format: RESOURCE_PATH_PATTERN)
     ResourceKind = String.enum("file", "directory")

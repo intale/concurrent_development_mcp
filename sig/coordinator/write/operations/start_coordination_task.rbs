@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Operations
       class StartCoordinationTask
-        def initialize: (transition: ApplyCoordinationTaskTransition, ?decider: Domain::CoordinationTasks::Start, ?clock: Shared::SystemClock) -> void
+        def initialize: (transition: ApplyCoordinationTaskTransition, ?decider: Domain::CoordinationTasks::Start) -> void
         def call: (task_id: String, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
       end
     end

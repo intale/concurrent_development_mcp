@@ -1,0 +1,14 @@
+module Coordinator
+  module Mcp
+    module Tasks
+      class ProjectedResultResolver
+        def initialize: (
+          ?receipts: Coordinator::Read::Repositories::CommandReceipts,
+          ?mapper: Coordinator::Write::Tasks::SemanticResultMapper
+        ) -> void
+
+        def call: (Coordinator::Write::Domain::CoordinationTasks::State state) -> Coordinator::Write::Tasks::SemanticResultV1::value?
+      end
+    end
+  end
+end

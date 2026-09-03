@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Operations
       class RecordCoordinationTaskOutcome
-        def initialize: (transition: ApplyCoordinationTaskTransition, ?decider: Domain::CoordinationTasks::RecordOutcome, ?clock: Shared::SystemClock) -> void
+        def initialize: (transition: ApplyCoordinationTaskTransition, ?decider: Domain::CoordinationTasks::RecordOutcome) -> void
         def call: (task_id: String, outcome: Tasks::OutcomeV2::value, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
       end
     end

@@ -16,7 +16,7 @@ module Coordinator::Mcp
         )
       end
 
-      def detailed(state)
+      def detailed(state, projected_result: nil)
         case state.status
         when "working"
           working(state)
@@ -25,7 +25,7 @@ module Coordinator::Mcp
             common_attributes(state).merge(
               resultType: "complete",
               status: "completed",
-              result: completed_result(state)
+              result: completed_result(projected_result)
             )
           )
         when "failed"
@@ -34,7 +34,7 @@ module Coordinator::Mcp
               resultType: "complete",
               status: "failed",
               statusMessage: state.status_message,
-              error: state.error
+              error: failed_error(state)
             )
           )
         when "cancelled"
@@ -78,8 +78,19 @@ module Coordinator::Mcp
         }
       end
 
-      def completed_result(state)
-        @semantic_presenter.call(state.semantic_result)
+      def completed_result(projected_result)
+        raise KeyError, "Completed Task result has not been projected yet" unless projected_result
+
+        @semantic_presenter.call(projected_result)
+      end
+
+      def failed_error(state)
+        return state.error if state.error
+
+        Coordinator::Write::Tasks::JsonRpcErrorV1.new(
+          code: -32_603,
+          message: state.status_message
+        )
       end
     end
   end

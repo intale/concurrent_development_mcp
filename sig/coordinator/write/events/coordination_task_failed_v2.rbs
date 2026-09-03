@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Events
+      class CoordinationTaskFailedV2 < Base
+        def task_id: () -> String
+        def code: () -> String
+        def reason: () -> String
+        def retryable: () -> bool
+      end
+    end
+  end
+end

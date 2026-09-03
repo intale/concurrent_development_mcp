@@ -32,14 +32,19 @@ module Coordinator::Write
           event = decision.value!
           next Success(snapshot.state) unless event
 
-          append(
+          persisted = append(
             event:,
             snapshot:,
             transition_name:,
             event_id:,
             caused_by: caused_by || snapshot.persisted_events.first
           )
-          Success(snapshot.state.apply(event))
+          Success(
+            snapshot.state.apply(
+              event,
+              occurred_at: persisted.created_at.utc.iso8601(6)
+            )
+          )
         end
       end
 
@@ -65,7 +70,7 @@ module Coordinator::Write
           @stream_factory.coordination_task(task_id),
           [ persisted ],
           expected_revision: snapshot.latest_revision
-        )
+        ).sole
       end
     end
   end

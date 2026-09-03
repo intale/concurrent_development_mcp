@@ -1,7 +1,7 @@
 module Coordinator
   module Write
-    module Commands
-      class StartCoordinationTask < Shared::Value
+    module Events
+      class CoordinationTaskCompletedV3 < Base
         def task_id: () -> String
       end
     end

@@ -20,6 +20,8 @@ module Coordinator
           def cancellation_requested: () -> bool
           def semantic_result: () -> Tasks::SemanticResultV1::value?
           def error: () -> Tasks::JsonRpcErrorV1?
+          def failure_code: () -> String?
+          def failure_retryable: () -> bool?
           def absent?: () -> bool
           def terminal?: () -> bool
           def apply: (Events::Base event, ?occurred_at: String?) -> State

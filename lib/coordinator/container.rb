@@ -1101,12 +1101,19 @@ module Coordinator
 
     register("mcp.settings", memoize: true) { Mcp::SettingsLoader.new.call }
     register("mcp.tasks.result_mapper", memoize: true) { Mcp::Tasks::ResultMapper.new }
+    register("mcp.tasks.projected_result_resolver", memoize: true) do
+      Mcp::Tasks::ProjectedResultResolver.new(
+        receipts: self["repositories.command_receipts"],
+        mapper: self["tasks.semantic_result_mapper"]
+      )
+    end
     register("mcp.tasks.extension", memoize: true) do
       Mcp::Tasks::Extension.new(
         get_task: self["operations.get_coordination_task"],
         acknowledge_task_input: self["operations.acknowledge_task_input"],
         cancel_task: self["operations.cancel_coordination_task"],
         result_mapper: self["mcp.tasks.result_mapper"],
+        projected_result_resolver: self["mcp.tasks.projected_result_resolver"],
         terminal_result_validator: Mcp::Tasks::TerminalResultValidator.new
       )
     end
@@ -2339,22 +2346,19 @@ module Coordinator
 
     register("operations.start_coordination_task", memoize: true) do
       Write::Operations::StartCoordinationTask.new(
-        transition: self["operations.apply_coordination_task_transition"],
-        clock: self["clock"]
+        transition: self["operations.apply_coordination_task_transition"]
       )
     end
 
     register("operations.record_coordination_task_outcome", memoize: true) do
       Write::Operations::RecordCoordinationTaskOutcome.new(
-        transition: self["operations.apply_coordination_task_transition"],
-        clock: self["clock"]
+        transition: self["operations.apply_coordination_task_transition"]
       )
     end
 
     register("operations.cancel_coordination_task") do
       Write::Operations::CancelCoordinationTask.new(
-        transition: self["operations.apply_coordination_task_transition"],
-        clock: self["clock"]
+        transition: self["operations.apply_coordination_task_transition"]
       )
     end
 

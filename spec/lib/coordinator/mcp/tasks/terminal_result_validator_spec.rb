@@ -4,7 +4,8 @@ RSpec.describe Coordinator::Mcp::Tasks::TerminalResultValidator do
   subject(:validator) { described_class.new }
 
   it "accepts a terminal result matching its persisted originating tool" do
-    expect(validator.call(completed_state(data: change_set_receipt))).to be_a(
+    result = semantic_result(data: change_set_receipt)
+    expect(validator.call(completed_state, projected_result: result)).to be_a(
       Coordinator::Write::Domain::CoordinationTasks::State
     )
   end
@@ -12,7 +13,8 @@ RSpec.describe Coordinator::Mcp::Tasks::TerminalResultValidator do
   it "rejects a receipt belonging to another mutation family" do
     expect do
       validator.call(
-        completed_state(
+        completed_state,
+        projected_result: semantic_result(
           data: Coordinator::Write::CommandReceiptData::WorkItem.new(
             change_set_id: "CS-terminal-schema",
             work_item_id: "W-terminal-schema"
@@ -31,37 +33,45 @@ RSpec.describe Coordinator::Mcp::Tasks::TerminalResultValidator do
     )
 
     expect do
-      validator.call(completed_state(data: change_set_receipt, next_actions: [ action ]))
+      validator.call(
+        completed_state,
+        projected_result: semantic_result(data: change_set_receipt, next_actions: [ action ])
+      )
     end.to raise_error(::MCP::Tool::OutputSchema::ValidationError)
   end
 
-  def completed_state(data:, next_actions: [])
+  def completed_state
     Coordinator::Write::Domain::CoordinationTasks::State.reduce(
-      [ submitted_event, started_event, completed_event(data:, next_actions:) ]
+      [ submitted_event, started_event, completed_event ],
+      occurred_at: [
+        "2026-08-28T10:00:00.000000Z",
+        "2026-08-28T10:00:01.000000Z",
+        "2026-08-28T10:00:02.000000Z"
+      ]
     )
   end
 
   def submitted_event
-    Coordinator::Write::Events::CoordinationTaskSubmittedV2.new(
+    Coordinator::Write::Events::CoordinationTaskSubmittedV3.new(
       task_id: task_id,
       tool_name: "change_set_create",
       command_id: target_command.command_id,
       command_input: Coordinator::Write::CommandInputDigest.new.document(target_command),
-      submitted_at: "2026-08-28T10:00:00.000000Z",
       ttl_ms: nil,
       poll_interval_ms: 500
     )
   end
 
   def started_event
-    Coordinator::Write::Events::CoordinationTaskExecutionStartedV1.new(
-      task_id:,
-      started_at: "2026-08-28T10:00:01.000000Z"
-    )
+    Coordinator::Write::Events::CoordinationTaskExecutionStartedV2.new(task_id:)
   end
 
-  def completed_event(data:, next_actions:)
-    result = Coordinator::Write::Tasks::SemanticResultV1::Success.new(
+  def completed_event
+    Coordinator::Write::Events::CoordinationTaskCompletedV3.new(task_id:)
+  end
+
+  def semantic_result(data:, next_actions: [])
+    Coordinator::Write::Tasks::SemanticResultV1::Success.new(
       kind: "success",
       summary: "Completed",
       command_id: target_command.command_id,
@@ -70,16 +80,11 @@ RSpec.describe Coordinator::Mcp::Tasks::TerminalResultValidator do
       warnings: [],
       next_actions:
     )
-    Coordinator::Write::Events::CoordinationTaskCompletedV2.new(
-      task_id:,
-      result:,
-      completed_at: "2026-08-28T10:00:02.000000Z"
-    )
   end
 
   def target_command
     @target_command ||= Coordinator::Write::Commands::CreateChangeSet.new(
-      command_id: "cmd-terminal-schema",
+      command_id: "01919191-9191-7192-8191-919191919191",
       actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "schema-agent"),
       change_set_id: "CS-terminal-schema",
       goal: "Validate terminal Task schemas",

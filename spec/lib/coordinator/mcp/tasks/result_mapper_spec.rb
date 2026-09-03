@@ -6,25 +6,21 @@ RSpec.describe Coordinator::Mcp::Tasks::ResultMapper do
   let(:task_id) { "01919191-9191-7191-8191-919191919191" }
   let(:submitted_at) { "2026-08-22T10:00:00.000000Z" }
   let(:submitted) do
-    Coordinator::Write::Events::CoordinationTaskSubmittedV2.new(
+    Coordinator::Write::Events::CoordinationTaskSubmittedV3.new(
       task_id:,
       tool_name: "change_set_create",
-      command_id: "cmd-task-wire",
+      command_id: target_command.command_id,
       command_input: Coordinator::Write::CommandInputDigest.new.document(target_command),
-      submitted_at:,
       ttl_ms: nil,
       poll_interval_ms: 500
     )
   end
   let(:started) do
-    Coordinator::Write::Events::CoordinationTaskExecutionStartedV1.new(
-      task_id:,
-      started_at: "2026-08-22T10:00:01.000000Z"
-    )
+    Coordinator::Write::Events::CoordinationTaskExecutionStartedV2.new(task_id:)
   end
   let(:target_command) do
     Coordinator::Write::Commands::CreateChangeSet.new(
-      command_id: "cmd-task-wire",
+      command_id: "01919191-9191-7192-8191-919191919191",
       actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "agent-a"),
       change_set_id: "CS-task-wire",
       goal: "Serialize every Task state",
@@ -47,9 +43,9 @@ RSpec.describe Coordinator::Mcp::Tasks::ResultMapper do
   end
 
   it "includes the cooperative cancellation message while execution remains working" do
-    cancellation = Coordinator::Write::Events::CoordinationTaskCancellationRequestedV1.new(
+    cancellation = Coordinator::Write::Events::CoordinationTaskCancellationRequestedV2.new(
       task_id:,
-      requested_at: "2026-08-22T10:00:02.000000Z"
+      reason: nil
     )
 
     result = mapper.detailed(state(submitted, started, cancellation)).to_h
@@ -62,13 +58,12 @@ RSpec.describe Coordinator::Mcp::Tasks::ResultMapper do
   end
 
   it "presents a semantic completion as the exact CallToolResult" do
-    completed = Coordinator::Write::Events::CoordinationTaskCompletedV2.new(
-      task_id:,
-      result: semantic_success,
-      completed_at: "2026-08-22T10:00:03.000000Z"
-    )
+    completed = Coordinator::Write::Events::CoordinationTaskCompletedV3.new(task_id:)
 
-    result = mapper.detailed(state(submitted, started, completed)).to_h
+    result = mapper.detailed(
+      state(submitted, started, completed),
+      projected_result: semantic_success
+    ).to_h
 
     expect(result).to include(resultType: "complete", status: "completed")
     expect(result.fetch(:result)).to eq(
@@ -77,18 +72,15 @@ RSpec.describe Coordinator::Mcp::Tasks::ResultMapper do
   end
 
   it "keeps JSON-RPC failure and cancellation as distinct terminal wire variants" do
-    failed = Coordinator::Write::Events::CoordinationTaskFailedV1.new(
+    failed = Coordinator::Write::Events::CoordinationTaskFailedV2.new(
       task_id:,
-      error: Coordinator::Write::Tasks::JsonRpcErrorV1.new(
-        code: -32_603,
-        message: "Internal error"
-      ),
-      failed_at: "2026-08-22T10:00:03.000000Z"
+      code: "internal_error",
+      reason: "Internal error",
+      retryable: false
     )
-    cancelled = Coordinator::Write::Events::CoordinationTaskCancelledV1.new(
+    cancelled = Coordinator::Write::Events::CoordinationTaskCancelledV2.new(
       task_id:,
-      reason: "cancelled_before_execution",
-      cancelled_at: "2026-08-22T10:00:01.000000Z"
+      reason: "Cancelled before execution"
     )
 
     failed_result = mapper.detailed(state(submitted, started, failed)).to_h
@@ -108,15 +100,18 @@ RSpec.describe Coordinator::Mcp::Tasks::ResultMapper do
   end
 
   def state(*events)
-    Coordinator::Write::Domain::CoordinationTasks::State.reduce(events)
+    Coordinator::Write::Domain::CoordinationTasks::State.reduce(
+      events,
+      occurred_at: events.each_index.map { |index| "2026-08-22T10:00:0#{index}.000000Z" }
+    )
   end
 
   def semantic_success
     @semantic_success ||= Coordinator::Write::Tasks::SemanticResultV1::Success.new(
       kind: "success",
       summary: "Target command completed",
-      command_id: "cmd-task-wire",
-      receipt: "cmd-task-wire",
+      command_id: target_command.command_id,
+      receipt: target_command.command_id,
       data: Coordinator::Write::CommandReceiptData::ChangeSet.new(
         change_set_id: "CS-task-wire"
       ),

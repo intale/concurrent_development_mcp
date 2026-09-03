@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
 module Coordinator::Write
-  module Commands
-    class CancelCoordinationTask < Value
+  module Events
+    class CoordinationTaskCancellationRequestedV2 < Base
+      contract type: "CoordinationTaskCancellationRequested", version: 2
+
       attribute :task_id, Types::TaskId
       attribute :reason, Types::TaskCancellationReason.optional
     end

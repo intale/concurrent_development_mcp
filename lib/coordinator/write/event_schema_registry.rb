@@ -13,6 +13,8 @@ module Coordinator::Write
       [ "ChangeSetCreated", 1 ] => Events::ChangeSetCreatedV1,
       [ "ChangeSetAcceptanceCriteriaDefined", 1 ] => Events::ChangeSetAcceptanceCriteriaDefinedV1,
       [ "CommandRegistered", 1 ] => Events::CommandRegisteredV1,
+      [ "CommandSucceeded", 1 ] => Events::CommandSucceededV1,
+      [ "CommandRejected", 1 ] => Events::CommandRejectedV1,
       [ "CommandCompleted", 1 ] => Events::CommandCompletedV1,
       [ "ProcessStepPlanned", 1 ] => Events::ProcessStepPlannedV1,
       [ "SkillRevisionPublished", 2 ] => Events::SkillRevisionPublishedV2,
@@ -116,10 +118,15 @@ module Coordinator::Write
       [ "CoordinationTaskSubmitted", 2 ] => Events::CoordinationTaskSubmittedV2,
       [ "CoordinationTaskSubmitted", 3 ] => Events::CoordinationTaskSubmittedV3,
       [ "CoordinationTaskExecutionStarted", 1 ] => Events::CoordinationTaskExecutionStartedV1,
+      [ "CoordinationTaskExecutionStarted", 2 ] => Events::CoordinationTaskExecutionStartedV2,
       [ "CoordinationTaskCompleted", 2 ] => Events::CoordinationTaskCompletedV2,
+      [ "CoordinationTaskCompleted", 3 ] => Events::CoordinationTaskCompletedV3,
       [ "CoordinationTaskFailed", 1 ] => Events::CoordinationTaskFailedV1,
+      [ "CoordinationTaskFailed", 2 ] => Events::CoordinationTaskFailedV2,
       [ "CoordinationTaskCancellationRequested", 1 ] => Events::CoordinationTaskCancellationRequestedV1,
-      [ "CoordinationTaskCancelled", 1 ] => Events::CoordinationTaskCancelledV1
+      [ "CoordinationTaskCancellationRequested", 2 ] => Events::CoordinationTaskCancellationRequestedV2,
+      [ "CoordinationTaskCancelled", 1 ] => Events::CoordinationTaskCancelledV1,
+      [ "CoordinationTaskCancelled", 2 ] => Events::CoordinationTaskCancelledV2
     }.freeze
 
     DEFAULT_VALIDATORS = {

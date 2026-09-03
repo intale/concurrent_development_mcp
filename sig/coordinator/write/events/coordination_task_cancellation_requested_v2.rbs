@@ -1,7 +1,7 @@
 module Coordinator
   module Write
-    module Commands
-      class CancelCoordinationTask < Shared::Value
+    module Events
+      class CoordinationTaskCancellationRequestedV2 < Base
         def task_id: () -> String
         def reason: () -> String?
       end

@@ -182,6 +182,7 @@ module Coordinator
 
       Identifier: untyped
       PublicCommandId: untyped
+      RequestId: untyped
       RepositoryId: untyped
       GitOid: untyped
       GitObjectFormat: untyped
@@ -189,7 +190,10 @@ module Coordinator
       Sha256Digest: untyped
       Timestamp: untyped
       UuidV7: untyped
+      CommandId: untyped
       TaskId: untyped
+      TaskCancellationReason: untyped
+      TaskFailureReason: untyped
       ResourceId: untyped
       ResourcePath: untyped
       ResourceKind: untyped

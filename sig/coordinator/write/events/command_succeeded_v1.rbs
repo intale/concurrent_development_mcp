@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Events
+      class CommandSucceededV1 < Base
+        def command_id: () -> String
+      end
+    end
+  end
+end

@@ -18,6 +18,8 @@ module Coordinator::Write
         attribute :cancellation_requested, Types::Strict::Bool
         attribute :semantic_result, Tasks::SemanticResultV1::Type.optional
         attribute :error, Tasks::JsonRpcErrorV1.optional
+        attribute :failure_code, Types::Identifier.optional
+        attribute :failure_retryable, Types::Strict::Bool.optional
 
         def self.initial
           new(
@@ -34,7 +36,9 @@ module Coordinator::Write
             started: false,
             cancellation_requested: false,
             semantic_result: nil,
-            error: nil
+            error: nil,
+            failure_code: nil,
+            failure_retryable: nil
           )
         end
 
@@ -85,11 +89,19 @@ module Coordinator::Write
                          }
           when Events::CoordinationTaskExecutionStartedV1
                          { started: true, last_updated_at: event.started_at }
+          when Events::CoordinationTaskExecutionStartedV2
+                         { started: true, last_updated_at: occurred_at }
           when Events::CoordinationTaskCancellationRequestedV1
                          {
                            cancellation_requested: true,
                            status_message: "Cancellation requested; execution may still complete",
                            last_updated_at: event.requested_at
+                         }
+          when Events::CoordinationTaskCancellationRequestedV2
+                         {
+                           cancellation_requested: true,
+                           status_message: event.reason || "Cancellation requested; execution may still complete",
+                           last_updated_at: occurred_at
                          }
           when Events::CoordinationTaskCompletedV2
                          {
@@ -98,6 +110,12 @@ module Coordinator::Write
                            semantic_result: event.result,
                            last_updated_at: event.completed_at
                          }
+          when Events::CoordinationTaskCompletedV3
+                         {
+                           status: "completed",
+                           status_message: nil,
+                           last_updated_at: occurred_at
+                         }
           when Events::CoordinationTaskFailedV1
                          {
                            status: "failed",
@@ -105,11 +123,25 @@ module Coordinator::Write
                            error: event.error,
                            last_updated_at: event.failed_at
                          }
+          when Events::CoordinationTaskFailedV2
+                         {
+                           status: "failed",
+                           status_message: event.reason,
+                           failure_code: event.code,
+                           failure_retryable: event.retryable,
+                           last_updated_at: occurred_at
+                         }
           when Events::CoordinationTaskCancelledV1
                          {
                            status: "cancelled",
                            status_message: "Cancelled before execution",
                            last_updated_at: event.cancelled_at
+                         }
+          when Events::CoordinationTaskCancelledV2
+                         {
+                           status: "cancelled",
+                           status_message: event.reason,
+                           last_updated_at: occurred_at
                          }
           end
 

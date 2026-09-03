@@ -34,15 +34,12 @@ RSpec.describe "Coordination Task command transitions" do
 
   it "Given a queued Task, when StartCoordinationTask runs, then it emits one start fact" do
     state = submitted_state
-    command = Coordinator::Write::Commands::StartCoordinationTask.new(
-      task_id:,
-      started_at: "2026-08-22T06:30:01.000000Z"
-    )
+    command = Coordinator::Write::Commands::StartCoordinationTask.new(task_id:)
 
     result = Coordinator::Write::Domain::CoordinationTasks::Start.new.call(state:, command:)
 
     expect(result.value!).to eq(
-      Coordinator::Write::Events::CoordinationTaskExecutionStartedV1.new(command.to_h)
+      Coordinator::Write::Events::CoordinationTaskExecutionStartedV2.new(command.to_h)
     )
   end
 
@@ -50,54 +47,54 @@ RSpec.describe "Coordination Task command transitions" do
     state = Coordinator::Write::Domain::CoordinationTasks::State.reduce(
       [
         submitted,
-        Coordinator::Write::Events::CoordinationTaskExecutionStartedV1.new(
-          task_id:,
-          started_at: "2026-08-22T06:30:01.000000Z"
-        )
+        Coordinator::Write::Events::CoordinationTaskExecutionStartedV2.new(task_id:)
       ],
       occurred_at: [
         "2026-08-22T06:30:00.000000Z",
         "2026-08-22T06:30:01.000000Z"
       ]
     )
-    command = Coordinator::Write::Commands::StartCoordinationTask.new(
-      task_id:,
-      started_at: "2026-08-22T06:30:02.000000Z"
-    )
+    command = Coordinator::Write::Commands::StartCoordinationTask.new(task_id:)
 
     expect(Coordinator::Write::Domain::CoordinationTasks::Start.new.call(state:, command:).value!).to be_nil
   end
 
   it "Given a queued Task, when Cancel runs, then it immediately cancels" do
     state = submitted_state
-    command = Coordinator::Write::Commands::CancelCoordinationTask.new(
-      task_id:,
-      requested_at: "2026-08-22T06:30:01.000000Z"
-    )
+    command = Coordinator::Write::Commands::CancelCoordinationTask.new(task_id:, reason: nil)
 
     event = Coordinator::Write::Domain::CoordinationTasks::Cancel.new.call(state:, command:).value!
 
-    expect(event).to be_a(Coordinator::Write::Events::CoordinationTaskCancelledV1)
+    expect(event).to eq(
+      Coordinator::Write::Events::CoordinationTaskCancelledV2.new(
+        task_id:,
+        reason: "Cancelled before execution"
+      )
+    )
   end
 
   it "Given a running Task, when Cancel runs, then it requests cooperative cancellation" do
     state = running_state
     command = Coordinator::Write::Commands::CancelCoordinationTask.new(
       task_id:,
-      requested_at: "2026-08-22T06:30:02.000000Z"
+      reason: "A user no longer needs this operation"
     )
 
     event = Coordinator::Write::Domain::CoordinationTasks::Cancel.new.call(state:, command:).value!
 
-    expect(event).to be_a(Coordinator::Write::Events::CoordinationTaskCancellationRequestedV1)
+    expect(event).to eq(
+      Coordinator::Write::Events::CoordinationTaskCancellationRequestedV2.new(
+        task_id:,
+        reason: "A user no longer needs this operation"
+      )
+    )
   end
 
   it "Given a running Task, when a domain rejection is recorded, then it emits one semantic fact" do
     result = domain_rejection
     command = Coordinator::Write::Commands::RecordCoordinationTaskOutcome.new(
       task_id:,
-      outcome: Coordinator::Write::Tasks::OutcomeV2::Completed.new(result:),
-      recorded_at: "2026-08-22T06:30:02.000000Z"
+      outcome: Coordinator::Write::Tasks::OutcomeV2::Completed.new(result:)
     )
 
     event = Coordinator::Write::Domain::CoordinationTasks::RecordOutcome.new.call(
@@ -105,12 +102,7 @@ RSpec.describe "Coordination Task command transitions" do
       command:
     ).value!
 
-    expect(event).to be_a(Coordinator::Write::Events::CoordinationTaskCompletedV2)
-    expect(event.result).to have_attributes(
-      kind: "domain_rejection",
-      status: "denied",
-      error: have_attributes(code: "change_set_already_exists")
-    )
+    expect(event).to eq(Coordinator::Write::Events::CoordinationTaskCompletedV3.new(task_id:))
   end
 
   it "Given a running Task, when a JSON-RPC failure is recorded, then it emits TaskFailed" do
@@ -118,8 +110,7 @@ RSpec.describe "Coordination Task command transitions" do
       task_id:,
       outcome: Coordinator::Write::Tasks::OutcomeV2::Failed.new(
         error: Coordinator::Write::Tasks::JsonRpcErrorV1.new(code: -32_603, message: "Internal error")
-      ),
-      recorded_at: "2026-08-22T06:30:02.000000Z"
+      )
     )
 
     event = Coordinator::Write::Domain::CoordinationTasks::RecordOutcome.new.call(
@@ -127,17 +118,21 @@ RSpec.describe "Coordination Task command transitions" do
       command:
     ).value!
 
-    expect(event).to be_a(Coordinator::Write::Events::CoordinationTaskFailedV1)
+    expect(event).to eq(
+      Coordinator::Write::Events::CoordinationTaskFailedV2.new(
+        task_id:,
+        code: "internal_error",
+        reason: "Internal error",
+        retryable: false
+      )
+    )
   end
 
   def running_state
     Coordinator::Write::Domain::CoordinationTasks::State.reduce(
       [
         submitted,
-        Coordinator::Write::Events::CoordinationTaskExecutionStartedV1.new(
-          task_id:,
-          started_at: "2026-08-22T06:30:01.000000Z"
-        )
+        Coordinator::Write::Events::CoordinationTaskExecutionStartedV2.new(task_id:)
       ],
       occurred_at: [
         "2026-08-22T06:30:00.000000Z",

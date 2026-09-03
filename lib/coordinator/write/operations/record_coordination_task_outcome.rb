@@ -5,20 +5,17 @@ module Coordinator::Write
     class RecordCoordinationTaskOutcome
       def initialize(
         transition:,
-        decider: Domain::CoordinationTasks::RecordOutcome.new,
-        clock: SystemClock.new
+        decider: Domain::CoordinationTasks::RecordOutcome.new
       )
         @transition = transition
         @decider = decider
-        @clock = clock
       end
 
       def call(task_id:, outcome:, caused_by: nil)
         @transition.call(
           command: Commands::RecordCoordinationTaskOutcome.new(
             task_id:,
-            outcome:,
-            recorded_at: @clock.now
+            outcome:
           ),
           decider: @decider,
           transition_name: "outcome",
