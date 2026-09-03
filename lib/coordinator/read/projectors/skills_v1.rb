@@ -3,16 +3,18 @@
 module Coordinator::Read
   module Projectors
     class SkillsV1
-      PROJECTION = ProjectionDefinition.new(name: "skills", version: 3)
+      PROJECTION = ProjectionDefinition.new(name: "skills", version: 4)
 
       def initialize(
         contract: Contracts::SkillSourceEvent.new,
         publication_loader: Coordinator::Write::Skills::PersistedPublicationLoader.new,
+        projection_builder: nil,
         skills: Repositories::Skills.new,
         processed_events: Repositories::ProcessedProjectionEvents.new
       )
         @contract = contract
         @publication_loader = publication_loader
+        @projection_builder = projection_builder
         @skills = skills
         @processed_events = processed_events
       end
@@ -54,15 +56,23 @@ module Coordinator::Read
         )
         raise InvalidProjectionSource, result.errors.to_h.inspect if result.failure?
 
-        publication = @publication_loader.call(event)
+        publication = if event.metadata.fetch("schema_version") == 3
+                        raise InvalidProjectionSource, "granular Skill projection builder is unavailable" unless @projection_builder
+
+                        @projection_builder.call(event)
+                      else
+                        @publication_loader.call(event)
+                      end
         raise InvalidProjectionSource, publication.failure.to_h.inspect if publication.failure?
 
         publication.value!
       end
 
       def verify_stream_identity!(event, publication)
+        expected_stream_revision = publication.is_a?(Coordinator::Write::Skills::ProjectionPublicationV3) ?
+          publication.revision : publication.revision - 1
         matches = event.stream.stream_id == publication.skill_id &&
-                  event.stream_revision + 1 == publication.revision
+                  event.stream_revision == expected_stream_revision
         return if matches
 
         raise InvalidProjectionSource, "Skill identity or logical revision does not match its source stream"

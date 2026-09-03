@@ -14,11 +14,26 @@ module Coordinator::Read
           Coordinator::Shared::Subscriptions::StreamFilter.new(
             context: "DevelopmentMemory",
             stream_name: "DevelopmentArtifactObservation"
+          ),
+          Coordinator::Shared::Subscriptions::StreamFilter.new(
+            context: "DevelopmentMemory",
+            stream_name: "DevelopmentArtifactRelation"
           )
         ],
         event_types: %w[
+          DevelopmentArtifactCreated
+          DevelopmentArtifactScopeChanged
+          DevelopmentArtifactTitleChanged
+          DevelopmentArtifactKindChanged
+          DevelopmentArtifactLabelAdded
+          DevelopmentArtifactLabelRemoved
+          DevelopmentArtifactSourceChanged
+          DevelopmentArtifactContentChanged
           DevelopmentArtifactCaptured
           DevelopmentArtifactObserved
+          DevelopmentArtifactObservationRecorded
+          DevelopmentArtifactObservationFactLinked
+          DevelopmentArtifactClassificationCorrectionRecorded
           DevelopmentArtifactClassificationCorrected
           DevelopmentArtifactRelationDeclared
           DevelopmentArtifactRelationSuperseded

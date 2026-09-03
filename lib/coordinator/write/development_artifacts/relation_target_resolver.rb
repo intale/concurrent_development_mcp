@@ -17,6 +17,12 @@ module Coordinator::Write
 
       def call(source_artifact_id:, target:)
         return Success(external_target(target)) if target.kind == "external"
+        if target.kind == "skill"
+          resolved = skill_target(target)
+          return Failure(target_missing(source_artifact_id, target)) unless resolved
+
+          return Success(resolved)
+        end
 
         event = target_event(target)
         return Failure(target_missing(source_artifact_id, target)) unless event
@@ -32,16 +38,55 @@ module Coordinator::Write
 
       def verified_target(target, event)
         values = { kind: target.kind, id: target.id, status: "verified" }
-        if target.kind == "skill"
-          publication = load_event(event)
-          values[:name] = publication.name
-          values[:scope] = publication.scope
-        elsif target.kind == "repository"
+        if target.kind == "repository"
           registration = load_event(event)
           values[:name] = registration.repository_key
           values[:scope] = registration.scope
+        elsif target.kind == "resource"
+          registration = load_event(event)
+          values[:name] = registration.normalized_path
+          values[:scope] = registration.repository_id
         end
         RelationTargetV1.new(**values)
+      end
+
+      def skill_target(target)
+        events = @event_store.read_grouped(
+          @stream_factory.skill(target.id),
+          GroupedEventReadCriteria.new(
+            event_types: [ "SkillRegistered", "SkillRevisionPublished" ],
+            direction: :desc
+          )
+        )
+        publication_event = events.find { _1.type == "SkillRevisionPublished" }
+        return unless publication_event
+
+        publication = load_event(publication_event)
+        case publication
+        when Events::SkillRevisionPublishedV3
+          registration_event = events.find { _1.type == "SkillRegistered" }
+          return unless registration_event
+
+          registration = load_event(registration_event)
+          return unless registration.is_a?(Events::SkillRegisteredV1) &&
+                        registration.skill_id == publication.skill_id
+
+          RelationTargetV1.new(
+            kind: target.kind,
+            id: target.id,
+            status: "verified",
+            name: registration.name,
+            scope: registration.scope
+          )
+        when Events::SkillRevisionPublishedV2
+          RelationTargetV1.new(
+            kind: target.kind,
+            id: target.id,
+            status: "verified",
+            name: publication.name,
+            scope: publication.scope
+          )
+        end
       end
 
       def target_event(target)
@@ -56,7 +101,15 @@ module Coordinator::Write
       def target_query(target)
         case target.kind
         when "artifact"
-          [ @stream_factory.development_artifact(target.id), EventQueries::DEVELOPMENT_ARTIFACT_CAPTURE, false ]
+          [
+            @stream_factory.development_artifact(target.id),
+            EventReadCriteria.new(
+              event_types: [ "DevelopmentArtifactCreated", "DevelopmentArtifactCaptured" ],
+              maximum_count: 1,
+              direction: :asc
+            ),
+            false
+          ]
         when "change_set"
           [ @stream_factory.change_set(target.id), EventQueries::CHANGE_SET_EXISTENCE, true ]
         when "work_item"
@@ -67,10 +120,14 @@ module Coordinator::Write
           [ @stream_factory.candidate(target.id), EventQueries::CANDIDATE_EXISTENCE, false ]
         when "decision"
           [ @stream_factory.decision(target.id), EventQueries::DECISION_EXISTENCE, false ]
-        when "skill"
-          [ @stream_factory.skill(target.id), EventQueries::SKILL_LATEST_REVISION, true ]
         when "repository"
           [ @stream_factory.repository(target.id), EventQueries::REPOSITORY_REGISTRATION, false ]
+        when "resource"
+          [
+            @stream_factory.resource(target.id),
+            EventReadCriteria.new(event_types: [ "ResourceRegistered" ], maximum_count: 1, direction: :asc),
+            false
+          ]
         when "operation_batch"
           [ @stream_factory.operation_batch(target.id), EventQueries::OPERATION_BATCH_EXISTENCE, false ]
         end

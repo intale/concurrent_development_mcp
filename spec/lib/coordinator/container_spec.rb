@@ -233,7 +233,7 @@ RSpec.describe Coordinator::Container do
         "release-sets-v1",
         "repositories-v1",
         "resources-v1",
-        "skills-v2",
+        "skills-v3",
         "user-utterances-v1",
         "verification-obligations-v1"
       ]

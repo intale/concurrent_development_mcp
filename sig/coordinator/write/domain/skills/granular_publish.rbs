@@ -1,0 +1,26 @@
+module Coordinator
+  module Write
+    module Domain
+      module Skills
+        class GranularPublish
+          class DecisionV1 < Shared::Value
+            def event_plan: () -> EventPlan?
+            def publication: () -> Events::SkillRevisionPublishedV3?
+            def skill_revision_id: () -> String
+            def revision: () -> Integer
+            def outcome: () -> String
+          end
+
+          def call: (
+            state: Coordinator::Write::Skills::SkillStateV1,
+            command: Commands::PublishSkillRevision,
+            skill_stream: StreamReference,
+            revision_stream: StreamReference,
+            asset_streams: Array[StreamReference],
+            revision_id: String
+          ) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

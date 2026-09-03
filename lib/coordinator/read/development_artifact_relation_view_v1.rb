@@ -2,8 +2,8 @@
 
 module Coordinator::Read
   class DevelopmentArtifactRelationViewV1 < Value
-    attribute :relation_id, Types::DevelopmentArtifactRelationId
-    attribute :source_artifact_id, Types::DevelopmentArtifactId
+    attribute :relation_id, ProjectedDevelopmentArtifactRelationId
+    attribute :source_artifact_id, ProjectedDevelopmentArtifactId
     attribute :relation, Types::DevelopmentArtifactRelationKind
     attribute :display_relation, Types::String
     attribute :inverse_relation, Types::String
@@ -18,7 +18,7 @@ module Coordinator::Read
     attribute :status, Types::String.enum("active", "superseded")
     attribute :observed_sequence, Types::Integer.constrained(gteq: 1)
     attribute :declared, DevelopmentArtifactEventEvidenceV1
-    attribute :replacement_relation_id, Types::DevelopmentArtifactRelationId.optional
+    attribute :replacement_relation_id, ProjectedDevelopmentArtifactRelationId.optional
     attribute :supersession_reason,
               Types::DevelopmentArtifactRelationSupersessionReason.optional
     attribute :superseded, DevelopmentArtifactEventEvidenceV1.optional

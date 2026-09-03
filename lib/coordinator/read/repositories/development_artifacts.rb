@@ -4,11 +4,13 @@ module Coordinator::Read
   module Repositories
     class DevelopmentArtifacts
       RELATION_OBSERVED_SEQUENCE_SQL = "development_artifact_relations.observed_sequence"
+      INITIAL_OBSERVATION_FACT_ROLES = %w[created scope title kind source content].freeze
       SUPERSESSION_OBSERVED_SEQUENCE_SQL =
         "development_artifact_relation_supersessions.observed_sequence"
       CURRENT_OBSERVED_SEQUENCE_SQL =
         "GREATEST(#{RELATION_OBSERVED_SEQUENCE_SQL}, " \
         "COALESCE(#{SUPERSESSION_OBSERVED_SEQUENCE_SQL}, 0))"
+      OBSERVATION_TABLE_SQL = "development_artifact_observations"
 
       def initialize(
         relation_registry: Coordinator::Shared::DevelopmentArtifactRelationRegistry.new,
@@ -28,9 +30,239 @@ module Coordinator::Read
         observation && build_view(artifact, observation)
       end
 
-      def fetch_content(artifact_id)
+      # Granular artifact facts intentionally project one property at a time.
+      # The write-side event data remains cohesive; this repository is the
+      # read-side adapter that folds those facts into the current view.
+      def store_created(event:, created:)
+        record = Coordinator::Read::DevelopmentArtifact.find_or_initialize_by(
+          artifact_id: created.artifact_id
+        )
+        return record if record.persisted? && record.captured_event.present?
+
+        record.assign_attributes(
+          captured_event: event_reference(event).to_h,
+          captured_actor: actor(event).to_h,
+          captured_markers: event.markers,
+          captured_metadata: event.metadata,
+          captured_causation_id: event.causation_id,
+          captured_correlation_id: event.correlation_id,
+          captured_global_position: event.global_position,
+          captured_at_domain: event.created_at,
+          captured_at_store: event.created_at,
+          stream_revision: [ record.stream_revision.to_i, event.stream_revision ].max
+        )
+        save_projection!(record, event)
+        record
+      end
+
+      def store_property(event:, fact:)
+        record = Coordinator::Read::DevelopmentArtifact.find_or_initialize_by(artifact_id: fact.artifact_id)
+        attributes = case fact
+        when Coordinator::Write::Events::DevelopmentArtifactScopeChangedV1
+          { scope: fact.scope }
+        when Coordinator::Write::Events::DevelopmentArtifactTitleChangedV1
+          { title: fact.title }
+        when Coordinator::Write::Events::DevelopmentArtifactKindChangedV1
+          { kind: fact.kind }
+        when Coordinator::Write::Events::DevelopmentArtifactLabelAddedV1
+          { labels: (Array(record.labels) | [ fact.label ]).sort }
+        when Coordinator::Write::Events::DevelopmentArtifactLabelRemovedV1
+          { labels: Array(record.labels) - [ fact.label ] }
+        when Coordinator::Write::Events::DevelopmentArtifactSourceChangedV1
+          {
+            source_kind: fact.source_kind,
+            source_locator: fact.locator,
+            source_revision: fact.revision,
+            source_observed_at: fact.observed_at,
+            source_collector: event.metadata["collector"]
+          }
+        when Coordinator::Write::Events::DevelopmentArtifactContentChangedV1
+          {
+            content_encoding: event.metadata.fetch("encoding"),
+            content_media_type: event.metadata.fetch("media_type"),
+            content_text: event.metadata.fetch("encoding") == "utf-8" ? fact.content : nil,
+            content_base64: event.metadata.fetch("encoding") == "binary" ? fact.content : nil,
+            content_sha256: event.metadata.fetch("content_sha256"),
+            content_byte_size: event.metadata.fetch("byte_size")
+          }
+        else
+          raise InvalidProjectionSource, "Unsupported granular Artifact fact #{fact.class.name}"
+        end
+        record.artifact_id = fact.artifact_id
+        record.stream_revision = [ record.stream_revision.to_i, event.stream_revision ].max
+        record.assign_attributes(attributes)
+        save_projection!(record, event)
+        record
+      end
+
+      def store_observation_recorded(event:, recorded:)
+        record = Coordinator::Read::DevelopmentArtifactObservation.find_or_initialize_by(
+          observation_id: recorded.observation_id
+        )
+        return record if record.observed_event&.fetch("event_id", nil) == event.id
+
+        attributes = {
+          **observed_evidence_attributes(event, occurred_at: event.created_at),
+          current_global_position: [ record.current_global_position.to_i, event.global_position ].max
+        }
+        if record.classified_event.blank?
+          attributes.merge!(
+            classification_revision: [ record.classification_revision.to_i, 1 ].max,
+            classification_reason: nil,
+            **classified_evidence_attributes(event, occurred_at: event.created_at)
+          )
+        end
+        record.assign_attributes(attributes)
+        save_projection!(record, event)
+        record
+      end
+
+      def store_classification_recorded(event:, correction:)
+        observation_id = correction.observation_id
+        return unless observation_id
+
+        record = Coordinator::Read::DevelopmentArtifactObservation.find_or_initialize_by(
+          observation_id:
+        )
+        if record.artifact_id && record.artifact_id != correction.artifact_id
+          raise ProjectionStateError, "Artifact classification changed observation identity"
+        end
+        if record.classification_revision > correction.classification_revision
+          return record
+        end
+        if record.classification_revision == correction.classification_revision && record.classified_event
+          return record if record.classification_reason == correction.reason
+
+          raise ProjectionStateError, "Artifact classification revision changed across events"
+        end
+
+        assign_observation_change(
+          record,
+          {
+            artifact_id: correction.artifact_id,
+            classification_revision: correction.classification_revision,
+            classification_reason: correction.reason,
+            **classified_evidence_attributes(event, occurred_at: event.created_at)
+          },
+          global_position: event.global_position,
+          event:
+        )
+      end
+
+      def store_observation_fact_link(event:, link:, observed_fact_event:, observed_fact:)
+        record = Coordinator::Read::DevelopmentArtifactObservation.find_or_initialize_by(
+          observation_id: link.observation_id
+        )
+        if record.artifact_id && record.artifact_id != link.artifact_id
+          raise ProjectionStateError, "Artifact observation changed identity"
+        end
+
+        link_record = Coordinator::Read::DevelopmentArtifactObservationFactLink.find_or_initialize_by(
+          link_event_id: event.id
+        )
+        return record if link_record.persisted?
+
+        link_record.assign_attributes(
+          observation_id: link.observation_id,
+          artifact_id: link.artifact_id,
+          role: link.role,
+          link_event: event_reference(event).to_h,
+          link_actor: actor(event).to_h,
+          link_markers: event.markers,
+          link_metadata: event.metadata,
+          link_causation_id: event.causation_id,
+          link_correlation_id: event.correlation_id,
+          link_global_position: event.global_position,
+          link_at_domain: event.created_at,
+          link_at_store: event.created_at,
+          observed_fact_event: event_reference(observed_fact_event).to_h,
+          observed_fact_event_id: observed_fact_event.id,
+          observed_fact_data: observed_fact.to_h,
+          observed_fact_metadata: observed_fact_event.metadata,
+          observed_fact_created_at: observed_fact_event.created_at
+        )
+        link_record.updated_at = event.created_at
+        link_record.save!(touch: false)
+
+        record.assign_attributes(artifact_id: link.artifact_id)
+        apply_observed_fact!(record, observed_fact, fact_event: observed_fact_event)
+        record.current_global_position = [ record.current_global_position.to_i, event.global_position ].max
+        save_projection!(record, event)
+        record
+      end
+
+      def store_relation_v2(event:, declaration:)
+        relation = Coordinator::Read::DevelopmentArtifactRelation.find_or_initialize_by(
+          relation_id: declaration.relation_id
+        )
+        relation.assign_attributes(
+          source_artifact_id: declaration.source_artifact_id,
+          relation: declaration.relation,
+          target_kind: declaration.target_kind,
+          target_id: declaration.target_id,
+          target_status: target_status_for(declaration.target_kind),
+          path: declaration.path,
+          fragment: declaration.fragment,
+          normalized_locator: declaration.normalized_locator,
+          declared_event: event_reference(event).to_h,
+          declared_actor: actor(event).to_h,
+          declared_markers: event.markers,
+          declared_metadata: event.metadata,
+          declared_causation_id: event.causation_id,
+          declared_correlation_id: event.correlation_id,
+          declared_global_position: event.global_position,
+          declared_at_domain: event.created_at,
+          declared_at_store: event.created_at
+        )
+        save_projection!(relation, event)
+        relation
+      end
+
+      def store_supersession_v2(event:, supersession:)
+        relation = Coordinator::Read::DevelopmentArtifactRelation.find_by(
+          relation_id: supersession.relation_id
+        )
+        return unless relation
+
+        record = Coordinator::Read::DevelopmentArtifactRelationSupersession.find_or_initialize_by(
+          superseded_relation_id: supersession.relation_id
+        )
+        return record if record.persisted?
+
+        attributes = {
+          source_artifact_id: supersession.source_artifact_id,
+          replacement_relation_id: supersession.replacement_relation_id,
+          reason: supersession.reason,
+          superseded_event: event_reference(event).to_h,
+          superseded_actor: actor(event).to_h,
+          superseded_markers: event.markers,
+          superseded_metadata: event.metadata,
+          superseded_causation_id: event.causation_id,
+          superseded_correlation_id: event.correlation_id,
+          superseded_global_position: event.global_position,
+          superseded_at_domain: event.created_at,
+          superseded_at_store: event.created_at,
+          observed_sequence: next_relation_observed_sequence
+        }
+        record.assign_attributes(attributes)
+        save_projection!(record, event)
+        record
+      end
+
+      def fetch_content(artifact_id, observation_id: nil)
+        if observation_id
+          observation = Coordinator::Read::DevelopmentArtifactObservation.find_by(
+            observation_id:, artifact_id:
+          )
+          return unless observation&.content_encoding
+
+          return build_content(observation)
+        end
+
         record = Coordinator::Read::DevelopmentArtifact.find_by(artifact_id:)
-        record && build_content(record)
+        return unless record&.content_encoding
+
+        build_content(record)
       end
 
       def page(query)
@@ -38,15 +270,27 @@ module Coordinator::Read
         relation = relation.where(scope: query.scope) if query.scope
         relation = relation.where(kind: query.kind) if query.kind
         relation = relation.where(source_kind: query.source_kind) if query.source_kind
-        relation = relation.where("labels @> ?::jsonb", JSON.generate(query.labels)) if query.labels.any?
+        if query.labels.any?
+          relation = relation.where(
+            "#{OBSERVATION_TABLE_SQL}.labels @> ?::jsonb",
+            JSON.generate(query.labels)
+          )
+        end
         relation = relation.where(
           artifact_id: relation_target_source_ids(query)
         ) if query.relation_target_kind
         if query.after_global_position
-          relation = relation.where("current_global_position > ?", query.after_global_position)
+          relation = relation.where(
+            "#{OBSERVATION_TABLE_SQL}.current_global_position > ?",
+            query.after_global_position
+          )
         end
 
-        rows = relation.order(:current_global_position, :observation_id).page(1).per(query.limit + 1).to_a
+        rows = relation
+          .order("#{OBSERVATION_TABLE_SQL}.current_global_position", "#{OBSERVATION_TABLE_SQL}.observation_id")
+          .page(1)
+          .per(query.limit + 1)
+          .to_a
         has_more = rows.length > query.limit
         visible_rows = rows.first(query.limit)
         counts = relationship_capacity_counts(visible_rows.map(&:artifact_id))
@@ -114,14 +358,15 @@ module Coordinator::Read
         resolution = locator_resolution(base)
         upper = cursor.through_observed_sequence || maximum_artifact_observed_sequence(base)
         window = base.where(
-          "observed_sequence > ? AND observed_sequence <= ?",
+          "#{OBSERVATION_TABLE_SQL}.observed_sequence > ? AND " \
+            "#{OBSERVATION_TABLE_SQL}.observed_sequence <= ?",
           cursor.after_observed_sequence,
           upper
         )
         window = after_observation_change(window, cursor)
         rows = window
           .includes(:artifact)
-          .order(:current_global_position, :observation_id)
+          .order("#{OBSERVATION_TABLE_SQL}.current_global_position", "#{OBSERVATION_TABLE_SQL}.observation_id")
           .limit(query.limit + 1)
           .to_a
         window_has_more = rows.length > query.limit
@@ -152,7 +397,8 @@ module Coordinator::Read
         verify_artifact!(record, artifact) if record
         record ||= Coordinator::Read::DevelopmentArtifact.new(artifact_id: artifact.artifact_id)
         record.assign_attributes(capture_attributes(event, capture))
-        record.save!
+        record.stream_revision = [ record.stream_revision.to_i, event.stream_revision ].max
+        save_projection!(record, event)
         record
       end
 
@@ -178,7 +424,7 @@ module Coordinator::Read
             )
           )
         end
-        assign_observation_change(record, attributes, global_position: event.global_position)
+        assign_observation_change(record, attributes, global_position: event.global_position, event:)
       end
 
       def store_classification(event:, correction:)
@@ -213,7 +459,7 @@ module Coordinator::Read
             occurred_at: correction.corrected_at
           )
         )
-        assign_observation_change(record, attributes, global_position: event.global_position)
+        assign_observation_change(record, attributes, global_position: event.global_position, event:)
       end
 
       def store_relation(event:, declaration:)
@@ -226,7 +472,7 @@ module Coordinator::Read
           relation_id: relation.relation_id
         )
         record.assign_attributes(relation_attributes(event, declaration))
-        record.save!
+        save_projection!(record, event)
         record
       end
 
@@ -247,7 +493,7 @@ module Coordinator::Read
             observed_sequence: next_relation_observed_sequence
           )
         )
-        record.save!
+        save_projection!(record, event)
         record
       end
 
@@ -273,14 +519,15 @@ module Coordinator::Read
       end
 
       def maximum_artifact_observed_sequence(relation)
-        relation.maximum(:observed_sequence) || 0
+        relation.maximum(Arel.sql("#{OBSERVATION_TABLE_SQL}.observed_sequence")) || 0
       end
 
       def after_observation_change(relation, cursor)
         return relation unless cursor.after_current_global_position
 
         relation.where(
-          "(current_global_position, observation_id) > (?, ?)",
+          "(#{OBSERVATION_TABLE_SQL}.current_global_position, " \
+            "#{OBSERVATION_TABLE_SQL}.observation_id) > (?, ?)",
           cursor.after_current_global_position,
           cursor.after_observation_id
         )
@@ -470,12 +717,52 @@ module Coordinator::Read
         }
       end
 
-      def assign_observation_change(record, attributes, global_position:)
+      def assign_observation_change(record, attributes, global_position:, event:)
         attributes[:current_global_position] = [ record.current_global_position.to_i, global_position ].max
         attributes[:observed_sequence] = next_artifact_observed_sequence if record.persisted?
         record.assign_attributes(attributes)
-        record.save!
+        save_projection!(record, event)
         record
+      end
+
+      def apply_observed_fact!(record, fact, fact_event:)
+        attributes = case fact
+        when Coordinator::Write::Events::DevelopmentArtifactScopeChangedV1
+          { scope: fact.scope }
+        when Coordinator::Write::Events::DevelopmentArtifactTitleChangedV1
+          { title: fact.title }
+        when Coordinator::Write::Events::DevelopmentArtifactKindChangedV1
+          { kind: fact.kind }
+        when Coordinator::Write::Events::DevelopmentArtifactLabelAddedV1
+          { labels: (Array(record.labels) | [ fact.label ]).sort }
+        when Coordinator::Write::Events::DevelopmentArtifactLabelRemovedV1
+          { labels: Array(record.labels) - [ fact.label ] }
+        when Coordinator::Write::Events::DevelopmentArtifactSourceChangedV1
+          {
+            source_kind: fact.source_kind,
+            source_locator: fact.locator,
+            source_revision: fact.revision,
+            source_observed_at: fact.observed_at,
+            source_collector: fact_event.metadata.fetch("collector")
+          }
+        when Coordinator::Write::Events::DevelopmentArtifactContentChangedV1
+          {
+            content_encoding: fact_event.metadata.fetch("encoding"),
+            content_media_type: fact_event.metadata.fetch("media_type"),
+            content_text: fact_event.metadata.fetch("encoding") == "utf-8" ? fact.content : nil,
+            content_base64: fact_event.metadata.fetch("encoding") == "binary" ? fact.content : nil,
+            content_sha256: fact_event.metadata.fetch("content_sha256"),
+            content_byte_size: fact_event.metadata.fetch("byte_size")
+          }
+        else
+          {}
+        end
+        record.assign_attributes(attributes)
+      end
+
+      def save_projection!(record, event)
+        record.updated_at = event.created_at
+        record.save!(touch: false)
       end
 
       def relation_attributes(event, declaration)
@@ -501,6 +788,10 @@ module Coordinator::Read
           declared_at_domain: declaration.declared_at,
           declared_at_store: event.created_at
         }
+      end
+
+      def target_status_for(target_kind)
+        target_kind == "external" ? "unverified" : "verified"
       end
 
       def supersession_attributes(event, supersession)
@@ -599,17 +890,19 @@ module Coordinator::Read
       def build_summary(observation, artifact, relationship_counts: nil)
         counts = relationship_counts || relationship_capacity_counts([ artifact.artifact_id ])
           .fetch(artifact.artifact_id)
+        content = observation.content_encoding ? observation : artifact
         DevelopmentArtifactSummaryV1.new(
           artifact_id: artifact.artifact_id,
+          stream_revision: artifact.stream_revision,
           observation_id: observation.observation_id,
           scope: observation.scope,
           title: observation.title,
           kind: observation.kind,
           labels: observation.labels,
-          media_type: artifact.content_media_type,
-          encoding: artifact.content_encoding,
-          content_sha256: artifact.content_sha256,
-          byte_size: artifact.content_byte_size,
+          media_type: content.content_media_type,
+          encoding: content.content_encoding,
+          content_sha256: content.content_sha256,
+          byte_size: content.content_byte_size,
           source: provenance(observation),
           classification_revision: observation.classification_revision,
           classification_reason: observation.classification_reason,
@@ -642,13 +935,7 @@ module Coordinator::Read
         peer_id = direction == "outgoing" ? record.target_id : record.source_artifact_id
         supersession = visible_supersession(record)
         definition = @relation_registry.fetch(record.relation)
-        target = Coordinator::Write::DevelopmentArtifacts::RelationTargetV1.new(
-          kind: record.target_kind,
-          id: record.target_id,
-          status: record.target_status,
-          name: record.target_name,
-          scope: record.target_scope
-        )
+        target = relation_target(record)
         DevelopmentArtifactRelationViewV1.new(
           relation_id: record.relation_id,
           source_artifact_id: record.source_artifact_id,
@@ -683,6 +970,32 @@ module Coordinator::Read
 
       def effective_sequence(record)
         record.supersession&.observed_sequence || record.observed_sequence
+      end
+
+      def relation_target(record)
+        attributes = {
+          kind: record.target_kind,
+          id: record.target_id,
+          status: record.target_status,
+          name: record.target_name,
+          scope: record.target_scope
+        }
+        case record.target_kind
+        when "skill"
+          skill = Coordinator::Read::Skill.find_by(skill_id: record.target_id)
+          attributes[:name] ||= skill&.name
+          attributes[:scope] ||= skill&.scope
+        when "repository"
+          repository = Coordinator::Read::Repository.find_by(repository_id: record.target_id)
+          attributes[:name] ||= repository_key(repository)
+          attributes[:scope] ||= repository&.scope
+        end
+        Coordinator::Write::DevelopmentArtifacts::RelationTargetV1.new(**attributes)
+      end
+
+      def repository_key(repository)
+        repository&.registered_markers&.find { _1.start_with?("repository-key:") }
+          &.delete_prefix("repository-key:")
       end
 
       def visible_supersession(record)
@@ -721,7 +1034,7 @@ module Coordinator::Read
         observations = complete_observations
           .where(artifact_id: ids)
           .includes(:artifact)
-          .order(:observed_global_position, :observation_id)
+          .order("#{OBSERVATION_TABLE_SQL}.observed_global_position", "#{OBSERVATION_TABLE_SQL}.observation_id")
           .to_a
           .index_by(&:artifact_id)
         counts = relationship_capacity_counts(ids)
@@ -766,7 +1079,35 @@ module Coordinator::Read
       end
 
       def complete_observations
-        Coordinator::Read::DevelopmentArtifactObservation.where.not(observed_event: nil)
+        relation = Coordinator::Read::DevelopmentArtifactObservation.joins(:artifact)
+        %i[
+          observed_event artifact_id scope title kind source_kind source_locator
+          source_observed_at source_collector classified_event classified_actor
+          classified_global_position classified_at_domain classified_at_store
+        ].each { |column| relation = relation.where.not(column => nil) }
+        %i[content_encoding content_media_type content_sha256 content_byte_size].each do |column|
+          relation = relation.where.not(development_artifacts: { column => nil })
+        end
+        granular_requirements = INITIAL_OBSERVATION_FACT_ROLES.map do |role|
+          escaped_role = role.gsub("'", "''")
+          "EXISTS (SELECT 1 FROM development_artifact_observation_fact_links " \
+            "WHERE development_artifact_observation_fact_links.observation_id = " \
+            "development_artifact_observations.observation_id AND " \
+            "development_artifact_observation_fact_links.role = '#{escaped_role}')"
+        end.join(" AND ")
+        completeness_sql = [
+          "development_artifact_observations.observed_event ->> 'type' = :legacy_type OR (",
+          "development_artifact_observations.content_encoding IS NOT NULL AND ",
+          "development_artifact_observations.content_media_type IS NOT NULL AND ",
+          "development_artifact_observations.content_sha256 IS NOT NULL AND ",
+          "development_artifact_observations.content_byte_size IS NOT NULL AND ",
+          granular_requirements,
+          ")"
+        ].join
+        relation.where(
+          completeness_sql,
+          legacy_type: "DevelopmentArtifactObserved"
+        )
       end
 
       def active_relations

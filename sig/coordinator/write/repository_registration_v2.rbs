@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    class RepositoryRegistrationV2 < Shared::Value
+      def repository_id: () -> String
+      def scope: () -> String
+      def repository_key: () -> String?
+      def display_name: () -> String?
+      def paths: () -> Array[String]
+      def remotes: () -> Array[String]
+    end
+  end
+end

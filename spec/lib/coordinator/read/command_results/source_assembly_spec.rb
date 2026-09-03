@@ -240,6 +240,162 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
     end
   end
 
+  context "when granular Artifact facts are emitted" do
+    let(:artifact_id) { SecureRandom.uuid_v7 }
+    let(:command) do
+      Coordinator::Write::Commands::UpdateDevelopmentArtifact.new(
+        command_id:,
+        actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "assembly-spec"),
+        artifact_id:,
+        expected_revision: 4,
+        changes: Coordinator::Write::DevelopmentArtifacts::UpdateChangesV1.new(title: "Updated")
+      )
+    end
+
+    it "reconstructs changed properties and native event time" do
+      register_command
+      append_task_submission
+      fact = append(
+        streams.development_artifact(artifact_id),
+        Coordinator::Write::Events::DevelopmentArtifactTitleChangedV1.new(
+          artifact_id:, title: "Updated"
+        ),
+        metadata: command_metadata(policy_version: "development-artifact-repository/v2"),
+        markers: [ "development-artifact:#{artifact_id}" ]
+      )
+      terminal = append_terminal(
+        Coordinator::Write::Events::CommandSucceededV1.new(command_id:),
+        emitted_events: [ event_reference(fact) ]
+      )
+
+      result = assemble.call(terminal)
+
+      expect(result.data).to have_attributes(
+        artifact_id:,
+        resulting_stream_revision: fact.stream_revision,
+        changed_properties: [ "title" ],
+        outcome: "updated",
+        updated_at: fact.created_at.utc.iso8601(6)
+      )
+    end
+  end
+
+  context "when a flat v2 Relation fact is emitted" do
+    let(:source_artifact_id) { SecureRandom.uuid_v7 }
+    let(:relation_id) { SecureRandom.uuid_v7 }
+    let(:command) do
+      Coordinator::Write::Commands::DeclareDevelopmentArtifactRelation.new(
+        command_id:,
+        actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "assembly-spec"),
+        artifact_relation: Coordinator::Write::DevelopmentArtifacts::RelationV1.new(
+          relation_id:,
+          source_artifact_id:,
+          relation: "references",
+          target: Coordinator::Write::DevelopmentArtifacts::RelationTargetV1.new(
+            kind: "external",
+            id: "https://example.test/target"
+          ),
+          attributes: Coordinator::Write::DevelopmentArtifacts::RelationAttributesV1.new(
+            path: nil,
+            fragment: nil,
+            normalized_locator: nil
+          )
+        )
+      )
+    end
+
+    it "reconstructs the target status from the flat declaration" do
+      register_command
+      append_task_submission
+      declaration = append(
+        streams.development_artifact_relation(relation_id),
+        Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV2.new(
+          relation_id:,
+          source_artifact_id:,
+          relation: "references",
+          target_kind: "external",
+          target_id: "https://example.test/target",
+          path: nil,
+          fragment: nil,
+          normalized_locator: nil
+        ),
+        metadata: command_metadata(policy_version: "development-artifact-repository/v2"),
+        markers: [ "development-artifact-relation:#{relation_id}" ]
+      )
+      terminal = append_terminal(
+        Coordinator::Write::Events::CommandSucceededV1.new(command_id:),
+        emitted_events: [ event_reference(declaration) ]
+      )
+
+      result = assemble.call(terminal)
+
+      expect(result.data.target).to have_attributes(
+        kind: "external",
+        id: "https://example.test/target",
+        status: "unverified"
+      )
+      expect(result.data.declared_at).to eq(declaration.created_at.utc.iso8601(6))
+    end
+  end
+
+  context "when a granular classification correction is recorded" do
+    let(:artifact_id) { SecureRandom.uuid_v7 }
+    let(:observation_id) { SecureRandom.uuid_v7 }
+    let(:command) do
+      Coordinator::Write::Commands::CorrectDevelopmentArtifactClassification.new(
+        command_id:,
+        actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "assembly-spec"),
+        observation_id:,
+        expected_revision: 1,
+        title: "Corrected title",
+        kind: "documentation",
+        labels: [ "corrected" ],
+        reason: "The initial classification was incomplete"
+      )
+    end
+
+    it "uses correction-recorded revision, command values, and native event time" do
+      register_command
+      append_task_submission
+      append(
+        streams.development_artifact_observation(observation_id),
+        Coordinator::Write::Events::DevelopmentArtifactObservationRecordedV1.new(
+          observation_id:
+        ),
+        metadata: command_metadata(policy_version: "development-artifact-repository/v2"),
+        markers: [ "development-artifact-observation:#{observation_id}" ]
+      )
+      correction = append(
+        streams.development_artifact_observation(observation_id),
+        Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectionRecordedV1.new(
+          artifact_id:,
+          observation_id:,
+          classification_revision: 2,
+          reason: command.reason
+        ),
+        metadata: command_metadata(policy_version: "development-artifact-repository/v2"),
+        markers: [ "development-artifact:#{artifact_id}" ]
+      )
+      terminal = append_terminal(
+        Coordinator::Write::Events::CommandSucceededV1.new(command_id:),
+        emitted_events: [ event_reference(correction) ]
+      )
+
+      result = assemble.call(terminal)
+
+      expect(result.data).to have_attributes(
+        artifact_id:,
+        observation_id:,
+        classification_revision: 2,
+        title: "Corrected title",
+        kind: "documentation",
+        labels: [ "corrected" ],
+        outcome: "corrected",
+        corrected_at: correction.created_at.utc.iso8601(6)
+      )
+    end
+  end
+
   def register_command
     append(
       streams.command(command_id),

@@ -7,7 +7,7 @@ module Coordinator::Read::Web
       attribute :scope, Coordinator::Shared::Types::String
       attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 100)
       attribute :name, Coordinator::Shared::Types::SkillName.optional
-      attribute :after_skill_id, Coordinator::Shared::Types::SkillId.optional
+      attribute :after_skill_id, Coordinator::Read::ProjectedSkillId.optional
     end
 
     class Artifacts < Coordinator::Shared::Value
@@ -36,13 +36,13 @@ module Coordinator::Read::Web
     class Artifact < Coordinator::Shared::Value
       attribute :project_ref, Coordinator::Shared::Types::String
       attribute :scope, Coordinator::Shared::Types::String
-      attribute :artifact_id, Coordinator::Shared::Types::DevelopmentArtifactId
+      attribute :artifact_id, Coordinator::Read::ProjectedDevelopmentArtifactId
     end
 
     class Relationships < Coordinator::Shared::Value
       attribute :project_ref, Coordinator::Shared::Types::String
       attribute :scope, Coordinator::Shared::Types::String
-      attribute :artifact_id, Coordinator::Shared::Types::DevelopmentArtifactId
+      attribute :artifact_id, Coordinator::Read::ProjectedDevelopmentArtifactId
       attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 100)
       attribute :direction, Coordinator::Shared::Types::String.enum("incoming", "outgoing", "both")
       attribute :relation, Coordinator::Shared::Types::DevelopmentArtifactRelationKind.optional

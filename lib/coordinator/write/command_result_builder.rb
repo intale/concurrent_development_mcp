@@ -464,20 +464,22 @@ module Coordinator::Write
       )
     end
 
-    def skill_publish(command:, publication:, input_digest:, persisted_events:, completed_at:)
+    def skill_publish(command:, revision:, outcome:, publication_event:, input_digest:, persisted_events:, completed_at:)
       build_completion(
         command:,
         tool_name: "skill_publish",
-        summary: "Skill revision published with an immutable asset snapshot.",
+        summary: outcome == "published" ?
+          "Skill revision published as cohesive immutable facts." :
+          "The requested Skill revision content is already published.",
         data: CommandReceiptData::SkillPublication.new(
           skill_id: command.skill_id,
           name: command.name,
           scope: command.scope,
-          revision: publication.revision,
+          revision:,
           content_digest: command.content_digest,
           asset_count: command.assets.length,
-          publication_event: event_reference(persisted_events.sole),
-          published_at: publication.published_at
+          publication_event: event_reference(publication_event),
+          published_at: publication_event.created_at.utc.iso8601(6)
         ),
         next_actions: [
           NextAction.new(
@@ -492,12 +494,15 @@ module Coordinator::Write
     end
 
     def development_artifact_capture(command:, decision:, input_digest:, persisted_events:, completed_at:)
-      artifact = decision.capture.artifact
-      observation = decision.observation.observation
+      granular = decision.respond_to?(:artifact)
+      artifact = granular ? decision.artifact : decision.capture.artifact
+      observation = granular ? decision.observation : decision.observation.observation
+      outcome = decision.outcome == "created" ? "captured" : decision.outcome
+      recorded_event = persisted_events.find { _1.type == "DevelopmentArtifactObservationRecorded" }
       build_completion(
         command:,
         tool_name: "development_artifact_capture",
-        summary: case decision.outcome
+        summary: case outcome
                  when "captured" then "Development Artifact content and observation captured."
                  when "observed" then "Development Artifact observation captured for existing content."
                  when "existing" then "Development Artifact observation already exists."
@@ -510,8 +515,9 @@ module Coordinator::Write
           kind: observation.kind,
           content_sha256: artifact.content.content_sha256,
           byte_size: artifact.content.byte_size,
-          outcome: decision.outcome,
-          recorded_at: decision.observation.recorded_at
+          outcome:,
+          recorded_at: recorded_event&.created_at&.utc&.iso8601(6) ||
+            (granular ? completed_at : decision.observation.recorded_at)
         ),
         next_actions: [
           NextAction.new(
@@ -520,6 +526,32 @@ module Coordinator::Write
               artifact_id: artifact.artifact_id,
               observation_id: observation.observation_id
             )
+          )
+        ],
+        input_digest:,
+        persisted_events:,
+        completed_at:
+      )
+    end
+
+    def development_artifact_update(command:, decision:, input_digest:, persisted_events:, completed_at:)
+      build_completion(
+        command:,
+        tool_name: "development_artifact_update",
+        summary: decision.outcome == "updated" ?
+          "Development Artifact properties updated as granular facts." :
+          "Development Artifact already has the requested properties.",
+        data: CommandReceiptData::DevelopmentArtifactUpdate.new(
+          artifact_id: decision.artifact_id,
+          resulting_stream_revision: persisted_events.last&.stream_revision || command.expected_revision,
+          changed_properties: decision.changed_properties,
+          outcome: decision.outcome,
+          updated_at: persisted_events.last&.created_at&.utc&.iso8601(6) || completed_at
+        ),
+        next_actions: [
+          NextAction.new(
+            tool: "development_artifact_get",
+            arguments: NextAction::DevelopmentArtifactArguments.new(artifact_id: decision.artifact_id)
           )
         ],
         input_digest:,
@@ -543,20 +575,20 @@ module Coordinator::Write
                  when "existing" then "Development Artifact observation classification is already current."
                  end,
         data: CommandReceiptData::DevelopmentArtifactClassification.new(
-          artifact_id: decision.observation.observation.artifact_id,
+          artifact_id: decision.respond_to?(:artifact_id) ? decision.artifact_id : decision.observation.observation.artifact_id,
           observation_id: command.observation_id,
           classification_revision: decision.classification_revision,
-          title: decision.title,
-          kind: decision.kind,
-          labels: decision.labels,
+          title: decision.respond_to?(:title) ? decision.title : decision.observation.title,
+          kind: decision.respond_to?(:kind) ? decision.kind : decision.observation.kind,
+          labels: decision.respond_to?(:labels) ? decision.labels : decision.observation.labels,
           outcome: decision.outcome,
-          corrected_at: completed_at
+          corrected_at: persisted_events.last&.created_at&.utc&.iso8601(6) || completed_at
         ),
         next_actions: [
           NextAction.new(
             tool: "development_artifact_get",
             arguments: NextAction::DevelopmentArtifactArguments.new(
-              artifact_id: decision.observation.observation.artifact_id,
+              artifact_id: decision.respond_to?(:artifact_id) ? decision.artifact_id : decision.observation.observation.artifact_id,
               observation_id: command.observation_id
             )
           )
@@ -568,8 +600,11 @@ module Coordinator::Write
     end
 
     def development_artifact_relation_declare(command:, decision:, input_digest:, persisted_events:, completed_at:)
-      artifact_relation = decision.declaration.artifact_relation
-      supersession = decision.supersession
+      granular = decision.respond_to?(:relation_id)
+      artifact_relation = granular ? command.artifact_relation : decision.declaration.artifact_relation
+      supersession = granular ? nil : decision.supersession
+      declaration_event = persisted_events.find { _1.type == "DevelopmentArtifactRelationDeclared" }
+      supersession_event = persisted_events.find { _1.type == "DevelopmentArtifactRelationSuperseded" }
       build_completion(
         command:,
         tool_name: "development_artifact_relation_declare",
@@ -583,10 +618,14 @@ module Coordinator::Write
           source_artifact_id: artifact_relation.source_artifact_id,
           relation: artifact_relation.relation,
           target: artifact_relation.target,
-          superseded_relation_id: supersession&.superseded_relation_id,
+          superseded_relation_id: granular ? command.supersedes_relation_id : supersession&.superseded_relation_id,
           outcome: decision.outcome,
-          declared_at: decision.declaration.declared_at,
-          superseded_at: supersession&.superseded_at
+          declared_at: granular ?
+            (declaration_event&.created_at&.utc&.iso8601(6) || completed_at) :
+            decision.declaration.declared_at,
+          superseded_at: granular ?
+            supersession_event&.created_at&.utc&.iso8601(6) :
+            supersession&.superseded_at
         ),
         next_actions: [
           NextAction.new(

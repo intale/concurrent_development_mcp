@@ -6,7 +6,7 @@ module Coordinator::Read
       attribute :after_observed_sequence, Types::Integer.constrained(gteq: 0)
       attribute :through_observed_sequence, Types::Integer.constrained(gteq: 0).optional
       attribute :after_declared_global_position, Types::GlobalPosition.optional
-      attribute :after_relation_id, Types::DevelopmentArtifactRelationId.optional
+      attribute :after_relation_id, ProjectedDevelopmentArtifactRelationId.optional
     end
 
     attribute :artifact, DevelopmentArtifactSummaryV1.optional

@@ -982,6 +982,11 @@ module Coordinator::Write
         attribute :current_revision, Types::DevelopmentArtifactClassificationRevision
       end
 
+      class DevelopmentArtifactRevisionConflictDetails < DevelopmentArtifactDetails
+        attribute :expected_revision, Types::Integer.constrained(gteq: 0)
+        attribute :current_revision, Types::Integer.constrained(gteq: 0)
+      end
+
       class DevelopmentArtifactClassificationLimitDetails < DevelopmentArtifactObservationDetails
         attribute :current_revision, Types::DevelopmentArtifactClassificationRevision
         attribute :maximum_revisions,
@@ -1067,6 +1072,12 @@ module Coordinator::Write
         attribute :code, Types::String.enum("development_artifact_classification_revision_limit_reached")
         attribute :message, Types::String
         attribute :details, DevelopmentArtifactClassificationLimitDetails
+      end
+
+      class DevelopmentArtifactRevisionConflictError < Value
+        attribute :code, Types::String.enum("development_artifact_revision_conflict")
+        attribute :message, Types::String
+        attribute :details, DevelopmentArtifactRevisionConflictDetails
       end
 
       class DevelopmentArtifactNotFoundError < Value
@@ -1484,6 +1495,7 @@ module Coordinator::Write
              DevelopmentArtifactObservationNotFoundError |
              DevelopmentArtifactClassificationRevisionConflictError |
              DevelopmentArtifactClassificationRevisionLimitReachedError |
+             DevelopmentArtifactRevisionConflictError |
              DevelopmentArtifactNotFoundError |
              DevelopmentArtifactTargetNotFoundError |
              DevelopmentArtifactRelationLimitReachedError |

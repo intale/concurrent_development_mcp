@@ -13,6 +13,7 @@ module Coordinator::Write
                 Types::Array.of(Types::String.constrained(min_size: 1, max_size: 1_024)).constrained(max_size: 20)
       attribute :remotes,
                 Types::Array.of(Types::String.constrained(min_size: 1, max_size: 2_048)).constrained(max_size: 20)
+      # Kept only so the read side can replay pre-EVENTS-02 history.
       attribute :registered_at, Types::Timestamp
     end
   end

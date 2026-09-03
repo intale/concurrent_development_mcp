@@ -554,6 +554,34 @@ module Coordinator::Write
         )
       end
 
+      def build_update_development_artifact(document)
+        input = document.input
+        raw_changes = input.changes
+        changes = {}
+        changes[:scope] = raw_changes.scope if raw_changes.respond_to?(:scope) && raw_changes.scope
+        changes[:title] = raw_changes.title if raw_changes.respond_to?(:title) && raw_changes.title
+        changes[:kind] = raw_changes.kind if raw_changes.respond_to?(:kind) && raw_changes.kind
+        changes[:labels] = raw_changes.labels if raw_changes.respond_to?(:labels) && raw_changes.labels
+        changes[:content] = raw_changes.content if raw_changes.respond_to?(:content) && raw_changes.content
+        if raw_changes.respond_to?(:source) && raw_changes.source
+          source = raw_changes.source
+          changes[:source] = DevelopmentArtifacts::SourceV1.new(
+            kind: source.kind,
+            locator: source.locator,
+            revision: source.revision,
+            observed_at: source.observed_at,
+            collector: source.collector
+          )
+        end
+        Commands::UpdateDevelopmentArtifact.new(
+          command_id: document.command_id,
+          actor: build_actor(input.actor),
+          artifact_id: input.artifact_id,
+          expected_revision: input.expected_revision,
+          changes: DevelopmentArtifacts::UpdateChangesV1.new(changes)
+        )
+      end
+
       def build_skill_asset(asset)
         Skills::AssetV2.new(asset.to_h)
       end

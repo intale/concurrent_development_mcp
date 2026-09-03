@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Domain
+      module DevelopmentArtifacts
+        class GranularCapture
+          def initialize: (?stream_factory: StreamFactory) -> void
+          def call: (artifact: Write::DevelopmentArtifacts::ArtifactV2, observation: Write::DevelopmentArtifacts::ArtifactObservationV1, fact_event_references: Array[EventReference]) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

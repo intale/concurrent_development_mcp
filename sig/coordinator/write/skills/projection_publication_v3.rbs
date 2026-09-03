@@ -1,0 +1,18 @@
+module Coordinator
+  module Write
+    module Skills
+      class ProjectionPublicationV3 < Shared::Value
+        def skill_id: () -> String
+        def skill_revision_id: () -> String
+        def name: () -> String
+        def scope: () -> String
+        def revision: () -> Integer
+        def description: () -> String
+        def instructions: () -> String
+        def assets: () -> Array[AssetV2]
+        def content_digest: () -> String
+        def published_at: () -> String
+      end
+    end
+  end
+end

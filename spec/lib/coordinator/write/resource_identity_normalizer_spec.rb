@@ -22,13 +22,13 @@ RSpec.describe Coordinator::Write::ResourceIdentityNormalizer do
     expect(identity).to be_frozen
   end
 
-  it "preserves byte-distinct case and Unicode sequences" do
+  it "normalizes equivalent Unicode sequences while preserving case" do
     paths = [ "Models/Å.rb", "Models/A\u030A.rb", "models/å.rb" ]
     markers = paths.map do |path|
       normalizer.call(repository_id:, kind: "file", path:).value!.identity_marker
     end
 
-    expect(markers.uniq.length).to eq(3)
+    expect(markers.uniq.length).to eq(2)
   end
 
   it "reports invalid Repository, kind, aliasing syntax, encoding, byte size, and depth through Dry validation" do

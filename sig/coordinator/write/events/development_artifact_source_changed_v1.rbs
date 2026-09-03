@@ -1,0 +1,9 @@
+module Coordinator::Write::Events
+  class DevelopmentArtifactSourceChangedV1 < Base
+    def artifact_id: () -> String
+    def source_kind: () -> String
+    def locator: () -> String
+    def revision: () -> String?
+    def observed_at: () -> String
+  end
+end

@@ -1,0 +1,17 @@
+module Coordinator
+  module Write
+    module Domain
+      module DevelopmentArtifacts
+        class GranularCaptureDecisionV1 < Shared::Value
+          def artifact: () -> Write::DevelopmentArtifacts::ArtifactV2
+          def observation: () -> Write::DevelopmentArtifacts::ArtifactObservationV1
+          def artifact_id: () -> String
+          def observation_id: () -> String
+          def event_plan: () -> EventPlan
+          def fact_event_ids: () -> Array[String]
+          def outcome: () -> String
+        end
+      end
+    end
+  end
+end

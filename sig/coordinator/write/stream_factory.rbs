@@ -5,8 +5,11 @@ module Coordinator
       def coordination_task: (String task_id) -> StreamReference
       def process_step: (String process_step_id) -> StreamReference
       def skill: (String skill_id) -> StreamReference
+      def skill_revision: (String skill_revision_id) -> StreamReference
+      def skill_asset: (String asset_id) -> StreamReference
       def development_artifact: (String artifact_id) -> StreamReference
       def development_artifact_observation: (String observation_id) -> StreamReference
+      def development_artifact_relation: (String relation_id) -> StreamReference
       def operation_batch: (String batch_id) -> StreamReference
       def repository: (String repository_id) -> StreamReference
       def resource: (String resource_id) -> StreamReference

@@ -784,7 +784,7 @@ module Coordinator
             },
             after_skill_id: {
               anyOf: [
-                uuid_v7,
+                identifier,
                 { type: "null" }
               ]
             },
@@ -926,6 +926,35 @@ module Coordinator
         operation_batch_schema(development_artifact_capture)
       end
 
+      def development_artifact_update
+        capture = development_artifact_capture
+        content = capture.fetch(:properties).fetch(:content)
+        source = capture.fetch(:properties).fetch(:source)
+        changes = object_schema(
+          properties: {
+            scope: capture.fetch(:properties).fetch(:scope),
+            title: capture.fetch(:properties).fetch(:title),
+            kind: capture.fetch(:properties).fetch(:kind),
+            labels: capture.fetch(:properties).fetch(:labels),
+            content:,
+            source:
+          },
+          required: []
+        ).merge(
+          description: "At least one property must be supplied; omitted properties remain unchanged.",
+          anyOf: %w[scope title kind labels content source].map { |property| { required: [ property ] } }
+        )
+        object_schema(
+          properties: common_mutation_properties.merge(
+            actor: attributed_actor(enum: %w[agent user]),
+            artifact_id: uuid_v7,
+            expected_revision: { type: "integer", minimum: 0 },
+            changes:
+          ),
+          required: %w[command_id actor artifact_id expected_revision changes]
+        )
+      end
+
       def development_artifact_classification_correct
         object_schema(
           properties: common_mutation_properties.merge(
@@ -1052,10 +1081,10 @@ module Coordinator
       def development_artifact_get
         object_schema(
           properties: {
-            artifact_id: uuid_v7,
+            artifact_id: identifier,
             observation_id: {
               anyOf: [
-                uuid_v7,
+                identifier,
                 { type: "null" }
               ],
               description: "Optional exact immutable observation; omit to receive the latest available observation."
@@ -1068,7 +1097,11 @@ module Coordinator
       def development_artifact_content_get
         object_schema(
           properties: {
-            artifact_id: uuid_v7
+            artifact_id: identifier,
+            observation_id: {
+              anyOf: [ identifier, { type: "null" } ],
+              description: "Optional exact immutable observation; omit to receive current artifact content."
+            }
           },
           required: %w[artifact_id]
         )
@@ -1086,7 +1119,7 @@ module Coordinator
             },
             after_relation_id: {
               anyOf: [
-                uuid_v7,
+                identifier,
                 { type: "null" }
               ]
             }
@@ -1100,7 +1133,7 @@ module Coordinator
         )
         object_schema(
           properties: {
-            artifact_id: uuid_v7,
+            artifact_id: identifier,
             direction: {
               anyOf: [ { type: "string", enum: %w[incoming outgoing both] }, { type: "null" } ]
             },
@@ -1145,7 +1178,7 @@ module Coordinator
             },
             after_observation_id: {
               anyOf: [
-                uuid_v7,
+                identifier,
                 { type: "null" }
               ],
               description: "Immutable observation tie-breaker inside a fixed observation window."

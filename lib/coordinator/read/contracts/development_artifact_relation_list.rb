@@ -27,7 +27,7 @@ module Coordinator::Read
       end
 
       rule(:artifact_id) do
-        key.failure("must be a valid Artifact ID") unless Types::DEVELOPMENT_ARTIFACT_ID_PATTERN.match?(value)
+        key.failure("must be a valid Artifact ID") unless ProjectedDevelopmentArtifactId.valid?(value)
       end
 
       rule(:cursor) do
@@ -38,7 +38,7 @@ module Coordinator::Read
         unless after_position.nil? == after_relation_id.nil?
           key.failure("declaration position and relation ID must both be present or absent")
         end
-        if after_relation_id && !Types::DEVELOPMENT_ARTIFACT_RELATION_ID_PATTERN.match?(after_relation_id)
+        if after_relation_id && !ProjectedDevelopmentArtifactRelationId.valid?(after_relation_id)
           key([ :cursor, :after_relation_id ]).failure("must be a valid relation ID")
         end
         through = value[:through_observed_sequence]

@@ -17,7 +17,7 @@ Feature: Development Artifact repository
     @CONTENT-TEXT-01 @CONTENT-DERIVE-01
     Scenario: Documentation and web-search evidence are discoverable through exact filters
       When the agent captures documentation and web-search Development Artifacts
-      Then both Artifact Tasks complete with different immutable IDs
+      Then both Artifact Tasks complete with different stable UUIDv7 IDs
       When the Development Artifact facts reach the read side
       Then listing the shared evidence labels returns both Artifacts
       And Artifact metadata excludes content bytes
@@ -30,16 +30,16 @@ Feature: Development Artifact repository
       Then its persisted and projected content is exactly the URL followed by one newline
       And the external-reference content contains no binary or fetched representation
 
-  Rule: Changed bytes are new facts connected by explicit relationships
+  Rule: Artifact properties evolve through cohesive facts under one stable identity
 
-    @CONTENT-BINARY-01
-    Scenario: A changed binary profile supersedes its earlier capture
-      When the agent captures two binary profile versions from distinct source locations
-      Then the changed profile has a different immutable Artifact ID
-      When the agent declares that the changed profile supersedes the earlier profile
-      And the binary Artifact facts reach the read side
-      Then the changed profile exposes the supersession relationship
-      And its exact Base64 content is available but never executed
+    @CONTENT-BINARY-01 @event-contract
+    Scenario: A binary profile changes content and provenance without changing identity
+      Given the agent has captured and projected a binary profile
+      When the agent updates its binary content and provenance through MCP
+      Then the update Task keeps its stable UUIDv7 Artifact ID
+      And the Artifact stream records only content and source change facts
+      When the changed binary Artifact facts reach the read side
+      Then its current content is the changed Base64 payload and is never executed
 
   Rule: Linked documentation is a directed graph that a clean agent can walk both ways
 
@@ -56,14 +56,14 @@ Feature: Development Artifact repository
       And the README edge preserves its literal parent-segment, fragment, and normalized locator
 
     @linked-artifacts @stale-view @AUD-ART-LOCATOR-ACTION-01 @AUD-ART-LOCATOR-PAGE-02
-    Scenario: Locator resolution reports lag and immutable revision ambiguity without choosing latest
+    Scenario: Locator resolution reports lag and exact revision ambiguity without choosing latest
       Given two source revisions at one exact locator are captured but not projected
       When the clean agent resolves that locator before projection
       Then the locator is absent with a bounded projection-lag retry action
       When both locator revisions reach the read side
       Then the locator is ambiguous and offers both exact revisions without choosing latest
       When the clean agent follows one exact revision action
-      Then exactly that immutable Artifact and its content action are returned
+      Then exactly that revision's Artifact and its content action are returned
       And an unknown exact locator remains honestly absent
 
   Rule: Replay and convergence cannot hide or duplicate graph edges
@@ -76,12 +76,12 @@ Feature: Development Artifact repository
       Then both responses expose the original Task and one logical relation result
       And one relation fact, command lifecycle, and projected edge exist
 
-  Rule: Source observations are immutable while classification is explicitly correctable
+  Rule: Captures have independent identities while observations remain explicitly correctable
 
     @linked-artifacts @AUD-ART-OBSERVATION-01
-    Scenario: Identical bytes observed at two Git revisions remain separate historical observations
+    Scenario: Identical bytes captured at two Git revisions remain separate historical observations
       When the agent captures identical documentation bytes from two Git revisions
-      Then both capture Tasks name one content-addressed Artifact and two observation IDs
+      Then both capture Tasks name separate UUIDv7 Artifacts and observation IDs
       When both Artifact observations reach the read side
       Then exact observation actions retrieve both Git revisions independently
       And both observations lead to the same passive content

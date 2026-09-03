@@ -12,6 +12,10 @@ module Coordinator::Mcp
       mutation_result(artifact_classification_data)
     end
 
+    def update_result
+      mutation_result(artifact_update_data)
+    end
+
     def operation_batch_acceptance_result
       mutation_result(operation_batch_acceptance_data)
     end
@@ -166,6 +170,23 @@ module Coordinator::Mcp
       )
     end
 
+    def artifact_update_data
+      Schemas.object_schema(
+        properties: {
+          artifact_id: artifact_id,
+          resulting_stream_revision: { type: "integer", minimum: 0 },
+          changed_properties: {
+            type: "array",
+            uniqueItems: true,
+            items: { type: "string", enum: %w[scope title kind labels content source] }
+          },
+          outcome: { type: "string", enum: %w[updated existing] },
+          updated_at: timestamp
+        },
+        required: %w[artifact_id resulting_stream_revision changed_properties outcome updated_at]
+      )
+    end
+
     def operation_batch_acceptance_data
       Schemas.object_schema(
         properties: {
@@ -222,6 +243,7 @@ module Coordinator::Mcp
       Schemas.object_schema(
         properties: {
           artifact_id: artifact_id,
+          stream_revision: { type: "integer", minimum: 0 },
           observation_id: observation_id,
           scope: text(maximum: Types::DEVELOPMENT_ARTIFACT_SCOPE_MAXIMUM_BYTES),
           title: text(maximum: Types::DEVELOPMENT_ARTIFACT_TITLE_MAXIMUM_BYTES),
@@ -249,7 +271,7 @@ module Coordinator::Mcp
           classified: event_evidence
         },
         required: %w[
-          artifact_id observation_id scope title kind labels media_type encoding content_sha256
+          artifact_id stream_revision observation_id scope title kind labels media_type encoding content_sha256
           byte_size source classification_revision classification_reason relationship_count
           relationship_capacity
           captured observed classified
@@ -611,15 +633,15 @@ module Coordinator::Mcp
     end
 
     def artifact_id
-      uuid_v7
+      Schemas.identifier
     end
 
     def observation_id
-      uuid_v7
+      Schemas.identifier
     end
 
     def relation_id
-      uuid_v7
+      Schemas.identifier
     end
 
     def artifact_byte_size

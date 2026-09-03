@@ -4,7 +4,7 @@ module Coordinator::Read
   class SkillViewV1 < Value
     Asset = SkillAssetManifestV1
 
-    attribute :skill_id, Types::SkillId
+    attribute :skill_id, ProjectedSkillId
     attribute :name, Types::SkillName
     attribute :scope, Types::SkillScope
     attribute :revision, Types::SkillRevision

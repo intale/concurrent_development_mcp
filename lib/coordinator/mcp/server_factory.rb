@@ -27,8 +27,11 @@ module Coordinator
         skill_publish_batch. Capture exact passive plans, decisions, requirements, documentation,
         evidence, profiles, caller-constructed checkpoint metadata, and import audits through
         development_artifact_capture or its Batch companion, then declare typed relationships.
-        Each capture receipt identifies immutable content and a distinct immutable observation.
-        Use development_artifact_get with observation_id for exact historical classification evidence.
+        Each capture allocates a stable UUIDv7 Artifact and a distinct immutable observation. Use
+        development_artifact_update with the latest projected stream_revision to change selected
+        properties; stale revisions are rejected from authoritative event-store state, while the
+        available projection remains readable. Use development_artifact_get with observation_id
+        for exact historical classification and content evidence.
         If title, kind, or labels were wrong, use development_artifact_classification_correct with
         the observed classification_revision; it never changes bytes, media type, or provenance.
         Preserve a cited URL without saved response bytes only as an external_reference whose

@@ -48,6 +48,8 @@ module Coordinator
       def development_artifact_capture: (Commands::CaptureDevelopmentArtifact command) -> String
       def development_artifact_capture_document: (Commands::CaptureDevelopmentArtifact command) -> CommandInputDocuments::CaptureDevelopmentArtifactV2
       def development_artifact_capture_canonical_document: (Commands::CaptureDevelopmentArtifact command) -> CommandInputDocuments::CaptureDevelopmentArtifactCanonicalV2
+      def development_artifact_update: (Commands::UpdateDevelopmentArtifact command) -> String
+      def development_artifact_update_document: (Commands::UpdateDevelopmentArtifact command) -> CommandInputDocuments::UpdateDevelopmentArtifactV1
       def development_artifact_classification_correct: (Commands::CorrectDevelopmentArtifactClassification command) -> String
       def development_artifact_classification_correct_document: (Commands::CorrectDevelopmentArtifactClassification command) -> CommandInputDocuments::CorrectDevelopmentArtifactClassificationV1
       def development_artifact_relation_declare: (Commands::DeclareDevelopmentArtifactRelation command) -> String

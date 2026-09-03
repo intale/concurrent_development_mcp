@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Metadata
+      class ContentV1 < EventMetadata
+        def encoding: () -> String
+        def media_type: () -> String
+        def byte_size: () -> Integer
+        def content_sha256: () -> String
+      end
+    end
+  end
+end

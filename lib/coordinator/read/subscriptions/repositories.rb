@@ -12,7 +12,10 @@ module Coordinator::Read
             stream_name: "Repository"
           )
         ],
-        event_types: [ "RepositoryRegistered" ]
+        event_types: %w[
+          RepositoryRegistered RepositoryDisplayNameChanged RepositoryPathAdded RepositoryPathRemoved
+          RepositoryRemoteAdded RepositoryRemoteRemoved
+        ]
       )
 
       def initialize(handler:, pull_interval: 1.0)

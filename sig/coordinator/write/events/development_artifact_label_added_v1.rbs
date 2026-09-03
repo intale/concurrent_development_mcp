@@ -1,0 +1,6 @@
+module Coordinator::Write::Events
+  class DevelopmentArtifactLabelAddedV1 < Base
+    def artifact_id: () -> String
+    def label: () -> String
+  end
+end

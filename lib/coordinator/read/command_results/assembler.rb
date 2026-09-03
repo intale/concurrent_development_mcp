@@ -11,6 +11,7 @@ module Coordinator::Read
         semantic_result_mapper: Coordinator::Write::Tasks::SemanticResultMapper.new,
         schema_registry: Coordinator::Write::EventSchemaRegistry.new,
         stream_factory: Coordinator::Write::StreamFactory.new,
+        repository_registration_loader: Coordinator::Write::RepositoryRegistrationLoader.new(event_store:),
         repository_natural_key_marker: Coordinator::Write::Repositories::NaturalKeyMarker.new,
         development_artifact_marker_builder: Coordinator::Write::DevelopmentArtifacts::MarkerBuilder.new
       )
@@ -19,6 +20,7 @@ module Coordinator::Read
         @semantic_result_mapper = semantic_result_mapper
         @schema_registry = schema_registry
         @stream_factory = stream_factory
+        @repository_registration_loader = repository_registration_loader
         @repository_natural_key_marker = repository_natural_key_marker
         @development_artifact_marker_builder = development_artifact_marker_builder
       end
@@ -178,6 +180,7 @@ module Coordinator::Read
           )
         when "skill_publish" then skill_publication(source, args:)
         when "development_artifact_capture" then development_artifact_capture(source, args:)
+        when "development_artifact_update" then development_artifact_update(source)
         when "development_artifact_classification_correct"
           development_artifact_classification(source, args:)
         when "development_artifact_relation_declare"
@@ -257,34 +260,66 @@ module Coordinator::Read
       end
 
       def skill_publication(source, args:)
-        publication = payload(source, Coordinator::Write::Events::SkillRevisionPublishedV2)
-        unless publication
-          publication = load_first(
-            @stream_factory.skill(source.command.skill_id),
-            Coordinator::Write::EventQueries::SKILL_LATEST_REVISION
-          )
-        end
-        @completion_builder.skill_publish(**args, publication:)
+        publication_event = event_for_any_payload(
+          source,
+          Coordinator::Write::Events::SkillRevisionPublishedV3,
+          Coordinator::Write::Events::SkillRevisionPublishedV2
+        ) || load_first_event(
+          @stream_factory.skill(source.command.skill_id),
+          Coordinator::Write::EventQueries::SKILL_LATEST_REVISION
+        )
+        publication = load_payload(publication_event)
+        revision = publication.revision
+        outcome = source.persisted_events.any? { _1.type == "SkillRevisionPublished" } ? "published" : "existing"
+        @completion_builder.skill_publish(
+          **args,
+          revision:,
+          outcome:,
+          publication_event:
+        )
       end
 
       def development_artifact_capture(source, args:)
         command = source.command
-        observation = payload(source, Coordinator::Write::Events::DevelopmentArtifactObservedV1) ||
-                      load_observation(command.observation.observation_id).observation
-        capture = payload(source, Coordinator::Write::Events::DevelopmentArtifactCapturedV2) ||
-                  load_first(
-                    @stream_factory.development_artifact(observation.observation.artifact_id),
-                    Coordinator::Write::EventQueries::DEVELOPMENT_ARTIFACT_CAPTURE
-                  )
-        outcome = if payload(source, Coordinator::Write::Events::DevelopmentArtifactCapturedV2)
-                    "captured"
-                  elsif payload(source, Coordinator::Write::Events::DevelopmentArtifactObservedV1)
-                    "observed"
-                  else
-                    "existing"
-                  end
-        artifact = capture.artifact
-        observed = observation.observation
+        created_event = event_for_any_payload(
+          source,
+          Coordinator::Write::Events::DevelopmentArtifactCreatedV1
+        )
+        recorded_event = event_for_any_payload(
+          source,
+          Coordinator::Write::Events::DevelopmentArtifactObservationRecordedV1
+        )
+        legacy_observed_event = event_for_any_payload(
+          source,
+          Coordinator::Write::Events::DevelopmentArtifactObservedV1
+        )
+        capture_event = event_for_any_payload(
+          source,
+          Coordinator::Write::Events::DevelopmentArtifactCapturedV2
+        )
+        if created_event || recorded_event || source.persisted_events.empty?
+          artifact = command.artifact
+          observed = command.observation
+          outcome = if created_event
+                      "captured"
+                    elsif recorded_event
+                      "observed"
+                    else
+                      "existing"
+                    end
+          recorded_at = event_timestamp(recorded_event || created_event) || source.completed_at
+        else
+          observation = payload(source, Coordinator::Write::Events::DevelopmentArtifactObservedV1) ||
+                        load_observation(command.observation.observation_id).observation
+          capture = payload(source, Coordinator::Write::Events::DevelopmentArtifactCapturedV2) || load_first(
+            @stream_factory.development_artifact(observation.observation.artifact_id),
+            Coordinator::Write::EventQueries::DEVELOPMENT_ARTIFACT_CAPTURE
+          )
+          artifact = capture.artifact
+          observed = observation.observation
+          outcome = legacy_observed_event ? "observed" : "existing"
+          recorded_at = event_timestamp(legacy_observed_event || capture_event) || source.completed_at
+        end
         completion(
           source,
           summary: {
@@ -301,7 +336,7 @@ module Coordinator::Read
             content_sha256: artifact.content.content_sha256,
             byte_size: artifact.content.byte_size,
             outcome:,
-            recorded_at: observation.recorded_at
+            recorded_at:
           ),
           next_actions: [
             Coordinator::Write::NextAction.new(
@@ -316,30 +351,113 @@ module Coordinator::Read
       end
 
       def development_artifact_classification(source, args:)
-        state = load_observation(source.command.observation_id)
+        command = source.command
+        history = load_observation_payloads(command.observation_id)
+        granular = history.any? do |event|
+          event.is_a?(Coordinator::Write::Events::DevelopmentArtifactObservationRecordedV1) ||
+            event.is_a?(Coordinator::Write::Events::DevelopmentArtifactObservationFactLinkedV1) ||
+            event.is_a?(Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectionRecordedV1)
+        end
         correction = payload(source, Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectedV1)
-        outcome = correction ? "corrected" : "existing"
+        correction_record = payload(
+          source,
+          Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectionRecordedV1
+        )
+        outcome = correction || correction_record ? "corrected" : "existing"
+        state = granular ? nil : ArtifactObservationState.reduce(history)
+        artifact_id = correction&.artifact_id || correction_record&.artifact_id ||
+          (granular ? observation_artifact_id(history) : state.observation.observation.artifact_id)
+        title = correction&.title || command.title || state&.title
+        kind = correction&.kind || command.kind || state&.kind
+        labels = correction&.labels || command.labels || state&.labels
+        revision = correction&.classification_revision || correction_record&.classification_revision ||
+          (granular ? granular_classification_revision(history) : state.classification_revision)
+        corrected_event = event_for_any_payload(
+          source,
+          Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectedV1,
+          Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectionRecordedV1
+        )
+        raise InvalidProjectionSource, "Classification source has no Artifact identity" unless artifact_id
+        raise InvalidProjectionSource, "Classification source has incomplete values" unless title && kind && labels
         completion(
           source,
           summary: outcome == "corrected" ?
             "Development Artifact observation classification corrected." :
             "Development Artifact observation classification is already current.",
           data: Coordinator::Write::CommandReceiptData::DevelopmentArtifactClassification.new(
-            artifact_id: state.observation.observation.artifact_id,
-            observation_id: source.command.observation_id,
-            classification_revision: state.classification_revision,
-            title: state.title,
-            kind: state.kind,
-            labels: state.labels,
+            artifact_id:,
+            observation_id: command.observation_id,
+            classification_revision: revision,
+            title:,
+            kind:,
+            labels:,
             outcome:,
-            corrected_at: source.completed_at
+            corrected_at: corrected_event&.created_at&.utc&.iso8601(6) || source.completed_at
           ),
           next_actions: [
             Coordinator::Write::NextAction.new(
               tool: "development_artifact_get",
               arguments: Coordinator::Write::NextAction::DevelopmentArtifactArguments.new(
-                artifact_id: state.observation.observation.artifact_id,
-                observation_id: source.command.observation_id
+                artifact_id:,
+                observation_id: command.observation_id
+              )
+            )
+          ]
+        )
+      end
+
+      def development_artifact_update(source)
+        command = source.command
+        property_event_types = %w[
+          DevelopmentArtifactScopeChanged
+          DevelopmentArtifactTitleChanged
+          DevelopmentArtifactKindChanged
+          DevelopmentArtifactLabelAdded
+          DevelopmentArtifactLabelRemoved
+          DevelopmentArtifactSourceChanged
+          DevelopmentArtifactContentChanged
+        ]
+        unless source.persisted_events.all? { |event| property_event_types.include?(event.type) }
+          raise InvalidProjectionSource, "Development Artifact update contains unsupported source evidence"
+        end
+        source.persisted_events.each_with_index do |event, index|
+          payload = source.payloads.fetch(index)
+          unless event.stream.stream_id == command.artifact_id &&
+                 payload.respond_to?(:artifact_id) && payload.artifact_id == command.artifact_id
+            raise InvalidProjectionSource, "Development Artifact update source does not match its command"
+          end
+        end
+        property_events = source.persisted_events
+        changed_properties = property_events.filter_map do |event|
+          {
+            "DevelopmentArtifactScopeChanged" => "scope",
+            "DevelopmentArtifactTitleChanged" => "title",
+            "DevelopmentArtifactKindChanged" => "kind",
+            "DevelopmentArtifactLabelAdded" => "labels",
+            "DevelopmentArtifactLabelRemoved" => "labels",
+            "DevelopmentArtifactSourceChanged" => "source",
+            "DevelopmentArtifactContentChanged" => "content"
+          }[event.type]
+        end.uniq
+        outcome = changed_properties.empty? ? "existing" : "updated"
+        latest_event = property_events.last
+        completion(
+          source,
+          summary: outcome == "updated" ?
+            "Development Artifact properties updated as granular facts." :
+            "Development Artifact already has the requested properties.",
+          data: Coordinator::Write::CommandReceiptData::DevelopmentArtifactUpdate.new(
+            artifact_id: command.artifact_id,
+            resulting_stream_revision: latest_event&.stream_revision || command.expected_revision,
+            changed_properties:,
+            outcome:,
+            updated_at: latest_event&.created_at&.utc&.iso8601(6) || source.completed_at
+          ),
+          next_actions: [
+            Coordinator::Write::NextAction.new(
+              tool: "development_artifact_get",
+              arguments: Coordinator::Write::NextAction::DevelopmentArtifactArguments.new(
+                artifact_id: command.artifact_id
               )
             )
           ]
@@ -348,9 +466,20 @@ module Coordinator::Read
 
       def development_artifact_relation(source, args:)
         command = source.command
-        declaration = payload(source, Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV1) ||
-                      load_artifact_relation(command)
-        supersession = payload(source, Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV1)
+        declaration_event = event_for_any_payload(
+          source,
+          Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV1,
+          Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV2
+        ) || load_artifact_relation_event(command)
+        declaration = load_payload(declaration_event)
+        artifact_relation = relation_from_declaration(declaration)
+        supersession = payload(source, Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV1) ||
+                       payload(source, Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV2)
+        supersession_event = event_for_any_payload(
+          source,
+          Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV1,
+          Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV2
+        )
         outcome = if supersession
                     "superseded"
                   elsif source.persisted_events.empty?
@@ -358,7 +487,6 @@ module Coordinator::Read
                   else
                     "declared"
                   end
-        artifact_relation = declaration.artifact_relation
         completion(
           source,
           summary: {
@@ -371,10 +499,10 @@ module Coordinator::Read
             source_artifact_id: artifact_relation.source_artifact_id,
             relation: artifact_relation.relation,
             target: artifact_relation.target,
-            superseded_relation_id: supersession&.superseded_relation_id,
+            superseded_relation_id: superseded_relation_id(supersession),
             outcome:,
-            declared_at: declaration.declared_at,
-            superseded_at: supersession&.superseded_at
+            declared_at: declaration_event.created_at.utc.iso8601(6),
+            superseded_at: supersession_event&.created_at&.utc&.iso8601(6)
           ),
           next_actions: [
             Coordinator::Write::NextAction.new(
@@ -387,9 +515,46 @@ module Coordinator::Read
         )
       end
 
+      def relation_from_declaration(declaration)
+        return declaration.artifact_relation if declaration.is_a?(
+          Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV1
+        )
+
+        Coordinator::Write::DevelopmentArtifacts::RelationV1.new(
+          relation_id: declaration.relation_id,
+          source_artifact_id: declaration.source_artifact_id,
+          relation: declaration.relation,
+          target: Coordinator::Write::DevelopmentArtifacts::RelationTargetV1.new(
+            kind: declaration.target_kind,
+            id: declaration.target_id,
+            status: declaration.target_kind == "external" ? "unverified" : "verified",
+            name: nil,
+            scope: nil
+          ),
+          attributes: Coordinator::Write::DevelopmentArtifacts::RelationAttributesV1.new(
+            path: declaration.path,
+            fragment: declaration.fragment,
+            normalized_locator: declaration.normalized_locator
+          )
+        )
+      end
+
+      def superseded_relation_id(supersession)
+        return unless supersession
+
+        supersession.respond_to?(:superseded_relation_id) ?
+          supersession.superseded_relation_id : supersession.relation_id
+      end
+
       def repository_registration(source)
-        registration = payload(source, Coordinator::Write::Events::RepositoryRegisteredV1) ||
-                       load_repository_registration(source.command)
+        registration_event = event_for_any_payload(
+          source,
+          Coordinator::Write::Events::RepositoryRegisteredV2,
+          Coordinator::Write::Events::RepositoryRegisteredV1
+        )
+        registration_event ||= load_repository_registration_event(source.command)
+        registration = @repository_registration_loader.call(registration_event.stream.stream_id)
+        raise InvalidProjectionSource, "Canonical Repository registration is incomplete" unless registration
         outcome = source.persisted_events.empty? ? "existing" : "registered"
         completion(
           source,
@@ -402,24 +567,34 @@ module Coordinator::Read
             display_name: registration.display_name,
             paths: registration.paths,
             remotes: registration.remotes,
-            registered_at: registration.registered_at
+            registered_at: registration_event.created_at.utc.iso8601(6)
           )
         )
       end
 
       def resource_resolution(source)
         command = source.command
-        registration = payload(source, Coordinator::Write::Events::ResourceIdentityV1::Registered)
-        binding = payload(source, Coordinator::Write::Events::ResourceIdentityV1::Bound)
-        outcome = if registration
+        registration_event = event_for_any_payload(
+          source,
+          Coordinator::Write::Events::ResourceIdentityV2::Registered,
+          Coordinator::Write::Events::ResourceIdentityV1::Registered
+        )
+        binding_event = event_for_any_payload(
+          source,
+          Coordinator::Write::Events::ResourceIdentityV2::Bound,
+          Coordinator::Write::Events::ResourceIdentityV1::Bound
+        )
+        outcome = if registration_event
                     "registered"
-                  elsif binding
+                  elsif binding_event
                     "reactivated"
                   else
                     "existing"
                   end
-        binding ||= current_resource_binding(command.identity.current_path_marker)
-        registration ||= resource_registration(binding.resource_id)
+        binding_event ||= current_resource_binding(command.identity.current_path_marker)
+        binding = load_payload(binding_event)
+        registration_event ||= resource_registration(binding.resource_id)
+        registration = load_payload(registration_event)
         summary = {
           "registered" => "Resource identity registered and bound.",
           "reactivated" => "Existing Resource identity reactivated.",
@@ -434,20 +609,25 @@ module Coordinator::Read
             kind: registration.kind,
             normalized_path: registration.normalized_path,
             outcome:,
-            registered_at: registration.registered_at,
-            bound_at: binding.bound_at
+            registered_at: registration_event.created_at.utc.iso8601(6),
+            bound_at: binding_event.created_at.utc.iso8601(6)
           )
         )
       end
 
       def resource_removal(source)
         command = source.command
-        registration = resource_registration(command.resource_id)
-        unbinding = payload(source, Coordinator::Write::Events::ResourceIdentityV1::Unbound)
-        outcome = unbinding ? "removed" : "already_inactive"
+        registration_event = resource_registration(command.resource_id)
+        registration = load_payload(registration_event)
+        unbinding_event = event_for_any_payload(
+          source,
+          Coordinator::Write::Events::ResourceIdentityV2::Unbound,
+          Coordinator::Write::Events::ResourceIdentityV1::Unbound
+        )
+        outcome = unbinding_event ? "removed" : "already_inactive"
         completion(
           source,
-          summary: unbinding ? "Resource binding removed." : "Resource binding was already inactive.",
+          summary: unbinding_event ? "Resource binding removed." : "Resource binding was already inactive.",
           data: Coordinator::Write::CommandReceiptData::ResourceRemoval.new(
             resource_id: registration.resource_id,
             repository_id: registration.repository_id,
@@ -455,7 +635,7 @@ module Coordinator::Read
             normalized_path: registration.normalized_path,
             outcome:,
             reason: command.reason,
-            unbound_at: unbinding&.unbound_at || source.completed_at
+            unbound_at: unbinding_event&.created_at&.utc&.iso8601(6) || source.completed_at
           )
         )
       end
@@ -518,6 +698,11 @@ module Coordinator::Read
         source.persisted_events.fetch(index)
       end
 
+      def event_for_any_payload(source, *payload_classes)
+        payload = source.payloads.find { |candidate| payload_classes.any? { candidate.is_a?(_1) } }
+        payload && event_for_payload(source, payload)
+      end
+
       def partition_payload?(payload)
         payload.is_a?(Coordinator::Write::Events::DecisionPartitionAdvancedV1)
       end
@@ -533,36 +718,66 @@ module Coordinator::Read
         )
       end
 
+      def event_timestamp(event)
+        event&.created_at&.utc&.iso8601(6)
+      end
+
       def load_first(stream, criteria)
+        load_payload(load_first_event(stream, criteria))
+      end
+
+      def load_first_event(stream, criteria)
         event = @event_store.read(stream, criteria).first
         raise InvalidProjectionSource, "Required command-result source event does not exist" unless event
 
-        load_payload(event)
+        event
       end
 
       def load_observation(observation_id)
-        events = @event_store.read(
-          @stream_factory.development_artifact_observation(observation_id),
-          Coordinator::Write::EventQueries::DEVELOPMENT_ARTIFACT_OBSERVATION_HISTORY
-        )
-        ArtifactObservationState.reduce(events.map { load_payload(_1) })
+        ArtifactObservationState.reduce(load_observation_payloads(observation_id))
       end
 
-      def load_artifact_relation(command)
+      def load_observation_payloads(observation_id)
+        @event_store.read(
+          @stream_factory.development_artifact_observation(observation_id),
+          Coordinator::Write::EventQueries::DEVELOPMENT_ARTIFACT_OBSERVATION_HISTORY
+        ).map { load_payload(_1) }
+      end
+
+      def observation_artifact_id(history)
+        history.filter_map do |event|
+          case event
+          when Coordinator::Write::Events::DevelopmentArtifactObservationFactLinkedV1
+            event.artifact_id
+          when Coordinator::Write::Events::DevelopmentArtifactObservedV1
+            event.observation.artifact_id
+          end
+        end.first
+      end
+
+      def granular_classification_revision(history)
+        1 + history.count do |event|
+          event.is_a?(Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectionRecordedV1)
+        end
+      end
+
+      def load_artifact_relation_event(command)
         marker = @development_artifact_marker_builder.relation_natural_key(command.artifact_relation)
-        event = @event_store.read_global_marked(
-          Coordinator::Write::GlobalMarkedEventReadCriteria.new(
-            stream_context: "DevelopmentMemory",
-            stream_name: "DevelopmentArtifact",
-            event_types: [ "DevelopmentArtifactRelationDeclared" ],
-            markers: [ marker ],
-            maximum_count: 1,
-            direction: :asc
-          )
-        ).first
+        event = %w[DevelopmentArtifact DevelopmentArtifactRelation].lazy.map do |stream_name|
+          @event_store.read_global_marked(
+            Coordinator::Write::GlobalMarkedEventReadCriteria.new(
+              stream_context: "DevelopmentMemory",
+              stream_name:,
+              event_types: [ "DevelopmentArtifactRelationDeclared" ],
+              markers: [ marker ],
+              maximum_count: 1,
+              direction: :asc
+            )
+          ).first
+        end.find(&:itself)
         raise InvalidProjectionSource, "Development Artifact relation source does not exist" unless event
 
-        load_payload(event)
+        event
       end
 
       def current_resource_binding(marker)
@@ -578,11 +793,11 @@ module Coordinator::Read
         ).first
         raise InvalidProjectionSource, "Resolved Resource binding does not exist" unless event
 
-        load_payload(event)
+        event
       end
 
       def resource_registration(resource_id)
-        load_first(
+        load_first_event(
           @stream_factory.resource(resource_id),
           Coordinator::Write::EventReadCriteria.new(
             event_types: [ "ResourceRegistered" ],
@@ -592,7 +807,7 @@ module Coordinator::Read
         )
       end
 
-      def load_repository_registration(command)
+      def load_repository_registration_event(command)
         marker = @repository_natural_key_marker.call(
           scope: command.scope,
           repository_key: command.repository_key
@@ -609,7 +824,7 @@ module Coordinator::Read
         ).first
         raise InvalidProjectionSource, "Canonical Repository registration does not exist" unless event
 
-        load_payload(event)
+        event
       end
 
       def load_payload(event)

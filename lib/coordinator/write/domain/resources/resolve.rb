@@ -7,28 +7,28 @@ module Coordinator::Write
         include Dry::Monads[:result]
 
         class DecisionV1 < Value
-          attribute :registration, Events::ResourceIdentityV1::Registration
-          attribute :binding, Events::ResourceIdentityV1::Binding
+          attribute :registration, Events::ResourceIdentityV2::Registration
+          attribute :binding, Events::ResourceIdentityV2::Binding
           attribute :events,
-                    Types::Array.of(Events::ResourceIdentityV1::ResolutionEvent).constrained(max_size: 2)
+                    Types::Array.of(Events::ResourceIdentityV2::ResolutionEvent).constrained(max_size: 2)
           attribute :outcome, Types::String.enum("registered", "reactivated", "existing")
         end
 
-        def call(identity:, proposed_resource_id:, registration:, current_binding:, resolved_at:)
-          return resolve_registered(identity:, registration:, current_binding:, resolved_at:) if registration
-          if current_binding.is_a?(Events::ResourceIdentityV1::Bound)
+        def call(identity:, proposed_resource_id:, registration:, current_binding:)
+          return resolve_registered(identity:, registration:, current_binding:) if registration
+          if current_binding.is_a?(Events::ResourceIdentityV2::Bound)
             return resolve_occupied(identity:, current_binding:)
           end
 
-          register(identity:, resource_id: proposed_resource_id, resolved_at:)
+          register(identity:, resource_id: proposed_resource_id)
         end
 
         private
 
-        def resolve_registered(identity:, registration:, current_binding:, resolved_at:)
+        def resolve_registered(identity:, registration:, current_binding:)
           return corrupt(identity, "registration_without_binding") unless current_binding
 
-          if current_binding.is_a?(Events::ResourceIdentityV1::Bound) &&
+          if current_binding.is_a?(Events::ResourceIdentityV2::Bound) &&
              current_binding.resource_id == registration.resource_id
             return corrupt(identity, "binding_registration_mismatch") unless
               current_binding.kind == registration.kind
@@ -43,13 +43,13 @@ module Coordinator::Write
             )
           end
 
-          if current_binding.is_a?(Events::ResourceIdentityV1::Unbound)
+          if current_binding.is_a?(Events::ResourceIdentityV2::Unbound)
             if current_binding.resource_id == registration.resource_id &&
                current_binding.kind != registration.kind
               return corrupt(identity, "binding_registration_mismatch")
             end
 
-            return reactivate(identity:, registration:, resolved_at:)
+            return reactivate(identity:, registration:)
           end
 
           return path_conflict(identity, current_binding) unless current_binding.kind == identity.kind
@@ -58,18 +58,18 @@ module Coordinator::Write
         end
 
         def resolve_occupied(identity:, current_binding:)
-          return path_conflict(identity, current_binding) unless current_binding.kind == identity.kind
+          return path_conflict(identity, current_binding) unless
+            current_binding.kind == identity.kind
 
           corrupt(identity, "binding_without_registration")
         end
 
-        def reactivate(identity:, registration:, resolved_at:)
-          binding = Events::ResourceIdentityV1::Bound.new(
+        def reactivate(identity:, registration:)
+          binding = Events::ResourceIdentityV2::Bound.new(
             resource_id: registration.resource_id,
             repository_id: identity.repository_id,
             kind: identity.kind,
-            normalized_path: identity.normalized_path,
-            bound_at: resolved_at
+            normalized_path: identity.normalized_path
           )
 
           Success(
@@ -82,20 +82,18 @@ module Coordinator::Write
           )
         end
 
-        def register(identity:, resource_id:, resolved_at:)
-          registration = Events::ResourceIdentityV1::Registered.new(
+        def register(identity:, resource_id:)
+          registration = Events::ResourceIdentityV2::Registered.new(
             resource_id:,
             repository_id: identity.repository_id,
             kind: identity.kind,
-            normalized_path: identity.normalized_path,
-            registered_at: resolved_at
+            normalized_path: identity.normalized_path
           )
-          binding = Events::ResourceIdentityV1::Bound.new(
+          binding = Events::ResourceIdentityV2::Bound.new(
             resource_id:,
             repository_id: identity.repository_id,
             kind: identity.kind,
-            normalized_path: identity.normalized_path,
-            bound_at: resolved_at
+            normalized_path: identity.normalized_path
           )
 
           Success(

@@ -53,6 +53,27 @@ RSpec.describe Coordinator::Read::Projectors::ResourcesV1, :read_model do
     )
   end
 
+  it "projects @2 identity facts using native event timestamps" do
+    registered = resource_event_v2(
+      Coordinator::Write::Events::ResourceIdentityV2::Registered.new(
+        resource_id:, repository_id:, kind: "file", normalized_path: "app/models/projected.rb"
+      ), revision: 0, position: 100, created_at: Time.utc(2026, 8, 30, 12)
+    )
+    bound = resource_event_v2(
+      Coordinator::Write::Events::ResourceIdentityV2::Bound.new(
+        resource_id:, repository_id:, kind: "file", normalized_path: "app/models/projected.rb"
+      ), revision: 1, position: 200, created_at: Time.utc(2026, 8, 30, 12, 1)
+    )
+
+    projector.call(registered)
+    projector.call(bound)
+    record = Coordinator::Read::Resource.find(resource_id)
+
+    expect(record.registered_at_domain).to eq(registered.created_at)
+    expect(record.latest_transition_at_domain).to eq(bound.created_at)
+    expect(record.updated_at).to eq(bound.created_at)
+  end
+
   def registered_payload
     Coordinator::Write::Events::ResourceIdentityV1::Registered.new(
       resource_id:,
@@ -95,6 +116,14 @@ RSpec.describe Coordinator::Read::Projectors::ResourcesV1, :read_model do
       policy_version: "resource-identity/v1",
       correlation_id:,
       causation_id:,
+      markers: [ "resource:#{resource_id}", "repository:#{repository_id}" ]
+    )
+  end
+
+  def resource_event_v2(payload, revision:, position:, created_at:)
+    ProjectionEventFactory.build(
+      payload:, stream:, stream_revision: revision, global_position: position,
+      policy_version: "resource-identity/v1", correlation_id:, created_at:,
       markers: [ "resource:#{resource_id}", "repository:#{repository_id}" ]
     )
   end

@@ -18,6 +18,22 @@ module Coordinator::Write
       StreamReference.new(context: "AgentKnowledge", stream_name: "Skill", stream_id: skill_id)
     end
 
+    def skill_revision(skill_revision_id)
+      StreamReference.new(
+        context: "AgentKnowledge",
+        stream_name: "SkillRevision",
+        stream_id: skill_revision_id
+      )
+    end
+
+    def skill_asset(asset_id)
+      StreamReference.new(
+        context: "AgentKnowledge",
+        stream_name: "SkillAsset",
+        stream_id: asset_id
+      )
+    end
+
     def operation_batch(batch_id)
       StreamReference.new(
         context: "DevelopmentCoordination",
@@ -39,6 +55,14 @@ module Coordinator::Write
         context: "DevelopmentMemory",
         stream_name: "DevelopmentArtifactObservation",
         stream_id: observation_id
+      )
+    end
+
+    def development_artifact_relation(relation_id)
+      StreamReference.new(
+        context: "DevelopmentMemory",
+        stream_name: "DevelopmentArtifactRelation",
+        stream_id: relation_id
       )
     end
 

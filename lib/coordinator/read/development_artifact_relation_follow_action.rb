@@ -22,6 +22,11 @@ module Coordinator::Read
     private
 
     def artifact_action(artifact_id)
+      # Pre-cutover artifact IDs can appear in projected relations until
+      # MIGRATION-01 rebuilds the read side. They are intentionally not valid
+      # write-side NextAction arguments, so omit the convenience action.
+      return unless Types::DevelopmentArtifactId.valid?(artifact_id)
+
       Coordinator::Write::NextAction.new(
         tool: "development_artifact_get",
         arguments: Coordinator::Write::NextAction::DevelopmentArtifactArguments.new(artifact_id:)

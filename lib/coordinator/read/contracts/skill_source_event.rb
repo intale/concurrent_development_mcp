@@ -7,7 +7,7 @@ module Coordinator::Read
 
       params do
         required(:event_type).filled(:string, eql?: "SkillRevisionPublished")
-        required(:schema_version).filled(:integer, eql?: 2)
+        required(:schema_version).filled(:integer, included_in?: [ 2, 3 ])
         required(:stream_context).filled(:string, eql?: "AgentKnowledge")
         required(:stream_name).filled(:string, eql?: "Skill")
         required(:stream_id).filled(:string)
@@ -17,7 +17,7 @@ module Coordinator::Read
         required(:actor_kind).filled(:string, included_in?: %w[agent user])
         required(:actor_id).filled(:string)
         required(:recorded_by).filled(:string, eql?: "coordinator")
-        required(:policy_version).filled(:string, eql?: "skill-repository/v1")
+        required(:policy_version).filled(:string, included_in?: %w[skill-repository/v1 skill-repository/v2])
       end
 
       rule(:stream_id) do

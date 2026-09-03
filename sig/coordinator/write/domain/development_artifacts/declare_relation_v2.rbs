@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Domain
+      module DevelopmentArtifacts
+        class DeclareRelationV2
+          def initialize: (?stream_factory: StreamFactory, ?relation_registry: Shared::DevelopmentArtifactRelationRegistry) -> void
+          def call: (relation: Write::DevelopmentArtifacts::RelationV1, ?source_relations: Array[RelationStateV2], ?superseded_state: RelationStateV2?, ?superseded_relation_id: String?, ?supersession_reason: String?) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

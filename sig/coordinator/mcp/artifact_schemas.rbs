@@ -3,6 +3,7 @@ module Coordinator
     module ArtifactSchemas
       def self.capture_result: () -> json_schema
       def self.classification_result: () -> json_schema
+      def self.update_result: () -> json_schema
       def self.operation_batch_acceptance_result: () -> json_schema
       def self.relation_declare_result: () -> json_schema
       def self.get_result: () -> json_schema
@@ -17,6 +18,7 @@ module Coordinator
       def self.command_domain_error: () -> json_schema
       def self.artifact_capture_data: () -> json_schema
       def self.artifact_classification_data: () -> json_schema
+      def self.artifact_update_data: () -> json_schema
       def self.operation_batch_acceptance_data: () -> json_schema
       def self.relation_declare_data: () -> json_schema
       def self.artifact_view: () -> json_schema

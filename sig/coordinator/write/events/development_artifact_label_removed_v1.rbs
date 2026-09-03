@@ -1,0 +1,6 @@
+module Coordinator::Write::Events
+  class DevelopmentArtifactLabelRemovedV1 < Base
+    def artifact_id: () -> String
+    def label: () -> String
+  end
+end

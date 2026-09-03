@@ -30,7 +30,6 @@ module Coordinator::Write
       end
 
       class PreparationV1 < Value
-        attribute :resolved_at, Types::Timestamp
         attribute :input_digest, Types::Sha256Digest
         attribute :proposed_resource_id, Types::ResourceId
         attribute :registration_event_id, Types::UuidV7
@@ -44,7 +43,6 @@ module Coordinator::Write
         decider: Domain::Resources::Resolve.new,
         repository_registration_loader: RepositoryRegistrationLoader.new(event_store:),
         input_digest: CommandInputDigest.new,
-        clock: SystemClock.new,
         resource_id_generator: ResourceIdGenerator.new,
         id_generator: IdGenerator.new,
         event_factory: EventFactory.new,
@@ -57,7 +55,6 @@ module Coordinator::Write
         @decider = decider
         @repository_registration_loader = repository_registration_loader
         @input_digest = input_digest
-        @clock = clock
         @resource_id_generator = resource_id_generator
         @id_generator = id_generator
         @event_factory = event_factory
@@ -95,7 +92,6 @@ module Coordinator::Write
       def call_command(command, caused_by: nil)
         steps do
           preparation = PreparationV1.new(
-            resolved_at: @clock.now,
             input_digest: @input_digest.call(command),
             proposed_resource_id: @resource_id_generator.call,
             registration_event_id: @id_generator.uuid_v7,
@@ -122,8 +118,10 @@ module Coordinator::Write
         repository = @repository_registration_loader.call(command.repository_id)
         return repository_not_registered(command) unless repository
 
-        registration = step load_registration(command.identity)
-        current_binding = step load_current_binding(command.identity)
+        registration_source = step load_registration(command.identity)
+        registration = registration_source&.last
+        current_binding_source = step load_current_binding(command.identity)
+        current_binding = current_binding_source&.last
 
         ActiveSupport::Notifications.instrument(
           "coordinator.command_boundary",
@@ -135,8 +133,7 @@ module Coordinator::Write
           identity: command.identity,
           proposed_resource_id: preparation.proposed_resource_id,
           registration:,
-          current_binding:,
-          resolved_at: preparation.resolved_at
+          current_binding:
         )
         return decision if decision.failure?
 
@@ -152,7 +149,8 @@ module Coordinator::Write
           resolution: resolved,
           input_digest: preparation.input_digest,
           persisted_events: persisted,
-          completed_at: preparation.resolved_at
+          registration_event: registration_source&.first,
+          binding_event: current_binding_source&.first
         )
 
         Success(completion)
@@ -179,7 +177,7 @@ module Coordinator::Write
           registration.kind == identity.kind &&
           registration.normalized_path == identity.normalized_path
 
-        Success(registration)
+        Success([ event, registration ])
       rescue EventHistoryLimitExceeded
         corrupt(identity, "duplicate_registration")
       rescue KeyError, Dry::Struct::Error
@@ -205,8 +203,7 @@ module Coordinator::Write
         return corrupt(identity, "binding_identity_mismatch") unless
           binding.repository_id == identity.repository_id &&
           binding.normalized_path == identity.normalized_path
-
-        Success(binding)
+        Success([ event, binding ])
       rescue KeyError, Dry::Struct::Error
         corrupt(identity, "binding_schema_invalid")
       end
@@ -253,11 +250,37 @@ module Coordinator::Write
       def deserialize(event)
         return unless event
 
-        @schema_registry.load(
+        payload = @schema_registry.load(
           type: event.type,
           schema_version: event.metadata.fetch("schema_version"),
           data: event.data
         )
+        case payload
+        when Events::ResourceIdentityV1::Registered
+          Events::ResourceIdentityV2::Registered.new(
+            resource_id: payload.resource_id,
+            repository_id: payload.repository_id,
+            kind: payload.kind,
+            normalized_path: payload.normalized_path.unicode_normalize(:nfc)
+          )
+        when Events::ResourceIdentityV1::Bound
+          Events::ResourceIdentityV2::Bound.new(
+            resource_id: payload.resource_id,
+            repository_id: payload.repository_id,
+            kind: payload.kind,
+            normalized_path: payload.normalized_path.unicode_normalize(:nfc)
+          )
+        when Events::ResourceIdentityV1::Unbound
+          Events::ResourceIdentityV2::Unbound.new(
+            resource_id: payload.resource_id,
+            repository_id: payload.repository_id,
+            kind: payload.kind,
+            normalized_path: payload.normalized_path.unicode_normalize(:nfc),
+            reason: payload.reason
+          )
+        else
+          payload
+        end
       end
 
       def persist_resource_events(resolution, command:, preparation:, caused_by:)
@@ -278,8 +301,8 @@ module Coordinator::Write
 
       def event_id(payload, preparation)
         case payload
-        when Events::ResourceIdentityV1::Registered then preparation.registration_event_id
-        when Events::ResourceIdentityV1::Bound then preparation.binding_event_id
+        when Events::ResourceIdentityV2::Registered then preparation.registration_event_id
+        when Events::ResourceIdentityV2::Bound then preparation.binding_event_id
         end
       end
 
@@ -287,17 +310,19 @@ module Coordinator::Write
         markers = [
           command.identity.identity_marker,
           "resource:#{payload.resource_id}",
-          "repository:#{payload.repository_id}",
+          "repository:#{command.identity.repository_id}",
           "command:#{command.command_id}"
         ]
         case payload
-        when Events::ResourceIdentityV1::Bound
+        when Events::ResourceIdentityV2::Bound, Events::ResourceIdentityV2::Unbound
           markers << command.identity.current_path_marker
         end
         markers
       end
 
-      def build_completion(command:, resolution:, input_digest:, persisted_events:, completed_at:)
+      def build_completion(command:, resolution:, input_digest:, persisted_events:, registration_event:, binding_event:)
+        registration_event ||= persisted_events.find { _1.type == "ResourceRegistered" }
+        binding_event ||= persisted_events.reverse.find { _1.type == "ResourceBound" }
         CommandResultV1.new(
           command_id: command.command_id,
           tool_name: TOOL_NAME,
@@ -311,13 +336,13 @@ module Coordinator::Write
             kind: resolution.registration.kind,
             normalized_path: resolution.registration.normalized_path,
             outcome: resolution.outcome,
-            registered_at: resolution.registration.registered_at,
-            bound_at: resolution.binding.bound_at
+            registered_at: registration_event.created_at.utc.iso8601(6),
+            bound_at: binding_event.created_at.utc.iso8601(6)
           ),
           warnings: [],
           next_actions: [],
           emitted_events: persisted_events.map { event_reference(_1) },
-          completed_at:
+          completed_at: binding_event.created_at.utc.iso8601(6)
         )
       end
 

@@ -1,0 +1,12 @@
+module Coordinator::Write::Events
+  class DevelopmentArtifactRelationDeclaredV2 < Base
+    def relation_id: () -> String
+    def source_artifact_id: () -> String
+    def relation: () -> String
+    def target_kind: () -> String
+    def target_id: () -> String
+    def path: () -> String?
+    def fragment: () -> String?
+    def normalized_locator: () -> String?
+  end
+end

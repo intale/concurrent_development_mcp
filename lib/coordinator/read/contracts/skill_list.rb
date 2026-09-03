@@ -23,7 +23,7 @@ module Coordinator::Read
       rule(:after_skill_id) do
         next unless value
 
-        key.failure("must be a valid Skill ID") unless Types::SKILL_ID_PATTERN.match?(value)
+        key.failure("must be a valid Skill ID") unless ProjectedSkillId.valid?(value)
       end
 
       private

@@ -5,6 +5,14 @@ module Coordinator::Write
     module DevelopmentArtifacts
       class State < Value
         Capture = Types.Instance(Events::DevelopmentArtifactCapturedV2)
+        Created = Types.Instance(Events::DevelopmentArtifactCreatedV1)
+        ScopeChange = Types.Instance(Events::DevelopmentArtifactScopeChangedV1)
+        TitleChange = Types.Instance(Events::DevelopmentArtifactTitleChangedV1)
+        KindChange = Types.Instance(Events::DevelopmentArtifactKindChangedV1)
+        LabelAddition = Types.Instance(Events::DevelopmentArtifactLabelAddedV1)
+        LabelRemoval = Types.Instance(Events::DevelopmentArtifactLabelRemovedV1)
+        SourceChange = Types.Instance(Events::DevelopmentArtifactSourceChangedV1)
+        ContentChange = Types.Instance(Events::DevelopmentArtifactContentChangedV1)
         Relation = Types.Instance(Events::DevelopmentArtifactRelationDeclaredV1)
         Supersession = Types.Instance(Events::DevelopmentArtifactRelationSupersededV1)
 
@@ -18,19 +26,66 @@ module Coordinator::Write
                     max_size: Types::DEVELOPMENT_ARTIFACT_RELATION_LIFETIME_MAXIMUM_COUNT
                   )
 
+        attribute? :created, Created.optional
+        attribute? :scope, ScopeChange.optional
+        attribute? :title, TitleChange.optional
+        attribute? :kind, KindChange.optional
+        attribute? :labels, Types::DevelopmentArtifactLabels.optional
+        attribute? :source, SourceChange.optional
+        attribute? :content, ContentChange.optional
+        attribute? :content_metadata, Coordinator::Write::DevelopmentArtifacts::ContentDescriptorV1.optional
+        attribute? :source_collector, Types::DevelopmentArtifactCollector.optional
+
         def self.initial
           new(capture: nil, relations: [], supersessions: [])
         end
 
-        def self.reduce(events)
+        def self.reduce(events, metadata_by_event: {})
           capture = nil
           relations = []
           supersessions = []
+          created = nil
+          scope = title = kind = source = content = nil
+          content_metadata = source_collector = nil
+          labels = []
           relation_ids = {}
           superseded_relation_ids = {}
 
           events.each do |event|
             case event
+            when Events::DevelopmentArtifactCreatedV1
+              raise InvalidDevelopmentArtifactHistory, "Artifact was created more than once" if created
+
+              created = event
+            when Events::DevelopmentArtifactScopeChangedV1
+              ensure_created!(created)
+              scope = event
+            when Events::DevelopmentArtifactTitleChangedV1
+              ensure_created!(created)
+              title = event
+            when Events::DevelopmentArtifactKindChangedV1
+              ensure_created!(created)
+              kind = event
+            when Events::DevelopmentArtifactLabelAddedV1
+              ensure_created!(created)
+              labels << event.label unless labels.include?(event.label)
+            when Events::DevelopmentArtifactLabelRemovedV1
+              ensure_created!(created)
+              labels.delete(event.label)
+            when Events::DevelopmentArtifactSourceChangedV1
+              ensure_created!(created)
+              source = event
+              source_collector = metadata_by_event[event.object_id]&.fetch("collector", nil)
+            when Events::DevelopmentArtifactContentChangedV1
+              ensure_created!(created)
+              content = event
+              metadata = metadata_by_event[event.object_id] || {}
+              if metadata.values_at("encoding", "media_type", "byte_size", "content_sha256").all?
+                content_metadata = Coordinator::Write::DevelopmentArtifacts::ContentDescriptorV1.new(
+                  encoding: metadata.fetch("encoding"), media_type: metadata.fetch("media_type"),
+                  byte_size: metadata.fetch("byte_size"), content_sha256: metadata.fetch("content_sha256")
+                )
+              end
             when Events::DevelopmentArtifactCapturedV2
               raise InvalidDevelopmentArtifactHistory, "Artifact was captured more than once" if capture
 
@@ -68,7 +123,26 @@ module Coordinator::Write
             end
           end
 
-          new(capture:, relations:, supersessions:)
+          new(
+            capture:,
+            relations:,
+            supersessions:,
+            created:,
+            scope:,
+            title:,
+            kind:,
+            labels:,
+            source:,
+            content:,
+            content_metadata:,
+            source_collector:
+          )
+        end
+
+        def self.ensure_created!(created)
+          return if created
+
+          raise InvalidDevelopmentArtifactHistory, "Artifact property fact precedes creation"
         end
 
         def relation(relation_id)

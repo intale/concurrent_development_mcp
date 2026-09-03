@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Skills
+      class AssetStateV1 < Shared::Value
+        def self.initial: (asset_id: String) -> AssetStateV1
+        def self.reduce: (Array[Events::Base] events) -> AssetStateV1?
+        def asset_id: () -> String
+        def path: () -> String?
+        def content: () -> String?
+        def executable: () -> bool?
+      end
+    end
+  end
+end

@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class SkillRevisionDescriptionDefinedV1 < Base
+        def skill_revision_id: () -> String
+        def description: () -> String
+      end
+    end
+  end
+end

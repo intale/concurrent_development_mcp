@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module Skills
+      class PublicationProjectionBuilderV3
+        REVISION_EVENT_TYPES: Array[String]
+        ASSET_EVENT_TYPES: Array[String]
+
+        def initialize: (event_store: _EventStore, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory) -> void
+        def call: (PgEventstore::Event publication_event) -> Dry::Monads::Result[ProjectionPublicationV3, OutcomeError]
+      end
+    end
+  end
+end

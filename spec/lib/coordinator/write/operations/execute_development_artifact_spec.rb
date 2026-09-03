@@ -2,387 +2,411 @@
 
 RSpec.describe "Development Artifact write operations", :event_store do
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
-  let(:capture) do
-    Coordinator::Write::Operations::ExecuteCaptureDevelopmentArtifact.new(event_store:)
-  end
-  let(:correct_classification) do
+  let(:streams) { Coordinator::Write::StreamFactory.new }
+  let(:capture) { Coordinator::Write::Operations::ExecuteCaptureDevelopmentArtifact.new(event_store:) }
+  let(:update) { Coordinator::Write::Operations::ExecuteUpdateDevelopmentArtifact.new(event_store:) }
+  let(:classification) do
     Coordinator::Write::Operations::ExecuteCorrectDevelopmentArtifactClassification.new(event_store:)
   end
   let(:declare_relation) do
     Coordinator::Write::Operations::ExecuteDeclareDevelopmentArtifactRelation.new(event_store:)
   end
-  let(:streams) { Coordinator::Write::StreamFactory.new }
 
-  it "captures canonical bytes once and records a new observation for the same natural Artifact" do
-    first = capture.call(capture_input)
-    replay = capture.call(capture_input(command_id: "cmd-artifact-replay"))
+  it "captures a fresh Artifact and Observation as granular facts with typed metadata" do
+    result = capture.call(capture_input)
 
-    expect(first).to be_success
-    expect(first.value!.data).to have_attributes(
-      outcome: "captured",
-      byte_size: 6,
-      content_sha256: a_string_matching(/\Asha256:[0-9a-f]{64}\z/)
-    )
-    expect(replay).to be_success
-    expect(replay.value!.data).to have_attributes(
-      artifact_id: first.value!.data.artifact_id,
-      outcome: "observed"
-    )
-    expect(replay.value!.data.observation_id).not_to eq(first.value!.data.observation_id)
-    expect(replay.value!.emitted_events.map(&:type)).to eq([ "DevelopmentArtifactObserved" ])
-    persisted = artifact_events(first.value!.data.artifact_id).sole
-    expect(persisted.type).to eq("DevelopmentArtifactCaptured")
-    expect(persisted.metadata.fetch("schema_version")).to eq(2)
-    persisted_content = persisted.data.dig("artifact", "content")
-    expect(persisted_content).to include("encoding" => "utf-8", "text" => "hello\n")
-    expect(persisted_content).not_to have_key("base64")
-    expect(command_events("cmd-artifact-replay")).to be_empty
-  end
-
-  it "keeps one natural Artifact identity and rejects content changes until content facts are introduced" do
-    first = capture.call(capture_input)
-    changed = capture.call(capture_input(command_id: "cmd-artifact-changed", text: "second"))
-
-    expect(first).to be_success
-    expect(changed).to be_failure
-    expect(changed.failure).to have_attributes(
-      code: :development_artifact_identity_conflict,
-      details: include(artifact_id: first.value!.data.artifact_id)
-    )
-  end
-
-  it "keeps classification corrections scoped to one observation" do
-    first = capture.call(capture_input)
-    capture_with_changed_classification = capture.call(
-      capture_input(command_id: "cmd-artifact-reclassify", title: "Other title")
-    )
-    correction = correct_classification.call(
-      classification_input(observation_id: first.value!.data.observation_id)
-    )
-    existing = correct_classification.call(
-      classification_input(
-        command_id: "cmd-classification-existing",
-        observation_id: first.value!.data.observation_id,
-        expected_revision: 2
-      )
-    )
-    stale = correct_classification.call(
-      classification_input(
-        command_id: "cmd-classification-stale",
-        observation_id: first.value!.data.observation_id,
-        title: "Stale correction"
-      )
-    )
-
-    expect(first).to be_success
-    expect(capture_with_changed_classification).to be_success
-    expect(capture_with_changed_classification.value!.data).to have_attributes(
-      artifact_id: first.value!.data.artifact_id,
-      outcome: "observed"
-    )
-    expect(capture_with_changed_classification.value!.data.observation_id).not_to eq(first.value!.data.observation_id)
-    expect(correction).to be_success
-    expect(correction.value!.data).to have_attributes(
-      artifact_id: first.value!.data.artifact_id,
-      observation_id: first.value!.data.observation_id,
-      classification_revision: 2,
-      title: "Other title",
-      outcome: "corrected"
-    )
-    expect(correction.value!.emitted_events.map(&:type)).to eq(
-      [ "DevelopmentArtifactClassificationCorrected" ]
-    )
-    expect(existing).to be_success
-    expect(existing.value!.data.outcome).to eq("existing")
-    expect(existing.value!.emitted_events).to be_empty
-    expect(stale.failure.code).to eq(:development_artifact_classification_revision_conflict)
-    expect(command_events("cmd-artifact-reclassify")).to be_empty
-    expect(command_events("cmd-classification-stale")).to be_empty
-    expect(observation_events(first.value!.data.observation_id).map(&:type)).to eq(
-      %w[DevelopmentArtifactObserved DevelopmentArtifactClassificationCorrected]
-    )
-  end
-
-  it "records distinct observations for unchanged bytes at two revisions of one locator" do
-    first = capture.call(capture_input)
-    second = capture.call(
-      capture_input(
-        command_id: "cmd-artifact-second-observation",
-        revision: "def456",
-        observed_at: "2026-08-25T16:01:00.000000Z"
-      )
-    )
-
-    expect([ first, second ]).to all(be_success)
-    expect(second.value!.data).to have_attributes(
-      artifact_id: first.value!.data.artifact_id,
-      outcome: "observed"
-    )
-    expect(second.value!.data.observation_id).not_to eq(first.value!.data.observation_id)
-    expect(artifact_events(first.value!.data.artifact_id).map(&:type)).to eq(
-      [ "DevelopmentArtifactCaptured" ]
-    )
-    expect(observation_events(first.value!.data.observation_id).map(&:type)).to eq(
-      [ "DevelopmentArtifactObserved" ]
-    )
-    expect(observation_events(second.value!.data.observation_id).map(&:type)).to eq(
-      [ "DevelopmentArtifactObserved" ]
-    )
-  end
-
-  it "declares an exact relation once and requires both Artifact endpoints" do
-    source = capture.call(capture_input).value!.data.artifact_id
-    target = capture.call(
-      capture_input(command_id: "cmd-artifact-target", locator: "docs/other.md", text: "other")
-    ).value!.data.artifact_id
-    first = declare_relation.call(relation_input(source:, target:))
-    replay = declare_relation.call(
-      relation_input(command_id: "cmd-relation-replay", source:, target:)
-    )
-    missing = declare_relation.call(
-      relation_input(
-        command_id: "cmd-relation-missing",
-        source:,
-        target: "018f0f4d-4e45-7abc-8def-000000000181"
-      )
-    )
-
-    expect(first).to be_success
-    expect(first.value!.data.outcome).to eq("declared")
-    expect(first.value!.data.target.status).to eq("verified")
-    expect(replay).to be_success
-    expect(replay.value!.data).to have_attributes(
-      relation_id: first.value!.data.relation_id,
-      outcome: "existing"
-    )
-    expect(replay.value!.emitted_events).to be_empty
-    expect(missing.failure.code).to eq(:development_artifact_target_not_found)
-    expect(missing.failure.details).to include(
-      target_kind: "artifact",
-      target_id: "018f0f4d-4e45-7abc-8def-000000000181"
-    )
-    expect(artifact_events(source).map(&:type)).to eq(
-      [ "DevelopmentArtifactCaptured", "DevelopmentArtifactRelationDeclared" ]
-    )
-  end
-
-  it "atomically supersedes an incorrect relation while preserving immutable history" do
-    source = capture.call(capture_input).value!.data.artifact_id
-    old_target = capture.call(
-      capture_input(command_id: "cmd-artifact-old", locator: "docs/old.md", text: "old")
-    ).value!.data.artifact_id
-    replacement_target = capture.call(
-      capture_input(command_id: "cmd-artifact-new", locator: "docs/new.md", text: "new")
-    ).value!.data.artifact_id
-    old = declare_relation.call(relation_input(source:, target: old_target)).value!.data
-
-    correction_input = relation_input(
-      command_id: "cmd-relation-correct",
-      source:,
-      target: replacement_target,
-      supersedes: { relation_id: old.relation_id, reason: "wrong target" }
-    )
-    correction = declare_relation.call(correction_input)
-    replay = declare_relation.call(correction_input)
-    semantic_retry = declare_relation.call(
-      correction_input.merge(command_id: "cmd-relation-correct-retry")
-    )
-
-    expect(correction).to be_success
-    expect(correction.value!.data).to have_attributes(
-      outcome: "superseded",
-      superseded_relation_id: old.relation_id,
-      superseded_at: a_string_matching(/Z\z/)
-    )
-    expect(correction.value!.emitted_events.map(&:type)).to eq(
-      %w[DevelopmentArtifactRelationDeclared DevelopmentArtifactRelationSuperseded]
-    )
-    expect(replay.value!.data).to have_attributes(
-      relation_id: correction.value!.data.relation_id,
-      superseded_relation_id: old.relation_id,
-      outcome: "existing",
-      declared_at: correction.value!.data.declared_at,
-      superseded_at: correction.value!.data.superseded_at
-    )
-    expect(replay.value!.emitted_events).to be_empty
-    expect(semantic_retry.value!.data.outcome).to eq("existing")
-    expect(semantic_retry.value!.emitted_events).to be_empty
-    expect(artifact_events(source).map(&:type)).to eq(
+    expect(result).to be_success
+    expect(result.value!.data).to have_attributes(outcome: "captured")
+    expect(result.value!.emitted_events.map(&:type)).to eq(
       %w[
-        DevelopmentArtifactCaptured
-        DevelopmentArtifactRelationDeclared
-        DevelopmentArtifactRelationDeclared
-        DevelopmentArtifactRelationSuperseded
+        DevelopmentArtifactCreated
+        DevelopmentArtifactScopeChanged
+        DevelopmentArtifactTitleChanged
+        DevelopmentArtifactKindChanged
+        DevelopmentArtifactSourceChanged
+        DevelopmentArtifactContentChanged
+        DevelopmentArtifactLabelAdded
+        DevelopmentArtifactLabelAdded
+        DevelopmentArtifactObservationRecorded
+        DevelopmentArtifactObservationFactLinked
+        DevelopmentArtifactObservationFactLinked
+        DevelopmentArtifactObservationFactLinked
+        DevelopmentArtifactObservationFactLinked
+        DevelopmentArtifactObservationFactLinked
+        DevelopmentArtifactObservationFactLinked
+        DevelopmentArtifactObservationFactLinked
+        DevelopmentArtifactObservationFactLinked
       ]
     )
 
-    dead_replacement = declare_relation.call(
-      relation_input(command_id: "cmd-relation-dead", source:, target: old_target)
+    artifact = result.value!.data
+    persisted = artifact_events(artifact.artifact_id)
+    expect(persisted.map(&:type)).to eq(
+      %w[
+        DevelopmentArtifactCreated
+        DevelopmentArtifactScopeChanged
+        DevelopmentArtifactTitleChanged
+        DevelopmentArtifactKindChanged
+        DevelopmentArtifactSourceChanged
+        DevelopmentArtifactContentChanged
+        DevelopmentArtifactLabelAdded
+        DevelopmentArtifactLabelAdded
+      ]
     )
-    expect(dead_replacement.failure.code).to eq(:development_artifact_relation_superseded)
+    expect(persisted.map(&:stream_revision)).to eq((0..7).to_a)
+    expect(persisted.map(&:created_at)).to all(be_a(Time))
+    expect(persisted.map { _1.data.keys.sort }).to eq([
+      [ "artifact_id" ], [ "artifact_id", "scope" ], [ "artifact_id", "title" ],
+      [ "artifact_id", "kind" ], [ "artifact_id", "source_kind", "locator", "revision", "observed_at" ],
+      [ "artifact_id", "content" ], [ "artifact_id", "label" ], [ "artifact_id", "label" ]
+    ].map(&:sort))
+
+    source = persisted.fetch(4)
+    expect(source.metadata).to include(
+      "collector" => "spec/v1",
+      "policy_version" => "development-artifact-repository/v2"
+    )
+    content = persisted.fetch(5)
+    expect(content.data).to eq("artifact_id" => artifact.artifact_id, "content" => "hello\n")
+    expect(content.metadata).to include(
+      "encoding" => "utf-8",
+      "media_type" => "text/markdown",
+      "byte_size" => 6,
+      "content_sha256" => a_string_matching(/\Asha256:[0-9a-f]{64}\z/)
+    )
+    expect(content.data).not_to have_key("content_sha256")
+
+    observations = observation_events(artifact.observation_id)
+    expect(observations.map(&:type)).to eq(
+      [ "DevelopmentArtifactObservationRecorded" ] +
+        Array.new(8, "DevelopmentArtifactObservationFactLinked")
+    )
+    expect(observations.drop(1).map { _1.data.fetch("role") }).to eq(
+      %w[created scope title kind source content label label]
+    )
+    expect(observations.drop(1).map { _1.data.dig("observed_fact", "stream_revision") }).to eq((0..7).to_a)
   end
 
-  it "denies unknown or redirected supersessions without partial writes" do
-    source = capture.call(capture_input).value!.data.artifact_id
-    first_target = capture.call(
-      capture_input(command_id: "cmd-artifact-first", locator: "docs/first.md", text: "first")
-    ).value!.data.artifact_id
-    second_target = capture.call(
-      capture_input(command_id: "cmd-artifact-second", locator: "docs/second.md", text: "second")
-    ).value!.data.artifact_id
-    third_target = capture.call(
-      capture_input(command_id: "cmd-artifact-third", locator: "docs/third.md", text: "third")
-    ).value!.data.artifact_id
-    old = declare_relation.call(relation_input(source:, target: first_target)).value!.data
-    declare_relation.call(
-      relation_input(
-        command_id: "cmd-relation-first-correction",
-        source:,
-        target: second_target,
-        supersedes: { relation_id: old.relation_id, reason: "first correction" }
+  it "allocates a new Artifact and Observation identity for every capture" do
+    first = capture.call(capture_input(command_id: "cmd-artifact-first"))
+    second = capture.call(capture_input(command_id: "cmd-artifact-second"))
+
+    expect([ first, second ]).to all(be_success)
+    expect(second.value!.data.artifact_id).not_to eq(first.value!.data.artifact_id)
+    expect(second.value!.data.observation_id).not_to eq(first.value!.data.observation_id)
+    expect(artifact_events(first.value!.data.artifact_id).length).to eq(8)
+    expect(artifact_events(second.value!.data.artifact_id).length).to eq(8)
+  end
+
+  it "updates one property with its expected stream revision" do
+    captured = capture.call(capture_input).value!.data
+    current_revision = artifact_events(captured.artifact_id).last.stream_revision
+
+    result = update.call(
+      update_input(
+        command_id: "cmd-artifact-title-update",
+        artifact_id: captured.artifact_id,
+        expected_revision: current_revision,
+        changes: { title: "Guide" }
       )
     )
 
-    redirected = declare_relation.call(
-      relation_input(
-        command_id: "cmd-relation-redirect",
-        source:,
-        target: third_target,
-        supersedes: { relation_id: old.relation_id, reason: "redirect" }
+    expect(result).to be_success
+    expect(result.value!.data).to have_attributes(
+      artifact_id: captured.artifact_id,
+      resulting_stream_revision: current_revision + 1,
+      changed_properties: [ "title" ],
+      outcome: "updated"
+    )
+    expect(artifact_events(captured.artifact_id).last).to have_attributes(
+      type: "DevelopmentArtifactTitleChanged",
+      stream_revision: current_revision + 1,
+      data: { "artifact_id" => captured.artifact_id, "title" => "Guide" }
+    )
+  end
+
+  it "updates multiple properties atomically and records each granular fact" do
+    captured = capture.call(capture_input).value!.data
+    current_revision = artifact_events(captured.artifact_id).last.stream_revision
+
+    result = update.call(
+      update_input(
+        command_id: "cmd-artifact-multi-update",
+        artifact_id: captured.artifact_id,
+        expected_revision: current_revision,
+        changes: { scope: "project:beta", title: "Guide", labels: %w[docs reviewed] }
       )
     )
-    unknown = declare_relation.call(
-      relation_input(
-        command_id: "cmd-relation-unknown",
-        source:,
-        target: third_target,
-        supersedes: {
-          relation_id: "018f0f4d-4e45-7abc-8def-000000000182",
-          reason: "unknown"
+
+    expect(result).to be_success
+    expect(result.value!.data.changed_properties).to contain_exactly("scope", "title", "labels")
+    new_events = artifact_events(captured.artifact_id).drop(current_revision + 1)
+    expect(new_events.map(&:type)).to eq(
+      %w[
+        DevelopmentArtifactScopeChanged
+        DevelopmentArtifactTitleChanged
+        DevelopmentArtifactLabelAdded
+        DevelopmentArtifactLabelRemoved
+      ]
+    )
+    expect(new_events.map(&:stream_revision)).to eq((current_revision + 1..current_revision + 4).to_a)
+  end
+
+  it "returns a no-op without appending facts" do
+    captured = capture.call(capture_input).value!.data
+    current_revision = artifact_events(captured.artifact_id).last.stream_revision
+
+    result = update.call(
+      update_input(
+        command_id: "cmd-artifact-no-op",
+        artifact_id: captured.artifact_id,
+        expected_revision: current_revision,
+        changes: { title: "README" }
+      )
+    )
+
+    expect(result).to be_success
+    expect(result.value!.data).to have_attributes(outcome: "existing", resulting_stream_revision: current_revision)
+    expect(artifact_events(captured.artifact_id).last.stream_revision).to eq(current_revision)
+    expect(result.value!.emitted_events).to be_empty
+  end
+
+  it "rejects a stale expected revision without partial writes" do
+    captured = capture.call(capture_input).value!.data
+    current_revision = artifact_events(captured.artifact_id).last.stream_revision
+
+    result = update.call(
+      update_input(
+        command_id: "cmd-artifact-stale-update",
+        artifact_id: captured.artifact_id,
+        expected_revision: current_revision - 1,
+        changes: { title: "Stale" }
+      )
+    )
+
+    expect(result).to be_failure
+    expect(result.failure).to have_attributes(
+      code: :development_artifact_revision_conflict,
+      details: {
+        artifact_id: captured.artifact_id,
+        expected_revision: current_revision - 1,
+        current_revision:
+      }
+    )
+    expect(artifact_events(captured.artifact_id).last.stream_revision).to eq(current_revision)
+  end
+
+  it "records a content metadata-only change as a ContentChanged fact" do
+    captured = capture.call(capture_input).value!.data
+    current_revision = artifact_events(captured.artifact_id).last.stream_revision
+
+    result = update.call(
+      update_input(
+        command_id: "cmd-artifact-media-type-update",
+        artifact_id: captured.artifact_id,
+        expected_revision: current_revision,
+        changes: {
+          content: { encoding: "utf-8", media_type: "text/plain", text: "hello\n" }
         }
       )
     )
 
-    expect(redirected.failure.code).to eq(:development_artifact_relation_already_superseded)
-    expect(unknown.failure.code).to eq(:development_artifact_relation_not_found)
-    expect(command_events("cmd-relation-redirect")).to be_empty
-    expect(command_events("cmd-relation-unknown")).to be_empty
-    expect(artifact_events(source).map(&:type).count("DevelopmentArtifactRelationDeclared")).to eq(2)
+    expect(result).to be_success
+    event = artifact_events(captured.artifact_id).last
+    expect(event).to have_attributes(type: "DevelopmentArtifactContentChanged")
+    expect(event.data).to eq("artifact_id" => captured.artifact_id, "content" => "hello\n")
+    expect(event.metadata).to include("media_type" => "text/plain", "byte_size" => 6)
   end
 
-  it "permits bounded cycles and converges concurrent duplicate declarations" do
-    first = capture.call(capture_input).value!.data.artifact_id
-    second = capture.call(
-      capture_input(command_id: "cmd-cycle-second", locator: "docs/second.md", text: "second")
-    ).value!.data.artifact_id
+  it "corrects classification through property facts, a correction fact, and links" do
+    captured = capture.call(capture_input).value!.data
 
-    forward = declare_relation.call(
-      relation_input(command_id: "cmd-cycle-forward", source: first, target: second, relation: "contains")
+    result = classification.call(
+      classification_input(
+        command_id: "cmd-artifact-classification",
+        observation_id: captured.observation_id,
+        expected_revision: 1,
+        title: "Guide",
+        labels: %w[docs reviewed]
+      )
     )
-    reverse = declare_relation.call(
-      relation_input(command_id: "cmd-cycle-reverse", source: second, target: first, relation: "contains")
-    )
-    concurrent = 2.times.map do |index|
-      Thread.new do
-        declare_relation.call(
-          relation_input(command_id: "cmd-race-#{index}", source: first, target: second)
-        )
-      end
-    end.map(&:value)
 
-    expect([ forward, reverse ]).to all(be_success)
-    expect(concurrent).to all(be_success)
-    expect(concurrent.map { _1.value!.data.outcome }).to contain_exactly("declared", "existing")
-    relation_ids = artifact_events(first).filter_map do |event|
-      event.data.dig("artifact_relation", "relation_id") if event.type == "DevelopmentArtifactRelationDeclared"
-    end
-    expect(relation_ids.uniq).to eq(relation_ids)
+    expect(result).to be_success
+    expect(result.value!.data).to have_attributes(
+      artifact_id: captured.artifact_id,
+      observation_id: captured.observation_id,
+      classification_revision: 2,
+      title: "Guide",
+      kind: "documentation",
+      labels: %w[docs reviewed],
+      outcome: "corrected"
+    )
+    expect(result.value!.emitted_events.map(&:type)).to eq(
+      %w[
+        DevelopmentArtifactTitleChanged
+        DevelopmentArtifactLabelAdded
+        DevelopmentArtifactLabelRemoved
+        DevelopmentArtifactClassificationCorrectionRecorded
+        DevelopmentArtifactObservationFactLinked
+        DevelopmentArtifactObservationFactLinked
+        DevelopmentArtifactObservationFactLinked
+      ]
+    )
+
+    artifact = artifact_events(captured.artifact_id)
+    expect(artifact.last(3).map(&:type)).to eq(
+      %w[
+        DevelopmentArtifactTitleChanged
+        DevelopmentArtifactLabelAdded
+        DevelopmentArtifactLabelRemoved
+      ]
+    )
+    correction = observation_events(captured.observation_id).fetch(9)
+    expect(correction).to have_attributes(
+      type: "DevelopmentArtifactClassificationCorrectionRecorded",
+      data: {
+        "artifact_id" => captured.artifact_id,
+        "observation_id" => captured.observation_id,
+        "classification_revision" => 2,
+        "reason" => "Improve imported classification"
+      }
+    )
+    expect(correction.metadata).to include(
+      "classifier" => "agent-1",
+      "policy_version" => "development-artifact-repository/v2"
+    )
+    links = observation_events(captured.observation_id).last(3)
+    expect(links.map { _1.data.dig("observed_fact", "event_id") }).to eq(artifact.last(3).map(&:id))
+    expect(links.map { _1.data.fetch("role") }).to eq(%w[title label label])
   end
 
-  it "separates active capacity from bounded lifetime history and lets supersession replace an active edge" do
-    source = capture.call(capture_input).value!.data.artifact_id
-    active = Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_ACTIVE_RELATION_MAXIMUM_COUNT.times.map do |index|
-      result = declare_relation.call(
-        relation_input(
-          command_id: "cmd-limit-#{index}",
-          source:,
-          target: "https://example.test/#{index}",
-          relation: "references",
-          target_kind: "external"
-        )
+  it "returns a classification no-op and rejects a stale classification revision" do
+    captured = capture.call(capture_input).value!.data
+    unchanged = classification.call(
+      classification_input(
+        command_id: "cmd-artifact-classification-no-op",
+        observation_id: captured.observation_id,
+        expected_revision: 1,
+        title: "README",
+        labels: %w[docs imported]
       )
-      expect(result).to be_success
-      result.value!.data
-    end
+    )
 
-    active_overflow = declare_relation.call(
+    expect(unchanged).to be_success
+    expect(unchanged.value!.data.outcome).to eq("existing")
+    expect(unchanged.value!.emitted_events).to be_empty
+
+    corrected = classification.call(
+      classification_input(
+        command_id: "cmd-artifact-classification-correct",
+        observation_id: captured.observation_id,
+        expected_revision: 1,
+        title: "Guide",
+        labels: %w[docs reviewed]
+      )
+    )
+    expect(corrected).to be_success
+
+    stale = classification.call(
+      classification_input(
+        command_id: "cmd-artifact-classification-stale",
+        observation_id: captured.observation_id,
+        expected_revision: 1,
+        title: "Another guide",
+        labels: %w[docs reviewed]
+      )
+    )
+    expect(stale).to be_failure
+    expect(stale.failure).to have_attributes(
+      code: :development_artifact_classification_revision_conflict,
+      details: {
+        observation_id: captured.observation_id,
+        expected_revision: 1,
+        current_revision: 2
+      }
+    )
+  end
+
+  it "declares and idempotently replays relations on independent relation streams" do
+    source = capture.call(capture_input(command_id: "cmd-relation-source")).value!.data
+    target = capture.call(capture_input(command_id: "cmd-relation-target", locator: "docs/target.md")).value!.data
+    input = relation_input(
+      command_id: "cmd-relation-declare",
+      source: source.artifact_id,
+      target: target.artifact_id,
+      attributes: { path: "docs/target.md" }
+    )
+
+    first = declare_relation.call(input)
+    replay = declare_relation.call(input.merge(command_id: "cmd-relation-replay"))
+
+    expect(first).to be_success
+    expect(first.value!.data).to have_attributes(outcome: "declared", relation: "references")
+    relation_id = first.value!.data.relation_id
+    expect(relation_events(relation_id).map(&:type)).to eq([ "DevelopmentArtifactRelationDeclared" ])
+    declaration = relation_events(relation_id).sole
+    expect(declaration.data).to include(
+      "relation_id" => relation_id,
+      "source_artifact_id" => source.artifact_id,
+      "relation" => "references",
+      "target_kind" => "artifact",
+      "target_id" => target.artifact_id,
+      "path" => "docs/target.md"
+    )
+    expect(artifact_events(source.artifact_id).map(&:type)).not_to include("DevelopmentArtifactRelationDeclared")
+
+    expect(replay).to be_success
+    expect(replay.value!.data).to have_attributes(relation_id:, outcome: "existing")
+    expect(replay.value!.emitted_events).to be_empty
+    expect(relation_events(relation_id).length).to eq(1)
+  end
+
+  it "supersedes a relation by appending to old and replacement relation streams" do
+    source = capture.call(capture_input(command_id: "cmd-supersession-source")).value!.data
+    first_target = capture.call(capture_input(command_id: "cmd-supersession-first", locator: "docs/first.md")).value!.data
+    second_target = capture.call(capture_input(command_id: "cmd-supersession-second", locator: "docs/second.md")).value!.data
+    old = declare_relation.call(
       relation_input(
-        command_id: "cmd-active-limit-overflow",
-        source:,
-        target: "https://example.test/active-overflow",
-        relation: "references",
-        target_kind: "external"
+        command_id: "cmd-relation-old",
+        source: source.artifact_id,
+        target: first_target.artifact_id,
+        attributes: { path: "docs/first.md" }
       )
-    )
-    expect(active_overflow.failure.code).to eq(:development_artifact_relation_limit_reached)
-    expect(active_overflow.failure.details).to include(
-      limit_kind: "active",
-      active_remaining: 0,
-      lifetime_remaining: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_RELATION_LIFETIME_MAXIMUM_COUNT -
-        Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_ACTIVE_RELATION_MAXIMUM_COUNT
-    )
+    ).value!.data
 
-    replacement = active.first
-    (
-      Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_RELATION_LIFETIME_MAXIMUM_COUNT -
-      Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_ACTIVE_RELATION_MAXIMUM_COUNT
-    ).times do |index|
-      result = declare_relation.call(
-        relation_input(
-          command_id: "cmd-lifetime-replacement-#{index}",
-          source:,
-          target: "https://example.test/replacement-#{index}",
-          relation: "references",
-          target_kind: "external",
-          supersedes: {
-            relation_id: replacement.relation_id,
-            reason: "replace active edge #{index}"
-          }
-        )
-      )
-      expect(result).to be_success
-      replacement = result.value!.data
-    end
-
-    lifetime_overflow = declare_relation.call(
+    replacement = declare_relation.call(
       relation_input(
-        command_id: "cmd-lifetime-limit-overflow",
-        source:,
-        target: "https://example.test/lifetime-overflow",
-        relation: "references",
-        target_kind: "external",
-        supersedes: {
-          relation_id: replacement.relation_id,
-          reason: "exceeds lifetime"
-        }
+        command_id: "cmd-relation-replacement",
+        source: source.artifact_id,
+        target: second_target.artifact_id,
+        attributes: { path: "docs/second.md" },
+        supersedes: { relation_id: old.relation_id, reason: "Target was replaced" }
       )
     )
 
-    expect(lifetime_overflow.failure.code).to eq(:development_artifact_relation_limit_reached)
-    expect(lifetime_overflow.failure.details).to include(
-      limit_kind: "lifetime",
-      active_remaining: 0,
-      lifetime_remaining: 0
+    expect(replacement).to be_success
+    new_relation_id = replacement.value!.data.relation_id
+    expect(relation_events(new_relation_id).map(&:type)).to eq([ "DevelopmentArtifactRelationDeclared" ])
+    expect(relation_events(old.relation_id).map(&:type)).to eq(
+      [ "DevelopmentArtifactRelationDeclared", "DevelopmentArtifactRelationSuperseded" ]
     )
-    expect(command_events("cmd-active-limit-overflow")).to be_empty
-    expect(command_events("cmd-lifetime-limit-overflow")).to be_empty
+    supersession = relation_events(old.relation_id).last
+    expect(supersession.data).to eq(
+      "relation_id" => old.relation_id,
+      "source_artifact_id" => source.artifact_id,
+      "replacement_relation_id" => new_relation_id,
+      "reason" => "Target was replaced"
+    )
+    expect(replacement.value!.emitted_events.map(&:type)).to eq(
+      [ "DevelopmentArtifactRelationDeclared", "DevelopmentArtifactRelationSuperseded" ]
+    )
   end
 
   def capture_input(
     command_id: "cmd-artifact-capture",
     locator: "docs/readme.md",
     revision: "abc123",
-    observed_at: "2026-08-25T16:00:00.000000Z",
+    observed_at: "2026-09-03T12:00:00.000000Z",
     text: "hello\n",
     **overrides
   )
@@ -393,27 +417,24 @@ RSpec.describe "Development Artifact write operations", :event_store do
       title: "README",
       kind: "documentation",
       labels: %w[docs imported],
-      content: {
-        encoding: "utf-8",
-        media_type: "text/markdown",
-        text:
-      },
+      content: { encoding: "utf-8", media_type: "text/markdown", text: },
       source: {
-        kind: "local_file",
-        locator:,
-        revision:,
-        observed_at:,
-        collector: "spec/v1"
+        kind: "local_file", locator:, revision:, observed_at:, collector: "spec/v1"
       }
     }.merge(overrides)
   end
 
-  def classification_input(
-    command_id: "cmd-classification-correct",
-    observation_id:,
-    expected_revision: 1,
-    title: "Other title"
-  )
+  def update_input(command_id:, artifact_id:, expected_revision:, changes:)
+    {
+      command_id:,
+      actor: { kind: "agent", id: "agent-1" },
+      artifact_id:,
+      expected_revision:,
+      changes:
+    }
+  end
+
+  def classification_input(command_id:, observation_id:, expected_revision:, title:, labels:)
     {
       command_id:,
       actor: { kind: "agent", id: "agent-1" },
@@ -421,26 +442,18 @@ RSpec.describe "Development Artifact write operations", :event_store do
       expected_revision:,
       title:,
       kind: "documentation",
-      labels: %w[docs imported],
-      reason: "Correct the observation title"
+      labels:,
+      reason: "Improve imported classification"
     }
   end
 
-  def relation_input(
-    command_id: "cmd-relation",
-    source:,
-    target:,
-    relation: "derived_from",
-    target_kind: "artifact",
-    attributes: {},
-    supersedes: nil
-  )
+  def relation_input(command_id:, source:, target:, attributes:, supersedes: nil)
     input = {
       command_id:,
       actor: { kind: "agent", id: "agent-1" },
       source_artifact_id: source,
-      relation:,
-      target: { kind: target_kind, id: target },
+      relation: "references",
+      target: { kind: "artifact", id: target },
       attributes:
     }
     input[:supersedes] = supersedes if supersedes
@@ -450,18 +463,42 @@ RSpec.describe "Development Artifact write operations", :event_store do
   def artifact_events(artifact_id)
     event_store.read(
       streams.development_artifact(artifact_id),
-      Coordinator::Write::EventQueries::DEVELOPMENT_ARTIFACT_HISTORY
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[
+          DevelopmentArtifactCreated DevelopmentArtifactScopeChanged DevelopmentArtifactTitleChanged
+          DevelopmentArtifactKindChanged DevelopmentArtifactLabelAdded DevelopmentArtifactLabelRemoved
+          DevelopmentArtifactSourceChanged DevelopmentArtifactContentChanged DevelopmentArtifactCaptured
+          DevelopmentArtifactRelationDeclared DevelopmentArtifactRelationSuperseded
+        ],
+        maximum_count: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_HISTORY_MAXIMUM_COUNT,
+        direction: :asc
+      )
     )
   end
 
   def observation_events(observation_id)
     event_store.read(
       streams.development_artifact_observation(observation_id),
-      Coordinator::Write::EventQueries::DEVELOPMENT_ARTIFACT_OBSERVATION_HISTORY
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[
+          DevelopmentArtifactObservationRecorded DevelopmentArtifactObservationFactLinked
+          DevelopmentArtifactClassificationCorrectionRecorded DevelopmentArtifactObserved
+          DevelopmentArtifactClassificationCorrected
+        ],
+        maximum_count: 128,
+        direction: :asc
+      )
     )
   end
 
-  def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
+  def relation_events(relation_id)
+    event_store.read(
+      streams.development_artifact_relation(relation_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[DevelopmentArtifactRelationDeclared DevelopmentArtifactRelationSuperseded],
+        maximum_count: 2,
+        direction: :asc
+      )
+    )
   end
 end

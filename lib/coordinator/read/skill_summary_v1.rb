@@ -2,7 +2,7 @@
 
 module Coordinator::Read
   class SkillSummaryV1 < Value
-    attribute :skill_id, Types::SkillId
+    attribute :skill_id, ProjectedSkillId
     attribute :name, Types::SkillName
     attribute :scope, Types::SkillScope
     attribute :revision, Types::SkillRevision

@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class SkillAssetExecutabilityDefinedV1 < Base
+        def asset_id: () -> String
+        def executable: () -> bool
+      end
+    end
+  end
+end

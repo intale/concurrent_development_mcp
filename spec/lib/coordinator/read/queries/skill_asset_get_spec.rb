@@ -42,24 +42,14 @@ RSpec.describe Coordinator::Read::Queries::SkillAssetGet, :read_model do
     expect(missing).to have_attributes(status: "not_found")
   end
 
-  it "pins asset content to the requested historical revision" do
+  it "does not serve asset content from an obsolete revision slice" do
     skill = create(
       :coordinator_read_skill,
       name: "binary-helper",
       scope: "project:alpha",
       revision: 2
     )
-    create(:coordinator_read_skill_revision, skill:, revision: 1, asset_count: 1)
     create(:coordinator_read_skill_revision, skill:, revision: 2, asset_count: 1)
-    create(
-      :coordinator_read_skill_asset,
-      :binary,
-      skill:,
-      revision: 1,
-      path: "fixtures/input.bin",
-      content_base64: "b25l",
-      byte_size: 3
-    )
     create(
       :coordinator_read_skill_asset,
       :binary,
@@ -70,14 +60,20 @@ RSpec.describe Coordinator::Read::Queries::SkillAssetGet, :read_model do
       byte_size: 3
     )
 
-    historical = query.call(
+    latest = query.call(
+      name: "binary-helper",
+      scope: "project:alpha",
+      path: "fixtures/input.bin"
+    ).value!
+    obsolete = query.call(
       name: "binary-helper",
       scope: "project:alpha",
       path: "fixtures/input.bin",
       revision: 1
     ).value!
 
-    expect(historical).to have_attributes(status: "ok")
-    expect(historical.data.asset).to have_attributes(revision: 1, base64: "b25l")
+    expect(latest).to have_attributes(status: "ok")
+    expect(latest.data.asset).to have_attributes(revision: 2, base64: "dHdv")
+    expect(obsolete).to have_attributes(status: "not_found")
   end
 end

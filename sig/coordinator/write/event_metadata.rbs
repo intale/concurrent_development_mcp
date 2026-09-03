@@ -4,6 +4,7 @@ module Coordinator
       def command_id: () -> String
       def actor_kind: () -> String
       def actor_id: () -> String
+      def actor_authenticated: () -> bool
       def recorded_by: () -> String
       def policy_version: () -> String?
     end

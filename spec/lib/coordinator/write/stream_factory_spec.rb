@@ -16,5 +16,14 @@ RSpec.describe Coordinator::Write::StreamFactory do
     expect(factory.attempt("A-1").to_h).to eq(
       context: "DevelopmentExecution", stream_name: "Attempt", stream_id: "A-1"
     )
+    expect(factory.skill_revision("revision-1").to_h).to eq(
+      context: "AgentKnowledge", stream_name: "SkillRevision", stream_id: "revision-1"
+    )
+    expect(factory.skill_asset("asset-1").to_h).to eq(
+      context: "AgentKnowledge", stream_name: "SkillAsset", stream_id: "asset-1"
+    )
+    expect(factory.development_artifact_relation("relation-1").to_h).to eq(
+      context: "DevelopmentMemory", stream_name: "DevelopmentArtifactRelation", stream_id: "relation-1"
+    )
   end
 end

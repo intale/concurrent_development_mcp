@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 RSpec.describe Coordinator::Read::Subscriptions::Repositories do
-  it "uses one unique read-model tuple and the exact Repository event filter" do
+  it "uses one unique read-model tuple and the complete Repository event filter" do
     definition = described_class::DEFINITION
 
     expect(definition.identity.to_h).to eq(
@@ -11,7 +11,14 @@ RSpec.describe Coordinator::Read::Subscriptions::Repositories do
     expect(definition.options).to eq(
       filter: {
         streams: [ { context: "DevelopmentPlanning", stream_name: "Repository" } ],
-        event_types: [ "RepositoryRegistered" ]
+        event_types: %w[
+          RepositoryRegistered
+          RepositoryDisplayNameChanged
+          RepositoryPathAdded
+          RepositoryPathRemoved
+          RepositoryRemoteAdded
+          RepositoryRemoteRemoved
+        ]
       }
     )
   end

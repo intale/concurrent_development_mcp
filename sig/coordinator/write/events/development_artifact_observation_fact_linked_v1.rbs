@@ -1,0 +1,8 @@
+module Coordinator::Write::Events
+  class DevelopmentArtifactObservationFactLinkedV1 < Base
+    def observation_id: () -> String
+    def artifact_id: () -> String
+    def role: () -> String
+    def observed_fact: () -> Coordinator::Write::EventReference
+  end
+end

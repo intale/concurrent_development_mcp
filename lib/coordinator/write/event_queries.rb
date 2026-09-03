@@ -150,10 +150,13 @@ module Coordinator::Write
 
     DEVELOPMENT_ARTIFACT_OBSERVATION_HISTORY = EventReadCriteria.new(
       event_types: [
+        "DevelopmentArtifactObservationRecorded",
+        "DevelopmentArtifactObservationFactLinked",
+        "DevelopmentArtifactClassificationCorrectionRecorded",
         "DevelopmentArtifactObserved",
         "DevelopmentArtifactClassificationCorrected"
       ],
-      maximum_count: Types::DEVELOPMENT_ARTIFACT_CLASSIFICATION_MAXIMUM_REVISIONS,
+      maximum_count: Types::DEVELOPMENT_ARTIFACT_OBSERVATION_HISTORY_MAXIMUM_COUNT,
       direction: :asc
     )
 

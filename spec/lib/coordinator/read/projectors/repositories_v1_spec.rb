@@ -49,6 +49,39 @@ RSpec.describe Coordinator::Read::Projectors::RepositoriesV1, :read_model do
     expect(processed_events).to be_empty
   end
 
+  it "folds RepositoryRegistered@2 and its cohesive property facts" do
+    events = [
+      registration_event_v2(revision: 0, position: 100),
+      property_event(
+        Coordinator::Write::Events::RepositoryDisplayNameChangedV1.new(
+          repository_id:, display_name: "Alpha"
+        ), revision: 1, position: 101
+      ),
+      property_event(
+        Coordinator::Write::Events::RepositoryPathAddedV1.new(
+          repository_id:, path: "/client/alpha"
+        ), revision: 2, position: 102
+      ),
+      property_event(
+        Coordinator::Write::Events::RepositoryRemoteAddedV1.new(
+          repository_id:, remote: "https://example.test/alpha.git"
+        ), revision: 3, position: 103
+      )
+    ]
+
+    events.each { projector.call(_1) }
+    item = catalog.page(query).items.sole
+
+    expect(item).to have_attributes(
+      repository_id:,
+      scope: "project:alpha",
+      display_name: "Alpha",
+      paths: [ "/client/alpha" ],
+      remotes: [ "https://example.test/alpha.git" ]
+    )
+    expect(Coordinator::Read::Repository.find(repository_id).updated_at).to eq(events.last.created_at)
+  end
+
   def registration_event(stream: Coordinator::Write::StreamFactory.new.repository(repository_id))
     payload = Coordinator::Write::Events::RepositoryRegisteredV1.new(
       repository_id:,
@@ -67,6 +100,27 @@ RSpec.describe Coordinator::Read::Projectors::RepositoriesV1, :read_model do
       policy_version: "repository-registration/v1",
       actor_id: "agent-repository",
       markers: [ "repository:#{repository_id}", repository_key_marker ]
+    )
+  end
+
+  def registration_event_v2(revision:, position:)
+    payload = Coordinator::Write::Events::RepositoryRegisteredV2.new(
+      repository_id:, scope: "project:alpha", repository_key: "alpha"
+    )
+    ProjectionEventFactory.build(
+      payload:, stream: Coordinator::Write::StreamFactory.new.repository(repository_id),
+      stream_revision: revision, global_position: position,
+      policy_version: "repository-registration/v1", actor_id: "agent-repository",
+      markers: [ "repository:#{repository_id}", repository_key_marker ]
+    )
+  end
+
+  def property_event(payload, revision:, position:)
+    ProjectionEventFactory.build(
+      payload:, stream: Coordinator::Write::StreamFactory.new.repository(repository_id),
+      stream_revision: revision, global_position: position,
+      policy_version: "repository-registration/v1", actor_id: "agent-repository",
+      markers: [ "repository:#{repository_id}" ]
     )
   end
 

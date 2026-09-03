@@ -38,6 +38,7 @@ module Coordinator
                                 Commands::CompleteCompensatedReleaseSet |
                                 Commands::PublishSkillRevision |
                                 Commands::CaptureDevelopmentArtifact |
+                                Commands::UpdateDevelopmentArtifact |
                                 Commands::CorrectDevelopmentArtifactClassification |
                                 Commands::DeclareDevelopmentArtifactRelation |
                                 Commands::CreateOperationBatch |

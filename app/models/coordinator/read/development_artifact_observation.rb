@@ -9,5 +9,11 @@ module Coordinator::Read
                foreign_key: "artifact_id",
                inverse_of: :observations,
                optional: true
+
+    has_many :fact_links,
+             class_name: "Coordinator::Read::DevelopmentArtifactObservationFactLink",
+             foreign_key: "observation_id",
+             inverse_of: :observation,
+             dependent: :delete_all
   end
 end

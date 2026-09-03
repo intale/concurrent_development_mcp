@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Domain
+      module DevelopmentArtifacts
+        class Update
+          def initialize: (?stream_factory: StreamFactory) -> void
+          def call: (artifact_id: String, changes: Write::DevelopmentArtifacts::UpdateChangesV1, state: State) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

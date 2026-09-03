@@ -1,0 +1,8 @@
+module Coordinator::Write::Events
+  class DevelopmentArtifactRelationSupersededV2 < Base
+    def relation_id: () -> String
+    def source_artifact_id: () -> String
+    def replacement_relation_id: () -> String?
+    def reason: () -> String
+  end
+end

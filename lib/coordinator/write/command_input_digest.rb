@@ -19,6 +19,7 @@ module Coordinator::Write
       case command
       when Commands::PublishSkillRevision then skill_publish_canonical_document(command)
       when Commands::CaptureDevelopmentArtifact then development_artifact_capture_canonical_document(command)
+      when Commands::UpdateDevelopmentArtifact then development_artifact_update_document(command)
       when Commands::DeclareDevelopmentArtifactRelation
         development_artifact_relation_declare_canonical_document(command)
       else
@@ -113,6 +114,7 @@ module Coordinator::Write
       when Commands::CompleteCompensatedReleaseSet then release_compensation_complete_document(command)
       when Commands::PublishSkillRevision then skill_publish_document(command)
       when Commands::CaptureDevelopmentArtifact then development_artifact_capture_document(command)
+      when Commands::UpdateDevelopmentArtifact then development_artifact_update_document(command)
       when Commands::CorrectDevelopmentArtifactClassification
         development_artifact_classification_correct_document(command)
       when Commands::DeclareDevelopmentArtifactRelation then development_artifact_relation_declare_document(command)
@@ -911,6 +913,38 @@ module Coordinator::Write
               revision: artifact.source.revision,
               observed_at: artifact.source.observed_at,
               collector: artifact.source.collector
+            )
+          )
+        )
+      )
+    end
+
+    def development_artifact_update(command)
+      @canonical_json.sha256(development_artifact_update_document(command).to_h)
+    end
+
+    def development_artifact_update_document(command)
+      changes = command.changes
+      CommandInputDocuments::UpdateDevelopmentArtifactV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "development_artifact_update",
+        input: CommandInputDocuments::UpdateDevelopmentArtifactInputV1.new(
+          actor: actor_document(command.actor),
+          artifact_id: command.artifact_id,
+          expected_revision: command.expected_revision,
+          changes: CommandInputDocuments::UpdateDevelopmentArtifactChangesV1.new(
+            scope: changes.scope,
+            title: changes.title,
+            kind: changes.kind,
+            labels: changes.labels,
+            content: changes.content,
+            source: changes.source && CommandInputDocuments::DevelopmentArtifactSourceV1.new(
+              kind: changes.source.kind,
+              locator: changes.source.locator,
+              revision: changes.source.revision,
+              observed_at: changes.source.observed_at,
+              collector: changes.source.collector
             )
           )
         )

@@ -117,7 +117,11 @@ module McpAcceptanceWorld
     )
     state = task_request("tasks/get", task_id, client_id:)
     result = state.dig("result", "result")
-    assert_acceptance_equal("completed", state.dig("result", "status"), "Resource resolution Task")
+    task_status = state.dig("result", "status")
+    assert_acceptance(
+      task_status == "completed",
+      "Resource resolution Task expected completed, got #{task_status.inspect}: #{state.inspect}"
+    )
     assert_acceptance_equal(false, result&.fetch("isError"), "Resource resolution error")
     resource_id = result.dig("structuredContent", "data", "resource_id")
     assert_acceptance(

@@ -8,11 +8,13 @@ module Coordinator::Read
       def initialize(
         contract: Contracts::DevelopmentArtifactSourceEvent.new,
         schema_registry: Coordinator::Write::EventSchemaRegistry.new,
+        event_store: nil,
         artifacts: Repositories::DevelopmentArtifacts.new,
         processed_events: Repositories::ProcessedProjectionEvents.new
       )
         @contract = contract
         @schema_registry = schema_registry
+        @event_store = event_store
         @artifacts = artifacts
         @processed_events = processed_events
       end
@@ -66,14 +68,31 @@ module Coordinator::Read
           case domain_event
           when Coordinator::Write::Events::DevelopmentArtifactCapturedV2
             domain_event.artifact.artifact_id
+          when Coordinator::Write::Events::DevelopmentArtifactCreatedV1,
+               Coordinator::Write::Events::DevelopmentArtifactScopeChangedV1,
+               Coordinator::Write::Events::DevelopmentArtifactTitleChangedV1,
+               Coordinator::Write::Events::DevelopmentArtifactKindChangedV1,
+               Coordinator::Write::Events::DevelopmentArtifactLabelAddedV1,
+               Coordinator::Write::Events::DevelopmentArtifactLabelRemovedV1,
+               Coordinator::Write::Events::DevelopmentArtifactSourceChangedV1,
+               Coordinator::Write::Events::DevelopmentArtifactContentChangedV1
+            domain_event.artifact_id
           when Coordinator::Write::Events::DevelopmentArtifactObservedV1
             domain_event.observation.observation_id
           when Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectedV1
+            domain_event.observation_id
+          when Coordinator::Write::Events::DevelopmentArtifactObservationRecordedV1,
+               Coordinator::Write::Events::DevelopmentArtifactObservationFactLinkedV1,
+               Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectionRecordedV1
             domain_event.observation_id
           when Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV1
             domain_event.artifact_relation.source_artifact_id
           when Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV1
             domain_event.source_artifact_id
+          when Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV2
+            domain_event.relation_id
+          when Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV2
+            domain_event.relation_id
           end
         return if event.stream.stream_id == artifact_id
 
@@ -82,19 +101,73 @@ module Coordinator::Read
 
       def project(event, domain_event)
         case domain_event
-        when Coordinator::Write::Events::DevelopmentArtifactCapturedV2
-          @artifacts.store_capture(event:, capture: domain_event)
-        when Coordinator::Write::Events::DevelopmentArtifactObservedV1
-          @artifacts.store_observation(event:, observed: domain_event)
+          when Coordinator::Write::Events::DevelopmentArtifactCapturedV2
+            @artifacts.store_capture(event:, capture: domain_event)
+          when Coordinator::Write::Events::DevelopmentArtifactCreatedV1
+            @artifacts.store_created(event:, created: domain_event)
+          when Coordinator::Write::Events::DevelopmentArtifactScopeChangedV1,
+               Coordinator::Write::Events::DevelopmentArtifactTitleChangedV1,
+               Coordinator::Write::Events::DevelopmentArtifactKindChangedV1,
+               Coordinator::Write::Events::DevelopmentArtifactLabelAddedV1,
+               Coordinator::Write::Events::DevelopmentArtifactLabelRemovedV1,
+               Coordinator::Write::Events::DevelopmentArtifactSourceChangedV1,
+               Coordinator::Write::Events::DevelopmentArtifactContentChangedV1
+            @artifacts.store_property(event:, fact: domain_event)
+          when Coordinator::Write::Events::DevelopmentArtifactObservedV1
+            @artifacts.store_observation(event:, observed: domain_event)
+          when Coordinator::Write::Events::DevelopmentArtifactObservationRecordedV1
+            @artifacts.store_observation_recorded(event:, recorded: domain_event)
+          when Coordinator::Write::Events::DevelopmentArtifactObservationFactLinkedV1
+            fact_event, fact = resolve_observed_fact(domain_event)
+            @artifacts.store_observation_fact_link(
+              event:,
+              link: domain_event,
+              observed_fact_event: fact_event,
+              observed_fact: fact
+            )
+          when Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectionRecordedV1
+            @artifacts.store_classification_recorded(event:, correction: domain_event)
         when Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectedV1
           @artifacts.store_classification(event:, correction: domain_event)
         when Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV1
           @artifacts.store_relation(event:, declaration: domain_event)
-        when Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV1
-          @artifacts.store_supersession(event:, supersession: domain_event)
+          when Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV1
+            @artifacts.store_supersession(event:, supersession: domain_event)
+          when Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV2
+            @artifacts.store_relation_v2(event:, declaration: domain_event)
+          when Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV2
+            @artifacts.store_supersession_v2(event:, supersession: domain_event)
         else
           raise InvalidProjectionSource, "Unsupported Artifact event #{domain_event.class.name}"
         end
+      end
+
+      def resolve_observed_fact(link)
+        raise InvalidProjectionSource, "Observation fact resolver is not configured" unless @event_store
+
+        reference = link.observed_fact
+        fact_event = @event_store.read_at(
+          Coordinator::Write::StreamReference.new(
+            context: reference.stream_context,
+            stream_name: reference.stream_name,
+            stream_id: reference.stream_id
+          ),
+          reference.stream_revision
+        )
+        unless fact_event &&
+               fact_event.id == reference.event_id &&
+               fact_event.type == reference.type &&
+               fact_event.stream.stream_id == reference.stream_id &&
+               fact_event.stream_revision == reference.stream_revision
+          raise InvalidProjectionSource, "Observation fact reference could not be resolved"
+        end
+
+        fact = @schema_registry.load(
+          type: fact_event.type,
+          schema_version: fact_event.metadata.fetch("schema_version"),
+          data: fact_event.data
+        )
+        [ fact_event, fact ]
       end
     end
   end

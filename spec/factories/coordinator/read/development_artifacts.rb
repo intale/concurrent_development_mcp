@@ -33,6 +33,7 @@ FactoryBot.define do
     captured_markers { [ "development-artifact:#{artifact_id}" ] }
     captured_metadata { { "schema_version" => 2 } }
     sequence(:captured_global_position, 800)
+    stream_revision { 0 }
     captured_at_domain { Time.utc(2026, 8, 30, 12) }
     captured_at_store { Time.utc(2026, 8, 30, 12, 0, 1) }
 
@@ -59,6 +60,12 @@ FactoryBot.define do
     source_revision { artifact.source_revision }
     source_observed_at { artifact.source_observed_at }
     source_collector { artifact.source_collector }
+    content_encoding { artifact.content_encoding }
+    content_media_type { artifact.content_media_type }
+    content_text { artifact.content_text }
+    content_base64 { artifact.content_base64 }
+    content_sha256 { artifact.content_sha256 }
+    content_byte_size { artifact.content_byte_size }
     classification_revision { 1 }
     classification_reason { nil }
     observed_event do
@@ -85,6 +92,46 @@ FactoryBot.define do
     classified_at_domain { observed_at_domain }
     classified_at_store { observed_at_store }
     current_global_position { [ observed_global_position, classified_global_position ].compact.max }
+    sequence(:observed_sequence, 1)
+  end
+
+  factory :coordinator_read_development_artifact_observation_fact_link,
+          class: "Coordinator::Read::DevelopmentArtifactObservationFactLink" do
+    association :observation, factory: :coordinator_read_development_artifact_observation
+    link_event_id { SecureRandom.uuid_v7 }
+    observation_id { observation.observation_id }
+    artifact_id { observation.artifact_id }
+    role { "artifact-property" }
+    link_event do
+      {
+        "event_id" => link_event_id,
+        "type" => "DevelopmentArtifactObservationFactLinked",
+        "stream_context" => "DevelopmentMemory",
+        "stream_name" => "DevelopmentArtifactObservation",
+        "stream_id" => observation_id,
+        "stream_revision" => 1
+      }
+    end
+    link_actor { { "kind" => "agent", "id" => "factory-agent", "authenticated" => false } }
+    link_markers { [ "development-artifact-observation:#{observation_id}" ] }
+    link_metadata { { "schema_version" => 1 } }
+    link_global_position { 950 }
+    link_at_domain { Time.utc(2026, 8, 30, 12, 1, 1) }
+    link_at_store { Time.utc(2026, 8, 30, 12, 1, 2) }
+    observed_fact_event do
+      {
+        "event_id" => SecureRandom.uuid_v7,
+        "type" => "DevelopmentArtifactTitleChanged",
+        "stream_context" => "DevelopmentMemory",
+        "stream_name" => "DevelopmentArtifact",
+        "stream_id" => artifact_id,
+        "stream_revision" => 1
+      }
+    end
+    observed_fact_event_id { observed_fact_event.fetch("event_id") }
+    observed_fact_data { { "artifact_id" => artifact_id, "title" => "Factory artifact" } }
+    observed_fact_metadata { { "schema_version" => 1 } }
+    observed_fact_created_at { Time.utc(2026, 8, 30, 12, 1) }
   end
 
   factory :coordinator_read_development_artifact_relation,

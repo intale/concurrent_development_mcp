@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module Domain
+      module DevelopmentArtifacts
+        class RelationStateV2 < Shared::Value
+          def declaration: () -> Events::DevelopmentArtifactRelationDeclaredV2?
+          def supersession: () -> Events::DevelopmentArtifactRelationSupersededV2?
+          def self.initial: () -> RelationStateV2
+          def self.reduce: (Array[Events::Base]) -> RelationStateV2
+          def active?: () -> bool
+        end
+      end
+    end
+  end
+end

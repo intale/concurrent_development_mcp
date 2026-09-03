@@ -6,6 +6,85 @@ RSpec.describe Coordinator::Read::Projectors::DevelopmentArtifactsV1, :read_mode
   let(:repository) { Coordinator::Read::Repositories::DevelopmentArtifacts.new }
   let(:correlation_id) { SecureRandom.uuid_v7 }
 
+  it "keeps event attribution while a granular observation is still incomplete" do
+    observation_id = SecureRandom.uuid_v7
+    event = observation_stream_event(
+      Coordinator::Write::Events::DevelopmentArtifactObservationRecordedV1.new(observation_id:),
+      observation_id:,
+      revision: 0,
+      position: 9
+    )
+
+    projector.call(event)
+
+    expect(Coordinator::Read::DevelopmentArtifactObservation.find(observation_id)).to have_attributes(
+      observed_actor: {
+        "kind" => "agent",
+        "id" => "agent-projector",
+        "authenticated" => false
+      },
+      observed_event: include("event_id" => event.id),
+      observed_at_domain: event.created_at
+    )
+  end
+
+  it "derives v2 relation target status from the target kind" do
+    source_id = SecureRandom.uuid_v7
+    artifact_relation_id = SecureRandom.uuid_v7
+    external_relation_id = SecureRandom.uuid_v7
+    stream_factory = Coordinator::Write::StreamFactory.new
+    artifact_relation = Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV2.new(
+      relation_id: artifact_relation_id,
+      source_artifact_id: source_id,
+      relation: "references",
+      target_kind: "artifact",
+      target_id: SecureRandom.uuid_v7,
+      path: nil,
+      fragment: nil,
+      normalized_locator: nil
+    )
+    external_relation = Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV2.new(
+      relation_id: external_relation_id,
+      source_artifact_id: source_id,
+      relation: "references",
+      target_kind: "external",
+      target_id: "https://example.test/resource",
+      path: nil,
+      fragment: nil,
+      normalized_locator: nil
+    )
+
+    projector.call(
+      ProjectionEventFactory.build(
+        payload: artifact_relation,
+        stream: stream_factory.development_artifact_relation(artifact_relation_id),
+        stream_revision: 0,
+        global_position: 10,
+        policy_version: "development-artifact-repository/v2"
+      )
+    )
+    projector.call(
+      ProjectionEventFactory.build(
+        payload: external_relation,
+        stream: stream_factory.development_artifact_relation(external_relation_id),
+        stream_revision: 0,
+        global_position: 11,
+        policy_version: "development-artifact-repository/v2"
+      )
+    )
+
+    expect(Coordinator::Read::DevelopmentArtifactRelation.find(artifact_relation_id)).to have_attributes(
+      target_status: "verified",
+      target_name: nil,
+      target_scope: nil
+    )
+    expect(Coordinator::Read::DevelopmentArtifactRelation.find(external_relation_id)).to have_attributes(
+      target_status: "unverified",
+      target_name: nil,
+      target_scope: nil
+    )
+  end
+
   it "projects capture and delayed relation delivery idempotently with exact source evidence" do
     source, observation = build_artifact(locator: "evidence.md", text: "evidence\n")
     target, = build_artifact(locator: "target.bin", binary: true)

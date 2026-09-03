@@ -16,7 +16,8 @@ Then("the endpoint assigns project discovery to the agent without assuming paths
     @migration_tools.select do |tool|
       %w[
         skill_publish skill_publish_batch development_artifact_capture
-        development_artifact_capture_batch development_artifact_relation_declare
+        development_artifact_capture_batch development_artifact_update
+        development_artifact_relation_declare
         development_artifact_relation_declare_batch
       ].include?(tool.fetch("name"))
     end
@@ -28,6 +29,7 @@ end
 
 Then("the import-capable schemas require exact content and caller-owned provenance") do
   artifact = @migration_tools.find { _1.fetch("name") == "development_artifact_capture" }
+  artifact_update = @migration_tools.find { _1.fetch("name") == "development_artifact_update" }
   skill = @migration_tools.find { _1.fetch("name") == "skill_publish" }
   artifact_schema = artifact.fetch("inputSchema")
 
@@ -44,6 +46,16 @@ Then("the import-capable schemas require exact content and caller-owned provenan
       "server never dereferences it"
     ),
     "Caller-owned locator"
+  )
+  update_schema = artifact_update.fetch("inputSchema")
+  assert_acceptance(
+    Regexp.new(update_schema.dig("properties", "artifact_id", "pattern")).match?(SecureRandom.uuid_v7),
+    "Stable Artifact UUIDv7 identity"
+  )
+  assert_acceptance_equal(
+    %w[content kind labels scope source title],
+    update_schema.dig("properties", "changes", "properties").keys.sort,
+    "Mutable Artifact properties"
   )
   assert_acceptance(
     skill.dig("inputSchema", "properties", "assets", "description").include?("Complete passive asset snapshot"),
@@ -85,10 +97,14 @@ When("the agent captures documentation and web-search Development Artifacts") do
   ]
 end
 
-Then("both Artifact Tasks complete with different immutable IDs") do
+Then("both Artifact Tasks complete with different stable UUIDv7 IDs") do
   assert_acceptance(@artifact_outcomes.all? { _1.fetch("status") == "ok" }, "Capture outcomes")
   @artifact_ids = @artifact_outcomes.map { _1.dig("data", "artifact_id") }
   assert_acceptance_equal(2, @artifact_ids.uniq.length, "Artifact identities")
+  assert_acceptance(
+    @artifact_ids.all? { Coordinator::Shared::Types::UUID_V7_PATTERN.match?(_1) },
+    "Artifact identities must be UUIDv7"
+  )
 end
 
 When("the Development Artifact facts reach the read side") do
@@ -96,10 +112,14 @@ When("the Development Artifact facts reach the read side") do
 end
 
 Then("listing the shared evidence labels returns both Artifacts") do
-  page = call_tool(
-    "development_artifact_list",
-    { scope: "project:acceptance", labels: %w[evidence imported], limit: 20 }
-  ).dig("result", "structuredContent", "data", "page")
+  page = await_read_model("Both exactly labelled Artifacts to become discoverable") do
+    observed = call_tool(
+      "development_artifact_list",
+      { scope: "project:acceptance", labels: %w[evidence imported], limit: 20 }
+    ).dig("result", "structuredContent", "data", "page")
+    ids = observed.fetch("items").map { _1.fetch("artifact_id") }.sort
+    [ ids == @artifact_ids.sort, observed ]
+  end
   assert_acceptance_equal(
     @artifact_ids.sort,
     page.fetch("items").map { _1.fetch("artifact_id") }.sort,
@@ -141,81 +161,122 @@ When("the external-reference Artifact fact reaches the read side") do
 end
 
 Then("its persisted and projected content is exactly the URL followed by one newline") do
-  event_content = artifact_events(@external_reference_id).sole.data.dig("artifact", "content")
+  event = artifact_events(@external_reference_id).find do |candidate|
+    candidate.type == "DevelopmentArtifactContentChanged"
+  end
+  assert_acceptance(event, "External-reference content fact")
   projected = artifact_content(@external_reference_id).dig("data", "content")
   expected = "#{@external_reference_url}\n"
-  assert_acceptance_equal(expected, event_content.fetch("text"), "Persisted reference")
+  assert_acceptance_equal(
+    { "artifact_id" => @external_reference_id, "content" => expected },
+    event.data,
+    "Persisted reference fact"
+  )
   assert_acceptance_equal(expected, projected.fetch("text"), "Projected reference")
 end
 
 Then("the external-reference content contains no binary or fetched representation") do
-  event_content = artifact_events(@external_reference_id).sole.data.dig("artifact", "content")
+  event = artifact_events(@external_reference_id).find do |candidate|
+    candidate.type == "DevelopmentArtifactContentChanged"
+  end
   projected = artifact_content(@external_reference_id).dig("data", "content")
-  assert_acceptance(!event_content.key?("base64"), "Reference event exposed Base64")
+  assert_acceptance_equal("utf-8", event.metadata.fetch("encoding"), "Reference event encoding")
+  assert_acceptance(!event.data.key?("base64"), "Reference event exposed Base64")
   assert_acceptance(!projected.key?("base64"), "Reference query exposed Base64")
   assert_acceptance_equal("text/uri-list", projected.fetch("media_type"), "Reference media type")
 end
 
-When("the agent captures two binary profile versions from distinct source locations") do
+Given("the agent has captured and projected a binary profile") do
   @profile_contents = [ "\x00\x01".b, "\x00\x02".b ]
-  @profile_outcomes = @profile_contents.each_with_index.map do |bytes, index|
-    capture_artifact_task(
-      command_id: "cmd-cuc-profile-#{index}",
-      title: "Profile #{index}",
-      kind: "performance_profile",
-      labels: %w[profile binary],
-      locator: "tmp/profile-#{index}.dump",
-      source_kind: "local_file",
+  capture = capture_artifact_task(
+    command_id: "cmd-cuc-profile-capture",
+    title: "Runtime profile",
+    kind: "performance_profile",
+    labels: %w[profile binary],
+    locator: "tmp/profile.dump",
+    source_kind: "local_file",
+    revision: "profile-a",
+    content: {
+      encoding: "binary",
+      media_type: "application/octet-stream",
+      base64: [ @profile_contents.first ].pack("m0")
+    }
+  )
+  assert_acceptance_equal("ok", capture.fetch("status"), "Binary capture Task")
+  @profile_id = capture.dig("data", "artifact_id")
+  projected = project_artifact(@profile_id)
+  @profile_initial_revision = projected.dig("data", "artifact", "artifact", "stream_revision")
+end
+
+When("the agent updates its binary content and provenance through MCP") do
+  @profile_update = update_artifact_task(
+    command_id: "cmd-cuc-profile-update",
+    artifact_id: @profile_id,
+    expected_revision: @profile_initial_revision,
+    changes: {
       content: {
         encoding: "binary",
         media_type: "application/octet-stream",
-        base64: [ bytes ].pack("m0")
+        base64: [ @profile_contents.last ].pack("m0")
+      },
+      source: {
+        kind: "local_file",
+        locator: "tmp/profile.dump",
+        revision: "profile-b",
+        observed_at: "2026-08-25T16:30:00.000000Z",
+        collector: "cucumber/v2"
       }
-    )
+    }
+  )
+end
+
+Then("the update Task keeps its stable UUIDv7 Artifact ID") do
+  assert_acceptance_equal("ok", @profile_update.fetch("status"), "Binary update Task")
+  assert_acceptance_equal(@profile_id, @profile_update.dig("data", "artifact_id"), "Stable Artifact identity")
+  assert_acceptance(
+    Coordinator::Shared::Types::UUID_V7_PATTERN.match?(@profile_id),
+    "Binary profile identity must be UUIDv7"
+  )
+end
+
+Then("the Artifact stream records only content and source change facts") do
+  facts = artifact_events(@profile_id).select do |event|
+    event.stream_revision > @profile_initial_revision
   end
-  @profile_ids = @profile_outcomes.map { _1.dig("data", "artifact_id") }
-end
-
-Then("the changed profile has a different immutable Artifact ID") do
-  assert_acceptance_equal(2, @profile_ids.uniq.length, "Changed profile identities")
-end
-
-When("the agent declares that the changed profile supersedes the earlier profile") do
-  task_id = submit_and_execute(
-    "development_artifact_relation_declare",
-    command_id: "cmd-cuc-profile-supersedes",
-    actor: { kind: "agent", id: "artifact-agent" },
-    source_artifact_id: @profile_ids.last,
-    relation: "supersedes",
-    target: { kind: "artifact", id: @profile_ids.first },
-    attributes: {}
-  )
-  @profile_relation_outcome = task_request("tasks/get", task_id)
-    .dig("result", "result", "structuredContent")
-end
-
-When("the binary Artifact facts reach the read side") do
-  @profile_ids.each { project_artifact(_1) }
-end
-
-Then("the changed profile exposes the supersession relationship") do
-  relationship = artifact_view(@profile_ids.last).dig("data", "artifact", "relationships").sole
-  assert_acceptance_equal("supersedes", relationship.fetch("relation"), "Relationship kind")
   assert_acceptance_equal(
-    @profile_ids.first,
-    relationship.dig("target", "id"),
-    "Relationship target"
+    %w[DevelopmentArtifactContentChanged DevelopmentArtifactSourceChanged],
+    facts.map(&:type),
+    "Updated property facts"
+  )
+  assert_acceptance_equal(
+    { "artifact_id" => @profile_id, "content" => [ @profile_contents.last ].pack("m0") },
+    facts.first.data,
+    "Binary content fact"
+  )
+  assert_acceptance(
+    facts.none? { |event| (event.data.keys & %w[scope title kind labels]).any? },
+    "Unchanged properties were copied into update facts"
   )
 end
 
-Then("its exact Base64 content is available but never executed") do
-  payload = artifact_content(@profile_ids.last)
+When("the changed binary Artifact facts reach the read side") do
+  expected_revision = @profile_update.dig("data", "resulting_stream_revision")
+  @profile_content = await_read_model("Changed binary profile to become available") do
+    view = artifact_view(@profile_id).dig("data", "artifact", "artifact")
+    payload = artifact_content(@profile_id)
+    matches = view&.fetch("stream_revision", -1) == expected_revision &&
+      payload.dig("data", "content", "base64") == [ @profile_contents.last ].pack("m0")
+    [ matches, payload ]
+  end
+end
+
+Then("its current content is the changed Base64 payload and is never executed") do
   assert_acceptance_equal(
     [ @profile_contents.last ].pack("m0"),
-    payload.dig("data", "content", "base64"),
+    @profile_content.dig("data", "content", "base64"),
     "Binary profile content"
   )
-  assert_acceptance(payload.fetch("warnings").sole.include?("passive data"), "Passive warning")
+  assert_acceptance(@profile_content.fetch("warnings").sole.include?("passive data"), "Passive warning")
 end
 
 Given("a README, two linked documents, and another parent are captured and mapped") do
@@ -460,7 +521,7 @@ Then("the locator is ambiguous and offers both exact revisions without choosing 
   assert_acceptance_equal(
     @locator_artifacts.values.map { _1.fetch(:artifact_id) }.sort,
     pages.flat_map { _1.fetch("items") }.map { _1.fetch("artifact_id") }.sort,
-    "Ambiguous immutable Artifacts"
+    "Ambiguous revision Artifacts"
   )
   @locator_revision_actions = @ambiguous_locator_pages.flat_map do |response|
     response.fetch("next_actions").select do |action|
@@ -487,7 +548,7 @@ When("the clean agent follows one exact revision action") do
   @exact_locator = follow_artifact_action(action)
 end
 
-Then("exactly that immutable Artifact and its content action are returned") do
+Then("exactly that revision's Artifact and its content action are returned") do
   page = @exact_locator.dig("data", "page")
   assert_acceptance_equal("unique", page.fetch("resolution"), "Exact revision resolution")
   assert_acceptance_equal(
@@ -545,7 +606,8 @@ When("the same relationship command is submitted twice") do
 end
 
 When("its relation fact reaches the read side after a subscription restart") do
-  event = artifact_events(@replay_parent).find { _1.type == "DevelopmentArtifactRelationDeclared" }
+  relation_id = @relation_replay_results.first.dig("data", "relation_id")
+  event = artifact_relation_events(relation_id).find { _1.type == "DevelopmentArtifactRelationDeclared" }
   assert_acceptance(event, "Replay relation fact")
   restart_read_model_subscriptions
   project_artifact_event(event)
@@ -561,7 +623,8 @@ Then("both responses expose the original Task and one logical relation result") 
 end
 
 Then("one relation fact, command lifecycle, and projected edge exist") do
-  relations = artifact_events(@replay_parent).count do |event|
+  relation_id = @relation_replay_results.first.dig("data", "relation_id")
+  relations = artifact_relation_events(relation_id).count do |event|
     event.type == "DevelopmentArtifactRelationDeclared"
   end
   assert_acceptance_equal(1, relations, "Durable replay relation facts")
@@ -611,11 +674,11 @@ Given("an earlier-captured parent has two committed relationships but only the l
     older: older.dig(:result, "data", "relation_id"),
     later: later.dig(:result, "data", "relation_id")
   }
-  declarations = artifact_events(@late_artifacts.fetch(:parent)).select do |event|
-    event.type == "DevelopmentArtifactRelationDeclared"
-  end
-  @late_declarations = declarations.index_by do |event|
-    event.data.dig("artifact_relation", "relation_id")
+  @late_declarations = @late_relation_ids.values.to_h do |relation_id|
+    event = artifact_relation_events(relation_id).find do |candidate|
+      candidate.type == "DevelopmentArtifactRelationDeclared"
+    end
+    [ relation_id, event ]
   end
   project_artifact_event(@late_declarations.fetch(@late_relation_ids.fetch(:later)))
 end
@@ -701,8 +764,8 @@ Given("a projected Artifact relationship and an unprojected replacement are avai
     attributes: { path: "original.md" }
   )
   @supersession_relation_ids = { original: original.dig(:result, "data", "relation_id") }
-  original_event = artifact_events(@supersession_artifacts.fetch(:parent)).find do |event|
-    event.data.dig("artifact_relation", "relation_id") == @supersession_relation_ids.fetch(:original)
+  original_event = artifact_relation_events(@supersession_relation_ids.fetch(:original)).find do |event|
+    event.type == "DevelopmentArtifactRelationDeclared"
   end
   project_artifact_event(original_event)
 
@@ -718,10 +781,12 @@ Given("a projected Artifact relationship and an unprojected replacement are avai
     }
   )
   @supersession_relation_ids[:replacement] = replacement.dig(:result, "data", "relation_id")
-  events = artifact_events(@supersession_artifacts.fetch(:parent))
-  @supersession_event = events.find { _1.type == "DevelopmentArtifactRelationSuperseded" }
-  @replacement_declaration = events.find do |event|
-    event.data.dig("artifact_relation", "relation_id") == @supersession_relation_ids.fetch(:replacement)
+  original_events = artifact_relation_events(@supersession_relation_ids.fetch(:original))
+  @supersession_event = original_events.find { _1.type == "DevelopmentArtifactRelationSuperseded" }
+  @replacement_declaration = artifact_relation_events(
+    @supersession_relation_ids.fetch(:replacement)
+  ).find do |event|
+    event.type == "DevelopmentArtifactRelationDeclared"
   end
 end
 

@@ -39,8 +39,9 @@ module Coordinator::Write
       end
 
       class RegisteredIdentityV1 < Value
-        attribute :registration, Events::ResourceIdentityV1::Registration
+        attribute :registration, Events::ResourceIdentityV2::Registration
         attribute :identity, ResourceIdentityV1
+        attribute :registration_event, Types.Instance(PgEventstore::Event)
       end
 
       def initialize(
@@ -104,10 +105,11 @@ module Coordinator::Write
 
       def execute_attempt(command:, preparation:, caused_by:)
         registered = step load_registered_identity(command.resource_id)
-        current_binding = step load_current_binding(
+        current_binding_source = step load_current_binding(
           registered.identity,
           resource_id: command.resource_id
         )
+        current_binding = current_binding_source&.last
         decision = @decider.call(
           registration: registered.registration,
           current_binding:,
@@ -129,7 +131,7 @@ module Coordinator::Write
           removal:,
           input_digest: preparation.input_digest,
           persisted_events: persisted,
-          completed_at: preparation.removed_at
+          binding_event: current_binding_source&.first
         )
 
         Success(completion)
@@ -174,7 +176,7 @@ module Coordinator::Write
         return corrupt(resource_id, "registration_global_mismatch") unless
           canonical_event&.id == event.id
 
-        Success(RegisteredIdentityV1.new(registration:, identity:))
+        Success(RegisteredIdentityV1.new(registration:, identity:, registration_event: event))
       rescue EventHistoryLimitExceeded
         corrupt(resource_id, "duplicate_registration")
       rescue KeyError, Dry::Struct::Error
@@ -204,7 +206,7 @@ module Coordinator::Write
           binding.repository_id == identity.repository_id &&
           binding.normalized_path == identity.normalized_path
 
-        Success(binding)
+        Success([ event, binding ])
       rescue KeyError, Dry::Struct::Error
         corrupt(resource_id, "binding_schema_invalid")
       end
@@ -242,11 +244,37 @@ module Coordinator::Write
       def deserialize(event)
         return unless event
 
-        @schema_registry.load(
+        payload = @schema_registry.load(
           type: event.type,
           schema_version: event.metadata.fetch("schema_version"),
           data: event.data
         )
+        case payload
+        when Events::ResourceIdentityV1::Registered
+          Events::ResourceIdentityV2::Registered.new(
+            resource_id: payload.resource_id,
+            repository_id: payload.repository_id,
+            kind: payload.kind,
+            normalized_path: payload.normalized_path.unicode_normalize(:nfc)
+          )
+        when Events::ResourceIdentityV1::Bound
+          Events::ResourceIdentityV2::Bound.new(
+            resource_id: payload.resource_id,
+            repository_id: payload.repository_id,
+            kind: payload.kind,
+            normalized_path: payload.normalized_path.unicode_normalize(:nfc)
+          )
+        when Events::ResourceIdentityV1::Unbound
+          Events::ResourceIdentityV2::Unbound.new(
+            resource_id: payload.resource_id,
+            repository_id: payload.repository_id,
+            kind: payload.kind,
+            normalized_path: payload.normalized_path.unicode_normalize(:nfc),
+            reason: payload.reason
+          )
+        else
+          payload
+        end
       end
 
       def persist_resource_events(removal, identity:, command:, event_id:, caused_by:)
@@ -269,8 +297,9 @@ module Coordinator::Write
         @event_store.append(@stream_factory.resource(payload.resource_id), [ event ])
       end
 
-      def build_completion(command:, removal:, input_digest:, persisted_events:, completed_at:)
+      def build_completion(command:, removal:, input_digest:, persisted_events:, binding_event:)
         registration = removal.registration
+        unbinding_event = persisted_events.first || (binding_event if removal.outcome == "already_inactive")
         CommandResultV1.new(
           command_id: command.command_id,
           tool_name: TOOL_NAME,
@@ -285,12 +314,12 @@ module Coordinator::Write
             normalized_path: registration.normalized_path,
             outcome: removal.outcome,
             reason: command.reason,
-            unbound_at: removal.unbound_at
+            unbound_at: unbinding_event&.created_at&.utc&.iso8601(6)
           ),
           warnings: [],
           next_actions: [],
           emitted_events: persisted_events.map { event_reference(_1) },
-          completed_at:
+          completed_at: (unbinding_event || binding_event || persisted_events.first).created_at.utc.iso8601(6)
         )
       end
 

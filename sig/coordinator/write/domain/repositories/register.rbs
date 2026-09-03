@@ -7,13 +7,13 @@ module Coordinator
             Registration: untyped
             Plan: untyped
 
-            def registration: () -> Events::RepositoryRegisteredV1
+            def registration: () -> RepositoryRegistrationV2
             def event_plan: () -> EventPlan?
             def outcome: () -> String
           end
 
           def initialize: (?stream_factory: StreamFactory) -> void
-          def call: (registration_by_key: Events::RepositoryRegisteredV1?, registration_by_id: Events::RepositoryRegisteredV1?, command: Commands::RegisterRepository, registered_at: String) -> Dry::Monads::Result
+          def call: (registration_by_key: RepositoryRegistrationV2?, registration_by_id: RepositoryRegistrationV2?, command: Commands::RegisterRepository) -> Dry::Monads::Result
         end
       end
     end

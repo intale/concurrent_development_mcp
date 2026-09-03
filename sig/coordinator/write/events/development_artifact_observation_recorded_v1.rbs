@@ -1,0 +1,5 @@
+module Coordinator::Write::Events
+  class DevelopmentArtifactObservationRecordedV1 < Base
+    def observation_id: () -> String
+  end
+end

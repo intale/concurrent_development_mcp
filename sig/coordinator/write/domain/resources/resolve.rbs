@@ -4,18 +4,17 @@ module Coordinator
       module Resources
         class Resolve
           class DecisionV1 < Shared::Value
-            def registration: () -> Events::ResourceIdentityV1::Registered
-            def binding: () -> Events::ResourceIdentityV1::Bound
-            def events: () -> Array[Events::ResourceIdentityV1::Registered | Events::ResourceIdentityV1::Bound]
+            def registration: () -> Events::ResourceIdentityV2::Registered
+            def binding: () -> Events::ResourceIdentityV2::Bound
+            def events: () -> Array[Events::ResourceIdentityV2::Registered | Events::ResourceIdentityV2::Bound]
             def outcome: () -> String
           end
 
           def call: (
             identity: ResourceIdentityV1,
             proposed_resource_id: String,
-            registration: Events::ResourceIdentityV1::Registered?,
-            current_binding: Events::ResourceIdentityV1::Bound | Events::ResourceIdentityV1::Unbound | nil,
-            resolved_at: String
+            registration: Events::ResourceIdentityV2::Registered?,
+            current_binding: Events::ResourceIdentityV2::Bound | Events::ResourceIdentityV2::Unbound | nil
           ) -> Dry::Monads::Result
         end
       end

@@ -28,11 +28,13 @@ module Coordinator::Read
       def store(event:, registration:)
         record = Coordinator::Read::Repository.lock.find_by(repository_id: registration.repository_id)
         if record
-          verify_registration!(record, event, registration)
+          apply_fact!(record, event, registration)
           return record
         end
 
-        Coordinator::Read::Repository.create!(registration_attributes(event, registration))
+        Coordinator::Read::Repository.new(registration_attributes(event, registration)).tap do |created|
+          created.save!(touch: false)
+        end
       end
 
       private
@@ -47,12 +49,13 @@ module Coordinator::Read
       end
 
       def registration_attributes(event, registration)
+        initial = registration.is_a?(Coordinator::Write::Events::RepositoryRegisteredV2)
         {
           repository_id: registration.repository_id,
           scope: registration.scope,
-          display_name: registration.display_name,
-          paths: registration.paths,
-          remotes: registration.remotes,
+          display_name: initial ? nil : registration.display_name,
+          paths: initial ? [] : registration.paths,
+          remotes: initial ? [] : registration.remotes,
           registered_event: event_reference(event).to_h,
           registered_actor: actor(event).to_h,
           registered_markers: event.markers,
@@ -60,17 +63,42 @@ module Coordinator::Read
           registered_causation_id: event.causation_id,
           registered_correlation_id: event.correlation_id,
           registered_global_position: event.global_position,
-          registered_at_domain: registration.registered_at,
-          registered_at_store: event.created_at
+          registered_at_domain: event.created_at,
+          registered_at_store: event.created_at,
+          updated_at: event.created_at,
+          created_at: event.created_at
         }
+      end
+
+      def apply_fact!(record, event, registration)
+        case registration
+        when Coordinator::Write::Events::RepositoryRegisteredV1,
+             Coordinator::Write::Events::RepositoryRegisteredV2
+          verify_registration!(record, event, registration)
+        when Coordinator::Write::Events::RepositoryDisplayNameChangedV1
+          record.display_name = registration.display_name
+        when Coordinator::Write::Events::RepositoryPathAddedV1
+          record.paths = (record.paths + [ registration.path ]).uniq
+        when Coordinator::Write::Events::RepositoryPathRemovedV1
+          record.paths = record.paths - [ registration.path ]
+        when Coordinator::Write::Events::RepositoryRemoteAddedV1
+          record.remotes = (record.remotes + [ registration.remote ]).uniq
+        when Coordinator::Write::Events::RepositoryRemoteRemovedV1
+          record.remotes = record.remotes - [ registration.remote ]
+        end
+        record.updated_at = event.created_at
+        record.save!(touch: false) if record.persisted?
+        record
       end
 
       def verify_registration!(record, event, registration)
         matches = record.scope == registration.scope &&
-                  record.display_name == registration.display_name &&
-                  record.paths == registration.paths &&
-                  record.remotes == registration.remotes &&
                   record.registered_event.fetch("event_id") == event.id
+        unless registration.is_a?(Coordinator::Write::Events::RepositoryRegisteredV2)
+          matches &&= record.display_name == registration.display_name &&
+                      record.paths == registration.paths &&
+                      record.remotes == registration.remotes
+        end
         return if matches
 
         raise ProjectionStateError, "Repository identity changed within its source stream"

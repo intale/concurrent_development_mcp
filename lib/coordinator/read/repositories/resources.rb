@@ -31,13 +31,17 @@ module Coordinator::Read
         record ||= create_skeleton(resource)
 
         case resource
-        when Coordinator::Write::Events::ResourceIdentityV1::Registered
+        when Coordinator::Write::Events::ResourceIdentityV1::Registered,
+             Coordinator::Write::Events::ResourceIdentityV2::Registered
           store_registration(record, event, resource)
         when Coordinator::Write::Events::ResourceIdentityV1::Bound,
-             Coordinator::Write::Events::ResourceIdentityV1::Unbound
+             Coordinator::Write::Events::ResourceIdentityV1::Unbound,
+             Coordinator::Write::Events::ResourceIdentityV2::Bound,
+             Coordinator::Write::Events::ResourceIdentityV2::Unbound
           store_transition(record, event, resource)
         end
 
+        record.update!(updated_at: event.created_at) if record.persisted?
         record
       end
 
@@ -48,7 +52,7 @@ module Coordinator::Read
           resource_id: resource.resource_id,
           repository_id: resource.repository_id,
           kind: resource.kind,
-          normalized_path: resource.normalized_path,
+          normalized_path: resource.normalized_path.unicode_normalize(:nfc),
           lifecycle_status: "registered"
         )
       rescue ActiveRecord::RecordNotUnique
@@ -77,14 +81,15 @@ module Coordinator::Read
       end
 
       def registration_attributes(event, resource)
-        evidence_attributes(event, occurred_at: resource.registered_at, prefix: :registered).merge(
+        evidence_attributes(event, occurred_at: event.created_at, prefix: :registered).merge(
           lifecycle_status: "registered"
         )
       end
 
       def transition_attributes(event, resource)
-        bound = resource.is_a?(Coordinator::Write::Events::ResourceIdentityV1::Bound)
-        occurred_at = bound ? resource.bound_at : resource.unbound_at
+        bound = resource.is_a?(Coordinator::Write::Events::ResourceIdentityV1::Bound) ||
+                resource.is_a?(Coordinator::Write::Events::ResourceIdentityV2::Bound)
+        occurred_at = event.created_at
         evidence_attributes(event, occurred_at:, prefix: :latest_transition).merge(
           lifecycle_status: bound ? "current" : "inactive",
           unbinding_reason: bound ? nil : resource.reason
@@ -108,7 +113,7 @@ module Coordinator::Read
       def verify_identity!(record, resource)
         matches = record.repository_id == resource.repository_id &&
                   record.kind == resource.kind &&
-                  record.normalized_path == resource.normalized_path
+                  record.normalized_path == resource.normalized_path.unicode_normalize(:nfc)
         return if matches
 
         raise ProjectionStateError, "Resource identity changed within its source stream"

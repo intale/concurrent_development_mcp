@@ -6,6 +6,9 @@ module Coordinator
       def relation: () -> String
       def target_kind: () -> String
       def target_id: () -> String
+      def target_status: () -> String
+      def target_name: () -> String?
+      def target_scope: () -> String?
       def path: () -> String?
       def fragment: () -> String?
       def normalized_locator: () -> String?

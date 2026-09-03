@@ -226,19 +226,31 @@ When("the agent publishes equivalent Unicode Skill assets through single and Bat
   await_operation_batch_terminal
 end
 
-Then("both Skill commands succeed with semantic version 2 facts") do
+Then("both Skill commands succeed with semantic version 3 facts") do
   assert_acceptance_equal("ok", @batch_parity_single.fetch(:outcome).fetch("status"), "Single outcome")
   batch_outcomes = operation_batch_events.select { _1.type == "OperationBatchItemSucceeded" }
   assert_acceptance_equal(1, batch_outcomes.length, "Batch outcomes")
 
-  facts = [ "semantic-single", "semantic-batch" ].map do |name|
+  publications = [ "semantic-single", "semantic-batch" ].map do |name|
     skill_events(name:, scope: "project:cucumber-batch").sole
   end
-  assert_acceptance_equal([ 2, 2 ], facts.map { _1.metadata.fetch("schema_version") }, "Fact schemas")
-  contents = facts.map { _1.data.fetch("assets").sole.fetch("content") }
-  assert_acceptance_equal(1, contents.uniq.length, "Single/Batch semantic content")
-  assert_acceptance_equal(@batch_parity_text, contents.first.fetch("text"), "Persisted Unicode text")
-  assert_acceptance(!contents.first.key?("base64"), "Persisted Unicode content exposed Base64")
+  assert_acceptance_equal([ 3, 3 ], publications.map { _1.metadata.fetch("schema_version") }, "Fact schemas")
+  contents = [ "semantic-single", "semantic-batch" ].map do |name|
+    skill_fact_events(name:, scope: "project:cucumber-batch")
+      .select { _1.type == "SkillAssetContentDefined" }
+      .sole
+  end
+  assert_acceptance_equal(
+    1,
+    contents.map { _1.data.fetch("content") }.uniq.length,
+    "Single/Batch semantic content"
+  )
+  assert_acceptance_equal([ "utf-8", "utf-8" ], contents.map { _1.metadata.fetch("encoding") }, "Content encodings")
+  assert_acceptance_equal(
+    [ @batch_parity_text, @batch_parity_text ],
+    contents.map { _1.data.fetch("content") },
+    "Persisted Unicode text"
+  )
 end
 
 Then("the Batch manifest returns the original text-first ordinary command arguments") do

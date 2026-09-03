@@ -29,7 +29,9 @@ module Coordinator::Write
 
       binding = binding_result.value!
       return inactive(target.resource_id, binding) unless
-        binding.is_a?(Events::ResourceIdentityV1::Bound) && binding.resource_id == target.resource_id
+        [ Events::ResourceIdentityV1::Bound, Events::ResourceIdentityV2::Bound ].any? {
+          binding.is_a?(_1)
+        } && binding.resource_id == target.resource_id
       return corrupt(target.resource_id, "binding_kind_mismatch") unless binding.kind == registration.kind
 
       Success(

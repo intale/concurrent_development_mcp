@@ -5,13 +5,13 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Create do
 
   let(:repository_id) { "018f22a2-7b9c-7def-8abc-1234567890ab" }
   let(:repository_registration) do
-    Coordinator::Write::Events::RepositoryRegisteredV1.new(
+    Coordinator::Write::RepositoryRegistrationV2.new(
       repository_id:,
       scope: "project:billing",
+      repository_key: nil,
       display_name: "Billing",
       paths: [ "/workspace/billing" ],
-      remotes: [ "https://example.test/billing.git" ],
-      registered_at: "2026-08-20T14:11:00.000000Z"
+      remotes: [ "https://example.test/billing.git" ]
     )
   end
   let(:command) do

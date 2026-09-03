@@ -49,7 +49,7 @@ module Coordinator::Read
           key.failure("current position and observation ID must both be present or absent")
         end
         if after_observation_id &&
-           !Types::DEVELOPMENT_ARTIFACT_OBSERVATION_ID_PATTERN.match?(after_observation_id)
+           !ProjectedDevelopmentArtifactObservationId.valid?(after_observation_id)
           key([ :cursor, :after_observation_id ]).failure("must be a valid Artifact observation ID")
         end
         through = value[:through_observed_sequence]

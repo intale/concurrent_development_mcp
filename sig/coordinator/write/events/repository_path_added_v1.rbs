@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class RepositoryPathAddedV1 < Base
+        def repository_id: () -> String
+        def path: () -> String
+      end
+    end
+  end
+end

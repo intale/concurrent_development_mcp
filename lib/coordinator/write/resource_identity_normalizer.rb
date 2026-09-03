@@ -17,7 +17,7 @@ module Coordinator::Write
       return Failure(invalid_identity(validation.errors.to_h)) unless validation.success?
 
       attributes = validation.to_h
-      normalized_path = attributes.fetch(:path)
+      normalized_path = attributes.fetch(:path).unicode_normalize(:nfc)
 
       Success(
         ResourceIdentityV1.new(

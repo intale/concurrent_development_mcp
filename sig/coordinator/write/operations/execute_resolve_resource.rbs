@@ -2,12 +2,13 @@ module Coordinator
   module Write
     module Operations
       class ExecuteResolveResource
+        TOOL_NAME: String
+
         class InputContract
           def call: (command_input) -> Dry::Validation::Result
         end
 
         class PreparationV1 < Shared::Value
-          def resolved_at: () -> String
           def input_digest: () -> String
           def proposed_resource_id: () -> String
           def registration_event_id: () -> String
@@ -21,7 +22,6 @@ module Coordinator
           ?decider: Domain::Resources::Resolve,
           ?repository_registration_loader: RepositoryRegistrationLoader,
           ?input_digest: CommandInputDigest,
-          ?clock: Shared::_Clock,
           ?resource_id_generator: ResourceIdGenerator,
           ?id_generator: Shared::_IdGenerator,
           ?event_factory: EventFactory,

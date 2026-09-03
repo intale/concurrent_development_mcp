@@ -10,7 +10,7 @@ Feature: Scoped repository registration
     Scenario: An agent registers a repository that is outside the server container
       When the agent registers a caller-created Repository for scope "project:payments/workspace:primary"
       Then the Repository Task completes with the exact attributed metadata
-      And one scoped Repository fact is durable without a server-derived location
+      And scoped Repository facts are durable without a server-derived location
 
     Scenario: A human repository label is not accepted as canonical identity
       When the agent tries to register Repository identity "payments"

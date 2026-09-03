@@ -2,6 +2,8 @@ module Coordinator
   module Write
     module Operations
       class ExecuteRemoveResource
+        TOOL_NAME: String
+
         class InputContract
           def call: (command_input) -> Dry::Validation::Result
         end
@@ -13,8 +15,9 @@ module Coordinator
         end
 
         class RegisteredIdentityV1 < Shared::Value
-          def registration: () -> Events::ResourceIdentityV1::Registered
+          def registration: () -> Events::ResourceIdentityV2::Registered
           def identity: () -> ResourceIdentityV1
+          def registration_event: () -> PgEventstore::Event
         end
 
         def initialize: (

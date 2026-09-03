@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Metadata
+      class SkillPublicationV3 < EventMetadata
+        def content_digest: () -> String
+      end
+    end
+  end
+end

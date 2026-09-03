@@ -1,0 +1,8 @@
+module Coordinator::Write::Events
+  class DevelopmentArtifactClassificationCorrectionRecordedV1 < Base
+    def artifact_id: () -> String
+    def observation_id: () -> String?
+    def classification_revision: () -> Integer
+    def reason: () -> String
+  end
+end

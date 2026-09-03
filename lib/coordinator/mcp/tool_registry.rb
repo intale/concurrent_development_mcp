@@ -74,6 +74,7 @@ module Coordinator
           Tools::SkillPublishBatch,
           Tools::DevelopmentArtifactCapture,
           Tools::DevelopmentArtifactCaptureBatch,
+          Tools::DevelopmentArtifactUpdate,
           Tools::DevelopmentArtifactClassificationCorrect,
           Tools::DevelopmentArtifactRelationDeclare,
           Tools::DevelopmentArtifactRelationDeclareBatch,

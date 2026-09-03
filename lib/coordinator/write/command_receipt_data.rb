@@ -453,6 +453,14 @@ module Coordinator::Write
       attribute :recorded_at, Types::Timestamp
     end
 
+    class DevelopmentArtifactUpdate < Value
+      attribute :artifact_id, Types::DevelopmentArtifactId
+      attribute :resulting_stream_revision, Types::Integer.constrained(gteq: 0)
+      attribute :changed_properties, Types::Array.of(Types::String)
+      attribute :outcome, Types::String.enum("updated", "existing")
+      attribute :updated_at, Types::Timestamp
+    end
+
     class DevelopmentArtifactClassification < Value
       attribute :artifact_id, Types::DevelopmentArtifactId
       attribute :observation_id, Types::DevelopmentArtifactObservationId
@@ -537,6 +545,7 @@ module Coordinator::Write
            ChangeSetCompletion |
            SkillPublication |
            DevelopmentArtifactCapture |
+           DevelopmentArtifactUpdate |
            DevelopmentArtifactClassification |
            DevelopmentArtifactRelation |
            OperationBatchAcceptance |

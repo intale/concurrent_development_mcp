@@ -6,7 +6,7 @@ module Coordinator::Read
       attribute :after_observed_sequence, Types::Integer.constrained(gteq: 0)
       attribute :through_observed_sequence, Types::Integer.constrained(gteq: 0).optional
       attribute :after_current_global_position, Types::GlobalPosition.optional
-      attribute :after_observation_id, Types::DevelopmentArtifactObservationId.optional
+      attribute :after_observation_id, ProjectedDevelopmentArtifactObservationId.optional
     end
 
     attribute :resolution, Types::String.enum("absent", "unique", "ambiguous")

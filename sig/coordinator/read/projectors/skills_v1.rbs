@@ -4,7 +4,7 @@ module Coordinator
       class SkillsV1
         PROJECTION: ProjectionDefinition
 
-        def initialize: (?contract: Contracts::SkillSourceEvent, ?publication_loader: Write::Skills::PersistedPublicationLoader, ?skills: Repositories::Skills, ?processed_events: Repositories::ProcessedProjectionEvents) -> void
+        def initialize: (?projection_builder: Write::Skills::PublicationProjectionBuilderV3?, ?contract: Contracts::SkillSourceEvent, ?publication_loader: Write::Skills::PersistedPublicationLoader, ?skills: Repositories::Skills, ?processed_events: Repositories::ProcessedProjectionEvents) -> void
         def call: (PgEventstore::Event event) -> void
       end
     end

@@ -1,0 +1,6 @@
+module Coordinator::Write::Events
+  class DevelopmentArtifactContentChangedV1 < Base
+    def artifact_id: () -> String
+    def content: () -> String
+  end
+end

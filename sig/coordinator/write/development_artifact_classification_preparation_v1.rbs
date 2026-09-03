@@ -4,6 +4,8 @@ module Coordinator
       def corrected_at: () -> String
       def input_digest: () -> String
       def correction_event_id: () -> String
+      def fact_event_ids: () -> Array[String]
+      def link_event_ids: () -> Array[String]
     end
   end
 end

@@ -754,6 +754,29 @@ module Coordinator::Write
       attribute :input, CaptureDevelopmentArtifactInputV2
     end
 
+    class UpdateDevelopmentArtifactChangesV1 < Value
+      Content = Coordinator::Write::Content::TextV1 | Coordinator::Write::Content::BinaryV1
+
+      attribute? :scope, Types::DevelopmentArtifactScope.optional
+      attribute? :title, Types::DevelopmentArtifactTitle.optional
+      attribute? :kind, Types::DevelopmentArtifactKind.optional
+      attribute? :labels, Types::DevelopmentArtifactLabels.optional
+      attribute? :content, Content.optional
+      attribute? :source, DevelopmentArtifactSourceV1.optional
+    end
+
+    class UpdateDevelopmentArtifactInputV1 < Value
+      attribute :actor, ActorV1
+      attribute :artifact_id, Types::DevelopmentArtifactId
+      attribute :expected_revision, Types::Integer.constrained(gteq: 0)
+      attribute :changes, UpdateDevelopmentArtifactChangesV1
+    end
+
+    class UpdateDevelopmentArtifactV1 < BaseV1
+      attribute :tool_name, Types::String.enum("development_artifact_update")
+      attribute :input, UpdateDevelopmentArtifactInputV1
+    end
+
     class CorrectDevelopmentArtifactClassificationInputV1 < Value
       attribute :actor, ActorV1
       attribute :observation_id, Types::DevelopmentArtifactObservationId
@@ -976,6 +999,7 @@ module Coordinator::Write
       CompleteCompensatedReleaseSetV1,
       PublishSkillRevisionV2,
       CaptureDevelopmentArtifactV2,
+      UpdateDevelopmentArtifactV1,
       CorrectDevelopmentArtifactClassificationV1,
       DeclareDevelopmentArtifactRelationV1,
       CreateOperationBatchV1,
@@ -997,6 +1021,7 @@ module Coordinator::Write
     CanonicalDigestType = DigestType |
                           PublishSkillRevisionCanonicalV2 |
                           CaptureDevelopmentArtifactCanonicalV2 |
+                          UpdateDevelopmentArtifactV1 |
                           DeclareDevelopmentArtifactRelationCanonicalV1
   end
 end

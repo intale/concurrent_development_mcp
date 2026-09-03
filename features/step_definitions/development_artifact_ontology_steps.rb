@@ -19,16 +19,23 @@ When("the agent captures identical documentation bytes from two Git revisions") 
   end
 end
 
-Then("both capture Tasks name one content-addressed Artifact and two observation IDs") do
+Then("both capture Tasks name separate UUIDv7 Artifacts and observation IDs") do
   assert_acceptance_equal(
-    1,
+    2,
     @historical_artifact_captures.map { _1.fetch("artifact_id") }.uniq.length,
-    "Content-addressed Artifact IDs"
+    "Stable Artifact IDs"
   )
   assert_acceptance_equal(
     2,
     @historical_artifact_captures.map { _1.fetch("observation_id") }.uniq.length,
     "Historical observation IDs"
+  )
+  identities = @historical_artifact_captures.flat_map do |capture|
+    [ capture.fetch("artifact_id"), capture.fetch("observation_id") ]
+  end
+  assert_acceptance(
+    identities.all? { Coordinator::Shared::Types::UUID_V7_PATTERN.match?(_1) },
+    "Artifact and observation identities must be UUIDv7"
   )
 end
 
@@ -49,14 +56,20 @@ Then("exact observation actions retrieve both Git revisions independently") do
 end
 
 Then("both observations lead to the same passive content") do
-  artifact_ids = @historical_artifact_captures.map { _1.fetch("artifact_id") }.uniq
-  content = artifact_content(artifact_ids.sole).dig("data", "content")
-  assert_acceptance_equal("unchanged documentation\n", content.fetch("text"), "Passive content")
+  content = @historical_artifact_captures.map do |capture|
+    artifact_content(
+      capture.fetch("artifact_id"),
+      observation_id: capture.fetch("observation_id")
+    ).dig("data", "content")
+  end
+  assert_acceptance_equal(
+    [ "unchanged documentation\n" ],
+    content.map { _1.fetch("text") }.uniq,
+    "Passive content"
+  )
   assert_acceptance_equal(
     1,
-    @historical_artifact_views.map do |view|
-      view.dig("data", "artifact", "artifact", "content_sha256")
-    end.uniq.length,
+    content.map { _1.fetch("content_sha256") }.uniq.length,
     "Historical content digests"
   )
 end
@@ -103,10 +116,14 @@ end
 
 Then("the correction advances the classification revision without capturing new bytes") do
   assert_acceptance_equal(2, @classification_outcome.dig("data", "classification_revision"), "Revision")
-  captures = artifact_events(@classification_artifact_id).count do |event|
-    event.type == "DevelopmentArtifactCaptured"
+  content_facts = artifact_events(@classification_artifact_id).count do |event|
+    event.type == "DevelopmentArtifactContentChanged"
   end
-  assert_acceptance_equal(1, captures, "Immutable Artifact capture facts")
+  assert_acceptance_equal(1, content_facts, "Artifact content facts")
+  correction_facts = artifact_observation_events(@classification_observation_id).count do |event|
+    event.type == "DevelopmentArtifactClassificationCorrectionRecorded"
+  end
+  assert_acceptance_equal(1, correction_facts, "Classification correction facts")
 end
 
 Then("exact observation retrieval exposes the corrected title and labels") do
@@ -115,8 +132,12 @@ Then("exact observation retrieval exposes the corrected title and labels") do
       @classification_artifact_id,
       observation_id: @classification_observation_id
     )
-    revision = payload.dig("data", "artifact", "artifact", "classification_revision")
-    [ revision == 2, payload ]
+    artifact = payload.dig("data", "artifact", "artifact")
+    converged = artifact&.fetch("classification_revision", nil) == 2 &&
+      artifact.fetch("title", nil) == "Authoritative coordination contract" &&
+      artifact.fetch("kind", nil) == "contract" &&
+      artifact.fetch("labels", nil) == %w[authoritative coordination]
+    [ converged, payload ]
   end
   @classification_after = projected.dig("data", "artifact", "artifact")
   assert_acceptance_equal(
@@ -173,7 +194,7 @@ Then("the relation Task is denied and no relation fact exists") do
     @missing_candidate_relation.dig("data", "code"),
     "Missing Candidate relation error"
   )
-  relation_facts = artifact_events(@target_validation_source).count do |event|
+  relation_facts = source_artifact_relation_events(@target_validation_source).count do |event|
     event.type == "DevelopmentArtifactRelationDeclared"
   end
   assert_acceptance_equal(0, relation_facts, "Denied relation facts")
@@ -242,13 +263,22 @@ When("both agents declare that the parent references the child") do
 end
 
 Then("both relation Tasks identify one directed edge") do
+  assert_acceptance(
+    @direction_outcomes.all? { _1.fetch("status") == "ok" },
+    "Both canonical relation Tasks must complete successfully"
+  )
   relation_ids = @direction_outcomes.map { _1.dig("data", "relation_id") }
-  assert_acceptance_equal(1, relation_ids.uniq.length, "Canonical directed relation IDs")
-  relation_facts = artifact_events(@direction_parent).count do |event|
+  canonical_ids = relation_ids.compact.uniq
+  assert_acceptance_equal(1, canonical_ids.length, "Canonical directed relation IDs")
+  assert_acceptance(
+    Coordinator::Shared::Types::UUID_V7_PATTERN.match?(canonical_ids.sole),
+    "Canonical directed relation ID must be UUIDv7"
+  )
+  relation_facts = artifact_relation_events(canonical_ids.sole).count do |event|
     event.type == "DevelopmentArtifactRelationDeclared"
   end
   assert_acceptance_equal(1, relation_facts, "Canonical directed relation facts")
-  @direction_relation_id = relation_ids.first
+  @direction_relation_id = canonical_ids.sole
 end
 
 Then("outgoing parent traversal and incoming child traversal expose inverse directions") do
@@ -308,7 +338,7 @@ Given("a source Artifact and authoritative coordination targets are available") 
     name: "artifact-follow-skill",
     scope: "project:cucumber-artifact-follow"
   ).sole
-  project_skill_event(skill_event)
+  await_skill_revision(skill_event)
 
   follow_batch_id = SecureRandom.uuid_v7
   follow_batch_task = submit_and_execute(
@@ -379,7 +409,11 @@ Then("every relationship supplies an action accepted by its public MCP tool") do
   )
   items.each do |relation|
     assert_acceptance_equal("verified", relation.dig("target", "status"), "Verified target")
-    action = relation.fetch("follow_action")
+    action = relation["follow_action"]
+    assert_acceptance(
+      action,
+      "#{relation.dig('target', 'kind')} relationship supplied no public follow action: #{relation.inspect}"
+    )
     response = call_tool(action.fetch("tool"), action.fetch("arguments"))
     structured = response.dig("result", "structuredContent")
     assert_acceptance(structured, "#{action.fetch('tool')} returned no structured result")
@@ -491,7 +525,7 @@ Then("it is denied from bounded history with the discoverable lifetime limit") d
   assert_acceptance_equal("lifetime", details.fetch("limit_kind"), "Lifetime limit kind")
   assert_acceptance_equal(256, details.fetch("lifetime_maximum"), "Lifetime maximum")
   assert_acceptance_equal(0, details.fetch("lifetime_remaining"), "Lifetime remaining")
-  declarations = artifact_events(@capacity_source).count do |event|
+  declarations = source_artifact_relation_events(@capacity_source).count do |event|
     event.type == "DevelopmentArtifactRelationDeclared"
   end
   assert_acceptance_equal(256, declarations, "Bounded declaration history")

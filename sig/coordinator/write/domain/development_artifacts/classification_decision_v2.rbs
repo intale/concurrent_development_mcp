@@ -1,0 +1,19 @@
+module Coordinator
+  module Write
+    module Domain
+      module DevelopmentArtifacts
+        class ClassificationDecisionV2 < Shared::Value
+          def observation_id: () -> String
+          def artifact_id: () -> String
+          def classification_revision: () -> Integer
+          def title: () -> String
+          def kind: () -> String
+          def labels: () -> Array[String]
+          def event_plan: () -> EventPlan?
+          def fact_event_ids: () -> Array[String]?
+          def outcome: () -> String
+        end
+      end
+    end
+  end
+end

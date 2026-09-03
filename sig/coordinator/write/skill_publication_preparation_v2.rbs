@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    class SkillPublicationPreparationV2 < Shared::Value
+      def recorded_at: () -> String
+      def input_digest: () -> String
+      def skill_revision_id: () -> String
+      def registration_event_id: () -> String
+      def revision_created_event_id: () -> String
+      def description_event_id: () -> String
+      def instructions_event_id: () -> String
+      def asset_ids: () -> Array[Skills::AssetPublicationIdsV1]
+      def publication_event_id: () -> String
+    end
+  end
+end

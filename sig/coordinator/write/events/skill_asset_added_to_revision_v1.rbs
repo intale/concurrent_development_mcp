@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Events
+      class SkillAssetAddedToRevisionV1 < Base
+        def skill_revision_id: () -> String
+        def skill_id: () -> String
+        def revision: () -> Integer
+        def asset_id: () -> String
+      end
+    end
+  end
+end

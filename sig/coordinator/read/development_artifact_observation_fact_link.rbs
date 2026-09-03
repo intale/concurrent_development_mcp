@@ -1,0 +1,26 @@
+module Coordinator
+  module Read
+    class DevelopmentArtifactObservationFactLink < ApplicationRecord
+      def link_event_id: () -> String
+      def observation_id: () -> String
+      def artifact_id: () -> String
+      def role: () -> String
+      def link_event: () -> Hash[String, untyped]
+      def link_actor: () -> Hash[String, untyped]
+      def link_markers: () -> Array[String]
+      def link_metadata: () -> Hash[String, untyped]
+      def link_causation_id: () -> String?
+      def link_correlation_id: () -> String?
+      def link_global_position: () -> Integer
+      def link_at_domain: () -> Time
+      def link_at_store: () -> Time
+      def observed_fact_event: () -> Hash[String, untyped]
+      def observed_fact_event_id: () -> String
+      def observed_fact_data: () -> Hash[untyped, untyped]
+      def observed_fact_metadata: () -> Hash[String, untyped]
+      def observed_fact_created_at: () -> Time
+      def observation: () -> DevelopmentArtifactObservation?
+      def artifact: () -> DevelopmentArtifact?
+    end
+  end
+end

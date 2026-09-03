@@ -2,7 +2,7 @@
 
 module Coordinator::Read
   class DevelopmentArtifactBinaryContentViewV2 < Value
-    attribute :artifact_id, Types::DevelopmentArtifactId
+    attribute :artifact_id, ProjectedDevelopmentArtifactId
     attribute :encoding, Types::String.enum("binary")
     attribute :media_type, Types::DevelopmentArtifactMediaType
     attribute :base64, Types::DevelopmentArtifactContentBase64

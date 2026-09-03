@@ -62,7 +62,7 @@ module Coordinator::Read
       end
 
       def verify_stream_identity!(event, registration)
-        return if event.stream.stream_id == registration.repository_id && event.stream_revision.zero?
+        return if event.stream.stream_id == registration.repository_id
 
         raise InvalidProjectionSource, "Repository identity does not match its source stream"
       end

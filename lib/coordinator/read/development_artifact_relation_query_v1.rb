@@ -2,7 +2,7 @@
 
 module Coordinator::Read
   class DevelopmentArtifactRelationQueryV1 < Value
-    attribute :artifact_id, Types::DevelopmentArtifactId
+    attribute :artifact_id, ProjectedDevelopmentArtifactId
     attribute :direction, Types::String.enum("incoming", "outgoing", "both")
     attribute :relation, Types::DevelopmentArtifactRelationKind.optional
     attribute :include_superseded, Types::Bool

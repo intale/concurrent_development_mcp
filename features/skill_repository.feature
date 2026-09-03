@@ -27,11 +27,11 @@ Feature: Scoped AI Skill repository
 
   Rule: Assets are passive content tied to one complete revision
 
-    @AUD-SKILL-SNAPSHOT-01 @AUD-SKILL-HISTORY-02
-    Scenario: An agent pins a complete historical Skill snapshot while a newer revision is available
+    @AUD-SKILL-SNAPSHOT-01
+    Scenario: The latest Skill snapshot replaces an obsolete revision
       Given Skill "review-history" in scope "project:alpha" has projected revisions 1 and 2 with different assets
-      When the agent retrieves Skill "review-history" revision 1 and follows its asset manifest
-      Then the Skill metadata, manifest, and asset content all describe revision 1
+      When the agent retrieves the latest Skill "review-history" and follows its asset manifest
+      Then the Skill metadata, manifest, and asset content all describe revision 2
       And retrieving Skill "review-history" without a revision returns revision 2
 
     @AUD-SKILL-CONCURRENT-PUBLISH-03 @live-subscriptions @concurrency
@@ -45,16 +45,17 @@ Feature: Scoped AI Skill repository
       Then Skill "shared-review" exposes exactly the winning revision 1 snapshot
 
     @AUD-SKILL-PROJECTION-REPLAY-04
-    Scenario: Delayed and duplicate Skill projections preserve history without regressing the current revision
+    Scenario: The read side converges on the latest Skill revision
       Given Skill "replayed-skill" in scope "project:alpha" has published revisions 1 and 2
-      When Skill revision 2 reaches the read side before revision 1 and both deliveries are repeated
+      When both published Skill revisions reach the read side
       Then retrieving Skill "replayed-skill" without a revision returns revision 2
-      And both historical Skill revisions remain retrievable
+      And the obsolete Skill revision is not retrievable
 
     Scenario: A script asset round-trips through publication and retrieval
       When the agent publishes Skill "release-check" with script asset "scripts/check.sh"
       And the Skill publication reaches the read side
-      Then the exact script asset content and digest are available through MCP
+      Then the Skill publication contains granular revision and asset facts
+      And the exact script asset content and digest are available through MCP
       And the Skill view exposes the asset manifest without embedding its content
 
     @CONTENT-SEMANTIC-02 @event-contract

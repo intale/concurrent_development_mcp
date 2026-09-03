@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandReceiptData
-      type value = RepositoryRegistration | ResourceResolution | ResourceRemoval | ChangeSet | WorkItem | Dependency | Attempt | WorkItemCompletion | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver | MergeSnapshotRegistration | MergeSnapshotVerification | MergeAuthorization | MergeObservation | ReleaseSetPreparation | RepositoryIntegration | ReleaseSetVerification | ReleaseSetActivation | ReleaseSetCompensationRequest | ReleaseSetCompletion | DependencySatisfaction | ChangeSetCompletion | SkillPublication | DevelopmentArtifactCapture | DevelopmentArtifactClassification | DevelopmentArtifactRelation | OperationBatchAcceptance | OperationBatchCancellation | OperationBatchTransition
+      type value = RepositoryRegistration | ResourceResolution | ResourceRemoval | ChangeSet | WorkItem | Dependency | Attempt | WorkItemCompletion | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver | MergeSnapshotRegistration | MergeSnapshotVerification | MergeAuthorization | MergeObservation | ReleaseSetPreparation | RepositoryIntegration | ReleaseSetVerification | ReleaseSetActivation | ReleaseSetCompensationRequest | ReleaseSetCompletion | DependencySatisfaction | ChangeSetCompletion | SkillPublication | DevelopmentArtifactCapture | DevelopmentArtifactUpdate | DevelopmentArtifactClassification | DevelopmentArtifactRelation | OperationBatchAcceptance | OperationBatchCancellation | OperationBatchTransition
 
       class RepositoryRegistration < Shared::Value
         def repository_id: () -> String
@@ -416,6 +416,14 @@ module Coordinator
         def byte_size: () -> Integer
         def outcome: () -> String
         def recorded_at: () -> String
+      end
+
+      class DevelopmentArtifactUpdate < Shared::Value
+        def artifact_id: () -> String
+        def resulting_stream_revision: () -> Integer
+        def changed_properties: () -> Array[String]
+        def outcome: () -> String
+        def updated_at: () -> String
       end
 
       class DevelopmentArtifactClassification < Shared::Value

@@ -2,7 +2,7 @@ module Coordinator
   module Read
     class DevelopmentArtifactObservation < ApplicationRecord
       def observation_id: () -> String
-      def artifact_id: () -> String
+      def artifact_id: () -> String?
       def scope: () -> String?
       def title: () -> String?
       def kind: () -> String?
@@ -14,6 +14,12 @@ module Coordinator
       def source_revision: () -> String?
       def source_observed_at: () -> Time?
       def source_collector: () -> String?
+      def content_encoding: () -> String?
+      def content_media_type: () -> String?
+      def content_text: () -> String?
+      def content_base64: () -> String?
+      def content_sha256: () -> String?
+      def content_byte_size: () -> Integer?
       def observed_event: () -> Hash[String, untyped]?
       def observed_actor: () -> Hash[String, untyped]?
       def observed_markers: () -> Array[String]
@@ -35,6 +41,7 @@ module Coordinator
       def current_global_position: () -> Integer
       def observed_sequence: () -> Integer
       def artifact: () -> DevelopmentArtifact?
+      def fact_links: () -> untyped
     end
   end
 end

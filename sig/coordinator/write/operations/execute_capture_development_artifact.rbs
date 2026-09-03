@@ -3,7 +3,7 @@ module Coordinator
     module Operations
       class ExecuteCaptureDevelopmentArtifact
         TOOL_NAME: String
-        def initialize: (event_store: _EventStore, ?preparer: PrepareCaptureDevelopmentArtifact, ?loader: DevelopmentArtifacts::Loader, ?decider: Domain::DevelopmentArtifacts::Capture, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?marker_builder: DevelopmentArtifacts::MarkerBuilder, ?natural_key_registry: NaturalKeys::Registry, ?completion_builder: CommandResultBuilder) -> void
+        def initialize: (event_store: _EventStore, ?preparer: PrepareCaptureDevelopmentArtifact, ?loader: DevelopmentArtifacts::Loader, ?decider: Domain::DevelopmentArtifacts::GranularCapture, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?stream_factory: StreamFactory, ?marker_builder: DevelopmentArtifacts::MarkerBuilder, ?completion_builder: CommandResultBuilder) -> void
         %a{rbs:test:skip}
         def call: (command_input input) -> Dry::Monads::Result
         def call_command: (Commands::CaptureDevelopmentArtifact command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result

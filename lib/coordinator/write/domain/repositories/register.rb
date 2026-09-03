@@ -7,7 +7,7 @@ module Coordinator::Write
         include Dry::Monads[:result]
 
         class DecisionV1 < Value
-          Registration = Types.Instance(Events::RepositoryRegisteredV1)
+          Registration = Types.Instance(RepositoryRegistrationV2)
           Plan = Types.Instance(EventPlan)
 
           attribute :registration, Registration
@@ -19,7 +19,7 @@ module Coordinator::Write
           @stream_factory = stream_factory
         end
 
-        def call(registration_by_key:, registration_by_id:, command:, registered_at:)
+        def call(registration_by_key:, registration_by_id:, command:)
           if registration_by_key
             return conflict(registration_by_key, command) unless
               compatible?(registration_by_key, registration_by_id, command)
@@ -35,26 +35,40 @@ module Coordinator::Write
 
           return conflict(registration_by_id, command) if registration_by_id
 
-          registration = Events::RepositoryRegisteredV1.new(
+          registration = RepositoryRegistrationV2.new(
             repository_id: command.repository_id,
             scope: command.scope,
             repository_key: command.repository_key,
             display_name: command.display_name,
             paths: command.paths,
-            remotes: command.remotes,
-            registered_at:
+            remotes: command.remotes
           )
+
+          events = [
+            Events::RepositoryRegisteredV2.new(
+              repository_id: command.repository_id,
+              scope: command.scope,
+              repository_key: command.repository_key
+            )
+          ]
+          events << Events::RepositoryDisplayNameChangedV1.new(
+            repository_id: command.repository_id,
+            display_name: command.display_name
+          ) if command.display_name
+          command.paths.each do |path|
+            events << Events::RepositoryPathAddedV1.new(repository_id: command.repository_id, path:)
+          end
+          command.remotes.each do |remote|
+            events << Events::RepositoryRemoteAddedV1.new(repository_id: command.repository_id, remote:)
+          end
 
           Success(
             DecisionV1.new(
               registration:,
               event_plan: EventPlan.new(
-                writes: [
-                  EventWrite.new(
-                    stream: @stream_factory.repository(command.repository_id),
-                    event: registration
-                  )
-                ]
+                writes: events.map do |event|
+                  EventWrite.new(stream: @stream_factory.repository(command.repository_id), event:)
+                end
               ),
               outcome: "registered"
             )

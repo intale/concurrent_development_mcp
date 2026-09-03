@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class RepositoryDisplayNameChangedV1 < Base
+        def repository_id: () -> String
+        def display_name: () -> String?
+      end
+    end
+  end
+end

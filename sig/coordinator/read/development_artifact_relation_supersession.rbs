@@ -3,7 +3,7 @@ module Coordinator
     class DevelopmentArtifactRelationSupersession < ApplicationRecord
       def superseded_relation_id: () -> String
       def source_artifact_id: () -> String
-      def replacement_relation_id: () -> String
+      def replacement_relation_id: () -> String?
       def reason: () -> String
       def superseded_event: () -> Hash[String, untyped]
       def superseded_actor: () -> Hash[String, untyped]

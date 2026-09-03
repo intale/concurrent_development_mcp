@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Metadata
+      class MarkerCodecV1 < EventMetadata
+        def marker_codec_version: () -> String
+      end
+    end
+  end
+end

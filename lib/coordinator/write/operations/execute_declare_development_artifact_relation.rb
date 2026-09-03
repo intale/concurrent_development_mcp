@@ -10,7 +10,7 @@ module Coordinator::Write
         preparer: PrepareDeclareDevelopmentArtifactRelation.new,
         loader: DevelopmentArtifacts::Loader.new(event_store:),
         target_resolver: DevelopmentArtifacts::RelationTargetResolver.new(event_store:),
-        decider: Domain::DevelopmentArtifacts::DeclareRelation.new,
+        decider: Domain::DevelopmentArtifacts::DeclareRelationV2.new,
         input_digest: CommandInputDigest.new,
         clock: SystemClock.new,
         id_generator: IdGenerator.new,
@@ -70,11 +70,25 @@ module Coordinator::Write
         )
         return target if target.failure?
 
+        source_state = @loader.load(artifact_relation.source_artifact_id)
+        unless source_state.created || source_state.capture
+          return Failure(OutcomeError.new(
+            code: :development_artifact_not_found,
+            message: "Source Development Artifact was not found",
+            details: { artifact_id: artifact_relation.source_artifact_id }
+          ))
+        end
+        command = with_target(command, target.value!)
+        source_relations = load_relation_states(artifact_relation.source_artifact_id)
+        superseded_state = command.supersedes_relation_id && source_relations.find do |state|
+          state.declaration&.relation_id == command.supersedes_relation_id
+        end
         decision_result = @decider.call(
-          state: @loader.load(artifact_relation.source_artifact_id),
-          command:,
-          target: target.value!,
-          declared_at: preparation.declared_at
+          relation: command.artifact_relation,
+          source_relations:,
+          superseded_state:,
+          superseded_relation_id: command.supersedes_relation_id,
+          supersession_reason: command.supersession_reason
         )
         return decision_result if decision_result.failure?
 
@@ -101,7 +115,7 @@ module Coordinator::Write
         events = @event_store.read_global_marked(
           GlobalMarkedEventReadCriteria.new(
             stream_context: "DevelopmentMemory",
-            stream_name: "DevelopmentArtifact",
+            stream_name: "DevelopmentArtifactRelation",
             event_types: [ "DevelopmentArtifactRelationDeclared" ],
             markers: [ @marker_builder.relation_natural_key(proposed) ],
             maximum_count: 1,
@@ -111,23 +125,12 @@ module Coordinator::Write
         return Success(command) if events.empty?
 
         declaration = load_event(events.sole)
-        existing = declaration.artifact_relation
-        return relation_registry_invalid(proposed) unless relation_tuple(existing) == relation_tuple(proposed)
+        return relation_registry_invalid(proposed) unless declaration.is_a?(Events::DevelopmentArtifactRelationDeclaredV2)
 
-        Success(with_relation_id(command, existing.relation_id))
+        Success(with_relation_id(command, declaration.relation_id))
       rescue EventHistoryLimitExceeded, EventSchemaRegistry::UnknownSchema,
              EventSchemaRegistry::SchemaMismatch, Dry::Struct::Error, KeyError, ArgumentError
         relation_registry_invalid(proposed)
-      end
-
-      def relation_tuple(relation)
-        [
-          relation.source_artifact_id,
-          relation.relation,
-          relation.target.kind,
-          relation.target.id,
-          relation.relation_attributes
-        ]
       end
 
       def with_relation_id(command, relation_id)
@@ -159,20 +162,6 @@ module Coordinator::Write
         )
       end
 
-      def command_id_reused(command, completion:, input_digest:)
-        OutcomeError.new(
-          code: :command_id_reused,
-          message: "Command ID is already bound to another tool or input",
-          details: {
-            command_id: command.command_id,
-            existing_tool_name: completion.tool_name,
-            existing_input_digest: completion.canonical_input_digest,
-            requested_tool_name: TOOL_NAME,
-            requested_input_digest: input_digest
-          }
-        )
-      end
-
       def load_event(event)
         @schema_registry.load(
           type: event.type,
@@ -185,32 +174,54 @@ module Coordinator::Write
         return [] unless plan
 
         artifact_relation = command.artifact_relation
-        stream = @stream_factory.development_artifact(artifact_relation.source_artifact_id)
-        unless plan.writes.length.between?(1, 2) && plan.writes.all? { _1.stream == stream }
-          raise "DeclareDevelopmentArtifactRelation domain plan must write one or two events to its source Artifact stream"
+        unless plan.writes.length.between?(1, 2) && plan.writes.all? do |write|
+          write.stream.stream_name == "DevelopmentArtifactRelation"
+        end
+          raise "DeclareDevelopmentArtifactRelation domain plan must write one or two relation events"
         end
 
-        persisted = plan.writes.zip(event_ids).map do |write, event_id|
+        persisted_writes = plan.writes.zip(event_ids).map do |write, event_id|
           event = write.event
-          @event_factory.build!(
+          [ write.stream, @event_factory.build!(
             event:,
             event_id:,
             metadata: command_metadata(command),
             markers: event_markers(event, artifact_relation:, command_id: command.command_id),
             caused_by:
-          )
+          ) ]
         end
-        @event_store.append(stream, persisted)
+        persisted_writes.map do |stream, event|
+          @event_store.append(stream, [ event ]).sole
+        end
       end
 
       def event_markers(event, artifact_relation:, command_id:)
         case event
-        when Events::DevelopmentArtifactRelationDeclaredV1
-          @marker_builder.relation(artifact_relation:, command_id:)
-        when Events::DevelopmentArtifactRelationSupersededV1
+        when Events::DevelopmentArtifactRelationDeclaredV2
+          @marker_builder.relation_v2(artifact_relation:, command_id:)
+        when Events::DevelopmentArtifactRelationSupersededV2
           @marker_builder.supersession(event:, command_id:)
         else
           raise "Unexpected Development Artifact relation event #{event.class.name}"
+        end
+      end
+
+      def load_relation_states(source_artifact_id)
+        events = @event_store.read_global_marked(
+          GlobalMarkedEventReadCriteria.new(
+            stream_context: "DevelopmentMemory",
+            stream_name: "DevelopmentArtifactRelation",
+            event_types: [
+              "DevelopmentArtifactRelationDeclared",
+              "DevelopmentArtifactRelationSuperseded"
+            ],
+            markers: [ "development-artifact:#{source_artifact_id}" ],
+            maximum_count: Types::DEVELOPMENT_ARTIFACT_RELATION_LIFETIME_MAXIMUM_COUNT * 2,
+            direction: :asc
+          )
+        )
+        events.group_by { _1.stream.stream_id }.values.map do |relation_events|
+          Domain::DevelopmentArtifacts::RelationStateV2.reduce(relation_events.map { load_event(_1) })
         end
       end
 
@@ -220,7 +231,13 @@ module Coordinator::Write
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
-          policy_version: "development-artifact-repository/v1"
+          policy_version: "development-artifact-repository/v2"
+        )
+      end
+
+      def with_target(command, target)
+        Commands::DeclareDevelopmentArtifactRelation.new(
+          command.to_h.merge(artifact_relation: command.artifact_relation.with_target(target))
         )
       end
     end

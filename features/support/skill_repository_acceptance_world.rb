@@ -71,7 +71,7 @@ module SkillRepositoryAcceptanceWorld
     registration = read_global_marked_events(
       stream_context: "AgentKnowledge",
       stream_name: "Skill",
-      event_types: [ "SkillRevisionPublished" ],
+      event_types: [ "SkillRegistered" ],
       marker:,
       maximum_count: 1
     ).first
@@ -84,17 +84,78 @@ module SkillRepositoryAcceptanceWorld
         maximum_count: 100,
         direction: :asc
       )
-    )
+      )
   end
 
-  def project_skill_event(event)
+  def skill_registration(skill_id)
+    event_store.read(
+      streams.skill(skill_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: [ "SkillRegistered" ],
+        maximum_count: 1,
+        direction: :asc
+      )
+    ).first
+  end
+
+  def skill_fact_events(name:, scope:)
+    registration = read_global_marked_events(
+      stream_context: "AgentKnowledge",
+      stream_name: "Skill",
+      event_types: [ "SkillRegistered" ],
+      marker: Coordinator::Write::Skills::MarkerBuilder.new.natural_key(name:, scope:),
+      maximum_count: 1
+    ).first
+    return [] unless registration
+
+    publications = skill_events(name:, scope:)
+    facts = [ registration ] + publications
+    publications.each do |publication|
+      revision_id = publication.data.fetch("skill_revision_id")
+      revision_events = event_store.read(
+        streams.skill_revision(revision_id),
+        Coordinator::Write::EventReadCriteria.new(
+          event_types: %w[
+            SkillRevisionCreated
+            SkillRevisionDescriptionDefined
+            SkillRevisionInstructionsDefined
+            SkillAssetAddedToRevision
+          ],
+          maximum_count: 100,
+          direction: :asc
+        )
+      )
+      facts.concat(revision_events)
+      revision_events.select { _1.type == "SkillAssetAddedToRevision" }.each do |assignment|
+        facts.concat(
+          event_store.read(
+            streams.skill_asset(assignment.data.fetch("asset_id")),
+            Coordinator::Write::EventReadCriteria.new(
+              event_types: %w[
+                SkillAssetCreated
+                SkillAssetPathDefined
+                SkillAssetContentDefined
+                SkillAssetExecutabilityDefined
+              ],
+              maximum_count: 10,
+              direction: :asc
+            )
+          )
+        )
+      end
+    end
+    facts.uniq(&:id).sort_by(&:global_position)
+  end
+
+  def await_skill_revision(event)
+    registration = skill_registration(event.data.fetch("skill_id"))
+    assert_acceptance(registration, "Skill #{event.data.fetch('skill_id')} has no registration fact")
     await_read_model(
-      "Skill #{event.data.fetch('name')} revision #{event.data.fetch('revision')} to become available"
+      "Skill #{registration.data.fetch('name')} revision #{event.data.fetch('revision')} to become available"
     ) do
       payload = skill_view(
-        name: event.data.fetch("name"),
-        scope: event.data.fetch("scope"),
-        revision: event.data.fetch("revision")
+        name: registration.data.fetch("name"),
+        scope: registration.data.fetch("scope")
       )
       [ payload.dig("data", "skill", "revision") == event.data.fetch("revision"), payload ]
     end

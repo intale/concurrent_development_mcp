@@ -2,8 +2,9 @@
 
 module Coordinator::Read
   class DevelopmentArtifactSummaryV1 < Value
-    attribute :artifact_id, Types::DevelopmentArtifactId
-    attribute :observation_id, Types::DevelopmentArtifactObservationId
+    attribute :artifact_id, ProjectedDevelopmentArtifactId
+    attribute :stream_revision, Types::Integer.constrained(gteq: 0)
+    attribute :observation_id, ProjectedDevelopmentArtifactObservationId
     attribute :scope, Types::DevelopmentArtifactScope
     attribute :title, Types::DevelopmentArtifactTitle
     attribute :kind, Types::DevelopmentArtifactKind

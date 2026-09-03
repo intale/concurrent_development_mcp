@@ -6,12 +6,15 @@ module Coordinator::Read
       config.validate_keys = true
 
       params do
-        required(:event_type).filled(:string, eql?: "RepositoryRegistered")
-        required(:schema_version).filled(:integer, eql?: 1)
+        required(:event_type).filled(:string, included_in?: %w[
+          RepositoryRegistered RepositoryDisplayNameChanged RepositoryPathAdded RepositoryPathRemoved
+          RepositoryRemoteAdded RepositoryRemoteRemoved
+        ])
+        required(:schema_version).filled(:integer)
         required(:stream_context).filled(:string, eql?: "DevelopmentPlanning")
         required(:stream_name).filled(:string, eql?: "Repository")
         required(:stream_id).filled(:string)
-        required(:stream_revision).filled(:integer, eql?: 0)
+        required(:stream_revision).filled(:integer, gteq?: 0)
         required(:global_position).filled(:integer, gteq?: 0)
         required(:command_id).filled(:string)
         required(:actor_kind).filled(:string, eql?: "agent")
@@ -22,6 +25,14 @@ module Coordinator::Read
 
       rule(:stream_id) do
         key.failure("must be a valid Repository UUIDv7") unless Types::UUID_V7_PATTERN.match?(value)
+      end
+
+      rule(:event_type, :schema_version, :stream_revision) do
+        expected = values[:event_type] == "RepositoryRegistered" ? [ 1, 2 ] : [ 1 ]
+        key(:schema_version).failure("unsupported Repository event schema") unless expected.include?(values[:schema_version])
+        if values[:event_type] == "RepositoryRegistered"
+          key(:stream_revision).failure("must be zero for RepositoryRegistered") unless values[:stream_revision].zero?
+        end
       end
 
       rule(:command_id, :actor_id) do

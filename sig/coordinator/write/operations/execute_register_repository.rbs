@@ -2,10 +2,12 @@ module Coordinator
   module Write
     module Operations
       class ExecuteRegisterRepository
+        TOOL_NAME: String
+        REPOSITORY_EVENT_TYPES: Array[String]
+
         class PreparationV1 < Shared::Value
-          def registered_at: () -> String
           def input_digest: () -> String
-          def domain_event_id: () -> String
+          def event_ids: () -> Array[String]
         end
 
         def initialize: (event_store: _EventStore, ?contract: Contracts::RegisterRepository, ?decider: Domain::Repositories::Register, ?input_digest: CommandInputDigest, ?clock: Shared::_Clock, ?id_generator: Shared::_IdGenerator, ?event_factory: EventFactory, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory, ?compound_marker_builder: Shared::CompoundMarkerBuilder, ?natural_key_marker: Repositories::NaturalKeyMarker) -> void

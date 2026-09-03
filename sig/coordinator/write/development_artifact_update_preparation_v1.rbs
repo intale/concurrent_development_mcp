@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    class DevelopmentArtifactUpdatePreparationV1 < Shared::Value
+      def recorded_at: () -> String
+      def input_digest: () -> String
+      def event_ids: () -> Array[String]
+    end
+  end
+end

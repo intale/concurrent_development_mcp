@@ -41,6 +41,7 @@ RSpec.describe Coordinator::Write::EventFactory do
       "command_id" => "cmd-100",
       "actor_kind" => "agent",
       "actor_id" => "planner-1",
+      "actor_authenticated" => false,
       "recorded_by" => "coordinator",
       "schema_version" => 1
     )

@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Events
+      class SkillRegisteredV1 < Base
+        def skill_id: () -> String
+        def name: () -> String
+        def scope: () -> String
+      end
+    end
+  end
+end

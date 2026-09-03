@@ -1,0 +1,36 @@
+module Coordinator
+  module Write
+    module Events
+      module ResourceIdentityV2
+        Registration: untyped
+        Binding: untyped
+        Unbinding: untyped
+        CurrentBinding: untyped
+        ResolutionEvent: untyped
+        Event: untyped
+
+        class Registered < Base
+          def resource_id: () -> String
+          def repository_id: () -> String
+          def kind: () -> String
+          def normalized_path: () -> String
+        end
+
+        class Bound < Base
+          def resource_id: () -> String
+          def repository_id: () -> String
+          def kind: () -> String
+          def normalized_path: () -> String
+        end
+
+        class Unbound < Base
+          def resource_id: () -> String
+          def repository_id: () -> String
+          def kind: () -> String
+          def normalized_path: () -> String
+          def reason: () -> String
+        end
+      end
+    end
+  end
+end

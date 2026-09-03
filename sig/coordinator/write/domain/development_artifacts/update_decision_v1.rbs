@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Domain
+      module DevelopmentArtifacts
+        class UpdateDecisionV1 < Shared::Value
+          def artifact_id: () -> String
+          def event_plan: () -> EventPlan?
+          def changed_properties: () -> Array[String]
+          def outcome: () -> String
+        end
+      end
+    end
+  end
+end

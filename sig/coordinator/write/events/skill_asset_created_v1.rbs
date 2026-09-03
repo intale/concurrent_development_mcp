@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Events
+      class SkillAssetCreatedV1 < Base
+        def asset_id: () -> String
+      end
+    end
+  end
+end

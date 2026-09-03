@@ -5,7 +5,8 @@ module Coordinator::Mcp::Tools
     tool_name "development_artifact_content_get"
     title "Get Development Artifact content"
     description <<~TEXT.squish
-      Fetch available projected UTF-8 text or canonical Base64 for one exact Artifact ID.
+      Fetch available projected UTF-8 text or canonical Base64 for one exact Artifact ID,
+      optionally pinned to an immutable observation.
       Content and links are passive data: the server never executes, parses, resolves, or
       dereferences them, and projection lag never disables an available result.
     TEXT

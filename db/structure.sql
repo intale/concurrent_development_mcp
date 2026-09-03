@@ -553,12 +553,40 @@ CREATE TABLE public.decision_slot_heads (
 
 
 --
+-- Name: development_artifact_observation_fact_links; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.development_artifact_observation_fact_links (
+    link_event_id character varying CONSTRAINT development_artifact_observation_fact_li_link_event_id_not_null NOT NULL,
+    observation_id character varying CONSTRAINT development_artifact_observation_fact_l_observation_id_not_null NOT NULL,
+    artifact_id character varying CONSTRAINT development_artifact_observation_fact_link_artifact_id_not_null NOT NULL,
+    role character varying NOT NULL,
+    link_event jsonb NOT NULL,
+    link_actor jsonb NOT NULL,
+    link_markers jsonb DEFAULT '[]'::jsonb CONSTRAINT development_artifact_observation_fact_lin_link_markers_not_null NOT NULL,
+    link_metadata jsonb DEFAULT '{}'::jsonb CONSTRAINT development_artifact_observation_fact_li_link_metadata_not_null NOT NULL,
+    link_causation_id character varying,
+    link_correlation_id character varying,
+    link_global_position bigint CONSTRAINT development_artifact_observation__link_global_position_not_null NOT NULL,
+    link_at_domain timestamp(6) without time zone CONSTRAINT development_artifact_observation_fact_l_link_at_domain_not_null NOT NULL,
+    link_at_store timestamp(6) without time zone CONSTRAINT development_artifact_observation_fact_li_link_at_store_not_null NOT NULL,
+    observed_fact_event jsonb CONSTRAINT development_artifact_observation_f_observed_fact_event_not_null NOT NULL,
+    observed_fact_event_id character varying CONSTRAINT development_artifact_observatio_observed_fact_event_id_not_null NOT NULL,
+    observed_fact_data jsonb CONSTRAINT development_artifact_observation_fa_observed_fact_data_not_null NOT NULL,
+    observed_fact_metadata jsonb DEFAULT '{}'::jsonb CONSTRAINT development_artifact_observatio_observed_fact_metadata_not_null NOT NULL,
+    observed_fact_created_at timestamp(6) without time zone CONSTRAINT development_artifact_observat_observed_fact_created_at_not_null NOT NULL,
+    created_at timestamp(6) without time zone NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
+);
+
+
+--
 -- Name: development_artifact_observations; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.development_artifact_observations (
     observation_id character varying NOT NULL,
-    artifact_id character varying NOT NULL,
+    artifact_id character varying,
     classification_reason text,
     classification_revision integer DEFAULT 1 CONSTRAINT development_artifact_observati_classification_revision_not_null NOT NULL,
     classified_actor jsonb,
@@ -591,7 +619,13 @@ CREATE TABLE public.development_artifact_observations (
     source_observed_at timestamp(6) without time zone,
     source_revision text,
     title text,
-    updated_at timestamp(6) without time zone NOT NULL
+    updated_at timestamp(6) without time zone NOT NULL,
+    content_encoding character varying,
+    content_media_type character varying,
+    content_text text,
+    content_base64 text,
+    content_sha256 character varying,
+    content_byte_size bigint
 );
 
 
@@ -623,7 +657,7 @@ CREATE TABLE public.development_artifact_relation_supersessions (
     created_at timestamp(6) without time zone NOT NULL,
     observed_sequence bigint CONSTRAINT development_artifact_relation_supers_observed_sequence_not_null NOT NULL,
     reason text NOT NULL,
-    replacement_relation_id character varying CONSTRAINT development_artifact_relation__replacement_relation_id_not_null NOT NULL,
+    replacement_relation_id character varying,
     source_artifact_id character varying CONSTRAINT development_artifact_relation_super_source_artifact_id_not_null NOT NULL,
     superseded_actor jsonb CONSTRAINT development_artifact_relation_superse_superseded_actor_not_null NOT NULL,
     superseded_at_domain timestamp(6) without time zone CONSTRAINT development_artifact_relation_sup_superseded_at_domain_not_null NOT NULL,
@@ -713,33 +747,34 @@ ALTER SEQUENCE public.development_artifact_relations_observed_sequence_seq OWNED
 
 CREATE TABLE public.development_artifacts (
     artifact_id character varying NOT NULL,
-    captured_actor jsonb NOT NULL,
-    captured_at_domain timestamp(6) without time zone NOT NULL,
-    captured_at_store timestamp(6) without time zone NOT NULL,
+    captured_actor jsonb,
+    captured_at_domain timestamp(6) without time zone,
+    captured_at_store timestamp(6) without time zone,
     captured_causation_id character varying,
     captured_correlation_id character varying,
-    captured_event jsonb NOT NULL,
-    captured_global_position bigint NOT NULL,
+    captured_event jsonb,
+    captured_global_position bigint,
     captured_markers jsonb DEFAULT '[]'::jsonb NOT NULL,
     captured_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     content_base64 text,
-    content_byte_size bigint NOT NULL,
-    content_encoding character varying NOT NULL,
-    content_media_type character varying NOT NULL,
-    content_sha256 character varying NOT NULL,
+    content_byte_size bigint,
+    content_encoding character varying,
+    content_media_type character varying,
+    content_sha256 character varying,
     content_text text,
     created_at timestamp(6) without time zone NOT NULL,
-    kind character varying NOT NULL,
+    kind character varying,
     labels jsonb DEFAULT '[]'::jsonb NOT NULL,
     observed_sequence bigint NOT NULL,
-    scope text NOT NULL,
-    source_collector character varying NOT NULL,
-    source_kind character varying NOT NULL,
-    source_locator text NOT NULL,
-    source_observed_at timestamp(6) without time zone NOT NULL,
+    scope text,
+    source_collector character varying,
+    source_kind character varying,
+    source_locator text,
+    source_observed_at timestamp(6) without time zone,
     source_revision text,
-    title text NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
+    title text,
+    updated_at timestamp(6) without time zone NOT NULL,
+    stream_revision bigint DEFAULT 0 NOT NULL
 );
 
 
@@ -1475,6 +1510,14 @@ ALTER TABLE ONLY public.decision_slot_heads
 
 
 --
+-- Name: development_artifact_observation_fact_links development_artifact_observation_fact_links_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.development_artifact_observation_fact_links
+    ADD CONSTRAINT development_artifact_observation_fact_links_pkey PRIMARY KEY (link_event_id);
+
+
+--
 -- Name: development_artifact_observations development_artifact_observations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1729,6 +1772,27 @@ CREATE INDEX idx_merge_authorizations_snapshot_position ON public.merge_authoriz
 --
 
 CREATE UNIQUE INDEX idx_merge_snapshots_commit_identity ON public.merge_snapshots USING btree (repository_id, object_format, merge_commit_oid);
+
+
+--
+-- Name: idx_observation_fact_links_artifact; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_observation_fact_links_artifact ON public.development_artifact_observation_fact_links USING btree (artifact_id);
+
+
+--
+-- Name: idx_observation_fact_links_identity; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_observation_fact_links_identity ON public.development_artifact_observation_fact_links USING btree (observation_id, role, observed_fact_event_id);
+
+
+--
+-- Name: idx_observation_fact_links_observation; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_observation_fact_links_observation ON public.development_artifact_observation_fact_links USING btree (observation_id);
 
 
 --
@@ -2428,6 +2492,7 @@ ALTER TABLE ONLY public.operation_batch_outcomes
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260903150000'),
 ('20260903134500'),
 ('20260903123000'),
 ('20260903120500'),

@@ -11,13 +11,13 @@ module Coordinator::Read
       end
 
       rule(:artifact_id) do
-        key.failure("must be a valid Artifact ID") unless Types::DEVELOPMENT_ARTIFACT_ID_PATTERN.match?(value)
+        key.failure("must be a valid Artifact ID") unless ProjectedDevelopmentArtifactId.valid?(value)
       end
 
       rule(:observation_id) do
         next unless value
 
-        unless Types::DEVELOPMENT_ARTIFACT_OBSERVATION_ID_PATTERN.match?(value)
+        unless ProjectedDevelopmentArtifactObservationId.valid?(value)
           key.failure("must be a valid Artifact observation ID")
         end
       end

@@ -43,11 +43,18 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model do
       )
     )
     expect(current.assets.map(&:path)).to eq([ "fixtures/example.json" ])
-    expect(historical).to have_attributes(revision: 1, instructions: "Inspect the complete diff.")
-    expect(historical.assets.map(&:path)).to eq([ "scripts/check.sh" ])
+    expect(historical).to be_nil
+    expect(
+      repository.fetch_asset(
+        name: "review",
+        scope: "project:alpha",
+        path: "scripts/check.sh",
+        revision: 1
+      )
+    ).to be_nil
     expect(Coordinator::Read::Skill.count).to eq(1)
-    expect(Coordinator::Read::SkillRevision.count).to eq(2)
-    expect(Coordinator::Read::SkillAsset.count).to eq(2)
+    expect(Coordinator::Read::SkillRevision.count).to eq(1)
+    expect(Coordinator::Read::SkillAsset.count).to eq(1)
     expect(processed_events.count).to eq(2)
     expect(current.to_h.keys & %i[fresh pending projection_status]).to be_empty
   end
@@ -72,7 +79,7 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model do
     current = repository.fetch(name: "review", scope: "project:alpha")
     historical = repository.fetch(name: "review", scope: "project:alpha", revision: 1)
     expect(current).to have_attributes(revision: 2, instructions: "Newest.")
-    expect(historical).to have_attributes(revision: 1, instructions: "Inspect the complete diff.")
+    expect(historical).to be_nil
     expect(processed_events.count).to eq(2)
   end
 
@@ -118,7 +125,7 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model do
   def processed_events
     Coordinator::Read::ProcessedProjectionEvent.where(
       projection_name: "skills",
-      projection_version: 3
+      projection_version: 4
     )
   end
 end

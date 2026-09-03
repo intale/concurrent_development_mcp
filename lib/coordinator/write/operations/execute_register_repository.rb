@@ -4,11 +4,18 @@ module Coordinator::Write
   module Operations
     class ExecuteRegisterRepository < Dry::Operation
       TOOL_NAME = "repository_register"
+      REPOSITORY_EVENT_TYPES = %w[
+        RepositoryRegistered
+        RepositoryDisplayNameChanged
+        RepositoryPathAdded
+        RepositoryPathRemoved
+        RepositoryRemoteAdded
+        RepositoryRemoteRemoved
+      ].freeze
 
       class PreparationV1 < Value
-        attribute :registered_at, Types::Timestamp
         attribute :input_digest, Types::Sha256Digest
-        attribute :domain_event_id, Types::UuidV7
+        attribute :event_ids, Types::Array.of(Types::UuidV7).constrained(min_size: 1, max_size: 42)
       end
 
       def initialize(
@@ -64,9 +71,8 @@ module Coordinator::Write
 
       def call_command(command, caused_by: nil)
         preparation = PreparationV1.new(
-          registered_at: @clock.now,
           input_digest: @input_digest.call(command),
-          domain_event_id: @id_generator.uuid_v7,
+          event_ids: Array.new(command_event_count(command)) { @id_generator.uuid_v7 },
         )
 
         @event_store.multiple { execute_attempt(command:, preparation:, caused_by:) }
@@ -85,8 +91,10 @@ module Coordinator::Write
       end
 
       def execute_attempt(command:, preparation:, caused_by:)
-        registration_by_key = load_registration_by_key(command)
-        registration_by_id = load_registration(command.repository_id)
+        registration_by_key_source = load_registration_by_key(command)
+        registration_by_id_source = load_registration(command.repository_id)
+        registration_by_key = registration_by_key_source&.last
+        registration_by_id = registration_by_id_source&.last
         ActiveSupport::Notifications.instrument(
           "coordinator.command_boundary",
           operation: "repository_register_dcb",
@@ -95,8 +103,7 @@ module Coordinator::Write
         decision = @decider.call(
           registration_by_key:,
           registration_by_id:,
-          command:,
-          registered_at: preparation.registered_at
+          command:
         )
         return decision if decision.failure?
 
@@ -105,73 +112,120 @@ module Coordinator::Write
                       persist_registration(
                         decided.event_plan,
                         command:,
-                        event_id: preparation.domain_event_id,
-                        caused_by:
+                        caused_by:,
+                        event_ids: preparation.event_ids
                       )
-        end
+                    end
         completion = build_completion(
           command:,
           input_digest: preparation.input_digest,
           registration: decided.registration,
           outcome: decided.outcome,
-          persisted_event: persisted,
-          completed_at: preparation.registered_at
+          persisted_events: persisted || [],
+          source_event: registration_by_key_source&.first || registration_by_id_source&.first
         )
 
         Success(completion)
       end
 
       def load_registration(repository_id)
-        event = @event_store.read(
+        events = @event_store.read(
           @stream_factory.repository(repository_id),
           EventReadCriteria.new(
-            event_types: [ "RepositoryRegistered" ],
-            maximum_count: 1,
+            event_types: REPOSITORY_EVENT_TYPES,
+            maximum_count: 1_024,
             direction: :asc
           )
-        ).first
-        deserialize(event)
+        )
+        fold_registration(events)
       end
 
       def load_registration_by_key(command)
-        repository_stream = @stream_factory.repository(command.repository_id)
         event = @event_store.read_global_marked(
           GlobalMarkedEventReadCriteria.new(
-            stream_context: repository_stream.context,
-            stream_name: repository_stream.stream_name,
+            stream_context: "DevelopmentPlanning",
+            stream_name: "Repository",
             event_types: [ "RepositoryRegistered" ],
             markers: [ scoped_repository_key_marker(command).marker ],
             maximum_count: 1,
             direction: :asc
           )
         ).first
-        deserialize(event)
-      end
-
-      def deserialize(event)
         return unless event
 
-        @schema_registry.load(
-          type: event.type,
-          schema_version: event.metadata.fetch("schema_version"),
-          data: event.data
-        )
+        load_registration(event.stream.stream_id)
       end
 
-      def persist_registration(plan, command:, event_id:, caused_by:)
-        write = plan.writes.sole
+      def fold_registration(events)
+        registration_event = events.find { _1.type == "RepositoryRegistered" }
+        return unless registration_event
 
-        event = @event_factory.build!(
-          event: write.event,
-          event_id:,
-          metadata: command_metadata(command),
-          markers: registration_markers(command),
-          caused_by:
-        )
-        @event_store.append(write.stream, [ event ]).fetch(0)
+        state = nil
+        events.each do |event|
+          payload = @schema_registry.load(
+            type: event.type,
+            schema_version: event.metadata.fetch("schema_version"),
+            data: event.data
+          )
+          state = case payload
+          when Events::RepositoryRegisteredV1
+            RepositoryRegistrationV2.new(
+              repository_id: payload.repository_id,
+              scope: payload.scope,
+              repository_key: payload.repository_key,
+              display_name: payload.display_name,
+              paths: payload.paths,
+              remotes: payload.remotes
+            )
+          when Events::RepositoryRegisteredV2
+            RepositoryRegistrationV2.new(
+              repository_id: payload.repository_id,
+              scope: payload.scope,
+              repository_key: payload.repository_key,
+              display_name: nil,
+              paths: [],
+              remotes: []
+            )
+          when Events::RepositoryDisplayNameChangedV1
+            replace_registration(state, display_name: payload.display_name)
+          when Events::RepositoryPathAddedV1
+            replace_registration(state, paths: (state.paths + [ payload.path ]).uniq)
+          when Events::RepositoryPathRemovedV1
+            replace_registration(state, paths: state.paths - [ payload.path ])
+          when Events::RepositoryRemoteAddedV1
+            replace_registration(state, remotes: (state.remotes + [ payload.remote ]).uniq)
+          when Events::RepositoryRemoteRemovedV1
+            replace_registration(state, remotes: state.remotes - [ payload.remote ])
+          else
+            state
+          end
+        end
+
+        [ registration_event, state ]
       end
 
-      def registration_markers(command)
+      def replace_registration(state, attributes)
+        RepositoryRegistrationV2.new(state.to_h.merge(attributes))
+      end
+
+      def persist_registration(plan, command:, caused_by:, event_ids:)
+        writes = plan.writes.each_with_index.map do |write, index|
+          @event_factory.build!(
+            event: write.event,
+            event_id: event_ids.fetch(index),
+            metadata: command_metadata(command),
+            markers: registration_markers(command, event: write.event),
+            caused_by:
+          )
+        end
+        @event_store.append(plan.writes.first.stream, writes)
+      end
+
+      def command_event_count(command)
+        1 + (command.display_name ? 1 : 0) + command.paths.length + command.remotes.length
+      end
+
+      def registration_markers(command, event: nil)
         scope = @compound_marker_builder.call(
           CompoundMarkerDefinitionV1.new(
             purpose: "repository-scope",
@@ -186,14 +240,15 @@ module Coordinator::Write
         )
         scoped_key = scoped_repository_key_marker(command)
 
-        [
+        markers = [
           "repository:#{command.repository_id}",
           "repository-key:#{command.repository_key}",
-          scope.marker,
-          identity.marker,
-          scoped_key.marker,
           "command:#{command.command_id}"
         ]
+        if event.is_a?(Events::RepositoryRegisteredV2)
+          markers.concat([ scope.marker, identity.marker, scoped_key.marker ])
+        end
+        markers
       end
 
       def scoped_repository_key_marker(command)
@@ -203,7 +258,8 @@ module Coordinator::Write
         )
       end
 
-      def build_completion(command:, input_digest:, registration:, outcome:, persisted_event:, completed_at:)
+      def build_completion(command:, input_digest:, registration:, outcome:, persisted_events:, source_event:)
+        event = persisted_events.first || source_event
         CommandResultV1.new(
           command_id: command.command_id,
           tool_name: TOOL_NAME,
@@ -219,12 +275,12 @@ module Coordinator::Write
             display_name: registration.display_name,
             paths: registration.paths,
             remotes: registration.remotes,
-            registered_at: registration.registered_at
+            registered_at: event.created_at.utc.iso8601(6)
           ),
           warnings: [],
           next_actions: [],
-          emitted_events: persisted_event ? [ event_reference(persisted_event) ] : [],
-          completed_at:
+          emitted_events: persisted_events.map { event_reference(_1) },
+          completed_at: event.created_at.utc.iso8601(6)
         )
       end
 

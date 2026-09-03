@@ -36,6 +36,27 @@ module DevelopmentArtifactAcceptanceWorld
     state.dig("result", "result", "structuredContent")
   end
 
+  def update_artifact_task(
+    command_id:,
+    artifact_id:,
+    expected_revision:,
+    changes:,
+    actor_id: "artifact-agent",
+    client_id: "default"
+  )
+    task_id = submit_and_execute(
+      "development_artifact_update",
+      client_id:,
+      command_id:,
+      actor: { kind: "agent", id: actor_id },
+      artifact_id:,
+      expected_revision:,
+      changes:
+    )
+    state = task_request("tasks/get", task_id, client_id:)
+    state.dig("result", "result", "structuredContent")
+  end
+
   def declare_artifact_relation_task(
     command_id:,
     source_artifact_id:,
@@ -70,7 +91,54 @@ module DevelopmentArtifactAcceptanceWorld
   def artifact_events(artifact_id)
     event_store.read(
       streams.development_artifact(artifact_id),
-      Coordinator::Write::EventQueries::DEVELOPMENT_ARTIFACT_HISTORY
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[
+          DevelopmentArtifactCreated DevelopmentArtifactScopeChanged DevelopmentArtifactTitleChanged
+          DevelopmentArtifactKindChanged DevelopmentArtifactLabelAdded DevelopmentArtifactLabelRemoved
+          DevelopmentArtifactSourceChanged DevelopmentArtifactContentChanged DevelopmentArtifactCaptured
+        ],
+        maximum_count: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_HISTORY_MAXIMUM_COUNT,
+        direction: :asc
+      )
+    )
+  end
+
+  def artifact_observation_events(observation_id)
+    event_store.read(
+      streams.development_artifact_observation(observation_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[
+          DevelopmentArtifactObservationRecorded DevelopmentArtifactObservationFactLinked
+          DevelopmentArtifactClassificationCorrectionRecorded DevelopmentArtifactObserved
+          DevelopmentArtifactClassificationCorrected
+        ],
+        maximum_count: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_OBSERVATION_HISTORY_MAXIMUM_COUNT,
+        direction: :asc
+      )
+    )
+  end
+
+  def artifact_relation_events(relation_id)
+    event_store.read(
+      streams.development_artifact_relation(relation_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[DevelopmentArtifactRelationDeclared DevelopmentArtifactRelationSuperseded],
+        maximum_count: 2,
+        direction: :asc
+      )
+    )
+  end
+
+  def source_artifact_relation_events(artifact_id)
+    event_store.read_global_marked(
+      Coordinator::Write::GlobalMarkedEventReadCriteria.new(
+        stream_context: "DevelopmentMemory",
+        stream_name: "DevelopmentArtifactRelation",
+        event_types: %w[DevelopmentArtifactRelationDeclared DevelopmentArtifactRelationSuperseded],
+        markers: [ "development-artifact:#{artifact_id}" ],
+        maximum_count: Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_RELATION_LIFETIME_MAXIMUM_COUNT * 2,
+        direction: :asc
+      )
     )
   end
 
@@ -89,13 +157,19 @@ module DevelopmentArtifactAcceptanceWorld
     when "DevelopmentArtifactCaptured"
       artifact_id = event.data.fetch("artifact").fetch("artifact_id")
       project_artifact(artifact_id)
+    when "DevelopmentArtifactCreated", "DevelopmentArtifactScopeChanged",
+         "DevelopmentArtifactTitleChanged", "DevelopmentArtifactKindChanged",
+         "DevelopmentArtifactLabelAdded", "DevelopmentArtifactLabelRemoved",
+         "DevelopmentArtifactSourceChanged", "DevelopmentArtifactContentChanged"
+      project_artifact(event.data.fetch("artifact_id"))
     when "DevelopmentArtifactRelationDeclared"
-      artifact_id = event.data.fetch("artifact_relation").fetch("source_artifact_id")
-      relation_id = event.data.dig("artifact_relation", "relation_id")
+      artifact_id = event.data["source_artifact_id"] ||
+        event.data.fetch("artifact_relation").fetch("source_artifact_id")
+      relation_id = event.data["relation_id"] || event.data.dig("artifact_relation", "relation_id")
       await_artifact_relation(artifact_id, relation_id:, status: "active")
     when "DevelopmentArtifactRelationSuperseded"
       artifact_id = event.data.fetch("source_artifact_id")
-      relation_id = event.data.fetch("superseded_relation_id")
+      relation_id = event.data["relation_id"] || event.data.fetch("superseded_relation_id")
       await_artifact_relation(artifact_id, relation_id:, status: "superseded")
     end
   end
@@ -107,8 +181,10 @@ module DevelopmentArtifactAcceptanceWorld
       .dig("result", "structuredContent")
   end
 
-  def artifact_content(artifact_id)
-    call_tool("development_artifact_content_get", { artifact_id: })
+  def artifact_content(artifact_id, observation_id: nil)
+    arguments = { artifact_id: }
+    arguments[:observation_id] = observation_id if observation_id
+    call_tool("development_artifact_content_get", arguments)
       .dig("result", "structuredContent")
   end
 
@@ -174,7 +250,10 @@ module DevelopmentArtifactAcceptanceWorld
 
   def await_artifact_relation_batch(batch_id)
     start_process_subscriptions
-    eventually("Artifact relation Batch #{batch_id} to become terminal", timeout_seconds: 30) do
+    eventually(
+      "Artifact relation Batch #{batch_id} to become terminal",
+      timeout_seconds: LiveSubscriptions::HIGH_VOLUME_TIMEOUT_SECONDS
+    ) do
       events = artifact_relation_batch_events(batch_id)
       terminal = events.any? do |event|
         %w[OperationBatchCompleted OperationBatchCancelled].include?(event.type)

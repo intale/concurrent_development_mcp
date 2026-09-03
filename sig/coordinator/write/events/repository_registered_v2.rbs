@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Events
+      class RepositoryRegisteredV2 < Base
+        def repository_id: () -> String
+        def scope: () -> String
+        def repository_key: () -> String?
+      end
+    end
+  end
+end

@@ -26,7 +26,7 @@ When("both scoped Skill facts reach the read side") do
   @scoped_skill_publications.each do |publication|
     outcome = publication.fetch(:outcome)
     skill_events(name: outcome.dig("data", "name"), scope: outcome.dig("data", "scope")).each do |event|
-      project_skill_event(event)
+      await_skill_revision(event)
     end
   end
 end
@@ -55,7 +55,7 @@ Given("Skill {string} in scope {string} has projected revision 1") do |name, sco
     instructions: "Revision one instructions.",
     assets: []
   )
-  project_skill_event(skill_events(name:, scope:).sole)
+  await_skill_revision(skill_events(name:, scope:).sole)
 end
 
 When("the agent publishes revision 2 without projecting it") do
@@ -109,7 +109,7 @@ Then("the stale Skill Task completes with revision conflict and a rejected comma
 end
 
 When("Skill revision 2 reaches the read side") do
-  project_skill_event(skill_events(name: @lagging_skill_name, scope: @lagging_skill_scope).last)
+  await_skill_revision(skill_events(name: @lagging_skill_name, scope: @lagging_skill_scope).last)
 end
 
 Then("Skill {string} is available at revision 2 without a freshness field") do |name|
@@ -137,7 +137,7 @@ When("the agent publishes Skill {string} with script asset {string}") do |name, 
 end
 
 When("the Skill publication reaches the read side") do
-  project_skill_event(skill_events(name: @asset_skill_name, scope: @asset_skill_scope).sole)
+  await_skill_revision(skill_events(name: @asset_skill_name, scope: @asset_skill_scope).sole)
 end
 
 Then("the exact script asset content and digest are available through MCP") do
@@ -199,7 +199,7 @@ When("the agent publishes and replays Skill {string} with Unicode text and binar
 end
 
 When("the semantic Skill fact reaches the read side") do
-  project_skill_event(
+  await_skill_revision(
     skill_events(name: @semantic_skill_name, scope: @semantic_skill_scope).sole
   )
 end
@@ -229,11 +229,17 @@ end
 Then("replay leaves one semantic Skill publication fact") do
   outcomes = @semantic_skill_publications.map { _1.fetch(:outcome).fetch("data") }
   assert_acceptance_equal(1, outcomes.uniq.length, "Replay outcomes")
-  event = skill_events(name: @semantic_skill_name, scope: @semantic_skill_scope).sole
-  assert_acceptance_equal(2, event.metadata.fetch("schema_version"), "Skill event schema")
-  contents = event.data.fetch("assets").map { _1.fetch("content") }
-  assert_acceptance(contents.any? { _1.key?("text") && !_1.key?("base64") }, "Text fact")
-  assert_acceptance(contents.any? { _1.key?("base64") && !_1.key?("text") }, "Binary fact")
+  publication = skill_events(name: @semantic_skill_name, scope: @semantic_skill_scope).sole
+  assert_acceptance_equal(3, publication.metadata.fetch("schema_version"), "Skill event schema")
+  contents = skill_fact_events(name: @semantic_skill_name, scope: @semantic_skill_scope)
+    .select { _1.type == "SkillAssetContentDefined" }
+  assert_acceptance_equal(2, contents.length, "Granular content facts")
+  text_fact = contents.find { _1.metadata.fetch("encoding") == "utf-8" }
+  binary_fact = contents.find { _1.metadata.fetch("encoding") == "binary" }
+  assert_acceptance(text_fact, "Text fact")
+  assert_acceptance(binary_fact, "Binary fact")
+  assert_acceptance_equal(@semantic_text, text_fact.data.fetch("content"), "Text content fact")
+  assert_acceptance_equal([ @semantic_binary ].pack("m0"), binary_fact.data.fetch("content"), "Binary content fact")
 end
 
 When("the agent submits a Skill asset with an invalid mixed encoding representation") do
@@ -296,38 +302,36 @@ Given("Skill {string} in scope {string} has projected revisions 1 and 2 with dif
     instructions: "Current revision two.",
     assets: [ script_asset("references/current.txt", "revision two policy\n") ]
   )
-  skill_events(name:, scope:).each { project_skill_event(_1) }
+  await_skill_revision(skill_events(name:, scope:).last)
 end
 
-When("the agent retrieves Skill {string} revision 1 and follows its asset manifest") do |name|
+When("the agent retrieves the latest Skill {string} and follows its asset manifest") do |name|
   @historical_skill_view = skill_view(
     name:,
-    scope: @historical_skill_scope,
-    revision: 1
+    scope: @historical_skill_scope
   )
   manifest = @historical_skill_view.dig("data", "skill", "assets").sole
   @historical_skill_asset = skill_asset(
     name:,
     scope: @historical_skill_scope,
-    revision: 1,
     path: manifest.fetch("path")
   )
 end
 
-Then("the Skill metadata, manifest, and asset content all describe revision 1") do
+Then("the Skill metadata, manifest, and asset content all describe revision 2") do
   skill = @historical_skill_view.dig("data", "skill")
   manifest = skill.fetch("assets").sole
   asset = @historical_skill_asset.dig("data", "asset")
 
   assert_acceptance_equal("ok", @historical_skill_view.fetch("status"), "Historical Skill status")
   assert_acceptance_equal("ok", @historical_skill_asset.fetch("status"), "Historical asset status")
-  assert_acceptance_equal(1, skill.fetch("revision"), "Historical Skill revision")
-  assert_acceptance_equal(1, asset.fetch("revision"), "Historical asset revision")
+  assert_acceptance_equal(2, skill.fetch("revision"), "Latest Skill revision")
+  assert_acceptance_equal(2, asset.fetch("revision"), "Latest asset revision")
   assert_acceptance_equal(manifest.fetch("content_sha256"), asset.fetch("content_sha256"), "Pinned digest")
   assert_acceptance_equal(
-    @historical_asset_content,
+    "revision two policy\n",
     asset.fetch("text"),
-    "Pinned asset content"
+    "Latest asset content"
   )
 end
 
@@ -411,7 +415,7 @@ end
 
 When("the winning Skill fact reaches the read side through live subscriptions") do
   event = skill_events(name: @concurrent_skill_name, scope: @concurrent_skill_scope).sole
-  project_skill_event(event)
+  await_skill_revision(event)
 end
 
 Then("Skill {string} exposes exactly the winning revision 1 snapshot") do |name|
@@ -445,15 +449,46 @@ Given("Skill {string} in scope {string} has published revisions 1 and 2") do |na
   )
 end
 
-When("Skill revision 2 reaches the read side before revision 1 and both deliveries are repeated") do
-  first_event, second_event = skill_events(name: @replayed_skill_name, scope: @replayed_skill_scope)
-  [ second_event, second_event, first_event, first_event ].each { project_skill_event(_1) }
+When("both published Skill revisions reach the read side") do
+  await_skill_revision(skill_events(name: @replayed_skill_name, scope: @replayed_skill_scope).last)
 end
 
-Then("both historical Skill revisions remain retrievable") do
-  revisions = [ 1, 2 ].map do |revision|
-    skill_view(name: @replayed_skill_name, scope: @replayed_skill_scope, revision:)
-      .dig("data", "skill", "revision")
-  end
-  assert_acceptance_equal([ 1, 2 ], revisions, "Historical Skill revisions")
+Then("the obsolete Skill revision is not retrievable") do
+  obsolete = skill_view(name: @replayed_skill_name, scope: @replayed_skill_scope, revision: 1)
+  assert_acceptance_equal("not_found", obsolete.fetch("status"), "Obsolete Skill revision")
+end
+
+Then("the Skill publication contains granular revision and asset facts") do
+  facts = skill_fact_events(name: @asset_skill_name, scope: @asset_skill_scope)
+  expected_types = %w[
+    SkillRegistered
+    SkillRevisionCreated
+    SkillRevisionDescriptionDefined
+    SkillRevisionInstructionsDefined
+    SkillAssetCreated
+    SkillAssetPathDefined
+    SkillAssetContentDefined
+    SkillAssetExecutabilityDefined
+    SkillAssetAddedToRevision
+    SkillRevisionPublished
+  ]
+  assert_acceptance(
+    (expected_types - facts.map(&:type)).empty?,
+    "Granular Skill fact types: #{facts.map(&:type).inspect}"
+  )
+
+  content = facts.find { _1.type == "SkillAssetContentDefined" }
+  assert_acceptance_equal(%w[asset_id content], content.data.keys.sort, "Content fact data")
+  assert_acceptance_equal(
+    "utf-8",
+    content.metadata.fetch("encoding"),
+    "Content fact encoding"
+  )
+  assert_acceptance_equal("text/x-shellscript", content.metadata.fetch("media_type"), "Content fact media type")
+  publication = facts.find { _1.type == "SkillRevisionPublished" }
+  assert_acceptance_equal(
+    %w[revision skill_id skill_revision_id],
+    publication.data.keys.sort,
+    "Publication fact data"
+  )
 end

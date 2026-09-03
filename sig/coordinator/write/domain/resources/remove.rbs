@@ -4,17 +4,16 @@ module Coordinator
       module Resources
         class Remove
           class DecisionV1 < Shared::Value
-            def registration: () -> Events::ResourceIdentityV1::Registered
-            def current_binding: () -> (Events::ResourceIdentityV1::Bound | Events::ResourceIdentityV1::Unbound)
-            def unbinding: () -> Events::ResourceIdentityV1::Unbound?
-            def events: () -> Array[Events::ResourceIdentityV1::Unbound]
+            def registration: () -> Events::ResourceIdentityV2::Registered
+            def current_binding: () -> (Events::ResourceIdentityV2::Bound | Events::ResourceIdentityV2::Unbound)
+            def unbinding: () -> Events::ResourceIdentityV2::Unbound?
+            def events: () -> Array[Events::ResourceIdentityV2::Unbound]
             def outcome: () -> String
-            def unbound_at: () -> String?
           end
 
           def call: (
-            registration: Events::ResourceIdentityV1::Registered,
-            current_binding: Events::ResourceIdentityV1::Bound | Events::ResourceIdentityV1::Unbound | nil,
+            registration: Events::ResourceIdentityV2::Registered,
+            current_binding: Events::ResourceIdentityV2::Bound | Events::ResourceIdentityV2::Unbound | nil,
             reason: String,
             removed_at: String
           ) -> Dry::Monads::Result

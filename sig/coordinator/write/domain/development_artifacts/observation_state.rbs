@@ -7,6 +7,12 @@ module Coordinator
           def self.reduce: (Array[Events::Base] events) -> ObservationState
           def observation: () -> Events::DevelopmentArtifactObservedV1?
           def corrections: () -> Array[Events::DevelopmentArtifactClassificationCorrectedV1]
+          def recorded: () -> Events::DevelopmentArtifactObservationRecordedV1?
+          def link: () -> Events::DevelopmentArtifactObservationFactLinkedV1?
+          def links: () -> Array[Events::DevelopmentArtifactObservationFactLinkedV1]
+          def correction_records: () -> Array[Events::DevelopmentArtifactClassificationCorrectionRecordedV1]
+          def artifact_id: () -> String?
+          def fact_event_ids: () -> Array[String]
           def classification_revision: () -> Integer
           def title: () -> String?
           def kind: () -> String?

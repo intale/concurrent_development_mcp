@@ -1,0 +1,16 @@
+module Coordinator
+  module Write
+    module Skills
+      class RevisionStateV1 < Shared::Value
+        def self.initial: (skill_revision_id: String, skill_id: String, revision: Integer) -> RevisionStateV1
+        def self.reduce: (Array[Events::Base] events) -> RevisionStateV1?
+        def skill_revision_id: () -> String
+        def skill_id: () -> String
+        def revision: () -> Integer
+        def description: () -> String?
+        def instructions: () -> String?
+        def asset_ids: () -> Array[String]
+      end
+    end
+  end
+end

@@ -9,15 +9,13 @@ module Coordinator::Write
         event_store:,
         preparer: PrepareCaptureDevelopmentArtifact.new,
         loader: DevelopmentArtifacts::Loader.new(event_store:),
-        decider: Domain::DevelopmentArtifacts::Capture.new,
+        decider: Domain::DevelopmentArtifacts::GranularCapture.new,
         input_digest: CommandInputDigest.new,
         clock: SystemClock.new,
         id_generator: IdGenerator.new,
         event_factory: EventFactory.new,
-        schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
         marker_builder: DevelopmentArtifacts::MarkerBuilder.new,
-        natural_key_registry: NaturalKeys::Registry.new(event_store:),
         completion_builder: CommandResultBuilder.new
       )
         @event_store = event_store
@@ -28,10 +26,8 @@ module Coordinator::Write
         @clock = clock
         @id_generator = id_generator
         @event_factory = event_factory
-        @schema_registry = schema_registry
         @stream_factory = stream_factory
         @marker_builder = marker_builder
-        @natural_key_registry = natural_key_registry
         @completion_builder = completion_builder
       end
 
@@ -50,25 +46,29 @@ module Coordinator::Write
       private
 
       def prepare_logical_values(command)
+        fact_count = 6 + command.artifact.labels.length
         DevelopmentArtifactCapturePreparationV1.new(
           captured_at: @clock.now,
           input_digest: @input_digest.development_artifact_capture(command),
-          capture_event_id: @id_generator.uuid_v7,
           observation_event_id: @id_generator.uuid_v7,
+          artifact_fact_event_ids: fact_count.times.map { @id_generator.uuid_v7 },
+          observation_fact_event_ids: fact_count.times.map { @id_generator.uuid_v7 }
         )
       end
 
       def execute_attempt(command:, preparation:, caused_by:)
-        resolved = resolve_artifact(command)
-        return resolved if resolved.failure?
+        state = @loader.load(command.artifact.artifact_id)
+        return Failure(OutcomeError.new(
+          code: :development_artifact_identity_conflict,
+          message: "Artifact UUIDv7 is already occupied",
+          details: { artifact_id: command.artifact.artifact_id }
+        )) if state.created || state.capture
 
-        command = resolved.value!
-
+        fact_references = proposed_fact_references(command.artifact.artifact_id, command, preparation)
         decision_result = @decider.call(
-          state: @loader.load(command.artifact.artifact_id),
-          observation_state: @loader.load_observation(command.observation.observation_id),
-          command:,
-          captured_at: preparation.captured_at
+          artifact: command.artifact,
+          observation: command.observation,
+          fact_event_references: fact_references
         )
         return decision_result if decision_result.failure?
 
@@ -90,114 +90,83 @@ module Coordinator::Write
         Success(completion)
       end
 
-      def resolve_artifact(command)
-        artifact = command.artifact
-        result = @natural_key_registry.find(
-          selector: NaturalKeys::Registry::SelectorV1.new(
-            stream_context: "DevelopmentMemory",
-            stream_name: "DevelopmentArtifact",
-            event_type: "DevelopmentArtifactCaptured",
-            marker: @marker_builder.natural_key(artifact)
-          ),
-          identity_from: ->(event) { artifact_identity_from(event, artifact) }
-        )
-        return registry_failure(result.failure) if result.failure?
-        return Success(command) unless result.value!
-
-        Success(with_artifact_id(command, result.value!.identity))
-      end
-
-      def artifact_identity_from(event, expected)
-        payload = load_event(event)
-        return unless payload.is_a?(Events::DevelopmentArtifactCapturedV2)
-
-        artifact = payload.artifact
-        return unless [ artifact.scope, artifact.source.kind, artifact.source.locator ] ==
-                      [ expected.scope, expected.source.kind, expected.source.locator ]
-
-        artifact.artifact_id
-      rescue EventSchemaRegistry::UnknownSchema, EventSchemaRegistry::SchemaMismatch,
-             Dry::Struct::Error, KeyError, ArgumentError
-        nil
-      end
-
-      def with_artifact_id(command, artifact_id)
-        artifact = DevelopmentArtifacts::ArtifactV2.new(command.artifact.to_h.merge(artifact_id:))
-        observation = DevelopmentArtifacts::ArtifactObservationV1.new(
-          command.observation.to_h.merge(artifact_id:)
-        )
-        Commands::CaptureDevelopmentArtifact.new(
-          command_id: command.command_id,
-          actor: command.actor,
-          artifact:,
-          observation:
-        )
-      end
-
-      def registry_failure(error)
-        Failure(
-          OutcomeError.new(
-            code: :development_artifact_identity_registry_invalid,
-            message: error.message,
-            details: error.to_h
-          )
-        )
-      end
-
-      def command_id_reused(command, completion:, input_digest:)
-        OutcomeError.new(
-          code: :command_id_reused,
-          message: "Command ID is already bound to another tool or input",
-          details: {
-            command_id: command.command_id,
-            existing_tool_name: completion.tool_name,
-            existing_input_digest: completion.canonical_input_digest,
-            requested_tool_name: TOOL_NAME,
-            requested_input_digest: input_digest
-          }
-        )
-      end
-
-      def load_event(event)
-        @schema_registry.load(
-          type: event.type,
-          schema_version: event.metadata.fetch("schema_version"),
-          data: event.data
-        )
-      end
-
       def persist_domain_plan(plan, command:, preparation:, caused_by:)
         return [] unless plan
 
-        expected_streams = [
-          @stream_factory.development_artifact(command.artifact.artifact_id),
-          @stream_factory.development_artifact_observation(command.observation.observation_id)
-        ]
-        unless plan.writes.length.between?(1, 2) &&
-               plan.writes.map(&:stream).uniq.length == plan.writes.length &&
-               plan.writes.all? { expected_streams.include?(_1.stream) }
-          raise "CaptureDevelopmentArtifact domain plan must write bounded Artifact and observation facts"
-        end
-
+        artifact_index = 0
+        observation_index = 0
         plan.writes.flat_map do |write|
           event = write.event
+          event_id = if event.is_a?(Events::DevelopmentArtifactObservationRecordedV1)
+            preparation.observation_event_id
+          elsif event.is_a?(Events::DevelopmentArtifactObservationFactLinkedV1)
+            preparation.observation_fact_event_ids.fetch(observation_index).tap { observation_index += 1 }
+          else
+            preparation.artifact_fact_event_ids.fetch(artifact_index).tap { artifact_index += 1 }
+          end
           persisted = @event_factory.build!(
             event:,
-            event_id: domain_event_id(event, preparation),
-            metadata: command_metadata(command),
-            markers: @marker_builder.capture(event:, command_id: command.command_id),
+            event_id:,
+            metadata: event_metadata(event, command),
+            markers: event_markers(event, command),
             caused_by:
           )
           @event_store.append(write.stream, [ persisted ])
         end
       end
 
-      def domain_event_id(event, preparation)
+      def proposed_fact_references(artifact_id, command, preparation)
+        types = [
+          "DevelopmentArtifactCreated", "DevelopmentArtifactScopeChanged",
+          "DevelopmentArtifactTitleChanged", "DevelopmentArtifactKindChanged",
+          "DevelopmentArtifactSourceChanged", "DevelopmentArtifactContentChanged"
+        ] + Array.new(command.artifact.labels.length, "DevelopmentArtifactLabelAdded")
+        types.each_with_index.map do |type, index|
+          EventReference.new(
+            event_id: preparation.artifact_fact_event_ids.fetch(index), type:,
+            stream_context: "DevelopmentMemory", stream_name: "DevelopmentArtifact",
+            stream_id: artifact_id, stream_revision: index
+          )
+        end
+      end
+
+      def event_metadata(event, command)
         case event
-        when Events::DevelopmentArtifactCapturedV2
-          preparation.capture_event_id
-        when Events::DevelopmentArtifactObservedV1 then preparation.observation_event_id
-        else raise "Unexpected Development Artifact capture event #{event.class.name}"
+        when Events::DevelopmentArtifactContentChangedV1
+          Metadata::ContentV1.new(
+            **command_metadata(command).to_h,
+            **content_metadata(command.artifact.content)
+          )
+        when Events::DevelopmentArtifactSourceChangedV1
+          Metadata::CollectorV1.new(
+            **command_metadata(command).to_h,
+            collector: command.artifact.source.collector
+          )
+        else
+          command_metadata(command)
+        end
+      end
+
+      def content_metadata(content)
+        {
+          encoding: content.encoding,
+          media_type: content.media_type,
+          byte_size: content.byte_size,
+          content_sha256: content.content_sha256
+        }
+      end
+
+      def event_markers(event, command)
+        if event.is_a?(Events::DevelopmentArtifactObservationRecordedV1) ||
+           event.is_a?(Events::DevelopmentArtifactObservationFactLinkedV1)
+          @marker_builder.observation(event:, command_id: command.command_id)
+        else
+          @marker_builder.artifact(
+            event:,
+            command_id: command.command_id,
+            natural_key: event.is_a?(Events::DevelopmentArtifactCreatedV1) ?
+              @marker_builder.natural_key(command.artifact) : nil
+          )
         end
       end
 
@@ -207,7 +176,7 @@ module Coordinator::Write
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
-          policy_version: "development-artifact-repository/v1"
+          policy_version: "development-artifact-repository/v2"
         )
       end
     end

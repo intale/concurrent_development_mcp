@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class RepositoryRemoteRemovedV1 < Base
+        def repository_id: () -> String
+        def remote: () -> String
+      end
+    end
+  end
+end

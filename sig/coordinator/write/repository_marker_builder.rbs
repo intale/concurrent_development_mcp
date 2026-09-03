@@ -5,7 +5,7 @@ module Coordinator
         ?compound_marker_builder: Shared::CompoundMarkerBuilder,
         ?resource_marker_codec: Shared::ResourceMarkerCodec
       ) -> void
-      def call: (Events::RepositoryRegisteredV1 registration) -> Array[String]
+      def call: (RepositoryRegistrationV2 registration) -> Array[String]
       def resource_event_markers: (repository_id: String, resource_kind: String, resource_path: String) -> Array[String]
       def resource_boundary_markers: (repository_id: String, resource_kind: String, resource_path: String) -> Array[String]
     end

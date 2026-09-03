@@ -48,6 +48,7 @@ module Coordinator::Write
         development_artifact_classification_correction_required: "conflict",
         development_artifact_observation_not_found: "not_found",
         development_artifact_classification_revision_conflict: "conflict",
+        development_artifact_revision_conflict: "conflict",
         development_artifact_classification_revision_limit_reached: "limit_reached",
         development_artifact_not_found: "not_found",
         development_artifact_target_not_found: "not_found",

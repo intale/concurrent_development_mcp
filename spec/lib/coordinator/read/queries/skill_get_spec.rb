@@ -40,30 +40,44 @@ RSpec.describe Coordinator::Read::Queries::SkillGet, :read_model do
     expect(invalid).to have_attributes(status: "invalid")
   end
 
-  it "retrieves an immutable historical revision after the projected head advances" do
+  it "does not serve an obsolete revision slice after the projected head advances" do
     skill = create(
       :coordinator_read_skill,
       name: "review",
       scope: "project:alpha",
       revision: 2
     )
-    create(
-      :coordinator_read_skill_revision,
-      skill:,
-      revision: 1,
-      instructions: "Inspect the complete diff."
-    )
     create(:coordinator_read_skill_revision, skill:, revision: 2, instructions: "Revision two.")
 
-    historical = query.call(name: "review", scope: "project:alpha", revision: 1).value!
+    latest = query.call(name: "review", scope: "project:alpha").value!
+    obsolete = query.call(name: "review", scope: "project:alpha", revision: 1).value!
     absent = query.call(name: "review", scope: "project:alpha", revision: 3).value!
 
-    expect(historical).to have_attributes(status: "ok")
-    expect(historical.data.skill).to have_attributes(
-      revision: 1,
-      instructions: "Inspect the complete diff."
-    )
+    expect(latest).to have_attributes(status: "ok")
+    expect(latest.data.skill).to have_attributes(revision: 2, instructions: "Revision two.")
+    expect(obsolete).to have_attributes(status: "not_found")
     expect(absent).to have_attributes(status: "not_found")
     expect(absent.data.details).to include(revision: 3)
+  end
+
+  it "serves a pre-cutover projected identity until the migration rebuilds the read side" do
+    skill = create(
+      :coordinator_read_skill,
+      skill_id: "skill:v1:#{'a' * 64}",
+      name: "event-modeling",
+      scope: "project:concurrent_development_mcp"
+    )
+    create(:coordinator_read_skill_revision, skill:, instructions: "Model cohesive facts.")
+
+    result = query.call(
+      name: "event-modeling",
+      scope: "project:concurrent_development_mcp"
+    ).value!
+
+    expect(result).to have_attributes(status: "ok")
+    expect(result.data.skill).to have_attributes(
+      skill_id: skill.skill_id,
+      instructions: "Model cohesive facts."
+    )
   end
 end

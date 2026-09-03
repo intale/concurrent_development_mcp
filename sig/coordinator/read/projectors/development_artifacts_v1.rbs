@@ -3,7 +3,7 @@ module Coordinator
     module Projectors
       class DevelopmentArtifactsV1
         PROJECTION: ProjectionDefinition
-        def initialize: (?contract: Contracts::DevelopmentArtifactSourceEvent, ?schema_registry: Write::EventSchemaRegistry, ?artifacts: Repositories::DevelopmentArtifacts, ?processed_events: Repositories::ProcessedProjectionEvents) -> void
+        def initialize: (?contract: Contracts::DevelopmentArtifactSourceEvent, ?schema_registry: Write::EventSchemaRegistry, ?event_store: Write::EventStore?, ?artifacts: Repositories::DevelopmentArtifacts, ?processed_events: Repositories::ProcessedProjectionEvents) -> void
         def call: (PgEventstore::Event event) -> void
       end
     end

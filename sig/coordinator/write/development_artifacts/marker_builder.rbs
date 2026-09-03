@@ -5,13 +5,35 @@ module Coordinator
         NATURAL_KEY_PURPOSE: String
         RELATION_NATURAL_KEY_PURPOSE: String
 
+        type artifact_event = Events::DevelopmentArtifactCreatedV1 |
+                              Events::DevelopmentArtifactScopeChangedV1 |
+                              Events::DevelopmentArtifactTitleChangedV1 |
+                              Events::DevelopmentArtifactKindChangedV1 |
+                              Events::DevelopmentArtifactLabelAddedV1 |
+                              Events::DevelopmentArtifactLabelRemovedV1 |
+                              Events::DevelopmentArtifactSourceChangedV1 |
+                              Events::DevelopmentArtifactContentChangedV1
+
+        type observation_event = Events::DevelopmentArtifactObservationRecordedV1 |
+                                 Events::DevelopmentArtifactObservationFactLinkedV1
+
+        type classification_event = Events::DevelopmentArtifactClassificationCorrectedV1 |
+                                    Events::DevelopmentArtifactClassificationCorrectionRecordedV1 |
+                                    Events::DevelopmentArtifactObservationFactLinkedV1
+
+        type supersession_event = Events::DevelopmentArtifactRelationSupersededV1 |
+                                  Events::DevelopmentArtifactRelationSupersededV2
+
         def initialize: (?marker_codec: Coordinator::Shared::Markers::CodecV2, ?marker_component_builder: Coordinator::Shared::CanonicalMarkerComponentBuilder, ?compound_marker_builder: Coordinator::Shared::CompoundMarkerBuilder) -> void
-        def capture: (event: Events::DevelopmentArtifactCapturedV2 | Events::DevelopmentArtifactObservedV1, command_id: String) -> Array[String]
+        def capture: (event: Events::DevelopmentArtifactCapturedV2 | Events::DevelopmentArtifactObservedV1 | Events::DevelopmentArtifactCreatedV1, command_id: String) -> Array[String]
+        def artifact: (event: artifact_event, command_id: String, ?natural_key: String?) -> Array[String]
+        def observation: (event: observation_event, command_id: String) -> Array[String]
         def natural_key: (ArtifactV2 artifact) -> String
-        def classification: (event: Events::DevelopmentArtifactClassificationCorrectedV1, command_id: String) -> Array[String]
+        def classification: (event: classification_event, command_id: String) -> Array[String]
         def relation: (artifact_relation: RelationV1, command_id: String) -> Array[String]
+        def relation_v2: (artifact_relation: RelationV1, command_id: String) -> Array[String]
         def relation_natural_key: (RelationV1 artifact_relation) -> String
-        def supersession: (event: Events::DevelopmentArtifactRelationSupersededV1, command_id: String) -> Array[String]
+        def supersession: (event: supersession_event, command_id: String) -> Array[String]
       end
     end
   end

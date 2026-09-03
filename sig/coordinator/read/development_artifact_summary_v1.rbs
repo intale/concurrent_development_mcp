@@ -2,6 +2,7 @@ module Coordinator
   module Read
     class DevelopmentArtifactSummaryV1 < Shared::Value
       def artifact_id: () -> String
+      def stream_revision: () -> Integer
       def observation_id: () -> String
       def scope: () -> String
       def title: () -> String

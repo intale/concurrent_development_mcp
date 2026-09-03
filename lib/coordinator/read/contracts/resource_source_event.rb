@@ -7,7 +7,7 @@ module Coordinator::Read
 
       params do
         required(:event_type).filled(:string, included_in?: %w[ResourceRegistered ResourceBound ResourceUnbound])
-        required(:schema_version).filled(:integer, eql?: 1)
+        required(:schema_version).filled(:integer, included_in?: [ 1, 2 ])
         required(:stream_context).filled(:string, eql?: "DevelopmentCoordination")
         required(:stream_name).filled(:string, eql?: "Resource")
         required(:stream_id).filled(:string)

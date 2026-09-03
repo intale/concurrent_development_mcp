@@ -234,6 +234,12 @@ module Coordinator
       )
     end
 
+    register("operations.prepare_update_development_artifact", memoize: true) do
+      Write::Operations::PrepareUpdateDevelopmentArtifact.new(
+        content_builder: self["development_artifacts.content_builder"]
+      )
+    end
+
     register("operations.prepare_correct_development_artifact_classification", memoize: true) do
       Write::Operations::PrepareCorrectDevelopmentArtifactClassification.new
     end
@@ -437,21 +443,27 @@ module Coordinator
     end
 
     register("domain.skills.publish", memoize: true) do
-      Write::Domain::Skills::Publish.new(stream_factory: self["stream_factory"])
+      Write::Domain::Skills::GranularPublish.new
     end
 
     register("domain.development_artifacts.capture", memoize: true) do
-      Write::Domain::DevelopmentArtifacts::Capture.new(stream_factory: self["stream_factory"])
+      Write::Domain::DevelopmentArtifacts::GranularCapture.new(
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("domain.development_artifacts.update", memoize: true) do
+      Write::Domain::DevelopmentArtifacts::Update.new(stream_factory: self["stream_factory"])
     end
 
     register("domain.development_artifacts.correct_classification", memoize: true) do
-      Write::Domain::DevelopmentArtifacts::CorrectClassification.new(
+      Write::Domain::DevelopmentArtifacts::CorrectClassificationV2.new(
         stream_factory: self["stream_factory"]
       )
     end
 
     register("domain.development_artifacts.declare_relation", memoize: true) do
-      Write::Domain::DevelopmentArtifacts::DeclareRelation.new(
+      Write::Domain::DevelopmentArtifacts::DeclareRelationV2.new(
         stream_factory: self["stream_factory"]
       )
     end
@@ -918,6 +930,11 @@ module Coordinator
     register("projectors.skills_v1", memoize: true) do
       Read::Projectors::SkillsV1.new(
         publication_loader: self["skills.persisted_publication_loader"],
+        projection_builder: Write::Skills::PublicationProjectionBuilderV3.new(
+          event_store: self["event_store"],
+          schema_registry: self["event_schema_registry"],
+          stream_factory: self["stream_factory"]
+        ),
         skills: self["repositories.skills"],
         processed_events: self["repositories.processed_projection_events"]
       )
@@ -926,6 +943,7 @@ module Coordinator
     register("projectors.development_artifacts_v1", memoize: true) do
       Read::Projectors::DevelopmentArtifactsV1.new(
         schema_registry: self["event_schema_registry"],
+        event_store: self["event_store"],
         artifacts: self["repositories.development_artifacts"],
         processed_events: self["repositories.processed_projection_events"]
       )
@@ -1547,7 +1565,6 @@ module Coordinator
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
-        publication_loader: self["skills.persisted_publication_loader"],
         stream_factory: self["stream_factory"],
         marker_builder: self["skills.marker_builder"],
         completion_builder: self["command_result_builder"]
@@ -1572,7 +1589,22 @@ module Coordinator
         clock: self["clock"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
-        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        marker_builder: self["development_artifacts.marker_builder"],
+        completion_builder: self["command_result_builder"]
+      )
+    end
+
+    register("operations.execute_update_development_artifact") do
+      Write::Operations::ExecuteUpdateDevelopmentArtifact.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_update_development_artifact"],
+        loader: self["development_artifacts.loader"],
+        decider: self["domain.development_artifacts.update"],
+        input_digest: self["command_input_digest"],
+        clock: self["clock"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
         stream_factory: self["stream_factory"],
         marker_builder: self["development_artifacts.marker_builder"],
         completion_builder: self["command_result_builder"]
@@ -2049,6 +2081,8 @@ module Coordinator
           self["operations.execute_publish_skill_revision"],
         capture_development_artifact:
           self["operations.execute_capture_development_artifact"],
+        update_development_artifact:
+          self["operations.execute_update_development_artifact"],
         correct_development_artifact_classification:
           self["operations.execute_correct_development_artifact_classification"],
         declare_development_artifact_relation:
@@ -2243,6 +2277,13 @@ module Coordinator
     register("operations.submit_capture_development_artifact_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_capture_development_artifact"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_update_development_artifact_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_update_development_artifact"],
         submitter: self["operations.submit_coordination_task"]
       )
     end

@@ -3,8 +3,9 @@ module Coordinator
     class DevelopmentArtifactCapturePreparationV1 < Shared::Value
       def captured_at: () -> String
       def input_digest: () -> String
-      def capture_event_id: () -> String
+      def artifact_fact_event_ids: () -> Array[String]
       def observation_event_id: () -> String
+      def observation_fact_event_ids: () -> Array[String]
     end
   end
 end

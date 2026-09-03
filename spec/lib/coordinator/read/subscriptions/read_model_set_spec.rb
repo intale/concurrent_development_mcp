@@ -109,7 +109,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
         "release-sets-v1",
         "repositories-v1",
         "resources-v1",
-        "skills-v2",
+        "skills-v3",
         "user-utterances-v1",
         "verification-obligations-v1"
       ]
@@ -159,7 +159,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
     )
     expect(skill_registration.definition.identity.to_h).to eq(
       set_name: "coordinator-read-models-v1",
-      subscription_name: "skills-v2"
+      subscription_name: "skills-v3"
     )
     expect(development_artifact_registration.definition.identity.to_h).to eq(
       set_name: "coordinator-read-models-v1",

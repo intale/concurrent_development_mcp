@@ -1,8 +1,10 @@
 module Coordinator
   module Write
     class RepositoryRegistrationLoader
+      EVENT_TYPES: Array[String]
+
       def initialize: (event_store: _EventStore, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory) -> void
-      def call: (String repository_id) -> Events::RepositoryRegisteredV1?
+      def call: (String repository_id) -> RepositoryRegistrationV2?
     end
   end
 end

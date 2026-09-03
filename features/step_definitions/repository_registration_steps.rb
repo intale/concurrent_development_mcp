@@ -33,19 +33,32 @@ Then("the Repository Task completes with the exact attributed metadata") do
   assert_acceptance_equal(@repository_arguments.fetch(:remotes), data.fetch("remotes"), "Attributed remotes")
 end
 
-Then("one scoped Repository fact is durable without a server-derived location") do
+Then("scoped Repository facts are durable without a server-derived location") do
   events = event_store.read(
     streams.repository(@repository_id),
     Coordinator::Write::EventReadCriteria.new(
-      event_types: [ "RepositoryRegistered" ],
-      maximum_count: 1,
+      event_types: %w[
+        RepositoryRegistered RepositoryDisplayNameChanged RepositoryPathAdded RepositoryPathRemoved
+        RepositoryRemoteAdded RepositoryRemoteRemoved
+      ],
+      maximum_count: 20,
       direction: :asc
     )
   )
-  event = events.sole
+  event = events.find { _1.type == "RepositoryRegistered" }
 
   assert_acceptance_equal(@repository_arguments.fetch(:scope), event.data.fetch("scope"), "Persisted scope")
-  assert_acceptance_equal(@repository_arguments.fetch(:paths), event.data.fetch("paths"), "Persisted paths")
+  assert_acceptance_equal(@repository_arguments.fetch(:repository_key), event.data.fetch("repository_key"), "Persisted key")
+  assert_acceptance_equal(
+    @repository_arguments.fetch(:paths),
+    events.select { _1.type == "RepositoryPathAdded" }.map { _1.data.fetch("path") },
+    "Persisted paths"
+  )
+  assert_acceptance_equal(
+    @repository_arguments.fetch(:remotes),
+    events.select { _1.type == "RepositoryRemoteAdded" }.map { _1.data.fetch("remote") },
+    "Persisted remotes"
+  )
   scope_markers = event.markers.grep(/\Acompound:(?:repository-scope|scoped-repository|scoped-repository-key):v2\|/)
   assert_acceptance_equal(3, scope_markers.length, "Scope markers")
 end

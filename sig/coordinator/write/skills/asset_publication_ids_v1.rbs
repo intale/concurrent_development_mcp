@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Skills
+      class AssetPublicationIdsV1 < Shared::Value
+        def asset_id: () -> String
+        def created_event_id: () -> String
+        def path_event_id: () -> String
+        def content_event_id: () -> String
+        def executability_event_id: () -> String
+        def assignment_event_id: () -> String
+      end
+    end
+  end
+end

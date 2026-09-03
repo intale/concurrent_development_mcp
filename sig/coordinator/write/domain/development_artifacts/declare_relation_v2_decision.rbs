@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Domain
+      module DevelopmentArtifacts
+        class DeclareRelationV2Decision < Shared::Value
+          def relation_id: () -> String
+          def source_artifact_id: () -> String
+          def event_plan: () -> EventPlan?
+          def outcome: () -> String
+        end
+      end
+    end
+  end
+end

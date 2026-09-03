@@ -161,12 +161,22 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
       name: "review",
       scope: "project:alpha"
     )
-    event_store.read_global_marked(
+    registration = event_store.read_global_marked(
       Coordinator::Write::GlobalMarkedEventReadCriteria.new(
         stream_context: "AgentKnowledge",
         stream_name: "Skill",
-        event_types: [ "SkillRevisionPublished" ],
+        event_types: [ "SkillRegistered" ],
         markers: [ marker ],
+        maximum_count: 1,
+        direction: :asc
+      )
+    ).first
+    return [] unless registration
+
+    event_store.read(
+      streams.skill(registration.stream.stream_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: [ "SkillRevisionPublished" ],
         maximum_count: 10,
         direction: :asc
       )

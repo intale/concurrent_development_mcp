@@ -52,29 +52,35 @@ module Coordinator::Read
         record = Coordinator::Read::Skill.lock.find_by(skill_id: publication.skill_id)
         verify_identity!(record, publication) if record
         verify_tuple_owner!(publication)
-        record ||= create_head(publication)
+        return record if record && publication.revision <= record.revision
+
+        record ||= create_head(event, publication)
         store_snapshot(event, publication)
-        record.update!(revision: publication.revision) if publication.revision > record.revision
+        record.update!(revision: publication.revision, updated_at: event.created_at)
         record
       end
 
       private
 
-      def create_head(publication)
+      def create_head(event, publication)
         Coordinator::Read::Skill.create!(
           skill_id: publication.skill_id,
           name: publication.name,
           scope: publication.scope,
-          revision: publication.revision
+          revision: publication.revision,
+          created_at: event.created_at,
+          updated_at: event.created_at
         )
       end
 
       def store_snapshot(event, publication)
-        snapshot = revision_for(publication, publication.revision)
-        return snapshot if snapshot
-
+        Coordinator::Read::SkillAsset.where(skill_id: publication.skill_id).delete_all
+        Coordinator::Read::SkillRevision.where(skill_id: publication.skill_id).delete_all
         snapshot = Coordinator::Read::SkillRevision.create!(
-          revision_attributes(event, publication)
+          revision_attributes(event, publication).merge(
+            created_at: event.created_at,
+            updated_at: event.created_at
+          )
         )
         store_assets(publication)
         snapshot
@@ -107,10 +113,12 @@ module Coordinator::Read
           publication.assets.map do |asset|
             asset_attributes(asset).merge(
               skill_id: publication.skill_id,
-              revision: publication.revision
+              revision: publication.revision,
+              created_at: Time.iso8601(publication.published_at),
+              updated_at: Time.iso8601(publication.published_at)
             )
           end,
-          record_timestamps: true
+          record_timestamps: false
         )
       end
 

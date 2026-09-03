@@ -1,5 +1,10 @@
 module Coordinator
   module Read
     type command_input = Hash[String | Symbol, untyped]
+
+    ProjectedSkillId: untyped
+    ProjectedDevelopmentArtifactId: untyped
+    ProjectedDevelopmentArtifactObservationId: untyped
+    ProjectedDevelopmentArtifactRelationId: untyped
   end
 end
