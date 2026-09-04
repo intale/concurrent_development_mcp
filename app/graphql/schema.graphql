@@ -1029,13 +1029,9 @@ type ReleaseIntegration {
 }
 
 type ReleaseMember {
-  candidateCount: Int!
-  changeSetId: ID!
-  mergeCommitOid: String!
-  mergeSnapshotId: ID!
+  candidateId: ID!
   position: Int!
   repositoryId: ID!
-  targetBranch: String!
 }
 
 type ReleaseSetConnection {

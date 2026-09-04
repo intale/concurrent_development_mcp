@@ -10,7 +10,7 @@ module Coordinator::Read
           :string,
           included_in?: %w[MergeAuthorizationGranted MergeAuthorizationDenied]
         )
-        required(:schema_version).filled(:integer, eql?: 1)
+        required(:schema_version).filled(:integer, eql?: 2)
         required(:stream_context).filled(:string, eql?: "DevelopmentIntegration")
         required(:stream_name).filled(:string, eql?: "MergeAuthorization")
         required(:stream_id).filled(:string)

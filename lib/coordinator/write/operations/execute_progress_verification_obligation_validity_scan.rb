@@ -10,8 +10,7 @@ module Coordinator::Write
         exact_loader: CandidateObligations::ExactEventLoader.new(event_store:),
         loader: VerificationObligationValidityScans::ScanLoader.new(event_store:),
         decider: Domain::VerificationObligationValidityScans::Progress.new,
-        retry_policy: VerificationObligationValidityScans::ExpectedRevisionRetry.new,
-        clock: SystemClock.new,
+        revision_guard: VerificationObligationValidityScans::ExpectedRevisionGuard.new,
         id_generator: IdGenerator.new,
         event_factory: EventFactory.new,
         stream_factory: StreamFactory.new,
@@ -22,8 +21,7 @@ module Coordinator::Write
         @exact_loader = exact_loader
         @loader = loader
         @decider = decider
-        @retry_policy = retry_policy
-        @clock = clock
+        @revision_guard = revision_guard
         @id_generator = id_generator
         @event_factory = event_factory
         @stream_factory = stream_factory
@@ -34,10 +32,10 @@ module Coordinator::Write
       def call(invocation)
         verify_input!(invocation)
         preparation = VerificationObligationValidityScans::ProgressPreparationV1.new(
-          progressed_at: @clock.now,
-          event_id: @id_generator.uuid_v7
+          event_id: @id_generator.uuid_v7,
+          correlation_id: invocation.caused_by&.correlation_id || @id_generator.uuid_v7
         )
-        @retry_policy.call(scan_id: invocation.command.scan_id) do
+        @revision_guard.call(scan_id: invocation.command.scan_id) do
           execute_attempt(invocation:, preparation:)
         end
       end
@@ -48,18 +46,19 @@ module Coordinator::Write
         command = invocation.command
         @exact_loader.call(invocation.checkpoint_reference)
         snapshot = @loader.call(command.scan_id)
-        decision = @decider.call(state: snapshot.state, command:, progressed_at: preparation.progressed_at)
+        decision = @decider.call(state: snapshot.state, command:)
         return decision if decision.failure?
 
         plan = decision.value!
         stream = @stream_factory.verification_obligation_validity_scan(command.scan_id)
-        verify_event_plan!(plan, snapshot.state, command, stream, preparation.progressed_at)
+        verify_event_plan!(plan, snapshot.state, command, stream)
         physical = @event_factory.build!(
           event: plan.events.sole,
           event_id: preparation.event_id,
-          metadata: metadata(command),
+          metadata: metadata(plan.events.sole, command),
           markers: markers(command),
-          caused_by: invocation.caused_by
+          caused_by: invocation.caused_by,
+          correlation_id: preparation.correlation_id
         )
         Success(
           @event_store.append(stream, [ physical ], expected_revision: snapshot.latest_revision).sole
@@ -73,26 +72,25 @@ module Coordinator::Write
         raise ArgumentError, "validity scan progress violates its dry-rb contract: #{result.errors.to_h.inspect}"
       end
 
-      def verify_event_plan!(plan, state, command, expected_stream, progressed_at)
+      def verify_event_plan!(plan, state, command, expected_stream)
         result = @event_plan_contract.call(
           plan:,
           state:,
           command:,
-          expected_stream:,
-          progressed_at:
+          expected_stream:
         )
         return if result.success?
 
         raise ArgumentError, "validity scan progress plan violates its dry-rb contract: #{result.errors.to_h.inspect}"
       end
 
-      def metadata(command)
+      def metadata(event, command)
         EventMetadata.new(
           command_id: command.command_id,
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
-          policy_version: command.rule_version
+          policy_version: event.is_a?(Events::VerificationObligationValidityScanCompletedV2) ? nil : command.rule_version
         )
       end
 

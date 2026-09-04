@@ -19,7 +19,7 @@ module Coordinator::Write
           next
         end
 
-        unless exact_reference?(history.candidate_event, "CandidateSubmitted", candidate.candidate_id, 0)
+        unless exact_reference?(history.candidate_event, "CandidateSubmitted", candidate.candidate_id)
           key.failure("must preserve the exact CandidateSubmitted reference")
         end
         unless candidate.candidate_id == history.requested.candidate_id
@@ -27,20 +27,11 @@ module Coordinator::Write
         end
 
         if manifest
-          unless exact_reference?(
-            history.manifest_event,
-            "CandidateChangeManifestCaptured",
-            candidate.candidate_id,
-            1
-          )
+          unless exact_reference?(history.manifest_event, "CandidateChangeManifestCaptured", candidate.candidate_id)
             key.failure("must preserve the exact Candidate manifest reference")
           end
-          fields = %i[
-            candidate_id repository_id target_branch object_format base_commit_oid head_commit_oid
-            manifest_digest
-          ]
-          unless fields.all? { candidate.public_send(_1) == manifest.public_send(_1) }
-            key.failure("CandidateSubmitted and manifest identities must match")
+          unless candidate.candidate_id == manifest.candidate_id
+            key.failure("Candidate state and manifest identities must match")
           end
         elsif history.manifest_event
           key.failure("manifest reference must be absent when the manifest is absent")
@@ -49,13 +40,12 @@ module Coordinator::Write
 
       private
 
-      def exact_reference?(reference, type, candidate_id, revision)
+      def exact_reference?(reference, type, candidate_id)
         reference &&
           reference.type == type &&
           reference.stream_context == "DevelopmentIntegration" &&
           reference.stream_name == "Candidate" &&
-          reference.stream_id == candidate_id &&
-          reference.stream_revision == revision
+          reference.stream_id == candidate_id
       end
     end
   end

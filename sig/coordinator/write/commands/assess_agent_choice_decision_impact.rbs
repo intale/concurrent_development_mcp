@@ -7,7 +7,7 @@ module Coordinator
         def assessment_id: () -> String
         def choice_id: () -> String
         def accepted_choice: () -> EventReference
-        def decision_change: () -> AgentChoiceImpacts::DecisionChangeEvidenceV1
+        def decision_change: () -> AgentChoiceImpacts::DecisionChangeEvidenceV2
         def policy_version: () -> String
       end
     end

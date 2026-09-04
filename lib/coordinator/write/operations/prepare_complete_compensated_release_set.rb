@@ -28,7 +28,7 @@ module Coordinator::Write
       private
 
       def build_evidence(item)
-        ReleaseSets::CompensationEvidenceV1.new(
+        ReleaseSets::CompensationEvidenceV2.new(
           **item,
           integration_event: EventReference.new(item.fetch(:integration_event)),
           producer: ReleaseSets::EvidenceProducerV1.new(item.fetch(:producer))

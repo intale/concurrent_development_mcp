@@ -1,0 +1,12 @@
+module Coordinator::Write
+  module MergeSnapshotVerifications
+    class VerifiedObservationV2 < Coordinator::Shared::Value
+      attr_reader selected: Coordinator::Write::Events::MergeSnapshotVerificationSelectedV1
+      attr_reader selected_event: Coordinator::Write::EventReference
+      attr_reader verified: Coordinator::Write::Events::MergeSnapshotVerifiedV2
+      attr_reader verified_event: Coordinator::Write::EventReference
+      attr_reader policy_version: String
+      attr_reader verification_digest: String
+    end
+  end
+end

@@ -1,0 +1,27 @@
+module Coordinator::Write
+  module Candidates
+    class StateLoader
+      @event_store: untyped
+
+      @schema_registry: untyped
+
+      @stream_factory: untyped
+
+      FACT_TYPES: ::Array["CandidateCreated" | "CandidateAssignedToAttempt" | "CandidateAssignedToRepository" | "CandidateTargetBranchSelected" | "CandidateCommitRangeDeclared" | "CandidateCheckpointKindSelected" | "CandidateWorkIntentionSetAssigned" | "CandidateChangeManifestCaptured" | "CandidateBuildContextCaptured" | "CandidateSubmitted" | "CandidateImpactSurfaceAssigned"]
+
+      def initialize: (event_store: untyped, ?schema_registry: untyped, ?stream_factory: untyped) -> void
+
+      def call: (untyped candidate_id) -> (nil | untyped)
+
+      private
+
+      def build_state: (untyped candidate_id, untyped events) -> untyped
+
+      def fetch_fact: (untyped facts, untyped type) -> untyped
+
+      def load_event: (untyped event) -> untyped
+
+      def event_reference: (untyped event) -> untyped
+    end
+  end
+end

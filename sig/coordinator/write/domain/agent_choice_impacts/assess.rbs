@@ -8,9 +8,7 @@ module Coordinator
           def initialize: (?stream_factory: StreamFactory) -> void
           def call: (
             state: AssessmentState,
-            command: Commands::AssessAgentChoiceDecisionImpact,
-            assessed_at: String,
-            assessment_event: EventReference
+            command: Commands::AssessAgentChoiceDecisionImpact
           ) -> Dry::Monads::Result
         end
       end

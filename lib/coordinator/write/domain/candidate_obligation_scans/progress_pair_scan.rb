@@ -10,15 +10,15 @@ module Coordinator::Write
           @stream_factory = stream_factory
         end
 
-        def call(state:, command:, progressed_at:)
+        def call(state:, command:)
           denial = denied(state, command)
           return denial if denial
 
           next_revision = command.last_processed_revision ? command.last_processed_revision + 1 : command.previous_from_revision
           event = if command.has_more
-            progressed_event(state, command, next_revision, progressed_at)
+            progressed_event(state, command, next_revision)
           else
-            completed_event(state, command, next_revision, progressed_at)
+            completed_event(command)
           end
           Success(
             EventPlan.new(
@@ -70,46 +70,21 @@ module Coordinator::Write
             (!command.has_more || last < state.to_revision)
         end
 
-        def progressed_event(state, command, next_revision, progressed_at)
-          Events::CandidateImpactPairScanProgressedV1.new(
-            **common(state, command),
-            previous_from_revision: command.previous_from_revision,
-            next_from_revision: next_revision,
-            page_number: state.page_count + 1,
-            page_registration_count: command.page_registration_count,
-            total_registration_count: state.total_registration_count + command.page_registration_count,
-            progressed_at:
-          )
-        end
-
-        def completed_event(state, command, next_revision, progressed_at)
-          Events::CandidateImpactPairScanCompletedV1.new(
-            **common(state, command),
-            previous_from_revision: command.previous_from_revision,
-            final_from_revision: next_revision,
-            page_count: state.page_count + 1,
-            page_registration_count: command.page_registration_count,
-            total_registration_count: state.total_registration_count + command.page_registration_count,
-            completed_at: progressed_at
-          )
-        end
-
-        def common(state, command)
-          {
+        def progressed_event(state, command, next_revision)
+          Events::CandidateImpactPairScanProgressedV2.new(
             scan_id: command.scan_id,
-            change_set_id: command.change_set_id,
-            source_registration: command.source_registration,
-            direction: command.direction,
-            policy_partition_event: command.policy_partition_event,
-            policy_head: command.policy_head,
+            page_number: state.page_count + 1,
+            next_from_revision: next_revision,
+            change_set_id: state.change_set_id,
+            direction: state.direction,
             markers: state.markers,
-            started_event: state.started_event,
-            previous_checkpoint: state.checkpoint_event,
             to_revision: state.to_revision,
-            page_size: command.page_size,
-            index_policy_version: command.index_policy_version,
-            rule_version: command.rule_version
-          }
+            page_size: state.page_size
+          )
+        end
+
+        def completed_event(command)
+          Events::CandidateImpactPairScanCompletedV2.new(scan_id: command.scan_id)
         end
 
         def failure(code, state, command)

@@ -4,7 +4,7 @@ module Coordinator
       module Candidates
         class Submit
           def initialize: (?stream_factory: Coordinator::Write::StreamFactory) -> void
-          def call: (state: SubmissionState, command: Coordinator::Write::Commands::SubmitCandidate, submitted_at: String, candidate_event: Coordinator::Write::EventReference, head_identity: Coordinator::Write::Candidates::HeadIdentityV1) -> Dry::Monads::Result
+          def call: (state: SubmissionState, command: Coordinator::Write::Commands::SubmitCandidate, submitted_at: String, head_identity: Coordinator::Write::Candidates::HeadIdentityV1) -> Dry::Monads::Result
         end
       end
     end

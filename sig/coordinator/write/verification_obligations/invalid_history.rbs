@@ -1,0 +1,6 @@
+module Coordinator::Write
+  module VerificationObligations
+    class InvalidHistory < StandardError
+    end
+  end
+end

@@ -111,7 +111,7 @@ module Coordinator::Write
         completion = @completion_builder.decision_activate(
           command:,
           activation:,
-          definition: state.candidate.definition,
+          definition_digest: state.candidate.definition.digest,
           slot: state.candidate.slot,
           partitions:,
           input_digest: preparation.input_digest,

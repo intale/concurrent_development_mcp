@@ -10,7 +10,7 @@ module Coordinator
       def reason: () -> String
       def policy_version: () -> String
       def accepted_choice: () -> Write::EventReference
-      def decision_change: () -> Write::AgentChoiceImpacts::DecisionChangeEvidenceV1
+      def decision_change: () -> Write::AgentChoiceImpacts::DecisionChangeEvidenceV2
       def before_context_digest: () -> String
       def after_context_digest: () -> String
       def before_evaluation: () -> Write::AgentChoices::PolicyEvaluationV1

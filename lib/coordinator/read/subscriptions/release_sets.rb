@@ -13,11 +13,17 @@ module Coordinator::Read
           )
         ],
         event_types: [
+          "ReleaseSetCreated",
+          "ReleaseSetMemberAdded",
           "ReleaseSetPrepared",
           "RepositoryIntegrationRecorded",
+          "RepositoryIntegrationMergeLinked",
           "ReleaseSetVerificationRecorded",
+          "ReleaseSetIntegrationLinked",
           "ReleaseSetActivated",
           "ReleaseSetCompensationRequested",
+          "ReleaseSetSuccessfulIntegrationLinked",
+          "ReleaseSetOutcomeRecorded",
           "ReleaseSetCompleted"
         ]
       )

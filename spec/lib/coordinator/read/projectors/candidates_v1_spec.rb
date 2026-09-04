@@ -1,85 +1,80 @@
 # frozen_string_literal: true
 
 RSpec.describe Coordinator::Read::Projectors::CandidatesV1, :read_model do
-  subject(:projector) { described_class.new }
+  subject(:projector) do
+    described_class.new(submission_loader:, impact_surface_loader:)
+  end
 
   let(:candidate_id) { "CAN-candidate-project" }
   let(:repository_id) { "01a03deb-6f55-74ba-bcc0-afd02e7b14dc" }
+  let(:surface_id) { SecureRandom.uuid_v7 }
   let(:stream) { Coordinator::Write::StreamFactory.new.candidate(candidate_id) }
   let(:correlation_id) { SecureRandom.uuid_v7 }
-  let(:manifest_digest) { "sha256:#{'a' * 64}" }
-  let(:build_context_digest) { "sha256:#{'b' * 64}" }
+  let(:manifest_digest) { digest("a") }
+  let(:build_context_digest) { digest("b") }
+  let(:submission_loader) { constant_loader(submission) }
+  let(:impact_surface_loader) { constant_loader(impact_source) }
 
-  it "serves each observed evidence stage and preserves exact source tracing" do
-    submitted, manifest, build_context = candidate_events
+  it "reconstructs the complete submitted Candidate at its terminal fact and stays idempotent" do
+    projector.call(submitted_event)
+    projector.call(submitted_event)
 
-    projector.call(submitted)
-    projector.call(submitted)
-    available = repository.fetch(candidate_id)
-    expect(available).to have_attributes(
+    projected = repository.fetch(candidate_id)
+    expect(projected).to have_attributes(
       evidence_status: "attributed_unverified",
-      manifest: nil,
-      build_context: nil,
+      repository_id:,
+      lease_set_id: submission.intention_set_id,
       submitted: have_attributes(
-        global_position: submitted.global_position,
-        causation_id: submitted.causation_id,
-        correlation_id: submitted.correlation_id
+        event: have_attributes(event_id: submitted_event.id, stream_revision: 9),
+        global_position: submitted_event.global_position,
+        occurred_at: submitted_event.created_at.utc.iso8601(6),
+        persisted_at: submitted_event.created_at.utc.iso8601(6)
       )
     )
-
-    projector.call(manifest)
-    projector.call(build_context)
-    projector.call(build_context)
-    projected = repository.fetch(candidate_id)
     expect(projected.manifest).to have_attributes(
       digest: manifest_digest,
       collector: have_attributes(kind: "agent", id: "agent-a", collector_version: "git-evidence-v1"),
-      evidence: have_attributes(
-        event: have_attributes(event_id: manifest.id, stream_revision: 1),
-        global_position: manifest.global_position,
-        causation_id: manifest.causation_id,
-        correlation_id: manifest.correlation_id
-      )
+      evidence: have_attributes(event: have_attributes(event_id: manifest_event.id, stream_revision: 7))
     )
     expect(projected.build_context).to have_attributes(
       digest: build_context_digest,
-      evidence: have_attributes(
-        event: have_attributes(event_id: build_context.id, stream_revision: 2),
-        global_position: build_context.global_position
-      )
-    )
-    expect(projected.to_h.keys & %i[fresh pending projection_status]).to be_empty
-    expect(Coordinator::Read::Candidate.count).to eq(1)
-    expect(processed_events.count).to eq(3)
-  end
-
-  it "rolls back its idempotency claim when manifest evidence precedes submission" do
-    submitted, manifest, = candidate_events
-
-    expect { projector.call(manifest) }.to raise_error(
-      Coordinator::Read::ProjectionStateError,
-      "CandidateSubmitted must be projected before its manifest"
-    )
-    expect(processed_events).to be_empty
-
-    projector.call(submitted)
-    projector.call(manifest)
-    expect(repository.fetch(candidate_id).manifest).not_to be_nil
-  end
-
-  it "indexes changed paths, observed inputs, and attributed impact keys idempotently" do
-    events = [ *candidate_events, impact_event ]
-
-    events.each { projector.call(_1) }
-    events.each { projector.call(_1) }
-
-    record = Coordinator::Read::Candidate.find(candidate_id)
-    expect(record.impact_surface).to include(
-      "surface_digest" => a_string_matching(Coordinator::Shared::Types::SHA256_DIGEST_PATTERN),
-      "evidence_status" => "attributed_unverified"
+      evidence: have_attributes(event: have_attributes(event_id: build_context_event.id, stream_revision: 8))
     )
     expect(Coordinator::Read::CandidateChangedResource.pluck(:path)).to eq([ "lib/candidate.rb" ])
     expect(Coordinator::Read::CandidateObservedInput.pluck(:path)).to eq([ "lib/candidate.rb" ])
+    expect(Coordinator::Read::Candidate.count).to eq(1)
+    expect(processed_events.count).to eq(1)
+  end
+
+  it "rolls back its idempotency claim when the exact Candidate history is incomplete" do
+    failing_loader = Class.new do
+      def call(_candidate_id)
+        raise Coordinator::Read::InvalidProjectionSource, "Candidate is missing CandidateCommitRangeDeclared"
+      end
+    end.new
+    failing_projector = described_class.new(
+      submission_loader: failing_loader,
+      impact_surface_loader:
+    )
+
+    expect { failing_projector.call(submitted_event) }.to raise_error(
+      Coordinator::Read::InvalidProjectionSource,
+      "Candidate is missing CandidateCommitRangeDeclared"
+    )
+    expect(processed_events).to be_empty
+    expect(Coordinator::Read::Candidate).not_to exist(candidate_id:)
+  end
+
+  it "loads the assigned impact surface and indexes its attributed keys idempotently" do
+    projector.call(submitted_event)
+    projector.call(surface_assignment_event)
+    projector.call(surface_assignment_event)
+
+    record = Coordinator::Read::Candidate.find(candidate_id)
+    expect(record.impact_surface).to include(
+      "surface_digest" => digest("d"),
+      "evidence_status" => "attributed_unverified"
+    )
     expect(
       Coordinator::Read::CandidateImpactKey.order(:direction).pluck(:direction, :impact_key)
     ).to contain_exactly(
@@ -88,28 +83,12 @@ RSpec.describe Coordinator::Read::Projectors::CandidatesV1, :read_model do
       [ "may_affect", "framework:rails:callbacks" ],
       [ "assumes", "database:postgresql" ]
     )
-    expect(processed_events.count).to eq(4)
+    expect(repository.fetch(candidate_id).to_h.keys & %i[fresh pending projection_status]).to be_empty
+    expect(processed_events.count).to eq(2)
   end
 
-  def candidate_events
-    submitted = candidate_event(submitted_payload, revision: 0, position: 100)
-    manifest = candidate_event(
-      manifest_payload,
-      revision: 1,
-      position: 200,
-      causation_id: submitted.id
-    )
-    build_context = candidate_event(
-      build_context_payload,
-      revision: 2,
-      position: 300,
-      causation_id: submitted.id
-    )
-    [ submitted, manifest, build_context ]
-  end
-
-  def submitted_payload
-    Coordinator::Write::Events::CandidateSubmittedV2.new(
+  def submission
+    @submission ||= Coordinator::Read::CandidateSubmissionViewV2.new(
       candidate_id:,
       change_set_id: "CS-candidate-project",
       work_item_id: "W-candidate-project",
@@ -121,12 +100,11 @@ RSpec.describe Coordinator::Read::Projectors::CandidatesV1, :read_model do
       base_commit_oid: "c" * 40,
       head_commit_oid: "d" * 40,
       checkpoint_kind: "final",
-      lease_set_id: "018f0f4d-4e45-7abc-8def-000000000201",
-      lease_policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
+      intention_set_id: SecureRandom.uuid_v7,
       lease_references: [
         Coordinator::Write::LeaseReferenceV2.new(
-          lease_id: "018f0f4d-4e45-7abc-8def-000000000202",
-          resource_id: "018f0f4d-4e45-7abc-8def-000000000203",
+          lease_id: SecureRandom.uuid_v7,
+          resource_id: SecureRandom.uuid_v7,
           resource_kind: "file",
           resource_path: "lib/candidate.rb",
           base_blob_oid: "e" * 40,
@@ -136,21 +114,18 @@ RSpec.describe Coordinator::Read::Projectors::CandidatesV1, :read_model do
       manifest_digest:,
       build_context_digest:,
       evidence_status: "attributed_unverified",
-      submitted_at: "2026-08-30T12:00:00.000000Z"
+      manifest: manifest_payload,
+      build_context: build_context_payload,
+      submitted_event:,
+      manifest_event:,
+      build_context_event:
     )
   end
 
   def manifest_payload
-    Coordinator::Write::Events::CandidateChangeManifestCapturedV1.new(
+    Coordinator::Write::Events::CandidateChangeManifestCapturedV2.new(
       candidate_id:,
-      repository_id:,
-      target_branch: "main",
-      object_format: "sha1",
-      base_commit_oid: "c" * 40,
-      head_commit_oid: "d" * 40,
       evidence_revision: 1,
-      policy_version: Coordinator::Write::Candidates::ChangeManifestDocumentV1::SCHEMA,
-      manifest_digest:,
       files: [
         Coordinator::Write::Candidates::ManifestFileV1.new(
           status: "modified",
@@ -161,21 +136,14 @@ RSpec.describe Coordinator::Read::Projectors::CandidatesV1, :read_model do
           old_mode: "100644",
           new_mode: "100644"
         )
-      ],
-      collector: evidence_collector("git-evidence-v1"),
-      captured_at: "2026-08-30T12:01:00.000000Z"
+      ]
     )
   end
 
   def build_context_payload
-    Coordinator::Write::Events::CandidateBuildContextCapturedV1.new(
+    Coordinator::Write::Events::CandidateBuildContextCapturedV2.new(
       candidate_id:,
-      repository_id:,
-      object_format: "sha1",
-      head_commit_oid: "d" * 40,
       evidence_revision: 1,
-      policy_version: Coordinator::Write::Candidates::BuildContextDocumentV1::SCHEMA,
-      build_context_digest:,
       inputs: [
         Coordinator::Write::Candidates::BuildInputV1.new(
           kind: "public_contract",
@@ -188,29 +156,65 @@ RSpec.describe Coordinator::Read::Projectors::CandidatesV1, :read_model do
           name: "RUBY_VERSION",
           value: RUBY_VERSION
         )
-      ],
-      dependency_graph_digest: "sha256:#{'c' * 64}",
-      test_environment_digest: nil,
-      collector: evidence_collector("build-context-v1"),
-      captured_at: "2026-08-30T12:02:00.000000Z"
+      ]
     )
   end
 
-  def impact_event
-    payload = Coordinator::Write::Events::CandidateImpactSurfaceDerivedV1.new(
+  def submitted_event
+    @submitted_event ||= projection_event(
+      Coordinator::Write::Events::CandidateSubmittedV3.new(candidate_id:),
+      stream:,
+      revision: 9,
+      position: 300,
+      policy_version: nil
+    )
+  end
+
+  def manifest_event
+    @manifest_event ||= projection_event(
+      manifest_payload,
+      stream:,
+      revision: 7,
+      position: 200,
+      metadata: Coordinator::Write::Metadata::CandidateChangeManifestV2.new(
+        **metadata_attributes("candidate-change-manifest/v1"),
+        collector: evidence_collector("git-evidence-v1"),
+        manifest_digest:
+      )
+    )
+  end
+
+  def build_context_event
+    @build_context_event ||= projection_event(
+      build_context_payload,
+      stream:,
+      revision: 8,
+      position: 250,
+      metadata: Coordinator::Write::Metadata::CandidateBuildContextV2.new(
+        **metadata_attributes("candidate-build-context/v1"),
+        collector: evidence_collector("build-context-v1"),
+        build_context_digest:,
+        dependency_graph_digest: digest("c"),
+        test_environment_digest: nil
+      )
+    )
+  end
+
+  def surface_assignment_event
+    @surface_assignment_event ||= projection_event(
+      Coordinator::Write::Events::CandidateImpactSurfaceAssignedV1.new(candidate_id:, surface_id:),
+      stream:,
+      revision: 10,
+      position: 400,
+      policy_version: nil
+    )
+  end
+
+  def impact_source
+    payload = Coordinator::Write::Events::CandidateImpactSurfaceDerivedV2.new(
+      surface_id:,
       candidate_id:,
-      change_set_id: "CS-candidate-project",
-      work_item_id: "W-candidate-project",
-      attempt_id: "A-candidate-project",
-      repository_id:,
-      target_branch: "main",
-      object_format: "sha1",
-      head_commit_oid: "d" * 40,
       evidence_revision: 1,
-      policy_version: Coordinator::Write::Candidates::ImpactSurfaceDocumentV1::SCHEMA,
-      surface_digest: "sha256:#{'d' * 64}",
-      manifest_digest:,
-      build_context_digest:,
       produces: [
         Coordinator::Write::Candidates::ImpactTransitionV1.new(
           impact_key: "contract:payments-api:v2",
@@ -218,37 +222,58 @@ RSpec.describe Coordinator::Read::Projectors::CandidatesV1, :read_model do
           after: "available"
         )
       ],
-      consumes: [
-        Coordinator::Write::Candidates::ImpactObservationV1.new(
-          impact_key: "runtime:ruby",
-          value: "4.0"
-        )
-      ],
-      may_affect: [
-        Coordinator::Write::Candidates::ImpactKeyV1.new(
-          impact_key: "framework:rails:callbacks"
-        )
-      ],
+      consumes: [ Coordinator::Write::Candidates::ImpactObservationV1.new(impact_key: "runtime:ruby", value: "4.0") ],
+      may_affect: [ Coordinator::Write::Candidates::ImpactKeyV1.new(impact_key: "framework:rails:callbacks") ],
       assumes: [
         Coordinator::Write::Candidates::ImpactAssumptionV1.new(
           impact_key: "database:postgresql",
           predicate: ">= 17"
         )
-      ],
-      analyzer: Coordinator::Write::Candidates::ImpactAnalyzerV1.new(
-        kind: "agent",
-        id: "analyzer-7",
-        analyzer_version: "impact-analyzer-v1"
-      ),
-      evidence_status: "attributed_unverified",
-      derived_at: "2026-08-30T12:03:00.000000Z"
+      ]
     )
-    candidate_event(
+    event = projection_event(
       payload,
-      revision: 3,
-      position: 400,
-      policy_version: Coordinator::Write::Candidates::ImpactSurfaceDocumentV1::SCHEMA
+      stream: Coordinator::Write::StreamFactory.new.candidate_impact_surface(surface_id),
+      revision: 0,
+      position: 350,
+      metadata: Coordinator::Write::Metadata::CandidateImpactSurfaceV2.new(
+        **metadata_attributes("candidate-impact-surface/v1"),
+        analyzer: Coordinator::Write::Candidates::ImpactAnalyzerV1.new(
+          kind: "agent",
+          id: "analyzer-7",
+          analyzer_version: "impact-analyzer-v1"
+        ),
+        manifest_digest:,
+        build_context_digest:,
+        surface_digest: digest("d")
+      )
     )
+    Coordinator::Read::CandidateImpactSurfaceSourceV2.new(surface: payload, event:)
+  end
+
+  def projection_event(payload, stream:, revision:, position:, policy_version: nil, metadata: nil)
+    ProjectionEventFactory.build(
+      payload:,
+      stream:,
+      stream_revision: revision,
+      global_position: position,
+      command_id: "cmd-candidate-project-#{revision}",
+      actor_id: payload.is_a?(Coordinator::Write::Events::CandidateImpactSurfaceDerivedV2) ? "analyzer-7" : "agent-a",
+      policy_version:,
+      metadata:,
+      correlation_id:,
+      markers: [ "candidate:#{candidate_id}", "repository:#{repository_id}" ]
+    )
+  end
+
+  def metadata_attributes(policy_version)
+    {
+      command_id: "cmd-candidate-project",
+      actor_kind: "agent",
+      actor_id: "agent-a",
+      recorded_by: "coordinator",
+      policy_version:
+    }
   end
 
   def evidence_collector(version)
@@ -259,25 +284,20 @@ RSpec.describe Coordinator::Read::Projectors::CandidatesV1, :read_model do
     )
   end
 
-  def candidate_event(
-    payload,
-    revision:,
-    position:,
-    policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
-    causation_id: nil
-  )
-    ProjectionEventFactory.build(
-      payload:,
-      stream:,
-      stream_revision: revision,
-      global_position: position,
-      command_id: "cmd-candidate-project-#{revision}",
-      actor_id: revision == 3 ? "analyzer-7" : "agent-a",
-      policy_version:,
-      correlation_id:,
-      causation_id:,
-      markers: [ "candidate:#{candidate_id}", "repository:#{repository_id}" ]
-    )
+  def constant_loader(value)
+    Class.new do
+      def initialize(value)
+        @value = value
+      end
+
+      def call(_identifier)
+        @value
+      end
+    end.new(value)
+  end
+
+  def digest(character)
+    "sha256:#{character * 64}"
   end
 
   def repository

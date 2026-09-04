@@ -5,7 +5,7 @@ module Coordinator::Write
     module CandidateObligationScans
       class RegistrySweepState < Value
         attribute :status, Types::CandidateImpactScanStatus
-        attribute :scan_id, Types::Identifier.optional
+        attribute :scan_id, Types::UuidV7.optional
         attribute :change_set_id, Types::Identifier.optional
         attribute :policy_partition_event, EventReference.optional
         attribute :policy_head, Coordinator::Write::Decisions::DecisionHeadV1.optional
@@ -15,7 +15,6 @@ module Coordinator::Write
         attribute :to_revision, Types::StreamRevisionCursor.optional
         attribute :page_size, Types::CandidateImpactScanPageSize.optional
         attribute :page_count, Types::Integer.constrained(gteq: 0)
-        attribute :total_registration_count, Types::Integer.constrained(gteq: 0)
         attribute :rule_version, Types::CandidateImpactRegistrySweepRuleVersion.optional
         attribute :skip_reason, Types::CandidateImpactRegistrySweepSkipReason.optional
 
@@ -32,7 +31,6 @@ module Coordinator::Write
             to_revision: nil,
             page_size: nil,
             page_count: 0,
-            total_registration_count: 0,
             rule_version: nil,
             skip_reason: nil
           )

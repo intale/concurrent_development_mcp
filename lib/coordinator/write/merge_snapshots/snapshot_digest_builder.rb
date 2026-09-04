@@ -7,7 +7,7 @@ module Coordinator::Write
         @canonical_json = canonical_json
       end
 
-      def call(command:, members:)
+      def call(command:, candidates:)
         document = SnapshotDigestDocumentV1.new(
           schema: SnapshotDigestDocumentV1::SCHEMA,
           merge_snapshot_id: command.merge_snapshot_id,
@@ -15,7 +15,7 @@ module Coordinator::Write
           target_branch: command.target_branch,
           object_format: command.object_format,
           target_base_commit_oid: command.target_base_commit_oid,
-          ordered_candidates: members.map { member_document(_1) },
+          ordered_candidates: candidates.map { member_document(_1) },
           merge_commit_oid: command.merge_commit_oid,
           producer: command.producer,
           run_id: command.run_id,
@@ -28,7 +28,8 @@ module Coordinator::Write
 
       private
 
-      def member_document(member)
+      def member_document(history)
+        member = history.candidate
         MemberDigestDocumentV1.new(
           candidate_id: member.candidate_id,
           change_set_id: member.change_set_id,
@@ -37,8 +38,8 @@ module Coordinator::Write
           base_commit_oid: member.base_commit_oid,
           head_commit_oid: member.head_commit_oid,
           manifest_digest: member.manifest_digest,
-          candidate_event: member.candidate_event,
-          manifest_event: member.manifest_event
+          candidate_event: history.candidate_event,
+          manifest_event: history.manifest_event
         )
       end
     end

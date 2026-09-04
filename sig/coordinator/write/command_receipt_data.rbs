@@ -159,7 +159,7 @@ module Coordinator
       class InterpretationProposal < Shared::Value
         def interpretation_id: () -> String
         def source_message_id: () -> String
-        def assessment: () -> Interpretations::InterpretationAssessmentV1
+        def assessment: () -> String
         def proposed_at: () -> String
       end
 
@@ -327,11 +327,11 @@ module Coordinator
       end
 
       class ReleaseSetPreparation < Shared::Value
-        Member: singleton(ReleaseSets::MemberEvidenceV1)
+        Member: singleton(ReleaseSets::MemberSummaryV2)
 
         def release_set_id: () -> String
         def change_set_id: () -> String
-        def ordered_members: () -> Array[ReleaseSets::MemberEvidenceV1]
+        def ordered_members: () -> Array[ReleaseSets::MemberSummaryV2]
         def release_digest: () -> String
         def policy_version: () -> String
         def prepared_event: () -> EventReference

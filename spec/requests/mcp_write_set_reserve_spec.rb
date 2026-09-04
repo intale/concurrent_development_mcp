@@ -31,7 +31,8 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
       work_item_id: "W-MCP-LSE-A",
       attempt_id: "A-MCP-LSE-A",
       resource_ids: [ invoice_resource_id, schema_resource_id ],
-      request_id: 1
+      request_id: 1,
+      mode: "exclusive"
     )
     expect(winner).to include(
       "result" => include("resultType" => "task")
@@ -55,7 +56,7 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
           "work_item_id" => "W-MCP-LSE-A",
           "attempt_id" => "A-MCP-LSE-A",
           "repository_id" => MCP_RESERVE_REPOSITORY_ID,
-          "policy_version" => "coordinator-resource-lease/v2",
+          "policy_version" => "coordinator-work-intention/v1",
           "resources" => contain_exactly(
             include("resource_id" => invoice_resource_id),
             include("resource_id" => schema_resource_id)
@@ -63,13 +64,19 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
         )
       )
     )
+    winner_data = result.fetch("structuredContent").fetch("data")
 
     submitted, started, task_completed = task_events(winner_task_id)
     command_terminal = command_events_for_task(winner_task_id).last
-    target_events = lease_events(invoice_resource_id) +
-                    lease_events(schema_resource_id) +
-                    write_set_events("A-MCP-LSE-A") +
-                    [ command_terminal ]
+    target_events = work_intention_events(winner_data) + [ command_terminal ]
+    expect(target_events.map(&:type)).to contain_exactly(
+      "WorkIntentionSetCreated",
+      "WorkIntentionAddedToSet",
+      "WorkIntentionAddedToSet",
+      "ResourceWorkIntentionDeclared",
+      "ResourceWorkIntentionDeclared",
+      "CommandSucceeded"
+    )
     expect(started.causation_id).to eq(submitted.id)
     expect(target_events.map(&:causation_id).uniq).to eq([ started.id ])
     expect(task_completed.causation_id).to eq(command_terminal.id)
@@ -96,17 +103,26 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
       "structuredContent" => include(
         "status" => "busy",
         "data" => include(
-          "code" => "lease_busy",
+          "code" => "work_intention_conflict",
           "details" => include(
-            "owner_attempt_id" => "A-MCP-LSE-A",
-            "owner_agent_id" => "agent-a",
-            "fencing_token" => 1
+            "blockers" => contain_exactly(
+              include(
+                "resource_id" => schema_resource_id,
+                "mode" => "exclusive",
+                "owner_attempt_id" => "A-MCP-LSE-A",
+                "owner_agent_id" => "agent-a",
+                "purpose" => "Work on WorkItem W-MCP-LSE-A",
+                "scope" => include(
+                  "change_set_id" => CHANGE_SET_ID,
+                  "work_item_id" => "W-MCP-LSE-A"
+                )
+              )
+            )
           )
         )
       )
     )
-    expect(lease_events(free_resource_id)).to be_empty
-    expect(write_set_events("A-MCP-LSE-B")).to be_empty
+    expect(work_intention_events_for_command("cmd-mcp-lse-b")).to be_empty
     expect(command_events("cmd-mcp-lse-b")).to be_empty
   end
 
@@ -133,7 +149,8 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
     attempt_id:,
     resource_ids:,
     request_id:,
-    expected_status: 200
+    expected_status: 200,
+    mode: "shared"
   )
     mcp_request(
       id: request_id,
@@ -150,7 +167,7 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
           attempt_id:,
           repository_id: MCP_RESERVE_REPOSITORY_ID,
           base_commit_oid: BASE_COMMIT_OID,
-          resources: resource_ids.map { { resource_id: _1 } },
+          resources: resource_ids.map { { resource_id: _1, mode: } },
           lease_duration_seconds: 300
         }
       }
@@ -276,13 +293,6 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
     )
   end
 
-  def write_set_events(attempt_id)
-    event_store.read(
-      streams.attempt(attempt_id),
-      Coordinator::Write::EventQueries::ATTEMPT_FOR_WRITE_SET_RESERVATION
-    ).select { _1.type == "WriteSetReserved" }
-  end
-
   def resolve_resource(path)
     @resource_ids ||= {}
     @resource_ids[path] ||= ResourceScenario.resolve(
@@ -293,14 +303,38 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
     )
   end
 
-  def lease_events(resource_id)
-    event_store.read(
-      streams.resource_lease(resource_id),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "ResourceLeaseAcquired" ],
-        maximum_count: 10,
-        direction: :asc
+  def work_intention_events_for_command(command_id)
+    [
+      [ "WorkIntentionSet", %w[WorkIntentionSetCreated WorkIntentionAddedToSet] ],
+      [
+        "ResourceWorkIntention",
+        %w[ResourceWorkIntentionDeclared ResourceWorkIntentionRenewed ResourceWorkIntentionWithdrawn]
+      ]
+    ].flat_map do |stream_name, event_types|
+      event_store.read_global_marked(
+        Coordinator::Write::GlobalMarkedEventReadCriteria.new(
+          stream_context: "DevelopmentCoordination",
+          stream_name:,
+          event_types:,
+          markers: [ "command:#{command_id}" ],
+          maximum_count: 32,
+          direction: :asc
+        )
       )
+    end
+  end
+
+  def work_intention_events(receipt)
+    set_events = event_store.read(
+      streams.work_intention_set(receipt.fetch("lease_set_id")),
+      Coordinator::Write::EventQueries::WORK_INTENTION_SET_STATE
     )
+    member_events = receipt.fetch("resources").flat_map do |reference|
+      event_store.read_grouped(
+        streams.resource_work_intention(reference.fetch("lease_id")),
+        Coordinator::Write::EventQueries::WORK_INTENTION_STATE
+      )
+    end
+    set_events + member_events
   end
 end

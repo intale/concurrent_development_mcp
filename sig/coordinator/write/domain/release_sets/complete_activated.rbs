@@ -2,7 +2,7 @@ module Coordinator::Write::Domain::ReleaseSets
   class CompleteActivated
     include Dry::Monads::Result::Mixin
 
-    def initialize: (?stream_factory: Coordinator::Write::StreamFactory, ?digest_builder: Coordinator::Write::ReleaseSets::CompletionDigestBuilder) -> void
-    def call: (state: LifecycleStateV1, command: Coordinator::Write::Commands::CompleteActivatedReleaseSet, completed_at: String) -> Dry::Monads::Result
+    def initialize: (?stream_factory: Coordinator::Write::StreamFactory) -> void
+    def call: (state: LifecycleStateV2, command: Coordinator::Write::Commands::CompleteActivatedReleaseSet) -> Dry::Monads::Result
   end
 end

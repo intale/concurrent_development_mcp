@@ -11,8 +11,6 @@ module Coordinator::Write
       attribute :repository_id, Types::RepositoryId
       attribute :object_format, Types::GitObjectFormat
       attribute :head_commit_oid, Types::GitOid
-      attribute :candidate_event, EventReference
-      attribute :registered_at, Types::Timestamp
     end
   end
 end

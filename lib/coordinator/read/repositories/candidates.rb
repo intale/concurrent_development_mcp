@@ -8,7 +8,10 @@ module Coordinator::Read
         record && build_view(record)
       end
 
-      def store_submission(event:, candidate:)
+      def store_submission(candidate:)
+        submitted_event = candidate.submitted_event
+        manifest_event = candidate.manifest_event
+        build_context_event = candidate.build_context_event
         Coordinator::Read::Candidate.create!(
           candidate_id: candidate.candidate_id,
           change_set_id: candidate.change_set_id,
@@ -21,75 +24,23 @@ module Coordinator::Read
           base_commit_oid: candidate.base_commit_oid,
           head_commit_oid: candidate.head_commit_oid,
           checkpoint_kind: candidate.checkpoint_kind,
-          lease_set_id: candidate.lease_set_id,
-          lease_policy_version: candidate.lease_policy_version,
+          lease_set_id: candidate.intention_set_id,
+          lease_policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
           lease_references: candidate.lease_references.map(&:to_h),
           manifest_digest: candidate.manifest_digest,
           build_context_digest: candidate.build_context_digest,
           evidence_status: candidate.evidence_status,
-          submitted_event: event_reference(event).to_h,
-          submitted_actor: actor(event).to_h,
-          submitted_markers: event.markers,
-          submitted_metadata: event.metadata,
-          submitted_causation_id: event.causation_id,
-          submitted_correlation_id: event.correlation_id,
-          submitted_global_position: event.global_position,
-          submitted_at_domain: candidate.submitted_at,
-          submitted_at_store: event.created_at
-        )
-      end
-
-      def store_manifest(event:, manifest:)
-        record = Coordinator::Read::Candidate.find_by(candidate_id: manifest.candidate_id)
-        raise ProjectionStateError, "CandidateSubmitted must be projected before its manifest" unless record
-
-        verify_manifest!(record, manifest)
-        record.update!(
+          **source_columns(:submitted, submitted_event),
           manifest: {
-            policy_version: manifest.policy_version,
-            digest: manifest.manifest_digest,
-            files: manifest.files.map(&:to_h),
-            collector: manifest.collector.to_h
+            policy_version: manifest_event.metadata.fetch("policy_version"),
+            digest: manifest_event.metadata.fetch("manifest_digest"),
+            files: candidate.manifest.files.map(&:to_h),
+            collector: manifest_event.metadata.fetch("collector")
           },
-          manifest_event: event_reference(event).to_h,
-          manifest_actor: actor(event).to_h,
-          manifest_markers: event.markers,
-          manifest_metadata: event.metadata,
-          manifest_causation_id: event.causation_id,
-          manifest_correlation_id: event.correlation_id,
-          manifest_global_position: event.global_position,
-          manifest_at_domain: manifest.captured_at,
-          manifest_at_store: event.created_at
+          **source_columns(:manifest, manifest_event),
+          build_context: build_context_document(candidate),
+          **optional_source_columns(:build_context, build_context_event)
         )
-        record
-      end
-
-      def store_build_context(event:, build_context:)
-        record = Coordinator::Read::Candidate.find_by(candidate_id: build_context.candidate_id)
-        raise ProjectionStateError, "CandidateSubmitted must be projected before its build context" unless record
-
-        verify_build_context!(record, build_context)
-        record.update!(
-          build_context: {
-            policy_version: build_context.policy_version,
-            digest: build_context.build_context_digest,
-            inputs: build_context.inputs.map(&:to_h),
-            environment: build_context.environment.map(&:to_h),
-            dependency_graph_digest: build_context.dependency_graph_digest,
-            test_environment_digest: build_context.test_environment_digest,
-            collector: build_context.collector.to_h
-          },
-          build_context_event: event_reference(event).to_h,
-          build_context_actor: actor(event).to_h,
-          build_context_markers: event.markers,
-          build_context_metadata: event.metadata,
-          build_context_causation_id: event.causation_id,
-          build_context_correlation_id: event.correlation_id,
-          build_context_global_position: event.global_position,
-          build_context_at_domain: build_context.captured_at,
-          build_context_at_store: event.created_at
-        )
-        record
       end
 
       def page(query)
@@ -117,26 +68,40 @@ module Coordinator::Read
 
       private
 
-      def verify_manifest!(record, manifest)
-        matches = record.repository_id == manifest.repository_id &&
-                  record.target_branch == manifest.target_branch &&
-                  record.object_format == manifest.object_format &&
-                  record.base_commit_oid == manifest.base_commit_oid &&
-                  record.head_commit_oid == manifest.head_commit_oid &&
-                  record.manifest_digest == manifest.manifest_digest
-        return if matches
+      def build_context_document(candidate)
+        context = candidate.build_context
+        event = candidate.build_context_event
+        return unless context && event
 
-        raise ProjectionStateError, "Candidate manifest identity changed"
+        {
+          policy_version: event.metadata.fetch("policy_version"),
+          digest: event.metadata.fetch("build_context_digest"),
+          inputs: context.inputs.map(&:to_h),
+          environment: context.environment.map(&:to_h),
+          dependency_graph_digest: event.metadata["dependency_graph_digest"],
+          test_environment_digest: event.metadata["test_environment_digest"],
+          collector: event.metadata.fetch("collector")
+        }
       end
 
-      def verify_build_context!(record, build_context)
-        matches = record.repository_id == build_context.repository_id &&
-                  record.object_format == build_context.object_format &&
-                  record.head_commit_oid == build_context.head_commit_oid &&
-                  record.build_context_digest == build_context.build_context_digest
-        return if matches
+      def source_columns(prefix, event)
+        {
+          "#{prefix}_event": event_reference(event).to_h,
+          "#{prefix}_actor": actor(event).to_h,
+          "#{prefix}_markers": event.markers,
+          "#{prefix}_metadata": event.metadata,
+          "#{prefix}_causation_id": event.causation_id,
+          "#{prefix}_correlation_id": event.correlation_id,
+          "#{prefix}_global_position": event.global_position,
+          "#{prefix}_at_domain": event.created_at,
+          "#{prefix}_at_store": event.created_at
+        }
+      end
 
-        raise ProjectionStateError, "Candidate build-context identity changed"
+      def optional_source_columns(prefix, event)
+        return {} unless event
+
+        source_columns(prefix, event)
       end
 
       def build_view(record)

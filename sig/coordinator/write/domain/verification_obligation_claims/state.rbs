@@ -4,16 +4,16 @@ module Coordinator
       module VerificationObligationClaims
         class State < Shared::Value
           def self.initial: () -> State
-          def obligation: () -> Events::VerificationObligationCreatedV1?
+          def obligation: () -> VerificationObligations::DefinitionV2?
           def obligation_event: () -> EventReference?
-          def claim: () -> Events::VerificationObligationClaimedV1?
+          def claim: () -> Events::VerificationObligationClaimedV2?
           def terminal_status: () -> String?
           def terminal_event: () -> EventReference?
           def absent?: () -> bool
           def terminal?: () -> bool
           def status: () -> String
           def active_at?: (String timestamp) -> bool
-          def active_claim_at: (String timestamp) -> Events::VerificationObligationClaimedV1?
+          def active_claim_at: (String timestamp) -> Events::VerificationObligationClaimedV2?
           def next_fencing_token: () -> Integer
           def scope_markers: () -> Array[String]
         end

@@ -15,42 +15,30 @@ RSpec.describe Coordinator::Write::Domain::VerificationEvidence::Submit do
       have_attributes(
         evidence_id:,
         evidence_kind: "combined_tests",
-        assessment_input_digest:,
         assessment: have_attributes(conclusion: "passed"),
         claim: have_attributes(claimant_id: "agent-blue", fencing_token: 1)
       )
     )
   end
 
-  it "VER-EVIDENCE-SATISFIED-02 emits evidence and a sibling satisfaction when every kind passed" do
+  it "VER-EVIDENCE-SATISFIED-02 leaves the terminal outcome to the evidence-outcome process" do
     existing = VerificationEvidenceExamples.observation(evidence_kind: "combined_tests")
     command = VerificationEvidenceExamples.command(evidence_kind: "contract_compatibility_review")
 
-    plan = decide(state: VerificationEvidenceExamples.state(evidence: [ existing ]), command:, revision: 3).value!
+    plan = decide(state: VerificationEvidenceExamples.state(evidence: [ existing ]), command:).value!
 
-    expect(plan.events.map(&:class)).to eq([
-      Coordinator::Write::Events::VerificationEvidenceSubmittedV1,
-      Coordinator::Write::Events::VerificationObligationSatisfiedV1
-    ])
-    outcome = plan.events.last
-    expect(outcome.selected_evidence.map(&:evidence_kind)).to eq(%w[combined_tests contract_compatibility_review])
-    expect(outcome.outcome_digest).to match(Coordinator::Shared::Types::SHA256_DIGEST_PATTERN)
-    expect(plan.writes.map(&:stream).uniq.length).to eq(1)
+    expect(plan.events.sole).to be_a(Coordinator::Write::Events::VerificationEvidenceSubmittedV2)
+    expect(plan.events.sole.evidence_kind).to eq("contract_compatibility_review")
   end
 
-  it "VER-EVIDENCE-FAILED-03 emits evidence and a sibling failure for a failed conclusion" do
+  it "VER-EVIDENCE-FAILED-03 records failed evidence without embedding an outcome" do
     command = VerificationEvidenceExamples.command(conclusion: "failed")
 
     plan = decide(command:).value!
 
-    expect(plan.events.map(&:class)).to eq([
-      Coordinator::Write::Events::VerificationEvidenceSubmittedV1,
-      Coordinator::Write::Events::VerificationObligationFailedV1
-    ])
-    expect(plan.events.last.triggering_evidence).to have_attributes(
+    expect(plan.events.sole).to have_attributes(
       evidence_id:,
-      conclusion: "failed",
-      assessment_input_digest:
+      assessment: have_attributes(conclusion: "failed")
     )
   end
 
@@ -59,7 +47,7 @@ RSpec.describe Coordinator::Write::Domain::VerificationEvidence::Submit do
       command = VerificationEvidenceExamples.command(conclusion:)
 
       expect(decide(command:).value!.events.map(&:class)).to eq([
-        Coordinator::Write::Events::VerificationEvidenceSubmittedV1
+        Coordinator::Write::Events::VerificationEvidenceSubmittedV2
       ])
     end
   end
@@ -96,7 +84,7 @@ RSpec.describe Coordinator::Write::Domain::VerificationEvidence::Submit do
       assessment_input_digest:
     )
 
-    result = decide(state: VerificationEvidenceExamples.state(evidence: [ existing ]), revision: 3)
+    result = decide(state: VerificationEvidenceExamples.state(evidence: [ existing ]))
 
     expect(result.failure.to_h).to include(
       code: :verification_evidence_already_submitted,
@@ -105,8 +93,7 @@ RSpec.describe Coordinator::Write::Domain::VerificationEvidence::Submit do
   end
 
   it "VER-EVIDENCE-TERMINAL-10 denies evidence after a terminal fact" do
-    failed_plan = decide(command: VerificationEvidenceExamples.command(conclusion: "failed")).value!
-    failed = failed_plan.events.last
+    failed = VerificationEvidenceExamples.failed
 
     result = decide(state: VerificationEvidenceExamples.state(failed:))
 
@@ -137,7 +124,7 @@ RSpec.describe Coordinator::Write::Domain::VerificationEvidence::Submit do
       )
     end
 
-    result = decide(state: VerificationEvidenceExamples.state(evidence: observations), revision: 34)
+    result = decide(state: VerificationEvidenceExamples.state(evidence: observations))
 
     expect(result.failure.to_h).to include(
       code: :verification_evidence_limit_reached,
@@ -148,7 +135,6 @@ RSpec.describe Coordinator::Write::Domain::VerificationEvidence::Submit do
   def decide(
     state: VerificationEvidenceExamples.state,
     command: VerificationEvidenceExamples.command,
-    revision: 2,
     submitted_at: self.submitted_at
   )
     decider.call(
@@ -156,7 +142,6 @@ RSpec.describe Coordinator::Write::Domain::VerificationEvidence::Submit do
       command:,
       evidence_id:,
       assessment_input_digest:,
-      evidence_event: VerificationEvidenceExamples.evidence_reference(revision:, evidence_id:),
       submitted_at:
     )
   end

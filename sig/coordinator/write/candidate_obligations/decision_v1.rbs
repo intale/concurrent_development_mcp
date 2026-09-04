@@ -3,9 +3,9 @@ module Coordinator::Write
     class DecisionV1 < Coordinator::Shared::Value
       def outcome: () -> String
       def plan: () -> Coordinator::Write::Domain::EventPlan?
-      def obligation: () -> Coordinator::Write::Events::VerificationObligationCreatedV1?
-      def self.created: (Coordinator::Write::Domain::EventPlan plan, Coordinator::Write::Events::VerificationObligationCreatedV1 obligation) -> DecisionV1
-      def self.replayed: (Coordinator::Write::Events::VerificationObligationCreatedV1 obligation) -> DecisionV1
+      def obligation: () -> (Coordinator::Write::Events::VerificationObligationCreatedV2 | Coordinator::Write::VerificationObligations::DefinitionV2)?
+      def self.created: (Coordinator::Write::Domain::EventPlan plan, Coordinator::Write::Events::VerificationObligationCreatedV2 obligation) -> DecisionV1
+      def self.replayed: (Coordinator::Write::VerificationObligations::DefinitionV2 obligation) -> DecisionV1
       def self.no_event: (String outcome) -> DecisionV1
     end
   end

@@ -19,15 +19,20 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCompleteCompensatedRelease
     completion_events = ReleaseSetScenario.release_lifecycle_events(
       prepared.dig(:input, :release_set_id)
     ).select { _1.type == "ReleaseSetCompleted" }
+    outcome_events = ReleaseSetScenario.release_lifecycle_events(
+      prepared.dig(:input, :release_set_id)
+    ).select { _1.type == "ReleaseSetOutcomeRecorded" }
 
     expect(denied.failure.code).to eq(:release_compensation_evidence_mismatch)
     expect(completed).to be_success
     expect(replay.failure.code).to eq(:release_set_already_completed)
-    expect(ReleaseSetScenario.load(completion_events.sole)).to have_attributes(
-      outcome: "compensated",
-      source_event: ReleaseSetScenario.reference(request.fetch(:event)),
-      rule_version: "release-set-completion/v1"
+    outcome = outcome_events.sole
+    expect(ReleaseSetScenario.load(outcome)).to have_attributes(outcome: "compensated")
+    expect(ReleaseSetScenario.load(completion_events.sole).to_h).to eq(
+      release_set_id: prepared.dig(:input, :release_set_id)
     )
+    expect(outcome.metadata).to include("rule_version" => "release-set-completion/v1")
+    expect(completion_events.sole.causation_id).to eq(outcome.id)
   end
 
   private
@@ -45,8 +50,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCompleteCompensatedRelease
         summary: "Ledger integration failed",
         producer: { name: "release-adapter", version: "1.0.0" },
         run_id: "release-failure-#{prefix}",
-        result_digest: "sha256:#{'d' * 64}",
-        occurred_at: "2026-08-24T21:30:00.000000Z"
+        result_digest: "sha256:#{'d' * 64}"
       }
     )
     Coordinator::Processes::ProcessManagers::ReleaseSetLifecycle.new(event_store:).call(failure.fetch(:event))
@@ -60,7 +64,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCompleteCompensatedRelease
     state = Coordinator::Write::ReleaseSets::HistoryLoader.new(event_store:).call(
       prepared.dig(:input, :release_set_id)
     )
-    evidence = request.fetch(:payload).successful_integrations.map do |reference|
+    evidence = state.compensation_request.successful_integrations.map do |reference|
       integration = state.integrations.find { _1.event == reference }
       {
         repository_id: integration.payload.repository_id,
@@ -69,8 +73,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCompleteCompensatedRelease
         external_reference: "reverts/#{prefix}",
         result_digest: "sha256:#{'e' * 64}",
         producer: { name: "release-reverter", version: "1.0.0" },
-        run_id: "release-compensation-#{prefix}",
-        compensated_at: "2026-08-24T22:00:00.000000Z"
+        run_id: "release-compensation-#{prefix}"
       }
     end
     {

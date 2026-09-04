@@ -10,11 +10,11 @@ module Coordinator::Write
         preparer: PrepareRecordReleaseSetVerification.new,
         history_loader: ReleaseSets::HistoryLoader.new(event_store:),
         decider: Domain::ReleaseSets::RecordVerification.new,
+        digest_builder: ReleaseSets::VerificationDigestBuilder.new,
         input_digest: CommandInputDigest.new,
         clock: SystemClock.new,
         id_generator: IdGenerator.new,
         event_factory: EventFactory.new,
-        schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
         completion_builder: CommandResultBuilder.new,
         event_plan_contract: Contracts::ReleaseSetVerificationEventPlan.new
@@ -23,11 +23,11 @@ module Coordinator::Write
         @preparer = preparer
         @history_loader = history_loader
         @decider = decider
+        @digest_builder = digest_builder
         @input_digest = input_digest
         @clock = clock
         @id_generator = id_generator
         @event_factory = event_factory
-        @schema_registry = schema_registry
         @stream_factory = stream_factory
         @completion_builder = completion_builder
         @event_plan_contract = event_plan_contract
@@ -51,73 +51,96 @@ module Coordinator::Write
         ReleaseSetVerificationPreparationV1.new(
           recorded_at: @clock.now,
           input_digest: @input_digest.release_verification_record(command),
-          verification_event_id: @id_generator.uuid_v7,
+          event_ids: (command.integration_events.length + 1).times.map { @id_generator.uuid_v7 }
         )
       end
 
       def execute_attempt(command:, preparation:, caused_by:)
         state = @history_loader.call(command.release_set_id)
-        decision = @decider.call(state:, command:, recorded_at: preparation.recorded_at)
+        decision = @decider.call(state:, command:)
         return decision if decision.failure?
 
         plan = decision.value!
-        verify_event_plan!(plan, state:, command:, recorded_at: preparation.recorded_at)
-        verification = plan.events.sole
-        persisted = persist_verification(verification, state:, command:, preparation:, caused_by:)
+        verify_event_plan!(plan, state:, command:)
+        verification = plan.events.first
+        verification_digest = @digest_builder.call(
+          release_set_id: command.release_set_id,
+          release_digest: state.preparation.payload.release_digest,
+          attempt_number: verification.attempt_number,
+          integration_events: command.integration_events,
+          evidence: command.evidence,
+          policy_version: command.policy_version
+        )
+        persisted = persist_plan(
+          plan,
+          state:,
+          command:,
+          preparation:,
+          verification_digest:,
+          caused_by:
+        )
         completion = @completion_builder.release_verification_record(
           command:,
           verification:,
+          integration_events: command.integration_events,
+          verification_digest:,
+          verification_event: persisted.first,
           input_digest: preparation.input_digest,
-          persisted_events: [ persisted ],
+          persisted_events: persisted,
           completed_at: preparation.recorded_at
         )
         Success(completion)
       end
 
-      def verify_event_plan!(plan, state:, command:, recorded_at:)
-        result = @event_plan_contract.call(plan:, state:, command:, recorded_at:)
+      def verify_event_plan!(plan, state:, command:)
+        result = @event_plan_contract.call(plan:, state:, command:)
         return if result.success?
 
         raise InvalidReleaseSetVerificationEventPlan, result.errors.to_h.inspect
       end
 
-      def persist_verification(verification, state:, command:, preparation:, caused_by:)
-        physical = @event_factory.build!(
-          event: verification,
-          event_id: preparation.verification_event_id,
-          metadata: command_metadata(command),
-          markers: verification_markers(command, verification),
-          caused_by:,
-          correlation_id: state.preparation.correlation_id
-        )
-        @event_store.append(@stream_factory.release_set(command.release_set_id), [ physical ]).sole
+      def persist_plan(plan, state:, command:, preparation:, verification_digest:, caused_by:)
+        parent = caused_by
+        plan.writes.zip(preparation.event_ids).map do |write, event_id|
+          physical = @event_factory.build!(
+            event: write.event,
+            event_id:,
+            metadata: event_metadata(write.event, state:, command:, verification_digest:),
+            markers: event_markers(write.event, command),
+            caused_by: parent,
+            correlation_id: state.preparation.correlation_id
+          )
+          persisted = @event_store.append(write.stream, [ physical ]).sole
+          parent = persisted
+          persisted
+        end
       end
 
-      def load_event(event)
-        @schema_registry.load(
-          type: event.type,
-          schema_version: event.metadata.fetch("schema_version"),
-          data: event.data
-        )
-      end
-
-      def verification_markers(command, verification)
-        [
-          "release-set:#{command.release_set_id}",
-          "release-verification-outcome:#{verification.evidence.outcome}",
-          "command:#{command.command_id}",
-          *command.integration_events.map { "repository-integration-event:#{_1.event_id}" }
-        ]
-      end
-
-      def command_metadata(command)
-        EventMetadata.new(
+      def event_metadata(event, state:, command:, verification_digest:)
+        attributes = {
           command_id: command.command_id,
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
           policy_version: command.policy_version
+        }
+        return EventMetadata.new(**attributes) unless event.is_a?(Events::ReleaseSetVerificationRecordedV2)
+
+        Metadata::ReleaseSetVerificationV2.new(
+          **attributes,
+          release_digest: state.preparation.payload.release_digest,
+          verification_digest:
         )
+      end
+
+      def event_markers(event, command)
+        markers = [ "release-set:#{command.release_set_id}", "command:#{command.command_id}" ]
+        if event.is_a?(Events::ReleaseSetVerificationRecordedV2)
+          markers << "release-verification-outcome:#{event.evidence.outcome}"
+        else
+          markers << "repository-integration-event:#{event.integration_event.event_id}"
+        end
+        markers
       end
     end
   end

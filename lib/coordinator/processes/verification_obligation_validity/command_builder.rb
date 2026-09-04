@@ -18,7 +18,7 @@ module Coordinator::Processes
       end
 
       def start(source)
-        change_set_id = source.payload.partition.anchor_id
+        change_set_id = change_set_id(source.payload)
         process_step = plan(
           source_event: source.event,
           step_name: "start-validity-scan",
@@ -98,6 +98,12 @@ module Coordinator::Processes
       end
 
       private
+
+      def change_set_id(payload)
+        return payload.partition.anchor_id if payload.is_a?(Coordinator::Write::Events::DecisionPartitionAdvancedV1)
+
+        payload.partition_id.delete_prefix("changeset:").delete_suffix(":candidate")
+      end
 
       def reference(event)
         Coordinator::Write::EventReference.new(

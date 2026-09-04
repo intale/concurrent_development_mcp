@@ -1,7 +1,7 @@
 module Coordinator::Write
   module CandidateObligations
     class Matcher
-      def call: (source: CandidateEvidenceV1, target: CandidateEvidenceV1) -> Array[ImpactReasonV1]
+      def call: (source: CandidateEvidenceV2, target: CandidateEvidenceV2) -> Array[ImpactReasonV1]
     end
   end
 end

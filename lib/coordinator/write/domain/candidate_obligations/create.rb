@@ -14,15 +14,13 @@ module Coordinator::Write
 
         def initialize(
           matcher: Coordinator::Write::CandidateObligations::Matcher.new,
-          validity_builder: Coordinator::Write::CandidateObligations::ValidityBuilder.new,
           stream_factory: StreamFactory.new
         )
           @matcher = matcher
-          @validity_builder = validity_builder
           @stream_factory = stream_factory
         end
 
-        def call(state:, command:, created_at:)
+        def call(state:, command:)
           policy_outcome = POLICY_OUTCOMES[state.policy.status]
           return Success(Coordinator::Write::CandidateObligations::DecisionV1.no_event(policy_outcome)) if policy_outcome
 
@@ -38,56 +36,60 @@ module Coordinator::Write
             state:,
             command:,
             policy:,
-            reasons:,
-            created_at: state.existing&.created_at || created_at
+            reasons:
           )
           return replay(state.existing, obligation) if state.existing
 
-          plan = EventPlan.new(
-            writes: [
-              EventWrite.new(
-                stream: @stream_factory.verification_obligation(command.obligation_id),
-                event: obligation
+          stream = @stream_factory.verification_obligation(command.obligation_id)
+          plan = EventPlan.new(writes: [
+            EventWrite.new(stream:, event: obligation),
+            EventWrite.new(
+              stream:,
+              event: Events::VerificationObligationAddedToChangeSetV1.new(
+                obligation_id: command.obligation_id,
+                change_set_id: state.source.subject.change_set_id
               )
-            ]
-          )
+            ),
+            EventWrite.new(
+              stream:,
+              event: Events::VerificationObligationSourceCandidateAssignedV1.new(
+                obligation_id: command.obligation_id,
+                candidate_id: state.source.subject.candidate_id
+              )
+            ),
+            EventWrite.new(
+              stream:,
+              event: Events::VerificationObligationTargetCandidateAssignedV1.new(
+                obligation_id: command.obligation_id,
+                candidate_id: state.target.subject.candidate_id
+              )
+            )
+          ])
           Success(Coordinator::Write::CandidateObligations::DecisionV1.created(plan, obligation))
         end
 
         private
 
-        def build_obligation(state:, command:, policy:, reasons:, created_at:)
-          validity = @validity_builder.call(
-            source: state.source,
-            target: state.target,
-            reasons:,
-            policy:,
-            rule_version: command.rule_version
-          )
-          Events::VerificationObligationCreatedV1.new(
+        def build_obligation(state:, command:, policy:, reasons:)
+          Events::VerificationObligationCreatedV2.new(
             obligation_id: command.obligation_id,
             kind: "candidate_compatibility",
-            status: "open",
-            change_set_id: state.source.subject.change_set_id,
-            source_candidate: state.source.subject,
-            target_candidate: state.target.subject,
-            reasons:,
+            reasons: reasons.map(&:kind),
             required_evidence: policy.required_evidence,
-            enforcement: policy.enforcement,
-            policy:,
-            validity_input_digest: validity.digest,
-            rule_version: command.rule_version,
-            created_at:
+            enforcement: policy.enforcement
           )
         end
 
         def replay(existing, expected)
-          unless existing == expected
+          unless existing.obligation_id == expected.obligation_id &&
+                 existing.kind == expected.kind &&
+                 existing.enforcement == expected.enforcement &&
+                 existing.reasons.map(&:kind) == expected.reasons &&
+                 existing.required_evidence == expected.required_evidence
             invalid!(
               "obligation_replay_mismatch",
               obligation_id: expected.obligation_id,
-              existing_validity_input_digest: existing.validity_input_digest,
-              expected_validity_input_digest: expected.validity_input_digest
+              existing_validity_input_digest: existing.validity_input_digest
             )
           end
 

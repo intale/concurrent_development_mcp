@@ -1,0 +1,19 @@
+module Coordinator::Read
+  module MergeSnapshots
+    interface _RegistrationLoader
+      def call: (PgEventstore::Event event, registration: Coordinator::Write::Events::MergeSnapshotRegisteredV2) -> Coordinator::Read::MergeSnapshotRegistrationViewV2
+    end
+
+    class RegistrationLoader
+      @candidate_loader: untyped
+
+      def initialize: (candidate_loader: untyped) -> void
+
+      def call: (untyped event, registration: untyped) -> untyped
+
+      private
+
+      def event_reference: (untyped event) -> untyped
+    end
+  end
+end

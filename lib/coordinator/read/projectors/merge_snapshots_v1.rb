@@ -6,6 +6,7 @@ module Coordinator::Read
       PROJECTION = ProjectionDefinition.new(name: "merge-snapshots", version: 1)
 
       def initialize(
+        registration_loader:,
         registration_contract: Contracts::MergeSnapshotSourceEvent.new,
         verification_contract: Contracts::MergeSnapshotVerificationSourceEvent.new,
         authorization_contract: Contracts::MergeAuthorizationSourceEvent.new,
@@ -16,6 +17,7 @@ module Coordinator::Read
         processed_events: Repositories::ProcessedProjectionEvents.new
       )
         @registration_contract = registration_contract
+        @registration_loader = registration_loader
         @verification_contract = verification_contract
         @authorization_contract = authorization_contract
         @observation_contract = observation_contract
@@ -71,7 +73,7 @@ module Coordinator::Read
       def contract_for(event)
         return @registration_contract if event.type == "MergeSnapshotRegistered"
         return @authorization_contract if event.type.start_with?("MergeAuthorization")
-        return @observation_contract if event.type == "MergeObserved"
+        return @observation_contract if %w[MergeObserved MergeObservationAuthorizationLinked].include?(event.type)
 
         @verification_contract
       end
@@ -79,9 +81,11 @@ module Coordinator::Read
       def valid_stream_identity?(event, payload)
         stream_id =
           case payload
-          when Coordinator::Write::Events::MergeAuthorizationGrantedV1,
-               Coordinator::Write::Events::MergeAuthorizationDeniedV1
+          when Coordinator::Write::Events::MergeAuthorizationGrantedV2,
+               Coordinator::Write::Events::MergeAuthorizationDeniedV2
             payload.authorization_id
+          when Coordinator::Write::Events::MergeSnapshotVerificationSubmittedV2
+            payload.verification_id
           else
             payload.merge_snapshot_id
           end
@@ -90,17 +94,25 @@ module Coordinator::Read
 
       def project(event, payload)
         case payload
-        when Coordinator::Write::Events::MergeSnapshotRegisteredV1
-          @snapshots.store(event:, snapshot: payload)
-        when Coordinator::Write::Events::MergeSnapshotVerificationSubmittedV1
+        when Coordinator::Write::Events::MergeSnapshotRegisteredV2
+          @snapshots.store(event:, snapshot: @registration_loader.call(event, registration: payload))
+        when Coordinator::Write::Events::MergeSnapshotVerificationSubmittedV2
           @snapshots.record_submission(event:, submission: payload)
-        when Coordinator::Write::Events::MergeSnapshotVerifiedV1
+        when Coordinator::Write::Events::MergeSnapshotVerificationAssignedV1
+          true
+        when Coordinator::Write::Events::MergeSnapshotVerificationSelectedV1
+          @snapshots.record_selection(event:, selection: payload)
+        when Coordinator::Write::Events::MergeSnapshotVerifiedV2
           @snapshots.record_verified(event:, verified: payload)
-        when Coordinator::Write::Events::MergeAuthorizationGrantedV1,
-             Coordinator::Write::Events::MergeAuthorizationDeniedV1
+        when Coordinator::Write::Events::MergeAuthorizationGrantedV2,
+             Coordinator::Write::Events::MergeAuthorizationDeniedV2
           @authorizations.store(event:, decision: payload)
-        when Coordinator::Write::Events::MergeObservedV1
+        when Coordinator::Write::Events::MergeObservedV2
           @snapshots.record_observation(event:, observation: payload)
+        when Coordinator::Write::Events::MergeObservationAuthorizationLinkedV1
+          @snapshots.link_observation_authorization(link: payload)
+        else
+          raise UnknownProjectionEvent, payload.class.name
         end
       end
     end

@@ -5,8 +5,7 @@ module Coordinator::Write
         def initialize: (?stream_factory: StreamFactory) -> void
         def call: (
           state: PairScanState,
-          command: Commands::ProgressCandidateImpactPairScan,
-          progressed_at: String
+          command: Commands::ProgressCandidateImpactPairScan
         ) -> Dry::Monads::Result
       end
     end

@@ -115,20 +115,30 @@ module Coordinator::Write
         end
 
         def partition_writes(states, correction_head, corrected_partition_ids)
-          states.filter_map do |state|
+          states.flat_map do |state|
             currently_present = state.active_decisions.any? { _1.decision_id == correction_head.decision_id }
             should_be_present = corrected_partition_ids.include?(state.partition.partition_id)
-            next if currently_present == should_be_present
+            event_classes = if currently_present && should_be_present
+              [ Events::DecisionRemovedFromPartitionV1, Events::DecisionAddedToPartitionV1 ]
+            elsif currently_present
+              [ Events::DecisionRemovedFromPartitionV1 ]
+            elsif should_be_present
+              [ Events::DecisionAddedToPartitionV1 ]
+            else
+              []
+            end
+            first_revision = state.latest_revision ? state.latest_revision + 1 : 0
 
-            next_revision = state.latest_revision ? state.latest_revision + 1 : 0
-            EventWrite.new(
-              stream: @stream_factory.decision_partition(state.partition.partition_id),
-              event: (should_be_present ? Events::DecisionAddedToPartitionV1 : Events::DecisionRemovedFromPartitionV1).new(
-                partition_id: state.partition.partition_id,
-                partition_revision: next_revision,
-                decision_id: correction_head.decision_id
+            event_classes.each_with_index.map do |event_class, index|
+              EventWrite.new(
+                stream: @stream_factory.decision_partition(state.partition.partition_id),
+                event: event_class.new(
+                  partition_id: state.partition.partition_id,
+                  partition_revision: first_revision + index,
+                  decision_id: correction_head.decision_id
+                )
               )
-            )
+            end
           end
         end
 

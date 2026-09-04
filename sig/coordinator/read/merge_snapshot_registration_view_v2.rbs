@@ -1,0 +1,5 @@
+module Coordinator::Read
+  class MergeSnapshotRegistrationViewV2 < Coordinator::Shared::Value
+    Member: untyped
+  end
+end

@@ -6,20 +6,20 @@ module Coordinator
           Observation: untyped
 
           def self.initial: () -> State
-          def obligation: () -> Events::VerificationObligationCreatedV1?
+          def obligation: () -> VerificationObligations::DefinitionV2?
           def obligation_event: () -> EventReference?
-          def latest_claim: () -> Events::VerificationObligationClaimedV1?
+          def latest_claim: () -> Events::VerificationObligationClaimedV2?
           def latest_claim_event: () -> EventReference?
-          def evidence: () -> Array[CompatibilityAssessments::EvidenceObservationV1]
-          def satisfied: () -> Events::VerificationObligationSatisfiedV1?
-          def failed: () -> Events::VerificationObligationFailedV1?
-          def waived: () -> Events::VerificationObligationWaivedV1?
-          def invalidated: () -> Events::VerificationObligationInvalidatedV1?
+          def evidence: () -> Array[CompatibilityAssessments::EvidenceObservationV2]
+          def satisfied: () -> Events::VerificationObligationSatisfiedV2?
+          def failed: () -> Events::VerificationObligationFailedV2?
+          def waived: () -> Events::VerificationObligationWaivedV2?
+          def invalidated: () -> Events::VerificationObligationInvalidatedV2?
           def policy_current: () -> bool
           def absent?: () -> bool
           def terminal?: () -> bool
           def status: () -> String
-          def active_claim_at: (String timestamp) -> Events::VerificationObligationClaimedV1?
+          def active_claim_at: (String timestamp) -> Events::VerificationObligationClaimedV2?
           def duplicate_assessment?: (String assessment_input_digest) -> bool
           def evidence_limit_reached?: () -> bool
           def passed_evidence_by_kind: () -> Hash[String, CompatibilityAssessments::EvidenceDecisionReferenceV1]

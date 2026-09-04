@@ -41,8 +41,11 @@ RSpec.describe "CHO-02 AgentChoice impact scan operations", :event_store do
 
     expect(result).to be_success
     expect(load(result.value!)).to have_attributes(
-      reason: "future_only",
-      decision_change: have_attributes(retroactivity: "future_only")
+      reason: "future_only"
+    )
+    expect(load(scan_source_events(invocation.command.scan_id).sole)).to have_attributes(
+      role: "decision_change",
+      source: reference(source)
     )
     expect(scan_state(invocation.command.scan_id)).to have_attributes(
       status: "skipped",
@@ -102,16 +105,11 @@ RSpec.describe "CHO-02 AgentChoice impact scan operations", :event_store do
       causation_id: completion_invocation.caused_by.id,
       correlation_id: started.correlation_id
     )
-    expect(load(completed.value!)).to have_attributes(
-      final_from_position: source.global_position,
-      page_count: 2,
-      total_choice_count: 50
-    )
+    expect(load(completed.value!)).to have_attributes(scan_id: started.stream.stream_id)
     expect(scan_state(started.stream.stream_id)).to have_attributes(
       status: "completed",
-      from_position: source.global_position,
-      page_count: 2,
-      total_choice_count: 50
+      from_position: nil,
+      page_count: 2
     )
   end
 
@@ -132,7 +130,9 @@ RSpec.describe "CHO-02 AgentChoice impact scan operations", :event_store do
 
     expect(results.count(&:success?)).to eq(1)
     expect(results.count(&:failure?)).to eq(1)
-    expect(results.find(&:failure?).failure.code).to eq(:agent_choice_impact_scan_not_running)
+    expect(results.find(&:failure?).failure.code).to be_in(
+      %i[agent_choice_impact_scan_not_running stale_stream]
+    )
     expect(scan_events(started.stream.stream_id).map(&:type)).to contain_exactly(
       "AgentChoiceImpactScanStarted",
       "AgentChoiceImpactScanCompleted"
@@ -343,6 +343,13 @@ RSpec.describe "CHO-02 AgentChoice impact scan operations", :event_store do
     event_store.read_grouped(
       streams.agent_choice_impact_scan(scan_id),
       Coordinator::Write::EventQueries::AGENT_CHOICE_IMPACT_SCAN_STATE
+    )
+  end
+
+  def scan_source_events(scan_id)
+    event_store.read(
+      streams.agent_choice_impact_scan(scan_id),
+      Coordinator::Write::EventQueries::AGENT_CHOICE_IMPACT_SCAN_SOURCES
     )
   end
 

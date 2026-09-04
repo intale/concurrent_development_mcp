@@ -8,7 +8,7 @@ module Coordinator::Write
       attribute :release_digest, Types::Sha256Digest
       attribute :verification_event, EventReference
       attribute :verification_digest, Types::Sha256Digest
-      attribute :activation_point, ActivationPointV1
+      attribute :activation_point, ActivationPointV2
       attribute :policy_version, Types::ReleaseSetActivationPolicyVersion
     end
   end

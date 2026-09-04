@@ -43,9 +43,16 @@ RSpec.describe "CAN-01 MCP Candidate coordination" do
     candidate_facts = CandidateScenario.candidate_events("CAN-mcp-candidate")
     command_terminal = command_events_for_task(task_id).last
     expect(candidate_facts.map(&:type)).to eq(%w[
-      CandidateSubmitted
+      CandidateCreated
+      CandidateAssignedToAttempt
+      CandidateAssignedToRepository
+      CandidateTargetBranchSelected
+      CandidateCommitRangeDeclared
+      CandidateCheckpointKindSelected
+      CandidateWorkIntentionSetAssigned
       CandidateChangeManifestCaptured
       CandidateBuildContextCaptured
+      CandidateSubmitted
     ])
     expect([ *candidate_facts, command_terminal ].map(&:causation_id).uniq).to eq([ started.id ])
     expect(task_completed.causation_id).to eq(command_terminal.id)

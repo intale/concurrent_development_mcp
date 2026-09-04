@@ -1,0 +1,6 @@
+module Coordinator::Write
+  module Events
+    class ReleaseSetMemberAddedV1 < Base
+    end
+  end
+end

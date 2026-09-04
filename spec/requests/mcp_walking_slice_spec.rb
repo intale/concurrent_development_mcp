@@ -492,7 +492,8 @@ module McpWalkingSliceSpec
       Coordinator::Write::EventQueries::MERGE_SNAPSHOT_REGISTRATION
     ).sole
     expect(snapshot.type).to eq("MergeSnapshotRegistered")
-    expect(snapshot.data.fetch("evidence_status")).to eq("attributed_unverified")
+    expect(snapshot.data.fetch("merge_snapshot_id")).to eq(arguments.fetch(:merge_snapshot_id))
+    expect(snapshot.data).not_to have_key("evidence_status")
   end
 
   it "serves an independently available merge snapshot projection", :read_model do

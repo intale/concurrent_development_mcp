@@ -1,0 +1,4 @@
+module Coordinator::Write
+  class ReleaseSetMultiEventPreparationV1 < Coordinator::Shared::Value
+  end
+end

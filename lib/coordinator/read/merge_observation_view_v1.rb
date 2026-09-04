@@ -10,7 +10,7 @@ module Coordinator::Read
     attribute :object_format, Types::GitObjectFormat
     attribute :target_before_commit_oid, Types::GitOid
     attribute :target_after_commit_oid, Types::GitOid
-    attribute :observer, Coordinator::Write::MergeObservations::ObserverV1
+    attribute :observer, Types::Identifier
     attribute :run_id, Types::Identifier
     attribute :observed_at, Types::Timestamp
     attribute :observation_digest, Types::Sha256Digest

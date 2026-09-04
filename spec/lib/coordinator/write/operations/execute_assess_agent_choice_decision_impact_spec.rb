@@ -220,7 +220,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAssessAgentChoiceDecisionI
         event_id: "0198e03a-d112-7000-8000-000000000099"
       )
     )
-    malformed_change = Coordinator::Write::AgentChoiceImpacts::DecisionChangeEvidenceV1.new(
+    malformed_change = Coordinator::Write::AgentChoiceImpacts::DecisionChangeEvidenceV2.new(
       valid.command.decision_change.to_h.merge(source_event: malformed_reference.to_h)
     )
     command = Coordinator::Write::Commands::AssessAgentChoiceDecisionImpact.new(

@@ -27,11 +27,21 @@ module Coordinator::Processes
         unless Types::UUID_V7_PATTERN.match?(value.correlation_id.to_s)
           key.failure("event must carry a pg_eventstore trace correlation ID")
         end
-        key.failure("schema version must be 1") unless value.metadata["schema_version"] == 1
+        unless allowed_schema_versions(value.type).include?(value.metadata["schema_version"])
+          key.failure("schema version is not supported")
+        end
         unless value.stream.context == context && value.stream.stream_name == stream_name
           key.failure("event stream does not match its type")
         end
         key.failure("event payload identity does not match its stream") unless value.data[identity_key] == value.stream.stream_id
+      end
+
+      private
+
+      def allowed_schema_versions(type)
+        return [ 1, 2 ] if %w[WorkItemCandidateSelected WorkItemCompleted].include?(type)
+
+        [ 2 ]
       end
     end
   end

@@ -177,7 +177,7 @@ module TerminalBuildProgressAcceptanceWorld
       state.dig("result", "result", "isError") == false,
       "Terminal Candidate submission failed: #{state.dig("result", "result", "structuredContent").inspect}"
     )
-    project_candidate_attachment(arguments.fetch(:candidate_id), arguments.fetch(:attempt_id))
+    project_candidate_context(arguments.fetch(:candidate_id), arguments.fetch(:attempt_id))
 
     { arguments:, task_id: }
   end

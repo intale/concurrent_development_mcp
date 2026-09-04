@@ -5,7 +5,7 @@ module Coordinator
         class Start
           PAGE_SIZE: Integer
           def initialize: (?stream_factory: StreamFactory) -> void
-          def call: (state: State, command: Commands::StartVerificationObligationValidityScan, started_at: String) -> Dry::Monads::Result
+          def call: (state: State, command: Commands::StartVerificationObligationValidityScan) -> Dry::Monads::Result
         end
       end
     end

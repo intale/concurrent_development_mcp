@@ -7,12 +7,12 @@ module Coordinator::Write
         ?compound_marker_builder: Coordinator::Shared::CompoundMarkerBuilder
       ) -> void
       def call: (
-        evidence: ImpactSurfaceEvidenceV1,
-        surface: Coordinator::Write::Events::CandidateImpactSurfaceDerivedV1
+        evidence: ImpactSurfaceEvidenceV2,
+        surface: Coordinator::Write::Events::CandidateImpactSurfaceDerivedV2
       ) -> Array[String]
       def counterpart: (
-        evidence: ImpactSurfaceEvidenceV1,
-        surface: Coordinator::Write::Events::CandidateImpactSurfaceDerivedV1,
+        evidence: ImpactSurfaceEvidenceV2,
+        surface: Coordinator::Write::Events::CandidateImpactSurfaceDerivedV2,
         direction: String
       ) -> Array[String]
     end

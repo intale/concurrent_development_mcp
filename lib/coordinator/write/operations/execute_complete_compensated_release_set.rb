@@ -10,12 +10,11 @@ module Coordinator::Write
         preparer: PrepareCompleteCompensatedReleaseSet.new,
         history_loader: ReleaseSets::HistoryLoader.new(event_store:),
         decider: Domain::ReleaseSets::CompleteCompensated.new,
+        digest_builder: ReleaseSets::CompletionDigestBuilder.new,
         input_digest: CommandInputDigest.new,
         clock: SystemClock.new,
         id_generator: IdGenerator.new,
         event_factory: EventFactory.new,
-        schema_registry: EventSchemaRegistry.new,
-        stream_factory: StreamFactory.new,
         completion_builder: CommandResultBuilder.new,
         event_plan_contract: Contracts::ReleaseSetCompensatedCompletionEventPlan.new
       )
@@ -23,12 +22,11 @@ module Coordinator::Write
         @preparer = preparer
         @history_loader = history_loader
         @decider = decider
+        @digest_builder = digest_builder
         @input_digest = input_digest
         @clock = clock
         @id_generator = id_generator
         @event_factory = event_factory
-        @schema_registry = schema_registry
-        @stream_factory = stream_factory
         @completion_builder = completion_builder
         @event_plan_contract = event_plan_contract
       end
@@ -48,50 +46,84 @@ module Coordinator::Write
       private
 
       def prepare_logical_values(command)
-        ReleaseSetLifecyclePreparationV1.new(
+        ReleaseSetMultiEventPreparationV1.new(
           occurred_at: @clock.now,
           input_digest: @input_digest.release_compensation_complete(command),
-          domain_event_id: @id_generator.uuid_v7,
+          event_ids: 2.times.map { @id_generator.uuid_v7 }
         )
       end
 
       def execute_attempt(command:, preparation:, caused_by:)
         state = @history_loader.call(command.release_set_id)
-        decision = @decider.call(state:, command:, completed_at: preparation.occurred_at)
+        decision = @decider.call(state:, command:)
         return decision if decision.failure?
 
         plan = decision.value!
-        verify_event_plan!(plan, state:, command:, completed_at: preparation.occurred_at)
-        completion_fact = plan.events.sole
-        persisted = persist_domain(completion_fact, state:, command:, preparation:, caused_by:)
+        verify_event_plan!(plan, state:, command:)
+        completion_digest = completion_digest(state:, command:)
+        persisted = persist_plan(plan, state:, command:, preparation:, completion_digest:, caused_by:)
         completion = @completion_builder.release_compensation_complete(
-          command:, completion: completion_fact, input_digest: preparation.input_digest,
-          persisted_events: [ persisted ], completed_at: preparation.occurred_at
+          command:,
+          change_set_id: state.preparation.payload.change_set_id,
+          outcome: "compensated",
+          source_event: command.compensation_request_event,
+          completion_digest:,
+          completion_event: persisted.last,
+          input_digest: preparation.input_digest,
+          persisted_events: persisted,
+          completed_at: preparation.occurred_at
         )
         Success(completion)
       end
 
-      def verify_event_plan!(plan, state:, command:, completed_at:)
-        result = @event_plan_contract.call(plan:, state:, command:, completed_at:)
+      def completion_digest(state:, command:)
+        @digest_builder.call(
+          release_set_id: command.release_set_id,
+          release_digest: state.preparation.payload.release_digest,
+          outcome: "compensated",
+          source_event: command.compensation_request_event,
+          compensation_evidence: command.evidence,
+          rule_version: command.rule_version
+        )
+      end
+
+      def verify_event_plan!(plan, state:, command:)
+        result = @event_plan_contract.call(plan:, state:, command:)
         raise InvalidReleaseSetCompensatedCompletionEventPlan, result.errors.to_h.inspect if result.failure?
       end
 
-      def persist_domain(completion, state:, command:, preparation:, caused_by:)
-        physical = @event_factory.build!(
-          event: completion,
-          event_id: preparation.domain_event_id,
-          metadata: command_metadata(command),
-          markers: [ "release-set:#{command.release_set_id}", "release-completion:compensated", "command:#{command.command_id}" ],
-          caused_by:,
-          correlation_id: state.preparation.correlation_id
-        )
-        @event_store.append(@stream_factory.release_set(command.release_set_id), [ physical ]).sole
+      def persist_plan(plan, state:, command:, preparation:, completion_digest:, caused_by:)
+        parent = caused_by
+        plan.writes.zip(preparation.event_ids).map do |write, event_id|
+          physical = @event_factory.build!(
+            event: write.event,
+            event_id:,
+            metadata: event_metadata(write.event, state:, command:, completion_digest:),
+            markers: [ "release-set:#{command.release_set_id}", "release-completion:compensated", "command:#{command.command_id}" ],
+            caused_by: parent,
+            correlation_id: state.preparation.correlation_id
+          )
+          persisted = @event_store.append(write.stream, [ physical ]).sole
+          parent = persisted
+          persisted
+        end
       end
 
-      def command_metadata(command)
-        EventMetadata.new(
-          command_id: command.command_id, actor_kind: command.actor.kind, actor_id: command.actor.id,
-          recorded_by: "coordinator", policy_version: command.rule_version
+      def event_metadata(event, state:, command:, completion_digest:)
+        attributes = {
+          command_id: command.command_id,
+          actor_kind: command.actor.kind,
+          actor_id: command.actor.id,
+          recorded_by: "coordinator",
+          policy_version: command.rule_version
+        }
+        return EventMetadata.new(**attributes) unless event.is_a?(Events::ReleaseSetOutcomeRecordedV1)
+
+        Metadata::ReleaseSetOutcomeV1.new(
+          **attributes,
+          completion_digest:,
+          release_digest: state.preparation.payload.release_digest,
+          rule_version: command.rule_version
         )
       end
     end

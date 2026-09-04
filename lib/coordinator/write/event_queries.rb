@@ -242,7 +242,11 @@ module Coordinator::Write
     )
 
     DECISION_PARTITION_LATEST = GroupedEventReadCriteria.new(
-      event_types: [ "DecisionPartitionAdvanced" ],
+      event_types: [
+        "DecisionPartitionAdvanced",
+        "DecisionAddedToPartition",
+        "DecisionRemovedFromPartition"
+      ],
       direction: :desc
     )
 
@@ -260,6 +264,12 @@ module Coordinator::Write
         "AgentChoiceImpactScanCompleted"
       ],
       direction: :desc
+    )
+
+    AGENT_CHOICE_IMPACT_SCAN_SOURCES = EventReadCriteria.new(
+      event_types: [ "AgentChoiceImpactScanSourceLinked" ],
+      maximum_count: 1,
+      direction: :asc
     )
 
     AGENT_CHOICE_FOR_IMPACT = EventReadCriteria.new(
@@ -291,13 +301,7 @@ module Coordinator::Write
     )
 
     CANDIDATE_EXISTENCE = EventReadCriteria.new(
-      event_types: [ "CandidateSubmitted" ],
-      maximum_count: 1,
-      direction: :asc
-    )
-
-    CANDIDATE_FOR_WORK_ITEM_COMPLETION = EventReadCriteria.new(
-      event_types: [ "CandidateSubmitted" ],
+      event_types: [ "CandidateCreated" ],
       maximum_count: 1,
       direction: :asc
     )
@@ -309,8 +313,8 @@ module Coordinator::Write
     )
 
     CANDIDATE_FOR_MERGE_SNAPSHOT = EventReadCriteria.new(
-      event_types: [ "CandidateSubmitted", "CandidateChangeManifestCaptured" ],
-      maximum_count: 2,
+      event_types: Candidates::StateLoader::FACT_TYPES,
+      maximum_count: 11,
       direction: :asc
     )
 
@@ -327,13 +331,19 @@ module Coordinator::Write
     )
 
     MERGE_SNAPSHOT_VERIFICATION_HISTORY = EventReadCriteria.new(
-      event_types: [ "MergeSnapshotVerificationSubmitted" ],
+      event_types: [ "MergeSnapshotVerificationAssigned" ],
       maximum_count: Types::MERGE_SNAPSHOT_VERIFICATION_MAXIMUM_COUNT + 1,
       direction: :asc
     )
 
     MERGE_SNAPSHOT_VERIFIED = EventReadCriteria.new(
-      event_types: [ "MergeSnapshotVerified" ],
+      event_types: [ "MergeSnapshotVerificationSelected", "MergeSnapshotVerified" ],
+      maximum_count: 2,
+      direction: :asc
+    )
+
+    MERGE_VERIFICATION_SUBMISSION = EventReadCriteria.new(
+      event_types: [ "MergeSnapshotVerificationSubmitted" ],
       maximum_count: 1,
       direction: :asc
     )
@@ -345,31 +355,27 @@ module Coordinator::Write
     )
 
     RELEASE_SET_PREPARATION = EventReadCriteria.new(
-      event_types: [ "ReleaseSetPrepared" ],
-      maximum_count: 1,
+      event_types: [ "ReleaseSetCreated", "ReleaseSetMemberAdded", "ReleaseSetPrepared" ],
+      maximum_count: Types::RELEASE_SET_MAXIMUM_MEMBERS + 3,
       direction: :asc
     )
 
     RELEASE_SET_LIFECYCLE = EventReadCriteria.new(
       event_types: [
+        "ReleaseSetCreated",
+        "ReleaseSetMemberAdded",
         "ReleaseSetPrepared",
         "RepositoryIntegrationRecorded",
+        "RepositoryIntegrationMergeLinked",
         "ReleaseSetVerificationRecorded",
+        "ReleaseSetIntegrationLinked",
         "ReleaseSetActivated",
         "ReleaseSetCompensationRequested",
+        "ReleaseSetSuccessfulIntegrationLinked",
+        "ReleaseSetOutcomeRecorded",
         "ReleaseSetCompleted"
       ],
       maximum_count: Types::RELEASE_SET_LIFECYCLE_MAXIMUM_EVENTS,
-      direction: :asc
-    )
-
-    CANDIDATE_FOR_IMPACT_SURFACE = GroupedEventReadCriteria.new(
-      event_types: [
-        "CandidateSubmitted",
-        "CandidateChangeManifestCaptured",
-        "CandidateBuildContextCaptured",
-        "CandidateImpactSurfaceDerived"
-      ],
       direction: :asc
     )
 
@@ -382,7 +388,12 @@ module Coordinator::Write
     VERIFICATION_OBLIGATION_FOR_CLAIM = GroupedEventReadCriteria.new(
       event_types: [
         "VerificationObligationCreated",
+        "VerificationObligationAddedToChangeSet",
+        "VerificationObligationSourceCandidateAssigned",
+        "VerificationObligationTargetCandidateAssigned",
         "VerificationObligationClaimed",
+        "VerificationEvidenceSubmitted",
+        "VerificationObligationEvidenceSelected",
         "VerificationObligationSatisfied",
         "VerificationObligationFailed",
         "VerificationObligationWaived",
@@ -406,6 +417,12 @@ module Coordinator::Write
     VERIFICATION_OBLIGATION_LIFECYCLE = GroupedEventReadCriteria.new(
       event_types: [
         "VerificationObligationCreated",
+        "VerificationObligationAddedToChangeSet",
+        "VerificationObligationSourceCandidateAssigned",
+        "VerificationObligationTargetCandidateAssigned",
+        "VerificationObligationClaimed",
+        "VerificationEvidenceSubmitted",
+        "VerificationObligationEvidenceSelected",
         "VerificationObligationSatisfied",
         "VerificationObligationFailed",
         "VerificationObligationWaived",
@@ -423,9 +440,33 @@ module Coordinator::Write
       direction: :desc
     )
 
+    VERIFICATION_OBLIGATION_VALIDITY_SCAN_SOURCES = EventReadCriteria.new(
+      event_types: [ "VerificationObligationValidityScanSourceLinked" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+
     VERIFICATION_EVIDENCE_HISTORY = EventReadCriteria.new(
       event_types: [ "VerificationEvidenceSubmitted" ],
       maximum_count: Types::VERIFICATION_EVIDENCE_MAXIMUM_COUNT,
+      direction: :asc
+    )
+
+    VERIFICATION_OBLIGATION_OUTCOME = EventReadCriteria.new(
+      event_types: [
+        "VerificationObligationCreated",
+        "VerificationObligationAddedToChangeSet",
+        "VerificationObligationSourceCandidateAssigned",
+        "VerificationObligationTargetCandidateAssigned",
+        "VerificationObligationClaimed",
+        "VerificationEvidenceSubmitted",
+        "VerificationObligationEvidenceSelected",
+        "VerificationObligationSatisfied",
+        "VerificationObligationFailed",
+        "VerificationObligationWaived",
+        "VerificationObligationInvalidated"
+      ],
+      maximum_count: 52,
       direction: :asc
     )
 
@@ -444,6 +485,12 @@ module Coordinator::Write
       direction: :desc
     )
 
+    CANDIDATE_IMPACT_REGISTRY_SWEEP_SOURCES = EventReadCriteria.new(
+      event_types: [ "CandidateImpactRegistrySweepSourceLinked" ],
+      maximum_count: 2,
+      direction: :asc
+    )
+
     CANDIDATE_IMPACT_PAIR_SCAN_STATE = GroupedEventReadCriteria.new(
       event_types: [
         "CandidateImpactPairScanStarted",
@@ -452,6 +499,12 @@ module Coordinator::Write
         "CandidateImpactPairScanCompleted"
       ],
       direction: :desc
+    )
+
+    CANDIDATE_IMPACT_PAIR_SCAN_SOURCES = EventReadCriteria.new(
+      event_types: [ "CandidateImpactPairScanSourceLinked" ],
+      maximum_count: 3,
+      direction: :asc
     )
 
     COORDINATION_TASK_HISTORY = EventReadCriteria.new(
@@ -584,7 +637,18 @@ module Coordinator::Write
       direction: :asc
     )
 
-    WORK_ITEM_FOR_MERGE_AUTHORIZATION = WORK_ITEM_FOR_CHANGE_SET_COMPLETION
+    WORK_ITEM_FOR_MERGE_AUTHORIZATION = EventReadCriteria.new(
+      event_types: [
+        "WorkItemCreated",
+        "WorkItemAddedToChangeSet",
+        "WorkItemAssignedToRepository",
+        "WorkItemDependencySatisfied",
+        "WorkItemCandidateSelected",
+        "WorkItemCompleted"
+      ],
+      maximum_count: 505,
+      direction: :asc
+    )
 
     CHANGE_SET_FOR_ACQUISITION = EventReadCriteria.new(
       event_types: [
@@ -683,11 +747,10 @@ module Coordinator::Write
         "AttemptAssignedToAgent",
         "AttemptBaseSnapshotRecorded",
         "AttemptStarted",
-        "CandidateAttachedToAttempt",
         "AttemptAbandoned",
         "AttemptCompleted"
       ],
-      maximum_count: 10,
+      maximum_count: 9,
       direction: :asc
     )
 

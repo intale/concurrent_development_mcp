@@ -21,7 +21,7 @@ module Coordinator::Write
           actor: Commands::Actor.new(kind: actor.fetch(:kind), id: actor.fetch(:id)),
           release_set_id: attributes.fetch(:release_set_id),
           integration_events: attributes.fetch(:integration_events).map { EventReference.new(_1) },
-          evidence: ReleaseSets::VerificationEvidenceV1.new(
+          evidence: ReleaseSets::VerificationEvidenceV2.new(
             **evidence,
             producer: ReleaseSets::EvidenceProducerV1.new(evidence.fetch(:producer)),
             findings: evidence.fetch(:findings).map { ReleaseSets::VerificationFindingV1.new(_1) }

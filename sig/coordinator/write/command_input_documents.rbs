@@ -556,7 +556,7 @@ module Coordinator
         def outcome: () -> String
         def merge_observation_event: () -> EventReferenceV1?
         def observation_digest: () -> String?
-        def failure: () -> ReleaseSets::IntegrationFailureV1?
+        def failure: () -> ReleaseSets::IntegrationFailureV2?
       end
 
       class RecordRepositoryIntegrationV1 < BaseV1
@@ -570,7 +570,7 @@ module Coordinator
         def actor: () -> ActorV1
         def release_set_id: () -> String
         def integration_events: () -> Array[EventReferenceV1]
-        def evidence: () -> ReleaseSets::VerificationEvidenceV1
+        def evidence: () -> ReleaseSets::VerificationEvidenceV2
       end
 
       class RecordReleaseSetVerificationV1 < BaseV1
@@ -583,7 +583,7 @@ module Coordinator
         def release_set_id: () -> String
         def verification_event: () -> EventReferenceV1
         def verification_digest: () -> String
-        def activation_point: () -> ReleaseSets::ActivationPointV1
+        def activation_point: () -> ReleaseSets::ActivationPointV2
       end
 
       class RecordReleaseSetActivationV1 < BaseV1
@@ -614,11 +614,11 @@ module Coordinator
       end
 
       class CompleteCompensatedReleaseSetInputV1 < Shared::Value
-        Evidence: singleton(ReleaseSets::CompensationEvidenceV1)
+        Evidence: singleton(ReleaseSets::CompensationEvidenceV2)
         def actor: () -> ActorV1
         def release_set_id: () -> String
         def compensation_request_event: () -> EventReferenceV1
-        def evidence: () -> Array[ReleaseSets::CompensationEvidenceV1]
+        def evidence: () -> Array[ReleaseSets::CompensationEvidenceV2]
       end
 
       class CompleteCompensatedReleaseSetV1 < BaseV1

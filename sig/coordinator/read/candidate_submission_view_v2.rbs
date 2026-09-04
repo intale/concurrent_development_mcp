@@ -1,0 +1,5 @@
+module Coordinator::Read
+  class CandidateSubmissionViewV2 < Coordinator::Shared::Value
+    Lease: untyped
+  end
+end

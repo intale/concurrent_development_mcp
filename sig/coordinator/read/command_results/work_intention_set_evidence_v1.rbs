@@ -1,0 +1,7 @@
+module Coordinator::Read
+  module CommandResults
+    class WorkIntentionSetEvidenceV1 < Coordinator::Shared::Value
+      Reference: untyped
+    end
+  end
+end

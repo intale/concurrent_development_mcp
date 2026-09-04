@@ -13,7 +13,7 @@ module Coordinator::Write
                     min_size: Types::RELEASE_SET_MINIMUM_MEMBERS,
                     max_size: Types::RELEASE_SET_MAXIMUM_MEMBERS
                   )
-      attribute :evidence, VerificationEvidenceV1
+      attribute :evidence, VerificationEvidenceV2
       attribute :policy_version, Types::ReleaseSetVerificationPolicyVersion
     end
   end

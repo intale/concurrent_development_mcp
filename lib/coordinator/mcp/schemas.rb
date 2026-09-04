@@ -1617,13 +1617,9 @@ module Coordinator
             summary: { type: "string", minLength: 1, maxLength: 2_000 },
             producer:,
             run_id: identifier,
-            result_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
-            occurred_at: {
-              type: "string",
-              pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$"
-            }
+            result_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" }
           },
-          required: %w[code summary producer run_id result_digest occurred_at]
+          required: %w[code summary producer run_id result_digest]
         )
         object_schema(
           properties: common_mutation_properties.merge(
@@ -1726,14 +1722,10 @@ module Coordinator
             external_reference: { type: "string", minLength: 1, maxLength: 1_000 },
             state_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
             producer:,
-            run_id: identifier,
-            activated_at: {
-              type: "string",
-              pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$"
-            }
+            run_id: identifier
           },
           required: %w[
-            kind environment external_reference state_digest producer run_id activated_at
+            kind environment external_reference state_digest producer run_id
           ]
         )
         object_schema(
@@ -1778,15 +1770,11 @@ module Coordinator
             external_reference: { type: "string", minLength: 1, maxLength: 1_000 },
             result_digest: { type: "string", pattern: "^sha256:[0-9a-f]{64}$" },
             producer:,
-            run_id: identifier,
-            compensated_at: {
-              type: "string",
-              pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{6}Z$"
-            }
+            run_id: identifier
           },
           required: %w[
             repository_id integration_event action external_reference result_digest producer
-            run_id compensated_at
+            run_id
           ]
         )
         object_schema(
@@ -2450,7 +2438,15 @@ module Coordinator
         object_schema(
           properties: {
             resource_id: uuid_v7,
-            base_blob_oid: { anyOf: [ git_oid, { type: "null" } ] }
+            base_blob_oid: { anyOf: [ git_oid, { type: "null" } ] },
+            mode: { type: "string", enum: %w[shared exclusive] },
+            purpose: { type: "string", minLength: 1, maxLength: 1_000 },
+            context: {
+              anyOf: [
+                { type: "string", minLength: 1, maxLength: 4_000 },
+                { type: "null" }
+              ]
+            }
           },
           required: %w[resource_id]
         )

@@ -91,7 +91,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::AgentChoiceDecisionImpac
 
     assessment = assessment_events(choice, source).sole
     payload = load(assessment)
-    expect(payload.decision_change.source_event).to eq(reference(source))
+    expect(decision_change_source(assessment)).to eq(reference(source))
     expect(payload.assessment.outcome).to eq("invalidated")
     step = process_step(
       source_event: choice.fetch(:accepted),
@@ -125,7 +125,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::AgentChoiceDecisionImpac
     process_manager.call(choice.fetch(:accepted))
 
     payload = load(assessment_events(choice, source).sole)
-    expect(payload.decision_change.source_event).to eq(reference(source))
+    expect(decision_change_source(assessment_events(choice, source).sole)).to eq(reference(source))
     expect(payload.assessment).to have_attributes(
       outcome: "still_valid",
       reason: "compliant_or_advisory"
@@ -198,8 +198,8 @@ RSpec.describe Coordinator::Processes::ProcessManagers::AgentChoiceDecisionImpac
     progressed_payload = load(progressed)
     expect(progressed_payload).to have_attributes(
       page_number: 1,
-      page_choice_count: 50,
-      total_choice_count: 50
+      next_from_position: be > 0,
+      page_size: 50
     )
     expect(process_manager.call(started)).to be_nil
     expect(choices.first(50).flat_map { assessment_events(_1, source) }.length).to eq(50)
@@ -207,11 +207,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::AgentChoiceDecisionImpac
     process_manager.call(progressed)
     expect(process_manager.call(progressed)).to be_nil
     completed = load(scan_event(source, "AgentChoiceImpactScanCompleted"))
-    expect(completed).to have_attributes(
-      page_count: 2,
-      page_choice_count: 1,
-      total_choice_count: 51
-    )
+    expect(completed).to have_attributes(scan_id: started.stream.stream_id)
     expect(choices.flat_map { assessment_events(_1, source) }.length).to eq(51)
     expect(choices.sum { choice_events(_1).count { |event| event.type == "AgentChoiceInvalidatedByDecision" } }).to eq(51)
   end
@@ -303,7 +299,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::AgentChoiceDecisionImpac
       Coordinator::Write::GlobalMarkedEventReadCriteria.new(
         stream_context: "AgentGovernance",
         stream_name: "AgentChoiceImpact",
-        event_types: [ "AgentChoiceImpactAssessed" ],
+        event_types: [ "AgentChoiceImpactAssessed", "AgentChoiceImpactAssessmentRecorded" ],
         markers: [ marker ],
         maximum_count: 1,
         direction: :asc
@@ -316,6 +312,21 @@ RSpec.describe Coordinator::Processes::ProcessManagers::AgentChoiceDecisionImpac
       streams.agent_choice(choice.fetch(:identifiers).fetch(:choice_id)),
       Coordinator::Write::EventQueries::AGENT_CHOICE_FOR_IMPACT
     )
+  end
+
+  def decision_change_source(assessment)
+    event_store.read(
+      streams.agent_choice_impact(assessment.stream.stream_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: [ "AgentChoiceImpactSourceLinked" ],
+        maximum_count: 2,
+        direction: :asc
+      )
+    ).map { load(_1) }
+      .find do |payload|
+        payload.is_a?(Coordinator::Write::Events::AgentChoiceImpactSourceLinkedV1) &&
+          payload.role == "decision_change"
+      end.source
   end
 
   def load(event)

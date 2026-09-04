@@ -11,8 +11,7 @@ module Coordinator::Write
         ) -> void
         def call: (
           state: State,
-          command: Coordinator::Write::Commands::CreateCandidateCompatibilityObligation,
-          created_at: String
+          command: Coordinator::Write::Commands::CreateCandidateCompatibilityObligation
         ) -> Dry::Monads::Result
       end
     end

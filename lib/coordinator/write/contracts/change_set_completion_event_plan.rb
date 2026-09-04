@@ -7,7 +7,7 @@ module Coordinator::Write
         required(:plan).value(Types.Instance(Domain::EventPlan))
         required(:command).value(Types.Instance(Commands::CompleteChangeSet))
         required(:work_items).array(Types.Instance(ChangeSetCompletions::WorkItemEvidenceV1))
-        required(:release_state).maybe(Types.Instance(Domain::ReleaseSets::LifecycleStateV1))
+        required(:release_state).maybe(Types.Instance(Domain::ReleaseSets::LifecycleStateV2))
         required(:completed_at).filled(:string)
       end
 

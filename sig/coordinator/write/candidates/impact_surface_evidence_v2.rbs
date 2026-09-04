@@ -1,0 +1,9 @@
+module Coordinator::Write
+  module Candidates
+    class ImpactSurfaceEvidenceV2 < Coordinator::Shared::Value
+      def candidate: () -> StateV2
+      def manifest: () -> Coordinator::Write::Events::CandidateChangeManifestCapturedV2
+      def build_context: () -> Coordinator::Write::Events::CandidateBuildContextCapturedV2?
+    end
+  end
+end

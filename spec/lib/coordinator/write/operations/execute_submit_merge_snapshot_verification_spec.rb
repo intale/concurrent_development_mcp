@@ -5,22 +5,30 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitMergeSnapshotVerific
   let(:operation) { described_class.new(event_store:) }
   let(:streams) { Coordinator::Write::StreamFactory.new }
 
-  it "records a qualifying assessment and verifies the exact snapshot atomically" do
+  it "records one assessment and assigns it to the exact snapshot atomically" do
     registration = MergeSnapshotScenario.register(prefix: "verify-pass")
     input = MergeSnapshotScenario.verification_input(registration, prefix: "verify-pass")
 
     result = operation.call(input)
 
     expect(result).to be_success
-    expect(result.value!.data).to have_attributes(status: "verified", conclusion: "passed")
-    events = verification_events(input.fetch(:merge_snapshot_id))
-    expect(events.map(&:type)).to eq(
-      %w[MergeSnapshotVerificationSubmitted MergeSnapshotVerified]
+    receipt = result.value!.data
+    expect(receipt).to have_attributes(status: "unverified", conclusion: "passed", verified_event: nil)
+    submission = submission_event(receipt.verification_id)
+    assignments = snapshot_events(input.fetch(:merge_snapshot_id))
+    expect(assignments.map(&:type)).to eq([ "MergeSnapshotVerificationAssigned" ])
+    expect(submission.data).to eq(
+      "verification_id" => receipt.verification_id,
+      "merge_snapshot_id" => input.fetch(:merge_snapshot_id),
+      "assessment" => stringify(input.fetch(:assessment))
     )
-    expect(events.map(&:stream_revision)).to eq([ 1, 2 ])
-    expect(events.map(&:correlation_id).uniq).to contain_exactly(events.first.correlation_id)
-    expect(events.last.data.dig("selected_verification", "event", "event_id")).to eq(events.first.id)
-    expect(events.last.data.dig("snapshot", "event", "event_id")).to eq(registration.fetch(:event).id)
+    expect(assignments.sole.data).to eq(
+      "verification_id" => receipt.verification_id,
+      "merge_snapshot_id" => input.fetch(:merge_snapshot_id)
+    )
+    expect(submission.metadata.fetch("verification_input_digest")).to eq(receipt.verification_input_digest)
+    expect(assignments.sole.causation_id).to eq(submission.id)
+    expect([ submission, assignments.sole ].map(&:correlation_id).uniq).to contain_exactly(submission.correlation_id)
   end
 
   it "retains a non-passing assessment and permits a later exact pass" do
@@ -40,14 +48,12 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitMergeSnapshotVerific
     passed = operation.call(passed_input)
 
     expect(failed.value!.data).to have_attributes(status: "failed")
-    expect(passed.value!.data).to have_attributes(status: "verified")
-    expect(verification_events(failed_input.fetch(:merge_snapshot_id)).map(&:type)).to eq(
-      %w[
-        MergeSnapshotVerificationSubmitted
-        MergeSnapshotVerificationSubmitted
-        MergeSnapshotVerified
-      ]
+    expect(passed.value!.data).to have_attributes(status: "unverified")
+    expect(snapshot_events(failed_input.fetch(:merge_snapshot_id)).map(&:type)).to eq(
+      %w[MergeSnapshotVerificationAssigned MergeSnapshotVerificationAssigned]
     )
+    expect(submission_event(failed.value!.data.verification_id).data.dig("assessment", "conclusion")).to eq("failed")
+    expect(submission_event(passed.value!.data.verification_id).data.dig("assessment", "conclusion")).to eq("passed")
   end
 
   it "leaves replay ownership to the registered Command lifecycle and rejects duplicate evidence" do
@@ -66,7 +72,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitMergeSnapshotVerific
     expect(first).to be_success
     expect(replay.failure.code).to eq(:merge_snapshot_verification_already_submitted)
     expect(duplicate.failure.code).to eq(:merge_snapshot_verification_already_submitted)
-    expect(verification_events(input.fetch(:merge_snapshot_id)).length).to eq(1)
+    expect(snapshot_events(input.fetch(:merge_snapshot_id)).map(&:type)).to eq(
+      [ "MergeSnapshotVerificationAssigned" ]
+    )
   end
 
   it "rejects absent, stale, and terminal snapshot decisions without partial facts" do
@@ -86,7 +94,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitMergeSnapshotVerific
 
     expect(operation.call(absent).failure.code).to eq(:merge_snapshot_not_found)
     expect(operation.call(stale).failure.code).to eq(:merge_snapshot_verification_binding_stale)
-    expect(operation.call(input)).to be_success
+    accepted = operation.call(input)
+    verify_submission(accepted.value!.data)
     terminal = input.merge(
       command_id: "cmd-verify-terminal",
       assessment: input.fetch(:assessment).merge(
@@ -95,10 +104,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitMergeSnapshotVerific
       )
     )
     expect(operation.call(terminal).failure.code).to eq(:merge_snapshot_already_verified)
-    expect(verification_events("MS-absent")).to be_empty
+    expect(snapshot_events("MS-absent")).to be_empty
   end
 
-  it "serializes competing qualifying assessments with one complete winner" do
+  it "serializes concurrent distinct assessments without losing either assignment" do
     registration = MergeSnapshotScenario.register(prefix: "verify-race")
     inputs = %w[a b].map do |suffix|
       base = MergeSnapshotScenario.verification_input(
@@ -114,22 +123,45 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitMergeSnapshotVerific
       Thread.new { described_class.new(event_store:).call(input) }
     end.map(&:value)
 
-    expect(results.count(&:success?)).to eq(1)
-    expect(results.count(&:failure?)).to eq(1)
-    expect(results.find(&:failure?).failure.code).to eq(:merge_snapshot_already_verified)
-    expect(verification_events(registration.dig(:input, :merge_snapshot_id)).map(&:type)).to eq(
-      %w[MergeSnapshotVerificationSubmitted MergeSnapshotVerified]
-    )
+    expect(results).to all(be_success)
+    expect(results.map { _1.value!.data.verification_id }.uniq.length).to eq(2)
+    expect(snapshot_events(registration.dig(:input, :merge_snapshot_id)).map(&:stream_revision)).to eq([ 1, 2 ])
   end
 
-  def verification_events(snapshot_id)
+  def verify_submission(receipt)
+    command = Coordinator::Write::Commands::VerifyMergeSnapshot.new(
+      command_id: Coordinator::Write::IdGenerator.new.uuid_v7,
+      actor: { kind: "system", id: "spec-verifier" },
+      merge_snapshot_id: receipt.merge_snapshot_id,
+      verification_id: receipt.verification_id,
+      policy_version: "merge-snapshot-verification/v1"
+    )
+    Coordinator::Write::Operations::ExecuteVerifyMergeSnapshot.new(event_store:).call(command)
+  end
+
+  def submission_event(verification_id)
+    event_store.read(
+      streams.merge_verification(verification_id),
+      Coordinator::Write::EventQueries::MERGE_VERIFICATION_SUBMISSION
+    ).sole
+  end
+
+  def snapshot_events(snapshot_id)
     event_store.read(
       streams.merge_snapshot(snapshot_id),
       Coordinator::Write::EventReadCriteria.new(
-        event_types: %w[MergeSnapshotVerificationSubmitted MergeSnapshotVerified],
-        maximum_count: 34,
+        event_types: %w[
+          MergeSnapshotVerificationAssigned
+          MergeSnapshotVerificationSelected
+          MergeSnapshotVerified
+        ],
+        maximum_count: 35,
         direction: :asc
       )
     )
+  end
+
+  def stringify(value)
+    JSON.parse(JSON.generate(value))
   end
 end

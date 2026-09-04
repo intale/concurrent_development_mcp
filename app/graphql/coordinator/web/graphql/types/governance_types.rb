@@ -310,7 +310,7 @@ module Coordinator::Web::Graphql::Types
     def before_reason_codes = object.before_evaluation.reason_codes
     def before_status = object.before_evaluation.status
     def decision_change_kind = object.decision_change.change_kind
-    def decision_changed_at = object.decision_change.changed_at
+    def decision_changed_at = object.decision_changed_at
     def decision_id = object.decision_change.decision_id
   end
 

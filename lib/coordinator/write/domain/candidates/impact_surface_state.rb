@@ -4,7 +4,7 @@ module Coordinator::Write
   module Domain
     module Candidates
       class ImpactSurfaceState < Value
-        attribute :evidence, Coordinator::Write::Candidates::ImpactSurfaceEvidenceV1.optional
+        attribute :evidence, Coordinator::Write::Candidates::ImpactSurfaceEvidenceV2.optional
         attribute :existing_surface, EventReference.optional
       end
     end

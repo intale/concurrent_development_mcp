@@ -30,7 +30,7 @@ module Coordinator::Write
         last = command.last_processed_revision
         return count.zero? && !command.has_more unless last
 
-        count.positive? && (!command.has_more || count == command.page_size)
+        count <= command.page_size
       end
 
       def physical_reference(event)

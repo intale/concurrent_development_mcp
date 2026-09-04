@@ -3,7 +3,7 @@ module Coordinator
     module AgentChoiceImpacts
       class RepairTargetV1 < Shared::Value
         def source_event: () -> PgEventstore::Event
-        def decision_change: () -> Write::AgentChoiceImpacts::DecisionChangeEvidenceV1
+        def decision_change: () -> Write::AgentChoiceImpacts::DecisionChangeEvidenceV2
       end
     end
   end

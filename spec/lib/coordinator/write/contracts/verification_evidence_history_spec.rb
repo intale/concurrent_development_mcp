@@ -12,23 +12,25 @@ RSpec.describe Coordinator::Write::Contracts::VerificationEvidenceHistory do
     open_state = VerificationEvidenceExamples.state(evidence: [ partial ])
     expect(contract.call(state: open_state, obligation_id:)).to be_success
 
-    satisfaction_plan = decide(
-      state: open_state,
-      command: VerificationEvidenceExamples.command(evidence_kind: "contract_compatibility_review"),
-      revision: 3
+    final_observation = VerificationEvidenceExamples.observation(
+      evidence_kind: "contract_compatibility_review",
+      revision: 6,
+      evidence_id: "06919191-9191-7191-8191-919191919191"
     )
-    final_observation = observation_from(satisfaction_plan.events.first, revision: 3)
     satisfied_state = VerificationEvidenceExamples.state(
       evidence: [ partial, final_observation ],
-      satisfied: satisfaction_plan.events.last
+      satisfied: VerificationEvidenceExamples.satisfied
     )
     expect(contract.call(state: satisfied_state, obligation_id:)).to be_success
 
-    failure_plan = decide(command: VerificationEvidenceExamples.command(conclusion: "failed"))
-    failed_observation = observation_from(failure_plan.events.first, revision: 2)
+    failed_observation = VerificationEvidenceExamples.observation(
+      evidence_kind: "combined_tests",
+      conclusion: "failed",
+      revision: 5
+    )
     failed_state = VerificationEvidenceExamples.state(
       evidence: [ failed_observation ],
-      failed: failure_plan.events.last
+      failed: VerificationEvidenceExamples.failed
     )
     expect(contract.call(state: failed_state, obligation_id:)).to be_success
   end
@@ -49,49 +51,17 @@ RSpec.describe Coordinator::Write::Contracts::VerificationEvidenceHistory do
       )
     ).to be_failure
 
-    failure_plan = decide(command: VerificationEvidenceExamples.command(conclusion: "failed"))
-    failed_observation = observation_from(failure_plan.events.first, revision: 2)
+    failed_observation = VerificationEvidenceExamples.observation(
+      evidence_kind: "combined_tests",
+      conclusion: "failed",
+      revision: 5
+    )
     impossible = VerificationEvidenceExamples.state(
       evidence: [ failed_observation ],
-      satisfied: satisfaction_from(failed_observation),
-      failed: failure_plan.events.last
+      satisfied: VerificationEvidenceExamples.satisfied,
+      failed: VerificationEvidenceExamples.failed
     )
     expect(contract.call(state: impossible, obligation_id:)).to be_failure
   end
 
-  def decide(
-    state: VerificationEvidenceExamples.state,
-    command: VerificationEvidenceExamples.command,
-    revision: 2
-  )
-    evidence_id = "05919191-9191-7191-8191-919191919191"
-    Coordinator::Write::Domain::VerificationEvidence::Submit.new.call(
-      state:,
-      command:,
-      evidence_id:,
-      assessment_input_digest: VerificationEvidenceExamples.digest("history-assessment", revision),
-      evidence_event: VerificationEvidenceExamples.evidence_reference(revision:, evidence_id:),
-      submitted_at: VerificationEvidenceExamples::SUBMITTED_AT
-    ).value!
-  end
-
-  def observation_from(event, revision:)
-    Coordinator::Write::CompatibilityAssessments::EvidenceObservationV1.new(
-      evidence: event,
-      event: VerificationEvidenceExamples.evidence_reference(revision:, evidence_id: event.evidence_id)
-    )
-  end
-
-  def satisfaction_from(observation)
-    obligation = VerificationEvidenceExamples.obligation
-    reference = observation.decision_reference
-    Coordinator::Write::Events::VerificationObligationSatisfiedV1.new(
-      obligation_id: obligation.obligation_id,
-      obligation_event: VerificationEvidenceExamples.obligation_event,
-      policy: obligation.policy,
-      selected_evidence: [ reference ],
-      outcome_digest: VerificationEvidenceExamples.digest("impossible"),
-      satisfied_at: VerificationEvidenceExamples::SUBMITTED_AT
-    )
-  end
 end

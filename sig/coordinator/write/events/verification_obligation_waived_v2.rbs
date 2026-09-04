@@ -1,0 +1,6 @@
+module Coordinator::Write
+  module Events
+    class VerificationObligationWaivedV2 < Base
+    end
+  end
+end

@@ -5,6 +5,7 @@ module Coordinator
         PROJECTION: ProjectionDefinition
 
         def initialize: (
+          assessment_loader: Coordinator::Read::AgentChoiceImpacts::_AssessmentLoader,
           ?contract: Contracts::AgentChoiceImpactSourceEvent,
           ?schema_registry: Write::EventSchemaRegistry,
           ?impacts: Repositories::AgentChoiceImpacts,

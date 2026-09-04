@@ -1,0 +1,9 @@
+module Coordinator::Write
+  module VerificationObligations
+    class PersistedDefinitionV2 < Coordinator::Shared::Value
+      def event: () -> PgEventstore::Event
+      def definition: () -> DefinitionV2
+      def reference: () -> Coordinator::Write::EventReference
+    end
+  end
+end

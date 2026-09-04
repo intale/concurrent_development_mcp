@@ -21,7 +21,7 @@ module Coordinator::Read
         "WriteSetExpanded" => [ "DevelopmentExecution", "Attempt" ],
         "WriteSetRenewed" => [ "DevelopmentExecution", "Attempt" ],
         "WriteSetReleased" => [ "DevelopmentExecution", "Attempt" ],
-        "CandidateAttachedToAttempt" => [ "DevelopmentExecution", "Attempt" ],
+        "CandidateSubmitted" => [ "DevelopmentIntegration", "Candidate" ],
         "WorkItemCandidateSelected" => [ "DevelopmentExecution", "WorkItem" ],
         "WorkItemCompleted" => [ "DevelopmentExecution", "WorkItem" ],
         "WorkItemRequeued" => [ "DevelopmentExecution", "WorkItem" ],
@@ -32,7 +32,7 @@ module Coordinator::Read
 
       params do
         required(:event_type).filled(:string, included_in?: EVENT_STREAMS.keys)
-        required(:schema_version).filled(:integer, included_in?: [ 1, 2 ])
+        required(:schema_version).filled(:integer, included_in?: [ 1, 2, 3 ])
         required(:stream_context).filled(:string)
         required(:stream_name).filled(:string)
         required(:stream_id).filled(:string)
@@ -55,7 +55,13 @@ module Coordinator::Read
           WriteSetRenewed
           WriteSetReleased
         ]
-        expected = versioned.include?(values[:event_type]) ? [ 2 ] : [ 1 ]
+        expected = if values[:event_type] == "CandidateSubmitted"
+                     [ 3 ]
+                   elsif versioned.include?(values[:event_type])
+                     [ 2 ]
+                   else
+                     [ 1 ]
+                   end
         key(:schema_version).failure("must match the projected event schema") unless expected.include?(values[:schema_version])
       end
 

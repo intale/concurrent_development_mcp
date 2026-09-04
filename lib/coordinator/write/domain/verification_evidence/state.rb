@@ -4,19 +4,19 @@ module Coordinator::Write
   module Domain
     module VerificationEvidence
       class State < Value
-        Observation = Types.Instance(CompatibilityAssessments::EvidenceObservationV1)
+        Observation = Types.Instance(CompatibilityAssessments::EvidenceObservationV2)
 
-        attribute :obligation, Types.Instance(Events::VerificationObligationCreatedV1).optional
+        attribute :obligation, Types.Instance(VerificationObligations::DefinitionV2).optional
         attribute :obligation_event, Types.Instance(EventReference).optional
-        attribute :latest_claim, Types.Instance(Events::VerificationObligationClaimedV1).optional
+        attribute :latest_claim, Types.Instance(Events::VerificationObligationClaimedV2).optional
         attribute :latest_claim_event, Types.Instance(EventReference).optional
         attribute :evidence, Types::Array.of(Observation).constrained(
           max_size: Types::VERIFICATION_EVIDENCE_MAXIMUM_COUNT
         )
-        attribute :satisfied, Types.Instance(Events::VerificationObligationSatisfiedV1).optional
-        attribute :failed, Types.Instance(Events::VerificationObligationFailedV1).optional
-        attribute? :waived, Types.Instance(Events::VerificationObligationWaivedV1).optional
-        attribute? :invalidated, Types.Instance(Events::VerificationObligationInvalidatedV1).optional
+        attribute :satisfied, Types.Instance(Events::VerificationObligationSatisfiedV2).optional
+        attribute :failed, Types.Instance(Events::VerificationObligationFailedV2).optional
+        attribute? :waived, Types.Instance(Events::VerificationObligationWaivedV2).optional
+        attribute? :invalidated, Types.Instance(Events::VerificationObligationInvalidatedV2).optional
         attribute :policy_current, Types::Bool
 
         def self.initial
@@ -58,7 +58,7 @@ module Coordinator::Write
         end
 
         def duplicate_assessment?(assessment_input_digest)
-          evidence.any? { _1.evidence.assessment_input_digest == assessment_input_digest }
+          evidence.any? { _1.assessment_input_digest == assessment_input_digest }
         end
 
         def evidence_limit_reached?

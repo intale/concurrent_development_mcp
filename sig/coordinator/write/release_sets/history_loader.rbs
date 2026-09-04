@@ -1,6 +1,6 @@
 module Coordinator::Write::ReleaseSets
   class HistoryLoader
-    def initialize: (event_store: Coordinator::Write::_EventStore, ?stream_factory: Coordinator::Write::StreamFactory, ?schema_registry: Coordinator::Write::EventSchemaRegistry) -> void
-    def call: (String release_set_id) -> Coordinator::Write::Domain::ReleaseSets::LifecycleStateV1
+    def initialize: (event_store: Coordinator::Write::_EventStore, ?candidate_state_loader: Coordinator::Write::Candidates::StateLoader, ?stream_factory: Coordinator::Write::StreamFactory, ?schema_registry: Coordinator::Write::EventSchemaRegistry) -> void
+    def call: (String release_set_id) -> Coordinator::Write::Domain::ReleaseSets::LifecycleStateV2
   end
 end

@@ -12,24 +12,38 @@ RSpec.describe Coordinator::Write::Operations::ExecutePrepareReleaseSet, :event_
 
     first = operation.call(input).value!
     replay = operation.call(input)
-    physical = preparation_events(input.fetch(:release_set_id)).sole
-    payload = load(physical)
+    physical = preparation_events(input.fetch(:release_set_id))
+    payloads = physical.map { load(_1) }
+    created, *members, prepared = physical
+    prepared_payload = payloads.last
 
     expect(replay.failure.code).to eq(:release_set_id_already_used)
-    expect(payload).to have_attributes(
+    expect(physical.map(&:type)).to eq([
+      "ReleaseSetCreated",
+      "ReleaseSetMemberAdded",
+      "ReleaseSetMemberAdded",
+      "ReleaseSetPrepared"
+    ])
+    expect(payloads.first).to have_attributes(
       release_set_id: input.fetch(:release_set_id),
-      change_set_id: "CS-release-success",
-      policy_version: "release-set-preparation/v1"
+      change_set_id: "CS-release-success"
     )
-    expect(payload.ordered_members.map(&:position)).to eq([ 1, 2 ])
     repository_ids = ReleaseSetScenario::REPOSITORIES.map { RepositoryScenario.repository_id(_1) }
-    expect(payload.ordered_members.map(&:repository_id)).to eq(repository_ids)
-    expect(payload.release_digest).to match(Coordinator::Shared::Types::SHA256_DIGEST_PATTERN)
-    expect(physical.markers).to include(
+    expect(payloads[1, 2].map(&:member_position)).to eq([ 1, 2 ])
+    expect(payloads[1, 2].map(&:repository_id)).to eq(repository_ids)
+    expect(payloads[1, 2].map(&:candidate_id)).to all(match(/\ACAN-/))
+    expect(prepared_payload.to_h).to eq(release_set_id: input.fetch(:release_set_id))
+    expect(prepared.metadata.fetch("release_digest")).to match(Coordinator::Shared::Types::SHA256_DIGEST_PATTERN)
+    expect(physical).to all(satisfy { |event| event.markers.include?("release-set:REL-success") })
+    expect(created.markers).to include(
       "release-set:REL-success",
       "change-set:CS-release-success",
       *repository_ids.map { "repository:#{_1}" }
     )
+    expect(physical.drop(1).map(&:causation_id)).to eq(physical.each_cons(2).map { _1.first.id })
+    expect(physical.map(&:correlation_id).uniq).to contain_exactly(created.correlation_id)
+    expect(prepared.metadata).not_to have_key("prepared_at")
+    expect(first.data.prepared_event).to eq(reference(prepared))
     expect(command_events(input.fetch(:command_id))).to be_empty
   end
 
@@ -55,7 +69,7 @@ RSpec.describe Coordinator::Write::Operations::ExecutePrepareReleaseSet, :event_
     result = operation.call(input.merge(command_id: "cmd-release-prepare-used-again"))
 
     expect(result.failure.code).to eq(:release_set_id_already_used)
-    expect(preparation_events(input.fetch(:release_set_id)).length).to eq(1)
+    expect(preparation_events(input.fetch(:release_set_id)).length).to eq(4)
   end
 
   def preparation_events(release_set_id)
@@ -71,6 +85,17 @@ RSpec.describe Coordinator::Write::Operations::ExecutePrepareReleaseSet, :event_
       type: event.type,
       schema_version: event.metadata.fetch("schema_version"),
       data: event.data
+    )
+  end
+
+  def reference(event)
+    Coordinator::Write::EventReference.new(
+      event_id: event.id,
+      type: event.type,
+      stream_context: event.stream.context,
+      stream_name: event.stream.stream_name,
+      stream_id: event.stream.stream_id,
+      stream_revision: event.stream_revision
     )
   end
 end

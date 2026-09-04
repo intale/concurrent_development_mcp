@@ -16,7 +16,11 @@ module Coordinator::Read
             stream_name: "AgentChoice"
           )
         ],
-        event_types: %w[AgentChoiceImpactAssessed AgentChoiceInvalidatedByDecision]
+        event_types: %w[
+          AgentChoiceImpactAssessmentRecorded
+          AgentChoiceImpactSourceLinked
+          AgentChoiceInvalidatedByDecision
+        ]
       )
 
       def initialize(handler:, pull_interval: 1.0)

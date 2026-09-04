@@ -174,15 +174,13 @@ module CandidateAcceptanceWorld
     )
   end
 
-  def candidate_attachment_events(attempt_id)
-    event_store.read(
-      streams.attempt(attempt_id),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "CandidateAttachedToAttempt" ],
-        maximum_count: 20,
-        direction: :asc
-      )
-    )
+  def candidate_work_intention_events(coordination)
+    coordination.fetch(:reservation).fetch("resources").flat_map do |resource|
+      event_store.read_grouped(
+        streams.resource_work_intention(resource.fetch("lease_id")),
+        Coordinator::Write::EventQueries::WORK_INTENTION_STATE
+      ).reverse
+    end
   end
 
   def candidate_head_events(repository_id:, head_commit_oid:)
@@ -221,12 +219,8 @@ module CandidateAcceptanceWorld
     end
   end
 
-  def project_candidate_attachment(candidate_id, attempt_id)
-    event = candidate_attachment_events(attempt_id).find do |candidate_event|
-      candidate_event.data.fetch("candidate_id") == candidate_id
-    end
-    assert_acceptance(event, "Candidate #{candidate_id} has no Attempt attachment")
-    await_read_model("Candidate #{candidate_id} Attempt attachment to become available") do
+  def project_candidate_context(candidate_id, attempt_id)
+    await_read_model("Candidate #{candidate_id} context to become available") do
       payload = candidate_context(attempt_id)
       checkpoints = payload.dig("data", "context", "candidate_checkpoints") || []
       [ checkpoints.any? { _1.fetch("candidate_id") == candidate_id }, payload ]
@@ -236,7 +230,7 @@ module CandidateAcceptanceWorld
   def project_complete_candidate(candidate_id, attempt_id)
     project_candidate_submission(candidate_id)
     project_remaining_candidate_evidence(candidate_id)
-    project_candidate_attachment(candidate_id, attempt_id)
+    project_candidate_context(candidate_id, attempt_id)
   end
 
   def candidate_view(candidate_id)
@@ -254,11 +248,7 @@ module CandidateAcceptanceWorld
   end
 
   def assert_candidate_target_absent(candidate_id, arguments, expect_head_absent: true)
-    attachments = candidate_attachment_events(arguments.fetch(:attempt_id)).select do |event|
-      event.data.fetch("candidate_id") == candidate_id
-    end
     assert_acceptance_equal([], candidate_events(candidate_id), "Denied Candidate facts")
-    assert_acceptance_equal([], attachments, "Denied Candidate attachments")
     return unless expect_head_absent
 
     assert_acceptance_equal(

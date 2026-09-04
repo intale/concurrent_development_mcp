@@ -1,0 +1,6 @@
+module Coordinator::Write
+  module Commands
+    class FailVerificationObligation < Coordinator::Shared::Value
+    end
+  end
+end

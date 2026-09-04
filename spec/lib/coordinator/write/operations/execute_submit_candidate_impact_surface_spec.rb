@@ -23,17 +23,23 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidateImpactSurfa
     )
     expect(completion.data).to have_attributes(
       candidate_id: input.fetch(:candidate_id),
+      surface_id: completion.data.surface_event.stream_id,
       surface_digest: command.surface.digest,
       evidence_revision: 1,
       evidence_status: "attributed_unverified"
     )
     expect(completion.emitted_events.map(&:type)).to eq([
       "CandidateImpactSurfaceDerived",
-      "CandidateImpactSurfaceRegistered"
+      "CandidateImpactSurfaceAssigned"
     ])
-    surface = impact_events(input.fetch(:candidate_id)).sole
-    registration = registry_events(candidate.fetch(:input).fetch(:change_set_id)).sole
+    assignment = assignment_events(input.fetch(:candidate_id)).sole
+    surface = impact_events(assignment.data.fetch("surface_id")).sole
     expect(surface.data).to include(
+      "surface_id" => assignment.data.fetch("surface_id"),
+      "candidate_id" => input.fetch(:candidate_id),
+      "evidence_revision" => 1
+    )
+    expect(surface.metadata).to include(
       "manifest_digest" => input.fetch(:manifest_digest),
       "build_context_digest" => input.fetch(:build_context_digest),
       "surface_digest" => command.surface.digest
@@ -41,14 +47,13 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidateImpactSurfa
     expect(surface.causation_id).to eq(parent.id)
     expect(surface.correlation_id).to eq(parent.correlation_id)
     expect(surface.metadata).not_to have_key("correlation_id")
-    expect(registration.data).to include(
+    expect(assignment.data).to eq(
       "candidate_id" => input.fetch(:candidate_id),
-      "surface_event" => completion.data.surface_event.to_h.stringify_keys,
-      "index_policy_version" => "candidate-impact-exact-index/v2"
+      "surface_id" => completion.data.surface_id
     )
-    expect(registration.markers.grep(/compound:candidate-impact-index/)).not_to be_empty
-    expect(registration.causation_id).to eq(parent.id)
-    expect(registration.correlation_id).to eq(parent.correlation_id)
+    expect(assignment.markers.grep(/compound:candidate-impact-index/)).not_to be_empty
+    expect(assignment.causation_id).to eq(parent.id)
+    expect(assignment.correlation_id).to eq(parent.correlation_id)
     expect(completion.data.registration_event).to eq(completion.emitted_events.fetch(1))
     expect(command_events(input.fetch(:command_id))).to be_empty
   end
@@ -57,8 +62,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidateImpactSurfa
     candidate = CandidateScenario.submit(prefix: "impact-replay")
     input = impact_input(candidate)
     expect(operation.call(input)).to be_success
-    ids = impact_events(input.fetch(:candidate_id)).map(&:id) +
-      registry_events(candidate.fetch(:input).fetch(:change_set_id)).map(&:id)
+    assignment = assignment_events(input.fetch(:candidate_id)).sole
+    ids = impact_events(assignment.data.fetch("surface_id")).map(&:id) +
+      assignment_events(input.fetch(:candidate_id)).map(&:id)
     reordered = input.merge(
       surface: input.fetch(:surface).merge(
         produces: input.dig(:surface, :produces).reverse
@@ -77,8 +83,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidateImpactSurfa
     expect(replay.failure.code).to eq(:candidate_impact_surface_already_recorded)
     expect(changed.failure.code).to eq(:candidate_impact_surface_already_recorded)
     expect(
-      impact_events(input.fetch(:candidate_id)).map(&:id) +
-        registry_events(candidate.fetch(:input).fetch(:change_set_id)).map(&:id)
+      impact_events(assignment.data.fetch("surface_id")).map(&:id) +
+        assignment_events(input.fetch(:candidate_id)).map(&:id)
     ).to eq(ids)
     expect(command_events(input.fetch(:command_id))).to be_empty
   end
@@ -102,8 +108,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidateImpactSurfa
       :candidate_impact_identity_mismatch,
       :candidate_impact_source_evidence_mismatch
     ])
-    expect(impact_events(valid.fetch(:candidate_id))).to be_empty
-    expect(registry_events(candidate.fetch(:input).fetch(:change_set_id))).to be_empty
+    expect(assignment_events(valid.fetch(:candidate_id))).to be_empty
     cases.each { expect(command_events(_1.fetch(:command_id))).to be_empty }
   end
 
@@ -126,10 +131,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidateImpactSurfa
     expect(results.find(&:failure?).failure.code).to eq(
       :candidate_impact_surface_already_recorded
     )
-    expect(impact_events(first.fetch(:candidate_id)).length).to eq(1)
-    registrations = registry_events(candidate.fetch(:input).fetch(:change_set_id))
-    expect(registrations.length).to eq(1)
-    expect(registrations.sole.data.fetch("candidate_id")).to eq(first.fetch(:candidate_id))
+    assignments = assignment_events(first.fetch(:candidate_id))
+    expect(assignments.length).to eq(1)
+    expect(impact_events(assignments.sole.data.fetch("surface_id")).length).to eq(1)
+    expect(assignments.sole.data.fetch("candidate_id")).to eq(first.fetch(:candidate_id))
     expect([ first, second ].flat_map { command_events(_1.fetch(:command_id)) }).to be_empty
   end
 
@@ -143,8 +148,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidateImpactSurfa
       candidate_id: input.fetch(:candidate_id),
       repository_id: input.fetch(:repository_id),
       head_commit_oid: input.fetch(:head_commit_oid),
-      manifest_digest: manifest.data.fetch("manifest_digest"),
-      build_context_digest: context&.data&.fetch("build_context_digest"),
+      manifest_digest: manifest.metadata.fetch("manifest_digest"),
+      build_context_digest: context&.metadata&.fetch("build_context_digest"),
       analyzer_version: "impact-analyzer-v1",
       surface: {
         produces: [
@@ -162,9 +167,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidateImpactSurfa
     }.compact
   end
 
-  def impact_events(candidate_id)
+  def impact_events(surface_id)
     event_store.read(
-      streams.candidate(candidate_id),
+      streams.candidate_impact_surface(surface_id),
       Coordinator::Write::EventReadCriteria.new(
         event_types: [ "CandidateImpactSurfaceDerived" ],
         maximum_count: 1,
@@ -180,12 +185,12 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidateImpactSurfa
     )
   end
 
-  def registry_events(change_set_id)
+  def assignment_events(candidate_id)
     event_store.read(
-      streams.candidate_impact_registry(change_set_id),
+      streams.candidate(candidate_id),
       Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "CandidateImpactSurfaceRegistered" ],
-        maximum_count: 4,
+        event_types: [ "CandidateImpactSurfaceAssigned" ],
+        maximum_count: 1,
         direction: :asc
       )
     )

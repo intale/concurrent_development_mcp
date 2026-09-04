@@ -1,6 +1,6 @@
 module Coordinator::Write::ReleaseSets
   class CompletionDigestBuilder
     def initialize: (?canonical_json: Coordinator::Shared::CanonicalJson) -> void
-    def call: (release_set_id: String, release_digest: String, outcome: String, source_event: Coordinator::Write::EventReference, compensation_evidence: Array[CompensationEvidenceV1], rule_version: String) -> String
+    def call: (release_set_id: String, release_digest: String, outcome: String, source_event: Coordinator::Write::EventReference, compensation_evidence: Array[CompensationEvidenceV2], rule_version: String) -> String
   end
 end

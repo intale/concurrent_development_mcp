@@ -97,7 +97,7 @@ module ProjectDeliveryGraphqlSpec
       query Release($projectRef: ID!, $releaseSetId: ID!) {
         projectReleaseSet(projectRef: $projectRef, releaseSetId: $releaseSetId) {
           releaseSet { id changeSetId status repositoryIds }
-          members { position repositoryId mergeSnapshotId candidateCount }
+          members { position repositoryId candidateId }
           integrations { repositoryId attemptId outcome failureCode }
           verificationAttemptCount
           activated

@@ -38,6 +38,7 @@ RSpec.describe Coordinator::Write::Domain::Attempts::Abandon do
   it "withdraws each active work intention before recording abandonment and requeue facts" do
     result = abandon.call(
       attempt_state:,
+      candidate_state: nil,
       work_item_state:,
       set_state: work_intention_set_state,
       member_states: [ work_intention_state ],
@@ -66,6 +67,7 @@ RSpec.describe Coordinator::Write::Domain::Attempts::Abandon do
   it "does not emit another terminal fact for an already withdrawn intention" do
     result = abandon.call(
       attempt_state:,
+      candidate_state: nil,
       work_item_state:,
       set_state: work_intention_set_state,
       member_states: [ work_intention_state(withdrawn: true) ],

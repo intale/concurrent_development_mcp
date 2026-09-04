@@ -1,0 +1,7 @@
+module Coordinator::Write
+  module VerificationObligations
+    class OutcomeSelector
+      def call: (state: untyped, triggering_evidence_id: untyped) -> untyped
+    end
+  end
+end

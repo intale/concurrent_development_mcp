@@ -1,0 +1,7 @@
+module Coordinator::Write
+  module VerificationObligations
+    class DefinitionV2 < Coordinator::Shared::Value
+      Reason: untyped
+    end
+  end
+end

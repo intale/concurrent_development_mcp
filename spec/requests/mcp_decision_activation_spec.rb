@@ -56,19 +56,20 @@ RSpec.describe "DEC-01 MCP Decision activation" do
     )
 
     submitted, started, task_completed = task_events(task_id)
-    recorded, activated = decision_events
+    recorded, derived, activated = decision_lifecycle_events
     slot = result.dig("data", "slot")
     slot_facts = slot_events(slot.fetch("slot_id"))
     partition = partition_events.sole
     command_terminal = CommandTraceFixture.terminal(task_id, event_store:)
-    domain_facts = [ recorded, activated, *slot_facts, partition ]
+    domain_facts = [ recorded, derived, activated, *slot_facts, partition ]
 
     expect(domain_facts.map(&:type)).to eq(%w[
       DecisionRecorded
+      DecisionDerivedFromInterpretation
       DecisionActivated
       DecisionSlotOpened
       DecisionSlotHeadChanged
-      DecisionPartitionAdvanced
+      DecisionAddedToPartition
     ])
     expect([ *domain_facts, command_terminal ].map(&:causation_id).uniq).to eq([ started.id ])
     expect(task_completed.causation_id).to eq(command_terminal.id)
@@ -283,8 +284,19 @@ RSpec.describe "DEC-01 MCP Decision activation" do
     event_store.read(
       streams.decision_partition("repo:#{DECISION_REPOSITORY_ID}:testing"),
       Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "DecisionPartitionAdvanced" ],
+        event_types: [ "DecisionAddedToPartition" ],
         maximum_count: 2,
+        direction: :asc
+      )
+    )
+  end
+
+  def decision_lifecycle_events
+    event_store.read(
+      streams.decision("D-mcp-decision"),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[DecisionRecorded DecisionDerivedFromInterpretation DecisionActivated],
+        maximum_count: 3,
         direction: :asc
       )
     )

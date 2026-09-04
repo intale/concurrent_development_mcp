@@ -35,10 +35,12 @@ RSpec.describe Coordinator::Write::Operations::ExecuteInvalidateVerificationObli
       "command:#{invocation.command.command_id}"
     )
     expect(load(event)).to have_attributes(
-      obligation_event: CandidateObligationScenario.reference(created.fetch(:event)),
-      invalidated_policy: created.fetch(:payload).policy,
-      superseding_partition_event: CandidateObligationScenario.reference(corrected.fetch(:partition_event)),
-      previous_status: "open"
+      obligation_id: created.fetch(:payload).obligation_id,
+      reason: "policy_partition_advanced"
+    )
+    expect(event.metadata).to include(
+      "invalidated_policy" => created.fetch(:payload).policy.to_h.deep_stringify_keys,
+      "rule_version" => "verification-obligation-validity/v1"
     )
   end
 
@@ -56,8 +58,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteInvalidateVerificationObli
     history = lifecycle_events(created)
 
     expect(load(event)).to have_attributes(
-      previous_status: "waived",
-      previous_terminal_event: CandidateObligationScenario.reference(history.find { _1.type == "VerificationObligationWaived" })
+      obligation_id: created.fetch(:payload).obligation_id,
+      reason: "policy_partition_advanced"
     )
     expect(history.map(&:type)).to eq(%w[
       VerificationObligationCreated

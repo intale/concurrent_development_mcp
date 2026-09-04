@@ -8,13 +8,11 @@ module Coordinator::Write::Operations
       ?decider: Coordinator::Write::Domain::MergeSnapshotVerifications::Submit,
       ?input_digest: Coordinator::Write::CommandInputDigest,
       ?verification_input_digest: Coordinator::Write::MergeSnapshotVerifications::VerificationInputDigest,
+      ?history_loader: Coordinator::Write::MergeSnapshotVerifications::HistoryLoader,
       ?clock: Coordinator::Shared::_Clock,
       ?id_generator: Coordinator::Shared::_IdGenerator,
       ?event_factory: Coordinator::Write::EventFactory,
-      ?schema_registry: Coordinator::Write::EventSchemaRegistry,
-      ?stream_factory: Coordinator::Write::StreamFactory,
       ?completion_builder: Coordinator::Write::CommandResultBuilder,
-      ?history_contract: Coordinator::Write::Contracts::MergeSnapshotVerificationHistory,
       ?event_plan_contract: Coordinator::Write::Contracts::MergeSnapshotVerificationEventPlan
     ) -> void
     %a{rbs:test:skip}

@@ -1,6 +1,8 @@
 module Coordinator::Write::ChangeSetCompletions
   class SourceEvidenceV1 < Coordinator::Shared::Value
-    type payload = Coordinator::Write::Events::WorkItemCompletedV1 | Coordinator::Write::Events::ReleaseSetCompletedV1
+    type payload = Coordinator::Write::Events::WorkItemCompletedV1 |
+                   Coordinator::Write::Events::WorkItemCompletedV2 |
+                   Coordinator::Write::Events::ReleaseSetCompletedV2
 
     def event: () -> PgEventstore::Event
     def reference: () -> Coordinator::Write::EventReference

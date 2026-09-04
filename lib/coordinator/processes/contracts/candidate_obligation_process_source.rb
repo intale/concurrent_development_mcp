@@ -5,7 +5,9 @@ module Coordinator::Processes
     class CandidateObligationProcessSource < Dry::Validation::Contract
       ALLOWED = {
         "DecisionPartitionAdvanced" => [ "HumanGuidance", "DecisionPartition" ],
-        "CandidateImpactSurfaceRegistered" => [ "DevelopmentIntegration", "CandidateImpactRegistry" ],
+        "DecisionAddedToPartition" => [ "HumanGuidance", "DecisionPartition" ],
+        "DecisionRemovedFromPartition" => [ "HumanGuidance", "DecisionPartition" ],
+        "CandidateImpactSurfaceAssigned" => [ "DevelopmentIntegration", "Candidate" ],
         "CandidateImpactRegistrySweepStarted" => [ "DevelopmentIntegration", "CandidateImpactRegistrySweep" ],
         "CandidateImpactRegistrySweepProgressed" => [ "DevelopmentIntegration", "CandidateImpactRegistrySweep" ],
         "CandidateImpactPairScanStarted" => [ "DevelopmentIntegration", "CandidateImpactPairScan" ],

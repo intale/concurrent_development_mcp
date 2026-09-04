@@ -10,33 +10,35 @@ module Coordinator::Write
           @stream_factory = stream_factory
         end
 
-        def call(history:, command:, observation_digest:, recorded_at:)
+        def call(history:, command:)
           denial = denied(history:, command:)
           return denial if denial
 
-          authorization = history.authorization
+          authorization = history.authorization.decision
           snapshot = history.current_evaluation.snapshot.registration
-          event = Events::MergeObservedV1.new(
+          observation = Events::MergeObservedV2.new(
             merge_snapshot_id: command.merge_snapshot_id,
-            authorization_event: command.authorization_event,
-            authorization_decision_digest: command.authorization_decision_digest,
             snapshot_binding: authorization.snapshot_binding,
             repository_id: command.repository_id,
             target_branch: command.target_branch,
             object_format: command.object_format,
             target_before_commit_oid: command.target_before_commit_oid,
             target_after_commit_oid: command.target_after_commit_oid,
-            observer: command.observer,
+            observer: command.observer.name,
             run_id: command.run_id,
-            observed_at: command.observed_at,
-            observation_digest:,
-            policy_version: command.policy_version,
-            evidence_status: "attributed_unverified",
-            recorded_at:
+            observed_at: command.observed_at
+          )
+          link = Events::MergeObservationAuthorizationLinkedV1.new(
+            merge_snapshot_id: command.merge_snapshot_id,
+            authorization_id: authorization.authorization_id,
+            authorization_event: command.authorization_event
           )
           Success(
             EventPlan.new(
-              writes: [ EventWrite.new(stream: @stream_factory.merge_snapshot(snapshot.merge_snapshot_id), event:) ]
+              writes: [
+                EventWrite.new(stream: @stream_factory.merge_snapshot(snapshot.merge_snapshot_id), event: observation),
+                EventWrite.new(stream: @stream_factory.merge_snapshot(snapshot.merge_snapshot_id), event: link)
+              ]
             )
           )
         end
@@ -54,19 +56,20 @@ module Coordinator::Write
         end
 
         def authorization_matches?(history, command)
-          authorization = history.authorization
-          history.authorization_event == command.authorization_event &&
-            authorization.decision_digest == command.authorization_decision_digest &&
+          evidence = history.authorization
+          authorization = evidence.decision
+          evidence.event == command.authorization_event &&
+            evidence.decision_digest == command.authorization_decision_digest &&
             authorization.merge_snapshot_id == command.merge_snapshot_id
         end
 
         def authorization_current?(history)
           evaluation = history.current_evaluation
-          evaluation&.granted? && evaluation == history.authorization.evaluation
+          evaluation&.granted? && evaluation == history.authorization.decision.evaluation
         end
 
         def transition_matches?(history, command)
-          authorization = history.authorization
+          authorization = history.authorization.decision
           snapshot = history.current_evaluation.snapshot.registration
           base = authorization.evaluation.target_base_observation
           command.repository_id == snapshot.repository_id &&

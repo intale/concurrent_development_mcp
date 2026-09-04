@@ -6,7 +6,8 @@ module Coordinator::Processes
       HANDLED_START_CODES = [ :agent_choice_impact_scan_already_decided ].freeze
       HANDLED_PROGRESS_CODES = [
         :agent_choice_impact_scan_not_running,
-        :agent_choice_impact_scan_checkpoint_changed
+        :agent_choice_impact_scan_checkpoint_changed,
+        :stale_stream
       ].freeze
 
       def initialize(
@@ -34,12 +35,15 @@ module Coordinator::Processes
         source = @source_builder.call(event)
         case source.payload
         when Coordinator::Write::Events::DecisionActivatedV1,
-             Coordinator::Write::Events::DecisionDefinitionCorrectedV1
+             Coordinator::Write::Events::DecisionActivatedV2,
+             Coordinator::Write::Events::DecisionDefinitionCorrectedV1,
+             Coordinator::Write::Events::DecisionDefinitionCorrectedV2
           start_scan(source)
-        when Coordinator::Write::Events::AgentChoiceImpactScanStartedV1,
-             Coordinator::Write::Events::AgentChoiceImpactScanProgressedV1
+        when Coordinator::Write::Events::AgentChoiceImpactScanStartedV2,
+             Coordinator::Write::Events::AgentChoiceImpactScanProgressedV2
           process_page(source)
-        when Coordinator::Write::Events::AgentChoiceAcceptedV1
+        when Coordinator::Write::Events::AgentChoiceAcceptedV1,
+             Coordinator::Write::Events::AgentChoiceAcceptedV2
           repair_choice(source)
         end
         nil

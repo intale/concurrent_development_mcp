@@ -8,6 +8,7 @@ module Coordinator::Write
       def initialize(
         event_store:,
         exact_loader: CandidateObligations::ExactEventLoader.new(event_store:),
+        definition_loader: VerificationObligations::DefinitionLoader.new(event_store:),
         decider: Domain::VerificationObligationInvalidations::Invalidate.new,
         digest_builder: VerificationObligationInvalidations::DigestBuilder.new,
         clock: SystemClock.new,
@@ -22,6 +23,7 @@ module Coordinator::Write
       )
         @event_store = event_store
         @exact_loader = exact_loader
+        @definition_loader = definition_loader
         @decider = decider
         @digest_builder = digest_builder
         @clock = clock
@@ -48,25 +50,24 @@ module Coordinator::Write
 
       def execute_attempt(invocation:, preparation:)
         command = invocation.command
-        obligation = @exact_loader.call(command.obligation_event)
+        obligation = @definition_loader.call(command.obligation_id)
         superseding = @exact_loader.call(command.superseding_partition_event)
         verify_evidence!(command, obligation, superseding)
-        state = load_state(command.obligation_id)
+        state = load_state(command.obligation_id, obligation)
         decision = @decider.call(
           state:,
           command:,
-          superseding_partition: superseding,
-          invalidated_at: preparation.invalidated_at
+          superseding_partition: superseding
         )
         return decision if decision.failure?
 
         plan = decision.value!
         digest = invalidation_digest(state, command)
-        verify_event_plan!(plan, state, command, digest, preparation.invalidated_at)
+        verify_event_plan!(plan, state, command)
         physical = @event_factory.build!(
           event: plan.events.sole,
           event_id: preparation.event_id,
-          metadata: metadata(command),
+          metadata: metadata(command, state, digest),
           markers: scope_markers(state.obligation, command),
           caused_by: invocation.caused_by_event
         )
@@ -78,14 +79,14 @@ module Coordinator::Write
         )
       end
 
-      def load_state(obligation_id)
+      def load_state(obligation_id, loaded_definition)
         grouped = @event_store.read_grouped(
           @stream_factory.verification_obligation(obligation_id),
           EventQueries::VERIFICATION_OBLIGATION_LIFECYCLE
         ).to_h { [ _1.type, _1 ] }
         state = Domain::VerificationObligationInvalidations::State.new(
-          obligation: payload(grouped["VerificationObligationCreated"]),
-          obligation_event: reference(grouped["VerificationObligationCreated"]),
+          obligation: loaded_definition&.definition,
+          obligation_event: loaded_definition&.reference,
           satisfied: payload(grouped["VerificationObligationSatisfied"]),
           satisfied_event: reference(grouped["VerificationObligationSatisfied"]),
           failed: payload(grouped["VerificationObligationFailed"]),
@@ -115,13 +116,11 @@ module Coordinator::Write
         raise ArgumentError, "invalidation evidence violates its dry-rb contract: #{result.errors.to_h.inspect}"
       end
 
-      def verify_event_plan!(plan, state, command, digest, invalidated_at)
+      def verify_event_plan!(plan, state, command)
         result = @event_plan_contract.call(
           plan:,
           state:,
-          command:,
-          invalidation_digest: digest,
-          invalidated_at:
+          command:
         )
         return if result.success?
 
@@ -162,13 +161,16 @@ module Coordinator::Write
         )
       end
 
-      def metadata(command)
-        EventMetadata.new(
+      def metadata(command, state, digest)
+        Metadata::VerificationInvalidationV2.new(
           command_id: command.command_id,
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
-          policy_version: command.rule_version
+          policy_version: command.rule_version,
+          invalidated_policy: state.obligation.policy,
+          invalidation_digest: digest,
+          rule_version: command.rule_version
         )
       end
 

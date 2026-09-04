@@ -1,0 +1,36 @@
+module Coordinator::Write
+  module Operations
+    class ExecuteVerifyMergeSnapshot < Dry::Operation
+      @event_store: untyped
+
+      @history_loader: untyped
+
+      @decider: untyped
+
+      @digest_builder: untyped
+
+      @event_factory: untyped
+
+      @id_generator: untyped
+
+      @event_plan_contract: untyped
+
+      def initialize: (event_store: untyped, ?history_loader: untyped, ?decider: untyped, ?digest_builder: untyped, ?event_factory: untyped, ?id_generator: untyped, ?event_plan_contract: untyped) -> void
+
+      %a{rbs:test:skip}
+      def call: (untyped command, ?caused_by: untyped?) -> untyped
+
+      private
+
+      def execute_attempt: (command: untyped, caused_by: untyped, preparation: untyped) -> untyped
+
+      def verify_plan!: (untyped plan, history: untyped, command: untyped) -> (nil | untyped)
+
+      def persist_plan: (untyped plan, command: untyped, caused_by: untyped, preparation: untyped, verification_digest: untyped) -> untyped
+
+      def event_metadata: (untyped event, untyped command, untyped verification_digest) -> untyped
+
+      def event_markers: (untyped command, untyped event) -> untyped
+    end
+  end
+end

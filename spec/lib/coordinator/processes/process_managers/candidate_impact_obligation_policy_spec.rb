@@ -84,13 +84,15 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CandidateImpactObligatio
       filter: {
         streams: [
           { context: "HumanGuidance", stream_name: "DecisionPartition" },
-          { context: "DevelopmentIntegration", stream_name: "CandidateImpactRegistry" },
+            { context: "DevelopmentIntegration", stream_name: "Candidate" },
           { context: "DevelopmentIntegration", stream_name: "CandidateImpactRegistrySweep" },
           { context: "DevelopmentIntegration", stream_name: "CandidateImpactPairScan" }
         ],
         event_types: %w[
-          DecisionPartitionAdvanced
-          CandidateImpactSurfaceRegistered
+             DecisionPartitionAdvanced
+             DecisionAddedToPartition
+             DecisionRemovedFromPartition
+          CandidateImpactSurfaceAssigned
           CandidateImpactRegistrySweepStarted
           CandidateImpactRegistrySweepProgressed
           CandidateImpactPairScanStarted

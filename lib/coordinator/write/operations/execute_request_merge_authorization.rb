@@ -76,20 +76,25 @@ module Coordinator::Write
         plan = @decider.call(
           command:,
           evaluation:,
-          authorization_id: preparation.authorization_id,
-          input_digest: preparation.input_digest,
-          decision_digest:,
-          decided_at: preparation.decided_at
+          authorization_id: preparation.authorization_id
         ).value!
-        verify_event_plan!(plan, command:, evaluation:, preparation:, decision_digest:)
+        verify_event_plan!(plan, command:, evaluation:, preparation:)
         decision = plan.events.sole
-        persisted = persist_decision(decision, command:, preparation:, caused_by:)
+        persisted = persist_decision(
+          decision,
+          command:,
+          preparation:,
+          decision_digest:,
+          caused_by:
+        )
         completion = @completion_builder.merge_authorization_request(
           command:,
           decision:,
+          decision_digest:,
           input_digest: preparation.input_digest,
           persisted_events: [ persisted ],
-          completed_at: preparation.decided_at
+          completed_at: preparation.decided_at,
+          decided_at: persisted.created_at.utc.iso8601(6)
         )
         Success(completion)
       end
@@ -101,26 +106,23 @@ module Coordinator::Write
         raise InvalidMergeAuthorizationEvaluation, result.errors.to_h.inspect
       end
 
-      def verify_event_plan!(plan, command:, evaluation:, preparation:, decision_digest:)
+      def verify_event_plan!(plan, command:, evaluation:, preparation:)
         result = @event_plan_contract.call(
           plan:,
           command:,
           evaluation:,
-          authorization_id: preparation.authorization_id,
-          input_digest: preparation.input_digest,
-          decision_digest:,
-          decided_at: preparation.decided_at
+          authorization_id: preparation.authorization_id
         )
         return if result.success?
 
         raise InvalidMergeAuthorizationEventPlan, result.errors.to_h.inspect
       end
 
-      def persist_decision(decision, command:, preparation:, caused_by:)
+      def persist_decision(decision, command:, preparation:, decision_digest:, caused_by:)
         physical = @event_factory.build!(
           event: decision,
           event_id: preparation.decision_event_id,
-          metadata: command_metadata(command),
+          metadata: command_metadata(command, preparation, decision_digest),
           markers: event_markers(command, decision),
           caused_by:,
           correlation_id: root_correlation_id(preparation, caused_by)
@@ -140,7 +142,7 @@ module Coordinator::Write
       end
 
       def event_markers(command, decision)
-        outcome = decision.is_a?(Events::MergeAuthorizationGrantedV1) ? "granted" : "denied"
+        outcome = decision.is_a?(Events::MergeAuthorizationGrantedV2) ? "granted" : "denied"
         markers = [
           "merge-authorization:#{decision.authorization_id}",
           "merge-authorization-outcome:#{outcome}",
@@ -159,13 +161,16 @@ module Coordinator::Write
         preparation.correlation_id unless caused_by
       end
 
-      def command_metadata(command)
-        EventMetadata.new(
+      def command_metadata(command, preparation, decision_digest)
+        Metadata::MergeAuthorizationV2.new(
           command_id: command.command_id,
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
-          policy_version: command.policy_version
+          policy_version: command.policy_version,
+          decision_digest:,
+          expected_impact_policy: command.expected_impact_policy,
+          input_digest: preparation.input_digest
         )
       end
     end

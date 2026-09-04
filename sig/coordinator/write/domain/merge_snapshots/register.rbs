@@ -1,7 +1,7 @@
 module Coordinator::Write::Domain::MergeSnapshots
   class Register
     def initialize: (?stream_factory: Coordinator::Write::StreamFactory, ?snapshot_digest_builder: Coordinator::Write::MergeSnapshots::SnapshotDigestBuilder) -> void
-    def call: (state: RegistrationState, command: Coordinator::Write::Commands::RegisterMergeSnapshot, commit_identity: Coordinator::Write::MergeSnapshots::CommitIdentityV1, snapshot_event: Coordinator::Write::EventReference, registered_at: String) -> Dry::Monads::Result
+    def call: (state: RegistrationState, command: Coordinator::Write::Commands::RegisterMergeSnapshot, commit_identity: Coordinator::Write::MergeSnapshots::CommitIdentityV1) -> Dry::Monads::Result
 
     private
 

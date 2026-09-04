@@ -5,7 +5,7 @@ module Coordinator::Write
     class AgentChoiceImpactScanStartCommand < Dry::Validation::Contract
       params do
         required(:command).value(Types.Instance(Commands::StartAgentChoiceImpactScan))
-        required(:decision_change).value(Types.Instance(AgentChoiceImpacts::DecisionChangeEvidenceV1))
+        required(:decision_change).value(Types.Instance(AgentChoiceImpacts::DecisionChangeEvidenceV2))
       end
 
       rule(:command, :decision_change) do

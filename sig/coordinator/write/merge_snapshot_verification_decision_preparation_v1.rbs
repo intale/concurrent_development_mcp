@@ -1,0 +1,4 @@
+module Coordinator::Write
+  class MergeSnapshotVerificationDecisionPreparationV1 < Coordinator::Shared::Value
+  end
+end

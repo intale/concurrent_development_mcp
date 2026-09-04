@@ -225,13 +225,9 @@ module Coordinator::Web::Graphql::Types
 
     class ReleaseMemberType < BaseObject
       graphql_name "ReleaseMember"
-      field :candidate_count, Integer, null: false
-      field :change_set_id, ID, null: false
-      field :merge_commit_oid, String, null: false
-      field :merge_snapshot_id, ID, null: false
+      field :candidate_id, ID, null: false
       field :position, Integer, null: false
       field :repository_id, ID, null: false
-      field :target_branch, String, null: false
     end
 
     class ReleaseIntegrationType < BaseObject

@@ -6,29 +6,17 @@ module Coordinator::Write
       class Invalidate
         include Dry::Monads[:result]
 
-        def initialize(
-          stream_factory: StreamFactory.new,
-          digest_builder: Coordinator::Write::VerificationObligationInvalidations::DigestBuilder.new
-        )
+        def initialize(stream_factory: StreamFactory.new)
           @stream_factory = stream_factory
-          @digest_builder = digest_builder
         end
 
-        def call(state:, command:, superseding_partition:, invalidated_at:)
+        def call(state:, command:, superseding_partition:)
           denial = denied(state, command, superseding_partition)
           return Failure(denial) if denial
 
-          event = Events::VerificationObligationInvalidatedV1.new(
+          event = Events::VerificationObligationInvalidatedV2.new(
             obligation_id: command.obligation_id,
-            obligation_event: state.obligation_event,
-            invalidated_policy: state.obligation.policy,
-            superseding_partition_event: command.superseding_partition_event,
-            previous_status: state.status,
-            previous_terminal_event: state.previous_terminal_event,
-            reason: "policy_partition_advanced",
-            invalidation_digest: invalidation_digest(state, command),
-            rule_version: command.rule_version,
-            invalidated_at:
+            reason: "policy_partition_advanced"
           )
           Success(
             EventPlan.new(
@@ -66,17 +54,6 @@ module Coordinator::Write
             previous.stream_name == current.stream_name &&
             previous.stream_id == current.stream_id &&
             previous.stream_revision < current.stream_revision
-        end
-
-        def invalidation_digest(state, command)
-          @digest_builder.call(
-            obligation_event: state.obligation_event,
-            invalidated_policy: state.obligation.policy,
-            superseding_partition_event: command.superseding_partition_event,
-            previous_status: state.status,
-            previous_terminal_event: state.previous_terminal_event,
-            rule_version: command.rule_version
-          )
         end
 
         def error(code, message, command)

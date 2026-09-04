@@ -227,7 +227,7 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::Assess do
   end
 
   def decision_change
-    Coordinator::Write::AgentChoiceImpacts::DecisionChangeEvidenceV1.new(
+    Coordinator::Write::AgentChoiceImpacts::DecisionChangeEvidenceV2.new(
       source_event: decision_source_reference,
       source_global_position: 42,
       source_command_id: "cmd-correct-assess",
@@ -236,8 +236,7 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::Assess do
       change_kind: "corrected",
       definition_digest: "sha256:#{'d' * 64}",
       retroactivity: "active_attempts",
-      affected_partitions: [ partition ],
-      changed_at: "2026-08-23T10:30:00.000000Z"
+      affected_partitions: [ partition ]
     )
   end
 

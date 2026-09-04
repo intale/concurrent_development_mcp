@@ -5,15 +5,14 @@ module Coordinator::Write
     module AgentChoiceImpacts
       class ScanState < Value
         attribute :status, Types::AgentChoiceImpactScanStatus
-        attribute :scan_id, Types::Identifier.optional
-        attribute :decision_change, Coordinator::Write::AgentChoiceImpacts::DecisionChangeEvidenceV1.optional
+        attribute :scan_id, Types::UuidV7.optional
+        attribute :decision_change, Coordinator::Write::AgentChoiceImpacts::DecisionChangeEvidenceV2.optional
         attribute :started_event, EventReference.optional
         attribute :checkpoint_event, EventReference.optional
         attribute :from_position, Types::GlobalPosition.optional
         attribute :to_position, Types::GlobalPosition.optional
         attribute :page_size, Types::AgentChoiceImpactPageSize.optional
         attribute :page_count, Types::Integer.constrained(gteq: 0)
-        attribute :total_choice_count, Types::Integer.constrained(gteq: 0)
         attribute :policy_version, Types::AgentChoiceImpactPolicyVersion.optional
         attribute :skip_reason, Types::AgentChoiceImpactScanSkipReason.optional
 
@@ -28,7 +27,6 @@ module Coordinator::Write
             to_position: nil,
             page_size: nil,
             page_count: 0,
-            total_choice_count: 0,
             policy_version: nil,
             skip_reason: nil
           )

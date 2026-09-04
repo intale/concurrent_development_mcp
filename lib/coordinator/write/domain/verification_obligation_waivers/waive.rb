@@ -10,19 +10,13 @@ module Coordinator::Write
           @stream_factory = stream_factory
         end
 
-        def call(state:, command:, waiver_input_digest:, waived_at:)
+        def call(state:, command:)
           denial = denied(state, command)
           return Failure(denial) if denial
 
-          event = Events::VerificationObligationWaivedV1.new(
+          event = Events::VerificationObligationWaivedV2.new(
             obligation_id: command.obligation_id,
-            obligation_event: state.obligation_event,
-            policy: state.obligation.policy,
-            previous_status: state.status,
-            previous_terminal_event: state.previous_terminal_event,
-            reason: command.reason,
-            waiver_input_digest:,
-            waived_at:
+            reason: command.reason
           )
           Success(
             EventPlan.new(
@@ -47,13 +41,6 @@ module Coordinator::Write
               command
             )
           end
-          unless state.policy_current
-            return error(
-              :verification_obligation_policy_stale,
-              "Verification obligation policy is no longer current",
-              command
-            )
-          end
           unless command.obligation_validity_input_digest == state.obligation.validity_input_digest
             return error(
               :verification_obligation_binding_stale,
@@ -68,7 +55,7 @@ module Coordinator::Write
 
         def terminal_denial(state, command)
           case state.status
-          when "open", "failed" then nil
+          when "open" then nil
           when "waived"
             error(
               :verification_obligation_already_waived,

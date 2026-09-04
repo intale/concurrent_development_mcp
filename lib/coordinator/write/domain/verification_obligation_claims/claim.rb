@@ -17,13 +17,11 @@ module Coordinator::Write
           return already_claimed(active_claim, command) if active_claim
 
           expires_at = (Time.iso8601(claimed_at) + command.claim_duration_seconds).utc.iso8601(6)
-          event = Events::VerificationObligationClaimedV1.new(
+          event = Events::VerificationObligationClaimedV2.new(
             obligation_id: command.obligation_id,
-            obligation_event: state.obligation_event,
             claim_id:,
             claimant_id: command.actor.id,
             fencing_token: state.next_fencing_token,
-            claimed_at:,
             expires_at:
           )
 

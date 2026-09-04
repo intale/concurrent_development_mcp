@@ -54,6 +54,7 @@ module Coordinator::Write
           recorded_at: @clock.now,
           input_digest: @input_digest.merge_observation_record(command),
           observation_event_id: @id_generator.uuid_v7,
+          authorization_link_event_id: @id_generator.uuid_v7,
           correlation_id: @id_generator.uuid_v7
         )
       end
@@ -63,16 +64,14 @@ module Coordinator::Write
         observation_digest = if history.authorization
                                @observation_digest_builder.call(
                                  command:,
-                                 authorization: history.authorization
+                                 authorization: history.authorization.decision
                                )
         else
                                preparation.input_digest
         end
         decision = @decider.call(
           history:,
-          command:,
-          observation_digest:,
-          recorded_at: preparation.recorded_at
+          command:
         )
         return decision if decision.failure?
 
@@ -80,17 +79,23 @@ module Coordinator::Write
         verify_event_plan!(
           plan,
           history:,
-          command:,
-          observation_digest:,
-          recorded_at: preparation.recorded_at
+          command:
         )
-        persisted = persist_observation(plan.events.sole, command:, preparation:, caused_by:)
+        persisted = persist_plan(
+          plan,
+          command:,
+          preparation:,
+          observation_digest:,
+          caused_by:
+        )
         completion = @completion_builder.merge_observation_record(
           command:,
-          observation: plan.events.sole,
+          observation: plan.events.fetch(0),
+          observation_digest:,
           input_digest: preparation.input_digest,
-          persisted_events: [ persisted ],
-          completed_at: preparation.recorded_at
+          persisted_events: persisted,
+          completed_at: preparation.recorded_at,
+          recorded_at: persisted.fetch(0).created_at.utc.iso8601(6)
         )
         Success(completion)
       end
@@ -104,7 +109,6 @@ module Coordinator::Write
         ).first
         Domain::MergeObservations::HistoryV1.new(
           authorization:,
-          authorization_event:,
           current_evaluation: evaluation,
           existing_observation: existing && load_event(existing),
           existing_observation_event: existing && event_reference(existing)
@@ -117,45 +121,61 @@ module Coordinator::Write
         return [ nil, nil ] unless physical && event_reference(physical) == reference
         return [ nil, nil ] unless physical.type == "MergeAuthorizationGranted"
 
-        [ load_event(physical), event_reference(physical) ]
+        decision = load_event(physical)
+        [
+          MergeAuthorizations::DecisionEvidenceV2.new(
+            decision:,
+            event: event_reference(physical),
+            decision_digest: physical.metadata.fetch("decision_digest"),
+            expected_impact_policy: metadata_expected_policy(physical.metadata),
+            policy_version: physical.metadata.fetch("policy_version")
+          ),
+          event_reference(physical)
+        ]
       end
 
-      def reevaluate(authorization, command, recorded_at:)
+      def reevaluate(authorization_evidence, command, recorded_at:)
+        authorization = authorization_evidence.decision
         authorization_command = Commands::RequestMergeAuthorization.new(
           command_id: command.command_id,
           actor: command.actor,
           merge_snapshot_id: authorization.merge_snapshot_id,
           snapshot_binding: authorization.snapshot_binding,
           target_base_observation: authorization.evaluation.target_base_observation,
-          expected_impact_policy: authorization.expected_impact_policy,
-          policy_version: authorization.policy_version
+          expected_impact_policy: authorization_evidence.expected_impact_policy,
+          policy_version: authorization_evidence.policy_version
         )
         @evaluator.call(authorization_command, decided_at: recorded_at)
       end
 
-      def verify_event_plan!(plan, history:, command:, observation_digest:, recorded_at:)
+      def verify_event_plan!(plan, history:, command:)
         result = @event_plan_contract.call(
           plan:,
           history:,
-          command:,
-          observation_digest:,
-          recorded_at:
+          command:
         )
         return if result.success?
 
         raise InvalidMergeObservationEventPlan, result.errors.to_h.inspect
       end
 
-      def persist_observation(observation, command:, preparation:, caused_by:)
-        physical = @event_factory.build!(
-          event: observation,
-          event_id: preparation.observation_event_id,
-          metadata: command_metadata(command),
-          markers: event_markers(command, observation),
-          caused_by:,
-          correlation_id: root_correlation_id(preparation, caused_by)
-        )
-        @event_store.append(@stream_factory.merge_snapshot(command.merge_snapshot_id), [ physical ]).sole
+      def persist_plan(plan, command:, preparation:, observation_digest:, caused_by:)
+        ids = [ preparation.observation_event_id, preparation.authorization_link_event_id ]
+        parent = caused_by
+        correlation_id = caused_by&.correlation_id || preparation.correlation_id
+        plan.writes.zip(ids).map do |write, event_id|
+          physical = @event_factory.build!(
+            event: write.event,
+            event_id:,
+            metadata: event_metadata(write.event, command, observation_digest),
+            markers: event_markers(command, observation_digest),
+            caused_by: parent,
+            correlation_id:
+          )
+          persisted = @event_store.append(write.stream, [ physical ]).sole
+          parent = persisted
+          persisted
+        end
       end
 
       def load_event(event)
@@ -177,10 +197,10 @@ module Coordinator::Write
         )
       end
 
-      def event_markers(command, observation)
+      def event_markers(command, observation_digest)
         [
           "merge-snapshot:#{command.merge_snapshot_id}",
-          "merge-observation:#{observation.observation_digest}",
+          "merge-observation:#{observation_digest}",
           "merge-authorization:#{command.authorization_event.stream_id}",
           "repository:#{command.repository_id}",
           "target-branch:#{command.target_branch}",
@@ -193,14 +213,41 @@ module Coordinator::Write
         preparation.correlation_id unless caused_by
       end
 
-      def command_metadata(command)
-        EventMetadata.new(
+      def event_metadata(event, command, observation_digest)
+        attributes = {
           command_id: command.command_id,
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
           policy_version: command.policy_version
-        )
+        }
+        case event
+        when Events::MergeObservedV2
+          Metadata::MergeObservationV2.new(
+            **attributes,
+            authorization_decision_digest: command.authorization_decision_digest,
+            observation_digest:
+          )
+        when Events::MergeObservationAuthorizationLinkedV1
+          EventMetadata.new(**attributes)
+        else
+          raise "Unexpected merge observation event #{event.class.name}"
+        end
+      end
+
+      def metadata_expected_policy(metadata)
+        value = metadata["expected_impact_policy"]
+        return unless value
+
+        MergeAuthorizations::ExpectedImpactPolicyV1.new(deep_symbolize(value))
+      end
+
+      def deep_symbolize(value)
+        case value
+        when Hash then value.to_h { |key, nested| [ key.to_sym, deep_symbolize(nested) ] }
+        when Array then value.map { deep_symbolize(_1) }
+        else value
+        end
       end
     end
   end

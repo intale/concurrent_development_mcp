@@ -21,7 +21,18 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRequestMergeAuthorization,
     expect(reevaluation.data.authorization_id).not_to eq(first.data.authorization_id)
     expect(authorization_events(reevaluation.data.authorization_id).length).to eq(1)
     expect(first.data.outcome).to eq("granted")
-    expect(payload).to be_a(Coordinator::Write::Events::MergeAuthorizationGrantedV1)
+    expect(payload).to be_a(Coordinator::Write::Events::MergeAuthorizationGrantedV2)
+    expect(payload.to_h.keys).to contain_exactly(
+      :authorization_id,
+      :merge_snapshot_id,
+      :evaluation,
+      :snapshot_binding
+    )
+    expect(event.metadata).to include(
+      "decision_digest" => first.data.decision_digest,
+      "input_digest" => first.canonical_input_digest,
+      "policy_version" => "merge-authorization/v1"
+    )
     expect(payload.evaluation).to be_granted
     expect(payload.evaluation.current_policy.status).to eq("absent")
     expect(payload.evaluation.obligations).to be_empty
@@ -61,7 +72,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRequestMergeAuthorization,
       prefix: "auth-unverified"
     )
     verified_stream = streams.merge_snapshot(unverified.dig(:input, :merge_snapshot_id))
-    verification = event_store.read(verified_stream, Coordinator::Write::EventQueries::MERGE_SNAPSHOT_VERIFIED).sole
+    verification = event_store.read(
+      verified_stream,
+      Coordinator::Write::EventQueries::MERGE_SNAPSHOT_VERIFIED
+    ).find { _1.type == "MergeSnapshotVerified" }
     # Preserve real command-produced history while presenting an exact different snapshot as the unverified case.
     other = MergeSnapshotScenario.register(
       prefix: "auth-actually-unverified",
@@ -86,7 +100,11 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRequestMergeAuthorization,
 
     stale = MergeSnapshotScenario.authorization_input(
       unverified,
-      { payload: load(verification), event: verification },
+      {
+        payload: load(verification),
+        event: verification,
+        verification_digest: verification.metadata.fetch("verification_digest")
+      },
       prefix: "auth-stale-base"
     )
     stale[:target_base_observation][:commit_oid] = "b" * 40
@@ -152,18 +170,20 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRequestMergeAuthorization,
       prefix: "auth-obligation",
       duration: 900
     )
-    CandidateObligationScenario.submit_compatibility_assessment(
+    combined = CandidateObligationScenario.submit_compatibility_assessment(
       created:,
       claim:,
       command_id: "cmd-auth-obligation-combined",
       evidence_kind: "combined_tests"
     )
-    CandidateObligationScenario.submit_compatibility_assessment(
+    CandidateObligationScenario.process_compatibility_outcome(combined)
+    contract = CandidateObligationScenario.submit_compatibility_assessment(
       created:,
       claim:,
       command_id: "cmd-auth-obligation-contract",
       evidence_kind: "contract_compatibility_review"
     )
+    CandidateObligationScenario.process_compatibility_outcome(contract)
     grant_input = open_input.merge(command_id: "cmd-authorize-auth-obligation-granted")
     grant = operation.call(grant_input).value!
 

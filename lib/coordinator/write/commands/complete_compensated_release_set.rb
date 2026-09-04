@@ -3,7 +3,7 @@
 module Coordinator::Write
   module Commands
     class CompleteCompensatedReleaseSet < Value
-      Evidence = ReleaseSets::CompensationEvidenceV1
+      Evidence = ReleaseSets::CompensationEvidenceV2
 
       attribute :command_id, Types::Identifier
       attribute :actor, Actor

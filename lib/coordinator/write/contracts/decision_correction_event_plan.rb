@@ -109,13 +109,17 @@ module Coordinator::Write
           return
         end
 
+        revisions = Hash.new { |hash, partition_id| hash[partition_id] = 0 }
         writes.zip(expected).each do |write, expectation|
           partition_state, event_class = expectation
           event = write.event
-          expected_revision = partition_state.latest_revision ? partition_state.latest_revision + 1 : 0
+          partition_id = partition_state.partition.partition_id
+          expected_revision = (partition_state.latest_revision ? partition_state.latest_revision + 1 : 0) +
+            revisions[partition_id]
+          revisions[partition_id] += 1
           unless event.is_a?(event_class) &&
-                 write.stream == streams.decision_partition(partition_state.partition.partition_id) &&
-                 event.partition_id == partition_state.partition.partition_id &&
+                 write.stream == streams.decision_partition(partition_id) &&
+                 event.partition_id == partition_id &&
                  event.partition_revision == expected_revision &&
                  event.decision_id == command.decision_id
             key.failure("partition membership fact does not match its authoritative predecessor")
@@ -125,12 +129,21 @@ module Coordinator::Write
 
       def partition_changes(state, decision_id)
         corrected_ids = state.candidate.partitions.map(&:partition_id)
-        state.partition_states.filter_map do |partition_state|
+        state.partition_states.flat_map do |partition_state|
           current = partition_state.active_decisions.any? { _1.decision_id == decision_id }
           corrected = corrected_ids.include?(partition_state.partition.partition_id)
-          next if current == corrected
-
-          [ partition_state, corrected ? Events::DecisionAddedToPartitionV1 : Events::DecisionRemovedFromPartitionV1 ]
+          if current && corrected
+            [
+              [ partition_state, Events::DecisionRemovedFromPartitionV1 ],
+              [ partition_state, Events::DecisionAddedToPartitionV1 ]
+            ]
+          elsif current
+            [ [ partition_state, Events::DecisionRemovedFromPartitionV1 ] ]
+          elsif corrected
+            [ [ partition_state, Events::DecisionAddedToPartitionV1 ] ]
+          else
+            []
+          end
         end
       end
     end

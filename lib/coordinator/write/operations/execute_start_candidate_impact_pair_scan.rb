@@ -39,8 +39,9 @@ module Coordinator::Write
 
       def call(invocation)
         preparation = CandidateObligationScans::StartPreparationV1.new(
-          started_at: @clock.now,
-          event_id: @id_generator.uuid_v7
+          observed_at: @clock.now,
+          event_ids: Array.new(4) { @id_generator.uuid_v7 },
+          correlation_id: invocation.caused_by&.correlation_id || @id_generator.uuid_v7
         )
 
         @event_store.multiple do
@@ -59,16 +60,9 @@ module Coordinator::Write
           policy_partition_event: command.policy_partition_event,
           policy_head: command.policy_head,
           change_set_id: command.change_set_id,
-          observed_at: preparation.started_at
+          observed_at: preparation.observed_at
         )
-        index_evidence = Candidates::ImpactSurfaceEvidenceV1.new(
-          submission: evidence.candidate,
-          submission_event: evidence.subject.candidate_event,
-          manifest: evidence.manifest,
-          manifest_event: evidence.subject.manifest_event,
-          build_context: evidence.build_context,
-          build_context_event: evidence.subject.build_context_event
-        )
+        index_evidence = Candidates::ImpactSurfaceEvidenceV2.new(candidate: evidence.candidate)
         routing_markers = @marker_builder.counterpart(
           evidence: index_evidence,
           surface: evidence.surface,
@@ -87,24 +81,17 @@ module Coordinator::Write
           state: snapshot.state,
           command:,
           policy:,
-          markers: routing_markers,
-          started_at: preparation.started_at
+          markers: routing_markers
         )
         return decision if decision.failure?
 
         plan = decision.value!
         stream = @stream_factory.candidate_impact_pair_scan(command.scan_id)
         verify_event_plan!(plan, command:, markers: routing_markers, expected_stream: stream)
-        physical = @event_factory.build!(
-          event: plan.events.sole,
-          event_id: preparation.event_id,
-          metadata: metadata(command),
-          markers: event_markers(command),
-          caused_by: invocation.caused_by
-        )
-        persisted = @event_store.append(stream, [ physical ]).sole
+        physical = physical_events(plan.events, command:, preparation:, caused_by: invocation.caused_by)
+        persisted = @event_store.append(stream, physical)
 
-        Success(persisted)
+        Success(persisted.first)
       end
 
       def verify_input!(invocation, evidence)
@@ -121,25 +108,46 @@ module Coordinator::Write
         raise ArgumentError, "pair scan start plan violates its dry-rb contract: #{result.errors.to_h.inspect}"
       end
 
-      def metadata(command)
-        EventMetadata.new(
+      def physical_events(events, command:, preparation:, caused_by:)
+        parent = caused_by
+        events.zip(preparation.event_ids).map do |event, event_id|
+          physical = @event_factory.build!(
+            event:,
+            event_id:,
+            metadata: metadata(event, command),
+            markers: event_markers(command, event),
+            caused_by: parent,
+            correlation_id: preparation.correlation_id
+          )
+          parent = physical
+          physical
+        end
+      end
+
+      def metadata(event, command)
+        common = {
           command_id: command.command_id,
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
-          policy_version: command.rule_version
-        )
+          policy_version: event.is_a?(Events::CandidateImpactPairScanSourceLinkedV1) ? nil : command.rule_version
+        }
+        return EventMetadata.new(common) if event.is_a?(Events::CandidateImpactPairScanSourceLinkedV1)
+
+        Metadata::CandidateImpactPairScanV2.new(common.merge(index_policy_version: command.index_policy_version))
       end
 
-      def event_markers(command)
-        [
+      def event_markers(command, event)
+        values = [
           "candidate-impact-pair-scan:#{command.scan_id}",
           "change-set:#{command.change_set_id}",
           "candidate-impact-direction:#{command.direction}",
           "source-registration:#{command.source_registration.event_id}",
           "decision:#{command.policy_head.decision_id}",
           "command:#{command.command_id}"
-        ].freeze
+        ]
+        values << "source-role:#{event.role}" if event.is_a?(Events::CandidateImpactPairScanSourceLinkedV1)
+        values.freeze
       end
     end
   end

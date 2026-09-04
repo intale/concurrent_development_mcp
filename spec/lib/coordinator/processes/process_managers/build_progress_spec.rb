@@ -165,10 +165,9 @@ RSpec.describe Coordinator::Processes::ProcessManagers::BuildProgress, :event_st
 
     completion = change_set_completion(completed.dig(:input, :change_set_id))
     payload = ReleaseSetScenario.load(completion)
-    expect(payload.work_item_completions.map(&:work_item_id)).to eq([
-      completed.dig(:input, :work_item_id)
-    ])
-    expect(payload.release_set_completion_event).to be_nil
+    expect(payload.change_set_id).to eq(completed.dig(:input, :change_set_id))
+    state = Coordinator::Write::ChangeSets::StateLoader.new(event_store:).call(payload.change_set_id)
+    expect(state).to have_attributes(status: "completed", release_set_id: nil)
     step = ProcessStepExamples.event(
       event_store:,
       source_event: source,
@@ -208,13 +207,11 @@ RSpec.describe Coordinator::Processes::ProcessManagers::BuildProgress, :event_st
 
     completion = change_set_completion(prepared.fetch(:payload).change_set_id)
     payload = ReleaseSetScenario.load(completion)
-    expect(payload.work_item_completions.map(&:candidate_id).sort).to eq(
-      prepared.fetch(:payload).ordered_members.flat_map do |member|
-        member.ordered_candidates.map(&:candidate_id)
-      end.sort
-    )
-    expect(payload.release_set_completion_event).to eq(
-      ReleaseSetScenario.reference(release_completion)
+    expect(payload.change_set_id).to eq(prepared.fetch(:payload).change_set_id)
+    state = Coordinator::Write::ChangeSets::StateLoader.new(event_store:).call(payload.change_set_id)
+    expect(state).to have_attributes(
+      status: "completed",
+      release_set_id: prepared.dig(:input, :release_set_id)
     )
   end
 
@@ -298,14 +295,22 @@ RSpec.describe Coordinator::Processes::ProcessManagers::BuildProgress, :event_st
   end
 
   def release_dependency_events(prepared)
-    event_store.read(
-      streams.change_set(prepared.fetch(:payload).change_set_id),
-      Coordinator::Write::EventQueries::CHANGE_SET_FOR_DEPENDENCY_SATISFACTION
-    ).select { _1.type == "WorkItemDependencySatisfied" }
+    event_store.read_global_marked(
+      Coordinator::Write::GlobalMarkedEventReadCriteria.new(
+        stream_context: "DevelopmentExecution",
+        stream_name: "WorkItem",
+        event_types: [ "WorkItemDependencySatisfied" ],
+        markers: [ "change-set:#{prepared.fetch(:payload).change_set_id}" ],
+        maximum_count: 500,
+        direction: :asc
+      )
+    )
   end
 
   def work_item_sources(prepared)
-    prepared.fetch(:payload).ordered_members.flat_map(&:ordered_candidates).map do |candidate|
+    loader = Coordinator::Write::Candidates::StateLoader.new(event_store:)
+    prepared.fetch(:payload).ordered_members.map(&:candidate_id).map do |candidate_id|
+      candidate = loader.call(candidate_id)
       event_store.read(
         streams.work_item(candidate.work_item_id),
         Coordinator::Write::EventQueries::WORK_ITEM_FOR_CHANGE_SET_COMPLETION
@@ -330,8 +335,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::BuildProgress, :event_st
       summary: "Repository integration failed",
       producer: { name: "release-adapter", version: "1.0.0" },
       run_id: "release-failure-#{prefix}",
-      result_digest: "sha256:#{'d' * 64}",
-      occurred_at: "2026-08-25T08:30:00.000000Z"
+      result_digest: "sha256:#{'d' * 64}"
     }
   end
 end

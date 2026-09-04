@@ -1,0 +1,6 @@
+module Coordinator::Write
+  module Metadata
+    class CandidateImpactPairScanV2 < EventMetadata
+    end
+  end
+end

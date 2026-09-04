@@ -68,11 +68,8 @@ module Coordinator::Write
             object_format: command.object_format,
             head_commit_oid: command.head_commit_oid
           ),
-          candidate_event_id: @id_generator.uuid_v7,
-          manifest_event_id: @id_generator.uuid_v7,
-          build_context_event_id: command.build_context && @id_generator.uuid_v7,
-          head_registration_event_id: @id_generator.uuid_v7,
-          attachment_event_id: @id_generator.uuid_v7,
+          candidate_fact_event_ids: Array.new(command.build_context ? 10 : 9) { @id_generator.uuid_v7 },
+          head_registration_event_id: @id_generator.uuid_v7
         )
       end
 
@@ -99,12 +96,10 @@ module Coordinator::Write
         return state_result if state_result.failure?
 
         state = state_result.value!
-        candidate_event = future_candidate_reference(command, prepared.candidate_event_id)
         decision = @decider.call(
           state:,
           command:,
           submitted_at: prepared.submitted_at,
-          candidate_event:,
           head_identity: prepared.head_identity
         )
         return decision if decision.failure?
@@ -113,8 +108,7 @@ module Coordinator::Write
           decision.value!,
           state:,
           command:,
-          prepared:,
-          candidate_event:
+          prepared:
         )
         persisted_events = persist_domain_plan(
           plan,
@@ -123,10 +117,8 @@ module Coordinator::Write
           repository_registration:,
           caused_by:
         )
-        submission = plan.events.fetch(0)
         completion = @completion_builder.candidate_submit(
           command:,
-          submission:,
           input_digest: prepared.input_digest,
           persisted_events:,
           completed_at: prepared.submitted_at
@@ -312,26 +304,11 @@ module Coordinator::Write
         )
       end
 
-      def future_candidate_reference(command, event_id)
-        stream = @stream_factory.candidate(command.candidate_id)
-        EventReference.new(
-          event_id:,
-          type: "CandidateSubmitted",
-          stream_context: stream.context,
-          stream_name: stream.stream_name,
-          stream_id: stream.stream_id,
-          stream_revision: 0
-        )
-      end
-
-      def apply_event_plan_contract(plan, state:, command:, prepared:, candidate_event:)
+      def apply_event_plan_contract(plan, state:, command:, prepared:)
         result = @event_plan_contract.call(
           plan:,
           command:,
-          state:,
-          head_identity: prepared.head_identity,
-          candidate_event:,
-          submitted_at: prepared.submitted_at
+          head_identity: prepared.head_identity
         )
         return plan if result.success?
 
@@ -343,8 +320,13 @@ module Coordinator::Write
           event = @event_factory.build!(
             event: write.event,
             event_id:,
-            metadata: command_metadata(command),
-            markers: event_markers(command, prepared.head_identity, repository_registration:),
+            metadata: event_metadata(write.event, command),
+            markers: event_markers(
+              write.event,
+              command,
+              prepared.head_identity,
+              repository_registration:
+            ),
             caused_by:
           )
 
@@ -353,13 +335,11 @@ module Coordinator::Write
       end
 
       def domain_event_ids(prepared)
-        ids = [ prepared.candidate_event_id, prepared.manifest_event_id ]
-        ids << prepared.build_context_event_id if prepared.build_context_event_id
-        ids.concat([ prepared.head_registration_event_id, prepared.attachment_event_id ])
+        prepared.candidate_fact_event_ids + [ prepared.head_registration_event_id ]
       end
 
-      def event_markers(command, head_identity, repository_registration:)
-        [
+      def event_markers(event, command, head_identity, repository_registration:)
+        markers = [
           "candidate:#{command.candidate_id}",
           "change-set:#{command.change_set_id}",
           "work-item:#{command.work_item_id}",
@@ -367,9 +347,42 @@ module Coordinator::Write
           "object-format:#{command.object_format}",
           "head-commit-oid:#{command.head_commit_oid}",
           "lease-set:#{command.lease_set_id}",
-          "command:#{command.command_id}",
-          head_identity.marker
+          "command:#{command.command_id}"
         ] + @repository_marker_builder.call(repository_registration)
+        markers << head_identity.marker if event.is_a?(Events::CandidateHeadRegisteredV2)
+        markers
+      end
+
+      def event_metadata(event, command)
+        attributes = command_metadata(command).to_h
+        case event
+        when Events::CandidateChangeManifestCapturedV2
+          Metadata::CandidateChangeManifestV2.new(
+            **attributes,
+            policy_version: command.manifest.policy_version,
+            collector: command.manifest.collector,
+            manifest_digest: command.manifest.digest
+          )
+        when Events::CandidateBuildContextCapturedV2
+          context = command.build_context
+          Metadata::CandidateBuildContextV2.new(
+            **attributes,
+            policy_version: context.policy_version,
+            collector: context.collector,
+            build_context_digest: context.digest,
+            dependency_graph_digest: context.dependency_graph_digest,
+            test_environment_digest: context.test_environment_digest
+          )
+        when Events::CandidateHeadRegisteredV2
+          Metadata::MarkerCodecV1.new(
+            **attributes,
+            marker_codec_version: Candidates::HeadIdentityBuilder::MARKER_CODEC_VERSION
+          )
+        when Events::CandidateWorkIntentionSetAssignedV1
+          EventMetadata.new(**attributes, policy_version: LeaseResourceV2::POLICY_VERSION)
+        else
+          EventMetadata.new(**attributes, policy_version: nil)
+        end
       end
 
       def command_metadata(command)
@@ -378,7 +391,7 @@ module Coordinator::Write
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
-          policy_version: LeaseResourceV2::POLICY_VERSION
+          policy_version: nil
         )
       end
 

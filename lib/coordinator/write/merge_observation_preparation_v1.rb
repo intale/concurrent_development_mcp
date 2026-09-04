@@ -5,6 +5,7 @@ module Coordinator::Write
     attribute :recorded_at, Types::Timestamp
     attribute :input_digest, Types::Sha256Digest
     attribute :observation_event_id, Types::UuidV7
+    attribute :authorization_link_event_id, Types::UuidV7
     attribute :correlation_id, Types::UuidV7
   end
 end

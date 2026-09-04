@@ -2,10 +2,10 @@ module Coordinator::Write
   module Domain
     module CandidateObligations
       class State < Coordinator::Shared::Value
-        def source: () -> Coordinator::Write::CandidateObligations::CandidateEvidenceV1
-        def target: () -> Coordinator::Write::CandidateObligations::CandidateEvidenceV1
+        def source: () -> Coordinator::Write::CandidateObligations::CandidateEvidenceV2
+        def target: () -> Coordinator::Write::CandidateObligations::CandidateEvidenceV2
         def policy: () -> Coordinator::Write::CandidateObligations::PolicyObservationV1
-        def existing: () -> Coordinator::Write::Events::VerificationObligationCreatedV1?
+        def existing: () -> Coordinator::Write::VerificationObligations::DefinitionV2?
       end
     end
   end

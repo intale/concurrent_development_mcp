@@ -7,7 +7,10 @@ module Coordinator::Write
 
       attribute :outcome, Types::CandidateObligationDecisionOutcome
       attribute :plan, Plan.optional
-      attribute :obligation, Events::VerificationObligationCreatedV1.optional
+      Obligation = Types.Instance(Events::VerificationObligationCreatedV2) |
+        Types.Instance(VerificationObligations::DefinitionV2)
+
+      attribute :obligation, Obligation.optional
 
       def self.created(plan, obligation)
         new(outcome: "created", plan:, obligation:)

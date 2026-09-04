@@ -14,8 +14,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordRepositoryIntegratio
     first = operation.call(input).value!
     replay = operation.call(input)
     events = lifecycle_events(prepared)
-    integration = events.last
+    integration = events.select { _1.type == "RepositoryIntegrationRecorded" }.sole
+    merge_link = events.select { _1.type == "RepositoryIntegrationMergeLinked" }.sole
     payload = ReleaseSetScenario.load(integration)
+    link_payload = ReleaseSetScenario.load(merge_link)
 
     expect(first).to be_a(Coordinator::Write::CommandResultV1)
     expect(replay.failure.code).to eq(:release_integration_attempt_reused)
@@ -24,8 +26,16 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordRepositoryIntegratio
       member_position: 1,
       attempt_number: 1,
       outcome: "integrated",
-      evidence_status: "attributed_unverified"
+      failure: nil
     )
+    expect(link_payload.merge_observation).to eq(
+      Coordinator::Write::EventReference.new(input.fetch(:merge_observation_event))
+    )
+    expect(integration.metadata).to include(
+      "integration_digest" => first.data.integration_digest,
+      "observation_digest" => input.fetch(:observation_digest)
+    )
+    expect(integration.data).not_to have_key("recorded_at")
     expect(integration.correlation_id).to eq(prepared.fetch(:event).correlation_id)
     expect(integration.markers).to include(
       "release-set:REL-integration-success",
@@ -87,16 +97,16 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordRepositoryIntegratio
     ReleaseSetScenario.record_activation(
       prepared, verification:, prefix: "integration-after-activation"
     )
-    integration = integrations.first.fetch(:payload)
+    integration = integrations.first.fetch(:input)
     input = {
       command_id: "cmd-release-integrate-after-activation",
       actor: { kind: "agent", id: "release-integrator-1" },
       release_set_id: prepared.dig(:input, :release_set_id),
-      repository_id: integration.repository_id,
+      repository_id: integration.fetch(:repository_id),
       attempt_id: "release-attempt-after-activation",
       outcome: "integrated",
-      merge_observation_event: integration.merge_observation_event.to_h,
-      observation_digest: integration.observation_digest,
+      merge_observation_event: integration.fetch(:merge_observation_event),
+      observation_digest: integration.fetch(:observation_digest),
       failure: nil
     }
 
@@ -142,7 +152,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordRepositoryIntegratio
       attempt_id: "release-attempt-#{prefix}-#{index + 1}",
       outcome: "integrated",
       merge_observation_event: observation.fetch(:completion).data.observation_event.to_h,
-      observation_digest: observation.fetch(:payload).observation_digest,
+      observation_digest: observation.fetch(:completion).data.observation_digest,
       failure: nil
     }
   end
@@ -153,8 +163,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordRepositoryIntegratio
       summary: "The external integration reported a merge conflict.",
       producer: { name: "release-adapter", version: "1.0.0" },
       run_id: "failed-integration-run-1",
-      result_digest: "sha256:#{'d' * 64}",
-      occurred_at: "2026-08-24T19:30:00.000000Z"
+      result_digest: "sha256:#{'d' * 64}"
     }
   end
 

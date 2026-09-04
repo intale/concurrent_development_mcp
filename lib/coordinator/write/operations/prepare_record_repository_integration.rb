@@ -38,7 +38,7 @@ module Coordinator::Write
       def integration_failure(attributes)
         return unless attributes
 
-        ReleaseSets::IntegrationFailureV1.new(
+        ReleaseSets::IntegrationFailureV2.new(
           **attributes,
           producer: ReleaseSets::EvidenceProducerV1.new(attributes.fetch(:producer))
         )

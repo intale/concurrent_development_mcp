@@ -14,7 +14,7 @@ Feature: Attributed Candidate checkpoints
       Then the Candidate Task completes with an attributed unverified checkpoint
       And Candidate "CAN-CUC-SUCCESS" has one traced atomic checkpoint with manifest and build context
       And Candidate "CAN-CUC-SUCCESS" is honestly not observed before projection
-      When the Candidate "CAN-CUC-SUCCESS" evidence and Attempt attachment reach the read side
+      When the Candidate "CAN-CUC-SUCCESS" evidence and Attempt context reach the read side
       Then available Candidate "CAN-CUC-SUCCESS" preserves evidence and Attempt context without a freshness claim
 
     Scenario: Exact command replay returns the original checkpoint without duplicate facts
@@ -22,7 +22,7 @@ Feature: Attributed Candidate checkpoints
       When the agent submits Candidate "CAN-CUC-REPLAY" with command "cmd-cuc-can-replay" at head "b" without build context
       And the exact Candidate command is retried through its original Task
       Then the replayed Candidate Task exposes the same result
-      And Candidate "CAN-CUC-REPLAY" has one submission, manifest, head registration, attachment, and successful command lifecycle
+      And Candidate "CAN-CUC-REPLAY" has one submission, manifest, head registration, and successful command lifecycle
 
   Rule: Invalid observations never create partial Candidate authority
 
@@ -52,7 +52,7 @@ Feature: Attributed Candidate checkpoints
       When Candidate "CAN-CUC-LAG-OLD" at head "b" is submitted and fully projected
       And newer Candidate "CAN-CUC-LAG-NEW" at head "e" commits without projection
       Then the prior Candidate history and Attempt checkpoint remain available while the newer Candidate is unobserved
-      When the Candidate "CAN-CUC-LAG-NEW" evidence and Attempt attachment reach the read side
+      When the Candidate "CAN-CUC-LAG-NEW" evidence and Attempt context reach the read side
       Then Candidate history includes both checkpoints and Attempt context points to "CAN-CUC-LAG-NEW" without a freshness claim
 
     Scenario: Concurrent Candidates for one repository head have one complete owner

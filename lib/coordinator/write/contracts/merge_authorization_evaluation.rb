@@ -64,9 +64,8 @@ module Coordinator::Write
         registration_valid &&
           evidence.verification_event == binding.verification_event &&
           verification.verification_digest == binding.verification_digest &&
-          verification.merge_snapshot_id == registration.merge_snapshot_id &&
-          verification.snapshot.snapshot == registration &&
-          verification.snapshot.event == evidence.registration_event
+          verification.verified.merge_snapshot_id == registration.merge_snapshot_id &&
+          verification.selected.merge_snapshot_id == registration.merge_snapshot_id
       end
 
       def expected_policy_matches?(expected, current)

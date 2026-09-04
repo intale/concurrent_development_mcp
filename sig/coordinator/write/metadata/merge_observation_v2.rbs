@@ -1,0 +1,6 @@
+module Coordinator::Write
+  module Metadata
+    class MergeObservationV2 < EventMetadata
+    end
+  end
+end

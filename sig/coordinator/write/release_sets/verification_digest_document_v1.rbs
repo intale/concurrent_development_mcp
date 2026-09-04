@@ -5,7 +5,7 @@ module Coordinator::Write::ReleaseSets
     def release_digest: () -> String
     def attempt_number: () -> Integer
     def integration_events: () -> Array[Coordinator::Write::EventReference]
-    def evidence: () -> VerificationEvidenceV1
+    def evidence: () -> VerificationEvidenceV2
     def policy_version: () -> String
   end
 end

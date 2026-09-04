@@ -12,47 +12,45 @@ module Coordinator::Write
           @stream_factory = stream_factory
         end
 
-        def call(state:, command:, decision_change:, started_at:)
+        def call(state:, command:, decision_change:)
           return already_decided(state, command) unless state.absent?
 
-          event = event_for(command, decision_change, started_at)
+          events = events_for(command, decision_change)
           Success(
             EventPlan.new(
-              writes: [
+              writes: events.map do |event|
                 EventWrite.new(
                   stream: @stream_factory.agent_choice_impact_scan(command.scan_id),
                   event:
                 )
-              ]
+              end
             )
           )
         end
 
         private
 
-        def event_for(command, decision_change, started_at)
+        def events_for(command, decision_change)
           reason = skip_reason(decision_change.retroactivity)
-          return skipped_event(command, decision_change, reason, started_at) if reason
-
-          Events::AgentChoiceImpactScanStartedV1.new(
-            scan_id: command.scan_id,
-            decision_change:,
-            from_position: 0,
-            to_position: decision_change.source_global_position,
-            page_size: PAGE_SIZE,
-            policy_version: command.policy_version,
-            started_at:
-          )
-        end
-
-        def skipped_event(command, decision_change, reason, started_at)
-          Events::AgentChoiceImpactScanSkippedV1.new(
-            scan_id: command.scan_id,
-            decision_change:,
-            reason:,
-            policy_version: command.policy_version,
-            skipped_at: started_at
-          )
+          lifecycle = if reason
+            Events::AgentChoiceImpactScanSkippedV2.new(scan_id: command.scan_id, reason:)
+          else
+            Events::AgentChoiceImpactScanStartedV2.new(
+              scan_id: command.scan_id,
+              decision_change:,
+              from_position: 0,
+              to_position: decision_change.source_global_position,
+              page_size: PAGE_SIZE
+            )
+          end
+          [
+            lifecycle,
+            Events::AgentChoiceImpactScanSourceLinkedV1.new(
+              scan_id: command.scan_id,
+              role: "decision_change",
+              source: decision_change.source_event
+            )
+          ]
         end
 
         def skip_reason(retroactivity)

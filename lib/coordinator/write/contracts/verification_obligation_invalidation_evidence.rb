@@ -5,37 +5,45 @@ module Coordinator::Write
     class VerificationObligationInvalidationEvidence < Dry::Validation::Contract
       params do
         required(:command).value(Types.Instance(Commands::InvalidateVerificationObligation))
-        required(:obligation).value(Types.Instance(CandidateObligations::PersistedEventV1))
+        required(:obligation).value(Types.Instance(VerificationObligations::LoadedDefinitionV2))
         required(:superseding_partition).value(Types.Instance(CandidateObligations::PersistedEventV1))
       end
 
       rule(:command, :obligation, :superseding_partition) do
         command = values[:command]
-        obligation = values[:obligation]
+        loaded = values[:obligation]
         superseding = values[:superseding_partition]
-        creation = obligation.payload
+        definition = loaded.definition
         partition = superseding.payload
         failures = []
-        failures << "obligation reference must resolve exactly" unless obligation.reference == command.obligation_event
-        failures << "obligation payload must match the command" unless creation.is_a?(Events::VerificationObligationCreatedV1) && creation.obligation_id == command.obligation_id
+        failures << "obligation reference must resolve exactly" unless loaded.reference == command.obligation_event
+        failures << "obligation identity must match the command" unless definition.obligation_id == command.obligation_id
         failures << "superseding partition reference must resolve exactly" unless superseding.reference == command.superseding_partition_event
-        failures << "superseding event must be a DecisionPartitionAdvanced fact" unless partition.is_a?(Events::DecisionPartitionAdvancedV1)
-        failures << "superseding event must be the matching Candidate partition" unless matching_candidate_partition?(creation, partition)
+        unless partition.is_a?(Events::DecisionPartitionAdvancedV1) ||
+               partition.is_a?(Events::DecisionAddedToPartitionV1) ||
+               partition.is_a?(Events::DecisionRemovedFromPartitionV1)
+          failures << "superseding event must be a Decision partition membership fact"
+        end
+        failures << "superseding event must be the matching Candidate partition" unless matching_candidate_partition?(definition, partition)
         failures.each { key(:command).failure(_1) }
       end
 
       private
 
-      def matching_candidate_partition?(creation, partition_event)
-        return false unless creation.is_a?(Events::VerificationObligationCreatedV1)
-        return false unless partition_event.is_a?(Events::DecisionPartitionAdvancedV1)
+      def matching_candidate_partition?(definition, partition_event)
+        prior = definition.policy.partition_event
+        partition_id = if partition_event.is_a?(Events::DecisionPartitionAdvancedV1)
+          current = partition_event.partition
+          return false unless current.topic_root == "candidate" &&
+                              current.anchor_kind == "changeset" &&
+                              current.anchor_id == definition.change_set_id
 
-        prior = creation.policy.partition_event
-        current = partition_event.partition
-        current.topic_root == "candidate" &&
-          current.anchor_kind == "changeset" &&
-          current.anchor_id == creation.change_set_id &&
-          current.partition_id == prior.stream_id &&
+          current.partition_id
+        else
+          partition_event.partition_id
+        end
+        partition_id == "changeset:#{definition.change_set_id}:candidate" &&
+          partition_id == prior.stream_id &&
           prior.stream_context == "HumanGuidance" &&
           prior.stream_name == "DecisionPartition"
       end

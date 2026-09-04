@@ -21,8 +21,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::VerificationObligationVa
     completed = scan_event(corrected, "VerificationObligationValidityScanCompleted")
     expect(load(invalidated)).to have_attributes(
       obligation_id: created.fetch(:payload).obligation_id,
-      superseding_partition_event: reference(corrected.fetch(:partition_event)),
-      previous_status: "open"
+      reason: "policy_partition_advanced"
     )
     expect(scan_events(corrected).map(&:type)).to contain_exactly(
       "VerificationObligationValidityScanStarted",
@@ -63,8 +62,10 @@ RSpec.describe Coordinator::Processes::ProcessManagers::VerificationObligationVa
     process_manager.call(created.fetch(:event))
 
     invalidated = invalidation_events(created).sole
-    expect(load(invalidated).superseding_partition_event)
-      .to eq(reference(corrected.fetch(:partition_event)))
+    expect(load(invalidated)).to have_attributes(
+      obligation_id: created.fetch(:payload).obligation_id,
+      reason: "policy_partition_advanced"
+    )
     step = process_step(
       source_event: created.fetch(:event),
       step_name: "invalidate-obligation",
@@ -95,6 +96,8 @@ RSpec.describe Coordinator::Processes::ProcessManagers::VerificationObligationVa
         ],
         event_types: %w[
           DecisionPartitionAdvanced
+          DecisionAddedToPartition
+          DecisionRemovedFromPartition
           VerificationObligationCreated
           VerificationObligationValidityScanStarted
           VerificationObligationValidityScanProgressed
@@ -113,18 +116,20 @@ RSpec.describe Coordinator::Processes::ProcessManagers::VerificationObligationVa
     process_manager.call(started)
     progressed = scan_event(corrected, "VerificationObligationValidityScanProgressed")
     process_manager.call(progressed)
-    completed = load(scan_event(corrected, "VerificationObligationValidityScanCompleted"))
+    completed_event = scan_event(corrected, "VerificationObligationValidityScanCompleted")
+    completed = load(completed_event)
 
     expect(load(progressed)).to have_attributes(
       page_number: 1,
-      page_obligation_count: 50,
-      total_obligation_count: 50
+      next_from_position: be_positive,
+      change_set_id: created.dig(:pair, :ids, :change_set_id),
+      page_size: 50
     )
-    expect(completed).to have_attributes(
-      page_count: 2,
-      page_obligation_count: 1,
-      total_obligation_count: 51
+    expect(completed).to have_attributes(scan_id: completed_event.stream.stream_id)
+    snapshot = Coordinator::Write::VerificationObligationValidityScans::ScanLoader.new(event_store:).call(
+      completed_event.stream.stream_id
     )
+    expect(snapshot.state).to have_attributes(status: "completed", page_count: 2)
     expect(obligation_ids.sum { invalidation_events_for(_1).length }).to eq(51)
   end
 
@@ -182,28 +187,73 @@ RSpec.describe Coordinator::Processes::ProcessManagers::VerificationObligationVa
 
   def seed_obligation_clones(created, count:)
     factory = Coordinator::Write::EventFactory.new
-    metadata = Coordinator::Write::EventMetadata.new(
+    ids = Coordinator::Shared::IdGenerator.new
+    definition = created.fetch(:payload)
+    common_metadata = {
       command_id: "seed-validity-page",
       actor_kind: "system",
       actor_id: "candidate-impact-obligation-policy",
       recorded_by: "coordinator",
       policy_version: "candidate-compatibility-obligation/v1"
-    )
-    Array.new(count) do |index|
-      obligation_id = "verification-obligation-v1:validity-page-#{index}"
-      payload = created.fetch(:payload).new(obligation_id:)
-      physical = factory.build!(
-        event: payload,
-        event_id: Coordinator::Shared::IdGenerator.new.uuid_v7,
-        metadata:,
-        markers: [
-          "verification-obligation:#{obligation_id}",
-          "change-set:#{payload.change_set_id}"
-        ]
-      )
-      event_store.append(streams.verification_obligation(obligation_id), [ physical ])
-      obligation_id
+    }
+    clones = Array.new(count) do
+      obligation_id = ids.uuid_v7
+      events = [
+        Coordinator::Write::Events::VerificationObligationCreatedV2.new(
+          obligation_id:,
+          kind: definition.kind,
+          reasons: definition.reasons.map(&:kind),
+          required_evidence: definition.required_evidence,
+          enforcement: definition.enforcement
+        ),
+        Coordinator::Write::Events::VerificationObligationAddedToChangeSetV1.new(
+          obligation_id:,
+          change_set_id: definition.change_set_id
+        ),
+        Coordinator::Write::Events::VerificationObligationSourceCandidateAssignedV1.new(
+          obligation_id:,
+          candidate_id: definition.source_candidate.candidate_id
+        ),
+        Coordinator::Write::Events::VerificationObligationTargetCandidateAssignedV1.new(
+          obligation_id:,
+          candidate_id: definition.target_candidate.candidate_id
+        )
+      ]
+      correlation_id = ids.uuid_v7
+      parent = nil
+      physical = events.map.with_index do |event, index|
+        metadata = if index.zero?
+          Coordinator::Write::Metadata::VerificationObligationV2.new(
+            **common_metadata,
+            policy: definition.policy,
+            rule_version: definition.rule_version,
+            validity_input_digest: definition.validity_input_digest
+          )
+        else
+          Coordinator::Write::EventMetadata.new(**common_metadata)
+        end
+        built = factory.build!(
+          event:,
+          event_id: ids.uuid_v7,
+          metadata:,
+          markers: [
+            "verification-obligation:#{obligation_id}",
+            "change-set:#{definition.change_set_id}"
+          ],
+          caused_by: parent,
+          correlation_id:
+        )
+        parent = built
+        built
+      end
+      [ obligation_id, physical ]
     end
+    event_store.multiple do
+      clones.each do |obligation_id, events|
+        event_store.append(streams.verification_obligation(obligation_id), events)
+      end
+    end
+    clones.map(&:first)
   end
 
   def load(event)

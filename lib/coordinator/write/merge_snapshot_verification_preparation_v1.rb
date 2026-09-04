@@ -6,7 +6,7 @@ module Coordinator::Write
     attribute :submitted_at, Types::Timestamp
     attribute :input_digest, Types::Sha256Digest
     attribute :submission_event_id, Types::UuidV7
-    attribute :verified_event_id, Types::UuidV7
+    attribute :assignment_event_id, Types::UuidV7
     attribute :correlation_id, Types::UuidV7
   end
 end

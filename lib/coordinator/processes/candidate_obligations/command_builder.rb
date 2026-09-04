@@ -70,7 +70,7 @@ module Coordinator::Processes
           policy_partition_event: trigger.partition_event,
           policy_head: trigger.head,
           from_revision: 0,
-          to_revision: registration_reference.stream_revision - 1,
+          to_revision: registration.global_position - 1,
           page_size: PAGE_SIZE,
           index_policy_version: INDEX_POLICY_VERSION,
           rule_version: PAIR_RULE_VERSION

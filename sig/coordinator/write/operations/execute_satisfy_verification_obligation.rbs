@@ -1,0 +1,13 @@
+module Coordinator::Write
+  module Operations
+    class ExecuteSatisfyVerificationObligation
+      @executor: untyped
+
+      @decider: untyped
+
+      def initialize: (event_store: untyped, ?executor: untyped, ?decider: untyped) -> void
+
+      def call: (untyped command, ?caused_by: untyped?) -> untyped
+    end
+  end
+end

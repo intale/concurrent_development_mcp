@@ -5,7 +5,7 @@ module Coordinator::Write
     class StartCandidateImpactRegistrySweep < Value
       attribute :command_id, Types::Identifier
       attribute :actor, Actor
-      attribute :scan_id, Types::Identifier
+      attribute :scan_id, Types::UuidV7
       attribute :change_set_id, Types::Identifier
       attribute :policy_partition_event, EventReference
       attribute :policy_head, Decisions::DecisionHeadV1

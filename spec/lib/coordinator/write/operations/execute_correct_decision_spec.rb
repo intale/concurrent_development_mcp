@@ -50,7 +50,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
       "decision_revision" => 4
     )
     partition_history = partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing")
-    expect(partition_history.map(&:stream_revision)).to eq([ 0 ])
+    expect(partition_history.map(&:stream_revision)).to eq([ 0, 1, 2 ])
     expect(partition_decision_ids(partition_history)).to eq([ "D-1" ])
     expect(original.value!.data).to have_attributes(
       outcome: "corrected",
@@ -171,7 +171,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
         DecisionDefinitionCorrected
       ]
     )
-    expect(partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing").map(&:stream_revision)).to eq([ 0 ])
+    expect(partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing").map(&:stream_revision)).to eq([ 0, 1, 2 ])
   end
 
   it "implements DEC-02A-PARTITION-LIMIT-01 over the old/new partition union" do
@@ -229,7 +229,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
       )
     )
     expect(corrected.definition.value.items).to eq(%w[combined_tests security_review])
-    expect(partition_events("changeset:CS-impact-policy:candidate").map(&:stream_revision)).to eq([ 0 ])
+    expect(partition_events("changeset:CS-impact-policy:candidate").map(&:stream_revision)).to eq([ 0, 1, 2 ])
     expect(partition_decision_ids(partition_events("changeset:CS-impact-policy:candidate"))).to eq([ "D-1" ])
   end
 

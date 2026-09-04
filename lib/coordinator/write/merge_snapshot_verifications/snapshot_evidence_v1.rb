@@ -3,7 +3,7 @@
 module Coordinator::Write
   module MergeSnapshotVerifications
     class SnapshotEvidenceV1 < Value
-      attribute :snapshot, Events::MergeSnapshotRegisteredV1
+      attribute :snapshot, MergeSnapshots::StateV2
       attribute :event, EventReference
     end
   end

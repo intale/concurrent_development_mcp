@@ -159,13 +159,13 @@ Feature: Dynamic write-set leases
 
     @CDM-ATTEMPT-003 @event-contract
     Scenario: A final Candidate prevents Attempt abandonment
-      Given agent "agent-a" has attached "final" Candidate "CAN-CUC-ABANDON" to active Attempt "A-CUC-CAN-ABANDON"
+      Given agent "agent-a" has submitted "final" Candidate "CAN-CUC-ABANDON" for active Attempt "A-CUC-CAN-ABANDON"
       When the agent tries to abandon the Candidate-bearing Attempt
       Then abandonment is denied without releasing leases or requeueing the WorkItem
 
     @CDM-ATTEMPT-004 @event-contract
     Scenario: An intermediate Candidate remains as history when its Attempt is abandoned
-      Given agent "agent-a" has attached "intermediate" Candidate "CAN-CUC-ABANDON" to active Attempt "A-CUC-CAN-ABANDON"
+      Given agent "agent-a" has submitted "intermediate" Candidate "CAN-CUC-ABANDON" for active Attempt "A-CUC-CAN-ABANDON"
       When the agent tries to abandon the Candidate-bearing Attempt
       Then the checkpoint remains recorded while the Attempt is abandoned and requeued
 

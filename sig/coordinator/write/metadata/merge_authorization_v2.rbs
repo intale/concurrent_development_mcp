@@ -1,0 +1,6 @@
+module Coordinator::Write
+  module Metadata
+    class MergeAuthorizationV2 < EventMetadata
+    end
+  end
+end

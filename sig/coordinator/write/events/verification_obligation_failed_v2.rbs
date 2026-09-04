@@ -1,0 +1,6 @@
+module Coordinator::Write
+  module Events
+    class VerificationObligationFailedV2 < Base
+    end
+  end
+end

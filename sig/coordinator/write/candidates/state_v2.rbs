@@ -1,0 +1,29 @@
+module Coordinator::Write
+  module Candidates
+    class StateV2 < Coordinator::Shared::Value
+      def candidate_id: () -> String
+      def change_set_id: () -> String
+      def work_item_id: () -> String
+      def attempt_id: () -> String
+      def agent_id: () -> String
+      def repository_id: () -> String
+      def target_branch: () -> String
+      def object_format: () -> String
+      def base_commit_oid: () -> String
+      def head_commit_oid: () -> String
+      def checkpoint_kind: () -> String
+      def intention_set_id: () -> String
+      def manifest_digest: () -> String
+      def build_context_digest: () -> String?
+      def manifest: () -> Coordinator::Write::Events::CandidateChangeManifestCapturedV2
+      def build_context: () -> Coordinator::Write::Events::CandidateBuildContextCapturedV2?
+      def submission_event: () -> Coordinator::Write::EventReference
+      def manifest_event: () -> Coordinator::Write::EventReference
+      def build_context_event: () -> Coordinator::Write::EventReference?
+      def surface_id: () -> String?
+      def surface_assignment_event: () -> Coordinator::Write::EventReference?
+      def latest_revision: () -> Integer
+      def evidence_status: () -> String
+    end
+  end
+end

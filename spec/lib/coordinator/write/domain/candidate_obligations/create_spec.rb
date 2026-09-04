@@ -22,40 +22,39 @@ RSpec.describe Coordinator::Write::Domain::CandidateObligations::Create do
   end
   let(:command) { CandidateObligationExamples.command(source:, target:) }
 
-  it "IMP-02-GATE-01 creates one exact open compatibility obligation" do
+  it "IMP-02-GATE-01 creates four cohesive compatibility-obligation facts" do
     decision = decide
 
     expect(decision).to have_attributes(outcome: "created")
-    expect(decision.plan.writes.sole).to have_attributes(
-      stream: have_attributes(
+    expect(decision.plan.writes).to all(
+      have_attributes(stream: have_attributes(
         context: "DevelopmentIntegration",
         stream_name: "VerificationObligation",
         stream_id: command.obligation_id
-      ),
-      event: decision.obligation
+      ))
     )
     expect(decision.obligation).to have_attributes(
       obligation_id: command.obligation_id,
       kind: "candidate_compatibility",
-      status: "open",
-      change_set_id: "CS-obligation",
-      source_candidate: source.subject,
-      target_candidate: target.subject,
       required_evidence: %w[combined_tests contract_compatibility_review],
-      enforcement: "merge_gate",
-      rule_version: CandidateObligationExamples::RULE_VERSION,
-      created_at: CandidateObligationExamples::TIMESTAMP
+      enforcement: "merge_gate"
     )
-    expect(decision.obligation.reasons.map(&:kind)).to eq(%w[
+    expect(decision.obligation.reasons).to eq(%w[
       observed_input_changed
       semantic_key_match
     ])
+    expect(decision.plan.events.drop(1)).to contain_exactly(
+      have_attributes(obligation_id: command.obligation_id, change_set_id: "CS-obligation"),
+      have_attributes(obligation_id: command.obligation_id, candidate_id: source.subject.candidate_id),
+      have_attributes(obligation_id: command.obligation_id, candidate_id: target.subject.candidate_id)
+    )
   end
 
   it "IMP-02-DUPLICATE-01 replays an exact existing obligation" do
-    original = decide.obligation
+    created = decide.obligation
+    original = CandidateObligationExamples.definition(created:, source:, target:)
 
-    replay = decide(existing: original, created_at: "2026-08-23T19:00:00.000000Z")
+    replay = decide(existing: original)
 
     expect(replay).to have_attributes(
       outcome: "replayed",
@@ -92,8 +91,7 @@ RSpec.describe Coordinator::Write::Domain::CandidateObligations::Create do
     target: self.target,
     command: self.command,
     policy: CandidateObligationExamples.policy,
-    existing: nil,
-    created_at: CandidateObligationExamples::TIMESTAMP
+    existing: nil
   )
     state = Coordinator::Write::Domain::CandidateObligations::State.new(
       source:,
@@ -101,6 +99,6 @@ RSpec.describe Coordinator::Write::Domain::CandidateObligations::Create do
       policy:,
       existing:
     )
-    decider.call(state:, command:, created_at:).value!
+    decider.call(state:, command:).value!
   end
 end

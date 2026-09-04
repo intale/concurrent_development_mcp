@@ -25,8 +25,11 @@ module CandidateObligationScenario
       Coordinator::Write::Operations::ExecuteCreateCandidateCompatibilityObligation,
       invocation(pair:, policy:)
     )
-    event = obligation_events(result.obligation_id).sole
-    { pair:, policy:, result:, event:, payload: load(event) }
+    event = obligation_events(result.obligation_id).find { _1.type == "VerificationObligationCreated" }
+    definition = Coordinator::Write::VerificationObligations::DefinitionLoader.new(
+      event_store:
+    ).call(result.obligation_id).definition
+    { pair:, policy:, result:, event:, payload: definition }
   end
 
   def submit_pair(
@@ -444,6 +447,19 @@ module CandidateObligationScenario
     ).data
   end
 
+  def process_compatibility_outcome(receipt)
+    event = event_store.read(
+      streams.verification_obligation(receipt.obligation_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: [ "VerificationEvidenceSubmitted" ],
+        maximum_count: Coordinator::Write::Types::VERIFICATION_EVIDENCE_MAXIMUM_COUNT + 1,
+        direction: :asc
+      )
+    ).find { _1.id == receipt.evidence_event.event_id }
+    Coordinator::Processes::ProcessManagers::VerificationEvidenceOutcome.new(event_store:).call(event)
+    receipt
+  end
+
   def verification_history(obligation_id)
     event_store.read(
       streams.verification_obligation(obligation_id),
@@ -588,10 +604,12 @@ module CandidateObligationScenario
   end
 
   def registry_events(change_set_id)
-    event_store.read(
-      streams.candidate_impact_registry(change_set_id),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "CandidateImpactSurfaceRegistered" ],
+    event_store.read_global_marked(
+      Coordinator::Write::GlobalMarkedEventReadCriteria.new(
+        stream_context: "DevelopmentIntegration",
+        stream_name: "Candidate",
+        event_types: [ "CandidateImpactSurfaceAssigned" ],
+        markers: [ "change-set:#{change_set_id}" ],
         maximum_count: 8,
         direction: :asc
       )
@@ -610,10 +628,10 @@ module CandidateObligationScenario
   end
 
   def current_partition(change_set_id)
-    event_store.read_grouped(
+    event_store.read(
       streams.decision_partition("changeset:#{change_set_id}:candidate"),
-      Coordinator::Write::EventQueries::DECISION_PARTITION_LATEST
-    ).first
+      Coordinator::Write::EventQueries::DECISION_PARTITION_STATE
+    ).last
   end
 
   def execute(operation_class, input)

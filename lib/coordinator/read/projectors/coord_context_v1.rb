@@ -3,9 +3,10 @@
 module Coordinator::Read
   module Projectors
     class CoordContextV1
-      PROJECTION = ProjectionDefinition.new(name: "coord_context", version: 3)
+      PROJECTION = ProjectionDefinition.new(name: "coord_context", version: 4)
 
       def initialize(
+        submission_loader:,
         contract: Contracts::CoordContextSourceEvent.new,
         schema_registry: Coordinator::Write::EventSchemaRegistry.new,
         reducer: Projections::CoordContextReducer.new,
@@ -15,6 +16,7 @@ module Coordinator::Read
         processed_events: Repositories::ProcessedProjectionEvents.new
       )
         @contract = contract
+        @submission_loader = submission_loader
         @schema_registry = schema_registry
         @reducer = reducer
         @state_loader = state_loader
@@ -26,6 +28,7 @@ module Coordinator::Read
       def call(event)
         payload = load_payload(event)
         verify_stream_identity!(event, payload)
+        source = expand_source(event, payload)
         identity = ProjectionEventIdentity.from_event(event)
         processed_at = Time.now.utc
 
@@ -36,11 +39,11 @@ module Coordinator::Read
             processed_at:
           )
 
-          record = locked_record(payload.change_set_id, processed_at:)
+          record = locked_record(source.change_set_id, processed_at:)
           rebuild = record.persisted? && record.projection_version != PROJECTION.version
           state = rebuild ? Projections::CoordContextStateV1.initial : load_state(record)
           positions = rebuild ? [ identity.barrier ] : update_source_positions(record, identity.barrier)
-          updated = @reducer.apply(state, payload)
+          updated = @reducer.apply(state, source)
 
           record.assign_attributes(
             projection_version: PROJECTION.version,
@@ -49,8 +52,8 @@ module Coordinator::Read
             last_processed_at: processed_at
           )
           record.save!
-          @contexts.store_attempt_event(event:, payload:)
-          persist_scope_roots(@scope_roots_builder.call(payload))
+          @contexts.store_attempt_event(event:, payload: source)
+          persist_scope_roots(@scope_roots_builder.call(source))
         end
 
         nil
@@ -59,6 +62,12 @@ module Coordinator::Read
       private
 
       def verify_stream_identity!(event, payload)
+        if payload.is_a?(Coordinator::Write::Events::CandidateSubmittedV3)
+          return if event.stream.stream_id == payload.candidate_id
+
+          raise InvalidProjectionSource, "Candidate identity does not match its source stream"
+        end
+
         expected_attempt_id =
           case payload
           when Coordinator::Write::Events::AttemptAuthorizedV1,
@@ -68,7 +77,6 @@ module Coordinator::Read
                Coordinator::Write::Events::WriteSetExpandedV2,
                Coordinator::Write::Events::WriteSetRenewedV2,
                Coordinator::Write::Events::WriteSetReleasedV2,
-               Coordinator::Write::Events::CandidateAttachedToAttemptV1,
                Coordinator::Write::Events::AttemptCompletedV1
             payload.attempt_id
           end
@@ -76,6 +84,17 @@ module Coordinator::Read
         return if event.stream.stream_id == expected_attempt_id
 
         raise InvalidProjectionSource, "Attempt identity does not match its source stream"
+      end
+
+      def expand_source(event, payload)
+        return payload unless payload.is_a?(Coordinator::Write::Events::CandidateSubmittedV3)
+
+        source = @submission_loader.call(payload.candidate_id)
+        unless source.candidate_id == payload.candidate_id && source.submitted_event.id == event.id
+          raise InvalidProjectionSource, "Candidate submission evidence does not match its terminal fact"
+        end
+
+        source
       end
 
       def load_payload(event)

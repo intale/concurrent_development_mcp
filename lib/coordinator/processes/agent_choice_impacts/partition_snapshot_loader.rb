@@ -8,13 +8,15 @@ module Coordinator::Processes
         stream_factory: Coordinator::Write::StreamFactory.new,
         schema_registry: Coordinator::Write::EventSchemaRegistry.new,
         reference_builder: EventReferenceBuilder.new,
-        contract: Contracts::AgentChoiceImpactPartitionSnapshot.new
+        contract: Contracts::AgentChoiceImpactPartitionSnapshot.new,
+        partition_state_loader: Coordinator::Write::Decisions::PartitionStateLoader.new(event_store:)
       )
         @event_store = event_store
         @stream_factory = stream_factory
         @schema_registry = schema_registry
         @reference_builder = reference_builder
         @contract = contract
+        @partition_state_loader = partition_state_loader
       end
 
       def call(partition)
@@ -25,11 +27,12 @@ module Coordinator::Processes
         return empty_observation(partition) unless event
 
         payload = load(event)
+        state = @partition_state_loader.call(partition)
         observation = Coordinator::Write::DecisionContexts::PartitionObservationV1.new(
           partition:,
           partition_revision: event.stream_revision,
           event: @reference_builder.call(event),
-          active_decisions: payload.active_decisions
+          active_decisions: state.active_decisions
         )
         verify!(partition, event, payload, observation)
         observation

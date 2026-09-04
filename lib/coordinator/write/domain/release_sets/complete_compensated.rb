@@ -6,34 +6,32 @@ module Coordinator::Write
       class CompleteCompensated
         include Dry::Monads[:result]
 
-        def initialize(
-          stream_factory: StreamFactory.new,
-          digest_builder: Coordinator::Write::ReleaseSets::CompletionDigestBuilder.new
-        )
+        def initialize(stream_factory: StreamFactory.new)
           @stream_factory = stream_factory
-          @digest_builder = digest_builder
         end
 
-        def call(state:, command:, completed_at:)
+        def call(state:, command:)
           denial = denied(state:, command:)
           return denial if denial
 
-          preparation = state.preparation.payload
-          attributes = {
-            release_set_id: command.release_set_id,
-            release_digest: preparation.release_digest,
-            outcome: "compensated",
-            source_event: command.compensation_request_event,
-            compensation_evidence: command.evidence,
-            rule_version: command.rule_version
-          }
-          event = Events::ReleaseSetCompletedV1.new(
-            **attributes,
-            change_set_id: preparation.change_set_id,
-            completion_digest: @digest_builder.call(**attributes),
-            completed_at:
+          stream = @stream_factory.release_set(command.release_set_id)
+          Success(
+            EventPlan.new(
+              writes: [
+                EventWrite.new(
+                  stream:,
+                  event: Events::ReleaseSetOutcomeRecordedV1.new(
+                    release_set_id: command.release_set_id,
+                    outcome: "compensated"
+                  )
+                ),
+                EventWrite.new(
+                  stream:,
+                  event: Events::ReleaseSetCompletedV2.new(release_set_id: command.release_set_id)
+                )
+              ]
+            )
           )
-          Success(EventPlan.new(writes: [ EventWrite.new(stream: @stream_factory.release_set(command.release_set_id), event:) ]))
         end
 
         private
@@ -46,19 +44,19 @@ module Coordinator::Write
           unless command.compensation_request_event == request.event
             return failure(:release_compensation_request_binding_stale, "Completion does not bind the exact compensation request")
           end
-          unless evidence_bindings(state, command.evidence) == expected_bindings(state, request)
+          unless evidence_bindings(command.evidence) == expected_bindings(state, request)
             return failure(:release_compensation_evidence_mismatch, "Compensation evidence must cover each exact integrated member in order")
           end
 
           nil
         end
 
-        def evidence_bindings(_state, evidence)
+        def evidence_bindings(evidence)
           evidence.map { [ _1.repository_id, _1.integration_event ] }
         end
 
         def expected_bindings(state, request)
-          request.payload.successful_integrations.map do |reference|
+          request.successful_integrations.map do |reference|
             integration = state.integrations.find { _1.event == reference }
             [ integration&.payload&.repository_id, reference ]
           end

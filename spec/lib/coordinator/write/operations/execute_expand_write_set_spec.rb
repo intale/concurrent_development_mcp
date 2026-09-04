@@ -30,7 +30,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_sto
     expect(result.value!.emitted_events.map(&:type)).not_to include("WriteSetExpanded")
   end
 
-  it "treats already-linked resources as an idempotent no-change decision" do
+  it "rejects already-linked resources as the same idempotent no-change decision" do
     reservation = setup_reservation
     input = expand_input(
       reservation,
@@ -41,11 +41,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_sto
     first = operation.call(input)
     second = operation.call(input)
 
-    expect(first).to be_success
-    expect(second).to be_success
-    expect(first.value!.data).to have_attributes(added_resources: [], resource_count: 1)
-    expect(first.value!.emitted_events).to be_empty
-    expect(second.value!.emitted_events).to be_empty
+    expect(first.failure).to have_attributes(code: :write_set_unchanged)
+    expect(second.failure).to have_attributes(code: :write_set_unchanged)
     expect(read_set(reservation.receipt.lease_set_id).length).to eq(2)
   end
 

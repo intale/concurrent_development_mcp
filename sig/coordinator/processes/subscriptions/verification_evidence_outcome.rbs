@@ -1,0 +1,9 @@
+module Coordinator::Processes
+  module Subscriptions
+    class VerificationEvidenceOutcome < Coordinator::Shared::Subscriptions::Registration
+      DEFINITION: untyped
+
+      def initialize: (handler: untyped, ?pull_interval: ::Float) -> void
+    end
+  end
+end

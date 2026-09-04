@@ -12,12 +12,35 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
     expect(result).to be_success
     receipt = result.value!.data
     expect(receipt).to be_a(Coordinator::Write::CommandReceiptData::CandidateSubmission)
-    submission = candidate_events("CAN-V2").first
-    expect(submission).to have_attributes(type: "CandidateSubmitted", stream_revision: 0)
-    expect(submission.metadata).to include("schema_version" => 2, "policy_version" => "coordinator-resource-lease/v2")
-    expect(submission.data.fetch("lease_references").map { _1.fetch("resource_id") }).to eq(reservation.resource_ids)
-    expect(submission.data.to_s).not_to include("resource_key_hash")
-    expect(attempt_events.count { _1.type == "CandidateAttachedToAttempt" }).to eq(1)
+    events = candidate_events("CAN-V2")
+    expect(events.map(&:type)).to eq(%w[
+      CandidateCreated
+      CandidateAssignedToAttempt
+      CandidateAssignedToRepository
+      CandidateTargetBranchSelected
+      CandidateCommitRangeDeclared
+      CandidateCheckpointKindSelected
+      CandidateWorkIntentionSetAssigned
+      CandidateChangeManifestCaptured
+      CandidateSubmitted
+    ])
+    expect(events.map(&:stream_revision)).to eq((0..8).to_a)
+    intention = events.fetch(6)
+    expect(intention.data).to eq(
+      "candidate_id" => "CAN-V2",
+      "intention_set_id" => reservation.receipt.lease_set_id
+    )
+    expect(intention.metadata).to include(
+      "schema_version" => 1,
+      "policy_version" => "coordinator-resource-lease/v2"
+    )
+    manifest = events.fetch(7)
+    expect(manifest.metadata).to include(
+      "schema_version" => 2,
+      "manifest_digest" => receipt.manifest_digest
+    )
+    expect(events.fetch(8).data).to eq("candidate_id" => "CAN-V2")
+    expect(events.flat_map { _1.data.keys }).not_to include("lease_references", "resource_key_hash")
   end
 
   it "leaves replay ownership to the registered Command lifecycle and keeps an existing Candidate immutable" do
@@ -116,14 +139,4 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
     )
   end
 
-  def attempt_events
-    event_store.read(
-      streams.attempt("A-LSE-A"),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "CandidateAttachedToAttempt" ],
-        maximum_count: 1,
-        direction: :asc
-      )
-    )
-  end
 end

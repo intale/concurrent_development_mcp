@@ -1,0 +1,4 @@
+module Coordinator::Read
+  class ReleaseSetPreparationViewV2 < Coordinator::Shared::Value
+  end
+end

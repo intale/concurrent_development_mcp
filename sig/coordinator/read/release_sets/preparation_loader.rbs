@@ -1,0 +1,23 @@
+module Coordinator::Read
+  module ReleaseSets
+    interface _PreparationLoader
+      def call: (String release_set_id) -> Coordinator::Read::ReleaseSetPreparationViewV2?
+    end
+
+    class PreparationLoader
+      @event_store: untyped
+
+      @stream_factory: untyped
+
+      @schema_registry: untyped
+
+      def initialize: (event_store: untyped, ?stream_factory: untyped, ?schema_registry: untyped) -> void
+
+      def call: (untyped release_set_id) -> untyped
+
+      private
+
+      def load_event: (untyped event) -> untyped
+    end
+  end
+end

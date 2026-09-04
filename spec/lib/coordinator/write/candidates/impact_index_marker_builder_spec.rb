@@ -42,13 +42,33 @@ RSpec.describe Coordinator::Write::Candidates::ImpactIndexMarkerBuilder do
   end
 
   def evidence
-    Coordinator::Write::Candidates::ImpactSurfaceEvidenceV1.new(
-      submission:,
-      submission_event: reference("CandidateSubmitted", 0),
+    Coordinator::Write::Candidates::ImpactSurfaceEvidenceV2.new(candidate:)
+  end
+
+  def candidate
+    Coordinator::Write::Candidates::StateV2.new(
+      candidate_id: "CAN-index",
+      change_set_id: "CS-index",
+      work_item_id: "W-index",
+      attempt_id: "A-index",
+      agent_id: "agent-index",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      target_branch: "main",
+      object_format: "sha1",
+      base_commit_oid: "a" * 40,
+      head_commit_oid: "b" * 40,
+      checkpoint_kind: "final",
+      intention_set_id: "01919191-9191-7191-8191-919191919190",
+      manifest_digest: "sha256:#{"a" * 64}",
+      build_context_digest: "sha256:#{"b" * 64}",
       manifest:,
       manifest_event: reference("CandidateChangeManifestCaptured", 1),
       build_context:,
-      build_context_event: reference("CandidateBuildContextCaptured", 2)
+      build_context_event: reference("CandidateBuildContextCaptured", 2),
+      submission_event: reference("CandidateSubmitted", 3),
+      surface_id: nil,
+      surface_assignment_event: nil,
+      latest_revision: 3
     )
   end
 
@@ -63,40 +83,10 @@ RSpec.describe Coordinator::Write::Candidates::ImpactIndexMarkerBuilder do
     components
   end
 
-  def submission
-    Coordinator::Write::Events::CandidateSubmittedV2.new(
-      candidate_id: "CAN-index",
-      change_set_id: "CS-index",
-      work_item_id: "W-index",
-      attempt_id: "A-index",
-      agent_id: "agent-index",
-      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
-      target_branch: "main",
-      object_format: "sha1",
-      base_commit_oid: "a" * 40,
-      head_commit_oid: "b" * 40,
-      checkpoint_kind: "final",
-      lease_set_id: "01919191-9191-7191-8191-919191919191",
-      lease_policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
-      lease_references: [ lease_reference ],
-      manifest_digest: "sha256:#{"a" * 64}",
-      build_context_digest: "sha256:#{"b" * 64}",
-      evidence_status: "attributed_unverified",
-      submitted_at: "2026-08-23T17:00:00.000000Z"
-    )
-  end
-
   def manifest
-    Coordinator::Write::Events::CandidateChangeManifestCapturedV1.new(
+    Coordinator::Write::Events::CandidateChangeManifestCapturedV2.new(
       candidate_id: "CAN-index",
-      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
-      target_branch: "main",
-      object_format: "sha1",
-      base_commit_oid: "a" * 40,
-      head_commit_oid: "b" * 40,
       evidence_revision: 1,
-      policy_version: "candidate-change-manifest/v1",
-      manifest_digest: "sha256:#{"a" * 64}",
       files: [ Coordinator::Write::Candidates::ManifestFileV1.new(
         status: "modified",
         old_path: "Gemfile",
@@ -105,49 +95,28 @@ RSpec.describe Coordinator::Write::Candidates::ImpactIndexMarkerBuilder do
         new_blob_oid: "d" * 40,
         old_mode: "100644",
         new_mode: "100644"
-      ) ],
-      collector: collector,
-      captured_at: "2026-08-23T17:00:00.000000Z"
+      ) ]
     )
   end
 
   def build_context
-    Coordinator::Write::Events::CandidateBuildContextCapturedV1.new(
+    Coordinator::Write::Events::CandidateBuildContextCapturedV2.new(
       candidate_id: "CAN-index",
-      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
-      object_format: "sha1",
-      head_commit_oid: "b" * 40,
       evidence_revision: 1,
-      policy_version: "candidate-build-context/v1",
-      build_context_digest: "sha256:#{"b" * 64}",
       inputs: [ Coordinator::Write::Candidates::BuildInputV1.new(
         kind: "toolchain_config",
         path: "config/database.yml",
         blob_oid: "e" * 40
       ) ],
-      environment: [],
-      dependency_graph_digest: nil,
-      test_environment_digest: nil,
-      collector: collector,
-      captured_at: "2026-08-23T17:00:00.000000Z"
+      environment: []
     )
   end
 
   def surface
-    Coordinator::Write::Events::CandidateImpactSurfaceDerivedV1.new(
+    Coordinator::Write::Events::CandidateImpactSurfaceDerivedV2.new(
+      surface_id: "01919191-9191-7191-8191-919191919194",
       candidate_id: "CAN-index",
-      change_set_id: "CS-index",
-      work_item_id: "W-index",
-      attempt_id: "A-index",
-      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
-      target_branch: "main",
-      object_format: "sha1",
-      head_commit_oid: "b" * 40,
       evidence_revision: 1,
-      policy_version: "candidate-impact-surface/v1",
-      surface_digest: "sha256:#{"c" * 64}",
-      manifest_digest: "sha256:#{"a" * 64}",
-      build_context_digest: "sha256:#{"b" * 64}",
       produces: [ Coordinator::Write::Candidates::ImpactTransitionV1.new(
         impact_key: "dependency:rubygems:rails",
         before: "4.2.11",
@@ -158,33 +127,7 @@ RSpec.describe Coordinator::Write::Candidates::ImpactIndexMarkerBuilder do
         value: "v1"
       ) ],
       may_affect: [],
-      assumes: [],
-      analyzer: Coordinator::Write::Candidates::ImpactAnalyzerV1.new(
-        kind: "agent",
-        id: "analyzer-index",
-        analyzer_version: "impact-v1"
-      ),
-      evidence_status: "attributed_unverified",
-      derived_at: "2026-08-23T17:01:00.000000Z"
-    )
-  end
-
-  def collector
-    Coordinator::Write::Candidates::EvidenceCollectorV1.new(
-      kind: "agent",
-      id: "agent-index",
-      collector_version: "git-v1"
-    )
-  end
-
-  def lease_reference
-    Coordinator::Write::LeaseReferenceV2.new(
-      resource_id: "01919191-9191-7191-8191-919191919190",
-      resource_kind: "file",
-      resource_path: "Gemfile",
-      base_blob_oid: "c" * 40,
-      lease_id: "01919191-9191-7191-8191-919191919192",
-      fencing_token: 1
+      assumes: []
     )
   end
 

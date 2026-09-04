@@ -6,8 +6,7 @@ module Coordinator::Write
         def call: (
           state: ImpactSurfaceState,
           command: Coordinator::Write::Commands::SubmitCandidateImpactSurface,
-          surface_event: Coordinator::Write::EventReference,
-          derived_at: String
+          surface_id: String
         ) -> Dry::Monads::Result
       end
     end

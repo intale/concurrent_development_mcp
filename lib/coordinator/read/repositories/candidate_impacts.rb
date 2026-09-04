@@ -96,9 +96,9 @@ module Coordinator::Read
 
       def store_surface(event:, surface:)
         record = candidate!(surface.candidate_id, "impact surface")
-        verify_surface!(record, surface)
+        verify_surface!(record, surface, event:)
         record.update!(
-          impact_surface: surface_document(surface),
+          impact_surface: surface_document(surface, event:),
           impact_event: event_reference(event).to_h,
           impact_actor: actor(event).to_h,
           impact_markers: event.markers,
@@ -106,7 +106,7 @@ module Coordinator::Read
           impact_causation_id: event.causation_id,
           impact_correlation_id: event.correlation_id,
           impact_global_position: event.global_position,
-          impact_at_domain: surface.derived_at,
+          impact_at_domain: event.created_at,
           impact_at_store: event.created_at
         )
         replace_impact_keys(record:, surface:)
@@ -207,34 +207,28 @@ module Coordinator::Read
         end.compact.uniq.sort
       end
 
-      def verify_surface!(record, surface)
-        matches = record.change_set_id == surface.change_set_id &&
-                  record.work_item_id == surface.work_item_id &&
-                  record.attempt_id == surface.attempt_id &&
-                  record.repository_id == surface.repository_id &&
-                  record.target_branch == surface.target_branch &&
-                  record.object_format == surface.object_format &&
-                  record.head_commit_oid == surface.head_commit_oid &&
-                  record.manifest_digest == surface.manifest_digest &&
-                  record.build_context_digest == surface.build_context_digest
+      def verify_surface!(record, surface, event:)
+        matches = record.candidate_id == surface.candidate_id &&
+                  record.manifest_digest == event.metadata.fetch("manifest_digest") &&
+                  record.build_context_digest == event.metadata["build_context_digest"]
         return if matches
 
         raise ProjectionStateError, "Candidate impact-surface identity changed"
       end
 
-      def surface_document(surface)
+      def surface_document(surface, event:)
         {
-          policy_version: surface.policy_version,
-          surface_digest: surface.surface_digest,
+          policy_version: event.metadata.fetch("policy_version"),
+          surface_digest: event.metadata.fetch("surface_digest"),
           evidence_revision: surface.evidence_revision,
-          manifest_digest: surface.manifest_digest,
-          build_context_digest: surface.build_context_digest,
+          manifest_digest: event.metadata.fetch("manifest_digest"),
+          build_context_digest: event.metadata["build_context_digest"],
           produces: surface.produces.map(&:to_h),
           consumes: surface.consumes.map(&:to_h),
           may_affect: surface.may_affect.map(&:to_h),
           assumes: surface.assumes.map(&:to_h),
-          analyzer: surface.analyzer.to_h,
-          evidence_status: surface.evidence_status
+          analyzer: event.metadata.fetch("analyzer"),
+          evidence_status: "attributed_unverified"
         }
       end
 

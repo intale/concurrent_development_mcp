@@ -1,0 +1,14 @@
+module Coordinator::Write
+  module MergeSnapshots
+    class StateLoader
+      def initialize: (
+        event_store: Coordinator::Write::EventStore,
+        ?candidate_state_loader: Coordinator::Write::Candidates::StateLoader,
+        ?schema_registry: Coordinator::Write::EventSchemaRegistry,
+        ?stream_factory: Coordinator::Write::StreamFactory
+      ) -> void
+
+      def call: (String merge_snapshot_id) -> StateV2?
+    end
+  end
+end

@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Contracts
       class InterpretationAdjudicationEventPlan < Dry::Validation::Contract
-        EVENT_BY_ACTION: Hash[String, singleton(Events::DecisionInterpretationAcceptedV1) | singleton(Events::DecisionInterpretationRejectedV1) | singleton(Events::DecisionClarificationRequiredV1)]
+        EVENT_BY_ACTION: Hash[String, singleton(Events::DecisionInterpretationAcceptedV2) | singleton(Events::DecisionInterpretationRejectedV2) | singleton(Events::DecisionClarificationRequiredV2)]
 
         def call: (command_input input) -> Dry::Validation::Result
       end

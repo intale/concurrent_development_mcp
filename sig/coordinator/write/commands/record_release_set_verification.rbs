@@ -4,7 +4,7 @@ module Coordinator::Write::Commands
     def actor: () -> Actor
     def release_set_id: () -> String
     def integration_events: () -> Array[Coordinator::Write::EventReference]
-    def evidence: () -> Coordinator::Write::ReleaseSets::VerificationEvidenceV1
+    def evidence: () -> Coordinator::Write::ReleaseSets::VerificationEvidenceV2
     def policy_version: () -> String
   end
 end

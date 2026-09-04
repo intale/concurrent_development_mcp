@@ -1,11 +1,23 @@
 # frozen_string_literal: true
 
 RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model do
-  subject(:projector) { described_class.new }
+  subject(:projector) { described_class.new(submission_loader:) }
 
   let(:repository) { Coordinator::Read::Repositories::CoordContexts.new }
   let(:repository_id) { "018f0f4d-4e45-7abc-8def-000000000601" }
   let(:correlation_id) { SecureRandom.uuid_v7 }
+  let(:candidate_submissions) { {} }
+  let(:submission_loader) do
+    Class.new do
+      def initialize(submissions)
+        @submissions = submissions
+      end
+
+      def call(candidate_id)
+        @submissions.fetch(candidate_id)
+      end
+    end.new(candidate_submissions)
+  end
 
   it "atomically projects exact source identities and ignores duplicate delivery" do
     events = planning_events(change_set_id: "CS-100", work_item_id: "W-100")
@@ -317,7 +329,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model do
       attempt_id: "A-CANDIDATE",
       agent_id: "agent-a"
     )
-    first = candidate_attached_event(
+    first = candidate_submitted_event(
       change_set_id: "CS-CANDIDATE",
       work_item_id: "W-CANDIDATE",
       attempt_id: "A-CANDIDATE",
@@ -327,7 +339,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model do
       revision: 2,
       position: 500
     )
-    second = candidate_attached_event(
+    second = candidate_submitted_event(
       change_set_id: "CS-CANDIDATE",
       work_item_id: "W-CANDIDATE",
       attempt_id: "A-CANDIDATE",
@@ -378,7 +390,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model do
       revision: 2,
       position: 500
     )
-    attached = candidate_attached_event(
+    submitted = candidate_submitted_event(
       change_set_id:,
       work_item_id:,
       attempt_id:,
@@ -405,12 +417,12 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model do
       revision: 4,
       position: 700
     )
-    [ *events, reserved, attached, released ].each { projector.call(_1) }
+    [ *events, reserved, submitted, released ].each { projector.call(_1) }
 
     before_completion = Coordinator::Read::Queries::CoordContext.new.call(attempt_id:).value!
     expect(before_completion.data.context.work_items.sole.status).to eq("acquired")
 
-    candidate_reference = event_payload(attached).candidate_event
+    candidate_reference = event_reference(submitted)
     selected = work_item_event(
       Coordinator::Write::Events::WorkItemCandidateSelectedV1.new(
         change_set_id:,
@@ -747,7 +759,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model do
     )
   end
 
-  def candidate_attached_event(
+  def candidate_submitted_event(
     change_set_id:,
     work_item_id:,
     attempt_id:,
@@ -757,27 +769,66 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model do
     revision:,
     position:
   )
-    attempt_event(
-      Coordinator::Write::Events::CandidateAttachedToAttemptV1.new(
-        candidate_id:,
-        candidate_event: source_reference("CandidateSubmitted", "Candidate", candidate_id, 0),
-        change_set_id:,
-        work_item_id:,
-        attempt_id:,
-        repository_id:,
-        target_branch: "main",
-        object_format: "sha1",
-        base_commit_oid: "a" * 40,
-        head_commit_oid: head_character * 40,
-        checkpoint_kind:,
-        manifest_digest: digest(head_character),
-        build_context_digest: nil,
-        attached_at: "2026-08-30T12:03:00.000000Z"
-      ),
-      attempt_id:,
+    submitted = projection_event(
+      payload: Coordinator::Write::Events::CandidateSubmittedV3.new(candidate_id:),
+      stream: Coordinator::Write::StreamFactory.new.candidate(candidate_id),
       revision:,
       position:
     )
+    manifest = Coordinator::Write::Events::CandidateChangeManifestCapturedV2.new(
+      candidate_id:,
+      evidence_revision: 1,
+      files: [
+        Coordinator::Write::Candidates::ManifestFileV1.new(
+          status: "modified",
+          old_path: "lib/context.rb",
+          new_path: "lib/context.rb",
+          old_blob_oid: "a" * 40,
+          new_blob_oid: head_character * 40,
+          old_mode: "100644",
+          new_mode: "100644"
+        )
+      ]
+    )
+    manifest_event = projection_event(
+      payload: manifest,
+      stream: Coordinator::Write::StreamFactory.new.candidate(candidate_id),
+      revision: revision - 1,
+      position: position - 1
+    )
+    candidate_submissions[candidate_id] = Coordinator::Read::CandidateSubmissionViewV2.new(
+      candidate_id:,
+      change_set_id:,
+      work_item_id:,
+      attempt_id:,
+      agent_id: "agent-a",
+      repository_id:,
+      target_branch: "main",
+      object_format: "sha1",
+      base_commit_oid: "a" * 40,
+      head_commit_oid: head_character * 40,
+      checkpoint_kind:,
+      intention_set_id: SecureRandom.uuid_v7,
+      lease_references: [
+        Coordinator::Write::LeaseReferenceV2.new(
+          lease_id: SecureRandom.uuid_v7,
+          resource_id: SecureRandom.uuid_v7,
+          resource_kind: "file",
+          resource_path: "lib/context.rb",
+          base_blob_oid: "a" * 40,
+          fencing_token: 1
+        )
+      ],
+      manifest_digest: digest(head_character),
+      build_context_digest: nil,
+      evidence_status: "attributed_unverified",
+      manifest:,
+      build_context: nil,
+      submitted_event: submitted,
+      manifest_event:,
+      build_context_event: nil
+    )
+    submitted
   end
 
   def lease_reference(resource_suffix:, lease_suffix:, path:, blob:)

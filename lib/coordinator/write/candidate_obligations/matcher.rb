@@ -44,7 +44,7 @@ module Coordinator::Write
       end
 
       def changed_paths(evidence)
-        evidence.manifest.files.flat_map do |file|
+        evidence.candidate.manifest.files.flat_map do |file|
           case file.status
           when "added", "copied" then [ file.new_path ]
           when "renamed" then [ file.old_path, file.new_path ]
@@ -54,7 +54,7 @@ module Coordinator::Write
       end
 
       def observed_paths(evidence)
-        evidence.build_context&.inputs&.map(&:path)&.uniq&.sort_by(&:b) || []
+        evidence.candidate.build_context&.inputs&.map(&:path)&.uniq&.sort_by(&:b) || []
       end
     end
   end

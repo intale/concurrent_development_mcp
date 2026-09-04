@@ -1,0 +1,31 @@
+module Coordinator::Write
+  module VerificationObligationOutcomes
+    class Executor
+      @event_store: untyped
+
+      @state_loader: untyped
+
+      @outcome_digest_builder: untyped
+
+      @event_factory: untyped
+
+      @id_generator: untyped
+
+      def initialize: (event_store: untyped, ?state_loader: untyped, ?outcome_digest_builder: untyped, ?event_factory: untyped, ?id_generator: untyped) -> void
+
+      def call: (command: untyped, decider: untyped, ?caused_by: untyped?) -> untyped
+
+      private
+
+      def build_events: (untyped events, state: untyped, command: untyped, caused_by: untyped) -> untyped
+
+      def metadata: (untyped event, state: untyped, command: untyped) -> untyped
+
+      def outcome_digest: (untyped event, untyped state, untyped command) -> untyped
+
+      def markers: (untyped event, untyped definition, untyped command) -> untyped
+
+      def scope_markers: (untyped obligation) -> ::Array[::String]
+    end
+  end
+end

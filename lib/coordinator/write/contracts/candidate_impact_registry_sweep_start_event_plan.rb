@@ -12,22 +12,27 @@ module Coordinator::Write
       rule(:plan, :command, :expected_stream) do
         plan = values[:plan]
         command = values[:command]
-        unless plan.writes.length == 1 && plan.writes.first.stream == values[:expected_stream]
-          key(:plan).failure("must contain one write to the registry-sweep stream")
-          next
+        lifecycle, *links = plan.events
+        lifecycle_valid = case lifecycle
+                          when Events::CandidateImpactRegistrySweepStartedV2
+                            lifecycle.scan_id == command.scan_id && lifecycle.change_set_id == command.change_set_id &&
+                              lifecycle.from_revision == command.from_revision && lifecycle.page_size == command.page_size
+                          when Events::CandidateImpactRegistrySweepSkippedV2
+                            lifecycle.scan_id == command.scan_id
+                          else
+                            false
+                          end
+        expected_links = {
+          "policy_partition" => command.policy_partition_event,
+          "policy_head" => command.policy_head.event
+        }
+        links_valid = links.length == 2 && links.all? do |link|
+          link.is_a?(Events::CandidateImpactRegistrySweepSourceLinkedV1) &&
+            link.scan_id == command.scan_id && expected_links[link.role] == link.source
         end
-
-        event = plan.writes.first.event
-        allowed = event.is_a?(Events::CandidateImpactRegistrySweepStartedV1) ||
-                  event.is_a?(Events::CandidateImpactRegistrySweepSkippedV1)
-        common = allowed && event.scan_id == command.scan_id &&
-                 event.change_set_id == command.change_set_id &&
-                 event.policy_partition_event == command.policy_partition_event &&
-                 event.policy_head == command.policy_head &&
-                 event.from_revision == command.from_revision &&
-                 event.page_size == command.page_size &&
-                 event.rule_version == command.rule_version
-        key(:plan).failure("event must retain the exact registry-sweep command evidence") unless common
+        streams_valid = plan.writes.length == 3 && plan.writes.all? { _1.stream == values[:expected_stream] }
+        key(:plan).failure("must contain the exact registry-sweep decision and source links") unless
+          streams_valid && lifecycle_valid && links_valid
       end
     end
   end

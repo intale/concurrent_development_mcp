@@ -30,7 +30,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteWaiveVerificationObligatio
     expect(command_events("cmd-waiver-open")).to be_empty
   end
 
-  it "allows an exact failed obligation to be waived while preserving its failure fact" do
+  it "rejects a failed obligation after the evidence-outcome process closes it" do
     created = CandidateObligationScenario.create_obligation(
       prefix: "waiver-failed",
       required_evidence: [ "combined_tests" ]
@@ -45,24 +45,24 @@ RSpec.describe Coordinator::Write::Operations::ExecuteWaiveVerificationObligatio
       command_id: "cmd-waiver-failed-evidence",
       conclusion: "failed"
     )
+    process_latest_evidence(created)
 
-    completion = execute(
+    result = execute(
       CandidateObligationScenario.waiver_arguments(
         created:,
         command_id: "cmd-waiver-failed"
       )
-    ).value!
+    )
     history = lifecycle_events(created)
 
-    expect(completion.data.previous_status).to eq("failed")
+    expect(result.failure.code).to eq(:verification_obligation_terminal)
     expect(history.map(&:type)).to eq(%w[
       VerificationObligationCreated
       VerificationObligationFailed
-      VerificationObligationWaived
     ])
   end
 
-  it "rejects non-user attribution and stale policy or binding without receipts" do
+  it "rejects non-user attribution and stale binding without receipts" do
     created = CandidateObligationScenario.create_obligation(
       prefix: "waiver-denials",
       required_evidence: [ "combined_tests" ]
@@ -84,12 +84,12 @@ RSpec.describe Coordinator::Write::Operations::ExecuteWaiveVerificationObligatio
       prefix: "waiver-denials",
       change_set_id: created.dig(:pair, :ids, :change_set_id)
     )
-    stale_policy = execute(base.merge(command_id: "cmd-waiver-policy"))
+    policy_lagged = execute(base.merge(command_id: "cmd-waiver-policy"))
 
     expect(non_user.failure.code).to eq(:invalid_input)
     expect(stale_binding.failure.code).to eq(:verification_obligation_binding_stale)
-    expect(stale_policy.failure.code).to eq(:verification_obligation_policy_stale)
-    expect(%w[cmd-waiver-agent cmd-waiver-binding cmd-waiver-policy].flat_map { command_events(_1) }).to be_empty
+    expect(policy_lagged).to be_success
+    expect(%w[cmd-waiver-agent cmd-waiver-binding].flat_map { command_events(_1) }).to be_empty
   end
 
   it "rejects a satisfied obligation and a second direct waiver" do
@@ -106,6 +106,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteWaiveVerificationObligatio
       claim:,
       command_id: "cmd-waiver-satisfied-evidence"
     )
+    process_latest_evidence(satisfied)
     denied = execute(
       CandidateObligationScenario.waiver_arguments(
         created: satisfied,
@@ -165,5 +166,17 @@ RSpec.describe Coordinator::Write::Operations::ExecuteWaiveVerificationObligatio
 
   def command_events(command_id)
     event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
+  end
+
+  def process_latest_evidence(created)
+    event = event_store.read(
+      streams.verification_obligation(created.fetch(:payload).obligation_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: [ "VerificationEvidenceSubmitted" ],
+        maximum_count: 32,
+        direction: :asc
+      )
+    ).last
+    Coordinator::Processes::ProcessManagers::VerificationEvidenceOutcome.new(event_store:).call(event)
   end
 end

@@ -18,8 +18,7 @@ RSpec.describe Coordinator::Write::Domain::VerificationObligationWaivers::Waive 
     Coordinator::Write::Domain::VerificationObligationWaivers::State.new(
       **described_state,
       obligation:,
-      obligation_event:,
-      policy_current: true
+      obligation_event:
     )
   end
   let(:described_state) do
@@ -43,30 +42,22 @@ RSpec.describe Coordinator::Write::Domain::VerificationObligationWaivers::Waive 
       stream: Coordinator::Write::StreamFactory.new.verification_obligation(obligation.obligation_id),
       event: have_attributes(
         obligation_id: obligation.obligation_id,
-        obligation_event:,
-        previous_status: "open",
-        previous_terminal_event: nil,
-        reason: command.reason,
-        waiver_input_digest: CandidateObligationExamples.digest("waiver-input")
+        reason: command.reason
       )
     )
   end
 
-  it "allows an exact current failed obligation to be waived" do
+  it "denies waiver after a failed outcome" do
     failed = VerificationEvidenceExamples.failed
     failed_event = VerificationEvidenceExamples.outcome_reference(type: "VerificationObligationFailed")
     failed_state = state.new(failed:, failed_event:)
 
-    event = decide(state: failed_state).value!.events.sole
-
-    expect(event).to have_attributes(previous_status: "failed", previous_terminal_event: failed_event)
+    expect(decide(state: failed_state).failure.code).to eq(:verification_obligation_terminal)
   end
 
-  it "denies non-user, stale binding/policy, satisfied, and already-waived states" do
+  it "denies non-user, stale binding, satisfied, and already-waived states" do
     expect(decide(command: command.new(actor: { kind: "agent", id: "agent-a" })).failure.code)
       .to eq(:verification_obligation_waiver_requires_user)
-    expect(decide(state: state.new(policy_current: false)).failure.code)
-      .to eq(:verification_obligation_policy_stale)
     expect(
       decide(command: command.new(obligation_validity_input_digest: CandidateObligationExamples.digest("old"))).failure.code
     ).to eq(:verification_obligation_binding_stale)
@@ -93,9 +84,7 @@ RSpec.describe Coordinator::Write::Domain::VerificationObligationWaivers::Waive 
   def decide(state: self.state, command: self.command)
     decider.call(
       state:,
-      command:,
-      waiver_input_digest: CandidateObligationExamples.digest("waiver-input"),
-      waived_at: VerificationEvidenceExamples::SUBMITTED_AT
+      command:
     )
   end
 end

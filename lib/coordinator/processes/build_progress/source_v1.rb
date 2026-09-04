@@ -6,10 +6,7 @@ module Coordinator::Processes
       attribute :event, Types.Instance(PgEventstore::Event)
       attribute :reference, Coordinator::Write::EventReference
       attribute :payload, Types.Instance(Coordinator::Write::Events::Base)
-
-      def change_set_id
-        payload.change_set_id
-      end
+      attribute :change_set_id, Types::Identifier
     end
   end
 end

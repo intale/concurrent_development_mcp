@@ -12,14 +12,20 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordReleaseSetVerificati
 
     first = operation.call(input).value!
     replay = operation.call(input)
-    event = ReleaseSetScenario.release_lifecycle_events(input.fetch(:release_set_id)).last
+    events = ReleaseSetScenario.release_lifecycle_events(input.fetch(:release_set_id))
+    event = events.select { _1.type == "ReleaseSetVerificationRecorded" }.sole
+    links = events.select { _1.type == "ReleaseSetIntegrationLinked" }
     payload = ReleaseSetScenario.load(event)
 
     expect(first).to be_a(Coordinator::Write::CommandResultV1)
     expect(replay.failure.code).to eq(:release_set_already_verified)
-    expect(payload).to have_attributes(attempt_number: 1, evidence_status: "attributed_unverified")
+    expect(payload).to have_attributes(attempt_number: 1)
     expect(payload.evidence.outcome).to eq("passed")
-    expect(payload.integration_events).to eq(integrations.map { _1.fetch(:completion).data.integration_event })
+    expect(links.map { ReleaseSetScenario.load(_1).integration_event }).to eq(
+      integrations.map { _1.fetch(:completion).data.integration_event }
+    )
+    expect(event.metadata.fetch("verification_digest")).to eq(first.data.verification_digest)
+    expect(event.data).not_to have_key("recorded_at")
     expect(event.correlation_id).to eq(prepared.fetch(:event).correlation_id)
   end
 

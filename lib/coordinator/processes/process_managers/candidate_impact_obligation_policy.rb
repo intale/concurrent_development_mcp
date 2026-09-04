@@ -8,12 +8,12 @@ module Coordinator::Processes
       HANDLED_REGISTRY_PROGRESS_CODES = [
         :candidate_impact_registry_sweep_not_running,
         :candidate_impact_registry_sweep_checkpoint_changed,
-        :candidate_impact_scan_concurrency_conflict
+        :stale_stream
       ].freeze
       HANDLED_PAIR_PROGRESS_CODES = [
         :candidate_impact_pair_scan_not_running,
         :candidate_impact_pair_scan_checkpoint_changed,
-        :candidate_impact_scan_concurrency_conflict
+        :stale_stream
       ].freeze
 
       def initialize(
@@ -44,15 +44,17 @@ module Coordinator::Processes
       def call(event)
         source = @source_builder.call(event)
         case source.payload
-        when Coordinator::Write::Events::DecisionPartitionAdvancedV1
+        when Coordinator::Write::Events::DecisionPartitionAdvancedV1,
+             Coordinator::Write::Events::DecisionAddedToPartitionV1,
+             Coordinator::Write::Events::DecisionRemovedFromPartitionV1
           start_registry_sweep(source)
-        when Coordinator::Write::Events::CandidateImpactSurfaceRegisteredV1
+        when Coordinator::Write::Events::CandidateImpactSurfaceAssignedV1
           start_registration_pairs(source)
-        when Coordinator::Write::Events::CandidateImpactRegistrySweepStartedV1,
-             Coordinator::Write::Events::CandidateImpactRegistrySweepProgressedV1
+        when Coordinator::Write::Events::CandidateImpactRegistrySweepStartedV2,
+             Coordinator::Write::Events::CandidateImpactRegistrySweepProgressedV2
           process_registry_page(source)
-        when Coordinator::Write::Events::CandidateImpactPairScanStartedV1,
-             Coordinator::Write::Events::CandidateImpactPairScanProgressedV1
+        when Coordinator::Write::Events::CandidateImpactPairScanStartedV2,
+             Coordinator::Write::Events::CandidateImpactPairScanProgressedV2
           process_pair_page(source)
         end
         nil

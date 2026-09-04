@@ -14,7 +14,7 @@ module Coordinator
         def start: (SourceV1 source) -> Write::AgentChoiceImpactScanInvocation
         def assess: (
           accepted_choice: PgEventstore::Event,
-          decision_change: Write::AgentChoiceImpacts::DecisionChangeEvidenceV1,
+          decision_change: Write::AgentChoiceImpacts::DecisionChangeEvidenceV2,
           caused_by: PgEventstore::Event
         ) -> Write::AgentChoiceImpactAssessmentInvocation
         def progress: (checkpoint: ScanCheckpointV1, page: PageV1) -> Write::AgentChoiceImpactScanProgressInvocation

@@ -9,7 +9,6 @@ module Coordinator
             command: Commands::SubmitCompatibilityAssessment,
             evidence_id: String,
             assessment_input_digest: String,
-            evidence_event: EventReference,
             submitted_at: String
           ) -> Dry::Monads::Result
         end

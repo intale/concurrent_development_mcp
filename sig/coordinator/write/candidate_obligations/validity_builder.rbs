@@ -3,8 +3,8 @@ module Coordinator::Write
     class ValidityBuilder
       def initialize: (?canonical_json: Coordinator::Shared::CanonicalJson) -> void
       def call: (
-        source: CandidateEvidenceV1,
-        target: CandidateEvidenceV1,
+        source: CandidateEvidenceV2,
+        target: CandidateEvidenceV2,
         reasons: Array[ImpactReasonV1],
         policy: ImpactPolicyEvidenceV1,
         rule_version: String

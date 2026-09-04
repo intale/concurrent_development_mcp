@@ -13,7 +13,9 @@ module Coordinator::Read
         stream_factory: Coordinator::Write::StreamFactory.new,
         repository_registration_loader: Coordinator::Write::RepositoryRegistrationLoader.new(event_store:),
         repository_natural_key_marker: Coordinator::Write::Repositories::NaturalKeyMarker.new,
-        development_artifact_marker_builder: Coordinator::Write::DevelopmentArtifacts::MarkerBuilder.new
+        development_artifact_marker_builder: Coordinator::Write::DevelopmentArtifacts::MarkerBuilder.new,
+        release_set_preparation_loader: Coordinator::Read::ReleaseSets::PreparationLoader.new(event_store:),
+        work_intention_set_evidence_loader: WorkIntentionSetEvidenceLoader.new(event_store:)
       )
         @event_store = event_store
         @completion_builder = completion_builder
@@ -23,6 +25,8 @@ module Coordinator::Read
         @repository_registration_loader = repository_registration_loader
         @repository_natural_key_marker = repository_natural_key_marker
         @development_artifact_marker_builder = development_artifact_marker_builder
+        @release_set_preparation_loader = release_set_preparation_loader
+        @work_intention_set_evidence_loader = work_intention_set_evidence_loader
       end
 
       def call(source)
@@ -66,118 +70,154 @@ module Coordinator::Read
             candidate_event: selection.candidate_event
           )
         when "attempt_abandon" then abandonment_completion(source)
-        when "write_set_reserve"
-          @completion_builder.write_set_reserve(
-            **args,
-            reservation: payload!(source, Coordinator::Write::Events::WriteSetReservedV2)
-          )
-        when "write_set_expand"
-          @completion_builder.write_set_expand(
-            **args,
-            expansion: payload!(source, Coordinator::Write::Events::WriteSetExpandedV2)
-          )
-        when "lease_renew"
-          @completion_builder.lease_renew(
-            **args,
-            renewal: payload!(source, Coordinator::Write::Events::WriteSetRenewedV2)
-          )
-        when "lease_release"
-          @completion_builder.lease_release(
-            **args,
-            release: payload!(source, Coordinator::Write::Events::WriteSetReleasedV2)
-          )
+        when "write_set_reserve" then write_set_reservation(source, args:)
+        when "write_set_expand" then write_set_expansion(source, args:)
+        when "lease_renew" then work_intention_set_renewal(source, args:)
+        when "lease_release" then work_intention_set_release(source, args:)
         when "guidance_record" then @completion_builder.guidance_record(**args)
         when "decision_interpretation_propose"
+          proposal = payload!(source, Coordinator::Write::Events::DecisionInterpretationProposedV2)
           @completion_builder.decision_interpretation_propose(
             **args,
-            proposal: payload!(source, Coordinator::Write::Events::DecisionInterpretationProposedV1)
+            assessment: proposal.assessment
           )
         when "decision_interpretation_adjudicate"
           @completion_builder.decision_interpretation_adjudicate(
             **args,
-            slot: payload(source, Coordinator::Write::Events::DecisionInterpretationAcceptedV1)&.slot
+            slot: payload(source, Coordinator::Write::Events::DecisionInterpretationAcceptedV2)&.slot
           )
         when "decision_activate" then decision_activation(source, args:)
         when "decision_correct" then decision_correction(source, args:)
         when "agent_choice_record"
+          recorded = payload!(source, Coordinator::Write::Events::AgentChoiceRecordedV2)
           @completion_builder.agent_choice_record(
             **args,
-            acceptance: payload!(source, Coordinator::Write::Events::AgentChoiceAcceptedV1)
+            recorded:,
+            acceptance: payload!(source, Coordinator::Write::Events::AgentChoiceAcceptedV2)
           )
         when "candidate_submit"
-          @completion_builder.candidate_submit(
-            **args,
-            submission: payload!(source, Coordinator::Write::Events::CandidateSubmittedV2)
-          )
+          @completion_builder.candidate_submit(**args)
         when "candidate_impact_surface_submit"
+          surface = payload!(source, Coordinator::Write::Events::CandidateImpactSurfaceDerivedV2)
           @completion_builder.candidate_impact_surface_submit(
             **args,
-            surface: payload!(source, Coordinator::Write::Events::CandidateImpactSurfaceDerivedV1)
+            surface_id: surface.surface_id
           )
         when "verification_obligation_claim"
           @completion_builder.verification_obligation_claim(
             **args,
-            claim: payload!(source, Coordinator::Write::Events::VerificationObligationClaimedV1)
+            claim: payload!(source, Coordinator::Write::Events::VerificationObligationClaimedV2)
           )
         when "compatibility_assessment_submit"
-          evidence = payload!(source, Coordinator::Write::Events::VerificationEvidenceSubmittedV1)
+          evidence = payload!(source, Coordinator::Write::Events::VerificationEvidenceSubmittedV2)
+          evidence_event = event_for_payload(source, evidence)
           @completion_builder.compatibility_assessment_submit(
             **args,
             evidence:,
-            assessment_input_digest: evidence.assessment_input_digest
+            assessment_input_digest: evidence_event.metadata.fetch("assessment_input_digest")
           )
         when "verification_obligation_waive"
           @completion_builder.verification_obligation_waive(
             **args,
-            waiver: payload!(source, Coordinator::Write::Events::VerificationObligationWaivedV1)
+            waiver: payload!(source, Coordinator::Write::Events::VerificationObligationWaivedV2)
           )
         when "merge_snapshot_register"
+          snapshot = payload!(source, Coordinator::Write::Events::MergeSnapshotRegisteredV2)
+          snapshot_event = event_for_payload(source, snapshot)
           @completion_builder.merge_snapshot_register(
             **args,
-            snapshot: payload!(source, Coordinator::Write::Events::MergeSnapshotRegisteredV1)
+            snapshot_digest: snapshot_event.metadata.fetch("snapshot_digest"),
+            registered_at: snapshot_event.created_at.utc.iso8601(6)
           )
         when "merge_verification_submit"
+          submission = payload!(source, Coordinator::Write::Events::MergeSnapshotVerificationSubmittedV2)
+          submission_event = event_for_payload(source, submission)
           @completion_builder.merge_verification_submit(
             **args,
-            submission: payload!(source, Coordinator::Write::Events::MergeSnapshotVerificationSubmittedV1)
+            submission:,
+            verification_input_digest: submission_event.metadata.fetch("verification_input_digest")
           )
         when "merge_authorization_request"
+          decision = payloads(source).find do |candidate|
+            candidate.is_a?(Coordinator::Write::Events::MergeAuthorizationGrantedV2) ||
+              candidate.is_a?(Coordinator::Write::Events::MergeAuthorizationDeniedV2)
+          end || missing_payload!(source, "merge authorization decision")
+          decision_event = event_for_payload(source, decision)
           @completion_builder.merge_authorization_request(
             **args,
-            decision: payloads(source).find do |candidate|
-              candidate.is_a?(Coordinator::Write::Events::MergeAuthorizationGrantedV1) ||
-                candidate.is_a?(Coordinator::Write::Events::MergeAuthorizationDeniedV1)
-            end || missing_payload!(source, "merge authorization decision")
+            decision:,
+            decision_digest: decision_event.metadata.fetch("decision_digest"),
+            decided_at: decision_event.created_at.utc.iso8601(6)
           )
         when "merge_observation_record"
+          observation = payload!(source, Coordinator::Write::Events::MergeObservedV2)
+          observation_event = event_for_payload(source, observation)
           @completion_builder.merge_observation_record(
             **args,
-            observation: payload!(source, Coordinator::Write::Events::MergeObservedV1)
+            observation:,
+            observation_digest: observation_event.metadata.fetch("observation_digest"),
+            recorded_at: observation_event.created_at.utc.iso8601(6)
           )
         when "release_set_prepare"
+          created = payload!(source, Coordinator::Write::Events::ReleaseSetCreatedV1)
+          members = payloads(source).grep(Coordinator::Write::Events::ReleaseSetMemberAddedV1)
+          prepared = payload!(source, Coordinator::Write::Events::ReleaseSetPreparedV2)
+          prepared_event = event_for_payload(source, prepared)
           @completion_builder.release_set_prepare(
             **args,
-            preparation: payload!(source, Coordinator::Write::Events::ReleaseSetPreparedV1)
+            change_set_id: created.change_set_id,
+            ordered_members: members.map do |member|
+              Coordinator::Write::ReleaseSets::MemberSummaryV2.new(
+                position: member.member_position,
+                repository_id: member.repository_id,
+                candidate_id: member.candidate_id
+              )
+            end,
+            release_digest: prepared_event.metadata.fetch("release_digest"),
+            prepared_event:
           )
         when "release_repository_integration_record"
+          integration = payload!(source, Coordinator::Write::Events::RepositoryIntegrationRecordedV2)
+          integration_event = event_for_payload(source, integration)
           @completion_builder.release_repository_integration_record(
             **args,
-            integration: payload!(source, Coordinator::Write::Events::RepositoryIntegrationRecordedV1)
+            integration:,
+            integration_digest: integration_event.metadata.fetch("integration_digest"),
+            integration_event:
           )
         when "release_verification_record"
+          verification = payload!(source, Coordinator::Write::Events::ReleaseSetVerificationRecordedV2)
+          verification_event = event_for_payload(source, verification)
           @completion_builder.release_verification_record(
             **args,
-            verification: payload!(source, Coordinator::Write::Events::ReleaseSetVerificationRecordedV1)
+            verification:,
+            integration_events: payloads(source).grep(Coordinator::Write::Events::ReleaseSetIntegrationLinkedV1).map(&:integration_event),
+            verification_digest: verification_event.metadata.fetch("verification_digest"),
+            verification_event:
           )
         when "release_activation_record"
+          activation = payload!(source, Coordinator::Write::Events::ReleaseSetActivatedV2)
+          activation_event = event_for_payload(source, activation)
           @completion_builder.release_activation_record(
             **args,
-            activation: payload!(source, Coordinator::Write::Events::ReleaseSetActivatedV1)
+            activation:,
+            activation_digest: activation_event.metadata.fetch("activation_digest"),
+            activation_event:
           )
         when "release_compensation_complete"
+          outcome = payload!(source, Coordinator::Write::Events::ReleaseSetOutcomeRecordedV1)
+          completion_event = event_for_payload(
+            source,
+            payload!(source, Coordinator::Write::Events::ReleaseSetCompletedV2)
+          )
+          preparation = @release_set_preparation_loader.call(outcome.release_set_id)
           @completion_builder.release_compensation_complete(
             **args,
-            completion: payload!(source, Coordinator::Write::Events::ReleaseSetCompletedV1)
+            change_set_id: preparation.change_set_id,
+            outcome: outcome.outcome,
+            source_event: source.command.compensation_request_event,
+            completion_digest: event_for_payload(source, outcome).metadata.fetch("completion_digest"),
+            completion_event:
           )
         when "skill_publish" then skill_publication(source, args:)
         when "development_artifact_capture" then development_artifact_capture(source, args:)
@@ -231,30 +271,209 @@ module Coordinator::Read
       end
 
       def decision_activation(source, args:)
-        activation = payload!(source, Coordinator::Write::Events::DecisionActivatedV1)
+        activation = payload!(source, Coordinator::Write::Events::DecisionActivatedV2)
+        recorded = payload!(source, Coordinator::Write::Events::DecisionRecordedV2)
+        definition = Coordinator::Write::Decisions::DecisionDefinitionV1.new(
+          document: recorded.definition,
+          digest: Coordinator::Write::CanonicalJson.new.sha256(recorded.definition.to_h)
+        )
+        opened = payload(source, Coordinator::Write::Events::DecisionSlotOpenedV2)
+        slot = if opened
+                 generated = Coordinator::Write::Decisions::DecisionSlotBuilder.new.call(definition)
+                 Coordinator::Write::Decisions::DecisionSlotV1.new(
+                   slot_id: opened.slot_id,
+                   document: opened.slot,
+                   compound_marker: generated.compound_marker
+                 )
+               end
         @completion_builder.decision_activate(
           **args,
           activation:,
-          partitions: partition_receipts(source)
+          definition_digest: definition.digest,
+          slot:,
+          partitions: activation_partition_receipts(source, definition)
         )
+      end
+
+      def write_set_expansion(source, args:)
+        command = source.command
+        memberships = @event_store.read(
+          @stream_factory.work_intention_set(command.lease_set_id),
+          Coordinator::Write::EventReadCriteria.new(
+            event_types: [ "WorkIntentionAddedToSet" ],
+            maximum_count: Coordinator::Shared::Types::WRITE_SET_RESOURCE_MAXIMUM_COUNT,
+            direction: :asc
+          )
+        ).map { load_payload(_1) }
+        declarations = memberships.map do |membership|
+          event = @event_store.read_grouped(
+            @stream_factory.resource_work_intention(membership.intention_id),
+            Coordinator::Write::EventQueries::WORK_INTENTION_STATE
+          )
+          declared = event.find { _1.type == "ResourceWorkIntentionDeclared" }
+          latest = event.find { _1.type == "ResourceWorkIntentionRenewed" } || declared
+          [ load_payload(declared), load_payload(latest) ]
+        end
+        emitted_declarations = payloads(source).grep(
+          Coordinator::Write::Events::ResourceWorkIntentionDeclaredV1
+        )
+        added_resources = emitted_declarations.map { lease_reference_for(_1) }
+        expiration = declarations.map { |declared, latest| latest.expires_at || declared.expires_at }.min
+        expansion = Coordinator::Write::WorkIntentionSetExpansionReceiptV1.new(
+          lease_set_id: command.lease_set_id,
+          repository_id: command.repository_id,
+          policy_version: Coordinator::Write::WorkIntentionPolicyV1::VERSION,
+          expanded_at: source.persisted_events.first&.created_at&.utc&.iso8601(6) || source.completed_at,
+          expires_at: expiration,
+          added_resources:,
+          resource_count: memberships.length
+        )
+        @completion_builder.write_set_expand(**args, expansion:)
+      end
+
+      def write_set_reservation(source, args:)
+        created = payload!(source, Coordinator::Write::Events::WorkIntentionSetCreatedV1)
+        evidence = work_intention_set_evidence(source, created.set_id)
+        reservation = Coordinator::Write::WorkIntentionSetReceiptV1.new(
+          lease_set_id: evidence.set_id,
+          repository_id: evidence.repository_id,
+          policy_version: Coordinator::Write::WorkIntentionPolicyV1::VERSION,
+          reserved_at: evidence.created_at,
+          expires_at: evidence.current_expires_at,
+          resources: evidence.resources
+        )
+        @completion_builder.write_set_reserve(**args, reservation:)
+      end
+
+      def work_intention_set_renewal(source, args:)
+        evidence = work_intention_set_evidence(source, source.command.lease_set_id)
+        renewal = Coordinator::Write::WorkIntentionSetRenewalReceiptV1.new(
+          lease_set_id: evidence.set_id,
+          repository_id: evidence.repository_id,
+          policy_version: Coordinator::Write::WorkIntentionPolicyV1::VERSION,
+          resources: evidence.resources,
+          resource_count: evidence.resources.length,
+          renewed_at: source.completed_at,
+          previous_expires_at: evidence.before_command_expires_at || evidence.current_expires_at,
+          expires_at: evidence.current_expires_at
+        )
+        @completion_builder.lease_renew(**args, renewal:)
+      end
+
+      def work_intention_set_release(source, args:)
+        evidence = work_intention_set_evidence(source, source.command.lease_set_id)
+        release = Coordinator::Write::WorkIntentionSetWithdrawalReceiptV1.new(
+          lease_set_id: evidence.set_id,
+          repository_id: evidence.repository_id,
+          policy_version: Coordinator::Write::WorkIntentionPolicyV1::VERSION,
+          resources: evidence.resources,
+          resource_count: evidence.resources.length,
+          previous_expires_at: evidence.current_expires_at,
+          released_at: source.completed_at
+        )
+        @completion_builder.lease_release(**args, release:)
+      end
+
+      def work_intention_set_evidence(source, set_id)
+        @work_intention_set_evidence_loader.call(
+          set_id,
+          excluding_event_ids: source.persisted_events.map(&:id)
+        )
+      end
+
+      def lease_reference_for(declaration)
+        registration = load_payload(resource_registration(declaration.resource_id))
+        Coordinator::Write::LeaseReferenceV2.new(
+          lease_id: declaration.intention_id,
+          resource_id: declaration.resource_id,
+          resource_kind: registration.kind,
+          resource_path: registration.normalized_path,
+          base_blob_oid: declaration.base_blob_oid,
+          fencing_token: declaration.fencing_token
+        )
+      end
+
+      def activation_partition_receipts(source, definition)
+        partitions = Coordinator::Write::Decisions::DecisionPartitionBuilder.new.call(definition)
+          .to_h { [ _1.partition_id, _1 ] }
+        payloads(source).filter_map.with_index do |candidate, index|
+          next unless candidate.is_a?(Coordinator::Write::Events::DecisionAddedToPartitionV1)
+
+          Coordinator::Write::Decisions::DecisionPartitionReceiptV1.new(
+            partition: partitions.fetch(candidate.partition_id),
+            partition_revision: source.persisted_events.fetch(index).stream_revision
+          )
+        end
       end
 
       def decision_correction(source, args:)
-        correction = payload!(source, Coordinator::Write::Events::DecisionDefinitionCorrectedV1)
+        correction = payload!(source, Coordinator::Write::Events::DecisionDefinitionCorrectedV2)
+        correction_event = event_for_payload(source, correction)
+        previous_document = previous_decision_definition(
+          correction.decision_id,
+          before_revision: correction_event.stream_revision
+        )
+        current = decision_definition(previous_document)
+        candidate = decision_definition(correction.definition)
+        slot = correction_slot(source, candidate)
         @completion_builder.decision_correct(
           **args,
           correction:,
-          correction_event: event_reference(event_for_payload(source, correction)),
-          partitions: partition_receipts(source)
+          previous_definition_digest: current.digest,
+          definition_digest: candidate.digest,
+          slot:,
+          correction_event: event_reference(correction_event),
+          partitions: correction_partition_receipts(source, current, candidate)
         )
       end
 
-      def partition_receipts(source)
-        payloads(source).filter_map.with_index do |candidate, index|
-          next unless candidate.is_a?(Coordinator::Write::Events::DecisionPartitionAdvancedV1)
+      def previous_decision_definition(decision_id, before_revision:)
+        events = @event_store.read(
+          @stream_factory.decision(decision_id),
+          Coordinator::Write::EventReadCriteria.new(
+            event_types: [ "DecisionRecorded", "DecisionDefinitionCorrected" ],
+            maximum_count: 33,
+            direction: :asc
+          )
+        )
+        event = events.select { _1.stream_revision < before_revision }.last
+        raise InvalidProjectionSource, "decision_correct is missing previous Decision definition" unless event
+
+        load_payload(event).definition
+      end
+
+      def decision_definition(document)
+        Coordinator::Write::Decisions::DecisionDefinitionV1.new(
+          document:,
+          digest: Coordinator::Write::CanonicalJson.new.sha256(document.to_h)
+        )
+      end
+
+      def correction_slot(source, definition)
+        change = payloads(source).grep(Coordinator::Write::Events::DecisionSlotHeadChangedV2)
+          .reverse
+          .find { _1.head&.decision_id == source.command.decision_id }
+        return unless change
+
+        generated = Coordinator::Write::Decisions::DecisionSlotBuilder.new.call(definition)
+        Coordinator::Write::Decisions::DecisionSlotV1.new(
+          slot_id: change.slot_id,
+          document: generated.document,
+          compound_marker: generated.compound_marker
+        )
+      end
+
+      def correction_partition_receipts(source, current, candidate)
+        partitions = (
+          Coordinator::Write::Decisions::DecisionPartitionBuilder.new.call(current) +
+          Coordinator::Write::Decisions::DecisionPartitionBuilder.new.call(candidate)
+        ).to_h { [ _1.partition_id, _1 ] }
+        payloads(source).filter_map.with_index do |payload, index|
+          next unless payload.is_a?(Coordinator::Write::Events::DecisionAddedToPartitionV1) ||
+                      payload.is_a?(Coordinator::Write::Events::DecisionRemovedFromPartitionV1)
 
           Coordinator::Write::Decisions::DecisionPartitionReceiptV1.new(
-            partition: candidate.partition,
+            partition: partitions.fetch(payload.partition_id),
             partition_revision: source.persisted_events.fetch(index).stream_revision
           )
         end
@@ -642,16 +861,23 @@ module Coordinator::Read
       end
 
       def abandonment_completion(source)
-        abandonment = payload!(source, Coordinator::Write::Events::AttemptAbandonedV2)
-        released_count = abandonment.released_leases.length
-        untouched_count = abandonment.untouched_resource_ids.length
+        abandonment = payload!(source, Coordinator::Write::Events::AttemptAbandonedV3)
+        payload!(source, Coordinator::Write::Events::WorkItemRequeuedV2)
+        withdrawn_count = payloads(source).count do |payload|
+          payload.is_a?(Coordinator::Write::Events::ResourceWorkIntentionWithdrawnV1)
+        end
+        member_count = @work_intention_set_evidence_loader.member_count_for_attempt(abandonment.attempt_id)
+        untouched_count = member_count - withdrawn_count
+        if untouched_count.negative?
+          raise InvalidProjectionSource, "Attempt abandonment withdrew more intentions than its set contains"
+        end
         warnings = [ "Reacquire the WorkItem with a fresh Attempt ID and base snapshot before resuming." ]
         if untouched_count.positive?
-          warnings << "#{untouched_count} recorded lease fence(s) were already inactive or superseded and were left untouched."
+          warnings << "#{untouched_count} work intention(s) were already inactive and were left unchanged."
         end
         completion(
           source,
-          summary: "Attempt abandoned; WorkItem requeued; #{released_count} current lease fence(s) released.",
+          summary: "Attempt abandoned; WorkItem requeued; #{withdrawn_count} active work intention(s) withdrawn.",
           data: Coordinator::Write::CommandReceiptData::Attempt.new(
             change_set_id: source.command.change_set_id,
             work_item_id: source.command.work_item_id,

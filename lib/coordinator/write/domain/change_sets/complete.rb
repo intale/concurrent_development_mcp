@@ -67,16 +67,14 @@ module Coordinator::Write
         def activated_release?(release_state)
           release_state.preparation && release_state.activation && release_state.completion &&
             release_state.completion.payload.outcome == "activated" &&
-            release_state.completion.payload.source_event == release_state.activation.event &&
-            release_state.preparation.payload.release_digest == release_state.activation.payload.release_digest &&
-            release_state.activation.payload.release_digest == release_state.completion.payload.release_digest
+            release_state.preparation.payload.release_digest == release_state.activation.release_digest &&
+            release_state.activation.release_digest == release_state.completion.release_digest
         end
 
         def release_change_set_matches?(release_state, command)
           [
             release_state.preparation.payload.change_set_id,
-            release_state.activation.payload.change_set_id,
-            release_state.completion.payload.change_set_id
+            release_state.activation.payload.change_set_id
           ].uniq == [ command.change_set_id ] &&
             release_state.preparation.payload.release_set_id == command.release_set_id &&
             release_state.activation.payload.release_set_id == command.release_set_id &&
@@ -85,16 +83,15 @@ module Coordinator::Write
 
         def exact_coverage?(release_state, work_items)
           expected = work_items.map { completion_key(_1) }.sort_by { |entry| entry.take(4) }
-          observed = release_state.preparation.payload.ordered_members.flat_map do |member|
-            member.ordered_candidates.map do |candidate|
-              [
-                member.repository_id,
-                candidate.work_item_id,
-                candidate.attempt_id,
-                candidate.candidate_id,
-                candidate.candidate_event.to_h
-              ]
-            end
+          observed = release_state.preparation.payload.ordered_members.map do |member|
+            candidate = member.candidate
+            [
+              member.repository_id,
+              candidate.work_item_id,
+              candidate.attempt_id,
+              candidate.candidate_id,
+              candidate.submission_event.to_h
+            ]
           end.sort_by { |entry| entry.take(4) }
           expected == observed
         end

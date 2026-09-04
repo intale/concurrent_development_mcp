@@ -439,11 +439,7 @@ module Coordinator::Read::Web::Repositories
       Coordinator::Read::Web::DeliveryBrowserV1::ReleaseMember.new(
         position: attributes.fetch("position"),
         repository_id: attributes.fetch("repository_id"),
-        target_branch: attributes.fetch("target_branch"),
-        merge_snapshot_id: attributes.fetch("merge_snapshot_id"),
-        change_set_id: attributes.fetch("change_set_id"),
-        merge_commit_oid: attributes.fetch("merge_commit_oid"),
-        candidate_count: attributes.fetch("ordered_candidates").length
+        candidate_id: attributes.fetch("candidate_id")
       )
     end
 

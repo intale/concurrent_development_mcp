@@ -40,9 +40,11 @@ module Coordinator::Write
           command.release_set_id.nil? &&
             payload.change_set_id == command.change_set_id &&
             payload.work_item_id == command.source_event.stream_id
-        when Events::ReleaseSetCompletedV1
-          command.release_set_id == payload.release_set_id &&
-            payload.change_set_id == command.change_set_id
+        when Events::WorkItemCompletedV2
+          command.release_set_id.nil? &&
+            payload.work_item_id == command.source_event.stream_id
+        when Events::ReleaseSetCompletedV2
+          command.release_set_id == payload.release_set_id
         else
           false
         end

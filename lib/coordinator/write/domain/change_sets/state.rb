@@ -15,7 +15,7 @@ module Coordinator::Write
                     .constrained(max_size: 500)
                     .default([].freeze)
         attribute :completed_at, Types::Timestamp.optional.default(nil)
-        attribute :release_set_id, Types::UuidV7.optional.default(nil)
+        attribute :release_set_id, Types::Identifier.optional.default(nil)
 
         def self.initial
           new(

@@ -21,13 +21,13 @@ module Coordinator::Read
           target_base_commit_oid: snapshot.target_base_commit_oid,
           ordered_candidates: snapshot.ordered_candidates.map(&:to_h),
           merge_commit_oid: snapshot.merge_commit_oid,
-          producer: snapshot.producer.to_h,
+          producer: snapshot.producer,
           run_id: snapshot.run_id,
           produced_at_domain: snapshot.produced_at,
           snapshot_digest: snapshot.snapshot_digest,
           policy_version: snapshot.policy_version,
           evidence_status: snapshot.evidence_status,
-          registered_at_domain: snapshot.registered_at,
+          registered_at_domain: event.created_at,
           registered_event: event_reference(event).to_h,
           registered_actor: actor(event).to_h,
           registered_markers: event.markers,
@@ -45,17 +45,29 @@ module Coordinator::Read
         )
         view = MergeSnapshotVerificationSubmissionViewV1.new(
           verification_id: submission.verification_id,
-          policy_version: submission.policy_version,
+          policy_version: event.metadata.fetch("policy_version"),
           assessment: submission.assessment,
-          verification_input_digest: submission.verification_input_digest,
-          submitted_at: submission.submitted_at,
-          source: event_source(event, occurred_at: submission.submitted_at)
+          verification_input_digest: event.metadata.fetch("verification_input_digest"),
+          submitted_at: event.created_at.utc.iso8601(6),
+          source: event_source(event)
         )
         status = submission.assessment.conclusion == "passed" ? "unverified" : submission.assessment.conclusion
         record.update!(
           verification_status: status,
-          verification_policy_version: submission.policy_version,
+          verification_policy_version: event.metadata.fetch("policy_version"),
           verification_submissions: [ *record.verification_submissions, view.to_h ]
+        )
+      end
+
+      def record_selection(event:, selection:)
+        record = Coordinator::Read::MergeSnapshot.find_by!(
+          merge_snapshot_id: selection.merge_snapshot_id
+        )
+        record.update!(
+          verified_decision: {
+            verification_id: selection.verification_id,
+            selected_event: event_reference(event).to_h
+          }
         )
       end
 
@@ -63,16 +75,35 @@ module Coordinator::Read
         record = Coordinator::Read::MergeSnapshot.find_by!(
           merge_snapshot_id: verified.merge_snapshot_id
         )
+        selection = symbolize(record.verified_decision || {})
+        verification_id = selection.fetch(:verification_id)
+        submission = record.verification_submissions
+          .map { symbolize(_1) }
+          .find { _1.fetch(:verification_id) == verification_id }
+        raise ProjectionStateError, "Selected merge verification was not projected" unless submission
+
+        assessment = Coordinator::Write::MergeSnapshotVerifications::AssessmentV1.new(
+          submission.fetch(:assessment)
+        )
+        submission_source = source_from_hash(submission.fetch(:source))
+        selected = Coordinator::Write::MergeSnapshotVerifications::VerificationDecisionReferenceV1.new(
+          verification_id:,
+          evidence_kind: assessment.evidence_kind,
+          conclusion: assessment.conclusion,
+          result_digest: assessment.result_digest,
+          verification_input_digest: submission.fetch(:verification_input_digest),
+          event: submission_source.event
+        )
         view = MergeSnapshotVerifiedViewV1.new(
-          policy_version: verified.policy_version,
-          selected_verification: verified.selected_verification,
-          verification_digest: verified.verification_digest,
-          verified_at: verified.verified_at,
-          source: event_source(event, occurred_at: verified.verified_at)
+          policy_version: event.metadata.fetch("policy_version"),
+          selected_verification: selected,
+          verification_digest: event.metadata.fetch("verification_digest"),
+          verified_at: event.created_at.utc.iso8601(6),
+          source: event_source(event)
         )
         record.update!(
           verification_status: "verified",
-          verification_policy_version: verified.policy_version,
+          verification_policy_version: event.metadata.fetch("policy_version"),
           verified_decision: view.to_h
         )
       end
@@ -81,10 +112,10 @@ module Coordinator::Read
         record = Coordinator::Read::MergeSnapshot.find_by!(
           merge_snapshot_id: observation.merge_snapshot_id
         )
-        view = MergeObservationViewV1.new(
-          authorization_event: observation.authorization_event,
-          authorization_decision_digest: observation.authorization_decision_digest,
-          snapshot_binding: observation.snapshot_binding,
+        record.update!(observation: {
+          authorization_event: nil,
+          authorization_decision_digest: event.metadata.fetch("authorization_decision_digest"),
+          snapshot_binding: observation.snapshot_binding.to_h,
           repository_id: observation.repository_id,
           target_branch: observation.target_branch,
           object_format: observation.object_format,
@@ -93,13 +124,21 @@ module Coordinator::Read
           observer: observation.observer,
           run_id: observation.run_id,
           observed_at: observation.observed_at,
-          observation_digest: observation.observation_digest,
-          policy_version: observation.policy_version,
-          evidence_status: observation.evidence_status,
-          recorded_at: observation.recorded_at,
-          source: event_source(event, occurred_at: observation.observed_at)
-        )
-        record.update!(observation: view.to_h)
+          observation_digest: event.metadata.fetch("observation_digest"),
+          policy_version: event.metadata.fetch("policy_version"),
+          evidence_status: "attributed_unverified",
+          recorded_at: event.created_at.utc.iso8601(6),
+          source: event_source(event).to_h
+        })
+      end
+
+      def link_observation_authorization(link:)
+        record = Coordinator::Read::MergeSnapshot.find_by!(merge_snapshot_id: link.merge_snapshot_id)
+        observation = record.observation&.deep_dup
+        raise ProjectionStateError, "Merge observation must precede its authorization link" unless observation
+
+        observation["authorization_event"] = link.authorization_event.to_h
+        record.update!(observation:)
       end
 
       private
@@ -115,7 +154,7 @@ module Coordinator::Read
             Coordinator::Write::MergeSnapshots::CandidateMemberV1.new(symbolize(candidate))
           end,
           merge_commit_oid: record.merge_commit_oid,
-          producer: Coordinator::Write::MergeSnapshots::ProducerV1.new(symbolize(record.producer)),
+          producer: record.producer,
           run_id: record.run_id,
           produced_at: record.produced_at_domain.utc.iso8601(6),
           snapshot_digest: record.snapshot_digest,
@@ -168,6 +207,8 @@ module Coordinator::Read
         return unless value
 
         attributes = symbolize(value)
+        return unless attributes[:policy_version]
+
         MergeSnapshotVerifiedViewV1.new(
           policy_version: attributes.fetch(:policy_version),
           selected_verification:
@@ -184,6 +225,8 @@ module Coordinator::Read
         return unless value
 
         attributes = symbolize(value)
+        return unless attributes[:authorization_event]
+
         MergeObservationViewV1.new(
           authorization_event: Coordinator::Write::EventReference.new(
             attributes.fetch(:authorization_event)
@@ -197,9 +240,7 @@ module Coordinator::Read
           object_format: attributes.fetch(:object_format),
           target_before_commit_oid: attributes.fetch(:target_before_commit_oid),
           target_after_commit_oid: attributes.fetch(:target_after_commit_oid),
-          observer: Coordinator::Write::MergeObservations::ObserverV1.new(
-            attributes.fetch(:observer)
-          ),
+          observer: attributes.fetch(:observer),
           run_id: attributes.fetch(:run_id),
           observed_at: attributes.fetch(:observed_at),
           observation_digest: attributes.fetch(:observation_digest),
@@ -210,14 +251,14 @@ module Coordinator::Read
         )
       end
 
-      def event_source(event, occurred_at:)
+      def event_source(event)
         MergeSnapshotSourceEvidenceV1.new(
           event: event_reference(event),
           actor: actor(event),
           markers: event.markers,
           metadata: event.metadata,
           global_position: event.global_position,
-          occurred_at:,
+          occurred_at: event.created_at.utc.iso8601(6),
           persisted_at: event.created_at.utc.iso8601(6),
           causation_id: event.causation_id,
           correlation_id: event.correlation_id

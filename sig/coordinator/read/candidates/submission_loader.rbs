@@ -1,0 +1,18 @@
+module Coordinator::Read
+  module Candidates
+    interface _SubmissionLoader
+      def call: (String candidate_id) -> Coordinator::Read::CandidateSubmissionViewV2
+    end
+
+    class SubmissionLoader
+      FACT_TYPES: Array[String]
+
+      def initialize: (
+        event_store: Coordinator::Write::EventStore,
+        ?stream_factory: Coordinator::Write::StreamFactory,
+        ?schema_registry: Coordinator::Write::EventSchemaRegistry
+      ) -> void
+      def call: (String candidate_id) -> Coordinator::Read::CandidateSubmissionViewV2
+    end
+  end
+end

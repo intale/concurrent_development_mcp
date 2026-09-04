@@ -45,7 +45,7 @@ module Coordinator::Processes
 
       def completion(source:, command_id:)
         release_set_id = source.payload.release_set_id if
-          source.payload.is_a?(Coordinator::Write::Events::ReleaseSetCompletedV1)
+          source.payload.is_a?(Coordinator::Write::Events::ReleaseSetCompletedV2)
         document = Coordinator::Write::ProcessDecisions::ChangeSetCompletionV1.new(
           schema: "process-decision/change-set-completion/v1",
           process_manager: "build-progress",

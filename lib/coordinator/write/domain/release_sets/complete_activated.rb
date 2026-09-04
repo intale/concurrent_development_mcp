@@ -6,37 +6,34 @@ module Coordinator::Write
       class CompleteActivated
         include Dry::Monads[:result]
 
-        def initialize(
-          stream_factory: StreamFactory.new,
-          digest_builder: Coordinator::Write::ReleaseSets::CompletionDigestBuilder.new
-        )
+        def initialize(stream_factory: StreamFactory.new)
           @stream_factory = stream_factory
-          @digest_builder = digest_builder
         end
 
-        def call(state:, command:, completed_at:)
+        def call(state:, command:)
           denial = denied(state:, command:)
           return denial if denial
 
-          preparation = state.preparation.payload
-          attributes = {
-            release_set_id: command.release_set_id,
-            release_digest: preparation.release_digest,
-            outcome: "activated",
-            source_event: command.activation_event,
-            compensation_evidence: [],
-            rule_version: command.rule_version
-          }
-          event = Events::ReleaseSetCompletedV1.new(
-            **attributes,
-            change_set_id: preparation.change_set_id,
-            completion_digest: @digest_builder.call(**attributes),
-            completed_at:
-          )
-          Success(EventPlan.new(writes: [ EventWrite.new(stream: @stream_factory.release_set(command.release_set_id), event:) ]))
+          Success(completion_plan(command.release_set_id, "activated"))
         end
 
         private
+
+        def completion_plan(release_set_id, outcome)
+          stream = @stream_factory.release_set(release_set_id)
+          EventPlan.new(
+            writes: [
+              EventWrite.new(
+                stream:,
+                event: Events::ReleaseSetOutcomeRecordedV1.new(release_set_id:, outcome:)
+              ),
+              EventWrite.new(
+                stream:,
+                event: Events::ReleaseSetCompletedV2.new(release_set_id:)
+              )
+            ]
+          )
+        end
 
         def denied(state:, command:)
           return failure(:release_set_not_found, "ReleaseSet has not been prepared") unless state.preparation

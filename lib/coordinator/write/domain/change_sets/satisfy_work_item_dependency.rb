@@ -120,9 +120,9 @@ module Coordinator::Write
                    payload.output_key == dependency.required_output&.key
           end
 
-          payload.is_a?(Events::WorkItemCompletedV1) &&
+          (payload.is_a?(Events::WorkItemCompletedV1) || payload.is_a?(Events::WorkItemCompletedV2)) &&
             completion_source?(payload, dependency:, change_set_id:, producer:) &&
-            payload.produced_outputs.any? do |output|
+            producer.produced_outputs.any? do |output|
               output.kind == dependency.required_output&.kind && output.key == dependency.required_output&.key
             end
         end
@@ -130,7 +130,7 @@ module Coordinator::Write
         def integration_source?(evidence, dependency:, change_set_id:, producer:)
           payload = evidence.payload
           state = evidence.release_state
-          return false unless payload.is_a?(Events::RepositoryIntegrationRecordedV1)
+          return false unless payload.is_a?(Events::RepositoryIntegrationRecordedV2)
           return false unless payload.change_set_id == change_set_id && payload.outcome == "integrated"
           return false unless state&.integrations&.any? { _1.event == evidence.reference }
 
@@ -140,7 +140,7 @@ module Coordinator::Write
         def verification_source?(evidence, dependency:, change_set_id:, producer:)
           payload = evidence.payload
           state = evidence.release_state
-          return false unless payload.is_a?(Events::ReleaseSetVerificationRecordedV1)
+          return false unless payload.is_a?(Events::ReleaseSetVerificationRecordedV2)
           return false unless payload.change_set_id == change_set_id && payload.evidence.outcome == "passed"
           return false unless payload.evidence.run_id == dependency.required_output&.key
           return false unless state&.verifications&.any? { _1.event == evidence.reference }
@@ -154,8 +154,9 @@ module Coordinator::Write
         def deployment_source?(evidence, dependency:, change_set_id:, producer:)
           payload = evidence.payload
           state = evidence.release_state
-          return false unless payload.is_a?(Events::ReleaseSetCompletedV1)
-          return false unless payload.change_set_id == change_set_id && payload.outcome == "activated"
+          return false unless payload.is_a?(Events::ReleaseSetCompletedV2)
+          return false unless state&.preparation&.payload&.change_set_id == change_set_id
+          return false unless state&.completion&.payload&.outcome == "activated"
           return false unless state&.completion&.event == evidence.reference
           return false unless state.preparation
 
@@ -167,11 +168,10 @@ module Coordinator::Write
         def member_contains_producer?(member, dependency:, producer:)
           return false unless member && producer.selected_candidate_id
 
-          member.ordered_candidates.any? do |candidate|
-            candidate.change_set_id == producer.change_set_id &&
-              candidate.work_item_id == dependency.producer_work_item_id &&
-              candidate.candidate_id == producer.selected_candidate_id
-          end
+          candidate = member.candidate
+          candidate.change_set_id == producer.change_set_id &&
+            candidate.work_item_id == dependency.producer_work_item_id &&
+            candidate.candidate_id == producer.selected_candidate_id
         end
 
         def ready_after?(change_set_state:, dependency:, consumer_state:)

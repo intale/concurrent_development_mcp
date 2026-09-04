@@ -7,11 +7,9 @@ module Coordinator::Write
         include Dry::Monads[:result]
 
         def initialize(
-          stream_factory: StreamFactory.new,
-          verified_digest_builder: Coordinator::Write::MergeSnapshotVerifications::VerifiedDigestBuilder.new
+          stream_factory: StreamFactory.new
         )
           @stream_factory = stream_factory
-          @verified_digest_builder = verified_digest_builder
         end
 
         def call(
@@ -19,34 +17,29 @@ module Coordinator::Write
           command:,
           snapshot_evidence:,
           verification_id:,
-          verification_input_digest:,
-          submission_event:,
-          submitted_at:
+          verification_input_digest:
         )
           denial = denied(history:, command:, snapshot_evidence:, verification_input_digest:)
           return Failure(denial) if denial
 
-          submission = Events::MergeSnapshotVerificationSubmittedV1.new(
+          submission = Events::MergeSnapshotVerificationSubmittedV2.new(
+            verification_id:,
             merge_snapshot_id: command.merge_snapshot_id,
-            snapshot: snapshot_evidence,
-            verification_id:,
-            policy_version: command.policy_version,
-            assessment: command.assessment,
-            verification_input_digest:,
-            submitted_at:
+            assessment: command.assessment
           )
-          writes = [ write(command.merge_snapshot_id, submission) ]
-          verified = verified_event(
-            command:,
-            snapshot_evidence:,
+          assignment = Events::MergeSnapshotVerificationAssignedV1.new(
             verification_id:,
-            verification_input_digest:,
-            submission_event:,
-            submitted_at:
+            merge_snapshot_id: command.merge_snapshot_id
           )
-          writes << write(command.merge_snapshot_id, verified) if verified
 
-          Success(EventPlan.new(writes:))
+          Success(
+            EventPlan.new(
+              writes: [
+                EventWrite.new(stream: @stream_factory.merge_verification(verification_id), event: submission),
+                EventWrite.new(stream: @stream_factory.merge_snapshot(command.merge_snapshot_id), event: assignment)
+              ]
+            )
+          )
         end
 
         private
@@ -93,45 +86,6 @@ module Coordinator::Write
             binding.ordered_candidates.map(&:to_h) == snapshot.ordered_candidates.map do |candidate|
               { candidate_id: candidate.candidate_id, head_commit_oid: candidate.head_commit_oid }
             end
-        end
-
-        def verified_event(
-          command:,
-          snapshot_evidence:,
-          verification_id:,
-          verification_input_digest:,
-          submission_event:,
-          submitted_at:
-        )
-          assessment = command.assessment
-          return unless assessment.conclusion == "passed"
-          return if assessment.findings.any? { %w[error critical].include?(_1.severity) }
-
-          selected = Coordinator::Write::MergeSnapshotVerifications::VerificationDecisionReferenceV1.new(
-            verification_id:,
-            evidence_kind: assessment.evidence_kind,
-            conclusion: assessment.conclusion,
-            result_digest: assessment.result_digest,
-            verification_input_digest:,
-            event: submission_event
-          )
-          Events::MergeSnapshotVerifiedV1.new(
-            merge_snapshot_id: command.merge_snapshot_id,
-            snapshot: snapshot_evidence,
-            policy_version: command.policy_version,
-            selected_verification: selected,
-            verification_digest: @verified_digest_builder.call(
-              merge_snapshot_id: command.merge_snapshot_id,
-              snapshot_digest: snapshot_evidence.snapshot.snapshot_digest,
-              policy_version: command.policy_version,
-              selected_verification: selected
-            ),
-            verified_at: submitted_at
-          )
-        end
-
-        def write(merge_snapshot_id, event)
-          EventWrite.new(stream: @stream_factory.merge_snapshot(merge_snapshot_id), event:)
         end
 
         def error(code, message, command, details = {})

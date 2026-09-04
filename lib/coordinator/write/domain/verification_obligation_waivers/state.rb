@@ -4,17 +4,16 @@ module Coordinator::Write
   module Domain
     module VerificationObligationWaivers
       class State < Value
-        attribute :obligation, Types.Instance(Events::VerificationObligationCreatedV1).optional
+        attribute :obligation, Types.Instance(VerificationObligations::DefinitionV2).optional
         attribute :obligation_event, Types.Instance(EventReference).optional
-        attribute :satisfied, Types.Instance(Events::VerificationObligationSatisfiedV1).optional
+        attribute :satisfied, Types.Instance(Events::VerificationObligationSatisfiedV2).optional
         attribute :satisfied_event, Types.Instance(EventReference).optional
-        attribute :failed, Types.Instance(Events::VerificationObligationFailedV1).optional
+        attribute :failed, Types.Instance(Events::VerificationObligationFailedV2).optional
         attribute :failed_event, Types.Instance(EventReference).optional
-        attribute :waived, Types.Instance(Events::VerificationObligationWaivedV1).optional
+        attribute :waived, Types.Instance(Events::VerificationObligationWaivedV2).optional
         attribute :waived_event, Types.Instance(EventReference).optional
-        attribute :invalidated, Types.Instance(Events::VerificationObligationInvalidatedV1).optional
+        attribute :invalidated, Types.Instance(Events::VerificationObligationInvalidatedV2).optional
         attribute :invalidated_event, Types.Instance(EventReference).optional
-        attribute :policy_current, Types::Bool
 
         def self.initial
           new(
@@ -27,8 +26,7 @@ module Coordinator::Write
             waived: nil,
             waived_event: nil,
             invalidated: nil,
-            invalidated_event: nil,
-            policy_current: false
+            invalidated_event: nil
           )
         end
 
@@ -43,9 +41,6 @@ module Coordinator::Write
           "open"
         end
 
-        def previous_terminal_event
-          failed_event || satisfied_event
-        end
       end
     end
   end

@@ -13,7 +13,7 @@ module Coordinator::Read
               Types::Array.of(Member)
                 .constrained(min_size: 1, max_size: Types::MERGE_SNAPSHOT_MAXIMUM_CANDIDATES)
     attribute :merge_commit_oid, Types::GitOid
-    attribute :producer, Coordinator::Write::MergeSnapshots::ProducerV1
+    attribute :producer, Types::Identifier
     attribute :run_id, Types::Identifier
     attribute :produced_at, Types::Timestamp
     attribute :snapshot_digest, Types::Sha256Digest

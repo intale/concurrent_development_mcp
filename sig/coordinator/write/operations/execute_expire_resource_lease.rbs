@@ -6,17 +6,17 @@ module Coordinator
 
         def initialize: (
           event_store: _EventStore,
-          ?decider: Domain::ResourceLeases::Expire,
+          ?decider: Domain::WorkIntentions::Expire,
           ?input_digest: CommandInputDigest,
           ?clock: Shared::_Clock,
           ?id_generator: Shared::_IdGenerator,
           ?event_factory: EventFactory,
-          ?schema_registry: EventSchemaRegistry,
           ?stream_factory: StreamFactory,
           ?completion_builder: CommandResultBuilder,
           ?repository_registration_loader: RepositoryRegistrationLoader,
           ?repository_marker_builder: RepositoryMarkerBuilder,
-          ?event_plan_contract: Contracts::ResourceLeaseExpiryEventPlan
+          ?resource_loader: WorkIntentionResourceLoader,
+          ?intention_loader: WorkIntentionLoader
         ) -> void
 
         %a{rbs:test:skip}

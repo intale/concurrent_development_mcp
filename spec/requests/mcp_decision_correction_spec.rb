@@ -31,7 +31,7 @@ RSpec.describe "DEC-02A MCP Decision correction" do
     expect(expected_head).to include(
       "event_id" => activated.id,
       "type" => "DecisionActivated",
-      "stream_revision" => 1
+      "stream_revision" => 2
     )
 
     arguments = correction_arguments(
@@ -57,9 +57,9 @@ RSpec.describe "DEC-02A MCP Decision correction" do
         "interpretation_id" => "I-mcp-correction",
         "outcome" => "corrected",
         "policy_status" => "active",
-        "correction_event" => include(
-          "type" => "DecisionDefinitionCorrected",
-          "stream_revision" => 2
+          "correction_event" => include(
+            "type" => "DecisionDefinitionCorrected",
+            "stream_revision" => 4
         )
       ),
       "next_actions" => [
@@ -70,15 +70,17 @@ RSpec.describe "DEC-02A MCP Decision correction" do
     submitted, started, task_completed = task_events(task_id)
     corrected = decision_events.find { _1.type == "DecisionDefinitionCorrected" }
     correction_facts = [
-      corrected,
+      *decision_events.select { _1.causation_id == started.id },
       *slot_events(result.dig("data", "slot", "slot_id")).select { _1.causation_id == started.id },
       *partition_events.select { _1.causation_id == started.id }
     ]
     command_terminal = CommandTraceFixture.terminal(task_id, event_store:)
     expect(correction_facts.map(&:type)).to eq(%w[
+      DecisionDerivedFromInterpretation
       DecisionDefinitionCorrected
       DecisionSlotHeadChanged
-      DecisionPartitionAdvanced
+      DecisionRemovedFromPartition
+      DecisionAddedToPartition
     ])
     expect([ *correction_facts, command_terminal ].map(&:causation_id).uniq).to eq([ started.id ])
     expect(task_completed.causation_id).to eq(command_terminal.id)
@@ -345,7 +347,12 @@ RSpec.describe "DEC-02A MCP Decision correction" do
     event_store.read(
       streams.decision("D-mcp-decision"),
       Coordinator::Write::EventReadCriteria.new(
-        event_types: %w[DecisionRecorded DecisionActivated DecisionDefinitionCorrected],
+        event_types: %w[
+          DecisionRecorded
+          DecisionDerivedFromInterpretation
+          DecisionActivated
+          DecisionDefinitionCorrected
+        ],
         maximum_count: 10,
         direction: :asc
       )
@@ -367,7 +374,7 @@ RSpec.describe "DEC-02A MCP Decision correction" do
     event_store.read(
       streams.decision_partition("repo:#{CORRECTION_REPOSITORY_ID}:testing"),
       Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "DecisionPartitionAdvanced" ],
+        event_types: %w[DecisionRemovedFromPartition DecisionAddedToPartition],
         maximum_count: 10,
         direction: :asc
       )

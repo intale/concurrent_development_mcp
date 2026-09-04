@@ -5,8 +5,7 @@ module Coordinator::Write
         def initialize: (?stream_factory: StreamFactory) -> void
         def call: (
           state: RegistrySweepState,
-          command: Commands::ProgressCandidateImpactRegistrySweep,
-          progressed_at: String
+          command: Commands::ProgressCandidateImpactRegistrySweep
         ) -> Dry::Monads::Result
       end
     end

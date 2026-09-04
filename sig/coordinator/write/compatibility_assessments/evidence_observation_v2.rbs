@@ -1,0 +1,7 @@
+module Coordinator::Write
+  module CompatibilityAssessments
+    class EvidenceObservationV2 < Coordinator::Shared::Value
+      def decision_reference: () -> untyped
+    end
+  end
+end

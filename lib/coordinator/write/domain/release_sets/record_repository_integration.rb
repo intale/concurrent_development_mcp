@@ -6,51 +6,44 @@ module Coordinator::Write
       class RecordRepositoryIntegration
         include Dry::Monads[:result]
 
-        def initialize(
-          stream_factory: StreamFactory.new,
-          digest_builder: Coordinator::Write::ReleaseSets::IntegrationDigestBuilder.new
-        )
+        def initialize(stream_factory: StreamFactory.new)
           @stream_factory = stream_factory
-          @digest_builder = digest_builder
         end
 
-        def call(state:, command:, observation:, recorded_at:)
+        def call(state:, command:, observation:)
           denial = denied(state:, command:, observation:)
           return denial if denial
 
           preparation = state.preparation.payload
           member = state.member(command.repository_id)
           attempt_number = state.integrations_for(command.repository_id).length + 1
-          attributes = {
-            release_set_id: command.release_set_id,
-            release_digest: preparation.release_digest,
-            repository_id: command.repository_id,
-            member_position: member.position,
-            attempt_id: command.attempt_id,
-            attempt_number:,
-            outcome: command.outcome,
-            merge_observation_event: command.merge_observation_event,
-            observation_digest: command.observation_digest,
-            failure: command.failure,
-            policy_version: command.policy_version
-          }
-          event = Events::RepositoryIntegrationRecordedV1.new(
-            **attributes,
-            change_set_id: preparation.change_set_id,
-            integration_digest: @digest_builder.call(**attributes),
-            evidence_status: "attributed_unverified",
-            recorded_at:
-          )
-          Success(
-            EventPlan.new(
-              writes: [
-                EventWrite.new(
-                  stream: @stream_factory.release_set(command.release_set_id),
-                  event:
-                )
-              ]
+          stream = @stream_factory.release_set(command.release_set_id)
+          writes = [
+            EventWrite.new(
+              stream:,
+              event: Events::RepositoryIntegrationRecordedV2.new(
+                release_set_id: command.release_set_id,
+                change_set_id: preparation.change_set_id,
+                repository_id: command.repository_id,
+                attempt_id: command.attempt_id,
+                attempt_number:,
+                member_position: member.position,
+                outcome: command.outcome,
+                failure: command.failure
+              )
             )
-          )
+          ]
+          if command.outcome == "integrated"
+            writes << EventWrite.new(
+              stream:,
+              event: Events::RepositoryIntegrationMergeLinkedV1.new(
+                release_set_id: command.release_set_id,
+                repository_id: command.repository_id,
+                merge_observation: command.merge_observation_event
+              )
+            )
+          end
+          Success(EventPlan.new(writes:))
         end
 
         private
@@ -70,7 +63,9 @@ module Coordinator::Write
           end
           return failure(:release_integration_out_of_order, "Prior ReleaseSet members must integrate first") unless prior_members_integrated?(state, member)
           return failure(:release_integration_evidence_invalid, "Integration outcome evidence is inconsistent") unless evidence_shape_valid?(command)
-          return failure(:release_integration_observation_mismatch, "Merge observation does not match the prepared member") if command.outcome == "integrated" && !observation_matches?(observation, member, command)
+          if command.outcome == "integrated" && !observation_matches?(observation, member, command)
+            return failure(:release_integration_observation_mismatch, "Merge observation does not match the prepared member")
+          end
 
           nil
         end
@@ -89,18 +84,22 @@ module Coordinator::Write
           end
         end
 
-        def observation_matches?(observation, member, command)
-          observation &&
-            observation.merge_snapshot_id == member.merge_snapshot_id &&
-            observation.authorization_event == member.authorization_event &&
-            observation.authorization_decision_digest == member.authorization_decision_digest &&
-            observation.snapshot_binding == member.snapshot_binding &&
-            observation.repository_id == member.repository_id &&
-            observation.target_branch == member.target_branch &&
-            observation.object_format == member.object_format &&
-            observation.target_before_commit_oid == member.target_base_commit_oid &&
-            observation.target_after_commit_oid == member.merge_commit_oid &&
-            observation.observation_digest == command.observation_digest
+        def observation_matches?(evidence, member, command)
+          return false unless evidence
+
+          observation = evidence.observation
+          snapshot = evidence.snapshot
+          evidence.event == command.merge_observation_event &&
+            evidence.observation_digest == command.observation_digest &&
+            snapshot.ordered_candidates.one? &&
+            snapshot.ordered_candidates.sole.candidate_id == member.candidate_id &&
+            snapshot.repository_id == member.repository_id &&
+            observation.merge_snapshot_id == snapshot.merge_snapshot_id &&
+            observation.repository_id == snapshot.repository_id &&
+            observation.target_branch == snapshot.target_branch &&
+            observation.object_format == snapshot.object_format &&
+            observation.target_before_commit_oid == snapshot.target_base_commit_oid &&
+            observation.target_after_commit_oid == snapshot.merge_commit_oid
         end
 
         def failure(code, message, details = {})

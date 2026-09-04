@@ -7,7 +7,7 @@ module Coordinator::Read
 
       params do
         required(:event_type).filled(:string, eql?: "MergeSnapshotRegistered")
-        required(:schema_version).filled(:integer, eql?: 1)
+        required(:schema_version).filled(:integer, eql?: 2)
         required(:stream_context).filled(:string, eql?: "DevelopmentIntegration")
         required(:stream_name).filled(:string, eql?: "MergeSnapshot")
         required(:stream_id).filled(:string)

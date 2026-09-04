@@ -3,7 +3,7 @@
 RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
   let(:context_registration) do
     Coordinator::Read::Subscriptions::CoordContext.new(
-      handler: Coordinator::Read::Projectors::CoordContextV1.new,
+      handler: Coordinator::Read::Projectors::CoordContextV1.new(submission_loader: inert_loader),
       pull_interval: 0.2
     )
   end
@@ -33,15 +33,28 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
   end
   let(:agent_choice_impact_registration) do
     Coordinator::Read::Subscriptions::AgentChoiceImpacts.new(
-      handler: Coordinator::Read::Projectors::AgentChoiceImpactsV1.new,
+      handler: Coordinator::Read::Projectors::AgentChoiceImpactsV1.new(
+        assessment_loader: inert_loader
+      ),
       pull_interval: 0.2
     )
   end
   let(:candidate_registration) do
     Coordinator::Read::Subscriptions::Candidates.new(
-      handler: Coordinator::Read::Projectors::CandidatesV1.new,
+      handler: Coordinator::Read::Projectors::CandidatesV1.new(
+        submission_loader: inert_loader,
+        impact_surface_loader: inert_loader
+      ),
       pull_interval: 0.2
     )
+  end
+
+  let(:inert_loader) do
+    Class.new do
+      def call(_identifier)
+        raise "not used by subscription registration specs"
+      end
+    end.new
   end
   let(:repository_registration) do
     Coordinator::Read::Subscriptions::Repositories.new(
@@ -81,13 +94,23 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
   end
   let(:merge_snapshot_registration) do
     Coordinator::Read::Subscriptions::MergeSnapshots.new(
-      handler: Coordinator::Read::Projectors::MergeSnapshotsV1.new,
+      handler: Coordinator::Read::Projectors::MergeSnapshotsV1.new(
+        registration_loader: inert_registration_loader
+      ),
       pull_interval: 0.2
     )
   end
+
+  let(:inert_registration_loader) do
+    Class.new do
+      def call(_event, registration:)
+        raise "not used by subscription registration specs"
+      end
+    end.new
+  end
   let(:release_set_registration) do
     Coordinator::Read::Subscriptions::ReleaseSets.new(
-      handler: Coordinator::Read::Projectors::ReleaseSetsV1.new,
+      handler: Coordinator::Read::Projectors::ReleaseSetsV1.new(preparation_loader: inert_loader),
       pull_interval: 0.2
     )
   end
@@ -100,7 +123,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
         "agent-choice-impacts-v1",
         "agent-choices-v1",
         "candidates-v1",
-        "coord-context-v3",
+        "coord-context-v4",
         "decision-governance-v1",
         "decision-interpretations-v1",
         "development-artifacts-v3",
@@ -116,9 +139,10 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
     )
     expect(context_registration.definition.identity.to_h).to eq(
       set_name: "coordinator-read-models-v1",
-      subscription_name: "coord-context-v3"
+      subscription_name: "coord-context-v4"
     )
     expect(context_registration.definition.event_types).to include(
+      "CandidateSubmitted",
       "WorkItemCandidateSelected",
       "AttemptCompleted",
       "WorkItemCompleted",

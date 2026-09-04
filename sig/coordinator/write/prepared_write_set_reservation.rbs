@@ -5,8 +5,8 @@ module Coordinator
       def expires_at: () -> String
       def input_digest: () -> String
       def lease_set_id: () -> String
-      def resources: () -> Array[PreparedLeaseTargetV1]
-      def reservation_event_id: () -> String
+      def resources: () -> Array[PreparedWorkIntentionTargetV1]
+      def set_event_id: () -> String
     end
   end
 end

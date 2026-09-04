@@ -1,0 +1,7 @@
+module Coordinator::Write
+  module Events
+    class CandidateChangeManifestCapturedV2 < Base
+      File: untyped
+    end
+  end
+end

@@ -131,7 +131,7 @@ const mergeDetail = {
 } satisfies NonNullable<ProjectDeliveryMergeQuery["projectMergeSnapshot"]>;
 const releaseDetail = {
   releaseSet: release,
-  members: [{ position: 1, repositoryId, targetBranch: "main", mergeSnapshotId: snapshot.id, changeSetId: checkpoint.changeSetId, mergeCommitOid: checkpoint.headCommitOid, candidateCount: 1 }],
+  members: [{ position: 1, repositoryId, candidateId: checkpoint.id }],
   integrations: [{ repositoryId, attemptId: "integration-ui-10", attemptNumber: 1, outcome: "succeeded", failureCode: null, recordedAt: timestamp }],
   verificationAttemptCount: 1,
   activated: false,

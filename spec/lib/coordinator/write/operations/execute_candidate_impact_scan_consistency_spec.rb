@@ -37,9 +37,12 @@ RSpec.describe "Candidate impact scan start consistency", :event_store do
     expect(result).to be_success
     persisted = pair_scan_events(invocation.command.scan_id).sole
     payload = load(persisted)
-    expect(payload.policy_partition_event).to eq(reference(policy.fetch(:partition_event)))
-    expect(payload.policy_head).to eq(policy.fetch(:head))
-    expect(reference(corrected.fetch(:partition_event))).not_to eq(payload.policy_partition_event)
+    snapshot = Coordinator::Write::CandidateObligationScans::PairScanLoader.new(event_store:).call(
+      invocation.command.scan_id
+    )
+    expect(snapshot.state.policy_partition_event).to eq(reference(policy.fetch(:partition_event)))
+    expect(snapshot.state.policy_head).to eq(policy.fetch(:head))
+    expect(reference(corrected.fetch(:partition_event))).not_to eq(snapshot.state.policy_partition_event)
     expect(current_partition(pair.dig(:ids, :change_set_id))).to eq(
       reference(corrected.fetch(:partition_event))
     )
@@ -82,7 +85,7 @@ RSpec.describe "Candidate impact scan start consistency", :event_store do
     payload = load(persisted)
     expect(registration).not_to be_nil
     valid_prefix = registration.global_position > persisted.global_position ||
-                   registration.stream_revision <= payload.to_revision
+                   registration.global_position <= payload.to_revision
     expect(valid_prefix).to eq(true)
   end
 

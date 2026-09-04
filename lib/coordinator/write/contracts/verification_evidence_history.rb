@@ -19,13 +19,10 @@ module Coordinator::Write
           next
         end
 
-        unless coherent_creation?(state, obligation_id)
-          key(:state).failure("must contain the exact revision-0 obligation creation")
-          next
-        end
+        key(:state).failure("must contain the exact obligation creation") unless coherent_creation?(state, obligation_id)
         key(:state).failure("must contain one coherent latest claim") unless coherent_claim?(state, obligation_id)
         key(:state).failure("must contain coherent evidence observations") unless coherent_evidence?(state, obligation_id)
-        key(:state).failure("must contain at most one coherent terminal outcome") unless coherent_terminal?(state, obligation_id)
+        key(:state).failure("must contain at most one coherent terminal fact") unless coherent_terminal?(state, obligation_id)
       end
 
       private
@@ -47,101 +44,33 @@ module Coordinator::Write
         return reference.nil? unless claim
 
         claim.obligation_id == obligation_id &&
-          claim.obligation_event == state.obligation_event &&
-          claim.claimed_at < claim.expires_at &&
           reference&.type == "VerificationObligationClaimed" &&
           same_stream?(reference, obligation_id)
       end
 
       def coherent_evidence?(state, obligation_id)
-        digests = state.evidence.map { _1.evidence.assessment_input_digest }
-        return false unless digests.uniq.length == digests.length
+        digests = state.evidence.map(&:assessment_input_digest)
         revisions = state.evidence.map { _1.event.stream_revision }
+        return false unless digests.uniq.length == digests.length
         return false unless revisions == revisions.sort && revisions.uniq.length == revisions.length
 
         state.evidence.all? do |observation|
           evidence = observation.evidence
           reference = observation.event
           evidence.obligation_id == obligation_id &&
-            evidence.obligation_event == state.obligation_event &&
             evidence.evidence_kind == evidence.assessment.evidence_kind &&
-            evidence.obligation_validity_input_digest == state.obligation.validity_input_digest &&
-            evidence.source_candidate == state.obligation.source_candidate &&
-            evidence.target_candidate == state.obligation.target_candidate &&
-            evidence.policy == state.obligation.policy &&
+            evidence.claim.claim_event.type == "VerificationObligationClaimed" &&
+            same_stream?(evidence.claim.claim_event, obligation_id) &&
+            observation.obligation_validity_input_digest == state.obligation.validity_input_digest &&
+            observation.policy == state.obligation.policy &&
             reference.type == "VerificationEvidenceSubmitted" &&
             same_stream?(reference, obligation_id)
         end
       end
 
       def coherent_terminal?(state, obligation_id)
-        return false if state.satisfied && state.failed
-        return false if state.satisfied && state.waived
-        return false if state.satisfied && !coherent_common?(state.satisfied, state, obligation_id)
-        return false if state.failed && !coherent_common?(state.failed, state, obligation_id)
-        return false if state.satisfied && !coherent_satisfaction?(state)
-        return false if state.failed && !coherent_failure?(state)
-        return false if state.waived && !coherent_waiver?(state, obligation_id)
-        return false if state.invalidated && !coherent_invalidation?(state, obligation_id)
-
-        true
-      end
-
-      def coherent_common?(terminal, state, obligation_id)
-        terminal.obligation_id == obligation_id &&
-          terminal.obligation_event == state.obligation_event &&
-          terminal.policy == state.obligation.policy
-      end
-
-      def coherent_waiver?(state, obligation_id)
-        waiver = state.waived
-        prior_valid =
-          case waiver.previous_status
-          when "open" then state.satisfied.nil? && state.failed.nil?
-          when "failed" then !state.failed.nil?
-          else false
-          end
-        coherent_common?(waiver, state, obligation_id) && prior_valid
-      end
-
-      def coherent_invalidation?(state, obligation_id)
-        invalidation = state.invalidated
-        invalidation.obligation_id == obligation_id &&
-          invalidation.obligation_event == state.obligation_event &&
-          invalidation.invalidated_policy == state.obligation.policy &&
-          invalidation_prior_status?(state, invalidation.previous_status)
-      end
-
-      def invalidation_prior_status?(state, status)
-        case status
-        when "open" then !state.satisfied && !state.failed && !state.waived
-        when "satisfied" then !state.satisfied.nil? && !state.waived
-        when "failed" then !state.failed.nil? && !state.waived
-        when "waived" then !state.waived.nil?
-        else false
-        end
-      end
-
-      def coherent_satisfaction?(state)
-        selected = state.satisfied.selected_evidence
-        observations = state.evidence.map(&:decision_reference)
-        required = state.obligation.required_evidence
-        selected.map(&:evidence_kind) == required &&
-          selected.all? { _1.conclusion == "passed" && observations.include?(_1) } &&
-          state.satisfied.outcome_digest == CompatibilityAssessments::OutcomeDigestBuilder.new.satisfied(
-            obligation: state.obligation,
-            selected_evidence: selected
-          )
-      end
-
-      def coherent_failure?(state)
-        triggering = state.failed.triggering_evidence
-        state.evidence.map(&:decision_reference).include?(triggering) &&
-          triggering.conclusion == "failed" &&
-          state.failed.outcome_digest == CompatibilityAssessments::OutcomeDigestBuilder.new.failed(
-            obligation: state.obligation,
-            triggering_evidence: triggering
-          )
+        terminals = [ state.satisfied, state.failed, state.waived, state.invalidated ].compact
+        terminals.length <= 1 && terminals.all? { _1.obligation_id == obligation_id }
       end
 
       def same_stream?(reference, obligation_id)

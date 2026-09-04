@@ -5,15 +5,19 @@ module Coordinator::Write
     module MergeSnapshotVerifications
       class HistoryV1 < Value
         Observation = Types.Instance(Coordinator::Write::MergeSnapshotVerifications::EvidenceObservationV1)
+        Assignment = Types.Instance(Coordinator::Write::MergeSnapshotVerifications::AssignmentObservationV1)
 
-        attribute :snapshot, Types.Instance(Events::MergeSnapshotRegisteredV1).optional
-        attribute :snapshot_event, Types.Instance(EventReference).optional
+        attribute :snapshot, Types.Instance(Coordinator::Write::MergeSnapshots::StateV2).optional
+        attribute :assignments,
+                  Types::Array.of(Assignment).constrained(
+                    max_size: Types::MERGE_SNAPSHOT_VERIFICATION_MAXIMUM_COUNT + 1
+                  )
         attribute :submissions,
                   Types::Array.of(Observation).constrained(
                     max_size: Types::MERGE_SNAPSHOT_VERIFICATION_MAXIMUM_COUNT + 1
                   )
-        attribute :verified, Types.Instance(Events::MergeSnapshotVerifiedV1).optional
-        attribute :verified_event, Types.Instance(EventReference).optional
+        attribute :verified,
+                  Types.Instance(Coordinator::Write::MergeSnapshotVerifications::VerifiedObservationV2).optional
 
         def absent?
           snapshot.nil?
@@ -25,7 +29,7 @@ module Coordinator::Write
 
         def duplicate?(verification_input_digest)
           submissions.any? do |observation|
-            observation.submission.verification_input_digest == verification_input_digest
+            observation.verification_input_digest == verification_input_digest
           end
         end
 

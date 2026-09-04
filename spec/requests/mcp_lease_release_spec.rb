@@ -48,14 +48,14 @@ RSpec.describe "MCP lease_release Task boundary", :event_store do
           "lease_set_id" => reservation.lease_set_id,
           "resource_count" => 2,
           "previous_expires_at" => "2026-08-22T10:10:00.000000Z",
-          "released_at" => "2026-08-22T10:05:00.000000Z"
+          "released_at" => match(Coordinator::Shared::Types::TIMESTAMP_PATTERN)
         )
       )
     )
 
     submitted, started, task_completed = task_events(task_id)
     command_terminal = CommandTraceFixture.terminal(task_id, event_store:)
-    target_events = resource_release_events + write_set_release_events + [ command_terminal ]
+    target_events = work_intention_withdrawal_events(reservation) + [ command_terminal ]
 
     expect(started.causation_id).to eq(submitted.id)
     expect(target_events.map(&:causation_id).uniq).to eq([ started.id ])
@@ -78,8 +78,7 @@ RSpec.describe "MCP lease_release Task boundary", :event_store do
 
     expect(replay_task_id).to eq(task_id)
     expect(replayed.dig("result", "result")).to eq(result)
-    expect(resource_release_events.length).to eq(2)
-    expect(write_set_release_events.length).to eq(1)
+    expect(work_intention_withdrawal_events(reservation).length).to eq(2)
     expect(CommandTraceFixture.events(task_id, event_store:).map(&:type)).to eq(
       [ "CommandRegistered", "CommandSucceeded" ]
     )
@@ -113,8 +112,7 @@ RSpec.describe "MCP lease_release Task boundary", :event_store do
     expect(CommandTraceFixture.events(task_id, event_store:).map(&:type)).to eq(
       [ "CommandRegistered", "CommandRejected" ]
     )
-    expect(resource_release_events).to be_empty
-    expect(write_set_release_events).to be_empty
+    expect(work_intention_withdrawal_events(reservation)).to be_empty
 
     malformed = submit_release(
       command_id: "cmd-mcp-release-malformed",
@@ -285,27 +283,12 @@ RSpec.describe "MCP lease_release Task boundary", :event_store do
     event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 
-  def write_set_release_events
-    event_store.read(
-      streams.attempt(RELEASE_ATTEMPT_ID),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "WriteSetReleased" ],
-        maximum_count: 10,
-        direction: :asc
-      )
-    )
-  end
-
-  def resource_release_events
-    %w[app/a.rb app/b.rb].flat_map do |path|
-      event_store.read(
-        streams.resource_lease(resolve_resource(path)),
-        Coordinator::Write::EventReadCriteria.new(
-          event_types: [ "ResourceLeaseReleased" ],
-          maximum_count: 10,
-          direction: :asc
-        )
-      )
+  def work_intention_withdrawal_events(reservation)
+    reservation.resources.flat_map do |reference|
+      event_store.read_grouped(
+        streams.resource_work_intention(reference.lease_id),
+        Coordinator::Write::EventQueries::WORK_INTENTION_STATE
+      ).select { _1.type == "ResourceWorkIntentionWithdrawn" }
     end
   end
 

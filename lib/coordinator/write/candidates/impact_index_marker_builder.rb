@@ -26,7 +26,7 @@ module Coordinator::Write
       private
 
       def role_markers(role:, evidence:, surface:, values_role: role)
-        repository_id = evidence.submission.repository_id
+        repository_id = evidence.candidate.repository_id
         paths = path_values(evidence, values_role)
         semantics = semantic_values(surface, values_role)
 

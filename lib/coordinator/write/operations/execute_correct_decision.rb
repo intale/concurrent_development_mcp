@@ -105,8 +105,9 @@ module Coordinator::Write
         completion = @completion_builder.decision_correct(
           command:,
           correction:,
-          current: state.current,
-          candidate: state.candidate,
+          previous_definition_digest: state.current.definition.digest,
+          definition_digest: state.candidate.definition.digest,
+          slot: state.candidate.slot,
           correction_event: event_reference(persisted_correction),
           partitions:,
           input_digest: preparation.input_digest,

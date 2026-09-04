@@ -10,24 +10,34 @@ module Coordinator::Write
           @stream_factory = stream_factory
         end
 
-        def call(state:, command:, requested_at:)
+        def call(state:, command:)
           trigger = trigger_for(state, command.trigger_event)
           denial = denied(state:, trigger:)
           return denial if denial
 
           preparation = state.preparation.payload
-          event = Events::ReleaseSetCompensationRequestedV1.new(
-            release_set_id: command.release_set_id,
-            change_set_id: preparation.change_set_id,
-            release_digest: preparation.release_digest,
-            trigger_event: command.trigger_event,
-            trigger_kind: trigger_kind(trigger),
-            successful_integrations: state.successful_integrations.map(&:event),
-            reason: reason(trigger),
-            rule_version: command.rule_version,
-            requested_at:
-          )
-          Success(EventPlan.new(writes: [ EventWrite.new(stream: @stream_factory.release_set(command.release_set_id), event:) ]))
+          stream = @stream_factory.release_set(command.release_set_id)
+          writes = [
+            EventWrite.new(
+              stream:,
+              event: Events::ReleaseSetCompensationRequestedV2.new(
+                release_set_id: command.release_set_id,
+                change_set_id: preparation.change_set_id,
+                reason: reason(trigger),
+                trigger_kind: trigger_kind(trigger)
+              )
+            )
+          ]
+          state.successful_integrations.each do |integration|
+            writes << EventWrite.new(
+              stream:,
+              event: Events::ReleaseSetSuccessfulIntegrationLinkedV1.new(
+                release_set_id: command.release_set_id,
+                integration_event: integration.event
+              )
+            )
+          end
+          Success(EventPlan.new(writes:))
         end
 
         private
@@ -51,9 +61,9 @@ module Coordinator::Write
 
         def compensation_trigger?(trigger)
           case trigger
-          when Coordinator::Write::ReleaseSets::IntegrationFactV1
+          when Coordinator::Write::ReleaseSets::IntegrationFactV2
             trigger.payload.outcome == "failed"
-          when Coordinator::Write::ReleaseSets::VerificationFactV1
+          when Coordinator::Write::ReleaseSets::VerificationFactV2
             trigger.payload.evidence.outcome == "failed"
           else
             false
@@ -61,13 +71,13 @@ module Coordinator::Write
         end
 
         def trigger_kind(trigger)
-          return "repository_integration_failed" if trigger.is_a?(Coordinator::Write::ReleaseSets::IntegrationFactV1)
+          return "repository_integration_failed" if trigger.is_a?(Coordinator::Write::ReleaseSets::IntegrationFactV2)
 
           "release_verification_failed"
         end
 
         def reason(trigger)
-          return trigger.payload.failure.summary if trigger.is_a?(Coordinator::Write::ReleaseSets::IntegrationFactV1)
+          return trigger.payload.failure.summary if trigger.is_a?(Coordinator::Write::ReleaseSets::IntegrationFactV2)
 
           "Composite ReleaseSet verification failed"
         end

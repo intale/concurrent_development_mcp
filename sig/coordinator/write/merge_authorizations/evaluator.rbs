@@ -14,8 +14,12 @@ module Coordinator
           ?natural_key_builder: CandidateObligations::NaturalKeyBuilder,
           ?obligation_loader: CandidateObligations::ObligationLoader,
           ?validity_builder: CandidateObligations::ValidityBuilder,
+          ?partition_state_loader: Decisions::PartitionStateLoader,
+          ?change_set_state_loader: ChangeSets::StateLoader,
           ?canonical_json: Shared::CanonicalJson,
-          ?policy_contract: Contracts::CandidateImpactPolicyDefinition
+          ?policy_contract: Contracts::CandidateImpactPolicyDefinition,
+          ?snapshot_loader: MergeSnapshots::StateLoader,
+          ?verification_history_loader: MergeSnapshotVerifications::HistoryLoader
         ) -> void
 
         def call: (Commands::RequestMergeAuthorization command, decided_at: String) -> EvaluationV1

@@ -7,8 +7,8 @@ module Coordinator::Write
 
       params do
         required(:command).value(Types.Instance(Commands::CreateCandidateCompatibilityObligation))
-        required(:source).value(Types.Instance(CandidateObligations::CandidateEvidenceV1))
-        required(:target).value(Types.Instance(CandidateObligations::CandidateEvidenceV1))
+        required(:source).value(Types.Instance(CandidateObligations::CandidateEvidenceV2))
+        required(:target).value(Types.Instance(CandidateObligations::CandidateEvidenceV2))
         required(:natural_key).value(Types.Instance(CandidateObligations::NaturalKeyV1))
       end
 
@@ -30,8 +30,10 @@ module Coordinator::Write
                source.subject.candidate_id != target.subject.candidate_id
           key(:command).failure("Candidates must be distinct members of one ChangeSet")
         end
-        validate_partition_reference(command, source.subject.change_set_id)
-        validate_head(command)
+        unless valid_partition_reference?(command, source.subject.change_set_id)
+          key(:command).failure("policy reference must identify the exact ChangeSet Candidate partition")
+        end
+        key(:command).failure("policy head must identify an exact Decision lifecycle event") unless valid_head?(command)
         unless natural_key.document.rule_version == command.rule_version &&
                natural_key.document.policy_head == command.policy_head
           key(:command).failure("natural key must retain the command policy and rule")
@@ -40,25 +42,23 @@ module Coordinator::Write
 
       private
 
-      def validate_partition_reference(command, change_set_id)
+      def valid_partition_reference?(command, change_set_id)
         reference = command.policy_partition_event
         expected_id = "changeset:#{change_set_id}:candidate"
-        valid = reference.type == "DecisionPartitionAdvanced" &&
-                reference.stream_context == "HumanGuidance" &&
-                reference.stream_name == "DecisionPartition" &&
-                reference.stream_id == expected_id
-        key(:command).failure("policy reference must identify the exact ChangeSet Candidate partition") unless valid
+        %w[DecisionPartitionAdvanced DecisionAddedToPartition DecisionRemovedFromPartition].include?(reference.type) &&
+          reference.stream_context == "HumanGuidance" &&
+          reference.stream_name == "DecisionPartition" &&
+          reference.stream_id == expected_id
       end
 
-      def validate_head(command)
+      def valid_head?(command)
         head = command.policy_head
         reference = head.event
-        valid = head.decision_revision == reference.stream_revision &&
-                reference.stream_context == "HumanGuidance" &&
-                reference.stream_name == "Decision" &&
-                reference.stream_id == head.decision_id &&
-                %w[DecisionActivated DecisionDefinitionCorrected].include?(reference.type)
-        key(:command).failure("policy head must identify an exact Decision lifecycle event") unless valid
+        head.decision_revision == reference.stream_revision &&
+          reference.stream_context == "HumanGuidance" &&
+          reference.stream_name == "Decision" &&
+          reference.stream_id == head.decision_id &&
+          %w[DecisionActivated DecisionDefinitionCorrected].include?(reference.type)
       end
     end
   end

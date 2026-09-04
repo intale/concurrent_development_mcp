@@ -4,7 +4,7 @@ module Coordinator
       module AgentChoices
         class Record
           def initialize: (?stream_factory: StreamFactory, ?policy_evaluator: PolicyEvaluator) -> void
-          def call: (state: State, command: Commands::RecordAgentChoice, recorded_at: String, recorded_event: EventReference) -> Dry::Monads::Result
+          def call: (state: State, command: Commands::RecordAgentChoice) -> Dry::Monads::Result
         end
       end
     end

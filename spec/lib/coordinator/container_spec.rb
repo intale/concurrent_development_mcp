@@ -211,9 +211,11 @@ RSpec.describe Coordinator::Container do
         "coordination-task-executor-lane-0-v2",
         "coordination-task-executor-lane-1-v2",
         "lease-expiry-scheduler-v1",
+        "merge-snapshot-verification-v1",
         "operation-batch-runner-v1",
         "release-set-lifecycle-v1",
         "resource-boundary-maintenance-v1",
+        "verification-evidence-outcome-v1",
         "verification-obligation-validity-v1"
       ]
     )
@@ -224,7 +226,7 @@ RSpec.describe Coordinator::Container do
         "agent-choice-impacts-v1",
         "agent-choices-v1",
         "candidates-v1",
-        "coord-context-v3",
+        "coord-context-v4",
         "decision-governance-v1",
         "decision-interpretations-v1",
         "development-artifacts-v3",

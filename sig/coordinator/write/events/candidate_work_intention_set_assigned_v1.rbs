@@ -1,0 +1,6 @@
+module Coordinator::Write
+  module Events
+    class CandidateWorkIntentionSetAssignedV1 < Base
+    end
+  end
+end

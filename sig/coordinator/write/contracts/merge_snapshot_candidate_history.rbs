@@ -2,6 +2,6 @@ module Coordinator::Write::Contracts
   class MergeSnapshotCandidateHistory < Dry::Validation::Contract
     private
 
-    def exact_reference?: (Coordinator::Write::EventReference? reference, String type, String candidate_id, Integer revision) -> bool
+    def exact_reference?: (Coordinator::Write::EventReference? reference, String type, String candidate_id) -> bool
   end
 end

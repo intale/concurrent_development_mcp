@@ -28,6 +28,7 @@ module Coordinator::Write
         set_loader: WorkIntentionSetLoader.new(event_store:),
         intention_loader: WorkIntentionLoader.new(event_store:),
         resource_loader: WorkIntentionResourceLoader.new(event_store:),
+        candidate_loader: Candidates::SubmissionByAttemptLoader.new(event_store:),
         repository_registration_loader: RepositoryRegistrationLoader.new(event_store:),
         repository_marker_builder: RepositoryMarkerBuilder.new
       )
@@ -43,6 +44,7 @@ module Coordinator::Write
         @set_loader = set_loader
         @intention_loader = intention_loader
         @resource_loader = resource_loader
+        @candidate_loader = candidate_loader
         @repository_registration_loader = repository_registration_loader
         @repository_marker_builder = repository_marker_builder
       end
@@ -103,6 +105,7 @@ module Coordinator::Write
           member_states = set_state.members.map { @intention_loader.call(_1.intention_id).state }
           plan = step @decider.call(
             attempt_state: load_attempt_state(command.attempt_id),
+            candidate_state: @candidate_loader.call(command.attempt_id),
             work_item_state: load_work_item_state(command.work_item_id),
             set_state:,
             member_states:,
@@ -116,14 +119,12 @@ module Coordinator::Write
             member_states:,
             caused_by:
           )
-          Success(
-            build_completion(
-              command:,
-              input_digest: prepared.input_digest,
-              persisted_events: persisted,
-              member_count: member_states.length,
-              abandoned_at: prepared.abandoned_at
-            )
+          build_completion(
+            command:,
+            input_digest: prepared.input_digest,
+            persisted_events: persisted,
+            member_count: member_states.length,
+            abandoned_at: prepared.abandoned_at
           )
         end
       end

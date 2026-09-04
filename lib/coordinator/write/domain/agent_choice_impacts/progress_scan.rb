@@ -10,16 +10,16 @@ module Coordinator::Write
           @stream_factory = stream_factory
         end
 
-        def call(state:, command:, progressed_at:)
+        def call(state:, command:)
           denial = denied(state, command)
           return denial if denial
 
           next_position = command.last_processed_position ? command.last_processed_position + 1 : command.previous_from_position
           event =
             if command.has_more
-              progressed_event(state, command, next_position, progressed_at)
+              progressed_event(state, command, next_position)
             else
-              completed_event(state, command, next_position, progressed_at)
+              completed_event(command)
             end
           Success(
             EventPlan.new(
@@ -53,34 +53,20 @@ module Coordinator::Write
           nil
         end
 
-        def progressed_event(state, command, next_position, progressed_at)
-          Events::AgentChoiceImpactScanProgressedV1.new(
+        def progressed_event(state, command, next_position)
+          Events::AgentChoiceImpactScanProgressedV2.new(
             scan_id: command.scan_id,
-            started_event: state.started_event,
-            previous_checkpoint: state.checkpoint_event,
-            previous_from_position: command.previous_from_position,
-            next_from_position: next_position,
             page_number: state.page_count + 1,
-            page_choice_count: command.page_choice_count,
-            total_choice_count: state.total_choice_count + command.page_choice_count,
-            policy_version: command.policy_version,
-            progressed_at:
+            next_from_position: next_position,
+            decision_change: state.decision_change,
+            from_position: 0,
+            to_position: state.to_position,
+            page_size: state.page_size
           )
         end
 
-        def completed_event(state, command, next_position, progressed_at)
-          Events::AgentChoiceImpactScanCompletedV1.new(
-            scan_id: command.scan_id,
-            started_event: state.started_event,
-            previous_checkpoint: state.checkpoint_event,
-            previous_from_position: command.previous_from_position,
-            final_from_position: next_position,
-            page_count: state.page_count + 1,
-            page_choice_count: command.page_choice_count,
-            total_choice_count: state.total_choice_count + command.page_choice_count,
-            policy_version: command.policy_version,
-            completed_at: progressed_at
-          )
+        def completed_event(command)
+          Events::AgentChoiceImpactScanCompletedV2.new(scan_id: command.scan_id)
         end
 
         def failure(code, state, command)

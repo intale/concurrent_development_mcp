@@ -10,8 +10,6 @@ module Coordinator::Write
       attribute :repository_id, Types::RepositoryId
       attribute :object_format, Types::GitObjectFormat
       attribute :merge_commit_oid, Types::GitOid
-      attribute :snapshot_event, EventReference
-      attribute :registered_at, Types::Timestamp
     end
   end
 end

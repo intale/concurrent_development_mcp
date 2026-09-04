@@ -6,45 +6,37 @@ module Coordinator::Write
       class RecordVerification
         include Dry::Monads[:result]
 
-        def initialize(
-          stream_factory: StreamFactory.new,
-          digest_builder: Coordinator::Write::ReleaseSets::VerificationDigestBuilder.new
-        )
+        def initialize(stream_factory: StreamFactory.new)
           @stream_factory = stream_factory
-          @digest_builder = digest_builder
         end
 
-        def call(state:, command:, recorded_at:)
+        def call(state:, command:)
           denial = denied(state:, command:)
           return denial if denial
 
           preparation = state.preparation.payload
-          attempt_number = state.verifications.length + 1
-          attributes = {
-            release_set_id: command.release_set_id,
-            release_digest: preparation.release_digest,
-            attempt_number:,
-            integration_events: command.integration_events,
-            evidence: command.evidence,
-            policy_version: command.policy_version
-          }
-          event = Events::ReleaseSetVerificationRecordedV1.new(
-            **attributes,
-            change_set_id: preparation.change_set_id,
-            verification_digest: @digest_builder.call(**attributes),
-            evidence_status: "attributed_unverified",
-            recorded_at:
-          )
-          Success(
-            EventPlan.new(
-              writes: [
-                EventWrite.new(
-                  stream: @stream_factory.release_set(command.release_set_id),
-                  event:
-                )
-              ]
+          stream = @stream_factory.release_set(command.release_set_id)
+          writes = [
+            EventWrite.new(
+              stream:,
+              event: Events::ReleaseSetVerificationRecordedV2.new(
+                release_set_id: command.release_set_id,
+                change_set_id: preparation.change_set_id,
+                attempt_number: state.verifications.length + 1,
+                evidence: command.evidence
+              )
             )
-          )
+          ]
+          command.integration_events.each do |integration_event|
+            writes << EventWrite.new(
+              stream:,
+              event: Events::ReleaseSetIntegrationLinkedV1.new(
+                release_set_id: command.release_set_id,
+                integration_event:
+              )
+            )
+          end
+          Success(EventPlan.new(writes:))
         end
 
         private

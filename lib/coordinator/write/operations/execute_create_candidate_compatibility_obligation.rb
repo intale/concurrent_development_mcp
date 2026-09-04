@@ -11,6 +11,7 @@ module Coordinator::Write
         policy_loader: CandidateObligations::ImpactPolicyLoader.new(event_store:),
         obligation_loader: CandidateObligations::ObligationLoader.new(event_store:),
         natural_key_builder: CandidateObligations::NaturalKeyBuilder.new,
+        validity_builder: CandidateObligations::ValidityBuilder.new,
         decider: Domain::CandidateObligations::Create.new,
         clock: SystemClock.new,
         id_generator: IdGenerator.new,
@@ -25,6 +26,7 @@ module Coordinator::Write
         @policy_loader = policy_loader
         @obligation_loader = obligation_loader
         @natural_key_builder = natural_key_builder
+        @validity_builder = validity_builder
         @decider = decider
         @clock = clock
         @id_generator = id_generator
@@ -39,7 +41,7 @@ module Coordinator::Write
         verify_invocation!(invocation)
         preparation = CandidateCompatibilityObligationPreparationV1.new(
           created_at: @clock.now,
-          obligation_event_id: @id_generator.uuid_v7
+          event_ids: Array.new(4) { @id_generator.uuid_v7 }
         )
 
         @event_store.multiple do
@@ -63,7 +65,7 @@ module Coordinator::Write
         verify_command!(command, source:, target:, natural_key:)
         existing = @obligation_loader.find(natural_key)
         if existing
-          return Success(result("replayed", existing.payload.obligation_id, existing.reference))
+          return Success(result("replayed", existing.definition.obligation_id, existing.reference))
         end
         policy = @policy_loader.call(
           policy_partition_event: command.policy_partition_event,
@@ -79,8 +81,7 @@ module Coordinator::Write
         )
         decision = @decider.call(
           state:,
-          command:,
-          created_at: preparation.created_at
+          command:
         ).value!
 
         result_for(
@@ -97,7 +98,7 @@ module Coordinator::Write
       def result_for(decision:, state:, command:, invocation:, preparation:, existing:, natural_key:)
         case decision.outcome
         when "created"
-          event = persist_creation(
+          events = persist_creation(
             decision:,
             state:,
             command:,
@@ -105,7 +106,7 @@ module Coordinator::Write
             preparation:,
             natural_key:
           )
-          Success(result(decision.outcome, command.obligation_id, event_reference(event)))
+          Success(result(decision.outcome, command.obligation_id, event_reference(events.first)))
         when "replayed"
           Success(result(decision.outcome, command.obligation_id, existing.reference))
         else
@@ -118,17 +119,18 @@ module Coordinator::Write
         verify_event_plan!(
           plan,
           state:,
-          command:,
-          created_at: preparation.created_at
+          command:
         )
-        physical = @event_factory.build!(
-          event: decision.obligation,
-          event_id: preparation.obligation_event_id,
-          metadata: event_metadata(command),
-          markers: event_markers(decision.obligation, command, natural_key),
-          caused_by: invocation.caused_by
-        )
-        @event_store.append(plan.writes.sole.stream, [ physical ]).sole
+        physical = plan.events.zip(preparation.event_ids).map do |event, event_id|
+          @event_factory.build!(
+            event:,
+            event_id:,
+            metadata: event_metadata(event, state:, command:),
+            markers: event_markers(event, state:, command:, natural_key:),
+            caused_by: invocation.caused_by
+          )
+        end
+        @event_store.append(plan.writes.first.stream, physical)
       end
 
       def verify_invocation!(invocation)
@@ -154,8 +156,8 @@ module Coordinator::Write
               "#{validation.errors.to_h.inspect}"
       end
 
-      def verify_event_plan!(plan, state:, command:, created_at:)
-        validation = @event_plan_contract.call(plan:, state:, command:, created_at:)
+      def verify_event_plan!(plan, state:, command:)
+        validation = @event_plan_contract.call(plan:, state:, command:)
         return if validation.success?
 
         raise ArgumentError,
@@ -163,24 +165,40 @@ module Coordinator::Write
               "#{validation.errors.to_h.inspect}"
       end
 
-      def event_metadata(command)
-        EventMetadata.new(
+      def event_metadata(event, state:, command:)
+        common = {
           command_id: command.command_id,
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
           policy_version: command.rule_version
+        }
+        return EventMetadata.new(**common) unless event.is_a?(Events::VerificationObligationCreatedV2)
+
+        reasons = CandidateObligations::Matcher.new.call(source: state.source, target: state.target)
+        validity = @validity_builder.call(
+          source: state.source,
+          target: state.target,
+          reasons:,
+          policy: state.policy.evidence,
+          rule_version: command.rule_version
+        )
+        Metadata::VerificationObligationV2.new(
+          **common,
+          policy: state.policy.evidence,
+          rule_version: command.rule_version,
+          validity_input_digest: validity.digest
         )
       end
 
-      def event_markers(obligation, command, natural_key)
-        source = obligation.source_candidate
-        target = obligation.target_candidate
-        [
-          "verification-obligation:#{obligation.obligation_id}",
-          "verification-obligation-kind:#{obligation.kind}",
-          "verification-obligation-status:#{obligation.status}",
-          "change-set:#{obligation.change_set_id}",
+      def event_markers(event, state:, command:, natural_key:)
+        source = state.source.subject
+        target = state.target.subject
+        markers = [
+          "verification-obligation:#{command.obligation_id}",
+          "verification-obligation-kind:candidate_compatibility",
+          "verification-obligation-status:open",
+          "change-set:#{source.change_set_id}",
           "source-candidate:#{source.candidate_id}",
           "target-candidate:#{target.candidate_id}",
           "candidate:#{source.candidate_id}",
@@ -189,11 +207,12 @@ module Coordinator::Write
           "work-item:#{target.work_item_id}",
           "repository:#{source.repository_id}",
           "repository:#{target.repository_id}",
-          "enforcement:#{obligation.enforcement}",
-          "decision:#{obligation.policy.head.decision_id}",
-          "command:#{command.command_id}",
-          natural_key.marker
-        ].freeze
+          "enforcement:#{state.policy.evidence.enforcement}",
+          "decision:#{state.policy.evidence.head.decision_id}",
+          "command:#{command.command_id}"
+        ]
+        markers << natural_key.marker if event.is_a?(Events::VerificationObligationCreatedV2)
+        markers.freeze
       end
 
       def result(outcome, obligation_id, event)

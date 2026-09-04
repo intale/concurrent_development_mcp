@@ -591,7 +591,7 @@ module Coordinator::Write
       attribute :outcome, Types::ReleaseSetIntegrationOutcome
       attribute :merge_observation_event, EventReferenceV1.optional
       attribute :observation_digest, Types::Sha256Digest.optional
-      attribute :failure, ReleaseSets::IntegrationFailureV1.optional
+      attribute :failure, ReleaseSets::IntegrationFailureV2.optional
     end
 
     class RecordRepositoryIntegrationV1 < BaseV1
@@ -610,7 +610,7 @@ module Coordinator::Write
                     min_size: Types::RELEASE_SET_MINIMUM_MEMBERS,
                     max_size: Types::RELEASE_SET_MAXIMUM_MEMBERS
                   )
-      attribute :evidence, ReleaseSets::VerificationEvidenceV1
+      attribute :evidence, ReleaseSets::VerificationEvidenceV2
     end
 
     class RecordReleaseSetVerificationV1 < BaseV1
@@ -623,7 +623,7 @@ module Coordinator::Write
       attribute :release_set_id, Types::Identifier
       attribute :verification_event, EventReferenceV1
       attribute :verification_digest, Types::Sha256Digest
-      attribute :activation_point, ReleaseSets::ActivationPointV1
+      attribute :activation_point, ReleaseSets::ActivationPointV2
     end
 
     class RecordReleaseSetActivationV1 < BaseV1
@@ -654,7 +654,7 @@ module Coordinator::Write
     end
 
     class CompleteCompensatedReleaseSetInputV1 < Value
-      Evidence = ReleaseSets::CompensationEvidenceV1
+      Evidence = ReleaseSets::CompensationEvidenceV2
 
       attribute :actor, ActorV1
       attribute :release_set_id, Types::Identifier

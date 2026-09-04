@@ -1,0 +1,19 @@
+module Coordinator
+  module Write
+    module Decisions
+      class PartitionStateLoader
+        def initialize: (
+          event_store: EventStore,
+          ?stream_factory: StreamFactory,
+          ?schema_registry: EventSchemaRegistry
+        ) -> void
+        def call: (DecisionPartitionV1 partition) -> DecisionPartitionStateV1
+
+        private
+        def load_decision_head: (String decision_id) -> DecisionHeadV1?
+        def load_event: (PgEventstore::Event event) -> Events::Base
+        def event_reference: (PgEventstore::Event event) -> EventReference
+      end
+    end
+  end
+end

@@ -11,7 +11,6 @@ module Coordinator::Write
         loader: CandidateObligationScans::RegistrySweepLoader.new(event_store:),
         decider: Domain::CandidateObligationScans::ProgressRegistrySweep.new,
         revision_guard: CandidateObligationScans::ExpectedRevisionGuard.new,
-        clock: SystemClock.new,
         id_generator: IdGenerator.new,
         event_factory: EventFactory.new,
         stream_factory: StreamFactory.new,
@@ -23,7 +22,6 @@ module Coordinator::Write
         @loader = loader
         @decider = decider
         @revision_guard = revision_guard
-        @clock = clock
         @id_generator = id_generator
         @event_factory = event_factory
         @stream_factory = stream_factory
@@ -34,8 +32,8 @@ module Coordinator::Write
       def call(invocation)
         verify_input!(invocation)
         preparation = CandidateObligationScans::ProgressPreparationV1.new(
-          progressed_at: @clock.now,
-          event_id: @id_generator.uuid_v7
+          event_id: @id_generator.uuid_v7,
+          correlation_id: invocation.caused_by&.correlation_id || @id_generator.uuid_v7
         )
 
         @revision_guard.call(scan_id: invocation.command.scan_id) do
@@ -47,13 +45,9 @@ module Coordinator::Write
 
       def execute_attempt(invocation:, preparation:)
         command = invocation.command
-        checkpoint = @exact_loader.call(invocation.checkpoint_reference)
+        @exact_loader.call(invocation.checkpoint_reference)
         snapshot = @loader.call(command.scan_id)
-        decision = @decider.call(
-          state: snapshot.state,
-          command:,
-          progressed_at: preparation.progressed_at
-        )
+        decision = @decider.call(state: snapshot.state, command:)
         return decision if decision.failure?
 
         plan = decision.value!
@@ -62,9 +56,10 @@ module Coordinator::Write
         physical = @event_factory.build!(
           event: plan.events.sole,
           event_id: preparation.event_id,
-          metadata: metadata(command),
+          metadata: metadata(plan.events.sole, command),
           markers: markers(command),
-          caused_by: invocation.caused_by
+          caused_by: invocation.caused_by,
+          correlation_id: preparation.correlation_id
         )
         persisted = @event_store.append(
           stream,
@@ -89,13 +84,13 @@ module Coordinator::Write
         raise ArgumentError, "registry sweep progress plan violates its dry-rb contract: #{result.errors.to_h.inspect}"
       end
 
-      def metadata(command)
+      def metadata(event, command)
         EventMetadata.new(
           command_id: command.command_id,
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
-          policy_version: command.rule_version
+          policy_version: event.is_a?(Events::CandidateImpactRegistrySweepCompletedV2) ? nil : command.rule_version
         )
       end
 

@@ -8,7 +8,7 @@ module Coordinator::Write::Commands
     def outcome: () -> String
     def merge_observation_event: () -> Coordinator::Write::EventReference?
     def observation_digest: () -> String?
-    def failure: () -> Coordinator::Write::ReleaseSets::IntegrationFailureV1?
+    def failure: () -> Coordinator::Write::ReleaseSets::IntegrationFailureV2?
     def policy_version: () -> String
   end
 end

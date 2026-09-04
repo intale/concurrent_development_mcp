@@ -10,58 +10,55 @@ module Coordinator::Write
           @stream_factory = stream_factory
         end
 
-        def call(state:, command:, policy:, markers:, started_at:)
+        def call(state:, command:, policy:, markers:)
           return already_decided(state, command) unless state.absent?
 
           reason = policy_reason(policy)
           reason ||= "no_predecessors" if command.to_revision.negative?
           reason ||= "no_routing_markers" if markers.empty?
-          event = reason ? skipped_event(command, markers, reason, started_at) : started_event(command, markers, started_at)
+          events = events_for(command, markers, reason)
           Success(
             EventPlan.new(
-              writes: [
+              writes: events.map do |event|
                 EventWrite.new(
                   stream: @stream_factory.candidate_impact_pair_scan(command.scan_id),
                   event:
                 )
-              ]
+              end
             )
           )
         end
 
         private
 
-        def started_event(command, markers, started_at)
-          Events::CandidateImpactPairScanStartedV1.new(
-            **common(command, markers),
-            to_revision: command.to_revision,
-            started_at:
-          )
+        def events_for(command, markers, reason)
+          lifecycle = if reason
+            Events::CandidateImpactPairScanSkippedV2.new(scan_id: command.scan_id, reason:)
+          else
+            Events::CandidateImpactPairScanStartedV2.new(
+              scan_id: command.scan_id,
+              change_set_id: command.change_set_id,
+              direction: command.direction,
+              markers:,
+              from_revision: command.from_revision,
+              to_revision: command.to_revision,
+              page_size: command.page_size
+            )
+          end
+          [
+            lifecycle,
+            source_link(command, "source_registration", command.source_registration),
+            source_link(command, "policy_partition", command.policy_partition_event),
+            source_link(command, "policy_head", command.policy_head.event)
+          ]
         end
 
-        def skipped_event(command, markers, reason, started_at)
-          Events::CandidateImpactPairScanSkippedV1.new(
-            **common(command, markers),
-            to_revision: command.to_revision,
-            reason:,
-            skipped_at: started_at
-          )
-        end
-
-        def common(command, markers)
-          {
+        def source_link(command, role, source)
+          Events::CandidateImpactPairScanSourceLinkedV1.new(
             scan_id: command.scan_id,
-            change_set_id: command.change_set_id,
-            source_registration: command.source_registration,
-            direction: command.direction,
-            policy_partition_event: command.policy_partition_event,
-            policy_head: command.policy_head,
-            markers:,
-            from_revision: command.from_revision,
-            page_size: command.page_size,
-            index_policy_version: command.index_policy_version,
-            rule_version: command.rule_version
-          }
+            role:,
+            source:
+          )
         end
 
         def policy_reason(policy)

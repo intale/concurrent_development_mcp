@@ -39,7 +39,7 @@ module Coordinator::Write
         ]
         pairs.all? do |payload, reference, type|
           if payload
-            payload.obligation_id == obligation_id && payload.obligation_event == state.obligation_event &&
+            payload.obligation_id == obligation_id &&
               reference&.type == type && same_stream?(reference, obligation_id)
           else
             reference.nil?

@@ -26,20 +26,32 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateCandidateCompatibili
         stream_revision: 0
       )
     )
-    physical = obligation_events(invocation.command.obligation_id).sole
+    facts = creation_facts(invocation.command.obligation_id)
+    physical = facts.fetch(0)
     obligation = CandidateObligationScenario.load(physical)
     expect(obligation).to have_attributes(
       kind: "candidate_compatibility",
-      status: "open",
-      change_set_id: pair.dig(:ids, :change_set_id),
       enforcement: "merge_gate",
-      required_evidence: %w[combined_tests contract_compatibility_review],
-      rule_version: CandidateObligationScenario::RULE_VERSION
+      required_evidence: %w[combined_tests contract_compatibility_review]
     )
-    expect(obligation.reasons.map(&:kind)).to eq(%w[
+    expect(obligation.reasons).to eq(%w[
       observed_input_changed
       semantic_key_match
     ])
+    expect(facts.drop(1).map(&:type)).to eq(%w[
+      VerificationObligationAddedToChangeSet
+      VerificationObligationSourceCandidateAssigned
+      VerificationObligationTargetCandidateAssigned
+    ])
+    expect(facts.drop(1).map { CandidateObligationScenario.load(_1).to_h }).to eq([
+      { obligation_id: invocation.command.obligation_id, change_set_id: pair.dig(:ids, :change_set_id) },
+      { obligation_id: invocation.command.obligation_id, candidate_id: pair.dig(:source, :candidate_id) },
+      { obligation_id: invocation.command.obligation_id, candidate_id: pair.dig(:target, :candidate_id) }
+    ])
+    expect(physical.metadata.fetch("rule_version")).to eq(CandidateObligationScenario::RULE_VERSION)
+    expect(physical.metadata.fetch("policy").fetch("head")).to eq(
+      policy.fetch(:head).to_h.deep_stringify_keys
+    )
     expect(physical.markers).to include(
       "verification-obligation:#{invocation.command.obligation_id}",
       "source-candidate:#{pair.dig(:source, :candidate_id)}",
@@ -147,10 +159,13 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateCandidateCompatibili
 
     expect(current.value!).to have_attributes(outcome: "created")
     expect(current_invocation.command.obligation_id).to eq(stale_invocation.command.obligation_id)
-    expect(CandidateObligationScenario.load(obligation_events(current_invocation.command.obligation_id).sole)).to have_attributes(
+    created = obligation_events(current_invocation.command.obligation_id).sole
+    expect(CandidateObligationScenario.load(created)).to have_attributes(
       enforcement: "verification_gate",
-      required_evidence: [ "combined_tests" ],
-      policy: have_attributes(head: corrected.fetch(:head))
+      required_evidence: [ "combined_tests" ]
+    )
+    expect(created.metadata.fetch("policy").fetch("head")).to eq(
+      corrected.fetch(:head).to_h.deep_stringify_keys
     )
   end
 
@@ -173,6 +188,13 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateCandidateCompatibili
 
   def obligation_events(obligation_id)
     CandidateObligationScenario.obligation_events(obligation_id)
+  end
+
+  def creation_facts(obligation_id)
+    event_store.read_grouped(
+      streams.verification_obligation(obligation_id),
+      Coordinator::Write::EventQueries::VERIFICATION_OBLIGATION_FOR_CLAIM
+    ).reverse.first(4)
   end
 
   def command_events(command_id)

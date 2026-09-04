@@ -485,16 +485,24 @@ module Coordinator
 
     register("merge_snapshots.candidate_loader") do
       Write::MergeSnapshots::CandidateLoader.new(
+        event_store: self["event_store"]
+      )
+    end
+
+    register("candidates.state_loader") do
+      Write::Candidates::StateLoader.new(event_store: self["event_store"])
+    end
+
+    register("merge_snapshots.state_loader") do
+      Write::MergeSnapshots::StateLoader.new(
         event_store: self["event_store"],
-        stream_factory: self["stream_factory"],
-        schema_registry: self["event_schema_registry"]
+        candidate_state_loader: self["candidates.state_loader"]
       )
     end
 
     register("domain.merge_snapshots.register", memoize: true) do
       Write::Domain::MergeSnapshots::Register.new(
-        stream_factory: self["stream_factory"],
-        snapshot_digest_builder: self["merge_snapshots.snapshot_digest_builder"]
+        stream_factory: self["stream_factory"]
       )
     end
 
@@ -512,8 +520,20 @@ module Coordinator
 
     register("domain.merge_snapshot_verifications.submit", memoize: true) do
       Write::Domain::MergeSnapshotVerifications::Submit.new(
-        stream_factory: self["stream_factory"],
-        verified_digest_builder: self["merge_snapshot_verifications.verified_digest_builder"]
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("domain.merge_snapshot_verifications.verify", memoize: true) do
+      Write::Domain::MergeSnapshotVerifications::Verify.new(
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("merge_snapshot_verifications.history_loader") do
+      Write::MergeSnapshotVerifications::HistoryLoader.new(
+        event_store: self["event_store"],
+        snapshot_loader: self["merge_snapshots.state_loader"]
       )
     end
 
@@ -522,7 +542,9 @@ module Coordinator
         event_store: self["event_store"],
         stream_factory: self["stream_factory"],
         schema_registry: self["event_schema_registry"],
-        canonical_json: self["canonical_json"]
+        canonical_json: self["canonical_json"],
+        snapshot_loader: self["merge_snapshots.state_loader"],
+        verification_history_loader: self["merge_snapshot_verifications.history_loader"]
       )
     end
 
@@ -551,9 +573,14 @@ module Coordinator
       )
     end
 
+    register("release_sets.release_digest_builder", memoize: true) do
+      Write::ReleaseSets::ReleaseDigestBuilder.new(canonical_json: self["canonical_json"])
+    end
+
     register("release_sets.history_loader", memoize: true) do
       Write::ReleaseSets::HistoryLoader.new(
         event_store: self["event_store"],
+        candidate_state_loader: self["candidates.state_loader"],
         stream_factory: self["stream_factory"],
         schema_registry: self["event_schema_registry"]
       )
@@ -575,37 +602,25 @@ module Coordinator
 
     register("domain.release_sets.prepare", memoize: true) do
       Write::Domain::ReleaseSets::Prepare.new(
-        stream_factory: self["stream_factory"],
-        digest_builder: Write::ReleaseSets::ReleaseDigestBuilder.new(
-          canonical_json: self["canonical_json"]
-        )
+        stream_factory: self["stream_factory"]
       )
     end
 
     register("domain.release_sets.record_repository_integration", memoize: true) do
       Write::Domain::ReleaseSets::RecordRepositoryIntegration.new(
-        stream_factory: self["stream_factory"],
-        digest_builder: Write::ReleaseSets::IntegrationDigestBuilder.new(
-          canonical_json: self["canonical_json"]
-        )
+        stream_factory: self["stream_factory"]
       )
     end
 
     register("domain.release_sets.record_verification", memoize: true) do
       Write::Domain::ReleaseSets::RecordVerification.new(
-        stream_factory: self["stream_factory"],
-        digest_builder: Write::ReleaseSets::VerificationDigestBuilder.new(
-          canonical_json: self["canonical_json"]
-        )
+        stream_factory: self["stream_factory"]
       )
     end
 
     register("domain.release_sets.record_activation", memoize: true) do
       Write::Domain::ReleaseSets::RecordActivation.new(
-        stream_factory: self["stream_factory"],
-        digest_builder: Write::ReleaseSets::ActivationDigestBuilder.new(
-          canonical_json: self["canonical_json"]
-        )
+        stream_factory: self["stream_factory"]
       )
     end
 
@@ -615,19 +630,13 @@ module Coordinator
 
     register("domain.release_sets.complete_activated", memoize: true) do
       Write::Domain::ReleaseSets::CompleteActivated.new(
-        stream_factory: self["stream_factory"],
-        digest_builder: Write::ReleaseSets::CompletionDigestBuilder.new(
-          canonical_json: self["canonical_json"]
-        )
+        stream_factory: self["stream_factory"]
       )
     end
 
     register("domain.release_sets.complete_compensated", memoize: true) do
       Write::Domain::ReleaseSets::CompleteCompensated.new(
-        stream_factory: self["stream_factory"],
-        digest_builder: Write::ReleaseSets::CompletionDigestBuilder.new(
-          canonical_json: self["canonical_json"]
-        )
+        stream_factory: self["stream_factory"]
       )
     end
 
@@ -653,7 +662,11 @@ module Coordinator
     end
 
     register("build_progress.source_builder", memoize: true) do
-      Processes::BuildProgress::SourceBuilder.new(schema_registry: self["event_schema_registry"])
+      Processes::BuildProgress::SourceBuilder.new(
+        event_store: self["event_store"],
+        schema_registry: self["event_schema_registry"],
+        release_history_loader: self["release_sets.history_loader"]
+      )
     end
 
     register("build_progress.command_builder", memoize: true) do
@@ -826,8 +839,17 @@ module Coordinator
       Read::Repositories::ReleaseSets.new
     end
 
+    register("read.release_sets.preparation_loader") do
+      Read::ReleaseSets::PreparationLoader.new(
+        event_store: self["event_store"],
+        stream_factory: self["stream_factory"],
+        schema_registry: self["event_schema_registry"]
+      )
+    end
+
     register("projectors.coord_context_v1", memoize: true) do
       Read::Projectors::CoordContextV1.new(
+        submission_loader: self["read.candidates.submission_loader"],
         schema_registry: self["event_schema_registry"],
         contexts: self["repositories.coord_contexts"],
         processed_events: self["repositories.processed_projection_events"]
@@ -895,6 +917,9 @@ module Coordinator
 
     register("projectors.agent_choice_impacts_v1", memoize: true) do
       Read::Projectors::AgentChoiceImpactsV1.new(
+        assessment_loader: Read::AgentChoiceImpacts::AssessmentLoader.new(
+          event_store: self["event_store"]
+        ),
         schema_registry: self["event_schema_registry"],
         impacts: self["repositories.agent_choice_impacts"],
         choices: self["repositories.agent_choices"],
@@ -904,11 +929,18 @@ module Coordinator
 
     register("projectors.candidates_v1", memoize: true) do
       Read::Projectors::CandidatesV1.new(
+        submission_loader: self["read.candidates.submission_loader"],
+        impact_surface_loader: Read::Candidates::ImpactSurfaceLoader.new(event_store: self["event_store"]),
         schema_registry: self["event_schema_registry"],
         candidates: self["repositories.candidates"],
         candidate_impacts: self["repositories.candidate_impacts"],
         processed_events: self["repositories.processed_projection_events"]
       )
+    end
+
+
+    register("read.candidates.submission_loader", memoize: true) do
+      Read::Candidates::SubmissionLoader.new(event_store: self["event_store"])
     end
 
     register("projectors.repositories_v1", memoize: true) do
@@ -967,6 +999,9 @@ module Coordinator
 
     register("projectors.merge_snapshots_v1", memoize: true) do
       Read::Projectors::MergeSnapshotsV1.new(
+        registration_loader: Read::MergeSnapshots::RegistrationLoader.new(
+          candidate_loader: Read::Candidates::SubmissionLoader.new(event_store: self["event_store"])
+        ),
         schema_registry: self["event_schema_registry"],
         snapshots: self["repositories.merge_snapshots"],
         authorizations: self["repositories.merge_authorizations"],
@@ -977,6 +1012,7 @@ module Coordinator
     register("projectors.release_sets_v1", memoize: true) do
       Read::Projectors::ReleaseSetsV1.new(
         schema_registry: self["event_schema_registry"],
+        preparation_loader: self["read.release_sets.preparation_loader"],
         release_sets: self["repositories.release_sets"],
         processed_events: self["repositories.processed_projection_events"]
       )
@@ -1672,7 +1708,6 @@ module Coordinator
         clock: self["clock"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
-        schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
         completion_builder: self["command_result_builder"]
       )
@@ -1687,6 +1722,7 @@ module Coordinator
         clock: self["clock"],
         id_generator: self["id_generator"],
         commit_identity_builder: self["merge_snapshots.commit_identity_builder"],
+        snapshot_digest_builder: self["merge_snapshots.snapshot_digest_builder"],
         candidate_loader: self["merge_snapshots.candidate_loader"],
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
@@ -1702,12 +1738,22 @@ module Coordinator
         decider: self["domain.merge_snapshot_verifications.submit"],
         input_digest: self["command_input_digest"],
         verification_input_digest: self["merge_snapshot_verifications.input_digest"],
+        history_loader: self["merge_snapshot_verifications.history_loader"],
         clock: self["clock"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
-        schema_registry: self["event_schema_registry"],
-        stream_factory: self["stream_factory"],
         completion_builder: self["command_result_builder"]
+      )
+    end
+
+    register("operations.execute_verify_merge_snapshot") do
+      Write::Operations::ExecuteVerifyMergeSnapshot.new(
+        event_store: self["event_store"],
+        history_loader: self["merge_snapshot_verifications.history_loader"],
+        decider: self["domain.merge_snapshot_verifications.verify"],
+        digest_builder: self["merge_snapshot_verifications.verified_digest_builder"],
+        event_factory: self["event_factory"],
+        id_generator: self["id_generator"]
       )
     end
 
@@ -1751,6 +1797,7 @@ module Coordinator
         preparer: self["operations.prepare_release_set"],
         member_loader: self["release_sets.member_loader"],
         decider: self["domain.release_sets.prepare"],
+        release_digest_builder: self["release_sets.release_digest_builder"],
         input_digest: self["command_input_digest"],
         clock: self["clock"],
         id_generator: self["id_generator"],
@@ -1766,7 +1813,9 @@ module Coordinator
         event_store: self["event_store"],
         preparer: self["operations.prepare_record_repository_integration"],
         history_loader: self["release_sets.history_loader"],
+        snapshot_loader: self["merge_snapshots.state_loader"],
         decider: self["domain.release_sets.record_repository_integration"],
+        digest_builder: Write::ReleaseSets::IntegrationDigestBuilder.new(canonical_json: self["canonical_json"]),
         input_digest: self["command_input_digest"],
         clock: self["clock"],
         id_generator: self["id_generator"],
@@ -1783,11 +1832,11 @@ module Coordinator
         preparer: self["operations.prepare_record_release_set_verification"],
         history_loader: self["release_sets.history_loader"],
         decider: self["domain.release_sets.record_verification"],
+        digest_builder: Write::ReleaseSets::VerificationDigestBuilder.new(canonical_json: self["canonical_json"]),
         input_digest: self["command_input_digest"],
         clock: self["clock"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
-        schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
         completion_builder: self["command_result_builder"]
       )
@@ -1799,11 +1848,11 @@ module Coordinator
         preparer: self["operations.prepare_record_release_set_activation"],
         history_loader: self["release_sets.history_loader"],
         decider: self["domain.release_sets.record_activation"],
+        digest_builder: Write::ReleaseSets::ActivationDigestBuilder.new(canonical_json: self["canonical_json"]),
         input_digest: self["command_input_digest"],
         clock: self["clock"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
-        schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
         completion_builder: self["command_result_builder"]
       )
@@ -1818,8 +1867,6 @@ module Coordinator
         clock: self["clock"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
-        schema_registry: self["event_schema_registry"],
-        stream_factory: self["stream_factory"],
         completion_builder: self["command_result_builder"]
       )
     end
@@ -1829,12 +1876,11 @@ module Coordinator
         event_store: self["event_store"],
         history_loader: self["release_sets.history_loader"],
         decider: self["domain.release_sets.complete_activated"],
+        digest_builder: Write::ReleaseSets::CompletionDigestBuilder.new(canonical_json: self["canonical_json"]),
         input_digest: self["command_input_digest"],
         clock: self["clock"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
-        schema_registry: self["event_schema_registry"],
-        stream_factory: self["stream_factory"],
         completion_builder: self["command_result_builder"]
       )
     end
@@ -1845,12 +1891,11 @@ module Coordinator
         preparer: self["operations.prepare_complete_compensated_release_set"],
         history_loader: self["release_sets.history_loader"],
         decider: self["domain.release_sets.complete_compensated"],
+        digest_builder: Write::ReleaseSets::CompletionDigestBuilder.new(canonical_json: self["canonical_json"]),
         input_digest: self["command_input_digest"],
         clock: self["clock"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
-        schema_registry: self["event_schema_registry"],
-        stream_factory: self["stream_factory"],
         completion_builder: self["command_result_builder"]
       )
     end
@@ -1907,7 +1952,6 @@ module Coordinator
     register("operations.execute_start_agent_choice_impact_scan", memoize: true) do
       Write::Operations::ExecuteStartAgentChoiceImpactScan.new(
         event_store: self["event_store"],
-        clock: self["clock"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
         stream_factory: self["stream_factory"]
@@ -1917,7 +1961,6 @@ module Coordinator
     register("operations.execute_progress_agent_choice_impact_scan", memoize: true) do
       Write::Operations::ExecuteProgressAgentChoiceImpactScan.new(
         event_store: self["event_store"],
-        clock: self["clock"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
         stream_factory: self["stream_factory"]
@@ -1947,7 +1990,6 @@ module Coordinator
     register("operations.execute_progress_candidate_impact_registry_sweep", memoize: true) do
       Write::Operations::ExecuteProgressCandidateImpactRegistrySweep.new(
         event_store: self["event_store"],
-        clock: self["clock"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
         stream_factory: self["stream_factory"]
@@ -1967,7 +2009,6 @@ module Coordinator
     register("operations.execute_progress_candidate_impact_pair_scan", memoize: true) do
       Write::Operations::ExecuteProgressCandidateImpactPairScan.new(
         event_store: self["event_store"],
-        clock: self["clock"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
         stream_factory: self["stream_factory"]
@@ -1987,7 +2028,6 @@ module Coordinator
     register("operations.execute_start_verification_obligation_validity_scan", memoize: true) do
       Write::Operations::ExecuteStartVerificationObligationValidityScan.new(
         event_store: self["event_store"],
-        clock: self["clock"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
         stream_factory: self["stream_factory"]
@@ -1997,7 +2037,6 @@ module Coordinator
     register("operations.execute_progress_verification_obligation_validity_scan", memoize: true) do
       Write::Operations::ExecuteProgressVerificationObligationValidityScan.new(
         event_store: self["event_store"],
-        clock: self["clock"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
         stream_factory: self["stream_factory"]
@@ -2013,6 +2052,14 @@ module Coordinator
         schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"]
       )
+    end
+
+    register("operations.execute_satisfy_verification_obligation", memoize: true) do
+      Write::Operations::ExecuteSatisfyVerificationObligation.new(event_store: self["event_store"])
+    end
+
+    register("operations.execute_fail_verification_obligation", memoize: true) do
+      Write::Operations::ExecuteFailVerificationObligation.new(event_store: self["event_store"])
     end
 
     register("lease_expiry_policy", memoize: true) do
@@ -2534,6 +2581,21 @@ module Coordinator
       )
     end
 
+    register("process_managers.verification_evidence_outcome", memoize: true) do
+      Processes::ProcessManagers::VerificationEvidenceOutcome.new(
+        event_store: self["event_store"],
+        satisfy: self["operations.execute_satisfy_verification_obligation"],
+        fail_obligation: self["operations.execute_fail_verification_obligation"]
+      )
+    end
+
+    register("process_managers.merge_snapshot_verification", memoize: true) do
+      Processes::ProcessManagers::MergeSnapshotVerification.new(
+        event_store: self["event_store"],
+        verify: self["operations.execute_verify_merge_snapshot"]
+      )
+    end
+
     register("process_managers.release_set_lifecycle", memoize: true) do
       Processes::ProcessManagers::ReleaseSetLifecycle.new(
         event_store: self["event_store"],
@@ -2600,6 +2662,18 @@ module Coordinator
     register("subscriptions.verification_obligation_validity", memoize: true) do
       Processes::Subscriptions::VerificationObligationValidity.new(
         handler: self["process_managers.verification_obligation_validity"]
+      )
+    end
+
+    register("subscriptions.verification_evidence_outcome", memoize: true) do
+      Processes::Subscriptions::VerificationEvidenceOutcome.new(
+        handler: self["process_managers.verification_evidence_outcome"]
+      )
+    end
+
+    register("subscriptions.merge_snapshot_verification", memoize: true) do
+      Processes::Subscriptions::MergeSnapshotVerification.new(
+        handler: self["process_managers.merge_snapshot_verification"]
       )
     end
 
@@ -2711,6 +2785,8 @@ module Coordinator
         self["subscriptions.agent_choice_decision_impact"],
         self["subscriptions.candidate_impact_obligation_policy"],
         self["subscriptions.verification_obligation_validity"],
+        self["subscriptions.verification_evidence_outcome"],
+        self["subscriptions.merge_snapshot_verification"],
         self["subscriptions.release_set_lifecycle"],
         self["subscriptions.build_progress"]
       ].freeze

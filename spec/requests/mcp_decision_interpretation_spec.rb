@@ -58,7 +58,7 @@ RSpec.describe "GDN-02/03 MCP interpretation lifecycle" do
       "data" => include(
         "interpretation_id" => "I-mcp-interpretation",
         "source_message_id" => "M-mcp-interpretation",
-        "assessment" => include("status" => "confirmation_required")
+        "assessment" => "confirmation_required"
       )
     )
 
@@ -78,11 +78,7 @@ RSpec.describe "GDN-02/03 MCP interpretation lifecycle" do
         .map(&:correlation_id).uniq
     ).to eq([ submitted.correlation_id ])
     expect(proposal.correlation_id).not_to eq(source.correlation_id)
-    expect(proposal.data.fetch("source_event")).to include(
-      "event_id" => source.id,
-      "type" => source.type,
-      "stream_revision" => source.stream_revision
-    )
+    expect(proposal.data.fetch("source_message_id")).to eq("M-mcp-interpretation")
     expect([ proposal, clarification, command_terminal ]).to all(
       satisfy { !_1.metadata.key?("causation_id") && !_1.metadata.key?("correlation_id") }
     )
@@ -364,7 +360,7 @@ RSpec.describe "GDN-02/03 MCP interpretation lifecycle" do
 
   def interpretation_events
     event_store.read(
-      streams.interpretation("M-mcp-interpretation"),
+      streams.interpretation("I-mcp-interpretation"),
       Coordinator::Write::EventReadCriteria.new(
         event_types: %w[
           DecisionInterpretationProposed

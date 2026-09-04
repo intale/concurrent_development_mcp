@@ -2,7 +2,7 @@
 
 FactoryBot.define do
   factory :coordinator_read_agent_choice_impact, class: "Coordinator::Read::AgentChoiceImpact" do
-    sequence(:assessment_id) { "choice-impact-v1:#{format('%064x', _1)}" }
+    assessment_id { SecureRandom.uuid_v7 }
     sequence(:choice_id) { "CHO-factory-impact-#{_1}" }
     sequence(:attempt_id) { "A-factory-impact-#{_1}" }
     outcome { "invalidated" }
@@ -43,7 +43,7 @@ FactoryBot.define do
             "anchor_id" => attempt_id
           }
         ],
-        "changed_at" => "2026-08-30T12:00:00.000000Z"
+        "changed_at" => "2026-08-30T11:59:00.000000Z"
       }
     end
     assessment do
@@ -61,25 +61,12 @@ FactoryBot.define do
         "reason_codes" => [ "selected_option_satisfies_decision" ]
       }
       {
-        "policy_version" => policy_version,
-        "before_context_digest" => "sha256:#{'a' * 64}",
-        "after_context_digest" => "sha256:#{'b' * 64}",
         "before_evaluation" => evaluation,
         "after_evaluation" => evaluation.merge(
           "status" => "blocked",
           "basis" => "blocking_violation",
           "reason_codes" => [ "selected_option_violates_blocking_decision" ]
         ),
-        "source_advancements" => [
-          {
-            "event_id" => SecureRandom.uuid_v7,
-            "type" => "DecisionPartitionAdvanced",
-            "stream_context" => "HumanGuidance",
-            "stream_name" => "DecisionPartition",
-            "stream_id" => decision_change.fetch("affected_partitions").sole.fetch("partition_id"),
-            "stream_revision" => 1
-          }
-        ],
         "outcome" => outcome,
         "reason" => reason
       }
@@ -87,7 +74,7 @@ FactoryBot.define do
     assessment_event do
       {
         "event_id" => SecureRandom.uuid_v7,
-        "type" => "AgentChoiceImpactAssessed",
+        "type" => "AgentChoiceImpactAssessmentRecorded",
         "stream_context" => "AgentGovernance",
         "stream_name" => "AgentChoiceImpact",
         "stream_id" => assessment_id,

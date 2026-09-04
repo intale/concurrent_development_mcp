@@ -60,9 +60,6 @@ Then(
     repository_id: @candidate_arguments.fetch(:repository_id),
     head_commit_oid: @candidate_arguments.fetch(:head_commit_oid)
   )
-  attachment_facts = candidate_attachment_events(
-    @candidate_arguments.fetch(:attempt_id)
-  ).select { _1.data.fetch("candidate_id") == candidate_id }
   command_lifecycle = assert_command_succeeded(
     @candidate_arguments.fetch(:command_id),
     context: "Candidate command lifecycle"
@@ -74,14 +71,13 @@ Then(
   assert_acceptance(started, "Candidate Task has no started fact")
 
   assert_acceptance_equal(
-    %w[CandidateSubmitted CandidateChangeManifestCaptured CandidateBuildContextCaptured],
+    %w[CandidateChangeManifestCaptured CandidateBuildContextCaptured CandidateSubmitted],
     candidate_facts.map(&:type),
     "Candidate stream facts"
   )
   assert_acceptance_equal(1, head_facts.length, "Candidate head registrations")
-  assert_acceptance_equal(1, attachment_facts.length, "Candidate Attempt attachments")
 
-  target_facts = [ *candidate_facts, *head_facts, *attachment_facts, terminal ]
+  target_facts = [ *candidate_facts, *head_facts, terminal ]
   assert_acceptance_equal([ started.id ], target_facts.map(&:causation_id).uniq, "Candidate causation")
   assert_acceptance_equal(
     [ started.correlation_id ],
@@ -121,7 +117,7 @@ Then(
 end
 
 When(
-  "the (remaining )Candidate {string} evidence and Attempt attachment reach the read side"
+  "the (remaining )Candidate {string} evidence and Attempt context reach the read side"
 ) do |candidate_id|
   project_complete_candidate(candidate_id, @candidate_coordination.dig(:ids, :attempt_id))
 end
@@ -179,10 +175,10 @@ Then("the replayed Candidate Task exposes the same result") do
 end
 
 Then(
-  "Candidate {string} has one submission, manifest, head registration, attachment, and successful command lifecycle"
+  "Candidate {string} has one submission, manifest, head registration, and successful command lifecycle"
 ) do |candidate_id|
   assert_acceptance_equal(
-    %w[CandidateSubmitted CandidateChangeManifestCaptured],
+    %w[CandidateChangeManifestCaptured CandidateSubmitted],
     candidate_events(candidate_id).map(&:type),
     "Replayed Candidate facts"
   )
@@ -194,10 +190,6 @@ Then(
     ).length,
     "Replayed head registrations"
   )
-  attachments = candidate_attachment_events(@candidate_arguments.fetch(:attempt_id)).select do |event|
-    event.data.fetch("candidate_id") == candidate_id
-  end
-  assert_acceptance_equal(1, attachments.length, "Replayed Candidate attachments")
   assert_command_succeeded(@candidate_arguments.fetch(:command_id), context: "Replayed Candidate command lifecycle")
 end
 
@@ -428,16 +420,11 @@ Then("the winning Candidate owns one complete checkpoint while the loser owns no
     repository_id: winner.fetch(:repository_id),
     head_commit_oid: winner.fetch(:head_commit_oid)
   )
-  winner_attachments = candidate_attachment_events(winner.fetch(:attempt_id)).select do |event|
-    event.data.fetch("candidate_id") == winner.fetch(:candidate_id)
-  end
-
   assert_acceptance_equal(
-    %w[CandidateSubmitted CandidateChangeManifestCaptured],
+    %w[CandidateChangeManifestCaptured CandidateSubmitted],
     candidate_events(winner.fetch(:candidate_id)).map(&:type),
     "Winning Candidate facts"
   )
-  assert_acceptance_equal(1, winner_attachments.length, "Winning Candidate attachment")
   assert_command_succeeded(winner.fetch(:command_id), context: "Winning Candidate command lifecycle")
   assert_command_rejected(loser.fetch(:command_id), context: "Losing Candidate command lifecycle")
   assert_acceptance_equal(1, head_facts.length, "Head ownership facts")

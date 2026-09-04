@@ -210,11 +210,27 @@ module Coordinator::Write
       )
     end
 
+    def candidate_impact_surface(surface_id)
+      StreamReference.new(
+        context: "DevelopmentIntegration",
+        stream_name: "CandidateImpactSurface",
+        stream_id: surface_id
+      )
+    end
+
     def merge_snapshot(merge_snapshot_id)
       StreamReference.new(
         context: "DevelopmentIntegration",
         stream_name: "MergeSnapshot",
         stream_id: merge_snapshot_id
+      )
+    end
+
+    def merge_verification(verification_id)
+      StreamReference.new(
+        context: "DevelopmentIntegration",
+        stream_name: "MergeVerification",
+        stream_id: verification_id
       )
     end
 

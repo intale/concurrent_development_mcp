@@ -10,24 +10,31 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
     expect(result).to be_success
     plan = result.value!
     expect(plan.events.map(&:class)).to eq([
-      Coordinator::Write::Events::CandidateSubmittedV2,
-      Coordinator::Write::Events::CandidateChangeManifestCapturedV1,
+      Coordinator::Write::Events::CandidateCreatedV1,
+      Coordinator::Write::Events::CandidateAssignedToAttemptV1,
+      Coordinator::Write::Events::CandidateAssignedToRepositoryV1,
+      Coordinator::Write::Events::CandidateTargetBranchSelectedV1,
+      Coordinator::Write::Events::CandidateCommitRangeDeclaredV1,
+      Coordinator::Write::Events::CandidateCheckpointKindSelectedV1,
+      Coordinator::Write::Events::CandidateWorkIntentionSetAssignedV1,
+      Coordinator::Write::Events::CandidateChangeManifestCapturedV2,
+      Coordinator::Write::Events::CandidateSubmittedV3,
       Coordinator::Write::Events::CandidateHeadRegisteredV2,
-      Coordinator::Write::Events::CandidateAttachedToAttemptV1
     ])
     expect(plan.writes.map(&:stream)).to eq([
-      streams.candidate("CAN-41"),
-      streams.candidate("CAN-41"),
+      *Array.new(9, streams.candidate("CAN-41")),
       streams.candidate_head(head_identity.registry_id),
-      streams.attempt("A-18")
     ])
-    expect(plan.events.first).to have_attributes(
-      manifest_digest: command.manifest.digest,
-      build_context_digest: nil,
-      lease_references: [ lease_reference ],
-      evidence_status: "attributed_unverified"
+    expect(plan.events.fetch(6)).to have_attributes(
+      candidate_id: "CAN-41",
+      intention_set_id: command.lease_set_id
     )
-    expect(plan.events.last.candidate_event).to eq(candidate_event)
+    expect(plan.events.fetch(7)).to have_attributes(
+      candidate_id: "CAN-41",
+      evidence_revision: 1,
+      files: command.manifest.files
+    )
+    expect(plan.events.fetch(8)).to have_attributes(candidate_id: "CAN-41")
   end
 
   it "CAN-01-CONTEXT-01 adds exactly one build-context fact" do
@@ -36,14 +43,24 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
     events = decide(command:).value!.events
 
     expect(events.map(&:class)).to eq([
-      Coordinator::Write::Events::CandidateSubmittedV2,
-      Coordinator::Write::Events::CandidateChangeManifestCapturedV1,
-      Coordinator::Write::Events::CandidateBuildContextCapturedV1,
+      Coordinator::Write::Events::CandidateCreatedV1,
+      Coordinator::Write::Events::CandidateAssignedToAttemptV1,
+      Coordinator::Write::Events::CandidateAssignedToRepositoryV1,
+      Coordinator::Write::Events::CandidateTargetBranchSelectedV1,
+      Coordinator::Write::Events::CandidateCommitRangeDeclaredV1,
+      Coordinator::Write::Events::CandidateCheckpointKindSelectedV1,
+      Coordinator::Write::Events::CandidateWorkIntentionSetAssignedV1,
+      Coordinator::Write::Events::CandidateChangeManifestCapturedV2,
+      Coordinator::Write::Events::CandidateBuildContextCapturedV2,
+      Coordinator::Write::Events::CandidateSubmittedV3,
       Coordinator::Write::Events::CandidateHeadRegisteredV2,
-      Coordinator::Write::Events::CandidateAttachedToAttemptV1
     ])
-    expect(events.first.build_context_digest).to eq(command.build_context.digest)
-    expect(events.fetch(2).build_context_digest).to eq(command.build_context.digest)
+    expect(events.fetch(8)).to have_attributes(
+      candidate_id: "CAN-41",
+      evidence_revision: 1,
+      inputs: command.build_context.inputs,
+      environment: command.build_context.environment
+    )
   end
 
   it "denies an existing Candidate or registered head without a plan" do
@@ -111,7 +128,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
     )
 
     expect(result).to be_success
-    expect(result.value!.events.first.lease_references).to eq([ reference ])
+    expect(result.value!.events.fetch(6).intention_set_id).to eq(command.lease_set_id)
   end
 
   def decide(
@@ -130,7 +147,6 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
       ),
       command:,
       submitted_at: "2026-08-23T11:30:00.000000Z",
-      candidate_event:,
       head_identity:
     )
   end

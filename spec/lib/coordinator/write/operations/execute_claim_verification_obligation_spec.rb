@@ -21,15 +21,13 @@ RSpec.describe Coordinator::Write::Operations::ExecuteClaimVerificationObligatio
 
     expect(result).to be_success
     claim = claim_events.sole
-    expect(claim).to have_attributes(type: "VerificationObligationClaimed", stream_revision: 1)
+    expect(claim).to have_attributes(type: "VerificationObligationClaimed", stream_revision: 4)
     expect(claim.data).to include(
       "obligation_id" => obligation_id,
       "claimant_id" => "agent-blue",
       "fencing_token" => 1,
-      "claimed_at" => "2026-08-24T07:00:00.000000Z",
       "expires_at" => "2026-08-24T07:05:00.000000Z"
     )
-    expect(claim.data.fetch("obligation_event")).to eq(event_reference(created.fetch(:event)))
     expect(claim.markers).to include(
       "verification-obligation:#{obligation_id}",
       "claim:#{claim.data.fetch('claim_id')}",
@@ -47,7 +45,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteClaimVerificationObligatio
       claim_id: claim.data.fetch("claim_id"),
       claimant_id: "agent-blue",
       fencing_token: 1,
-      claim_event: have_attributes(event_id: claim.id, stream_revision: 1)
+      claim_event: have_attributes(event_id: claim.id, stream_revision: 4)
     )
     expect(command_events("cmd-claim-1")).to be_empty
   end
@@ -112,7 +110,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteClaimVerificationObligatio
 
     expect(results.count(&:success?)).to eq(1)
     expect(results.count(&:failure?)).to eq(1)
-    expect(results.find(&:failure?).failure.code).to eq(:verification_obligation_already_claimed)
+    expect(results.find(&:failure?).failure.code).to eq(:stale_stream)
     expect(claim_events.length).to eq(1)
     expect(claim_events.sole.data.fetch("fencing_token")).to eq(1)
     expect(contenders.flat_map { command_events(_1.fetch(:command_id)) }).to be_empty

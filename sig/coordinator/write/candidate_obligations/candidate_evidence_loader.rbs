@@ -4,9 +4,12 @@ module Coordinator::Write
       def initialize: (
         event_store: Coordinator::Write::_EventStore,
         ?exact_loader: ExactEventLoader,
+        ?candidate_loader: Coordinator::Write::Candidates::StateLoader,
+        ?stream_factory: Coordinator::Write::StreamFactory,
+        ?schema_registry: Coordinator::Write::EventSchemaRegistry,
         ?evidence_contract: Coordinator::Write::Contracts::CandidateObligationEvidence
       ) -> void
-      def call: (Coordinator::Write::EventReference registration_reference) -> CandidateEvidenceV1
+      def call: (Coordinator::Write::EventReference registration_reference) -> CandidateEvidenceV2
     end
   end
 end

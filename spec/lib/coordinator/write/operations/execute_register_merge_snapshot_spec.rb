@@ -16,12 +16,18 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRegisterMergeSnapshot, :ev
     expect(replay.failure.code).to eq(:merge_snapshot_id_already_used)
     snapshot = snapshot_events("MS-merge-register").sole
     registry = commit_events(input.fetch(:merge_commit_oid)).sole
-    expect(snapshot.data.fetch("ordered_candidates").map { _1.fetch("candidate_id") }).to eq(
-      candidates.map { _1.fetch(:candidate_id) }
+    expect(snapshot.data.fetch("ordered_candidates")).to eq(candidates.map { _1.fetch(:candidate_id) })
+    expect(snapshot.data.keys).to contain_exactly(
+      "merge_snapshot_id", "repository_id", "target_branch", "object_format",
+      "target_base_commit_oid", "merge_commit_oid", "ordered_candidates", "producer",
+      "run_id", "produced_at"
     )
-    expect(snapshot.data.fetch("evidence_status")).to eq("attributed_unverified")
-    expect(registry.data.fetch("snapshot_event").fetch("event_id")).to eq(snapshot.id)
+    expect(snapshot.metadata.fetch("snapshot_digest")).to match(/\Asha256:[0-9a-f]{64}\z/)
+    expect(registry.data.keys).to contain_exactly(
+      "registry_id", "repository_id", "object_format", "merge_commit_oid", "merge_snapshot_id"
+    )
     expect(snapshot.correlation_id).to eq(registry.correlation_id)
+    expect(registry.causation_id).to eq(snapshot.id)
     expect(command_events(input.fetch(:command_id))).to be_empty
   end
 

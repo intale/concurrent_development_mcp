@@ -5,7 +5,7 @@ module Coordinator::Write
     class StartVerificationObligationValidityScan < Value
       attribute :command_id, Types::Identifier
       attribute :actor, Actor
-      attribute :scan_id, Types::Identifier
+      attribute :scan_id, Types::UuidV7
       attribute :change_set_id, Types::Identifier
       attribute :superseding_partition_event, EventReference
       attribute :source_global_position, Types::GlobalPosition

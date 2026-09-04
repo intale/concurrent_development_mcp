@@ -12,19 +12,16 @@ module Coordinator::Write
       rule(:plan, :command, :expected_stream) do
         plan = values[:plan]
         command = values[:command]
-        write = plan.writes.first
-        event = write&.event
-        valid_type = event.is_a?(Events::AgentChoiceImpactScanProgressedV1) ||
-                     event.is_a?(Events::AgentChoiceImpactScanCompletedV1)
-        valid_payload = event&.scan_id == command.scan_id &&
-                        event&.previous_checkpoint == command.expected_checkpoint &&
-                        event&.previous_from_position == command.previous_from_position &&
-                        event&.page_choice_count == command.page_choice_count &&
-                        event&.policy_version == command.policy_version
-
-        unless plan.writes.one? && write.stream == values[:expected_stream] && valid_type && valid_payload
-          key(:plan).failure("must contain one exact impact scan progress or completion write")
+        event = plan.events.first
+        valid = plan.writes.one? && plan.writes.first.stream == values[:expected_stream] &&
+          event&.scan_id == command.scan_id
+        valid &&= if command.has_more
+          event.is_a?(Events::AgentChoiceImpactScanProgressedV2) &&
+            event.next_from_position == command.last_processed_position + 1
+        else
+          event.is_a?(Events::AgentChoiceImpactScanCompletedV2)
         end
+        key(:plan).failure("must contain one exact scan progress or completion fact") unless valid
       end
     end
   end

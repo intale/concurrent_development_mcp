@@ -7,24 +7,22 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::StartScan do
     result = decider.call(
       state: Coordinator::Write::Domain::AgentChoiceImpacts::ScanState.initial,
       command: start_command,
-      decision_change: decision_change("active_attempts"),
-      started_at: occurred_at
+      decision_change: decision_change("active_attempts")
     )
 
     expect(result).to be_success
-    expect(result.value!.writes.sole).to have_attributes(
-      stream: streams.agent_choice_impact_scan(scan_id),
-      event: have_attributes(
+    expect(result.value!.writes).to all(have_attributes(stream: streams.agent_choice_impact_scan(scan_id)))
+    expect(result.value!.events).to contain_exactly(
+      have_attributes(
         scan_id:,
         from_position: 0,
         to_position: 900,
-        page_size: 50,
-        policy_version: "agent-choice-decision-impact/v1",
-        started_at: occurred_at
-      )
+        page_size: 50
+      ),
+      have_attributes(scan_id:, role: "decision_change", source: source_event)
     )
-    expect(result.value!.events.sole).to be_a(
-      Coordinator::Write::Events::AgentChoiceImpactScanStartedV1
+    expect(result.value!.events.first).to be_a(
+      Coordinator::Write::Events::AgentChoiceImpactScanStartedV2
     )
   end
 
@@ -40,14 +38,11 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::StartScan do
       result = decider.call(
         state: Coordinator::Write::Domain::AgentChoiceImpacts::ScanState.initial,
         command: start_command,
-        decision_change: decision_change(retroactivity),
-        started_at: occurred_at
+        decision_change: decision_change(retroactivity)
       )
 
-      expect(result.value!.events.sole).to have_attributes(
-        reason:,
-        decision_change: have_attributes(retroactivity:)
-      )
+      expect(result.value!.events.first).to have_attributes(reason:)
+      expect(result.value!.events.last).to have_attributes(role: "decision_change", source: source_event)
     end
   end
 
@@ -55,8 +50,7 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::StartScan do
     result = decider.call(
       state: running_state,
       command: start_command,
-      decision_change: decision_change("active_attempts"),
-      started_at: occurred_at
+      decision_change: decision_change("active_attempts")
     )
 
     expect(result.failure).to have_attributes(code: :agent_choice_impact_scan_already_decided)
@@ -74,7 +68,7 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::StartScan do
   end
 
   def decision_change(retroactivity)
-    Coordinator::Write::AgentChoiceImpacts::DecisionChangeEvidenceV1.new(
+    Coordinator::Write::AgentChoiceImpacts::DecisionChangeEvidenceV2.new(
       source_event:,
       source_global_position: 900,
       source_command_id: "cmd-decision-change",
@@ -83,8 +77,7 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::StartScan do
       change_kind: "corrected",
       definition_digest: "sha256:#{'a' * 64}",
       retroactivity:,
-      affected_partitions: [ partition ],
-      changed_at: occurred_at
+      affected_partitions: [ partition ]
     )
   end
 
@@ -99,7 +92,6 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::StartScan do
       to_position: 900,
       page_size: 50,
       page_count: 0,
-      total_choice_count: 0,
       policy_version: "agent-choice-decision-impact/v1",
       skip_reason: nil
     )
@@ -144,7 +136,4 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::StartScan do
     @streams ||= Coordinator::Write::StreamFactory.new
   end
 
-  def occurred_at
-    "2026-08-23T08:00:00.000000Z"
-  end
 end

@@ -3,17 +3,18 @@
 module Coordinator::Read
   module Contracts
     class AgentChoiceImpactSourceEvent < Dry::Validation::Contract
-      STREAM_BY_EVENT_TYPE = {
-        "AgentChoiceImpactAssessed" => [ "AgentChoiceImpact", 0 ],
-        "AgentChoiceInvalidatedByDecision" => [ "AgentChoice", 2 ]
+      EVENT_DEFINITION_BY_TYPE = {
+        "AgentChoiceImpactAssessmentRecorded" => [ 1, "AgentChoiceImpact", 0..0 ],
+        "AgentChoiceImpactSourceLinked" => [ 1, "AgentChoiceImpact", 1..2 ],
+        "AgentChoiceInvalidatedByDecision" => [ 2, "AgentChoice", 2..2 ]
       }.freeze
-      EVENT_TYPES = STREAM_BY_EVENT_TYPE.keys.freeze
+      EVENT_TYPES = EVENT_DEFINITION_BY_TYPE.keys.freeze
 
       config.validate_keys = true
 
       params do
         required(:event_type).filled(:string, included_in?: EVENT_TYPES)
-        required(:schema_version).filled(:integer, eql?: 1)
+        required(:schema_version).filled(:integer, included_in?: [ 1, 2 ])
         required(:stream_context).filled(:string, eql?: "AgentGovernance")
         required(:stream_name).filled(:string)
         required(:stream_id).filled(:string)
@@ -26,9 +27,11 @@ module Coordinator::Read
         required(:policy_version).filled(:string, eql?: "agent-choice-decision-impact/v1")
       end
 
-      rule(:event_type, :stream_name, :stream_revision) do
-        expected_name, expected_revision = STREAM_BY_EVENT_TYPE.fetch(values[:event_type])
-        unless values[:stream_name] == expected_name && values[:stream_revision] == expected_revision
+      rule(:event_type, :schema_version, :stream_name, :stream_revision) do
+        expected_version, expected_name, expected_revisions = EVENT_DEFINITION_BY_TYPE.fetch(values[:event_type])
+        unless values[:schema_version] == expected_version &&
+               values[:stream_name] == expected_name &&
+               expected_revisions.cover?(values[:stream_revision])
           key(:stream_name).failure("must match the AgentChoice impact lifecycle position")
         end
       end

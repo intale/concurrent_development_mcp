@@ -23,13 +23,11 @@ module VerificationEvidenceExamples
   end
 
   def claim
-    Coordinator::Write::Events::VerificationObligationClaimedV1.new(
+    Coordinator::Write::Events::VerificationObligationClaimedV2.new(
       obligation_id: obligation.obligation_id,
-      obligation_event:,
       claim_id: CLAIM_ID,
       claimant_id: "agent-blue",
       fencing_token: 1,
-      claimed_at: CLAIMED_AT,
       expires_at: EXPIRES_AT
     )
   end
@@ -40,7 +38,7 @@ module VerificationEvidenceExamples
       type: "VerificationObligationClaimed",
       stream_name: "VerificationObligation",
       stream_id: obligation.obligation_id,
-      revision: 1
+      revision: 4
     )
   end
 
@@ -141,14 +139,13 @@ module VerificationEvidenceExamples
   def observation(
     evidence_kind:,
     conclusion: "passed",
-    revision: 2,
+    revision: 5,
     evidence_id: "04919191-9191-7191-8191-919191919191",
     assessment_input_digest: digest("accepted", evidence_kind, revision)
   )
-    event = Coordinator::Write::Events::VerificationEvidenceSubmittedV1.new(
-      obligation_id: obligation.obligation_id,
-      obligation_event:,
+    event = Coordinator::Write::Events::VerificationEvidenceSubmittedV2.new(
       evidence_id:,
+      obligation_id: obligation.obligation_id,
       evidence_kind:,
       claim: {
         claim_id: claim.claim_id,
@@ -156,49 +153,66 @@ module VerificationEvidenceExamples
         fencing_token: claim.fencing_token,
         claim_event:
       },
-      source_candidate: obligation.source_candidate,
-      target_candidate: obligation.target_candidate,
-      policy: obligation.policy,
-      obligation_validity_input_digest: obligation.validity_input_digest,
-      assessment: assessment(evidence_kind:, conclusion:),
-      assessment_input_digest:,
-      submitted_at: SUBMITTED_AT
+      assessment: assessment(evidence_kind:, conclusion:)
     )
-    Coordinator::Write::CompatibilityAssessments::EvidenceObservationV1.new(
+    Coordinator::Write::CompatibilityAssessments::EvidenceObservationV2.new(
       evidence: event,
-      event: evidence_reference(revision:, evidence_id:)
+      event: evidence_reference(revision:, evidence_id:),
+      assessment_input_digest:,
+      obligation_validity_input_digest: obligation.validity_input_digest,
+      policy: obligation.policy
     )
   end
 
   def failed
-    failed_command = command(conclusion: "failed")
-    Coordinator::Write::Domain::VerificationEvidence::Submit.new.call(
-      state: state,
-      command: failed_command,
-      evidence_id: "05919191-9191-7191-8191-919191919191",
-      assessment_input_digest: digest("failed-assessment"),
-      evidence_event: evidence_reference(
-        revision: 2,
-        evidence_id: "05919191-9191-7191-8191-919191919191"
-      ),
-      submitted_at: SUBMITTED_AT
+    evidence_id = "05919191-9191-7191-8191-919191919191"
+    observed = observation(evidence_kind: "combined_tests", conclusion: "failed", evidence_id:)
+    outcome_state = outcome_state(evidence: [ observed ])
+    command = Coordinator::Write::Commands::FailVerificationObligation.new(
+      command_id: Coordinator::Shared::IdGenerator.new.uuid_v7,
+      actor: { kind: "system", id: "verification-evidence-outcome" },
+      obligation_id: obligation.obligation_id,
+      triggering_evidence_id: evidence_id,
+      reason: "submitted_evidence_failed"
+    )
+    Coordinator::Write::Domain::VerificationObligationOutcomes::Fail.new.call(
+      state: outcome_state,
+      command:
     ).value!.events.last
   end
 
   def satisfied
-    existing = observation(evidence_kind: "combined_tests")
-    final_command = command(evidence_kind: "contract_compatibility_review")
-    Coordinator::Write::Domain::VerificationEvidence::Submit.new.call(
-      state: state(evidence: [ existing ]),
-      command: final_command,
-      evidence_id: "06919191-9191-7191-8191-919191919191",
-      assessment_input_digest: digest("satisfied-assessment"),
-      evidence_event: evidence_reference(
-        revision: 3,
-        evidence_id: "06919191-9191-7191-8191-919191919191"
-      ),
-      submitted_at: SUBMITTED_AT
+    existing = observation(evidence_kind: "combined_tests", revision: 5)
+    evidence_id = "06919191-9191-7191-8191-919191919191"
+    final = observation(
+      evidence_kind: "contract_compatibility_review",
+      revision: 6,
+      evidence_id:,
+      assessment_input_digest: digest("satisfied-assessment")
+    )
+    command = Coordinator::Write::Commands::SatisfyVerificationObligation.new(
+      command_id: Coordinator::Shared::IdGenerator.new.uuid_v7,
+      actor: { kind: "system", id: "verification-evidence-outcome" },
+      obligation_id: obligation.obligation_id,
+      triggering_evidence_id: evidence_id,
+      selected_evidence_ids: [ existing.evidence.evidence_id, evidence_id ]
+    )
+    Coordinator::Write::Domain::VerificationObligationOutcomes::Satisfy.new.call(
+      state: outcome_state(evidence: [ existing, final ]),
+      command:
     ).value!.events.last
+  end
+
+  def outcome_state(evidence:, terminal_status: nil, terminal_event: nil)
+    Coordinator::Write::VerificationObligations::OutcomeStateV2.new(
+      definition: obligation,
+      definition_event: obligation_event,
+      evidence:,
+      selected_evidence_ids: [],
+      terminal_status:,
+      terminal_event:,
+      latest_revision: evidence.map { _1.event.stream_revision }.max || 3
+    )
   end
 
   def outcome_reference(type:, revision: 4)

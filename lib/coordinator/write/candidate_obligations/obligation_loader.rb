@@ -5,10 +5,12 @@ module Coordinator::Write
     class ObligationLoader
       def initialize(
         event_store:,
-        schema_registry: EventSchemaRegistry.new
+        schema_registry: EventSchemaRegistry.new,
+        definition_loader: VerificationObligations::DefinitionLoader.new(event_store:)
       )
         @event_store = event_store
         @schema_registry = schema_registry
+        @definition_loader = definition_loader
       end
 
       def find(natural_key)
@@ -31,19 +33,19 @@ module Coordinator::Write
         event = events.first
         return unless event
 
-        payload = @schema_registry.load(
+        creation = @schema_registry.load(
           type: event.type,
           schema_version: event.metadata.fetch("schema_version"),
           data: event.data
         )
         reference = event_reference(event)
-        valid = payload.is_a?(Events::VerificationObligationCreatedV1) &&
+        valid = creation.is_a?(Events::VerificationObligationCreatedV2) &&
                 event.stream_revision == 0 &&
-                payload.obligation_id == event.stream.stream_id &&
+                creation.obligation_id == event.stream.stream_id &&
                 reference.type == "VerificationObligationCreated" &&
                 reference.stream_context == "DevelopmentIntegration" &&
                 reference.stream_name == "VerificationObligation" &&
-                reference.stream_id == payload.obligation_id &&
+                reference.stream_id == creation.obligation_id &&
                 event.markers.include?(natural_key.marker)
         unless valid
           raise InvalidHistory.new(
@@ -55,7 +57,19 @@ module Coordinator::Write
           )
         end
 
-        PersistedEventV1.new(event:, payload:, reference:)
+        loaded = @definition_loader.call(creation.obligation_id)
+        unless loaded&.reference == reference
+          raise InvalidHistory.new(
+            reason: "obligation_definition_invalid",
+            evidence: { obligation_id: creation.obligation_id }
+          )
+        end
+
+        VerificationObligations::PersistedDefinitionV2.new(
+          event:,
+          definition: loaded.definition,
+          reference:
+        )
       end
 
       private

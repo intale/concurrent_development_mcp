@@ -24,15 +24,18 @@ module Coordinator::Write
       end
 
       def call(recorded_choice:, decision_change:)
+        change_event = read_reference(decision_change.source_event)
+        invalid!("decision_change_source_missing", source: decision_change.source_event.to_h) unless change_event
+        changed_at = change_event.created_at.utc.iso8601(6)
         recorded_observations = recorded_choice.decision_context.document.partitions
-        changes = partition_changes(recorded_observations, decision_change)
+        changes = partition_changes(recorded_observations, decision_change, change_event)
         before_observations = replace_observations(recorded_observations, changes, :before_observation)
         after_observations = replace_observations(recorded_observations, changes, :after_observation)
         decisions = load_historical_decisions(before_observations, after_observations)
-        before_resolution = resolve(recorded_choice, before_observations, decisions, decision_change.changed_at)
-        after_resolution = resolve(recorded_choice, after_observations, decisions, decision_change.changed_at)
-        before_context = build_context(recorded_choice, before_observations, before_resolution, decision_change.changed_at)
-        after_context = build_context(recorded_choice, after_observations, after_resolution, decision_change.changed_at)
+        before_resolution = resolve(recorded_choice, before_observations, decisions, changed_at)
+        after_resolution = resolve(recorded_choice, after_observations, decisions, changed_at)
+        before_context = build_context(recorded_choice, before_observations, before_resolution, changed_at)
+        after_context = build_context(recorded_choice, after_observations, after_resolution, changed_at)
 
         ReconstructionV1.new(
           before_context:,
@@ -46,9 +49,8 @@ module Coordinator::Write
 
       private
 
-      def partition_changes(recorded_observations, decision_change)
-        source_event = read_reference(decision_change.source_event)
-        source_payload = source_event && load(source_event)
+      def partition_changes(recorded_observations, decision_change, source_event)
+        source_payload = load(source_event)
         if source_payload.is_a?(Events::DecisionActivatedV2) ||
            source_payload.is_a?(Events::DecisionDefinitionCorrectedV2)
           return cohesive_partition_changes(recorded_observations, decision_change, source_event)
@@ -188,8 +190,7 @@ module Coordinator::Write
         valid = event.metadata["command_id"] == decision_change.source_command_id &&
                 payload.is_a?(Events::DecisionPartitionAdvancedV1) &&
                 payload.decision == expected_head &&
-                payload.change_kind == decision_change.change_kind &&
-                payload.advanced_at == decision_change.changed_at
+                payload.change_kind == decision_change.change_kind
         unless valid
           invalid!(
             "source_partition_advancement_invalid",

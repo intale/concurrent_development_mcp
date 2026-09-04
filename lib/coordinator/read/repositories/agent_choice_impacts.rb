@@ -24,9 +24,11 @@ module Coordinator::Read
           attempt_id: impact.attempt_id,
           outcome: assessment.outcome,
           reason: assessment.reason,
-          policy_version: assessment.policy_version,
+          policy_version: event.metadata.fetch("policy_version"),
           accepted_choice: impact.accepted_choice.to_h,
-          decision_change: impact.decision_change.to_h,
+          decision_change: impact.decision_change.to_h.merge(
+            changed_at: impact.decision_changed_at
+          ),
           assessment: assessment.to_h,
           assessment_event: event_reference(event).to_h,
           source_actor: attributed_actor(impact.decision_change.source_actor).to_h,
@@ -36,7 +38,7 @@ module Coordinator::Read
           causation_id: event.causation_id,
           correlation_id: event.correlation_id,
           event_global_position: event.global_position,
-          assessed_at_domain: impact.assessed_at,
+          assessed_at_domain: event.created_at,
           assessed_at_store: event.created_at
         )
       end
@@ -61,8 +63,13 @@ module Coordinator::Read
       private
 
       def build(record)
-        assessment = Coordinator::Write::AgentChoiceImpacts::AssessmentV1.new(
+        assessment = Coordinator::Write::AgentChoiceImpacts::ImpactAssessmentV2.new(
           symbolize(record.assessment)
+        )
+        decision_change_attributes = symbolize(record.decision_change)
+        decision_changed_at = decision_change_attributes.delete(:changed_at)
+        decision_change = Coordinator::Write::AgentChoiceImpacts::DecisionChangeEvidenceV2.new(
+          decision_change_attributes
         )
         AgentChoiceImpactViewV1.new(
           assessment_id: record.assessment_id,
@@ -72,14 +79,10 @@ module Coordinator::Read
           reason: record.reason,
           policy_version: record.policy_version,
           accepted_choice: Coordinator::Write::EventReference.new(symbolize(record.accepted_choice)),
-          decision_change: Coordinator::Write::AgentChoiceImpacts::DecisionChangeEvidenceV1.new(
-            symbolize(record.decision_change)
-          ),
-          before_context_digest: assessment.before_context_digest,
-          after_context_digest: assessment.after_context_digest,
+          decision_change:,
+          decision_changed_at:,
           before_evaluation: assessment.before_evaluation,
           after_evaluation: assessment.after_evaluation,
-          source_advancements: assessment.source_advancements,
           source_actor: AttributedActorV1.new(symbolize(record.source_actor)),
           assessment_evidence: assessment_evidence(record)
         )

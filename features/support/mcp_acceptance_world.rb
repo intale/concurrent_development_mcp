@@ -284,7 +284,7 @@ module McpAcceptanceWorld
   end
 
   def work_item_events(work_item_id)
-    event_store.read(
+    event_store.read_grouped(
       streams.work_item(work_item_id),
       Coordinator::Write::EventQueries::WORK_ITEM_FOR_ACQUISITION
     )

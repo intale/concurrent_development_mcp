@@ -1,0 +1,12 @@
+module Coordinator::Write
+  module Candidates
+    interface _StateLoader
+      def call: (String candidate_id) -> StateV2?
+    end
+
+    class SubmissionByAttemptLoader
+      def initialize: (event_store: _EventStore, ?state_loader: _StateLoader) -> void
+      def call: (String attempt_id) -> StateV2?
+    end
+  end
+end

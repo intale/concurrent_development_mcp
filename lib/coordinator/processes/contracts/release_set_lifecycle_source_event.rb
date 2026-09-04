@@ -16,8 +16,8 @@ module Coordinator::Processes
       rule(:event) do
         key.failure("must be a persisted event") if value.stream.nil? || value.stream_revision.nil?
         key.failure("must have a UUIDv7 event ID") unless Types::UUID_V7_PATTERN.match?(value.id)
-        unless EVENT_TYPES.include?(value.type) && value.metadata["schema_version"] == 1
-          key.failure("must be a supported ReleaseSet lifecycle source at schema version 1")
+        unless EVENT_TYPES.include?(value.type) && value.metadata["schema_version"] == 2
+          key.failure("must be a supported ReleaseSet lifecycle source at schema version 2")
         end
         stream = value.stream
         unless stream&.context == "DevelopmentIntegration" && stream.stream_name == "ReleaseSet"

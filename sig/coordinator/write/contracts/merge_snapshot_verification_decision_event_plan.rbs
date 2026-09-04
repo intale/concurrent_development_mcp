@@ -1,0 +1,6 @@
+module Coordinator::Write
+  module Contracts
+    class MergeSnapshotVerificationDecisionEventPlan < Dry::Validation::Contract
+    end
+  end
+end

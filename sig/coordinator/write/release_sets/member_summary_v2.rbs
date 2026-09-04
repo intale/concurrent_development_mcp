@@ -1,0 +1,6 @@
+module Coordinator::Write
+  module ReleaseSets
+    class MemberSummaryV2 < Coordinator::Shared::Value
+    end
+  end
+end

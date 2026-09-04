@@ -32,13 +32,22 @@ RSpec.describe "IMP-01 MCP Candidate impact evidence" do
     )
 
     submitted, started, task_completed = task_events(task_id)
-    candidate_events = CandidateScenario.candidate_events("CAN-mcp-impact")
-    surface = candidate_events.find { _1.type == "CandidateImpactSurfaceDerived" }
+    assignment = CandidateScenario.candidate_events("CAN-mcp-impact").find do |event|
+      event.type == "CandidateImpactSurfaceAssigned"
+    end
+    surface = event_store.read(
+      streams.candidate_impact_surface(assignment.data.fetch("surface_id")),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: [ "CandidateImpactSurfaceDerived" ],
+        maximum_count: 1,
+        direction: :asc
+      )
+    ).sole
     command_terminal = CommandTraceFixture.terminal(task_id, event_store:)
     expect(surface.causation_id).to eq(started.id)
     expect(command_terminal.causation_id).to eq(started.id)
     expect(task_completed.causation_id).to eq(command_terminal.id)
-    expect([ submitted, started, surface, command_terminal, task_completed ].map(&:correlation_id).uniq).to eq(
+    expect([ submitted, started, surface, assignment, command_terminal, task_completed ].map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
     )
   end

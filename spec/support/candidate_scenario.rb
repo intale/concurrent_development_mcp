@@ -46,16 +46,21 @@ module CandidateScenario
     }
   end
 
-  def submit(prefix:, build_context: true, path: "lib/candidate.rb", head_commit_oid: "b" * 40)
+  def submit(
+    prefix:,
+    build_context: true,
+    path: "lib/candidate.rb",
+    head_commit_oid: "b" * 40,
+    checkpoint_kind: "final"
+  )
     prepared = prepare(prefix:, path:, head_commit_oid:)
-    input = prepared.fetch(:input)
+    input = prepared.fetch(:input).merge(checkpoint_kind:)
     input = input.merge(build_context: build_context_for(path)) if build_context
     completion = execute(Coordinator::Write::Operations::ExecuteSubmitCandidate, input)
     prepared.merge(
       input:,
       completion:,
-      events: candidate_events(input.fetch(:candidate_id)),
-      attachment: attachment_events(prepared.dig(:ids, :attempt_id)).last
+      events: candidate_events(input.fetch(:candidate_id))
     )
   end
 
@@ -69,8 +74,8 @@ module CandidateScenario
       candidate_id: input.fetch(:candidate_id),
       repository_id: input.fetch(:repository_id),
       head_commit_oid: input.fetch(:head_commit_oid),
-      manifest_digest: manifest.data.fetch("manifest_digest"),
-      build_context_digest: context&.data&.fetch("build_context_digest"),
+      manifest_digest: manifest.metadata.fetch("manifest_digest"),
+      build_context_digest: context&.metadata&.fetch("build_context_digest"),
       analyzer_version: "impact-analyzer-v1",
       surface: surface || {
         produces: [ { impact_key: "contract:payments-api:v2", after: "available" } ],
@@ -223,24 +228,8 @@ module CandidateScenario
     event_store.read(
       streams.candidate(candidate_id),
       Coordinator::Write::EventReadCriteria.new(
-        event_types: %w[
-          CandidateSubmitted
-          CandidateChangeManifestCaptured
-          CandidateBuildContextCaptured
-          CandidateImpactSurfaceDerived
-        ],
-        maximum_count: 4,
-        direction: :asc
-      )
-    )
-  end
-
-  def attachment_events(attempt_id)
-    event_store.read(
-      streams.attempt(attempt_id),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "CandidateAttachedToAttempt" ],
-        maximum_count: 20,
+        event_types: Coordinator::Write::Candidates::StateLoader::FACT_TYPES,
+        maximum_count: 11,
         direction: :asc
       )
     )

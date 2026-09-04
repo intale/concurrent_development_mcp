@@ -9,9 +9,7 @@ module Coordinator::Write::Domain::MergeSnapshotVerifications
       command: Coordinator::Write::Commands::SubmitMergeSnapshotVerification,
       snapshot_evidence: Coordinator::Write::MergeSnapshotVerifications::SnapshotEvidenceV1?,
       verification_id: String,
-      verification_input_digest: String,
-      submission_event: Coordinator::Write::EventReference,
-      submitted_at: String
+      verification_input_digest: String
     ) -> Dry::Monads::Result
   end
 end

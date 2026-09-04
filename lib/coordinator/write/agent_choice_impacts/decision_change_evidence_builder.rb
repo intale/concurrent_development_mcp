@@ -85,7 +85,7 @@ module Coordinator::Write
       end
 
       def build_evidence(event, payload, definition)
-        DecisionChangeEvidenceV1.new(
+        DecisionChangeEvidenceV2.new(
           source_event: reference(event),
           source_global_position: event.global_position,
           source_command_id: event.metadata.fetch("command_id"),
@@ -97,8 +97,7 @@ module Coordinator::Write
           change_kind: change_kind(payload),
           definition_digest: definition.digest,
           retroactivity: definition.document.enforcement.retroactivity,
-          affected_partitions: affected_partitions(event, payload, definition),
-          changed_at: event.created_at.utc.iso8601(6)
+          affected_partitions: affected_partitions(event, payload, definition)
         )
       end
 

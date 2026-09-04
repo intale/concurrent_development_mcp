@@ -1,0 +1,7 @@
+module Coordinator::Write
+  module Metadata
+    class MergeSnapshotVerificationV2 < Coordinator::Write::EventMetadata
+      attr_reader verification_input_digest: String
+    end
+  end
+end

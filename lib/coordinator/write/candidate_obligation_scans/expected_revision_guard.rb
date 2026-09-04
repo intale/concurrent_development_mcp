@@ -10,7 +10,7 @@ module Coordinator::Write
       rescue PgEventstore::WrongExpectedRevisionError
         Failure(
           OutcomeError.new(
-            code: :candidate_impact_scan_concurrency_conflict,
+            code: :stale_stream,
             message: "Candidate impact scan changed concurrently; processing may succeed if retried",
             details: { scan_id: }
           )

@@ -43,11 +43,9 @@ RSpec.describe Coordinator::Write::Domain::VerificationObligationClaims::Claim d
       ),
       event: have_attributes(
         obligation_id: obligation.obligation_id,
-        obligation_event:,
         claim_id:,
         claimant_id: "agent-blue",
         fencing_token: 1,
-        claimed_at:,
         expires_at: "2026-08-24T07:05:00.000000Z"
       )
     )
@@ -88,7 +86,6 @@ RSpec.describe Coordinator::Write::Domain::VerificationObligationClaims::Claim d
     expect(result.value!.events.sole).to have_attributes(
       claimant_id: "agent-green",
       fencing_token: 2,
-      claimed_at: "2026-08-24T07:05:00.000000Z",
       expires_at: "2026-08-24T07:10:00.000000Z"
     )
   end
@@ -109,13 +106,11 @@ RSpec.describe Coordinator::Write::Domain::VerificationObligationClaims::Claim d
   end
 
   def claimed_event
-    Coordinator::Write::Events::VerificationObligationClaimedV1.new(
+    Coordinator::Write::Events::VerificationObligationClaimedV2.new(
       obligation_id: obligation.obligation_id,
-      obligation_event:,
       claim_id:,
       claimant_id: "agent-blue",
       fencing_token: 1,
-      claimed_at:,
       expires_at: "2026-08-24T07:05:00.000000Z"
     )
   end

@@ -31,7 +31,6 @@ module Coordinator::Write
             required(:version).filled(:string)
           end
           required(:run_id).filled(:string)
-          required(:activated_at).filled(:string)
         end
       end
 
@@ -58,7 +57,6 @@ module Coordinator::Write
         key.failure("external_reference must contain at most 1,000 characters") if value.fetch(:external_reference).length > 1_000
         key.failure("state_digest must be a SHA-256 digest") unless Types::SHA256_DIGEST_PATTERN.match?(value.fetch(:state_digest))
         key.failure("run_id must be canonical") unless Types::IDENTIFIER_PATTERN.match?(value.fetch(:run_id))
-        key.failure("activated_at must be a UTC timestamp with microseconds") unless Types::TIMESTAMP_PATTERN.match?(value.fetch(:activated_at))
       end
     end
   end

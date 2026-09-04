@@ -6,38 +6,50 @@ module Coordinator::Write
       class Prepare
         include Dry::Monads[:result]
 
-        def initialize(
-          stream_factory: StreamFactory.new,
-          digest_builder: Coordinator::Write::ReleaseSets::ReleaseDigestBuilder.new
-        )
+        def initialize(stream_factory: StreamFactory.new)
           @stream_factory = stream_factory
-          @digest_builder = digest_builder
         end
 
-        def call(state:, command:, prepared_at:)
+        def call(state:, command:)
           denial = denied(state)
           return denial if denial
 
           change_set_id = state.ordered_members.map(&:change_set_id).uniq.sole
-          release_digest = @digest_builder.call(
-            release_set_id: command.release_set_id,
-            change_set_id:,
-            ordered_members: state.ordered_members,
-            policy_version: command.policy_version
-          )
-          event = Events::ReleaseSetPreparedV1.new(
-            release_set_id: command.release_set_id,
-            change_set_id:,
-            ordered_members: state.ordered_members,
-            release_digest:,
-            policy_version: command.policy_version,
-            prepared_at:
-          )
-          Success(
-            EventPlan.new(
-              writes: [ EventWrite.new(stream: @stream_factory.release_set(command.release_set_id), event:) ]
+          stream = @stream_factory.release_set(command.release_set_id)
+          writes = [
+            EventWrite.new(
+              stream:,
+              event: Events::ReleaseSetCreatedV1.new(
+                release_set_id: command.release_set_id,
+                change_set_id:
+              )
+            )
+          ]
+          state.ordered_members.each do |member|
+            writes << EventWrite.new(
+              stream:,
+              event: Events::ReleaseSetMemberAddedV1.new(
+                release_set_id: command.release_set_id,
+                member_position: member.position,
+                repository_id: member.repository_id,
+                candidate_id: member.ordered_candidates.sole.candidate_id
+              )
+            )
+          end
+          writes << EventWrite.new(
+            stream:,
+            event: Events::ReleaseSetPreparedV2.new(
+              release_set_id: command.release_set_id
             )
           )
+          writes << EventWrite.new(
+            stream: @stream_factory.change_set(change_set_id),
+            event: Events::ChangeSetReleaseSetLinkedV1.new(
+              change_set_id:,
+              release_set_id: command.release_set_id
+            )
+          )
+          Success(EventPlan.new(writes:))
         end
 
         private
@@ -57,6 +69,7 @@ module Coordinator::Write
           return invariant(:release_set_repositories_repeated, "ReleaseSet repositories must be unique") unless members.map(&:repository_id).uniq.length == members.length
           return invariant(:release_set_snapshots_repeated, "ReleaseSet snapshots must be unique") unless members.map(&:merge_snapshot_id).uniq.length == members.length
           return invariant(:release_set_change_sets_mixed, "ReleaseSet members must belong to one ChangeSet") unless members.map(&:change_set_id).uniq.one?
+          return invariant(:release_set_snapshot_candidates_ambiguous, "Each ReleaseSet member snapshot must contain exactly one Candidate") unless members.all? { _1.ordered_candidates.one? }
 
           nil
         end

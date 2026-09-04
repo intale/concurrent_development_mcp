@@ -1,0 +1,13 @@
+module Coordinator::Write
+  module VerificationObligations
+    class OutcomeStateV2 < Coordinator::Shared::Value
+      Observation: untyped
+
+      def terminal?: () -> untyped
+
+      def observation: (untyped evidence_id) -> untyped
+
+      def passed_by_kind: () -> untyped
+    end
+  end
+end

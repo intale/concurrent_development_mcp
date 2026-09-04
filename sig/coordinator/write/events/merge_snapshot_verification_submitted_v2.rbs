@@ -1,0 +1,9 @@
+module Coordinator::Write
+  module Events
+    class MergeSnapshotVerificationSubmittedV2 < Base
+      attr_reader verification_id: String
+      attr_reader merge_snapshot_id: String
+      attr_reader assessment: Coordinator::Write::MergeSnapshotVerifications::AssessmentV1
+    end
+  end
+end

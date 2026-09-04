@@ -2,7 +2,7 @@
 
 module Coordinator::Read
   class ReleaseSetViewV1 < Value
-    Member = Coordinator::Write::ReleaseSets::MemberEvidenceV1
+    Member = ReleaseSetMemberViewV1
     Integration = ReleaseSetIntegrationViewV1
     Verification = ReleaseSetVerificationViewV1
     Activation = ReleaseSetActivationViewV1

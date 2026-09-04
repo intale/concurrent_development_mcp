@@ -5,10 +5,12 @@ module Coordinator::Processes
     class BuildProgress
       SOURCE_DEPENDENCY_KINDS = {
         Coordinator::Write::Events::WorkItemCandidateSelectedV1 => %w[requires_candidate],
+        Coordinator::Write::Events::WorkItemCandidateSelectedV2 => %w[requires_candidate],
         Coordinator::Write::Events::WorkItemCompletedV1 => %w[requires_completion requires_artifact requires_contract],
-        Coordinator::Write::Events::RepositoryIntegrationRecordedV1 => %w[must_integrate_after],
-        Coordinator::Write::Events::ReleaseSetVerificationRecordedV1 => %w[requires_composite_verification],
-        Coordinator::Write::Events::ReleaseSetCompletedV1 => %w[must_deploy_after]
+        Coordinator::Write::Events::WorkItemCompletedV2 => %w[requires_completion requires_artifact requires_contract],
+        Coordinator::Write::Events::RepositoryIntegrationRecordedV2 => %w[must_integrate_after],
+        Coordinator::Write::Events::ReleaseSetVerificationRecordedV2 => %w[requires_composite_verification],
+        Coordinator::Write::Events::ReleaseSetCompletedV2 => %w[must_deploy_after]
       }.freeze
       HANDLED_OUTCOME_CODES = %i[
         change_set_not_active
@@ -27,13 +29,14 @@ module Coordinator::Processes
 
       def initialize(
         event_store:,
-        source_builder: Coordinator::Processes::BuildProgress::SourceBuilder.new,
+        source_builder: Coordinator::Processes::BuildProgress::SourceBuilder.new(event_store:),
         command_builder: Coordinator::Processes::BuildProgress::CommandBuilder.new,
         process_step_planner: Coordinator::Processes::ProcessStepPlanner.new(event_store:),
         satisfy_dependency: Coordinator::Write::Operations::ExecuteSatisfyWorkItemDependency.new(event_store:),
         complete_change_set: Coordinator::Write::Operations::ExecuteCompleteChangeSet.new(event_store:),
         schema_registry: Coordinator::Write::EventSchemaRegistry.new,
-        stream_factory: Coordinator::Write::StreamFactory.new
+        stream_factory: Coordinator::Write::StreamFactory.new,
+        change_set_state_loader: Coordinator::Write::ChangeSets::StateLoader.new(event_store:)
       )
         @event_store = event_store
         @source_builder = source_builder
@@ -43,6 +46,7 @@ module Coordinator::Processes
         @complete_change_set = complete_change_set
         @schema_registry = schema_registry
         @stream_factory = stream_factory
+        @change_set_state_loader = change_set_state_loader
       end
 
       def call(event)
@@ -69,7 +73,8 @@ module Coordinator::Processes
 
       def completion_source?(source)
         source.payload.is_a?(Coordinator::Write::Events::WorkItemCompletedV1) ||
-          source.payload.is_a?(Coordinator::Write::Events::ReleaseSetCompletedV1)
+          source.payload.is_a?(Coordinator::Write::Events::WorkItemCompletedV2) ||
+          source.payload.is_a?(Coordinator::Write::Events::ReleaseSetCompletedV2)
       end
 
       def complete(source)
@@ -89,19 +94,8 @@ module Coordinator::Processes
 
       def dependencies_for(source)
         kinds = SOURCE_DEPENDENCY_KINDS.fetch(source.payload.class)
-        @event_store.read(
-          @stream_factory.change_set(source.change_set_id),
-          Coordinator::Write::EventQueries::CHANGE_SET_FOR_DEPENDENCY_SATISFACTION
-        ).filter_map do |event|
-          payload = @schema_registry.load(
-            type: event.type,
-            schema_version: event.metadata.fetch("schema_version"),
-            data: event.data
-          )
-          next unless payload.is_a?(Coordinator::Write::Events::WorkItemDependencyDeclaredV1)
-          next unless kinds.include?(payload.dependency_kind)
-
-          payload
+        @change_set_state_loader.call(source.change_set_id).dependencies.select do |dependency|
+          kinds.include?(dependency.dependency_kind)
         end
       end
 

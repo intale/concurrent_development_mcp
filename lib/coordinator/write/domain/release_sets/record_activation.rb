@@ -6,34 +6,19 @@ module Coordinator::Write
       class RecordActivation
         include Dry::Monads[:result]
 
-        def initialize(
-          stream_factory: StreamFactory.new,
-          digest_builder: Coordinator::Write::ReleaseSets::ActivationDigestBuilder.new
-        )
+        def initialize(stream_factory: StreamFactory.new)
           @stream_factory = stream_factory
-          @digest_builder = digest_builder
         end
 
-        def call(state:, command:, recorded_at:)
+        def call(state:, command:)
           denial = denied(state:, command:)
           return denial if denial
 
           preparation = state.preparation.payload
-          verification = state.latest_verification
-          attributes = {
+          event = Events::ReleaseSetActivatedV2.new(
             release_set_id: command.release_set_id,
-            release_digest: preparation.release_digest,
-            verification_event: command.verification_event,
-            verification_digest: command.verification_digest,
-            activation_point: command.activation_point,
-            policy_version: command.policy_version
-          }
-          event = Events::ReleaseSetActivatedV1.new(
-            **attributes,
             change_set_id: preparation.change_set_id,
-            activation_digest: @digest_builder.call(**attributes),
-            evidence_status: "attributed_unverified",
-            recorded_at:
+            activation_point: command.activation_point
           )
           Success(EventPlan.new(writes: [ EventWrite.new(stream: @stream_factory.release_set(command.release_set_id), event:) ]))
         end
@@ -50,7 +35,7 @@ module Coordinator::Write
 
           verification = state.latest_verification
           unless command.verification_event == verification.event &&
-                 command.verification_digest == verification.payload.verification_digest
+                 command.verification_digest == verification.verification_digest
             return failure(:release_activation_verification_binding_stale, "Activation does not bind the exact latest passing verification")
           end
 

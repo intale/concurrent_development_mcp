@@ -1,0 +1,6 @@
+module Coordinator::Read
+  module AgentChoiceImpacts
+    class DecisionChangeSourceV1 < Coordinator::Shared::Value
+    end
+  end
+end

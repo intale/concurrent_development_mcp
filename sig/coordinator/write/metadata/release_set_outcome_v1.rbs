@@ -1,0 +1,6 @@
+module Coordinator::Write
+  module Metadata
+    class ReleaseSetOutcomeV1 < EventMetadata
+    end
+  end
+end

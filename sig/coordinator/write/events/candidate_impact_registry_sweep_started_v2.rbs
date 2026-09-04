@@ -1,0 +1,6 @@
+module Coordinator::Write
+  module Events
+    class CandidateImpactRegistrySweepStartedV2 < Base
+    end
+  end
+end

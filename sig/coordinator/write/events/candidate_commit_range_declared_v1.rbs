@@ -1,0 +1,6 @@
+module Coordinator::Write
+  module Events
+    class CandidateCommitRangeDeclaredV1 < Base
+    end
+  end
+end

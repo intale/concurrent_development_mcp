@@ -13,6 +13,7 @@ module Coordinator::Write
         clock: SystemClock.new,
         id_generator: IdGenerator.new,
         commit_identity_builder: MergeSnapshots::CommitIdentityBuilder.new,
+        snapshot_digest_builder: MergeSnapshots::SnapshotDigestBuilder.new,
         candidate_loader: MergeSnapshots::CandidateLoader.new(event_store:),
         event_factory: EventFactory.new,
         schema_registry: EventSchemaRegistry.new,
@@ -28,6 +29,7 @@ module Coordinator::Write
         @clock = clock
         @id_generator = id_generator
         @commit_identity_builder = commit_identity_builder
+        @snapshot_digest_builder = snapshot_digest_builder
         @candidate_loader = candidate_loader
         @event_factory = event_factory
         @schema_registry = schema_registry
@@ -74,25 +76,24 @@ module Coordinator::Write
         preparation = preparation.with_commit_identity(commit_identity)
 
         state = load_state(command, existing_commit:)
-        snapshot_event = future_snapshot_reference(command, preparation.snapshot_event_id)
         decision = @decider.call(
           state:,
           command:,
-          commit_identity: preparation.commit_identity,
-          snapshot_event:,
-          registered_at: preparation.registered_at
+          commit_identity: preparation.commit_identity
         )
         return decision if decision.failure?
 
         plan = decision.value!
-        verify_plan!(plan, state:, command:, preparation:, snapshot_event:)
-        persisted = persist_plan(plan, command:, preparation:, caused_by:)
+        verify_plan!(plan, state:, command:, preparation:)
+        snapshot_digest = @snapshot_digest_builder.call(command:, candidates: state.candidates)
+        persisted = persist_plan(plan, command:, preparation:, caused_by:, snapshot_digest:)
         completion = @completion_builder.merge_snapshot_register(
           command:,
-          snapshot: plan.events.fetch(0),
+          snapshot_digest:,
           input_digest: preparation.input_digest,
           persisted_events: persisted,
-          completed_at: preparation.registered_at
+          completed_at: preparation.registered_at,
+          registered_at: preparation.registered_at
         )
         Success(completion)
       end
@@ -157,44 +158,34 @@ module Coordinator::Write
         event && event_reference(event)
       end
 
-      def future_snapshot_reference(command, event_id)
-        stream = @stream_factory.merge_snapshot(command.merge_snapshot_id)
-        EventReference.new(
-          event_id:,
-          type: "MergeSnapshotRegistered",
-          stream_context: stream.context,
-          stream_name: stream.stream_name,
-          stream_id: stream.stream_id,
-          stream_revision: 0
-        )
-      end
-
-      def verify_plan!(plan, state:, command:, preparation:, snapshot_event:)
+      def verify_plan!(plan, state:, command:, preparation:)
         result = @event_plan_contract.call(
           plan:,
           command:,
           state:,
-          commit_identity: preparation.commit_identity,
-          snapshot_event:,
-          registered_at: preparation.registered_at
+          commit_identity: preparation.commit_identity
         )
         return if result.success?
 
         raise InvalidMergeSnapshotRegistrationEventPlan, result.errors.to_h.inspect
       end
 
-      def persist_plan(plan, command:, preparation:, caused_by:)
+      def persist_plan(plan, command:, preparation:, caused_by:, snapshot_digest:)
         ids = [ preparation.snapshot_event_id, preparation.commit_registration_event_id ]
+        parent = caused_by
+        correlation_id = caused_by&.correlation_id || preparation.correlation_id
         plan.writes.zip(ids).map do |write, event_id|
           physical = @event_factory.build!(
             event: write.event,
             event_id:,
-            metadata: command_metadata(command),
+            metadata: event_metadata(write.event, command, snapshot_digest),
             markers: event_markers(command, preparation.commit_identity, plan.events.fetch(0)),
-            caused_by:,
-            correlation_id: root_correlation_id(preparation, caused_by)
+            caused_by: parent,
+            correlation_id:
           )
-          @event_store.append(write.stream, [ physical ]).sole
+          persisted = @event_store.append(write.stream, [ physical ]).sole
+          parent = persisted
+          persisted
         end
       end
 
@@ -208,12 +199,9 @@ module Coordinator::Write
           "command:#{command.command_id}",
           identity.marker
         ]
-        snapshot.ordered_candidates.each do |candidate|
+        snapshot.ordered_candidates.each do |candidate_id|
           markers.concat([
-            "candidate:#{candidate.candidate_id}",
-            "change-set:#{candidate.change_set_id}",
-            "work-item:#{candidate.work_item_id}",
-            "attempt:#{candidate.attempt_id}"
+            "candidate:#{candidate_id}"
           ])
         end
         markers
@@ -238,18 +226,22 @@ module Coordinator::Write
         )
       end
 
-      def root_correlation_id(preparation, caused_by)
-        preparation.correlation_id unless caused_by
-      end
-
-      def command_metadata(command)
-        EventMetadata.new(
+      def event_metadata(event, command, snapshot_digest)
+        attributes = {
           command_id: command.command_id,
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
           policy_version: command.policy_version
-        )
+        }
+        case event
+        when Events::MergeSnapshotRegisteredV2
+          Metadata::MergeSnapshotV2.new(**attributes, snapshot_digest:)
+        when Events::MergeSnapshotCommitRegisteredV2
+          Metadata::MarkerCodecV1.new(**attributes, marker_codec_version: "compound-marker-v2")
+        else
+          raise "Unexpected merge-snapshot registration event #{event.class.name}"
+        end
       end
     end
   end

@@ -2,7 +2,7 @@ module Coordinator
   module Read
     module Projections
       class CoordContextReducer
-        def apply: (CoordContextStateV1 state, Write::Events::Base event) -> CoordContextStateV1
+        def apply: (CoordContextStateV1 state, Write::Events::Base | CandidateSubmissionViewV2 event) -> CoordContextStateV1
       end
     end
   end

@@ -8,6 +8,7 @@ module Coordinator::Write
       attribute :partition, DecisionPartitionV1
       attribute :latest_revision, Types::StreamRevision.optional
       attribute :active_decisions, Types::Array.of(Head).constrained(max_size: 32)
+      attribute :latest_event, EventReference.optional.default(nil)
     end
   end
 end

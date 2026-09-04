@@ -7,23 +7,21 @@ module Coordinator::Write
         required(:plan).value(Types.Instance(Domain::EventPlan))
         required(:command).value(Types.Instance(Commands::StartVerificationObligationValidityScan))
         required(:expected_stream).value(Types.Instance(StreamReference))
-        required(:started_at).filled(:string)
       end
 
-      rule(:plan, :command, :expected_stream, :started_at) do
+      rule(:plan, :command, :expected_stream) do
         plan = values[:plan]
         command = values[:command]
-        write = plan.writes.sole if plan.writes.length == 1
-        event = write&.event
-        valid = write&.stream == values[:expected_stream] &&
-          event.is_a?(Events::VerificationObligationValidityScanStartedV1) &&
-          event.scan_id == command.scan_id &&
-          event.change_set_id == command.change_set_id &&
-          event.superseding_partition_event == command.superseding_partition_event &&
-          event.from_position.zero? && event.to_position == command.source_global_position &&
-          event.page_size == 50 && event.rule_version == command.rule_version &&
-          event.started_at == values[:started_at]
-        key(:plan).failure("must write the exact validity scan start") unless valid
+        started, link = plan.events
+        valid = plan.writes.length == 2 && plan.writes.all? { _1.stream == values[:expected_stream] } &&
+          started.is_a?(Events::VerificationObligationValidityScanStartedV2) &&
+          started.scan_id == command.scan_id && started.change_set_id == command.change_set_id &&
+          started.from_position.zero? && started.to_position == command.source_global_position &&
+          started.page_size == 50 &&
+          link.is_a?(Events::VerificationObligationValidityScanSourceLinkedV1) &&
+          link.scan_id == command.scan_id && link.role == "superseding_partition" &&
+          link.source == command.superseding_partition_event
+        key(:plan).failure("must contain the exact validity-scan start and source link") unless valid
       end
     end
   end

@@ -22,9 +22,12 @@ RSpec.describe Coordinator::Processes::ProcessManagers::ReleaseSetLifecycle, :ev
     process_manager.call(failure.fetch(:event))
     request = lifecycle(prepared).select { _1.type == "ReleaseSetCompensationRequested" }.sole
     payload = ReleaseSetScenario.load(request)
+    successful_integrations = lifecycle(prepared)
+      .select { _1.type == "ReleaseSetSuccessfulIntegrationLinked" }
+      .map { ReleaseSetScenario.load(_1).integration_event }
 
-    expect(payload.successful_integrations.length).to eq(1)
-    expect(payload.trigger_event).to eq(ReleaseSetScenario.reference(failure.fetch(:event)))
+    expect(successful_integrations.length).to eq(1)
+    expect(request.markers).to include("release-compensation-trigger:#{failure.fetch(:event).id}")
     step = process_step(
       source_event: failure.fetch(:event),
       step_name: "request-compensation",
@@ -48,17 +51,17 @@ RSpec.describe Coordinator::Processes::ProcessManagers::ReleaseSetLifecycle, :ev
     process_manager.call(activation.fetch(:event))
     process_manager.call(activation.fetch(:event))
     completion = lifecycle(prepared).select { _1.type == "ReleaseSetCompleted" }.sole
+    outcome = lifecycle(prepared).select { _1.type == "ReleaseSetOutcomeRecorded" }.sole
 
-    expect(ReleaseSetScenario.load(completion)).to have_attributes(
-      outcome: "activated",
-      source_event: ReleaseSetScenario.reference(activation.fetch(:event))
-    )
+    expect(ReleaseSetScenario.load(outcome).outcome).to eq("activated")
+    expect(ReleaseSetScenario.load(completion).release_set_id).to eq(prepared.dig(:input, :release_set_id))
     step = process_step(
       source_event: activation.fetch(:event),
       step_name: "complete-activated-release-set",
       subject_id: prepared.dig(:input, :release_set_id)
     )
-    expect(completion.causation_id).to eq(step.id)
+    expect(outcome.causation_id).to eq(step.id)
+    expect(completion.causation_id).to eq(outcome.id)
     expect(completion.correlation_id).to eq(prepared.fetch(:event).correlation_id)
     expect(completion.metadata.fetch("command_id")).to eq(step.data.fetch("target_command_id"))
   end
@@ -86,12 +89,13 @@ RSpec.describe Coordinator::Processes::ProcessManagers::ReleaseSetLifecycle, :ev
     process_manager.call(verification.fetch(:event))
     request = lifecycle(prepared).select { _1.type == "ReleaseSetCompensationRequested" }.sole
     payload = ReleaseSetScenario.load(request)
+    successful_integrations = lifecycle(prepared)
+      .select { _1.type == "ReleaseSetSuccessfulIntegrationLinked" }
+      .map { ReleaseSetScenario.load(_1).integration_event }
 
-    expect(payload).to have_attributes(
-      trigger_kind: "release_verification_failed",
-      trigger_event: ReleaseSetScenario.reference(verification.fetch(:event))
-    )
-    expect(payload.successful_integrations).to eq(integrations.map { _1.fetch(:completion).data.integration_event })
+    expect(payload.trigger_kind).to eq("release_verification_failed")
+    expect(request.markers).to include("release-compensation-trigger:#{verification.fetch(:event).id}")
+    expect(successful_integrations).to eq(integrations.map { _1.fetch(:completion).data.integration_event })
   end
 
   it "publishes one unique registration in the shared process-manager set" do
@@ -139,8 +143,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::ReleaseSetLifecycle, :ev
       summary: "Ledger integration failed",
       producer: { name: "release-adapter", version: "1.0.0" },
       run_id: "release-failure-#{prefix}",
-      result_digest: "sha256:#{'d' * 64}",
-      occurred_at: "2026-08-24T21:30:00.000000Z"
+      result_digest: "sha256:#{'d' * 64}"
     }
   end
 end

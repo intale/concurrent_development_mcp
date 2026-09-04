@@ -36,8 +36,9 @@ module Coordinator::Write
       def call(invocation)
         verify_input!(invocation)
         preparation = CandidateObligationScans::StartPreparationV1.new(
-          started_at: @clock.now,
-          event_id: @id_generator.uuid_v7
+          observed_at: @clock.now,
+          event_ids: Array.new(3) { @id_generator.uuid_v7 },
+          correlation_id: invocation.caused_by&.correlation_id || @id_generator.uuid_v7
         )
 
         @event_store.multiple do
@@ -54,7 +55,7 @@ module Coordinator::Write
           policy_partition_event: command.policy_partition_event,
           policy_head: command.policy_head,
           change_set_id: command.change_set_id,
-          observed_at: preparation.started_at
+          observed_at: preparation.observed_at
         )
         latest = latest_registry_revision(command.change_set_id)
         snapshot = @loader.call(command.scan_id)
@@ -70,31 +71,30 @@ module Coordinator::Write
           state: snapshot.state,
           command:,
           policy:,
-          latest_registry_revision: latest,
-          started_at: preparation.started_at
+          latest_registry_revision: latest
         )
         return decision if decision.failure?
 
         plan = decision.value!
         stream = @stream_factory.candidate_impact_registry_sweep(command.scan_id)
         verify_event_plan!(plan, command:, expected_stream: stream)
-        physical = @event_factory.build!(
-          event: plan.events.sole,
-          event_id: preparation.event_id,
-          metadata: metadata(command),
-          markers: markers(command),
-          caused_by: invocation.caused_by
-        )
-        persisted = @event_store.append(stream, [ physical ]).sole
+        physical = physical_events(plan.events, command:, preparation:, caused_by: invocation.caused_by)
+        persisted = @event_store.append(stream, physical)
 
-        Success(persisted)
+        Success(persisted.first)
       end
 
       def latest_registry_revision(change_set_id)
-        @event_store.read_grouped(
-          @stream_factory.candidate_impact_registry(change_set_id),
-          EventQueries::CANDIDATE_IMPACT_REGISTRY_LATEST
-        ).first&.stream_revision
+        @event_store.read_latest_global_marked(
+          GlobalMarkedEventReadCriteria.new(
+            stream_context: "DevelopmentIntegration",
+            stream_name: "Candidate",
+            event_types: [ "CandidateImpactSurfaceAssigned" ],
+            markers: [ "change-set:#{change_set_id}" ],
+            maximum_count: 1,
+            direction: :desc
+          )
+        )&.global_position
       end
 
       def verify_input!(invocation)
@@ -111,24 +111,42 @@ module Coordinator::Write
         raise ArgumentError, "registry sweep start plan violates its dry-rb contract: #{result.errors.to_h.inspect}"
       end
 
-      def metadata(command)
+      def physical_events(events, command:, preparation:, caused_by:)
+        parent = caused_by
+        events.zip(preparation.event_ids).map do |event, event_id|
+          physical = @event_factory.build!(
+            event:,
+            event_id:,
+            metadata: metadata(event, command),
+            markers: markers(command, event),
+            caused_by: parent,
+            correlation_id: preparation.correlation_id
+          )
+          parent = physical
+          physical
+        end
+      end
+
+      def metadata(event, command)
         EventMetadata.new(
           command_id: command.command_id,
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
-          policy_version: command.rule_version
+          policy_version: event.is_a?(Events::CandidateImpactRegistrySweepSourceLinkedV1) ? nil : command.rule_version
         )
       end
 
-      def markers(command)
-        [
+      def markers(command, event)
+        values = [
           "candidate-impact-registry-sweep:#{command.scan_id}",
           "change-set:#{command.change_set_id}",
           "decision:#{command.policy_head.decision_id}",
           "policy-partition-event:#{command.policy_partition_event.event_id}",
           "command:#{command.command_id}"
-        ].freeze
+        ]
+        values << "source-role:#{event.role}" if event.is_a?(Events::CandidateImpactRegistrySweepSourceLinkedV1)
+        values.freeze
       end
     end
   end

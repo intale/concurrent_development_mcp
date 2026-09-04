@@ -56,13 +56,7 @@ RSpec.describe Coordinator::Write::Domain::VerificationObligationInvalidations::
       stream: Coordinator::Write::StreamFactory.new.verification_obligation(obligation.obligation_id),
       event: have_attributes(
         obligation_id: obligation.obligation_id,
-        obligation_event:,
-        invalidated_policy: obligation.policy,
-        superseding_partition_event: superseding_reference,
-        previous_status: "open",
-        previous_terminal_event: nil,
-        reason: "policy_partition_advanced",
-        rule_version: "verification-obligation-validity/v1"
+        reason: "policy_partition_advanced"
       )
     )
   end
@@ -90,8 +84,7 @@ RSpec.describe Coordinator::Write::Domain::VerificationObligationInvalidations::
     decider.call(
       state:,
       command:,
-      superseding_partition:,
-      invalidated_at: VerificationEvidenceExamples::SUBMITTED_AT
+      superseding_partition:
     )
   end
 end

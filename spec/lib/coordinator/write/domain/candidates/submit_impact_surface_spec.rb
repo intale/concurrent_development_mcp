@@ -8,26 +8,22 @@ RSpec.describe Coordinator::Write::Domain::Candidates::SubmitImpactSurface do
 
     expect(result).to be_success
     expect(result.value!.writes.map(&:stream)).to eq([
-      streams.candidate("CAN-41"),
-      streams.candidate_impact_registry("CS-1")
+      streams.candidate_impact_surface(surface_id),
+      streams.candidate("CAN-41")
     ])
-    surface, registration = result.value!.events
+    surface, assignment = result.value!.events
     expect(surface).to have_attributes(
+      surface_id:,
       candidate_id: "CAN-41",
-      change_set_id: "CS-1",
-      surface_digest: command.surface.digest,
-      manifest_digest: manifest.manifest_digest,
-      evidence_status: "attributed_unverified",
-      derived_at: "2026-08-23T15:00:00.000000Z"
+      evidence_revision: 1,
+      produces: command.surface.produces,
+      consumes: command.surface.consumes,
+      may_affect: command.surface.may_affect,
+      assumes: command.surface.assumes
     )
-    expect(registration).to have_attributes(
+    expect(assignment).to have_attributes(
       candidate_id: "CAN-41",
-      change_set_id: "CS-1",
-      candidate_event: candidate_event,
-      manifest_event: manifest_event,
-      build_context_event: nil,
-      surface_event: surface_event,
-      index_policy_version: "candidate-impact-exact-index/v2"
+      surface_id:
     )
   end
 
@@ -59,19 +55,38 @@ RSpec.describe Coordinator::Write::Domain::Candidates::SubmitImpactSurface do
         existing_surface:
       ),
       command:,
-      surface_event:,
-      derived_at: "2026-08-23T15:00:00.000000Z"
+      surface_id:
     )
   end
 
   def evidence
-    Coordinator::Write::Candidates::ImpactSurfaceEvidenceV1.new(
-      submission:,
-      submission_event: candidate_event,
+    Coordinator::Write::Candidates::ImpactSurfaceEvidenceV2.new(candidate: candidate_state)
+  end
+
+  def candidate_state
+    Coordinator::Write::Candidates::StateV2.new(
+      candidate_id: "CAN-41",
+      change_set_id: "CS-1",
+      work_item_id: "W-1",
+      attempt_id: "A-1",
+      agent_id: "agent-7",
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      target_branch: "main",
+      object_format: "sha1",
+      base_commit_oid: "a" * 40,
+      head_commit_oid: "b" * 40,
+      checkpoint_kind: "final",
+      intention_set_id: "01919191-9191-7191-8191-919191919191",
+      manifest_digest: "sha256:#{"a" * 64}",
+      build_context_digest: nil,
       manifest:,
-      manifest_event:,
       build_context: nil,
-      build_context_event: nil
+      submission_event: candidate_event,
+      manifest_event:,
+      build_context_event: nil,
+      surface_id: nil,
+      surface_assignment_event: nil,
+      latest_revision: 8
     )
   end
 
@@ -103,40 +118,10 @@ RSpec.describe Coordinator::Write::Domain::Candidates::SubmitImpactSurface do
     }
   end
 
-  def submission
-    Coordinator::Write::Events::CandidateSubmittedV2.new(
-      candidate_id: "CAN-41",
-      change_set_id: "CS-1",
-      work_item_id: "W-1",
-      attempt_id: "A-1",
-      agent_id: "agent-7",
-      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
-      target_branch: "main",
-      object_format: "sha1",
-      base_commit_oid: "a" * 40,
-      head_commit_oid: "b" * 40,
-      checkpoint_kind: "final",
-      lease_set_id: "01919191-9191-7191-8191-919191919191",
-      lease_policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
-      lease_references: [ lease_reference ],
-      manifest_digest: "sha256:#{"a" * 64}",
-      build_context_digest: nil,
-      evidence_status: "attributed_unverified",
-      submitted_at: "2026-08-23T14:00:00.000000Z"
-    )
-  end
-
   def manifest
-    Coordinator::Write::Events::CandidateChangeManifestCapturedV1.new(
+    Coordinator::Write::Events::CandidateChangeManifestCapturedV2.new(
       candidate_id: "CAN-41",
-      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
-      target_branch: "main",
-      object_format: "sha1",
-      base_commit_oid: "a" * 40,
-      head_commit_oid: "b" * 40,
       evidence_revision: 1,
-      policy_version: "candidate-change-manifest/v1",
-      manifest_digest: "sha256:#{"a" * 64}",
       files: [ Coordinator::Write::Candidates::ManifestFileV1.new(
         status: "modified",
         old_path: "Gemfile",
@@ -145,13 +130,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::SubmitImpactSurface do
         new_blob_oid: "d" * 40,
         old_mode: "100644",
         new_mode: "100644"
-      ) ],
-      collector: Coordinator::Write::Candidates::EvidenceCollectorV1.new(
-        kind: "agent",
-        id: "agent-7",
-        collector_version: "git-v1"
-      ),
-      captured_at: "2026-08-23T14:00:00.000000Z"
+      ) ]
     )
   end
 
@@ -208,6 +187,10 @@ RSpec.describe Coordinator::Write::Domain::Candidates::SubmitImpactSurface do
       stream_id: "CAN-41",
       stream_revision: 2
     )
+  end
+
+  def surface_id
+    "01919191-9191-7191-8191-919191919197"
   end
 
   def streams

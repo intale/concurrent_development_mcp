@@ -1,0 +1,25 @@
+module Coordinator::Write
+  module VerificationObligations
+    class OutcomeStateLoader
+      @event_store: untyped
+
+      @definition_loader: untyped
+
+      @stream_factory: untyped
+
+      @schema_registry: untyped
+
+      def initialize: (event_store: untyped, ?definition_loader: untyped, ?stream_factory: untyped, ?schema_registry: untyped) -> void
+
+      def call: (untyped obligation_id, ?through_revision: untyped?) -> untyped
+
+      private
+
+      def load_event: (untyped event) -> untyped
+
+      def reference: (untyped event) -> untyped
+
+      def deep_symbolize: (untyped value) -> untyped
+    end
+  end
+end

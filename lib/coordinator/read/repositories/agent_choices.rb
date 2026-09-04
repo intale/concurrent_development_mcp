@@ -64,21 +64,25 @@ module Coordinator::Read
         record
       end
 
-      def invalidate(event:, invalidation:)
+      def invalidate(event:, invalidation:, assessment:)
         record = Coordinator::Read::AgentChoice.find_by(choice_id: invalidation.choice_id)
         raise ProjectionStateError, "AgentChoiceAccepted must be projected before invalidation" unless record&.accepted_event
 
-        verify_invalidation!(record, invalidation)
+        verify_invalidation!(record, invalidation, assessment)
         record.update!(
           observation_status: "invalidated",
-          invalidation: invalidation.to_h,
+          invalidation: {
+            assessment_event: event_reference(assessment.assessment_event).to_h,
+            decision_change_event: assessment.decision_change.source_event.to_h,
+            reason: invalidation.reason
+          },
           invalidated_event: event_reference(event).to_h,
           invalidated_actor: actor(event).to_h,
           invalidated_markers: event.markers,
           invalidated_metadata: event.metadata,
           invalidated_causation_id: event.causation_id,
           invalidated_correlation_id: event.correlation_id,
-          invalidated_at_domain: invalidation.invalidated_at,
+          invalidated_at_domain: event.created_at,
           invalidated_at_store: event.created_at
         )
         record
@@ -93,9 +97,11 @@ module Coordinator::Read
         raise ProjectionStateError, "AgentChoiceAccepted does not reference the projected recorded choice"
       end
 
-      def verify_invalidation!(record, invalidation)
+      def verify_invalidation!(record, invalidation, assessment)
         accepted_event = Coordinator::Write::EventReference.new(symbolize(record.accepted_event))
-        return if record.observation_status == "accepted" && accepted_event == invalidation.accepted_choice
+        return if record.observation_status == "accepted" &&
+                  accepted_event == assessment.accepted_choice &&
+                  invalidation.choice_id == assessment.choice_id
 
         raise ProjectionStateError, "AgentChoice invalidation does not close the projected accepted choice"
       end
@@ -153,15 +159,11 @@ module Coordinator::Read
       def invalidation_view(record)
         return unless record.invalidation && record.invalidated_event
 
-        payload = Coordinator::Write::Events::AgentChoiceInvalidatedByDecisionV1.new(
-          symbolize(record.invalidation)
-        )
+        payload = symbolize(record.invalidation)
         AgentChoiceInvalidationViewV1.new(
-          assessment_event: payload.assessment_event,
-          decision_change_event: payload.decision_change_event,
-          previous_context_digest: payload.previous_context_digest,
-          resulting_context_digest: payload.resulting_context_digest,
-          reason: payload.reason,
+          assessment_event: Coordinator::Write::EventReference.new(payload.fetch(:assessment_event)),
+          decision_change_event: Coordinator::Write::EventReference.new(payload.fetch(:decision_change_event)),
+          reason: payload.fetch(:reason),
           evidence: invalidated_evidence(record)
         )
       end

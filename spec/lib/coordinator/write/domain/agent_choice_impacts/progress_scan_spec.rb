@@ -6,25 +6,24 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::ProgressScan do
   it "implements CHO-02-PAGE-01 by advancing after one full target page" do
     result = decider.call(
       state: running_state,
-      command: progress_command(last_position: 550, count: 50, has_more: true),
-      progressed_at: occurred_at
+      command: progress_command(last_position: 550, count: 50, has_more: true)
     )
 
     expect(result).to be_success
     expect(result.value!.events.sole).to be_a(
-      Coordinator::Write::Events::AgentChoiceImpactScanProgressedV1
+      Coordinator::Write::Events::AgentChoiceImpactScanProgressedV2
     )
     expect(result.value!.events.sole).to have_attributes(
-      previous_from_position: 0,
       next_from_position: 551,
       page_number: 1,
-      page_choice_count: 50,
-      total_choice_count: 50
+      from_position: 0,
+      to_position: 900,
+      page_size: 50
     )
   end
 
   it "implements CHO-02-PAGE-COMPLETE-01 including an empty final page" do
-    state = running_state(from_position: 551, page_count: 1, total_choice_count: 50)
+    state = running_state(from_position: 551, page_count: 1)
     result = decider.call(
       state:,
       command: progress_command(
@@ -33,27 +32,20 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::ProgressScan do
         last_position: nil,
         count: 0,
         has_more: false
-      ),
-      progressed_at: occurred_at
+      )
     )
 
     expect(result).to be_success
     expect(result.value!.events.sole).to be_a(
-      Coordinator::Write::Events::AgentChoiceImpactScanCompletedV1
+      Coordinator::Write::Events::AgentChoiceImpactScanCompletedV2
     )
-    expect(result.value!.events.sole).to have_attributes(
-      final_from_position: 551,
-      page_count: 2,
-      page_choice_count: 0,
-      total_choice_count: 50
-    )
+    expect(result.value!.events.sole).to have_attributes(scan_id:)
   end
 
   it "implements CHO-02-PAGE-STALE-01 as an explicit zero-event outcome" do
     result = decider.call(
       state: running_state(from_position: 551),
-      command: progress_command(last_position: 550, count: 50, has_more: true),
-      progressed_at: occurred_at
+      command: progress_command(last_position: 550, count: 50, has_more: true)
     )
 
     expect(result.failure).to have_attributes(code: :agent_choice_impact_scan_checkpoint_changed)
@@ -62,8 +54,7 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::ProgressScan do
   it "rejects a page beyond the frozen source position" do
     result = decider.call(
       state: running_state,
-      command: progress_command(last_position: 901, count: 1, has_more: false),
-      progressed_at: occurred_at
+      command: progress_command(last_position: 901, count: 1, has_more: false)
     )
 
     expect(result.failure).to have_attributes(code: :agent_choice_impact_scan_page_out_of_bounds)
@@ -72,8 +63,7 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::ProgressScan do
   it "rejects a sentinel claim when the processed page already reaches the frozen source position" do
     result = decider.call(
       state: running_state,
-      command: progress_command(last_position: 900, count: 50, has_more: true),
-      progressed_at: occurred_at
+      command: progress_command(last_position: 900, count: 50, has_more: true)
     )
 
     expect(result.failure).to have_attributes(code: :agent_choice_impact_scan_page_out_of_bounds)
@@ -102,7 +92,6 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::ProgressScan do
   def running_state(
     from_position: 0,
     page_count: 0,
-    total_choice_count: 0,
     checkpoint: started_event
   )
     Coordinator::Write::Domain::AgentChoiceImpacts::ScanState.new(
@@ -115,14 +104,13 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::ProgressScan do
       to_position: 900,
       page_size: 50,
       page_count:,
-      total_choice_count:,
       policy_version: "agent-choice-decision-impact/v1",
       skip_reason: nil
     )
   end
 
   def decision_change
-    Coordinator::Write::AgentChoiceImpacts::DecisionChangeEvidenceV1.new(
+    Coordinator::Write::AgentChoiceImpacts::DecisionChangeEvidenceV2.new(
       source_event:,
       source_global_position: 900,
       source_command_id: "cmd-decision-change",
@@ -138,8 +126,7 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::ProgressScan do
           anchor_kind: "repo",
           anchor_id: "billing"
         )
-      ],
-      changed_at: occurred_at
+      ]
     )
   end
 
@@ -169,7 +156,4 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::ProgressScan do
     "018f0000-0000-7000-8000-000000000004"
   end
 
-  def occurred_at
-    "2026-08-23T08:00:00.000000Z"
-  end
 end

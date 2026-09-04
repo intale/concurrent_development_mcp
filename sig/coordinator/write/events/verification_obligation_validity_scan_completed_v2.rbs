@@ -1,0 +1,6 @@
+module Coordinator::Write
+  module Events
+    class VerificationObligationValidityScanCompletedV2 < Base
+    end
+  end
+end

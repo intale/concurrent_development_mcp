@@ -16,7 +16,7 @@ module Coordinator::Write
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
         completion_builder: CommandResultBuilder.new,
-        policy_loader: CandidateObligations::ImpactPolicyLoader.new(event_store:),
+        definition_loader: VerificationObligations::DefinitionLoader.new(event_store:),
         history_contract: Contracts::VerificationObligationWaiverHistory.new,
         event_plan_contract: Contracts::VerificationObligationWaiverEventPlan.new
       )
@@ -30,7 +30,7 @@ module Coordinator::Write
         @schema_registry = schema_registry
         @stream_factory = stream_factory
         @completion_builder = completion_builder
-        @policy_loader = policy_loader
+        @definition_loader = definition_loader
         @history_contract = history_contract
         @event_plan_contract = event_plan_contract
       end
@@ -41,10 +41,16 @@ module Coordinator::Write
       end
 
       def call_command(command, caused_by: nil)
-        steps do
-          preparation = prepare_logical_values(command)
-          step @event_store.multiple { execute_attempt(command:, preparation:, caused_by:) }
-        end
+        preparation = prepare_logical_values(command)
+        execute_attempt(command:, preparation:, caused_by:)
+      rescue PgEventstore::WrongExpectedRevisionError
+        Failure(
+          OutcomeError.new(
+            code: :stale_stream,
+            message: "Verification obligation changed concurrently; the request may succeed if retried",
+            details: { obligation_id: command.obligation_id }
+          )
+        )
       end
 
       private
@@ -59,13 +65,8 @@ module Coordinator::Write
       end
 
       def execute_attempt(command:, preparation:, caused_by:)
-        state = load_state(command.obligation_id, preparation.waived_at)
-        decision = @decider.call(
-          state:,
-          command:,
-          waiver_input_digest: preparation.input_digest,
-          waived_at: preparation.waived_at
-        )
+        state, latest_revision = load_state(command.obligation_id)
+        decision = @decider.call(state:, command:)
         return decision if decision.failure?
 
         plan = decision.value!
@@ -75,7 +76,8 @@ module Coordinator::Write
           obligation: state.obligation,
           command:,
           preparation:,
-          caused_by:
+          caused_by:,
+          expected_revision: latest_revision
         )
         completion = @completion_builder.verification_obligation_waive(
           command:,
@@ -87,16 +89,16 @@ module Coordinator::Write
         Success(completion)
       end
 
-      def load_state(obligation_id, observed_at)
+      def load_state(obligation_id)
+        definition = @definition_loader.call(obligation_id)
         grouped = @event_store.read_grouped(
           @stream_factory.verification_obligation(obligation_id),
           EventQueries::VERIFICATION_OBLIGATION_LIFECYCLE
         ).to_h { [ _1.type, _1 ] }
-        creation = grouped["VerificationObligationCreated"]
-        obligation = creation && load_event(creation)
+        obligation = definition&.definition
         state = Domain::VerificationObligationWaivers::State.new(
           obligation:,
-          obligation_event: reference_or_nil(creation),
+          obligation_event: definition&.reference,
           satisfied: payload_or_nil(grouped["VerificationObligationSatisfied"]),
           satisfied_event: reference_or_nil(grouped["VerificationObligationSatisfied"]),
           failed: payload_or_nil(grouped["VerificationObligationFailed"]),
@@ -104,23 +106,11 @@ module Coordinator::Write
           waived: payload_or_nil(grouped["VerificationObligationWaived"]),
           waived_event: reference_or_nil(grouped["VerificationObligationWaived"]),
           invalidated: payload_or_nil(grouped["VerificationObligationInvalidated"]),
-          invalidated_event: reference_or_nil(grouped["VerificationObligationInvalidated"]),
-          policy_current: current_policy?(obligation, observed_at)
+          invalidated_event: reference_or_nil(grouped["VerificationObligationInvalidated"])
         )
         verify_history!(state, obligation_id:)
-        state
-      end
-
-      def current_policy?(obligation, observed_at)
-        return false unless obligation
-
-        observation = @policy_loader.call(
-          policy_partition_event: obligation.policy.partition_event,
-          policy_head: obligation.policy.head,
-          change_set_id: obligation.change_set_id,
-          observed_at:
-        )
-        observation.status == "gating" && observation.evidence == obligation.policy
+        latest_revision = [ definition&.event, *grouped.values ].compact.map(&:stream_revision).max || -1
+        [ state, latest_revision ]
       end
 
       def verify_history!(state, obligation_id:)
@@ -134,20 +124,18 @@ module Coordinator::Write
         validation = @event_plan_contract.call(
           plan:,
           state:,
-          command:,
-          waiver_input_digest: preparation.input_digest,
-          waived_at: preparation.waived_at
+          command:
         )
         return if validation.success?
 
         raise InvalidVerificationObligationWaiverEventPlan, validation.errors.to_h.inspect
       end
 
-      def persist_waiver(waiver, obligation:, command:, preparation:, caused_by:)
+      def persist_waiver(waiver, obligation:, command:, preparation:, caused_by:, expected_revision:)
         physical = @event_factory.build!(
           event: waiver,
           event_id: preparation.waiver_event_id,
-          metadata: command_metadata(command),
+          metadata: command_metadata(command, obligation, preparation),
           markers: scope_markers(obligation) + [
             "verification-obligation-status:waived",
             "command:#{command.command_id}"
@@ -157,7 +145,8 @@ module Coordinator::Write
         )
         @event_store.append(
           @stream_factory.verification_obligation(command.obligation_id),
-          [ physical ]
+          [ physical ],
+          expected_revision:
         ).sole
       end
 
@@ -185,13 +174,15 @@ module Coordinator::Write
         preparation.correlation_id unless caused_by
       end
 
-      def command_metadata(command)
-        EventMetadata.new(
+      def command_metadata(command, obligation, preparation)
+        Metadata::VerificationWaiverV2.new(
           command_id: command.command_id,
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
-          policy_version: "verification-obligation-waiver/v1"
+          policy_version: "verification-obligation-waiver/v2",
+          policy: obligation.policy,
+          waiver_input_digest: preparation.input_digest
         )
       end
 

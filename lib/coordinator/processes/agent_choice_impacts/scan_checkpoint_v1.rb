@@ -5,8 +5,8 @@ module Coordinator::Processes
     class ScanCheckpointV1 < Value
       attribute :event, Types.Instance(PgEventstore::Event)
       attribute :reference, Coordinator::Write::EventReference
-      attribute :scan_id, Types::Identifier
-      attribute :decision_change, Coordinator::Write::AgentChoiceImpacts::DecisionChangeEvidenceV1
+      attribute :scan_id, Types::UuidV7
+      attribute :decision_change, Coordinator::Write::AgentChoiceImpacts::DecisionChangeEvidenceV2
       attribute :from_position, Types::GlobalPosition
       attribute :to_position, Types::GlobalPosition
       attribute :page_size, Types::AgentChoiceImpactPageSize

@@ -1,0 +1,23 @@
+module Coordinator::Processes
+  module ProcessManagers
+    class MergeSnapshotVerification
+      @schema_registry: untyped
+
+      @process_step_planner: untyped
+
+      @verify: untyped
+
+      RULE_VERSION: "merge-snapshot-verification/v1"
+
+      HANDLED_CODES: ::Array[:merge_snapshot_already_verified]
+
+      def initialize: (event_store: untyped, ?schema_registry: untyped, ?process_step_planner: untyped, ?verify: untyped) -> void
+
+      def call: (untyped event) -> (untyped | nil)
+
+      private
+
+      def load_submission: (untyped event) -> untyped
+    end
+  end
+end

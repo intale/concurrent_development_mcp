@@ -126,11 +126,7 @@ module Coordinator::Read::Web
     class ReleaseMember < Coordinator::Shared::Value
       attribute :position, Coordinator::Shared::Types::Integer.constrained(gteq: 1)
       attribute :repository_id, Coordinator::Shared::Types::UuidV7
-      attribute :target_branch, Coordinator::Shared::Types::String
-      attribute :merge_snapshot_id, Coordinator::Shared::Types::Identifier
-      attribute :change_set_id, Coordinator::Shared::Types::Identifier
-      attribute :merge_commit_oid, Coordinator::Shared::Types::GitOid
-      attribute :candidate_count, Coordinator::Shared::Types::Integer.constrained(gteq: 1)
+      attribute :candidate_id, Coordinator::Shared::Types::Identifier
     end
 
     class ReleaseIntegration < Coordinator::Shared::Value

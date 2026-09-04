@@ -1,0 +1,7 @@
+module Coordinator::Write
+  module AgentChoiceImpacts
+    class DecisionChangeEvidenceV2 < Coordinator::Shared::Value
+      Partition: untyped
+    end
+  end
+end

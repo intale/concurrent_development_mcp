@@ -4,7 +4,7 @@ module Coordinator
       module AgentChoiceImpacts
         class ProgressScan
           def initialize: (?stream_factory: StreamFactory) -> void
-          def call: (state: ScanState, command: Commands::ProgressAgentChoiceImpactScan, progressed_at: String) -> Dry::Monads::Result
+          def call: (state: ScanState, command: Commands::ProgressAgentChoiceImpactScan) -> Dry::Monads::Result
         end
       end
     end

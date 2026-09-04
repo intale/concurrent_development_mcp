@@ -5,8 +5,8 @@ module Coordinator::Write::CandidateObligations
       ?compound_marker_builder: Coordinator::Shared::CompoundMarkerBuilder
     ) -> void
     def call: (
-      source: CandidateEvidenceV1,
-      target: CandidateEvidenceV1,
+      source: CandidateEvidenceV2,
+      target: CandidateEvidenceV2,
       policy_partition_event: Coordinator::Write::EventReference,
       policy_head: Coordinator::Write::Decisions::DecisionHeadV1,
       rule_version: String

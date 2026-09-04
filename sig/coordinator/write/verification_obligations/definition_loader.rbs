@@ -1,0 +1,33 @@
+module Coordinator::Write
+  module VerificationObligations
+    class DefinitionLoader
+      @event_store: untyped
+
+      @schema_registry: untyped
+
+      @stream_factory: untyped
+
+      @candidate_state_loader: untyped
+
+      @candidate_evidence_loader: untyped
+
+      @matcher: untyped
+
+      FACT_TYPES: ::Array["VerificationObligationCreated" | "VerificationObligationAddedToChangeSet" | "VerificationObligationSourceCandidateAssigned" | "VerificationObligationTargetCandidateAssigned"]
+
+      def initialize: (event_store: untyped, ?schema_registry: untyped, ?stream_factory: untyped, ?candidate_state_loader: untyped, ?candidate_evidence_loader: untyped, ?matcher: untyped) -> void
+
+      def call: (untyped obligation_id) -> (nil | untyped)
+
+      private
+
+      def candidate_evidence: (untyped candidate_id) -> untyped
+
+      def load_event: (untyped event) -> untyped
+
+      def event_reference: (untyped event) -> untyped
+
+      def deep_symbolize: (untyped value) -> untyped
+    end
+  end
+end

@@ -10,15 +10,15 @@ module Coordinator::Write
           @stream_factory = stream_factory
         end
 
-        def call(state:, command:, progressed_at:)
+        def call(state:, command:)
           denial = denied(state, command)
           return denial if denial
 
           next_position = command.last_processed_position ?
             command.last_processed_position + 1 : command.previous_from_position
           event = command.has_more ?
-            progressed_event(state, command, next_position, progressed_at) :
-            completed_event(state, command, next_position, progressed_at)
+            progressed_event(state, command, next_position) :
+            completed_event(command)
           Success(
             EventPlan.new(
               writes: [
@@ -64,40 +64,18 @@ module Coordinator::Write
             (!command.has_more || command.page_obligation_count == command.page_size)
         end
 
-        def progressed_event(state, command, next_position, progressed_at)
-          Events::VerificationObligationValidityScanProgressedV1.new(
-            **common(state, command),
-            previous_from_position: command.previous_from_position,
-            next_from_position: next_position,
-            page_number: state.page_count + 1,
-            page_obligation_count: command.page_obligation_count,
-            total_obligation_count: state.total_obligation_count + command.page_obligation_count,
-            progressed_at:
-          )
-        end
-
-        def completed_event(state, command, next_position, progressed_at)
-          Events::VerificationObligationValidityScanCompletedV1.new(
-            **common(state, command),
-            previous_from_position: command.previous_from_position,
-            final_from_position: next_position,
-            page_count: state.page_count + 1,
-            page_obligation_count: command.page_obligation_count,
-            total_obligation_count: state.total_obligation_count + command.page_obligation_count,
-            completed_at: progressed_at
-          )
-        end
-
-        def common(state, command)
-          {
+        def progressed_event(state, command, next_position)
+          Events::VerificationObligationValidityScanProgressedV2.new(
             scan_id: command.scan_id,
-            change_set_id: command.change_set_id,
-            superseding_partition_event: command.superseding_partition_event,
-            started_event: state.started_event,
-            previous_checkpoint: state.checkpoint_event,
-            page_size: command.page_size,
-            rule_version: command.rule_version
-          }
+            page_number: state.page_count + 1,
+            next_from_position: next_position,
+            change_set_id: state.change_set_id,
+            page_size: state.page_size
+          )
+        end
+
+        def completed_event(command)
+          Events::VerificationObligationValidityScanCompletedV2.new(scan_id: command.scan_id)
         end
 
         def failure(code, state, command)

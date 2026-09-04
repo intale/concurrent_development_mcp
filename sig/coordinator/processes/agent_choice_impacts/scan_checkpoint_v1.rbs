@@ -5,7 +5,7 @@ module Coordinator
         def event: () -> PgEventstore::Event
         def reference: () -> Write::EventReference
         def scan_id: () -> String
-        def decision_change: () -> Write::AgentChoiceImpacts::DecisionChangeEvidenceV1
+        def decision_change: () -> Write::AgentChoiceImpacts::DecisionChangeEvidenceV2
         def from_position: () -> Integer
         def to_position: () -> Integer
         def page_size: () -> Integer

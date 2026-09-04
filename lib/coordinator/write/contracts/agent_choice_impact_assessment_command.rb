@@ -5,7 +5,7 @@ module Coordinator::Write
     class AgentChoiceImpactAssessmentCommand < Dry::Validation::Contract
       params do
         required(:command).value(Types.Instance(Commands::AssessAgentChoiceDecisionImpact))
-        required(:authoritative_change).value(Types.Instance(AgentChoiceImpacts::DecisionChangeEvidenceV1))
+        required(:authoritative_change).value(Types.Instance(AgentChoiceImpacts::DecisionChangeEvidenceV2))
       end
 
       rule(:command, :authoritative_change) do

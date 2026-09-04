@@ -17,31 +17,7 @@ FactoryBot.define do
         {
           "position" => index + 1,
           "repository_id" => repository_id,
-          "target_branch" => "main",
-          "object_format" => "sha1",
-          "merge_snapshot_id" => "MS-#{release_set_id}-#{index + 1}",
-          "change_set_id" => change_set_id,
-          "target_base_commit_oid" => "a" * 40,
-          "merge_commit_oid" => (index + 1).to_s * 40,
-          "snapshot_binding" => {},
-          "authorization_event" => {},
-          "authorization_decision_digest" => "sha256:#{'a' * 64}",
-          "ordered_candidates" => [
-            {
-              "candidate_id" => "CAN-#{release_set_id}-#{index + 1}",
-              "change_set_id" => change_set_id,
-              "work_item_id" => "W-#{release_set_id}-#{index + 1}",
-              "attempt_id" => "A-#{release_set_id}-#{index + 1}",
-              "repository_id" => repository_id,
-              "target_branch" => "main",
-              "object_format" => "sha1",
-              "base_commit_oid" => "a" * 40,
-              "head_commit_oid" => "b" * 40,
-              "manifest_digest" => "sha256:#{'b' * 64}",
-              "candidate_event" => {},
-              "manifest_event" => {}
-            }
-          ]
+          "candidate_id" => "CAN-#{release_set_id}-#{index + 1}"
         }
       end
     end
@@ -62,12 +38,18 @@ FactoryBot.define do
         "stream_context" => "DevelopmentIntegration",
         "stream_name" => "ReleaseSet",
         "stream_id" => release_set_id,
-        "stream_revision" => 0
+        "stream_revision" => repository_ids.length + 1
       }
     end
     prepared_actor { { "kind" => "agent", "id" => "factory-agent", "authenticated" => false } }
     prepared_markers { [ "release-set:#{release_set_id}" ] }
-    prepared_metadata { { "schema_version" => 1 } }
+    prepared_metadata do
+      {
+        "schema_version" => 2,
+        "release_digest" => release_digest,
+        "policy_version" => preparation_policy_version
+      }
+    end
     sequence(:prepared_global_position, 1_400)
     prepared_at_store { Time.utc(2026, 8, 30, 12, 0, 1) }
   end

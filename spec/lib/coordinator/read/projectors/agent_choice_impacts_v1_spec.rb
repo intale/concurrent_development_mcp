@@ -1,34 +1,42 @@
 # frozen_string_literal: true
 
 RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model do
-  subject(:projector) { described_class.new }
+  subject(:projector) { described_class.new(assessment_loader:) }
 
   let(:choice_id) { "CHO-impact-project" }
   let(:attempt_id) { "A-impact-project" }
-  let(:assessment_id) { "ACI-impact-project" }
+  let(:assessment_id) { SecureRandom.uuid_v7 }
   let(:correlation_id) { SecureRandom.uuid_v7 }
+  let(:decision_changed_at) { "2026-08-30T11:59:00.000000Z" }
+  let(:assessment_loader) do
+    assessment = assessment_view
+    Class.new do
+      define_method(:initialize) { |view| @view = view }
+      define_method(:call) { |identifier| @view if identifier == @view.assessment_id }
+    end.new(assessment)
+  end
 
-  it "projects assessment and invalidation evidence idempotently with exact attribution" do
+  it "projects exact assessment sources and invalidation evidence idempotently" do
     create_accepted_choice
-    assessment, invalidation = impact_events
+    assessment, accepted_link, decision_link, invalidation = impact_events
 
-    projector.call(assessment)
-    projector.call(assessment)
-    projector.call(invalidation)
-    projector.call(invalidation)
+    [ assessment, accepted_link, decision_link, invalidation ].each do |event|
+      projector.call(event)
+      projector.call(event)
+    end
 
-    page = impact_repository.page(
+    impact = impact_repository.page(
       Coordinator::Read::AgentChoiceImpactListQueryV1.new(
         attempt_id:,
         after_global_position: nil,
         limit: 20
       )
-    )
-    impact = page.items.sole
+    ).items.sole
     expect(impact).to have_attributes(
       outcome: "invalidated",
       reason: "blocking_policy_introduced",
       accepted_choice: accepted_choice_reference,
+      decision_changed_at:,
       source_actor: have_attributes(kind: "orchestrator", id: "guidance-host"),
       assessment_evidence: have_attributes(
         event: event_reference(assessment),
@@ -38,10 +46,6 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model 
         correlation_id: assessment.correlation_id
       )
     )
-    expect(impact.decision_change.source_actor).to have_attributes(
-      kind: "orchestrator",
-      id: "guidance-host"
-    )
 
     choice = Coordinator::Read::Repositories::AgentChoices.new.fetch(choice_id)
     expect(choice).to have_attributes(
@@ -49,6 +53,7 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model 
       invalidation: have_attributes(
         reason: "blocking_policy_introduced",
         assessment_event: event_reference(assessment),
+        decision_change_event: decision_change.source_event,
         evidence: have_attributes(
           event: event_reference(invalidation),
           causation_id: invalidation.causation_id,
@@ -57,11 +62,11 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model 
       )
     )
     expect(Coordinator::Read::AgentChoiceImpact.count).to eq(1)
-    expect(processed_events.count).to eq(2)
+    expect(processed_events.count).to eq(4)
   end
 
-  it "rolls back the idempotency claim until the accepted Choice projection is available" do
-    _assessment, invalidation = impact_events
+  it "rolls back the invalidation claim until the accepted Choice projection is available" do
+    invalidation = impact_events.last
 
     expect { projector.call(invalidation) }.to raise_error(
       Coordinator::Read::ProjectionStateError,
@@ -77,8 +82,46 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model 
   end
 
   def impact_events
-    assessment = ProjectionEventFactory.build(
-      payload: assessment_payload,
+    assessment = assessment_event
+    accepted_link = source_link_event(
+      role: "accepted_choice",
+      source: accepted_choice_reference,
+      revision: 1,
+      global_position: 201
+    )
+    decision_link = source_link_event(
+      role: "decision_change",
+      source: decision_change.source_event,
+      revision: 2,
+      global_position: 202
+    )
+    invalidation = ProjectionEventFactory.build(
+      payload: Coordinator::Write::Events::AgentChoiceInvalidatedByDecisionV2.new(
+        choice_id:,
+        reason: "blocking_policy_introduced"
+      ),
+      stream: Coordinator::Write::StreamFactory.new.agent_choice(choice_id),
+      stream_revision: 2,
+      global_position: 203,
+      command_id: "cmd-impact-assessment",
+      actor_kind: "system",
+      actor_id: "agent-choice-decision-impact",
+      policy_version: "agent-choice-decision-impact/v1",
+      correlation_id:,
+      causation_id: assessment.id,
+      markers: assessment_markers
+    )
+    [ assessment, accepted_link, decision_link, invalidation ]
+  end
+
+  def assessment_event
+    @assessment_event ||= ProjectionEventFactory.build(
+      payload: Coordinator::Write::Events::AgentChoiceImpactAssessmentRecordedV1.new(
+        assessment_id:,
+        choice_id:,
+        attempt_id:,
+        assessment: impact_assessment
+      ),
       stream: Coordinator::Write::StreamFactory.new.agent_choice_impact(assessment_id),
       stream_revision: 0,
       global_position: 200,
@@ -88,59 +131,57 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model 
       policy_version: "agent-choice-decision-impact/v1",
       correlation_id:,
       causation_id: SecureRandom.uuid_v7,
-      markers: [ "choice:#{choice_id}", "attempt:#{attempt_id}" ]
+      markers: assessment_markers
     )
-    invalidation = ProjectionEventFactory.build(
-      payload: Coordinator::Write::Events::AgentChoiceInvalidatedByDecisionV1.new(
-        choice_id:,
-        accepted_choice: accepted_choice_reference,
-        assessment_event: event_reference(assessment),
-        decision_change_event: decision_change.source_event,
-        previous_context_digest: "sha256:#{'a' * 64}",
-        resulting_context_digest: "sha256:#{'b' * 64}",
-        reason: "blocking_policy_introduced",
-        invalidated_at: "2026-08-30T12:02:00.000000Z"
+  end
+
+  def source_link_event(role:, source:, revision:, global_position:)
+    ProjectionEventFactory.build(
+      payload: Coordinator::Write::Events::AgentChoiceImpactSourceLinkedV1.new(
+        assessment_id:,
+        role:,
+        source:
       ),
-      stream: Coordinator::Write::StreamFactory.new.agent_choice(choice_id),
-      stream_revision: 2,
-      global_position: 300,
-      command_id: "cmd-impact-invalidation",
+      stream: Coordinator::Write::StreamFactory.new.agent_choice_impact(assessment_id),
+      stream_revision: revision,
+      global_position:,
+      command_id: "cmd-impact-assessment",
       actor_kind: "system",
       actor_id: "agent-choice-decision-impact",
       policy_version: "agent-choice-decision-impact/v1",
       correlation_id:,
-      causation_id: assessment.id,
-      markers: [ "choice:#{choice_id}", "attempt:#{attempt_id}" ]
+      causation_id: assessment_event.id,
+      markers: assessment_markers
     )
-    [ assessment, invalidation ]
   end
 
-  def assessment_payload
-    Coordinator::Write::Events::AgentChoiceImpactAssessedV1.new(
+  def assessment_view
+    Coordinator::Read::AgentChoiceImpacts::AssessmentViewV2.new(
       assessment_id:,
       choice_id:,
       attempt_id:,
+      assessment: impact_assessment,
       accepted_choice: accepted_choice_reference,
       decision_change:,
-      assessment: Coordinator::Write::AgentChoiceImpacts::AssessmentV1.new(
-        policy_version: "agent-choice-decision-impact/v1",
-        before_context_digest: "sha256:#{'a' * 64}",
-        after_context_digest: "sha256:#{'b' * 64}",
-        before_evaluation: policy_evaluation(
-          status: "allowed",
-          basis: "compliant",
-          reason_code: "selected_option_satisfies_decision"
-        ),
-        after_evaluation: policy_evaluation(
-          status: "blocked",
-          basis: "blocking_violation",
-          reason_code: "selected_option_violates_blocking_decision"
-        ),
-        source_advancements: [ partition_advancement_reference ],
-        outcome: "invalidated",
-        reason: "blocking_policy_introduced"
+      decision_changed_at:,
+      assessment_event:
+    )
+  end
+
+  def impact_assessment
+    @impact_assessment ||= Coordinator::Write::AgentChoiceImpacts::ImpactAssessmentV2.new(
+      before_evaluation: policy_evaluation(
+        status: "allowed",
+        basis: "compliant",
+        reason_code: "selected_option_satisfies_decision"
       ),
-      assessed_at: "2026-08-30T12:01:00.000000Z"
+      after_evaluation: policy_evaluation(
+        status: "blocked",
+        basis: "blocking_violation",
+        reason_code: "selected_option_violates_blocking_decision"
+      ),
+      outcome: "invalidated",
+      reason: "blocking_policy_introduced"
     )
   end
 
@@ -156,19 +197,11 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model 
   end
 
   def decision_change
-    @decision_change ||= Coordinator::Write::AgentChoiceImpacts::DecisionChangeEvidenceV1.new(
-      source_event: source_reference(
-        "DecisionDefinitionCorrected",
-        "Decision",
-        "D-impact-project",
-        2
-      ),
+    @decision_change ||= Coordinator::Write::AgentChoiceImpacts::DecisionChangeEvidenceV2.new(
+      source_event: source_reference("DecisionDefinitionCorrected", "Decision", "D-impact-project", 2),
       source_global_position: 100,
       source_command_id: "cmd-decision-change",
-      source_actor: Coordinator::Write::Commands::Actor.new(
-        kind: "orchestrator",
-        id: "guidance-host"
-      ),
+      source_actor: Coordinator::Write::Commands::Actor.new(kind: "orchestrator", id: "guidance-host"),
       decision_id: "D-impact-project",
       change_kind: "corrected",
       definition_digest: "sha256:#{'c' * 64}",
@@ -180,8 +213,7 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model 
           anchor_kind: "attempt",
           anchor_id: attempt_id
         )
-      ],
-      changed_at: "2026-08-30T12:00:00.000000Z"
+      ]
     )
   end
 
@@ -197,21 +229,11 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model 
   end
 
   def accepted_choice_reference
-    @accepted_choice_reference ||= source_reference(
-      "AgentChoiceAccepted",
-      "AgentChoice",
-      choice_id,
-      1
-    )
+    @accepted_choice_reference ||= source_reference("AgentChoiceAccepted", "AgentChoice", choice_id, 1)
   end
 
-  def partition_advancement_reference
-    @partition_advancement_reference ||= source_reference(
-      "DecisionPartitionAdvanced",
-      "DecisionPartition",
-      "attempt:#{attempt_id}:testing",
-      1
-    )
+  def assessment_markers
+    [ "impact-assessment:#{assessment_id}", "choice:#{choice_id}", "attempt:#{attempt_id}" ]
   end
 
   def source_reference(type, stream_name, stream_id, revision)

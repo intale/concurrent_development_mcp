@@ -6,12 +6,8 @@ module Coordinator::Write
       class Submit
         include Dry::Monads[:result]
 
-        def initialize(
-          stream_factory: StreamFactory.new,
-          outcome_digest_builder: CompatibilityAssessments::OutcomeDigestBuilder.new
-        )
+        def initialize(stream_factory: StreamFactory.new)
           @stream_factory = stream_factory
-          @outcome_digest_builder = outcome_digest_builder
         end
 
         def call(
@@ -19,7 +15,6 @@ module Coordinator::Write
           command:,
           evidence_id:,
           assessment_input_digest:,
-          evidence_event:,
           submitted_at:
         )
           denial = denied(state, command, assessment_input_digest, submitted_at)
@@ -28,23 +23,9 @@ module Coordinator::Write
           evidence = build_evidence(
             state:,
             command:,
-            evidence_id:,
-            assessment_input_digest:,
-            submitted_at:
+            evidence_id:
           )
-          writes = [ write(command.obligation_id, evidence) ]
-          evidence_reference = CompatibilityAssessments::EvidenceDecisionReferenceV1.new(
-            evidence_kind: evidence.evidence_kind,
-            evidence_id: evidence.evidence_id,
-            conclusion: evidence.assessment.conclusion,
-            result_digest: evidence.assessment.result_digest,
-            assessment_input_digest: evidence.assessment_input_digest,
-            event: evidence_event
-          )
-          terminal = terminal_event(state, evidence, evidence_reference, submitted_at)
-          writes << write(command.obligation_id, terminal) if terminal
-
-          Success(EventPlan.new(writes:))
+          Success(EventPlan.new(writes: [ write(command.obligation_id, evidence) ]))
         end
 
         private
@@ -139,62 +120,20 @@ module Coordinator::Write
             binding.head_commit_oid == candidate.head_commit_oid
         end
 
-        def build_evidence(state:, command:, evidence_id:, assessment_input_digest:, submitted_at:)
+        def build_evidence(state:, command:, evidence_id:)
           obligation = state.obligation
           claim = state.latest_claim
-          Events::VerificationEvidenceSubmittedV1.new(
-            obligation_id: obligation.obligation_id,
-            obligation_event: state.obligation_event,
+          Events::VerificationEvidenceSubmittedV2.new(
             evidence_id:,
+            obligation_id: obligation.obligation_id,
             evidence_kind: command.assessment.evidence_kind,
+            assessment: command.assessment,
             claim: {
               claim_id: claim.claim_id,
               claimant_id: claim.claimant_id,
               fencing_token: claim.fencing_token,
               claim_event: state.latest_claim_event
-            },
-            source_candidate: obligation.source_candidate,
-            target_candidate: obligation.target_candidate,
-            policy: obligation.policy,
-            obligation_validity_input_digest: obligation.validity_input_digest,
-            assessment: command.assessment,
-            assessment_input_digest:,
-            submitted_at:
-          )
-        end
-
-        def terminal_event(state, evidence, evidence_reference, submitted_at)
-          return failed_event(state.obligation, state.obligation_event, evidence_reference, submitted_at) if evidence.assessment.conclusion == "failed"
-          return unless evidence.assessment.conclusion == "passed"
-
-          selected = state.passed_evidence_by_kind.merge(evidence.evidence_kind => evidence_reference)
-          return unless state.obligation.required_evidence.all? { selected.key?(_1) }
-
-          selected_evidence = state.obligation.required_evidence.map { selected.fetch(_1) }
-          Events::VerificationObligationSatisfiedV1.new(
-            obligation_id: state.obligation.obligation_id,
-            obligation_event: state.obligation_event,
-            policy: state.obligation.policy,
-            selected_evidence:,
-            outcome_digest: @outcome_digest_builder.satisfied(
-              obligation: state.obligation,
-              selected_evidence:
-            ),
-            satisfied_at: submitted_at
-          )
-        end
-
-        def failed_event(obligation, obligation_event, evidence_reference, submitted_at)
-          Events::VerificationObligationFailedV1.new(
-            obligation_id: obligation.obligation_id,
-            obligation_event:,
-            policy: obligation.policy,
-            triggering_evidence: evidence_reference,
-            outcome_digest: @outcome_digest_builder.failed(
-              obligation:,
-              triggering_evidence: evidence_reference
-            ),
-            failed_at: submitted_at
+            }
           )
         end
 

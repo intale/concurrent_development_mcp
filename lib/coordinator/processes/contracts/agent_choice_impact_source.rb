@@ -13,12 +13,15 @@ module Coordinator::Processes
         expected_stream_id =
           case payload
           when Coordinator::Write::Events::DecisionActivatedV1,
-               Coordinator::Write::Events::DecisionDefinitionCorrectedV1
+               Coordinator::Write::Events::DecisionActivatedV2,
+               Coordinator::Write::Events::DecisionDefinitionCorrectedV1,
+               Coordinator::Write::Events::DecisionDefinitionCorrectedV2
             payload.decision_id
-          when Coordinator::Write::Events::AgentChoiceAcceptedV1
+          when Coordinator::Write::Events::AgentChoiceAcceptedV1,
+               Coordinator::Write::Events::AgentChoiceAcceptedV2
             payload.choice_id
-          when Coordinator::Write::Events::AgentChoiceImpactScanStartedV1,
-               Coordinator::Write::Events::AgentChoiceImpactScanProgressedV1
+          when Coordinator::Write::Events::AgentChoiceImpactScanStartedV2,
+               Coordinator::Write::Events::AgentChoiceImpactScanProgressedV2
             payload.scan_id
           end
 

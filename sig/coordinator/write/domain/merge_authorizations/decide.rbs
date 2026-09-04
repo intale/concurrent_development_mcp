@@ -7,10 +7,7 @@ module Coordinator
           def call: (
             command: Commands::RequestMergeAuthorization,
             evaluation: Write::MergeAuthorizations::EvaluationV1,
-            authorization_id: String,
-            input_digest: String,
-            decision_digest: String,
-            decided_at: String
+            authorization_id: String
           ) -> Dry::Monads::Result
         end
       end

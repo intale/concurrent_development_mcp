@@ -10,11 +10,11 @@ module Coordinator::Write
           @stream_factory = stream_factory
         end
 
-        def call(state:, command:, submitted_at:, candidate_event:, head_identity:)
+        def call(state:, command:, submitted_at:, head_identity:)
           denial = denied(state:, command:, submitted_at:)
           return denial if denial
 
-          Success(build_plan(command:, state:, submitted_at:, candidate_event:, head_identity:))
+          Success(build_plan(command:, state:, head_identity:))
         end
 
         private
@@ -192,52 +192,76 @@ module Coordinator::Write
           end
         end
 
-        def build_plan(command:, state:, submitted_at:, candidate_event:, head_identity:)
+        def build_plan(command:, state:, head_identity:)
           candidate_stream = @stream_factory.candidate(command.candidate_id)
           manifest = command.manifest
           context = command.build_context
-          candidate = Events::CandidateSubmittedV2.new(
-            candidate_id: command.candidate_id,
-            change_set_id: command.change_set_id,
-            work_item_id: command.work_item_id,
-            attempt_id: command.attempt_id,
-            agent_id: command.actor.id,
-            repository_id: command.repository_id,
-            target_branch: command.target_branch,
-            object_format: command.object_format,
-            base_commit_oid: command.base_commit_oid,
-            head_commit_oid: command.head_commit_oid,
-            checkpoint_kind: command.checkpoint_kind,
-            lease_set_id: command.lease_set_id,
-            lease_policy_version: state.attempt.lease_policy_version,
-            lease_references: state.attempt.lease_resources,
-            manifest_digest: manifest.digest,
-            build_context_digest: context&.digest,
-            evidence_status: "attributed_unverified",
-            submitted_at:
-          )
           writes = [
-            EventWrite.new(stream: candidate_stream, event: candidate),
             EventWrite.new(
               stream: candidate_stream,
-              event: Events::CandidateChangeManifestCapturedV1.new(
+              event: Events::CandidateCreatedV1.new(candidate_id: command.candidate_id)
+            ),
+            EventWrite.new(
+              stream: candidate_stream,
+              event: Events::CandidateAssignedToAttemptV1.new(
                 candidate_id: command.candidate_id,
-                repository_id: command.repository_id,
-                target_branch: command.target_branch,
+                attempt_id: command.attempt_id,
+                work_item_id: command.work_item_id,
+                change_set_id: command.change_set_id
+              )
+            ),
+            EventWrite.new(
+              stream: candidate_stream,
+              event: Events::CandidateAssignedToRepositoryV1.new(
+                candidate_id: command.candidate_id,
+                repository_id: command.repository_id
+              )
+            ),
+            EventWrite.new(
+              stream: candidate_stream,
+              event: Events::CandidateTargetBranchSelectedV1.new(
+                candidate_id: command.candidate_id,
+                target_branch: command.target_branch
+              )
+            ),
+            EventWrite.new(
+              stream: candidate_stream,
+              event: Events::CandidateCommitRangeDeclaredV1.new(
+                candidate_id: command.candidate_id,
                 object_format: command.object_format,
                 base_commit_oid: command.base_commit_oid,
-                head_commit_oid: command.head_commit_oid,
+                head_commit_oid: command.head_commit_oid
+              )
+            ),
+            EventWrite.new(
+              stream: candidate_stream,
+              event: Events::CandidateCheckpointKindSelectedV1.new(
+                candidate_id: command.candidate_id,
+                checkpoint_kind: command.checkpoint_kind
+              )
+            ),
+            EventWrite.new(
+              stream: candidate_stream,
+              event: Events::CandidateWorkIntentionSetAssignedV1.new(
+                candidate_id: command.candidate_id,
+                intention_set_id: command.lease_set_id
+              )
+            ),
+            EventWrite.new(
+              stream: candidate_stream,
+              event: Events::CandidateChangeManifestCapturedV2.new(
+                candidate_id: command.candidate_id,
                 evidence_revision: 1,
-                policy_version: manifest.policy_version,
-                manifest_digest: manifest.digest,
-                files: manifest.files,
-                collector: manifest.collector,
-                captured_at: submitted_at
+                files: manifest.files
               )
             )
           ]
-          writes << build_context_write(command, context, candidate_stream, submitted_at) if context
+          writes << build_context_write(command, context, candidate_stream) if context
           writes.concat([
+            EventWrite.new(
+              stream: candidate_stream,
+              event: Events::CandidateSubmittedV3.new(candidate_id: command.candidate_id)
+            ),
             EventWrite.new(
               stream: @stream_factory.candidate_head(head_identity.registry_id),
               event: Events::CandidateHeadRegisteredV2.new(
@@ -246,51 +270,21 @@ module Coordinator::Write
                 attempt_id: command.attempt_id,
                 repository_id: command.repository_id,
                 object_format: command.object_format,
-                head_commit_oid: command.head_commit_oid,
-                candidate_event:,
-                registered_at: submitted_at
-              )
-            ),
-            EventWrite.new(
-              stream: @stream_factory.attempt(command.attempt_id),
-              event: Events::CandidateAttachedToAttemptV1.new(
-                candidate_id: command.candidate_id,
-                candidate_event:,
-                change_set_id: command.change_set_id,
-                work_item_id: command.work_item_id,
-                attempt_id: command.attempt_id,
-                repository_id: command.repository_id,
-                target_branch: command.target_branch,
-                object_format: command.object_format,
-                base_commit_oid: command.base_commit_oid,
-                head_commit_oid: command.head_commit_oid,
-                checkpoint_kind: command.checkpoint_kind,
-                manifest_digest: manifest.digest,
-                build_context_digest: context&.digest,
-                attached_at: submitted_at
+                head_commit_oid: command.head_commit_oid
               )
             )
           ])
           EventPlan.new(writes:)
         end
 
-        def build_context_write(command, context, candidate_stream, submitted_at)
+        def build_context_write(command, context, candidate_stream)
           EventWrite.new(
             stream: candidate_stream,
-            event: Events::CandidateBuildContextCapturedV1.new(
+            event: Events::CandidateBuildContextCapturedV2.new(
               candidate_id: command.candidate_id,
-              repository_id: command.repository_id,
-              object_format: command.object_format,
-              head_commit_oid: command.head_commit_oid,
               evidence_revision: 1,
-              policy_version: context.policy_version,
-              build_context_digest: context.digest,
               inputs: context.inputs,
-              environment: context.environment,
-              dependency_graph_digest: context.dependency_graph_digest,
-              test_environment_digest: context.test_environment_digest,
-              collector: context.collector,
-              captured_at: submitted_at
+              environment: context.environment
             )
           )
         end

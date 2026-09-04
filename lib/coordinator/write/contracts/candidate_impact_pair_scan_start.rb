@@ -7,7 +7,7 @@ module Coordinator::Write
 
       params do
         required(:invocation).value(Types.Instance(CandidateImpactPairScanInvocation))
-        required(:evidence).value(Types.Instance(CandidateObligations::CandidateEvidenceV1))
+        required(:evidence).value(Types.Instance(CandidateObligations::CandidateEvidenceV2))
       end
 
       rule(:invocation, :evidence) do
@@ -24,7 +24,9 @@ module Coordinator::Write
         failures << "actor must be the candidate-impact obligation policy" unless command.actor.kind == "system" && command.actor.id == "candidate-impact-obligation-policy"
         failures << "registration must match exact Candidate evidence" unless command.source_registration == evidence.registration_event
         failures << "ChangeSet must match exact Candidate evidence" unless command.change_set_id == evidence.subject.change_set_id
-        failures << "revision bounds must select predecessors only" unless command.from_revision.zero? && command.to_revision == command.source_registration.stream_revision - 1
+        unless command.from_revision.zero? && command.to_revision == evidence.registration_global_position - 1
+          failures << "position bounds must select registrations preceding the source"
+        end
         failures << "page and index policy versions must be version-1 constants" unless command.page_size == 50 && command.index_policy_version == Candidates::ImpactIndexMarkerBuilder::POLICY_VERSION
         failures.each { key(:invocation).failure(_1) }
       end

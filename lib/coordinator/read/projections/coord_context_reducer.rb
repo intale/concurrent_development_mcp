@@ -21,7 +21,7 @@ module Coordinator::Read
         when Coordinator::Write::Events::WriteSetExpandedV2 then apply_write_set_expanded(state, event)
         when Coordinator::Write::Events::WriteSetRenewedV2 then apply_write_set_renewed(state, event)
         when Coordinator::Write::Events::WriteSetReleasedV2 then apply_write_set_released(state, event)
-        when Coordinator::Write::Events::CandidateAttachedToAttemptV1 then apply_candidate_attached(state, event)
+        when Coordinator::Read::CandidateSubmissionViewV2 then apply_candidate_submitted(state, event)
         when Coordinator::Write::Events::WorkItemCandidateSelectedV1 then apply_candidate_selected(state, event)
         when Coordinator::Write::Events::AttemptCompletedV1 then apply_attempt_completed(state, event)
         when Coordinator::Write::Events::WorkItemCompletedV1 then apply_work_item_completed(state, event)
@@ -364,11 +364,11 @@ module Coordinator::Read
         )
       end
 
-      def apply_candidate_attached(state, event)
+      def apply_candidate_submitted(state, event)
         require_attempt(state, event.attempt_id, event.change_set_id, event.work_item_id)
         checkpoint = CoordContextStateV1::CandidateCheckpoint.new(
           candidate_id: event.candidate_id,
-          candidate_event: event.candidate_event,
+          candidate_event: event_reference(event.submitted_event),
           change_set_id: event.change_set_id,
           work_item_id: event.work_item_id,
           attempt_id: event.attempt_id,
@@ -380,7 +380,7 @@ module Coordinator::Read
           checkpoint_kind: event.checkpoint_kind,
           manifest_digest: event.manifest_digest,
           build_context_digest: event.build_context_digest,
-          attached_at: event.attached_at
+          attached_at: event.submitted_event.created_at.utc.iso8601(6)
         )
 
         replace(
@@ -390,6 +390,17 @@ module Coordinator::Read
             :attempt_id,
             checkpoint
           )
+        )
+      end
+
+      def event_reference(event)
+        Coordinator::Write::EventReference.new(
+          event_id: event.id,
+          type: event.type,
+          stream_context: event.stream.context,
+          stream_name: event.stream.stream_name,
+          stream_id: event.stream.stream_id,
+          stream_revision: event.stream_revision
         )
       end
 

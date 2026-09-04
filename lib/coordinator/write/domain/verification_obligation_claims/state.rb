@@ -4,9 +4,9 @@ module Coordinator::Write
   module Domain
     module VerificationObligationClaims
       class State < Value
-        attribute :obligation, Types.Instance(Events::VerificationObligationCreatedV1).optional
+        attribute :obligation, Types.Instance(VerificationObligations::DefinitionV2).optional
         attribute :obligation_event, Types.Instance(EventReference).optional
-        attribute :claim, Types.Instance(Events::VerificationObligationClaimedV1).optional
+        attribute :claim, Types.Instance(Events::VerificationObligationClaimedV2).optional
         attribute? :terminal_status, Types::VerificationObligationStatus.optional
         attribute? :terminal_event, Types.Instance(EventReference).optional
 

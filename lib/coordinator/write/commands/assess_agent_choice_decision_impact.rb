@@ -8,7 +8,7 @@ module Coordinator::Write
       attribute :assessment_id, Types::Identifier
       attribute :choice_id, Types::Identifier
       attribute :accepted_choice, EventReference
-      attribute :decision_change, AgentChoiceImpacts::DecisionChangeEvidenceV1
+      attribute :decision_change, AgentChoiceImpacts::DecisionChangeEvidenceV2
       attribute :policy_version, Types::AgentChoiceImpactPolicyVersion
     end
   end

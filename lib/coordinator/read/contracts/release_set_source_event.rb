@@ -3,17 +3,26 @@
 module Coordinator::Read
   module Contracts
     class ReleaseSetSourceEvent < Dry::Validation::Contract
+      EVENT_SCHEMAS = {
+        "ReleaseSetCreated" => [ 1, "release-set-preparation/v1" ],
+        "ReleaseSetMemberAdded" => [ 1, "release-set-preparation/v1" ],
+        "ReleaseSetPrepared" => [ 2, "release-set-preparation/v1" ],
+        "RepositoryIntegrationRecorded" => [ 2, "release-set-integration/v1" ],
+        "RepositoryIntegrationMergeLinked" => [ 1, "release-set-integration/v1" ],
+        "ReleaseSetVerificationRecorded" => [ 2, "release-set-verification/v1" ],
+        "ReleaseSetIntegrationLinked" => [ 1, "release-set-verification/v1" ],
+        "ReleaseSetActivated" => [ 2, "release-set-activation/v1" ],
+        "ReleaseSetCompensationRequested" => [ 2, "release-set-compensation/v1" ],
+        "ReleaseSetSuccessfulIntegrationLinked" => [ 1, "release-set-compensation/v1" ],
+        "ReleaseSetOutcomeRecorded" => [ 1, "release-set-completion/v1" ],
+        "ReleaseSetCompleted" => [ 2, "release-set-completion/v1" ]
+      }.freeze
+
       config.validate_keys = true
 
       params do
-        required(:event_type).filled(
-          :string,
-          included_in?: %w[
-            ReleaseSetPrepared RepositoryIntegrationRecorded ReleaseSetVerificationRecorded
-            ReleaseSetActivated ReleaseSetCompensationRequested ReleaseSetCompleted
-          ]
-        )
-        required(:schema_version).filled(:integer, eql?: 1)
+        required(:event_type).filled(:string, included_in?: EVENT_SCHEMAS.keys)
+        required(:schema_version).filled(:integer)
         required(:stream_context).filled(:string, eql?: "DevelopmentIntegration")
         required(:stream_name).filled(:string, eql?: "ReleaseSet")
         required(:stream_id).filled(:string)
@@ -23,37 +32,19 @@ module Coordinator::Read
         required(:actor_kind).filled(:string, included_in?: %w[agent system])
         required(:actor_id).filled(:string)
         required(:recorded_by).filled(:string, eql?: "coordinator")
-        required(:policy_version).filled(
-          :string,
-          included_in?: %w[
-            release-set-preparation/v1 release-set-integration/v1 release-set-verification/v1
-            release-set-activation/v1 release-set-compensation/v1 release-set-completion/v1
-          ]
-        )
+        required(:policy_version).filled(:string)
       end
 
-      rule(:event_type, :stream_revision, :policy_version) do
-        expected = {
-          "ReleaseSetPrepared" => [ "release-set-preparation/v1", 0 ],
-          "RepositoryIntegrationRecorded" => [ "release-set-integration/v1", 1 ],
-          "ReleaseSetVerificationRecorded" => [ "release-set-verification/v1", 1 ],
-          "ReleaseSetActivated" => [ "release-set-activation/v1", 1 ],
-          "ReleaseSetCompensationRequested" => [ "release-set-compensation/v1", 1 ],
-          "ReleaseSetCompleted" => [ "release-set-completion/v1", 1 ]
-        }.fetch(values[:event_type])
-        key.failure("policy_version does not match event_type") unless values[:policy_version] == expected.first
-        minimum_revision = expected.last
-        if values[:event_type] == "ReleaseSetPrepared"
-          key.failure("preparation must be the first stream event") unless values[:stream_revision] == minimum_revision
-        elsif values[:stream_revision] < minimum_revision
-          key.failure("lifecycle event revision is invalid")
-        end
+      rule(:event_type, :schema_version, :policy_version) do
+        expected_schema, expected_policy = EVENT_SCHEMAS.fetch(values[:event_type])
+        key(:schema_version).failure("does not match event_type") unless values[:schema_version] == expected_schema
+        key(:policy_version).failure("does not match event_type") unless values[:policy_version] == expected_policy
       end
 
       rule(:event_type, :actor_kind) do
         allowed = case values[:event_type]
-        when "ReleaseSetCompensationRequested" then [ "system" ]
-        when "ReleaseSetCompleted" then %w[agent system]
+        when "ReleaseSetCompensationRequested", "ReleaseSetSuccessfulIntegrationLinked" then [ "system" ]
+        when "ReleaseSetOutcomeRecorded", "ReleaseSetCompleted" then %w[agent system]
         else [ "agent" ]
         end
         key(:actor_kind).failure("actor_kind does not match event_type") unless allowed.include?(values[:actor_kind])

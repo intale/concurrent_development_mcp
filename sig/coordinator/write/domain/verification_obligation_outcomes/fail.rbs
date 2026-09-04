@@ -1,0 +1,17 @@
+module Coordinator::Write
+  module Domain
+    module VerificationObligationOutcomes
+      class Fail
+        @stream_factory: untyped
+
+        def initialize: (?stream_factory: untyped) -> void
+
+        def call: (state: untyped, command: untyped) -> untyped
+
+        private
+
+        def terminal_failure: (untyped state, untyped command) -> untyped
+      end
+    end
+  end
+end

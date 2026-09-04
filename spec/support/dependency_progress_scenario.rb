@@ -66,9 +66,13 @@ module DependencyProgressScenario
 
   def dependency_events(scenario)
     event_store.read(
-      streams.change_set(scenario.dig(:ids, :change_set_id)),
-      Coordinator::Write::EventQueries::CHANGE_SET_FOR_DEPENDENCY_SATISFACTION
-    ).select { _1.type == "WorkItemDependencySatisfied" }
+      streams.work_item(scenario.dig(:ids, :consumer_work_item_id)),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: [ "WorkItemDependencySatisfied" ],
+        maximum_count: 500,
+        direction: :asc
+      )
+    )
   end
 
   def readiness_events(scenario)

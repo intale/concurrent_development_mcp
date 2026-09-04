@@ -1,0 +1,18 @@
+module Coordinator::Write
+  module MergeSnapshots
+    class StateV2 < Coordinator::Shared::Value
+      attr_reader merge_snapshot_id: String
+      attr_reader repository_id: String
+      attr_reader target_branch: String
+      attr_reader object_format: String
+      attr_reader target_base_commit_oid: String
+      attr_reader merge_commit_oid: String
+      attr_reader ordered_candidates: Array[CandidateMemberV1]
+      attr_reader producer: String
+      attr_reader run_id: String
+      attr_reader produced_at: String
+      attr_reader snapshot_digest: String
+      attr_reader registration_event: Coordinator::Write::EventReference
+    end
+  end
+end

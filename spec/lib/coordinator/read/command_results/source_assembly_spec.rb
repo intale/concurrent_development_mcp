@@ -396,6 +396,114 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
     end
   end
 
+  context "when an Attempt is abandoned through granular lifecycle facts" do
+    let(:intention_id) { SecureRandom.uuid_v7 }
+    let(:resource_id) { SecureRandom.uuid_v7 }
+    let(:set_id) { SecureRandom.uuid_v7 }
+    let(:command) do
+      Coordinator::Write::Commands::AbandonAttempt.new(
+        command_id:,
+        actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "assembly-spec"),
+        change_set_id: "CS-command-result",
+        work_item_id: "W-command-result",
+        attempt_id: "A-command-result",
+        reason: "Execution was interrupted after an intermediate checkpoint."
+      )
+    end
+
+    it "reconstructs the receipt without an abandonment snapshot" do
+      append_work_intention_set
+      register_command
+      append_task_submission
+      domain_events = append_abandonment_facts
+      terminal = append_terminal(
+        Coordinator::Write::Events::CommandSucceededV1.new(command_id:),
+        emitted_events: domain_events.map { event_reference(_1) }
+      )
+
+      result = assemble.call(terminal)
+
+      expect(result).to have_attributes(
+        status: "ok",
+        summary: "Attempt abandoned; WorkItem requeued; 1 active work intention(s) withdrawn.",
+        warnings: [ "Reacquire the WorkItem with a fresh Attempt ID and base snapshot before resuming." ]
+      )
+      expect(result.data).to have_attributes(
+        change_set_id: command.change_set_id,
+        work_item_id: command.work_item_id,
+        attempt_id: command.attempt_id
+      )
+      expect(result.emitted_events.map(&:type)).to eq([
+        "ResourceWorkIntentionWithdrawn",
+        "AttemptAbandoned",
+        "WorkItemRequeued"
+      ])
+    end
+
+    def append_work_intention_set
+      facts = [
+        Coordinator::Write::Events::WorkIntentionSetCreatedV1.new(
+          set_id:,
+          attempt_id: command.attempt_id,
+          work_item_id: command.work_item_id,
+          change_set_id: command.change_set_id,
+          repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID
+        ),
+        Coordinator::Write::Events::WorkIntentionAddedToSetV1.new(
+          set_id:,
+          intention_id:,
+          resource_id:
+        )
+      ]
+      facts.each do |fact|
+        append(
+          streams.work_intention_set(set_id),
+          fact,
+          metadata: command_metadata,
+          markers: [ "attempt:#{command.attempt_id}", "work-intention-set:#{set_id}" ]
+        )
+      end
+    end
+
+    def append_abandonment_facts
+      [
+        [
+          streams.resource_work_intention(intention_id),
+          Coordinator::Write::Events::ResourceWorkIntentionWithdrawnV1.new(
+            intention_id:,
+            resource_id:,
+            fencing_token: 1,
+            reason: command.reason
+          )
+        ],
+        [
+          streams.attempt(command.attempt_id),
+          Coordinator::Write::Events::AttemptAbandonedV3.new(
+            attempt_id: command.attempt_id,
+            reason: command.reason
+          )
+        ],
+        [
+          streams.work_item(command.work_item_id),
+          Coordinator::Write::Events::WorkItemRequeuedV2.new(
+            work_item_id: command.work_item_id,
+            change_set_id: command.change_set_id,
+            attempt_id: command.attempt_id,
+            agent_id: command.actor.id,
+            reason: command.reason
+          )
+        ]
+      ].map do |stream, fact|
+        append(
+          stream,
+          fact,
+          metadata: command_metadata,
+          markers: [ "command:#{command_id}", "attempt:#{command.attempt_id}" ]
+        )
+      end
+    end
+  end
+
   def register_command
     append(
       streams.command(command_id),

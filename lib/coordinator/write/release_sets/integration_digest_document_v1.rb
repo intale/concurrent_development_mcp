@@ -13,7 +13,7 @@ module Coordinator::Write
       attribute :outcome, Types::ReleaseSetIntegrationOutcome
       attribute :merge_observation_event, EventReference.optional
       attribute :observation_digest, Types::Sha256Digest.optional
-      attribute :failure, IntegrationFailureV1.optional
+      attribute :failure, IntegrationFailureV2.optional
       attribute :policy_version, Types::ReleaseSetIntegrationPolicyVersion
     end
   end

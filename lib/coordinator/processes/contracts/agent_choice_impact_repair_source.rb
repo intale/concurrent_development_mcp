@@ -10,7 +10,8 @@ module Coordinator::Processes
       rule(:source) do
         source = value
         payload = source.payload
-        valid = payload.is_a?(Coordinator::Write::Events::AgentChoiceAcceptedV1) &&
+        valid = (payload.is_a?(Coordinator::Write::Events::AgentChoiceAcceptedV1) ||
+                 payload.is_a?(Coordinator::Write::Events::AgentChoiceAcceptedV2)) &&
                 source.reference.type == "AgentChoiceAccepted" &&
                 source.reference.stream_context == "AgentGovernance" &&
                 source.reference.stream_name == "AgentChoice" &&

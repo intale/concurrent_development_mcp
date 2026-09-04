@@ -1,0 +1,15 @@
+module Coordinator::Write
+  module VerificationObligations
+    class OutcomeDecisionV1 < Coordinator::Shared::Value
+      Observation: untyped
+
+      def terminal?: () -> untyped
+
+      def self.none: () -> untyped
+
+      def self.satisfied: (untyped evidence) -> untyped
+
+      def self.failed: (untyped evidence) -> untyped
+    end
+  end
+end

@@ -10,6 +10,7 @@ module Coordinator::Write
         exact_loader: ExactEventLoader.new(event_store:),
         definition_loader: DecisionDefinitionLoader.new(event_store:, exact_loader:),
         stream_factory: StreamFactory.new,
+        partition_state_loader: Decisions::PartitionStateLoader.new(event_store:),
         canonical_json: CanonicalJson.new,
         definition_contract: Contracts::CandidateImpactPolicyDefinition.new
       )
@@ -17,21 +18,21 @@ module Coordinator::Write
         @exact_loader = exact_loader
         @definition_loader = definition_loader
         @stream_factory = stream_factory
+        @partition_state_loader = partition_state_loader
         @canonical_json = canonical_json
         @definition_contract = definition_contract
       end
 
       def call(policy_partition_event:, policy_head:, change_set_id:, observed_at:)
         persisted_partition = @exact_loader.call(policy_partition_event)
-        partition_event = payload!(persisted_partition, Events::DecisionPartitionAdvancedV1)
         partition = expected_partition(change_set_id)
-        validate_partition!(persisted_partition.reference, partition_event, partition)
+        validate_partition!(persisted_partition.reference, persisted_partition.payload, partition)
         definition = @definition_loader.call(head: policy_head, partition:)
         validate_definition!(definition, change_set_id)
 
-        current = current_partition_event(partition.partition_id)
-        return PolicyObservationV1.stale unless current == persisted_partition.reference
-        return PolicyObservationV1.stale unless partition_event.active_decisions.include?(policy_head)
+        state = @partition_state_loader.call(partition)
+        return PolicyObservationV1.stale unless state.latest_event == persisted_partition.reference
+        return PolicyObservationV1.stale unless state.active_decisions.include?(policy_head)
 
         level = definition.document.enforcement.level
         return PolicyObservationV1.non_gating unless GATE_LEVELS.include?(level)
@@ -55,16 +56,6 @@ module Coordinator::Write
 
       private
 
-      def current_partition_event(partition_id)
-        event = @event_store.read_grouped(
-          @stream_factory.decision_partition(partition_id),
-          EventQueries::DECISION_PARTITION_LATEST
-        ).first
-        return unless event
-
-        event_reference(event)
-      end
-
       def expected_partition(change_set_id)
         Decisions::DecisionPartitionV1.new(
           partition_id: "changeset:#{change_set_id}:candidate",
@@ -75,15 +66,10 @@ module Coordinator::Write
       end
 
       def validate_partition!(reference, payload, expected)
-        heads = payload.active_decisions
-        valid = reference.type == "DecisionPartitionAdvanced" &&
-                reference.stream_context == "HumanGuidance" &&
+        valid = reference.stream_context == "HumanGuidance" &&
                 reference.stream_name == "DecisionPartition" &&
                 reference.stream_id == expected.partition_id &&
-                payload.partition == expected &&
-                payload.partition_revision == reference.stream_revision &&
-                heads == heads.uniq(&:decision_id).sort_by { _1.decision_id.b } &&
-                heads.include?(payload.decision)
+                partition_payload_valid?(payload, expected, reference)
         return if valid
 
         invalid!(
@@ -91,6 +77,22 @@ module Coordinator::Write
           partition_event: reference.to_h,
           expected_partition: expected.to_h
         )
+      end
+
+      def partition_payload_valid?(payload, expected, reference)
+        case payload
+        when Events::DecisionPartitionAdvancedV1
+          heads = payload.active_decisions
+          payload.partition == expected &&
+            payload.partition_revision == reference.stream_revision &&
+            heads == heads.uniq(&:decision_id).sort_by { _1.decision_id.b } &&
+            heads.include?(payload.decision)
+        when Events::DecisionAddedToPartitionV1, Events::DecisionRemovedFromPartitionV1
+          payload.partition_id == expected.partition_id &&
+            payload.partition_revision == reference.stream_revision
+        else
+          false
+        end
       end
 
       def validate_definition!(definition, change_set_id)

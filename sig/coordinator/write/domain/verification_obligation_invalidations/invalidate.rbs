@@ -3,15 +3,11 @@ module Coordinator
     module Domain
       module VerificationObligationInvalidations
         class Invalidate
-          def initialize: (
-            ?stream_factory: StreamFactory,
-            ?digest_builder: Coordinator::Write::VerificationObligationInvalidations::DigestBuilder
-          ) -> void
+          def initialize: (?stream_factory: StreamFactory) -> void
           def call: (
             state: State,
             command: Commands::InvalidateVerificationObligation,
-            superseding_partition: Coordinator::Write::CandidateObligations::PersistedEventV1,
-            invalidated_at: String
+            superseding_partition: Coordinator::Write::CandidateObligations::PersistedEventV1
           ) -> Dry::Monads::Result
         end
       end

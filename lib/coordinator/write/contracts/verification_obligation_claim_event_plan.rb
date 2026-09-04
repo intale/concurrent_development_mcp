@@ -21,13 +21,11 @@ module Coordinator::Write
 
         valid = plan.writes.length == 1 &&
           plan.writes.first.stream == expected_stream &&
-          event.is_a?(Events::VerificationObligationClaimedV1) &&
+          event.is_a?(Events::VerificationObligationClaimedV2) &&
           event.obligation_id == command.obligation_id &&
-          event.obligation_event == state.obligation_event &&
           event.claim_id == values[:claim_id] &&
           event.claimant_id == command.actor.id &&
           event.fencing_token == state.next_fencing_token &&
-          event.claimed_at == values[:claimed_at] &&
           event.expires_at == expected_expiry
 
         key(:plan).failure("must contain one coherent fenced VerificationObligation claim") unless valid

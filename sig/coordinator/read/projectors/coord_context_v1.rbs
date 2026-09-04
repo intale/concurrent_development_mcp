@@ -5,6 +5,7 @@ module Coordinator
         PROJECTION: ProjectionDefinition
 
         def initialize: (
+          submission_loader: Candidates::_SubmissionLoader,
           ?contract: Contracts::CoordContextSourceEvent,
           ?schema_registry: Write::EventSchemaRegistry,
           ?reducer: Projections::CoordContextReducer,

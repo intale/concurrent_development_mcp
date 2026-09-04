@@ -5,12 +5,14 @@ module Coordinator::Write
     class DependencySatisfactionSource < Dry::Validation::Contract
       WORK_ITEM_SOURCES = [
         Events::WorkItemCandidateSelectedV1,
-        Events::WorkItemCompletedV1
+        Events::WorkItemCandidateSelectedV2,
+        Events::WorkItemCompletedV1,
+        Events::WorkItemCompletedV2
       ].freeze
       RELEASE_SET_SOURCES = [
-        Events::RepositoryIntegrationRecordedV1,
-        Events::ReleaseSetVerificationRecordedV1,
-        Events::ReleaseSetCompletedV1
+        Events::RepositoryIntegrationRecordedV2,
+        Events::ReleaseSetVerificationRecordedV2,
+        Events::ReleaseSetCompletedV2
       ].freeze
 
       params do
@@ -54,10 +56,15 @@ module Coordinator::Write
       private
 
       def validate_work_item_source(key, evidence:, payload:, command:)
+        change_set_id = if payload.is_a?(Events::WorkItemCompletedV2)
+          evidence.producer_state.change_set_id
+        else
+          payload.change_set_id
+        end
         unless evidence.reference.stream_context == "DevelopmentExecution" &&
                evidence.reference.stream_name == "WorkItem" &&
                evidence.reference.stream_id == payload.work_item_id &&
-               payload.change_set_id == command.change_set_id &&
+               change_set_id == command.change_set_id &&
                evidence.release_state.nil?
           key(:evidence).failure("WorkItem source scope is inconsistent")
         end
@@ -67,8 +74,7 @@ module Coordinator::Write
         unless evidence.reference.stream_context == "DevelopmentIntegration" &&
                evidence.reference.stream_name == "ReleaseSet" &&
                evidence.reference.stream_id == payload.release_set_id &&
-               payload.change_set_id == command.change_set_id &&
-               evidence.release_state
+               evidence.release_state&.preparation&.payload&.change_set_id == command.change_set_id
           key(:evidence).failure("ReleaseSet source scope is inconsistent")
         end
       end

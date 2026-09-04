@@ -17,11 +17,33 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordMergeObservation, :e
 
     expect(replay.failure.code).to eq(:merge_already_observed)
     expect(payload).to have_attributes(
-      authorization_event: authorization.fetch(:completion).data.decision_event,
       target_before_commit_oid: registration.dig(:input, :target_base_commit_oid),
       target_after_commit_oid: registration.dig(:input, :merge_commit_oid),
-      evidence_status: "attributed_unverified"
+      observer: "git-provider-webhook"
     )
+    expect(payload.to_h.keys).to contain_exactly(
+      :merge_snapshot_id,
+      :repository_id,
+      :target_branch,
+      :object_format,
+      :target_before_commit_oid,
+      :target_after_commit_oid,
+      :observer,
+      :run_id,
+      :snapshot_binding,
+      :observed_at
+    )
+    expect(physical.metadata).to include(
+      "authorization_decision_digest" => authorization.fetch(:completion).data.decision_digest,
+      "observation_digest" => first.data.observation_digest
+    )
+    link = observation_links(registration.dig(:input, :merge_snapshot_id)).sole
+    expect(link.data).to eq(
+      "merge_snapshot_id" => registration.dig(:input, :merge_snapshot_id),
+      "authorization_id" => authorization.fetch(:completion).data.authorization_id,
+      "authorization_event" => stringify(authorization.fetch(:completion).data.decision_event.to_h)
+    )
+    expect(link.causation_id).to eq(physical.id)
     expect(first.summary).to include("coordinator did not perform or verify it")
     expect(command_events(input.fetch(:command_id))).to be_empty
   end
@@ -39,7 +61,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordMergeObservation, :e
 
   it "rejects a grant after its Candidate policy partition advances" do
     registration, _authorization, input = scenario("observation-stale")
-    change_set_id = load(registration.fetch(:event)).ordered_candidates.sole.change_set_id
+    candidate_id = registration.dig(:input, :ordered_candidates, 0, :candidate_id)
+    change_set_id = Coordinator::Write::Candidates::StateLoader.new(event_store:).call(candidate_id).change_set_id
     CandidateObligationScenario.activate_policy(
       prefix: "observation-stale",
       change_set_id:,
@@ -81,6 +104,17 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordMergeObservation, :e
     event_store.read(streams.merge_snapshot(merge_snapshot_id), Coordinator::Write::EventQueries::MERGE_OBSERVATION)
   end
 
+  def observation_links(merge_snapshot_id)
+    event_store.read(
+      streams.merge_snapshot(merge_snapshot_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: [ "MergeObservationAuthorizationLinked" ],
+        maximum_count: 1,
+        direction: :asc
+      )
+    )
+  end
+
   def command_events(command_id)
     event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
@@ -91,5 +125,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordMergeObservation, :e
       schema_version: event.metadata.fetch("schema_version"),
       data: event.data
     )
+  end
+
+  def stringify(value)
+    JSON.parse(JSON.generate(value))
   end
 end

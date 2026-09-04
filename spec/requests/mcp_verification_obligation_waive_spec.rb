@@ -53,11 +53,12 @@ RSpec.describe "VER-03 MCP verification-obligation waiver", :event_store do
       required_evidence: [ "combined_tests" ]
     )
     claim = CandidateObligationScenario.claim_obligation(created:, prefix: "mcp-waiver-denied")
-    CandidateObligationScenario.submit_compatibility_assessment(
+    receipt = CandidateObligationScenario.submit_compatibility_assessment(
       created:,
       claim:,
       command_id: "cmd-mcp-waiver-satisfied-evidence"
     )
+    CandidateObligationScenario.process_compatibility_outcome(receipt)
     arguments = CandidateObligationScenario.waiver_arguments(
       created:,
       command_id: "cmd-mcp-waiver-satisfied"

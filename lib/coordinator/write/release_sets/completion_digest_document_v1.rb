@@ -3,7 +3,7 @@
 module Coordinator::Write
   module ReleaseSets
     class CompletionDigestDocumentV1 < Value
-      Evidence = CompensationEvidenceV1
+      Evidence = CompensationEvidenceV2
 
       attribute :schema, Types::String.enum("release-set-completion/v1")
       attribute :release_set_id, Types::Identifier

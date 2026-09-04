@@ -33,9 +33,7 @@ module Coordinator::Write
 
         claim = state.claim
         if claim
-          valid_claim = claim.obligation_id == obligation_id &&
-            claim.obligation_event == reference &&
-            claim.claimed_at < claim.expires_at
+          valid_claim = claim.obligation_id == obligation_id
           key(:state).failure("must contain one coherent latest claim") unless valid_claim
         end
 

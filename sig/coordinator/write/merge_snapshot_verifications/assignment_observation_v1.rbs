@@ -1,0 +1,8 @@
+module Coordinator::Write
+  module MergeSnapshotVerifications
+    class AssignmentObservationV1 < Coordinator::Shared::Value
+      attr_reader assignment: Coordinator::Write::Events::MergeSnapshotVerificationAssignedV1
+      attr_reader event: Coordinator::Write::EventReference
+    end
+  end
+end

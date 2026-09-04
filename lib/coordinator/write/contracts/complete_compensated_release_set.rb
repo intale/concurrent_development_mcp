@@ -38,7 +38,6 @@ module Coordinator::Write
             required(:version).filled(:string)
           end
           required(:run_id).filled(:string)
-          required(:compensated_at).filled(:string)
         end
       end
 
@@ -70,9 +69,6 @@ module Coordinator::Write
             key.failure("producer name and version must contain at most 100 characters")
           end
           key.failure("run_id must be canonical") unless Types::IDENTIFIER_PATTERN.match?(item.fetch(:run_id))
-          unless Types::TIMESTAMP_PATTERN.match?(item.fetch(:compensated_at))
-            key.failure("compensated_at must be a UTC timestamp with microseconds")
-          end
         end
       end
     end

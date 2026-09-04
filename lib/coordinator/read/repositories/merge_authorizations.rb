@@ -16,13 +16,13 @@ module Coordinator::Read
           authorization_id: decision.authorization_id,
           merge_snapshot_id: decision.merge_snapshot_id,
           outcome: outcome(decision),
-          policy_version: decision.policy_version,
+          policy_version: event.metadata.fetch("policy_version"),
           snapshot_binding: decision.snapshot_binding.to_h,
-          expected_impact_policy: decision.expected_impact_policy&.to_h,
+          expected_impact_policy: event.metadata["expected_impact_policy"],
           evaluation: decision.evaluation.to_h,
-          input_digest: decision.input_digest,
-          decision_digest: decision.decision_digest,
-          decided_at_domain: decision.decided_at,
+          input_digest: event.metadata.fetch("input_digest"),
+          decision_digest: event.metadata.fetch("decision_digest"),
+          decided_at_domain: event.created_at,
           source_event: event_reference(event).to_h,
           source_actor: actor(event).to_h,
           source_markers: event.markers,
@@ -94,7 +94,7 @@ module Coordinator::Read
       end
 
       def outcome(decision)
-        decision.is_a?(Coordinator::Write::Events::MergeAuthorizationGrantedV1) ? "granted" : "denied"
+        decision.is_a?(Coordinator::Write::Events::MergeAuthorizationGrantedV2) ? "granted" : "denied"
       end
 
       def symbolize(value)

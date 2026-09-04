@@ -1,0 +1,7 @@
+module Coordinator::Write
+  module ReleaseSets
+    class VerificationEvidenceV2 < Coordinator::Shared::Value
+      Finding: untyped
+    end
+  end
+end

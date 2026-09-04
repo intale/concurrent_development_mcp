@@ -3,6 +3,6 @@ module Coordinator::Write::Domain::ReleaseSets
     include Dry::Monads::Result::Mixin
 
     def initialize: (?stream_factory: Coordinator::Write::StreamFactory) -> void
-    def call: (state: LifecycleStateV1, command: Coordinator::Write::Commands::RequestReleaseSetCompensation, requested_at: String) -> Dry::Monads::Result
+    def call: (state: LifecycleStateV2, command: Coordinator::Write::Commands::RequestReleaseSetCompensation) -> Dry::Monads::Result
   end
 end

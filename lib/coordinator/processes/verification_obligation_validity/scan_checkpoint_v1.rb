@@ -5,7 +5,7 @@ module Coordinator::Processes
     class ScanCheckpointV1 < Value
       attribute :event, Types.Instance(PgEventstore::Event)
       attribute :reference, Coordinator::Write::EventReference
-      attribute :scan_id, Types::Identifier
+      attribute :scan_id, Types::UuidV7
       attribute :change_set_id, Types::Identifier
       attribute :superseding_partition_event, Coordinator::Write::EventReference
       attribute :from_position, Types::GlobalPosition

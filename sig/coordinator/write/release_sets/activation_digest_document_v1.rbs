@@ -5,7 +5,7 @@ module Coordinator::Write::ReleaseSets
     def release_digest: () -> String
     def verification_event: () -> Coordinator::Write::EventReference
     def verification_digest: () -> String
-    def activation_point: () -> ActivationPointV1
+    def activation_point: () -> ActivationPointV2
     def policy_version: () -> String
   end
 end

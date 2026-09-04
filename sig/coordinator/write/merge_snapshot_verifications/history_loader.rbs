@@ -1,0 +1,31 @@
+module Coordinator::Write
+  module MergeSnapshotVerifications
+    class HistoryLoader
+      @event_store: untyped
+
+      @snapshot_loader: untyped
+
+      @schema_registry: untyped
+
+      @stream_factory: untyped
+
+      @contract: untyped
+
+      def initialize: (event_store: untyped, ?snapshot_loader: untyped, ?schema_registry: untyped, ?stream_factory: untyped, ?contract: untyped) -> void
+
+      def call: (untyped merge_snapshot_id) -> untyped
+
+      private
+
+      def assignment_observations: (untyped merge_snapshot_id) -> untyped
+
+      def submission_observation: (untyped verification_id) -> untyped
+
+      def terminal_observation: (untyped merge_snapshot_id) -> (nil | untyped)
+
+      def load_event: (untyped event) -> untyped
+
+      def event_reference: (untyped event) -> untyped
+    end
+  end
+end

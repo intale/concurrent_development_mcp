@@ -1,0 +1,9 @@
+module Coordinator::Write
+  module Events
+    class CandidateBuildContextCapturedV2 < Base
+      Input: untyped
+
+      Environment: untyped
+    end
+  end
+end

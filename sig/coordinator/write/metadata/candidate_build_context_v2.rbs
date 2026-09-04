@@ -1,0 +1,6 @@
+module Coordinator::Write
+  module Metadata
+    class CandidateBuildContextV2 < EventMetadata
+    end
+  end
+end

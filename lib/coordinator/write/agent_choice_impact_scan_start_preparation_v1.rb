@@ -2,7 +2,7 @@
 
 module Coordinator::Write
   class AgentChoiceImpactScanStartPreparationV1 < Value
-    attribute :started_at, Types::Timestamp
-    attribute :event_id, Types::UuidV7
+    attribute :event_ids, Types::Array.of(Types::UuidV7).constrained(size: 2)
+    attribute :correlation_id, Types::UuidV7
   end
 end

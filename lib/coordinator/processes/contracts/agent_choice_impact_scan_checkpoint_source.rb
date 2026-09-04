@@ -12,8 +12,8 @@ module Coordinator::Processes
         state = values[:state]
         source = values[:source]
         payload = source.payload
-        checkpoint_payload = payload.is_a?(Coordinator::Write::Events::AgentChoiceImpactScanStartedV1) ||
-                             payload.is_a?(Coordinator::Write::Events::AgentChoiceImpactScanProgressedV1)
+        checkpoint_payload = payload.is_a?(Coordinator::Write::Events::AgentChoiceImpactScanStartedV2) ||
+                             payload.is_a?(Coordinator::Write::Events::AgentChoiceImpactScanProgressedV2)
         complete_state = state.scan_id && state.decision_change && state.started_event &&
                          state.checkpoint_event && !state.from_position.nil? && state.to_position &&
                          state.page_size && state.policy_version

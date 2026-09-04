@@ -1,0 +1,13 @@
+module Coordinator::Write
+  module Events
+    class CandidateImpactSurfaceDerivedV2 < Base
+      Transition: untyped
+
+      Observation: untyped
+
+      Key: untyped
+
+      Assumption: untyped
+    end
+  end
+end

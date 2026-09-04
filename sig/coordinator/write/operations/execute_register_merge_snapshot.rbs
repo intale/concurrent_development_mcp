@@ -10,6 +10,7 @@ module Coordinator::Write::Operations
       ?clock: Coordinator::Shared::_Clock,
       ?id_generator: Coordinator::Shared::_IdGenerator,
       ?commit_identity_builder: Coordinator::Write::MergeSnapshots::CommitIdentityBuilder,
+      ?snapshot_digest_builder: Coordinator::Write::MergeSnapshots::SnapshotDigestBuilder,
       ?candidate_loader: Coordinator::Write::MergeSnapshots::CandidateLoader,
       ?event_factory: Coordinator::Write::EventFactory,
       ?schema_registry: Coordinator::Write::EventSchemaRegistry,

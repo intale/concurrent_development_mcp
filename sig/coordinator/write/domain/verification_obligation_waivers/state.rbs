@@ -4,20 +4,18 @@ module Coordinator
       module VerificationObligationWaivers
         class State < Shared::Value
           def self.initial: () -> State
-          def obligation: () -> Events::VerificationObligationCreatedV1?
+          def obligation: () -> VerificationObligations::DefinitionV2?
           def obligation_event: () -> EventReference?
-          def satisfied: () -> Events::VerificationObligationSatisfiedV1?
+          def satisfied: () -> Events::VerificationObligationSatisfiedV2?
           def satisfied_event: () -> EventReference?
-          def failed: () -> Events::VerificationObligationFailedV1?
+          def failed: () -> Events::VerificationObligationFailedV2?
           def failed_event: () -> EventReference?
-          def waived: () -> Events::VerificationObligationWaivedV1?
+          def waived: () -> Events::VerificationObligationWaivedV2?
           def waived_event: () -> EventReference?
-          def invalidated: () -> Events::VerificationObligationInvalidatedV1?
+          def invalidated: () -> Events::VerificationObligationInvalidatedV2?
           def invalidated_event: () -> EventReference?
-          def policy_current: () -> bool
           def absent?: () -> bool
           def status: () -> String
-          def previous_terminal_event: () -> EventReference?
         end
       end
     end

@@ -2,12 +2,25 @@ module Coordinator::Read::Projectors
   class ReleaseSetsV1
     PROJECTION: Coordinator::Read::ProjectionDefinition
 
-    def initialize: (?contract: Coordinator::Read::Contracts::ReleaseSetSourceEvent, ?schema_registry: Coordinator::Write::EventSchemaRegistry, ?release_sets: Coordinator::Read::Repositories::ReleaseSets, ?processed_events: Coordinator::Read::Repositories::ProcessedProjectionEvents) -> void
+    type source_payload = Coordinator::Write::Events::ReleaseSetCreatedV1 |
+                          Coordinator::Write::Events::ReleaseSetMemberAddedV1 |
+                          Coordinator::Write::Events::ReleaseSetPreparedV2 |
+                          Coordinator::Write::Events::RepositoryIntegrationRecordedV2 |
+                          Coordinator::Write::Events::RepositoryIntegrationMergeLinkedV1 |
+                          Coordinator::Write::Events::ReleaseSetVerificationRecordedV2 |
+                          Coordinator::Write::Events::ReleaseSetIntegrationLinkedV1 |
+                          Coordinator::Write::Events::ReleaseSetActivatedV2 |
+                          Coordinator::Write::Events::ReleaseSetCompensationRequestedV2 |
+                          Coordinator::Write::Events::ReleaseSetSuccessfulIntegrationLinkedV1 |
+                          Coordinator::Write::Events::ReleaseSetOutcomeRecordedV1 |
+                          Coordinator::Write::Events::ReleaseSetCompletedV2
+
+    def initialize: (preparation_loader: Coordinator::Read::ReleaseSets::_PreparationLoader, ?contract: Coordinator::Read::Contracts::ReleaseSetSourceEvent, ?schema_registry: Coordinator::Write::EventSchemaRegistry, ?release_sets: Coordinator::Read::Repositories::ReleaseSets, ?processed_events: Coordinator::Read::Repositories::ProcessedProjectionEvents) -> void
     def call: (PgEventstore::Event event) -> nil
 
     private
 
-    def project: (event: PgEventstore::Event, payload: Coordinator::Write::Events::ReleaseSetPreparedV1 | Coordinator::Write::Events::RepositoryIntegrationRecordedV1 | Coordinator::Write::Events::ReleaseSetVerificationRecordedV1 | Coordinator::Write::Events::ReleaseSetActivatedV1 | Coordinator::Write::Events::ReleaseSetCompensationRequestedV1 | Coordinator::Write::Events::ReleaseSetCompletedV1) -> (Coordinator::Read::ReleaseSet | bool)
-    def load_payload: (PgEventstore::Event event) -> (Coordinator::Write::Events::ReleaseSetPreparedV1 | Coordinator::Write::Events::RepositoryIntegrationRecordedV1 | Coordinator::Write::Events::ReleaseSetVerificationRecordedV1 | Coordinator::Write::Events::ReleaseSetActivatedV1 | Coordinator::Write::Events::ReleaseSetCompensationRequestedV1 | Coordinator::Write::Events::ReleaseSetCompletedV1)
+    def project: (event: PgEventstore::Event, payload: source_payload) -> untyped
+    def load_payload: (PgEventstore::Event event) -> source_payload
   end
 end

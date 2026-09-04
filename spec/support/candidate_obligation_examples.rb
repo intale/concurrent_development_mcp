@@ -19,93 +19,97 @@ module CandidateObligationExamples
     change_set_id: "CS-obligation"
   )
     ids = Coordinator::Shared::IdGenerator.new
-    candidate_reference = reference(
-      id: ids.uuid_v7,
-      type: "CandidateSubmitted",
-      stream_name: "Candidate",
-      stream_id: candidate_id,
-      revision: 0
+    manifest_digest = digest(candidate_id, "manifest")
+    context_digest = observed_paths.any? ? digest(candidate_id, "context") : nil
+    surface_digest = digest(candidate_id, "surface")
+    head_character = registry_revision.even? ? "b" : "e"
+    manifest = Coordinator::Write::Events::CandidateChangeManifestCapturedV2.new(
+      candidate_id:,
+      evidence_revision: 1,
+      files: [ CandidateScenario.manifest_file(path) ]
     )
+    build_context = if observed_paths.any?
+      Coordinator::Write::Events::CandidateBuildContextCapturedV2.new(
+        candidate_id:,
+        evidence_revision: 1,
+        inputs: observed_paths.map { { kind: "public_contract", path: _1, blob_oid: "d" * 40 } },
+        environment: []
+      )
+    end
     manifest_reference = reference(
       id: ids.uuid_v7,
       type: "CandidateChangeManifestCaptured",
       stream_name: "Candidate",
       stream_id: candidate_id,
-      revision: 1
+      revision: 7
     )
-    has_context = observed_paths.any?
-    context_reference = if has_context
+    context_reference = if build_context
       reference(
         id: ids.uuid_v7,
         type: "CandidateBuildContextCaptured",
         stream_name: "Candidate",
         stream_id: candidate_id,
-        revision: 2
+        revision: 8
       )
     end
+    candidate_reference = reference(
+      id: ids.uuid_v7,
+      type: "CandidateSubmitted",
+      stream_name: "Candidate",
+      stream_id: candidate_id,
+      revision: build_context ? 9 : 8
+    )
+    surface_id = ids.uuid_v7
     surface_reference = reference(
       id: ids.uuid_v7,
       type: "CandidateImpactSurfaceDerived",
-      stream_name: "Candidate",
-      stream_id: candidate_id,
-      revision: has_context ? 3 : 2
+      stream_name: "CandidateImpactSurface",
+      stream_id: surface_id,
+      revision: 0
     )
     registration_reference = reference(
       id: ids.uuid_v7,
-      type: "CandidateImpactSurfaceRegistered",
-      stream_name: "CandidateImpactRegistry",
-      stream_id: change_set_id,
-      revision: registry_revision
+      type: "CandidateImpactSurfaceAssigned",
+      stream_name: "Candidate",
+      stream_id: candidate_id,
+      revision: build_context ? 10 : 9
     )
-    manifest_digest = digest(candidate_id, "manifest")
-    context_digest = has_context ? digest(candidate_id, "context") : nil
-    surface_digest = digest(candidate_id, "surface")
-    head_character = registry_revision.even? ? "b" : "e"
-    candidate = candidate_event(
+    surface = Coordinator::Write::Events::CandidateImpactSurfaceDerivedV2.new(
+      surface_id:,
+      candidate_id:,
+      evidence_revision: 1,
+      produces: produces.map { { impact_key: _1, before: nil, after: "changed" } },
+      consumes: consumes.map { { impact_key: _1, value: "observed" } },
+      may_affect: may_affect.map { { impact_key: _1 } },
+      assumes: assumes.map { { impact_key: _1, predicate: "required" } }
+    )
+    assignment = Coordinator::Write::Events::CandidateImpactSurfaceAssignedV1.new(
+      candidate_id:,
+      surface_id:
+    )
+    candidate = Coordinator::Write::Candidates::StateV2.new(
       candidate_id:,
       change_set_id:,
+      work_item_id: "W-obligation",
+      attempt_id: "A-obligation",
+      agent_id: "agent-a",
       repository_id:,
-      head_character:,
+      target_branch: "main",
+      object_format: "sha1",
+      base_commit_oid: "a" * 40,
+      head_commit_oid: head_character * 40,
+      checkpoint_kind: "final",
+      intention_set_id: ids.uuid_v7,
       manifest_digest:,
-      context_digest:,
-      path:
-    )
-    manifest = manifest_event(
-      candidate_id:,
-      repository_id:,
-      head_character:,
-      manifest_digest:,
-      path:
-    )
-    context = if has_context
-      context_event(
-        candidate_id:,
-        repository_id:,
-        head_character:,
-        context_digest:,
-        observed_paths:
-      )
-    end
-    surface = surface_event(
-      candidate_id:,
-      change_set_id:,
-      repository_id:,
-      head_character:,
-      manifest_digest:,
-      context_digest:,
-      surface_digest:,
-      produces:,
-      consumes:,
-      may_affect:,
-      assumes:
-    )
-    registration = registration_event(
-      candidate:,
-      candidate_reference:,
-      manifest_reference:,
-      context_reference:,
-      surface_reference:,
-      surface_digest:
+      build_context_digest: context_digest,
+      manifest:,
+      build_context:,
+      submission_event: candidate_reference,
+      manifest_event: manifest_reference,
+      build_context_event: context_reference,
+      surface_id:,
+      surface_assignment_event: registration_reference,
+      latest_revision: registration_reference.stream_revision
     )
     subject = Coordinator::Write::CandidateObligations::CandidateSubjectV1.new(
       candidate_id:,
@@ -113,10 +117,10 @@ module CandidateObligationExamples
       work_item_id: candidate.work_item_id,
       attempt_id: candidate.attempt_id,
       repository_id:,
-      target_branch: "main",
-      object_format: "sha1",
-      base_commit_oid: "a" * 40,
-      head_commit_oid: head_character * 40,
+      target_branch: candidate.target_branch,
+      object_format: candidate.object_format,
+      base_commit_oid: candidate.base_commit_oid,
+      head_commit_oid: candidate.head_commit_oid,
       manifest_digest:,
       build_context_digest: context_digest,
       surface_digest:,
@@ -126,13 +130,15 @@ module CandidateObligationExamples
       surface_event: surface_reference,
       registration_event: registration_reference
     )
-    Coordinator::Write::CandidateObligations::CandidateEvidenceV1.new(
-      registration:,
+
+    Coordinator::Write::CandidateObligations::CandidateEvidenceV2.new(
+      registration: assignment,
       registration_event: registration_reference,
+      registration_global_position: registry_revision,
       candidate:,
-      manifest:,
-      build_context: context,
       surface:,
+      surface_event: surface_reference,
+      surface_digest:,
       subject:
     )
   end
@@ -143,7 +149,7 @@ module CandidateObligationExamples
     Coordinator::Write::CandidateObligations::PolicyObservationV1.gating(
       Coordinator::Write::CandidateObligations::ImpactPolicyEvidenceV1.new(
         partition_event: partition_reference,
-        partition: partition,
+        partition:,
         head: decision_head,
         definition_digest: digest("policy", "definition"),
         change_set_id: "CS-obligation",
@@ -183,18 +189,54 @@ module CandidateObligationExamples
       assumes: [ "dependency:rubygems:rails" ]
     )
     command = command(source:, target:)
+    policy_observation = policy
+    matcher = Coordinator::Write::CandidateObligations::Matcher.new
+    reasons = matcher.call(source:, target:)
     state = Coordinator::Write::Domain::CandidateObligations::State.new(
       source:,
       target:,
-      policy: policy,
+      policy: policy_observation,
       existing: nil
     )
-
-    Coordinator::Write::Domain::CandidateObligations::Create.new.call(
+    decision = Coordinator::Write::Domain::CandidateObligations::Create.new.call(
       state:,
-      command:,
+      command:
+    ).value!
+    created = decision.plan.events.fetch(0)
+    validity = Coordinator::Write::CandidateObligations::ValidityBuilder.new.call(
+      source:,
+      target:,
+      policy: policy_observation.evidence,
+      reasons:,
+      rule_version: RULE_VERSION
+    )
+
+    definition(created:, source:, target:, policy_observation:, reasons:, validity:)
+  end
+
+  def definition(created:, source:, target:, policy_observation: policy, reasons: nil, validity: nil)
+    reasons ||= Coordinator::Write::CandidateObligations::Matcher.new.call(source:, target:)
+    validity ||= Coordinator::Write::CandidateObligations::ValidityBuilder.new.call(
+      source:,
+      target:,
+      policy: policy_observation.evidence,
+      reasons:,
+      rule_version: RULE_VERSION
+    )
+    Coordinator::Write::VerificationObligations::DefinitionV2.new(
+      obligation_id: created.obligation_id,
+      kind: created.kind,
+      change_set_id: source.subject.change_set_id,
+      source_candidate: source.subject,
+      target_candidate: target.subject,
+      reasons:,
+      required_evidence: created.required_evidence,
+      enforcement: created.enforcement,
+      policy: policy_observation.evidence,
+      validity_input_digest: validity.digest,
+      rule_version: RULE_VERSION,
       created_at: TIMESTAMP
-    ).value!.obligation
+    )
   end
 
   def decision_head
@@ -248,143 +290,5 @@ module CandidateObligationExamples
 
   def digest(*parts)
     Coordinator::Shared::CanonicalJson.new.sha256(parts)
-  end
-
-  def candidate_event(candidate_id:, change_set_id:, repository_id:, head_character:, manifest_digest:, context_digest:, path:)
-    Coordinator::Write::Events::CandidateSubmittedV2.new(
-      candidate_id:,
-      change_set_id:,
-      work_item_id: "W-obligation",
-      attempt_id: "A-obligation",
-      agent_id: "agent-a",
-      repository_id:,
-      target_branch: "main",
-      object_format: "sha1",
-      base_commit_oid: "a" * 40,
-      head_commit_oid: head_character * 40,
-      checkpoint_kind: "final",
-      lease_set_id: Coordinator::Shared::IdGenerator.new.uuid_v7,
-      lease_policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
-      lease_references: [ lease_reference(path) ],
-      manifest_digest:,
-      build_context_digest: context_digest,
-      evidence_status: "attributed_unverified",
-      submitted_at: TIMESTAMP
-    )
-  end
-
-  def manifest_event(candidate_id:, repository_id:, head_character:, manifest_digest:, path:)
-    Coordinator::Write::Events::CandidateChangeManifestCapturedV1.new(
-      candidate_id:,
-      repository_id:,
-      target_branch: "main",
-      object_format: "sha1",
-      base_commit_oid: "a" * 40,
-      head_commit_oid: head_character * 40,
-      evidence_revision: 1,
-      policy_version: "candidate-change-manifest/v1",
-      manifest_digest:,
-      files: [ CandidateScenario.manifest_file(path) ],
-      collector: collector,
-      captured_at: TIMESTAMP
-    )
-  end
-
-  def context_event(candidate_id:, repository_id:, head_character:, context_digest:, observed_paths:)
-    Coordinator::Write::Events::CandidateBuildContextCapturedV1.new(
-      candidate_id:,
-      repository_id:,
-      object_format: "sha1",
-      head_commit_oid: head_character * 40,
-      evidence_revision: 1,
-      policy_version: "candidate-build-context/v1",
-      build_context_digest: context_digest,
-      inputs: observed_paths.map { { kind: "public_contract", path: _1, blob_oid: "d" * 40 } },
-      environment: [],
-      dependency_graph_digest: nil,
-      test_environment_digest: nil,
-      collector:,
-      captured_at: TIMESTAMP
-    )
-  end
-
-  def surface_event(
-    candidate_id:,
-    change_set_id:,
-    repository_id:,
-    head_character:,
-    manifest_digest:,
-    context_digest:,
-    surface_digest:,
-    produces:,
-    consumes:,
-    may_affect:,
-    assumes:
-  )
-    Coordinator::Write::Events::CandidateImpactSurfaceDerivedV1.new(
-      candidate_id:,
-      change_set_id:,
-      work_item_id: "W-obligation",
-      attempt_id: "A-obligation",
-      repository_id:,
-      target_branch: "main",
-      object_format: "sha1",
-      head_commit_oid: head_character * 40,
-      evidence_revision: 1,
-      policy_version: "candidate-impact-surface/v1",
-      surface_digest:,
-      manifest_digest:,
-      build_context_digest: context_digest,
-      produces: produces.map { { impact_key: _1, before: nil, after: "changed" } },
-      consumes: consumes.map { { impact_key: _1, value: "observed" } },
-      may_affect: may_affect.map { { impact_key: _1 } },
-      assumes: assumes.map { { impact_key: _1, predicate: "required" } },
-      analyzer: { kind: "agent", id: "analyzer-1", analyzer_version: "impact-analyzer-v1" },
-      evidence_status: "attributed_unverified",
-      derived_at: TIMESTAMP
-    )
-  end
-
-  def registration_event(
-    candidate:,
-    candidate_reference:,
-    manifest_reference:,
-    context_reference:,
-    surface_reference:,
-    surface_digest:
-  )
-    Coordinator::Write::Events::CandidateImpactSurfaceRegisteredV1.new(
-      candidate_id: candidate.candidate_id,
-      change_set_id: candidate.change_set_id,
-      work_item_id: candidate.work_item_id,
-      attempt_id: candidate.attempt_id,
-      repository_id: candidate.repository_id,
-      target_branch: candidate.target_branch,
-      object_format: candidate.object_format,
-      base_commit_oid: candidate.base_commit_oid,
-      head_commit_oid: candidate.head_commit_oid,
-      candidate_event: candidate_reference,
-      manifest_event: manifest_reference,
-      build_context_event: context_reference,
-      surface_event: surface_reference,
-      surface_digest:,
-      index_policy_version: "candidate-impact-exact-index/v2",
-      registered_at: TIMESTAMP
-    )
-  end
-
-  def lease_reference(path)
-    {
-      lease_id: Coordinator::Shared::IdGenerator.new.uuid_v7,
-      resource_id: Coordinator::Shared::IdGenerator.new.uuid_v7,
-      resource_kind: "file",
-      resource_path: path,
-      base_blob_oid: "c" * 40,
-      fencing_token: 1
-    }
-  end
-
-  def collector
-    { kind: "agent", id: "collector-1", collector_version: "evidence-v1" }
   end
 end

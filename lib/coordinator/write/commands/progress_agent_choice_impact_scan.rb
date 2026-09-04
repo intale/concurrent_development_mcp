@@ -5,7 +5,7 @@ module Coordinator::Write
     class ProgressAgentChoiceImpactScan < Value
       attribute :command_id, Types::Identifier
       attribute :actor, Actor
-      attribute :scan_id, Types::Identifier
+      attribute :scan_id, Types::UuidV7
       attribute :expected_checkpoint, EventReference
       attribute :previous_from_position, Types::GlobalPosition
       attribute :last_processed_position, Types::GlobalPosition.optional

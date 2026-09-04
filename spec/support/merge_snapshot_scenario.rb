@@ -72,11 +72,24 @@ module MergeSnapshotScenario
   def verify(registration, prefix:, conclusion: "passed", findings: [])
     input = verification_input(registration, prefix:, conclusion:, findings:)
     completion = execute(Coordinator::Write::Operations::ExecuteSubmitMergeSnapshotVerification, input)
+    submission_event = event_store.read(
+      streams.merge_verification(completion.data.verification_id),
+      Coordinator::Write::EventQueries::MERGE_VERIFICATION_SUBMISSION
+    ).sole
+    Coordinator::Processes::ProcessManagers::MergeSnapshotVerification.new(event_store:).call(
+      submission_event
+    )
     event = event_store.read(
       streams.merge_snapshot(input.fetch(:merge_snapshot_id)),
       Coordinator::Write::EventQueries::MERGE_SNAPSHOT_VERIFIED
-    ).first
-    { input:, completion:, event:, payload: event && load(event) }
+    ).find { _1.type == "MergeSnapshotVerified" }
+    {
+      input:,
+      completion:,
+      event:,
+      payload: event && load(event),
+      verification_digest: event&.metadata&.fetch("verification_digest")
+    }
   end
 
   def register_candidates(prefix:, candidates:)
@@ -110,7 +123,6 @@ module MergeSnapshotScenario
 
   def authorization_input(registration, verification, prefix:, expected_impact_policy: nil)
     registration_receipt = registration.fetch(:completion).data
-    verified = verification.fetch(:payload)
     input = registration.fetch(:input)
     {
       command_id: "cmd-authorize-#{prefix}",
@@ -120,7 +132,7 @@ module MergeSnapshotScenario
         registration_event: registration_receipt.snapshot_event.to_h,
         snapshot_digest: registration_receipt.snapshot_digest,
         verification_event: reference(verification.fetch(:event)).to_h,
-        verification_digest: verified.verification_digest
+        verification_digest: verification.fetch(:verification_digest)
       },
       target_base_observation: {
         repository_id: input.fetch(:repository_id),
@@ -175,11 +187,25 @@ module MergeSnapshotScenario
   end
 
   def expected_policy(policy)
-    payload = load(policy.fetch(:decision))
+    head = policy.fetch(:head)
+    partition_event = policy.fetch(:partition_event)
+    partition_id = partition_event.stream.stream_id
+    change_set_id = partition_id.delete_prefix("changeset:").delete_suffix(":candidate")
+    definition = Coordinator::Write::CandidateObligations::DecisionDefinitionLoader.new(
+      event_store:
+    ).call(
+      head:,
+      partition: Coordinator::Write::Decisions::DecisionPartitionV1.new(
+        partition_id:,
+        topic_root: "candidate",
+        anchor_kind: "changeset",
+        anchor_id: change_set_id
+      )
+    )
     {
-      partition_event: reference(policy.fetch(:partition_event)).to_h,
-      head: policy.fetch(:head).to_h,
-      definition_digest: payload.definition_digest
+      partition_event: reference(partition_event).to_h,
+      head: head.to_h,
+      definition_digest: definition.digest
     }
   end
 

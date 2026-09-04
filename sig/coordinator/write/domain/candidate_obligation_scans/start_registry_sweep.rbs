@@ -7,8 +7,7 @@ module Coordinator::Write
           state: RegistrySweepState,
           command: Commands::StartCandidateImpactRegistrySweep,
           policy: Coordinator::Write::CandidateObligations::PolicyObservationV1,
-          latest_registry_revision: Integer?,
-          started_at: String
+          latest_registry_revision: Integer?
         ) -> Dry::Monads::Result
       end
     end

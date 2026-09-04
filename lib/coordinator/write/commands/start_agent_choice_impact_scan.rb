@@ -5,7 +5,7 @@ module Coordinator::Write
     class StartAgentChoiceImpactScan < Value
       attribute :command_id, Types::Identifier
       attribute :actor, Actor
-      attribute :scan_id, Types::Identifier
+      attribute :scan_id, Types::UuidV7
       attribute :source_event, EventReference
       attribute :source_global_position, Types::GlobalPosition
       attribute :policy_version, Types::AgentChoiceImpactPolicyVersion

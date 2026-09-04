@@ -5,7 +5,7 @@ module Coordinator::Write
         event_store: Coordinator::Write::_EventStore,
         ?schema_registry: Coordinator::Write::EventSchemaRegistry
       ) -> void
-      def find: (NaturalKeyV1 natural_key) -> PersistedEventV1?
+      def find: (NaturalKeyV1 natural_key) -> Coordinator::Write::VerificationObligations::PersistedDefinitionV2?
     end
   end
 end

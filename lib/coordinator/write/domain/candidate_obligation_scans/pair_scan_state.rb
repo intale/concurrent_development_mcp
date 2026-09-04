@@ -5,7 +5,7 @@ module Coordinator::Write
     module CandidateObligationScans
       class PairScanState < Value
         attribute :status, Types::CandidateImpactScanStatus
-        attribute :scan_id, Types::Identifier.optional
+        attribute :scan_id, Types::UuidV7.optional
         attribute :change_set_id, Types::Identifier.optional
         attribute :source_registration, EventReference.optional
         attribute :direction, Types::CandidateImpactQueryDirection.optional
@@ -18,7 +18,6 @@ module Coordinator::Write
         attribute :to_revision, Types::StreamRevisionCursor.optional
         attribute :page_size, Types::CandidateImpactScanPageSize.optional
         attribute :page_count, Types::Integer.constrained(gteq: 0)
-        attribute :total_registration_count, Types::Integer.constrained(gteq: 0)
         attribute :index_policy_version, Types::CandidateImpactIndexPolicyVersion.optional
         attribute :rule_version, Types::CandidateImpactPairScanRuleVersion.optional
         attribute :skip_reason, Types::CandidateImpactPairScanSkipReason.optional
@@ -39,7 +38,6 @@ module Coordinator::Write
             to_revision: nil,
             page_size: nil,
             page_count: 0,
-            total_registration_count: 0,
             index_policy_version: nil,
             rule_version: nil,
             skip_reason: nil

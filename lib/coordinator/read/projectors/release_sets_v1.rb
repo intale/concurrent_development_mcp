@@ -8,11 +8,13 @@ module Coordinator::Read
       def initialize(
         contract: Contracts::ReleaseSetSourceEvent.new,
         schema_registry: Coordinator::Write::EventSchemaRegistry.new,
+        preparation_loader:,
         release_sets: Repositories::ReleaseSets.new,
         processed_events: Repositories::ProcessedProjectionEvents.new
       )
         @contract = contract
         @schema_registry = schema_registry
+        @preparation_loader = preparation_loader
         @release_sets = release_sets
         @processed_events = processed_events
       end
@@ -39,17 +41,28 @@ module Coordinator::Read
 
       def project(event:, payload:)
         case payload
-        when Coordinator::Write::Events::ReleaseSetPreparedV1
-          @release_sets.store(event:, release_set: payload)
-        when Coordinator::Write::Events::RepositoryIntegrationRecordedV1
+        when Coordinator::Write::Events::ReleaseSetCreatedV1,
+             Coordinator::Write::Events::ReleaseSetMemberAddedV1
+          true
+        when Coordinator::Write::Events::ReleaseSetPreparedV2
+          @release_sets.store(event:, preparation: @preparation_loader.call(payload.release_set_id))
+        when Coordinator::Write::Events::RepositoryIntegrationRecordedV2
           @release_sets.record_integration(event:, integration: payload)
-        when Coordinator::Write::Events::ReleaseSetVerificationRecordedV1
+        when Coordinator::Write::Events::RepositoryIntegrationMergeLinkedV1
+          @release_sets.link_integration(event:, link: payload)
+        when Coordinator::Write::Events::ReleaseSetVerificationRecordedV2
           @release_sets.record_verification(event:, verification: payload)
-        when Coordinator::Write::Events::ReleaseSetActivatedV1
+        when Coordinator::Write::Events::ReleaseSetIntegrationLinkedV1
+          @release_sets.link_verification_integration(event:, link: payload)
+        when Coordinator::Write::Events::ReleaseSetActivatedV2
           @release_sets.record_activation(event:, activation: payload)
-        when Coordinator::Write::Events::ReleaseSetCompensationRequestedV1
+        when Coordinator::Write::Events::ReleaseSetCompensationRequestedV2
           @release_sets.record_compensation_request(event:, request: payload)
-        when Coordinator::Write::Events::ReleaseSetCompletedV1
+        when Coordinator::Write::Events::ReleaseSetSuccessfulIntegrationLinkedV1
+          @release_sets.link_compensation_integration(event:, link: payload)
+        when Coordinator::Write::Events::ReleaseSetOutcomeRecordedV1
+          @release_sets.record_outcome(event:, outcome: payload)
+        when Coordinator::Write::Events::ReleaseSetCompletedV2
           @release_sets.record_completion(event:, completion: payload)
         else
           raise UnknownProjectionEvent, payload.class.name

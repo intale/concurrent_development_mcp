@@ -3,6 +3,8 @@
 module Coordinator::Write
   module Candidates
     class HeadIdentityBuilder
+      MARKER_CODEC_VERSION = "compound-marker-v2"
+
       def initialize(
         id_generator: IdGenerator.new,
         compound_marker_builder: CompoundMarkerBuilder.new

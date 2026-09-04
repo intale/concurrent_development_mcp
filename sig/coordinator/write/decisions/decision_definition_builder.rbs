@@ -3,7 +3,7 @@ module Coordinator
     module Decisions
       class DecisionDefinitionBuilder
         def initialize: (?topic_registry: Interpretations::TopicRegistry, ?canonical_json: Shared::CanonicalJson) -> void
-        def call: (proposal: Events::DecisionInterpretationProposedV1, valid_from_default: String) -> DecisionDefinitionV1
+        def call: (proposal: Events::DecisionInterpretationProposedV1 | Events::DecisionInterpretationProposedV2, valid_from_default: String) -> DecisionDefinitionV1
       end
     end
   end

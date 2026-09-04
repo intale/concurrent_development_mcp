@@ -15,8 +15,12 @@ module Coordinator::Write
         natural_key_builder: CandidateObligations::NaturalKeyBuilder.new,
         obligation_loader: CandidateObligations::ObligationLoader.new(event_store:),
         validity_builder: CandidateObligations::ValidityBuilder.new,
+        partition_state_loader: Decisions::PartitionStateLoader.new(event_store:),
+        change_set_state_loader: ChangeSets::StateLoader.new(event_store:),
         canonical_json: CanonicalJson.new,
-        policy_contract: Contracts::CandidateImpactPolicyDefinition.new
+        policy_contract: Contracts::CandidateImpactPolicyDefinition.new,
+        snapshot_loader: MergeSnapshots::StateLoader.new(event_store:),
+        verification_history_loader: MergeSnapshotVerifications::HistoryLoader.new(event_store:)
       )
         @event_store = event_store
         @stream_factory = stream_factory
@@ -27,8 +31,12 @@ module Coordinator::Write
         @natural_key_builder = natural_key_builder
         @obligation_loader = obligation_loader
         @validity_builder = validity_builder
+        @partition_state_loader = partition_state_loader
+        @change_set_state_loader = change_set_state_loader
         @canonical_json = canonical_json
         @policy_contract = policy_contract
+        @snapshot_loader = snapshot_loader
+        @verification_history_loader = verification_history_loader
       end
 
       def call(command, decided_at:)
@@ -85,9 +93,8 @@ module Coordinator::Write
       private
 
       def load_snapshot(command, reasons)
-        stream = @stream_factory.merge_snapshot(command.merge_snapshot_id)
-        registration_event = @event_store.read(stream, EventQueries::MERGE_SNAPSHOT_REGISTRATION).first
-        unless registration_event
+        registration = @snapshot_loader.call(command.merge_snapshot_id)
+        unless registration
           reasons << reason(
             code: "merge_snapshot_not_found",
             message: "Merge snapshot does not exist",
@@ -95,12 +102,12 @@ module Coordinator::Write
           )
           return
         end
-        verification_event = @event_store.read(stream, EventQueries::MERGE_SNAPSHOT_VERIFIED).first
+        verification = @verification_history_loader.call(command.merge_snapshot_id).verified
         SnapshotEvidenceV1.new(
-          registration: load_event(registration_event),
-          registration_event: event_reference(registration_event),
-          verification: verification_event && load_event(verification_event),
-          verification_event: verification_event && event_reference(verification_event)
+          registration:,
+          registration_event: registration.registration_event,
+          verification:,
+          verification_event: verification&.verified_event
         )
       end
 
@@ -167,17 +174,7 @@ module Coordinator::Write
       end
 
       def load_work_item_progress(registration, change_set_id, reasons)
-        change_set_events = @event_store.read(
-          @stream_factory.change_set(change_set_id),
-          EventQueries::CHANGE_SET_FOR_MERGE_AUTHORIZATION
-        )
-        change_set_state = Domain::ChangeSets::State.reduce(change_set_events.map { load_event(_1) })
-        satisfactions = change_set_events.filter_map do |event|
-          next unless event.type == "WorkItemDependencySatisfied"
-
-          payload = load_event(event)
-          [ payload.dependency_id, [ payload, event_reference(event) ] ]
-        end.to_h
+        change_set_state = @change_set_state_loader.call(change_set_id)
 
         registration.ordered_candidates.filter_map do |candidate|
           reason_count = reasons.length
@@ -191,20 +188,23 @@ module Coordinator::Write
             next
           end
 
-          events = @event_store.read(
+          history = @event_store.read(
             @stream_factory.work_item(candidate.work_item_id),
             EventQueries::WORK_ITEM_FOR_MERGE_AUTHORIZATION
-          ).to_h { [ _1.type, _1 ] }
-          created_event = events["WorkItemCreated"]
-          selected_event = events["WorkItemCandidateSelected"]
-          completed_event = events["WorkItemCompleted"]
-          created = created_event && load_event(created_event)
-          selected = selected_event && load_event(selected_event)
-          completed = completed_event && load_event(completed_event)
+          )
+          state = Domain::WorkItems::State.reduce(history.map { load_event(_1) })
+          selected_event = history.reverse.find { _1.type == "WorkItemCandidateSelected" }
+          completed_event = history.reverse.find { _1.type == "WorkItemCompleted" }
+          satisfactions = history.filter_map do |event|
+            next unless event.type == "WorkItemDependencySatisfied"
 
-          validate_work_item_scope(created, candidate, change_set_id, reasons)
-          validate_selection(selected, selected_event, candidate, reasons)
-          validate_completion(completed, completed_event, candidate, reasons)
+            payload = load_event(event)
+            [ payload.dependency_id, [ payload, event_reference(event) ] ]
+          end.to_h
+
+          validate_work_item_scope(state, candidate, change_set_id, reasons)
+          validate_selection(state, selected_event, candidate, reasons)
+          validate_completion(state, completed_event, candidate, reasons)
           incoming = dependency_progress(
             change_set_state,
             satisfactions,
@@ -227,11 +227,10 @@ module Coordinator::Write
         end.freeze
       end
 
-      def validate_work_item_scope(created, candidate, change_set_id, reasons)
-        return if created.is_a?(Events::WorkItemCreatedV1) &&
-                  created.change_set_id == change_set_id &&
-                  created.work_item_id == candidate.work_item_id &&
-                  created.repository_id == candidate.repository_id
+      def validate_work_item_scope(state, candidate, change_set_id, reasons)
+        return if state.work_item_id == candidate.work_item_id &&
+                  state.change_set_id == change_set_id &&
+                  state.repository_id == candidate.repository_id
 
         reasons << reason(
           code: "candidate_work_item_scope_invalid",
@@ -241,8 +240,8 @@ module Coordinator::Write
         )
       end
 
-      def validate_selection(selected, selected_event, candidate, reasons)
-        unless selected
+      def validate_selection(state, selected_event, candidate, reasons)
+        unless state.selected_candidate_id
           reasons << reason(
             code: "candidate_not_selected",
             message: "Snapshot Candidate has not been selected by its WorkItem",
@@ -252,12 +251,8 @@ module Coordinator::Write
           )
           return
         end
-        return if selected.is_a?(Events::WorkItemCandidateSelectedV1) &&
-                  selected.change_set_id == candidate.change_set_id &&
-                  selected.work_item_id == candidate.work_item_id &&
-                  selected.attempt_id == candidate.attempt_id &&
-                  selected.candidate_id == candidate.candidate_id &&
-                  selected.candidate_event == candidate.candidate_event
+        return if state.selected_candidate_id == candidate.candidate_id &&
+                  state.selected_candidate_event == candidate.candidate_event
 
         reasons << reason(
           code: "candidate_selection_mismatch",
@@ -269,8 +264,8 @@ module Coordinator::Write
         )
       end
 
-      def validate_completion(completed, completed_event, candidate, reasons)
-        unless completed
+      def validate_completion(state, completed_event, candidate, reasons)
+        unless state.status == "completed"
           reasons << reason(
             code: "candidate_work_item_not_completed",
             message: "Snapshot Candidate WorkItem has not completed",
@@ -279,12 +274,8 @@ module Coordinator::Write
           )
           return
         end
-        return if completed.is_a?(Events::WorkItemCompletedV1) &&
-                  completed.change_set_id == candidate.change_set_id &&
-                  completed.work_item_id == candidate.work_item_id &&
-                  completed.attempt_id == candidate.attempt_id &&
-                  completed.candidate_id == candidate.candidate_id &&
-                  completed.candidate_event == candidate.candidate_event
+        return if state.selected_candidate_id == candidate.candidate_id &&
+                  state.selected_candidate_event == candidate.candidate_event
 
         reasons << reason(
           code: "candidate_completion_mismatch",
@@ -314,9 +305,16 @@ module Coordinator::Write
           DependencyProgressV1.new(
             dependency_id: dependency.dependency_id,
             satisfaction_event: reference,
-            source_event: payload.source_event
+            source_event: dependency_source(payload)
           )
         end.freeze
+      end
+
+      def dependency_source(payload)
+        case payload
+        when Events::WorkItemDependencySatisfiedV1 then payload.source_event
+        when Events::WorkItemDependencySatisfiedV2 then payload.source
+        end
       end
 
       def load_current_policy(change_set_id, decided_at:)
@@ -326,25 +324,15 @@ module Coordinator::Write
           anchor_kind: "changeset",
           anchor_id: change_set_id
         )
-        event = @event_store.read_grouped(
-          @stream_factory.decision_partition(partition.partition_id),
-          EventQueries::DECISION_PARTITION_LATEST
-        ).first
-        return absent_policy(partition) unless event
+        state = @partition_state_loader.call(partition)
+        return absent_policy(partition) unless state.latest_event
 
-        payload = load_event(event)
-        reference = event_reference(event)
-        valid = payload.is_a?(Events::DecisionPartitionAdvancedV1) &&
-                payload.partition == partition && payload.partition_revision == event.stream_revision &&
-                payload.active_decisions.include?(payload.decision)
-        return invalid_policy(partition, reference) unless valid
-
-        definitions = payload.active_decisions.map do |head|
+        definitions = state.active_decisions.map do |head|
           [ head, @definition_loader.call(head:, partition:) ]
         end
         policies = definitions.select { _2.document.topic.topic_id == "candidate.impact_policy" }
         return absent_policy(partition) if policies.empty?
-        return invalid_policy(partition, reference) unless policies.one?
+        return invalid_policy(partition, state.latest_event) unless policies.one?
 
         head, definition = policies.sole
         expected_digest = @canonical_json.sha256(definition.document.to_h)
@@ -353,12 +341,12 @@ module Coordinator::Write
           change_set_id:,
           expected_digest:
         )
-        return invalid_policy(partition, reference) if validation.failure?
-        return invalid_policy(partition, reference) if definition.document.validity.valid_from > decided_at
+        return invalid_policy(partition, state.latest_event) if validation.failure?
+        return invalid_policy(partition, state.latest_event) if definition.document.validity.valid_from > decided_at
 
         CurrentImpactPolicyV1.new(
           partition:,
-          partition_event: reference,
+          partition_event: state.latest_event,
           head:,
           definition_digest: definition.digest,
           status: definition.document.enforcement.level,
@@ -404,11 +392,18 @@ module Coordinator::Write
         evidence = []
         references = []
         registration.ordered_candidates.each do |member|
-          events = @event_store.read_marked(
-            @stream_factory.candidate_impact_registry(change_set_id),
-            EventQueries.candidate_impact_surface_registration("candidate:#{member.candidate_id}")
+          events = @event_store.read_global_marked(
+            GlobalMarkedEventReadCriteria.new(
+              stream_context: "DevelopmentIntegration",
+              stream_name: "Candidate",
+              event_types: [ "CandidateImpactSurfaceAssigned" ],
+              markers: [ "candidate:#{member.candidate_id}" ],
+              maximum_count: 2,
+              direction: :asc
+            )
           )
-          if events.empty?
+          persisted = events.find { _1.markers.include?("change-set:#{change_set_id}") }
+          unless persisted
             reasons << reason(
               code: "candidate_impact_surface_missing",
               message: "Gating policy requires exact Candidate impact-surface evidence",
@@ -416,7 +411,6 @@ module Coordinator::Write
             )
             next
           end
-          persisted = events.sole
           candidate = @candidate_loader.call(event_reference(persisted))
           unless candidate_matches_member?(candidate, member)
             reasons << reason(
@@ -503,7 +497,7 @@ module Coordinator::Write
         persisted_creation = @obligation_loader.find(natural_key)
         return missing_obligation(natural_key, source, target, policy) unless persisted_creation
 
-        obligation_id = persisted_creation.payload.obligation_id
+        obligation_id = persisted_creation.definition.obligation_id
         grouped = @event_store.read_grouped(
           @stream_factory.verification_obligation(obligation_id),
           EventQueries::VERIFICATION_OBLIGATION_LIFECYCLE
@@ -511,7 +505,7 @@ module Coordinator::Write
         creation_event = grouped["VerificationObligationCreated"]
         return missing_obligation(natural_key, source, target, policy) unless creation_event
 
-        creation = load_event(creation_event)
+        definition = persisted_creation.definition
         expected_validity = @validity_builder.call(
           source:,
           target:,
@@ -519,7 +513,7 @@ module Coordinator::Write
           policy:,
           rule_version: RULE_VERSION
         )
-        unless valid_creation?(creation, obligation_id, source, target, policy, expected_validity.digest)
+        unless valid_creation?(definition, obligation_id, source, target, policy, expected_validity.digest)
           return invalid_obligation(natural_key, obligation_id, source, target, policy, event_reference(creation_event))
         end
 
@@ -532,7 +526,7 @@ module Coordinator::Write
           required_evidence: policy.required_evidence,
           identity_digest: natural_key.digest,
           status:,
-          validity_input_digest: creation.validity_input_digest,
+          validity_input_digest: definition.validity_input_digest,
           creation_event: event_reference(creation_event),
           terminal_event: terminal && event_reference(terminal)
         )
@@ -568,16 +562,15 @@ module Coordinator::Write
         )
       end
 
-      def valid_creation?(creation, obligation_id, source, target, policy, validity_digest)
-        creation.is_a?(Events::VerificationObligationCreatedV1) &&
-          creation.obligation_id == obligation_id &&
-          creation.source_candidate == source.subject &&
-          creation.target_candidate == target.subject &&
-          creation.policy == policy &&
-          creation.required_evidence == policy.required_evidence &&
-          creation.enforcement == policy.enforcement &&
-          creation.validity_input_digest == validity_digest &&
-          creation.rule_version == RULE_VERSION
+      def valid_creation?(definition, obligation_id, source, target, policy, validity_digest)
+        definition.obligation_id == obligation_id &&
+          definition.source_candidate == source.subject &&
+          definition.target_candidate == target.subject &&
+          definition.policy == policy &&
+          definition.required_evidence == policy.required_evidence &&
+          definition.enforcement == policy.enforcement &&
+          definition.validity_input_digest == validity_digest &&
+          definition.rule_version == RULE_VERSION
       end
 
       def obligation_status(grouped)

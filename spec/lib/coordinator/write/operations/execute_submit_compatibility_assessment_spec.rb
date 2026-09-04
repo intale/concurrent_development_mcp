@@ -31,7 +31,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCompatibilityAssessm
     expect(command_events(input.fetch(:command_id))).to be_empty
   end
 
-  it "emits immediate satisfied and failed sibling outcomes from the same command" do
+  it "records evidence before the process manager derives satisfied and failed outcomes" do
     satisfied, satisfied_claim = claimed_obligation(
       "evidence-satisfied",
       required_evidence: %w[combined_tests contract_compatibility_review]
@@ -49,17 +49,19 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCompatibilityAssessm
     )
     expect(execute(first).value!.data.status).to eq("open")
     satisfied_completion = execute(second).value!
+    satisfied_trigger = evidence_events(satisfied).last
+    process_outcome(satisfied_trigger)
 
-    expect(satisfied_completion.data.status).to eq("satisfied")
+    expect(satisfied_completion.data.status).to eq("open")
     satisfied_events = evidence_events(satisfied)
     expect(satisfied_events.map(&:type)).to eq([
       "VerificationEvidenceSubmitted",
       "VerificationEvidenceSubmitted",
+      "VerificationObligationEvidenceSelected",
+      "VerificationObligationEvidenceSelected",
       "VerificationObligationSatisfied"
     ])
-    root_outputs = satisfied_events.last(2) + command_events(second.fetch(:command_id))
-    expect(root_outputs.map(&:correlation_id).uniq.length).to eq(1)
-    expect(root_outputs.map(&:causation_id).uniq).to eq([ nil ])
+    expect(satisfied_events.drop(2).map(&:correlation_id).uniq).to eq([ satisfied_trigger.correlation_id ])
 
     failed, failed_claim = claimed_obligation(
       "evidence-failed",
@@ -73,10 +75,12 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCompatibilityAssessm
       conclusion: "failed"
     )
     failed_completion = execute(failure_input).value!
+    process_outcome(evidence_events(failed).sole)
 
-    expect(failed_completion.data.status).to eq("failed")
+    expect(failed_completion.data.status).to eq("open")
     expect(evidence_events(failed).map(&:type)).to eq([
       "VerificationEvidenceSubmitted",
+      "VerificationObligationEvidenceSelected",
       "VerificationObligationFailed"
     ])
   end
@@ -156,7 +160,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCompatibilityAssessm
     end
   end
 
-  it "serializes concurrent final evidence so exactly one terminal outcome is written" do
+  it "accepts concurrent evidence and converges process redelivery on one terminal outcome" do
     created, claim = claimed_obligation(
       "evidence-race",
       required_evidence: [ "combined_tests" ]
@@ -175,10 +179,15 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCompatibilityAssessm
       Thread.new { execute(input) }
     end.map(&:value)
 
-    expect(results.count(&:success?)).to eq(1)
-    expect(results.select(&:failure?).sole.failure.code).to eq(:verification_obligation_terminal)
+    expect(results).to all(be_success)
+    evidence_events(created).select { _1.type == "VerificationEvidenceSubmitted" }.each do |event|
+      process_outcome(event)
+      process_outcome(event)
+    end
     expect(evidence_events(created).map(&:type)).to contain_exactly(
       "VerificationEvidenceSubmitted",
+      "VerificationEvidenceSubmitted",
+      "VerificationObligationEvidenceSelected",
       "VerificationObligationSatisfied"
     )
     expect(inputs.flat_map { command_events(_1.fetch(:command_id)) }).to be_empty
@@ -229,6 +238,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCompatibilityAssessm
       result_salt: "terminal-second"
     )
     expect(execute(first)).to be_success
+    process_outcome(evidence_events(terminal).sole)
     expect(execute(second).failure.code).to eq(:verification_obligation_terminal)
 
     denied_commands = %w[
@@ -295,7 +305,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCompatibilityAssessm
       streams.verification_obligation(created.fetch(:result).obligation_id),
       Coordinator::Write::EventReadCriteria.new(
         event_types: %w[
-          VerificationEvidenceSubmitted VerificationObligationSatisfied VerificationObligationFailed
+          VerificationEvidenceSubmitted VerificationObligationEvidenceSelected
+          VerificationObligationSatisfied VerificationObligationFailed
         ],
         maximum_count: 34,
         direction: :asc
@@ -305,5 +316,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCompatibilityAssessm
 
   def command_events(command_id)
     event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
+  end
+
+  def process_outcome(event)
+    Coordinator::Processes::ProcessManagers::VerificationEvidenceOutcome.new(event_store:).call(event)
   end
 end

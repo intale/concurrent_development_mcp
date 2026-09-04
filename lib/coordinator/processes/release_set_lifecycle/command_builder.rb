@@ -9,11 +9,11 @@ module Coordinator::Processes
 
       def rule_version(source)
         case source.payload
-        when Coordinator::Write::Events::RepositoryIntegrationRecordedV1
+        when Coordinator::Write::Events::RepositoryIntegrationRecordedV2
           COMPENSATION_RULE_VERSION if source.payload.outcome == "failed"
-        when Coordinator::Write::Events::ReleaseSetVerificationRecordedV1
+        when Coordinator::Write::Events::ReleaseSetVerificationRecordedV2
           COMPENSATION_RULE_VERSION if source.payload.evidence.outcome == "failed"
-        when Coordinator::Write::Events::ReleaseSetActivatedV1
+        when Coordinator::Write::Events::ReleaseSetActivatedV2
           COMPLETION_RULE_VERSION
         end
       end

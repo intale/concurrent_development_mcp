@@ -7,48 +7,41 @@ module Coordinator::Write
         required(:plan).value(Types.Instance(Domain::EventPlan))
         required(:state).value(Types.Instance(Domain::CandidateObligations::State))
         required(:command).value(Types.Instance(Commands::CreateCandidateCompatibilityObligation))
-        required(:created_at).filled(:string)
       end
 
-      rule(:plan, :state, :command, :created_at) do
-        plan = values[:plan]
+      rule(:plan, :state, :command) do
         state = values[:state]
         command = values[:command]
-        event = plan.events.first
         policy = state.policy.evidence
         reasons = CandidateObligations::Matcher.new.call(source: state.source, target: state.target)
-        valid = plan.writes.length == 1 &&
-                plan.writes.first.stream == StreamFactory.new.verification_obligation(command.obligation_id) &&
-                event.is_a?(Events::VerificationObligationCreatedV1) &&
-                !state.existing && policy && !reasons.empty?
-        unless valid
-          key(:plan).failure("must contain one new exact VerificationObligation creation")
-          next
+        stream = StreamFactory.new.verification_obligation(command.obligation_id)
+        expected = [
+          Events::VerificationObligationCreatedV2.new(
+            obligation_id: command.obligation_id,
+            kind: "candidate_compatibility",
+            enforcement: policy.enforcement,
+            reasons: reasons.map(&:kind),
+            required_evidence: policy.required_evidence
+          ),
+          Events::VerificationObligationAddedToChangeSetV1.new(
+            obligation_id: command.obligation_id,
+            change_set_id: state.source.subject.change_set_id
+          ),
+          Events::VerificationObligationSourceCandidateAssignedV1.new(
+            obligation_id: command.obligation_id,
+            candidate_id: state.source.subject.candidate_id
+          ),
+          Events::VerificationObligationTargetCandidateAssignedV1.new(
+            obligation_id: command.obligation_id,
+            candidate_id: state.target.subject.candidate_id
+          )
+        ]
+        plan = values[:plan]
+        unless !state.existing && policy && !reasons.empty? &&
+               plan.events == expected &&
+               plan.writes.map(&:stream) == Array.new(4, stream)
+          key(:plan).failure("must contain the four exact cohesive obligation facts")
         end
-
-        validity = CandidateObligations::ValidityBuilder.new.call(
-          source: state.source,
-          target: state.target,
-          reasons:,
-          policy:,
-          rule_version: command.rule_version
-        )
-        expected = Events::VerificationObligationCreatedV1.new(
-          obligation_id: command.obligation_id,
-          kind: "candidate_compatibility",
-          status: "open",
-          change_set_id: state.source.subject.change_set_id,
-          source_candidate: state.source.subject,
-          target_candidate: state.target.subject,
-          reasons:,
-          required_evidence: policy.required_evidence,
-          enforcement: policy.enforcement,
-          policy:,
-          validity_input_digest: validity.digest,
-          rule_version: command.rule_version,
-          created_at: values[:created_at]
-        )
-        key(:plan).failure("must preserve the exact obligation decision") unless event == expected
       end
     end
   end

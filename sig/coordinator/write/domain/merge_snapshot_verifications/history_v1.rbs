@@ -2,11 +2,10 @@ module Coordinator::Write::Domain::MergeSnapshotVerifications
   class HistoryV1 < Coordinator::Shared::Value
     Observation: untyped
 
-    attr_reader snapshot: Coordinator::Write::Events::MergeSnapshotRegisteredV1?
-    attr_reader snapshot_event: Coordinator::Write::EventReference?
+    attr_reader snapshot: Coordinator::Write::MergeSnapshots::StateV2?
+    attr_reader assignments: Array[Coordinator::Write::MergeSnapshotVerifications::AssignmentObservationV1]
     attr_reader submissions: Array[Coordinator::Write::MergeSnapshotVerifications::EvidenceObservationV1]
-    attr_reader verified: Coordinator::Write::Events::MergeSnapshotVerifiedV1?
-    attr_reader verified_event: Coordinator::Write::EventReference?
+    attr_reader verified: Coordinator::Write::MergeSnapshotVerifications::VerifiedObservationV2?
 
     def absent?: () -> bool
     def terminal?: () -> bool

@@ -226,6 +226,7 @@ module Coordinator::Write
 
     class CandidateImpactSurface < Value
       attribute :candidate_id, Types::Identifier
+      attribute :surface_id, Types::UuidV7
       attribute :surface_digest, Types::Sha256Digest
       attribute :evidence_revision, Types::CandidateEvidenceRevision
       attribute :evidence_status, Types::CandidateEvidenceStatus
@@ -328,7 +329,7 @@ module Coordinator::Write
     end
 
     class ReleaseSetPreparation < Value
-      Member = ReleaseSets::MemberEvidenceV1
+      Member = ReleaseSets::MemberSummaryV2
 
       attribute :release_set_id, Types::Identifier
       attribute :change_set_id, Types::Identifier

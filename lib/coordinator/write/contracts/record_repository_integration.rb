@@ -36,7 +36,6 @@ module Coordinator::Write
             end
             required(:run_id).filled(:string)
             required(:result_digest).filled(:string)
-            required(:occurred_at).filled(:string)
           end
         end
       end
@@ -82,7 +81,6 @@ module Coordinator::Write
         end
         key.failure("run_id must use the canonical format") unless Types::IDENTIFIER_PATTERN.match?(value.fetch(:run_id))
         key.failure("result_digest must be a SHA-256 digest") unless Types::SHA256_DIGEST_PATTERN.match?(value.fetch(:result_digest))
-        key.failure("occurred_at must be a UTC timestamp with microseconds") unless Types::TIMESTAMP_PATTERN.match?(value.fetch(:occurred_at))
       end
     end
   end

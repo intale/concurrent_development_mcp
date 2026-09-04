@@ -13,7 +13,7 @@ module Coordinator::Processes
           ),
           Coordinator::Shared::Subscriptions::StreamFilter.new(
             context: "DevelopmentIntegration",
-            stream_name: "CandidateImpactRegistry"
+            stream_name: "Candidate"
           ),
           Coordinator::Shared::Subscriptions::StreamFilter.new(
             context: "DevelopmentIntegration",
@@ -26,7 +26,9 @@ module Coordinator::Processes
         ],
         event_types: %w[
           DecisionPartitionAdvanced
-          CandidateImpactSurfaceRegistered
+          DecisionAddedToPartition
+          DecisionRemovedFromPartition
+          CandidateImpactSurfaceAssigned
           CandidateImpactRegistrySweepStarted
           CandidateImpactRegistrySweepProgressed
           CandidateImpactPairScanStarted

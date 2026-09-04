@@ -14,14 +14,14 @@ module Coordinator::Write
     def read(reference, criteria)
       stream = @pg_stream_factory.call(reference)
 
-      events = @client.read(
-        stream,
-        options: {
-          direction: criteria.direction,
-          max_count: criteria.query_max_count,
-          filter: { event_types: criteria.event_types }
-        }
-      )
+      options = {
+        direction: criteria.direction,
+        max_count: criteria.query_max_count,
+        filter: { event_types: criteria.event_types }
+      }
+      options[:from_revision] = criteria.from_revision unless criteria.from_revision.nil?
+      options[:to_revision] = criteria.to_revision unless criteria.to_revision.nil?
+      events = @client.read(stream, options:)
       return events if events.length <= criteria.maximum_count
 
       raise EventHistoryLimitExceeded,

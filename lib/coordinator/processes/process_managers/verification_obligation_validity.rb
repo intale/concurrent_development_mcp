@@ -6,7 +6,8 @@ module Coordinator::Processes
       HANDLED_START_CODES = [ :verification_obligation_validity_scan_already_decided ].freeze
       HANDLED_PROGRESS_CODES = [
         :verification_obligation_validity_scan_not_running,
-        :verification_obligation_validity_scan_checkpoint_changed
+        :verification_obligation_validity_scan_checkpoint_changed,
+        :stale_stream
       ].freeze
       HANDLED_INVALIDATION_CODES = [
         :verification_obligation_already_invalidated,
@@ -17,6 +18,7 @@ module Coordinator::Processes
         event_store:,
         source_builder: Coordinator::Processes::VerificationObligationValidity::SourceBuilder.new(event_store:),
         partition_loader: Coordinator::Processes::VerificationObligationValidity::CurrentPartitionLoader.new(event_store:),
+        definition_loader: Coordinator::Write::VerificationObligations::DefinitionLoader.new(event_store:),
         checkpoint_loader: Coordinator::Processes::VerificationObligationValidity::CheckpointLoader.new(event_store:),
         page_reader: Coordinator::Processes::VerificationObligationValidity::PageReader.new(event_store:),
         command_builder: Coordinator::Processes::VerificationObligationValidity::CommandBuilder.new(event_store:),
@@ -26,6 +28,7 @@ module Coordinator::Processes
       )
         @source_builder = source_builder
         @partition_loader = partition_loader
+        @definition_loader = definition_loader
         @checkpoint_loader = checkpoint_loader
         @page_reader = page_reader
         @command_builder = command_builder
@@ -37,12 +40,14 @@ module Coordinator::Processes
       def call(event)
         source = @source_builder.call(event)
         case source.payload
-        when Coordinator::Write::Events::DecisionPartitionAdvancedV1
+        when Coordinator::Write::Events::DecisionPartitionAdvancedV1,
+             Coordinator::Write::Events::DecisionAddedToPartitionV1,
+             Coordinator::Write::Events::DecisionRemovedFromPartitionV1
           start_scan(source) if candidate_partition?(source.payload)
-        when Coordinator::Write::Events::VerificationObligationCreatedV1
+        when Coordinator::Write::Events::VerificationObligationCreatedV2
           repair_creation(source)
-        when Coordinator::Write::Events::VerificationObligationValidityScanStartedV1,
-             Coordinator::Write::Events::VerificationObligationValidityScanProgressedV1
+        when Coordinator::Write::Events::VerificationObligationValidityScanStartedV2,
+             Coordinator::Write::Events::VerificationObligationValidityScanProgressedV2
           process_page(source)
         end
         nil
@@ -51,6 +56,9 @@ module Coordinator::Processes
       private
 
       def start_scan(source)
+        current = @partition_loader.call(change_set_id(source.payload))
+        return unless current&.reference == source.reference
+
         execute!(
           @start_scan.call(@command_builder.start(source)),
           handled_codes: HANDLED_START_CODES,
@@ -59,9 +67,13 @@ module Coordinator::Processes
       end
 
       def repair_creation(source)
-        partition = @partition_loader.call(source.payload.change_set_id)
+        loaded = @definition_loader.call(source.payload.obligation_id)
+        return unless loaded&.reference == source.reference
+
+        definition = loaded.definition
+        partition = @partition_loader.call(definition.change_set_id)
         return unless partition
-        return if partition.reference == source.payload.policy.partition_event
+        return if partition.reference == definition.policy.partition_event
 
         invalidate(
           obligation_event: source.event,
@@ -106,10 +118,20 @@ module Coordinator::Processes
       end
 
       def candidate_partition?(partition_event)
-        partition = partition_event.partition
-        partition.topic_root == "candidate" &&
-          partition.anchor_kind == "changeset" &&
-          partition.partition_id == "changeset:#{partition.anchor_id}:candidate"
+        if partition_event.is_a?(Coordinator::Write::Events::DecisionPartitionAdvancedV1)
+          partition = partition_event.partition
+          partition.topic_root == "candidate" &&
+            partition.anchor_kind == "changeset" &&
+            partition.partition_id == "changeset:#{partition.anchor_id}:candidate"
+        else
+          /\Achangeset:[^:]+:candidate\z/.match?(partition_event.partition_id)
+        end
+      end
+
+      def change_set_id(partition_event)
+        return partition_event.partition.anchor_id if partition_event.is_a?(Coordinator::Write::Events::DecisionPartitionAdvancedV1)
+
+        partition_event.partition_id.delete_prefix("changeset:").delete_suffix(":candidate")
       end
 
       def execute!(result, handled_codes:, transition:)

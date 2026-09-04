@@ -1,0 +1,31 @@
+module Coordinator::Processes
+  module ProcessManagers
+    class VerificationEvidenceOutcome
+      @schema_registry: untyped
+
+      @state_loader: untyped
+
+      @selector: untyped
+
+      @process_step_planner: untyped
+
+      @satisfy: untyped
+
+      @fail_obligation: untyped
+
+      RULE_VERSION: "verification-evidence-outcome/v1"
+
+      HANDLED_CODES: ::Array[:verification_obligation_terminal | :verification_obligation_not_satisfied | :verification_obligation_not_failed]
+
+      def initialize: (event_store: untyped, ?schema_registry: untyped, ?state_loader: untyped, ?selector: untyped, ?process_step_planner: untyped, ?satisfy: untyped, ?fail_obligation: untyped) -> void
+
+      def call: (untyped event) -> (nil | untyped)
+
+      private
+
+      def load_evidence: (untyped event) -> untyped
+
+      def build_command: (untyped command_id, untyped evidence, untyped decision) -> untyped
+    end
+  end
+end

@@ -35,30 +35,33 @@ module ReleaseSetScenario
     event = event_store.read(
       streams.release_set(input.fetch(:release_set_id)),
       Coordinator::Write::EventQueries::RELEASE_SET_PREPARATION
-    ).sole
-    { input:, completion:, event:, payload: load(event), dependency: }
+    ).find { _1.type == "ReleaseSetPrepared" }
+    { input:, completion:, event:, payload: completion.data, dependency: }
   end
 
   def observe_member(prepared, index:, prefix:)
-    member = prepared.fetch(:payload).ordered_members.fetch(index)
+    member = prepared.fetch(:input).fetch(:ordered_members).fetch(index)
+    snapshot = Coordinator::Write::MergeSnapshots::StateLoader.new(event_store:).call(
+      member.fetch(:merge_snapshot_id)
+    )
     input = {
       command_id: "cmd-release-observe-#{prefix}-#{index + 1}",
       actor: { kind: "agent", id: "release-integrator-1" },
-      merge_snapshot_id: member.merge_snapshot_id,
-      authorization_event: member.authorization_event.to_h,
-      authorization_decision_digest: member.authorization_decision_digest,
-      repository_id: member.repository_id,
-      target_branch: member.target_branch,
-      object_format: member.object_format,
-      target_before_commit_oid: member.target_base_commit_oid,
-      target_after_commit_oid: member.merge_commit_oid,
+      merge_snapshot_id: member.fetch(:merge_snapshot_id),
+      authorization_event: member.fetch(:authorization_event),
+      authorization_decision_digest: member.fetch(:authorization_decision_digest),
+      repository_id: member.fetch(:repository_id),
+      target_branch: member.fetch(:target_branch),
+      object_format: member.fetch(:object_format),
+      target_before_commit_oid: snapshot.target_base_commit_oid,
+      target_after_commit_oid: snapshot.merge_commit_oid,
       observer: { name: "release-adapter", version: "1.0.0" },
       run_id: "release-observation-#{prefix}-#{index + 1}",
       observed_at: "2026-08-24T19:00:0#{index}.000000Z"
     }
     completion = execute(Coordinator::Write::Operations::ExecuteRecordMergeObservation, input)
     event = event_store.read(
-      streams.merge_snapshot(member.merge_snapshot_id),
+      streams.merge_snapshot(member.fetch(:merge_snapshot_id)),
       Coordinator::Write::EventQueries::MERGE_OBSERVATION
     ).sole
     { input:, completion:, event:, payload: load(event) }
@@ -74,12 +77,14 @@ module ReleaseSetScenario
       attempt_id: "release-attempt-#{prefix}-#{index + 1}",
       outcome: observation ? "integrated" : "failed",
       merge_observation_event: observation&.dig(:completion)&.data&.observation_event&.to_h,
-      observation_digest: observation&.dig(:payload)&.observation_digest,
+      observation_digest: observation&.dig(:completion)&.data&.observation_digest,
       failure: failure
     }
     completion = execute(Coordinator::Write::Operations::ExecuteRecordRepositoryIntegration, input)
-    event = release_lifecycle_events(prepared.dig(:input, :release_set_id)).last
-    { input:, completion:, event:, payload: load(event) }
+    event = release_lifecycle_events(prepared.dig(:input, :release_set_id)).reverse.find do |candidate|
+      candidate.type == "RepositoryIntegrationRecorded" && candidate.id == completion.data.integration_event.event_id
+    end
+    { input:, completion:, event:, payload: completion.data }
   end
 
   def integrate_all(prepared, prefix:)
@@ -106,8 +111,10 @@ module ReleaseSetScenario
       }
     }
     completion = execute(Coordinator::Write::Operations::ExecuteRecordReleaseSetVerification, input)
-    event = release_lifecycle_events(prepared.dig(:input, :release_set_id)).last
-    { input:, completion:, event:, payload: load(event) }
+    event = release_lifecycle_events(prepared.dig(:input, :release_set_id)).reverse.find do |candidate|
+      candidate.type == "ReleaseSetVerificationRecorded" && candidate.id == completion.data.verification_event.event_id
+    end
+    { input:, completion:, event:, payload: completion.data }
   end
 
   def record_activation(prepared, verification:, prefix:)
@@ -123,20 +130,19 @@ module ReleaseSetScenario
         external_reference: "deployments/#{prefix}",
         state_digest: "sha256:#{'a' * 64}",
         producer: { name: "deployment-controller", version: "1.0.0" },
-        run_id: "release-activation-#{prefix}",
-        activated_at: "2026-08-24T21:00:00.000000Z"
+        run_id: "release-activation-#{prefix}"
       }
     }
     completion = execute(Coordinator::Write::Operations::ExecuteRecordReleaseSetActivation, input)
     event = release_lifecycle_events(prepared.dig(:input, :release_set_id)).last
-    { input:, completion:, event:, payload: load(event) }
+    { input:, completion:, event:, payload: completion.data }
   end
 
   def complete_compensation(prepared, request:, prefix:)
     state = Coordinator::Write::ReleaseSets::HistoryLoader.new(event_store:).call(
       prepared.dig(:input, :release_set_id)
     )
-    evidence = request.fetch(:payload).successful_integrations.map.with_index do |reference, index|
+    evidence = state.compensation_request.successful_integrations.map.with_index do |reference, index|
       integration = state.integrations.find { _1.event == reference }
       {
         repository_id: integration.payload.repository_id,
@@ -145,8 +151,7 @@ module ReleaseSetScenario
         external_reference: "reverts/#{prefix}/#{index + 1}",
         result_digest: "sha256:#{(index + 5).to_s * 64}",
         producer: { name: "release-reverter", version: "1.0.0" },
-        run_id: "release-compensation-#{prefix}-#{index + 1}",
-        compensated_at: "2026-08-24T22:00:0#{index}.000000Z"
+        run_id: "release-compensation-#{prefix}-#{index + 1}"
       }
     end
     input = {
@@ -158,7 +163,7 @@ module ReleaseSetScenario
     }
     completion = execute(Coordinator::Write::Operations::ExecuteCompleteCompensatedReleaseSet, input)
     event = release_lifecycle_events(prepared.dig(:input, :release_set_id)).last
-    { input:, completion:, event:, payload: load(event) }
+    { input:, completion:, event:, payload: completion.data }
   end
 
   def authorized_members(prefix:, dependency: nil, omit_completed_member: false)

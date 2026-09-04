@@ -1,0 +1,39 @@
+module Coordinator::Write
+  module Domain
+    module ReleaseSets
+      class LifecycleStateV2 < Coordinator::Shared::Value
+        Integration: untyped
+
+        Verification: untyped
+
+        Activation: untyped
+
+        CompensationRequest: untyped
+
+        Completion: untyped
+
+        def member: (untyped repository_id) -> untyped
+
+        def integrations_for: (untyped repository_id) -> untyped
+
+        def latest_integration: (untyped repository_id) -> untyped
+
+        def integrated?: (untyped repository_id) -> untyped
+
+        def all_integrated?: () -> untyped
+
+        def successful_integrations: () -> (::Array[untyped] | untyped)
+
+        def latest_verification: () -> untyped
+
+        def verified?: () -> untyped
+
+        def activated?: () -> untyped
+
+        def compensation_requested?: () -> untyped
+
+        def completed?: () -> untyped
+      end
+    end
+  end
+end

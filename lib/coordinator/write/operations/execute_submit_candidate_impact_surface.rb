@@ -13,11 +13,11 @@ module Coordinator::Write
         clock: SystemClock.new,
         id_generator: IdGenerator.new,
         event_factory: EventFactory.new,
-        schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
         index_marker_builder: Candidates::ImpactIndexMarkerBuilder.new,
         completion_builder: CommandResultBuilder.new,
-        event_plan_contract: Contracts::CandidateImpactSurfaceEventPlan.new
+        event_plan_contract: Contracts::CandidateImpactSurfaceEventPlan.new,
+        candidate_state_loader: Candidates::StateLoader.new(event_store:)
       )
         @event_store = event_store
         @preparer = preparer
@@ -26,11 +26,11 @@ module Coordinator::Write
         @clock = clock
         @id_generator = id_generator
         @event_factory = event_factory
-        @schema_registry = schema_registry
         @stream_factory = stream_factory
         @index_marker_builder = index_marker_builder
         @completion_builder = completion_builder
         @event_plan_contract = event_plan_contract
+        @candidate_state_loader = candidate_state_loader
       end
 
       def call(input)
@@ -51,6 +51,7 @@ module Coordinator::Write
         PreparedCandidateImpactSurfaceSubmission.new(
           derived_at: @clock.now,
           input_digest: @input_digest.candidate_impact_surface_submit(command),
+          surface_id: @id_generator.uuid_v7,
           surface_event_id: @id_generator.uuid_v7,
           registration_event_id: @id_generator.uuid_v7,
         )
@@ -58,26 +59,22 @@ module Coordinator::Write
 
       def execute_attempt(command:, prepared:, caused_by:)
         state = load_state(command.candidate_id)
-        surface_event = future_surface_reference(command, state, prepared.surface_event_id)
         decision = @decider.call(
           state:,
           command:,
-          surface_event:,
-          derived_at: prepared.derived_at
+          surface_id: prepared.surface_id
         )
         return decision if decision.failure?
 
         plan = apply_event_plan_contract(
           decision.value!,
-          state:,
           command:,
-          surface_event:,
-          derived_at: prepared.derived_at
+          surface_id: prepared.surface_id
         )
         persisted_events = persist_domain_plan(plan, state:, command:, prepared:, caused_by:)
         completion = @completion_builder.candidate_impact_surface_submit(
           command:,
-          surface: plan.events.fetch(0),
+          surface_id: prepared.surface_id,
           input_digest: prepared.input_digest,
           persisted_events:,
           completed_at: prepared.derived_at
@@ -87,62 +84,19 @@ module Coordinator::Write
       end
 
       def load_state(candidate_id)
-        submission = nil
-        submission_event = nil
-        manifest = nil
-        manifest_event = nil
-        build_context = nil
-        build_context_event = nil
-        existing_surface = nil
-        @event_store.read_grouped(
-          @stream_factory.candidate(candidate_id),
-          EventQueries::CANDIDATE_FOR_IMPACT_SURFACE
-        ).each do |event|
-          case event.type
-          when "CandidateSubmitted"
-            submission = load_event(event)
-            submission_event = event_reference(event)
-          when "CandidateChangeManifestCaptured"
-            manifest = load_event(event)
-            manifest_event = event_reference(event)
-          when "CandidateBuildContextCaptured"
-            build_context = load_event(event)
-            build_context_event = event_reference(event)
-          when "CandidateImpactSurfaceDerived" then existing_surface = event_reference(event)
-          end
-        end
-
-        evidence = if submission && manifest
-          Candidates::ImpactSurfaceEvidenceV1.new(
-            submission:,
-            submission_event:,
-            manifest:,
-            manifest_event:,
-            build_context:,
-            build_context_event:
-          )
-        end
+        candidate = @candidate_state_loader.call(candidate_id)
+        evidence = candidate && Candidates::ImpactSurfaceEvidenceV2.new(candidate:)
         Domain::Candidates::ImpactSurfaceState.new(
           evidence:,
-          existing_surface:
+          existing_surface: candidate&.surface_assignment_event
         )
       end
 
-      def load_event(event)
-        @schema_registry.load(
-          type: event.type,
-          schema_version: event.metadata.fetch("schema_version"),
-          data: event.data
-        )
-      end
-
-      def apply_event_plan_contract(plan, state:, command:, surface_event:, derived_at:)
+      def apply_event_plan_contract(plan, command:, surface_id:)
         result = @event_plan_contract.call(
           plan:,
-          state:,
           command:,
-          surface_event:,
-          derived_at:
+          surface_id:
         )
         return plan if result.success?
 
@@ -150,13 +104,13 @@ module Coordinator::Write
       end
 
       def persist_domain_plan(plan, state:, command:, prepared:, caused_by:)
-        surface = plan.events.fetch(0)
         event_ids = [ prepared.surface_event_id, prepared.registration_event_id ]
+        surface = plan.events.fetch(0)
         plan.writes.zip(event_ids).map do |write, event_id|
           event = @event_factory.build!(
             event: write.event,
             event_id:,
-            metadata: command_metadata(command),
+            metadata: event_metadata(write.event, command),
             markers: markers_for(write.event, command:, state:, surface:),
             caused_by:
           )
@@ -165,29 +119,33 @@ module Coordinator::Write
       end
 
       def markers_for(event, command:, state:, surface:)
+        candidate = state.evidence.candidate
         markers = [
           "candidate:#{command.candidate_id}",
-          "change-set:#{surface.change_set_id}",
-          "work-item:#{surface.work_item_id}",
-          "attempt:#{surface.attempt_id}",
+          "change-set:#{candidate.change_set_id}",
+          "work-item:#{candidate.work_item_id}",
+          "attempt:#{candidate.attempt_id}",
           "repository:#{command.repository_id}",
           "head-commit-oid:#{command.head_commit_oid}",
           "command:#{command.command_id}"
         ]
-        if event.is_a?(Events::CandidateImpactSurfaceRegisteredV1)
+        if event.is_a?(Events::CandidateImpactSurfaceAssignedV1)
           markers.concat(@index_marker_builder.call(evidence: state.evidence, surface:))
         end
         markers.freeze
       end
 
-      def future_surface_reference(command, state, event_id)
-        EventReference.new(
-          event_id:,
-          type: "CandidateImpactSurfaceDerived",
-          stream_context: "DevelopmentIntegration",
-          stream_name: "Candidate",
-          stream_id: command.candidate_id,
-          stream_revision: state.evidence ? state.evidence.next_candidate_revision : 0
+      def event_metadata(event, command)
+        attributes = command_metadata(command).to_h
+        return EventMetadata.new(**attributes, policy_version: nil) unless event.is_a?(Events::CandidateImpactSurfaceDerivedV2)
+
+        Metadata::CandidateImpactSurfaceV2.new(
+          **attributes,
+          policy_version: command.surface.policy_version,
+          analyzer: command.surface.analyzer,
+          manifest_digest: command.manifest_digest,
+          build_context_digest: command.build_context_digest,
+          surface_digest: command.surface.digest
         )
       end
 
@@ -197,7 +155,7 @@ module Coordinator::Write
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
-          policy_version: Candidates::ImpactSurfaceDocumentV1::SCHEMA
+          policy_version: nil
         )
       end
 

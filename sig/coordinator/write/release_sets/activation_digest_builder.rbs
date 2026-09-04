@@ -1,6 +1,6 @@
 module Coordinator::Write::ReleaseSets
   class ActivationDigestBuilder
     def initialize: (?canonical_json: Coordinator::Shared::CanonicalJson) -> void
-    def call: (release_set_id: String, release_digest: String, verification_event: Coordinator::Write::EventReference, verification_digest: String, activation_point: ActivationPointV1, policy_version: String) -> String
+    def call: (release_set_id: String, release_digest: String, verification_event: Coordinator::Write::EventReference, verification_digest: String, activation_point: ActivationPointV2, policy_version: String) -> String
   end
 end

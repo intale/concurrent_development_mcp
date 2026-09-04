@@ -1,0 +1,19 @@
+module Coordinator::Write
+  module Domain
+    module MergeSnapshotVerifications
+      class Verify
+        @stream_factory: untyped
+
+        def initialize: (?stream_factory: untyped) -> void
+
+        def call: (history: untyped, command: untyped) -> untyped
+
+        private
+
+        def qualifying?: (untyped assessment) -> untyped
+
+        def error: (untyped code, untyped message, untyped command) -> untyped
+      end
+    end
+  end
+end

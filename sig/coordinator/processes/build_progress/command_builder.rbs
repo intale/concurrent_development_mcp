@@ -3,7 +3,7 @@ module Coordinator::Processes::BuildProgress
     ACTOR: Coordinator::Write::Commands::Actor
     RULE_VERSION: String
     def initialize: (?compound_marker_builder: Coordinator::Shared::CompoundMarkerBuilder) -> void
-    def call: (source: SourceV1, dependency: Coordinator::Write::Events::WorkItemDependencyDeclaredV1, command_id: String) -> Coordinator::Write::Commands::SatisfyWorkItemDependency
+    def call: (source: SourceV1, dependency: Coordinator::Write::Domain::ChangeSets::Dependency, command_id: String) -> Coordinator::Write::Commands::SatisfyWorkItemDependency
     def completion: (source: SourceV1, command_id: String) -> Coordinator::Write::Commands::CompleteChangeSet
   end
 end

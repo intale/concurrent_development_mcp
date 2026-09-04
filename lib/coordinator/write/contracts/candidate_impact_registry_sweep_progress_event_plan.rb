@@ -14,23 +14,19 @@ module Coordinator::Write
         plan = values[:plan]
         command = values[:command]
         state = values[:state]
-        unless plan.writes.length == 1 && plan.writes.first.stream == values[:expected_stream]
-          key(:plan).failure("must contain one write to the registry-sweep stream")
-          next
+        event = plan.events.first
+        valid = plan.writes.one? && plan.writes.first.stream == values[:expected_stream] &&
+          event&.scan_id == command.scan_id
+        valid &&= if command.has_more
+          event.is_a?(Events::CandidateImpactRegistrySweepProgressedV2) &&
+            event.page_number == state.page_count + 1 &&
+            event.next_from_revision == command.last_processed_revision + 1 &&
+            event.change_set_id == state.change_set_id && event.to_revision == state.to_revision &&
+            event.page_size == state.page_size
+        else
+          event.is_a?(Events::CandidateImpactRegistrySweepCompletedV2)
         end
-
-        event = plan.writes.first.event
-        expected_class = command.has_more ? Events::CandidateImpactRegistrySweepProgressedV1 : Events::CandidateImpactRegistrySweepCompletedV1
-        common = event.is_a?(expected_class) && event.scan_id == command.scan_id &&
-                 event.policy_partition_event == command.policy_partition_event &&
-                 event.policy_head == command.policy_head &&
-                 event.started_event == state.started_event &&
-                 event.previous_checkpoint == command.expected_checkpoint &&
-                 event.previous_from_revision == command.previous_from_revision &&
-                 event.to_revision == state.to_revision &&
-                 event.page_registration_count == command.page_registration_count &&
-                 event.rule_version == command.rule_version
-        key(:plan).failure("event must retain the exact registry-sweep checkpoint evidence") unless common
+        key(:plan).failure("must contain one exact registry-sweep progress or completion fact") unless valid
       end
     end
   end

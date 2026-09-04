@@ -48,7 +48,10 @@ module Coordinator::Write
           hash do
             required(:partition_event).hash do
               required(:event_id).filled(:string)
-              required(:type).filled(:string, eql?: "DecisionPartitionAdvanced")
+              required(:type).filled(
+                :string,
+                included_in?: %w[DecisionPartitionAdvanced DecisionAddedToPartition DecisionRemovedFromPartition]
+              )
               required(:stream_context).filled(:string, eql?: "HumanGuidance")
               required(:stream_name).filled(:string, eql?: "DecisionPartition")
               required(:stream_id).filled(:string)

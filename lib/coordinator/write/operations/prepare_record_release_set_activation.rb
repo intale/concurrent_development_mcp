@@ -22,7 +22,7 @@ module Coordinator::Write
           release_set_id: attributes.fetch(:release_set_id),
           verification_event: EventReference.new(attributes.fetch(:verification_event)),
           verification_digest: attributes.fetch(:verification_digest),
-          activation_point: ReleaseSets::ActivationPointV1.new(
+          activation_point: ReleaseSets::ActivationPointV2.new(
             **point,
             producer: ReleaseSets::EvidenceProducerV1.new(point.fetch(:producer))
           ),

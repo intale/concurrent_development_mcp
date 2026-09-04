@@ -10,6 +10,7 @@ module Coordinator::Write
         preparer: PrepareReleaseSet.new,
         member_loader: ReleaseSets::MemberLoader.new(event_store:),
         decider: Domain::ReleaseSets::Prepare.new,
+        release_digest_builder: ReleaseSets::ReleaseDigestBuilder.new,
         input_digest: CommandInputDigest.new,
         clock: SystemClock.new,
         id_generator: IdGenerator.new,
@@ -23,6 +24,7 @@ module Coordinator::Write
         @preparer = preparer
         @member_loader = member_loader
         @decider = decider
+        @release_digest_builder = release_digest_builder
         @input_digest = input_digest
         @clock = clock
         @id_generator = id_generator
@@ -51,7 +53,7 @@ module Coordinator::Write
         ReleaseSetPreparationV1.new(
           prepared_at: @clock.now,
           input_digest: @input_digest.release_set_prepare(command),
-          prepared_event_id: @id_generator.uuid_v7,
+          event_ids: (command.ordered_members.length + 3).times.map { @id_generator.uuid_v7 },
           correlation_id: @id_generator.uuid_v7
         )
       end
@@ -77,40 +79,69 @@ module Coordinator::Write
           existing_preparation: existing && event_reference(existing),
           ordered_members: members
         )
-        decision = @decider.call(state:, command:, prepared_at: preparation.prepared_at)
+        decision = @decider.call(state:, command:)
         return decision if decision.failure?
 
         plan = decision.value!
-        verify_event_plan!(plan, state:, command:, prepared_at: preparation.prepared_at)
-        prepared = plan.events.sole
-        persisted = persist_preparation(prepared, command:, preparation:, caused_by:)
+        verify_event_plan!(plan, state:, command:)
+        change_set_id = state.ordered_members.map(&:change_set_id).uniq.sole
+        release_digest = @release_digest_builder.call(
+          release_set_id: command.release_set_id,
+          change_set_id:,
+          ordered_members: state.ordered_members,
+          policy_version: command.policy_version
+        )
+        persisted = persist_plan(
+          plan,
+          state:,
+          command:,
+          preparation:,
+          release_digest:,
+          caused_by:
+        )
+        prepared_index = state.ordered_members.length + 1
         completion = @completion_builder.release_set_prepare(
           command:,
-          preparation: prepared,
+          change_set_id:,
+          ordered_members: state.ordered_members.map do |member|
+            ReleaseSets::MemberSummaryV2.new(
+              position: member.position,
+              repository_id: member.repository_id,
+              candidate_id: member.ordered_candidates.sole.candidate_id
+            )
+          end,
+          release_digest:,
+          prepared_event: persisted.fetch(prepared_index),
           input_digest: preparation.input_digest,
-          persisted_events: [ persisted ],
+          persisted_events: persisted,
           completed_at: preparation.prepared_at
         )
         Success(completion)
       end
 
-      def verify_event_plan!(plan, state:, command:, prepared_at:)
-        result = @event_plan_contract.call(plan:, state:, command:, prepared_at:)
+      def verify_event_plan!(plan, state:, command:)
+        result = @event_plan_contract.call(plan:, state:, command:)
         return if result.success?
 
         raise InvalidReleaseSetPreparationEventPlan, result.errors.to_h.inspect
       end
 
-      def persist_preparation(event, command:, preparation:, caused_by:)
-        physical = @event_factory.build!(
-          event:,
-          event_id: preparation.prepared_event_id,
-          metadata: command_metadata(command),
-          markers: event_markers(command, event),
-          caused_by:,
-          correlation_id: root_correlation_id(preparation, caused_by)
-        )
-        @event_store.append(@stream_factory.release_set(command.release_set_id), [ physical ]).sole
+      def persist_plan(plan, state:, command:, preparation:, release_digest:, caused_by:)
+        parent = caused_by
+        correlation_id = caused_by&.correlation_id || preparation.correlation_id
+        plan.writes.zip(preparation.event_ids).map do |write, event_id|
+          physical = @event_factory.build!(
+            event: write.event,
+            event_id:,
+            metadata: event_metadata(write.event, command, release_digest),
+            markers: event_markers(command, state),
+            caused_by: parent,
+            correlation_id:
+          )
+          persisted = @event_store.append(write.stream, [ physical ]).sole
+          parent = persisted
+          persisted
+        end
       end
 
       def load_event(event)
@@ -132,13 +163,14 @@ module Coordinator::Write
         )
       end
 
-      def event_markers(command, event)
+      def event_markers(command, state)
+        change_set_id = state.ordered_members.map(&:change_set_id).uniq.sole
         [
           "release-set:#{command.release_set_id}",
-          "change-set:#{event.change_set_id}",
+          "change-set:#{change_set_id}",
           "release-set-policy:#{command.policy_version}",
           "command:#{command.command_id}",
-          *event.ordered_members.flat_map do |member|
+          *state.ordered_members.flat_map do |member|
             [
               "repository:#{member.repository_id}",
               "merge-snapshot:#{member.merge_snapshot_id}",
@@ -152,14 +184,19 @@ module Coordinator::Write
         preparation.correlation_id unless caused_by
       end
 
-      def command_metadata(command)
-        EventMetadata.new(
+      def event_metadata(event, command, release_digest)
+        attributes = {
           command_id: command.command_id,
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
           policy_version: command.policy_version
-        )
+        }
+        if event.is_a?(Events::ReleaseSetPreparedV2)
+          Metadata::ReleaseSetPreparedV2.new(**attributes, release_digest:)
+        else
+          EventMetadata.new(**attributes)
+        end
       end
     end
   end

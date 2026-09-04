@@ -10,19 +10,14 @@ module Coordinator::Write
           @stream_factory = stream_factory
         end
 
-        def call(command:, evaluation:, authorization_id:, input_digest:, decision_digest:, decided_at:)
+        def call(command:, evaluation:, authorization_id:)
           event_class = evaluation.granted? ?
-            Events::MergeAuthorizationGrantedV1 : Events::MergeAuthorizationDeniedV1
+            Events::MergeAuthorizationGrantedV2 : Events::MergeAuthorizationDeniedV2
           event = event_class.new(
             authorization_id:,
             merge_snapshot_id: command.merge_snapshot_id,
-            policy_version: command.policy_version,
             snapshot_binding: command.snapshot_binding,
-            expected_impact_policy: command.expected_impact_policy,
-            evaluation:,
-            input_digest:,
-            decision_digest:,
-            decided_at:
+            evaluation:
           )
           Success(
             EventPlan.new(

@@ -17,7 +17,8 @@ module Coordinator::Write
         stream_factory: StreamFactory.new,
         completion_builder: CommandResultBuilder.new,
         event_plan_contract: Contracts::WorkItemCompletionEventPlan.new,
-        change_set_state_loader: ChangeSets::StateLoader.new(event_store:)
+        change_set_state_loader: ChangeSets::StateLoader.new(event_store:),
+        candidate_state_loader: Candidates::StateLoader.new(event_store:)
       )
         @event_store = event_store
         @preparer = preparer
@@ -31,6 +32,7 @@ module Coordinator::Write
         @completion_builder = completion_builder
         @event_plan_contract = event_plan_contract
         @change_set_state_loader = change_set_state_loader
+        @candidate_state_loader = candidate_state_loader
       end
 
       def call(input)
@@ -56,9 +58,8 @@ module Coordinator::Write
       end
 
       def execute_attempt(command:, prepared:, caused_by:)
-        candidate_event = load_candidate_event(command.candidate_id)
-        candidate = candidate_event && load_event(candidate_event)
-        candidate_reference = candidate_event && event_reference(candidate_event)
+        candidate = @candidate_state_loader.call(command.candidate_id)
+        candidate_reference = candidate&.submission_event
         decision = @decider.call(
           change_set_state: load_change_set_state(command.change_set_id),
           work_item_state: load_work_item_state(command.work_item_id),
@@ -110,13 +111,6 @@ module Coordinator::Write
         )
         events = SpecificStreamEventSequence.merge(membership, lifecycle.reverse)
         Domain::Attempts::State.reduce(events.map { load_event(_1) })
-      end
-
-      def load_candidate_event(candidate_id)
-        @event_store.read(
-          @stream_factory.candidate(candidate_id),
-          EventQueries::CANDIDATE_FOR_WORK_ITEM_COMPLETION
-        ).first
       end
 
       def load_event(event)

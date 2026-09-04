@@ -18,12 +18,12 @@ module Coordinator::Write
       end
 
       def call(requested, position:, actor:, command_id:, evaluated_at:)
-        authorization, reference = load_authorization(requested.authorization_event)
+        authorization = load_authorization(requested.authorization_event)
         return failure(:release_member_authorization_not_found, "Exact merge authorization grant was not found") unless authorization
-        return failure(:release_member_authorization_binding_stale, "Authorization binding does not match the requested member") unless authorization_matches?(authorization, reference, requested)
+        return failure(:release_member_authorization_binding_stale, "Authorization binding does not match the requested member") unless authorization_matches?(authorization, requested)
 
         evaluation = reevaluate(authorization, actor:, command_id:, evaluated_at:)
-        return stale(evaluation) unless evaluation.granted? && evaluation == authorization.evaluation
+        return stale(evaluation) unless evaluation.granted? && evaluation == authorization.decision.evaluation
 
         snapshot = evaluation.snapshot.registration
         return failure(:release_member_scope_mismatch, "Release member scope does not match its authorized snapshot") unless scope_matches?(snapshot, requested)
@@ -41,8 +41,8 @@ module Coordinator::Write
             change_set_id: change_set_ids.sole,
             target_base_commit_oid: snapshot.target_base_commit_oid,
             merge_commit_oid: snapshot.merge_commit_oid,
-            snapshot_binding: authorization.snapshot_binding,
-            authorization_event: reference,
+            snapshot_binding: authorization.decision.snapshot_binding,
+            authorization_event: authorization.event,
             authorization_decision_digest: authorization.decision_digest,
             ordered_candidates: snapshot.ordered_candidates
           )
@@ -54,28 +54,36 @@ module Coordinator::Write
       def load_authorization(expected_reference)
         stream = @stream_factory.merge_authorization(expected_reference.stream_id)
         physical = @event_store.read_at(stream, expected_reference.stream_revision)
-        return [ nil, nil ] unless physical && event_reference(physical) == expected_reference
-        return [ nil, nil ] unless physical.type == "MergeAuthorizationGranted"
+        return unless physical && event_reference(physical) == expected_reference
+        return unless physical.type == "MergeAuthorizationGranted" && physical.metadata.fetch("schema_version") == 2
 
-        [ load_event(physical), event_reference(physical) ]
+        MergeAuthorizations::DecisionEvidenceV2.new(
+          decision: load_event(physical),
+          event: event_reference(physical),
+          decision_digest: physical.metadata.fetch("decision_digest"),
+          expected_impact_policy: metadata_expected_policy(physical.metadata),
+          policy_version: physical.metadata.fetch("policy_version")
+        )
       end
 
-      def authorization_matches?(authorization, reference, requested)
-        reference == requested.authorization_event &&
+      def authorization_matches?(evidence, requested)
+        authorization = evidence.decision
+        evidence.event == requested.authorization_event &&
           authorization.merge_snapshot_id == requested.merge_snapshot_id &&
           authorization.snapshot_binding == requested.snapshot_binding &&
-          authorization.decision_digest == requested.authorization_decision_digest
+          evidence.decision_digest == requested.authorization_decision_digest
       end
 
-      def reevaluate(authorization, actor:, command_id:, evaluated_at:)
+      def reevaluate(evidence, actor:, command_id:, evaluated_at:)
+        authorization = evidence.decision
         command = Commands::RequestMergeAuthorization.new(
           command_id:,
           actor:,
           merge_snapshot_id: authorization.merge_snapshot_id,
           snapshot_binding: authorization.snapshot_binding,
           target_base_observation: authorization.evaluation.target_base_observation,
-          expected_impact_policy: authorization.expected_impact_policy,
-          policy_version: authorization.policy_version
+          expected_impact_policy: evidence.expected_impact_policy,
+          policy_version: evidence.policy_version
         )
         @evaluator.call(command, decided_at: evaluated_at)
       end
@@ -104,6 +112,21 @@ module Coordinator::Write
           stream_id: event.stream.stream_id,
           stream_revision: event.stream_revision
         )
+      end
+
+      def metadata_expected_policy(metadata)
+        value = metadata["expected_impact_policy"]
+        return unless value
+
+        MergeAuthorizations::ExpectedImpactPolicyV1.new(deep_symbolize(value))
+      end
+
+      def deep_symbolize(value)
+        case value
+        when Hash then value.to_h { |key, nested| [ key.to_sym, deep_symbolize(nested) ] }
+        when Array then value.map { deep_symbolize(_1) }
+        else value
+        end
       end
 
       def stale(evaluation)

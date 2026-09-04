@@ -22,11 +22,15 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordReleaseSetActivation
 
     expect(replay.failure.code).to eq(:release_set_already_activated)
     expect(payload).to have_attributes(
-      verification_event: verification.fetch(:completion).data.verification_event,
-      verification_digest: verification.fetch(:payload).verification_digest,
-      evidence_status: "attributed_unverified",
-      policy_version: "release-set-activation/v1"
+      release_set_id: input.fetch(:release_set_id),
+      change_set_id: prepared.fetch(:completion).data.change_set_id,
+      activation_point: Coordinator::Write::ReleaseSets::ActivationPointV2.new(input.fetch(:activation_point))
     )
+    expect(activation.metadata).to include(
+      "verification_digest" => verification.fetch(:completion).data.verification_digest,
+      "policy_version" => "release-set-activation/v1"
+    )
+    expect(activation.data).not_to have_key("recorded_at")
     expect(activation.correlation_id).to eq(prepared.fetch(:event).correlation_id)
   end
 
@@ -48,8 +52,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordReleaseSetActivation
         external_reference: "configuration/activation-stale",
         state_digest: "sha256:#{'a' * 64}",
         producer: { name: "deployment-controller", version: "1.0.0" },
-        run_id: "release-activation-stale",
-        activated_at: "2026-08-24T21:00:00.000000Z"
+        run_id: "release-activation-stale"
       }
     }
 

@@ -1,0 +1,7 @@
+module Coordinator::Write
+  module AgentChoiceImpacts
+    class ExpectedRevisionGuard
+      def call: (scan_id: untyped) { () -> untyped } -> untyped
+    end
+  end
+end

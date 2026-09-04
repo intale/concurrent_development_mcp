@@ -10,8 +10,8 @@ module Coordinator::Write
           @stream_factory = stream_factory
         end
 
-        def call(attempt_state:, work_item_state:, set_state:, member_states:, command:, abandoned_at:)
-          denial = denied(attempt_state:, work_item_state:, set_state:, command:)
+        def call(attempt_state:, candidate_state:, work_item_state:, set_state:, member_states:, command:, abandoned_at:)
+          denial = denied(attempt_state:, candidate_state:, work_item_state:, set_state:, command:)
           return denial if denial
 
           withdrawals = member_states.select { _1.active_at?(abandoned_at) }.map do |state|
@@ -50,8 +50,8 @@ module Coordinator::Write
 
         private
 
-        def denied(attempt_state:, work_item_state:, set_state:, command:)
-          attempt_denial = attempt_denied(attempt_state:, command:)
+        def denied(attempt_state:, candidate_state:, work_item_state:, set_state:, command:)
+          attempt_denial = attempt_denied(attempt_state:, candidate_state:, command:)
           return attempt_denial if attempt_denial
 
           work_item_denial = work_item_denied(work_item_state:, command:)
@@ -65,12 +65,12 @@ module Coordinator::Write
           failure(:attempt_scope_mismatch, "Work-intention set belongs to another scope", command)
         end
 
-        def attempt_denied(attempt_state:, command:)
+        def attempt_denied(attempt_state:, candidate_state:, command:)
           return failure(:attempt_not_found, "Attempt does not exist", command) if attempt_state.absent?
           unless attempt_state.status == "active"
             return failure(:attempt_not_active, "Attempt is not active and cannot be abandoned", command)
           end
-          if attempt_state.selected_candidate_checkpoint_kind == "final"
+          if candidate_state&.checkpoint_kind == "final"
             return failure(
               :attempt_not_active,
               "Attempt has a final Candidate and must be completed instead of abandoned",

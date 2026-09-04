@@ -1,6 +1,6 @@
 module Coordinator::Write::Domain::MergeObservations
   class Record
     def initialize: (?stream_factory: Coordinator::Write::StreamFactory) -> void
-    def call: (history: HistoryV1, command: Coordinator::Write::Commands::RecordMergeObservation, observation_digest: String, recorded_at: String) -> Dry::Monads::Result
+    def call: (history: HistoryV1, command: Coordinator::Write::Commands::RecordMergeObservation) -> Dry::Monads::Result
   end
 end

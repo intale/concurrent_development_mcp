@@ -13,10 +13,17 @@ module Coordinator::Read
           )
         ],
         event_types: %w[
+          CandidateCreated
+          CandidateAssignedToAttempt
+          CandidateAssignedToRepository
+          CandidateTargetBranchSelected
+          CandidateCommitRangeDeclared
+          CandidateCheckpointKindSelected
+          CandidateWorkIntentionSetAssigned
           CandidateSubmitted
           CandidateChangeManifestCaptured
           CandidateBuildContextCaptured
-          CandidateImpactSurfaceDerived
+          CandidateImpactSurfaceAssigned
         ]
       )
 

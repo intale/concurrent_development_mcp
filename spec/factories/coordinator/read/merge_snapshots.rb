@@ -41,7 +41,7 @@ FactoryBot.define do
       ]
     end
     merge_commit_oid { "9" * 40 }
-    producer { { "name" => "git-merge", "version" => "2.47.0" } }
+    producer { "git-merge" }
     sequence(:run_id) { "run-factory-#{_1}" }
     produced_at_domain { Time.utc(2026, 8, 30, 12) }
     snapshot_digest { "sha256:#{'d' * 64}" }
@@ -59,7 +59,7 @@ FactoryBot.define do
     end
     registered_actor { { "kind" => "agent", "id" => "factory-agent", "authenticated" => false } }
     registered_markers { [ "merge-snapshot:#{merge_snapshot_id}" ] }
-    registered_metadata { { "schema_version" => 1, "policy_version" => policy_version } }
+    registered_metadata { { "schema_version" => 2, "policy_version" => policy_version } }
     registered_causation_id { nil }
     registered_correlation_id { SecureRandom.uuid_v7 }
     sequence(:registered_global_position, 1_200)

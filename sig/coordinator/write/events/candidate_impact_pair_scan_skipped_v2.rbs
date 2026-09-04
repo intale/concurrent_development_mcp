@@ -1,0 +1,6 @@
+module Coordinator::Write
+  module Events
+    class CandidateImpactPairScanSkippedV2 < Base
+    end
+  end
+end

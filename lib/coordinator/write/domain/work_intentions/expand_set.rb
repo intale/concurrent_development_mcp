@@ -33,7 +33,13 @@ module Coordinator::Write
           additions = requests.reject do |request|
             set_state.members.any? { _1.resource_id == request.resource.resource_id }
           end
-          return Success(WorkIntentionDecisionV1.no_change) if additions.empty?
+          if additions.empty?
+            return failure(
+              :write_set_unchanged,
+              "Every requested resource is already in the work-intention set",
+              command
+            )
+          end
           if set_state.members.length + additions.length > WorkIntentionPolicyV1::MAXIMUM_SET_SIZE
             return failure(
               :write_set_limit_reached,

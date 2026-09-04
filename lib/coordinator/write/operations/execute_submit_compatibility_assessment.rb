@@ -17,6 +17,7 @@ module Coordinator::Write
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
         completion_builder: CommandResultBuilder.new,
+        definition_loader: VerificationObligations::DefinitionLoader.new(event_store:),
         policy_loader: CandidateObligations::ImpactPolicyLoader.new(event_store:),
         history_contract: Contracts::VerificationEvidenceHistory.new,
         event_plan_contract: Contracts::VerificationEvidenceEventPlan.new
@@ -32,6 +33,7 @@ module Coordinator::Write
         @schema_registry = schema_registry
         @stream_factory = stream_factory
         @completion_builder = completion_builder
+        @definition_loader = definition_loader
         @policy_loader = policy_loader
         @history_contract = history_contract
         @event_plan_contract = event_plan_contract
@@ -59,30 +61,23 @@ module Coordinator::Write
           input_digest: @input_digest.compatibility_assessment_submit(command),
           assessment_input_digest: @assessment_input_digest.call(command),
           evidence_event_id: @id_generator.uuid_v7,
-          terminal_event_id: @id_generator.uuid_v7,
           correlation_id: @id_generator.uuid_v7
         )
       end
 
       def execute_attempt(command:, preparation:, caused_by:)
-        state, observed_events = load_state(command.obligation_id, preparation.submitted_at)
-        evidence_event = future_evidence_reference(
-          command.obligation_id,
-          observed_events,
-          preparation.evidence_event_id
-        )
+        state = load_state(command.obligation_id, preparation.submitted_at)
         decision = @decider.call(
           state:,
           command:,
           evidence_id: preparation.evidence_id,
           assessment_input_digest: preparation.assessment_input_digest,
-          evidence_event:,
           submitted_at: preparation.submitted_at
         )
         return decision if decision.failure?
 
         plan = decision.value!
-        verify_event_plan!(plan, state:, command:, preparation:, evidence_event:)
+        verify_event_plan!(plan, state:, command:, preparation:)
         persisted_events = persist_domain_plan(
           plan,
           state:,
@@ -104,27 +99,32 @@ module Coordinator::Write
 
       def load_state(obligation_id, observed_at)
         stream = @stream_factory.verification_obligation(obligation_id)
+        definition = @definition_loader.call(obligation_id)
         grouped = @event_store.read_grouped(
           stream,
           EventQueries::VERIFICATION_OBLIGATION_FOR_EVIDENCE
         ).to_h { [ _1.type, _1 ] }
         evidence_events = @event_store.read(stream, EventQueries::VERIFICATION_EVIDENCE_HISTORY)
-        creation = grouped["VerificationObligationCreated"]
         claim = grouped["VerificationObligationClaimed"]
         satisfied = grouped["VerificationObligationSatisfied"]
         failed = grouped["VerificationObligationFailed"]
         waived = grouped["VerificationObligationWaived"]
         invalidated = grouped["VerificationObligationInvalidated"]
-        obligation = creation ? load_event(creation) : nil
+        obligation = definition&.definition
         state = Domain::VerificationEvidence::State.new(
           obligation:,
-          obligation_event: creation ? event_reference(creation) : nil,
+          obligation_event: definition&.reference,
           latest_claim: claim ? load_event(claim) : nil,
           latest_claim_event: claim ? event_reference(claim) : nil,
           evidence: evidence_events.map do |event|
-            CompatibilityAssessments::EvidenceObservationV1.new(
+            CompatibilityAssessments::EvidenceObservationV2.new(
               evidence: load_event(event),
-              event: event_reference(event)
+              event: event_reference(event),
+              assessment_input_digest: event.metadata.fetch("assessment_input_digest"),
+              obligation_validity_input_digest: event.metadata.fetch("obligation_validity_input_digest"),
+              policy: CandidateObligations::ImpactPolicyEvidenceV1.new(
+                deep_symbolize(event.metadata.fetch("policy"))
+              )
             )
           end,
           satisfied: satisfied ? load_event(satisfied) : nil,
@@ -138,7 +138,7 @@ module Coordinator::Write
           )
         )
         verify_history!(state, obligation_id:)
-        [ state, (grouped.values + evidence_events).freeze ]
+        state
       end
 
       def current_policy?(obligation, observed_at, terminal:)
@@ -154,18 +154,6 @@ module Coordinator::Write
         observation.status == "gating" && observation.evidence == obligation.policy
       end
 
-      def future_evidence_reference(obligation_id, observed_events, event_id)
-        latest_revision = observed_events.map(&:stream_revision).max || -1
-        EventReference.new(
-          event_id:,
-          type: "VerificationEvidenceSubmitted",
-          stream_context: "DevelopmentIntegration",
-          stream_name: "VerificationObligation",
-          stream_id: obligation_id,
-          stream_revision: latest_revision + 1
-        )
-      end
-
       def verify_history!(state, obligation_id:)
         validation = @history_contract.call(state:, obligation_id:)
         return if validation.success?
@@ -173,14 +161,13 @@ module Coordinator::Write
         raise InvalidVerificationEvidenceHistory, validation.errors.to_h.inspect
       end
 
-      def verify_event_plan!(plan, state:, command:, preparation:, evidence_event:)
+      def verify_event_plan!(plan, state:, command:, preparation:)
         validation = @event_plan_contract.call(
           plan:,
           state:,
           command:,
           evidence_id: preparation.evidence_id,
           assessment_input_digest: preparation.assessment_input_digest,
-          evidence_event:,
           submitted_at: preparation.submitted_at
         )
         return if validation.success?
@@ -189,12 +176,11 @@ module Coordinator::Write
       end
 
       def persist_domain_plan(plan, state:, command:, preparation:, caused_by:)
-        event_ids = [ preparation.evidence_event_id, preparation.terminal_event_id ]
-        physical = plan.events.each_with_index.map do |event, index|
+        physical = plan.events.map do |event|
           @event_factory.build!(
             event:,
-            event_id: event_ids.fetch(index),
-            metadata: command_metadata(command),
+            event_id: preparation.evidence_event_id,
+            metadata: command_metadata(command, state.obligation, preparation),
             markers: event_markers(state, command, event),
             caused_by:,
             correlation_id: root_correlation_id(preparation, caused_by)
@@ -210,7 +196,7 @@ module Coordinator::Write
       def event_markers(state, command, event)
         common = scope_markers(state.obligation) + [ "command:#{command.command_id}" ]
         case event
-        when Events::VerificationEvidenceSubmittedV1
+        when Events::VerificationEvidenceSubmittedV2
           common + [
             "verification-evidence:#{event.evidence_id}",
             "verification-evidence-kind:#{event.evidence_kind}",
@@ -218,10 +204,6 @@ module Coordinator::Write
             "claim:#{event.claim.claim_id}",
             "claimant:#{event.claim.claimant_id}"
           ]
-        when Events::VerificationObligationSatisfiedV1
-          common + [ "verification-obligation-status:satisfied" ]
-        when Events::VerificationObligationFailedV1
-          common + [ "verification-obligation-status:failed" ]
         end
       end
 
@@ -245,14 +227,25 @@ module Coordinator::Write
         ]
       end
 
-      def command_metadata(command)
-        EventMetadata.new(
+      def command_metadata(command, obligation, preparation)
+        Metadata::VerificationEvidenceV2.new(
           command_id: command.command_id,
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
-          policy_version: "compatibility-assessment/v1"
+          policy_version: "compatibility-assessment/v2",
+          assessment_input_digest: preparation.assessment_input_digest,
+          obligation_validity_input_digest: obligation.validity_input_digest,
+          policy: obligation.policy
         )
+      end
+
+      def deep_symbolize(value)
+        case value
+        when Hash then value.to_h { |key, nested| [ key.to_sym, deep_symbolize(nested) ] }
+        when Array then value.map { deep_symbolize(_1) }
+        else value
+        end
       end
 
       def load_event(event)
