@@ -52,18 +52,16 @@ module Coordinator::Processes
         end
         return payload.change_set_id unless payload.is_a?(Coordinator::Write::Events::WorkItemCompletedV2)
 
-        membership = @event_store.read(
+        selection = @event_store.read(
           @stream_factory.work_item(event.stream.stream_id),
-          Coordinator::Write::EventReadCriteria.new(
-            event_types: [ "WorkItemAddedToChangeSet" ],
-            maximum_count: 1,
-            direction: :asc
-          )
-        ).sole
+          Coordinator::Write::EventQueries::WORK_ITEM_LATEST_CANDIDATE_SELECTION
+        ).first
+        raise BuildProgressProcessRejected, "WorkItemCompleted has no Candidate selection" unless selection
+
         @schema_registry.load(
-          type: membership.type,
-          schema_version: membership.metadata.fetch("schema_version"),
-          data: membership.data
+          type: selection.type,
+          schema_version: selection.metadata.fetch("schema_version"),
+          data: selection.data
         ).change_set_id
       end
     end

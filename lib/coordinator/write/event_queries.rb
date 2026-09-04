@@ -637,6 +637,12 @@ module Coordinator::Write
       direction: :asc
     )
 
+    WORK_ITEM_LATEST_CANDIDATE_SELECTION = EventReadCriteria.new(
+      event_types: [ "WorkItemCandidateSelected" ],
+      maximum_count: 1,
+      direction: :desc
+    )
+
     WORK_ITEM_FOR_MERGE_AUTHORIZATION = EventReadCriteria.new(
       event_types: [
         "WorkItemCreated",
