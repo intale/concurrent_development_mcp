@@ -16,7 +16,8 @@ module Coordinator::Write
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
         completion_builder: CommandResultBuilder.new,
-        event_plan_contract: Contracts::WorkItemCompletionEventPlan.new
+        event_plan_contract: Contracts::WorkItemCompletionEventPlan.new,
+        change_set_state_loader: ChangeSets::StateLoader.new(event_store:)
       )
         @event_store = event_store
         @preparer = preparer
@@ -29,6 +30,7 @@ module Coordinator::Write
         @stream_factory = stream_factory
         @completion_builder = completion_builder
         @event_plan_contract = event_plan_contract
+        @change_set_state_loader = change_set_state_loader
       end
 
       def call(input)
@@ -49,7 +51,7 @@ module Coordinator::Write
         PreparedWorkItemCompletionV1.new(
           completed_at: @clock.now,
           input_digest: @input_digest.work_item_complete(command),
-          domain_event_ids: 3.times.map { @id_generator.uuid_v7 },
+          domain_event_ids: (3 + command.produced_outputs.length).times.map { @id_generator.uuid_v7 },
         )
       end
 
@@ -76,10 +78,9 @@ module Coordinator::Write
           prepared:,
           caused_by:
         )
-        completion_fact = decision.value!.events.fetch(2)
         completion = @completion_builder.work_item_complete(
           command:,
-          completion: completion_fact,
+          candidate_event: candidate_reference,
           input_digest: prepared.input_digest,
           persisted_events: persisted,
           completed_at: prepared.completed_at
@@ -89,11 +90,7 @@ module Coordinator::Write
       end
 
       def load_change_set_state(change_set_id)
-        events = @event_store.read(
-          @stream_factory.change_set(change_set_id),
-          EventQueries::CHANGE_SET_FOR_WORK_ITEM_COMPLETION
-        ).map { load_event(_1) }
-        Domain::ChangeSets::State.reduce(events)
+        @change_set_state_loader.call(change_set_id)
       end
 
       def load_work_item_state(work_item_id)

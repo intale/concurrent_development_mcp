@@ -16,8 +16,8 @@ module Coordinator::Write
 
         key(:plan).failure("must contain one proposal and at most one clarification") unless events.length.between?(1, 2)
         key(:plan).failure("must write only to the expected Interpretation stream") unless plan.writes.all? { _1.stream == values[:expected_stream] }
-        key(:plan).failure("must begin with DecisionInterpretationProposed") unless events.first.is_a?(Events::DecisionInterpretationProposedV1)
-        if events.length == 2 && !events.last.is_a?(Events::DecisionClarificationRequiredV1)
+        key(:plan).failure("must begin with DecisionInterpretationProposed") unless events.first.is_a?(Events::DecisionInterpretationProposedV2)
+        if events.length == 2 && !events.last.is_a?(Events::DecisionClarificationRequiredV2)
           key(:plan).failure("second event must be DecisionClarificationRequired")
         end
         events.each do |event|

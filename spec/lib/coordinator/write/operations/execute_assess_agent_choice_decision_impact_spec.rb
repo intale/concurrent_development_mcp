@@ -37,19 +37,19 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAssessAgentChoiceDecisionI
       outcome: "invalidated",
       reason: "blocking_policy_introduced",
       before_evaluation: have_attributes(status: "allowed", basis: "compliant"),
-      after_evaluation: have_attributes(status: "blocked", basis: "blocking_violation"),
-      source_advancements: contain_exactly(
-        have_attributes(
-          type: "DecisionPartitionAdvanced",
-          stream_id: "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing",
-          stream_revision: 1
-        ),
-        have_attributes(
-          type: "DecisionPartitionAdvanced",
-          stream_id: "workitem:W-impact-invalidate:testing",
-          stream_revision: 0
-        )
-      )
+      after_evaluation: have_attributes(status: "blocked", basis: "blocking_violation")
+    )
+    assessment_history = AgentChoiceImpactScenario.assessment_history(invocation.command.assessment_id)
+    expect(assessment_history.map(&:type)).to eq(
+      %w[AgentChoiceImpactAssessmentRecorded AgentChoiceImpactSourceLinked AgentChoiceImpactSourceLinked]
+    )
+    links = assessment_history.drop(1).map { load(_1) }
+    expect(links.map(&:role)).to contain_exactly("accepted_choice", "decision_change")
+    expect(links.find { _1.role == "accepted_choice" }.source).to eq(
+      AgentChoiceImpactScenario.reference(choice.fetch(:accepted))
+    )
+    expect(links.find { _1.role == "decision_change" }.source).to eq(
+      AgentChoiceImpactScenario.reference(source)
     )
     events = AgentChoiceImpactScenario.choice_events(choice_id(choice))
     expect(events.map(&:type)).to eq(
@@ -58,11 +58,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAssessAgentChoiceDecisionI
     invalidation_event = events.last
     invalidation = load(invalidation_event)
     expect(invalidation).to have_attributes(
-      accepted_choice: AgentChoiceImpactScenario.reference(choice.fetch(:accepted)),
-      assessment_event: AgentChoiceImpactScenario.reference(assessment_event),
-      decision_change_event: AgentChoiceImpactScenario.reference(source),
-      previous_context_digest: assessment.assessment.before_context_digest,
-      resulting_context_digest: assessment.assessment.after_context_digest,
+      choice_id: choice_id(choice),
       reason: "blocking_policy_introduced"
     )
     expect([ assessment_event, invalidation_event ]).to all(

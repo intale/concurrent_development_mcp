@@ -18,7 +18,8 @@ module Coordinator::Write
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
         completion_builder: CommandResultBuilder.new,
-        event_plan_contract: Contracts::ChangeSetCompletionEventPlan.new
+        event_plan_contract: Contracts::ChangeSetCompletionEventPlan.new,
+        change_set_state_loader: ChangeSets::StateLoader.new(event_store:)
       )
         @event_store = event_store
         @source_loader = source_loader
@@ -33,6 +34,7 @@ module Coordinator::Write
         @stream_factory = stream_factory
         @completion_builder = completion_builder
         @event_plan_contract = event_plan_contract
+        @change_set_state_loader = change_set_state_loader
       end
 
       def call(command, caused_by:)
@@ -44,7 +46,7 @@ module Coordinator::Write
           preparation = PreparedChangeSetCompletionV1.new(
             occurred_at: @clock.now,
             input_digest: @input_digest.change_set_completion_policy(command),
-            completion_event_id: @id_generator.uuid_v7,
+            domain_event_ids: (command.release_set_id ? 2 : 1).times.map { @id_generator.uuid_v7 },
           )
 
           step @event_store.multiple { execute_attempt(command:, preparation:, caused_by:) }
@@ -81,28 +83,25 @@ module Coordinator::Write
           release_state:,
           completed_at: preparation.occurred_at
         )
-        persisted = persist_completion_fact(
-          plan.events.sole,
+        persisted = persist_domain_plan(
+          plan,
           command:,
           caused_by:,
-          event_id: preparation.completion_event_id
+          event_ids: preparation.domain_event_ids
         )
         completion = @completion_builder.change_set_completion_policy(
           command:,
-          completion: plan.events.sole,
+          work_items:,
+          release_set_completion_event: release_state&.completion&.event,
           input_digest: preparation.input_digest,
-          persisted_events: [ persisted ],
+          persisted_events: persisted,
           completed_at: preparation.occurred_at
         )
         Success(completion)
       end
 
       def load_change_set(change_set_id)
-        events = @event_store.read(
-          @stream_factory.change_set(change_set_id),
-          EventQueries::CHANGE_SET_FOR_COMPLETION
-        ).map { load_event(_1) }
-        Domain::ChangeSets::State.reduce(events)
+        @change_set_state_loader.call(change_set_id)
       end
 
       def verify_event_plan!(plan:, command:, work_items:, release_state:, completed_at:)
@@ -118,15 +117,17 @@ module Coordinator::Write
         raise InvalidChangeSetCompletionEventPlan, result.errors.to_h.inspect
       end
 
-      def persist_completion_fact(completion, command:, caused_by:, event_id:)
-        physical = @event_factory.build!(
-          event: completion,
-          event_id:,
-          metadata: command_metadata(command),
-          markers: completion_markers(completion, command:),
-          caused_by:
-        )
-        @event_store.append(@stream_factory.change_set(command.change_set_id), [ physical ]).sole
+      def persist_domain_plan(plan, command:, caused_by:, event_ids:)
+        physical = plan.events.zip(event_ids).map do |event, event_id|
+          @event_factory.build!(
+            event:,
+            event_id:,
+            metadata: command_metadata(command),
+            markers: completion_markers(event, command:),
+            caused_by:
+          )
+        end
+        @event_store.append(@stream_factory.change_set(command.change_set_id), physical)
       end
 
       def completion_markers(_completion, command:)

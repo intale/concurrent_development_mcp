@@ -90,7 +90,10 @@ module Coordinator::Write
       )
     end
 
-    def work_item_complete(command:, completion:, input_digest:, persisted_events:, completed_at:)
+    def work_item_complete(command:, candidate_event:, input_digest:, persisted_events:, completed_at:)
+      selected_event = persisted_events.find { _1.type == "WorkItemCandidateSelected" }
+      attempt_event = persisted_events.find { _1.type == "AttemptCompleted" }
+      completed_event = persisted_events.find { _1.type == "WorkItemCompleted" }
       build_completion(
         command:,
         tool_name: "work_item_complete",
@@ -100,12 +103,12 @@ module Coordinator::Write
           work_item_id: command.work_item_id,
           attempt_id: command.attempt_id,
           candidate_id: command.candidate_id,
-          candidate_event: completion.candidate_event,
-          selected_event: event_reference(persisted_events.fetch(0)),
-          attempt_completed_event: event_reference(persisted_events.fetch(1)),
-          work_item_completed_event: event_reference(persisted_events.fetch(2)),
-          produced_outputs: completion.produced_outputs,
-          completed_at: completion.completed_at
+          candidate_event:,
+          selected_event: event_reference(selected_event),
+          attempt_completed_event: event_reference(attempt_event),
+          work_item_completed_event: event_reference(completed_event),
+          produced_outputs: command.produced_outputs,
+          completed_at:
         ),
         next_actions: [
           NextAction.new(
@@ -279,7 +282,7 @@ module Coordinator::Write
       )
     end
 
-    def decision_interpretation_propose(command:, proposal:, input_digest:, persisted_events:, completed_at:)
+    def decision_interpretation_propose(command:, assessment:, input_digest:, persisted_events:, completed_at:)
       build_completion(
         command:,
         tool_name: "decision_interpretation_propose",
@@ -287,8 +290,8 @@ module Coordinator::Write
         data: CommandReceiptData::InterpretationProposal.new(
           interpretation_id: command.interpretation_id,
           source_message_id: command.source_message_id,
-          assessment: proposal.assessment,
-          proposed_at: proposal.proposed_at
+          assessment:,
+          proposed_at: completed_at
         ),
         next_actions: [
           NextAction.new(
@@ -337,7 +340,16 @@ module Coordinator::Write
       )
     end
 
-    def decision_activate(command:, activation:, partitions:, input_digest:, persisted_events:, completed_at:)
+    def decision_activate(
+      command:,
+      activation:,
+      definition:,
+      slot:,
+      partitions:,
+      input_digest:,
+      persisted_events:,
+      completed_at:
+    )
       build_completion(
         command:,
         tool_name: "decision_activate",
@@ -347,10 +359,10 @@ module Coordinator::Write
           interpretation_id: command.interpretation_id,
           outcome: "activated",
           policy_status: "active",
-          definition_digest: activation.definition_digest,
-          slot: activation.slot,
+          definition_digest: definition.digest,
+          slot:,
           partitions:,
-          activated_at: activation.activated_at
+          activated_at: completed_at
         ),
         next_actions: [
           NextAction.new(
@@ -367,6 +379,8 @@ module Coordinator::Write
     def decision_correct(
       command:,
       correction:,
+      current:,
+      candidate:,
       correction_event:,
       partitions:,
       input_digest:,
@@ -382,12 +396,12 @@ module Coordinator::Write
           interpretation_id: command.interpretation_id,
           outcome: "corrected",
           policy_status: "active",
-          previous_definition_digest: correction.previous_definition_digest,
-          definition_digest: correction.definition.digest,
+          previous_definition_digest: current.definition.digest,
+          definition_digest: candidate.definition.digest,
           correction_event:,
-          slot: correction.slot,
+          slot: candidate.slot,
           partitions:,
-          corrected_at: correction.corrected_at
+          corrected_at: completed_at
         ),
         next_actions: [
           NextAction.new(
@@ -401,7 +415,7 @@ module Coordinator::Write
       )
     end
 
-    def agent_choice_record(command:, acceptance:, input_digest:, persisted_events:, completed_at:)
+    def agent_choice_record(command:, recorded:, acceptance:, input_digest:, persisted_events:, completed_at:)
       build_completion(
         command:,
         tool_name: "agent_choice_record",
@@ -411,12 +425,12 @@ module Coordinator::Write
           choice_type: command.choice_type,
           outcome: "accepted",
           assessment_basis: acceptance.assessment.basis,
-          context_digest: acceptance.context_digest,
+          context_digest: recorded.decision_context.digest,
           recorded_event: event_reference(persisted_events.fetch(0)),
           accepted_event: event_reference(persisted_events.fetch(1)),
           based_on_decisions: acceptance.assessment.based_on_decisions,
           warnings: acceptance.assessment.warnings,
-          accepted_at: acceptance.accepted_at
+          accepted_at: completed_at
         ),
         next_actions: [
           NextAction.new(
@@ -1115,17 +1129,25 @@ module Coordinator::Write
       )
     end
 
-    def change_set_completion_policy(command:, completion:, input_digest:, persisted_events:, completed_at:)
+    def change_set_completion_policy(
+      command:,
+      work_items:,
+      release_set_completion_event:,
+      input_digest:,
+      persisted_events:,
+      completed_at:
+    )
+      completion_event = persisted_events.find { _1.type == "ChangeSetCompleted" }
       build_completion(
         command:,
         tool_name: "change_set_completion_policy",
         summary: "ChangeSet completed from exact WorkItem and release evidence.",
         data: CommandReceiptData::ChangeSetCompletion.new(
-          change_set_id: completion.change_set_id,
-          work_item_completions: completion.work_item_completions,
-          release_set_completion_event: completion.release_set_completion_event,
-          completion_event: event_reference(persisted_events.sole),
-          completed_at: completion.completed_at
+          change_set_id: command.change_set_id,
+          work_item_completions: work_items,
+          release_set_completion_event:,
+          completion_event: event_reference(completion_event),
+          completed_at:
         ),
         next_actions: [],
         input_digest:,

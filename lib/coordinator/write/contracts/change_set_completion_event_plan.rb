@@ -14,20 +14,18 @@ module Coordinator::Write
       rule(:plan, :command, :work_items, :release_state, :completed_at) do
         plan = values[:plan]
         command = values[:command]
-        event = plan.writes.sole&.event if plan.writes.one?
-        unless event.is_a?(Events::ChangeSetCompletedV1) &&
-               plan.writes.sole.stream == StreamFactory.new.change_set(command.change_set_id)
-          key(:plan).failure("must contain exactly one ChangeSet completion write")
+        expected_types = command.release_set_id ?
+          [ Events::ChangeSetReleaseSetLinkedV1, Events::ChangeSetCompletedV2 ] :
+          [ Events::ChangeSetCompletedV2 ]
+        expected_stream = StreamFactory.new.change_set(command.change_set_id)
+        unless plan.events.map(&:class) == expected_types && plan.writes.all? { _1.stream == expected_stream }
+          key(:plan).failure("must contain the optional release relation followed by ChangeSet completion")
           next
         end
 
-        expected_release = values[:release_state]&.completion&.event
-        unless event.change_set_id == command.change_set_id &&
-               event.work_item_completions == values[:work_items] &&
-               event.release_set_completion_event == expected_release &&
-               event.rule_version == command.rule_version &&
-               event.completed_at == values[:completed_at]
-          key(:plan).failure("must preserve exact completion evidence, rule, and time")
+        unless plan.events.all? { _1.change_set_id == command.change_set_id } &&
+               (!command.release_set_id || plan.events.first.release_set_id == command.release_set_id)
+          key(:plan).failure("must preserve the ChangeSet and optional ReleaseSet identities")
         end
       end
     end

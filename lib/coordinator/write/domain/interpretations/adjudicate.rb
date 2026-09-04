@@ -21,47 +21,41 @@ module Coordinator::Write
             return occupied_slot_failure(state.slot_acceptance, slot)
           end
 
-          event = build_event(command:, evidence:, slot:, adjudicated_at:)
+          event = build_event(command:, slot:)
           Success(
             EventPlan.new(
-              writes: [ EventWrite.new(stream: @stream_factory.interpretation(command.source_message_id), event:) ]
+              writes: [ EventWrite.new(stream: @stream_factory.interpretation(command.interpretation_id), event:) ]
             )
           )
         end
 
         private
 
-        def build_event(command:, evidence:, slot:, adjudicated_at:)
+        def build_event(command:, slot:)
           common = {
             interpretation_id: command.interpretation_id,
             source_message_id: command.source_message_id
           }
           case command.action
           when "accept"
-            Events::DecisionInterpretationAcceptedV1.new(
+            Events::DecisionInterpretationAcceptedV2.new(
               **common,
-              proposal_event: evidence.event,
               slot:,
-              rationale: command.rationale,
-              accepted_at: adjudicated_at
+              rationale: command.rationale.summary
             )
           when "reject"
-            Events::DecisionInterpretationRejectedV1.new(
+            Events::DecisionInterpretationRejectedV2.new(
               **common,
-              proposal_event: evidence.event,
-              rationale: command.rationale,
-              rejected_at: adjudicated_at
+              rationale: command.rationale.summary
             )
           when "request_clarification"
             clarification = command.clarification
-            Events::DecisionClarificationRequiredV1.new(
+            Events::DecisionClarificationRequiredV2.new(
               **common,
-              status: clarification.status,
               origin: "adjudication",
               reasons: [ command.rationale.code ],
-              questions: clarification.questions,
-              rationale: command.rationale,
-              required_at: adjudicated_at
+              questions: clarification.questions.map(&:prompt),
+              rationale: command.rationale.summary
             )
           end
         end

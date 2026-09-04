@@ -49,26 +49,34 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Create do
     expect(result).to be_success
     plan = result.value!
     expect(plan.writes.map { _1.stream.to_h }).to eq(
-      [
-        { context: "DevelopmentExecution", stream_name: "WorkItem", stream_id: "W-200" },
-        { context: "DevelopmentPlanning", stream_name: "ChangeSet", stream_id: "CS-100" }
-      ]
+      Array.new(6) do
+        { context: "DevelopmentExecution", stream_name: "WorkItem", stream_id: "W-200" }
+      end
     )
-    expect(plan.events).to contain_exactly(
-      Coordinator::Write::Events::WorkItemCreatedV1.new(
+    expect(plan.events).to eq(
+      [
+      Coordinator::Write::Events::WorkItemCreatedV2.new(work_item_id: "W-200"),
+      Coordinator::Write::Events::WorkItemAddedToChangeSetV2.new(
         work_item_id: "W-200",
         change_set_id: "CS-100",
-        repository_id:,
-        goal: "Implement capture validation",
-        acceptance_criteria: [ "Reject duplicate ownership" ],
-        competitive_mode: false,
-        created_at: occurred_at
       ),
-      Coordinator::Write::Events::WorkItemAddedToChangeSetV1.new(
-        change_set_id: "CS-100",
+      Coordinator::Write::Events::WorkItemAssignedToRepositoryV1.new(
         work_item_id: "W-200",
-        added_at: occurred_at
+        repository_id:,
+      ),
+      Coordinator::Write::Events::WorkItemGoalDefinedV1.new(
+        work_item_id: "W-200",
+        goal: "Implement capture validation",
+      ),
+      Coordinator::Write::Events::WorkItemAcceptanceCriteriaDefinedV1.new(
+        work_item_id: "W-200",
+        acceptance_criteria: [ "Reject duplicate ownership" ],
+      ),
+      Coordinator::Write::Events::WorkItemCompetitiveModeSelectedV1.new(
+        work_item_id: "W-200",
+        competitive_mode: false
       )
+      ]
     )
   end
 

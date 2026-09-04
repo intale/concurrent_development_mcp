@@ -21,32 +21,29 @@ module Coordinator::Write
           )
           return denial if denial
 
-          satisfaction = Events::WorkItemDependencySatisfiedV1.new(
+          satisfaction = Events::WorkItemDependencySatisfiedV2.new(
             change_set_id: command.change_set_id,
             dependency_id: dependency.dependency_id,
             producer_work_item_id: dependency.producer_work_item_id,
             consumer_work_item_id: dependency.consumer_work_item_id,
             dependency_kind: dependency.dependency_kind,
             required_output: dependency.required_output,
-            source_event: evidence.reference,
-            rule_version: command.rule_version,
-            satisfied_at:
+            source: evidence.reference
           )
           writes = [
             EventWrite.new(
-              stream: @stream_factory.change_set(command.change_set_id),
+              stream: @stream_factory.work_item(dependency.consumer_work_item_id),
               event: satisfaction
             )
           ]
           if ready_after?(change_set_state:, dependency:, consumer_state:)
             writes << EventWrite.new(
               stream: @stream_factory.work_item(dependency.consumer_work_item_id),
-              event: Events::WorkItemMadeReadyV1.new(
+              event: Events::WorkItemMadeReadyV2.new(
                 change_set_id: command.change_set_id,
                 work_item_id: dependency.consumer_work_item_id,
                 readiness_decision_id: command.command_id,
-                reason: "dependencies_satisfied",
-                made_ready_at: satisfied_at
+                reason: "dependencies_satisfied"
               )
             )
           end
@@ -97,25 +94,37 @@ module Coordinator::Write
         end
 
         def candidate_source?(payload, dependency:, change_set_id:, producer:)
-          payload.is_a?(Events::WorkItemCandidateSelectedV1) &&
+          (payload.is_a?(Events::WorkItemCandidateSelectedV1) ||
+            payload.is_a?(Events::WorkItemCandidateSelectedV2)) &&
             payload.change_set_id == change_set_id &&
             payload.work_item_id == dependency.producer_work_item_id &&
             payload.candidate_id == producer.selected_candidate_id
         end
 
         def completion_source?(payload, dependency:, change_set_id:, producer:)
-          payload.is_a?(Events::WorkItemCompletedV1) &&
-            payload.change_set_id == change_set_id &&
+          return payload.change_set_id == change_set_id &&
+                 payload.work_item_id == dependency.producer_work_item_id &&
+                 payload.candidate_id == producer.selected_candidate_id if payload.is_a?(Events::WorkItemCompletedV1)
+
+          payload.is_a?(Events::WorkItemCompletedV2) &&
             payload.work_item_id == dependency.producer_work_item_id &&
-            payload.candidate_id == producer.selected_candidate_id
+            producer.change_set_id == change_set_id &&
+            producer.status == "completed"
         end
 
         def output_source?(payload, dependency:, change_set_id:, producer:)
-          return false unless completion_source?(payload, dependency:, change_set_id:, producer:)
-
-          payload.produced_outputs.any? do |output|
-            output.kind == dependency.required_output&.kind && output.key == dependency.required_output&.key
+          if payload.is_a?(Events::WorkItemOutputRecordedV1)
+            return producer.change_set_id == change_set_id &&
+                   payload.work_item_id == dependency.producer_work_item_id &&
+                   payload.output_kind == dependency.required_output&.kind &&
+                   payload.output_key == dependency.required_output&.key
           end
+
+          payload.is_a?(Events::WorkItemCompletedV1) &&
+            completion_source?(payload, dependency:, change_set_id:, producer:) &&
+            payload.produced_outputs.any? do |output|
+              output.kind == dependency.required_output&.kind && output.key == dependency.required_output&.key
+            end
         end
 
         def integration_source?(evidence, dependency:, change_set_id:, producer:)

@@ -1,0 +1,8 @@
+module Coordinator
+  module Write
+    class WorkIntentionObservationV1 < Shared::Value
+      def state: () -> Domain::WorkIntentions::State
+      def resource: () -> WorkIntentionResourceV1
+    end
+  end
+end

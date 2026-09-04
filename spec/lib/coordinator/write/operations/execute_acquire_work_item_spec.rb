@@ -37,30 +37,53 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAcquireWorkItem, :event_st
       )
     )
     expect(work_item_events("W-200").map(&:type)).to eq(
-      [ "WorkItemCreated", "WorkItemMadeReady", "WorkItemAcquired" ]
+      %w[
+        WorkItemCreated
+        WorkItemAddedToChangeSet
+        WorkItemAssignedToRepository
+        WorkItemGoalDefined
+        WorkItemAcceptanceCriteriaDefined
+        WorkItemCompetitiveModeSelected
+        WorkItemMadeReady
+        WorkItemAcquired
+      ]
     )
-    expect(attempt_events("A-300").map(&:type)).to eq([ "AttemptAuthorized", "AttemptStarted" ])
+    expect(attempt_events("A-300").map(&:type)).to eq(
+      %w[
+        AttemptAuthorized
+        AttemptAssignedToWorkItem
+        AttemptAssignedToAgent
+        AttemptBaseSnapshotRecorded
+        AttemptStarted
+      ]
+    )
     expect(command_events("cmd-300")).to be_empty
 
     authorized = attempt_events("A-300").first
-    expect(authorized.data.fetch("base_snapshots")).to eq(
-      [
-        {
-          "repository_id" => repository_id,
-          "object_format" => "sha1",
-          "commit_oid" => "0123456789abcdef0123456789abcdef01234567"
-        }
-      ]
+    expect(authorized.data).to eq("attempt_id" => "A-300")
+    snapshot = attempt_events("A-300").find { _1.type == "AttemptBaseSnapshotRecorded" }
+    expect(snapshot.data).to eq(
+      "attempt_id" => "A-300",
+      "repository_id" => repository_id,
+      "object_format" => "sha1",
+      "commit_oid" => "0123456789abcdef0123456789abcdef01234567"
     )
     timestamps = [
-      work_item_events("W-200").last.data.fetch("acquired_at"),
-      authorized.data.fetch("authorized_at"),
-      attempt_events("A-300").last.data.fetch("started_at"),
+      work_item_events("W-200").last.created_at.utc.iso8601(6),
+      authorized.created_at.utc.iso8601(6),
+      attempt_events("A-300").last.created_at.utc.iso8601(6),
       completion.completed_at
     ]
-    expect(timestamps.uniq.length).to eq(1)
+    expect(timestamps).to all(match(Coordinator::Shared::Types::TIMESTAMP_PATTERN))
     expect(completion.emitted_events.map { [ _1.stream_name, _1.stream_id, _1.stream_revision ] }).to eq(
-      [ [ "WorkItem", "W-200", 2 ], [ "Attempt", "A-300", 0 ], [ "Attempt", "A-300", 1 ] ]
+      [
+        [ "Attempt", "A-300", 0 ],
+        [ "Attempt", "A-300", 1 ],
+        [ "Attempt", "A-300", 2 ],
+        [ "Attempt", "A-300", 3 ],
+        [ "Attempt", "A-300", 4 ],
+        [ "WorkItem", "W-200", 7 ]
+      ]
     )
   end
 
@@ -179,7 +202,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAcquireWorkItem, :event_st
     expect(results.count(&:failure?)).to eq(1)
     expect(results.find(&:failure?).failure.code).to eq(:work_item_unavailable)
     expect(work_item_events("W-200").count { _1.type == "WorkItemAcquired" }).to eq(1)
-    expect(competing_inputs.sum { attempt_events(_1.fetch(:attempt_id)).length }).to eq(2)
+    expect(competing_inputs.sum { attempt_events(_1.fetch(:attempt_id)).length }).to eq(5)
     expect(competing_inputs.flat_map { command_events(_1.fetch(:command_id)) }).to be_empty
   end
 
@@ -229,7 +252,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAcquireWorkItem, :event_st
   end
 
   def work_item_events(work_item_id)
-    event_store.read(
+    event_store.read_grouped(
       streams.work_item(work_item_id),
       Coordinator::Write::EventQueries::WORK_ITEM_FOR_ACQUISITION
     )

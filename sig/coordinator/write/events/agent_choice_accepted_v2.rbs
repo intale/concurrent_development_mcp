@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class AgentChoiceAcceptedV2 < Base
+        def choice_id: () -> String
+        def assessment: () -> AgentChoices::ChoiceAssessmentV1
+      end
+    end
+  end
+end

@@ -4,9 +4,9 @@ module Coordinator::Write
   module Contracts
     class InterpretationAdjudicationEventPlan < Dry::Validation::Contract
       EVENT_BY_ACTION = {
-        "accept" => Events::DecisionInterpretationAcceptedV1,
-        "reject" => Events::DecisionInterpretationRejectedV1,
-        "request_clarification" => Events::DecisionClarificationRequiredV1
+        "accept" => Events::DecisionInterpretationAcceptedV2,
+        "reject" => Events::DecisionInterpretationRejectedV2,
+        "request_clarification" => Events::DecisionClarificationRequiredV2
       }.freeze
 
       params do

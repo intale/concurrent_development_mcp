@@ -36,17 +36,12 @@ RSpec.describe Coordinator::Write::Operations::ExecuteDeclareWorkItemDependency,
       )
     )
     expect(change_set_events.map(&:type)).to eq(
-      [
-        "ChangeSetCreated",
-        "ChangeSetAcceptanceCriteriaDefined",
-        "WorkItemAddedToChangeSet",
-        "WorkItemAddedToChangeSet",
-        "WorkItemDependencyDeclared"
-      ]
+      [ "ChangeSetCreated", "ChangeSetAcceptanceCriteriaDefined" ]
     )
+    expect(dependency_events.map(&:type)).to eq([ "WorkItemDependencyDeclared" ])
     expect(command_events("cmd-230")).to be_empty
     expect(completion.emitted_events.map { [ _1.stream_name, _1.stream_revision ] }).to eq(
-      [ [ "ChangeSet", 4 ] ]
+      [ [ "WorkItem", 6 ] ]
     )
   end
 
@@ -157,7 +152,16 @@ RSpec.describe Coordinator::Write::Operations::ExecuteDeclareWorkItemDependency,
   end
 
   def dependency_events
-    change_set_events.select { _1.type == "WorkItemDependencyDeclared" }
+    [ "W-100", "W-200" ].flat_map do |work_item_id|
+      event_store.read(
+        streams.work_item(work_item_id),
+        Coordinator::Write::EventReadCriteria.new(
+          event_types: [ "WorkItemDependencyDeclared" ],
+          maximum_count: 1,
+          direction: :asc
+        )
+      )
+    end.sort_by(&:global_position)
   end
 
   def command_events(command_id)

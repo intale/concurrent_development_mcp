@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Events
+      class WorkItemMadeReadyV2 < Base
+        def work_item_id: () -> String
+        def change_set_id: () -> String
+        def readiness_decision_id: () -> String
+        def reason: () -> String
+      end
+    end
+  end
+end

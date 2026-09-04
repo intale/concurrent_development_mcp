@@ -15,28 +15,26 @@ module Coordinator::Write
 
           stream = @stream_factory.change_set(command.change_set_id)
 
-          Success(
-            EventPlan.new(
-              writes: [
-                EventWrite.new(
-                  stream:,
-                  event: Events::ChangeSetCreatedV1.new(
-                    change_set_id: command.change_set_id,
-                    goal: command.goal,
-                    created_at: occurred_at
-                  )
-                ),
-                EventWrite.new(
-                  stream:,
-                  event: Events::ChangeSetAcceptanceCriteriaDefinedV1.new(
-                    change_set_id: command.change_set_id,
-                    acceptance_criteria: command.acceptance_criteria,
-                    defined_at: occurred_at
-                  )
-                )
-              ]
+          Success(EventPlan.new(writes: [
+            EventWrite.new(
+              stream:,
+              event: Events::ChangeSetCreatedV2.new(change_set_id: command.change_set_id)
+            ),
+            EventWrite.new(
+              stream:,
+              event: Events::ChangeSetGoalDefinedV1.new(
+                change_set_id: command.change_set_id,
+                goal: command.goal
+              )
+            ),
+            EventWrite.new(
+              stream:,
+              event: Events::ChangeSetAcceptanceCriteriaDefinedV2.new(
+                change_set_id: command.change_set_id,
+                acceptance_criteria: command.acceptance_criteria
+              )
             )
-          )
+          ]))
         end
 
         private

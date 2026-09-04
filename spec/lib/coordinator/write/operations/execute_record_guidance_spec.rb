@@ -33,13 +33,13 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordGuidance, :event_sto
     result = operation.call(input)
 
     expect(result).to be_success
-    fact = conversation_events("C-1").sole
+    fact = conversation_events("C-1").first
     expect(fact).to have_attributes(type: "UserUtteranceRecorded", stream_revision: 0)
     expect(fact.markers).to include("message:M-1", "conversation:C-1", "command:cmd-guidance-1")
     expect(fact.data).to include(
       "message_id" => "M-1",
       "conversation_id" => "C-1",
-      "source" => "mcp_client",
+      "source" => "user",
       "text" => "Do not use Redis in billing."
     )
     expect(fact.metadata).to include("actor_kind" => "agent", "actor_id" => "host-1")
@@ -49,7 +49,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordGuidance, :event_sto
         conversation_id: "C-1",
         source: "mcp_client",
         policy_status: "evidence_only",
-        recorded_at: fact.data.fetch("recorded_at")
+        recorded_at: result.value!.completed_at
       )
     )
     expect(command_events("cmd-guidance-1")).to be_empty
@@ -61,7 +61,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordGuidance, :event_sto
     )
 
     expect(result).to be_success
-    expect(conversation_events("C-1").sole.type).to eq("UserUtteranceForwardedByAgent")
+    expect(conversation_events("C-1").first.type).to eq("UserUtteranceForwardedByAgent")
   end
 
   it "leaves replay ownership to the registered Command lifecycle" do
@@ -108,7 +108,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordGuidance, :event_sto
     expect(results.count(&:success?)).to eq(1)
     expect(results.count(&:failure?)).to eq(1)
     expect(results.find(&:failure?).failure.code).to eq(:message_already_recorded)
-    expect(global_message_events("M-1").length).to eq(1)
+    expect(global_message_events("M-1").count { _1.type.start_with?("UserUtterance") }).to eq(1)
     expect(inputs.flat_map { command_events(_1.fetch(:command_id)) }).to be_empty
   end
 

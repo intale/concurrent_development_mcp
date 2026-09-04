@@ -16,84 +16,77 @@ module Coordinator::Write
         command = values[:command]
         streams = values[:stream_factory]
         candidate = state.candidate
-        events = plan.events
-        expected_count = 2 + candidate.partitions.length + (candidate.slot ? 2 : 0)
+        expected_count = 3 + candidate.partitions.length + (candidate.slot ? 2 : 0)
 
-        key(:plan).failure("must contain the complete activation event set") unless events.length == expected_count
-        validate_decision_writes(key, plan, candidate, command, streams)
-        validate_slot_writes(key, plan, candidate, command, streams)
-        validate_partition_writes(key, plan, state, command, streams)
+        key(:plan).failure("must contain the complete activation fact set") unless plan.events.length == expected_count
+        validate_decision_facts(key, plan, candidate, command, streams)
+        validate_slot_facts(key, plan, candidate, command, streams)
+        validate_partition_facts(key, plan, state, command, streams)
       end
 
       private
 
-      def validate_decision_writes(key, plan, candidate, command, streams)
-        writes = plan.writes.first(2)
-        expected_stream = streams.decision(command.decision_id)
-        unless writes.map(&:event).map(&:class) == [ Events::DecisionRecordedV1, Events::DecisionActivatedV1 ]
-          key.failure("must begin with DecisionRecorded and DecisionActivated")
+      def validate_decision_facts(key, plan, candidate, command, streams)
+        writes = plan.writes.first(3)
+        expected_types = [
+          Events::DecisionRecordedV2,
+          Events::DecisionDerivedFromInterpretationV1,
+          Events::DecisionActivatedV2
+        ]
+        unless writes.map { _1.event.class } == expected_types
+          key.failure("must begin with recorded, derivation, and activation facts")
           return
         end
+        expected_stream = streams.decision(command.decision_id)
         key.failure("Decision facts must share the command Decision stream") unless writes.all? { _1.stream == expected_stream }
 
-        recorded, activated = writes.map(&:event)
-        unless recorded.decision_id == command.decision_id && activated.decision_id == command.decision_id
-          key.failure("Decision fact identities must match the command")
+        recorded, derived, activated = writes.map(&:event)
+        unless [ recorded, derived, activated ].all? { _1.decision_id == command.decision_id } &&
+               [ recorded, derived, activated ].all? { _1.interpretation_id == command.interpretation_id } &&
+               recorded.definition == candidate.definition.document
+          key.failure("Decision facts must retain the decided identities and definition")
         end
-        unless recorded.interpretation_id == command.interpretation_id && activated.interpretation_id == command.interpretation_id
-          key.failure("Interpretation identities must match the command")
-        end
-        key.failure("activation must reference its planned recorded fact") unless activated.recorded_event == candidate.recorded_event
-        key.failure("activation must retain the normalized definition digest") unless activated.definition_digest == candidate.definition.digest
-        key.failure("activation must retain the derived partitions") unless activated.partitions == candidate.partitions
       end
 
-      def validate_slot_writes(key, plan, candidate, command, streams)
-        offset = 2
-        slot_writes = plan.writes.slice(offset, candidate.slot ? 2 : 0)
-        return key.failure("set-union activation must not write a DecisionSlot") unless candidate.slot || slot_writes.empty?
+      def validate_slot_facts(key, plan, candidate, command, streams)
+        writes = plan.writes.drop(3).first(candidate.slot ? 2 : 0)
+        return key.failure("set-union activation must not write a DecisionSlot") unless candidate.slot || writes.empty?
         return unless candidate.slot
 
-        unless slot_writes.map(&:event).map(&:class) == [ Events::DecisionSlotOpenedV1, Events::DecisionSlotHeadChangedV1 ]
+        unless writes.map { _1.event.class } == [ Events::DecisionSlotOpenedV2, Events::DecisionSlotHeadChangedV2 ]
           key.failure("exclusive activation must open and assign exactly one DecisionSlot")
           return
         end
         expected_stream = streams.decision_slot(candidate.slot.slot_id)
-        key.failure("DecisionSlot facts must share the canonical slot stream") unless slot_writes.all? { _1.stream == expected_stream }
+        key.failure("DecisionSlot facts must share the canonical slot stream") unless writes.all? { _1.stream == expected_stream }
 
-        opened, changed = slot_writes.map(&:event)
-        key.failure("DecisionSlot identity must retain the canonical slot") unless opened.slot == candidate.slot && changed.slot_id == candidate.slot.slot_id
-        key.failure("new DecisionSlot must have no previous head") unless changed.previous_head.nil?
-        unless opened.opened_by == changed.head && changed.head.decision_id == command.decision_id
-          key.failure("DecisionSlot head must reference the activation")
+        opened, changed = writes.map(&:event)
+        unless opened.slot_id == candidate.slot.slot_id &&
+               opened.slot == candidate.slot.document &&
+               opened.opened_by == command.decision_id &&
+               changed.slot_id == candidate.slot.slot_id &&
+               changed.head.decision_id == command.decision_id &&
+               changed.head.event == candidate.activated_event
+          key.failure("DecisionSlot facts must retain the canonical slot and activation head")
         end
       end
 
-      def validate_partition_writes(key, plan, state, command, streams)
-        offset = state.candidate.slot ? 4 : 2
-        writes = plan.writes.drop(offset)
-        unless writes.length == state.partition_states.length && writes.all? { _1.event.is_a?(Events::DecisionPartitionAdvancedV1) }
-          key.failure("must advance every and only derived DecisionPartition")
+      def validate_partition_facts(key, plan, state, command, streams)
+        writes = plan.writes.drop(state.candidate.slot ? 5 : 3)
+        unless writes.length == state.partition_states.length &&
+               writes.all? { _1.event.is_a?(Events::DecisionAddedToPartitionV1) }
+          key.failure("must add the Decision to every and only derived partition")
           return
         end
 
         writes.zip(state.partition_states).each do |write, partition_state|
           event = write.event
           expected_revision = partition_state.latest_revision ? partition_state.latest_revision + 1 : 0
-          expected_head = Decisions::DecisionHeadV1.new(
-            decision_id: command.decision_id,
-            decision_revision: state.candidate.activated_event.stream_revision,
-            event: state.candidate.activated_event
-          )
-          expected_heads = (partition_state.active_decisions + [ expected_head ])
-            .uniq(&:decision_id)
-            .sort_by { _1.decision_id.b }
           unless write.stream == streams.decision_partition(partition_state.partition.partition_id) &&
-                 event.partition == partition_state.partition &&
+                 event.partition_id == partition_state.partition.partition_id &&
                  event.partition_revision == expected_revision &&
-                 event.decision == expected_head &&
-                 event.active_decisions == expected_heads
-            key.failure("DecisionPartition write does not match its authoritative predecessor")
+                 event.decision_id == command.decision_id
+            key.failure("Decision partition fact does not match its authoritative predecessor")
           end
         end
       end

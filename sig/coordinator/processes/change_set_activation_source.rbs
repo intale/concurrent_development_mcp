@@ -3,7 +3,7 @@ module Coordinator
     class ChangeSetActivationSource < Shared::Value
       def event: () -> PgEventstore::Event
       def reference: () -> Write::EventReference
-      def payload: () -> Write::Events::ChangeSetActivatedV1
+      def payload: () -> (Write::Events::ChangeSetActivatedV1 | Write::Events::ChangeSetActivatedV2)
     end
   end
 end

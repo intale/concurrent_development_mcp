@@ -4,7 +4,7 @@ module Coordinator::Write
   module Operations
     class ExecuteAbandonAttempt < Dry::Operation
       TOOL_NAME = "attempt_abandon"
-      POLICY_VERSION = "attempt-abandonment/v1"
+      POLICY_VERSION = "attempt-abandonment/v2"
 
       class PreparedV1 < Value
         attribute :abandoned_at, Types::Timestamp
@@ -14,8 +14,6 @@ module Coordinator::Write
         attribute :attempt_event_id, Types::UuidV7
         attribute :work_item_event_id, Types::UuidV7
       end
-
-      class InvalidEventPlan < StandardError; end
 
       def initialize(
         event_store:,
@@ -27,7 +25,11 @@ module Coordinator::Write
         event_factory: EventFactory.new,
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
-        event_plan_contract: Contracts::AttemptAbandonmentEventPlan.new
+        set_loader: WorkIntentionSetLoader.new(event_store:),
+        intention_loader: WorkIntentionLoader.new(event_store:),
+        resource_loader: WorkIntentionResourceLoader.new(event_store:),
+        repository_registration_loader: RepositoryRegistrationLoader.new(event_store:),
+        repository_marker_builder: RepositoryMarkerBuilder.new
       )
         @event_store = event_store
         @contract = contract
@@ -38,7 +40,11 @@ module Coordinator::Write
         @event_factory = event_factory
         @schema_registry = schema_registry
         @stream_factory = stream_factory
-        @event_plan_contract = event_plan_contract
+        @set_loader = set_loader
+        @intention_loader = intention_loader
+        @resource_loader = resource_loader
+        @repository_registration_loader = repository_registration_loader
+        @repository_marker_builder = repository_marker_builder
       end
 
       def call(input)
@@ -65,9 +71,8 @@ module Coordinator::Write
       end
 
       def call_command(command, caused_by: nil)
+        prepared = prepare_logical_values(command)
         steps do
-          prepared = prepare_logical_values(command)
-
           step @event_store.multiple { execute_attempt(command:, prepared:, caused_by:) }
         end
       end
@@ -88,67 +93,47 @@ module Coordinator::Write
           input_digest: @input_digest.call(command),
           resource_event_ids: 32.times.map { @id_generator.uuid_v7 },
           attempt_event_id: @id_generator.uuid_v7,
-          work_item_event_id: @id_generator.uuid_v7,
+          work_item_event_id: @id_generator.uuid_v7
         )
       end
 
       def execute_attempt(command:, prepared:, caused_by:)
-        attempt_state = load_attempt_state(command.attempt_id)
-        current_observations = load_current_observations(attempt_state)
-        decision = @decider.call(
-          attempt_state:,
-          work_item_state: load_work_item_state(command.work_item_id),
-          current_observations:,
-          command:,
-          abandoned_at: prepared.abandoned_at
-        )
-        return decision if decision.failure?
-
-        plan = decision.value!
-        verify_event_plan!(
-          plan,
-          command:,
-          attempt_state:,
-          abandoned_at: prepared.abandoned_at
-        )
-        persisted_events = persist_domain_plan(
-          plan,
-          command:,
-          prepared:,
-          caused_by:
-        )
-        completion = build_completion(
-          command:,
-          input_digest: prepared.input_digest,
-          persisted_events:,
-          abandoned_at: prepared.abandoned_at
-        )
-
-        Success(completion)
+        steps do
+          set_state = @set_loader.find_by_attempt(command.attempt_id) || Domain::WorkIntentions::SetState.initial
+          member_states = set_state.members.map { @intention_loader.call(_1.intention_id).state }
+          plan = step @decider.call(
+            attempt_state: load_attempt_state(command.attempt_id),
+            work_item_state: load_work_item_state(command.work_item_id),
+            set_state:,
+            member_states:,
+            command:,
+            abandoned_at: prepared.abandoned_at
+          )
+          persisted = step persist_domain_plan(
+            plan,
+            command:,
+            prepared:,
+            member_states:,
+            caused_by:
+          )
+          Success(
+            build_completion(
+              command:,
+              input_digest: prepared.input_digest,
+              persisted_events: persisted,
+              member_count: member_states.length,
+              abandoned_at: prepared.abandoned_at
+            )
+          )
+        end
       end
 
       def load_attempt_state(attempt_id)
-        stream = @stream_factory.attempt(attempt_id)
-        membership = @event_store.read(
-          stream,
-          EventQueries::ATTEMPT_FOR_WRITE_SET_EXPANSION
-        )
-        latest_lifecycle = @event_store.read_grouped(
-          stream,
-          GroupedEventReadCriteria.new(
-            event_types: [
-              "WriteSetRenewed",
-              "WriteSetReleased",
-              "CandidateAttachedToAttempt",
-              "AttemptAbandoned",
-              "AttemptCompleted"
-            ],
-            direction: :desc
-          )
-        ).reverse
-
-        events = SpecificStreamEventSequence.merge(membership, latest_lifecycle)
-        Domain::Attempts::State.reduce(events.map { load_event(_1) })
+        events = @event_store.read(
+          @stream_factory.attempt(attempt_id),
+          EventQueries::ATTEMPT_FOR_WORK_INTENTIONS
+        ).map { deserialize(_1) }
+        Domain::Attempts::State.reduce(events)
       end
 
       def load_work_item_state(work_item_id)
@@ -157,6 +142,11 @@ module Coordinator::Write
           GroupedEventReadCriteria.new(
             event_types: [
               "WorkItemCreated",
+              "WorkItemAddedToChangeSet",
+              "WorkItemAssignedToRepository",
+              "WorkItemGoalDefined",
+              "WorkItemAcceptanceCriteriaDefined",
+              "WorkItemCompetitiveModeSelected",
               "WorkItemMadeReady",
               "WorkItemAcquired",
               "WorkItemRequeued",
@@ -165,106 +155,80 @@ module Coordinator::Write
             ],
             direction: :desc
           )
-        ).reverse.map { load_event(_1) }
-
+        ).reverse.map { deserialize(_1) }
         Domain::WorkItems::State.reduce(events)
       end
 
-      def load_current_observations(attempt_state)
-        attempt_state.lease_resources.map do |reference|
-          CurrentLeaseObservationV2.new(
-            reference:,
-            state: load_lease_state(reference.resource_id)
-          )
-        end
-      end
-
-      def load_lease_state(resource_identity)
-        events = @event_store.read_grouped(
-          @stream_factory.resource_lease(resource_identity),
-          EventQueries::RESOURCE_LEASE_FOR_RESERVATION
-        ).reverse.map { load_event(_1) }
-
-        Domain::ResourceLeases::State.reduce(events)
-      end
-
-      def load_event(event)
-        @schema_registry.load(
-          type: event.type,
-          schema_version: event.metadata.fetch("schema_version"),
-          data: event.data
-        )
-      end
-
-      def verify_event_plan!(plan, command:, attempt_state:, abandoned_at:)
-        result = @event_plan_contract.call(
-          plan:,
-          command:,
-          attempt_state:,
-          abandoned_at:
-        )
-        return if result.success?
-
-        raise InvalidEventPlan, result.errors.to_h.inspect
-      end
-
-      def persist_domain_plan(plan, command:, prepared:, caused_by:)
-        resource_count = plan.writes.length - 2
-        event_ids = prepared.resource_event_ids.first(resource_count) + [
+      def persist_domain_plan(plan, command:, prepared:, member_states:, caused_by:)
+        withdrawals = plan.events.grep(Events::ResourceWorkIntentionWithdrawnV1)
+        event_ids = prepared.resource_event_ids.first(withdrawals.length) + [
           prepared.attempt_event_id,
           prepared.work_item_event_id
         ]
+        resources = load_resources(member_states.select { |state| withdrawals.any? { _1.intention_id == state.intention_id } })
+        return resources if resources.failure?
 
-        plan.writes.zip(event_ids).map do |write, event_id|
-          event = @event_factory.build!(
-            event: write.event,
+        persisted = plan.writes.zip(event_ids).map do |write, event_id|
+          event = write.event
+          physical = @event_factory.build!(
+            event:,
             event_id:,
             metadata: command_metadata(command),
-            markers: event_markers(command, write.event),
+            markers: event_markers(command, event, member_states:, resources: resources.value!),
             caused_by:
           )
-
-          @event_store.append(write.stream, [ event ]).fetch(0)
+          @event_store.append(write.stream, [ physical ]).fetch(0)
         end
+        Success(persisted)
       end
 
-      def event_markers(command, event)
+      def load_resources(states)
+        resources = states.map do |state|
+          target = ResourceLeaseTargetV1.new(
+            resource_id: state.resource_id,
+            base_blob_oid: state.base_blob_oid
+          )
+          result = @resource_loader.call(target, repository_id: state.repository_id)
+          return result if result.failure?
+
+          registration = @repository_registration_loader.call(state.repository_id)
+          return repository_not_registered(state.repository_id) unless registration
+
+          [ state.intention_id, result.value!, registration ]
+        end
+        Success(resources)
+      end
+
+      def event_markers(command, event, member_states:, resources:)
         common = [
           "change-set:#{command.change_set_id}",
           "work-item:#{command.work_item_id}",
           "attempt:#{command.attempt_id}",
           "command:#{command.command_id}"
         ]
-        lease_set_id =
-          case event
-          when Events::ResourceLeaseReleasedV2,
-               Events::AttemptAbandonedV2
-            event.lease_set_id
-          end
-        common << "lease-set:#{lease_set_id}" if lease_set_id
-        return common unless event.is_a?(Events::ResourceLeaseReleasedV2)
+        return common unless event.is_a?(Events::ResourceWorkIntentionWithdrawnV1)
 
+        state = member_states.find { _1.intention_id == event.intention_id }
+        _intention_id, resource, registration = resources.find { _1.first == event.intention_id }
         common + [
-          "repository:#{event.repository_id}",
-          "resource:#{event.resource_id}",
-          "resource-kind:#{event.resource_kind}",
-          *RepositoryMarkerBuilder.new.resource_event_markers(
-            repository_id: event.repository_id,
-            resource_kind: event.resource_kind,
-            resource_path: event.resource_path
+          "work-intention-set:#{state.set_id}",
+          "work-intention:#{state.intention_id}",
+          "resource:#{state.resource_id}",
+          "resource-kind:#{resource.kind}",
+          *@repository_marker_builder.call(registration),
+          *@repository_marker_builder.work_intention_event_markers(
+            repository_id: state.repository_id,
+            resource_path: resource.path
           )
         ]
       end
 
-      def build_completion(command:, input_digest:, persisted_events:, abandoned_at:)
-        abandonment = persisted_events[-2]
-        released_count = abandonment.data.fetch("released_leases").length
-        untouched_count = abandonment.data.fetch("untouched_resource_ids").length
-        warnings = [
-          "Reacquire the WorkItem with a fresh Attempt ID and base snapshot before resuming."
-        ]
+      def build_completion(command:, input_digest:, persisted_events:, member_count:, abandoned_at:)
+        withdrawn_count = persisted_events.count { _1.type == "ResourceWorkIntentionWithdrawn" }
+        untouched_count = member_count - withdrawn_count
+        warnings = [ "Reacquire the WorkItem with a fresh Attempt ID and base snapshot before resuming." ]
         if untouched_count.positive?
-          warnings << "#{untouched_count} recorded lease fence(s) were already inactive or superseded and were left untouched."
+          warnings << "#{untouched_count} work intention(s) were already inactive and were left unchanged."
         end
 
         CommandResultV1.new(
@@ -272,7 +236,7 @@ module Coordinator::Write
           tool_name: TOOL_NAME,
           canonical_input_digest: input_digest,
           status: "ok",
-          summary: "Attempt abandoned; WorkItem requeued; #{released_count} current lease fence(s) released.",
+          summary: "Attempt abandoned; WorkItem requeued; #{withdrawn_count} active work intention(s) withdrawn.",
           receipt: command.command_id,
           data: CommandReceiptData::Attempt.new(
             change_set_id: command.change_set_id,
@@ -297,6 +261,14 @@ module Coordinator::Write
         )
       end
 
+      def deserialize(event)
+        @schema_registry.load(
+          type: event.type,
+          schema_version: event.metadata.fetch("schema_version"),
+          data: event.data
+        )
+      end
+
       def command_metadata(command)
         EventMetadata.new(
           command_id: command.command_id,
@@ -304,6 +276,16 @@ module Coordinator::Write
           actor_id: command.actor.id,
           recorded_by: "coordinator",
           policy_version: POLICY_VERSION
+        )
+      end
+
+      def repository_not_registered(repository_id)
+        Failure(
+          OutcomeError.new(
+            code: :repository_not_registered,
+            message: "Repository is not registered",
+            details: { repository_id: }
+          )
         )
       end
     end

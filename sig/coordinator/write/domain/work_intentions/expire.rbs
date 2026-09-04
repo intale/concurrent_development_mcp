@@ -1,0 +1,16 @@
+module Coordinator
+  module Write
+    module Domain
+      module WorkIntentions
+        class Expire
+          def initialize: (?stream_factory: StreamFactory) -> void
+          def call: (
+            state: State,
+            command: Commands::ExpireResourceLease,
+            observed_at: String
+          ) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

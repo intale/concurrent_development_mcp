@@ -42,7 +42,7 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Acquire do
     )
   end
 
-  it "implements EXE-01-SUCCESS-01 as one ordered three-event command plan" do
+  it "implements EXE-01-SUCCESS-01 as cohesive Attempt facts followed by WorkItem acquisition" do
     result = decider.call(
       change_set_state:,
       work_item_state:,
@@ -52,29 +52,33 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Acquire do
     )
 
     expect(result).to be_success
-    expect(result.value!.writes.map { _1.stream.stream_name }).to eq([ "WorkItem", "Attempt", "Attempt" ])
+    expect(result.value!.writes.map { _1.stream.stream_name }).to eq(
+      [ "Attempt", "Attempt", "Attempt", "Attempt", "Attempt", "WorkItem" ]
+    )
     expect(result.value!.events).to eq(
       [
-        Coordinator::Write::Events::WorkItemAcquiredV1.new(
+        Coordinator::Write::Events::AttemptAuthorizedV2.new(attempt_id: "A-300"),
+        Coordinator::Write::Events::AttemptAssignedToWorkItemV1.new(
+          attempt_id: "A-300",
           change_set_id: "CS-100",
-          work_item_id: "W-200",
+          work_item_id: "W-200"
+        ),
+        Coordinator::Write::Events::AttemptAssignedToAgentV1.new(
           attempt_id: "A-300",
           agent_id: "agent-a",
-          acquired_at: occurred_at
         ),
-        Coordinator::Write::Events::AttemptAuthorizedV1.new(
+        Coordinator::Write::Events::AttemptBaseSnapshotRecordedV1.new(
           attempt_id: "A-300",
-          change_set_id: "CS-100",
-          work_item_id: "W-200",
-          agent_id: "agent-a",
-          base_snapshots: [ snapshot ],
-          authorized_at: occurred_at
+          repository_id: snapshot.repository_id,
+          object_format: snapshot.object_format,
+          commit_oid: snapshot.commit_oid
         ),
-        Coordinator::Write::Events::AttemptStartedV1.new(
-          attempt_id: "A-300",
-          change_set_id: "CS-100",
+        Coordinator::Write::Events::AttemptStartedV2.new(attempt_id: "A-300"),
+        Coordinator::Write::Events::WorkItemAcquiredV2.new(
           work_item_id: "W-200",
-          started_at: occurred_at
+          change_set_id: "CS-100",
+          attempt_id: "A-300",
+          agent_id: "agent-a"
         )
       ]
     )

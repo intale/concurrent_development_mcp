@@ -49,40 +49,52 @@ module Coordinator::Write
         end
 
         def build_plan(command:, occurred_at:)
-          EventPlan.new(
-            writes: [
+          attempt_stream = @stream_factory.attempt(command.attempt_id)
+          EventPlan.new(writes: [
+            EventWrite.new(
+              stream: attempt_stream,
+              event: Events::AttemptAuthorizedV2.new(attempt_id: command.attempt_id)
+            ),
+            EventWrite.new(
+              stream: attempt_stream,
+              event: Events::AttemptAssignedToWorkItemV1.new(
+                attempt_id: command.attempt_id,
+                change_set_id: command.change_set_id,
+                work_item_id: command.work_item_id
+              )
+            ),
+            EventWrite.new(
+              stream: attempt_stream,
+              event: Events::AttemptAssignedToAgentV1.new(
+                attempt_id: command.attempt_id,
+                agent_id: command.actor.id
+              )
+            ),
+            *command.base_snapshots.map do |snapshot|
               EventWrite.new(
-                stream: @stream_factory.work_item(command.work_item_id),
-                event: Events::WorkItemAcquiredV1.new(
-                  change_set_id: command.change_set_id,
-                  work_item_id: command.work_item_id,
+                stream: attempt_stream,
+                event: Events::AttemptBaseSnapshotRecordedV1.new(
                   attempt_id: command.attempt_id,
-                  agent_id: command.actor.id,
-                  acquired_at: occurred_at
-                )
-              ),
-              EventWrite.new(
-                stream: @stream_factory.attempt(command.attempt_id),
-                event: Events::AttemptAuthorizedV1.new(
-                  attempt_id: command.attempt_id,
-                  change_set_id: command.change_set_id,
-                  work_item_id: command.work_item_id,
-                  agent_id: command.actor.id,
-                  base_snapshots: command.base_snapshots,
-                  authorized_at: occurred_at
-                )
-              ),
-              EventWrite.new(
-                stream: @stream_factory.attempt(command.attempt_id),
-                event: Events::AttemptStartedV1.new(
-                  attempt_id: command.attempt_id,
-                  change_set_id: command.change_set_id,
-                  work_item_id: command.work_item_id,
-                  started_at: occurred_at
+                  repository_id: snapshot.repository_id,
+                  object_format: snapshot.object_format,
+                  commit_oid: snapshot.commit_oid
                 )
               )
-            ]
-          )
+            end,
+            EventWrite.new(
+              stream: attempt_stream,
+              event: Events::AttemptStartedV2.new(attempt_id: command.attempt_id)
+            ),
+            EventWrite.new(
+              stream: @stream_factory.work_item(command.work_item_id),
+              event: Events::WorkItemAcquiredV2.new(
+                work_item_id: command.work_item_id,
+                change_set_id: command.change_set_id,
+                attempt_id: command.attempt_id,
+                agent_id: command.actor.id
+              )
+            )
+          ])
         end
 
         def failure(code, message, command)

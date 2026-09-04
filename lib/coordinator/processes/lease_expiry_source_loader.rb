@@ -16,12 +16,16 @@ module Coordinator::Processes
 
     def call(locator)
       event = @event_store.read_at(
-        @stream_factory.resource_lease(locator.resource_stream_id),
+        @stream_factory.resource_work_intention(locator.resource_stream_id),
         locator.stream_revision
       )
       raise InvalidSourceEvent, "scheduled lease-expiry source event is unavailable" unless event
 
       source = @source_builder.call(event)
+      loaded = Coordinator::Write::WorkIntentionLoader.new(event_store: @event_store).call(
+        locator.resource_stream_id
+      )
+      source = LeaseExpirySource.new(source.attributes.merge(state: loaded.state))
       result = @reloaded_source_contract.call(locator:, source:)
       raise InvalidSourceEvent, result.errors.to_h.inspect if result.failure?
 

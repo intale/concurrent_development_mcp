@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class ChangeSetGoalDefinedV1 < Base
+        def change_set_id: () -> String
+        def goal: () -> String
+      end
+    end
+  end
+end

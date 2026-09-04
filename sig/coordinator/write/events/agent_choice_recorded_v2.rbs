@@ -1,0 +1,17 @@
+module Coordinator
+  module Write
+    module Events
+      class AgentChoiceRecordedV2 < Base
+        Option: singleton(AgentChoices::ChoiceOptionV1)
+
+        def choice_id: () -> String
+        def choice_type: () -> String
+        def selected: () -> AgentChoices::ChoiceOptionV1
+        def alternatives: () -> Array[AgentChoices::ChoiceOptionV1]
+        def context: () -> DecisionContexts::QueryContextV1
+        def decision_context: () -> DecisionContexts::ContextV1
+        def reason_summary: () -> String
+      end
+    end
+  end
+end

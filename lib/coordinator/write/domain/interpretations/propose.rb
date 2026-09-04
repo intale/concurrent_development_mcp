@@ -55,7 +55,7 @@ module Coordinator::Write
             proposed_at:
           )
 
-          Success(build_plan(command.source_message_id, proposal, assessment, proposed_at))
+          Success(build_plan(command.interpretation_id, proposal, assessment))
         end
 
         private
@@ -106,35 +106,29 @@ module Coordinator::Write
 
         def build_proposal(command:, source:, scope:, provenance:, assessment:, proposed_at:)
           submitted = command.proposed_decision
-          Events::DecisionInterpretationProposedV1.new(
+          Events::DecisionInterpretationProposedV2.new(
             interpretation_id: command.interpretation_id,
             source_message_id: command.source_message_id,
-            source_event: source.event,
-            source_span: command.source_span,
-            classifier: command.classifier,
+            source_span: command.source_span&.text || source.text,
             proposed_decision: Coordinator::Write::Interpretations::ProposedDecisionV1.new(
               submitted.to_h.merge(scope:)
             ),
-            scope_provenance: provenance,
-            ambiguities: command.ambiguities,
-            assessment:,
-            proposed_at:
+            ambiguities: command.ambiguities.map(&:description),
+            assessment: assessment.status
           )
         end
 
-        def build_plan(message_id, proposal, assessment, proposed_at)
-          stream = @stream_factory.interpretation(message_id)
+        def build_plan(interpretation_id, proposal, assessment)
+          stream = @stream_factory.interpretation(interpretation_id)
           events = [ proposal ]
           unless assessment.status == "accepted_for_activation"
-            events << Events::DecisionClarificationRequiredV1.new(
+            events << Events::DecisionClarificationRequiredV2.new(
               interpretation_id: proposal.interpretation_id,
               source_message_id: proposal.source_message_id,
-              status: assessment.status,
               origin: "proposal_assessment",
               reasons: assessment.reasons,
-              questions: assessment.questions,
-              rationale: nil,
-              required_at: proposed_at
+              questions: assessment.questions.map(&:prompt),
+              rationale: assessment.reasons.join(", ")
             )
           end
 

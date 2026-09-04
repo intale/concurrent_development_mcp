@@ -22,6 +22,7 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::State do
       repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       goal: "Implement capture validation",
       acceptance_criteria: [ "Reject duplicate ownership" ],
+      competitive_mode: false,
       status: "planned",
       active_attempt_id: nil,
       active_agent_id: nil,

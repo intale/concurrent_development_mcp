@@ -19,12 +19,7 @@ module Coordinator::Write
               writes: [
                 EventWrite.new(
                   stream: @stream_factory.change_set(command.change_set_id),
-                  event: Events::ChangeSetActivatedV1.new(
-                    change_set_id: command.change_set_id,
-                    work_item_count: state.work_item_ids.length,
-                    dependency_count: state.dependencies.length,
-                    activated_at: occurred_at
-                  )
+                  event: Events::ChangeSetActivatedV2.new(change_set_id: command.change_set_id)
                 )
               ]
             )

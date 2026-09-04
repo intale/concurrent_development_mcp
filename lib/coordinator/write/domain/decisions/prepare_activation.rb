@@ -51,10 +51,12 @@ module Coordinator::Write
 
           accepted = acceptance.acceptance
           proposed = proposal.proposal
-          accepted.interpretation_id == command.interpretation_id &&
+          identities_match = accepted.interpretation_id == command.interpretation_id &&
             proposed.interpretation_id == command.interpretation_id &&
-            accepted.source_message_id == proposed.source_message_id &&
-            accepted.proposal_event == proposal.event
+            accepted.source_message_id == proposed.source_message_id
+          return false unless identities_match
+
+          !accepted.respond_to?(:proposal_event) || accepted.proposal_event == proposal.event
         end
 
         def not_accepted(command)

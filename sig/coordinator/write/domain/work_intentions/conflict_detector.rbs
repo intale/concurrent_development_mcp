@@ -1,0 +1,18 @@
+module Coordinator
+  module Write
+    module Domain
+      module WorkIntentions
+        class ConflictDetector
+          def call: (
+            requests: Array[RequestedWorkIntentionV1],
+            observations: Array[WorkIntentionObservationV1],
+            at: String,
+            ?ignored_intention_ids: Array[String]
+          ) -> Array[WorkIntentionObservationV1]
+
+          def details: (Array[WorkIntentionObservationV1] observations) -> Hash[Symbol, untyped]
+        end
+      end
+    end
+  end
+end

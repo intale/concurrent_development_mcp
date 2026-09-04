@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    class PreparedWorkIntentionTargetV1 < Shared::Value
+      def target: () -> ResourceLeaseTargetV1
+      def intention_id: () -> String
+      def declaration_event_id: () -> String
+      def membership_event_id: () -> String
+    end
+  end
+end

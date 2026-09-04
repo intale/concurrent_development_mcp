@@ -13,7 +13,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteProposeDecisionInterpretat
     result = operation.call(InterpretationInput.build)
 
     expect(result).to be_success
-    fact = interpretation_events("M-1").sole
+    fact = interpretation_events("I-1").sole
     expect(fact).to have_attributes(type: "DecisionInterpretationProposed", stream_revision: 0)
     expect(fact.markers).to include(
       "message:M-1",
@@ -23,14 +23,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteProposeDecisionInterpretat
     expect(fact.data).to include(
       "interpretation_id" => "I-1",
       "source_message_id" => "M-1",
-      "assessment" => include("status" => "accepted_for_activation")
+      "assessment" => "accepted_for_activation"
     )
-    expect(fact.data.fetch("source_event")).to include(
-      "type" => "UserUtteranceRecorded",
-      "stream_context" => "HumanGuidance",
-      "stream_name" => "Conversation"
-    )
-    expect(result.value!.data.assessment.status).to eq("accepted_for_activation")
+    expect(fact.metadata).to include("classifier", "scope_provenance")
+    expect(result.value!.data.assessment).to eq("accepted_for_activation")
     expect(command_events("cmd-interpretation-1")).to be_empty
   end
 
@@ -46,7 +42,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteProposeDecisionInterpretat
     )
 
     result = operation.call(input)
-    facts = interpretation_events("M-1")
+    facts = interpretation_events("I-1")
 
     expect(result).to be_success
     expect(facts.map(&:type)).to eq(%w[
@@ -54,7 +50,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteProposeDecisionInterpretat
       DecisionClarificationRequired
     ])
     expect(facts.map(&:stream_revision)).to eq([ 0, 1 ])
-    expect(result.value!.data.assessment.status).to eq("confirmation_required")
+    expect(result.value!.data.assessment).to eq("confirmation_required")
     expect(result.value!.emitted_events.map(&:type)).to eq(facts.map(&:type))
   end
 
@@ -85,7 +81,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteProposeDecisionInterpretat
       source_span_mismatch
       interpretation_already_proposed
     ])
-    expect(interpretation_events("M-1").length).to eq(1)
+    expect(interpretation_events("I-1").length).to eq(1)
     expect(command_events("cmd-interpretation-missing")).to be_empty
     expect(command_events("cmd-interpretation-span")).to be_empty
     expect(command_events("cmd-interpretation-duplicate")).to be_empty
@@ -109,7 +105,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteProposeDecisionInterpretat
     end.map(&:value)
 
     expect(results).to all(be_success)
-    expect(interpretation_events("M-1").count { _1.type == "DecisionInterpretationProposed" }).to eq(2)
+    facts = %w[I-A I-B].flat_map { interpretation_events(_1) }
+    expect(facts.count { _1.type == "DecisionInterpretationProposed" }).to eq(2)
     expect(inputs.flat_map { command_events(_1.fetch(:command_id)) }).to be_empty
   end
 
@@ -128,9 +125,11 @@ RSpec.describe Coordinator::Write::Operations::ExecuteProposeDecisionInterpretat
     end
 
     expect(results).to all(be_success)
-    proposals = interpretation_events("M-1").select { _1.type == "DecisionInterpretationProposed" }
+    proposals = levels.each_index.map do |index|
+      interpretation_events("I-impact-policy-#{index}").find { _1.type == "DecisionInterpretationProposed" }
+    end
     expect(proposals.map { _1.data.dig("proposed_decision", "enforcement", "level") }).to eq(levels)
-    expect(proposals.map { _1.data.dig("assessment", "status") }.uniq).to eq([ "confirmation_required" ])
+    expect(proposals.map { _1.data.fetch("assessment") }.uniq).to eq([ "confirmation_required" ])
     expect(levels.each_index.flat_map { command_events("cmd-impact-policy-#{_1}") }).to be_empty
   end
 
@@ -182,9 +181,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteProposeDecisionInterpretat
     )
   end
 
-  def interpretation_events(message_id)
+  def interpretation_events(interpretation_id)
     event_store.read(
-      streams.interpretation(message_id),
+      streams.interpretation(interpretation_id),
       Coordinator::Write::EventReadCriteria.new(
         event_types: %w[DecisionInterpretationProposed DecisionClarificationRequired],
         maximum_count: 20,

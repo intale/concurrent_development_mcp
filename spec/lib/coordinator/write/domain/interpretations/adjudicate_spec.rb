@@ -71,13 +71,12 @@ RSpec.describe Coordinator::Write::Domain::Interpretations::Adjudicate do
 
     expect(result).to be_success
     event = result.value!.events.sole
-    expect(event).to be_a(Coordinator::Write::Events::DecisionInterpretationAcceptedV1)
+    expect(event).to be_a(Coordinator::Write::Events::DecisionInterpretationAcceptedV2)
     expect(event).to have_attributes(
       interpretation_id: "I-1",
       source_message_id: "M-1",
-      proposal_event: proposal_evidence.event,
       slot:,
-      accepted_at: adjudicated_at
+      rationale: "The proposed reading matches the intended guidance."
     )
   end
 
@@ -90,8 +89,8 @@ RSpec.describe Coordinator::Write::Domain::Interpretations::Adjudicate do
     )
 
     event = result.value!.events.sole
-    expect(event).to be_a(Coordinator::Write::Events::DecisionInterpretationRejectedV1)
-    expect(event.rationale.code).to eq("incorrect_scope")
+    expect(event).to be_a(Coordinator::Write::Events::DecisionInterpretationRejectedV2)
+    expect(event.rationale).to eq("Scope is incorrect.")
   end
 
   it "implements GDN-03-CLARIFY-01" do
@@ -103,8 +102,8 @@ RSpec.describe Coordinator::Write::Domain::Interpretations::Adjudicate do
     )
 
     event = result.value!.events.sole
-    expect(event).to be_a(Coordinator::Write::Events::DecisionClarificationRequiredV1)
-    expect(event).to have_attributes(origin: "adjudication", status: "needs_classification")
+    expect(event).to be_a(Coordinator::Write::Events::DecisionClarificationRequiredV2)
+    expect(event).to have_attributes(origin: "adjudication")
     expect(event.questions.length).to eq(1)
   end
 

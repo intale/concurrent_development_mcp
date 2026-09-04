@@ -17,7 +17,8 @@ module Coordinator::Write
         stream_factory: StreamFactory.new,
         completion_builder: CommandResultBuilder.new,
         repository_registration_loader: RepositoryRegistrationLoader.new(event_store:),
-        repository_marker_builder: RepositoryMarkerBuilder.new
+        repository_marker_builder: RepositoryMarkerBuilder.new,
+        change_set_state_loader: ChangeSets::StateLoader.new(event_store:)
       )
         @event_store = event_store
         @preparer = preparer
@@ -31,6 +32,7 @@ module Coordinator::Write
         @completion_builder = completion_builder
         @repository_registration_loader = repository_registration_loader
         @repository_marker_builder = repository_marker_builder
+        @change_set_state_loader = change_set_state_loader
       end
 
       def call(input)
@@ -52,7 +54,7 @@ module Coordinator::Write
         {
           occurred_at: @clock.now,
           input_digest: @input_digest.work_item_create(command),
-          domain_event_ids: 2.times.map { @id_generator.uuid_v7 }.freeze,
+          domain_event_ids: 6.times.map { @id_generator.uuid_v7 }.freeze,
         }.freeze
       end
 
@@ -85,12 +87,7 @@ module Coordinator::Write
       end
 
       def load_change_set_state(change_set_id)
-        events = @event_store.read(
-          @stream_factory.change_set(change_set_id),
-          EventQueries::CHANGE_SET_FOR_WORK_ITEM_CREATION
-        ).map { load_event(_1) }
-
-        Domain::ChangeSets::State.reduce(events)
+        @change_set_state_loader.call(change_set_id)
       end
 
       def load_work_item_state(work_item_id)
@@ -118,17 +115,16 @@ module Coordinator::Write
         validate_domain_plan!(plan, command:, event_ids:)
         metadata = command_metadata(command)
 
-        plan.writes.zip(event_ids).map do |write, event_id|
-          event = @event_factory.build!(
+        physical_events = plan.writes.zip(event_ids).map do |write, event_id|
+          @event_factory.build!(
             event: write.event,
             event_id:,
             metadata:,
             markers: markers_for(command, repository_registration:),
             caused_by:
           )
-
-          @event_store.append(write.stream, [ event ]).fetch(0)
         end
+        @event_store.append(plan.writes.first.stream, physical_events)
       end
 
       def validate_domain_plan!(plan, command:, event_ids:)
@@ -136,13 +132,14 @@ module Coordinator::Write
           raise "Prepared event ID count does not match the decided write plan"
         end
 
-        expected_streams = [
-          @stream_factory.work_item(command.work_item_id),
-          @stream_factory.change_set(command.change_set_id)
-        ]
+        expected_streams = [ @stream_factory.work_item(command.work_item_id) ] * 6
         expected_event_classes = [
-          Events::WorkItemCreatedV1,
-          Events::WorkItemAddedToChangeSetV1
+          Events::WorkItemCreatedV2,
+          Events::WorkItemAddedToChangeSetV2,
+          Events::WorkItemAssignedToRepositoryV1,
+          Events::WorkItemGoalDefinedV1,
+          Events::WorkItemAcceptanceCriteriaDefinedV1,
+          Events::WorkItemCompetitiveModeSelectedV1
         ]
 
         unless plan.writes.map(&:stream) == expected_streams && plan.events.map(&:class) == expected_event_classes

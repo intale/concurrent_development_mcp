@@ -1,0 +1,8 @@
+module Coordinator
+  module Write
+    module WorkIntentionPolicyV1
+      VERSION: String
+      MAXIMUM_SET_SIZE: Integer
+    end
+  end
+end

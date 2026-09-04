@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    class WorkIntentionSetReceiptV1 < Shared::Value
+      Reference: singleton(LeaseReferenceV2)
+
+      def lease_set_id: () -> String
+      def repository_id: () -> String
+      def policy_version: () -> String
+      def reserved_at: () -> String
+      def expires_at: () -> String
+      def resources: () -> Array[LeaseReferenceV2]
+    end
+  end
+end

@@ -48,7 +48,7 @@ module Coordinator::Write
         {
           occurred_at: @clock.now,
           input_digest: @input_digest.create_change_set(command),
-          domain_event_ids: 2.times.map { @id_generator.uuid_v7 }.freeze,
+          domain_event_ids: 3.times.map { @id_generator.uuid_v7 }.freeze,
         }.freeze
       end
 

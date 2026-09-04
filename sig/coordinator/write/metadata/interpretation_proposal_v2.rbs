@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Metadata
+      class InterpretationProposalV2 < Shared::Value
+        def classifier: () -> Interpretations::ClassifierAttributionV1
+        def scope_provenance: () -> Interpretations::DecisionScopeProvenanceV1
+      end
+    end
+  end
+end

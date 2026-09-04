@@ -43,12 +43,11 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::EvaluateReadiness do
       stream_id: "W-100"
     )
     expect(write.event).to eq(
-      Coordinator::Write::Events::WorkItemMadeReadyV1.new(
+      Coordinator::Write::Events::WorkItemMadeReadyV2.new(
         change_set_id: "CS-100",
         work_item_id: "W-100",
         readiness_decision_id: command.command_id,
-        reason: "change_set_activated",
-        made_ready_at: occurred_at
+        reason: "change_set_activated"
       )
     )
   end

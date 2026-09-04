@@ -18,12 +18,16 @@ module Coordinator::Write
           @stream_factory = stream_factory
         end
 
-        def call(state:, command:, assessed_at:, assessment_event:)
+        def call(state:, command:)
           outcome, reason = outcome(state)
           assessment = build_assessment(state.reconstruction, command, outcome, reason)
-          writes = [ assessment_write(state, command, assessment, assessed_at) ]
+          writes = [
+            assessment_write(state, command, assessment),
+            source_link_write(command, "accepted_choice", state.choice.accepted_event),
+            source_link_write(command, "decision_change", command.decision_change.source_event)
+          ]
           if outcome == "invalidated"
-            writes << invalidation_write(state, command, assessment_event, reason, assessed_at)
+            writes << invalidation_write(command, reason)
           end
 
           Success(EventPlan.new(writes:))
@@ -48,45 +52,43 @@ module Coordinator::Write
         end
 
         def build_assessment(reconstruction, command, outcome, reason)
-          Coordinator::Write::AgentChoiceImpacts::AssessmentV1.new(
-            policy_version: command.policy_version,
-            before_context_digest: reconstruction.before_context.digest,
-            after_context_digest: reconstruction.after_context.digest,
+          Coordinator::Write::AgentChoiceImpacts::ImpactAssessmentV2.new(
             before_evaluation: reconstruction.before_evaluation,
             after_evaluation: reconstruction.after_evaluation,
-            source_advancements: reconstruction.source_advancements,
             outcome:,
             reason:
           )
         end
 
-        def assessment_write(state, command, assessment, assessed_at)
+        def assessment_write(state, command, assessment)
           EventWrite.new(
             stream: @stream_factory.agent_choice_impact(command.assessment_id),
-            event: Events::AgentChoiceImpactAssessedV1.new(
+            event: Events::AgentChoiceImpactAssessmentRecordedV1.new(
               assessment_id: command.assessment_id,
               choice_id: command.choice_id,
               attempt_id: state.choice.recorded.context.attempt_id,
-              accepted_choice: state.choice.accepted_event,
-              decision_change: command.decision_change,
-              assessment:,
-              assessed_at:
+              assessment:
             )
           )
         end
 
-        def invalidation_write(state, command, assessment_event, reason, assessed_at)
+        def source_link_write(command, role, source)
+          EventWrite.new(
+            stream: @stream_factory.agent_choice_impact(command.assessment_id),
+            event: Events::AgentChoiceImpactSourceLinkedV1.new(
+              assessment_id: command.assessment_id,
+              role:,
+              source:
+            )
+          )
+        end
+
+        def invalidation_write(command, reason)
           EventWrite.new(
             stream: @stream_factory.agent_choice(command.choice_id),
-            event: Events::AgentChoiceInvalidatedByDecisionV1.new(
+            event: Events::AgentChoiceInvalidatedByDecisionV2.new(
               choice_id: command.choice_id,
-              accepted_choice: state.choice.accepted_event,
-              assessment_event:,
-              decision_change_event: command.decision_change.source_event,
-              previous_context_digest: state.reconstruction.before_context.digest,
-              resulting_context_digest: state.reconstruction.after_context.digest,
-              reason:,
-              invalidated_at: assessed_at
+              reason:
             )
           )
         end

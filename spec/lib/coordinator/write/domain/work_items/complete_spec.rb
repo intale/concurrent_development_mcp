@@ -35,33 +35,29 @@ RSpec.describe Coordinator::Write::Domain::WorkItems::Complete do
     plan = result.value!
     expect(plan.writes.map(&:stream)).to eq([
       streams.work_item("W-1"),
+      streams.work_item("W-1"),
       streams.attempt("A-1"),
       streams.work_item("W-1")
     ])
     expect(plan.events.map(&:class)).to eq([
-      Coordinator::Write::Events::WorkItemCandidateSelectedV1,
-      Coordinator::Write::Events::AttemptCompletedV1,
-      Coordinator::Write::Events::WorkItemCompletedV1
+      Coordinator::Write::Events::WorkItemCandidateSelectedV2,
+      Coordinator::Write::Events::WorkItemOutputRecordedV1,
+      Coordinator::Write::Events::AttemptCompletedV2,
+      Coordinator::Write::Events::WorkItemCompletedV2
     ])
-    expect(plan.events).to all(have_attributes(candidate_event:, candidate_id: "CAN-1"))
-    expect(plan.events.last).to have_attributes(
-      produced_outputs: command.produced_outputs,
-      rule_version: "work-item-completion/v1",
-      completed_at:
+    expect(plan.events.first).to have_attributes(candidate_event:, candidate_id: "CAN-1")
+    expect(plan.events.fetch(1)).to have_attributes(
+      work_item_id: "W-1",
+      output_kind: "artifact",
+      output_key: "billing-gem"
     )
+    expect(plan.events.last).to have_attributes(work_item_id: "W-1")
   end
 
-  it "denies a non-final Candidate and an active unexpired write set" do
+  it "denies a non-final Candidate" do
     handoff = decide(candidate: candidate(checkpoint_kind: "handoff"))
-    active_lease = decide(
-      attempt_state: attempt_state(lease_released_at: nil, lease_expires_at: "2026-08-25T08:15:00.000000Z")
-    )
 
     expect(handoff.failure.code).to eq(:candidate_not_final)
-    expect(active_lease.failure).to have_attributes(
-      code: :write_set_still_active,
-      details: include(lease_set_id: lease_set_id, expires_at: "2026-08-25T08:15:00.000000Z")
-    )
   end
 
   it "denies stale ownership, Candidate scope, and already-completed WorkItems" do

@@ -66,7 +66,13 @@ module ResourceLeaseOperationScenario
         kind: attributes.fetch(:kind),
         path: attributes.fetch(:path)
       )
-      { resource_id:, base_blob_oid: attributes[:base_blob_oid] }
+      {
+        resource_id:,
+        base_blob_oid: attributes[:base_blob_oid],
+        mode: attributes.fetch(:mode, "shared"),
+        purpose: attributes.fetch(:purpose, "Coordinate #{attributes.fetch(:path)}"),
+        context: attributes[:context]
+      }
     end
     resource_ids = targets.map { _1.fetch(:resource_id) }
     result = Coordinator::Write::Operations::ExecuteReserveWriteSet.new(event_store:).call(

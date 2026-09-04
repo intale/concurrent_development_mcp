@@ -1,0 +1,8 @@
+module Coordinator
+  module Write
+    class LoadedWorkIntentionV1 < Shared::Value
+      def state: () -> Domain::WorkIntentions::State
+      def stream_revision: () -> Integer?
+    end
+  end
+end

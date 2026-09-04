@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Events
+      class DecisionClarificationRequiredV2 < Base
+        def interpretation_id: () -> String
+        def source_message_id: () -> String
+        def origin: () -> String
+        def reasons: () -> Array[String]
+        def questions: () -> Array[String]
+        def rationale: () -> String
+      end
+    end
+  end
+end

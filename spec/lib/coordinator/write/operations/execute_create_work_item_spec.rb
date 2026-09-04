@@ -24,7 +24,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateWorkItem, :event_sto
     create_change_set("CS-100")
   end
 
-  it "persists both cross-stream facts and returns a transient typed result" do
+  it "persists cohesive WorkItem facts and returns a transient typed result" do
     result = operation.call(input)
 
     expect(result).to be_success
@@ -35,27 +35,34 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateWorkItem, :event_sto
         work_item_id: "W-200"
       )
     )
-    expect(work_item_events("W-200").map(&:type)).to eq([ "WorkItemCreated" ])
+    expect(work_item_events("W-200").map(&:type)).to eq(
+      %w[
+        WorkItemCreated
+        WorkItemAddedToChangeSet
+        WorkItemAssignedToRepository
+        WorkItemGoalDefined
+        WorkItemAcceptanceCriteriaDefined
+        WorkItemCompetitiveModeSelected
+      ]
+    )
     expect(change_set_events("CS-100").map(&:type)).to eq(
-      [ "ChangeSetCreated", "ChangeSetAcceptanceCriteriaDefined", "WorkItemAddedToChangeSet" ]
+      [ "ChangeSetCreated", "ChangeSetAcceptanceCriteriaDefined" ]
     )
     expect(command_events("cmd-200")).to be_empty
     expect(completion.emitted_events.map { [ _1.stream_name, _1.stream_revision ] }).to eq(
-      [ [ "WorkItem", 0 ], [ "ChangeSet", 2 ] ]
+      (0..5).map { [ "WorkItem", _1 ] }
     )
   end
 
   it "writes the routing markers on real persisted events" do
     operation.call(input)
 
-    created = work_item_events("W-200").sole
-    membership = change_set_events("CS-100").last
+    facts = work_item_events("W-200")
     repository_markers = Coordinator::Write::RepositoryMarkerBuilder.new.call(
       Coordinator::Write::RepositoryRegistrationLoader.new(event_store:).call(repository_id)
     )
     common = [ "change-set:CS-100", "command:cmd-200", "work-item:W-200" ] + repository_markers
-    expect(created.markers).to contain_exactly(*common)
-    expect(membership.markers).to contain_exactly(*common)
+    expect(facts).to all(have_attributes(markers: contain_exactly(*common)))
   end
 
   it "leaves replay ownership to the registered Command lifecycle" do
@@ -75,7 +82,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateWorkItem, :event_sto
 
     expect(result).to be_failure
     expect(result.failure.code).to eq(:work_item_already_exists)
-    expect(work_item_events("W-200").length).to eq(1)
+    expect(work_item_events("W-200").length).to eq(6)
     expect(command_events("cmd-200")).to be_empty
   end
 
@@ -136,8 +143,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateWorkItem, :event_sto
     expect(results.count(&:success?)).to eq(1)
     expect(results.count(&:failure?)).to eq(1)
     expect(results.find(&:failure?).failure.code).to eq(:work_item_already_exists)
-    expect(work_item_events("W-200").length).to eq(1)
-    expect(change_set_events("CS-100").count { _1.type == "WorkItemAddedToChangeSet" }).to eq(1)
+    expect(work_item_events("W-200").length).to eq(6)
+    expect(work_item_events("W-200").count { _1.type == "WorkItemAddedToChangeSet" }).to eq(1)
     expect(competing_inputs.flat_map { command_events(_1.fetch(:command_id)) }).to be_empty
   end
 
@@ -175,8 +182,15 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateWorkItem, :event_sto
     event_store.read(
       streams.work_item(work_item_id),
       Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "WorkItemCreated" ],
-        maximum_count: 1,
+        event_types: %w[
+          WorkItemCreated
+          WorkItemAddedToChangeSet
+          WorkItemAssignedToRepository
+          WorkItemGoalDefined
+          WorkItemAcceptanceCriteriaDefined
+          WorkItemCompetitiveModeSelected
+        ],
+        maximum_count: 6,
         direction: :asc
       )
     )
@@ -187,8 +201,6 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateWorkItem, :event_sto
   end
 
   def persisted_ids
-    work_item_events("W-200").map(&:id) +
-      change_set_events("CS-100").select { _1.type == "WorkItemAddedToChangeSet" }.map(&:id) +
-      command_events("cmd-200").map(&:id)
+    work_item_events("W-200").map(&:id) + command_events("cmd-200").map(&:id)
   end
 end

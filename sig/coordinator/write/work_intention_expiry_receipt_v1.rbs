@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    class WorkIntentionExpiryReceiptV1 < Shared::Value
+      def resource_id: () -> String
+      def lease_id: () -> String
+      def lease_set_id: () -> String
+      def fencing_token: () -> Integer
+      def expires_at: () -> String
+      def expired_at: () -> String
+    end
+  end
+end

@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Events
+      class WorkIntentionAddedToSetV1 < Base
+        def set_id: () -> String
+        def intention_id: () -> String
+        def resource_id: () -> String
+      end
+    end
+  end
+end

@@ -114,6 +114,22 @@ module Coordinator::Write
       )
     end
 
+    def work_intention_set(set_id)
+      StreamReference.new(
+        context: "DevelopmentCoordination",
+        stream_name: "WorkIntentionSet",
+        stream_id: set_id
+      )
+    end
+
+    def resource_work_intention(intention_id)
+      StreamReference.new(
+        context: "DevelopmentCoordination",
+        stream_name: "ResourceWorkIntention",
+        stream_id: intention_id
+      )
+    end
+
     def conversation(conversation_id)
       StreamReference.new(
         context: "HumanGuidance",

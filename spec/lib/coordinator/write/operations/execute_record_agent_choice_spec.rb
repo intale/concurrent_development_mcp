@@ -176,57 +176,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordAgentChoice, :event_
   end
 
   def authoritative_context
-    observations = Coordinator::Write::DecisionContexts::PartitionSelector.new.call(query_context).map do |partition|
-      event = event_store.read_grouped(
-        streams.decision_partition(partition.partition_id),
-        Coordinator::Write::EventQueries::DECISION_PARTITION_LATEST
-      ).first
-      payload = event && load(event)
-      Coordinator::Write::DecisionContexts::PartitionObservationV1.new(
-        partition:,
-        partition_revision: event&.stream_revision,
-        event: event && reference(event),
-        active_decisions: payload ? payload.active_decisions : []
-      )
-    end
-    heads = observations.flat_map(&:active_decisions).uniq { [ _1.decision_id, _1.event.event_id ] }
-    resolution = Coordinator::Write::DecisionContexts::Resolver.new.call(
-      context: query_context,
-      observations:,
-      decisions: heads.map { current_decision(_1.decision_id) },
-      resolved_at: Coordinator::Shared::SystemClock.new.now
-    )
-    Coordinator::Write::DecisionContexts::Builder.new.call(
-      context: query_context,
-      observations:,
-      resolution:,
-      resolved_at: Coordinator::Shared::SystemClock.new.now
-    )
-  end
-
-  def current_decision(decision_id)
-    events = event_store.read_grouped(
-      streams.decision(decision_id),
-      Coordinator::Write::EventQueries::DECISION_CORRECTION_STATE
-    )
-    recorded_event = events.find { _1.type == "DecisionRecorded" }
-    activated_event = events.find { _1.type == "DecisionActivated" }
-    correction_event = events.find { _1.type == "DecisionDefinitionCorrected" }
-    recorded = load(recorded_event)
-    activation = load(activated_event)
-    correction = correction_event && load(correction_event)
-    head_event = correction_event || activated_event
-    Coordinator::Write::Decisions::DecisionCurrentStateV1.new(
-      decision_id:,
-      definition: correction ? correction.definition : recorded.definition,
-      head: Coordinator::Write::Decisions::DecisionHeadV1.new(
-        decision_id:,
-        decision_revision: head_event.stream_revision,
-        event: reference(head_event)
-      ),
-      slot: correction ? correction.slot : activation.slot,
-      partitions: correction ? correction.partitions : activation.partitions
-    )
+    AgentChoiceImpactScenario.authoritative_context(query_context.to_h)
   end
 
   def seed_active_attempt

@@ -30,33 +30,59 @@ module Coordinator::Write
         )
         grouped = events.to_h { [ _1.type, _1 ] }
         created = grouped["WorkItemCreated"]
+        membership = grouped["WorkItemAddedToChangeSet"]
+        assignment = grouped["WorkItemAssignedToRepository"]
         selected = grouped["WorkItemCandidateSelected"]
         completed = grouped["WorkItemCompleted"]
         return incomplete(work_item_id) unless created && selected && completed
 
         created_payload = load_event(created)
+        membership_payload = membership && load_event(membership)
+        assignment_payload = assignment && load_event(assignment)
         selected_payload = load_event(selected)
         completed_payload = load_event(completed)
-        return invalid(work_item_id) unless coherent?(created_payload, selected_payload, completed_payload, change_set_id:)
+        return invalid(work_item_id) unless coherent?(
+          created_payload,
+          membership_payload,
+          assignment_payload,
+          selected_payload,
+          completed_payload,
+          change_set_id:
+        )
+
+        repository_id = assignment_payload&.repository_id || created_payload.repository_id
 
         Success(
           WorkItemEvidenceV1.new(
             change_set_id:,
             work_item_id:,
-            repository_id: created_payload.repository_id,
-            attempt_id: completed_payload.attempt_id,
-            candidate_id: completed_payload.candidate_id,
-            candidate_event: completed_payload.candidate_event,
+            repository_id:,
+            attempt_id: selected_payload.attempt_id,
+            candidate_id: selected_payload.candidate_id,
+            candidate_event: selected_payload.candidate_event,
             selected_event: event_reference(selected),
             completed_event: event_reference(completed),
-            completed_at: completed_payload.completed_at
+            completed_at: completed.created_at.utc.iso8601(6)
           )
         )
       end
 
-      def coherent?(created, selected, completed, change_set_id:)
-        created.is_a?(Events::WorkItemCreatedV1) &&
-          selected.is_a?(Events::WorkItemCandidateSelectedV1) &&
+      def coherent?(created, membership, assignment, selected, completed, change_set_id:)
+        return legacy_coherent?(created, selected, completed, change_set_id:) if created.is_a?(Events::WorkItemCreatedV1)
+
+        created.is_a?(Events::WorkItemCreatedV2) &&
+          membership.is_a?(Events::WorkItemAddedToChangeSetV2) &&
+          assignment.is_a?(Events::WorkItemAssignedToRepositoryV1) &&
+          selected.is_a?(Events::WorkItemCandidateSelectedV2) &&
+          completed.is_a?(Events::WorkItemCompletedV2) &&
+          membership.change_set_id == change_set_id &&
+          selected.change_set_id == change_set_id &&
+          [ created.work_item_id, membership.work_item_id, assignment.work_item_id,
+            selected.work_item_id, completed.work_item_id ].uniq == [ created.work_item_id ]
+      end
+
+      def legacy_coherent?(created, selected, completed, change_set_id:)
+        selected.is_a?(Events::WorkItemCandidateSelectedV1) &&
           completed.is_a?(Events::WorkItemCompletedV1) &&
           created.change_set_id == change_set_id &&
           selected.change_set_id == change_set_id &&

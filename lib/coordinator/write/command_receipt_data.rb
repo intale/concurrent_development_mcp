@@ -94,8 +94,8 @@ module Coordinator::Write
       attribute :policy_version, Types::ResourceLeasePolicyVersion
       attribute :expanded_at, Types::Timestamp
       attribute :expires_at, Types::Timestamp
-      attribute :added_resources, Types::Array.of(Reference).constrained(min_size: 1, max_size: 31)
-      attribute :resource_count, Types::ExpandedWriteSetSize
+      attribute :added_resources, Types::Array.of(Reference).constrained(max_size: 32)
+      attribute :resource_count, Types::WriteSetSize
     end
 
     class LeaseSetRenewal < Value
@@ -149,7 +149,7 @@ module Coordinator::Write
     class InterpretationProposal < Value
       attribute :interpretation_id, Types::Identifier
       attribute :source_message_id, Types::Identifier
-      attribute :assessment, Interpretations::InterpretationAssessmentV1
+      attribute :assessment, Types::InterpretationAssessmentStatus
       attribute :proposed_at, Types::Timestamp
     end
 
@@ -172,7 +172,7 @@ module Coordinator::Write
       attribute :policy_status, Types::DecisionPolicyStatus
       attribute :definition_digest, Types::Sha256Digest
       attribute :slot, Decisions::DecisionSlotV1.optional
-      attribute :partitions, Types::Array.of(PartitionReceipt).constrained(min_size: 1, max_size: 32)
+      attribute :partitions, Types::Array.of(PartitionReceipt).constrained(max_size: 32)
       attribute :activated_at, Types::Timestamp
     end
 
@@ -187,7 +187,7 @@ module Coordinator::Write
       attribute :definition_digest, Types::Sha256Digest
       attribute :correction_event, EventReference
       attribute :slot, Decisions::DecisionSlotV1.optional
-      attribute :partitions, Types::Array.of(PartitionReceipt).constrained(min_size: 1, max_size: 32)
+      attribute :partitions, Types::Array.of(PartitionReceipt).constrained(max_size: 32)
       attribute :corrected_at, Types::Timestamp
     end
 

@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class AgentChoiceInvalidatedByDecisionV2 < Base
+        def choice_id: () -> String
+        def reason: () -> String
+      end
+    end
+  end
+end

@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    class WorkIntentionDecisionV1 < Shared::Value
+      Plan: singleton(Domain::EventPlan)
+
+      def kind: () -> String
+      def plan: () -> Domain::EventPlan?
+    end
+  end
+end

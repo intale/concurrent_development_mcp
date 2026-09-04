@@ -1,0 +1,8 @@
+module Coordinator
+  module Write
+    class WorkIntentionLoader
+      def initialize: (event_store: _EventStore, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory) -> void
+      def call: (String intention_id) -> LoadedWorkIntentionV1
+    end
+  end
+end

@@ -19,10 +19,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteEvaluateWorkItemReadiness,
       "change_set_id" => "CS-100",
       "work_item_id" => "W-100",
       "readiness_decision_id" => command.command_id,
-      "reason" => "change_set_activated",
-      "made_ready_at" => made_ready.data.fetch("made_ready_at")
+      "reason" => "change_set_activated"
     )
-    expect(made_ready.data.fetch("made_ready_at")).to match(Coordinator::Shared::Types::TIMESTAMP_PATTERN)
+    expect(made_ready.created_at.utc.iso8601(6)).to match(Coordinator::Shared::Types::TIMESTAMP_PATTERN)
     expect(made_ready.markers).to eq(
       (command.process_decision_components + [
         command.process_decision_marker,
@@ -39,7 +38,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteEvaluateWorkItemReadiness,
       "actor_kind" => "system",
       "actor_id" => "change-set-readiness",
       "policy_version" => "change-set-readiness/v1",
-      "schema_version" => 1
+      "schema_version" => 2
     )
     expect(work_item_state("W-100").status).to eq("ready")
     expect(command_events(command.command_id)).to be_empty

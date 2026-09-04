@@ -59,6 +59,25 @@ module Coordinator::Write
 
         def apply(event)
           case event
+          when Events::AttemptAuthorizedV2
+            rebuild(attempt_id: event.attempt_id, status: "authorized")
+          when Events::AttemptAssignedToWorkItemV1
+            rebuild(change_set_id: event.change_set_id, work_item_id: event.work_item_id)
+          when Events::AttemptAssignedToAgentV1
+            rebuild(agent_id: event.agent_id)
+          when Events::AttemptBaseSnapshotRecordedV1
+            snapshot = RepositorySnapshotV1.new(
+              repository_id: event.repository_id,
+              object_format: event.object_format,
+              commit_oid: event.commit_oid
+            )
+            rebuild(base_snapshots: base_snapshots + [ snapshot ])
+          when Events::AttemptStartedV2
+            rebuild(status: "active")
+          when Events::AttemptAbandonedV3
+            rebuild(status: "abandoned")
+          when Events::AttemptCompletedV2
+            rebuild(status: "completed")
           when Events::AttemptAuthorizedV1
             self.class.new(
               attempt_id: event.attempt_id,
@@ -251,6 +270,12 @@ module Coordinator::Write
           else
             self
           end
+        end
+
+        private
+
+        def rebuild(**changes)
+          self.class.new(attributes.merge(changes))
         end
       end
     end

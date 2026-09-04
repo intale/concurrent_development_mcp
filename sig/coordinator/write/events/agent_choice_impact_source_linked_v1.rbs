@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Events
+      class AgentChoiceImpactSourceLinkedV1 < Base
+        def assessment_id: () -> String
+        def role: () -> String
+        def source: () -> EventReference
+      end
+    end
+  end
+end

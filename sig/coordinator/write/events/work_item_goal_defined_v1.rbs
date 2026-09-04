@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class WorkItemGoalDefinedV1 < Base
+        def work_item_id: () -> String
+        def goal: () -> String
+      end
+    end
+  end
+end

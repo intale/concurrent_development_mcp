@@ -15,7 +15,8 @@ module Coordinator::Write
         event_factory: EventFactory.new,
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
-        completion_builder: CommandResultBuilder.new
+        completion_builder: CommandResultBuilder.new,
+        change_set_state_loader: ChangeSets::StateLoader.new(event_store:)
       )
         @event_store = event_store
         @preparer = preparer
@@ -27,6 +28,7 @@ module Coordinator::Write
         @schema_registry = schema_registry
         @stream_factory = stream_factory
         @completion_builder = completion_builder
+        @change_set_state_loader = change_set_state_loader
       end
 
       def call(input)
@@ -77,12 +79,7 @@ module Coordinator::Write
       end
 
       def load_change_set_state(change_set_id)
-        events = @event_store.read(
-          @stream_factory.change_set(change_set_id),
-          EventQueries::CHANGE_SET_FOR_ACTIVATION
-        ).map { load_event(_1) }
-
-        Domain::ChangeSets::State.reduce(events)
+        @change_set_state_loader.call(change_set_id)
       end
 
       def load_event(event)
@@ -96,7 +93,7 @@ module Coordinator::Write
       def persist_domain_plan(plan, command:, event_id:, caused_by:)
         expected_stream = @stream_factory.change_set(command.change_set_id)
         write = plan.writes.sole
-        unless write.stream == expected_stream && write.event.class == Events::ChangeSetActivatedV1
+        unless write.stream == expected_stream && write.event.class == Events::ChangeSetActivatedV2
           raise "ActivateChangeSet plan does not match its frozen ChangeSet-stream contract"
         end
 

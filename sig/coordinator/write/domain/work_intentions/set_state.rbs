@@ -1,0 +1,23 @@
+module Coordinator
+  module Write
+    module Domain
+      module WorkIntentions
+        class SetState < Shared::Value
+          Reference: singleton(WorkIntentionReferenceV1)
+
+          def self.initial: () -> SetState
+          def self.reduce: (Array[Events::Base] events) -> SetState
+
+          def set_id: () -> String?
+          def attempt_id: () -> String?
+          def work_item_id: () -> String?
+          def change_set_id: () -> String?
+          def repository_id: () -> String?
+          def members: () -> Array[WorkIntentionReferenceV1]
+          def absent?: () -> bool
+          def apply: (Events::Base event) -> SetState
+        end
+      end
+    end
+  end
+end

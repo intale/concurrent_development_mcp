@@ -7,8 +7,8 @@ module Coordinator::Processes
         set_name: ProcessManagerSet::SET_NAME,
         subscription_name: "lease-expiry-scheduler-v1",
         stream_context: "DevelopmentCoordination",
-        stream_name: "ResourceLease",
-        event_types: [ "ResourceLeaseAcquired", "ResourceLeaseRenewed" ]
+        stream_name: "ResourceWorkIntention",
+        event_types: [ "ResourceWorkIntentionDeclared", "ResourceWorkIntentionRenewed" ]
       )
 
       def initialize(handler:, pull_interval: 1.0)

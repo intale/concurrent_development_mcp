@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class WorkItemCompetitiveModeSelectedV1 < Base
+        def work_item_id: () -> String
+        def competitive_mode: () -> bool
+      end
+    end
+  end
+end

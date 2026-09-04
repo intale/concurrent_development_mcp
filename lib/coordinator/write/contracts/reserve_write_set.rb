@@ -19,6 +19,9 @@ module Coordinator::Write
         required(:resources).array(:hash) do
           required(:resource_id).filled(:string)
           optional(:base_blob_oid).maybe(:string)
+          optional(:mode).filled(:string, included_in?: [ "shared", "exclusive" ])
+          optional(:purpose).filled(:string, max_size?: 1_000)
+          optional(:context).maybe(:string, max_size?: 4_000)
         end
         required(:lease_duration_seconds).value(:integer)
       end

@@ -15,6 +15,7 @@ module Coordinator::Write
                     .constrained(max_size: 500)
                     .default([].freeze)
         attribute :completed_at, Types::Timestamp.optional.default(nil)
+        attribute :release_set_id, Types::UuidV7.optional.default(nil)
 
         def self.initial
           new(
@@ -25,7 +26,8 @@ module Coordinator::Write
             work_item_ids: [],
             dependencies: [],
             dependency_satisfactions: [],
-            completed_at: nil
+            completed_at: nil,
+            release_set_id: nil
           )
         end
 
@@ -37,107 +39,68 @@ module Coordinator::Write
           status == "absent"
         end
 
+        def dependency_satisfied?(dependency_id)
+          dependency_satisfactions.any? { _1.dependency_id == dependency_id }
+        end
+
         def apply(event)
           case event
           when Events::ChangeSetCreatedV1
-            self.class.new(
-              change_set_id: event.change_set_id,
-              goal: event.goal,
-              status: "draft",
-              acceptance_criteria:,
-              work_item_ids:,
-              dependencies:,
-              dependency_satisfactions:,
-              completed_at:
-            )
-          when Events::ChangeSetAcceptanceCriteriaDefinedV1
-            self.class.new(
-              change_set_id:,
-              goal:,
-              status:,
-              acceptance_criteria: event.acceptance_criteria,
-              work_item_ids:,
-              dependencies:,
-              dependency_satisfactions:,
-              completed_at:
-            )
-          when Events::WorkItemAddedToChangeSetV1
-            self.class.new(
-              change_set_id:,
-              goal:,
-              status:,
-              acceptance_criteria:,
-              work_item_ids: work_item_ids + [ event.work_item_id ],
-              dependencies:,
-              dependency_satisfactions:,
-              completed_at:
-            )
-          when Events::WorkItemDependencyDeclaredV1
-            self.class.new(
-              change_set_id:,
-              goal:,
-              status:,
-              acceptance_criteria:,
-              work_item_ids:,
-              dependencies: dependencies + [
-                Dependency.new(
-                  dependency_id: event.dependency_id,
-                  producer_work_item_id: event.producer_work_item_id,
-                  consumer_work_item_id: event.consumer_work_item_id,
-                  dependency_kind: event.dependency_kind,
-                  required_output: event.required_output
-                )
-              ],
-              dependency_satisfactions:,
-              completed_at:
-            )
+            rebuild(change_set_id: event.change_set_id, goal: event.goal, status: "draft")
+          when Events::ChangeSetCreatedV2
+            rebuild(change_set_id: event.change_set_id, status: "draft")
+          when Events::ChangeSetGoalDefinedV1
+            rebuild(goal: event.goal)
+          when Events::ChangeSetAcceptanceCriteriaDefinedV1,
+               Events::ChangeSetAcceptanceCriteriaDefinedV2
+            rebuild(acceptance_criteria: event.acceptance_criteria)
+          when Events::WorkItemAddedToChangeSetV1,
+               Events::WorkItemAddedToChangeSetV2
+            rebuild(work_item_ids: (work_item_ids + [ event.work_item_id ]).uniq)
+          when Events::WorkItemDependencyDeclaredV1,
+               Events::WorkItemDependencyDeclaredV2
+            rebuild(dependencies: dependencies + [ dependency_from(event) ])
           when Events::WorkItemDependencySatisfiedV1
-            self.class.new(
-              change_set_id:,
-              goal:,
-              status:,
-              acceptance_criteria:,
-              work_item_ids:,
-              dependencies:,
-              dependency_satisfactions: dependency_satisfactions + [
-                DependencySatisfaction.new(
-                  dependency_id: event.dependency_id,
-                  source_event: event.source_event,
-                  satisfied_at: event.satisfied_at
-                )
-              ],
-              completed_at:
-            )
-          when Events::ChangeSetActivatedV1
-            self.class.new(
-              change_set_id:,
-              goal:,
-              status: "active",
-              acceptance_criteria:,
-              work_item_ids:,
-              dependencies:,
-              dependency_satisfactions:,
-              completed_at:
-            )
+            rebuild(dependency_satisfactions: dependency_satisfactions + [
+              DependencySatisfaction.new(
+                dependency_id: event.dependency_id,
+                source_event: event.source_event,
+                satisfied_at: event.satisfied_at
+              )
+            ])
+          when Events::WorkItemDependencySatisfiedV2
+            rebuild(dependency_satisfactions: dependency_satisfactions + [
+              DependencySatisfaction.new(dependency_id: event.dependency_id, source_event: event.source)
+            ])
+          when Events::ChangeSetActivatedV1, Events::ChangeSetActivatedV2
+            rebuild(status: "active")
+          when Events::ChangeSetReleaseSetLinkedV1
+            rebuild(release_set_id: event.release_set_id)
           when Events::ChangeSetCompletedV1
-            self.class.new(
-              change_set_id:,
-              goal:,
-              status: "completed",
-              acceptance_criteria:,
-              work_item_ids:,
-              dependencies:,
-              dependency_satisfactions:,
-              completed_at: event.completed_at
-            )
+            rebuild(status: "completed", completed_at: event.completed_at)
+          when Events::ChangeSetCompletedV2
+            rebuild(status: "completed")
           else
             self
           end
         end
 
-        def dependency_satisfied?(dependency_id)
-          dependency_satisfactions.any? { _1.dependency_id == dependency_id }
+        private
+
+        def rebuild(**changes)
+          self.class.new(attributes.merge(changes))
         end
+
+        def dependency_from(event)
+          Dependency.new(
+            dependency_id: event.dependency_id,
+            producer_work_item_id: event.producer_work_item_id,
+            consumer_work_item_id: event.consumer_work_item_id,
+            dependency_kind: event.dependency_kind,
+            required_output: event.required_output
+          )
+        end
+
       end
     end
   end

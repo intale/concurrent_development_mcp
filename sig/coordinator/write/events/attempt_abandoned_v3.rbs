@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class AttemptAbandonedV3 < Base
+        def attempt_id: () -> String
+        def reason: () -> String
+      end
+    end
+  end
+end

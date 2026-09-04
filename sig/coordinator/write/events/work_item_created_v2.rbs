@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Events
+      class WorkItemCreatedV2 < Base
+        def work_item_id: () -> String
+      end
+    end
+  end
+end

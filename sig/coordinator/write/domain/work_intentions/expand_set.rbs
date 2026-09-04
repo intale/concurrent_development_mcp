@@ -1,0 +1,20 @@
+module Coordinator
+  module Write
+    module Domain
+      module WorkIntentions
+        class ExpandSet
+          def initialize: (?stream_factory: StreamFactory, ?conflict_detector: ConflictDetector) -> void
+          def call: (
+            attempt_state: Domain::Attempts::State,
+            set_state: SetState,
+            member_states: Array[State],
+            boundary: WorkIntentionBoundaryV1,
+            command: Commands::ExpandWriteSet,
+            requests: Array[RequestedWorkIntentionV1],
+            expanded_at: String
+          ) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

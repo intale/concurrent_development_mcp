@@ -39,7 +39,7 @@ module Coordinator::Write
           after_context:,
           before_evaluation: evaluate(before_resolution, recorded_choice.selected.option_id),
           after_evaluation: evaluate(after_resolution, recorded_choice.selected.option_id),
-          source_advancements: changes.sort_by { _1.partition.partition_id.b }.map(&:advancement_event),
+          source_advancements: changes.sort_by { _1.partition.partition_id.b }.map(&:advancement_event).uniq,
           source_already_observed: source_already_observed(changes)
         )
       end
@@ -47,6 +47,13 @@ module Coordinator::Write
       private
 
       def partition_changes(recorded_observations, decision_change)
+        source_event = read_reference(decision_change.source_event)
+        source_payload = source_event && load(source_event)
+        if source_payload.is_a?(Events::DecisionActivatedV2) ||
+           source_payload.is_a?(Events::DecisionDefinitionCorrectedV2)
+          return cohesive_partition_changes(recorded_observations, decision_change, source_event)
+        end
+
         affected = decision_change.affected_partitions.to_h { [ _1.partition_id, _1 ] }
         relevant = recorded_observations.select { affected.key?(_1.partition.partition_id) }
         if relevant.empty?
@@ -74,6 +81,83 @@ module Coordinator::Write
             advancement_event: reference(source_event)
           )
         end.freeze
+      end
+
+      def cohesive_partition_changes(recorded_observations, decision_change, source_event)
+        affected = decision_change.affected_partitions.to_h { [ _1.partition_id, _1 ] }
+        relevant = recorded_observations.select { affected.key?(_1.partition.partition_id) }
+        if relevant.empty?
+          invalid!(
+            "no_affected_choice_partitions",
+            choice_partitions: recorded_observations.map { _1.partition.partition_id },
+            source_partitions: affected.keys.sort_by(&:b)
+          )
+        end
+
+        source_head = Decisions::DecisionHeadV1.new(
+          decision_id: decision_change.decision_id,
+          decision_revision: source_event.stream_revision,
+          event: reference(source_event)
+        )
+        after_decision = @decision_loader.call(source_head)
+        previous_event = previous_lifecycle_event(source_event)
+        previous_head = previous_event && Decisions::DecisionHeadV1.new(
+          decision_id: decision_change.decision_id,
+          decision_revision: previous_event.stream_revision,
+          event: reference(previous_event)
+        )
+        before_decision = previous_head && @decision_loader.call(previous_head)
+        before_partition_ids = before_decision ? before_decision.partitions.map(&:partition_id) : []
+        after_partition_ids = after_decision.partitions.map(&:partition_id)
+
+        relevant.map do |recorded|
+          partition = affected.fetch(recorded.partition.partition_id)
+          unless partition == recorded.partition
+            invalid!("affected_partition_definition_mismatch", partition_id: partition.partition_id)
+          end
+
+          baseline = recorded.active_decisions.reject do |head|
+            head.decision_id == decision_change.decision_id
+          end
+          before_heads = baseline.dup
+          before_heads << previous_head if previous_head && before_partition_ids.include?(partition.partition_id)
+          after_heads = baseline.dup
+          after_heads << source_head if after_partition_ids.include?(partition.partition_id)
+          PartitionChangeV1.new(
+            partition:,
+            recorded_observation: recorded,
+            before_observation: observation_with_heads(recorded, before_heads),
+            after_observation: observation_with_heads(recorded, after_heads),
+            advancement_event: decision_change.source_event
+          )
+        end.freeze
+      end
+
+      def observation_with_heads(recorded, heads)
+        DecisionContexts::PartitionObservationV1.new(
+          partition: recorded.partition,
+          partition_revision: recorded.partition_revision,
+          event: recorded.event,
+          active_decisions: heads.uniq(&:decision_id).sort_by { _1.decision_id.b }
+        )
+      end
+
+      def previous_lifecycle_event(source_event)
+        return if source_event.stream_revision.zero?
+
+        stream = StreamReference.new(
+          context: source_event.stream.context,
+          stream_name: source_event.stream.stream_name,
+          stream_id: source_event.stream.stream_id
+        )
+        @event_store.read(
+          stream,
+          EventReadCriteria.new(
+            event_types: %w[DecisionActivated DecisionDefinitionCorrected],
+            maximum_count: 2_048,
+            direction: :asc
+          )
+        ).select { _1.stream_revision < source_event.stream_revision }.max_by(&:stream_revision)
       end
 
       def load_source_advancement(partition, decision_change)
@@ -223,8 +307,10 @@ module Coordinator::Write
 
       def source_already_observed(changes)
         observed = changes.map do |change|
-          recorded_revision = change.recorded_observation.partition_revision || -1
-          recorded_revision >= change.after_observation.partition_revision
+          decision_id = change.advancement_event.stream_id
+          expected = change.after_observation.active_decisions.find { _1.decision_id == decision_id }
+          recorded = change.recorded_observation.active_decisions.find { _1.decision_id == decision_id }
+          expected ? recorded && recorded.decision_revision >= expected.decision_revision : recorded.nil?
         end
         return true if observed.all?
         return false if observed.none?
@@ -252,6 +338,18 @@ module Coordinator::Write
           stream_id: event.stream.stream_id,
           stream_revision: event.stream_revision
         )
+      end
+
+      def read_reference(event_reference)
+        event = @event_store.read_at(
+          StreamReference.new(
+            context: event_reference.stream_context,
+            stream_name: event_reference.stream_name,
+            stream_id: event_reference.stream_id
+          ),
+          event_reference.stream_revision
+        )
+        event if event && reference(event) == event_reference
       end
 
       def invalid!(reason, evidence)

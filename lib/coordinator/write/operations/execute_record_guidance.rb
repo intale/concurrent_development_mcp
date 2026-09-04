@@ -48,7 +48,7 @@ module Coordinator::Write
         GuidanceRecordPreparationV1.new(
           occurred_at: @clock.now,
           input_digest: @input_digest.guidance_record(command),
-          domain_event_id: @id_generator.uuid_v7,
+          domain_event_ids: (1 + anchor_count(command)).times.map { @id_generator.uuid_v7 },
         )
       end
 
@@ -60,7 +60,7 @@ module Coordinator::Write
         persisted_events = persist_domain_plan(
           decision.value!,
           command:,
-          event_id: preparation.domain_event_id,
+          event_ids: preparation.domain_event_ids,
           caused_by:
         )
         completion = @completion_builder.guidance_record(
@@ -89,25 +89,39 @@ module Coordinator::Write
         )
       end
 
-      def persist_domain_plan(plan, command:, event_id:, caused_by:)
+      def persist_domain_plan(plan, command:, event_ids:, caused_by:)
         expected_stream = @stream_factory.conversation(command.conversation_id)
-        unless plan.writes.length == 1 && plan.writes.first.stream == expected_stream
-          raise "RecordGuidance domain plan must contain one write to its Conversation stream"
+        unless plan.writes.length == event_ids.length && plan.writes.all? { _1.stream == expected_stream }
+          raise "RecordGuidance domain plan must contain its utterance and anchor facts on one Conversation stream"
         end
 
-        persisted = @event_factory.build!(
-          event: plan.writes.first.event,
-          event_id:,
-          metadata: command_metadata(command),
-          markers: [
-            message_marker(command.message_id),
-            "conversation:#{command.conversation_id}",
-            "command:#{command.command_id}"
-          ],
-          caused_by:
-        )
+        persisted = plan.events.zip(event_ids).map do |event, event_id|
+          @event_factory.build!(
+            event:,
+            event_id:,
+            metadata: command_metadata(command),
+            markers: event_markers(event, command:),
+            caused_by:
+          )
+        end
 
-        @event_store.append(expected_stream, [ persisted ])
+        @event_store.append(expected_stream, persisted)
+      end
+
+      def anchor_count(command)
+        command.anchors.repository_ids.length +
+          [ command.anchors.change_set_id, command.anchors.work_item_id, command.anchors.attempt_id ].compact.length
+      end
+
+      def event_markers(event, command:)
+        markers = [
+          message_marker(command.message_id),
+          "conversation:#{command.conversation_id}",
+          "command:#{command.command_id}"
+        ]
+        return markers unless event.is_a?(Events::GuidanceMessageAnchoredV1)
+
+        markers + [ "#{event.anchor_kind.tr('_', '-')}:#{event.anchor_id}" ]
       end
 
       def message_marker(message_id)

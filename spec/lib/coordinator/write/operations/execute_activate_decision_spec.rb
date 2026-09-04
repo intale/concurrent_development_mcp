@@ -17,8 +17,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
 
     expect(original).to be_success
     expect(replay.failure.code).to eq(:decision_already_exists)
-    expect(decision_events("D-1").map(&:type)).to eq(%w[DecisionRecorded DecisionActivated])
-    expect(decision_events("D-1").map(&:stream_revision)).to eq([ 0, 1 ])
+    expect(decision_events("D-1").map(&:type)).to eq(
+      %w[DecisionRecorded DecisionDerivedFromInterpretation DecisionActivated]
+    )
+    expect(decision_events("D-1").map(&:stream_revision)).to eq([ 0, 1, 2 ])
     activation = decision_events("D-1").last
     expect(activation.markers).to include(
       "decision:D-1",
@@ -28,11 +30,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
       "command:cmd-decision-activation-1",
         a_string_starting_with("compound:decision-slot:v2|")
     )
-    expect(activation.data.fetch("recorded_event")).to include(
-      "type" => "DecisionRecorded",
-      "stream_id" => "D-1",
-      "stream_revision" => 0
-    )
+    expect(activation.data.keys).to contain_exactly("decision_id", "interpretation_id", "rationale")
 
     slot = original.value!.data.slot
     expect(slot_events(slot.slot_id).map(&:type)).to eq(%w[DecisionSlotOpened DecisionSlotHeadChanged])
@@ -43,13 +41,12 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
       anchor_id: RepositoryScenario::DEFAULT_REPOSITORY_ID
     )
     expect(receipt_partition.partition_revision).to eq(0)
-    expect(partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing").sole).to have_attributes(
-      type: "DecisionPartitionAdvanced",
+    partition_fact = partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing").sole
+    expect(partition_fact).to have_attributes(
+      type: "DecisionAddedToPartition",
       stream_revision: 0
     )
-    expect(load(partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing").sole).active_decisions).to contain_exactly(
-      have_attributes(decision_id: "D-1", decision_revision: 1)
-    )
+    expect(load(partition_fact)).to have_attributes(decision_id: "D-1", partition_revision: 0)
     expect(command_events("cmd-decision-activation-1")).to be_empty
   end
 
@@ -89,7 +86,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
     expect(first).to be_success
     expect(reused_decision.failure.code).to eq(:decision_already_exists)
     expect(reused_interpretation.failure.code).to eq(:interpretation_already_activated)
-    expect(decision_events("D-1").length).to eq(2)
+    expect(decision_events("D-1").length).to eq(3)
     expect(decision_events("D-2")).to be_empty
   end
 
@@ -153,7 +150,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
     expect(results.count(&:success?)).to eq(1)
     expect(results.count(&:failure?)).to eq(1)
     expect(results.find(&:failure?).failure.code).to eq(:decision_slot_occupied)
-    expect(%w[D-A D-B].sum { decision_events(_1).length }).to eq(2)
+    expect(%w[D-A D-B].sum { decision_events(_1).length }).to eq(3)
     expect(partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing").length).to eq(1)
   end
 
@@ -189,10 +186,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
     expect(results.map { _1.value!.data.slot }).to all(be_nil)
     partition_history = partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing")
     expect(partition_history.map(&:stream_revision)).to eq([ 0, 1 ])
-    first_revision_decision_ids = load(partition_history.first).active_decisions.map(&:decision_id)
-    expect(first_revision_decision_ids.length).to eq(1)
-    expect(first_revision_decision_ids.sole).to be_in(%w[D-A D-B])
-    expect(load(partition_history.last).active_decisions.map(&:decision_id)).to contain_exactly("D-A", "D-B")
+    first_revision_decision_id = load(partition_history.first).decision_id
+    expect(first_revision_decision_id).to be_in(%w[D-A D-B])
+    expect(partition_history.map { load(_1).decision_id }).to contain_exactly("D-A", "D-B")
     expect(results.map { _1.value!.data.partitions.sole.partition_revision }.sort).to eq([ 0, 1 ])
   end
 
@@ -221,7 +217,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
     results.each_with_index do |result, index|
       level = levels.fetch(index)
       recorded = load(decision_events("D-impact-#{index}").first)
-      expect(recorded.definition.document).to have_attributes(
+      expect(recorded.definition).to have_attributes(
         topic_root: "candidate",
         enforcement: have_attributes(level:)
       )
@@ -274,7 +270,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
       )
     )
     expect(decision_events("D-B")).to be_empty
-    expect(load(partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing").sole).active_decisions.map(&:decision_id)).to eq([ "D-A" ])
+    expect(load(partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing").sole).decision_id).to eq("D-A")
   end
 
   def seed_accepted_interpretation(
@@ -333,7 +329,14 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
   end
 
   def decision_events(decision_id)
-    event_store.read(streams.decision(decision_id), Coordinator::Write::EventQueries::DECISION_EXISTENCE)
+    event_store.read(
+      streams.decision(decision_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[DecisionRecorded DecisionDerivedFromInterpretation DecisionActivated],
+        maximum_count: 3,
+        direction: :asc
+      )
+    )
   end
 
   def slot_events(slot_id)
@@ -351,7 +354,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
     event_store.read(
       streams.decision_partition(partition_id),
       Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "DecisionPartitionAdvanced" ],
+        event_types: [ "DecisionAddedToPartition" ],
         maximum_count: 40,
         direction: :asc
       )

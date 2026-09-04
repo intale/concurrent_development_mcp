@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Events
+      class DecisionInterpretationAcceptedV2 < Base
+        def interpretation_id: () -> String
+        def source_message_id: () -> String
+        def slot: () -> Interpretations::InterpretationSlotV1
+        def rationale: () -> String
+      end
+    end
+  end
+end

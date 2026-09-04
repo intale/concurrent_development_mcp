@@ -116,7 +116,8 @@ module Coordinator::Write
       def terminal_evidence(event)
         payload = load_event(event)
         Interpretations::InterpretationTerminalEvidenceV1.new(
-          status: payload.is_a?(Events::DecisionInterpretationAcceptedV1) ? "accepted" : "rejected",
+          status: payload.is_a?(Events::DecisionInterpretationAcceptedV1) ||
+            payload.is_a?(Events::DecisionInterpretationAcceptedV2) ? "accepted" : "rejected",
           interpretation_id: payload.interpretation_id,
           event: event_reference(event)
         )
@@ -126,7 +127,7 @@ module Coordinator::Write
         result = @event_plan_contract.call(
           plan:,
           command:,
-          expected_stream: @stream_factory.interpretation(command.source_message_id)
+          expected_stream: @stream_factory.interpretation(command.interpretation_id)
         )
         return plan if result.success?
 
@@ -142,7 +143,7 @@ module Coordinator::Write
           caused_by:
         )
 
-        @event_store.append(@stream_factory.interpretation(command.source_message_id), [ event ])
+        @event_store.append(@stream_factory.interpretation(command.interpretation_id), [ event ])
       end
 
       def markers_for(command, slot)

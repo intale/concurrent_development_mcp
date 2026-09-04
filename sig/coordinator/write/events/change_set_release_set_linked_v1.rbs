@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class ChangeSetReleaseSetLinkedV1 < Base
+        def change_set_id: () -> String
+        def release_set_id: () -> String
+      end
+    end
+  end
+end

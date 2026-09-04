@@ -23,17 +23,13 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateChangeSet, :event_
     expect(result).to be_success
     completion = result.value!
     activation = activation_events("CS-100").sole
-    expect(activation.data).to include(
-      "change_set_id" => "CS-100",
-      "work_item_count" => 2,
-      "dependency_count" => 1
-    )
-    expect(activation.data.fetch("activated_at")).to match(Coordinator::Shared::Types::TIMESTAMP_PATTERN)
+    expect(activation.data).to eq("change_set_id" => "CS-100")
+    expect(activation.created_at.utc.iso8601(6)).to match(Coordinator::Shared::Types::TIMESTAMP_PATTERN)
     expect(completion.data).to eq(
       Coordinator::Write::CommandReceiptData::ChangeSet.new(change_set_id: "CS-100")
     )
     expect(completion.emitted_events.map { [ _1.stream_name, _1.stream_revision ] }).to eq(
-      [ [ "ChangeSet", 5 ] ]
+      [ [ "ChangeSet", 3 ] ]
     )
     expect(command_events("cmd-250")).to be_empty
   end

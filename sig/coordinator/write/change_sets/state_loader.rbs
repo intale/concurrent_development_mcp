@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module ChangeSets
+      class StateLoader
+        OWN_EVENT_TYPES: Array[String]
+        MEMBER_EVENT_TYPES: Array[String]
+        MAXIMUM_OWN_EVENTS: Integer
+        MAXIMUM_MEMBER_EVENTS: Integer
+
+        def initialize: (event_store: _EventStore, ?stream_factory: StreamFactory, ?schema_registry: EventSchemaRegistry) -> void
+        def call: (String change_set_id) -> Domain::ChangeSets::State
+      end
+    end
+  end
+end

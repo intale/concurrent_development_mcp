@@ -27,23 +27,22 @@ RSpec.describe Coordinator::Write::Domain::ChangeSets::DeclareWorkItemDependency
     )
   end
 
-  it "decides one dependency fact on the authoritative ChangeSet stream" do
+  it "decides one dependency fact on the consumer WorkItem stream" do
     result = decider.call(state: draft_state, command:, occurred_at:)
 
     expect(result).to be_success
     write = result.value!.writes.sole
     expect(write.stream.to_h).to eq(
-      context: "DevelopmentPlanning", stream_name: "ChangeSet", stream_id: "CS-100"
+      context: "DevelopmentExecution", stream_name: "WorkItem", stream_id: "W-200"
     )
     expect(write.event).to eq(
-      Coordinator::Write::Events::WorkItemDependencyDeclaredV1.new(
+      Coordinator::Write::Events::WorkItemDependencyDeclaredV2.new(
         change_set_id: "CS-100",
         dependency_id: "DEP-1",
         producer_work_item_id: "W-100",
         consumer_work_item_id: "W-200",
         dependency_kind: "requires_candidate",
-        required_output: nil,
-        declared_at: occurred_at
+        required_output: nil
       )
     )
   end

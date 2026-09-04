@@ -5,8 +5,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateChangeSet, :event_st
   let(:streams) { Coordinator::Write::StreamFactory.new }
   let(:change_set_events) do
     Coordinator::Write::EventReadCriteria.new(
-      event_types: [ "ChangeSetCreated", "ChangeSetAcceptanceCriteriaDefined" ],
-      maximum_count: 2,
+      event_types: [ "ChangeSetCreated", "ChangeSetGoalDefined", "ChangeSetAcceptanceCriteriaDefined" ],
+      maximum_count: 3,
       direction: :asc
     )
   end
@@ -25,18 +25,19 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateChangeSet, :event_st
     }
   end
 
-  it "persists the two facts and returns a transient typed result" do
+  it "persists cohesive identity, goal, and acceptance-criteria facts" do
     result = operation.call(input)
 
     expect(result).to be_success
     completion = result.value!
     facts = event_store.read(streams.change_set("CS-100"), change_set_events)
     expect(facts.map(&:type)).to eq(
-      [ "ChangeSetCreated", "ChangeSetAcceptanceCriteriaDefined" ]
+      [ "ChangeSetCreated", "ChangeSetGoalDefined", "ChangeSetAcceptanceCriteriaDefined" ]
     )
-    expect(facts.map(&:stream_revision)).to eq([ 0, 1 ])
+    expect(facts.map(&:stream_revision)).to eq([ 0, 1, 2 ])
     expect(facts.map(&:id)).to all(match(Coordinator::Shared::Types::UUID_V7_PATTERN))
-    expect(facts.first.data.fetch("created_at")).to match(Coordinator::Shared::Types::TIMESTAMP_PATTERN)
+    expect(facts.first.data).to eq("change_set_id" => "CS-100")
+    expect(facts.first.created_at.utc.iso8601(6)).to match(Coordinator::Shared::Types::TIMESTAMP_PATTERN)
     expect(event_store.read(streams.command("cmd-100"), command_events)).to be_empty
     expect(completion.data).to eq(
       Coordinator::Write::CommandReceiptData::ChangeSet.new(change_set_id: "CS-100")
@@ -87,7 +88,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCreateChangeSet, :event_st
     expect(results.count(&:failure?)).to eq(1)
     expect(results.find(&:failure?).failure.code).to eq(:change_set_already_exists)
     expect(event_store.read(streams.change_set("CS-100"), change_set_events).map(&:type)).to eq(
-      [ "ChangeSetCreated", "ChangeSetAcceptanceCriteriaDefined" ]
+      [ "ChangeSetCreated", "ChangeSetGoalDefined", "ChangeSetAcceptanceCriteriaDefined" ]
     )
     completed_commands = competing_inputs.count do |competing_input|
       event_store.read(streams.command(competing_input.fetch(:command_id)), command_events).one?

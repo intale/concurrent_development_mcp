@@ -1,0 +1,8 @@
+module Coordinator
+  module Write
+    class RequestedWorkIntentionV1 < Shared::Value
+      def prepared_target: () -> PreparedWorkIntentionTargetV1
+      def resource: () -> WorkIntentionResourceV1
+    end
+  end
+end

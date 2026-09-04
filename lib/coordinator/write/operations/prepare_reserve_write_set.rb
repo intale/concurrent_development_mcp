@@ -53,7 +53,13 @@ module Coordinator::Write
         resources = attributes.fetch(:resources).map do |resource|
           ResourceLeaseTargetV1.new(
             resource_id: resource.fetch(:resource_id),
-            base_blob_oid: resource[:base_blob_oid]
+            base_blob_oid: resource[:base_blob_oid],
+            mode: resource.fetch(:mode, "shared"),
+            purpose: resource.fetch(
+              :purpose,
+              "Work on WorkItem #{attributes.fetch(:work_item_id)}"
+            ),
+            context: resource[:context]
           )
         end
 

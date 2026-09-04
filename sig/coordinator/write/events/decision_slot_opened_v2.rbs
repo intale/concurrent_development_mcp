@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Events
+      class DecisionSlotOpenedV2 < Base
+        def slot_id: () -> String
+        def slot: () -> Decisions::DecisionSlotDocumentV1
+        def opened_by: () -> String
+      end
+    end
+  end
+end

@@ -32,6 +32,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCompleteWorkItem, :event_s
     )
     expect(completion.emitted_events.map(&:type)).to eq([
       "WorkItemCandidateSelected",
+      "WorkItemOutputRecorded",
+      "WorkItemOutputRecorded",
       "AttemptCompleted",
       "WorkItemCompleted"
     ])
@@ -64,15 +66,17 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCompleteWorkItem, :event_s
     expect(terminal_event_ids(candidate, input)).to eq(event_ids)
   end
 
-  it "does not append terminal facts while the authoritative write set remains active" do
+  it "uses Candidate and Attempt authority without consulting a stale read model" do
     candidate = CandidateScenario.submit(prefix: "complete-active-lease")
     input = CandidateScenario.completion_input(candidate)
 
     result = operation.call(input)
 
-    expect(result.failure.code).to eq(:write_set_still_active)
-    expect(work_item_terminal_events(candidate)).to be_empty
-    expect(attempt_terminal_events(candidate)).to be_empty
+    expect(result).to be_success
+    expect(work_item_terminal_events(candidate).map(&:type)).to eq(
+      [ "WorkItemCandidateSelected", "WorkItemCompleted" ]
+    )
+    expect(attempt_terminal_events(candidate).map(&:type)).to eq([ "AttemptCompleted" ])
     expect(command_events(input.fetch(:command_id))).to be_empty
   end
 

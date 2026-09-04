@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class WorkItemAddedToChangeSetV2 < Base
+        def work_item_id: () -> String
+        def change_set_id: () -> String
+      end
+    end
+  end
+end

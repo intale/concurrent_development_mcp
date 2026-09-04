@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Events
+      class GuidanceMessageAnchoredV1 < Base
+        def conversation_id: () -> String
+        def message_id: () -> String
+        def anchor_kind: () -> String
+        def anchor_id: () -> String
+      end
+    end
+  end
+end

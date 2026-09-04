@@ -21,6 +21,10 @@ module Coordinator::Write
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
         completion_builder: CommandResultBuilder.new,
+        natural_key_registry: NaturalKeys::Registry.new(event_store:),
+        canonical_json: CanonicalJson.new,
+        decision_slot_builder: Decisions::DecisionSlotBuilder.new,
+        decision_partition_builder: Decisions::DecisionPartitionBuilder.new,
         event_plan_contract: Contracts::AgentChoiceEventPlan.new
       )
         @event_store = event_store
@@ -36,6 +40,10 @@ module Coordinator::Write
         @schema_registry = schema_registry
         @stream_factory = stream_factory
         @completion_builder = completion_builder
+        @natural_key_registry = natural_key_registry
+        @canonical_json = canonical_json
+        @decision_slot_builder = decision_slot_builder
+        @decision_partition_builder = decision_partition_builder
         @event_plan_contract = event_plan_contract
       end
 
@@ -66,25 +74,22 @@ module Coordinator::Write
         state = load_state(command, preparation)
         return state if state.failure?
 
-        recorded_event = future_recorded_reference(command, preparation.recorded_event_id)
         decision = @decider.call(
           state: state.value!,
-          command:,
-          recorded_at: preparation.recorded_at,
-          recorded_event:
+          command:
         )
         return decision if decision.failure?
 
         plan = apply_event_plan_contract(
           decision.value!,
           command:,
-          context: state.value!.current_context,
-          recorded_event:
+          context: state.value!.current_context
         )
         persisted_events = persist_domain_plan(plan, command:, preparation:, caused_by:)
         acceptance = plan.events.fetch(1)
         completion = @completion_builder.agent_choice_record(
           command:,
+          recorded: plan.events.fetch(0),
           acceptance:,
           input_digest: preparation.input_digest,
           persisted_events:,
@@ -137,11 +142,11 @@ module Coordinator::Write
       def load_observations(partitions)
         observations = []
         partitions.each do |partition|
-          event = @event_store.read_grouped(
+          events = @event_store.read(
             @stream_factory.decision_partition(partition.partition_id),
-            EventQueries::DECISION_PARTITION_LATEST
-          ).first
-          unless event
+            EventQueries::DECISION_PARTITION_STATE
+          )
+          if events.empty?
             observations << DecisionContexts::PartitionObservationV1.new(
               partition:,
               partition_revision: nil,
@@ -151,18 +156,53 @@ module Coordinator::Write
             next
           end
 
-          payload = load_event(event)
-          invalid = invalid_partition_snapshot(partition, event, payload)
-          return invalid if invalid
+          active = {}
+          events.each do |event|
+            payload = load_event(event)
+            case payload
+            when Events::DecisionPartitionAdvancedV1
+              invalid = invalid_partition_snapshot(partition, event, payload)
+              return invalid if invalid
+
+              active = payload.active_decisions.to_h { [ _1.decision_id, _1 ] }
+            when Events::DecisionAddedToPartitionV1
+              unless payload.partition_id == partition.partition_id &&
+                     payload.partition_revision == event.stream_revision
+                return invalid_partition_fact(partition, event)
+              end
+              head = load_decision_head(payload.decision_id)
+              active[payload.decision_id] = head if head
+            when Events::DecisionRemovedFromPartitionV1
+              unless payload.partition_id == partition.partition_id &&
+                     payload.partition_revision == event.stream_revision
+                return invalid_partition_fact(partition, event)
+              end
+              active.delete(payload.decision_id)
+            end
+          end
 
           observations << DecisionContexts::PartitionObservationV1.new(
             partition:,
-            partition_revision: event.stream_revision,
-            event: event_reference(event),
-            active_decisions: payload.active_decisions
+            partition_revision: events.last.stream_revision,
+            event: event_reference(events.last),
+            active_decisions: active.values.sort_by { _1.decision_id.b }
           )
         end
         Success(observations.freeze)
+      end
+
+      def invalid_partition_fact(partition, event)
+        Failure(
+          OutcomeError.new(
+            code: :decision_partition_state_invalid,
+            message: "DecisionPartition membership fact violates its authoritative invariant",
+            details: {
+              partition_id: partition.partition_id,
+              stream_revision: event.stream_revision,
+              reason: "membership_fact_invalid"
+            }
+          )
+        )
       end
 
       def invalid_partition_snapshot(partition, event, payload)
@@ -225,18 +265,92 @@ module Coordinator::Write
         head_event = correction_event || activated_event
         current = Decisions::DecisionCurrentStateV1.new(
           decision_id: expected_head.decision_id,
-          definition: correction ? correction.definition : recorded.definition,
+          definition: normalize_definition(correction ? correction.definition : recorded.definition),
           head: Decisions::DecisionHeadV1.new(
             decision_id: expected_head.decision_id,
             decision_revision: head_event.stream_revision,
             event: event_reference(head_event)
           ),
-          slot: correction ? correction.slot : activation.slot,
-          partitions: correction ? correction.partitions : activation.partitions
+          slot: current_slot(correction:, activation:, definition_payload: correction ? correction.definition : recorded.definition),
+          partitions: current_partitions(
+            correction:,
+            activation:,
+            definition_payload: correction ? correction.definition : recorded.definition
+          )
         )
         return Success(current) if current.head == expected_head
 
         invalid_decision_head(expected_head, current.head)
+      end
+
+      def normalize_definition(value)
+        return value if value.is_a?(Decisions::DecisionDefinitionV1)
+
+        Decisions::DecisionDefinitionV1.new(
+          document: value,
+          digest: @canonical_json.sha256(value.to_h)
+        )
+      end
+
+      def current_slot(correction:, activation:, definition_payload:)
+        return correction.slot if correction.is_a?(Events::DecisionDefinitionCorrectedV1)
+        return activation.slot if !correction && activation.is_a?(Events::DecisionActivatedV1)
+
+        proposed = @decision_slot_builder.call(normalize_definition(definition_payload))
+        return unless proposed
+
+        result = @natural_key_registry.find(
+          selector: NaturalKeys::Registry::SelectorV1.new(
+            stream_context: "HumanGuidance",
+            stream_name: "DecisionSlot",
+            event_type: "DecisionSlotOpened",
+            marker: proposed.compound_marker.marker
+          ),
+          identity_from: ->(event) { decision_slot_identity_from(event, proposed) }
+        )
+        raise KeyError, result.failure.message if result.failure?
+        raise KeyError, "active Decision slot is not registered" unless result.value!
+
+        Decisions::DecisionSlotV1.new(
+          slot_id: result.value!.identity,
+          document: proposed.document,
+          compound_marker: proposed.compound_marker
+        )
+      end
+
+      def current_partitions(correction:, activation:, definition_payload:)
+        return correction.partitions if correction.is_a?(Events::DecisionDefinitionCorrectedV1)
+        return activation.partitions if !correction && activation.is_a?(Events::DecisionActivatedV1)
+
+        @decision_partition_builder.call(normalize_definition(definition_payload))
+      end
+
+      def decision_slot_identity_from(event, proposed)
+        opening = load_event(event)
+        case opening
+        when Events::DecisionSlotOpenedV1
+          opening.slot.slot_id if opening.slot.document == proposed.document
+        when Events::DecisionSlotOpenedV2
+          opening.slot_id if opening.slot == proposed.document
+        end
+      rescue EventSchemaRegistry::UnknownSchema, EventSchemaRegistry::SchemaMismatch,
+             Dry::Struct::Error, KeyError, ArgumentError
+        nil
+      end
+
+      def load_decision_head(decision_id)
+        event = @event_store.read_grouped(
+          @stream_factory.decision(decision_id),
+          EventQueries::DECISION_CORRECTION_STATE
+        ).select { %w[DecisionDefinitionCorrected DecisionActivated].include?(_1.type) }
+          .max_by(&:stream_revision)
+        return unless event
+
+        Decisions::DecisionHeadV1.new(
+          decision_id:,
+          decision_revision: event.stream_revision,
+          event: event_reference(event)
+        )
       end
 
       def invalid_decision_head(expected, current)
@@ -277,12 +391,11 @@ module Coordinator::Write
         )
       end
 
-      def apply_event_plan_contract(plan, command:, context:, recorded_event:)
+      def apply_event_plan_contract(plan, command:, context:)
         result = @event_plan_contract.call(
           plan:,
           command:,
           context:,
-          recorded_event:,
           expected_stream: @stream_factory.agent_choice(command.choice_id)
         )
         return plan if result.success?
@@ -331,17 +444,6 @@ module Coordinator::Write
           actor_id: command.actor.id,
           recorded_by: "coordinator",
           policy_version: "testing-framework-resolution/v1"
-        )
-      end
-
-      def future_recorded_reference(command, event_id)
-        EventReference.new(
-          event_id:,
-          type: "AgentChoiceRecorded",
-          stream_context: "AgentGovernance",
-          stream_name: "AgentChoice",
-          stream_id: command.choice_id,
-          stream_revision: 0
         )
       end
 

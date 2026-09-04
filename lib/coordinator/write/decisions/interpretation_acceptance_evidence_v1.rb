@@ -3,7 +3,9 @@
 module Coordinator::Write
   module Decisions
     class InterpretationAcceptanceEvidenceV1 < Value
-      attribute :acceptance, Events::DecisionInterpretationAcceptedV1
+      attribute :acceptance,
+                Types.Instance(Events::DecisionInterpretationAcceptedV1) |
+                  Types.Instance(Events::DecisionInterpretationAcceptedV2)
       attribute :event, EventReference
     end
   end

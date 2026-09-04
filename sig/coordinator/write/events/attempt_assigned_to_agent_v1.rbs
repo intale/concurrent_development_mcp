@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class AttemptAssignedToAgentV1 < Base
+        def attempt_id: () -> String
+        def agent_id: () -> String
+      end
+    end
+  end
+end

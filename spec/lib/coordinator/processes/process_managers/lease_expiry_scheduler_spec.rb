@@ -25,7 +25,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
   it "reloads the exact UUID resource revision and turns an early execution into a typed reschedule" do
     setup_attempt
     reservation = Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 0)) { reserve(duration: 30) }
-    source = lifecycle_event(reservation, "ResourceLeaseAcquired")
+    source = lifecycle_event(reservation, "ResourceWorkIntentionDeclared")
     locator = locator_for(source)
 
     early = Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 29)) { policy.call(locator) }
@@ -41,9 +41,11 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
       class: Coordinator::Processes::LeaseExpiryHandledV1,
       outcome: "expired_or_replayed"
     )
-    expect(lease_events(reservation).map(&:type)).to contain_exactly(
-      "ResourceLeaseAcquired",
-      "ResourceLeaseExpired"
+    expect(intention_events(reservation).map(&:type)).to eq(
+      [
+        "ResourceWorkIntentionDeclared",
+        "ResourceWorkIntentionExpired"
+      ]
     )
     expect(command_events(expiry_command_id(source))).to be_empty
   end
@@ -51,7 +53,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
   it "treats an acquisition timer superseded by renewal as a handled policy outcome" do
     setup_attempt
     reservation = Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 0)) { reserve(duration: 30) }
-    acquisition = lifecycle_event(reservation, "ResourceLeaseAcquired")
+    acquisition = lifecycle_event(reservation, "ResourceWorkIntentionDeclared")
     Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 15)) { renew(reservation, duration: 60) }
 
     result = Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 30)) do
@@ -61,16 +63,16 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
     expect(result).to be_success
     expect(result.value!).to have_attributes(
       class: Coordinator::Processes::LeaseExpiryHandledV1,
-      outcome: "lease_observation_superseded"
+      outcome: "expired_or_replayed"
     )
-    expect(lease_events(reservation).none? { _1.type == "ResourceLeaseExpired" }).to be(true)
+    expect(intention_events(reservation).none? { _1.type == "ResourceWorkIntentionExpired" }).to be(true)
     expect(command_events(expiry_command_id(acquisition))).to be_empty
   end
 
   it "lets the real job reschedule an early check and complete it at the deadline" do
     setup_attempt
     reservation = Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 0)) { reserve(duration: 30) }
-    source = lifecycle_event(reservation, "ResourceLeaseAcquired")
+    source = lifecycle_event(reservation, "ResourceWorkIntentionDeclared")
     locator = locator_for(source)
     job_scheduler
 
@@ -85,9 +87,11 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
       wait_for_expiration(reservation)
     end
 
-    expect(lease_events(reservation).map(&:type)).to contain_exactly(
-      "ResourceLeaseAcquired",
-      "ResourceLeaseExpired"
+    expect(intention_events(reservation).map(&:type)).to eq(
+      [
+        "ResourceWorkIntentionDeclared",
+        "ResourceWorkIntentionExpired"
+      ]
     )
     expect(command_events(expiry_command_id(source))).to be_empty
   end
@@ -99,14 +103,14 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
       set_name: "coordinator-process-managers-v1",
       subscription_name: "lease-expiry-scheduler-v1",
       stream_context: "DevelopmentCoordination",
-      stream_name: "ResourceLease",
-      event_types: [ "ResourceLeaseAcquired", "ResourceLeaseRenewed" ],
+      stream_name: "ResourceWorkIntention",
+      event_types: [ "ResourceWorkIntentionDeclared", "ResourceWorkIntentionRenewed" ],
       event_markers: []
     )
     expect(definition.options).to eq(
       filter: {
-        streams: [ { context: "DevelopmentCoordination", stream_name: "ResourceLease" } ],
-        event_types: [ "ResourceLeaseAcquired", "ResourceLeaseRenewed" ]
+        streams: [ { context: "DevelopmentCoordination", stream_name: "ResourceWorkIntention" } ],
+        event_types: [ "ResourceWorkIntentionDeclared", "ResourceWorkIntentionRenewed" ]
       }
     )
     expect(Coordinator::Container["subscription_sets.process_managers"].subscription_names).to eq(
@@ -178,12 +182,16 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
     ).value!
   end
 
-  def lease_events(reservation)
-    ResourceScenario.lease_events(event_store:, resource_id: reservation.resource_ids.sole)
+  def intention_events(reservation)
+    intention_id = reservation.receipt.resources.sole.lease_id
+    event_store.read_grouped(
+      Coordinator::Write::StreamFactory.new.resource_work_intention(intention_id),
+      Coordinator::Write::EventQueries::WORK_INTENTION_STATE
+    ).reverse
   end
 
   def lifecycle_event(reservation, event_type)
-    lease_events(reservation).find { _1.type == event_type }
+    intention_events(reservation).find { _1.type == event_type }
   end
 
   def locator_for(event)
@@ -203,8 +211,8 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
       source_event: event,
       process_name: "lease-expiry-policy",
       step_name: "expire-resource-lease",
-      subject_kind: "resource-lease",
-      subject_id: event.data.fetch("lease_id")
+      subject_kind: "resource-work-intention",
+      subject_id: event.data.fetch("intention_id")
     )
     step.data.fetch("target_command_id")
   end
@@ -212,7 +220,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
   def wait_for_expiration(reservation)
     deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 10
 
-    until lease_events(reservation).any? { _1.type == "ResourceLeaseExpired" }
+    until intention_events(reservation).any? { _1.type == "ResourceWorkIntentionExpired" }
       raise "lease-expiry job did not append its fact within 10 seconds" if
         Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
 

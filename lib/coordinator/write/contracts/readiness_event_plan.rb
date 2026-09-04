@@ -13,7 +13,7 @@ module Coordinator::Write
         expected_stream = values[:expected_stream]
         write = plan.writes.first
 
-        unless plan.writes.one? && write.stream == expected_stream && write.event.class == Events::WorkItemMadeReadyV1
+        unless plan.writes.one? && write.stream == expected_stream && write.event.class == Events::WorkItemMadeReadyV2
           key(:plan).failure("must contain one WorkItemMadeReady write to the target WorkItem stream")
         end
       end

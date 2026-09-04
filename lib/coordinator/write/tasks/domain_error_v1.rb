@@ -56,6 +56,31 @@ module Coordinator::Write
         attribute :expires_at, Types::Timestamp
       end
 
+      class WorkIntentionBlockerScope < Value
+        attribute :repository_id, Types::RepositoryId
+        attribute :change_set_id, Types::Identifier
+        attribute :work_item_id, Types::Identifier
+      end
+
+      class WorkIntentionBlocker < Value
+        attribute :intention_id, Types::UuidV7
+        attribute :resource_id, Types::ResourceId
+        attribute :resource_kind, Types::ResourceKind
+        attribute :resource_path, Types::ResourcePath
+        attribute :mode, Types::WorkIntentionMode
+        attribute :owner_agent_id, Types::Identifier
+        attribute :owner_attempt_id, Types::Identifier
+        attribute :purpose, Types::WorkIntentionPurpose
+        attribute :context, Types::WorkIntentionContext.optional
+        attribute :expires_at, Types::Timestamp
+        attribute :scope, WorkIntentionBlockerScope
+      end
+
+      class WorkIntentionConflictDetails < Value
+        attribute :blockers,
+                  Types::Array.of(WorkIntentionBlocker).constrained(min_size: 1, max_size: 1_024)
+      end
+
       class LeaseSetMismatchDetails < AttemptDetails
         attribute :current_lease_set_id, Types::UuidV7
         attribute :requested_lease_set_id, Types::UuidV7
@@ -543,6 +568,12 @@ module Coordinator::Write
         attribute :code, Types::String.enum("lease_busy")
         attribute :message, Types::String
         attribute :details, LeaseBusyDetails
+      end
+
+      class WorkIntentionConflictError < Value
+        attribute :code, Types::String.enum("work_intention_conflict")
+        attribute :message, Types::String
+        attribute :details, WorkIntentionConflictDetails
       end
 
       class LeaseSetMismatchError < Value

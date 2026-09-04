@@ -16,7 +16,8 @@ module Coordinator::Write
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
         completion_builder: CommandResultBuilder.new,
-        event_plan_contract: Contracts::AcquisitionEventPlan.new
+        event_plan_contract: Contracts::AcquisitionEventPlan.new,
+        change_set_state_loader: ChangeSets::StateLoader.new(event_store:)
       )
         @event_store = event_store
         @preparer = preparer
@@ -29,6 +30,7 @@ module Coordinator::Write
         @stream_factory = stream_factory
         @completion_builder = completion_builder
         @event_plan_contract = event_plan_contract
+        @change_set_state_loader = change_set_state_loader
       end
 
       def call(input)
@@ -50,7 +52,7 @@ module Coordinator::Write
         PreparedAcquisition.new(
           occurred_at: @clock.now,
           input_digest: @input_digest.work_item_acquire(command),
-          domain_event_ids: 3.times.map { @id_generator.uuid_v7 },
+          domain_event_ids: (5 + command.base_snapshots.length).times.map { @id_generator.uuid_v7 },
         )
       end
 
@@ -81,28 +83,14 @@ module Coordinator::Write
       end
 
       def load_change_set_state(change_set_id)
-        events = @event_store.read(
-          @stream_factory.change_set(change_set_id),
-          EventQueries::CHANGE_SET_FOR_ACQUISITION
-        ).map { load_event(_1) }
-
-        Domain::ChangeSets::State.reduce(events)
+        @change_set_state_loader.call(change_set_id)
       end
 
       def load_work_item_state(work_item_id)
         events = @event_store.read_grouped(
           @stream_factory.work_item(work_item_id),
-          GroupedEventReadCriteria.new(
-            event_types: [
-              "WorkItemCreated",
-              "WorkItemMadeReady",
-              "WorkItemAcquired",
-              "WorkItemRequeued",
-              "WorkItemCompleted"
-            ],
-            direction: :desc
-          )
-        ).reverse.map { load_event(_1) }
+          EventQueries::WORK_ITEM_FOR_ACQUISITION
+        ).map { load_event(_1) }
 
         Domain::WorkItems::State.reduce(events)
       end

@@ -23,14 +23,16 @@ RSpec.describe Coordinator::Write::Domain::ChangeSets::Create do
 
     expect(result).to be_success
     expect(result.value!.events).to contain_exactly(
-      an_instance_of(Coordinator::Write::Events::ChangeSetCreatedV1),
-      an_instance_of(Coordinator::Write::Events::ChangeSetAcceptanceCriteriaDefinedV1)
+      an_instance_of(Coordinator::Write::Events::ChangeSetCreatedV2),
+      an_instance_of(Coordinator::Write::Events::ChangeSetGoalDefinedV1),
+      an_instance_of(Coordinator::Write::Events::ChangeSetAcceptanceCriteriaDefinedV2)
     )
     expect(result.value!.events.map { _1.class.event_type }).to eq(
-      [ "ChangeSetCreated", "ChangeSetAcceptanceCriteriaDefined" ]
+      [ "ChangeSetCreated", "ChangeSetGoalDefined", "ChangeSetAcceptanceCriteriaDefined" ]
     )
     expect(result.value!.writes.map(&:stream).map(&:to_h)).to eq(
       [
+        { context: "DevelopmentPlanning", stream_name: "ChangeSet", stream_id: "CS-100" },
         { context: "DevelopmentPlanning", stream_name: "ChangeSet", stream_id: "CS-100" },
         { context: "DevelopmentPlanning", stream_name: "ChangeSet", stream_id: "CS-100" }
       ]
@@ -38,14 +40,15 @@ RSpec.describe Coordinator::Write::Domain::ChangeSets::Create do
     expect(result.value!.events.map(&:to_h)).to eq(
       [
         {
-          change_set_id: "CS-100",
-          goal: "Add coordinated billing change",
-          created_at: occurred_at
+          change_set_id: "CS-100"
         },
         {
           change_set_id: "CS-100",
-          acceptance_criteria: [ "Two agents cannot own the same WorkItem" ],
-          defined_at: occurred_at
+          goal: "Add coordinated billing change"
+        },
+        {
+          change_set_id: "CS-100",
+          acceptance_criteria: [ "Two agents cannot own the same WorkItem" ]
         }
       ]
     )

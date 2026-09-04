@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class DecisionDerivedFromInterpretationV1 < Base
+        def decision_id: () -> String
+        def interpretation_id: () -> String
+      end
+    end
+  end
+end

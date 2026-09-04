@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module Events
+      class WorkItemDependencySatisfiedV2 < Base
+        def dependency_id: () -> String
+        def change_set_id: () -> String
+        def producer_work_item_id: () -> String
+        def consumer_work_item_id: () -> String
+        def dependency_kind: () -> String
+        def required_output: () -> RequiredOutput?
+        def source: () -> EventReference
+      end
+    end
+  end
+end

@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Events
+      class DecisionAddedToPartitionV1 < Base
+        def partition_id: () -> String
+        def partition_revision: () -> Integer
+        def decision_id: () -> String
+      end
+    end
+  end
+end

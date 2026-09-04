@@ -11,6 +11,7 @@ module Coordinator::Write
         work_item_unavailable: "conflict",
         attempt_already_exists: "conflict",
         lease_busy: "busy",
+        work_intention_conflict: "busy",
         resource_boundary_maintenance_required: "limit_reached",
         resource_history_corrupt: "conflict",
         resource_path_conflict: "conflict",

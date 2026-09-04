@@ -20,6 +20,9 @@ module Coordinator::Write
         repository_registration_loader: RepositoryRegistrationLoader.new(event_store:),
         repository_marker_builder: RepositoryMarkerBuilder.new,
         natural_key_registry: NaturalKeys::Registry.new(event_store:),
+        work_intention_set_loader: WorkIntentionSetLoader.new(event_store:),
+        work_intention_loader: WorkIntentionLoader.new(event_store:),
+        work_intention_resource_loader: WorkIntentionResourceLoader.new(event_store:),
         event_plan_contract: Contracts::CandidateSubmissionEventPlan.new
       )
         @event_store = event_store
@@ -36,6 +39,9 @@ module Coordinator::Write
         @repository_registration_loader = repository_registration_loader
         @repository_marker_builder = repository_marker_builder
         @natural_key_registry = natural_key_registry
+        @work_intention_set_loader = work_intention_set_loader
+        @work_intention_loader = work_intention_loader
+        @work_intention_resource_loader = work_intention_resource_loader
         @event_plan_contract = event_plan_contract
       end
 
@@ -175,12 +181,10 @@ module Coordinator::Write
 
       def load_submission_state(command, existing_head:)
         attempt = load_attempt_state(command.attempt_id)
-        current_leases = attempt.lease_resources.map do |reference|
-          CurrentLeaseObservationV2.new(
-            reference:,
-            state: load_lease_state(reference.resource_id)
-          )
-        end
+        hydration = hydrate_work_intentions(attempt, command:)
+        return hydration if hydration.failure?
+
+        attempt, current_leases = hydration.value!
 
         Success(Domain::Candidates::SubmissionState.new(
           existing_candidate: load_existing_reference(
@@ -191,6 +195,84 @@ module Coordinator::Write
           attempt:,
           current_leases:
         ))
+      end
+
+      def hydrate_work_intentions(attempt, command:)
+        set_state = @work_intention_set_loader.find_by_attempt(command.attempt_id)
+        return Success([ attempt, legacy_lease_observations(attempt) ]) unless set_state
+
+        observations = set_state.members.map do |member|
+          intention = @work_intention_loader.call(member.intention_id).state
+          resource_result = @work_intention_resource_loader.call(
+            ResourceLeaseTargetV1.new(
+              resource_id: intention.resource_id,
+              base_blob_oid: intention.base_blob_oid
+            ),
+            repository_id: intention.repository_id
+          )
+          return resource_result if resource_result.failure?
+
+          resource = resource_result.value!
+          reference = LeaseReferenceV2.new(
+            lease_id: intention.intention_id,
+            resource_id: intention.resource_id,
+            resource_kind: resource.kind,
+            resource_path: resource.path,
+            base_blob_oid: intention.base_blob_oid,
+            fencing_token: intention.fencing_token
+          )
+          CurrentLeaseObservationV2.new(
+            reference:,
+            state: legacy_lease_state(intention, resource:)
+          )
+        end
+        released_at = observations.all? { !_1.state.released_at.nil? } ? observations.first&.state&.released_at : nil
+        attempt = Domain::Attempts::State.new(
+          attempt.attributes.merge(
+            lease_set_id: set_state.set_id,
+            lease_repository_id: set_state.repository_id,
+            lease_policy_version: LeaseResourceV2::POLICY_VERSION,
+            lease_resources: observations.map(&:reference),
+            lease_expires_at: observations.map { _1.state.expires_at }.compact.min,
+            lease_released_at: released_at
+          )
+        )
+        Success([ attempt, observations ])
+      end
+
+      def legacy_lease_observations(attempt)
+        attempt.lease_resources.map do |reference|
+          CurrentLeaseObservationV2.new(
+            reference:,
+            state: load_lease_state(reference.resource_id)
+          )
+        end
+      end
+
+      def legacy_lease_state(intention, resource:)
+        Domain::ResourceLeases::State.new(
+          lease_id: intention.intention_id,
+          lease_set_id: intention.set_id,
+          resource_id: intention.resource_id,
+          resource_kind: resource.kind,
+          resource_path: resource.path,
+          policy_version: LeaseResourceV2::POLICY_VERSION,
+          mode: intention.mode,
+          change_set_id: intention.change_set_id,
+          work_item_id: intention.work_item_id,
+          attempt_id: intention.attempt_id,
+          agent_id: intention.agent_id,
+          repository_id: intention.repository_id,
+          object_format: intention.object_format,
+          base_commit_oid: intention.base_commit_oid,
+          base_blob_oid: intention.base_blob_oid,
+          fencing_token: intention.fencing_token,
+          acquired_at: nil,
+          renewed_at: nil,
+          expires_at: intention.expires_at,
+          released_at: intention.withdrawn ? intention.expires_at : nil,
+          expired_at: intention.expired ? intention.expires_at : nil
+        )
       end
 
       def load_existing_reference(stream, criteria)

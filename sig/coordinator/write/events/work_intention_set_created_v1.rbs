@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module Events
+      class WorkIntentionSetCreatedV1 < Base
+        def set_id: () -> String
+        def attempt_id: () -> String
+        def work_item_id: () -> String
+        def change_set_id: () -> String
+        def repository_id: () -> String
+      end
+    end
+  end
+end

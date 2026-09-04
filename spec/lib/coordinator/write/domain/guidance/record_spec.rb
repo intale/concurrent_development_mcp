@@ -25,7 +25,7 @@ RSpec.describe Coordinator::Write::Domain::Guidance::Record do
     )
   end
 
-  it "implements GDN-01-DIRECT-01 as one immutable evidence fact" do
+  it "implements GDN-01-DIRECT-01 as one utterance and separate anchor facts" do
     result = decider.call(
       state: Coordinator::Write::Domain::Guidance::State.initial,
       command: command,
@@ -33,19 +33,26 @@ RSpec.describe Coordinator::Write::Domain::Guidance::Record do
     )
 
     expect(result).to be_success
-    expect(result.value!.writes.sole.stream.to_h).to eq(
+    expect(result.value!.writes.map(&:stream).uniq.sole.to_h).to eq(
       context: "HumanGuidance",
       stream_name: "Conversation",
       stream_id: "C-1"
     )
-    expect(result.value!.events.sole).to eq(
-      Coordinator::Write::Events::UserUtteranceRecordedV1.new(
+    expect(result.value!.events.first).to eq(
+      Coordinator::Write::Events::UserUtteranceRecordedV2.new(
         message_id: "M-1",
         conversation_id: "C-1",
-        source: "mcp_client",
-        text: "Do not use Redis in billing.",
-        anchors:,
-        recorded_at: occurred_at
+        source: "user",
+        text: "Do not use Redis in billing."
+      )
+    )
+    expect(result.value!.events.drop(1)).to contain_exactly(
+      Coordinator::Write::Events::GuidanceMessageAnchoredV1.new(
+        conversation_id: "C-1", message_id: "M-1", anchor_kind: "repository",
+        anchor_id: RepositoryScenario::DEFAULT_REPOSITORY_ID
+      ),
+      Coordinator::Write::Events::GuidanceMessageAnchoredV1.new(
+        conversation_id: "C-1", message_id: "M-1", anchor_kind: "change_set", anchor_id: "CS-1"
       )
     )
   end
@@ -57,10 +64,11 @@ RSpec.describe Coordinator::Write::Domain::Guidance::Record do
       occurred_at:
     )
 
-    expect(result.value!.events.sole).to be_a(
-      Coordinator::Write::Events::UserUtteranceForwardedByAgentV1
+    expect(result.value!.events.first).to be_a(
+      Coordinator::Write::Events::UserUtteranceForwardedByAgentV2
     )
-    expect(result.value!.events.sole.source).to eq("agent_forwarded")
+    expect(result.value!.events.first.source).to eq("agent_forwarded")
+    expect(result.value!.events.drop(1)).to all(be_a(Coordinator::Write::Events::GuidanceMessageAnchoredV1))
   end
 
   it "implements GDN-01-DUPLICATE-01 as a zero-event failure" do

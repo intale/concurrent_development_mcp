@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Events
+      class DecisionRecordedV2 < Base
+        def decision_id: () -> String
+        def interpretation_id: () -> String
+        def source_message_id: () -> String
+        def definition: () -> Decisions::DecisionDefinitionDocumentV1
+      end
+    end
+  end
+end

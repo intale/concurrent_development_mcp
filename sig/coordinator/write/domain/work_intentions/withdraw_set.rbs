@@ -1,0 +1,19 @@
+module Coordinator
+  module Write
+    module Domain
+      module WorkIntentions
+        class WithdrawSet
+          def initialize: (?stream_factory: StreamFactory) -> void
+          def call: (
+            attempt_state: Domain::Attempts::State,
+            set_state: SetState,
+            member_states: Array[State],
+            command: Commands::ReleaseLeaseSet,
+            withdrawn_at: String,
+            ?reason: String?
+          ) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

@@ -31,7 +31,7 @@ RSpec.describe Coordinator::Write::Domain::ChangeSets::Activate do
     )
   end
 
-  it "implements PLN-ACTIVATE-SUCCESS-01 with authoritative graph counts" do
+  it "implements PLN-ACTIVATE-SUCCESS-01 as a lifecycle fact without a graph snapshot" do
     result = decider.call(state: draft_state, command:, occurred_at:)
 
     expect(result).to be_success
@@ -42,12 +42,7 @@ RSpec.describe Coordinator::Write::Domain::ChangeSets::Activate do
       stream_id: "CS-100"
     )
     expect(write.event).to eq(
-      Coordinator::Write::Events::ChangeSetActivatedV1.new(
-        change_set_id: "CS-100",
-        work_item_count: 2,
-        dependency_count: 1,
-        activated_at: occurred_at
-      )
+      Coordinator::Write::Events::ChangeSetActivatedV2.new(change_set_id: "CS-100")
     )
   end
 

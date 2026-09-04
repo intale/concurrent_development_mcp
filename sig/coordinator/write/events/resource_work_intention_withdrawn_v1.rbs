@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Events
+      class ResourceWorkIntentionWithdrawnV1 < Base
+        def intention_id: () -> String
+        def resource_id: () -> String
+        def fencing_token: () -> Integer
+        def reason: () -> String?
+      end
+    end
+  end
+end

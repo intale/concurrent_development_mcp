@@ -8,7 +8,7 @@ module Coordinator::Write
       def initialize(
         event_store:,
         preparer: PrepareReserveWriteSet.new,
-        decider: Domain::ResourceLeases::Reserve.new,
+        decider: Domain::WorkIntentions::DeclareSet.new,
         input_digest: CommandInputDigest.new,
         clock: SystemClock.new,
         id_generator: IdGenerator.new,
@@ -18,8 +18,9 @@ module Coordinator::Write
         completion_builder: CommandResultBuilder.new,
         repository_registration_loader: RepositoryRegistrationLoader.new(event_store:),
         repository_marker_builder: RepositoryMarkerBuilder.new,
-        lease_resource_loader: LeaseResourceLoader.new(event_store:),
-        event_plan_contract: Contracts::WriteSetReservationEventPlan.new
+        resource_loader: WorkIntentionResourceLoader.new(event_store:),
+        set_loader: WorkIntentionSetLoader.new(event_store:),
+        boundary_loader: WorkIntentionBoundaryLoader.new(event_store:)
       )
         @event_store = event_store
         @preparer = preparer
@@ -33,9 +34,9 @@ module Coordinator::Write
         @completion_builder = completion_builder
         @repository_registration_loader = repository_registration_loader
         @repository_marker_builder = repository_marker_builder
-        @lease_resource_loader = lease_resource_loader
-        @resource_boundary_loader = ResourceBoundaryLoader.new(event_store:, schema_registry:)
-        @event_plan_contract = event_plan_contract
+        @resource_loader = resource_loader
+        @set_loader = set_loader
+        @boundary_loader = boundary_loader
       end
 
       def call(input)
@@ -53,22 +54,22 @@ module Coordinator::Write
       private
 
       def prepare_logical_values(command)
-        acquired_at = @clock.now
-        expires_at = (Time.iso8601(acquired_at) + command.lease_duration_seconds).utc.iso8601(6)
-
+        declared_at = @clock.now
+        expires_at = (Time.iso8601(declared_at) + command.lease_duration_seconds).utc.iso8601(6)
         PreparedWriteSetReservation.new(
-          acquired_at:,
+          acquired_at: declared_at,
           expires_at:,
           input_digest: @input_digest.write_set_reserve(command),
           lease_set_id: @id_generator.uuid_v7,
-          resources: command.resources.map do |resource|
-            PreparedLeaseTargetV1.new(
-              target: resource,
-              lease_id: @id_generator.uuid_v7,
-              event_id: @id_generator.uuid_v7
+          resources: command.resources.map do |target|
+            PreparedWorkIntentionTargetV1.new(
+              target:,
+              intention_id: @id_generator.uuid_v7,
+              declaration_event_id: @id_generator.uuid_v7,
+              membership_event_id: @id_generator.uuid_v7
             )
           end,
-          reservation_event_id: @id_generator.uuid_v7,
+          set_event_id: @id_generator.uuid_v7
         )
       end
 
@@ -79,177 +80,159 @@ module Coordinator::Write
         resources = load_resources(command)
         return resources if resources.failure?
 
-        execute_attempt(
-          command:,
-          resources: resources.value!,
-          prepared:,
-          repository_registration: registration,
-          caused_by:
-        )
-      end
-
-      def execute_attempt(command:, resources:, prepared:, repository_registration:, caused_by:)
-        attempt_state = load_attempt_state(command.attempt_id)
-        lease_states = resources.map { load_lease_state(_1.resource_id) }
-        boundary_states = load_boundary_states(command, resources:)
-        return boundary_states if boundary_states.failure?
+        requests = resources.value!.zip(prepared.resources).map do |resource, prepared_target|
+          RequestedWorkIntentionV1.new(resource:, prepared_target:)
+        end
+        boundary = load_boundary(command, resources: resources.value!, at: prepared.acquired_at)
+        return boundary if boundary.failure?
 
         decision = @decider.call(
-          attempt_state:,
-          lease_states: lease_states + boundary_states.value!,
+          attempt_state: load_attempt_state(command.attempt_id),
+          existing_set_state: @set_loader.find_by_attempt(command.attempt_id) || Domain::WorkIntentions::SetState.initial,
+          boundary: boundary.value!,
           command:,
-          resources:,
-          lease_set_id: prepared.lease_set_id,
-          lease_ids: prepared.resources.map(&:lease_id),
-          acquired_at: prepared.acquired_at,
-          expires_at: prepared.expires_at
+          requests:,
+          set_id: prepared.lease_set_id,
+          expires_at: prepared.expires_at,
+          declared_at: prepared.acquired_at
         )
         return decision if decision.failure?
 
-        plan = decision.value!
-        verify_event_plan!(plan, command:, resources:, prepared:, lease_states:)
-        ActiveSupport::Notifications.instrument(
-          "coordinator.command_boundary",
-          operation: TOOL_NAME,
-          command_id: command.command_id
-        )
-        ActiveSupport::Notifications.instrument(
-          "coordinator.command_boundary",
-          operation: "resource_boundary_dcb",
-          command_id: command.command_id,
-          event_ids: prepared.resources.map(&:event_id)
-        )
-        persisted_domain_events = persist_domain_plan(
+        plan = decision.value!.plan
+        persisted = persist_domain_plan(
           plan,
           command:,
           prepared:,
-          repository_registration:,
+          resources: resources.value!,
+          repository_registration: registration,
           caused_by:
         )
-        reservation = plan.events.last
-        completion = @completion_builder.write_set_reserve(
-          command:,
-          reservation:,
-          input_digest: prepared.input_digest,
-          persisted_events: persisted_domain_events,
-          completed_at: prepared.acquired_at
+        receipt = reservation_receipt(plan, command:, resources: resources.value!, prepared:)
+        Success(
+          @completion_builder.write_set_reserve(
+            command:,
+            reservation: receipt,
+            input_digest: prepared.input_digest,
+            persisted_events: persisted,
+            completed_at: prepared.acquired_at
+          )
         )
-
-        Success(completion)
+      rescue EventHistoryLimitExceeded
+        history_limit(command)
       end
 
       def load_attempt_state(attempt_id)
         events = @event_store.read(
           @stream_factory.attempt(attempt_id),
-          EventQueries::ATTEMPT_FOR_WRITE_SET_RESERVATION
-        ).map { load_event(_1) }
-
+          EventQueries::ATTEMPT_FOR_WORK_INTENTIONS
+        ).map { deserialize(_1) }
         Domain::Attempts::State.reduce(events)
       end
 
-      def load_lease_state(resource_id)
-        events = @event_store.read_grouped(
-          @stream_factory.resource_lease(resource_id),
-          EventQueries::RESOURCE_LEASE_FOR_RESERVATION
-        ).reverse.map { load_event(_1) }
+      def load_resources(command)
+        resources = command.resources.map do |target|
+          result = @resource_loader.call(target, repository_id: command.repository_id)
+          return result if result.failure?
 
-        Domain::ResourceLeases::State.reduce(events)
+          result.value!
+        end
+        Success(resources)
       end
 
-      def load_boundary_states(command, resources:)
+      def load_boundary(command, resources:, at:)
         markers = resources.flat_map do |resource|
-          @repository_marker_builder.resource_boundary_markers(
+          @repository_marker_builder.work_intention_boundary_markers(
             repository_id: command.repository_id,
             resource_kind: resource.kind,
             resource_path: resource.path
           )
         end.uniq
-        Success(@resource_boundary_loader.call(markers, repository_id: command.repository_id).states)
-      rescue EventHistoryLimitExceeded
-        Failure(
-          OutcomeError.new(
-            code: :resource_boundary_maintenance_required,
-            message: "Resource boundary maintenance is catching up; retry this request",
-            details: {
-              repository_id: command.repository_id,
-              boundary_marker_count: markers.length,
-              maximum_delta_event_count: EventQueries::RESOURCE_BOUNDARY_DECISION_DELTA_MAXIMUM_COUNT
-            }
+        @boundary_loader.call(markers, repository_id: command.repository_id, at:)
+      end
+
+      def persist_domain_plan(plan, command:, prepared:, resources:, repository_registration:, caused_by:)
+        plan.writes.map do |write|
+          event = @event_factory.build!(
+            event: write.event,
+            event_id: event_id_for(write.event, prepared:),
+            metadata: command_metadata(command),
+            markers: event_markers(
+              command,
+              write.event,
+              resources:,
+              repository_registration:
+            ),
+            caused_by:
           )
+          @event_store.append(write.stream, [ event ]).fetch(0)
+        end
+      end
+
+      def event_id_for(event, prepared:)
+        return prepared.set_event_id if event.is_a?(Events::WorkIntentionSetCreatedV1)
+
+        target = prepared.resources.find { _1.intention_id == event.intention_id }
+        return target.declaration_event_id if event.is_a?(Events::ResourceWorkIntentionDeclaredV1)
+
+        target.membership_event_id
+      end
+
+      def event_markers(command, event, resources:, repository_registration:)
+        common = [
+          "change-set:#{command.change_set_id}",
+          "work-item:#{command.work_item_id}",
+          "attempt:#{command.attempt_id}",
+          "command:#{command.command_id}",
+          "work-intention-set:#{event.set_id}",
+          *@repository_marker_builder.call(repository_registration)
+        ]
+        return common unless event.respond_to?(:resource_id)
+
+        resource = resources.find { _1.resource_id == event.resource_id }
+        markers = common + [
+          "resource:#{resource.resource_id}",
+          "resource-kind:#{resource.kind}",
+          "work-intention:#{event.intention_id}"
+        ]
+        return markers unless event.is_a?(Events::ResourceWorkIntentionDeclaredV1)
+
+        markers + [
+          *@repository_marker_builder.work_intention_event_markers(
+            repository_id: command.repository_id,
+            resource_path: resource.path
+          )
+        ]
+      end
+
+      def reservation_receipt(plan, command:, resources:, prepared:)
+        declarations = plan.events.grep(Events::ResourceWorkIntentionDeclaredV1)
+        references = declarations.map do |event|
+          resource = resources.find { _1.resource_id == event.resource_id }
+          LeaseReferenceV2.new(
+            lease_id: event.intention_id,
+            resource_id: event.resource_id,
+            resource_kind: resource.kind,
+            resource_path: resource.path,
+            base_blob_oid: event.base_blob_oid,
+            fencing_token: event.fencing_token
+          )
+        end
+        WorkIntentionSetReceiptV1.new(
+          lease_set_id: prepared.lease_set_id,
+          repository_id: command.repository_id,
+          policy_version: WorkIntentionPolicyV1::VERSION,
+          reserved_at: prepared.acquired_at,
+          expires_at: prepared.expires_at,
+          resources: references
         )
       end
 
-      def load_resources(command)
-        resources = command.resources.map do |target|
-          result = @lease_resource_loader.call(target, repository_id: command.repository_id)
-          return result if result.failure?
-
-          result.value!
-        end
-
-        Success(resources)
-      end
-
-      def load_event(event)
+      def deserialize(event)
         @schema_registry.load(
           type: event.type,
           schema_version: event.metadata.fetch("schema_version"),
           data: event.data
         )
-      end
-
-      def verify_event_plan!(plan, command:, resources:, prepared:, lease_states:)
-        result = @event_plan_contract.call(
-          plan:,
-          command:,
-          resources:,
-          attempt_stream: @stream_factory.attempt(command.attempt_id),
-          lease_states:,
-          lease_set_id: prepared.lease_set_id,
-          lease_ids: prepared.resources.map(&:lease_id),
-          acquired_at: prepared.acquired_at,
-          expires_at: prepared.expires_at
-        )
-        return if result.success?
-
-        raise InvalidWriteSetReservationEventPlan, result.errors.to_h.inspect
-      end
-
-      def persist_domain_plan(plan, command:, prepared:, repository_registration:, caused_by:)
-        event_ids = prepared.resources.map(&:event_id) + [ prepared.reservation_event_id ]
-
-        plan.writes.zip(event_ids).map do |write, event_id|
-          event = @event_factory.build!(
-            event: write.event,
-            event_id:,
-            metadata: command_metadata(command),
-            markers: event_markers(command, write.event, repository_registration:),
-            caused_by:
-          )
-
-          @event_store.append(write.stream, [ event ]).fetch(0)
-        end
-      end
-
-      def event_markers(command, event, repository_registration:)
-        common = [
-          "change-set:#{command.change_set_id}",
-          "work-item:#{command.work_item_id}",
-          "attempt:#{command.attempt_id}",
-          "command:#{command.command_id}"
-        ] + @repository_marker_builder.call(repository_registration)
-        return common + [ "lease-set:#{event.lease_set_id}" ] unless event.is_a?(Events::ResourceLeaseAcquiredV2)
-
-        common + [
-          "lease-set:#{event.lease_set_id}",
-          "resource:#{event.resource_id}",
-          "resource-kind:#{event.resource_kind}",
-          *@repository_marker_builder.resource_event_markers(
-            repository_id: event.repository_id,
-            resource_kind: event.resource_kind,
-            resource_path: event.resource_path
-          )
-        ]
       end
 
       def command_metadata(command)
@@ -258,7 +241,21 @@ module Coordinator::Write
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
-          policy_version: LeaseResourceV2::POLICY_VERSION
+          policy_version: WorkIntentionPolicyV1::VERSION
+        )
+      end
+
+      def history_limit(command)
+        Failure(
+          OutcomeError.new(
+            code: :resource_boundary_maintenance_required,
+            message: "Work-intention boundary history exceeded its decision limit",
+            details: {
+              repository_id: command.repository_id,
+              boundary_marker_count: command.resources.length,
+              maximum_delta_event_count: EventQueries::WORK_INTENTION_BOUNDARY_MAXIMUM_COUNT
+            }
+          )
         )
       end
 

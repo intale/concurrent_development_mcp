@@ -89,13 +89,12 @@ RSpec.describe Coordinator::Write::Domain::Interpretations::Propose do
 
     expect(result).to be_success
     proposal = result.value!.events.sole
-    expect(proposal).to be_a(Coordinator::Write::Events::DecisionInterpretationProposedV1)
-    expect(proposal.assessment.status).to eq("accepted_for_activation")
+    expect(proposal).to be_a(Coordinator::Write::Events::DecisionInterpretationProposedV2)
+    expect(proposal.assessment).to eq("accepted_for_activation")
     expect(proposal.proposed_decision.scope).to have_attributes(
       repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
       work_item_id: "W-1"
     )
-    expect(proposal.scope_provenance).to have_attributes(kind: "inferred", anchor_level: "work_item")
   end
 
   it "implements GDN-02-CONFIRM-01 with proposal and clarification from one command" do
@@ -116,10 +115,10 @@ RSpec.describe Coordinator::Write::Domain::Interpretations::Propose do
     )
 
     expect(result.value!.events.map(&:class)).to eq([
-      Coordinator::Write::Events::DecisionInterpretationProposedV1,
-      Coordinator::Write::Events::DecisionClarificationRequiredV1
+      Coordinator::Write::Events::DecisionInterpretationProposedV2,
+      Coordinator::Write::Events::DecisionClarificationRequiredV2
     ])
-    expect(result.value!.events.first.assessment.status).to eq("confirmation_required")
+    expect(result.value!.events.first.assessment).to eq("confirmation_required")
   end
 
   it "implements GDN-02-UNCERTAIN-01 without coercing a question into policy" do
@@ -141,10 +140,8 @@ RSpec.describe Coordinator::Write::Domain::Interpretations::Propose do
       proposed_at:
     )
 
-    expect(result.value!.events.first.assessment).to have_attributes(
-      status: "needs_classification",
-      reasons: include("non_normative_statement_kind", "scope_unresolved")
-    )
+    expect(result.value!.events.first.assessment).to eq("needs_classification")
+    expect(result.value!.events.last.reasons).to include("non_normative_statement_kind", "scope_unresolved")
     expect(result.value!.events.length).to eq(2)
   end
 
@@ -189,20 +186,9 @@ RSpec.describe Coordinator::Write::Domain::Interpretations::Propose do
       proposed_at:
     ).value!.events.first
 
-    expect(explicit.scope_provenance).to have_attributes(
-      kind: "explicit",
-      anchor_level: "unresolved"
-    )
-    expect(explicit.assessment).to have_attributes(
-      status: "needs_classification",
-      reasons: include("scope_unresolved")
-    )
-    expect(inferred.scope_provenance).to have_attributes(
-      kind: "unresolved",
-      anchor_level: "unresolved"
-    )
+    expect(explicit.assessment).to eq("needs_classification")
     expect(inferred.proposed_decision.scope.repository_ids).to be_empty
-    expect(inferred.assessment.status).to eq("needs_classification")
+    expect(inferred.assessment).to eq("needs_classification")
   end
 
   it "denies missing source, mismatched span, unsupported topic, bad topic value, and reused identity" do

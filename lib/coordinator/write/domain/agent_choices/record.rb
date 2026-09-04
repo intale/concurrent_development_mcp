@@ -11,7 +11,7 @@ module Coordinator::Write
           @policy_evaluator = policy_evaluator
         end
 
-        def call(state:, command:, recorded_at:, recorded_event:)
+        def call(state:, command:)
           denial = denied(state, command)
           return denial if denial
 
@@ -22,7 +22,7 @@ module Coordinator::Write
           assessment = assess(evaluation, state.resolution.effective_decision, command)
           return assessment if assessment.failure?
 
-          Success(build_plan(command, state.current_context, assessment.value!, recorded_at, recorded_event))
+          Success(build_plan(command, state.current_context, assessment.value!))
         end
 
         private
@@ -152,31 +152,27 @@ module Coordinator::Write
           )
         end
 
-        def build_plan(command, context, assessment, recorded_at, recorded_event)
+        def build_plan(command, context, assessment)
           stream = @stream_factory.agent_choice(command.choice_id)
           EventPlan.new(
             writes: [
               EventWrite.new(
                 stream:,
-                event: Events::AgentChoiceRecordedV1.new(
+                event: Events::AgentChoiceRecordedV2.new(
                   choice_id: command.choice_id,
                   choice_type: command.choice_type,
                   selected: command.selected,
                   alternatives: command.alternatives,
                   reason_summary: command.reason_summary,
                   context: command.context,
-                  decision_context: context,
-                  recorded_at:
+                  decision_context: context
                 )
               ),
               EventWrite.new(
                 stream:,
-                event: Events::AgentChoiceAcceptedV1.new(
+                event: Events::AgentChoiceAcceptedV2.new(
                   choice_id: command.choice_id,
-                  recorded_event:,
-                  context_digest: context.digest,
-                  assessment:,
-                  accepted_at: recorded_at
+                  assessment:
                 )
               )
             ]

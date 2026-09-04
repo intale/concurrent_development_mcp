@@ -54,6 +54,7 @@ module Coordinator::Write
           activated_at: @clock.now,
           input_digest: @input_digest.decision_activate(command),
           recorded_event_id: @id_generator.uuid_v7,
+          derived_event_id: @id_generator.uuid_v7,
           activated_event_id: @id_generator.uuid_v7,
           slot_opened_event_id: @id_generator.uuid_v7,
           slot_head_event_id: @id_generator.uuid_v7,
@@ -81,7 +82,7 @@ module Coordinator::Write
             event_id: preparation.activated_event_id,
             type: "DecisionActivated",
             decision_id: command.decision_id,
-            stream_revision: 1
+            stream_revision: 2
           )
         )
         return candidate if candidate.failure?
@@ -102,13 +103,16 @@ module Coordinator::Write
           plan,
           command:,
           preparation:,
+          state:,
           caused_by:
         )
-        activation = plan.events.find { _1.is_a?(Events::DecisionActivatedV1) }
-        partitions = partition_receipts(plan, persisted_events)
+        activation = plan.events.find { _1.is_a?(Events::DecisionActivatedV2) }
+        partitions = partition_receipts(plan, persisted_events, state)
         completion = @completion_builder.decision_activate(
           command:,
           activation:,
+          definition: state.candidate.definition,
+          slot: state.candidate.slot,
           partitions:,
           input_digest: preparation.input_digest,
           persisted_events:,
@@ -154,10 +158,12 @@ module Coordinator::Write
 
       def decision_slot_identity_from(event, proposed)
         opening = load_event(event)
-        return unless opening.is_a?(Events::DecisionSlotOpenedV1)
-        return unless opening.slot.document == proposed.document
-
-        opening.slot.slot_id
+        case opening
+        when Events::DecisionSlotOpenedV1
+          opening.slot.slot_id if opening.slot.document == proposed.document
+        when Events::DecisionSlotOpenedV2
+          opening.slot_id if opening.slot == proposed.document
+        end
       rescue EventSchemaRegistry::UnknownSchema, EventSchemaRegistry::SchemaMismatch,
              Dry::Struct::Error, KeyError, ArgumentError
         nil
@@ -240,15 +246,42 @@ module Coordinator::Write
       end
 
       def load_partition_state(partition)
-        event = @event_store.read_grouped(
+        events = @event_store.read(
           @stream_factory.decision_partition(partition.partition_id),
-          EventQueries::DECISION_PARTITION_LATEST
-        ).first
-        payload = event && load_event(event)
+          EventQueries::DECISION_PARTITION_STATE
+        )
+        active = {}
+        events.each do |event|
+          payload = load_event(event)
+          case payload
+          when Events::DecisionPartitionAdvancedV1
+            active = payload.active_decisions.to_h { [ _1.decision_id, _1 ] }
+          when Events::DecisionAddedToPartitionV1
+            head = load_decision_head(payload.decision_id)
+            active[payload.decision_id] = head if head
+          when Events::DecisionRemovedFromPartitionV1
+            active.delete(payload.decision_id)
+          end
+        end
         Decisions::DecisionPartitionStateV1.new(
           partition:,
-          latest_revision: event&.stream_revision,
-          active_decisions: payload ? payload.active_decisions : []
+          latest_revision: events.last&.stream_revision,
+          active_decisions: active.values.sort_by { _1.decision_id.b }
+        )
+      end
+
+      def load_decision_head(decision_id)
+        event = @event_store.read_grouped(
+          @stream_factory.decision(decision_id),
+          EventQueries::DECISION_CORRECTION_STATE
+        ).select { %w[DecisionDefinitionCorrected DecisionActivated].include?(_1.type) }
+          .max_by(&:stream_revision)
+        return unless event
+
+        Decisions::DecisionHeadV1.new(
+          decision_id:,
+          decision_revision: event.stream_revision,
+          event: event_reference(event)
         )
       end
 
@@ -264,10 +297,10 @@ module Coordinator::Write
         raise ArgumentError, "decision activation plan violates its dry-rb contract: #{result.errors.to_h.inspect}"
       end
 
-      def persist_domain_plan(plan, command:, preparation:, caused_by:)
+      def persist_domain_plan(plan, command:, preparation:, state:, caused_by:)
         partition_index = 0
-        definition = plan.events.first.definition
-        slot = plan.events.fetch(1).slot
+        definition = state.candidate.definition
+        slot = state.candidate.slot
         physical_writes = plan.writes.map do |write|
           event_id, partition_index = event_identity(
             write.event,
@@ -291,29 +324,32 @@ module Coordinator::Write
 
       def event_identity(event, preparation, partition_index)
         case event
-        when Events::DecisionRecordedV1
+        when Events::DecisionRecordedV2
           [ preparation.recorded_event_id, partition_index ]
-        when Events::DecisionActivatedV1
+        when Events::DecisionDerivedFromInterpretationV1
+          [ preparation.derived_event_id, partition_index ]
+        when Events::DecisionActivatedV2
           [ preparation.activated_event_id, partition_index ]
-        when Events::DecisionSlotOpenedV1
+        when Events::DecisionSlotOpenedV2
           [ preparation.slot_opened_event_id, partition_index ]
-        when Events::DecisionSlotHeadChangedV1
+        when Events::DecisionSlotHeadChangedV2
           [ preparation.slot_head_event_id, partition_index ]
-        when Events::DecisionPartitionAdvancedV1
+        when Events::DecisionAddedToPartitionV1
           [ preparation.partition_event_ids.fetch(partition_index), partition_index + 1 ]
         end
       end
 
       def markers_for(event, command, definition:, slot:)
         case event
-        when Events::DecisionRecordedV1, Events::DecisionActivatedV1
+        when Events::DecisionRecordedV2, Events::DecisionDerivedFromInterpretationV1,
+             Events::DecisionActivatedV2
           decision_markers(command, definition, slot)
-        when Events::DecisionSlotOpenedV1, Events::DecisionSlotHeadChangedV1
+        when Events::DecisionSlotOpenedV2, Events::DecisionSlotHeadChangedV2
           slot_markers(slot, command)
-        when Events::DecisionPartitionAdvancedV1
+        when Events::DecisionAddedToPartitionV1
           [
-            "decision-partition:#{event.partition.partition_id}",
-            "topic-root:#{event.partition.topic_root}",
+            "decision-partition:#{event.partition_id}",
+            "topic-root:#{definition.document.topic_root}",
             "decision:#{command.decision_id}",
             "command:#{command.command_id}"
           ]
@@ -341,12 +377,12 @@ module Coordinator::Write
         ]
       end
 
-      def partition_receipts(plan, persisted_events)
-        payloads = plan.events.select { _1.is_a?(Events::DecisionPartitionAdvancedV1) }
-        events = persisted_events.select { _1.type == "DecisionPartitionAdvanced" }
+      def partition_receipts(plan, persisted_events, state)
+        payloads = plan.events.select { _1.is_a?(Events::DecisionAddedToPartitionV1) }
+        events = persisted_events.select { _1.type == "DecisionAddedToPartition" }
         payloads.zip(events).map do |payload, event|
           Decisions::DecisionPartitionReceiptV1.new(
-            partition: payload.partition,
+            partition: state.candidate.partitions.find { _1.partition_id == payload.partition_id },
             partition_revision: event.stream_revision
           )
         end

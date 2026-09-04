@@ -70,9 +70,15 @@ module Coordinator::Processes
       private
 
       def load_memberships(change_set_id)
-        @event_store.read(
-          @stream_factory.change_set(change_set_id),
-          Coordinator::Write::EventQueries::CHANGE_SET_MEMBERS_FOR_READINESS
+        @event_store.read_global_marked(
+          Coordinator::Write::GlobalMarkedEventReadCriteria.new(
+            stream_context: "DevelopmentExecution",
+            stream_name: "WorkItem",
+            event_types: [ "WorkItemAddedToChangeSet" ],
+            markers: [ "change-set:#{change_set_id}" ],
+            maximum_count: 100,
+            direction: :asc
+          )
         ).map do |event|
           @schema_registry.load(
             type: event.type,

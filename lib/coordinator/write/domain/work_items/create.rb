@@ -54,30 +54,45 @@ module Coordinator::Write
         end
 
         def build_plan(command:, occurred_at:)
-          EventPlan.new(
-            writes: [
-              EventWrite.new(
-                stream: @stream_factory.work_item(command.work_item_id),
-                event: Events::WorkItemCreatedV1.new(
-                  work_item_id: command.work_item_id,
-                  change_set_id: command.change_set_id,
-                  repository_id: command.repository_id,
-                  goal: command.goal,
-                  acceptance_criteria: command.acceptance_criteria,
-                  competitive_mode: false,
-                  created_at: occurred_at
-                )
-              ),
-              EventWrite.new(
-                stream: @stream_factory.change_set(command.change_set_id),
-                event: Events::WorkItemAddedToChangeSetV1.new(
-                  change_set_id: command.change_set_id,
-                  work_item_id: command.work_item_id,
-                  added_at: occurred_at
-                )
+          stream = @stream_factory.work_item(command.work_item_id)
+          EventPlan.new(writes: [
+            EventWrite.new(stream:, event: Events::WorkItemCreatedV2.new(work_item_id: command.work_item_id)),
+            EventWrite.new(
+              stream:,
+              event: Events::WorkItemAddedToChangeSetV2.new(
+                work_item_id: command.work_item_id,
+                change_set_id: command.change_set_id
               )
-            ]
-          )
+            ),
+            EventWrite.new(
+              stream:,
+              event: Events::WorkItemAssignedToRepositoryV1.new(
+                work_item_id: command.work_item_id,
+                repository_id: command.repository_id
+              )
+            ),
+            EventWrite.new(
+              stream:,
+              event: Events::WorkItemGoalDefinedV1.new(
+                work_item_id: command.work_item_id,
+                goal: command.goal
+              )
+            ),
+            EventWrite.new(
+              stream:,
+              event: Events::WorkItemAcceptanceCriteriaDefinedV1.new(
+                work_item_id: command.work_item_id,
+                acceptance_criteria: command.acceptance_criteria
+              )
+            ),
+            EventWrite.new(
+              stream:,
+              event: Events::WorkItemCompetitiveModeSelectedV1.new(
+                work_item_id: command.work_item_id,
+                competitive_mode: false
+              )
+            )
+          ])
         end
       end
     end

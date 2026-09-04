@@ -1,0 +1,21 @@
+module Coordinator
+  module Write
+    module Domain
+      module WorkIntentions
+        class DeclareSet
+          def initialize: (?stream_factory: StreamFactory, ?conflict_detector: ConflictDetector) -> void
+          def call: (
+            attempt_state: Domain::Attempts::State,
+            existing_set_state: SetState,
+            boundary: WorkIntentionBoundaryV1,
+            command: Commands::ReserveWriteSet,
+            requests: Array[RequestedWorkIntentionV1],
+            set_id: String,
+            expires_at: String,
+            declared_at: String
+          ) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

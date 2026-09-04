@@ -4,6 +4,6 @@ module Coordinator::Write
   class PreparedAcquisition < Value
     attribute :occurred_at, Types::Timestamp
     attribute :input_digest, Types::Sha256Digest
-    attribute :domain_event_ids, Types::Array.of(Types::UuidV7).constrained(size: 3)
+    attribute :domain_event_ids, Types::Array.of(Types::UuidV7).constrained(min_size: 5, max_size: 105)
   end
 end

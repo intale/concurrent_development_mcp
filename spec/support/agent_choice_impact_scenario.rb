@@ -167,16 +167,28 @@ module AgentChoiceImpactScenario
   def authoritative_context(context_input)
     context = Coordinator::Write::DecisionContexts::QueryContextV1.new(context_input)
     observations = Coordinator::Write::DecisionContexts::PartitionSelector.new.call(context).map do |partition|
-      event = event_store.read_grouped(
+      events = event_store.read(
         streams.decision_partition(partition.partition_id),
-        Coordinator::Write::EventQueries::DECISION_PARTITION_LATEST
-      ).first
-      payload = event && load(event)
+        Coordinator::Write::EventQueries::DECISION_PARTITION_STATE
+      )
+      active = {}
+      events.each do |event|
+        payload = load(event)
+        case payload
+        when Coordinator::Write::Events::DecisionPartitionAdvancedV1
+          active = payload.active_decisions.to_h { [ _1.decision_id, _1 ] }
+        when Coordinator::Write::Events::DecisionAddedToPartitionV1
+          active[payload.decision_id] = current_decision(payload.decision_id).head
+        when Coordinator::Write::Events::DecisionRemovedFromPartitionV1
+          active.delete(payload.decision_id)
+        end
+      end
+      event = events.last
       Coordinator::Write::DecisionContexts::PartitionObservationV1.new(
         partition:,
         partition_revision: event&.stream_revision,
         event: event && reference(event),
-        active_decisions: payload ? payload.active_decisions : []
+        active_decisions: active.values.sort_by { _1.decision_id.b }
       )
     end
     heads = observations.flat_map(&:active_decisions).uniq { [ _1.decision_id, _1.event.event_id ] }
@@ -205,17 +217,42 @@ module AgentChoiceImpactScenario
     activation = load(activated_event)
     correction = correction_event && load(correction_event)
     head_event = correction_event || activated_event
+    definition = normalize_definition(correction ? correction.definition : recorded.definition)
     Coordinator::Write::Decisions::DecisionCurrentStateV1.new(
       decision_id:,
-      definition: correction ? correction.definition : recorded.definition,
+      definition:,
       head: Coordinator::Write::Decisions::DecisionHeadV1.new(
         decision_id:,
         decision_revision: head_event.stream_revision,
         event: reference(head_event)
       ),
-      slot: correction ? correction.slot : activation.slot,
-      partitions: correction ? correction.partitions : activation.partitions
+      slot: legacy_slot(correction:, activation:),
+      partitions: legacy_partitions(correction:, activation:) ||
+        Coordinator::Write::Decisions::DecisionPartitionBuilder.new.call(definition)
     )
+  end
+
+  def normalize_definition(value)
+    return value if value.is_a?(Coordinator::Write::Decisions::DecisionDefinitionV1)
+
+    Coordinator::Write::Decisions::DecisionDefinitionV1.new(
+      document: value,
+      digest: Coordinator::Write::CanonicalJson.new.sha256(value.to_h)
+    )
+  end
+
+  def legacy_slot(correction:, activation:)
+    return correction.slot if correction.is_a?(Coordinator::Write::Events::DecisionDefinitionCorrectedV1)
+    return activation.slot if !correction && activation.is_a?(Coordinator::Write::Events::DecisionActivatedV1)
+
+    nil
+  end
+
+  def legacy_partitions(correction:, activation:)
+    return correction.partitions if correction.is_a?(Coordinator::Write::Events::DecisionDefinitionCorrectedV1)
+    return activation.partitions if !correction && activation.is_a?(Coordinator::Write::Events::DecisionActivatedV1)
+
+    nil
   end
 
   def accepted_interpretation(suffix:, decision_id:, option_id:, scope:, enforcement:, relations:)
@@ -295,6 +332,17 @@ module AgentChoiceImpactScenario
     event_store.read(
       streams.agent_choice_impact(assessment_id),
       Coordinator::Write::EventQueries::AGENT_CHOICE_IMPACT_ASSESSMENT
+    )
+  end
+
+  def assessment_history(assessment_id)
+    event_store.read(
+      streams.agent_choice_impact(assessment_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: [ "AgentChoiceImpactAssessmentRecorded", "AgentChoiceImpactSourceLinked" ],
+        maximum_count: 3,
+        direction: :asc
+      )
     )
   end
 

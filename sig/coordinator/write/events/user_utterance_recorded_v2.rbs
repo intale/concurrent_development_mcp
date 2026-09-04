@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Events
+      class UserUtteranceRecordedV2 < Base
+        def conversation_id: () -> String
+        def message_id: () -> String
+        def source: () -> String
+        def text: () -> String
+      end
+    end
+  end
+end

@@ -35,54 +35,88 @@ RSpec.describe Coordinator::Write::Domain::Attempts::Abandon do
     )
   end
 
-  it "Given a current UUID lease, when abandoning, then releases it and records UUID membership" do
-    observation = Coordinator::Write::CurrentLeaseObservationV2.new(
-      reference:,
-      state: ResourceLeaseExamples.lease_state(resource:, reference:)
-    )
+  it "withdraws each active work intention before recording abandonment and requeue facts" do
     result = abandon.call(
       attempt_state:,
       work_item_state:,
-      current_observations: [ observation ],
+      set_state: work_intention_set_state,
+      member_states: [ work_intention_state ],
       command:,
       abandoned_at: "2026-08-22T10:05:00.000000Z"
     )
 
     expect(result).to be_success
-    release, abandonment, requeue = result.value!.events
-    expect(release).to be_a(Coordinator::Write::Events::ResourceLeaseReleasedV2)
-    expect(abandonment).to be_a(Coordinator::Write::Events::AttemptAbandonedV2)
-    expect(abandonment.released_leases).to eq([ reference ])
-    expect(abandonment.untouched_resource_ids).to be_empty
-    expect(requeue).to be_a(Coordinator::Write::Events::WorkItemRequeuedV1)
-  end
-
-  it "Given a successor owns the Resource, when abandoning the old Attempt, then leaves that fence untouched" do
-    successor = ResourceLeaseExamples.reference(
-      resource:,
-      lease_id: "07919191-9191-7191-8191-919191919191",
-      fencing_token: 2
-    )
-    observation = Coordinator::Write::CurrentLeaseObservationV2.new(
-      reference:,
-      state: ResourceLeaseExamples.lease_state(
-        resource:,
-        reference: successor,
-        fencing_token: 2,
-        attempt_id: "A-OTHER",
-        agent_id: "agent-b"
+    withdrawal, abandonment, requeue = result.value!.events
+    expect(withdrawal).to eq(
+      Coordinator::Write::Events::ResourceWorkIntentionWithdrawnV1.new(
+        intention_id: reference.lease_id,
+        resource_id: reference.resource_id,
+        fencing_token: reference.fencing_token,
+        reason: "Checkpoint and hand off"
       )
     )
+    expect(abandonment).to eq(
+      Coordinator::Write::Events::AttemptAbandonedV3.new(
+        attempt_id: "A-LSE-A", reason: "Checkpoint and hand off"
+      )
+    )
+    expect(requeue).to be_a(Coordinator::Write::Events::WorkItemRequeuedV2)
+  end
+
+  it "does not emit another terminal fact for an already withdrawn intention" do
     result = abandon.call(
       attempt_state:,
       work_item_state:,
-      current_observations: [ observation ],
+      set_state: work_intention_set_state,
+      member_states: [ work_intention_state(withdrawn: true) ],
       command:,
       abandoned_at: "2026-08-22T10:05:00.000000Z"
     ).value!
 
-    expect(result.events.none? { _1.is_a?(Coordinator::Write::Events::ResourceLeaseReleasedV2) }).to be(true)
-    expect(result.events.first).to be_a(Coordinator::Write::Events::AttemptAbandonedV2)
-    expect(result.events.first.untouched_resource_ids).to eq([ resource.resource_id ])
+    expect(result.events.map(&:class)).to eq(
+      [ Coordinator::Write::Events::AttemptAbandonedV3, Coordinator::Write::Events::WorkItemRequeuedV2 ]
+    )
+  end
+
+  def work_intention_set_state
+    Coordinator::Write::Domain::WorkIntentions::SetState.new(
+      set_id: ResourceLeaseExamples::LEASE_SET_ID,
+      attempt_id: "A-LSE-A",
+      work_item_id: "W-LSE-A",
+      change_set_id: "CS-LSE",
+      repository_id: ResourceLeaseExamples::REPOSITORY_ID,
+      members: [
+        Coordinator::Write::WorkIntentionReferenceV1.new(
+          intention_id: reference.lease_id,
+          resource_id: reference.resource_id
+        )
+      ]
+    )
+  end
+
+  def work_intention_state(**overrides)
+    Coordinator::Write::Domain::WorkIntentions::State.new(
+      {
+        intention_id: reference.lease_id,
+        set_id: ResourceLeaseExamples::LEASE_SET_ID,
+        resource_id: reference.resource_id,
+        repository_id: ResourceLeaseExamples::REPOSITORY_ID,
+        change_set_id: "CS-LSE",
+        work_item_id: "W-LSE-A",
+        attempt_id: "A-LSE-A",
+        agent_id: "agent-a",
+        mode: "shared",
+        purpose: "Coordinate the resource",
+        context: nil,
+        object_format: "sha1",
+        base_commit_oid: "a" * 40,
+        base_blob_oid: nil,
+        fencing_token: reference.fencing_token,
+        expires_at: ResourceLeaseExamples::EXPIRES_AT,
+        withdrawn: false,
+        withdrawal_reason: nil,
+        expired: false
+      }.merge(overrides)
+    )
   end
 end

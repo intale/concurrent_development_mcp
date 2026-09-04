@@ -60,9 +60,10 @@ module Coordinator::Read
         when "change_set_activate" then @completion_builder.change_set_activate(**args)
         when "work_item_acquire" then @completion_builder.work_item_acquire(**args)
         when "work_item_complete"
+          selection = payload!(source, Coordinator::Write::Events::WorkItemCandidateSelectedV2)
           @completion_builder.work_item_complete(
             **args,
-            completion: payload!(source, Coordinator::Write::Events::WorkItemCompletedV1)
+            candidate_event: selection.candidate_event
           )
         when "attempt_abandon" then abandonment_completion(source)
         when "write_set_reserve"

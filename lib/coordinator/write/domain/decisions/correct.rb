@@ -24,12 +24,12 @@ module Coordinator::Write
           partition_error = validate_partitions(state, command)
           return partition_error if partition_error
 
-          Success(build_plan(state, command, corrected_at))
+          Success(build_plan(state, command))
         end
 
         private
 
-        def build_plan(state, command, corrected_at)
+        def build_plan(state, command)
           current = state.current
           candidate = state.candidate
           correction_head = Coordinator::Write::Decisions::DecisionHeadV1.new(
@@ -40,15 +40,21 @@ module Coordinator::Write
           writes = [
             EventWrite.new(
               stream: @stream_factory.decision(command.decision_id),
-              event: correction_event(current, candidate, command, corrected_at)
+              event: Events::DecisionDerivedFromInterpretationV1.new(
+                decision_id: command.decision_id,
+                interpretation_id: command.interpretation_id
+              )
+            ),
+            EventWrite.new(
+              stream: @stream_factory.decision(command.decision_id),
+              event: correction_event(candidate, command)
             )
           ]
-          writes.concat(slot_writes(state, correction_head, corrected_at))
+          writes.concat(slot_writes(state, correction_head))
           writes.concat(
             partition_writes(
               state.partition_states,
               correction_head,
-              corrected_at,
               candidate.partitions.map(&:partition_id)
             )
           )
@@ -56,101 +62,74 @@ module Coordinator::Write
           EventPlan.new(writes:)
         end
 
-        def correction_event(current, candidate, command, corrected_at)
+        def correction_event(candidate, command)
           proposal = candidate.proposal.proposal
-          Events::DecisionDefinitionCorrectedV1.new(
+          Events::DecisionDefinitionCorrectedV2.new(
             decision_id: command.decision_id,
             interpretation_id: command.interpretation_id,
             source_message_id: proposal.source_message_id,
-            source_event: proposal.source_event,
-            proposal_event: candidate.proposal.event,
-            acceptance_event: candidate.acceptance.event,
-            previous_head: current.head,
-            previous_definition_digest: current.definition.digest,
-            definition: candidate.definition,
-            classifier: proposal.classifier,
-            scope_provenance: proposal.scope_provenance,
-            previous_slot: current.slot,
-            slot: candidate.slot,
-            previous_partitions: current.partitions,
-            partitions: candidate.partitions,
-            rationale: command.rationale,
-            corrected_at:
+            definition: candidate.definition.document,
+            rationale: command.rationale.summary
           )
         end
 
-        def slot_writes(state, correction_head, corrected_at)
+        def slot_writes(state, correction_head)
           old_slot = state.current.slot
           new_slot = state.candidate.slot
           return [] unless old_slot || new_slot
-          return advance_same_slot(old_slot, state.current.head, correction_head, corrected_at) if old_slot == new_slot
+          return advance_same_slot(old_slot, correction_head) if old_slot == new_slot
 
           writes = []
-          writes << head_change(old_slot, state.current.head, nil, corrected_at) if old_slot
+          writes << head_change(old_slot, nil) if old_slot
           return writes unless new_slot
 
           new_state = slot_state(state, new_slot)
           unless new_state.opened
             writes << EventWrite.new(
               stream: @stream_factory.decision_slot(new_slot.slot_id),
-              event: Events::DecisionSlotOpenedV1.new(
-                slot: new_slot,
-                opened_by: correction_head,
-                opened_at: corrected_at
+              event: Events::DecisionSlotOpenedV2.new(
+                slot_id: new_slot.slot_id,
+                slot: new_slot.document,
+                opened_by: correction_head.decision_id
               )
             )
           end
-          writes << head_change(new_slot, nil, correction_head, corrected_at)
+          writes << head_change(new_slot, correction_head)
           writes
         end
 
-        def advance_same_slot(slot, previous_head, head, corrected_at)
+        def advance_same_slot(slot, head)
           return [] unless slot
 
-          [ head_change(slot, previous_head, head, corrected_at) ]
+          [ head_change(slot, head) ]
         end
 
-        def head_change(slot, previous_head, head, corrected_at)
+        def head_change(slot, head)
           EventWrite.new(
             stream: @stream_factory.decision_slot(slot.slot_id),
-            event: Events::DecisionSlotHeadChangedV1.new(
+            event: Events::DecisionSlotHeadChangedV2.new(
               slot_id: slot.slot_id,
-              previous_head:,
-              head:,
-              changed_at: corrected_at
+              head:
             )
           )
         end
 
-        def partition_writes(states, correction_head, corrected_at, corrected_partition_ids)
-          states.map do |state|
+        def partition_writes(states, correction_head, corrected_partition_ids)
+          states.filter_map do |state|
+            currently_present = state.active_decisions.any? { _1.decision_id == correction_head.decision_id }
+            should_be_present = corrected_partition_ids.include?(state.partition.partition_id)
+            next if currently_present == should_be_present
+
             next_revision = state.latest_revision ? state.latest_revision + 1 : 0
             EventWrite.new(
               stream: @stream_factory.decision_partition(state.partition.partition_id),
-              event: Events::DecisionPartitionAdvancedV1.new(
-                partition: state.partition,
+              event: (should_be_present ? Events::DecisionAddedToPartitionV1 : Events::DecisionRemovedFromPartitionV1).new(
+                partition_id: state.partition.partition_id,
                 partition_revision: next_revision,
-                decision: correction_head,
-                active_decisions: next_active_decisions(
-                  state,
-                  correction_head,
-                  corrected_partition_ids
-                ),
-                change_kind: "corrected",
-                advanced_at: corrected_at
+                decision_id: correction_head.decision_id
               )
             )
           end
-        end
-
-        def next_active_decisions(state, correction_head, corrected_partition_ids)
-          heads = state.active_decisions.reject do |head|
-            head.decision_id == correction_head.decision_id
-          end
-          if corrected_partition_ids.include?(state.partition.partition_id)
-            heads << correction_head
-          end
-          heads.sort_by { _1.decision_id.b }.freeze
         end
 
         def validate_partitions(state, command)

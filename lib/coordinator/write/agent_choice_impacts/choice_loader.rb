@@ -39,9 +39,14 @@ module Coordinator::Write
       private
 
       def validate_history!(choice_id, expected_accepted, events, payloads)
-        expected_types = [ Events::AgentChoiceRecordedV1, Events::AgentChoiceAcceptedV1 ]
-        expected_types << Events::AgentChoiceInvalidatedByDecisionV1 if payloads.length == 3
-        unless payloads.length.between?(2, 3) && payloads.map(&:class) == expected_types
+        valid_pair = [
+          [ Events::AgentChoiceRecordedV1, Events::AgentChoiceAcceptedV1 ],
+          [ Events::AgentChoiceRecordedV2, Events::AgentChoiceAcceptedV2 ]
+        ].include?(payloads.first(2).map(&:class))
+        valid_invalidation = payloads.length == 2 ||
+          payloads.last.is_a?(Events::AgentChoiceInvalidatedByDecisionV1) ||
+          payloads.last.is_a?(Events::AgentChoiceInvalidatedByDecisionV2)
+        unless payloads.length.between?(2, 3) && valid_pair && valid_invalidation
           invalid!("choice_lifecycle_invalid", choice_id:, event_types: events.map(&:type))
         end
 
@@ -53,8 +58,8 @@ module Coordinator::Write
                          accepted.choice_id == choice_id &&
                          recorded_reference.stream_revision == 0 &&
                          accepted_reference.stream_revision == 1 &&
-                         accepted.recorded_event == recorded_reference &&
-                         accepted.context_digest == recorded.decision_context.digest &&
+                         (!accepted.respond_to?(:recorded_event) || accepted.recorded_event == recorded_reference) &&
+                         (!accepted.respond_to?(:context_digest) || accepted.context_digest == recorded.decision_context.digest) &&
                          accepted_reference == expected_accepted
         unless valid_identity
           invalid!(
@@ -95,7 +100,7 @@ module Coordinator::Write
         event = observation.event
         heads = observation.active_decisions
         event &&
-          event.type == "DecisionPartitionAdvanced" &&
+          %w[DecisionPartitionAdvanced DecisionAddedToPartition DecisionRemovedFromPartition].include?(event.type) &&
           event.stream_context == "HumanGuidance" &&
           event.stream_name == "DecisionPartition" &&
           event.stream_id == observation.partition.partition_id &&
@@ -115,6 +120,14 @@ module Coordinator::Write
       def validate_invalidation!(choice_id, accepted_reference, events, payloads)
         invalidation = payloads.fetch(2, nil)
         return unless invalidation
+
+        if invalidation.is_a?(Events::AgentChoiceInvalidatedByDecisionV2)
+          invalidation_reference = reference(events.fetch(2))
+          valid = invalidation_reference.stream_revision == 2 &&
+                  invalidation.choice_id == choice_id
+          invalid!("choice_invalidation_invalid", choice_id:) unless valid
+          return
+        end
 
         invalidation_reference = reference(events.fetch(2))
         assessment_event = read_reference(invalidation.assessment_event)

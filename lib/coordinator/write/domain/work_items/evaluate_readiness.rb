@@ -19,12 +19,11 @@ module Coordinator::Write
               writes: [
                 EventWrite.new(
                   stream: @stream_factory.work_item(command.work_item_id),
-                  event: Events::WorkItemMadeReadyV1.new(
+                  event: Events::WorkItemMadeReadyV2.new(
                     change_set_id: command.change_set_id,
                     work_item_id: command.work_item_id,
                     readiness_decision_id: command.readiness_decision_id,
-                    reason: "change_set_activated",
-                    made_ready_at: occurred_at
+                    reason: "change_set_activated"
                   )
                 )
               ]

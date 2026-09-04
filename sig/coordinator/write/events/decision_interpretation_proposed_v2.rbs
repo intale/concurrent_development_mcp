@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Events
+      class DecisionInterpretationProposedV2 < Base
+        def interpretation_id: () -> String
+        def source_message_id: () -> String
+        def source_span: () -> String
+        def proposed_decision: () -> Interpretations::ProposedDecisionV1
+        def assessment: () -> String
+        def ambiguities: () -> Array[String]
+      end
+    end
+  end
+end

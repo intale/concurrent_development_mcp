@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Events
+      class WorkItemAcquiredV2 < Base
+        def work_item_id: () -> String
+        def change_set_id: () -> String
+        def attempt_id: () -> String
+        def agent_id: () -> String
+      end
+    end
+  end
+end

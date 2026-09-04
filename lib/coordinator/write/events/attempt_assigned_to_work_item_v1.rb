@@ -1,0 +1,13 @@
+# frozen_string_literal: true
+
+module Coordinator::Write
+  module Events
+    class AttemptAssignedToWorkItemV1 < Base
+      contract type: "AttemptAssignedToWorkItem", version: 1
+
+      attribute :attempt_id, Types::Identifier
+      attribute :change_set_id, Types::Identifier
+      attribute :work_item_id, Types::Identifier
+    end
+  end
+end

@@ -23,12 +23,12 @@ module Coordinator::Write
           capacity_error = partition_capacity_error(state, command)
           return capacity_error if capacity_error
 
-          Success(build_plan(state, command, activated_at))
+          Success(build_plan(state, command))
         end
 
         private
 
-        def build_plan(state, command, activated_at)
+        def build_plan(state, command)
           candidate = state.candidate
           decision_head = Coordinator::Write::Decisions::DecisionHeadV1.new(
             decision_id: command.decision_id,
@@ -39,95 +39,79 @@ module Coordinator::Write
           writes = [
             EventWrite.new(
               stream: decision_stream,
-              event: recorded_event(candidate, command, activated_at)
+              event: recorded_event(candidate, command)
             ),
             EventWrite.new(
               stream: decision_stream,
-              event: activated_event(candidate, command, activated_at)
+              event: Events::DecisionDerivedFromInterpretationV1.new(
+                decision_id: command.decision_id,
+                interpretation_id: command.interpretation_id
+              )
+            ),
+            EventWrite.new(
+              stream: decision_stream,
+              event: activated_event(command)
             )
           ]
-          writes.concat(slot_writes(candidate.slot, decision_head, activated_at))
-          writes.concat(partition_writes(state.partition_states, decision_head, activated_at))
+          writes.concat(slot_writes(candidate.slot, decision_head))
+          writes.concat(partition_writes(state.partition_states, decision_head))
 
           EventPlan.new(writes:)
         end
 
-        def recorded_event(candidate, command, activated_at)
+        def recorded_event(candidate, command)
           proposal = candidate.proposal.proposal
-          Events::DecisionRecordedV1.new(
+          Events::DecisionRecordedV2.new(
             decision_id: command.decision_id,
             interpretation_id: command.interpretation_id,
             source_message_id: proposal.source_message_id,
-            source_event: proposal.source_event,
-            proposal_event: candidate.proposal.event,
-            acceptance_event: candidate.acceptance.event,
-            definition: candidate.definition,
-            classifier: proposal.classifier,
-            scope_provenance: proposal.scope_provenance,
-            recorded_at: activated_at
+            definition: candidate.definition.document
           )
         end
 
-        def activated_event(candidate, command, activated_at)
-          Events::DecisionActivatedV1.new(
+        def activated_event(command)
+          Events::DecisionActivatedV2.new(
             decision_id: command.decision_id,
             interpretation_id: command.interpretation_id,
-            recorded_event: candidate.recorded_event,
-            definition_digest: candidate.definition.digest,
-            slot: candidate.slot,
-            partitions: candidate.partitions,
-            rationale: command.rationale,
-            activated_at:
+            rationale: command.rationale.summary
           )
         end
 
-        def slot_writes(slot, decision_head, activated_at)
+        def slot_writes(slot, decision_head)
           return [] unless slot
 
           stream = @stream_factory.decision_slot(slot.slot_id)
           [
             EventWrite.new(
               stream:,
-              event: Events::DecisionSlotOpenedV1.new(
-                slot:,
-                opened_by: decision_head,
-                opened_at: activated_at
+              event: Events::DecisionSlotOpenedV2.new(
+                slot_id: slot.slot_id,
+                slot: slot.document,
+                opened_by: decision_head.decision_id
               )
             ),
             EventWrite.new(
               stream:,
-              event: Events::DecisionSlotHeadChangedV1.new(
+              event: Events::DecisionSlotHeadChangedV2.new(
                 slot_id: slot.slot_id,
-                previous_head: nil,
-                head: decision_head,
-                changed_at: activated_at
+                head: decision_head
               )
             )
           ]
         end
 
-        def partition_writes(states, decision_head, activated_at)
+        def partition_writes(states, decision_head)
           states.map do |state|
             next_revision = state.latest_revision ? state.latest_revision + 1 : 0
             EventWrite.new(
               stream: @stream_factory.decision_partition(state.partition.partition_id),
-              event: Events::DecisionPartitionAdvancedV1.new(
-                partition: state.partition,
+              event: Events::DecisionAddedToPartitionV1.new(
+                partition_id: state.partition.partition_id,
                 partition_revision: next_revision,
-                decision: decision_head,
-                active_decisions: next_active_decisions(state, decision_head),
-                change_kind: "activated",
-                advanced_at: activated_at
+                decision_id: decision_head.decision_id
               )
             )
           end
-        end
-
-        def next_active_decisions(state, decision_head)
-          (state.active_decisions + [ decision_head ])
-            .uniq(&:decision_id)
-            .sort_by { _1.decision_id.b }
-            .freeze
         end
 
         def partition_capacity_error(state, command)

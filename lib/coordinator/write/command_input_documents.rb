@@ -157,6 +157,9 @@ module Coordinator::Write
     class ResourceLeaseTargetV1 < Value
       attribute :resource_id, Types::ResourceId
       attribute :base_blob_oid, Types::GitOid.optional
+      attribute :mode, Types::WorkIntentionMode
+      attribute :purpose, Types::WorkIntentionPurpose
+      attribute :context, Types::WorkIntentionContext.optional
     end
 
     class ReserveWriteSetInputV1 < Value

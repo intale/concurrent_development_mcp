@@ -29,9 +29,9 @@ module Coordinator::Processes
         source_event: source.event,
         process_name: "lease-expiry-policy",
         step_name: "expire-resource-lease",
-        subject_kind: "resource-lease",
-        subject_id: source.payload.lease_id,
-        rule_version: "lease-expiry/v1",
+        subject_kind: "resource-work-intention",
+        subject_id: source.payload.intention_id,
+        rule_version: "work-intention-expiry/v1",
         allocate_target_entity: false
       )
       command = @command_builder.call(source, command_id: process_step.target_command_id)

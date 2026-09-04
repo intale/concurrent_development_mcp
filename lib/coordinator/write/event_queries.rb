@@ -94,6 +94,36 @@ module Coordinator::Write
     RESOURCE_BOUNDARY_ACTIVE_LEASE_MAXIMUM_COUNT = 1_024
     RESOURCE_BOUNDARY_MAXIMUM_GLOBAL_POSITION = (2**63) - 1
 
+    WORK_INTENTION_LIFECYCLE_EVENT_TYPES = %w[
+      ResourceWorkIntentionDeclared
+      ResourceWorkIntentionRenewed
+      ResourceWorkIntentionWithdrawn
+      ResourceWorkIntentionExpired
+    ].freeze
+    WORK_INTENTION_BOUNDARY_MAXIMUM_COUNT = 4_096
+
+    def self.work_intention_boundary(markers)
+      GlobalMarkedEventReadCriteria.new(
+        stream_context: "DevelopmentCoordination",
+        stream_name: "ResourceWorkIntention",
+        event_types: WORK_INTENTION_LIFECYCLE_EVENT_TYPES,
+        markers:,
+        maximum_count: WORK_INTENTION_BOUNDARY_MAXIMUM_COUNT,
+        direction: :asc
+      )
+    end
+
+    def self.work_intention_set_for_attempt(marker)
+      GlobalMarkedEventReadCriteria.new(
+        stream_context: "DevelopmentCoordination",
+        stream_name: "WorkIntentionSet",
+        event_types: [ "WorkIntentionSetCreated" ],
+        markers: [ marker ],
+        maximum_count: 1,
+        direction: :asc
+      )
+    end
+
     def self.resource_lease_boundary_pages(marker, from_position:, to_position:, maximum_count:)
       RESOURCE_LEASE_LIFECYCLE_EVENT_TYPES.map do |event_type|
         GlobalMarkedEventPageCriteria.new(
@@ -182,7 +212,7 @@ module Coordinator::Write
 
     DECISION_EXISTENCE = EventReadCriteria.new(
       event_types: [ "DecisionRecorded", "DecisionActivated" ],
-      maximum_count: 2,
+      maximum_count: 3,
       direction: :asc
     )
 
@@ -199,6 +229,16 @@ module Coordinator::Write
     DECISION_SLOT_LATEST = GroupedEventReadCriteria.new(
       event_types: [ "DecisionSlotOpened", "DecisionSlotHeadChanged" ],
       direction: :desc
+    )
+
+    DECISION_PARTITION_STATE = EventReadCriteria.new(
+      event_types: [
+        "DecisionPartitionAdvanced",
+        "DecisionAddedToPartition",
+        "DecisionRemovedFromPartition"
+      ],
+      maximum_count: 2_048,
+      direction: :asc
     )
 
     DECISION_PARTITION_LATEST = GroupedEventReadCriteria.new(
@@ -233,14 +273,20 @@ module Coordinator::Write
     )
 
     AGENT_CHOICE_IMPACT_ASSESSMENT = EventReadCriteria.new(
-      event_types: [ "AgentChoiceImpactAssessed" ],
+      event_types: [ "AgentChoiceImpactAssessed", "AgentChoiceImpactAssessmentRecorded" ],
       maximum_count: 1,
       direction: :asc
     )
 
     ATTEMPT_FOR_AGENT_CHOICE = EventReadCriteria.new(
-      event_types: [ "AttemptAuthorized", "AttemptStarted" ],
-      maximum_count: 2,
+      event_types: [
+        "AttemptAuthorized",
+        "AttemptAssignedToWorkItem",
+        "AttemptAssignedToAgent",
+        "AttemptBaseSnapshotRecorded",
+        "AttemptStarted"
+      ],
+      maximum_count: 35,
       direction: :asc
     )
 
@@ -512,6 +558,11 @@ module Coordinator::Write
     WORK_ITEM_FOR_READINESS_EVALUATION = GroupedEventReadCriteria.new(
       event_types: [
         "WorkItemCreated",
+        "WorkItemAddedToChangeSet",
+        "WorkItemAssignedToRepository",
+        "WorkItemGoalDefined",
+        "WorkItemAcceptanceCriteriaDefined",
+        "WorkItemCompetitiveModeSelected",
         "WorkItemMadeReady",
         "WorkItemAcquired",
         "WorkItemRequeued",
@@ -522,8 +573,14 @@ module Coordinator::Write
     )
 
     WORK_ITEM_FOR_CHANGE_SET_COMPLETION = EventReadCriteria.new(
-      event_types: [ "WorkItemCreated", "WorkItemCandidateSelected", "WorkItemCompleted" ],
-      maximum_count: 3,
+      event_types: [
+        "WorkItemCreated",
+        "WorkItemAddedToChangeSet",
+        "WorkItemAssignedToRepository",
+        "WorkItemCandidateSelected",
+        "WorkItemCompleted"
+      ],
+      maximum_count: 5,
       direction: :asc
     )
 
@@ -539,9 +596,19 @@ module Coordinator::Write
       direction: :asc
     )
 
-    WORK_ITEM_FOR_ACQUISITION = EventReadCriteria.new(
-      event_types: [ "WorkItemCreated", "WorkItemMadeReady", "WorkItemAcquired" ],
-      maximum_count: 3,
+    WORK_ITEM_FOR_ACQUISITION = GroupedEventReadCriteria.new(
+      event_types: [
+        "WorkItemCreated",
+        "WorkItemAddedToChangeSet",
+        "WorkItemAssignedToRepository",
+        "WorkItemGoalDefined",
+        "WorkItemAcceptanceCriteriaDefined",
+        "WorkItemCompetitiveModeSelected",
+        "WorkItemMadeReady",
+        "WorkItemAcquired",
+        "WorkItemRequeued",
+        "WorkItemCompleted"
+      ],
       direction: :asc
     )
 
@@ -559,10 +626,16 @@ module Coordinator::Write
     WORK_ITEM_FOR_COMPLETION = GroupedEventReadCriteria.new(
       event_types: [
         "WorkItemCreated",
+        "WorkItemAddedToChangeSet",
+        "WorkItemAssignedToRepository",
+        "WorkItemGoalDefined",
+        "WorkItemAcceptanceCriteriaDefined",
+        "WorkItemCompetitiveModeSelected",
         "WorkItemMadeReady",
         "WorkItemAcquired",
         "WorkItemRequeued",
         "WorkItemCandidateSelected",
+        "WorkItemOutputRecorded",
         "WorkItemCompleted"
       ],
       direction: :desc
@@ -571,18 +644,29 @@ module Coordinator::Write
     ATTEMPT_FOR_WORK_ITEM_COMPLETION = EventReadCriteria.new(
       event_types: [
         "AttemptAuthorized",
+        "AttemptAssignedToWorkItem",
+        "AttemptAssignedToAgent",
+        "AttemptBaseSnapshotRecorded",
         "AttemptStarted",
+        "WorkIntentionSetCreated",
+        "WorkIntentionAddedToSet",
         "WriteSetReserved",
         "WriteSetExpanded",
         "AttemptCompleted"
       ],
-      maximum_count: 35,
+      maximum_count: 137,
       direction: :asc
     )
 
     ATTEMPT_FOR_ACQUISITION = EventReadCriteria.new(
-      event_types: [ "AttemptAuthorized", "AttemptStarted" ],
-      maximum_count: 2,
+      event_types: [
+        "AttemptAuthorized",
+        "AttemptAssignedToWorkItem",
+        "AttemptAssignedToAgent",
+        "AttemptBaseSnapshotRecorded",
+        "AttemptStarted"
+      ],
+      maximum_count: 104,
       direction: :asc
     )
 
@@ -592,6 +676,32 @@ module Coordinator::Write
       direction: :asc
     )
 
+    ATTEMPT_FOR_WORK_INTENTIONS = EventReadCriteria.new(
+      event_types: [
+        "AttemptAuthorized",
+        "AttemptAssignedToWorkItem",
+        "AttemptAssignedToAgent",
+        "AttemptBaseSnapshotRecorded",
+        "AttemptStarted",
+        "CandidateAttachedToAttempt",
+        "AttemptAbandoned",
+        "AttemptCompleted"
+      ],
+      maximum_count: 10,
+      direction: :asc
+    )
+
+    WORK_INTENTION_SET_STATE = EventReadCriteria.new(
+      event_types: [ "WorkIntentionSetCreated", "WorkIntentionAddedToSet" ],
+      maximum_count: 33,
+      direction: :asc
+    )
+
+    WORK_INTENTION_STATE = GroupedEventReadCriteria.new(
+      event_types: WORK_INTENTION_LIFECYCLE_EVENT_TYPES,
+      direction: :desc
+    )
+
     ATTEMPT_FOR_WRITE_SET_EXPANSION = EventReadCriteria.new(
       event_types: [ "AttemptAuthorized", "AttemptStarted", "WriteSetReserved", "WriteSetExpanded" ],
       maximum_count: 34,
@@ -599,8 +709,16 @@ module Coordinator::Write
     )
 
     ATTEMPT_FOR_CANDIDATE_SUBMISSION = EventReadCriteria.new(
-      event_types: [ "AttemptAuthorized", "AttemptStarted", "WriteSetReserved", "WriteSetExpanded" ],
-      maximum_count: 34,
+      event_types: [
+        "AttemptAuthorized",
+        "AttemptAssignedToWorkItem",
+        "AttemptAssignedToAgent",
+        "AttemptBaseSnapshotRecorded",
+        "AttemptStarted",
+        "WriteSetReserved",
+        "WriteSetExpanded"
+      ],
+      maximum_count: 37,
       direction: :asc
     )
 

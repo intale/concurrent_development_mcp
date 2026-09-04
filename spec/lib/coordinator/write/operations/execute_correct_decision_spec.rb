@@ -21,14 +21,18 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
     expect(original).to be_success
     expect(replay.failure.code).to eq(:decision_revision_changed)
     expect(decision_events("D-1").map(&:type)).to eq(
-      %w[DecisionRecorded DecisionActivated DecisionDefinitionCorrected]
+      %w[
+        DecisionRecorded
+        DecisionDerivedFromInterpretation
+        DecisionActivated
+        DecisionDerivedFromInterpretation
+        DecisionDefinitionCorrected
+      ]
     )
     correction = decision_events("D-1").last
-    expect(correction).to have_attributes(stream_revision: 2)
-    expect(correction.data.fetch("previous_head").fetch("event")).to include(
-      "event_id" => activation.id,
-      "type" => "DecisionActivated",
-      "stream_revision" => 1
+    expect(correction).to have_attributes(stream_revision: 4)
+    expect(correction.data.keys).to contain_exactly(
+      "decision_id", "definition", "interpretation_id", "rationale", "source_message_id"
     )
     expect(correction.markers).to include(
       "decision:D-1",
@@ -43,24 +47,22 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
     expect(heads.length).to eq(2)
     expect(heads.last.data.fetch("head")).to include(
       "decision_id" => "D-1",
-      "decision_revision" => 2
+      "decision_revision" => 4
     )
     partition_history = partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing")
-    expect(partition_history.map(&:stream_revision)).to eq([ 0, 1 ])
-    expect(load(partition_history.last).active_decisions).to contain_exactly(
-      have_attributes(decision_id: "D-1", decision_revision: 2)
-    )
+    expect(partition_history.map(&:stream_revision)).to eq([ 0 ])
+    expect(partition_decision_ids(partition_history)).to eq([ "D-1" ])
     expect(original.value!.data).to have_attributes(
       outcome: "corrected",
       policy_status: "active",
-      correction_event: have_attributes(type: "DecisionDefinitionCorrected", stream_revision: 2)
+      correction_event: have_attributes(type: "DecisionDefinitionCorrected", stream_revision: 4)
     )
     expect(command_events("cmd-decision-correction-1")).to be_empty
   end
 
   it "implements DEC-02A-CORRECT-NARROW-SCOPE-01 by moving the slot and advancing both partitions" do
     activation = seed_active_decision
-    old_slot_id = load(activation).slot.slot_id
+    old_slot_id = decision_slot_id("D-1")
     seed_correction(
       scope: InterpretationInput.scope(
         repository_ids: [ RepositoryScenario::DEFAULT_REPOSITORY_ID ],
@@ -77,10 +79,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
     expect(slot_events(new_slot_id).map(&:type)).to eq(%w[DecisionSlotOpened DecisionSlotHeadChanged])
     expect(partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing").map(&:stream_revision)).to eq([ 0, 1 ])
     expect(partition_events("workitem:W-42:testing").map(&:stream_revision)).to eq([ 0 ])
-    expect(load(partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing").last).active_decisions).to be_empty
-    expect(load(partition_events("workitem:W-42:testing").sole).active_decisions).to contain_exactly(
-      have_attributes(decision_id: "D-1", decision_revision: 2)
-    )
+    expect(partition_decision_ids(partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing"))).to be_empty
+    expect(partition_decision_ids(partition_events("workitem:W-42:testing"))).to eq([ "D-1" ])
     expect(result.value!.data.partitions.map { _1.partition.partition_id }).to eq(
       [
         "repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing",
@@ -97,7 +97,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
 
     expect(result).to be_failure
     expect(result.failure.code).to eq(:interpretation_not_a_correction)
-    expect(decision_events("D-1").map(&:type)).to eq(%w[DecisionRecorded DecisionActivated])
+    expect(decision_events("D-1").map(&:type)).to eq(
+      %w[DecisionRecorded DecisionDerivedFromInterpretation DecisionActivated]
+    )
     expect(command_events("cmd-decision-correction-1")).to be_empty
   end
 
@@ -118,8 +120,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
 
     expect(result).to be_failure
     expect(result.failure).to have_attributes(code: :decision_slot_occupied)
-    expect(decision_events("D-1").map(&:type)).to eq(%w[DecisionRecorded DecisionActivated])
-    original_slot = load(first_activation).slot.slot_id
+    expect(decision_events("D-1").map(&:type)).to eq(
+      %w[DecisionRecorded DecisionDerivedFromInterpretation DecisionActivated]
+    )
+    original_slot = decision_slot_id("D-1")
     expect(load(slot_events(original_slot).last).head.decision_id).to eq("D-1")
   end
 
@@ -159,9 +163,15 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
     expect(results.count(&:failure?)).to eq(1)
     expect(results.find(&:failure?).failure.code).to eq(:decision_revision_changed)
     expect(decision_events("D-1").map(&:type)).to eq(
-      %w[DecisionRecorded DecisionActivated DecisionDefinitionCorrected]
+      %w[
+        DecisionRecorded
+        DecisionDerivedFromInterpretation
+        DecisionActivated
+        DecisionDerivedFromInterpretation
+        DecisionDefinitionCorrected
+      ]
     )
-    expect(partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing").map(&:stream_revision)).to eq([ 0, 1 ])
+    expect(partition_events("repo:#{RepositoryScenario::DEFAULT_REPOSITORY_ID}:testing").map(&:stream_revision)).to eq([ 0 ])
   end
 
   it "implements DEC-02A-PARTITION-LIMIT-01 over the old/new partition union" do
@@ -186,7 +196,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
 
     expect(result).to be_failure
     expect(result.failure).to have_attributes(code: :decision_partition_limit_reached)
-    expect(decision_events("D-1").map(&:type)).to eq(%w[DecisionRecorded DecisionActivated])
+    expect(decision_events("D-1").map(&:type)).to eq(
+      %w[DecisionRecorded DecisionDerivedFromInterpretation DecisionActivated]
+    )
   end
 
   it "corrects one Candidate impact policy head within the exact ChangeSet partition" do
@@ -208,7 +220,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
 
     expect(result).to be_success
     corrected = load(decision_events("D-1").last)
-    expect(corrected.definition.document).to have_attributes(
+    expect(corrected.definition).to have_attributes(
       topic_root: "candidate",
       enforcement: have_attributes(
         level: "merge_gate",
@@ -216,11 +228,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
         on_violation: "block"
       )
     )
-    expect(corrected.definition.document.value.items).to eq(%w[combined_tests security_review])
-    expect(partition_events("changeset:CS-impact-policy:candidate").map(&:stream_revision)).to eq([ 0, 1 ])
-    expect(load(partition_events("changeset:CS-impact-policy:candidate").last).active_decisions).to contain_exactly(
-      have_attributes(decision_id: "D-1", decision_revision: 2)
-    )
+    expect(corrected.definition.value.items).to eq(%w[combined_tests security_review])
+    expect(partition_events("changeset:CS-impact-policy:candidate").map(&:stream_revision)).to eq([ 0 ])
+    expect(partition_decision_ids(partition_events("changeset:CS-impact-policy:candidate"))).to eq([ "D-1" ])
   end
 
   it "denies a correction that would exceed the bounded active-head snapshot" do
@@ -263,8 +273,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
         maximum_active_decisions: 1
       )
     )
-    expect(decision_events("D-1").map(&:type)).to eq(%w[DecisionRecorded DecisionActivated])
-    expect(load(partition_events("workitem:W-42:testing").sole).active_decisions.map(&:decision_id)).to eq([ "D-2" ])
+    expect(decision_events("D-1").map(&:type)).to eq(
+      %w[DecisionRecorded DecisionDerivedFromInterpretation DecisionActivated]
+    )
+    expect(partition_decision_ids(partition_events("workitem:W-42:testing"))).to eq([ "D-2" ])
   end
 
   def seed_active_decision(
@@ -288,6 +300,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
       )
     )
     raise result.failure.inspect if result.failure?
+
+    (@slot_ids_by_decision ||= {})[decision_id] = result.value!.data.slot&.slot_id
 
     decision_events(decision_id).find { _1.type == "DecisionActivated" }
   end
@@ -354,7 +368,12 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
     event_store.read(
       streams.decision(decision_id),
       Coordinator::Write::EventReadCriteria.new(
-        event_types: %w[DecisionRecorded DecisionActivated DecisionDefinitionCorrected],
+        event_types: %w[
+          DecisionRecorded
+          DecisionDerivedFromInterpretation
+          DecisionActivated
+          DecisionDefinitionCorrected
+        ],
         maximum_count: 10,
         direction: :asc
       )
@@ -376,11 +395,27 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCorrectDecision, :event_st
     event_store.read(
       streams.decision_partition(partition_id),
       Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "DecisionPartitionAdvanced" ],
+        event_types: %w[DecisionAddedToPartition DecisionRemovedFromPartition],
         maximum_count: 40,
         direction: :asc
       )
     )
+  end
+
+  def partition_decision_ids(events)
+    events.each_with_object([]) do |event, decision_ids|
+      fact = load(event)
+      case fact
+      when Coordinator::Write::Events::DecisionAddedToPartitionV1
+        decision_ids << fact.decision_id unless decision_ids.include?(fact.decision_id)
+      when Coordinator::Write::Events::DecisionRemovedFromPartitionV1
+        decision_ids.delete(fact.decision_id)
+      end
+    end
+  end
+
+  def decision_slot_id(decision_id)
+    (@slot_ids_by_decision || {}).fetch(decision_id)
   end
 
   def command_events(command_id)

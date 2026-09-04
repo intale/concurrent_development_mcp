@@ -6,6 +6,7 @@ module Coordinator::Write
       RETRYABLE_CODES = %i[
         concurrency_conflict
         lease_busy
+        work_intention_conflict
         resource_boundary_maintenance_required
       ].freeze
 

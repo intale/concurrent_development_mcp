@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Events
+      class WorkItemOutputRecordedV1 < Base
+        def work_item_id: () -> String
+        def output_kind: () -> String
+        def output_key: () -> String
+      end
+    end
+  end
+end

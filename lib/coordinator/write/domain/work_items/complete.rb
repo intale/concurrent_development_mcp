@@ -51,7 +51,7 @@ module Coordinator::Write
           candidate_denial = denied_candidate(candidate, work_item_state, command)
           return candidate_denial if candidate_denial
 
-          denied_write_set(attempt_state, command, completed_at:)
+          nil
         end
 
         def denied_work_item(state, command)
@@ -99,57 +99,38 @@ module Coordinator::Write
           failure(:candidate_not_final, "Only a final Candidate can complete a WorkItem", command)
         end
 
-        def denied_write_set(state, command, completed_at:)
-          unless state.lease_set_id && state.lease_expires_at
-            return failure(:write_set_not_reserved, "Attempt does not have an authoritative write set", command)
-          end
-          return if state.lease_released_at || completed_at >= state.lease_expires_at
-
-          failure(
-            :write_set_still_active,
-            "Release the Attempt write set or retry after its recorded expiry before completion",
-            command,
-            lease_set_id: state.lease_set_id,
-            expires_at: state.lease_expires_at
-          )
-        end
-
         def build_plan(command:, candidate_event:, completed_at:)
-          common = {
-            change_set_id: command.change_set_id,
-            work_item_id: command.work_item_id,
-            attempt_id: command.attempt_id,
-            candidate_id: command.candidate_id,
-            candidate_event:
-          }
-
-          EventPlan.new(
-            writes: [
+          work_item_stream = @stream_factory.work_item(command.work_item_id)
+          EventPlan.new(writes: [
+            EventWrite.new(
+              stream: work_item_stream,
+              event: Events::WorkItemCandidateSelectedV2.new(
+                change_set_id: command.change_set_id,
+                work_item_id: command.work_item_id,
+                attempt_id: command.attempt_id,
+                candidate_id: command.candidate_id,
+                candidate_event:
+              )
+            ),
+            *command.produced_outputs.map do |output|
               EventWrite.new(
-                stream: @stream_factory.work_item(command.work_item_id),
-                event: Events::WorkItemCandidateSelectedV1.new(
-                  **common,
-                  selected_at: completed_at
-                )
-              ),
-              EventWrite.new(
-                stream: @stream_factory.attempt(command.attempt_id),
-                event: Events::AttemptCompletedV1.new(
-                  **common,
-                  completed_at:
-                )
-              ),
-              EventWrite.new(
-                stream: @stream_factory.work_item(command.work_item_id),
-                event: Events::WorkItemCompletedV1.new(
-                  **common,
-                  produced_outputs: command.produced_outputs,
-                  rule_version: RULE_VERSION,
-                  completed_at:
+                stream: work_item_stream,
+                event: Events::WorkItemOutputRecordedV1.new(
+                  work_item_id: command.work_item_id,
+                  output_kind: output.kind,
+                  output_key: output.key
                 )
               )
-            ]
-          )
+            end,
+            EventWrite.new(
+              stream: @stream_factory.attempt(command.attempt_id),
+              event: Events::AttemptCompletedV2.new(attempt_id: command.attempt_id)
+            ),
+            EventWrite.new(
+              stream: work_item_stream,
+              event: Events::WorkItemCompletedV2.new(work_item_id: command.work_item_id)
+            )
+          ])
         end
 
         def failure(code, message, command, **extra)

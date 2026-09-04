@@ -45,6 +45,8 @@ module Coordinator::Write
         preparation = AgentChoiceImpactAssessmentPreparationV1.new(
           assessed_at: @clock.now,
           assessment_event_id: @id_generator.uuid_v7,
+          accepted_choice_link_event_id: @id_generator.uuid_v7,
+          decision_change_link_event_id: @id_generator.uuid_v7,
           invalidation_event_id: @id_generator.uuid_v7
         )
 
@@ -75,15 +77,12 @@ module Coordinator::Write
           attempt: @attempt_loader.call(choice.recorded),
           reconstruction:
         )
-        assessment_reference = future_assessment_reference(command, preparation.assessment_event_id)
         decision = @decider.call(
           state:,
-          command:,
-          assessed_at: preparation.assessed_at,
-          assessment_event: assessment_reference
+          command:
         )
         plan = decision.value!
-        verify_event_plan!(plan, state:, command:, assessment_reference:)
+        verify_event_plan!(plan, state:, command:)
         persist(plan, state:, command:, invocation:, preparation:)
       end
 
@@ -133,12 +132,11 @@ module Coordinator::Write
         raise ArgumentError, "impact assessment command violates its dry-rb contract: #{result.errors.to_h.inspect}"
       end
 
-      def verify_event_plan!(plan, state:, command:, assessment_reference:)
+      def verify_event_plan!(plan, state:, command:)
         result = @event_plan_contract.call(
           plan:,
           state:,
           command:,
-          assessment_event: assessment_reference,
           impact_stream: @stream_factory.agent_choice_impact(command.assessment_id),
           choice_stream: @stream_factory.agent_choice(command.choice_id)
         )
@@ -148,27 +146,33 @@ module Coordinator::Write
       end
 
       def persist(plan, state:, command:, invocation:, preparation:)
+        event_ids = [
+          preparation.assessment_event_id,
+          preparation.accepted_choice_link_event_id,
+          preparation.decision_change_link_event_id,
+          preparation.invalidation_event_id
+        ]
         physical_events = plan.events.each_with_index.map do |event, index|
           @event_factory.build!(
             event:,
-            event_id: index.zero? ? preparation.assessment_event_id : preparation.invalidation_event_id,
+            event_id: event_ids.fetch(index),
             metadata: metadata(command),
             markers: index.zero? ? assessment_markers(command, state) : invalidation_markers(command, state),
             caused_by: invocation.caused_by
           )
         end
-        persisted_assessment = @event_store.append(
+        persisted_impact_events = @event_store.append(
           @stream_factory.agent_choice_impact(command.assessment_id),
-          [ physical_events.fetch(0) ]
-        ).sole
-        if physical_events.length == 2
+          physical_events.first(3)
+        )
+        if physical_events.length == 4
           @event_store.append(
             @stream_factory.agent_choice(command.choice_id),
-            [ physical_events.fetch(1) ]
+            [ physical_events.fetch(3) ]
           )
         end
 
-        Success(persisted_assessment)
+        Success(persisted_impact_events.first)
       end
 
       def metadata(command)
@@ -209,17 +213,6 @@ module Coordinator::Write
             "decision-partition:#{observation.partition.partition_id}"
           end
         ).uniq.freeze
-      end
-
-      def future_assessment_reference(command, event_id)
-        EventReference.new(
-          event_id:,
-          type: "AgentChoiceImpactAssessed",
-          stream_context: "AgentGovernance",
-          stream_name: "AgentChoiceImpact",
-          stream_id: command.assessment_id,
-          stream_revision: 0
-        )
       end
 
       def event_reference(event)

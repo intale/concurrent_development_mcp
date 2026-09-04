@@ -16,7 +16,8 @@ module Coordinator::Write
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
         completion_builder: CommandResultBuilder.new,
-        event_plan_contract: Contracts::DependencySatisfactionEventPlan.new
+        event_plan_contract: Contracts::DependencySatisfactionEventPlan.new,
+        change_set_state_loader: ChangeSets::StateLoader.new(event_store:)
       )
         @event_store = event_store
         @source_loader = source_loader
@@ -29,6 +30,7 @@ module Coordinator::Write
         @stream_factory = stream_factory
         @completion_builder = completion_builder
         @event_plan_contract = event_plan_contract
+        @change_set_state_loader = change_set_state_loader
       end
 
       def call(command, caused_by:)
@@ -90,11 +92,7 @@ module Coordinator::Write
       end
 
       def load_change_set(change_set_id)
-        events = @event_store.read(
-          @stream_factory.change_set(change_set_id),
-          EventQueries::CHANGE_SET_FOR_DEPENDENCY_SATISFACTION
-        ).map { load_event(_1) }
-        Domain::ChangeSets::State.reduce(events)
+        @change_set_state_loader.call(change_set_id)
       end
 
       def load_work_item(work_item_id)
@@ -142,7 +140,7 @@ module Coordinator::Write
           "source-event:#{command.source_event.event_id}",
           "command:#{command.command_id}"
         ]
-        return common unless event.is_a?(Events::WorkItemDependencySatisfiedV1)
+        return common unless event.is_a?(Events::WorkItemDependencySatisfiedV2)
 
         common + [
           "producer-work-item:#{event.producer_work_item_id}",

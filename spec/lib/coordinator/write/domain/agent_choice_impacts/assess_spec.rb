@@ -6,20 +6,20 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::Assess do
   it "CHO-02-ASSESS-STILL-VALID-01 records one allowed assessment" do
     plan = assess(before_status: "allowed", after_status: "allowed")
 
-    expect(plan.events).to contain_exactly(
-      have_attributes(
-        assessment: have_attributes(
-          outcome: "still_valid",
-          reason: "compliant_or_advisory"
-        )
+    expect(plan.events.first).to have_attributes(
+      class: Coordinator::Write::Events::AgentChoiceImpactAssessmentRecordedV1,
+      assessment: have_attributes(
+        outcome: "still_valid",
+        reason: "compliant_or_advisory"
       )
     )
+    expect(plan.events.drop(1).map(&:role)).to eq(%w[accepted_choice decision_change])
   end
 
   it "records prior noncompliance without blaming the later change" do
     plan = assess(before_status: "blocked", after_status: "blocked")
 
-    expect(plan.events.sole.assessment).to have_attributes(
+    expect(plan.events.first.assessment).to have_attributes(
       outcome: "still_valid",
       reason: "noncompliance_preceded_change"
     )
@@ -32,7 +32,7 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::Assess do
       source_already_observed: true
     )
 
-    expect(plan.events.sole.assessment).to have_attributes(
+    expect(plan.events.first.assessment).to have_attributes(
       outcome: "not_applicable",
       reason: "change_already_observed"
     )
@@ -45,7 +45,7 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::Assess do
       active_attempt: false
     )
 
-    expect(plan.events.sole.assessment).to have_attributes(
+    expect(plan.events.first.assessment).to have_attributes(
       outcome: "not_applicable",
       reason: "attempt_not_active"
     )
@@ -58,7 +58,7 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::Assess do
       invalidated: true
     )
 
-    expect(plan.events.sole.assessment).to have_attributes(
+    expect(plan.events.first.assessment).to have_attributes(
       outcome: "already_invalidated",
       reason: "choice_terminal"
     )
@@ -76,19 +76,17 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::Assess do
 
       expect(plan.events.map(&:class)).to eq(
         [
-          Coordinator::Write::Events::AgentChoiceImpactAssessedV1,
-          Coordinator::Write::Events::AgentChoiceInvalidatedByDecisionV1
+          Coordinator::Write::Events::AgentChoiceImpactAssessmentRecordedV1,
+          Coordinator::Write::Events::AgentChoiceImpactSourceLinkedV1,
+          Coordinator::Write::Events::AgentChoiceImpactSourceLinkedV1,
+          Coordinator::Write::Events::AgentChoiceInvalidatedByDecisionV2
         ]
       )
       expect(plan.events.first.assessment).to have_attributes(
         outcome: "invalidated",
         reason:
       )
-      expect(plan.events.last).to have_attributes(
-        assessment_event: assessment_reference,
-        decision_change_event: decision_change.source_event,
-        reason:
-      )
+      expect(plan.events.last).to have_attributes(choice_id: "CHO-assess", reason:)
     end
   end
 
@@ -107,9 +105,7 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::Assess do
         active_attempt:,
         invalidated:
       ),
-      command:,
-      assessed_at: "2026-08-23T11:00:00.000000Z",
-      assessment_event: assessment_reference
+      command:
     ).value!
   end
 
@@ -222,7 +218,7 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::Assess do
     Coordinator::Write::Commands::AssessAgentChoiceDecisionImpact.new(
       command_id: "choice-impact-v1:#{'c' * 64}",
       actor: { kind: "system", id: "agent-choice-decision-impact" },
-      assessment_id: "choice-impact-v1:#{'c' * 64}",
+      assessment_id: "0198e03a-d112-7000-8000-000000000013",
       choice_id: "CHO-assess",
       accepted_choice: accepted_reference,
       decision_change:,
@@ -347,7 +343,7 @@ RSpec.describe Coordinator::Write::Domain::AgentChoiceImpacts::Assess do
       event_id: "0198e03a-d112-7000-8000-000000000013",
       type: "AgentChoiceImpactAssessed",
       stream_name: "AgentChoiceImpact",
-      stream_id: "choice-impact-v1:#{'c' * 64}",
+      stream_id: "0198e03a-d112-7000-8000-000000000013",
       stream_revision: 0
     )
   end

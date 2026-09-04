@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    class WorkIntentionBoundaryV1 < Shared::Value
+      State: singleton(Domain::WorkIntentions::State)
+      Observation: singleton(WorkIntentionObservationV1)
+
+      def states: () -> Array[Domain::WorkIntentions::State]
+      def active_observations: () -> Array[WorkIntentionObservationV1]
+    end
+  end
+end

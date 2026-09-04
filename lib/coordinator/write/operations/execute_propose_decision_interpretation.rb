@@ -64,13 +64,14 @@ module Coordinator::Write
         persisted_events = persist_domain_plan(
           plan,
           command:,
+          state:,
           preparation:,
           caused_by:
         )
         proposal = plan.events.first
         completion = @completion_builder.decision_interpretation_propose(
           command:,
-          proposal:,
+          assessment: proposal.assessment,
           input_digest: preparation.input_digest,
           persisted_events:,
           completed_at: preparation.proposed_at
@@ -95,43 +96,70 @@ module Coordinator::Write
 
       def build_source(event)
         payload = load_event(event)
+        anchors = if payload.respond_to?(:anchors)
+                    payload.anchors
+                  else
+                    load_guidance_anchors(payload.conversation_id, payload.message_id)
+                  end
         Interpretations::GuidanceSourceEvidenceV1.new(
           message_id: payload.message_id,
           text: payload.text,
-          anchors: payload.anchors,
+          anchors:,
           event: event_reference(event)
         )
+      end
+
+      def load_guidance_anchors(conversation_id, message_id)
+        events = @event_store.read(
+          @stream_factory.conversation(conversation_id),
+          EventReadCriteria.new(
+            event_types: [ "GuidanceMessageAnchored" ],
+            maximum_count: 102,
+            direction: :asc
+          )
+        ).map { load_event(_1) }.select { _1.message_id == message_id }
+        repositories = events.filter_map { _1.anchor_id if _1.anchor_kind == "repository" }
+        GuidanceAnchorsV1.new(
+          repository_ids: repositories,
+          change_set_id: anchor_id(events, "change_set"),
+          work_item_id: anchor_id(events, "work_item"),
+          attempt_id: anchor_id(events, "attempt")
+        )
+      end
+
+      def anchor_id(events, kind)
+        events.find { _1.anchor_kind == kind }&.anchor_id
       end
 
       def apply_event_plan_contract(plan, command)
         result = @event_plan_contract.call(
           plan:,
           command:,
-          expected_stream: @stream_factory.interpretation(command.source_message_id)
+          expected_stream: @stream_factory.interpretation(command.interpretation_id)
         )
         return plan if result.success?
 
         raise ArgumentError, "interpretation plan violates its dry-rb contract: #{result.errors.to_h.inspect}"
       end
 
-      def persist_domain_plan(plan, command:, preparation:, caused_by:)
+      def persist_domain_plan(plan, command:, state:, preparation:, caused_by:)
         event_ids = [ preparation.proposal_event_id, preparation.clarification_event_id ]
         persisted = plan.events.each_with_index.map do |event, index|
           @event_factory.build!(
             event:,
             event_id: event_ids.fetch(index),
-            metadata: command_metadata(command),
+            metadata: event_metadata(event, command, source: state.source),
             markers: markers_for(event, command),
             caused_by:
           )
         end
 
-        @event_store.append(@stream_factory.interpretation(command.source_message_id), persisted)
+        @event_store.append(@stream_factory.interpretation(command.interpretation_id), persisted)
       end
 
       def markers_for(event, command)
         common = [ message_marker(command.source_message_id), "command:#{command.command_id}" ]
-        identity = if event.is_a?(Events::DecisionInterpretationProposedV1)
+        identity = if event.is_a?(Events::DecisionInterpretationProposedV2)
                      interpretation_marker(command.interpretation_id)
         else
                      "interpretation-lifecycle:#{command.interpretation_id}"
@@ -174,6 +202,20 @@ module Coordinator::Write
           actor_id: command.actor.id,
           recorded_by: "coordinator",
           policy_version: "interpretation-proposal/v1"
+        )
+      end
+
+      def event_metadata(event, command, source:)
+        common = command_metadata(command).to_h
+        return EventMetadata.new(common) unless event.is_a?(Events::DecisionInterpretationProposedV2)
+
+        Metadata::InterpretationProposalV2.new(
+          **common,
+          classifier: command.classifier,
+          scope_provenance: Domain::Interpretations::ScopeResolver.new.call(
+            submitted_scope: command.proposed_decision.scope,
+            source:
+          ).provenance
         )
       end
     end

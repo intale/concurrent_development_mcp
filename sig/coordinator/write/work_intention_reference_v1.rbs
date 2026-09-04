@@ -1,0 +1,8 @@
+module Coordinator
+  module Write
+    class WorkIntentionReferenceV1 < Shared::Value
+      def intention_id: () -> String
+      def resource_id: () -> String
+    end
+  end
+end

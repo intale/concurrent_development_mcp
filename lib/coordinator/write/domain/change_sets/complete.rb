@@ -14,22 +14,22 @@ module Coordinator::Write
           denial = denied(state:, work_items:, release_state:, command:)
           return denial if denial
 
-          Success(
-            EventPlan.new(
-              writes: [
-                EventWrite.new(
-                  stream: @stream_factory.change_set(command.change_set_id),
-                  event: Events::ChangeSetCompletedV1.new(
-                    change_set_id: command.change_set_id,
-                    work_item_completions: work_items,
-                    release_set_completion_event: release_state&.completion&.event,
-                    rule_version: command.rule_version,
-                    completed_at:
-                  )
-                )
-              ]
+          stream = @stream_factory.change_set(command.change_set_id)
+          writes = []
+          if command.release_set_id
+            writes << EventWrite.new(
+              stream:,
+              event: Events::ChangeSetReleaseSetLinkedV1.new(
+                change_set_id: command.change_set_id,
+                release_set_id: command.release_set_id
+              )
             )
+          end
+          writes << EventWrite.new(
+            stream:,
+            event: Events::ChangeSetCompletedV2.new(change_set_id: command.change_set_id)
           )
+          Success(EventPlan.new(writes:))
         end
 
         private

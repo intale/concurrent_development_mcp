@@ -106,15 +106,14 @@ module Coordinator::Write
           EventPlan.new(
             writes: [
               EventWrite.new(
-                stream: @stream_factory.change_set(command.change_set_id),
-                event: Events::WorkItemDependencyDeclaredV1.new(
+                stream: @stream_factory.work_item(command.consumer_work_item_id),
+                event: Events::WorkItemDependencyDeclaredV2.new(
                   change_set_id: command.change_set_id,
                   dependency_id: command.dependency_id,
                   producer_work_item_id: command.producer_work_item_id,
                   consumer_work_item_id: command.consumer_work_item_id,
                   dependency_kind: command.dependency_kind,
-                  required_output: command.required_output,
-                  declared_at: occurred_at
+                  required_output: command.required_output
                 )
               )
             ]

@@ -10,7 +10,7 @@ module Coordinator::Processes
       rule(:event) do
         key.failure("must be a persisted event") if value.stream.nil? || value.stream_revision.nil?
         key.failure("must have a UUIDv7 event ID") unless Types::UUID_V7_PATTERN.match?(value.id)
-        key.failure("must be ChangeSetActivated@1") unless activation_schema?(value)
+        key.failure("must be ChangeSetActivated@1 or @2") unless activation_schema?(value)
         key.failure("must belong to the ChangeSet stream") unless activation_stream?(value)
         key.failure("must identify the same ChangeSet in stream and payload") unless matching_change_set?(value)
         key.failure("must carry a pg_eventstore trace correlation ID") unless valid_trace_correlation?(value)
@@ -19,7 +19,7 @@ module Coordinator::Processes
       private
 
       def activation_schema?(event)
-        event.type == "ChangeSetActivated" && event.metadata["schema_version"] == 1
+        event.type == "ChangeSetActivated" && [ 1, 2 ].include?(event.metadata["schema_version"])
       end
 
       def activation_stream?(event)

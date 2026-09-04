@@ -40,6 +40,24 @@ module Coordinator::Write
       markers.uniq
     end
 
+    def work_intention_event_markers(repository_id:, resource_path:)
+      paths = ancestor_paths(resource_path) + [ resource_path ]
+
+      [
+        path_marker("resource-exact", repository_id, resource_path),
+        *paths.map { path_marker("resource-within", repository_id, _1) }
+      ].uniq
+    end
+
+    def work_intention_boundary_markers(repository_id:, resource_kind:, resource_path:)
+      markers = ancestor_paths(resource_path).map do |path|
+        path_marker("resource-exact", repository_id, path)
+      end
+      marker_role = resource_kind == "directory" ? "resource-within" : "resource-exact"
+      markers << path_marker(marker_role, repository_id, resource_path)
+      markers.uniq
+    end
+
     private
 
     def ancestor_paths(path)

@@ -7,187 +7,211 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
   let(:streams) { Coordinator::Write::StreamFactory.new }
   subject(:operation) { described_class.new(event_store:) }
 
-  it "resolves server-owned Resource identity before atomically writing schema-v2 leases" do
-    seed_active_attempts([ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ])
-    first = resolve("app/services/capture.rb")
-    second = resolve("db/schema.rb")
-    input = reserve_input(
-      command_id: "cmd-reserve-v2",
-      agent_id: "agent-a",
-      work_item_id: "W-LSE-A",
-      attempt_id: "A-LSE-A",
-      resource_ids: [ first, second ]
-    )
+  it "records one cohesive intention plus one set-membership fact per resource" do
+    start_attempts([ [ "W-INT-A", "A-INT-A", "agent-a" ] ])
+    resources = [ resolve("app/services/capture.rb"), resolve("db/schema.rb") ]
 
-    result = operation.call(input)
+    result = operation.call(
+      reserve_input(
+        command_id: "cmd-declare-intentions",
+        agent_id: "agent-a",
+        work_item_id: "W-INT-A",
+        attempt_id: "A-INT-A",
+        resources: resources.map { { resource_id: _1, purpose: "Implement the scoped change" } }
+      )
+    )
 
     expect(result).to be_success
     receipt = result.value!.data
-    expect(receipt).to be_a(Coordinator::Write::CommandReceiptData::LeaseSet)
-    expect(receipt).to have_attributes(policy_version: "coordinator-resource-lease/v2")
-    expect(receipt.resources.map(&:resource_id)).to contain_exactly(first, second)
-    expect(receipt.resources).to all(be_a(Coordinator::Write::LeaseReferenceV2))
+    expect(receipt).to have_attributes(
+      policy_version: Coordinator::Write::WorkIntentionPolicyV1::VERSION,
+      repository_id: REPOSITORY_ID
+    )
+    expect(receipt.resources.map(&:resource_id)).to contain_exactly(*resources)
 
-    [ first, second ].each do |resource_id|
-      event = lease_events(resource_id).sole
-      expect(event).to have_attributes(type: "ResourceLeaseAcquired", stream_revision: 0)
-      expect(event.stream.stream_id).to eq(resource_id)
-      expect(event.data).to include("resource_id" => resource_id, "fencing_token" => 1)
-      expect(event.data).not_to have_key("resource_key_hash")
-      expect(event.markers).to include("resource:#{resource_id}")
-      expect(event.markers).not_to include(a_string_starting_with("resource-key-hash:"))
+    set_events = read_set(receipt.lease_set_id)
+    expect(set_events.map(&:type)).to eq(
+      [ "WorkIntentionSetCreated", "WorkIntentionAddedToSet", "WorkIntentionAddedToSet" ]
+    )
+    expect(set_events.first.data.keys).to contain_exactly(
+      "set_id", "attempt_id", "work_item_id", "change_set_id", "repository_id"
+    )
+
+    receipt.resources.each do |reference|
+      event = read_intention(reference.lease_id).sole
+      expect(event).to have_attributes(type: "ResourceWorkIntentionDeclared", stream_revision: 0)
+      expect(event.stream.stream_id).to eq(reference.lease_id)
+      expect(event.data.keys).to contain_exactly(
+        "intention_id", "set_id", "resource_id", "repository_id", "change_set_id",
+        "work_item_id", "attempt_id", "agent_id", "mode", "purpose", "context",
+        "object_format", "base_commit_oid", "base_blob_oid", "fencing_token", "expires_at"
+      )
+      expect(event.data).to include(
+        "resource_id" => reference.resource_id,
+        "mode" => "shared",
+        "purpose" => "Implement the scoped change"
+      )
+      expect(event.markers).to include(
+        "work-intention:#{reference.lease_id}",
+        "work-intention-set:#{receipt.lease_set_id}",
+        "resource:#{reference.resource_id}"
+      )
+      expect(event.markers).to include(a_string_matching(/role=\d+:resource-exact(?:\||$)/))
+      expect(event.markers).to include(a_string_matching(/role=\d+:resource-within(?:\||$)/))
     end
   end
 
-  it "leaves replay ownership to the registered Command lifecycle without duplicate facts" do
-    seed_active_attempts([ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ])
-    resource_id = resolve("app/replay.rb")
-    input = reserve_input(
-      command_id: "cmd-reserve-replay",
-      agent_id: "agent-a",
-      work_item_id: "W-LSE-A",
-      attempt_id: "A-LSE-A",
-      resource_ids: [ resource_id ]
-    )
-
-    original = operation.call(input)
-    replay = operation.call(input)
-    changed = operation.call(input.merge(lease_duration_seconds: 901))
-
-    expect(original).to be_success
-    expect(replay.failure.code).to eq(:write_set_already_reserved)
-    expect(changed.failure.code).to eq(:write_set_already_reserved)
-    expect(lease_events(resource_id).length).to eq(1)
-    expect(command_events("cmd-reserve-replay")).to be_empty
-  end
-
-  it "rejects missing, cross-repository, and inactive Resources from write-side facts" do
-    seed_active_attempts([ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ])
-    active = resolve("app/inactive.rb")
-    Coordinator::Write::Operations::ExecuteRemoveResource.new(event_store:).call(
-      command_id: "cmd-remove-before-lease",
-      actor: { kind: "agent", id: "agent-a" },
-      resource_id: active,
-      reason: "removed"
-    ).value!
-    missing = SecureRandom.uuid_v7
-
-    inactive = operation.call(
-      reserve_input(
-        command_id: "cmd-inactive-resource",
-        agent_id: "agent-a",
-        work_item_id: "W-LSE-A",
-        attempt_id: "A-LSE-A",
-        resource_ids: [ active ]
-      )
-    )
-    absent = operation.call(
-      reserve_input(
-        command_id: "cmd-missing-resource",
-        agent_id: "agent-a",
-        work_item_id: "W-LSE-A",
-        attempt_id: "A-LSE-A",
-        resource_ids: [ missing ]
-      )
-    )
-
-    expect(inactive.failure).to have_attributes(code: :resource_not_active)
-    expect(inactive.failure.details).to include(resource_id: active)
-    expect(absent.failure).to have_attributes(code: :resource_not_found, details: { resource_id: missing })
-    expect(command_events("cmd-inactive-resource")).to be_empty
-    expect(command_events("cmd-missing-resource")).to be_empty
-  end
-
-  it "serializes two agents contending for the same Resource so only one full decision commits" do
-    seed_active_attempts(
+  it "allows two agents to declare shared intentions for the same resource" do
+    start_attempts(
       [
-        [ "W-LSE-A", "A-LSE-A", "agent-a" ],
-        [ "W-LSE-B", "A-LSE-B", "agent-b" ]
+        [ "W-INT-A", "A-INT-A", "agent-a" ],
+        [ "W-INT-B", "A-INT-B", "agent-b" ]
       ]
     )
-    shared = resolve("app/shared.rb")
-    first = reserve_input(
-      command_id: "cmd-race-a",
-      agent_id: "agent-a",
-      work_item_id: "W-LSE-A",
-      attempt_id: "A-LSE-A",
-      resource_ids: [ shared ]
-    )
-    second = reserve_input(
-      command_id: "cmd-race-b",
-      agent_id: "agent-b",
-      work_item_id: "W-LSE-B",
-      attempt_id: "A-LSE-B",
-      resource_ids: [ shared ]
-    )
+    resource_id = resolve("config/routes.rb")
+    inputs = [
+      reserve_input(
+        command_id: "cmd-shared-a",
+        agent_id: "agent-a",
+        work_item_id: "W-INT-A",
+        attempt_id: "A-INT-A",
+        resources: [ { resource_id:, purpose: "Add routes for feature A" } ]
+      ),
+      reserve_input(
+        command_id: "cmd-shared-b",
+        agent_id: "agent-b",
+        work_item_id: "W-INT-B",
+        attempt_id: "A-INT-B",
+        resources: [ { resource_id:, purpose: "Add routes for feature B" } ]
+      )
+    ]
 
-    results = [ first, second ].map do |input|
+    results = inputs.map do |input|
       Thread.new { described_class.new(event_store:).call(input) }
     end.map(&:value)
 
-    expect(results.count(&:success?)).to eq(1)
-    expect(results.find(&:failure?).failure.code).to eq(:lease_busy)
-    expect(lease_events(shared).length).to eq(1)
-    expect(%w[cmd-race-a cmd-race-b].flat_map { command_events(_1) }).to be_empty
+    expect(results).to all(be_success)
+    fences = results.map { _1.value!.data.resources.sole.fencing_token }
+    expect(fences).to contain_exactly(1, 2)
   end
 
-  it "blocks directory descendants across distinct UUIDs but does not treat a file prefix as an ancestor" do
-    seed_active_attempts(
+  it "rejects shared or exclusive work when an overlapping exclusive intention is active" do
+    start_attempts(
       [
-        [ "W-LSE-A", "A-LSE-A", "agent-a" ],
-        [ "W-LSE-B", "A-LSE-B", "agent-b" ]
+        [ "W-INT-A", "A-INT-A", "agent-a" ],
+        [ "W-INT-B", "A-INT-B", "agent-b" ]
       ]
     )
-    directory = resolve("app/models", kind: "directory")
-    child = resolve("app/models/user.rb")
-    parent_file = resolve("app/services")
-    child_file = resolve("app/services/capture.rb")
-
-    operation.call(
+    directory = resolve("curriculum/chapter-2", kind: "directory")
+    child = resolve("curriculum/chapter-2/paragraph.md")
+    owner = operation.call(
       reserve_input(
-        command_id: "cmd-directory-owner",
+        command_id: "cmd-exclusive-owner",
         agent_id: "agent-a",
-        work_item_id: "W-LSE-A",
-        attempt_id: "A-LSE-A",
-        resource_ids: [ directory ]
+        work_item_id: "W-INT-A",
+        attempt_id: "A-INT-A",
+        resources: [
+          {
+            resource_id: directory,
+            mode: "exclusive",
+            purpose: "Rewrite the chapter translation",
+            context: "Paragraph edits would be invalidated by the rewrite"
+          }
+        ]
       )
-    ).value!
+    )
+    expect(owner).to be_success
+
     blocked = operation.call(
       reserve_input(
-        command_id: "cmd-directory-child",
+        command_id: "cmd-shared-child",
         agent_id: "agent-b",
-        work_item_id: "W-LSE-B",
-        attempt_id: "A-LSE-B",
-        resource_ids: [ child ]
+        work_item_id: "W-INT-B",
+        attempt_id: "A-INT-B",
+        resources: [ { resource_id: child, purpose: "Correct one paragraph" } ]
       )
     )
 
-    expect(blocked.failure).to have_attributes(code: :lease_busy)
-    expect(blocked.failure.details).to include(resource_id: child)
-
-    release_receipt(operation.call(
-      reserve_input(
-        command_id: "cmd-file-prefix-owner",
-        agent_id: "agent-b",
-        work_item_id: "W-LSE-B",
-        attempt_id: "A-LSE-B",
-        resource_ids: [ parent_file, child_file ]
-      )
-    ))
-    expect(lease_events(parent_file).length).to eq(1)
-    expect(lease_events(child_file).length).to eq(1)
+    expect(blocked.failure).to have_attributes(code: :work_intention_conflict)
+    blocker = blocked.failure.details.fetch(:blockers).sole
+    expect(blocker).to include(
+      resource_id: directory,
+      resource_kind: "directory",
+      resource_path: "curriculum/chapter-2",
+      mode: "exclusive",
+      owner_agent_id: "agent-a",
+      owner_attempt_id: "A-INT-A",
+      purpose: "Rewrite the chapter translation",
+      context: "Paragraph edits would be invalidated by the rewrite"
+    )
+    expect(blocker.fetch(:scope)).to include(
+      repository_id: REPOSITORY_ID,
+      change_set_id: "CS-LSE",
+      work_item_id: "W-INT-A"
+    )
   end
 
-  def release_receipt(result)
+  it "does not treat a file path prefix as an ancestor overlap" do
+    start_attempts([ [ "W-INT-A", "A-INT-A", "agent-a" ] ])
+    prefix = resolve("app/services")
+    child = resolve("app/services/capture.rb")
+
+    result = operation.call(
+      reserve_input(
+        command_id: "cmd-file-prefixes",
+        agent_id: "agent-a",
+        work_item_id: "W-INT-A",
+        attempt_id: "A-INT-A",
+        resources: [
+          { resource_id: prefix, mode: "exclusive", purpose: "Edit the prefix-named file" },
+          { resource_id: child, mode: "exclusive", purpose: "Edit the nested file" }
+        ]
+      )
+    )
+
     expect(result).to be_success
-    result.value!
+    expect(result.value!.data.resources.length).to eq(2)
+  end
+
+  it "rejects duplicate declaration and invalid resource identities without partial facts" do
+    start_attempts([ [ "W-INT-A", "A-INT-A", "agent-a" ] ])
+    resource_id = resolve("app/replay.rb")
+    input = reserve_input(
+      command_id: "cmd-declare-once",
+      agent_id: "agent-a",
+      work_item_id: "W-INT-A",
+      attempt_id: "A-INT-A",
+      resources: [ { resource_id: } ]
+    )
+
+    original = operation.call(input)
+    duplicate = operation.call(input)
+    missing_id = SecureRandom.uuid_v7
+    missing = operation.call(
+      reserve_input(
+        command_id: "cmd-missing-resource",
+        agent_id: "agent-a",
+        work_item_id: "W-INT-A",
+        attempt_id: "A-INT-A",
+        resources: [ { resource_id: missing_id } ]
+      )
+    )
+
+    expect(original).to be_success
+    expect(duplicate.failure).to have_attributes(code: :write_set_already_reserved)
+    expect(missing.failure).to have_attributes(code: :resource_not_found, details: { resource_id: missing_id })
+    expect(read_intention(original.value!.data.resources.sole.lease_id).length).to eq(1)
+  end
+
+  def start_attempts(attempts)
+    ResourceLeaseOperationScenario.start_attempts(event_store:, attempts:)
   end
 
   def resolve(path, kind: "file")
     ResourceScenario.resolve(event_store:, repository_id: REPOSITORY_ID, kind:, path:)
   end
 
-  def reserve_input(command_id:, agent_id:, work_item_id:, attempt_id:, resource_ids:)
+  def reserve_input(command_id:, agent_id:, work_item_id:, attempt_id:, resources:)
     {
       command_id:,
       actor: { kind: "agent", id: agent_id },
@@ -196,56 +220,22 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
       attempt_id:,
       repository_id: REPOSITORY_ID,
       base_commit_oid: "a" * 40,
-      resources: resource_ids.map { { resource_id: _1 } },
+      resources:,
       lease_duration_seconds: 900
     }
   end
 
-  def seed_active_attempts(attempts)
-    RepositoryScenario.register(event_store:)
-    Coordinator::Write::Operations::ExecuteCreateChangeSet.new(event_store:).call(
-      command_id: "seed-create-CS-LSE",
-      actor: { kind: "agent", id: "planner-1" },
-      change_set_id: "CS-LSE",
-      goal: "Coordinate resource leases",
-      acceptance_criteria: [ "Overlapping agents cannot both write" ]
-    ).value!
-    attempts.each do |work_item_id, _attempt_id, _agent_id|
-      Coordinator::Write::Operations::ExecuteCreateWorkItem.new(event_store:).call(
-        command_id: "seed-create-#{work_item_id}",
-        actor: { kind: "agent", id: "planner-1" },
-        change_set_id: "CS-LSE",
-        work_item_id:,
-        repository_id: REPOSITORY_ID,
-        goal: "Implement #{work_item_id}",
-        acceptance_criteria: [ "The work is verifiable" ]
-      ).value!
-    end
-    Coordinator::Write::Operations::ExecuteActivateChangeSet.new(event_store:).call(
-      command_id: "seed-activate-CS-LSE",
-      actor: { kind: "agent", id: "planner-1" },
-      change_set_id: "CS-LSE"
-    ).value!
-    activation = event_store.read(streams.change_set("CS-LSE"), Coordinator::Write::EventQueries::CHANGE_SET_FOR_ACQUISITION)
-      .find { _1.type == "ChangeSetActivated" }
-    Coordinator::Processes::ProcessManagers::ChangeSetReadiness.new(event_store:).call(activation)
-    attempts.each do |work_item_id, attempt_id, agent_id|
-      Coordinator::Write::Operations::ExecuteAcquireWorkItem.new(event_store:).call(
-        command_id: "seed-acquire-#{attempt_id}",
-        actor: { kind: "agent", id: agent_id },
-        change_set_id: "CS-LSE",
-        work_item_id:,
-        attempt_id:,
-        base_snapshots: [ { repository_id: REPOSITORY_ID, commit_oid: "a" * 40 } ]
-      ).value!
-    end
+  def read_set(set_id)
+    event_store.read(
+      streams.work_intention_set(set_id),
+      Coordinator::Write::EventQueries::WORK_INTENTION_SET_STATE
+    )
   end
 
-  def lease_events(resource_id)
-    ResourceScenario.lease_events(event_store:, resource_id:)
-  end
-
-  def command_events(command_id)
-    event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
+  def read_intention(intention_id)
+    event_store.read_grouped(
+      streams.resource_work_intention(intention_id),
+      Coordinator::Write::EventQueries::WORK_INTENTION_STATE
+    ).reverse
   end
 end

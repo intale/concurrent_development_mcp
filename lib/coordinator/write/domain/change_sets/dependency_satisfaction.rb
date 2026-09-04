@@ -6,7 +6,7 @@ module Coordinator::Write
       class DependencySatisfaction < Value
         attribute :dependency_id, Types::Identifier
         attribute :source_event, EventReference
-        attribute :satisfied_at, Types::Timestamp
+        attribute :satisfied_at, Types::Timestamp.optional.default(nil)
       end
     end
   end

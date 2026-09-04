@@ -1,0 +1,35 @@
+module Coordinator
+  module Write
+    module Domain
+      module WorkIntentions
+        class State < Shared::Value
+          def self.initial: () -> State
+          def self.reduce: (Array[Events::Base] events) -> State
+
+          def intention_id: () -> String?
+          def set_id: () -> String?
+          def resource_id: () -> String?
+          def repository_id: () -> String?
+          def change_set_id: () -> String?
+          def work_item_id: () -> String?
+          def attempt_id: () -> String?
+          def agent_id: () -> String?
+          def mode: () -> String?
+          def purpose: () -> String?
+          def context: () -> String?
+          def object_format: () -> String?
+          def base_commit_oid: () -> String?
+          def base_blob_oid: () -> String?
+          def fencing_token: () -> Integer
+          def expires_at: () -> String?
+          def withdrawn: () -> bool
+          def withdrawal_reason: () -> String?
+          def expired: () -> bool
+          def absent?: () -> bool
+          def active_at?: (String timestamp) -> bool
+          def apply: (Events::Base event) -> State
+        end
+      end
+    end
+  end
+end

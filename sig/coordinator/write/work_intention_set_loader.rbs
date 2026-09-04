@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    class WorkIntentionSetLoader
+      def initialize: (event_store: _EventStore, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory) -> void
+      def call: (String set_id) -> Domain::WorkIntentions::SetState
+      def find_by_attempt: (String attempt_id) -> Domain::WorkIntentions::SetState?
+    end
+  end
+end

@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module AgentChoiceImpacts
+      class ImpactAssessmentV2 < Shared::Value
+        Evaluation: singleton(AgentChoices::PolicyEvaluationV1)
+
+        def before_evaluation: () -> AgentChoices::PolicyEvaluationV1
+        def after_evaluation: () -> AgentChoices::PolicyEvaluationV1
+        def outcome: () -> String
+        def reason: () -> String
+      end
+    end
+  end
+end

@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Events
+      class AttemptAuthorizedV2 < Base
+        def attempt_id: () -> String
+      end
+    end
+  end
+end

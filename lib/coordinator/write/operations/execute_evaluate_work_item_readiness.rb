@@ -12,7 +12,8 @@ module Coordinator::Write
         schema_registry: EventSchemaRegistry.new,
         stream_factory: StreamFactory.new,
         invocation_contract: Contracts::ReadinessInvocation.new,
-        event_plan_contract: Contracts::ReadinessEventPlan.new
+        event_plan_contract: Contracts::ReadinessEventPlan.new,
+        change_set_state_loader: ChangeSets::StateLoader.new(event_store:)
       )
         @event_store = event_store
         @decider = decider
@@ -23,6 +24,7 @@ module Coordinator::Write
         @stream_factory = stream_factory
         @invocation_contract = invocation_contract
         @event_plan_contract = event_plan_contract
+        @change_set_state_loader = change_set_state_loader
       end
 
       def call(invocation)
@@ -77,12 +79,7 @@ module Coordinator::Write
       end
 
       def load_change_set_state(change_set_id)
-        events = @event_store.read(
-          @stream_factory.change_set(change_set_id),
-          EventQueries::CHANGE_SET_FOR_READINESS_EVALUATION
-        ).map { load_event(_1) }
-
-        Domain::ChangeSets::State.reduce(events)
+        @change_set_state_loader.call(change_set_id)
       end
 
       def load_work_item_state(work_item_id)

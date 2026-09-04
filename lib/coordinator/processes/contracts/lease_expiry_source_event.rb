@@ -3,28 +3,22 @@
 module Coordinator::Processes
   module Contracts
     class LeaseExpirySourceEvent < Dry::Validation::Contract
-      SUPPORTED_TYPES = %w[ResourceLeaseAcquired ResourceLeaseRenewed].freeze
+      SUPPORTED_TYPES = %w[
+        ResourceWorkIntentionDeclared
+        ResourceWorkIntentionRenewed
+      ].freeze
 
       params do
         required(:event).value(Types.Instance(PgEventstore::Event))
       end
 
-      def initialize(
-        compound_marker_builder: CompoundMarkerBuilder.new,
-        repository_marker_builder: Coordinator::Write::RepositoryMarkerBuilder.new
-      )
-        super()
-        @compound_marker_builder = compound_marker_builder
-        @repository_marker_builder = repository_marker_builder
-      end
-
       rule(:event) do
         key.failure("must be a persisted event") unless persisted?(value)
         key.failure("must have a UUIDv7 event ID") unless Types::UUID_V7_PATTERN.match?(value.id)
-        key.failure("must be a supported ResourceLease lifecycle source") unless supported_schema?(value)
-        key.failure("must belong to its ResourceLease stream") unless matching_resource_stream?(value)
+        key.failure("must be a supported work-intention lifecycle source") unless supported_schema?(value)
+        key.failure("must belong to its ResourceWorkIntention stream") unless matching_stream?(value)
         key.failure("must carry command provenance") unless matching_provenance?(value)
-        key.failure("must carry its complete resource-routing markers") unless matching_markers?(value)
+        key.failure("must carry its work-intention routing markers") unless matching_markers?(value)
         key.failure("must carry a pg_eventstore trace correlation ID") unless valid_trace_correlation?(value)
       end
 
@@ -35,61 +29,37 @@ module Coordinator::Processes
       end
 
       def supported_schema?(event)
-        SUPPORTED_TYPES.include?(event.type) && event.metadata["schema_version"] == 2
+        SUPPORTED_TYPES.include?(event.type) && event.metadata["schema_version"] == 1
       end
 
-      def matching_resource_stream?(event)
+      def matching_stream?(event)
         stream = event.stream
-        identity = event.data["resource_id"]
-        return false unless stream && identity
+        intention_id = event.data["intention_id"]
+        return false unless stream && intention_id
 
         stream.context == "DevelopmentCoordination" &&
-          stream.stream_name == "ResourceLease" &&
-          stream.stream_id == identity
+          stream.stream_name == "ResourceWorkIntention" &&
+          stream.stream_id == intention_id
       end
 
       def matching_provenance?(event)
         command_id = event.metadata["command_id"]
-
         Types::IDENTIFIER_PATTERN.match?(command_id.to_s) &&
-          event.metadata["policy_version"] == Coordinator::Write::LeaseResourceV2::POLICY_VERSION
+          event.metadata["policy_version"] == Coordinator::Write::WorkIntentionPolicyV1::VERSION
       end
 
       def matching_markers?(event)
         data = event.data
-        scope_markers = event.markers.grep(/\Ascope:/)
-        return false unless scope_markers.one?
-
-        scope = scope_markers.fetch(0)
-        repository = "repository:#{data['repository_id']}"
-        repository_components = [
-          scope,
-          repository
-        ]
-        scoped_repository = @compound_marker_builder.call(
-          CompoundMarkerDefinitionV1.new(
-            purpose: "scoped-repository",
-            components: repository_components
-          )
-        )
-        expected = [
-          "change-set:#{data['change_set_id']}",
-          "work-item:#{data['work_item_id']}",
-          "attempt:#{data['attempt_id']}",
+        markers = event.markers
+        required = [
           "command:#{event.metadata['command_id']}",
-          "lease-set:#{data['lease_set_id']}",
-          *repository_components,
-          scoped_repository.marker,
-          "resource:#{data['resource_id']}",
-          "resource-kind:#{data['resource_kind']}",
-          *@repository_marker_builder.resource_event_markers(
-            repository_id: data.fetch("repository_id"),
-            resource_kind: data.fetch("resource_kind"),
-            resource_path: data.fetch("resource_path")
-          )
-        ].uniq.sort
-
-        event.markers == expected
+          "work-intention:#{data['intention_id']}",
+          "resource:#{data['resource_id']}"
+        ]
+        required.all? { markers.include?(_1) } &&
+          markers.any? { _1.start_with?("work-intention-set:") } &&
+          markers.any? { _1.match?(/role=\d+:resource-exact(?:\||$)/) } &&
+          markers.any? { _1.match?(/role=\d+:resource-within(?:\||$)/) }
       end
 
       def valid_trace_correlation?(event)

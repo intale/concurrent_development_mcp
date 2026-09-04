@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class ChangeSetAcceptanceCriteriaDefinedV2 < Base
+        def change_set_id: () -> String
+        def acceptance_criteria: () -> Array[String]
+      end
+    end
+  end
+end

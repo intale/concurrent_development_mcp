@@ -313,23 +313,23 @@ module Coordinator
     end
 
     register("domain.resource_leases.reserve", memoize: true) do
-      Write::Domain::ResourceLeases::Reserve.new(stream_factory: self["stream_factory"])
+      Write::Domain::WorkIntentions::DeclareSet.new(stream_factory: self["stream_factory"])
     end
 
     register("domain.resource_leases.expand", memoize: true) do
-      Write::Domain::ResourceLeases::Expand.new(stream_factory: self["stream_factory"])
+      Write::Domain::WorkIntentions::ExpandSet.new(stream_factory: self["stream_factory"])
     end
 
     register("domain.resource_leases.renew", memoize: true) do
-      Write::Domain::ResourceLeases::Renew.new(stream_factory: self["stream_factory"])
+      Write::Domain::WorkIntentions::RenewSet.new(stream_factory: self["stream_factory"])
     end
 
     register("domain.resource_leases.release", memoize: true) do
-      Write::Domain::ResourceLeases::Release.new(stream_factory: self["stream_factory"])
+      Write::Domain::WorkIntentions::WithdrawSet.new(stream_factory: self["stream_factory"])
     end
 
     register("domain.resource_leases.expire", memoize: true) do
-      Write::Domain::ResourceLeases::Expire.new(stream_factory: self["stream_factory"])
+      Write::Domain::WorkIntentions::Expire.new(stream_factory: self["stream_factory"])
     end
 
     register("domain.verification_obligation_claims.claim", memoize: true) do
@@ -1356,8 +1356,7 @@ module Coordinator
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
         schema_registry: self["event_schema_registry"],
-        stream_factory: self["stream_factory"],
-        event_plan_contract: Write::Contracts::AttemptAbandonmentEventPlan.new
+        stream_factory: self["stream_factory"]
       )
     end
 
@@ -1370,7 +1369,6 @@ module Coordinator
         clock: self["clock"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
-        schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
         completion_builder: self["command_result_builder"]
       )
@@ -1429,7 +1427,6 @@ module Coordinator
         clock: self["clock"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
-        schema_registry: self["event_schema_registry"],
         stream_factory: self["stream_factory"],
         completion_builder: self["command_result_builder"]
       )
