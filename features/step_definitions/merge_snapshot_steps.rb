@@ -41,12 +41,15 @@ Then("the merge snapshot Task completes with exact attributed Candidate evidence
   members = event.data.fetch("ordered_candidates")
   assert_acceptance_equal(
     [ @candidate_arguments.fetch(:candidate_id) ],
-    members.map { _1.fetch("candidate_id") },
+    members,
     "Ordered Candidates"
+  )
+  snapshot = Coordinator::Write::MergeSnapshots::StateLoader.new(event_store:).call(
+    @merge_snapshot_arguments.fetch(:merge_snapshot_id)
   )
   assert_acceptance_equal(
     [ @candidate_arguments.fetch(:head_commit_oid) ],
-    members.map { _1.fetch("head_commit_oid") },
+    snapshot.ordered_candidates.map(&:head_commit_oid),
     "Ordered heads"
   )
 end
@@ -118,7 +121,14 @@ end
 Then(
   "{int} submitted report(s) and {int} verified fact(s) are durable for the exact snapshot"
 ) do |submission_count, verified_count|
-  events = merge_verification_events
+  events = if verified_count.positive?
+             eventually("Merge snapshot verification Saga to become terminal") do
+               observed = merge_verification_events
+               [ observed.count { _1.type == "MergeSnapshotVerified" } == verified_count, observed ]
+             end
+  else
+             merge_verification_events
+  end
   assert_acceptance_equal(
     submission_count,
     events.count { _1.type == "MergeSnapshotVerificationSubmitted" },
@@ -256,7 +266,11 @@ When(
 end
 
 Then("the merge authorization Task completes with durable outcome {string}") do |outcome|
-  assert_acceptance_equal("completed", @merge_authorization_state.dig("result", "status"), "Task")
+  assert_acceptance_equal(
+    "completed",
+    @merge_authorization_state.dig("result", "status"),
+    "Task #{@merge_authorization_state.inspect}"
+  )
   result = @merge_authorization_state.dig("result", "result")
   assert_acceptance_equal(false, result.fetch("isError"), "Authorization decision")
   assert_acceptance_equal(
@@ -425,7 +439,7 @@ def merge_authorization_arguments(command_id:)
       registration_event: registration.fetch("snapshot_event"),
       snapshot_digest: registration.fetch("snapshot_digest"),
       verification_event: merge_event_reference(verified_event),
-      verification_digest: verified_event.data.fetch("verification_digest")
+      verification_digest: verified_event.metadata.fetch("verification_digest")
     },
     target_base_observation: {
       repository_id: @merge_snapshot_arguments.fetch(:repository_id),
@@ -448,7 +462,7 @@ def merge_authorization_expected_policy
       @obligation_policy.fetch(:partition_event)
     ).to_h,
     head: @obligation_policy.fetch(:head).to_h,
-    definition_digest: @obligation_policy.fetch(:decision_event).data.fetch("definition_digest")
+    definition_digest: candidate_impact_policy_definition_digest
   }
 end
 
@@ -456,7 +470,10 @@ def submit_merge_authorization(arguments)
   @merge_authorization_arguments = arguments
   response = call_tool("merge_authorization_request", arguments)
   @merge_authorization_task_id = response.dig("result", "taskId")
-  assert_acceptance(@merge_authorization_task_id, "merge_authorization_request did not return a Task")
+  assert_acceptance(
+    @merge_authorization_task_id,
+    "merge_authorization_request did not return a Task: #{response.inspect}"
+  )
   execute_task(@merge_authorization_task_id)
   @merge_authorization_state = task_request("tasks/get", @merge_authorization_task_id)
 end
@@ -505,14 +522,34 @@ def complete_merge_candidate_work_item(candidate)
 end
 
 def merge_verification_events
-  event_store.read(
+  snapshot_events = event_store.read(
     streams.merge_snapshot(@merge_snapshot_arguments.fetch(:merge_snapshot_id)),
     Coordinator::Write::EventReadCriteria.new(
-      event_types: %w[MergeSnapshotVerificationSubmitted MergeSnapshotVerified],
+      event_types: %w[
+        MergeSnapshotVerificationAssigned
+        MergeSnapshotVerificationSelected
+        MergeSnapshotVerified
+      ],
       maximum_count: 34,
       direction: :asc
     )
   )
+  submissions = snapshot_events.filter_map do |event|
+    next unless event.type == "MergeSnapshotVerificationAssigned"
+
+    event_store.read(
+      streams.merge_verification(event.data.fetch("verification_id")),
+      Coordinator::Write::EventQueries::MERGE_VERIFICATION_SUBMISSION
+    ).first
+  end
+  [ *submissions, *snapshot_events ].sort_by(&:global_position)
+end
+
+def candidate_impact_policy_definition_digest
+  decision_id = @obligation_policy.fetch(:decision_id)
+  recorded = decision_events(decision_id).find { _1.type == "DecisionRecorded" }
+  assert_acceptance(recorded, "Candidate impact policy definition is missing")
+  Coordinator::Shared::CanonicalJson.new.sha256(recorded.data.fetch("definition"))
 end
 
 def merge_authorization_events

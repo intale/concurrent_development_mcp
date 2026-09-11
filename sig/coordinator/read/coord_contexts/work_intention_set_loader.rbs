@@ -1,0 +1,13 @@
+module Coordinator::Read
+  module CoordContexts
+    class WorkIntentionSetLoader
+      def initialize: (
+        event_store: Coordinator::Write::EventStore,
+        ?stream_factory: Coordinator::Write::StreamFactory,
+        ?schema_registry: Coordinator::Write::EventSchemaRegistry
+      ) -> void
+
+      def call: (PgEventstore::Event, Coordinator::Write::Events::Base) -> Coordinator::Read::WorkIntentionSetViewV1
+    end
+  end
+end

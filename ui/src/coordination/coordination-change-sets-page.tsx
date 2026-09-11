@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useProjectWorkspace } from "../projects/project-workspace-shell.js";
 import { fetchProjectChangeSet, fetchProjectChangeSets } from "./project-coordination-api.js";
+import type { ChangeSetStatus } from "./project-coordination-api.js";
 import {
   detailLocation,
   listLocation,
@@ -31,12 +32,17 @@ function ChangeSetListPage() {
   const { project, projectRef } = useProjectWorkspace();
   const [searchParams, setSearchParams] = useSearchParams();
   const after = searchParams.get("after") ?? undefined;
+  const requestedStatus = searchParams.get("status") ?? "";
+  const status: ChangeSetStatus | undefined = requestedStatus === "planning" ||
+    requestedStatus === "active" || requestedStatus === "completed"
+    ? requestedStatus
+    : undefined;
   const basePath = `/projects/${projectRef}/coordination`;
   const listPath = `${basePath}/change-sets`;
   const headingRef = useCoordinationHeading(`ChangeSets · ${project.displayLabel}`, after ?? "first");
   const query = useQuery({
-    queryKey: ["project-change-sets", projectRef, after],
-    queryFn: ({ signal }) => fetchProjectChangeSets(projectRef, after, signal),
+    queryKey: ["project-change-sets", projectRef, status, after],
+    queryFn: ({ signal }) => fetchProjectChangeSets(projectRef, status, after, signal),
     refetchInterval: REFRESH_INTERVAL_MS
   });
   const connection = query.data?.projectChangeSets;
@@ -46,6 +52,31 @@ function ChangeSetListPage() {
     <div className="vstack gap-3">
       <CoordinationNavigation basePath={basePath} />
       <div><h2 className="h3 mb-1" ref={headingRef} tabIndex={-1}>ChangeSets</h2><p className="text-body-secondary mb-0">Goals and progress across every Repository member in this Project.</p></div>
+      <form aria-label="ChangeSet filters" className="card card-body">
+        <div className="row g-3 align-items-end">
+          <div className="col-12 col-md-6 col-xl-4">
+            <label className="form-label" htmlFor="change-set-status">Status</label>
+            <select
+              className="form-select"
+              id="change-set-status"
+              onChange={(event) => {
+                const next = new URLSearchParams(searchParams);
+                next.delete("after");
+                next.delete("trail");
+                if (event.target.value) next.set("status", event.target.value);
+                else next.delete("status");
+                setSearchParams(next);
+              }}
+              value={status ?? ""}
+            >
+              <option value="">All statuses</option>
+              <option value="planning">Planning</option>
+              <option value="active">Active</option>
+              <option value="completed">Completed</option>
+            </select>
+          </div>
+        </div>
+      </form>
       {query.isPending ? <LoadingState label="ChangeSets" /> : null}
       {errorMessage && !connection ? <InitialError label="ChangeSets" message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
       {!query.isPending && !errorMessage && !connection ? <div className="alert alert-warning" role="status">This Project is not available in the latest projection.</div> : null}

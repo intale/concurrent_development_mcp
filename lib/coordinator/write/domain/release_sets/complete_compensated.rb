@@ -15,9 +15,22 @@ module Coordinator::Write
           return denial if denial
 
           stream = @stream_factory.release_set(command.release_set_id)
+          compensation_writes = command.evidence.map do |evidence|
+            EventWrite.new(
+              stream:,
+              event: Events::RepositoryCompensationRecordedV1.new(
+                release_set_id: command.release_set_id,
+                repository_id: evidence.repository_id,
+                integration_event: evidence.integration_event,
+                action: evidence.action,
+                external_reference: evidence.external_reference
+              )
+            )
+          end
           Success(
             EventPlan.new(
               writes: [
+                *compensation_writes,
                 EventWrite.new(
                   stream:,
                   event: Events::ReleaseSetOutcomeRecordedV1.new(

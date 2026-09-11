@@ -250,7 +250,11 @@ Then(
   invalidations = impact_choice_events(choice_id).select do |event|
     event.type == "AgentChoiceInvalidatedByDecision"
   end
-  assert_acceptance_equal("invalidated", payload.assessment.outcome, "Impact outcome")
+  assert_acceptance_equal(
+    "invalidated",
+    payload.assessment.outcome,
+    "Impact outcome #{payload.assessment.to_h.inspect}"
+  )
   assert_acceptance_equal("blocking_policy_introduced", payload.assessment.reason, "Impact reason")
   assert_acceptance_equal(1, invalidations.length, "Terminal invalidation count")
   accepted = impact_choice_events(choice_id).find { _1.type == "AgentChoiceAccepted" }

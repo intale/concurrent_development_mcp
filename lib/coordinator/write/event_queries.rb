@@ -372,6 +372,7 @@ module Coordinator::Write
         "ReleaseSetActivated",
         "ReleaseSetCompensationRequested",
         "ReleaseSetSuccessfulIntegrationLinked",
+        "RepositoryCompensationRecorded",
         "ReleaseSetOutcomeRecorded",
         "ReleaseSetCompleted"
       ],
@@ -641,6 +642,51 @@ module Coordinator::Write
       event_types: [ "WorkItemCandidateSelected" ],
       maximum_count: 1,
       direction: :desc
+    )
+
+    CHANGE_SET_DEFINITION_FOR_PROJECTION = EventReadCriteria.new(
+      event_types: [
+        "ChangeSetCreated",
+        "ChangeSetGoalDefined",
+        "ChangeSetAcceptanceCriteriaDefined"
+      ],
+      maximum_count: 3,
+      direction: :asc
+    )
+
+    WORK_ITEM_DEFINITION_FOR_PROJECTION = EventReadCriteria.new(
+      event_types: [
+        "WorkItemCreated",
+        "WorkItemAddedToChangeSet",
+        "WorkItemAssignedToRepository",
+        "WorkItemGoalDefined",
+        "WorkItemAcceptanceCriteriaDefined",
+        "WorkItemCompetitiveModeSelected"
+      ],
+      maximum_count: 6,
+      direction: :asc
+    )
+
+    ATTEMPT_DEFINITION_FOR_PROJECTION = EventReadCriteria.new(
+      event_types: [
+        "AttemptAuthorized",
+        "AttemptAssignedToWorkItem",
+        "AttemptAssignedToAgent",
+        "AttemptBaseSnapshotRecorded",
+        "AttemptStarted"
+      ],
+      maximum_count: 5,
+      direction: :asc
+    )
+
+    WORK_ITEM_COMPLETION_FOR_PROJECTION = EventReadCriteria.new(
+      event_types: [
+        "WorkItemCandidateSelected",
+        "WorkItemOutputRecorded",
+        "WorkItemCompleted"
+      ],
+      maximum_count: Types::WORK_ITEM_OUTPUT_MAXIMUM_COUNT + 2,
+      direction: :asc
     )
 
     WORK_ITEM_FOR_MERGE_AUTHORIZATION = EventReadCriteria.new(

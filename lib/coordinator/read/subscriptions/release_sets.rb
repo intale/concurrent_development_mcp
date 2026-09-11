@@ -23,6 +23,7 @@ module Coordinator::Read
           "ReleaseSetActivated",
           "ReleaseSetCompensationRequested",
           "ReleaseSetSuccessfulIntegrationLinked",
+          "RepositoryCompensationRecorded",
           "ReleaseSetOutcomeRecorded",
           "ReleaseSetCompleted"
         ]

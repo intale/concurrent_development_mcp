@@ -2,6 +2,8 @@
 
 module Coordinator::Read::Web::Repositories
   class ProjectCatalog
+    include EventTimePagination
+
     SEARCH_SQL = <<~SQL.squish.freeze
       repositories.scope ILIKE :pattern ESCAPE E'\\\\'
       OR repositories.display_name ILIKE :pattern ESCAPE E'\\\\'
@@ -17,12 +19,14 @@ module Coordinator::Read::Web::Repositories
     end
 
     def page(query)
-      scopes, has_more = project_scopes(query)
+      scope_rows, has_more = project_scopes(query)
+      scopes = scope_rows.map(&:scope)
       summaries = summaries_for(scopes, query.repositories_first)
 
       Coordinator::Read::Web::ProjectCatalogV1::ProjectPage.new(
         items: scopes.map { summaries.fetch(_1) },
         next_scope: has_more ? scopes.last : nil,
+        next_updated_at: has_more ? event_time(scope_rows.last) : nil,
         has_more:
       )
     end
@@ -33,15 +37,19 @@ module Coordinator::Read::Web::Repositories
       return if repository_count.zero?
 
       display_label = overview_display_label(relation, query.scope, repository_count)
-      relation = relation.where("repository_id > ?", query.after_repository_id) if query.after_repository_id
-      records = relation.order(:repository_id).limit(query.repositories_first + 1).to_a
-
+      records, has_more = event_time_page(
+        relation:,
+        id_column: :repository_id,
+        after_updated_at: query.after_updated_at,
+        after_id: query.after_repository_id,
+        limit: query.repositories_first
+      )
       Coordinator::Read::Web::ProjectCatalogV1::ProjectOverview.new(
         project_ref: query.project_ref,
         scope: query.scope,
         display_label:,
         repository_count:,
-        repositories: repository_page(records, query.repositories_first, repository_count)
+        repositories: repository_page(records, query.repositories_first, repository_count, has_more:)
       )
     end
 
@@ -50,15 +58,22 @@ module Coordinator::Read::Web::Repositories
     def project_scopes(query)
       relation = Coordinator::Read::Repository.all
       relation = apply_search(relation, query.search) if query.search
+      relation = relation.select(:scope, "MAX(updated_at) AS updated_at").group(:scope)
+      direction = query.sort == "oldest_first" ? :asc : :desc
+      comparator = direction == :asc ? ">" : "<"
       if query.after_scope
-        comparator = query.sort == "scope_asc" ? ">" : "<"
-        relation = relation.where("scope #{comparator} ?", query.after_scope)
+        relation = relation.having(
+          "MAX(updated_at) #{comparator} :updated_at OR " \
+          "(MAX(updated_at) = :updated_at AND scope #{comparator} :scope)",
+          updated_at: query.after_updated_at,
+          scope: query.after_scope
+        )
       end
-      direction = query.sort == "scope_asc" ? :asc : :desc
-      scopes = relation.select(:scope).distinct.order(scope: direction).limit(query.first + 1).pluck(:scope)
-      has_more = scopes.length > query.first
-
-      [ scopes.first(query.first), has_more ]
+      rows = relation
+        .order(Arel.sql("MAX(updated_at) #{direction.to_s.upcase}, scope #{direction.to_s.upcase}"))
+        .limit(query.first + 1)
+        .to_a
+      [ rows.first(query.first), rows.length > query.first ]
     end
 
     def apply_search(relation, search)
@@ -91,21 +106,22 @@ module Coordinator::Read::Web::Repositories
       ranked = Coordinator::Read::Repository.where(scope: scopes).select(
         "repositories.*",
         "COUNT(*) OVER (PARTITION BY scope) AS project_repository_count",
-        "ROW_NUMBER() OVER (PARTITION BY scope ORDER BY repository_id) AS project_member_position"
+        "ROW_NUMBER() OVER (PARTITION BY scope ORDER BY updated_at DESC, repository_id DESC) " \
+        "AS project_member_position"
       )
       Coordinator::Read::Repository
         .from("(#{ranked.to_sql}) repositories")
         .where("project_member_position <= ?", repositories_first + 1)
-        .order(:scope, :repository_id)
+        .order(:scope, updated_at: :desc, repository_id: :desc)
         .to_a
     end
 
-    def repository_page(records, limit, total_count)
+    def repository_page(records, limit, total_count, has_more: records.length > limit)
       page_records = records.first(limit)
-      has_more = records.length > limit
       Coordinator::Read::Web::ProjectCatalogV1::RepositoryPage.new(
         items: page_records.map { repository_member(_1) },
         next_repository_id: has_more ? page_records.last.repository_id : nil,
+        next_updated_at: has_more ? event_time(page_records.last) : nil,
         has_more:,
         total_count:
       )

@@ -2,6 +2,7 @@
 
 module Coordinator::Read::Web::Contracts
   class CoordinationDashboard
+    CHANGE_SET_STATUSES = %w[planning active completed].freeze
     PRESENTATION_STATUSES = %w[pending ready assigned running completed].freeze
 
     class Page < Dry::Validation::Contract
@@ -14,6 +15,7 @@ module Coordinator::Read::Web::Contracts
         optional(:presentation_statuses).array(:string)
         optional(:work_item_sort).filled(:string)
         optional(:blocking).maybe(:bool)
+        optional(:domain_status).maybe(:string)
         optional(:change_set_id).maybe(:string)
         optional(:agent_id).maybe(:string)
       end
@@ -37,16 +39,22 @@ module Coordinator::Read::Web::Contracts
         key.failure("is unsupported") unless allowed.include?(value)
       end
 
+      rule(:domain_status) do
+        next unless value
+
+        key.failure("is unsupported") unless CHANGE_SET_STATUSES.include?(value)
+      end
+
       rule(:after_id, :after_sort_value, :kind, :work_item_sort) do
-        sort = values[:work_item_sort] || "work_item_id_asc"
-        needs_sort_value = values[:kind] == "work_items" && sort != "work_item_id_asc" && values[:after_id]
+        sort = values[:work_item_sort] || "updated_at_desc"
+        needs_sort_value = values[:after_id]
         key(:after_sort_value).failure("is required for this cursor") if needs_sort_value && !values[:after_sort_value]
         next unless needs_sort_value && values[:after_sort_value]
 
         valid = case sort
         when "status_asc"
           values[:after_sort_value].match?(/\A[0-4]\z/)
-        when "latest_activity_desc"
+        when "latest_activity_desc", "updated_at_desc", "updated_at_asc"
           values[:after_sort_value].match?(/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z\z/)
         end
         key(:after_sort_value).failure("is invalid for this sort") unless valid

@@ -25,6 +25,69 @@ PROJECT_KNOWLEDGE_ARTIFACT_QUERY = <<~GRAPHQL.freeze
   }
 GRAPHQL
 
+GLOBAL_KNOWLEDGE_SKILLS_QUERY = <<~GRAPHQL.freeze
+  query GlobalKnowledgeSkills($projectScope: String, $name: String) {
+    skills(projectScope: $projectScope, name: $name, first: 20) {
+      nodes { id name scope }
+    }
+  }
+GRAPHQL
+
+GLOBAL_KNOWLEDGE_SKILL_QUERY = <<~GRAPHQL.freeze
+  query GlobalKnowledgeSkill($skillId: ID!) {
+    skill(skillId: $skillId) {
+      skill { id name scope instructions }
+    }
+  }
+GRAPHQL
+
+Given("projected global Skills contain the same name in two Project scopes") do
+  create_knowledge_browser_project
+  selected = FactoryBot.create(
+    :coordinator_read_skill,
+    skill_id: knowledge_browser_skill_id,
+    name: "event-modeling",
+    scope: @knowledge_browser_scope
+  )
+  FactoryBot.create(
+    :coordinator_read_skill_revision,
+    skill: selected,
+    instructions: "Selected Project instructions"
+  )
+
+  other_scope = "project:test/knowledge-browser-other-#{SecureRandom.uuid_v7}"
+  FactoryBot.create(:coordinator_read_repository, scope: other_scope)
+  other = FactoryBot.create(:coordinator_read_skill, name: "event-modeling", scope: other_scope)
+  FactoryBot.create(:coordinator_read_skill_revision, skill: other, instructions: "Other Project instructions")
+end
+
+When("the browser filters global Skills by the exact selected Project and name") do
+  @global_knowledge_skills_payload = query_project_knowledge(
+    GLOBAL_KNOWLEDGE_SKILLS_QUERY,
+    projectScope: @knowledge_browser_scope,
+    name: "event-modeling"
+  )
+end
+
+Then("only the selected scoped Skill is presented and opens by stable identity") do
+  rows = @global_knowledge_skills_payload.fetch("data").fetch("skills").fetch("nodes")
+  assert_acceptance_equal(
+    [ [ knowledge_browser_skill_id, "event-modeling", @knowledge_browser_scope ] ],
+    rows.map { _1.values_at("id", "name", "scope") },
+    "Exactly scoped global Skills"
+  )
+
+  detail = query_project_knowledge(
+    GLOBAL_KNOWLEDGE_SKILL_QUERY,
+    skillId: rows.sole.fetch("id")
+  ).fetch("data").fetch("skill").fetch("skill")
+  assert_acceptance_equal(
+    [ knowledge_browser_skill_id, "Selected Project instructions" ],
+    detail.values_at("id", "instructions"),
+    "Stable Skill detail"
+  )
+end
+
 Given("projected knowledge rows contain current and obsolete revisions of one Skill") do
   create_knowledge_browser_project
   skill = FactoryBot.create(

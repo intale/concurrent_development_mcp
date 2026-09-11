@@ -2,6 +2,8 @@
 
 module Coordinator::Read::Web::Repositories
   class GovernanceBrowser
+    include EventTimePagination
+
     def initialize(
       decisions: Coordinator::Read::Repositories::DecisionGovernance.new,
       utterances: Coordinator::Read::Repositories::UserUtterances.new,
@@ -27,14 +29,19 @@ module Coordinator::Read::Web::Repositories
         relation = relation.where("definition #>> '{document,topic,topic_id}' = ?", query.topic_id)
       end
       relation = relation.where(policy_status: query.policy_status) if query.policy_status
-      relation = relation.where("decision_id > ?", query.after_decision_id) if query.after_decision_id
-      ids = relation.order(:decision_id).limit(query.first + 1).pluck(:decision_id)
-      has_more = ids.length > query.first
-      page_ids = ids.first(query.first)
+      rows, has_more = event_time_page(
+        relation:,
+        id_column: :decision_id,
+        after_updated_at: query.after_updated_at,
+        after_id: query.after_decision_id,
+        limit: query.first
+      )
+      page_ids = rows.map(&:decision_id)
 
       Coordinator::Read::Web::GovernanceBrowserV1::DecisionPage.new(
         items: @decisions.fetch_many(page_ids),
         next_decision_id: has_more ? page_ids.last : nil,
+        next_updated_at: has_more ? event_time(rows.last) : nil,
         has_more:
       )
     end
@@ -45,14 +52,19 @@ module Coordinator::Read::Web::Repositories
 
       relation = guidance_for_project(repository_ids)
       relation = relation.where(source: query.source) if query.source
-      relation = relation.where("message_id > ?", query.after_message_id) if query.after_message_id
-      ids = relation.order(:message_id).limit(query.first + 1).pluck(:message_id)
-      has_more = ids.length > query.first
-      page_ids = ids.first(query.first)
+      rows, has_more = event_time_page(
+        relation:,
+        id_column: :message_id,
+        after_updated_at: query.after_updated_at,
+        after_id: query.after_message_id,
+        limit: query.first
+      )
+      page_ids = rows.map(&:message_id)
 
       Coordinator::Read::Web::GovernanceBrowserV1::GuidancePage.new(
         items: @utterances.fetch_many(page_ids),
         next_message_id: has_more ? page_ids.last : nil,
+        next_updated_at: has_more ? event_time(rows.last) : nil,
         has_more:
       )
     end
@@ -64,14 +76,19 @@ module Coordinator::Read::Web::Repositories
       relation = choices_for_project(repository_ids)
       relation = relation.where(choice_type: query.choice_type) if query.choice_type
       relation = relation.where(observation_status: query.status) if query.status
-      relation = relation.where("choice_id > ?", query.after_choice_id) if query.after_choice_id
-      ids = relation.order(:choice_id).limit(query.first + 1).pluck(:choice_id)
-      has_more = ids.length > query.first
-      page_ids = ids.first(query.first)
+      rows, has_more = event_time_page(
+        relation:,
+        id_column: :choice_id,
+        after_updated_at: query.after_updated_at,
+        after_id: query.after_choice_id,
+        limit: query.first
+      )
+      page_ids = rows.map(&:choice_id)
 
       Coordinator::Read::Web::GovernanceBrowserV1::AgentChoicePage.new(
         items: @choices.fetch_many(page_ids),
         next_choice_id: has_more ? page_ids.last : nil,
+        next_updated_at: has_more ? event_time(rows.last) : nil,
         has_more:
       )
     end
@@ -83,7 +100,7 @@ module Coordinator::Read::Web::Repositories
       impact_page(
         relation: impacts_for_project(repository_ids),
         outcome: query.outcome,
-        after_global_position: query.after_global_position,
+        after_updated_at: query.after_updated_at,
         after_assessment_id: query.after_assessment_id,
         limit: query.first
       )
@@ -142,7 +159,7 @@ module Coordinator::Read::Web::Repositories
         impacts: impact_page(
           relation: impacts_for_project(repository_ids).where(choice_id: query.choice_id),
           outcome: nil,
-          after_global_position: query.after_impact_global_position,
+          after_updated_at: query.after_impact_updated_at,
           after_assessment_id: query.after_impact_assessment_id,
           limit: query.first
         )
@@ -165,14 +182,18 @@ module Coordinator::Read::Web::Repositories
       relation = Coordinator::Read::CommandReceipt.all
       relation = relation.where(tool_name: query.tool_name) if query.tool_name
       relation = relation.where(status: query.status) if query.status
-      relation = relation.where("command_id > ?", query.after_command_id) if query.after_command_id
-      rows = relation.order(:command_id).limit(query.first + 1).to_a
-      has_more = rows.length > query.first
-      page_rows = rows.first(query.first)
+      page_rows, has_more = event_time_page(
+        relation:,
+        id_column: :command_id,
+        after_updated_at: query.after_updated_at,
+        after_id: query.after_command_id,
+        limit: query.first
+      )
 
       Coordinator::Read::Web::GovernanceBrowserV1::ReceiptPage.new(
         items: page_rows.map { build_receipt(_1) },
         next_command_id: has_more ? page_rows.last.command_id : nil,
+        next_updated_at: has_more ? event_time(page_rows.last) : nil,
         has_more:
       )
     end
@@ -197,18 +218,17 @@ module Coordinator::Read::Web::Repositories
       Coordinator::Read::DecisionDefinition.where(decision_id: decision_ids)
     end
 
-    def impact_page(relation:, outcome:, after_global_position:, after_assessment_id:, limit:)
+    def impact_page(relation:, outcome:, after_updated_at:, after_assessment_id:, limit:)
       relation = relation.where(outcome:) if outcome
-      if after_global_position && after_assessment_id
+      if after_updated_at && after_assessment_id
         relation = relation.where(
-          "event_global_position > ? OR " \
-          "(event_global_position = ? AND assessment_id > ?)",
-          after_global_position,
-          after_global_position,
+          "updated_at < ? OR (updated_at = ? AND assessment_id < ?)",
+          after_updated_at,
+          after_updated_at,
           after_assessment_id
         )
       end
-      rows = relation.order(:event_global_position, :assessment_id).limit(limit + 1).to_a
+      rows = relation.order(updated_at: :desc, assessment_id: :desc).limit(limit + 1).to_a
       has_more = rows.length > limit
       page_rows = rows.first(limit)
       last = page_rows.last
@@ -216,7 +236,7 @@ module Coordinator::Read::Web::Repositories
       Coordinator::Read::Web::GovernanceBrowserV1::ImpactPage.new(
         items: @impacts.fetch_many(page_rows.map(&:assessment_id)),
         next_cursor: has_more ? Coordinator::Read::Web::GovernanceBrowserV1::ImpactCursor.new(
-          global_position: last.event_global_position,
+          updated_at: event_time(last),
           assessment_id: last.assessment_id
         ) : nil,
         has_more:

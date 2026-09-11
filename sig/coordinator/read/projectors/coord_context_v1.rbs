@@ -5,14 +5,15 @@ module Coordinator
         PROJECTION: ProjectionDefinition
 
         def initialize: (
-          submission_loader: Candidates::_SubmissionLoader,
+          source_loader: CoordContexts::_SourceLoader,
           ?contract: Contracts::CoordContextSourceEvent,
           ?schema_registry: Write::EventSchemaRegistry,
           ?reducer: Projections::CoordContextReducer,
           ?state_loader: Projections::CoordContextStateLoader,
           ?scope_roots_builder: ProjectionScopeRootsBuilder,
           ?contexts: Repositories::CoordContexts,
-          ?processed_events: Repositories::ProcessedProjectionEvents
+          ?processed_events: Repositories::ProcessedProjectionEvents,
+          ?projection_timestamp: ProjectionTimestamp
         ) -> void
         def call: (PgEventstore::Event event) -> void
       end

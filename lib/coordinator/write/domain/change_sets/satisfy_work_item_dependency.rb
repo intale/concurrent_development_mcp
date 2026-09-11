@@ -168,10 +168,11 @@ module Coordinator::Write
         def member_contains_producer?(member, dependency:, producer:)
           return false unless member && producer.selected_candidate_id
 
-          candidate = member.candidate
-          candidate.change_set_id == producer.change_set_id &&
-            candidate.work_item_id == dependency.producer_work_item_id &&
-            candidate.candidate_id == producer.selected_candidate_id
+          member.ordered_candidates.any? do |candidate|
+            candidate.change_set_id == producer.change_set_id &&
+              candidate.work_item_id == dependency.producer_work_item_id &&
+              candidate.candidate_id == producer.selected_candidate_id
+          end
         end
 
         def ready_after?(change_set_state:, dependency:, consumer_state:)

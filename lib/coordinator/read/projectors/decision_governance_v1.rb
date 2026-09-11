@@ -7,11 +7,13 @@ module Coordinator::Read
 
       def initialize(
         contract: Contracts::DecisionGovernanceSourceEvent.new,
+        interpretation_evidence_loader:,
         schema_registry: Coordinator::Write::EventSchemaRegistry.new,
         governance: Repositories::DecisionGovernance.new,
         processed_events: Repositories::ProcessedProjectionEvents.new
       )
         @contract = contract
+        @interpretation_evidence_loader = interpretation_evidence_loader
         @schema_registry = schema_registry
         @governance = governance
         @processed_events = processed_events
@@ -26,7 +28,7 @@ module Coordinator::Read
           next unless @processed_events.claim(
             definition: PROJECTION,
             identity:,
-            processed_at: Time.now.utc
+            processed_at: event.created_at
           )
 
           project(event, payload)
@@ -61,7 +63,10 @@ module Coordinator::Read
         expected_id = case payload
         when Coordinator::Write::Events::DecisionRecordedV1,
              Coordinator::Write::Events::DecisionActivatedV1,
-             Coordinator::Write::Events::DecisionDefinitionCorrectedV1
+             Coordinator::Write::Events::DecisionDefinitionCorrectedV1,
+             Coordinator::Write::Events::DecisionRecordedV2,
+             Coordinator::Write::Events::DecisionActivatedV2,
+             Coordinator::Write::Events::DecisionDefinitionCorrectedV2
           payload.decision_id
         when Coordinator::Write::Events::DecisionSlotOpenedV1
           payload.slot.slot_id
@@ -69,6 +74,12 @@ module Coordinator::Read
           payload.slot_id
         when Coordinator::Write::Events::DecisionPartitionAdvancedV1
           payload.partition.partition_id
+        when Coordinator::Write::Events::DecisionSlotOpenedV2,
+             Coordinator::Write::Events::DecisionSlotHeadChangedV2
+          payload.slot_id
+        when Coordinator::Write::Events::DecisionAddedToPartitionV1,
+             Coordinator::Write::Events::DecisionRemovedFromPartitionV1
+          payload.partition_id
         end
         return if event.stream.stream_id == expected_id
 
@@ -89,6 +100,27 @@ module Coordinator::Read
           @governance.change_slot_head(event:, change: payload)
         when Coordinator::Write::Events::DecisionPartitionAdvancedV1
           @governance.advance_partition(event:, advancement: payload)
+        when Coordinator::Write::Events::DecisionRecordedV2
+          @governance.store_decision_v2(
+            event:,
+            decision: payload,
+            interpretation: @interpretation_evidence_loader.call(payload.interpretation_id)
+          )
+        when Coordinator::Write::Events::DecisionActivatedV2
+          @governance.activate_decision_v2(event:, activation: payload)
+        when Coordinator::Write::Events::DecisionDefinitionCorrectedV2
+          @governance.correct_decision_v2(
+            event:,
+            correction: payload,
+            interpretation: @interpretation_evidence_loader.call(payload.interpretation_id)
+          )
+        when Coordinator::Write::Events::DecisionSlotOpenedV2
+          @governance.open_slot_v2(event:, opening: payload)
+        when Coordinator::Write::Events::DecisionSlotHeadChangedV2
+          @governance.change_slot_head_v2(event:, change: payload)
+        when Coordinator::Write::Events::DecisionAddedToPartitionV1,
+             Coordinator::Write::Events::DecisionRemovedFromPartitionV1
+          @governance.apply_partition_delta(event:, delta: payload)
         end
       end
     end

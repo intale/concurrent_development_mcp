@@ -6,6 +6,8 @@ module Coordinator
           def initialize: (
             ?skills_contract: Contracts::KnowledgeBrowser::Skills,
             ?artifacts_contract: Contracts::KnowledgeBrowser::Artifacts,
+            ?skill_by_id_contract: Contracts::KnowledgeBrowser::SkillById,
+            ?skill_asset_by_id_contract: Contracts::KnowledgeBrowser::SkillAssetById,
             ?skill_contract: Contracts::KnowledgeBrowser::Skill,
             ?skill_asset_contract: Contracts::KnowledgeBrowser::SkillAsset,
             ?artifact_contract: Contracts::KnowledgeBrowser::Artifact,
@@ -14,7 +16,9 @@ module Coordinator
             ?project_reference: ProjectReference
           ) -> void
           def skills: (command_input input) -> Read::SkillPageV1?
-          def artifacts: (command_input input) -> Read::DevelopmentArtifactPageV1?
+          def artifacts: (command_input input) -> KnowledgeBrowserV1::ArtifactPage?
+          def skill_by_id: (command_input input) -> KnowledgeBrowserV1::SkillDetail?
+          def skill_asset_by_id: (command_input input) -> KnowledgeBrowserV1::SkillAssetDetail?
           def skill: (command_input input) -> KnowledgeBrowserV1::SkillDetail?
           def skill_asset: (command_input input) -> KnowledgeBrowserV1::SkillAssetDetail?
           def artifact: (command_input input) -> KnowledgeBrowserV1::ArtifactDetail?
@@ -23,6 +27,7 @@ module Coordinator
           private
 
           def project: (Hash[Symbol, untyped] values) -> { project_ref: String, scope: String }
+          def optional_project: (Hash[Symbol, untyped] values) -> { project_ref: String?, scope: String? }
           def validate: (Dry::Validation::Contract contract, command_input input) -> Hash[Symbol, untyped]
         end
       end

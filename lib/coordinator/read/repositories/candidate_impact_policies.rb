@@ -32,7 +32,7 @@ module Coordinator::Read
           definition_digest: definition.digest,
           required_evidence: document.value.items,
           enforcement: document.enforcement.level,
-          valid_from: document.validity.valid_from,
+          valid_from: document.validity.valid_from || effective_from(decision_record, head),
           evidence: evidence(partition_record)
         )
       end
@@ -68,8 +68,16 @@ module Coordinator::Read
         document.topic.topic_id == TOPIC_ID &&
           document.scope.change_set_id == change_set_id &&
           document.value.schema == "string-set/v1" &&
-          document.value.items &&
-          document.validity.valid_from
+          document.value.items
+      end
+
+      def effective_from(record, head)
+        timestamp = if head.event.type == "DecisionDefinitionCorrected"
+          record.corrected_at_domain
+        else
+          record.activated_at_domain
+        end
+        timestamp.utc.iso8601(6)
       end
 
       def evidence(record)

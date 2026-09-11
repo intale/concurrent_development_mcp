@@ -1,0 +1,4 @@
+module Coordinator::Read::Web::Repositories
+  module EventTimePagination
+  end
+end

@@ -18,6 +18,7 @@ module Coordinator::Write
         valid = write&.stream == StreamFactory.new.verification_obligation(command.obligation_id) &&
           event.is_a?(Events::VerificationObligationInvalidatedV2) &&
           event.obligation_id == command.obligation_id &&
+          event.superseding_partition_event == command.superseding_partition_event &&
           event.reason == "policy_partition_advanced"
         key(:plan).failure("must write the exact invalidation fact") unless valid
       end

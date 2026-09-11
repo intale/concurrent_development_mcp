@@ -29,6 +29,39 @@ module ReleaseSetAcceptanceWorld
     )
   end
 
+  def release_set_preparation
+    Coordinator::Read::ReleaseSets::PreparationLoader.new(event_store:).call(
+      @release_set_arguments.fetch(:release_set_id)
+    )
+  end
+
+  def release_set_history
+    Coordinator::Write::ReleaseSets::HistoryLoader.new(event_store:).call(
+      @release_set_arguments.fetch(:release_set_id)
+    )
+  end
+
+  def release_set_member_inputs
+    @release_set_arguments.fetch(:ordered_members)
+  end
+
+  def release_set_snapshot(member)
+    Coordinator::Write::MergeSnapshots::StateLoader.new(event_store:).call(
+      member.fetch(:merge_snapshot_id)
+    )
+  end
+
+  def release_set_change_set_link(change_set_id)
+    event_store.read(
+      streams.change_set(change_set_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: [ "ChangeSetReleaseSetLinked" ],
+        maximum_count: 1,
+        direction: :asc
+      )
+    ).sole
+  end
+
   def release_event_reference(event)
     Coordinator::Write::EventReference.new(
       event_id: event.id,

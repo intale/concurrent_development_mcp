@@ -2,7 +2,7 @@
 
 module Coordinator::Web::Graphql
   class DeliveryBrowserCursor
-    SCHEMA = "delivery-browser-cursor/v2"
+    SCHEMA = "delivery-browser-cursor/v3"
     TIMELINE_KINDS = %w[
       candidates obligations merge-snapshots release-sets operation-batches evidence authorizations
     ].freeze
@@ -37,8 +37,8 @@ module Coordinator::Web::Graphql
 
     def self.valid_cursor?(kind, cursor)
       if TIMELINE_KINDS.include?(kind)
-        return cursor.is_a?(Hash) && cursor.keys.sort == %w[id position] &&
-          cursor.fetch("position", nil).is_a?(Integer) && cursor.fetch("position") >= 0 &&
+        return cursor.is_a?(Hash) && cursor.keys.sort == %w[id updated_at] &&
+          Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(cursor.fetch("updated_at", "")) &&
           Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(cursor.fetch("id", ""))
       end
 

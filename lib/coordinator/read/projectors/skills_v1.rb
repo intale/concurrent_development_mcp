@@ -28,7 +28,7 @@ module Coordinator::Read
           next unless @processed_events.claim(
             definition: PROJECTION,
             identity:,
-            processed_at: Time.now.utc
+            processed_at: event.created_at
           )
 
           @skills.store_revision(event:, publication:)
@@ -60,9 +60,9 @@ module Coordinator::Read
                         raise InvalidProjectionSource, "granular Skill projection builder is unavailable" unless @projection_builder
 
                         @projection_builder.call(event)
-                      else
+        else
                         @publication_loader.call(event)
-                      end
+        end
         raise InvalidProjectionSource, publication.failure.to_h.inspect if publication.failure?
 
         publication.value!

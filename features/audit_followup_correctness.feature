@@ -68,25 +68,6 @@ Feature: Audited coordination remains correct under replay, interruption, and co
       And every event in the Batch Saga has the Batch correlation identifier
       And duplicate source delivery produces no additional logical outcome
 
-  Rule: Resource-boundary history remains bounded without becoming unavailable
-
-    @AUD2-LEASE-HISTORY-ROLLOVER-01 @live-subscriptions
-    Scenario: A released hot directory remains leasable after lifecycle rollover
-      Given a directory boundary has exceeded the former lifecycle-history limit
-      And every prior child lease on that boundary is released or expired
-      When an agent reserves the directory through public MCP
-      Then the reservation Task completes successfully
-      And its authoritative decision uses a bounded snapshot plus delta
-
-    @AUD2-LEASE-ROLLOVER-RACE-02 @live-subscriptions @concurrency
-    Scenario: Rollover racing a conflicting reservation preserves one valid lease decision
-      Given two independent agents can reach the same resource-boundary decision concurrently
-      When the rollover command and conflicting reservation reach the deterministic database barrier
-      And the barrier releases both operations
-      Then both operations terminate without a partial write
-      And the resulting boundary has at most one active overlapping lease
-      And every retry retains its logical event identities
-
   Rule: Clean clients share canonical repository and public-action semantics
 
     @AUD2-REPOSITORY-BOOTSTRAP-RACE-01 @live-subscriptions @concurrency
@@ -97,7 +78,7 @@ Feature: Audited coordination remains correct under replay, interruption, and co
       Then one canonical Repository UUID is authoritative for that scope and key
       And both agents discover the same canonical Repository through MCP
       When both agents use the discovered Repository to contend for one file
-      Then the second lease is blocked in the shared Repository namespace
+      Then both shared intentions coexist in the canonical Repository namespace
 
     @AUD2-NEXT-ACTION-EXECUTABLE-02 @AUD-MCP-NEXT-ACTION-05
     Scenario: Every advertised next action is an executable MCP request

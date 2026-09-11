@@ -6,6 +6,7 @@ module Coordinator
 
         def initialize: (
           ?contract: Contracts::DecisionInterpretationSourceEvent,
+          source_loader: Interpretations::ProjectionSourceLoader,
           ?schema_registry: Write::EventSchemaRegistry,
           ?interpretations: Repositories::DecisionInterpretations,
           ?processed_events: Repositories::ProcessedProjectionEvents

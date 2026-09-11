@@ -20,7 +20,9 @@ RSpec.describe Coordinator::Read::Web::Queries::DeliveryBrowser, :read_model do
       candidate_id: "CAN-delivery-newer",
       change_set_id:,
       repository_id: member_repository_id,
-      submitted_global_position: 102
+      submitted_global_position: 102,
+      created_at: Time.utc(2026, 8, 30, 12, 2),
+      updated_at: Time.utc(2026, 8, 30, 12, 2)
     )
     older = create(
       :coordinator_read_candidate,
@@ -28,7 +30,9 @@ RSpec.describe Coordinator::Read::Web::Queries::DeliveryBrowser, :read_model do
       change_set_id:,
       repository_id:,
       head_commit_oid: "c" * 40,
-      submitted_global_position: 101
+      submitted_global_position: 101,
+      created_at: Time.utc(2026, 8, 30, 12, 1),
+      updated_at: Time.utc(2026, 8, 30, 12, 1)
     )
     create(
       :coordinator_read_candidate,
@@ -66,7 +70,7 @@ RSpec.describe Coordinator::Read::Web::Queries::DeliveryBrowser, :read_model do
       first: 1,
       sort: "newest_first",
       change_set_id:,
-      after_position: first.next_cursor.position,
+      after_updated_at: first.next_cursor.updated_at,
       after_id: first.next_cursor.id
     )
     obligations = query.obligations(project_ref:, status: "open")

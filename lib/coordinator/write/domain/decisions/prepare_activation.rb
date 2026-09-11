@@ -26,7 +26,7 @@ module Coordinator::Write
 
           definition = @definition_builder.call(
             proposal: proposal.proposal,
-            valid_from_default: activated_at
+            valid_from_default: nil
           )
           partitions = @partition_builder.call(definition)
           return partition_limit(command, partitions.length) if partitions.length > 32

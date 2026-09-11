@@ -18,18 +18,18 @@ module Coordinator::Read
       end
 
       def call(event)
-        utterance = load_utterance(event)
-        verify_stream_identity!(event, utterance)
+        fact = load_fact(event)
+        verify_stream_identity!(event, fact)
         identity = ProjectionEventIdentity.from_event(event)
 
         ApplicationRecord.transaction do
           next unless @processed_events.claim(
             definition: PROJECTION,
             identity:,
-            processed_at: Time.now.utc
+            processed_at: event.created_at
           )
 
-          @utterances.store(event:, utterance:)
+          project(event, fact)
         end
 
         nil
@@ -37,7 +37,7 @@ module Coordinator::Read
 
       private
 
-      def load_utterance(event)
+      def load_fact(event)
         result = @contract.call(
           event_type: event.type,
           schema_version: event.metadata["schema_version"],
@@ -57,10 +57,22 @@ module Coordinator::Read
         )
       end
 
-      def verify_stream_identity!(event, utterance)
-        return if event.stream.stream_id == utterance.conversation_id
+      def verify_stream_identity!(event, fact)
+        return if event.stream.stream_id == fact.conversation_id
 
         raise InvalidProjectionSource, "utterance conversation does not match its source stream"
+      end
+
+      def project(event, fact)
+        case fact
+        when Coordinator::Write::Events::UserUtteranceRecordedV1,
+             Coordinator::Write::Events::UserUtteranceForwardedByAgentV1,
+             Coordinator::Write::Events::UserUtteranceRecordedV2,
+             Coordinator::Write::Events::UserUtteranceForwardedByAgentV2
+          @utterances.store(event:, utterance: fact)
+        when Coordinator::Write::Events::GuidanceMessageAnchoredV1
+          @utterances.add_anchor(event:, anchor: fact)
+        end
       end
     end
   end

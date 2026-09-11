@@ -8,6 +8,7 @@ module Coordinator
           def kind: () -> String
           def first: () -> Integer
           def after_id: () -> String?
+          def after_updated_at: () -> String?
           def as_of: () -> String
           def path: () -> String?
           def resource_kind: () -> String?

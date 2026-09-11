@@ -8,6 +8,7 @@ module Coordinator::Read::Web
       attribute :kind, Coordinator::Shared::Types::String.enum("resources", "active_leases")
       attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 100)
       attribute :after_id, Coordinator::Shared::Types::UuidV7.optional
+      attribute :after_updated_at, Coordinator::Shared::Types::Timestamp.optional
       attribute :as_of, Coordinator::Shared::Types::Timestamp
       attribute :path, Coordinator::Shared::Types::String.optional
       attribute :resource_kind,

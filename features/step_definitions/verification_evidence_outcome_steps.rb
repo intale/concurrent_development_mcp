@@ -56,8 +56,12 @@ Then("one attributed evidence fact and no terminal fact are durable") do
 end
 
 Then("two attributed evidence facts and one satisfied fact are durable") do
+  start_process_subscriptions
   evidence = compatibility_evidence_events
-  terminal = verification_terminal_events.sole
+  terminal = eventually("Verification evidence satisfaction Saga to complete") do
+    events = verification_terminal_events
+    [ events.one?, events ]
+  end.sole
   assert_acceptance_equal(2, evidence.length, "Satisfied evidence facts")
   assert_acceptance_equal(
     %w[combined_tests contract_compatibility_review],
@@ -70,9 +74,9 @@ Then("two attributed evidence facts and one satisfied fact are durable") do
     "Satisfied terminal fact"
   )
   assert_acceptance_equal(
-    task_command_id(@current_evidence_attempt.fetch(:task_id)),
-    terminal.metadata.fetch("command_id"),
-    "Satisfied command"
+    evidence.map { _1.data.fetch("evidence_id") },
+    verification_selection_events.map { _1.data.fetch("evidence_id") },
+    "Satisfied evidence selection"
   )
 end
 
@@ -81,11 +85,20 @@ Then("the final evidence, outcome, command terminal, and Task carry exact tracin
 end
 
 Then("one attributed evidence fact and one failed fact are durable") do
+  start_process_subscriptions
   evidence = compatibility_evidence_events.sole
-  terminal = verification_terminal_events.sole
+  terminal = eventually("Verification evidence failure Saga to complete") do
+    events = verification_terminal_events
+    [ events.one?, events ]
+  end.sole
   assert_acceptance_equal("failed", evidence.data.dig("assessment", "conclusion"), "Failed conclusion")
   assert_acceptance_equal("VerificationObligationFailed", terminal.type, "Failed terminal fact")
-  assert_acceptance_equal(evidence.id, terminal.data.dig("triggering_evidence", "event", "event_id"), "Failure evidence")
+  assert_acceptance_equal(
+    evidence.data.fetch("evidence_id"),
+    verification_selection_events.sole.data.fetch("evidence_id"),
+    "Failure evidence selection"
+  )
+  assert_acceptance_equal("submitted_evidence_failed", terminal.data.fetch("reason"), "Failure reason")
 end
 
 Then("the evidence result remains an attributed report rather than an execution claim") do
@@ -246,13 +259,13 @@ When("the claimant executes both required evidence Tasks concurrently") do
   @concurrent_evidence_attempts.each { capture_evidence_attempt(_1) }
 end
 
-Then("both evidence Tasks succeed with one open and one satisfied result") do
+Then("both evidence Tasks succeed with open submission results") do
   @concurrent_evidence_attempts.each do |attempt|
     assert_acceptance_equal("completed", attempt.dig(:state, "result", "status"), "Race Task status")
     assert_acceptance_equal(false, attempt.dig(:result, "isError"), "Race Task error")
   end
   assert_acceptance_equal(
-    %w[open satisfied],
+    %w[open open],
     @concurrent_evidence_attempts.map { _1.dig(:content, "data", "status") }.sort,
     "Race results"
   )
@@ -260,7 +273,11 @@ end
 
 Then("exactly two evidence facts and one satisfied fact are durable") do
   assert_acceptance_equal(2, compatibility_evidence_events.length, "Concurrent evidence facts")
-  terminal = verification_terminal_events.sole
+  start_process_subscriptions
+  terminal = eventually("Concurrent verification satisfaction Saga to complete") do
+    events = verification_terminal_events
+    [ events.one?, events ]
+  end.sole
   assert_acceptance_equal("VerificationObligationSatisfied", terminal.type, "Concurrent outcome")
   lifecycle_facts = @concurrent_evidence_attempts.sum do |attempt|
     command_events(attempt.fetch(:command_id)).length
@@ -283,7 +300,11 @@ When("both passed assessments commit without projecting their evidence") do
   ]
   @lag_evidence_attempts.each { execute_evidence_attempt(_1) }
   assert_acceptance_equal(2, compatibility_evidence_events.length, "Lag source evidence")
-  assert_acceptance_equal(1, verification_terminal_events.length, "Lag source outcome")
+  start_process_subscriptions
+  eventually("Lagging-view verification outcome to become durable") do
+    events = verification_terminal_events
+    [ events.one?, events.map(&:type) ]
+  end
 end
 
 Then("the available view still reports open with no observed evidence") do

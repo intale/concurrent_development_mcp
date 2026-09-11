@@ -75,15 +75,16 @@ RSpec.describe Coordinator::Read::Web::Queries::KnowledgeBrowser, :read_model do
 
     expect(skills.items.map(&:skill_id)).to eq([ skill_id ])
     expect(skills.items.first).to have_attributes(revision: 2, asset_count: 2)
-    expect(artifacts.items.map(&:artifact_id)).to eq([ parent_id ])
-    expect(artifacts).to have_attributes(has_more: true, next_global_position: 801)
+    expect(artifacts.items.map(&:artifact_id)).to eq([ child_id ])
+    expect(artifacts).to have_attributes(has_more: true)
 
     second = query.artifacts(
       project_ref:,
       first: 1,
-      after_global_position: artifacts.next_global_position
+      after_updated_at: artifacts.next_cursor.updated_at,
+      after_observation_id: artifacts.next_cursor.observation_id
     )
-    expect(second.items.map(&:artifact_id)).to eq([ child_id ])
+    expect(second.items.map(&:artifact_id)).to eq([ parent_id ])
   end
 
   it "returns only the latest Skill revision and its current text or binary assets" do
@@ -103,6 +104,16 @@ RSpec.describe Coordinator::Read::Web::Queries::KnowledgeBrowser, :read_model do
       name: "event-modeling",
       path: "references/obsolete.md"
     )).to be_nil
+  end
+
+  it "lists global Skills with exact Project and name filters and resolves details by Skill identity" do
+    page = query.skills(scope:, name: "event-modeling", first: 20)
+    detail = query.skill_by_id(skill_id:)
+    asset = query.skill_asset_by_id(skill_id:, path: "references/current.md")
+
+    expect(page.items.map(&:skill_id)).to eq([ skill_id ])
+    expect(detail.skill).to have_attributes(skill_id:, scope:, name: "event-modeling")
+    expect(asset.asset).to have_attributes(path: "references/current.md", text: "current reference")
   end
 
   it "separates Artifact content from active relationship traversal" do
@@ -179,7 +190,9 @@ RSpec.describe Coordinator::Read::Web::Queries::KnowledgeBrowser, :read_model do
       source_locator: locator,
       observed_global_position: position,
       classified_global_position: position,
-      current_global_position: position
+      current_global_position: position,
+      created_at: Time.utc(2026, 8, 30, 12) + position.seconds,
+      updated_at: Time.utc(2026, 8, 30, 12) + position.seconds
     )
     artifact
   end

@@ -2,7 +2,7 @@
 
 module Coordinator::Web::Graphql
   class KnowledgeBrowserCursor
-    SCHEMA = "project-knowledge-cursor/v2"
+    SCHEMA = "project-knowledge-cursor/v3"
     KINDS = %w[skills artifacts relationships].freeze
 
     def self.encode(kind, filters:, cursor:)
@@ -35,11 +35,13 @@ module Coordinator::Web::Graphql
     def self.valid_cursor?(cursor, kind)
       case kind
       when "skills"
-        cursor.keys.sort == [ "after_id" ] &&
+        cursor.keys.sort == %w[after_id after_updated_at] &&
+          Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(cursor.fetch("after_updated_at", "")) &&
           Coordinator::Shared::Types::SKILL_ID_PATTERN.match?(cursor.fetch("after_id", ""))
       when "artifacts"
-        cursor.keys.sort == [ "after_position" ] &&
-          cursor.fetch("after_position", nil).is_a?(Integer) && cursor.fetch("after_position") >= 0
+        cursor.keys.sort == %w[after_id after_updated_at] &&
+          Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(cursor.fetch("after_updated_at", "")) &&
+          Coordinator::Shared::Types::UUID_V7_PATTERN.match?(cursor.fetch("after_id", ""))
       when "relationships"
         valid_relationship_cursor?(cursor)
       else

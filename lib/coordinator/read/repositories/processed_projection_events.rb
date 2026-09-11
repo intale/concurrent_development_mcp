@@ -11,7 +11,8 @@ module Coordinator::Read
             identity.to_h.merge(
               projection_name: definition.name,
               projection_version: definition.version,
-              processed_at:
+              processed_at:,
+              updated_at: processed_at
             )
           ],
           unique_by: IDENTITY_INDEX,

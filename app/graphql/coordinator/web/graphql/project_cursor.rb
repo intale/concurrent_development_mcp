@@ -2,7 +2,7 @@
 
 module Coordinator::Web::Graphql
   class ProjectCursor
-    PREFIX = "project-catalog:v2"
+    PREFIX = "project-catalog:v3"
 
     class ProjectsPayloadContract < Dry::Validation::Contract
       config.validate_keys = true
@@ -11,8 +11,9 @@ module Coordinator::Web::Graphql
         required(:prefix).filled(:string, eql?: PREFIX)
         required(:kind).filled(:string, eql?: "projects")
         required(:after_scope).filled(:string)
+        required(:after_updated_at).filled(:string)
         required(:search).maybe(:string)
-        required(:sort).filled(:string, included_in?: %w[scope_asc scope_desc])
+        required(:sort).filled(:string, included_in?: %w[oldest_first newest_first])
       end
     end
 
@@ -24,14 +25,16 @@ module Coordinator::Web::Graphql
         required(:kind).filled(:string, eql?: "repositories")
         required(:project_ref).filled(:string)
         required(:after_repository_id).filled(:string)
+        required(:after_updated_at).filled(:string)
       end
     end
 
-    def self.encode_projects(after_scope:, search:, sort:)
+    def self.encode_projects(after_scope:, after_updated_at:, search:, sort:)
       encode(
         "prefix" => PREFIX,
         "kind" => "projects",
         "after_scope" => after_scope,
+        "after_updated_at" => after_updated_at,
         "search" => search,
         "sort" => sort
       )
@@ -43,26 +46,29 @@ module Coordinator::Web::Graphql
       payload = decode(cursor, ProjectsPayloadContract.new, "project")
       canonical = encode_projects(
         after_scope: payload.fetch(:after_scope),
+        after_updated_at: payload.fetch(:after_updated_at),
         search: payload[:search],
         sort: payload.fetch(:sort)
       )
       valid_scope = Coordinator::Read::Contracts::RepositoryList.new.call(
         scope: payload.fetch(:after_scope)
       ).success?
-      raise InvalidCursor, "project cursor is invalid" unless canonical == cursor && valid_scope
+      valid_timestamp = Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(payload.fetch(:after_updated_at))
+      raise InvalidCursor, "project cursor is invalid" unless canonical == cursor && valid_scope && valid_timestamp
       unless payload.values_at(:search, :sort) == [ search, sort ]
         raise InvalidCursor, "project cursor does not match this query"
       end
 
-      payload.fetch(:after_scope)
+      payload.slice(:after_scope, :after_updated_at)
     end
 
-    def self.encode_repositories(project_ref:, after_repository_id:)
+    def self.encode_repositories(project_ref:, after_repository_id:, after_updated_at:)
       encode(
         "prefix" => PREFIX,
         "kind" => "repositories",
         "project_ref" => project_ref,
-        "after_repository_id" => after_repository_id
+        "after_repository_id" => after_repository_id,
+        "after_updated_at" => after_updated_at
       )
     end
 
@@ -72,10 +78,12 @@ module Coordinator::Web::Graphql
       payload = decode(cursor, RepositoriesPayloadContract.new, "project repository")
       canonical = encode_repositories(
         project_ref: payload.fetch(:project_ref),
-        after_repository_id: payload.fetch(:after_repository_id)
+        after_repository_id: payload.fetch(:after_repository_id),
+        after_updated_at: payload.fetch(:after_updated_at)
       )
       valid = canonical == cursor &&
-        Coordinator::Shared::Types::UUID_V7_PATTERN.match?(payload.fetch(:after_repository_id))
+        Coordinator::Shared::Types::UUID_V7_PATTERN.match?(payload.fetch(:after_repository_id)) &&
+        Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(payload.fetch(:after_updated_at))
       begin
         Coordinator::Read::Web::ProjectReference.new.decode(payload.fetch(:project_ref))
       rescue Coordinator::Read::Web::ProjectReference::InvalidReference
@@ -86,7 +94,7 @@ module Coordinator::Web::Graphql
         raise InvalidCursor, "project repository cursor does not match this project"
       end
 
-      payload.fetch(:after_repository_id)
+      payload.slice(:after_repository_id, :after_updated_at)
     end
 
     def self.encode(payload)

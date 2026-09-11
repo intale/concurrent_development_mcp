@@ -83,15 +83,16 @@ module Coordinator::Write
 
         def exact_coverage?(release_state, work_items)
           expected = work_items.map { completion_key(_1) }.sort_by { |entry| entry.take(4) }
-          observed = release_state.preparation.payload.ordered_members.map do |member|
-            candidate = member.candidate
-            [
-              member.repository_id,
-              candidate.work_item_id,
-              candidate.attempt_id,
-              candidate.candidate_id,
-              candidate.submission_event.to_h
-            ]
+          observed = release_state.preparation.payload.ordered_members.flat_map do |member|
+            member.ordered_candidates.map do |candidate|
+              [
+                member.repository_id,
+                candidate.work_item_id,
+                candidate.attempt_id,
+                candidate.candidate_id,
+                candidate.submission_event.to_h
+              ]
+            end
           end.sort_by { |entry| entry.take(4) }
           expected == observed
         end

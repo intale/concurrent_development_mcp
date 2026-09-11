@@ -37,7 +37,7 @@ module Coordinator::Write
         level = definition.document.enforcement.level
         return PolicyObservationV1.non_gating unless GATE_LEVELS.include?(level)
 
-        valid_from = definition.document.validity.valid_from
+        valid_from = definition.document.validity.valid_from || policy_head_created_at(policy_head)
         return PolicyObservationV1.inactive if valid_from > observed_at
 
         PolicyObservationV1.gating(
@@ -55,6 +55,10 @@ module Coordinator::Write
       end
 
       private
+
+      def policy_head_created_at(policy_head)
+        @exact_loader.call(policy_head.event).event.created_at.utc.iso8601(6)
+      end
 
       def expected_partition(change_set_id)
         Decisions::DecisionPartitionV1.new(

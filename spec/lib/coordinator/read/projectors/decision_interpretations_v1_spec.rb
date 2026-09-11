@@ -1,7 +1,13 @@
 # frozen_string_literal: true
 
 RSpec.describe Coordinator::Read::Projectors::DecisionInterpretationsV1, :read_model do
-  subject(:projector) { described_class.new }
+  subject(:projector) do
+    described_class.new(
+      source_loader: Coordinator::Read::Interpretations::ProjectionSourceLoader.new(
+        event_store: Coordinator::Container["event_store"]
+      )
+    )
+  end
 
   let(:message_id) { "M-project-interpretation" }
   let(:interpretation_id) { "I-project" }

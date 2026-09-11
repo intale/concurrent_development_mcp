@@ -16,7 +16,8 @@ export const PRESENTATION_STATUSES: readonly CoordinationPresentationStatus[] = 
 ];
 
 export const WORK_ITEM_SORTS: ReadonlyArray<{ readonly label: string; readonly value: WorkItemSort }> = [
-  { label: "Work item ID", value: "WORK_ITEM_ID_ASC" },
+  { label: "Recently updated", value: "UPDATED_AT_DESC" },
+  { label: "Least recently updated", value: "UPDATED_AT_ASC" },
   { label: "Status", value: "STATUS_ASC" },
   { label: "Latest activity", value: "LATEST_ACTIVITY_DESC" }
 ];

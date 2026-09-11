@@ -309,7 +309,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::BuildProgress, :event_st
 
   def work_item_sources(prepared)
     loader = Coordinator::Write::Candidates::StateLoader.new(event_store:)
-    prepared.fetch(:payload).ordered_members.map(&:candidate_id).map do |candidate_id|
+    prepared.fetch(:payload).ordered_members.flat_map(&:ordered_candidate_ids).map do |candidate_id|
       candidate = loader.call(candidate_id)
       event_store.read(
         streams.work_item(candidate.work_item_id),

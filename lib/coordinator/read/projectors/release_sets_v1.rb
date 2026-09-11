@@ -29,7 +29,7 @@ module Coordinator::Read
           next unless @processed_events.claim(
             definition: PROJECTION,
             identity: ProjectionEventIdentity.from_event(event),
-            processed_at: Time.now.utc
+            processed_at: event.created_at
           )
 
           project(event:, payload:)
@@ -60,6 +60,8 @@ module Coordinator::Read
           @release_sets.record_compensation_request(event:, request: payload)
         when Coordinator::Write::Events::ReleaseSetSuccessfulIntegrationLinkedV1
           @release_sets.link_compensation_integration(event:, link: payload)
+        when Coordinator::Write::Events::RepositoryCompensationRecordedV1
+          @release_sets.record_repository_compensation(event:, compensation: payload)
         when Coordinator::Write::Events::ReleaseSetOutcomeRecordedV1
           @release_sets.record_outcome(event:, outcome: payload)
         when Coordinator::Write::Events::ReleaseSetCompletedV2

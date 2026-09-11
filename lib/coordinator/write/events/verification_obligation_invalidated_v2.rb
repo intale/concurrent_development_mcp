@@ -6,6 +6,7 @@ module Coordinator::Write
       contract type: "VerificationObligationInvalidated", version: 2
 
       attribute :obligation_id, Types::Identifier
+      attribute :superseding_partition_event, EventReference
       attribute :reason, Types::String.constrained(min_size: 1, max_size: 2_000)
     end
   end

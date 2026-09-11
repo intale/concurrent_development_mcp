@@ -13,6 +13,7 @@ module Coordinator
         class RepositoryPage < Shared::Value
           def items: () -> Array[RepositoryMember]
           def next_repository_id: () -> String?
+          def next_updated_at: () -> String?
           def has_more: () -> bool
           def total_count: () -> Integer
         end
@@ -28,6 +29,7 @@ module Coordinator
         class ProjectPage < Shared::Value
           def items: () -> Array[ProjectSummary]
           def next_scope: () -> String?
+          def next_updated_at: () -> String?
           def has_more: () -> bool
         end
 

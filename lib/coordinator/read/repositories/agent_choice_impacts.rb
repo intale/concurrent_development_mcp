@@ -3,6 +3,8 @@
 module Coordinator::Read
   module Repositories
     class AgentChoiceImpacts
+      include EventTimestamped
+
       def fetch(assessment_id)
         record = Coordinator::Read::AgentChoiceImpact.find_by(assessment_id:)
         record && build(record)
@@ -16,9 +18,9 @@ module Coordinator::Read
         end
       end
 
-      def store_assessment(event:, impact:)
+      def store_assessment(event:, projection_event: event, impact:)
         assessment = impact.assessment
-        Coordinator::Read::AgentChoiceImpact.create!(
+        create_from_event(Coordinator::Read::AgentChoiceImpact, event: projection_event, attributes: {
           assessment_id: impact.assessment_id,
           choice_id: impact.choice_id,
           attempt_id: impact.attempt_id,
@@ -40,7 +42,7 @@ module Coordinator::Read
           event_global_position: event.global_position,
           assessed_at_domain: event.created_at,
           assessed_at_store: event.created_at
-        )
+        })
       end
 
       def page(query)

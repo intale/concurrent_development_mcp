@@ -6,6 +6,7 @@ module Coordinator
           def search: () -> String?
           def sort: () -> String
           def after_scope: () -> String?
+          def after_updated_at: () -> String?
           def first: () -> Integer
           def repositories_first: () -> Integer
         end
@@ -14,6 +15,7 @@ module Coordinator
           def project_ref: () -> String
           def scope: () -> String
           def after_repository_id: () -> String?
+          def after_updated_at: () -> String?
           def repositories_first: () -> Integer
         end
       end

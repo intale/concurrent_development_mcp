@@ -35,6 +35,56 @@ fragment ArtifactSummaryFields on DevelopmentArtifactSummary {
   }
 }
 
+query Skills($first: Int, $name: String, $projectScope: String, $after: String) {
+  skills(first: $first, name: $name, projectScope: $projectScope, after: $after) {
+    nodes {
+      ...SkillSummaryFields
+    }
+    pageInfo {
+      endCursor
+      hasNextPage
+    }
+  }
+}
+
+query Skill($skillId: ID!) {
+  skill(skillId: $skillId) {
+    skill {
+      id
+      name
+      scope
+      revision
+      description
+      instructions
+      contentDigest
+      publishedAt
+      assets {
+        path
+        mediaType
+        executable
+        contentDigest
+        byteSize
+      }
+    }
+  }
+}
+
+query SkillAsset($skillId: ID!, $path: String!) {
+  skillAsset(skillId: $skillId, path: $path) {
+    asset {
+      path
+      revision
+      encoding
+      mediaType
+      executable
+      text
+      base64
+      contentDigest
+      byteSize
+    }
+  }
+}
+
 query ProjectSkills($projectRef: ID!, $first: Int, $name: String, $after: String) {
   projectSkills(projectRef: $projectRef, first: $first, name: $name, after: $after) {
     nodes { ...SkillSummaryFields }

@@ -12,18 +12,30 @@ module Coordinator::Read
       ]
 
       case event
-      when Coordinator::Write::Events::WorkItemCreatedV1,
+      when Coordinator::Read::WorkItemDefinitionViewV1,
+           Coordinator::Read::WorkItemCompletionViewV1,
+           Coordinator::Read::AttemptDefinitionViewV1,
+           Coordinator::Read::AttemptAbandonmentViewV1,
+           Coordinator::Read::AttemptCompletionViewV1,
+           Coordinator::Write::Events::WorkItemCreatedV1,
            Coordinator::Write::Events::WorkItemAddedToChangeSetV1,
            Coordinator::Write::Events::WorkItemMadeReadyV1,
+           Coordinator::Write::Events::WorkItemMadeReadyV2,
            Coordinator::Write::Events::WorkItemAcquiredV1,
+           Coordinator::Write::Events::WorkItemAcquiredV2,
+           Coordinator::Write::Events::WorkItemRequeuedV1,
+           Coordinator::Write::Events::WorkItemRequeuedV2,
            Coordinator::Write::Events::AttemptAuthorizedV1,
            Coordinator::Write::Events::AttemptStartedV1,
+           Coordinator::Write::Events::AttemptAbandonedV2,
            Coordinator::Write::Events::WriteSetReservedV2,
            Coordinator::Write::Events::WriteSetExpandedV2,
            Coordinator::Write::Events::WriteSetRenewedV2,
            Coordinator::Write::Events::WriteSetReleasedV2,
+           Coordinator::Read::WorkIntentionSetViewV1,
            Coordinator::Read::CandidateSubmissionViewV2,
            Coordinator::Write::Events::WorkItemCandidateSelectedV1,
+           Coordinator::Write::Events::WorkItemCandidateSelectedV2,
            Coordinator::Write::Events::WorkItemCompletedV1,
            Coordinator::Write::Events::AttemptCompletedV1
         roots << ProjectionScopeRoot.new(
@@ -34,12 +46,17 @@ module Coordinator::Read
       end
 
       case event
-      when Coordinator::Write::Events::AttemptAuthorizedV1,
+      when Coordinator::Read::AttemptDefinitionViewV1,
+           Coordinator::Read::AttemptAbandonmentViewV1,
+           Coordinator::Read::AttemptCompletionViewV1,
+           Coordinator::Write::Events::AttemptAuthorizedV1,
            Coordinator::Write::Events::AttemptStartedV1,
+           Coordinator::Write::Events::AttemptAbandonedV2,
            Coordinator::Write::Events::WriteSetReservedV2,
            Coordinator::Write::Events::WriteSetExpandedV2,
            Coordinator::Write::Events::WriteSetRenewedV2,
            Coordinator::Write::Events::WriteSetReleasedV2,
+           Coordinator::Read::WorkIntentionSetViewV1,
            Coordinator::Read::CandidateSubmissionViewV2,
            Coordinator::Write::Events::AttemptCompletedV1
         roots << ProjectionScopeRoot.new(

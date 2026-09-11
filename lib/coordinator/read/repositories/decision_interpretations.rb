@@ -3,13 +3,15 @@
 module Coordinator::Read
   module Repositories
     class DecisionInterpretations
+      include EventTimestamped
+
       Page = Data.define(:records, :next_after_revision)
 
       def page(query)
         rows = Coordinator::Read::DecisionInterpretation
           .where(message_id: query.message_id)
           .where("stream_revision > ?", query.after_revision)
-          .order(:stream_revision)
+          .order(stream_revision: :asc)
           .limit(query.limit + 1)
           .to_a
         has_more = rows.length > query.limit
@@ -22,7 +24,7 @@ module Coordinator::Read
       end
 
       def store_proposal(event:, proposal:)
-        Coordinator::Read::DecisionInterpretation.create!(
+        create_from_event(Coordinator::Read::DecisionInterpretation, event:, attributes: {
           interpretation_id: proposal.interpretation_id,
           message_id: proposal.source_message_id,
           source_event: proposal.source_event.to_h,
@@ -48,7 +50,38 @@ module Coordinator::Read
           causation_id: event.causation_id,
           correlation_id: event.correlation_id,
           proposed_at_domain: proposal.proposed_at
-        )
+        })
+      end
+
+      def store_proposal_v2(event:, source:)
+        proposal = source.proposal
+        create_from_event(Coordinator::Read::DecisionInterpretation, event:, attributes: {
+          interpretation_id: proposal.interpretation_id,
+          message_id: proposal.source_message_id,
+          source_event: source.source_event.to_h,
+          source_span: source.source_span.to_h,
+          classifier: source.classifier.to_h,
+          proposed_decision: proposal.proposed_decision.to_h,
+          scope_provenance: source.scope_provenance.to_h,
+          ambiguities: source.ambiguities.map(&:to_h),
+          assessment: source.assessment.to_h,
+          proposal_status: proposal.assessment,
+          lifecycle_status: "proposed",
+          policy_status: "proposal_only",
+          adjudication: nil,
+          clarification_required: false,
+          actor_kind: event.metadata.fetch("actor_kind"),
+          actor_id: event.metadata.fetch("actor_id"),
+          event_id: event.id,
+          event_type: event.type,
+          stream_context: event.stream.context,
+          stream_name: event.stream.stream_name,
+          stream_id: event.stream.stream_id,
+          stream_revision: event.stream_revision,
+          causation_id: event.causation_id,
+          correlation_id: event.correlation_id,
+          proposed_at_domain: event.created_at
+        })
       end
 
       def require_clarification(event:, clarification:)
@@ -56,71 +89,102 @@ module Coordinator::Read
           interpretation_id: clarification.interpretation_id,
           message_id: clarification.source_message_id
         )
+        questions = clarification_questions(clarification)
+        status = if clarification.respond_to?(:status)
+                   clarification.status
+        elsif clarification.origin == "adjudication"
+                   "needs_classification"
+        else
+                   record.proposal_status
+        end
+        occurred_at = clarification.respond_to?(:required_at) ? clarification.required_at : event.created_at
         attributes = {
           assessment: {
-            status: clarification.status,
+            status:,
             reasons: clarification.reasons,
-            questions: clarification.questions.map(&:to_h)
+            questions: questions.map(&:to_h)
           },
-          proposal_status: clarification.status,
+          proposal_status: status,
           lifecycle_status: "clarification_required",
           clarification_required: true,
           clarification_event_id: event.id,
           clarification_stream_revision: event.stream_revision,
-          clarification_required_at_domain: clarification.required_at
+          clarification_required_at_domain: occurred_at
         }
         if clarification.origin == "adjudication"
           attributes[:adjudication] = build_adjudication(
             event:,
             action: "request_clarification",
             outcome: "clarification_required",
-            rationale: clarification.rationale,
+            rationale: normalize_adjudication_rationale("clarification_required", clarification.rationale),
             clarification: Coordinator::Write::Interpretations::AdjudicationClarificationV1.new(
-              status: clarification.status,
-              questions: clarification.questions
+              status:,
+              questions:
             ),
             slot: nil,
-            adjudicated_at: clarification.required_at
+            adjudicated_at: timestamp(occurred_at)
           ).to_h
         end
-        record.update!(attributes)
+        save_from_event(record, event:, attributes:)
       end
 
       def accept(event:, acceptance:)
         record = find_interpretation(acceptance)
-        record.update!(
+        save_from_event(record, event:, attributes: {
           lifecycle_status: "accepted",
           clarification_required: false,
           adjudication: build_adjudication(
             event:,
             action: "accept",
             outcome: "accepted_for_activation",
-            rationale: acceptance.rationale,
+            rationale: normalize_adjudication_rationale("accepted", acceptance.rationale),
             clarification: nil,
             slot: acceptance.slot,
-            adjudicated_at: acceptance.accepted_at
+            adjudicated_at: timestamp(acceptance.respond_to?(:accepted_at) ? acceptance.accepted_at : event.created_at)
           ).to_h
-        )
+        })
       end
 
       def reject(event:, rejection:)
         record = find_interpretation(rejection)
-        record.update!(
+        save_from_event(record, event:, attributes: {
           lifecycle_status: "rejected",
           clarification_required: false,
           adjudication: build_adjudication(
             event:,
             action: "reject",
             outcome: "rejected",
-            rationale: rejection.rationale,
+            rationale: normalize_adjudication_rationale("rejected", rejection.rationale),
             clarification: nil,
             slot: nil,
-            adjudicated_at: rejection.rejected_at
+            adjudicated_at: timestamp(rejection.respond_to?(:rejected_at) ? rejection.rejected_at : event.created_at)
           ).to_h
-        )
+        })
       end
 
       private
+
+      def clarification_questions(clarification)
+        clarification.questions.map.with_index do |question, index|
+          next question unless question.is_a?(String)
+
+          Coordinator::Write::Interpretations::ClarificationQuestionV1.new(
+            field: "clarification_#{index + 1}",
+            prompt: question,
+            options: []
+          )
+        end
+      end
+
+      def normalize_adjudication_rationale(code, rationale)
+        return rationale unless rationale.is_a?(String)
+
+        Coordinator::Write::Interpretations::AdjudicationRationaleV1.new(code:, summary: rationale)
+      end
+
+      def timestamp(value)
+        value.respond_to?(:utc) ? value.utc.iso8601(6) : value
+      end
 
       def build(record)
         InterpretationProposalV1.new(

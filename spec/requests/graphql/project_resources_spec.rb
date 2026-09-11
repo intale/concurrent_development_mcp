@@ -224,7 +224,16 @@ RSpec.describe "Project resource GraphQL", :read_model do
   end
 
   def create_resource(resource_id, repository_id, path)
-    create(:coordinator_read_resource, resource_id:, repository_id:, normalized_path: path)
+    index = resource_ids.index(resource_id) || resource_ids.length
+    projected_at = Time.utc(2026, 8, 30, 12, 2) - index.seconds
+    create(
+      :coordinator_read_resource,
+      resource_id:,
+      repository_id:,
+      normalized_path: path,
+      created_at: projected_at,
+      updated_at: projected_at
+    )
   end
 
   def create_lease(attempt_id, resource_id, lease_id, agent_id, expires_at)

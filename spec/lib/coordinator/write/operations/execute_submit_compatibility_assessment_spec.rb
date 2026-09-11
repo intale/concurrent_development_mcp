@@ -147,16 +147,14 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCompatibilityAssessm
   end
 
   it "treats exact claim expiry as expired" do
-    Timecop.freeze(Time.utc(2026, 8, 24, 8, 30, 0)) do
-      created, claim = claimed_obligation("evidence-expired", duration: 30)
-      input = assessment_input(created:, claim:, command_id: "cmd-evidence-expired")
+    created, claim = claimed_obligation("evidence-expired", duration: 30)
+    input = assessment_input(created:, claim:, command_id: "cmd-evidence-expired")
 
-      Timecop.travel(Time.iso8601(claim.expires_at)) do
-        result = execute(input)
+    Timecop.travel(Time.iso8601(claim.expires_at)) do
+      result = execute(input)
 
-        expect(result.failure.code).to eq(:verification_obligation_claim_expired)
-        expect(command_events(input.fetch(:command_id))).to be_empty
-      end
+      expect(result.failure.code).to eq(:verification_obligation_claim_expired)
+      expect(command_events(input.fetch(:command_id))).to be_empty
     end
   end
 

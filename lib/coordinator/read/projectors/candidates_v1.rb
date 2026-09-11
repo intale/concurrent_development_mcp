@@ -32,7 +32,7 @@ module Coordinator::Read
           next unless @processed_events.claim(
             definition: PROJECTION,
             identity:,
-            processed_at: Time.now.utc
+            processed_at: event.created_at
           )
 
           project(event, payload)
@@ -87,12 +87,18 @@ module Coordinator::Read
           true
         when Coordinator::Write::Events::CandidateSubmittedV3
           submission = @submission_loader.call(payload.candidate_id)
-          @candidates.store_submission(candidate: submission)
-          @candidate_impacts.store_manifest(manifest: submission.manifest)
-          @candidate_impacts.store_build_context(build_context: submission.build_context) if submission.build_context
+          @candidates.store_submission(event:, candidate: submission)
+          @candidate_impacts.store_manifest(event:, manifest: submission.manifest)
+          if submission.build_context
+            @candidate_impacts.store_build_context(event:, build_context: submission.build_context)
+          end
         when Coordinator::Write::Events::CandidateImpactSurfaceAssignedV1
           source = @impact_surface_loader.call(payload.surface_id)
-          @candidate_impacts.store_surface(event: source.event, surface: source.surface)
+          @candidate_impacts.store_surface(
+            event: source.event,
+            projection_event: event,
+            surface: source.surface
+          )
         else
           raise UnknownProjectionEvent, payload.class.name
         end

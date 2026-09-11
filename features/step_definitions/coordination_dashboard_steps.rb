@@ -26,6 +26,46 @@ COORDINATION_WORK_ITEM_DETAIL_QUERY = <<~GRAPHQL.freeze
   }
 GRAPHQL
 
+COORDINATION_CHANGE_SETS_QUERY = <<~GRAPHQL.freeze
+  query CoordinationChangeSets($projectRef: ID!, $status: CoordinationChangeSetStatus) {
+    projectChangeSets(projectRef: $projectRef, first: 100, status: $status) {
+      nodes { id domainStatus }
+    }
+  }
+GRAPHQL
+
+Given("projected dashboard rows contain planning, active, and completed ChangeSets") do
+  create_dashboard_project
+  {
+    "planning-filter" => [ "planned", "planning" ],
+    "active-filter" => [ "ready", "active" ],
+    "completed-filter" => [ "completed", "completed" ]
+  }.each do |key, (work_item_status, change_set_status)|
+    create_dashboard_context(
+      key,
+      [ dashboard_work_item_row("W-#{key}", work_item_status, change_set_key: key) ],
+      change_set_status:
+    )
+  end
+end
+
+When("the browser filters projected ChangeSets by status {string}") do |status|
+  @coordination_change_sets_payload = coordination_graphql_query(
+    COORDINATION_CHANGE_SETS_QUERY,
+    projectRef: @coordination_dashboard_project_ref,
+    status: status.upcase
+  )
+end
+
+Then("only the completed ChangeSet is presented") do
+  rows = graphql_data(@coordination_change_sets_payload).fetch("projectChangeSets").fetch("nodes")
+  assert_acceptance_equal(
+    [ [ "CS-completed-filter", "completed" ] ],
+    rows.map { _1.values_at("id", "domainStatus") },
+    "Exactly filtered ChangeSets"
+  )
+end
+
 Given("projected dashboard rows contain pending, ready, and running scheduled work") do
   create_dashboard_project
   create_dashboard_context("planning", [ dashboard_work_item_row("W-pending", "planned") ])
@@ -246,7 +286,7 @@ def create_dashboard_project
   @coordination_dashboard_change_sets = {}
 end
 
-def create_dashboard_context(key, work_items, dependencies: [])
+def create_dashboard_context(key, work_items, dependencies: [], change_set_status: nil)
   change_set_id = "CS-#{key}"
   @coordination_dashboard_change_sets[key] = change_set_id
   template = FactoryBot.build(
@@ -256,7 +296,7 @@ def create_dashboard_context(key, work_items, dependencies: [])
     work_item_id: work_items.first.fetch("work_item_id")
   )
   document = template.document.deep_dup
-  document["change_set"]["status"] = key == "planning" ? "planning" : "active"
+  document["change_set"]["status"] = change_set_status || (key == "planning" ? "planning" : "active")
   document["work_items"] = work_items
   document["work_item_ids"] = work_items.map { _1.fetch("work_item_id") }
   document["dependencies"] = dependencies

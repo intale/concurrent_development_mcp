@@ -3,7 +3,7 @@
 module Coordinator::Read::Web
   class DeliveryBrowserV1
     class TimelineCursor < Coordinator::Shared::Value
-      attribute :position, Coordinator::Shared::Types::GlobalPosition
+      attribute :updated_at, Coordinator::Shared::Types::Timestamp
       attribute :id, Coordinator::Shared::Types::Identifier
     end
 
@@ -126,7 +126,9 @@ module Coordinator::Read::Web
     class ReleaseMember < Coordinator::Shared::Value
       attribute :position, Coordinator::Shared::Types::Integer.constrained(gteq: 1)
       attribute :repository_id, Coordinator::Shared::Types::UuidV7
-      attribute :candidate_id, Coordinator::Shared::Types::Identifier
+      attribute :merge_snapshot_id, Coordinator::Shared::Types::Identifier
+      attribute :ordered_candidate_ids,
+                Coordinator::Shared::Types::Array.of(Coordinator::Shared::Types::Identifier)
     end
 
     class ReleaseIntegration < Coordinator::Shared::Value

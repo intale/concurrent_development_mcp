@@ -2,6 +2,17 @@ module Coordinator
   module Read
     module Web
       class KnowledgeBrowserV1
+        class ArtifactCursor < Shared::Value
+          def updated_at: () -> String
+          def observation_id: () -> String
+        end
+
+        class ArtifactPage < Shared::Value
+          def items: () -> Array[Read::DevelopmentArtifactSummaryV1]
+          def next_cursor: () -> ArtifactCursor?
+          def has_more: () -> bool
+        end
+
         class SkillDetail < Shared::Value
           def skill: () -> Read::SkillViewV1
         end

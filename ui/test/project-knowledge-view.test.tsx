@@ -134,7 +134,7 @@ function render(node: ReactNode, route = "/") {
 }
 
 test("focused Skill and Artifact collections lead with meaning and adjacent primary actions", () => {
-  const skillsMarkup = render(<SkillCards connection={{ nodes: [skillSummary], pageInfo: { endCursor: "next", hasNextPage: true } }} hrefFor={(name) => `/skills/${name}`} />);
+  const skillsMarkup = render(<SkillCards connection={{ nodes: [skillSummary], pageInfo: { endCursor: "next", hasNextPage: true } }} hrefFor={(skill) => `/skills/${skill.name}`} />);
   const artifactsMarkup = render(<ArtifactCards connection={{ nodes: [artifactSummary], pageInfo: { endCursor: "next", hasNextPage: true } }} hrefFor={(id) => `/artifacts/${id}`} />);
 
   assert.match(skillsMarkup, /Model coordination facts/);
@@ -157,7 +157,7 @@ test("Skill, asset, Artifact, and relationship details stay on focused pages", (
   assert.match(assetMarkup, /Example content/);
   assert.match(assetMarkup, /Back to Skill/);
   assert.match(artifactMarkup, /View 1 relationships/);
-  assert.match(artifactMarkup, /# Parent README/);
+  assert.match(artifactMarkup, /<h1>Parent README<\/h1>/);
   assert.doesNotMatch(artifactMarkup, /Child guide/);
   assert.match(relationshipMarkup, /Child guide/);
   assert.match(relationshipMarkup, /View related Artifact/);

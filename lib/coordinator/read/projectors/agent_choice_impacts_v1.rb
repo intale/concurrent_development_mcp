@@ -30,7 +30,7 @@ module Coordinator::Read
           next unless @processed_events.claim(
             definition: PROJECTION,
             identity:,
-            processed_at: Time.now.utc
+            processed_at: event.created_at
           )
 
           project(event, payload)
@@ -89,7 +89,11 @@ module Coordinator::Read
           assessment = @assessment_loader.call(payload.assessment_id)
           raise InvalidProjectionSource, "AgentChoice impact assessment is incomplete" unless assessment
 
-          @impacts.store_assessment(event: assessment.assessment_event, impact: assessment)
+          @impacts.store_assessment(
+            event: assessment.assessment_event,
+            projection_event: event,
+            impact: assessment
+          )
         when Coordinator::Write::Events::AgentChoiceInvalidatedByDecisionV2
           assessment = @assessment_loader.call(assessment_id(event))
           raise InvalidProjectionSource, "AgentChoice invalidation assessment is incomplete" unless assessment

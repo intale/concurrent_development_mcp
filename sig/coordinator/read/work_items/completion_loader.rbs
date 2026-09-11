@@ -1,0 +1,12 @@
+module Coordinator::Read
+  module WorkItems
+    class CompletionLoader
+      def initialize: (
+        event_store: Coordinator::Write::EventStore,
+        ?stream_factory: Coordinator::Write::StreamFactory,
+        ?schema_registry: Coordinator::Write::EventSchemaRegistry
+      ) -> void
+      def call: (String work_item_id, ?terminal_event_id: String?) -> Coordinator::Read::WorkItemCompletionViewV1
+    end
+  end
+end

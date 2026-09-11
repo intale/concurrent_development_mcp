@@ -1,0 +1,10 @@
+module Coordinator
+  module Read
+    module Interpretations
+      class ProjectionSourceLoader
+        def initialize: (event_store: Write::EventStore, ?schema_registry: Write::EventSchemaRegistry) -> void
+        def call: (PgEventstore::Event event, Write::Events::DecisionInterpretationProposedV2 proposal) -> InterpretationProjectionSourceV2
+      end
+    end
+  end
+end

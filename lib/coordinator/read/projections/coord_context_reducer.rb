@@ -3,36 +3,74 @@
 module Coordinator::Read
   module Projections
     class CoordContextReducer
-      def apply(state, event)
+      def apply(state, event, occurred_at: nil)
         case event
+        when Coordinator::Read::ChangeSetDefinitionViewV1 then apply_change_set_definition(state, event)
         when Coordinator::Write::Events::ChangeSetCreatedV1 then apply_change_set_created(state, event)
         when Coordinator::Write::Events::ChangeSetAcceptanceCriteriaDefinedV1 then apply_acceptance_criteria(state, event)
+        when Coordinator::Read::WorkItemDefinitionViewV1 then apply_work_item_definition(state, event)
         when Coordinator::Write::Events::WorkItemCreatedV1 then apply_work_item_created(state, event)
         when Coordinator::Write::Events::WorkItemAddedToChangeSetV1 then apply_work_item_added(state, event)
-        when Coordinator::Write::Events::WorkItemDependencyDeclaredV1 then apply_dependency_declared(state, event)
-        when Coordinator::Write::Events::ChangeSetActivatedV1 then apply_change_set_activated(state, event)
-        when Coordinator::Write::Events::WorkItemMadeReadyV1 then apply_work_item_made_ready(state, event)
-        when Coordinator::Write::Events::WorkItemAcquiredV1 then apply_work_item_acquired(state, event)
+        when Coordinator::Write::Events::WorkItemDependencyDeclaredV1,
+             Coordinator::Write::Events::WorkItemDependencyDeclaredV2
+          apply_dependency_declared(state, event, occurred_at:)
+        when Coordinator::Write::Events::ChangeSetActivatedV1,
+             Coordinator::Write::Events::ChangeSetActivatedV2
+          apply_change_set_activated(state, event, occurred_at:)
+        when Coordinator::Write::Events::WorkItemMadeReadyV1,
+             Coordinator::Write::Events::WorkItemMadeReadyV2
+          apply_work_item_made_ready(state, event, occurred_at:)
+        when Coordinator::Write::Events::WorkItemAcquiredV1,
+             Coordinator::Write::Events::WorkItemAcquiredV2
+          apply_work_item_acquired(state, event, occurred_at:)
+        when Coordinator::Read::AttemptDefinitionViewV1 then apply_attempt_definition(state, event)
         when Coordinator::Write::Events::AttemptAuthorizedV1 then apply_attempt_authorized(state, event)
         when Coordinator::Write::Events::AttemptStartedV1 then apply_attempt_started(state, event)
+        when Coordinator::Read::AttemptAbandonmentViewV1 then apply_attempt_abandonment(state, event)
         when Coordinator::Write::Events::AttemptAbandonedV2 then apply_attempt_abandoned(state, event)
-        when Coordinator::Write::Events::WorkItemRequeuedV1 then apply_work_item_requeued(state, event)
+        when Coordinator::Write::Events::WorkItemRequeuedV1,
+             Coordinator::Write::Events::WorkItemRequeuedV2
+          apply_work_item_requeued(state, event, occurred_at:)
         when Coordinator::Write::Events::WriteSetReservedV2 then apply_write_set_reserved(state, event)
         when Coordinator::Write::Events::WriteSetExpandedV2 then apply_write_set_expanded(state, event)
         when Coordinator::Write::Events::WriteSetRenewedV2 then apply_write_set_renewed(state, event)
         when Coordinator::Write::Events::WriteSetReleasedV2 then apply_write_set_released(state, event)
+        when Coordinator::Read::WorkIntentionSetViewV1 then apply_work_intention_set(state, event)
         when Coordinator::Read::CandidateSubmissionViewV2 then apply_candidate_submitted(state, event)
-        when Coordinator::Write::Events::WorkItemCandidateSelectedV1 then apply_candidate_selected(state, event)
+        when Coordinator::Write::Events::WorkItemCandidateSelectedV1,
+             Coordinator::Write::Events::WorkItemCandidateSelectedV2
+          apply_candidate_selected(state, event, occurred_at:)
+        when Coordinator::Read::AttemptCompletionViewV1 then apply_attempt_completed(state, event)
         when Coordinator::Write::Events::AttemptCompletedV1 then apply_attempt_completed(state, event)
+        when Coordinator::Read::WorkItemCompletionViewV1 then apply_work_item_completed(state, event)
         when Coordinator::Write::Events::WorkItemCompletedV1 then apply_work_item_completed(state, event)
-        when Coordinator::Write::Events::WorkItemDependencySatisfiedV1 then apply_dependency_satisfied(state, event)
-        when Coordinator::Write::Events::ChangeSetCompletedV1 then apply_change_set_completed(state, event)
+        when Coordinator::Write::Events::WorkItemDependencySatisfiedV1,
+             Coordinator::Write::Events::WorkItemDependencySatisfiedV2
+          apply_dependency_satisfied(state, event, occurred_at:)
+        when Coordinator::Write::Events::ChangeSetCompletedV1,
+             Coordinator::Write::Events::ChangeSetCompletedV2
+          apply_change_set_completed(state, event, occurred_at:)
         else
           raise UnknownProjectionEvent, "coord_context/v1 does not handle #{event.class.name}"
         end
       end
 
       private
+
+      def apply_change_set_definition(state, event)
+        replace(
+          state,
+          change_set: CoordContextStateV1::ChangeSet.new(
+            change_set_id: event.change_set_id,
+            goal: event.goal,
+            acceptance_criteria: event.acceptance_criteria,
+            status: "planning",
+            created_at: event.created_at,
+            activated_at: nil,
+            completed_at: nil
+          )
+        )
+      end
 
       def apply_change_set_created(state, event)
         replace(
@@ -83,13 +121,18 @@ module Coordinator::Read
         replace(state, work_items: upsert(state.work_items, :work_item_id, work_item))
       end
 
+      def apply_work_item_definition(state, event)
+        updated = apply_work_item_created(state, event)
+        apply_work_item_added(updated, event)
+      end
+
       def apply_work_item_added(state, event)
         require_change_set(state, event.change_set_id)
         ids = state.work_item_ids.include?(event.work_item_id) ? state.work_item_ids : state.work_item_ids + [ event.work_item_id ]
         replace(state, work_item_ids: ids)
       end
 
-      def apply_dependency_declared(state, event)
+      def apply_dependency_declared(state, event, occurred_at: nil)
         require_change_set(state, event.change_set_id)
         dependency = CoordContextStateV1::Dependency.new(
           dependency_id: event.dependency_id,
@@ -98,24 +141,27 @@ module Coordinator::Read
           dependency_kind: event.dependency_kind,
           required_output: event.required_output,
           source_event: nil,
-          declared_at: event.declared_at,
+          declared_at: occurrence_time(event, occurred_at, :declared_at),
           satisfied_at: nil
         )
 
         replace(state, dependencies: upsert(state.dependencies, :dependency_id, dependency))
       end
 
-      def apply_change_set_activated(state, event)
+      def apply_change_set_activated(state, event, occurred_at: nil)
         change_set = require_change_set(state, event.change_set_id)
         replace(
           state,
           change_set: CoordContextStateV1::ChangeSet.new(
-            change_set.attributes.merge(status: "active", activated_at: event.activated_at)
+            change_set.attributes.merge(
+              status: "active",
+              activated_at: occurrence_time(event, occurred_at, :activated_at)
+            )
           )
         )
       end
 
-      def apply_work_item_made_ready(state, event)
+      def apply_work_item_made_ready(state, event, occurred_at: nil)
         work_item = require_work_item(state, event.work_item_id, event.change_set_id)
         replace(
           state,
@@ -123,13 +169,16 @@ module Coordinator::Read
             state.work_items,
             :work_item_id,
             CoordContextStateV1::WorkItem.new(
-              work_item.attributes.merge(status: "ready", made_ready_at: event.made_ready_at)
+              work_item.attributes.merge(
+                status: "ready",
+                made_ready_at: occurrence_time(event, occurred_at, :made_ready_at)
+              )
             )
           )
         )
       end
 
-      def apply_work_item_acquired(state, event)
+      def apply_work_item_acquired(state, event, occurred_at: nil)
         work_item = require_work_item(state, event.work_item_id, event.change_set_id)
         replace(
           state,
@@ -141,14 +190,14 @@ module Coordinator::Read
                 status: "acquired",
                 active_attempt_id: event.attempt_id,
                 active_agent_id: event.agent_id,
-                acquired_at: event.acquired_at
+                acquired_at: occurrence_time(event, occurred_at, :acquired_at)
               )
             )
           )
         )
       end
 
-      def apply_work_item_requeued(state, event)
+      def apply_work_item_requeued(state, event, occurred_at: nil)
         work_item = require_work_item(state, event.work_item_id, event.change_set_id)
         return state if work_item.status == "completed"
         return state if work_item.active_attempt_id && work_item.active_attempt_id != event.attempt_id
@@ -166,7 +215,7 @@ module Coordinator::Read
                 status: "ready",
                 active_attempt_id: nil,
                 active_agent_id: nil,
-                made_ready_at: event.requeued_at,
+                made_ready_at: occurrence_time(event, occurred_at, :requeued_at),
                 acquired_at: nil
               )
             )
@@ -185,6 +234,28 @@ module Coordinator::Read
           status: "authorized",
           authorized_at: event.authorized_at,
           started_at: nil,
+          write_set: nil,
+          selected_candidate_id: nil,
+          selected_candidate_event: nil,
+          completed_at: nil,
+          abandonment_reason: nil,
+          abandoned_at: nil
+        )
+
+        replace(state, attempts: bounded_attempts(upsert(state.attempts, :attempt_id, attempt)))
+      end
+
+      def apply_attempt_definition(state, event)
+        require_work_item(state, event.work_item_id, event.change_set_id)
+        attempt = CoordContextStateV1::Attempt.new(
+          attempt_id: event.attempt_id,
+          change_set_id: event.change_set_id,
+          work_item_id: event.work_item_id,
+          agent_id: event.agent_id,
+          base_snapshots: event.base_snapshots,
+          status: "started",
+          authorized_at: event.authorized_at,
+          started_at: event.started_at,
           write_set: nil,
           selected_candidate_id: nil,
           selected_candidate_event: nil,
@@ -236,6 +307,10 @@ module Coordinator::Read
             )
           )
         )
+      end
+
+      def apply_attempt_abandonment(state, event)
+        apply_attempt_abandoned(state, event)
       end
 
       def apply_write_set_reserved(state, event)
@@ -364,6 +439,34 @@ module Coordinator::Read
         )
       end
 
+      def apply_work_intention_set(state, event)
+        attempt = require_attempt(state, event.attempt_id, event.change_set_id, event.work_item_id)
+        unless attempt.agent_id == event.agent_id
+          raise ProjectionStateError, "Attempt #{event.attempt_id} work-intention attribution changed"
+        end
+
+        write_set = CoordContextStateV1::WriteSet.new(
+          lease_set_id: event.set_id,
+          repository_id: event.repository_id,
+          policy_version: event.policy_version,
+          resources: event.resources.map { projected_write_set_resource(_1) },
+          reserved_at: event.reserved_at,
+          last_expanded_at: event.last_expanded_at,
+          last_renewed_at: event.last_renewed_at,
+          previous_expires_at: event.previous_expires_at,
+          expires_at: event.expires_at,
+          released_at: event.released_at
+        )
+        replace(
+          state,
+          attempts: upsert(
+            state.attempts,
+            :attempt_id,
+            CoordContextStateV1::Attempt.new(attempt.attributes.merge(write_set:))
+          )
+        )
+      end
+
       def apply_candidate_submitted(state, event)
         require_attempt(state, event.attempt_id, event.change_set_id, event.work_item_id)
         checkpoint = CoordContextStateV1::CandidateCheckpoint.new(
@@ -404,7 +507,7 @@ module Coordinator::Read
         )
       end
 
-      def apply_candidate_selected(state, event)
+      def apply_candidate_selected(state, event, occurred_at: nil)
         work_item = require_work_item(state, event.work_item_id, event.change_set_id)
         replace(
           state,
@@ -415,7 +518,7 @@ module Coordinator::Read
               work_item.attributes.merge(
                 selected_candidate_id: event.candidate_id,
                 selected_candidate_event: event.candidate_event,
-                selected_at: event.selected_at
+                selected_at: occurrence_time(event, occurred_at, :selected_at)
               )
             )
           )
@@ -462,7 +565,7 @@ module Coordinator::Read
         )
       end
 
-      def apply_dependency_satisfied(state, event)
+      def apply_dependency_satisfied(state, event, occurred_at: nil)
         require_change_set(state, event.change_set_id)
         dependency = state.dependencies.find { _1.dependency_id == event.dependency_id }
         raise ProjectionStateError, "Dependency #{event.dependency_id} is not projected" unless dependency
@@ -480,20 +583,23 @@ module Coordinator::Read
             :dependency_id,
             CoordContextStateV1::Dependency.new(
               dependency.attributes.merge(
-                source_event: event.source_event,
-                satisfied_at: event.satisfied_at
+                source_event: event.respond_to?(:source_event) ? event.source_event : event.source,
+                satisfied_at: occurrence_time(event, occurred_at, :satisfied_at)
               )
             )
           )
         )
       end
 
-      def apply_change_set_completed(state, event)
+      def apply_change_set_completed(state, event, occurred_at: nil)
         change_set = require_change_set(state, event.change_set_id)
         replace(
           state,
           change_set: CoordContextStateV1::ChangeSet.new(
-            change_set.attributes.merge(status: "completed", completed_at: event.completed_at)
+            change_set.attributes.merge(
+              status: "completed",
+              completed_at: occurrence_time(event, occurred_at, :completed_at)
+            )
           )
         )
       end
@@ -567,6 +673,13 @@ module Coordinator::Read
 
       def terminal_attempt?(attempt)
         %w[abandoned completed].include?(attempt.status)
+      end
+
+      def occurrence_time(event, observed, legacy_attribute)
+        return observed if observed
+        return event.public_send(legacy_attribute) if event.respond_to?(legacy_attribute)
+
+        raise ProjectionStateError, "#{event.class.name} requires its persisted Event.created_at"
       end
     end
   end

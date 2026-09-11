@@ -3,6 +3,8 @@
 module Coordinator::Read
   module Repositories
     class RepositoryCatalog
+      include EventTimestamped
+
       def initialize(compound_marker_builder: Coordinator::Shared::CompoundMarkerBuilder.new)
         @compound_marker_builder = compound_marker_builder
       end
@@ -86,8 +88,7 @@ module Coordinator::Read
         when Coordinator::Write::Events::RepositoryRemoteRemovedV1
           record.remotes = record.remotes - [ registration.remote ]
         end
-        record.updated_at = event.created_at
-        record.save!(touch: false) if record.persisted?
+        save_from_event(record, event:) if record.persisted?
         record
       end
 

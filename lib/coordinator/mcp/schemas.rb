@@ -1903,12 +1903,20 @@ module Coordinator
             )
           end
         }
-        partition_event = merge_authorization_event_reference(
-          type: "DecisionPartitionAdvanced",
-          context: "HumanGuidance",
-          stream_name: "DecisionPartition",
-          minimum_revision: 0
-        )
+        partition_event = {
+          anyOf: %w[
+            DecisionPartitionAdvanced
+            DecisionAddedToPartition
+            DecisionRemovedFromPartition
+          ].map do |type|
+            merge_authorization_event_reference(
+              type:,
+              context: "HumanGuidance",
+              stream_name: "DecisionPartition",
+              minimum_revision: 0
+            )
+          end
+        }
         expected_policy = object_schema(
           properties: {
             partition_event:,

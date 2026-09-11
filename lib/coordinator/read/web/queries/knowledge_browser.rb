@@ -5,6 +5,8 @@ module Coordinator::Read::Web::Queries
     def initialize(
       skills_contract: Coordinator::Read::Web::Contracts::KnowledgeBrowser::Skills.new,
       artifacts_contract: Coordinator::Read::Web::Contracts::KnowledgeBrowser::Artifacts.new,
+      skill_by_id_contract: Coordinator::Read::Web::Contracts::KnowledgeBrowser::SkillById.new,
+      skill_asset_by_id_contract: Coordinator::Read::Web::Contracts::KnowledgeBrowser::SkillAssetById.new,
       skill_contract: Coordinator::Read::Web::Contracts::KnowledgeBrowser::Skill.new,
       skill_asset_contract: Coordinator::Read::Web::Contracts::KnowledgeBrowser::SkillAsset.new,
       artifact_contract: Coordinator::Read::Web::Contracts::KnowledgeBrowser::Artifact.new,
@@ -14,6 +16,8 @@ module Coordinator::Read::Web::Queries
     )
       @skills_contract = skills_contract
       @artifacts_contract = artifacts_contract
+      @skill_by_id_contract = skill_by_id_contract
+      @skill_asset_by_id_contract = skill_asset_by_id_contract
       @skill_contract = skill_contract
       @skill_asset_contract = skill_asset_contract
       @artifact_contract = artifact_contract
@@ -26,11 +30,26 @@ module Coordinator::Read::Web::Queries
       values = validate(@skills_contract, input)
       @repository.skills(
         Coordinator::Read::Web::KnowledgeBrowserQueryV1::Skills.new(
-          **project(values),
+          **optional_project(values),
           first: values[:first] || 20,
           name: values[:name],
+          after_updated_at: values[:after_updated_at],
           after_skill_id: values[:after_skill_id]
         )
+      )
+    end
+
+    def skill_by_id(input)
+      values = validate(@skill_by_id_contract, input)
+      @repository.skill_by_id(
+        Coordinator::Read::Web::KnowledgeBrowserQueryV1::SkillById.new(**values)
+      )
+    end
+
+    def skill_asset_by_id(input)
+      values = validate(@skill_asset_by_id_contract, input)
+      @repository.skill_asset_by_id(
+        Coordinator::Read::Web::KnowledgeBrowserQueryV1::SkillAssetById.new(**values)
       )
     end
 
@@ -43,7 +62,8 @@ module Coordinator::Read::Web::Queries
           kind: values[:kind],
           labels: values[:labels] || [],
           source_kind: values[:source_kind],
-          after_global_position: values[:after_global_position]
+          after_updated_at: values[:after_updated_at],
+          after_observation_id: values[:after_observation_id]
         )
       )
     end
@@ -103,6 +123,15 @@ module Coordinator::Read::Web::Queries
 
     def project(values)
       project_ref = values[:project_ref]
+      { project_ref:, scope: @project_reference.decode(project_ref) }
+    end
+
+    def optional_project(values)
+      return { project_ref: nil, scope: values[:scope] } if values[:scope]
+
+      project_ref = values[:project_ref]
+      return { project_ref: nil, scope: nil } unless project_ref
+
       { project_ref:, scope: @project_reference.decode(project_ref) }
     end
 

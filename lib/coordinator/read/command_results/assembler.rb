@@ -32,14 +32,14 @@ module Coordinator::Read
       def call(source)
         semantic_result = if source.command_state.rejected?
                             rejected(source)
-                          else
+        else
                             completion = successful_completion(source)
                             @semantic_result_mapper.call(
                               Success(completion),
                               command_id: source.command_state.request_id,
                               tool_name: source.command_state.tool_name
                             )
-                          end
+        end
 
         ResultV1.from_semantic(
           semantic_result:,
@@ -170,7 +170,9 @@ module Coordinator::Read
               Coordinator::Write::ReleaseSets::MemberSummaryV2.new(
                 position: member.member_position,
                 repository_id: member.repository_id,
-                candidate_id: member.candidate_id
+                merge_snapshot_id: member.merge_snapshot_id,
+                ordered_candidate_ids: member.ordered_candidate_ids,
+                authorization_event: member.authorization_event
               )
             end,
             release_digest: prepared_event.metadata.fetch("release_digest"),
@@ -285,7 +287,7 @@ module Coordinator::Read
                    document: opened.slot,
                    compound_marker: generated.compound_marker
                  )
-               end
+        end
         @completion_builder.decision_activate(
           **args,
           activation:,
@@ -522,11 +524,11 @@ module Coordinator::Read
           observed = command.observation
           outcome = if created_event
                       "captured"
-                    elsif recorded_event
+          elsif recorded_event
                       "observed"
-                    else
+          else
                       "existing"
-                    end
+          end
           recorded_at = event_timestamp(recorded_event || created_event) || source.completed_at
         else
           observation = payload(source, Coordinator::Write::Events::DevelopmentArtifactObservedV1) ||
@@ -702,11 +704,11 @@ module Coordinator::Read
         )
         outcome = if supersession
                     "superseded"
-                  elsif source.persisted_events.empty?
+        elsif source.persisted_events.empty?
                     "existing"
-                  else
+        else
                     "declared"
-                  end
+        end
         completion(
           source,
           summary: {
@@ -806,11 +808,11 @@ module Coordinator::Read
         )
         outcome = if registration_event
                     "registered"
-                  elsif binding_event
+        elsif binding_event
                     "reactivated"
-                  else
+        else
                     "existing"
-                  end
+        end
         binding_event ||= current_resource_binding(command.identity.current_path_marker)
         binding = load_payload(binding_event)
         registration_event ||= resource_registration(binding.resource_id)

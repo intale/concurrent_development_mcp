@@ -32,7 +32,9 @@ module Coordinator::Write
                 release_set_id: command.release_set_id,
                 member_position: member.position,
                 repository_id: member.repository_id,
-                candidate_id: member.ordered_candidates.sole.candidate_id
+                merge_snapshot_id: member.merge_snapshot_id,
+                ordered_candidate_ids: member.ordered_candidates.map(&:candidate_id),
+                authorization_event: member.authorization_event
               )
             )
           end
@@ -69,8 +71,6 @@ module Coordinator::Write
           return invariant(:release_set_repositories_repeated, "ReleaseSet repositories must be unique") unless members.map(&:repository_id).uniq.length == members.length
           return invariant(:release_set_snapshots_repeated, "ReleaseSet snapshots must be unique") unless members.map(&:merge_snapshot_id).uniq.length == members.length
           return invariant(:release_set_change_sets_mixed, "ReleaseSet members must belong to one ChangeSet") unless members.map(&:change_set_id).uniq.one?
-          return invariant(:release_set_snapshot_candidates_ambiguous, "Each ReleaseSet member snapshot must contain exactly one Candidate") unless members.all? { _1.ordered_candidates.one? }
-
           nil
         end
 

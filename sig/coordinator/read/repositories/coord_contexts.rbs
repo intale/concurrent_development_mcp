@@ -2,10 +2,17 @@ module Coordinator
   module Read
     module Repositories
       class CoordContexts
-        def initialize: (?state_loader: Projections::CoordContextStateLoader) -> void
+        def initialize: (
+          ?state_loader: Projections::CoordContextStateLoader,
+          ?projection_timestamp: ProjectionTimestamp
+        ) -> void
         def fetch: (String change_set_id) -> CoordContextSnapshot?
         def resolve: (scope_kind: String, scope_id: String) -> CoordContextSnapshot?
-        def store_attempt_event: (event: PgEventstore::Event, payload: Write::Events::Base) -> nil
+        def store_attempt_event: (
+          event: PgEventstore::Event,
+          payload: Write::Events::Base | AttemptDefinitionViewV1 | AttemptAbandonmentViewV1 | AttemptCompletionViewV1 | WorkIntentionSetViewV1,
+          projection_version: Integer
+        ) -> nil
         def attempt_page: (
           work_item_id: String,
           after_authorized_global_position: Integer?,

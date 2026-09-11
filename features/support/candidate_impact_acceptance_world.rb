@@ -131,8 +131,8 @@ module CandidateImpactAcceptanceWorld
       candidate_id:,
       repository_id: candidate.dig(:arguments, :repository_id),
       head_commit_oid: candidate.dig(:arguments, :head_commit_oid),
-      manifest_digest: manifest.data.fetch("manifest_digest"),
-      build_context_digest: build_context&.data&.fetch("build_context_digest"),
+      manifest_digest: manifest.metadata.fetch("manifest_digest"),
+      build_context_digest: build_context&.metadata&.fetch("build_context_digest"),
       analyzer_version: "impact-analyzer-v1",
       surface:
     }.compact
@@ -166,7 +166,7 @@ module CandidateImpactAcceptanceWorld
 
   def project_impact(candidate)
     candidate_id = candidate.dig(:arguments, :candidate_id)
-    event = candidate_events(candidate_id).find { _1.type == "CandidateImpactSurfaceDerived" }
+    event = impact_events(candidate).first
     assert_acceptance(event, "Candidate #{candidate_id} has no impact fact")
     await_read_model("Candidate #{candidate_id} impact surface to become available") do
       payload = candidate_impact_view(candidate_id)
@@ -176,9 +176,25 @@ module CandidateImpactAcceptanceWorld
   end
 
   def impact_events(candidate)
-    candidate_events(candidate.dig(:arguments, :candidate_id)).select do |event|
-      event.type == "CandidateImpactSurfaceDerived"
-    end
+    candidate_id = candidate.dig(:arguments, :candidate_id)
+    assignment = event_store.read(
+      streams.candidate(candidate_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: [ "CandidateImpactSurfaceAssigned" ],
+        maximum_count: 1,
+        direction: :asc
+      )
+    ).first
+    return [] unless assignment
+
+    event_store.read(
+      streams.candidate_impact_surface(assignment.data.fetch("surface_id")),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: [ "CandidateImpactSurfaceDerived" ],
+        maximum_count: 1,
+        direction: :asc
+      )
+    )
   end
 end
 

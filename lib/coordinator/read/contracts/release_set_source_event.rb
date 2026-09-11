@@ -14,6 +14,7 @@ module Coordinator::Read
         "ReleaseSetActivated" => [ 2, "release-set-activation/v1" ],
         "ReleaseSetCompensationRequested" => [ 2, "release-set-compensation/v1" ],
         "ReleaseSetSuccessfulIntegrationLinked" => [ 1, "release-set-compensation/v1" ],
+        "RepositoryCompensationRecorded" => [ 1, "release-set-completion/v1" ],
         "ReleaseSetOutcomeRecorded" => [ 1, "release-set-completion/v1" ],
         "ReleaseSetCompleted" => [ 2, "release-set-completion/v1" ]
       }.freeze
@@ -44,7 +45,7 @@ module Coordinator::Read
       rule(:event_type, :actor_kind) do
         allowed = case values[:event_type]
         when "ReleaseSetCompensationRequested", "ReleaseSetSuccessfulIntegrationLinked" then [ "system" ]
-        when "ReleaseSetOutcomeRecorded", "ReleaseSetCompleted" then %w[agent system]
+        when "RepositoryCompensationRecorded", "ReleaseSetOutcomeRecorded", "ReleaseSetCompleted" then %w[agent system]
         else [ "agent" ]
         end
         key(:actor_kind).failure("actor_kind does not match event_type") unless allowed.include?(values[:actor_kind])

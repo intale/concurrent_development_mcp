@@ -84,7 +84,8 @@ RSpec.describe Coordinator::Read::Web::Queries::ProjectResources, :read_model do
       first: 1,
       as_of:,
       path: "app/",
-      after_id: first.next_resource_id
+      after_id: first.next_resource_id,
+      after_updated_at: first.next_updated_at
     )
     inactive = described_class.new.resources(
       project_ref:,
@@ -163,7 +164,16 @@ RSpec.describe Coordinator::Read::Web::Queries::ProjectResources, :read_model do
   def create_resource(resource_id, repository_id, path, trait: nil)
     arguments = [ :coordinator_read_resource ]
     arguments << trait if trait
-    create(*arguments, resource_id:, repository_id:, normalized_path: path)
+    index = resource_ids.index(resource_id) || resource_ids.length
+    projected_at = Time.utc(2026, 8, 30, 12, 2) - index.seconds
+    create(
+      *arguments,
+      resource_id:,
+      repository_id:,
+      normalized_path: path,
+      created_at: projected_at,
+      updated_at: projected_at
+    )
   end
 
   def create_lease_attempt(attempt_id, resource_id, lease_id, agent_id, expires_at: nil, released: false)

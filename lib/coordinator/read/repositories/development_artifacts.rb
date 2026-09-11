@@ -14,10 +14,12 @@ module Coordinator::Read
 
       def initialize(
         relation_registry: Coordinator::Shared::DevelopmentArtifactRelationRegistry.new,
-        follow_action: DevelopmentArtifactRelationFollowAction.new
+        follow_action: DevelopmentArtifactRelationFollowAction.new,
+        projection_timestamp: ProjectionTimestamp.new
       )
         @relation_registry = relation_registry
         @follow_action = follow_action
+        @projection_timestamp = projection_timestamp
       end
 
       def fetch(artifact_id, observation_id: nil)
@@ -300,6 +302,48 @@ module Coordinator::Read
         DevelopmentArtifactPageV1.new(
           items:,
           next_global_position: has_more ? rows.fetch(query.limit - 1).current_global_position : nil,
+          has_more:
+        )
+      end
+
+      def event_time_page(query)
+        relation = complete_observations.includes(:artifact)
+        relation = relation.where(scope: query.scope) if query.scope
+        relation = relation.where(kind: query.kind) if query.kind
+        relation = relation.where(source_kind: query.source_kind) if query.source_kind
+        if query.labels.any?
+          relation = relation.where(
+            "#{OBSERVATION_TABLE_SQL}.labels @> ?::jsonb",
+            JSON.generate(query.labels)
+          )
+        end
+        if query.after_updated_at
+          relation = relation.where(
+            "#{OBSERVATION_TABLE_SQL}.updated_at < :updated_at OR " \
+            "(#{OBSERVATION_TABLE_SQL}.updated_at = :updated_at AND " \
+            "#{OBSERVATION_TABLE_SQL}.observation_id < :observation_id)",
+            updated_at: query.after_updated_at,
+            observation_id: query.after_observation_id
+          )
+        end
+        rows = relation
+          .order("#{OBSERVATION_TABLE_SQL}.updated_at DESC", "#{OBSERVATION_TABLE_SQL}.observation_id DESC")
+          .limit(query.first + 1)
+          .to_a
+        has_more = rows.length > query.first
+        visible_rows = rows.first(query.first)
+        counts = relationship_capacity_counts(visible_rows.map(&:artifact_id))
+        items = visible_rows.map do |record|
+          build_summary(record, record.artifact, relationship_counts: counts.fetch(record.artifact_id))
+        end
+        last = visible_rows.last
+
+        Coordinator::Read::Web::KnowledgeBrowserV1::ArtifactPage.new(
+          items:,
+          next_cursor: has_more ? Coordinator::Read::Web::KnowledgeBrowserV1::ArtifactCursor.new(
+            updated_at: last.updated_at.utc.iso8601(6),
+            observation_id: last.observation_id
+          ) : nil,
           has_more:
         )
       end
@@ -761,7 +805,7 @@ module Coordinator::Read
       end
 
       def save_projection!(record, event)
-        record.updated_at = event.created_at
+        record.updated_at = @projection_timestamp.call(current: record.updated_at, event:)
         record.save!(touch: false)
       end
 

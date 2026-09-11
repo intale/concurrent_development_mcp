@@ -9,6 +9,7 @@ import {
   ProjectArtifactsPage,
   ProjectSkillsPage
 } from "./knowledge/project-knowledge-page.js";
+import { GlobalSkillsPage } from "./knowledge/global-skills-page.js";
 import {
   ProjectGovernanceChoicesPage,
   ProjectGovernanceDecisionsPage,
@@ -238,6 +239,15 @@ export function App() {
               <li className="nav-item">
                 <NavLink
                   className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
+                  to="/skills"
+                >
+                  <i aria-hidden="true" className="nav-icon bi bi-journal-code" />
+                  <p>Skills</p>
+                </NavLink>
+              </li>
+              <li className="nav-item">
+                <NavLink
+                  className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
                   to="/audit/command-receipts"
                 >
                   <i aria-hidden="true" className="nav-icon bi bi-receipt" />
@@ -261,6 +271,9 @@ export function App() {
       <main className="app-main" id="main-content" ref={mainRef}>
         <Routes>
           <Route path="/projects" element={<ProjectCatalogPage />} />
+          <Route path="/skills" element={<GlobalSkillsPage />} />
+          <Route path="/skills/:skillId" element={<GlobalSkillsPage />} />
+          <Route path="/skills/:skillId/assets/*" element={<GlobalSkillsPage />} />
           <Route path="/audit/command-receipts" element={<CommandReceiptsPage />} />
           <Route path="/audit/command-receipts/:commandId" element={<CommandReceiptsPage />} />
           <Route path="/operations/batches" element={<OperationBatchesPage />} />

@@ -8,6 +8,7 @@ module Coordinator
           event_store: _EventStore,
           ?stream_factory: StreamFactory,
           ?schema_registry: EventSchemaRegistry,
+          ?exact_loader: CandidateObligations::ExactEventLoader,
           ?candidate_loader: CandidateObligations::CandidateEvidenceLoader,
           ?definition_loader: CandidateObligations::DecisionDefinitionLoader,
           ?matcher: CandidateObligations::Matcher,

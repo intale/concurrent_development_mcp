@@ -6,9 +6,11 @@ module Coordinator::Read::Web::Contracts
       config.validate_keys = true
 
       params do
-        required(:project_ref).filled(:string)
+        optional(:project_ref).maybe(:string)
+        optional(:scope).maybe(:string)
         optional(:first).filled(:integer, gteq?: 1, lteq?: 100)
         optional(:name).maybe(:string)
+        optional(:after_updated_at).maybe(:string)
         optional(:after_skill_id).maybe(:string)
       end
 
@@ -18,9 +20,47 @@ module Coordinator::Read::Web::Contracts
         key.failure("is too long") if value.bytesize > Coordinator::Shared::Types::SKILL_NAME_MAXIMUM_BYTES
       end
 
+      rule(:project_ref, :scope) do
+        base.failure("project_ref and scope are mutually exclusive") if values[:project_ref] && values[:scope]
+        next unless values[:scope]
+
+        result = Coordinator::Read::Contracts::RepositoryList.new.call(scope: values[:scope])
+        key(:scope).failure("must be an exact valid Project scope") if result.failure?
+      end
+
       rule(:after_skill_id) do
         next unless value
 
+        key.failure("must be a Skill ID") unless Coordinator::Shared::Types::SKILL_ID_PATTERN.match?(value)
+      end
+
+
+      rule(:after_updated_at, :after_skill_id) do
+        base.failure("cursor coordinates must both be present or absent") unless
+          values[:after_updated_at].nil? == values[:after_skill_id].nil?
+        next unless values[:after_updated_at]
+
+        unless Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(values[:after_updated_at])
+          key(:after_updated_at).failure("must be an event timestamp")
+        end
+      end
+    end
+
+    class SkillById < Dry::Validation::Contract
+      params { required(:skill_id).filled(:string) }
+
+      rule(:skill_id) do
+        key.failure("must be a Skill ID") unless Coordinator::Shared::Types::SKILL_ID_PATTERN.match?(value)
+      end
+    end
+
+    class SkillAssetById < Dry::Validation::Contract
+      params do
+        required(:skill_id).filled(:string)
+        required(:path).filled(:string)
+      end
+
+      rule(:skill_id) do
         key.failure("must be a Skill ID") unless Coordinator::Shared::Types::SKILL_ID_PATTERN.match?(value)
       end
     end
@@ -34,7 +74,8 @@ module Coordinator::Read::Web::Contracts
         optional(:kind).maybe(:string)
         optional(:labels).array(:string)
         optional(:source_kind).maybe(:string)
-        optional(:after_global_position).maybe(:integer, gteq?: 0)
+        optional(:after_updated_at).maybe(:string)
+        optional(:after_observation_id).maybe(:string)
       end
 
       rule(:kind) do
@@ -63,6 +104,20 @@ module Coordinator::Read::Web::Contracts
             label.bytesize > Coordinator::Shared::Types::DEVELOPMENT_ARTIFACT_LABEL_MAXIMUM_BYTES
           label_key.failure("must not have leading or trailing whitespace") unless label == label.strip
           label_key.failure("must not contain control characters") if /[\u0000-\u001f\u007f]/.match?(label)
+        end
+      end
+
+
+      rule(:after_updated_at, :after_observation_id) do
+        base.failure("cursor coordinates must both be present or absent") unless
+          values[:after_updated_at].nil? == values[:after_observation_id].nil?
+        if values[:after_updated_at] &&
+            !Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(values[:after_updated_at])
+          key(:after_updated_at).failure("must be an event timestamp")
+        end
+        if values[:after_observation_id] &&
+            !Coordinator::Shared::Types::UUID_V7_PATTERN.match?(values[:after_observation_id])
+          key(:after_observation_id).failure("must be an Observation UUIDv7")
         end
       end
     end

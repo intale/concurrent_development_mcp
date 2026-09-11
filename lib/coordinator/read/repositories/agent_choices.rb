@@ -3,6 +3,8 @@
 module Coordinator::Read
   module Repositories
     class AgentChoices
+      include EventTimestamped
+
       def fetch(choice_id)
         record = Coordinator::Read::AgentChoice.find_by(choice_id:)
         record && build(record)
@@ -14,7 +16,7 @@ module Coordinator::Read
       end
 
       def store_recorded(event:, choice:)
-        Coordinator::Read::AgentChoice.create!(
+        create_from_event(Coordinator::Read::AgentChoice, event:, attributes: {
           choice_id: choice.choice_id,
           choice_type: choice.choice_type,
           observation_status: "recorded",
@@ -37,11 +39,11 @@ module Coordinator::Read
           recorded_correlation_id: event.correlation_id,
           accepted_causation_id: nil,
           accepted_correlation_id: nil,
-          recorded_at_domain: choice.recorded_at,
+          recorded_at_domain: choice.respond_to?(:recorded_at) ? choice.recorded_at : event.created_at,
           accepted_at_domain: nil,
           recorded_at_store: event.created_at,
           accepted_at_store: nil
-        )
+        })
       end
 
       def accept(event:, acceptance:)
@@ -49,7 +51,7 @@ module Coordinator::Read
         raise ProjectionStateError, "AgentChoiceRecorded must be projected before AgentChoiceAccepted" unless record
 
         verify_acceptance!(record, acceptance)
-        record.update!(
+        save_from_event(record, event:, attributes: {
           observation_status: "accepted",
           assessment: acceptance.assessment.to_h,
           accepted_event: event_reference(event).to_h,
@@ -58,9 +60,9 @@ module Coordinator::Read
           accepted_metadata: event.metadata,
           accepted_causation_id: event.causation_id,
           accepted_correlation_id: event.correlation_id,
-          accepted_at_domain: acceptance.accepted_at,
+          accepted_at_domain: acceptance.respond_to?(:accepted_at) ? acceptance.accepted_at : event.created_at,
           accepted_at_store: event.created_at
-        )
+        })
         record
       end
 
@@ -69,7 +71,7 @@ module Coordinator::Read
         raise ProjectionStateError, "AgentChoiceAccepted must be projected before invalidation" unless record&.accepted_event
 
         verify_invalidation!(record, invalidation, assessment)
-        record.update!(
+        save_from_event(record, event:, attributes: {
           observation_status: "invalidated",
           invalidation: {
             assessment_event: event_reference(assessment.assessment_event).to_h,
@@ -84,13 +86,15 @@ module Coordinator::Read
           invalidated_correlation_id: event.correlation_id,
           invalidated_at_domain: event.created_at,
           invalidated_at_store: event.created_at
-        )
+        })
         record
       end
 
       private
 
       def verify_acceptance!(record, acceptance)
+        return if acceptance.is_a?(Coordinator::Write::Events::AgentChoiceAcceptedV2)
+
         recorded_event = Coordinator::Write::EventReference.new(symbolize(record.recorded_event))
         return if recorded_event == acceptance.recorded_event && record.context_digest == acceptance.context_digest
 

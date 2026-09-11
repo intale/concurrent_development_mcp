@@ -18,6 +18,7 @@ FactoryBot.define do
       ]
     end
     status { "authorized" }
+    projection_version { 6 }
     authorization_event do
       {
         "event_id" => SecureRandom.uuid_v7,

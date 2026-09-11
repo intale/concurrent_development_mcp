@@ -13,7 +13,7 @@ module Coordinator::Read
 
       params do
         required(:event_type).filled(:string, included_in?: EVENT_TYPES)
-        required(:schema_version).filled(:integer, eql?: 1)
+        required(:schema_version).filled(:integer, included_in?: [ 1, 2 ])
         required(:stream_context).filled(:string, eql?: "AgentGovernance")
         required(:stream_name).filled(:string, eql?: "AgentChoice")
         required(:stream_id).filled(:string)

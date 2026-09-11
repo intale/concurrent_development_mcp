@@ -3,6 +3,12 @@ Feature: Inspect current project Skills and Development Artifacts
 
   Rule: Skill browsing exposes only the current revision
 
+    @UI-GWT-27
+    Scenario: Global Skills use exact Project and name filters with stable detail identity
+      Given projected global Skills contain the same name in two Project scopes
+      When the browser filters global Skills by the exact selected Project and name
+      Then only the selected scoped Skill is presented and opens by stable identity
+
     @UI-GWT-08
     Scenario: Current Skill instructions and assets hide obsolete revision content
       Given projected knowledge rows contain current and obsolete revisions of one Skill

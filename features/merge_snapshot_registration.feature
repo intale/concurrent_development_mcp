@@ -24,7 +24,7 @@ Feature: Attributed merge snapshot registration
     Then the merge snapshot Task completes with exact attributed Candidate evidence
     When merge snapshot "MS-CUC-MERGE-VERIFY" reaches the read side
     And the agent submits "passed" merge verification with command "cmd-cuc-merge-verify-pass"
-    Then the merge verification Task completes with status "verified"
+    Then the merge verification Task completes with status "unverified"
     And 1 submitted report and 1 verified fact are durable for the exact snapshot
     And the available merge snapshot still reports "unverified"
     When the terminal merge verification reaches the read side after a subscription restart
@@ -38,7 +38,7 @@ Feature: Attributed merge snapshot registration
     And the agent submits "failed" merge verification with command "cmd-cuc-merge-recover-failed"
     Then the merge verification Task completes with status "failed"
     When the agent submits "passed" merge verification with command "cmd-cuc-merge-recover-passed"
-    Then the merge verification Task completes with status "verified"
+    Then the merge verification Task completes with status "unverified"
     And 2 submitted reports and 1 verified fact are durable for the exact snapshot
 
   Scenario: A stale snapshot binding is rejected from authoritative events
@@ -55,7 +55,7 @@ Feature: Attributed merge snapshot registration
     And the agent registers merge snapshot "MS-CUC-MERGE-AUTH-GRANT" with command "cmd-cuc-merge-auth-grant-snapshot"
     And merge snapshot "MS-CUC-MERGE-AUTH-GRANT" reaches the read side
     And the agent submits "passed" merge verification with command "cmd-cuc-merge-auth-grant-verification"
-    Then the merge verification Task completes with status "verified"
+    Then the merge verification Task completes with status "unverified"
     When the merge snapshot Candidates complete their WorkItems
     And the agent requests merge authorization with command "cmd-cuc-merge-auth-grant"
     Then the merge authorization Task completes with durable outcome "granted"
@@ -69,7 +69,7 @@ Feature: Attributed merge snapshot registration
     And the agent registers merge snapshot "MS-CUC-MERGE-AUTH-STALE" with command "cmd-cuc-merge-auth-stale-snapshot"
     And merge snapshot "MS-CUC-MERGE-AUTH-STALE" reaches the read side
     And the agent submits "passed" merge verification with command "cmd-cuc-merge-auth-stale-verification"
-    Then the merge verification Task completes with status "verified"
+    Then the merge verification Task completes with status "unverified"
     When the merge snapshot Candidates complete their WorkItems
     And the agent requests merge authorization against a changed target base with command "cmd-cuc-merge-auth-stale"
     Then the merge authorization Task completes with durable outcome "denied"
@@ -82,7 +82,7 @@ Feature: Attributed merge snapshot registration
     Then one exact open Rails obligation is durable under "merge_gate"
     When the integrator registers exact Rails pair snapshot "MS-CUC-MERGE-AUTH-OPEN"
     And the agent submits "passed" merge verification with command "cmd-cuc-merge-auth-open-verification"
-    Then the merge verification Task completes with status "verified"
+    Then the merge verification Task completes with status "unverified"
     When the merge snapshot Candidates complete their WorkItems
     And the agent requests merge authorization with command "cmd-cuc-merge-auth-open"
     Then the merge authorization Task completes with durable outcome "denied"

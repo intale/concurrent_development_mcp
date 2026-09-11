@@ -297,15 +297,14 @@ When("both agents use the discovered Repository to contend for one file") do
   @repository_race_lease_outcomes = contend_for_shared_repository_file(@repository_race_canonical_id)
 end
 
-Then("the second lease is blocked in the shared Repository namespace") do
-  first, second = @repository_race_lease_outcomes
-  assert_acceptance_equal("ok", first.fetch("status"), "First lease result")
-  assert_acceptance_equal("busy", second.fetch("status"), "Second lease result")
+Then("both shared intentions coexist in the canonical Repository namespace") do
   assert_acceptance_equal(
-    "agent-a",
-    second.dig("data", "details", "owner_agent_id"),
-    "Shared namespace owner"
+    %w[ok ok],
+    @repository_race_lease_outcomes.map { _1.fetch("status") }.sort,
+    "Shared intention results"
   )
+  set_ids = @repository_race_lease_outcomes.map { _1.dig("data", "lease_set_id") }
+  assert_acceptance_equal(2, set_ids.compact.uniq.length, "Independent work-intention sets")
 end
 
 Given("an MCP result contains one or more next actions") do

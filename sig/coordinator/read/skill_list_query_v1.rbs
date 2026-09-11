@@ -3,7 +3,9 @@ module Coordinator
     class SkillListQueryV1 < Shared::Value
       def name: () -> String?
       def scope: () -> String?
+      def after_updated_at: () -> String?
       def after_skill_id: () -> String?
+      def order: () -> String
       def limit: () -> Integer
     end
   end

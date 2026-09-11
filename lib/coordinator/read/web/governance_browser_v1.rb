@@ -7,6 +7,7 @@ module Coordinator::Read::Web
                 Coordinator::Shared::Types::Array.of(Coordinator::Read::DecisionViewV1)
                   .constrained(max_size: 50)
       attribute :next_decision_id, Coordinator::Shared::Types::Identifier.optional
+      attribute :next_updated_at, Coordinator::Shared::Types::Timestamp.optional
       attribute :has_more, Coordinator::Shared::Types::Strict::Bool
     end
 
@@ -15,6 +16,7 @@ module Coordinator::Read::Web
                 Coordinator::Shared::Types::Array.of(Coordinator::Read::GuidanceUtteranceV1)
                   .constrained(max_size: 50)
       attribute :next_message_id, Coordinator::Shared::Types::Identifier.optional
+      attribute :next_updated_at, Coordinator::Shared::Types::Timestamp.optional
       attribute :has_more, Coordinator::Shared::Types::Strict::Bool
     end
 
@@ -23,11 +25,12 @@ module Coordinator::Read::Web
                 Coordinator::Shared::Types::Array.of(Coordinator::Read::AgentChoiceViewV1)
                   .constrained(max_size: 50)
       attribute :next_choice_id, Coordinator::Shared::Types::Identifier.optional
+      attribute :next_updated_at, Coordinator::Shared::Types::Timestamp.optional
       attribute :has_more, Coordinator::Shared::Types::Strict::Bool
     end
 
     class ImpactCursor < Coordinator::Shared::Value
-      attribute :global_position, Coordinator::Shared::Types::GlobalPosition
+      attribute :updated_at, Coordinator::Shared::Types::Timestamp
       attribute :assessment_id, Coordinator::Shared::Types::Identifier
     end
 
@@ -90,6 +93,7 @@ module Coordinator::Read::Web
       attribute :items,
                 Coordinator::Shared::Types::Array.of(CommandReceipt).constrained(max_size: 100)
       attribute :next_command_id, Coordinator::Shared::Types::Identifier.optional
+      attribute :next_updated_at, Coordinator::Shared::Types::Timestamp.optional
       attribute :has_more, Coordinator::Shared::Types::Strict::Bool
     end
 

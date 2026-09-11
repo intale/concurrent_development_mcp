@@ -11,33 +11,34 @@ module Coordinator::Read::Web::Repositories
     end
 
     def skills(query)
-      return unless project_exists?(query.scope)
+      return if query.scope && !project_exists?(query.scope)
 
       @skills.page(
         Coordinator::Read::SkillListQueryV1.new(
           name: query.name,
           scope: query.scope,
+          after_updated_at: query.after_updated_at,
           after_skill_id: query.after_skill_id,
+          order: "updated_at",
           limit: query.first
         )
       )
     end
 
+    def skill_by_id(query)
+      skill = @skills.fetch_by_id(query.skill_id)
+      skill && Coordinator::Read::Web::KnowledgeBrowserV1::SkillDetail.new(skill:)
+    end
+
+    def skill_asset_by_id(query)
+      asset = @skills.fetch_asset_by_id(skill_id: query.skill_id, path: query.path)
+      asset && Coordinator::Read::Web::KnowledgeBrowserV1::SkillAssetDetail.new(asset:)
+    end
+
     def artifacts(query)
       return unless project_exists?(query.scope)
 
-      @artifacts.page(
-        Coordinator::Read::DevelopmentArtifactListQueryV1.new(
-          scope: query.scope,
-          kind: query.kind,
-          labels: query.labels,
-          source_kind: query.source_kind,
-          relation_target_kind: nil,
-          relation_target_id: nil,
-          after_global_position: query.after_global_position,
-          limit: query.first
-        )
-      )
+      @artifacts.event_time_page(query)
     end
 
     def skill(query)

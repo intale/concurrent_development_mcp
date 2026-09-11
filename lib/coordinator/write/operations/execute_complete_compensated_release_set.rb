@@ -49,7 +49,7 @@ module Coordinator::Write
         ReleaseSetMultiEventPreparationV1.new(
           occurred_at: @clock.now,
           input_digest: @input_digest.release_compensation_complete(command),
-          event_ids: 2.times.map { @id_generator.uuid_v7 }
+          event_ids: (command.evidence.length + 2).times.map { @id_generator.uuid_v7 }
         )
       end
 
@@ -99,7 +99,7 @@ module Coordinator::Write
             event: write.event,
             event_id:,
             metadata: event_metadata(write.event, state:, command:, completion_digest:),
-            markers: [ "release-set:#{command.release_set_id}", "release-completion:compensated", "command:#{command.command_id}" ],
+            markers: event_markers(write.event, command),
             caused_by: parent,
             correlation_id: state.preparation.correlation_id
           )
@@ -117,6 +117,18 @@ module Coordinator::Write
           recorded_by: "coordinator",
           policy_version: command.rule_version
         }
+        if event.is_a?(Events::RepositoryCompensationRecordedV1)
+          evidence = command.evidence.find do |candidate|
+            candidate.repository_id == event.repository_id &&
+              candidate.integration_event == event.integration_event
+          end
+          return Metadata::RepositoryCompensationV1.new(
+            **attributes,
+            result_digest: evidence.result_digest,
+            producer: evidence.producer,
+            run_id: evidence.run_id
+          )
+        end
         return EventMetadata.new(**attributes) unless event.is_a?(Events::ReleaseSetOutcomeRecordedV1)
 
         Metadata::ReleaseSetOutcomeV1.new(
@@ -125,6 +137,21 @@ module Coordinator::Write
           release_digest: state.preparation.payload.release_digest,
           rule_version: command.rule_version
         )
+      end
+
+      def event_markers(event, command)
+        markers = [
+          "release-set:#{command.release_set_id}",
+          "release-completion:compensated",
+          "command:#{command.command_id}"
+        ]
+        if event.is_a?(Events::RepositoryCompensationRecordedV1)
+          markers.concat([
+            "repository:#{event.repository_id}",
+            "repository-integration-event:#{event.integration_event.event_id}"
+          ])
+        end
+        markers
       end
     end
   end

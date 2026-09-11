@@ -11,6 +11,14 @@ module Coordinator::Read
         snapshot && build_view(record, snapshot)
       end
 
+      def fetch_by_id(skill_id, revision: nil)
+        record = Coordinator::Read::Skill.find_by(skill_id:)
+        return unless record
+
+        snapshot = revision_for(record, revision || record.revision)
+        snapshot && build_view(record, snapshot)
+      end
+
       def fetch_asset(name:, scope:, path:, revision: nil)
         record = Coordinator::Read::Skill.find_by(name:, scope:)
         return unless record
@@ -27,12 +35,34 @@ module Coordinator::Read
         asset && build_asset_view(record, snapshot, asset)
       end
 
+      def fetch_asset_by_id(skill_id:, path:, revision: nil)
+        record = Coordinator::Read::Skill.find_by(skill_id:)
+        return unless record
+
+        selected_revision = revision || record.revision
+        snapshot = revision_for(record, selected_revision)
+        return unless snapshot
+
+        asset = Coordinator::Read::SkillAsset.find_by(skill_id:, revision: selected_revision, path:)
+        asset && build_asset_view(record, snapshot, asset)
+      end
+
       def page(query)
         relation = Coordinator::Read::Skill.all
         relation = relation.where(name: query.name) if query.name
         relation = relation.where(scope: query.scope) if query.scope
-        relation = relation.where("skill_id > ?", query.after_skill_id) if query.after_skill_id
-        rows = relation.order(:skill_id).page(1).per(query.limit + 1).to_a
+        if query.order == "updated_at" && query.after_skill_id
+          relation = relation.where(
+            "updated_at < :updated_at OR (updated_at = :updated_at AND skill_id < :id)",
+            updated_at: query.after_updated_at,
+            id: query.after_skill_id
+          )
+        end
+        relation = query.order == "updated_at" ? relation.order(updated_at: :desc, skill_id: :desc) : relation.order(:skill_id)
+        if query.order == "skill_id" && query.after_skill_id
+          relation = relation.where("skill_id > ?", query.after_skill_id)
+        end
+        rows = relation.page(1).per(query.limit + 1).to_a
         has_more = rows.length > query.limit
         selected_rows = rows.first(query.limit)
         snapshots = revisions_for(selected_rows)
@@ -43,6 +73,7 @@ module Coordinator::Read
 
         SkillPageV1.new(
           items:,
+          next_updated_at: has_more && query.order == "updated_at" ? selected_rows.last.updated_at.utc.iso8601(6) : nil,
           next_skill_id: has_more ? items.last.skill_id : nil,
           has_more:
         )
@@ -56,7 +87,9 @@ module Coordinator::Read
 
         record ||= create_head(event, publication)
         store_snapshot(event, publication)
-        record.update!(revision: publication.revision, updated_at: event.created_at)
+        record.assign_attributes(revision: publication.revision)
+        record.updated_at = [ record.updated_at, event.created_at ].compact.max
+        record.save!(touch: false)
         record
       end
 
@@ -82,7 +115,7 @@ module Coordinator::Read
             updated_at: event.created_at
           )
         )
-        store_assets(publication)
+        store_assets(event, publication)
         snapshot
       end
 
@@ -106,7 +139,7 @@ module Coordinator::Read
         }
       end
 
-      def store_assets(publication)
+      def store_assets(event, publication)
         return if publication.assets.empty?
 
         Coordinator::Read::SkillAsset.insert_all!(
@@ -114,8 +147,8 @@ module Coordinator::Read
             asset_attributes(asset).merge(
               skill_id: publication.skill_id,
               revision: publication.revision,
-              created_at: Time.iso8601(publication.published_at),
-              updated_at: Time.iso8601(publication.published_at)
+              created_at: event.created_at,
+              updated_at: event.created_at
             )
           end,
           record_timestamps: false

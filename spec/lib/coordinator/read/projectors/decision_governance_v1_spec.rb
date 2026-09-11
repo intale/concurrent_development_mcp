@@ -1,7 +1,13 @@
 # frozen_string_literal: true
 
 RSpec.describe Coordinator::Read::Projectors::DecisionGovernanceV1, :read_model do
-  subject(:projector) { described_class.new }
+  subject(:projector) do
+    described_class.new(
+      interpretation_evidence_loader: Coordinator::Read::Decisions::InterpretationEvidenceLoader.new(
+        event_store: Coordinator::Container["event_store"]
+      )
+    )
+  end
 
   let(:repository_id) { "018f0f4d-4e45-7abc-8def-000000000001" }
   let(:correlation_id) { SecureRandom.uuid_v7 }

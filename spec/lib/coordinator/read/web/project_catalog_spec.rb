@@ -18,7 +18,7 @@ RSpec.describe Coordinator::Read::Web::Queries::ProjectCatalog, :read_model do
   end
 
   it "discovers exact Project scopes with bounded explicit Repository previews" do
-    first = catalog.page(first: 2, repositories_first: 2, sort: "scope_asc")
+    first = catalog.page(first: 2, repositories_first: 2, sort: "newest_first")
 
     expect(first.items.map(&:scope)).to eq(%w[project:alpha project:beta])
     expect(first).to have_attributes(has_more: true, next_scope: "project:beta")
@@ -40,26 +40,32 @@ RSpec.describe Coordinator::Read::Web::Queries::ProjectCatalog, :read_model do
     second = catalog.page(
       first: 2,
       repositories_first: 2,
-      sort: "scope_asc",
-      after_scope: first.next_scope
+      sort: "newest_first",
+      after_scope: first.next_scope,
+      after_updated_at: first.next_updated_at
     )
     expect(second.items.map(&:scope)).to eq([ "project:gamma" ])
     expect(second).to have_attributes(has_more: false, next_scope: nil)
   end
 
   it "searches scope, Repository display name, and Repository path on the server" do
-    by_scope = catalog.page(search: "ALPHA", sort: "scope_asc")
-    by_name = catalog.page(search: "billing", sort: "scope_asc")
-    by_path = catalog.page(search: "search-target", sort: "scope_asc")
+    by_scope = catalog.page(search: "ALPHA", sort: "newest_first")
+    by_name = catalog.page(search: "billing", sort: "newest_first")
+    by_path = catalog.page(search: "search-target", sort: "newest_first")
 
     expect(by_scope.items.map(&:scope)).to eq([ "project:alpha" ])
     expect(by_name.items.map(&:scope)).to eq([ "project:alpha" ])
     expect(by_path.items.map(&:scope)).to eq([ "project:beta" ])
   end
 
-  it "supports descending stable scope continuation" do
-    first = catalog.page(first: 2, sort: "scope_desc")
-    second = catalog.page(first: 2, sort: "scope_desc", after_scope: first.next_scope)
+  it "supports stable oldest-event-time continuation" do
+    first = catalog.page(first: 2, sort: "oldest_first")
+    second = catalog.page(
+      first: 2,
+      sort: "oldest_first",
+      after_scope: first.next_scope,
+      after_updated_at: first.next_updated_at
+    )
 
     expect(first.items.map(&:scope)).to eq(%w[project:gamma project:beta])
     expect(second.items.map(&:scope)).to eq([ "project:alpha" ])
@@ -71,7 +77,8 @@ RSpec.describe Coordinator::Read::Web::Queries::ProjectCatalog, :read_model do
     second = catalog.overview(
       project_ref:,
       repositories_first: 2,
-      after_repository_id: first.repositories.next_repository_id
+      after_repository_id: first.repositories.next_repository_id,
+      after_updated_at: first.repositories.next_updated_at
     )
 
     expect(first).to have_attributes(
@@ -131,7 +138,9 @@ RSpec.describe Coordinator::Read::Web::Queries::ProjectCatalog, :read_model do
       scope:,
       display_name: name,
       paths: [ path ],
-      registered_at_domain: Time.utc(2020, 1, 1, 12)
+      registered_at_domain: Time.utc(2020, 1, 1, 12),
+      created_at: Time.utc(2026, 8, 30, 12) - index.seconds,
+      updated_at: Time.utc(2026, 8, 30, 12) - index.seconds
     )
   end
 end

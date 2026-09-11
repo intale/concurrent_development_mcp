@@ -5,6 +5,8 @@ module Coordinator
         PROJECTION: ProjectionDefinition
 
         def initialize: (
+          ?definition_loader: Write::VerificationObligations::DefinitionLoader?,
+          ?outcome_state_loader: Write::VerificationObligations::OutcomeStateLoader?,
           ?contract: Contracts::VerificationObligationSourceEvent,
           ?schema_registry: Write::EventSchemaRegistry,
           ?obligations: Repositories::VerificationObligations,

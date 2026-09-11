@@ -2,7 +2,9 @@ module Coordinator
   module Read
     module Contracts
       class CoordContextSourceEvent
-        EVENT_STREAMS: Hash[String, [String, String]]
+        EVENT_STREAMS: Hash[[String, Integer], [String, String]]
+        EVENT_TYPES: Array[String]
+        SCHEMA_VERSIONS: Array[Integer]
 
         def call: (command_input input) -> Dry::Validation::Result
       end

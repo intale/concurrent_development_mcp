@@ -4,7 +4,10 @@ import {
   ProjectArtifactsDocument,
   ProjectSkillAssetDocument,
   ProjectSkillDocument,
-  ProjectSkillsDocument
+  ProjectSkillsDocument,
+  SkillAssetDocument,
+  SkillDocument,
+  SkillsDocument
 } from "../gql/graphql.js";
 import type {
   ArtifactRelationDirection,
@@ -22,7 +25,13 @@ import type {
   ProjectSkillQuery,
   ProjectSkillQueryVariables,
   ProjectSkillsQuery,
-  ProjectSkillsQueryVariables
+  ProjectSkillsQueryVariables,
+  SkillAssetQuery,
+  SkillAssetQueryVariables,
+  SkillQuery,
+  SkillQueryVariables,
+  SkillsQuery,
+  SkillsQueryVariables
 } from "../gql/graphql.js";
 import { executeGraphql } from "../graphql-client.js";
 
@@ -35,6 +44,35 @@ export interface ArtifactFilters {
 export interface RelationshipFilters {
   readonly direction: ArtifactRelationDirection;
   readonly relation?: DevelopmentArtifactRelationKind;
+}
+
+export function fetchSkills(
+  projectScope: string | undefined,
+  name: string | undefined,
+  after: string | null,
+  signal: AbortSignal
+): Promise<SkillsQuery> {
+  const variables: SkillsQueryVariables = {
+    first: 20,
+    ...(projectScope ? { projectScope } : {}),
+    ...(name ? { name } : {}),
+    ...(after ? { after } : {})
+  };
+  return executeGraphql(SkillsDocument, variables, signal);
+}
+
+export function fetchSkill(skillId: string, signal: AbortSignal): Promise<SkillQuery> {
+  const variables: SkillQueryVariables = { skillId };
+  return executeGraphql(SkillDocument, variables, signal);
+}
+
+export function fetchSkillAsset(
+  skillId: string,
+  path: string,
+  signal: AbortSignal
+): Promise<SkillAssetQuery> {
+  const variables: SkillAssetQueryVariables = { skillId, path };
+  return executeGraphql(SkillAssetDocument, variables, signal);
 }
 
 export function fetchProjectSkills(

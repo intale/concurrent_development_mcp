@@ -26,9 +26,13 @@ module CandidateObligationScenario
       invocation(pair:, policy:)
     )
     event = obligation_events(result.obligation_id).find { _1.type == "VerificationObligationCreated" }
-    definition = Coordinator::Write::VerificationObligations::DefinitionLoader.new(
+    loaded = Coordinator::Write::VerificationObligations::DefinitionLoader.new(
       event_store:
-    ).call(result.obligation_id).definition
+    ).call(result.obligation_id)
+    unless loaded
+      raise "Verification obligation #{result.obligation_id} was not persisted: #{result.to_h.inspect}"
+    end
+    definition = loaded.definition
     { pair:, policy:, result:, event:, payload: definition }
   end
 

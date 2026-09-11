@@ -81,6 +81,9 @@ module McpAcceptanceWorld
     path:,
     repository_id: acceptance_repository_id,
     base_blob_oid: nil,
+    mode: nil,
+    purpose: nil,
+    context: nil,
     client_id: "default",
     actor_id: nil
   )
@@ -91,7 +94,7 @@ module McpAcceptanceWorld
       client_id:,
       actor_id:
     )
-    { resource_id:, base_blob_oid: }.compact
+    { resource_id:, base_blob_oid:, mode:, purpose:, context: }.compact
   end
 
   def resolve_resource_id(
@@ -173,7 +176,7 @@ module McpAcceptanceWorld
   end
 
   def project_attempt_context(change_set_id:, work_item_id:, attempt_id:)
-    expected_lease_set_id = write_set_events(attempt_id).last&.data&.fetch("lease_set_id", nil)
+    expected_intention_set_id = work_intention_set_state(attempt_id)&.set_id
     await_read_model("Attempt #{attempt_id} coordination context to become available") do
       payload = coordination_context(attempt_id:)
       context = payload.dig("data", "context")
@@ -181,7 +184,7 @@ module McpAcceptanceWorld
       matches = context&.dig("change_set", "change_set_id") == change_set_id &&
                 context.fetch("work_items", []).any? { _1.fetch("work_item_id") == work_item_id } &&
                 attempt &&
-                (!expected_lease_set_id || attempt.dig("write_set", "lease_set_id") == expected_lease_set_id)
+                (!expected_intention_set_id || attempt.dig("write_set", "lease_set_id") == expected_intention_set_id)
       [ matches, payload ]
     end
   end
@@ -327,6 +330,51 @@ module McpAcceptanceWorld
     )
   end
 
+  def work_intention_set_state(attempt_id)
+    Coordinator::Write::WorkIntentionSetLoader.new(event_store:).find_by_attempt(attempt_id)
+  end
+
+  def work_intention_set_events(attempt_id)
+    state = work_intention_set_state(attempt_id)
+    return [] unless state
+
+    event_store.read(
+      streams.work_intention_set(state.set_id),
+      Coordinator::Write::EventQueries::WORK_INTENTION_SET_STATE
+    )
+  end
+
+  def work_intention_events(intention_id)
+    event_store.read_grouped(
+      streams.resource_work_intention(intention_id),
+      Coordinator::Write::EventQueries::WORK_INTENTION_STATE
+    ).reverse
+  end
+
+  def work_intention_events_for_attempt(attempt_id)
+    state = work_intention_set_state(attempt_id)
+    return [] unless state
+
+    state.members.flat_map { work_intention_events(_1.intention_id) }
+  end
+
+  def work_intention_events_for_command(command_id)
+    %w[WorkIntentionSet ResourceWorkIntention].flat_map do |stream_name|
+      event_store.read_global_marked(
+        Coordinator::Write::GlobalMarkedEventReadCriteria.new(
+          stream_context: "DevelopmentCoordination",
+          stream_name:,
+          event_types: stream_name == "WorkIntentionSet" ?
+            %w[WorkIntentionSetCreated WorkIntentionAddedToSet] :
+            Coordinator::Write::EventQueries::WORK_INTENTION_LIFECYCLE_EVENT_TYPES,
+          markers: [ "command:#{resolve_command_id(command_id)}" ],
+          maximum_count: 64,
+          direction: :asc
+        )
+      )
+    end
+  end
+
   def guidance_events(conversation_id)
     event_store.read(
       streams.conversation(conversation_id),
@@ -348,18 +396,17 @@ module McpAcceptanceWorld
   end
 
   def interpretation_events(message_id)
-    event_store.read(
-      streams.interpretation(message_id),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: %w[
-          DecisionInterpretationProposed
-          DecisionClarificationRequired
-          DecisionInterpretationAccepted
-          DecisionInterpretationRejected
-        ],
-        maximum_count: 100,
-        direction: :asc
-      )
+    read_global_marked_events(
+      stream_context: "HumanGuidance",
+      stream_name: "Interpretation",
+      event_types: %w[
+        DecisionInterpretationProposed
+        DecisionClarificationRequired
+        DecisionInterpretationAccepted
+        DecisionInterpretationRejected
+      ],
+      marker: "message:#{message_id}",
+      maximum_count: 100
     )
   end
 
@@ -428,7 +475,7 @@ module McpAcceptanceWorld
     event_store.read(
       streams.decision_partition(partition_id),
       Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "DecisionPartitionAdvanced" ],
+        event_types: [ "DecisionAddedToPartition", "DecisionRemovedFromPartition" ],
         maximum_count: 10,
         direction: :asc
       )
@@ -678,7 +725,7 @@ module McpAcceptanceWorld
     read_global_marked_events(
       stream_context: "AgentGovernance",
       stream_name: "AgentChoiceImpact",
-      event_types: [ "AgentChoiceImpactAssessed" ],
+      event_types: [ "AgentChoiceImpactAssessmentRecorded" ],
       marker:,
       maximum_count: 1
     ).first

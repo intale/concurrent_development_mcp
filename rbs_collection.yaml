@@ -43,6 +43,7 @@ gems:
   - name: concurrent-ruby
     ignore: true
   - name: connection_pool
+    ignore: true
   - name: date
     ignore: true
   - name: dbm

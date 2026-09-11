@@ -10,7 +10,7 @@ module Coordinator::Read::Web
       attribute :sort, Sort
       attribute :change_set_id, Coordinator::Shared::Types::Identifier.optional
       attribute :checkpoint_kind, Coordinator::Shared::Types::CandidateCheckpointKind.optional
-      attribute :after_position, Coordinator::Shared::Types::GlobalPosition.optional
+      attribute :after_updated_at, Coordinator::Shared::Types::Timestamp.optional
       attribute :after_id, Coordinator::Shared::Types::Identifier.optional
     end
 
@@ -20,7 +20,7 @@ module Coordinator::Read::Web
       attribute :sort, Sort
       attribute :change_set_id, Coordinator::Shared::Types::Identifier.optional
       attribute :status, Coordinator::Shared::Types::VerificationObligationStatus.optional
-      attribute :after_position, Coordinator::Shared::Types::GlobalPosition.optional
+      attribute :after_updated_at, Coordinator::Shared::Types::Timestamp.optional
       attribute :after_id, Coordinator::Shared::Types::Identifier.optional
     end
 
@@ -28,7 +28,7 @@ module Coordinator::Read::Web
       attribute :project_scope, Coordinator::Shared::Types::String
       attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 50)
       attribute :sort, Sort
-      attribute :after_position, Coordinator::Shared::Types::GlobalPosition.optional
+      attribute :after_updated_at, Coordinator::Shared::Types::Timestamp.optional
       attribute :after_id, Coordinator::Shared::Types::Identifier.optional
     end
 
@@ -38,7 +38,7 @@ module Coordinator::Read::Web
       attribute :sort, Sort
       attribute :change_set_id, Coordinator::Shared::Types::Identifier.optional
       attribute :status, Coordinator::Shared::Types::String.optional
-      attribute :after_position, Coordinator::Shared::Types::GlobalPosition.optional
+      attribute :after_updated_at, Coordinator::Shared::Types::Timestamp.optional
       attribute :after_id, Coordinator::Shared::Types::Identifier.optional
     end
 
@@ -54,7 +54,7 @@ module Coordinator::Read::Web
       attribute :project_scope, Coordinator::Shared::Types::String
       attribute :obligation_id, Coordinator::Shared::Types::Identifier
       attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 50)
-      attribute :after_evidence_position, Coordinator::Shared::Types::GlobalPosition.optional
+      attribute :after_evidence_updated_at, Coordinator::Shared::Types::Timestamp.optional
       attribute :after_evidence_id, Coordinator::Shared::Types::UuidV7.optional
     end
 
@@ -62,7 +62,7 @@ module Coordinator::Read::Web
       attribute :project_scope, Coordinator::Shared::Types::String
       attribute :merge_snapshot_id, Coordinator::Shared::Types::Identifier
       attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 50)
-      attribute :after_authorization_position, Coordinator::Shared::Types::GlobalPosition.optional
+      attribute :after_authorization_updated_at, Coordinator::Shared::Types::Timestamp.optional
       attribute :after_authorization_id, Coordinator::Shared::Types::UuidV7.optional
     end
 
@@ -76,7 +76,7 @@ module Coordinator::Read::Web
       attribute :sort, Sort
       attribute :target_tool, Coordinator::Shared::Types::OperationBatchTargetTool.optional
       attribute :status, Coordinator::Shared::Types::OperationBatchStatus.optional
-      attribute :after_position, Coordinator::Shared::Types::GlobalPosition.optional
+      attribute :after_updated_at, Coordinator::Shared::Types::Timestamp.optional
       attribute :after_id, Coordinator::Shared::Types::UuidV7.optional
     end
 

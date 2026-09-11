@@ -3,6 +3,8 @@
 module Coordinator::Read
   module Repositories
     class OperationBatches
+      include EventTimestamped
+
       def initialize(
         arguments_builder: OperationBatchArguments.new,
         command_receipts: CommandReceipts.new
@@ -52,7 +54,7 @@ module Coordinator::Read
       end
 
       def store(event:, payload:)
-        record = Coordinator::Read::OperationBatch.lock.find_or_create_by!(batch_id: payload.batch_id)
+        record = Coordinator::Read::OperationBatch.lock.find_or_initialize_by(batch_id: payload.batch_id)
         case payload
         when Coordinator::Write::Events::OperationBatchCreatedV2
           store_creation(record, event, payload)
@@ -67,7 +69,7 @@ module Coordinator::Read
         when Coordinator::Write::Events::OperationBatchCancelledV2
           store_terminal(record, event, payload, kind: "cancelled")
         end
-        refresh_summary(record)
+        refresh_summary(record, event:)
       end
 
       private
@@ -97,7 +99,7 @@ module Coordinator::Read
           raise ProjectionStateError, "Operation Batch creation changed for one stream"
         end
 
-        record.update!(
+        save_from_event(record, event:, attributes: {
           target_tool: payload.target_tool,
           total: payload.items.length,
           page_size: payload.page_size,
@@ -112,11 +114,11 @@ module Coordinator::Read
           created_global_position: event.global_position,
           created_at_domain: event.created_at,
           created_at_store: event.created_at
-        )
-        payload.items.each { store_item(record, _1) }
+        })
+        payload.items.each { store_item(record, _1, event:) }
       end
 
-      def store_item(batch, item)
+      def store_item(batch, item, event:)
         record = Coordinator::Read::OperationBatchItem.find_or_initialize_by(
           batch_id: batch.batch_id,
           item_index: item.index
@@ -137,13 +139,12 @@ module Coordinator::Read
           unless matches
             raise ProjectionStateError, "Operation Batch manifest item changed for one stream"
           end
-          backfill_outcome(record)
+          backfill_outcome(record, event:)
           return
         end
 
-        record.assign_attributes(attributes)
-        record.save!
-        backfill_outcome(record)
+        save_from_event(record, event:, attributes:)
+        backfill_outcome(record, event:)
       end
 
       def store_outcome(record, event, payload, status:)
@@ -176,7 +177,7 @@ module Coordinator::Read
           finished_at_domain: event.created_at,
           finished_at_store: event.created_at
         )
-        outcome.save!
+        save_from_event(outcome, event:)
       end
 
       def verify_outcome!(outcome, payload, status:)
@@ -186,7 +187,7 @@ module Coordinator::Read
         raise ProjectionStateError, "Operation Batch item has conflicting outcomes"
       end
 
-      def backfill_outcome(item)
+      def backfill_outcome(item, event:)
         outcome = Coordinator::Read::OperationBatchOutcome.find_by(
           batch_id: item.batch_id,
           item_index: item.item_index
@@ -196,14 +197,14 @@ module Coordinator::Read
           raise ProjectionStateError, "Operation Batch outcome targets another Command"
         end
 
-        outcome.update!(
+        save_from_event(outcome, event:, attributes: {
           command_id: item.command_id,
           canonical_input_digest: item.canonical_input_digest
-        )
+        })
       end
 
       def store_cancellation(record, event, payload)
-        record.update!(
+        save_from_event(record, event:, attributes: {
           cancellation_requested: true,
           cancellation_event: event_reference(event).to_h,
           cancellation_actor: actor(event).to_h,
@@ -214,7 +215,7 @@ module Coordinator::Read
           cancellation_global_position: event.global_position,
           cancellation_at_domain: event.created_at,
           cancellation_at_store: event.created_at
-        )
+        })
       end
 
       def store_terminal(record, event, payload, kind:)
@@ -222,7 +223,7 @@ module Coordinator::Read
           raise ProjectionStateError, "Operation Batch has conflicting terminal outcomes"
         end
 
-        record.update!(
+        save_from_event(record, event:, attributes: {
           terminal_kind: kind,
           terminal_event: event_reference(event).to_h,
           terminal_actor: actor(event).to_h,
@@ -233,10 +234,10 @@ module Coordinator::Read
           terminal_global_position: event.global_position,
           terminal_at_domain: event.created_at,
           terminal_at_store: event.created_at
-        )
+        })
       end
 
-      def refresh_summary(record)
+      def refresh_summary(record, event:)
         statuses = Coordinator::Read::OperationBatchOutcome.where(batch_id: record.batch_id).group(:status).count
         succeeded = statuses.fetch("succeeded", 0)
         rejected = statuses.fetch("rejected", 0)
@@ -245,7 +246,7 @@ module Coordinator::Read
         when "completed" then rejected.positive? ? "completed_with_errors" : "completed"
         else record.cancellation_requested ? "cancelling" : "running"
         end
-        record.update!(succeeded_count: succeeded, rejected_count: rejected, status:)
+        save_from_event(record, event:, attributes: { succeeded_count: succeeded, rejected_count: rejected, status: })
       end
 
       def build_item(item, outcome, receipt:, terminal_kind:)

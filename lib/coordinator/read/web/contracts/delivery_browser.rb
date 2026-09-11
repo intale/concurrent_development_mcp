@@ -23,7 +23,7 @@ module Coordinator::Read::Web::Contracts
           :string,
           included_in?: Coordinator::Shared::Types::CANDIDATE_CHECKPOINT_KINDS
         )
-        optional(:after_position).maybe(:integer, gteq?: 0)
+        optional(:after_updated_at).maybe(:string)
         optional(:after_id).maybe(:string)
       end
 
@@ -33,8 +33,10 @@ module Coordinator::Read::Web::Contracts
         key.failure("must be an identifier") unless Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
       end
 
-      rule(:after_position, :after_id) do
-        base.failure("cursor coordinates must both be present or absent") unless values[:after_position].nil? == values[:after_id].nil?
+      rule(:after_updated_at, :after_id) do
+        base.failure("cursor coordinates must both be present or absent") unless values[:after_updated_at].nil? == values[:after_id].nil?
+        key(:after_updated_at).failure("must be an event timestamp") if values[:after_updated_at] &&
+          !Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(values[:after_updated_at])
       end
     end
 
@@ -50,7 +52,7 @@ module Coordinator::Read::Web::Contracts
           :string,
           included_in?: Coordinator::Shared::Types::VERIFICATION_OBLIGATION_STATUSES
         )
-        optional(:after_position).maybe(:integer, gteq?: 0)
+        optional(:after_updated_at).maybe(:string)
         optional(:after_id).maybe(:string)
       end
 
@@ -60,8 +62,10 @@ module Coordinator::Read::Web::Contracts
         key.failure("must be an identifier") unless Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
       end
 
-      rule(:after_position, :after_id) do
-        base.failure("cursor coordinates must both be present or absent") unless values[:after_position].nil? == values[:after_id].nil?
+      rule(:after_updated_at, :after_id) do
+        base.failure("cursor coordinates must both be present or absent") unless values[:after_updated_at].nil? == values[:after_id].nil?
+        key(:after_updated_at).failure("must be an event timestamp") if values[:after_updated_at] &&
+          !Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(values[:after_updated_at])
       end
     end
 
@@ -72,7 +76,7 @@ module Coordinator::Read::Web::Contracts
         required(:project_ref).filled(:string)
         optional(:first).filled(:integer, gteq?: 1, lteq?: 50)
         optional(:sort).filled(:string, included_in?: SORTS)
-        optional(:after_position).maybe(:integer, gteq?: 0)
+        optional(:after_updated_at).maybe(:string)
         optional(:after_id).maybe(:string)
       end
 
@@ -82,8 +86,10 @@ module Coordinator::Read::Web::Contracts
         key.failure("must be an identifier") unless Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
       end
 
-      rule(:after_position, :after_id) do
-        base.failure("cursor coordinates must both be present or absent") unless values[:after_position].nil? == values[:after_id].nil?
+      rule(:after_updated_at, :after_id) do
+        base.failure("cursor coordinates must both be present or absent") unless values[:after_updated_at].nil? == values[:after_id].nil?
+        key(:after_updated_at).failure("must be an event timestamp") if values[:after_updated_at] &&
+          !Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(values[:after_updated_at])
       end
     end
 
@@ -96,7 +102,7 @@ module Coordinator::Read::Web::Contracts
         optional(:sort).filled(:string, included_in?: SORTS)
         optional(:change_set_id).maybe(:string)
         optional(:status).maybe(:string, included_in?: RELEASE_STATUSES)
-        optional(:after_position).maybe(:integer, gteq?: 0)
+        optional(:after_updated_at).maybe(:string)
         optional(:after_id).maybe(:string)
       end
 
@@ -106,8 +112,10 @@ module Coordinator::Read::Web::Contracts
         key.failure("must be an identifier") unless Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
       end
 
-      rule(:after_position, :after_id) do
-        base.failure("cursor coordinates must both be present or absent") unless values[:after_position].nil? == values[:after_id].nil?
+      rule(:after_updated_at, :after_id) do
+        base.failure("cursor coordinates must both be present or absent") unless values[:after_updated_at].nil? == values[:after_id].nil?
+        key(:after_updated_at).failure("must be an event timestamp") if values[:after_updated_at] &&
+          !Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(values[:after_updated_at])
       end
     end
 
@@ -137,7 +145,7 @@ module Coordinator::Read::Web::Contracts
         required(:project_ref).filled(:string)
         required(:obligation_id).filled(:string)
         optional(:first).filled(:integer, gteq?: 1, lteq?: 50)
-        optional(:after_evidence_position).maybe(:integer, gteq?: 0)
+        optional(:after_evidence_updated_at).maybe(:string)
         optional(:after_evidence_id).maybe(:string)
       end
 
@@ -151,10 +159,12 @@ module Coordinator::Read::Web::Contracts
         key.failure("must be an identifier") unless Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
       end
 
-      rule(:after_evidence_position, :after_evidence_id) do
-        position = values[:after_evidence_position]
+      rule(:after_evidence_updated_at, :after_evidence_id) do
+        position = values[:after_evidence_updated_at]
         identifier = values[:after_evidence_id]
         base.failure("evidence cursor coordinates must both be present or absent") unless position.nil? == identifier.nil?
+        key(:after_evidence_updated_at).failure("must be an event timestamp") if position &&
+          !Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(position)
       end
     end
 
@@ -165,7 +175,7 @@ module Coordinator::Read::Web::Contracts
         required(:project_ref).filled(:string)
         required(:merge_snapshot_id).filled(:string)
         optional(:first).filled(:integer, gteq?: 1, lteq?: 50)
-        optional(:after_authorization_position).maybe(:integer, gteq?: 0)
+        optional(:after_authorization_updated_at).maybe(:string)
         optional(:after_authorization_id).maybe(:string)
       end
 
@@ -179,10 +189,12 @@ module Coordinator::Read::Web::Contracts
         key.failure("must be an identifier") unless Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
       end
 
-      rule(:after_authorization_position, :after_authorization_id) do
-        position = values[:after_authorization_position]
+      rule(:after_authorization_updated_at, :after_authorization_id) do
+        position = values[:after_authorization_updated_at]
         identifier = values[:after_authorization_id]
         base.failure("authorization cursor coordinates must both be present or absent") unless position.nil? == identifier.nil?
+        key(:after_authorization_updated_at).failure("must be an event timestamp") if position &&
+          !Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(position)
       end
     end
 
@@ -207,7 +219,7 @@ module Coordinator::Read::Web::Contracts
         optional(:sort).filled(:string, included_in?: SORTS)
         optional(:target_tool).maybe(:string, included_in?: BATCH_TOOLS)
         optional(:status).maybe(:string, included_in?: BATCH_STATUSES)
-        optional(:after_position).maybe(:integer, gteq?: 0)
+        optional(:after_updated_at).maybe(:string)
         optional(:after_id).maybe(:string)
       end
 
@@ -217,10 +229,12 @@ module Coordinator::Read::Web::Contracts
         key.failure("must be a UUIDv7") unless Coordinator::Shared::Types::UUID_V7_PATTERN.match?(value)
       end
 
-      rule(:after_position, :after_id) do
-        position = values[:after_position]
+      rule(:after_updated_at, :after_id) do
+        position = values[:after_updated_at]
         identifier = values[:after_id]
         base.failure("batch cursor coordinates must both be present or absent") unless position.nil? == identifier.nil?
+        key(:after_updated_at).failure("must be an event timestamp") if position &&
+          !Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(position)
       end
     end
 

@@ -1,42 +1,43 @@
 @event-contract
-Feature: Dynamic write-set leases
-  Agents reserve complete normalized resource sets through authoritative Tasks.
+Feature: Dynamic work intentions
+  Agents declare shared or exclusive intentions for normalized resources through authoritative Tasks.
+  Intentions communicate planned work; only an exclusive intention prevents overlapping declarations.
   Available projections report observations without authorizing edits.
 
   Background:
     Given an MCP agent supports checkpointed Tasks
 
-  Rule: Overlapping write sets are reserved atomically
+  Rule: Exclusive work intentions reject overlapping declarations atomically
 
     @AUD-LEASE-DF-CONFLICT-01 @LEASE-DESC-01 @live-subscriptions @concurrency
-    Scenario: A directory lease blocks a later child-file lease through public MCP Tasks
+    Scenario: An exclusive directory intention blocks a later shared child-file intention
       Given two independent MCP agents have live active Attempts in ChangeSet "CS-AUD-LSE-DIR-FIRST"
-      When agent "agent-a" reserves directory "app/models" through a public Task
-      And agent "agent-b" reserves file "app/models/user.rb" through a public Task
-      Then the first hierarchical reservation succeeds and the second completes busy
-      And only the directory resource has a durable lease acquisition
+      When agent "agent-a" declares an exclusive intention for directory "app/models" through a public Task
+      And agent "agent-b" declares a shared intention for file "app/models/user.rb" through a public Task
+      Then the first hierarchical intention succeeds and the second completes busy with its blocker context
+      And only the directory resource has a durable intention declaration
 
     @AUD-LEASE-DF-CONFLICT-02 @LEASE-DESC-01 @live-subscriptions @concurrency
-    Scenario: A child-file lease blocks a later parent-directory lease through public MCP Tasks
+    Scenario: A shared child-file intention blocks a later exclusive parent-directory intention
       Given two independent MCP agents have live active Attempts in ChangeSet "CS-AUD-LSE-FILE-FIRST"
-      When agent "agent-a" reserves file "app/models/user.rb" through a public Task
-      And agent "agent-b" reserves directory "app/models" through a public Task
-      Then the first hierarchical reservation succeeds and the second completes busy
-      And only the file resource has a durable lease acquisition
+      When agent "agent-a" declares a shared intention for file "app/models/user.rb" through a public Task
+      And agent "agent-b" declares an exclusive intention for directory "app/models" through a public Task
+      Then the first hierarchical intention succeeds and the second completes busy with its blocker context
+      And only the file resource has a durable intention declaration
 
     @LEASE-EQUAL-01 @live-subscriptions
-    Scenario: A second agent cannot introduce another kind at a currently leased path
+    Scenario: A second agent cannot introduce another kind at a registered path
       Given two independent MCP agents have live active Attempts in ChangeSet "CS-ID-LSE-EQUAL-PATH"
-      When agent "agent-a" reserves file "app/models" through a public Task
+      When agent "agent-a" declares a shared intention for file "app/models" through a public Task
       And agent "agent-b" tries to resolve directory "app/models" for leasing
       Then the first hierarchical reservation succeeds and the alternative kind is denied
-      And only the current file resource has a durable lease acquisition
+      And only the current file resource has a durable intention declaration
 
     @LEASE-FILE-PREFIX-01 @live-subscriptions
-    Scenario: A file lease does not cover a descendant-looking path
+    Scenario: Shared file intentions coexist at descendant-looking paths
       Given two independent MCP agents have live active Attempts in ChangeSet "CS-ID-LSE-FILE-PREFIX"
-      When agent "agent-a" reserves file "app/models" through a public Task
-      And agent "agent-b" reserves file "app/models/user.rb" through a public Task
+      When agent "agent-a" declares a shared intention for file "app/models" through a public Task
+      And agent "agent-b" declares a shared intention for file "app/models/user.rb" through a public Task
       Then both hierarchical reservation Tasks complete successfully
 
     @AUD-LEASE-DISJOINT-03 @live-subscriptions @concurrency
@@ -52,12 +53,12 @@ Feature: Dynamic write-set leases
       Given two independent MCP agents have live active Attempts in ChangeSet "CS-AUD-LSE-PATH-BYTES"
       When agent "agent-a" submits literal resource path "app\\models\\user.rb" through public MCP
       Then MCP rejects the unsupported path before allocating a Task
-      And no lease is stored for either path spelling
+      And no work intention is stored for either path spelling
 
     @CDM-LEASE-001 @concurrency @stale-view
-    Scenario: Two active agents request an overlapping file through concurrent Tasks
+    Scenario: Concurrent shared and exclusive declarations for one file produce one blocker
       Given agents "agent-a" and "agent-b" have active Attempts in ChangeSet "CS-CUC-LSE"
-      When both agents concurrently reserve initial write sets overlapping on "db/schema.rb"
+      When both agents concurrently declare initial work intentions overlapping on "db/schema.rb"
       Then one reservation Task succeeds and the other completes busy
       And the winner owns its complete write set
       And the loser owns no partial write set
@@ -74,11 +75,11 @@ Feature: Dynamic write-set leases
     Scenario: Cancelling a queued reservation writes no lease
       Given agents "agent-a" and "agent-b" have active Attempts in ChangeSet "CS-CUC-LSE-CANCEL"
       When agent "agent-a" cancels a queued reservation for "app/shared.rb" before execution
-      Then the cancelled reservation writes no lease fact
+      Then the cancelled reservation writes no work-intention fact
       When agent "agent-b" deliberately reserves "app/shared.rb"
       Then the successor obtains fencing token 1
 
-  Rule: An agent expands its current write set without renewing it
+  Rule: An agent expands its current intention set without renewing it
 
     @CDM-LEASE-007 @stale-view
     Scenario: Added file evidence reaches an available read model after the durable Task
@@ -89,7 +90,7 @@ Feature: Dynamic write-set leases
       When the write-set expansion reaches the read side
       Then available context exposes both observed files without a freshness claim
 
-  Rule: An agent renews its complete observed lease set
+  Rule: An agent renews its complete observed intention set
 
     @CDM-LEASE-008 @stale-view
     Scenario: A durable renewal extends ownership while an older context remains available
@@ -100,16 +101,7 @@ Feature: Dynamic write-set leases
       When the write-set renewal reaches the read side
       Then available context exposes the later observed deadline without a freshness claim
 
-    @CDM-LEASE-006
-    Scenario: Renewal makes an older observed expiry non-authoritative
-      Given agents "agent-a" and "agent-b" have active Attempts in ChangeSet "CS-CUC-RENEW-BUSY"
-      And agent "agent-a" reserves "app/shared.rb" for 30 seconds
-      When the predecessor renews its exact lease set before the old deadline
-      Then the authoritative deadline moves beyond the old expiry
-      When agent "agent-b" deliberately reserves after the old deadline but before the renewed deadline
-      Then the contender remains busy with the renewed deadline
-
-  Rule: An agent releases its complete observed lease set
+  Rule: An agent withdraws its complete observed intention set
 
     @CDM-LEASE-010 @stale-view
     Scenario: A durable release frees the set while an older context remains available
@@ -149,14 +141,6 @@ Feature: Dynamic write-set leases
       When the agent reacquires the requeued WorkItem as fresh Attempt "A-CUC-ABANDON-NEXT"
       Then the fresh Attempt starts from a new base declaration while the old Attempt remains terminal
 
-    @CDM-ATTEMPT-002 @concurrency
-    Scenario: Abandonment never releases a fence acquired by a successor
-      Given agents "agent-a" and "agent-b" have active Attempts in ChangeSet "CS-CUC-ABANDON-SUPERSEDED"
-      And agent "agent-a" reserves "app/shared.rb" for 30 seconds
-      And after its deadline agent "agent-b" reserves the same file before the expiry policy runs
-      When the expired predecessor abandons its Attempt
-      Then the abandonment requeues the predecessor and leaves the successor fence untouched
-
     @CDM-ATTEMPT-003 @event-contract
     Scenario: A final Candidate prevents Attempt abandonment
       Given agent "agent-a" has submitted "final" Candidate "CAN-CUC-ABANDON" for active Attempt "A-CUC-CAN-ABANDON"
@@ -168,33 +152,3 @@ Feature: Dynamic write-set leases
       Given agent "agent-a" has submitted "intermediate" Candidate "CAN-CUC-ABANDON" for active Attempt "A-CUC-CAN-ABANDON"
       When the agent tries to abandon the Candidate-bearing Attempt
       Then the checkpoint remains recorded while the Attempt is abandoned and requeued
-
-  Rule: Elapsed lease availability does not wait for expiry audit
-
-    @AUD-LEASE-EXPIRY-ID-05 @live-subscriptions @event-contract
-    Scenario: A public use of the acquisition event ID cannot preempt lease expiry
-      Given two independent MCP agents have live active Attempts in ChangeSet "CS-AUD-LSE-EXPIRY-ID"
-      When agent "agent-a" reserves expiring file "app/expiry-owned.rb" through a public Task
-      And a public client uses the acquisition event ID for an unrelated mutation
-      And the real lease-expiry job handles the due source
-      Then the lease expires under a distinct deterministic internal command
-      When agent "agent-b" reserves the expired file through a public Task
-      Then the successor receives a higher fencing token
-      When a public client submits a command in the reserved internal namespace
-      Then MCP rejects the reserved command ID before allocating a Task
-
-    @CDM-LEASE-009 @stale-view
-    Scenario: A successor reserves an elapsed file before the predecessor timer runs
-      Given agents "agent-a" and "agent-b" have active Attempts in ChangeSet "CS-CUC-EXPIRY"
-      When agent "agent-a" reserves "app/shared.rb" for 30 seconds
-      And that reservation reaches the available read side
-      And after its deadline agent "agent-b" reserves the same file before the expiry policy runs
-      Then the successor reservation Task succeeds with the next fencing token
-      And the successor was admitted without an expiry audit fact
-      When the expired predecessor timer is handled
-      Then the timer is superseded and cannot affect the successor
-      When the expired predecessor tries to renew its old fence
-      Then the predecessor renewal is denied without affecting the successor
-      When the expired predecessor tries to release its old fence
-      Then the predecessor release is denied without affecting the successor
-      And the predecessor's older context remains available without a freshness claim

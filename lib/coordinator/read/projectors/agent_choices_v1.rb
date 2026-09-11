@@ -26,7 +26,7 @@ module Coordinator::Read
           next unless @processed_events.claim(
             definition: PROJECTION,
             identity:,
-            processed_at: Time.now.utc
+            processed_at: event.created_at
           )
 
           project(event, payload)
@@ -68,9 +68,11 @@ module Coordinator::Read
 
       def project(event, payload)
         case payload
-        when Coordinator::Write::Events::AgentChoiceRecordedV1
+        when Coordinator::Write::Events::AgentChoiceRecordedV1,
+             Coordinator::Write::Events::AgentChoiceRecordedV2
           @choices.store_recorded(event:, choice: payload)
-        when Coordinator::Write::Events::AgentChoiceAcceptedV1
+        when Coordinator::Write::Events::AgentChoiceAcceptedV1,
+             Coordinator::Write::Events::AgentChoiceAcceptedV2
           @choices.accept(event:, acceptance: payload)
         end
       end

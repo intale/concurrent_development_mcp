@@ -28,8 +28,9 @@ module Coordinator::Read::Web::Queries
           after_id: validated[:after_id],
           after_sort_value: validated[:after_sort_value],
           presentation_statuses: validated[:presentation_statuses] || [],
-          work_item_sort: validated[:work_item_sort] || "work_item_id_asc",
+          work_item_sort: validated[:work_item_sort] || "updated_at_desc",
           blocking: validated[:blocking],
+          domain_status: validated[:domain_status],
           change_set_id: validated[:change_set_id],
           agent_id: validated[:agent_id]
         )

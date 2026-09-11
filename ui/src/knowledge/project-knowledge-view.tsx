@@ -1,10 +1,14 @@
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
+import ReactMarkdown from "react-markdown";
 import { Link, NavLink } from "react-router-dom";
 import { CopyIdentifier } from "../copy-identifier.js";
 import { RetryRefresh } from "../retry-refresh.js";
 import type {
   ArtifactConnection,
+  GlobalSkill,
+  GlobalSkillAsset,
+  GlobalSkillConnection,
   ProjectArtifact,
   ProjectArtifactRelationships,
   ProjectSkill,
@@ -95,8 +99,8 @@ export function PaginationControls({ canPrevious, nextCursor, onNext, onPrevious
 }
 
 export function SkillCards({ connection, hrefFor }: {
-  readonly connection: SkillConnection;
-  readonly hrefFor: (name: string) => string;
+  readonly connection: SkillConnection | GlobalSkillConnection;
+  readonly hrefFor: (skill: SkillConnection["nodes"][number]) => string;
 }) {
   if (connection.nodes.length === 0) return <div className="alert alert-info" role="status">No Skills match this name.</div>;
   return (
@@ -112,7 +116,7 @@ export function SkillCards({ connection, hrefFor }: {
               <p className="mb-0">{skill.description}</p>
               <div className="small text-body-secondary">{skill.assetCount} assets · published {formatted(skill.publishedAt)}</div>
               <div className="small text-body-secondary text-break">Shared in <code>{skill.scope}</code></div>
-              <Link className="btn btn-primary align-self-start mt-auto" to={hrefFor(skill.name)}>View Skill</Link>
+              <Link className="btn btn-primary align-self-start mt-auto" to={hrefFor(skill)}>View Skill</Link>
             </div>
           </article>
         </div>
@@ -122,7 +126,7 @@ export function SkillCards({ connection, hrefFor }: {
 }
 
 export function SkillDetail({ detail, assetHref, backTo }: {
-  readonly detail: ProjectSkill;
+  readonly detail: ProjectSkill | GlobalSkill;
   readonly assetHref: (path: string) => string;
   readonly backTo: string;
 }) {
@@ -136,7 +140,7 @@ export function SkillDetail({ detail, assetHref, backTo }: {
       <div className="card-body vstack gap-4">
         <CopyIdentifier label="Skill name" value={skill.name} />
         <div><h4 className="h6">Purpose</h4><p className="mb-0">{skill.description}</p></div>
-        <Content text={skill.instructions} />
+        <Content mediaType="text/markdown" text={skill.instructions} />
         <section aria-labelledby="skill-assets-heading">
           <h4 className="h6" id="skill-assets-heading">Assets</h4>
           {skill.assets.length === 0 ? <p className="text-body-secondary mb-0">This Skill has no assets.</p> : (
@@ -158,7 +162,7 @@ export function SkillDetail({ detail, assetHref, backTo }: {
 }
 
 export function SkillAssetDetail({ detail, backTo }: {
-  readonly detail: ProjectSkillAsset;
+  readonly detail: ProjectSkillAsset | GlobalSkillAsset;
   readonly backTo: string;
 }) {
   const { asset } = detail;
@@ -170,7 +174,7 @@ export function SkillAssetDetail({ detail, backTo }: {
       </div>
       <div className="card-body vstack gap-4">
         <CopyIdentifier label="Skill asset path" value={asset.path} />
-        <Content base64={asset.base64} text={asset.text} />
+        <Content base64={asset.base64} mediaType={asset.mediaType} text={asset.text} />
         <DetailEvidence rows={[
           ["Media type", asset.mediaType],
           ["Encoding", asset.encoding],
@@ -234,7 +238,7 @@ export function ArtifactDetail({ detail, relationshipsHref, backTo }: {
           <div className="col-12 col-lg-6"><h4 className="h6">Classification</h4><p className="mb-1">{artifact.labels.map((label) => <span className="badge text-bg-secondary me-1" key={label}>{label}</span>)}</p><p className="small text-body-secondary mb-0">Revision {artifact.classificationRevision} · {artifact.classificationReason ?? "No reason recorded"}</p></div>
           <div className="col-12 col-lg-6"><h4 className="h6">Provenance</h4><p className="text-break mb-1">{humanized(artifact.source.kind)} · <code>{artifact.source.locator}</code></p><p className="small text-body-secondary mb-0">Observed {formatted(artifact.source.observedAt)} by {artifact.source.collector}</p></div>
         </div>
-        <Content base64={content.base64} text={content.text} />
+        <Content base64={content.base64} mediaType={content.mediaType} text={content.text} />
         <DetailEvidence rows={[
           ["Artifact", artifact.id],
           ["Observation", artifact.observationId],
@@ -271,10 +275,26 @@ export function RelationshipCards({ detail, peerHref }: {
   );
 }
 
-function Content({ base64, text }: { readonly base64?: string | null; readonly text?: string | null }) {
+function Content({ base64, mediaType, text }: {
+  readonly base64?: string | null;
+  readonly mediaType?: string | null;
+  readonly text?: string | null;
+}) {
+  if (text !== null && text !== undefined && markdownMediaType(mediaType)) {
+    return (
+      <div className="border rounded bg-body-tertiary p-3 overflow-auto">
+        <ReactMarkdown skipHtml>{text}</ReactMarkdown>
+      </div>
+    );
+  }
   if (text !== null && text !== undefined) return <pre className="border rounded bg-body-tertiary p-3 mb-0 text-wrap overflow-auto">{text}</pre>;
   if (base64) return <div className="alert alert-secondary mb-0">Binary content is available through the GraphQL boundary; this browser does not render or transform it.</div>;
   return <div className="text-body-secondary">No content is available in this projection.</div>;
+}
+
+function markdownMediaType(mediaType: string | null | undefined): boolean {
+  const normalized = mediaType?.split(";", 1)[0]?.trim().toLowerCase();
+  return normalized === "text/markdown" || normalized === "text/x-markdown";
 }
 
 function DetailEvidence({ rows }: { readonly rows: ReadonlyArray<readonly [string, string | null | undefined]> }) {

@@ -53,12 +53,14 @@ module Coordinator::Read::Web
     class ResourcePage < Coordinator::Shared::Value
       attribute :items, Coordinator::Shared::Types::Array.of(Resource).constrained(max_size: 100)
       attribute :next_resource_id, Coordinator::Shared::Types::UuidV7.optional
+      attribute :next_updated_at, Coordinator::Shared::Types::Timestamp.optional
       attribute :has_more, Coordinator::Shared::Types::Strict::Bool
     end
 
     class LeasePage < Coordinator::Shared::Value
       attribute :items, Coordinator::Shared::Types::Array.of(Lease).constrained(max_size: 100)
       attribute :next_lease_id, Coordinator::Shared::Types::UuidV7.optional
+      attribute :next_updated_at, Coordinator::Shared::Types::Timestamp.optional
       attribute :has_more, Coordinator::Shared::Types::Strict::Bool
       attribute :as_of, Coordinator::Shared::Types::Timestamp
     end

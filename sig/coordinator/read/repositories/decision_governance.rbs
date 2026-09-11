@@ -9,11 +9,17 @@ module Coordinator
           Array[Write::Decisions::DecisionPartitionV1] partitions
         ) -> Array[DecisionResolution::PartitionObservationV1]
         def store_decision: (event: PgEventstore::Event, decision: Write::Events::DecisionRecordedV1) -> void
+        def store_decision_v2: (event: PgEventstore::Event, decision: Write::Events::DecisionRecordedV2, interpretation: DecisionInterpretationEvidenceV2) -> DecisionDefinition
         def activate_decision: (event: PgEventstore::Event, activation: Write::Events::DecisionActivatedV1) -> void
+        def activate_decision_v2: (event: PgEventstore::Event, activation: Write::Events::DecisionActivatedV2) -> DecisionDefinition
         def correct_decision: (event: PgEventstore::Event, correction: Write::Events::DecisionDefinitionCorrectedV1) -> void
+        def correct_decision_v2: (event: PgEventstore::Event, correction: Write::Events::DecisionDefinitionCorrectedV2, interpretation: DecisionInterpretationEvidenceV2) -> DecisionDefinition
         def open_slot: (event: PgEventstore::Event, opening: Write::Events::DecisionSlotOpenedV1) -> void
+        def open_slot_v2: (event: PgEventstore::Event, opening: Write::Events::DecisionSlotOpenedV2) -> DecisionDefinition?
         def change_slot_head: (event: PgEventstore::Event, change: Write::Events::DecisionSlotHeadChangedV1) -> void
+        def change_slot_head_v2: (event: PgEventstore::Event, change: Write::Events::DecisionSlotHeadChangedV2) -> DecisionDefinition?
         def advance_partition: (event: PgEventstore::Event, advancement: Write::Events::DecisionPartitionAdvancedV1) -> void
+        def apply_partition_delta: (event: PgEventstore::Event, delta: Write::Events::DecisionAddedToPartitionV1 | Write::Events::DecisionRemovedFromPartitionV1) -> DecisionPartitionHead
       end
     end
   end

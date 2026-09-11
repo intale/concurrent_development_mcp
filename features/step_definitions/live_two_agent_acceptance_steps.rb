@@ -10,15 +10,15 @@ When("both agents discover the ChangeSet from scope and acquire their WorkItems 
   discover_and_acquire_luna_work
 end
 
-When("their parent and child write-set requests reach the real reservation boundary concurrently") do
+When("their exclusive parent and shared child work-intention requests reach the real decision boundary concurrently") do
   contend_for_luna_parent_and_child
 end
 
-Then("agent A owns the parent while agent B receives the holder and retry boundary") do
+Then("agent A declares the exclusive parent while agent B receives the blocker context") do
   assert_luna_contention_contract
 end
 
-Then("agent B can reserve a disjoint resource while agent A remains active") do
+Then("agent B can declare a disjoint intention while agent A remains active") do
   assert_acceptance_equal(3, @luna_reservations.length, "Concurrent disjoint reservations")
 end
 
@@ -33,8 +33,8 @@ end
 Then("the stale context remains available and the authoritative command is rejected") do
   assert_acceptance_equal("ok", @luna_lag_observation.dig(:stale, "status"), "Stale read")
   assert_acceptance_equal(
-    "write_set_released",
-    @luna_lag_observation.dig(:renewal, "data", "code"),
+    "denied",
+    @luna_lag_observation.dig(:renewal, "status"),
     "Stale write"
   )
 end

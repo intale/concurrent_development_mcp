@@ -1,0 +1,11 @@
+module Coordinator
+  module Read
+    class DecisionInterpretationEvidenceV2 < Value
+      attr_reader source_event: Write::EventReference
+      attr_reader proposal_event: Write::EventReference
+      attr_reader acceptance_event: Write::EventReference
+      attr_reader classifier: Write::Interpretations::ClassifierAttributionV1
+      attr_reader scope_provenance: Write::Interpretations::DecisionScopeProvenanceV1
+    end
+  end
+end

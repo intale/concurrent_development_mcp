@@ -56,8 +56,8 @@ module Coordinator::Write
       end
 
       def validate_validity(validity, report)
-        valid = validity.valid_from && validity.valid_until.nil? && validity.until_event.nil?
-        report.call(:validity, "must start at activation/correction without expiry") unless valid
+        valid = validity.valid_until.nil? && validity.until_event.nil?
+        report.call(:validity, "must not expire") unless valid
       end
 
       def validate_enforcement(enforcement, report)

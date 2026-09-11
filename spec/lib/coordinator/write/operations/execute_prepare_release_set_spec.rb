@@ -31,7 +31,9 @@ RSpec.describe Coordinator::Write::Operations::ExecutePrepareReleaseSet, :event_
     repository_ids = ReleaseSetScenario::REPOSITORIES.map { RepositoryScenario.repository_id(_1) }
     expect(payloads[1, 2].map(&:member_position)).to eq([ 1, 2 ])
     expect(payloads[1, 2].map(&:repository_id)).to eq(repository_ids)
-    expect(payloads[1, 2].map(&:candidate_id)).to all(match(/\ACAN-/))
+    expect(payloads[1, 2].flat_map(&:ordered_candidate_ids)).to all(match(/\ACAN-/))
+    expect(payloads[1, 2].map(&:merge_snapshot_id)).to all(match(/\AMS-/))
+    expect(payloads[1, 2].map(&:authorization_event)).to all(be_a(Coordinator::Write::EventReference))
     expect(prepared_payload.to_h).to eq(release_set_id: input.fetch(:release_set_id))
     expect(prepared.metadata.fetch("release_digest")).to match(Coordinator::Shared::Types::SHA256_DIGEST_PATTERN)
     expect(physical).to all(satisfy { |event| event.markers.include?("release-set:REL-success") })

@@ -71,7 +71,7 @@ module VerificationEvidenceOutcomeAcceptanceWorld
     claim:,
     assessment:
   )
-    obligation = candidate_obligation_payload
+    obligation = candidate_obligation_definition
     assessment ||= compatibility_assessment_document(
       evidence_kind:,
       conclusion:,
@@ -152,6 +152,12 @@ module VerificationEvidenceOutcomeAcceptanceWorld
     end
   end
 
+  def verification_selection_events
+    verification_obligation_history.select do |event|
+      event.type == "VerificationObligationEvidenceSelected"
+    end
+  end
+
   def project_verification_events(events, redeliver: false)
     expected_status =
       if events.any? { _1.type == "VerificationObligationSatisfied" }
@@ -211,22 +217,52 @@ module VerificationEvidenceOutcomeAcceptanceWorld
     command_id = task_command_id(attempt.fetch(:task_id))
     command_terminal = command_terminal_event(command_id)
     outcome = verification_terminal_events.find do |event|
-      event.metadata.fetch("command_id") == command_id
+      event.correlation_id == evidence&.correlation_id
     end
     assert_acceptance(evidence, "Traced evidence fact is missing")
     assert_acceptance(outcome, "Traced outcome fact is missing")
     assert_acceptance_equal("CommandSucceeded", command_terminal&.type, "Evidence command terminal")
     assert_acceptance_equal(started.id, evidence.causation_id, "Evidence immediate parent")
-    assert_acceptance_equal(started.id, outcome.causation_id, "Outcome immediate parent")
     assert_acceptance_equal(started.id, command_terminal.causation_id, "Command terminal immediate parent")
     assert_acceptance_equal(command_terminal.id, task_completed.causation_id, "Task completion parent")
+    process_step = process_step_event(
+      source_event: evidence,
+      process_name: "verification-evidence-outcome",
+      step_name: outcome.type.delete_prefix("VerificationObligation").downcase,
+      subject_kind: "verification-obligation",
+      subject_id: @obligation_id
+    )
+    assert_acceptance(process_step, "Verification outcome process step is missing")
+    outcome_facts = verification_selection_events.select do |event|
+      event.correlation_id == evidence.correlation_id
+    end + [ outcome ]
+    parents = [ process_step, *outcome_facts ].each_cons(2)
+    assert_acceptance(
+      parents.all? { |parent, child| child.causation_id == parent.id },
+      "Verification outcome facts do not form one causal Saga chain"
+    )
+    assert_acceptance_equal(
+      process_step.data.fetch("target_command_id"),
+      outcome.metadata.fetch("command_id"),
+      "Verification outcome process command"
+    )
     assert_acceptance_equal(
       [ submitted.correlation_id ],
-      [ submitted, started, evidence, outcome, command_terminal, task_completed ].map(&:correlation_id).uniq,
+      [
+        submitted,
+        started,
+        evidence,
+        process_step,
+        *outcome_facts,
+        command_terminal,
+        task_completed
+      ].map(&:correlation_id).uniq,
       "Evidence Task correlation"
     )
     assert_acceptance(
-      [ evidence, outcome, command_terminal ].none? { _1.metadata.key?("correlation_id") },
+      [ evidence, *outcome_facts, command_terminal ].none? do |event|
+        event.metadata.key?("correlation_id")
+      end,
       "Application metadata duplicates correlation"
     )
   end

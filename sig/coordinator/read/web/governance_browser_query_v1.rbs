@@ -8,6 +8,7 @@ module Coordinator
           def topic_id: () -> String?
           def policy_status: () -> String?
           def after_decision_id: () -> String?
+          def after_updated_at: () -> String?
         end
 
         class GuidanceList < Shared::Value
@@ -15,6 +16,7 @@ module Coordinator
           def first: () -> Integer
           def source: () -> String?
           def after_message_id: () -> String?
+          def after_updated_at: () -> String?
         end
 
         class Choices < Shared::Value
@@ -23,13 +25,14 @@ module Coordinator
           def choice_type: () -> String?
           def status: () -> String?
           def after_choice_id: () -> String?
+          def after_updated_at: () -> String?
         end
 
         class Impacts < Shared::Value
           def project_scope: () -> String
           def first: () -> Integer
           def outcome: () -> String?
-          def after_global_position: () -> Integer?
+          def after_updated_at: () -> String?
           def after_assessment_id: () -> String?
         end
 
@@ -49,7 +52,7 @@ module Coordinator
           def project_scope: () -> String
           def choice_id: () -> String
           def first: () -> Integer
-          def after_impact_global_position: () -> Integer?
+          def after_impact_updated_at: () -> String?
           def after_impact_assessment_id: () -> String?
         end
 
@@ -63,6 +66,7 @@ module Coordinator
           def tool_name: () -> String?
           def status: () -> String?
           def after_command_id: () -> String?
+          def after_updated_at: () -> String?
         end
 
         class Receipt < Shared::Value

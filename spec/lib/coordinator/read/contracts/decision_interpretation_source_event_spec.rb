@@ -39,7 +39,6 @@ RSpec.describe Coordinator::Read::Contracts::DecisionInterpretationSourceEvent d
     expect(result).to be_failure
     expect(result.errors.to_h.keys).to contain_exactly(
       :event_type,
-      :schema_version,
       :stream_context,
       :stream_name,
       :stream_id,
@@ -47,5 +46,6 @@ RSpec.describe Coordinator::Read::Contracts::DecisionInterpretationSourceEvent d
       :actor_kind,
       :actor_id
     )
+    expect(contract.call(valid_input.merge(schema_version: 3)).errors.to_h).to have_key(:schema_version)
   end
 end

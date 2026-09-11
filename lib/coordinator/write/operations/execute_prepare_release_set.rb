@@ -107,7 +107,9 @@ module Coordinator::Write
             ReleaseSets::MemberSummaryV2.new(
               position: member.position,
               repository_id: member.repository_id,
-              candidate_id: member.ordered_candidates.sole.candidate_id
+              merge_snapshot_id: member.merge_snapshot_id,
+              ordered_candidate_ids: member.ordered_candidates.map(&:candidate_id),
+              authorization_event: member.authorization_event
             )
           end,
           release_digest:,

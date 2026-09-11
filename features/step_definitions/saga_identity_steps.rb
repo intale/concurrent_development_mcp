@@ -39,8 +39,9 @@ end
 Then("the live ReleaseSet Saga eventually reaches its valid terminal outcome") do
   finish_paused_saga
   events = release_set_lifecycle_events(@release_set_id)
-  completion = events.select { _1.type == "ReleaseSetCompleted" }.sole
-  assert_acceptance_equal("compensated", release_set_payload(completion).outcome, "ReleaseSet outcome")
+  completion = Coordinator::Write::ReleaseSets::HistoryLoader.new(event_store:)
+    .call(@release_set_id).completion
+  assert_acceptance_equal("compensated", completion.payload.outcome, "ReleaseSet outcome")
   request = events.find { _1.type == "ReleaseSetCompensationRequested" }
   assert_acceptance_equal(@reserved_internal_command_id, request.metadata.fetch("command_id"), "Process command")
   assert_acceptance_equal([ events.first.correlation_id ], events.map(&:correlation_id).uniq, "Saga correlation")

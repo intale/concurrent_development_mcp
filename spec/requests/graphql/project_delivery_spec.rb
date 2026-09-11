@@ -97,7 +97,7 @@ module ProjectDeliveryGraphqlSpec
       query Release($projectRef: ID!, $releaseSetId: ID!) {
         projectReleaseSet(projectRef: $projectRef, releaseSetId: $releaseSetId) {
           releaseSet { id changeSetId status repositoryIds }
-          members { position repositoryId candidateId }
+          members { position repositoryId mergeSnapshotId orderedCandidateIds }
           integrations { repositoryId attemptId outcome failureCode }
           verificationAttemptCount
           activated
@@ -146,7 +146,8 @@ module ProjectDeliveryGraphqlSpec
         candidate_id: "CAN-graphql-new",
         change_set_id: CHANGE_SET_ID,
         repository_id: MEMBER_REPOSITORY_ID,
-        submitted_global_position: 102
+        submitted_global_position: 102,
+        updated_at: Time.utc(2026, 9, 4, 12, 0, 2)
       )
       create(
         :coordinator_read_candidate,
@@ -154,7 +155,8 @@ module ProjectDeliveryGraphqlSpec
         change_set_id: CHANGE_SET_ID,
         repository_id: REPOSITORY_ID,
         head_commit_oid: "c" * 40,
-        submitted_global_position: 101
+        submitted_global_position: 101,
+        updated_at: Time.utc(2026, 9, 4, 12, 0, 1)
       )
       create(
         :coordinator_read_candidate,
@@ -162,7 +164,8 @@ module ProjectDeliveryGraphqlSpec
         change_set_id: CHANGE_SET_ID,
         repository_id: OTHER_REPOSITORY_ID,
         head_commit_oid: "d" * 40,
-        submitted_global_position: 103
+        submitted_global_position: 103,
+        updated_at: Time.utc(2026, 9, 4, 12, 0, 3)
       )
       obligation = create(
         :coordinator_read_verification_obligation,

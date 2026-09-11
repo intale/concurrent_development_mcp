@@ -213,7 +213,8 @@ query ProjectDeliveryRelease($projectRef: ID!, $releaseSetId: ID!) {
     members {
       position
       repositoryId
-      candidateId
+      mergeSnapshotId
+      orderedCandidateIds
     }
     integrations { repositoryId attemptId attemptNumber outcome failureCode recordedAt }
     verificationAttemptCount

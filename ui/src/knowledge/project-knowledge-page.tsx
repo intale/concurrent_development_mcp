@@ -103,7 +103,7 @@ function SkillsPage({ projectRef }: { readonly projectRef: string }) {
       {query.isPending ? <LoadingState label="Skills" /> : null}
       {errorMessage && !connection ? <InitialError label="Skills" message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
       {!query.isPending && !errorMessage && !connection ? <div className="alert alert-warning" role="status">This Project is not available in the latest projection.</div> : null}
-      {connection ? <>{errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}<SkillCards connection={connection} hrefFor={(skill) => detailLocation(listPath, skill, listLocation(listPath, searchParams))} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={connection.pageInfo.hasNextPage ? connection.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}
+      {connection ? <>{errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}<SkillCards connection={connection} hrefFor={(skill) => detailLocation(listPath, skill.name, listLocation(listPath, searchParams))} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={connection.pageInfo.hasNextPage ? connection.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}
       <p className="small text-body-secondary mb-0">Only each Skill&apos;s latest projected revision is shown.</p>
     </div>
   );

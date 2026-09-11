@@ -1,0 +1,4 @@
+module Coordinator::Read
+  class WorkItemCompletionViewV1 < Coordinator::Shared::Value
+  end
+end

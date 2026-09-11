@@ -41,7 +41,7 @@ function WorkItemListPage() {
     (status): status is CoordinationPresentationStatus => PRESENTATION_STATUSES.includes(status as CoordinationPresentationStatus)
   ), [searchParams]);
   const requestedSort = searchParams.get("sort") as WorkItemSort | null;
-  const sort = WORK_ITEM_SORTS.some(({ value }) => value === requestedSort) ? requestedSort as WorkItemSort : "WORK_ITEM_ID_ASC";
+  const sort = WORK_ITEM_SORTS.some(({ value }) => value === requestedSort) ? requestedSort as WorkItemSort : "UPDATED_AT_DESC";
   const changeSetId = searchParams.get("changeSet")?.trim() || undefined;
   const agentId = searchParams.get("agent")?.trim() || undefined;
   const after = searchParams.get("after") ?? undefined;

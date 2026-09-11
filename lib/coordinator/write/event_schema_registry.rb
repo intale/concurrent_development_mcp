@@ -227,6 +227,7 @@ module Coordinator::Write
       [ "ReleaseSetActivated", 2 ] => Events::ReleaseSetActivatedV2,
       [ "ReleaseSetCompensationRequested", 2 ] => Events::ReleaseSetCompensationRequestedV2,
       [ "ReleaseSetSuccessfulIntegrationLinked", 1 ] => Events::ReleaseSetSuccessfulIntegrationLinkedV1,
+      [ "RepositoryCompensationRecorded", 1 ] => Events::RepositoryCompensationRecordedV1,
       [ "ReleaseSetOutcomeRecorded", 1 ] => Events::ReleaseSetOutcomeRecordedV1,
       [ "ReleaseSetCompleted", 2 ] => Events::ReleaseSetCompletedV2,
       [ "CoordinationTaskSubmitted", 3 ] => Events::CoordinationTaskSubmittedV3,

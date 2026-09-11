@@ -3,11 +3,21 @@
 module Coordinator::Read::Web
   class KnowledgeBrowserQueryV1
     class Skills < Coordinator::Shared::Value
-      attribute :project_ref, Coordinator::Shared::Types::String
-      attribute :scope, Coordinator::Shared::Types::String
+      attribute :project_ref, Coordinator::Shared::Types::String.optional
+      attribute :scope, Coordinator::Shared::Types::String.optional
       attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 100)
       attribute :name, Coordinator::Shared::Types::SkillName.optional
+      attribute :after_updated_at, Coordinator::Shared::Types::String.optional
       attribute :after_skill_id, Coordinator::Read::ProjectedSkillId.optional
+    end
+
+    class SkillById < Coordinator::Shared::Value
+      attribute :skill_id, Coordinator::Read::ProjectedSkillId
+    end
+
+    class SkillAssetById < Coordinator::Shared::Value
+      attribute :skill_id, Coordinator::Read::ProjectedSkillId
+      attribute :path, Coordinator::Shared::Types::SkillAssetPath
     end
 
     class Artifacts < Coordinator::Shared::Value
@@ -17,7 +27,8 @@ module Coordinator::Read::Web
       attribute :kind, Coordinator::Shared::Types::DevelopmentArtifactKind.optional
       attribute :labels, Coordinator::Shared::Types::DevelopmentArtifactLabels
       attribute :source_kind, Coordinator::Shared::Types::DevelopmentArtifactSourceKind.optional
-      attribute :after_global_position, Coordinator::Shared::Types::GlobalPosition.optional
+      attribute :after_updated_at, Coordinator::Shared::Types::Timestamp.optional
+      attribute :after_observation_id, Coordinator::Shared::Types::UuidV7.optional
     end
 
     class Skill < Coordinator::Shared::Value

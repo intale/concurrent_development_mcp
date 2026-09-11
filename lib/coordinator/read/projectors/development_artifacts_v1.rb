@@ -28,7 +28,7 @@ module Coordinator::Read
           next unless @processed_events.claim(
             definition: PROJECTION,
             identity:,
-            processed_at: Time.now.utc
+            processed_at: event.created_at
           )
 
           project(event, domain_event)
@@ -101,11 +101,11 @@ module Coordinator::Read
 
       def project(event, domain_event)
         case domain_event
-          when Coordinator::Write::Events::DevelopmentArtifactCapturedV2
+        when Coordinator::Write::Events::DevelopmentArtifactCapturedV2
             @artifacts.store_capture(event:, capture: domain_event)
-          when Coordinator::Write::Events::DevelopmentArtifactCreatedV1
+        when Coordinator::Write::Events::DevelopmentArtifactCreatedV1
             @artifacts.store_created(event:, created: domain_event)
-          when Coordinator::Write::Events::DevelopmentArtifactScopeChangedV1,
+        when Coordinator::Write::Events::DevelopmentArtifactScopeChangedV1,
                Coordinator::Write::Events::DevelopmentArtifactTitleChangedV1,
                Coordinator::Write::Events::DevelopmentArtifactKindChangedV1,
                Coordinator::Write::Events::DevelopmentArtifactLabelAddedV1,
@@ -113,11 +113,11 @@ module Coordinator::Read
                Coordinator::Write::Events::DevelopmentArtifactSourceChangedV1,
                Coordinator::Write::Events::DevelopmentArtifactContentChangedV1
             @artifacts.store_property(event:, fact: domain_event)
-          when Coordinator::Write::Events::DevelopmentArtifactObservedV1
+        when Coordinator::Write::Events::DevelopmentArtifactObservedV1
             @artifacts.store_observation(event:, observed: domain_event)
-          when Coordinator::Write::Events::DevelopmentArtifactObservationRecordedV1
+        when Coordinator::Write::Events::DevelopmentArtifactObservationRecordedV1
             @artifacts.store_observation_recorded(event:, recorded: domain_event)
-          when Coordinator::Write::Events::DevelopmentArtifactObservationFactLinkedV1
+        when Coordinator::Write::Events::DevelopmentArtifactObservationFactLinkedV1
             fact_event, fact = resolve_observed_fact(domain_event)
             @artifacts.store_observation_fact_link(
               event:,
@@ -125,17 +125,17 @@ module Coordinator::Read
               observed_fact_event: fact_event,
               observed_fact: fact
             )
-          when Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectionRecordedV1
+        when Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectionRecordedV1
             @artifacts.store_classification_recorded(event:, correction: domain_event)
         when Coordinator::Write::Events::DevelopmentArtifactClassificationCorrectedV1
           @artifacts.store_classification(event:, correction: domain_event)
         when Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV1
           @artifacts.store_relation(event:, declaration: domain_event)
-          when Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV1
+        when Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV1
             @artifacts.store_supersession(event:, supersession: domain_event)
-          when Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV2
+        when Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV2
             @artifacts.store_relation_v2(event:, declaration: domain_event)
-          when Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV2
+        when Coordinator::Write::Events::DevelopmentArtifactRelationSupersededV2
             @artifacts.store_supersession_v2(event:, supersession: domain_event)
         else
           raise InvalidProjectionSource, "Unsupported Artifact event #{domain_event.class.name}"

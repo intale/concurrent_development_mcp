@@ -32,6 +32,7 @@ module Coordinator::Write
           verifications: facts[:verifications].freeze,
           activation: facts[:activation],
           compensation_request: facts[:compensation_request],
+          compensation_evidence: facts[:compensation_evidence].freeze,
           completion: facts[:completion]
         )
       rescue Dry::Struct::Error, KeyError => error
@@ -49,6 +50,7 @@ module Coordinator::Write
           verifications: [],
           activation: nil,
           compensation_request: nil,
+          compensation_evidence: [],
           pending_outcome: nil,
           completion: nil
         }
@@ -66,6 +68,7 @@ module Coordinator::Write
         when Events::ReleaseSetActivatedV2 then apply_activation!(facts, payload, event)
         when Events::ReleaseSetCompensationRequestedV2 then apply_compensation!(facts, payload, event)
         when Events::ReleaseSetSuccessfulIntegrationLinkedV1 then apply_success_link!(facts, payload, event)
+        when Events::RepositoryCompensationRecordedV1 then apply_repository_compensation!(facts, payload, event)
         when Events::ReleaseSetOutcomeRecordedV1 then apply_outcome!(facts, payload, event)
         when Events::ReleaseSetCompletedV2 then apply_completion!(facts, event)
         end
@@ -88,16 +91,22 @@ module Coordinator::Write
           raise InvalidReleaseSetHistory, "ReleaseSet contains duplicate repositories"
         end
 
-        candidate = @candidate_state_loader.call(payload.candidate_id)
-        unless candidate && candidate.repository_id == payload.repository_id
-          raise InvalidReleaseSetHistory, "ReleaseSet member Candidate is absent or belongs to another repository"
-        end
+        candidates = payload.ordered_candidate_ids.map do |candidate_id|
+          candidate = @candidate_state_loader.call(candidate_id)
+          unless candidate && candidate.repository_id == payload.repository_id
+            raise InvalidReleaseSetHistory,
+                  "ReleaseSet member Candidate is absent or belongs to another repository"
+          end
 
+          candidate
+        end
         facts[:members] << MemberV2.new(
           position: payload.member_position,
           repository_id: payload.repository_id,
-          candidate_id: payload.candidate_id,
-          candidate:
+          merge_snapshot_id: payload.merge_snapshot_id,
+          ordered_candidate_ids: payload.ordered_candidate_ids,
+          authorization_event: payload.authorization_event,
+          ordered_candidates: candidates.freeze
         )
       end
 
@@ -217,8 +226,35 @@ module Coordinator::Write
         )
       end
 
+      def apply_repository_compensation!(facts, payload, event)
+        request = facts[:compensation_request]
+        raise InvalidReleaseSetHistory, "Repository compensation appeared before its request" unless request
+        raise InvalidReleaseSetHistory, "Repository compensation appeared after terminal outcome" if facts[:pending_outcome] || facts[:completion]
+        unless request.successful_integrations.include?(payload.integration_event)
+          raise InvalidReleaseSetHistory, "Repository compensation references an unrequested integration"
+        end
+        integration = facts[:integrations].find { _1.event == payload.integration_event }
+        unless integration&.payload&.repository_id == payload.repository_id
+          raise InvalidReleaseSetHistory, "Repository compensation identity does not match its integration"
+        end
+        if facts[:compensation_evidence].any? { _1.integration_event == payload.integration_event }
+          raise InvalidReleaseSetHistory, "Repository compensation contains duplicate integration evidence"
+        end
+
+        facts[:compensation_evidence] << CompensationEvidenceV2.new(
+          repository_id: payload.repository_id,
+          integration_event: payload.integration_event,
+          action: payload.action,
+          external_reference: payload.external_reference,
+          result_digest: event.metadata.fetch("result_digest"),
+          producer: EvidenceProducerV1.new(event.metadata.fetch("producer").transform_keys(&:to_sym)),
+          run_id: event.metadata.fetch("run_id")
+        )
+      end
+
       def apply_outcome!(facts, payload, event)
         raise InvalidReleaseSetHistory, "ReleaseSet contains duplicate terminal outcomes" if facts[:pending_outcome] || facts[:completion]
+        validate_compensation_evidence!(facts, payload)
         facts[:pending_outcome] = [ payload, event ]
       end
 
@@ -231,6 +267,7 @@ module Coordinator::Write
           payload: outcome,
           outcome_event: event_reference(outcome_event),
           event: event_reference(event),
+          compensation_evidence: facts[:compensation_evidence].freeze,
           completion_digest: outcome_event.metadata.fetch("completion_digest"),
           release_digest: outcome_event.metadata.fetch("release_digest"),
           rule_version: outcome_event.metadata.fetch("rule_version")
@@ -249,6 +286,19 @@ module Coordinator::Write
 
       def require_preparation!(facts)
         raise InvalidReleaseSetHistory, "ReleaseSet lifecycle fact appeared before preparation" unless facts[:preparation]
+      end
+
+      def validate_compensation_evidence!(facts, outcome)
+        if outcome.outcome == "compensated"
+          request = facts[:compensation_request]
+          expected = request&.successful_integrations || []
+          actual = facts[:compensation_evidence].map(&:integration_event)
+          unless actual == expected
+            raise InvalidReleaseSetHistory, "Compensated ReleaseSet is missing exact repository evidence"
+          end
+        elsif facts[:compensation_evidence].any?
+          raise InvalidReleaseSetHistory, "Activated ReleaseSet cannot contain compensation evidence"
+        end
       end
 
       def validate_identity!(payload, release_set_id:, event:)

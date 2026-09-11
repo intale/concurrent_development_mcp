@@ -16,6 +16,7 @@ module Coordinator::Read::Web::Contracts
         required(:as_of).filled(:string)
         optional(:first).filled(:integer, gteq?: 1, lteq?: 100)
         optional(:after_id).maybe(:string)
+        optional(:after_updated_at).maybe(:string)
         optional(:path).maybe(:string, max_size?: 2_048)
         optional(:resource_kind).maybe(:string)
         optional(:resource_lifecycle_status).maybe(:string)
@@ -31,6 +32,15 @@ module Coordinator::Read::Web::Contracts
 
       rule(:after_id) do
         key.failure("must be UUIDv7") if value && !Coordinator::Shared::Types::UUID_V7_PATTERN.match?(value)
+      end
+
+      rule(:after_updated_at, :after_id) do
+        base.failure("cursor coordinates must both be present or absent") unless
+          values[:after_updated_at].nil? == values[:after_id].nil?
+        next unless values[:after_updated_at]
+
+        key(:after_updated_at).failure("must be a canonical UTC timestamp") unless
+          Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(values[:after_updated_at])
       end
 
       rule(:as_of) do

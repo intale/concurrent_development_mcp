@@ -1,0 +1,12 @@
+module Coordinator::Read
+  module WorkItems
+    class DefinitionLoader
+      def initialize: (
+        event_store: Coordinator::Write::EventStore,
+        ?stream_factory: Coordinator::Write::StreamFactory,
+        ?schema_registry: Coordinator::Write::EventSchemaRegistry
+      ) -> void
+      def call: (String work_item_id) -> Coordinator::Read::WorkItemDefinitionViewV1
+    end
+  end
+end

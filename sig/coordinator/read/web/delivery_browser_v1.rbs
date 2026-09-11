@@ -3,7 +3,7 @@ module Coordinator
     module Web
       class DeliveryBrowserV1
         class TimelineCursor < Shared::Value
-          def position: () -> Integer
+          def updated_at: () -> String
           def id: () -> String
         end
 

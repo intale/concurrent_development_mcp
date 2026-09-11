@@ -66,49 +66,50 @@ Then("one exact open Rails obligation is durable under {string}") do |level|
   events = candidate_obligation_events
   assert_acceptance_equal(1, events.length, "Durable Candidate compatibility obligations")
   event = events.sole
-  payload = candidate_obligation_payload
+  state = candidate_obligation_state
+  definition = state.definition
   source = @obligation_candidates.fetch("source")
   target = @obligation_candidates.fetch("target")
-  assert_acceptance_equal("open", payload.status, "Obligation status")
-  assert_acceptance_equal(level, payload.enforcement, "Obligation enforcement")
+  assert_acceptance_equal(nil, state.terminal_status, "Obligation terminal status")
+  assert_acceptance_equal(level, definition.enforcement, "Obligation enforcement")
   assert_acceptance_equal(
     CandidateImpactObligationAcceptanceWorld::REQUIRED_EVIDENCE,
-    payload.required_evidence,
+    definition.required_evidence,
     "Required evidence"
   )
   assert_acceptance_equal(
     source.dig(:arguments, :candidate_id),
-    payload.source_candidate.candidate_id,
+    definition.source_candidate.candidate_id,
     "Obligation source Candidate"
   )
   assert_acceptance_equal(
     target.dig(:arguments, :candidate_id),
-    payload.target_candidate.candidate_id,
+    definition.target_candidate.candidate_id,
     "Obligation target Candidate"
   )
   assert_acceptance_equal(
     [ "semantic_key_match" ],
-    payload.reasons.map(&:kind),
+    definition.reasons.map(&:kind),
     "Exact Rails impact reasons"
   )
   assert_acceptance_equal(
     [ [ "dependency:rubygems:rails" ] ],
-    payload.reasons.map(&:matches),
+    definition.reasons.map(&:matches),
     "Exact Rails impact matches"
   )
   assert_acceptance_equal(
-    %w[CandidateSubmitted CandidateChangeManifestCaptured CandidateImpactSurfaceDerived CandidateImpactSurfaceRegistered],
+    %w[CandidateSubmitted CandidateChangeManifestCaptured CandidateImpactSurfaceDerived CandidateImpactSurfaceAssigned],
     [
-      payload.source_candidate.candidate_event.type,
-      payload.source_candidate.manifest_event.type,
-      payload.source_candidate.surface_event.type,
-      payload.source_candidate.registration_event.type
+      definition.source_candidate.candidate_event.type,
+      definition.source_candidate.manifest_event.type,
+      definition.source_candidate.surface_event.type,
+      definition.source_candidate.registration_event.type
     ],
     "Source evidence references"
   )
   assert_acceptance_equal(
     @obligation_policy.fetch(:head),
-    payload.policy.head,
+    definition.policy.head,
     "Exact policy head"
   )
   source_registration = @obligation_candidates.dig("source", :registration)

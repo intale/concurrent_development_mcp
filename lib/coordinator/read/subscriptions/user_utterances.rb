@@ -12,7 +12,7 @@ module Coordinator::Read
             stream_name: "Conversation"
           )
         ],
-        event_types: Coordinator::Write::EventQueries::GUIDANCE_MESSAGE_EVENT_TYPES
+        event_types: Contracts::GuidanceSourceEvent::EVENT_TYPES
       )
 
       def initialize(handler:, pull_interval: 1.0)

@@ -125,8 +125,7 @@ module SagaIdentityAcceptanceWorld
           summary: "The second repository integration failed.",
           producer: { name: "saga-release-adapter", version: "1.0.0" },
           run_id: "saga-release-failure-#{prefix}",
-          result_digest: "sha256:#{'f' * 64}",
-          occurred_at: "2026-08-27T12:30:00.000000Z"
+          result_digest: "sha256:#{'f' * 64}"
         }
       },
       client_id: "saga-agent"
@@ -317,7 +316,10 @@ module SagaIdentityAcceptanceWorld
       }
     }
     complete_saga_task("merge_verification_submit", **verification_arguments)
-    verified = merge_snapshot_events(snapshot_id).find { _1.type == "MergeSnapshotVerified" }
+    verified = eventually("Merge snapshot #{snapshot_id} verification Saga") do
+      event = merge_snapshot_events(snapshot_id).find { _1.type == "MergeSnapshotVerified" }
+      [ !event.nil?, event ]
+    end
     assert_acceptance(verified, "Merge snapshot #{snapshot_id} has no verified fact")
     authorization_state = complete_saga_task(
       "merge_authorization_request",
@@ -328,7 +330,7 @@ module SagaIdentityAcceptanceWorld
         registration_event: registration.fetch("snapshot_event"),
         snapshot_digest: registration.fetch("snapshot_digest"),
         verification_event: saga_event_reference(verified),
-        verification_digest: verified.data.fetch("verification_digest")
+        verification_digest: verified.metadata.fetch("verification_digest")
       },
       target_base_observation: {
         repository_id: snapshot_arguments.fetch(:repository_id),
@@ -355,7 +357,7 @@ module SagaIdentityAcceptanceWorld
           registration_event: registration.fetch("snapshot_event"),
           snapshot_digest: registration.fetch("snapshot_digest"),
           verification_event: saga_event_reference(verified),
-          verification_digest: verified.data.fetch("verification_digest")
+          verification_digest: verified.metadata.fetch("verification_digest")
         },
         authorization_event: authorization.fetch("decision_event"),
         authorization_decision_digest: authorization.fetch("decision_digest")
@@ -395,7 +397,7 @@ module SagaIdentityAcceptanceWorld
       attempt_id: "release-attempt-#{prefix}-1",
       outcome: "integrated",
       merge_observation_event: saga_event_reference(observation),
-      observation_digest: observation.data.fetch("observation_digest"),
+      observation_digest: observation.metadata.fetch("observation_digest"),
       failure: nil
     )
   end
@@ -407,20 +409,17 @@ module SagaIdentityAcceptanceWorld
       end
       [ !event.nil?, event ]
     end
-    request = release_set_payload(request_event)
-    lifecycle = release_set_lifecycle_events(@release_set_id)
-    evidence = request.successful_integrations.map.with_index do |reference, index|
-      integration = lifecycle.find { _1.id == reference.event_id }
-      payload = release_set_payload(integration)
+    state = Coordinator::Write::ReleaseSets::HistoryLoader.new(event_store:).call(@release_set_id)
+    evidence = state.compensation_request.successful_integrations.map.with_index do |reference, index|
+      integration = state.integrations.find { _1.event == reference }
       {
-        repository_id: payload.repository_id,
+        repository_id: integration.payload.repository_id,
         integration_event: reference.to_h,
         action: "revert",
         external_reference: "reverts/saga-identity/#{index + 1}",
         result_digest: "sha256:#{'e' * 64}",
         producer: { name: "saga-reverter", version: "1.0.0" },
-        run_id: "saga-revert-#{index + 1}",
-        compensated_at: "2026-08-27T13:00:0#{index}.000000Z"
+        run_id: "saga-revert-#{index + 1}"
       }
     end
     complete_saga_task(
@@ -443,7 +442,8 @@ module SagaIdentityAcceptanceWorld
       Coordinator::Write::EventReadCriteria.new(
         event_types: %w[
           MergeSnapshotRegistered
-          MergeSnapshotVerificationSubmitted
+          MergeSnapshotVerificationAssigned
+          MergeSnapshotVerificationSelected
           MergeSnapshotVerified
           MergeObserved
         ],

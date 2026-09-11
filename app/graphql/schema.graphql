@@ -178,6 +178,15 @@ type CoordinationChangeSetConnection {
   pageInfo: PageInfo!
 }
 
+"""
+Current projected ChangeSet lifecycle status.
+"""
+enum CoordinationChangeSetStatus {
+  ACTIVE
+  COMPLETED
+  PLANNING
+}
+
 type CoordinationCheckpoint {
   checkpointKind: String!
   evidenceStatus: String!
@@ -807,14 +816,14 @@ type ProjectSkillAsset {
 
 enum ProjectSort {
   """
-  Exact Project scope ascending.
+  Most recently updated Project first.
   """
-  SCOPE_ASC
+  NEWEST_FIRST
 
   """
-  Exact Project scope descending.
+  Least recently updated Project first.
   """
-  SCOPE_DESC
+  OLDEST_FIRST
 }
 
 type ProjectVerificationObligation {
@@ -901,7 +910,7 @@ type Query {
   """
   Page current ChangeSets whose WorkItems belong to the exact Project scope.
   """
-  projectChangeSets(after: String, first: Int = 20, projectRef: ID!): CoordinationChangeSetConnection
+  projectChangeSets(after: String, first: Int = 20, projectRef: ID!, status: CoordinationChangeSetStatus): CoordinationChangeSetConnection
 
   """
   One Decision associated with the exact Project scope.
@@ -1011,12 +1020,27 @@ type Query {
   """
   Page current WorkItems in the exact Project scope with server-driven filters.
   """
-  projectWorkItems(after: String, agentId: String, changeSetId: ID, first: Int = 20, presentationStatuses: [CoordinationPresentationStatus!], projectRef: ID!, sort: WorkItemSort = WORK_ITEM_ID_ASC): CoordinationWorkItemConnection
+  projectWorkItems(after: String, agentId: String, changeSetId: ID, first: Int = 20, presentationStatuses: [CoordinationPresentationStatus!], projectRef: ID!, sort: WorkItemSort = UPDATED_AT_DESC): CoordinationWorkItemConnection
 
   """
   Discover exact Project scopes with bounded Repository-member previews.
   """
-  projects(after: String, first: Int = 20, repositoriesFirst: Int = 3, search: String, sort: ProjectSort = SCOPE_ASC): ProjectConnection!
+  projects(after: String, first: Int = 20, repositoriesFirst: Int = 3, search: String, sort: ProjectSort = NEWEST_FIRST): ProjectConnection!
+
+  """
+  Resolve one current Skill by its stable identity.
+  """
+  skill(skillId: ID!): ProjectSkill
+
+  """
+  Resolve one current Skill asset by Skill identity and exact path.
+  """
+  skillAsset(path: String!, skillId: ID!): ProjectSkillAsset
+
+  """
+  Page all current Skills, optionally filtered by exact Project and exact name.
+  """
+  skills(after: String, first: Int = 20, name: String, projectScope: String): SkillConnection!
 }
 
 type ReleaseIntegration {
@@ -1029,7 +1053,8 @@ type ReleaseIntegration {
 }
 
 type ReleaseMember {
-  candidateId: ID!
+  mergeSnapshotId: ID!
+  orderedCandidateIds: [ID!]!
   position: Int!
   repositoryId: ID!
 }
@@ -1189,5 +1214,6 @@ type VerificationReason {
 enum WorkItemSort {
   LATEST_ACTIVITY_DESC
   STATUS_ASC
-  WORK_ITEM_ID_ASC
+  UPDATED_AT_ASC
+  UPDATED_AT_DESC
 }

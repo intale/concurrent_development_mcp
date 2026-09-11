@@ -3,6 +3,8 @@
 module Coordinator::Read
   module Repositories
     class CandidateImpacts
+      include EventTimestamped
+
       OUTGOING_MATCH_SQL = <<~SQL.squish.freeze
         EXISTS (
           SELECT 1
@@ -74,30 +76,32 @@ module Coordinator::Read
         @policies = policies
       end
 
-      def store_manifest(manifest:)
+      def store_manifest(event:, manifest:)
         record = candidate!(manifest.candidate_id, "manifest resources")
         replace_partition(
           Coordinator::Read::CandidateChangedResource,
           record:,
           values: changed_paths(manifest.files),
-          value_key: :path
+          value_key: :path,
+          event:
         )
       end
 
-      def store_build_context(build_context:)
+      def store_build_context(event:, build_context:)
         record = candidate!(build_context.candidate_id, "build-context inputs")
         replace_partition(
           Coordinator::Read::CandidateObservedInput,
           record:,
           values: build_context.inputs.map(&:path).uniq.sort,
-          value_key: :path
+          value_key: :path,
+          event:
         )
       end
 
-      def store_surface(event:, surface:)
+      def store_surface(event:, projection_event: event, surface:)
         record = candidate!(surface.candidate_id, "impact surface")
         verify_surface!(record, surface, event:)
-        record.update!(
+        save_from_event(record, event: projection_event, attributes: {
           impact_surface: surface_document(surface, event:),
           impact_event: event_reference(event).to_h,
           impact_actor: actor(event).to_h,
@@ -108,8 +112,8 @@ module Coordinator::Read
           impact_global_position: event.global_position,
           impact_at_domain: event.created_at,
           impact_at_store: event.created_at
-        )
-        replace_impact_keys(record:, surface:)
+        })
+        replace_impact_keys(record:, surface:, event: projection_event)
         record
       end
 
@@ -155,24 +159,23 @@ module Coordinator::Read
           raise(ProjectionStateError, "CandidateSubmitted must be projected before its #{component}")
       end
 
-      def replace_partition(model, record:, values:, value_key:)
+      def replace_partition(model, record:, values:, value_key:, event:)
         model.where(candidate_id: record.candidate_id).delete_all
         return if values.empty?
 
-        now = Time.now.utc
         model.insert_all!(values.map do |value|
           {
             candidate_id: record.candidate_id,
             change_set_id: record.change_set_id,
             repository_id: record.repository_id,
             value_key => value,
-            created_at: now,
-            updated_at: now
+            created_at: event.created_at,
+            updated_at: event.created_at
           }
         end)
       end
 
-      def replace_impact_keys(record:, surface:)
+      def replace_impact_keys(record:, surface:, event:)
         Coordinator::Read::CandidateImpactKey.where(candidate_id: record.candidate_id).delete_all
         rows = {
           "produces" => surface.produces,
@@ -191,9 +194,8 @@ module Coordinator::Read
         end
         return if rows.empty?
 
-        now = Time.now.utc
         Coordinator::Read::CandidateImpactKey.insert_all!(rows.map do |row|
-          row.merge(created_at: now, updated_at: now)
+          row.merge(created_at: event.created_at, updated_at: event.created_at)
         end)
       end
 

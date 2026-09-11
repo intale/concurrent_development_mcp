@@ -3,13 +3,15 @@
 module Coordinator::Read
   module Repositories
     class ReleaseSets
+      include EventTimestamped
+
       def fetch(release_set_id)
         record = Coordinator::Read::ReleaseSet.find_by(release_set_id:)
         record && build_view(record)
       end
 
       def store(event:, preparation:)
-        Coordinator::Read::ReleaseSet.create!(
+        create_from_event(Coordinator::Read::ReleaseSet, event:, attributes: {
           release_set_id: preparation.release_set_id,
           change_set_id: preparation.change_set_id,
           ordered_members: preparation.ordered_members.map(&:to_h),
@@ -31,16 +33,16 @@ module Coordinator::Read
           prepared_correlation_id: event.correlation_id,
           prepared_global_position: event.global_position,
           prepared_at_store: event.created_at
-        )
+        })
       end
 
       def record_integration(event:, integration:)
         record = Coordinator::Read::ReleaseSet.find_by!(release_set_id: integration.release_set_id)
         integrations = record.integrations + [ integration_view(event:, integration:).to_h ]
-        record.update!(
+        save_from_event(record, event:, attributes: {
           integrations:,
           status: every_member_integrated?(record.ordered_members, integrations) ? "verifying" : "integrating"
-        )
+        })
       end
 
       def link_integration(event:, link:)
@@ -57,19 +59,19 @@ module Coordinator::Read
           "merge_observation_event" => link.merge_observation.to_h,
           "observation_digest" => observation_digest(record, index)
         )
-        record.update!(
+        save_from_event(record, event:, attributes: {
           integrations:,
           status: every_member_integrated?(record.ordered_members, integrations) ? "verifying" : "integrating"
-        )
+        })
       end
 
       def record_verification(event:, verification:)
         record = Coordinator::Read::ReleaseSet.find_by!(release_set_id: verification.release_set_id)
-        record.update!(
+        save_from_event(record, event:, attributes: {
           verifications: record.verifications + [ verification_view(event:, verification:).to_h ],
           verification_status: verification.evidence.outcome,
           status: verification.evidence.outcome == "passed" ? "verified" : "verifying"
-        )
+        })
       end
 
       def link_verification_integration(event:, link:)
@@ -81,20 +83,24 @@ module Coordinator::Read
         latest["integration_events"] = [ *latest.fetch("integration_events"), link.integration_event.to_h ]
         latest["integration_link_events"] = [ *latest.fetch("integration_link_events", []), event_reference(event).to_h ]
         verifications[-1] = latest
-        record.update!(verifications:)
+        save_from_event(record, event:, attributes: { verifications: })
       end
 
       def record_activation(event:, activation:)
         record = Coordinator::Read::ReleaseSet.find_by!(release_set_id: activation.release_set_id)
-        record.update!(activation: activation_view(record, event:, activation:).to_h, status: "activated")
+        save_from_event(
+          record,
+          event:,
+          attributes: { activation: activation_view(record, event:, activation:).to_h, status: "activated" }
+        )
       end
 
       def record_compensation_request(event:, request:)
         record = Coordinator::Read::ReleaseSet.find_by!(release_set_id: request.release_set_id)
-        record.update!(
+        save_from_event(record, event:, attributes: {
           compensation_request: compensation_request_view(event:, request:).to_h,
           status: "compensation_requested"
-        )
+        })
       end
 
       def link_compensation_integration(event:, link:)
@@ -104,12 +110,35 @@ module Coordinator::Read
 
         request["successful_integrations"] = [ *request.fetch("successful_integrations"), link.integration_event.to_h ]
         request["integration_link_events"] = [ *request.fetch("integration_link_events", []), event_reference(event).to_h ]
-        record.update!(compensation_request: request)
+        save_from_event(record, event:, attributes: { compensation_request: request })
+      end
+
+      def record_repository_compensation(event:, compensation:)
+        record = Coordinator::Read::ReleaseSet.find_by!(release_set_id: compensation.release_set_id)
+        values = record.completion&.dup || { "compensation_evidence" => [] }
+        evidence = Coordinator::Write::ReleaseSets::CompensationEvidenceV2.new(
+          repository_id: compensation.repository_id,
+          integration_event: compensation.integration_event,
+          action: compensation.action,
+          external_reference: compensation.external_reference,
+          result_digest: event.metadata.fetch("result_digest"),
+          producer: Coordinator::Write::ReleaseSets::EvidenceProducerV1.new(
+            symbolize(event.metadata.fetch("producer"))
+          ),
+          run_id: event.metadata.fetch("run_id")
+        )
+        values["compensation_evidence"] = [ *values.fetch("compensation_evidence", []), evidence.to_h ]
+        save_from_event(record, event:, attributes: { completion: values })
       end
 
       def record_outcome(event:, outcome:)
         record = Coordinator::Read::ReleaseSet.find_by!(release_set_id: outcome.release_set_id)
-        record.update!(completion: completion_view(event:, outcome:).to_h)
+        evidence = record.completion&.fetch("compensation_evidence", []) || []
+        save_from_event(
+          record,
+          event:,
+          attributes: { completion: completion_view(event:, outcome:, compensation_evidence: evidence).to_h }
+        )
       end
 
       def record_completion(event:, completion:)
@@ -119,7 +148,7 @@ module Coordinator::Read
 
         values["completed_at"] = event.created_at.utc.iso8601(6)
         values["source"] = source_evidence_from_event(event).to_h
-        record.update!(completion: values, status: "completed")
+        save_from_event(record, event:, attributes: { completion: values, status: "completed" })
       end
 
       private
@@ -136,7 +165,7 @@ module Coordinator::Read
           verifications: record.verifications.map { build_verification(_1) },
           activation: record.activation && build_activation(record.activation),
           compensation_request: record.compensation_request && build_compensation_request(record.compensation_request),
-          completion: record.completion && build_completion(record.completion),
+          completion: record.completion&.key?("outcome") && build_completion(record.completion),
           preparation_policy_version: record.preparation_policy_version,
           prepared_at: record.prepared_at_domain.utc.iso8601(6),
           prepared: source_evidence(record)
@@ -200,11 +229,11 @@ module Coordinator::Read
         )
       end
 
-      def completion_view(event:, outcome:)
+      def completion_view(event:, outcome:, compensation_evidence:)
         ReleaseSetCompletionViewV1.new(
           outcome: outcome.outcome,
           source_event: nil,
-          compensation_evidence: [],
+          compensation_evidence: compensation_evidence.map { compensation_evidence_value(symbolize(_1)) },
           completion_digest: event.metadata.fetch("completion_digest"),
           rule_version: event.metadata.fetch("rule_version"),
           completed_at: event.created_at.utc.iso8601(6),

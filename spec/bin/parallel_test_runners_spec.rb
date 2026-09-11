@@ -75,7 +75,7 @@ RSpec.describe "parallel test executables" do
     collection = YAML.safe_load_file(Rails.root.join("rbs_collection.yaml"))
     enabled = collection.fetch("gems").reject { _1.fetch("ignore", false) }.map { _1.fetch("name") }
 
-    expect(enabled).to contain_exactly("connection_pool", "pg_eventstore")
+    expect(enabled).to contain_exactly("pg_eventstore")
   end
 
   it "uses a quiet strict Cucumber profile that excludes future scenarios" do

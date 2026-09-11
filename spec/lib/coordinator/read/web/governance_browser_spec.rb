@@ -32,7 +32,12 @@ RSpec.describe Coordinator::Read::Web::Queries::GovernanceBrowser, :read_model d
     expect(choices.items.map(&:choice_id)).to eq([ "CHO-project" ])
     expect(impacts.items.map(&:assessment_id)).to eq([ impact_id ])
 
-    second = query.decisions(project_ref:, first: 1, after_decision_id: first.next_decision_id)
+    second = query.decisions(
+      project_ref:,
+      first: 1,
+      after_decision_id: first.next_decision_id,
+      after_updated_at: first.next_updated_at
+    )
     expect(second.items.map(&:decision_id)).to eq([ "D-member" ])
   end
 

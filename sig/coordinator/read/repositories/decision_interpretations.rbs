@@ -12,18 +12,22 @@ module Coordinator
           event: PgEventstore::Event,
           proposal: Write::Events::DecisionInterpretationProposedV1
         ) -> DecisionInterpretation
+        def store_proposal_v2: (
+          event: PgEventstore::Event,
+          source: InterpretationProjectionSourceV2
+        ) -> DecisionInterpretation
         def require_clarification: (
           event: PgEventstore::Event,
-          clarification: Write::Events::DecisionClarificationRequiredV1
-        ) -> bool
+          clarification: Write::Events::DecisionClarificationRequiredV2
+        ) -> DecisionInterpretation
         def accept: (
           event: PgEventstore::Event,
-          acceptance: Write::Events::DecisionInterpretationAcceptedV1
-        ) -> bool
+          acceptance: Write::Events::DecisionInterpretationAcceptedV2
+        ) -> DecisionInterpretation
         def reject: (
           event: PgEventstore::Event,
-          rejection: Write::Events::DecisionInterpretationRejectedV1
-        ) -> bool
+          rejection: Write::Events::DecisionInterpretationRejectedV2
+        ) -> DecisionInterpretation
       end
     end
   end

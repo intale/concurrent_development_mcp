@@ -12,7 +12,7 @@ Feature: Immutable multi-repository ReleaseSet preparation
       Given ReleaseSet "SUCCESS" has two exact current repository grants for one ChangeSet
       When the agent prepares the ordered ReleaseSet through MCP
       Then the ReleaseSet Task completes with the exact repository order
-      And one prepared fact and command success fact preserve the Task trace
+      And the granular preparation facts and command success preserve the Task trace
       And the ReleaseSet remains available as not observed before projection
       When the ReleaseSet preparation reaches the read side after a subscription restart
       Then the ordered ReleaseSet is available without a freshness gate

@@ -21,8 +21,9 @@ module Coordinator::Read::Web::Queries
       @repository.page(
         Coordinator::Read::Web::ProjectCatalogQueriesV1::Discovery.new(
           search: validated[:search],
-          sort: validated[:sort] || "scope_asc",
+          sort: validated[:sort] || "newest_first",
           after_scope: validated[:after_scope],
+          after_updated_at: validated[:after_updated_at],
           first: validated[:first] || 20,
           repositories_first: validated[:repositories_first] || 3
         )
@@ -39,6 +40,7 @@ module Coordinator::Read::Web::Queries
           project_ref:,
           scope: @project_reference.decode(project_ref),
           after_repository_id: validated[:after_repository_id],
+          after_updated_at: validated[:after_updated_at],
           repositories_first: validated[:repositories_first] || 20
         )
       )

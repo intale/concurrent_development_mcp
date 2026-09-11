@@ -15,6 +15,7 @@ module Coordinator
           def presentation_statuses: () -> Array[String]
           def work_item_sort: () -> String
           def blocking: () -> bool?
+          def domain_status: () -> String?
           def change_set_id: () -> String?
           def agent_id: () -> String?
         end

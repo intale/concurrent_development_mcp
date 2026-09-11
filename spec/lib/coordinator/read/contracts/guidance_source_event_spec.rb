@@ -6,7 +6,7 @@ RSpec.describe Coordinator::Read::Contracts::GuidanceSourceEvent do
   let(:valid_input) do
     {
       event_type: "UserUtteranceRecorded",
-      schema_version: 1,
+      schema_version: 2,
       stream_context: "HumanGuidance",
       stream_name: "Conversation",
       stream_id: "C-1",
@@ -16,10 +16,13 @@ RSpec.describe Coordinator::Read::Contracts::GuidanceSourceEvent do
     }
   end
 
-  it "accepts either modeled utterance type only on a Conversation source" do
+  it "accepts cohesive utterance and anchor facts only on a Conversation source" do
     expect(contract.call(valid_input)).to be_success
     expect(
       contract.call(valid_input.merge(event_type: "UserUtteranceForwardedByAgent"))
+    ).to be_success
+    expect(
+      contract.call(valid_input.merge(event_type: "GuidanceMessageAnchored", schema_version: 1))
     ).to be_success
   end
 
@@ -27,7 +30,7 @@ RSpec.describe Coordinator::Read::Contracts::GuidanceSourceEvent do
     result = contract.call(
       valid_input.merge(
         event_type: "DecisionActivated",
-        schema_version: 2,
+        schema_version: 1,
         stream_context: "DevelopmentPlanning",
         stream_name: "ChangeSet",
         stream_id: "bad id",
@@ -39,12 +42,12 @@ RSpec.describe Coordinator::Read::Contracts::GuidanceSourceEvent do
     expect(result).to be_failure
     expect(result.errors.to_h.keys).to contain_exactly(
       :event_type,
-      :schema_version,
       :stream_context,
       :stream_name,
       :stream_id,
       :actor_kind,
       :actor_id
     )
+    expect(contract.call(valid_input.merge(schema_version: 3)).errors.to_h).to have_key(:schema_version)
   end
 end

@@ -2,6 +2,17 @@
 
 module Coordinator::Read::Web
   class KnowledgeBrowserV1
+    class ArtifactCursor < Coordinator::Shared::Value
+      attribute :updated_at, Coordinator::Shared::Types::Timestamp
+      attribute :observation_id, Coordinator::Shared::Types::UuidV7
+    end
+
+    class ArtifactPage < Coordinator::Shared::Value
+      attribute :items, Coordinator::Shared::Types::Array.of(Coordinator::Read::DevelopmentArtifactSummaryV1)
+      attribute :next_cursor, ArtifactCursor.optional
+      attribute :has_more, Coordinator::Shared::Types::Strict::Bool
+    end
+
     class SkillDetail < Coordinator::Shared::Value
       attribute :skill, Coordinator::Read::SkillViewV1
     end

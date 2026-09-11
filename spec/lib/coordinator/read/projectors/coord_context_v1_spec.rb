@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model do
-  subject(:projector) { described_class.new(submission_loader:) }
+  subject(:projector) { described_class.new(source_loader:) }
 
   let(:repository) { Coordinator::Read::Repositories::CoordContexts.new }
   let(:repository_id) { "018f0f4d-4e45-7abc-8def-000000000601" }
@@ -18,9 +18,23 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model do
       end
     end.new(candidate_submissions)
   end
+  let(:source_loader) do
+    Class.new do
+      def initialize(submission_loader)
+        @submission_loader = submission_loader
+      end
+
+      def call(_event, payload)
+        return payload unless payload.is_a?(Coordinator::Write::Events::CandidateSubmittedV3)
+
+        @submission_loader.call(payload.candidate_id)
+      end
+    end.new(submission_loader)
+  end
 
   it "atomically projects exact source identities and ignores duplicate delivery" do
     events = planning_events(change_set_id: "CS-100", work_item_id: "W-100")
+    events.fetch(:criteria).created_at = Time.utc(2026, 8, 30, 12, 1)
     %i[created criteria membership work_item].each { projector.call(events.fetch(_1)) }
     projector.call(events.fetch(:work_item))
 
@@ -38,6 +52,26 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model do
     )
     expect(snapshot.source_positions.length).to eq(2)
     expect(Coordinator::Read::ProcessedProjectionEvent.where(projection_name: "coord_context").count).to eq(4)
+    expect(
+      Coordinator::Read::CoordContextScope.find_by!(scope_kind: "change_set", scope_id: "CS-100").updated_at
+    ).to eq(Time.utc(2026, 8, 30, 12, 1))
+  end
+
+  it "keeps the projection available when the broad type filter encounters another schema version" do
+    event = candidate_submitted_event(
+      change_set_id: "CS-RETIRED-SCHEMA",
+      work_item_id: "W-RETIRED-SCHEMA",
+      attempt_id: "A-RETIRED-SCHEMA",
+      candidate_id: "CAN-RETIRED-SCHEMA",
+      checkpoint_kind: "intermediate",
+      head_character: "b",
+      revision: 0,
+      position: 500
+    )
+    event.metadata["schema_version"] = 2
+
+    expect { projector.call(event) }
+      .not_to change(Coordinator::Read::ProcessedProjectionEvent, :count)
   end
 
   it "converges when cross-stream WorkItem siblings arrive in either order" do
@@ -322,6 +356,34 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model do
     expect(history.write_set_release_event.fetch("event_id")).to eq(released.id)
   end
 
+  it "rebuilds projection-owned Attempt history when the projection version advances" do
+    create(
+      :coordinator_read_attempt_history,
+      :with_write_set,
+      attempt_id: "A-REBUILD",
+      change_set_id: "CS-REBUILD",
+      work_item_id: "W-REBUILD",
+      projection_version: described_class::PROJECTION.version - 1
+    )
+    events = active_attempt_events(
+      change_set_id: "CS-REBUILD",
+      work_item_id: "W-REBUILD",
+      attempt_id: "A-REBUILD",
+      agent_id: "agent-rebuild"
+    )
+
+    events.each { projector.call(_1) }
+
+    history = Coordinator::Read::AttemptHistory.find("A-REBUILD")
+    expect(history).to have_attributes(
+      projection_version: described_class::PROJECTION.version,
+      agent_id: "agent-rebuild",
+      status: "started",
+      write_set_lease_set_id: nil,
+      write_set_resources: []
+    )
+  end
+
   it "keeps the latest observed Candidate checkpoint per Attempt while history remains separate" do
     events = active_attempt_events(
       change_set_id: "CS-CANDIDATE",
@@ -564,10 +626,10 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model do
     converged = Coordinator::Read::Queries::CoordContext.new.call(work_item_id: consumer_id).value!
     expect(converged.data.blockers).to be_empty
     expect(converged.next_actions).to be_empty
-    expect(converged.data.context.dependencies.sole).to have_attributes(
-      source_event: source,
-      satisfied_at: "2026-08-30T12:06:00.000000Z"
-    )
+      expect(converged.data.context.dependencies.sole).to have_attributes(
+        source_event: source,
+        satisfied_at: "2026-08-30T12:00:00.000000Z"
+      )
   end
 
   def planning_events(change_set_id:, work_item_id:)

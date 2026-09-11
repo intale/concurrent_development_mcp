@@ -7,8 +7,9 @@ module Coordinator::Read::Web::Contracts
 
       params do
         optional(:search).maybe(:string, min_size?: 1)
-        optional(:sort).filled(:string, included_in?: %w[scope_asc scope_desc])
+        optional(:sort).filled(:string, included_in?: %w[oldest_first newest_first])
         optional(:after_scope).maybe(:string)
+        optional(:after_updated_at).maybe(:string)
         optional(:first).filled(:integer, gteq?: 1, lteq?: 100)
         optional(:repositories_first).filled(:integer, gteq?: 1, lteq?: 20)
       end
@@ -28,6 +29,15 @@ module Coordinator::Read::Web::Contracts
         result = Coordinator::Read::Contracts::RepositoryList.new.call(scope: value)
         key.failure("must be an exact valid Project scope") if result.failure?
       end
+
+      rule(:after_scope, :after_updated_at) do
+        base.failure("cursor coordinates must both be present or absent") unless
+          values[:after_scope].nil? == values[:after_updated_at].nil?
+        next unless values[:after_updated_at]
+
+        key(:after_updated_at).failure("must be an event timestamp") unless
+          Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(values[:after_updated_at])
+      end
     end
 
     class Overview < Dry::Validation::Contract
@@ -36,6 +46,7 @@ module Coordinator::Read::Web::Contracts
       params do
         required(:project_ref).filled(:string, max_size?: 2_048)
         optional(:after_repository_id).maybe(:string)
+        optional(:after_updated_at).maybe(:string)
         optional(:repositories_first).filled(:integer, gteq?: 1, lteq?: 100)
       end
 
@@ -44,6 +55,11 @@ module Coordinator::Read::Web::Contracts
 
         key.failure("must be a Repository UUIDv7") unless
           Coordinator::Shared::Types::UUID_V7_PATTERN.match?(value)
+      end
+
+      rule(:after_repository_id, :after_updated_at) do
+        base.failure("cursor coordinates must both be present or absent") unless
+          values[:after_repository_id].nil? == values[:after_updated_at].nil?
       end
     end
   end

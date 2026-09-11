@@ -71,7 +71,7 @@ RSpec.describe "Read-only web boundaries" do
       path.read.scan(/@UI-GWT-\d{2}/)
     end
 
-    expect(tags.sort).to eq((1..25).map { format("@UI-GWT-%02d", _1) })
+    expect(tags.sort).to eq((1..27).map { format("@UI-GWT-%02d", _1) })
   end
 
   it "keeps Rails GraphQL adapters outside runtime RBS assertions" do

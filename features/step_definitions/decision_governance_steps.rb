@@ -147,7 +147,7 @@ Then("the activation Task succeeds with one complete consistency boundary") do
     "Decision slot event plan"
   )
   assert_acceptance_equal(
-    [ "DecisionPartitionAdvanced" ],
+    [ "DecisionAddedToPartition" ],
     decision_partition_events.map(&:type),
     "Decision partition event plan"
   )
@@ -321,7 +321,7 @@ Then("the correction Task succeeds while the previous Decision view remains avai
     "Decision correction slot plan"
   )
   assert_acceptance_equal(
-    %w[DecisionPartitionAdvanced DecisionPartitionAdvanced],
+    %w[DecisionAddedToPartition DecisionRemovedFromPartition DecisionAddedToPartition],
     decision_partition_events.map(&:type),
     "Decision correction partition plan"
   )

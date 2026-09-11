@@ -12,6 +12,7 @@ module Coordinator::Read::Projectors
                           Coordinator::Write::Events::ReleaseSetActivatedV2 |
                           Coordinator::Write::Events::ReleaseSetCompensationRequestedV2 |
                           Coordinator::Write::Events::ReleaseSetSuccessfulIntegrationLinkedV1 |
+                          Coordinator::Write::Events::RepositoryCompensationRecordedV1 |
                           Coordinator::Write::Events::ReleaseSetOutcomeRecordedV1 |
                           Coordinator::Write::Events::ReleaseSetCompletedV2
 

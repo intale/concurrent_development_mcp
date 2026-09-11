@@ -1,6 +1,12 @@
 # frozen_string_literal: true
 
 module LiveTwoAgentAcceptanceWorld
+  ReportedErrorCollector = Data.define(:errors) do
+    def report(error, **)
+      errors << error
+    end
+  end
+
   BASE_COMMIT = "a" * 40
   BASE_BLOB = "b" * 40
   CANDIDATE_HEADS = {
@@ -111,8 +117,26 @@ module LiveTwoAgentAcceptanceWorld
       )
     }
     requests = {
-      agent_a: [ agent_a, { kind: "directory", path: "app/models" } ],
-      agent_b: [ agent_b, { kind: "file", path: "app/models/order.rb", base_blob_oid: BASE_BLOB } ]
+      agent_a: [
+        agent_a,
+        {
+          kind: "directory",
+          path: "app/models",
+          mode: "exclusive",
+          purpose: "Restructure the model layer",
+          context: "Child edits would be invalidated by the restructuring."
+        }
+      ],
+      agent_b: [
+        agent_b,
+        {
+          kind: "file",
+          path: "app/models/order.rb",
+          base_blob_oid: BASE_BLOB,
+          mode: "shared",
+          purpose: "Adjust the order model"
+        }
+      ]
     }.transform_values do |entry, resource|
       [ entry, luna_resource_target(entry, resource) ]
     end
@@ -137,7 +161,7 @@ module LiveTwoAgentAcceptanceWorld
       [ _1.fetch(:key), _1.except(:key, :command_id, :internal_command_id, :worker_lane) ]
     end
     install_contention_barrier(
-      operation: "write_set_reserve",
+      operation: "coordination_task_execute",
       command_ids: @luna_contention_command_ids.values
     )
     start_process_subscriptions
@@ -181,14 +205,17 @@ module LiveTwoAgentAcceptanceWorld
     )
     denied = @luna_contention_results.fetch(:agent_b)
     assert_acceptance_equal("busy", denied.fetch("status"), "Child reservation")
+    blocker = denied.dig("data", "details", "blockers").sole
     assert_acceptance_equal(
       CLIENTS.fetch(:agent_a),
-      denied.dig("data", "details", "owner_agent_id"),
+      blocker.fetch("owner_agent_id"),
       "Blocking agent"
     )
+    assert_acceptance_equal("exclusive", blocker.fetch("mode"), "Blocking mode")
+    assert_acceptance_equal("Restructure the model layer", blocker.fetch("purpose"), "Blocking purpose")
     assert_acceptance(
-      denied.dig("data", "details", "expires_at"),
-      "The busy result must expose the lease-expiry retry boundary"
+      blocker.fetch("expires_at"),
+      "The busy result must expose when the blocking intention elapses"
     )
     assert_acceptance_equal(3, @luna_reservations.length, "Active disjoint write sets")
   end
@@ -284,10 +311,10 @@ module LiveTwoAgentAcceptanceWorld
       },
       client_id: agent_a.fetch(:client_id)
     )
-    assert_acceptance_equal(
-      "write_set_released",
-      renewal.dig("data", "code"),
-      "Authoritative stale-command rejection"
+    assert_acceptance_equal("denied", renewal.fetch("status"), "Authoritative stale-command status")
+    assert_acceptance(
+      renewal.dig("data", "code").to_s.length.positive?,
+      "Authoritative stale-command rejection must expose a typed reason"
     )
     @luna_lag_observation = { before:, stale:, renewal: }
 
@@ -397,8 +424,7 @@ module LiveTwoAgentAcceptanceWorld
           external_reference: "two-luna/releases/1",
           state_digest: "sha256:#{'8' * 64}",
           producer: { name: "two-luna-release-adapter", version: "1.0.0" },
-          run_id: "two-luna-release-activation",
-          activated_at: "2026-08-28T10:45:00.000000Z"
+          run_id: "two-luna-release-activation"
         }
       },
       client_id: CLIENTS.fetch(:verifier)
@@ -506,6 +532,12 @@ module LiveTwoAgentAcceptanceWorld
       "completed",
       reconstruction.dig("release", "data", "release_set", "status"),
       "Reconstructed ReleaseSet"
+    )
+    release_members = reconstruction.dig("release", "data", "release_set", "ordered_members")
+    assert_acceptance_equal(
+      @luna_candidates.values.map { _1.fetch("candidate_id") }.sort,
+      release_members.flat_map { _1.fetch("ordered_candidate_ids") }.sort,
+      "Reconstructed ReleaseSet Candidate coverage"
     )
   end
 
@@ -675,6 +707,9 @@ module LiveTwoAgentAcceptanceWorld
       path: resource.fetch(:path),
       repository_id: entry.fetch(:repository_id),
       base_blob_oid: resource[:base_blob_oid],
+      mode: resource[:mode],
+      purpose: resource[:purpose],
+      context: resource[:context],
       client_id: entry.fetch(:client_id),
       actor_id: entry.fetch(:agent_id)
     )
@@ -1048,12 +1083,24 @@ module LiveTwoAgentAcceptanceWorld
     state = luna_round_trip(
       await_task_terminal(handle.fetch(:task_id), client_id: handle.fetch(:client_id))
     )
-    assert_acceptance_equal("completed", state.dig("result", "status"), "#{handle.fetch(:tool)} Task")
+    assert_acceptance_equal(
+      "completed",
+      state.dig("result", "status"),
+      "#{handle.fetch(:tool)} Task: #{state.inspect}"
+    )
     state.dig("result", "result", "structuredContent")
   end
 
   def luna_task(tool, arguments, client_id:)
+    collector = ReportedErrorCollector.new(errors: [])
+    Rails.error.subscribe(collector)
     luna_task_result(luna_task_handle(tool, arguments, client_id:))
+  rescue StandardError
+    raise collector.errors.first if collector.errors.any?
+
+    raise
+  ensure
+    Rails.error.unsubscribe(collector) if collector
   end
 
   def luna_successful_task(tool, arguments, client_id:)

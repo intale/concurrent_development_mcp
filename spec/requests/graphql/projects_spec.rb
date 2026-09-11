@@ -147,7 +147,7 @@ module ProjectCatalogGraphqlSpec
       expect(definition).not_to match(/^type (?:Mutation|Subscription)\b/)
     end
 
-    def execute_projects(first: 20, repositories_first: 3, search: nil, sort: "SCOPE_ASC", after: nil)
+    def execute_projects(first: 20, repositories_first: 3, search: nil, sort: "NEWEST_FIRST", after: nil)
       execute(
         PROJECTS_QUERY,
         search:,
@@ -186,7 +186,9 @@ module ProjectCatalogGraphqlSpec
         scope:,
         display_name: name,
         paths: [ path ],
-        registered_at_domain: Time.utc(2020, 1, 1, 12)
+        registered_at_domain: Time.utc(2020, 1, 1, 12),
+        created_at: Time.utc(2026, 8, 30, 12) - index.seconds,
+        updated_at: Time.utc(2026, 8, 30, 12) - index.seconds
       )
     end
   end

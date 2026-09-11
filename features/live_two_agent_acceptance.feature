@@ -7,9 +7,9 @@ Feature: Live two-agent checkpointed coordination
   Scenario: Two 5.6-luna agents checkpoint and release one concurrent multi-repository change
     Given project scope "project:acceptance/two-luna-live" has an active ChangeSet for two independent 5.6-luna agents
     When both agents discover the ChangeSet from scope and acquire their WorkItems through MCP
-    And their parent and child write-set requests reach the real reservation boundary concurrently
-    Then agent A owns the parent while agent B receives the holder and retry boundary
-    And agent B can reserve a disjoint resource while agent A remains active
+    And their exclusive parent and shared child work-intention requests reach the real decision boundary concurrently
+    Then agent A declares the exclusive parent while agent B receives the blocker context
+    And agent B can declare a disjoint intention while agent A remains active
     When both agents persist final Candidate checkpoints through MCP
     And an available stale context is used for a command after its lease has been released
     Then the stale context remains available and the authoritative command is rejected

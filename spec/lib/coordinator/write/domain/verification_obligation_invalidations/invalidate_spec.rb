@@ -56,6 +56,7 @@ RSpec.describe Coordinator::Write::Domain::VerificationObligationInvalidations::
       stream: Coordinator::Write::StreamFactory.new.verification_obligation(obligation.obligation_id),
       event: have_attributes(
         obligation_id: obligation.obligation_id,
+        superseding_partition_event: superseding_reference,
         reason: "policy_partition_advanced"
       )
     )

@@ -89,10 +89,10 @@ module Coordinator::Write
 
           observation = evidence.observation
           snapshot = evidence.snapshot
-          evidence.event == command.merge_observation_event &&
+            evidence.event == command.merge_observation_event &&
             evidence.observation_digest == command.observation_digest &&
-            snapshot.ordered_candidates.one? &&
-            snapshot.ordered_candidates.sole.candidate_id == member.candidate_id &&
+            snapshot.merge_snapshot_id == member.merge_snapshot_id &&
+            snapshot.ordered_candidates.map(&:candidate_id) == member.ordered_candidates.map(&:candidate_id) &&
             snapshot.repository_id == member.repository_id &&
             observation.merge_snapshot_id == snapshot.merge_snapshot_id &&
             observation.repository_id == snapshot.repository_id &&

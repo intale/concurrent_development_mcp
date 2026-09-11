@@ -15,6 +15,7 @@ module Coordinator::Read
         query = SkillListQueryV1.new(
           name: validated[:name],
           scope: validated[:scope],
+          after_updated_at: nil,
           after_skill_id: validated[:after_skill_id],
           limit: validated[:limit] || 20
         )

@@ -36,6 +36,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteInvalidateVerificationObli
     )
     expect(load(event)).to have_attributes(
       obligation_id: created.fetch(:payload).obligation_id,
+      superseding_partition_event: CandidateObligationScenario.reference(
+        corrected.fetch(:partition_event)
+      ),
       reason: "policy_partition_advanced"
     )
     expect(event.metadata).to include(
@@ -59,6 +62,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteInvalidateVerificationObli
 
     expect(load(event)).to have_attributes(
       obligation_id: created.fetch(:payload).obligation_id,
+      superseding_partition_event: CandidateObligationScenario.reference(
+        corrected.fetch(:partition_event)
+      ),
       reason: "policy_partition_advanced"
     )
     expect(history.map(&:type)).to eq(%w[

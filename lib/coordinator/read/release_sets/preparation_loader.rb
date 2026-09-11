@@ -29,7 +29,9 @@ module Coordinator::Read
             members << ReleaseSetMemberViewV1.new(
               position: payload.member_position,
               repository_id: payload.repository_id,
-              candidate_id: payload.candidate_id
+              merge_snapshot_id: payload.merge_snapshot_id,
+              ordered_candidate_ids: payload.ordered_candidate_ids,
+              authorization_event: payload.authorization_event
             )
           when Coordinator::Write::Events::ReleaseSetPreparedV2
             prepared = [ payload, event ]

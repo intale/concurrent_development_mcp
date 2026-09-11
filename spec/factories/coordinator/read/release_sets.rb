@@ -17,7 +17,16 @@ FactoryBot.define do
         {
           "position" => index + 1,
           "repository_id" => repository_id,
-          "candidate_id" => "CAN-#{release_set_id}-#{index + 1}"
+          "merge_snapshot_id" => "MS-#{release_set_id}-#{index + 1}",
+          "ordered_candidate_ids" => [ "CAN-#{release_set_id}-#{index + 1}" ],
+          "authorization_event" => {
+            "event_id" => SecureRandom.uuid_v7,
+            "type" => "MergeAuthorizationGranted",
+            "stream_context" => "DevelopmentIntegration",
+            "stream_name" => "MergeAuthorization",
+            "stream_id" => SecureRandom.uuid_v7,
+            "stream_revision" => 0
+          }
         }
       end
     end

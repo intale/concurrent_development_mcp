@@ -35,7 +35,7 @@ module Coordinator::Read
           next unless @processed_events.claim(
             definition: PROJECTION,
             identity: ProjectionEventIdentity.from_event(event),
-            processed_at: Time.now.utc
+            processed_at: event.created_at
           )
 
           project(event, payload)
@@ -110,7 +110,7 @@ module Coordinator::Read
         when Coordinator::Write::Events::MergeObservedV2
           @snapshots.record_observation(event:, observation: payload)
         when Coordinator::Write::Events::MergeObservationAuthorizationLinkedV1
-          @snapshots.link_observation_authorization(link: payload)
+          @snapshots.link_observation_authorization(event:, link: payload)
         else
           raise UnknownProjectionEvent, payload.class.name
         end

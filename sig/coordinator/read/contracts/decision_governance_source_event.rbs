@@ -2,7 +2,7 @@ module Coordinator
   module Read
     module Contracts
       class DecisionGovernanceSourceEvent < Dry::Validation::Contract
-        STREAM_BY_EVENT_TYPE: Hash[String, String]
+        EVENT_SCHEMAS: Hash[String, [String, Array[Integer]]]
         EVENT_TYPES: Array[String]
 
         def call: (Hash[Symbol, untyped] input) -> Dry::Validation::Result

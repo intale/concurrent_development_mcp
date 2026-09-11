@@ -17,8 +17,8 @@ module Coordinator::Write
         physical = @event_store.read(
           @stream_factory.release_set(release_set_id),
           EventQueries::RELEASE_SET_PREPARATION
-        ).first
-        return unless physical&.type == "ReleaseSetPrepared"
+        ).find { _1.type == "ReleaseSetPrepared" }
+        return unless physical
 
         payload = @schema_registry.load(
           type: physical.type,

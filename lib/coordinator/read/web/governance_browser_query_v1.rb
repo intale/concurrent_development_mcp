@@ -8,6 +8,7 @@ module Coordinator::Read::Web
       attribute :topic_id, Coordinator::Shared::Types::Identifier.optional
       attribute :policy_status, Coordinator::Shared::Types::DecisionPolicyStatus.optional
       attribute :after_decision_id, Coordinator::Shared::Types::Identifier.optional
+      attribute :after_updated_at, Coordinator::Shared::Types::Timestamp.optional
     end
 
     class GuidanceList < Coordinator::Shared::Value
@@ -15,6 +16,7 @@ module Coordinator::Read::Web
       attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 50)
       attribute :source, Coordinator::Shared::Types::GuidanceSource.optional
       attribute :after_message_id, Coordinator::Shared::Types::Identifier.optional
+      attribute :after_updated_at, Coordinator::Shared::Types::Timestamp.optional
     end
 
     class Choices < Coordinator::Shared::Value
@@ -23,13 +25,14 @@ module Coordinator::Read::Web
       attribute :choice_type, Coordinator::Shared::Types::AgentChoiceType.optional
       attribute :status, Coordinator::Shared::Types::AgentChoiceObservationStatus.optional
       attribute :after_choice_id, Coordinator::Shared::Types::Identifier.optional
+      attribute :after_updated_at, Coordinator::Shared::Types::Timestamp.optional
     end
 
     class Impacts < Coordinator::Shared::Value
       attribute :project_scope, Coordinator::Shared::Types::String
       attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 50)
       attribute :outcome, Coordinator::Shared::Types::AgentChoiceImpactAssessmentOutcome.optional
-      attribute :after_global_position, Coordinator::Shared::Types::GlobalPosition.optional
+      attribute :after_updated_at, Coordinator::Shared::Types::Timestamp.optional
       attribute :after_assessment_id, Coordinator::Shared::Types::Identifier.optional
     end
 
@@ -49,7 +52,7 @@ module Coordinator::Read::Web
       attribute :project_scope, Coordinator::Shared::Types::String
       attribute :choice_id, Coordinator::Shared::Types::Identifier
       attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 100)
-      attribute :after_impact_global_position, Coordinator::Shared::Types::GlobalPosition.optional
+      attribute :after_impact_updated_at, Coordinator::Shared::Types::Timestamp.optional
       attribute :after_impact_assessment_id, Coordinator::Shared::Types::Identifier.optional
     end
 
@@ -63,6 +66,7 @@ module Coordinator::Read::Web
       attribute :tool_name, Coordinator::Shared::Types::CoordinationToolName.optional
       attribute :status, Coordinator::Shared::Types::String.enum("ok").optional
       attribute :after_command_id, Coordinator::Shared::Types::Identifier.optional
+      attribute :after_updated_at, Coordinator::Shared::Types::Timestamp.optional
     end
 
     class Receipt < Coordinator::Shared::Value

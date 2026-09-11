@@ -1,0 +1,24 @@
+module Coordinator::Read
+  module CoordContexts
+    class WorkIntentionStateV1 < Coordinator::Shared::Value
+      def self.reduce: (Array[Coordinator::Write::Events::Base]) -> WorkIntentionStateV1
+
+      def intention_id: () -> String
+      def set_id: () -> String
+      def resource_id: () -> String
+      def repository_id: () -> String
+      def change_set_id: () -> String
+      def work_item_id: () -> String
+      def attempt_id: () -> String
+      def agent_id: () -> String
+      def mode: () -> String
+      def purpose: () -> String
+      def context: () -> String?
+      def object_format: () -> String
+      def base_commit_oid: () -> String
+      def base_blob_oid: () -> String?
+      def fencing_token: () -> Integer
+      def expires_at: () -> String
+    end
+  end
+end

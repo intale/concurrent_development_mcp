@@ -15,10 +15,10 @@ export interface ProjectRow {
   readonly scope: string;
 }
 
-export const DEFAULT_PROJECT_SORT: ProjectSort = "SCOPE_ASC";
+export const DEFAULT_PROJECT_SORT: ProjectSort = "NEWEST_FIRST";
 
 export function parseProjectSort(value: string | null): ProjectSort {
-  return value === "SCOPE_DESC" ? "SCOPE_DESC" : DEFAULT_PROJECT_SORT;
+  return value === "OLDEST_FIRST" ? "OLDEST_FIRST" : DEFAULT_PROJECT_SORT;
 }
 
 export function preservePageForCatalogFilters<TData>(

@@ -3,6 +3,8 @@
 module Coordinator::Read
   module Repositories
     class Resources
+      include EventTimestamped
+
       def fetch(resource_id)
         record = Coordinator::Read::Resource.find_by(resource_id:)
         record && build_view(record)
@@ -28,7 +30,7 @@ module Coordinator::Read
       def store(event:, resource:)
         record = Coordinator::Read::Resource.lock.find_by(resource_id: resource.resource_id)
         verify_identity!(record, resource) if record
-        record ||= create_skeleton(resource)
+        record ||= create_skeleton(resource, event:)
 
         case resource
         when Coordinator::Write::Events::ResourceIdentityV1::Registered,
@@ -41,20 +43,20 @@ module Coordinator::Read
           store_transition(record, event, resource)
         end
 
-        record.update!(updated_at: event.created_at) if record.persisted?
+        save_from_event(record, event:) if record.persisted?
         record
       end
 
       private
 
-      def create_skeleton(resource)
-        Coordinator::Read::Resource.create!(
+      def create_skeleton(resource, event:)
+        create_from_event(Coordinator::Read::Resource, event:, attributes: {
           resource_id: resource.resource_id,
           repository_id: resource.repository_id,
           kind: resource.kind,
           normalized_path: resource.normalized_path.unicode_normalize(:nfc),
           lifecycle_status: "registered"
-        )
+        })
       rescue ActiveRecord::RecordNotUnique
         record = Coordinator::Read::Resource.lock.find_by(resource_id: resource.resource_id)
         verify_identity!(record, resource) if record
@@ -68,7 +70,7 @@ module Coordinator::Read
         return record if existing_event_id == event.id
         raise ProjectionStateError, "Resource has two registration facts" if existing_event_id
 
-        record.update!(registration_attributes(event, resource))
+        record.assign_attributes(registration_attributes(event, resource))
         record
       end
 
@@ -76,7 +78,7 @@ module Coordinator::Read
         latest_position = record.latest_transition_global_position
         return record if latest_position && latest_position >= event.global_position
 
-        record.update!(transition_attributes(event, resource))
+        record.assign_attributes(transition_attributes(event, resource))
         record
       end
 

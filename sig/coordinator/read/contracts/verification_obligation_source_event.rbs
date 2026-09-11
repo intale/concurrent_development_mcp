@@ -3,6 +3,7 @@ module Coordinator
     module Contracts
       class VerificationObligationSourceEvent < Dry::Validation::Contract
         EVENT_TYPES: Array[String]
+        SCHEMA_VERSIONS: Hash[String, Array[Integer]]
 
         def call: (command_input input) -> Dry::Validation::Result
       end

@@ -2,6 +2,8 @@
 
 module Coordinator::Read::Web::Repositories
   class ProjectResources
+    include EventTimePagination
+
     def resources(query)
       repository_ids = project_repository_ids(query.scope)
       return if repository_ids.empty?
@@ -15,12 +17,18 @@ module Coordinator::Read::Web::Repositories
         pattern = ActiveRecord::Base.sanitize_sql_like(query.path)
         relation = relation.where("normalized_path ILIKE ?", "%#{pattern}%")
       end
-      relation = relation.where("resource_id > ?", query.after_id) if query.after_id
-      records, has_more = bounded(relation.order(:resource_id), query.first)
+      records, has_more = event_time_page(
+        relation:,
+        id_column: :resource_id,
+        after_updated_at: query.after_updated_at,
+        after_id: query.after_id,
+        limit: query.first
+      )
 
       Coordinator::Read::Web::ProjectResourcesV1::ResourcePage.new(
         items: records.map { build_resource_record(_1) },
         next_resource_id: has_more ? records.last.resource_id : nil,
+        next_updated_at: has_more ? event_time(records.last) : nil,
         has_more:
       )
     end
@@ -39,12 +47,19 @@ module Coordinator::Read::Web::Repositories
         .where(released_at_domain: nil, attempt_terminal_at_domain: nil)
         .where("expires_at_domain > ?", Time.iso8601(query.as_of))
       relation = apply_lease_filters(relation, query)
-      relation = relation.where("lease_id > ?", query.after_id) if query.after_id
-      records, has_more = bounded(relation.order(:lease_id), query.first)
+      records, has_more = event_time_page(
+        relation:,
+        id_column: :lease_id,
+        timestamp_column: :last_projected_at,
+        after_updated_at: query.after_updated_at,
+        after_id: query.after_id,
+        limit: query.first
+      )
 
       Coordinator::Read::Web::ProjectResourcesV1::LeasePage.new(
         items: records.map { build_lease(_1, query.as_of) },
         next_lease_id: has_more ? records.last.lease_id : nil,
+        next_updated_at: has_more ? records.last.last_projected_at.utc.iso8601(6) : nil,
         has_more:,
         as_of: query.as_of
       )

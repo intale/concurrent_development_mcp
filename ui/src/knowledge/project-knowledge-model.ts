@@ -10,6 +10,9 @@ import type {
   ProjectSkillAssetQuery,
   ProjectSkillQuery,
   ProjectSkillsQuery,
+  SkillAssetQuery,
+  SkillQuery,
+  SkillsQuery,
   SkillSummaryFieldsFragment
 } from "../gql/graphql.js";
 
@@ -71,6 +74,9 @@ export type ArtifactSummary = ArtifactSummaryFieldsFragment;
 export type SkillConnection = NonNullable<ProjectSkillsQuery["projectSkills"]>;
 export type ProjectSkill = NonNullable<ProjectSkillQuery["projectSkill"]>;
 export type ProjectSkillAsset = NonNullable<ProjectSkillAssetQuery["projectSkillAsset"]>;
+export type GlobalSkillConnection = SkillsQuery["skills"];
+export type GlobalSkill = NonNullable<SkillQuery["skill"]>;
+export type GlobalSkillAsset = NonNullable<SkillAssetQuery["skillAsset"]>;
 export type ArtifactConnection = NonNullable<ProjectArtifactsQuery["projectArtifacts"]>;
 export type ProjectArtifact = NonNullable<ProjectArtifactQuery["projectArtifact"]>;
 export type ProjectArtifactRelationships = NonNullable<

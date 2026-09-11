@@ -16,6 +16,7 @@ module Coordinator::Read::Web
       attribute :items,
                 Coordinator::Shared::Types::Array.of(RepositoryMember).constrained(max_size: 100)
       attribute :next_repository_id, Coordinator::Shared::Types::UuidV7.optional
+      attribute :next_updated_at, Coordinator::Shared::Types::Timestamp.optional
       attribute :has_more, Coordinator::Shared::Types::Strict::Bool
       attribute :total_count, Coordinator::Shared::Types::Integer.constrained(gteq: 1)
     end
@@ -32,6 +33,7 @@ module Coordinator::Read::Web
       attribute :items,
                 Coordinator::Shared::Types::Array.of(ProjectSummary).constrained(max_size: 100)
       attribute :next_scope, Coordinator::Shared::Types::String.optional
+      attribute :next_updated_at, Coordinator::Shared::Types::Timestamp.optional
       attribute :has_more, Coordinator::Shared::Types::Strict::Bool
     end
 

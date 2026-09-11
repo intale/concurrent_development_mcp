@@ -38,7 +38,8 @@ module Coordinator::Read::Web::Queries
           first: values[:first] || 20,
           topic_id: values[:topic_id],
           policy_status: values[:policy_status],
-          after_decision_id: values[:after_decision_id]
+          after_decision_id: values[:after_decision_id],
+          after_updated_at: values[:after_updated_at]
         )
       )
     end
@@ -50,7 +51,8 @@ module Coordinator::Read::Web::Queries
           project_scope: project_scope(values),
           first: values[:first] || 20,
           source: values[:source],
-          after_message_id: values[:after_message_id]
+          after_message_id: values[:after_message_id],
+          after_updated_at: values[:after_updated_at]
         )
       )
     end
@@ -63,7 +65,8 @@ module Coordinator::Read::Web::Queries
           first: values[:first] || 20,
           choice_type: values[:choice_type],
           status: values[:status],
-          after_choice_id: values[:after_choice_id]
+          after_choice_id: values[:after_choice_id],
+          after_updated_at: values[:after_updated_at]
         )
       )
     end
@@ -75,7 +78,7 @@ module Coordinator::Read::Web::Queries
           project_scope: project_scope(values),
           first: values[:first] || 20,
           outcome: values[:outcome],
-          after_global_position: values[:after_global_position],
+          after_updated_at: values[:after_updated_at],
           after_assessment_id: values[:after_assessment_id]
         )
       )
@@ -110,7 +113,7 @@ module Coordinator::Read::Web::Queries
           project_scope: project_scope(values),
           choice_id: values[:choice_id],
           first: values[:first] || 20,
-          after_impact_global_position: values[:after_impact_global_position],
+          after_impact_updated_at: values[:after_impact_updated_at],
           after_impact_assessment_id: values[:after_impact_assessment_id]
         )
       )
@@ -133,7 +136,8 @@ module Coordinator::Read::Web::Queries
           first: values[:first] || 20,
           tool_name: values[:tool_name],
           status: values[:status],
-          after_command_id: values[:after_command_id]
+          after_command_id: values[:after_command_id],
+          after_updated_at: values[:after_updated_at]
         )
       )
     end

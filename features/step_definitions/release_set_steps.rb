@@ -27,8 +27,15 @@ Then("the ReleaseSet Task completes with the exact repository order") do
   )
 end
 
-Then("one prepared fact and command success fact preserve the Task trace") do
-  prepared = release_set_events(@release_set_arguments.fetch(:release_set_id)).sole
+Then("the granular preparation facts and command success preserve the Task trace") do
+  preparation_facts = release_set_events(@release_set_arguments.fetch(:release_set_id))
+  assert_acceptance_equal(
+    %w[ReleaseSetCreated ReleaseSetMemberAdded ReleaseSetMemberAdded ReleaseSetPrepared],
+    preparation_facts.map(&:type),
+    "ReleaseSet preparation facts"
+  )
+  change_set_id = release_set_payload(preparation_facts.first).change_set_id
+  change_set_link = release_set_change_set_link(change_set_id)
   lifecycle = command_events(@release_set_arguments.fetch(:command_id))
   assert_acceptance_equal(
     %w[CommandRegistered CommandSucceeded],
@@ -40,11 +47,19 @@ Then("one prepared fact and command success fact preserve the Task trace") do
     event.type == "CoordinationTaskExecutionStarted"
   end
   assert_acceptance(started, "ReleaseSet Task has no execution-started fact")
-  assert_acceptance_equal(started.id, prepared.causation_id, "Preparation causation")
-  assert_acceptance_equal(started.id, completion.causation_id, "Completion causation")
+  causal_chain = [ started, *preparation_facts, change_set_link ]
+  assert_acceptance(
+    causal_chain.each_cons(2).all? { |parent, child| child.causation_id == parent.id },
+    "ReleaseSet preparation does not form one causal chain"
+  )
+  assert_acceptance_equal(
+    started.id,
+    completion.causation_id,
+    "Command success must share the Task execution as its causal parent"
+  )
   assert_acceptance_equal(
     [ started.correlation_id ],
-    [ prepared, completion ].map(&:correlation_id).uniq,
+    [ *causal_chain, completion ].map(&:correlation_id).uniq,
     "Preparation correlation"
   )
 end
@@ -85,39 +100,38 @@ end
 
 When("the agent records both repository integrations through MCP in order") do
   release_set_id = @release_set_arguments.fetch(:release_set_id)
-  prepared = release_set_payload(release_set_lifecycle_events(release_set_id).first)
-  @release_integration_tasks = prepared.ordered_members.map.with_index do |member, index|
+  @release_integration_tasks = release_set_member_inputs.map.with_index do |member, index|
+    snapshot = release_set_snapshot(member)
     observation_task_id = submit_and_execute(
       "merge_observation_record",
       command_id: "cmd-cuc-release-observe-#{index + 1}",
       actor: { kind: "agent", id: "release-integrator-1" },
-      merge_snapshot_id: member.merge_snapshot_id,
-      authorization_event: member.authorization_event.to_h,
-      authorization_decision_digest: member.authorization_decision_digest,
-      repository_id: member.repository_id,
-      target_branch: member.target_branch,
-      object_format: member.object_format,
-      target_before_commit_oid: member.target_base_commit_oid,
-      target_after_commit_oid: member.merge_commit_oid,
+      merge_snapshot_id: member.fetch(:merge_snapshot_id),
+      authorization_event: member.fetch(:authorization_event),
+      authorization_decision_digest: member.fetch(:authorization_decision_digest),
+      repository_id: member.fetch(:repository_id),
+      target_branch: member.fetch(:target_branch),
+      object_format: member.fetch(:object_format),
+      target_before_commit_oid: snapshot.target_base_commit_oid,
+      target_after_commit_oid: snapshot.merge_commit_oid,
       observer: { name: "release-adapter", version: "1.0.0" },
       run_id: "cuc-release-observation-#{index + 1}",
       observed_at: "2026-08-24T21:00:0#{index}.000000Z"
     )
     observation = event_store.read(
-      streams.merge_snapshot(member.merge_snapshot_id),
+      streams.merge_snapshot(member.fetch(:merge_snapshot_id)),
       Coordinator::Write::EventQueries::MERGE_OBSERVATION
     ).sole
-    observation_payload = release_set_payload(observation)
     task_id = submit_and_execute(
       "release_repository_integration_record",
       command_id: "cmd-cuc-release-integrate-#{index + 1}",
       actor: { kind: "agent", id: "release-integrator-1" },
       release_set_id:,
-      repository_id: member.repository_id,
+      repository_id: member.fetch(:repository_id),
       attempt_id: "cuc-release-attempt-#{index + 1}",
       outcome: "integrated",
       merge_observation_event: release_event_reference(observation).to_h,
-      observation_digest: observation_payload.observation_digest,
+      observation_digest: observation.metadata.fetch("observation_digest"),
       failure: nil
     )
     { observation_task_id:, task_id: }
@@ -157,10 +171,24 @@ Then("the integration and verification Tasks preserve one ReleaseSet trace") do
     "ReleaseSet lifecycle correlation"
   )
   domain_tasks = @release_integration_tasks.map { _1.fetch(:task_id) } + [ @release_verification_task_id ]
-  domain_events = lifecycle.drop(1)
-  domain_tasks.zip(domain_events).each do |task_id, event|
+  domain_tasks.each do |task_id|
     started = task_events(task_id).find { _1.type == "CoordinationTaskExecutionStarted" }
-    assert_acceptance_equal(started.id, event.causation_id, "ReleaseSet lifecycle causation")
+    command_id = task_command_id(task_id)
+    facts = lifecycle.select { _1.metadata["command_id"] == command_id }
+    assert_acceptance(facts.any?, "ReleaseSet Task emitted no lifecycle facts")
+    assert_acceptance_equal(started.id, facts.first.causation_id, "ReleaseSet lifecycle causation")
+    assert_acceptance(
+      facts.each_cons(2).all? { |parent, child| child.causation_id == parent.id },
+      "ReleaseSet Task facts do not form one causal chain"
+    )
+    terminal = command_events(command_id).find { _1.type == "CommandSucceeded" }
+    assert_acceptance(terminal, "ReleaseSet command has no success fact")
+    assert_acceptance_equal(started.id, terminal.causation_id, "ReleaseSet command success causation")
+    assert_acceptance_equal(
+      [ expected_correlation ],
+      [ started, *facts, terminal ].map(&:correlation_id).uniq,
+      "ReleaseSet Task correlation"
+    )
     state = task_request("tasks/get", task_id)
     assert_acceptance_equal("completed", state.dig("result", "status"), "ReleaseSet Task")
   end
@@ -200,22 +228,20 @@ When("the agent records external ReleaseSet activation through MCP") do
   verification = release_set_lifecycle_events(release_set_id).find do |event|
     event.type == "ReleaseSetVerificationRecorded"
   end
-  payload = release_set_payload(verification)
   @release_activation_task_id = submit_and_execute(
     "release_activation_record",
     command_id: "cmd-cuc-release-activation",
     actor: { kind: "agent", id: "release-operator-1" },
     release_set_id:,
     verification_event: release_event_reference(verification).to_h,
-    verification_digest: payload.verification_digest,
+    verification_digest: verification.metadata.fetch("verification_digest"),
     activation_point: {
       kind: "deployment_manifest",
       environment: "production",
       external_reference: "deployments/cuc-release-activation",
       state_digest: "sha256:#{'a' * 64}",
       producer: { name: "deployment-controller", version: "1.0.0" },
-      run_id: "cuc-release-activation-run",
-      activated_at: "2026-08-24T22:00:00.000000Z"
+      run_id: "cuc-release-activation-run"
     }
   )
 end
@@ -232,6 +258,7 @@ end
 Then("the activation Task and Saga completion preserve the ReleaseSet trace") do
   lifecycle = release_set_lifecycle_events(@release_set_arguments.fetch(:release_set_id))
   activation = lifecycle.find { _1.type == "ReleaseSetActivated" }
+  outcome = lifecycle.select { _1.type == "ReleaseSetOutcomeRecorded" }.sole
   completion = lifecycle.select { _1.type == "ReleaseSetCompleted" }.sole
   started = task_events(@release_activation_task_id).find do |event|
     event.type == "CoordinationTaskExecutionStarted"
@@ -247,13 +274,14 @@ Then("the activation Task and Saga completion preserve the ReleaseSet trace") do
   assert_acceptance_equal("completed", state.dig("result", "status"), "Activation Task")
   assert_acceptance_equal(started.id, activation.causation_id, "Activation causation")
   assert_acceptance(process_step, "Release completion ProcessStep is missing")
-  assert_acceptance_equal(process_step.id, completion.causation_id, "Completion causation")
+  assert_acceptance_equal(process_step.id, outcome.causation_id, "Release outcome causation")
+  assert_acceptance_equal(outcome.id, completion.causation_id, "Completion causation")
   assert_acceptance_equal(
     [ lifecycle.first.correlation_id ],
     lifecycle.map(&:correlation_id).uniq,
     "Activated lifecycle correlation"
   )
-  assert_acceptance_equal("activated", release_set_payload(completion).outcome, "Completion outcome")
+  assert_acceptance_equal("activated", release_set_history.completion.payload.outcome, "Completion outcome")
 end
 
 Then("the completed activated ReleaseSet is available without a freshness gate") do
@@ -270,48 +298,47 @@ end
 
 When("the first repository integrates while the second records failure through MCP") do
   release_set_id = @release_set_arguments.fetch(:release_set_id)
-  prepared = release_set_payload(release_set_lifecycle_events(release_set_id).first)
-  first = prepared.ordered_members.first
+  first = release_set_member_inputs.first
+  first_snapshot = release_set_snapshot(first)
   submit_and_execute(
     "merge_observation_record",
     command_id: "cmd-cuc-compensation-observe",
     actor: { kind: "agent", id: "release-integrator-1" },
-    merge_snapshot_id: first.merge_snapshot_id,
-    authorization_event: first.authorization_event.to_h,
-    authorization_decision_digest: first.authorization_decision_digest,
-    repository_id: first.repository_id,
-    target_branch: first.target_branch,
-    object_format: first.object_format,
-    target_before_commit_oid: first.target_base_commit_oid,
-    target_after_commit_oid: first.merge_commit_oid,
+    merge_snapshot_id: first.fetch(:merge_snapshot_id),
+    authorization_event: first.fetch(:authorization_event),
+    authorization_decision_digest: first.fetch(:authorization_decision_digest),
+    repository_id: first.fetch(:repository_id),
+    target_branch: first.fetch(:target_branch),
+    object_format: first.fetch(:object_format),
+    target_before_commit_oid: first_snapshot.target_base_commit_oid,
+    target_after_commit_oid: first_snapshot.merge_commit_oid,
     observer: { name: "release-adapter", version: "1.0.0" },
     run_id: "cuc-compensation-observation",
     observed_at: "2026-08-24T21:00:00.000000Z"
   )
   observation = event_store.read(
-    streams.merge_snapshot(first.merge_snapshot_id),
+    streams.merge_snapshot(first.fetch(:merge_snapshot_id)),
     Coordinator::Write::EventQueries::MERGE_OBSERVATION
   ).sole
-  observation_payload = release_set_payload(observation)
   @release_success_task_id = submit_and_execute(
     "release_repository_integration_record",
     command_id: "cmd-cuc-compensation-integrate-1",
     actor: { kind: "agent", id: "release-integrator-1" },
     release_set_id:,
-    repository_id: first.repository_id,
+    repository_id: first.fetch(:repository_id),
     attempt_id: "cuc-compensation-attempt-1",
     outcome: "integrated",
     merge_observation_event: release_event_reference(observation).to_h,
-    observation_digest: observation_payload.observation_digest,
+    observation_digest: observation.metadata.fetch("observation_digest"),
     failure: nil
   )
-  second = prepared.ordered_members.fetch(1)
+  second = release_set_member_inputs.fetch(1)
   @release_failure_task_id = submit_and_execute(
     "release_repository_integration_record",
     command_id: "cmd-cuc-compensation-integrate-2",
     actor: { kind: "agent", id: "release-integrator-1" },
     release_set_id:,
-    repository_id: second.repository_id,
+    repository_id: second.fetch(:repository_id),
     attempt_id: "cuc-compensation-attempt-2",
     outcome: "failed",
     merge_observation_event: nil,
@@ -321,8 +348,7 @@ When("the first repository integrates while the second records failure through M
       summary: "Ledger deployment failed",
       producer: { name: "release-adapter", version: "1.0.0" },
       run_id: "cuc-compensation-failure",
-      result_digest: "sha256:#{'d' * 64}",
-      occurred_at: "2026-08-24T21:30:00.000000Z"
+      result_digest: "sha256:#{'d' * 64}"
     }
   )
 end
@@ -342,7 +368,7 @@ end
 
 Then("one exact compensation request is durable with Saga tracing") do
   lifecycle = release_set_lifecycle_events(@release_set_arguments.fetch(:release_set_id))
-  request = release_set_payload(@release_compensation_request_event)
+  request = release_set_history.compensation_request
   failure = lifecycle.select { _1.type == "RepositoryIntegrationRecorded" }.last
   process_step = process_step_event(
     source_event: failure,
@@ -351,16 +377,26 @@ Then("one exact compensation request is durable with Saga tracing") do
     subject_kind: "release-set",
     subject_id: @release_set_arguments.fetch(:release_set_id)
   )
-  assert_acceptance_equal(1, request.successful_integrations.length, "Compensation members")
-  assert_acceptance_equal(release_event_reference(failure), request.trigger_event, "Compensation trigger")
+  successful_integrations = lifecycle.select do |event|
+    event.type == "RepositoryIntegrationRecorded" && release_set_payload(event).outcome == "integrated"
+  end.map { release_event_reference(_1) }
+  assert_acceptance_equal(successful_integrations, request.successful_integrations, "Compensation members")
+  assert_acceptance_equal("repository_integration_failed", request.payload.trigger_kind, "Compensation trigger kind")
   assert_acceptance(process_step, "Compensation ProcessStep is missing")
+  assert_acceptance_equal(failure.id, process_step.causation_id, "Compensation ProcessStep source")
   assert_acceptance_equal(process_step.id, @release_compensation_request_event.causation_id, "Saga causation")
+  assert_acceptance(
+    [ @release_compensation_request_event, *request.integration_link_events.map do |reference|
+      lifecycle.find { _1.id == reference.event_id }
+    end ].each_cons(2).all? { |parent, child| child.causation_id == parent.id },
+    "Compensation facts do not form one causal chain"
+  )
   assert_acceptance_equal(lifecycle.first.correlation_id, @release_compensation_request_event.correlation_id, "Saga correlation")
 end
 
 When("the agent records exact external compensation through MCP") do
   release_set_id = @release_set_arguments.fetch(:release_set_id)
-  request = release_set_payload(@release_compensation_request_event)
+  request = release_set_history.compensation_request
   lifecycle = release_set_lifecycle_events(release_set_id)
   evidence = request.successful_integrations.map.with_index do |reference, index|
     integration = lifecycle.find { _1.id == reference.event_id }
@@ -372,8 +408,7 @@ When("the agent records exact external compensation through MCP") do
       external_reference: "reverts/cuc-compensation/#{index + 1}",
       result_digest: "sha256:#{'e' * 64}",
       producer: { name: "release-reverter", version: "1.0.0" },
-      run_id: "cuc-compensation-run-#{index + 1}",
-      compensated_at: "2026-08-24T22:30:0#{index}.000000Z"
+      run_id: "cuc-compensation-run-#{index + 1}"
     }
   end
   @release_compensation_task_id = submit_and_execute(
@@ -388,19 +423,25 @@ end
 
 Then("the compensation Task completes the ReleaseSet with one physical correlation") do
   lifecycle = release_set_lifecycle_events(@release_set_arguments.fetch(:release_set_id))
+  compensations = lifecycle.select { _1.type == "RepositoryCompensationRecorded" }
+  outcome = lifecycle.select { _1.type == "ReleaseSetOutcomeRecorded" }.sole
   completion = lifecycle.select { _1.type == "ReleaseSetCompleted" }.sole
   started = task_events(@release_compensation_task_id).find do |event|
     event.type == "CoordinationTaskExecutionStarted"
   end
   state = task_request("tasks/get", @release_compensation_task_id)
   assert_acceptance_equal("completed", state.dig("result", "status"), "Compensation Task")
-  assert_acceptance_equal(started.id, completion.causation_id, "Compensation completion causation")
+  completion_chain = [ started, *compensations, outcome, completion ]
+  assert_acceptance(
+    completion_chain.each_cons(2).all? { |parent, child| child.causation_id == parent.id },
+    "Compensation completion facts do not form one causal chain"
+  )
   assert_acceptance_equal(
     [ lifecycle.first.correlation_id ],
     lifecycle.map(&:correlation_id).uniq,
     "Compensated lifecycle correlation"
   )
-  assert_acceptance_equal("compensated", release_set_payload(completion).outcome, "Completion outcome")
+  assert_acceptance_equal("compensated", release_set_history.completion.payload.outcome, "Completion outcome")
 end
 
 Then("the completed compensated ReleaseSet is available without a freshness gate") do

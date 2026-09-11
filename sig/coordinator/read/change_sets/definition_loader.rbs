@@ -1,0 +1,12 @@
+module Coordinator::Read
+  module ChangeSets
+    class DefinitionLoader
+      def initialize: (
+        event_store: Coordinator::Write::EventStore,
+        ?stream_factory: Coordinator::Write::StreamFactory,
+        ?schema_registry: Coordinator::Write::EventSchemaRegistry
+      ) -> void
+      def call: (String change_set_id) -> Coordinator::Read::ChangeSetDefinitionViewV1
+    end
+  end
+end

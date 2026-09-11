@@ -135,7 +135,6 @@ module CandidateImpactObligationAcceptanceWorld
         event: candidate_obligation_event_reference(decision_event)
       )
     }
-    derive_candidate_obligation_id if candidate_obligation_gating_policy? && candidate_obligation_registrations.length == 2
     @obligation_policy
   end
 
@@ -172,13 +171,14 @@ module CandidateImpactObligationAcceptanceWorld
     )
   end
 
-  def candidate_obligation_payload
-    event = candidate_obligation_events.sole
-    Coordinator::Container["event_schema_registry"].load(
-      type: event.type,
-      schema_version: event.metadata.fetch("schema_version"),
-      data: event.data
-    )
+  def candidate_obligation_state
+    Coordinator::Write::VerificationObligations::OutcomeStateLoader.new(
+      event_store:
+    ).call(@obligation_id)
+  end
+
+  def candidate_obligation_definition
+    candidate_obligation_state.definition
   end
 
   def project_candidate_obligation(redeliver: true)
@@ -308,10 +308,12 @@ module CandidateImpactObligationAcceptanceWorld
   end
 
   def candidate_obligation_registrations
-    event_store.read(
-      streams.candidate_impact_registry(@obligation_change_set_id),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "CandidateImpactSurfaceRegistered" ],
+    event_store.read_global_marked(
+      Coordinator::Write::GlobalMarkedEventReadCriteria.new(
+        stream_context: "DevelopmentIntegration",
+        stream_name: "Candidate",
+        event_types: [ "CandidateImpactSurfaceAssigned" ],
+        markers: [ "change-set:#{@obligation_change_set_id}" ],
         maximum_count: 8,
         direction: :asc
       )
@@ -322,7 +324,7 @@ module CandidateImpactObligationAcceptanceWorld
     event_store.read(
       streams.decision_partition("changeset:#{@obligation_change_set_id}:candidate"),
       Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "DecisionPartitionAdvanced" ],
+        event_types: [ "DecisionAddedToPartition", "DecisionRemovedFromPartition" ],
         maximum_count: 8,
         direction: :asc
       )
@@ -362,7 +364,7 @@ module CandidateImpactObligationAcceptanceWorld
       obligation = obligation_loader.find(natural_key)
       [ !obligation.nil?, obligation ]
     end
-    @obligation_id = persisted.payload.obligation_id
+    @obligation_id = persisted.definition.obligation_id
   end
 
   def candidate_registry_sweep_events
@@ -385,9 +387,7 @@ module CandidateImpactObligationAcceptanceWorld
   def await_candidate_obligation_saga(include_registry:)
     return unless %w[verification_gate merge_gate].include?(@obligation_policy.fetch(:level))
 
-    if candidate_obligation_registrations.length == 2
-      derive_candidate_obligation_id
-    elsif include_registry
+    if include_registry
       eventually("Candidate impact registry sweep to complete") do
         events = candidate_registry_sweep_events
         terminal = events.any? do
@@ -399,6 +399,7 @@ module CandidateImpactObligationAcceptanceWorld
         [ terminal, events.map(&:type) ]
       end
     end
+    derive_candidate_obligation_id if candidate_obligation_registrations.length == 2
     return unless @obligation_id
 
     eventually("Verification obligation #{@obligation_id} to become durable") do

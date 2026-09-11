@@ -5,23 +5,26 @@ module Coordinator
         class DecisionPage < Shared::Value
           def items: () -> Array[Read::DecisionViewV1]
           def next_decision_id: () -> String?
+          def next_updated_at: () -> String?
           def has_more: () -> bool
         end
 
         class GuidancePage < Shared::Value
           def items: () -> Array[Read::GuidanceUtteranceV1]
           def next_message_id: () -> String?
+          def next_updated_at: () -> String?
           def has_more: () -> bool
         end
 
         class AgentChoicePage < Shared::Value
           def items: () -> Array[Read::AgentChoiceViewV1]
           def next_choice_id: () -> String?
+          def next_updated_at: () -> String?
           def has_more: () -> bool
         end
 
         class ImpactCursor < Shared::Value
-          def global_position: () -> Integer
+          def updated_at: () -> String
           def assessment_id: () -> String
         end
 
@@ -74,6 +77,7 @@ module Coordinator
         class ReceiptPage < Shared::Value
           def items: () -> Array[CommandReceipt]
           def next_command_id: () -> String?
+          def next_updated_at: () -> String?
           def has_more: () -> bool
         end
 

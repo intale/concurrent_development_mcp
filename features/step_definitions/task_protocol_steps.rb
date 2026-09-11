@@ -374,7 +374,18 @@ Then("the newer WorkItem exists only on the write side of that response") do
   work_item_id = @current_arguments.fetch(:work_item_id)
   payload = @stale_context_response.dig("result", "structuredContent")
   work_items = payload.dig("data", "context", "work_items")
-  assert_acceptance_equal(1, work_item_events(work_item_id).length, "Persisted WorkItem facts")
+  assert_acceptance_equal(
+    %w[
+      WorkItemCreated
+      WorkItemAddedToChangeSet
+      WorkItemAssignedToRepository
+      WorkItemGoalDefined
+      WorkItemAcceptanceCriteriaDefined
+      WorkItemCompetitiveModeSelected
+    ],
+    work_item_events(work_item_id).map(&:type),
+    "Persisted WorkItem facts"
+  )
   assert_acceptance_equal([], work_items, "Lagging projected WorkItems")
 end
 

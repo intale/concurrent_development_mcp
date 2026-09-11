@@ -89,14 +89,14 @@ test("keeps available rows visible during refresh failure without a remote detai
 test("binds placeholder preservation and URL cursor history to catalog filters", () => {
   const page = { projects: [project] } as const;
   assert.equal(
-    preservePageForCatalogFilters(page, ["projects", "catalog", "SCOPE_ASC", null], "catalog", "SCOPE_ASC"),
+    preservePageForCatalogFilters(page, ["projects", "catalog", "NEWEST_FIRST", null], "catalog", "NEWEST_FIRST"),
     page
   );
   assert.equal(
-    preservePageForCatalogFilters(page, ["projects", "other", "SCOPE_ASC", null], "catalog", "SCOPE_ASC"),
+    preservePageForCatalogFilters(page, ["projects", "other", "NEWEST_FIRST", null], "catalog", "NEWEST_FIRST"),
     undefined
   );
-  assert.equal(parseProjectSort("unexpected"), "SCOPE_ASC");
+  assert.equal(parseProjectSort("unexpected"), "NEWEST_FIRST");
 
   const first = new URLSearchParams("q=catalog");
   const second = nextProjectPageParameters(first, "cursor-1");

@@ -2,7 +2,7 @@
 
 module VerificationObligationLifecycleAcceptanceWorld
   def submit_verification_obligation_waiver(user_id:, command_id:)
-    obligation = candidate_obligation_payload
+    obligation = candidate_obligation_definition
     arguments = {
       command_id:,
       actor: { kind: "user", id: user_id },

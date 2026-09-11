@@ -849,10 +849,17 @@ module Coordinator
 
     register("projectors.coord_context_v1", memoize: true) do
       Read::Projectors::CoordContextV1.new(
-        submission_loader: self["read.candidates.submission_loader"],
+        source_loader: self["read.coord_contexts.source_loader"],
         schema_registry: self["event_schema_registry"],
         contexts: self["repositories.coord_contexts"],
         processed_events: self["repositories.processed_projection_events"]
+      )
+    end
+
+    register("read.coord_contexts.source_loader", memoize: true) do
+      Read::CoordContexts::SourceLoader.new(
+        event_store: self["event_store"],
+        submission_loader: self["read.candidates.submission_loader"]
       )
     end
 
@@ -893,6 +900,10 @@ module Coordinator
 
     register("projectors.decision_interpretations_v1", memoize: true) do
       Read::Projectors::DecisionInterpretationsV1.new(
+        source_loader: Read::Interpretations::ProjectionSourceLoader.new(
+          event_store: self["event_store"],
+          schema_registry: self["event_schema_registry"]
+        ),
         schema_registry: self["event_schema_registry"],
         interpretations: self["repositories.decision_interpretations"],
         processed_events: self["repositories.processed_projection_events"]
@@ -901,6 +912,11 @@ module Coordinator
 
     register("projectors.decision_governance_v1", memoize: true) do
       Read::Projectors::DecisionGovernanceV1.new(
+        interpretation_evidence_loader: Read::Decisions::InterpretationEvidenceLoader.new(
+          event_store: self["event_store"],
+          schema_registry: self["event_schema_registry"],
+          stream_factory: self["stream_factory"]
+        ),
         schema_registry: self["event_schema_registry"],
         governance: self["repositories.decision_governance"],
         processed_events: self["repositories.processed_projection_events"]
@@ -991,6 +1007,12 @@ module Coordinator
 
     register("projectors.verification_obligations_v1", memoize: true) do
       Read::Projectors::VerificationObligationsV1.new(
+        definition_loader: Write::VerificationObligations::DefinitionLoader.new(
+          event_store: self["event_store"]
+        ),
+        outcome_state_loader: Write::VerificationObligations::OutcomeStateLoader.new(
+          event_store: self["event_store"]
+        ),
         schema_registry: self["event_schema_registry"],
         obligations: self["repositories.verification_obligations"],
         processed_events: self["repositories.processed_projection_events"]

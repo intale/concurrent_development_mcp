@@ -3,62 +3,50 @@
 RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
   let(:context_registration) do
     Coordinator::Read::Subscriptions::CoordContext.new(
-      handler: Coordinator::Read::Projectors::CoordContextV1.new(submission_loader: inert_loader),
+      handler: Coordinator::Container["projectors.coord_context_v1"],
       pull_interval: 0.2
     )
   end
   let(:utterance_registration) do
     Coordinator::Read::Subscriptions::UserUtterances.new(
-      handler: Coordinator::Read::Projectors::UserUtterancesV1.new,
+      handler: Coordinator::Container["projectors.user_utterances_v1"],
       pull_interval: 0.2
     )
   end
   let(:interpretation_registration) do
     Coordinator::Read::Subscriptions::DecisionInterpretations.new(
-      handler: Coordinator::Read::Projectors::DecisionInterpretationsV1.new,
+      handler: Coordinator::Container["projectors.decision_interpretations_v1"],
       pull_interval: 0.2
     )
   end
   let(:decision_registration) do
     Coordinator::Read::Subscriptions::DecisionGovernance.new(
-      handler: Coordinator::Read::Projectors::DecisionGovernanceV1.new,
+      handler: Coordinator::Container["projectors.decision_governance_v1"],
       pull_interval: 0.2
     )
   end
   let(:agent_choice_registration) do
     Coordinator::Read::Subscriptions::AgentChoices.new(
-      handler: Coordinator::Read::Projectors::AgentChoicesV1.new,
+      handler: Coordinator::Container["projectors.agent_choices_v1"],
       pull_interval: 0.2
     )
   end
   let(:agent_choice_impact_registration) do
     Coordinator::Read::Subscriptions::AgentChoiceImpacts.new(
-      handler: Coordinator::Read::Projectors::AgentChoiceImpactsV1.new(
-        assessment_loader: inert_loader
-      ),
+      handler: Coordinator::Container["projectors.agent_choice_impacts_v1"],
       pull_interval: 0.2
     )
   end
   let(:candidate_registration) do
     Coordinator::Read::Subscriptions::Candidates.new(
-      handler: Coordinator::Read::Projectors::CandidatesV1.new(
-        submission_loader: inert_loader,
-        impact_surface_loader: inert_loader
-      ),
+      handler: Coordinator::Container["projectors.candidates_v1"],
       pull_interval: 0.2
     )
   end
 
-  let(:inert_loader) do
-    Class.new do
-      def call(_identifier)
-        raise "not used by subscription registration specs"
-      end
-    end.new
-  end
   let(:repository_registration) do
     Coordinator::Read::Subscriptions::Repositories.new(
-      handler: Coordinator::Read::Projectors::RepositoriesV1.new,
+      handler: Coordinator::Container["projectors.repositories_v1"],
       pull_interval: 0.2
     )
   end
@@ -70,47 +58,38 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
   end
   let(:skill_registration) do
     Coordinator::Read::Subscriptions::Skills.new(
-      handler: Coordinator::Read::Projectors::SkillsV1.new,
+      handler: Coordinator::Container["projectors.skills_v1"],
       pull_interval: 0.2
     )
   end
   let(:development_artifact_registration) do
     Coordinator::Read::Subscriptions::DevelopmentArtifacts.new(
-      handler: Coordinator::Read::Projectors::DevelopmentArtifactsV1.new,
+      handler: Coordinator::Container["projectors.development_artifacts_v1"],
       pull_interval: 0.2
     )
   end
   let(:operation_batch_registration) do
     Coordinator::Read::Subscriptions::OperationBatches.new(
-      handler: Coordinator::Read::Projectors::OperationBatchesV2.new,
+      handler: Coordinator::Container["projectors.operation_batches_v2"],
       pull_interval: 0.2
     )
   end
   let(:verification_obligation_registration) do
     Coordinator::Read::Subscriptions::VerificationObligations.new(
-      handler: Coordinator::Read::Projectors::VerificationObligationsV1.new,
+      handler: Coordinator::Container["projectors.verification_obligations_v1"],
       pull_interval: 0.2
     )
   end
   let(:merge_snapshot_registration) do
     Coordinator::Read::Subscriptions::MergeSnapshots.new(
-      handler: Coordinator::Read::Projectors::MergeSnapshotsV1.new(
-        registration_loader: inert_registration_loader
-      ),
+      handler: Coordinator::Container["projectors.merge_snapshots_v1"],
       pull_interval: 0.2
     )
   end
 
-  let(:inert_registration_loader) do
-    Class.new do
-      def call(_event, registration:)
-        raise "not used by subscription registration specs"
-      end
-    end.new
-  end
   let(:release_set_registration) do
     Coordinator::Read::Subscriptions::ReleaseSets.new(
-      handler: Coordinator::Read::Projectors::ReleaseSetsV1.new(preparation_loader: inert_loader),
+      handler: Coordinator::Container["projectors.release_sets_v1"],
       pull_interval: 0.2
     )
   end
@@ -123,7 +102,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
         "agent-choice-impacts-v1",
         "agent-choices-v1",
         "candidates-v1",
-        "coord-context-v4",
+        "coord-context-v6",
         "decision-governance-v1",
         "decision-interpretations-v1",
         "development-artifacts-v3",
@@ -139,7 +118,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
     )
     expect(context_registration.definition.identity.to_h).to eq(
       set_name: "coordinator-read-models-v1",
-      subscription_name: "coord-context-v4"
+      subscription_name: "coord-context-v6"
     )
     expect(context_registration.definition.event_types).to include(
       "CandidateSubmitted",

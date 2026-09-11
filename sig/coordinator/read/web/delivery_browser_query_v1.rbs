@@ -8,7 +8,7 @@ module Coordinator
           def sort: () -> String
           def change_set_id: () -> String?
           def checkpoint_kind: () -> String?
-          def after_position: () -> Integer?
+          def after_updated_at: () -> String?
           def after_id: () -> String?
         end
 
@@ -18,7 +18,7 @@ module Coordinator
           def sort: () -> String
           def change_set_id: () -> String?
           def status: () -> String?
-          def after_position: () -> Integer?
+          def after_updated_at: () -> String?
           def after_id: () -> String?
         end
 
@@ -26,7 +26,7 @@ module Coordinator
           def project_scope: () -> String
           def first: () -> Integer
           def sort: () -> String
-          def after_position: () -> Integer?
+          def after_updated_at: () -> String?
           def after_id: () -> String?
         end
 
@@ -36,7 +36,7 @@ module Coordinator
           def sort: () -> String
           def change_set_id: () -> String?
           def status: () -> String?
-          def after_position: () -> Integer?
+          def after_updated_at: () -> String?
           def after_id: () -> String?
         end
 
@@ -52,7 +52,7 @@ module Coordinator
           def project_scope: () -> String
           def obligation_id: () -> String
           def first: () -> Integer
-          def after_evidence_position: () -> Integer?
+          def after_evidence_updated_at: () -> String?
           def after_evidence_id: () -> String?
         end
 
@@ -60,7 +60,7 @@ module Coordinator
           def project_scope: () -> String
           def merge_snapshot_id: () -> String
           def first: () -> Integer
-          def after_authorization_position: () -> Integer?
+          def after_authorization_updated_at: () -> String?
           def after_authorization_id: () -> String?
         end
 
@@ -74,7 +74,7 @@ module Coordinator
           def sort: () -> String
           def target_tool: () -> String?
           def status: () -> String?
-          def after_position: () -> Integer?
+          def after_updated_at: () -> String?
           def after_id: () -> String?
         end
 

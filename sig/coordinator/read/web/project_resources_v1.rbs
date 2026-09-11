@@ -51,12 +51,14 @@ module Coordinator
         class ResourcePage < Shared::Value
           def items: () -> Array[Resource]
           def next_resource_id: () -> String?
+          def next_updated_at: () -> String?
           def has_more: () -> bool
         end
 
         class LeasePage < Shared::Value
           def items: () -> Array[Lease]
           def next_lease_id: () -> String?
+          def next_updated_at: () -> String?
           def has_more: () -> bool
           def as_of: () -> String
         end

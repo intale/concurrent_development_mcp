@@ -146,7 +146,7 @@ When("the producer completes through an MCP Task and build progress handles its 
   )
   start_process_subscriptions
   eventually("Consumer WorkItem to become ready after producer completion") do
-    satisfied = terminal_dependency_events(ids.fetch(:change_set_id))
+    satisfied = terminal_dependency_events(ids.fetch(:consumer_work_item_id))
     ready = terminal_readiness_events(ids.fetch(:consumer_work_item_id))
     [ satisfied.length == 1 && ready.length == 1, { satisfied: satisfied.map(&:type), ready: ready.map(&:type) } ]
   end

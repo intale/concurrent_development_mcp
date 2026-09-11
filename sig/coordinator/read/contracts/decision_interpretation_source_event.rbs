@@ -3,6 +3,7 @@ module Coordinator
     module Contracts
       class DecisionInterpretationSourceEvent
         EVENT_TYPES: Array[String]
+        EVENT_SCHEMAS: Hash[String, Array[Integer]]
 
         def call: (command_input input) -> Dry::Validation::Result
       end

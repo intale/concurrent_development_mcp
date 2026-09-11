@@ -2,6 +2,8 @@
 
 module Coordinator::Read::Web::Repositories
   class DeliveryBrowser
+    include EventTimePagination
+
     def initialize(
       candidates: Coordinator::Read::Repositories::Candidates.new,
       candidate_impacts: Coordinator::Read::Repositories::CandidateImpacts.new
@@ -129,16 +131,15 @@ module Coordinator::Read::Web::Repositories
       relation = relation.where(status: query.status) if query.status
       rows, has_more = timeline_rows(
         relation:,
-        position_column: :created_global_position,
         id_column: :batch_id,
-        after_position: query.after_position,
+        after_updated_at: query.after_updated_at,
         after_id: query.after_id,
         sort: query.sort,
         limit: query.first
       )
       Coordinator::Read::Web::DeliveryBrowserV1::OperationBatchPage.new(
         items: rows.map { build_batch_summary(_1) },
-        next_cursor: timeline_cursor(rows.last, :created_global_position, :batch_id, has_more:),
+        next_cursor: timeline_cursor(rows.last, :batch_id, has_more:),
         has_more:
       )
     end
@@ -181,9 +182,8 @@ module Coordinator::Read::Web::Repositories
       relation = relation.where(checkpoint_kind: query.checkpoint_kind) if query.checkpoint_kind
       rows, has_more = timeline_rows(
         relation:,
-        position_column: :submitted_global_position,
         id_column: :candidate_id,
-        after_position: query.after_position,
+        after_updated_at: query.after_updated_at,
         after_id: query.after_id,
         sort: query.sort,
         limit: query.first
@@ -191,7 +191,7 @@ module Coordinator::Read::Web::Repositories
       summaries = @candidates.summaries(rows.map(&:candidate_id))
       Coordinator::Read::Web::DeliveryBrowserV1::CandidatePage.new(
         items: rows.map { summaries.fetch(_1.candidate_id) },
-        next_cursor: timeline_cursor(rows.last, :submitted_global_position, :candidate_id, has_more:),
+        next_cursor: timeline_cursor(rows.last, :candidate_id, has_more:),
         has_more:
       )
     end
@@ -202,16 +202,15 @@ module Coordinator::Read::Web::Repositories
       relation = relation.where(status: query.status) if query.status
       rows, has_more = timeline_rows(
         relation:,
-        position_column: :event_global_position,
         id_column: :obligation_id,
-        after_position: query.after_position,
+        after_updated_at: query.after_updated_at,
         after_id: query.after_id,
         sort: query.sort,
         limit: query.first
       )
       Coordinator::Read::Web::DeliveryBrowserV1::VerificationPage.new(
         items: rows.map { build_verification_summary(_1) },
-        next_cursor: timeline_cursor(rows.last, :event_global_position, :obligation_id, has_more:),
+        next_cursor: timeline_cursor(rows.last, :obligation_id, has_more:),
         has_more:
       )
     end
@@ -219,16 +218,15 @@ module Coordinator::Read::Web::Repositories
     def merge_page(query, repository_ids)
       rows, has_more = timeline_rows(
         relation: Coordinator::Read::MergeSnapshot.where(repository_id: repository_ids),
-        position_column: :registered_global_position,
         id_column: :merge_snapshot_id,
-        after_position: query.after_position,
+        after_updated_at: query.after_updated_at,
         after_id: query.after_id,
         sort: query.sort,
         limit: query.first
       )
       Coordinator::Read::Web::DeliveryBrowserV1::MergePage.new(
         items: rows.map { build_merge_summary(_1) },
-        next_cursor: timeline_cursor(rows.last, :registered_global_position, :merge_snapshot_id, has_more:),
+        next_cursor: timeline_cursor(rows.last, :merge_snapshot_id, has_more:),
         has_more:
       )
     end
@@ -239,16 +237,15 @@ module Coordinator::Read::Web::Repositories
       relation = relation.where(status: query.status) if query.status
       rows, has_more = timeline_rows(
         relation:,
-        position_column: :prepared_global_position,
         id_column: :release_set_id,
-        after_position: query.after_position,
+        after_updated_at: query.after_updated_at,
         after_id: query.after_id,
         sort: query.sort,
         limit: query.first
       )
       Coordinator::Read::Web::DeliveryBrowserV1::ReleasePage.new(
         items: rows.map { build_release_summary(_1) },
-        next_cursor: timeline_cursor(rows.last, :prepared_global_position, :release_set_id, has_more:),
+        next_cursor: timeline_cursor(rows.last, :release_set_id, has_more:),
         has_more:
       )
     end
@@ -277,20 +274,19 @@ module Coordinator::Read::Web::Repositories
       relation = Coordinator::Read::VerificationObligationEvidenceItem.where(
         obligation_id: record.obligation_id
       )
-      if query.after_evidence_position && query.after_evidence_id
+      if query.after_evidence_updated_at && query.after_evidence_id
         relation = relation.where(
-          "event_global_position > :position OR " \
-          "(event_global_position = :position AND evidence_id > :identifier)",
-          position: query.after_evidence_position,
+          "updated_at > :updated_at OR (updated_at = :updated_at AND evidence_id > :identifier)",
+          updated_at: query.after_evidence_updated_at,
           identifier: query.after_evidence_id
         )
       end
-      rows = relation.order(:event_global_position, :evidence_id).limit(query.first + 1).to_a
+      rows = relation.order(:updated_at, :evidence_id).limit(query.first + 1).to_a
       has_more = rows.length > query.first
       selected = rows.first(query.first)
       Coordinator::Read::Web::DeliveryBrowserV1::EvidencePage.new(
         items: selected.map { build_evidence(_1) },
-        next_cursor: timeline_cursor(selected.last, :event_global_position, :evidence_id, has_more:),
+        next_cursor: timeline_cursor(selected.last, :evidence_id, has_more:),
         has_more:
       )
     end
@@ -299,52 +295,46 @@ module Coordinator::Read::Web::Repositories
       relation = Coordinator::Read::MergeAuthorization.where(
         merge_snapshot_id: record.merge_snapshot_id
       )
-      if query.after_authorization_position && query.after_authorization_id
+      if query.after_authorization_updated_at && query.after_authorization_id
         relation = relation.where(
-          "source_global_position > :position OR " \
-          "(source_global_position = :position AND authorization_id > :identifier)",
-          position: query.after_authorization_position,
+          "updated_at > :updated_at OR (updated_at = :updated_at AND authorization_id > :identifier)",
+          updated_at: query.after_authorization_updated_at,
           identifier: query.after_authorization_id
         )
       end
-      rows = relation.order(:source_global_position, :authorization_id).limit(query.first + 1).to_a
+      rows = relation.order(:updated_at, :authorization_id).limit(query.first + 1).to_a
       has_more = rows.length > query.first
       selected = rows.first(query.first)
       Coordinator::Read::Web::DeliveryBrowserV1::AuthorizationPage.new(
         items: selected.map { build_authorization(_1) },
-        next_cursor: timeline_cursor(selected.last, :source_global_position, :authorization_id, has_more:),
+        next_cursor: timeline_cursor(selected.last, :authorization_id, has_more:),
         has_more:
       )
     end
 
     def timeline_rows(
       relation:,
-      position_column:,
       id_column:,
-      after_position:,
+      after_updated_at:,
       after_id:,
       sort:,
       limit:
     )
-      direction = sort == "newest_first" ? :desc : :asc
-      comparator = direction == :desc ? "<" : ">"
-      if after_position && after_id
-        relation = relation.where(
-          "#{position_column} #{comparator} :position OR " \
-          "(#{position_column} = :position AND #{id_column} #{comparator} :identifier)",
-          position: after_position,
-          identifier: after_id
-        )
-      end
-      rows = relation.order(position_column => direction, id_column => direction).limit(limit + 1).to_a
-      [ rows.first(limit), rows.length > limit ]
+      event_time_page(
+        relation:,
+        id_column:,
+        after_updated_at:,
+        after_id:,
+        sort:,
+        limit:
+      )
     end
 
-    def timeline_cursor(record, position_column, id_column, has_more:)
+    def timeline_cursor(record, id_column, has_more:)
       return unless has_more && record
 
       Coordinator::Read::Web::DeliveryBrowserV1::TimelineCursor.new(
-        position: record.public_send(position_column),
+        updated_at: event_time(record),
         id: record.public_send(id_column)
       )
     end
@@ -439,7 +429,8 @@ module Coordinator::Read::Web::Repositories
       Coordinator::Read::Web::DeliveryBrowserV1::ReleaseMember.new(
         position: attributes.fetch("position"),
         repository_id: attributes.fetch("repository_id"),
-        candidate_id: attributes.fetch("candidate_id")
+        merge_snapshot_id: attributes.fetch("merge_snapshot_id"),
+        ordered_candidate_ids: attributes.fetch("ordered_candidate_ids")
       )
     end
 

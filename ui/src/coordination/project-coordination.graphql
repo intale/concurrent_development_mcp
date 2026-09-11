@@ -45,8 +45,13 @@ fragment CoordinationDependencyFields on CoordinationDependency {
   lastProcessedAt
 }
 
-query ProjectChangeSets($projectRef: ID!, $first: Int, $after: String) {
-  projectChangeSets(projectRef: $projectRef, first: $first, after: $after) {
+query ProjectChangeSets(
+  $projectRef: ID!
+  $first: Int
+  $after: String
+  $status: CoordinationChangeSetStatus
+) {
+  projectChangeSets(projectRef: $projectRef, first: $first, after: $after, status: $status) {
     nodes { ...CoordinationChangeSetFields }
     pageInfo { endCursor hasNextPage }
   }

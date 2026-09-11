@@ -9,8 +9,13 @@ module ProjectCoordinationGraphqlSpec
     let(:project_ref) { Coordinator::Read::Web::ProjectReference.new.encode(scope:) }
 
     CHANGE_SETS_QUERY = <<~GRAPHQL.freeze
-      query ChangeSets($projectRef: ID!, $first: Int, $after: String) {
-        projectChangeSets(projectRef: $projectRef, first: $first, after: $after) {
+      query ChangeSets(
+        $projectRef: ID!
+        $first: Int
+        $after: String
+        $status: CoordinationChangeSetStatus
+      ) {
+        projectChangeSets(projectRef: $projectRef, first: $first, after: $after, status: $status) {
           nodes { id goal domainStatus workItemCount runningWorkItemCount openWorkItemCount }
           pageInfo { endCursor hasNextPage }
         }
@@ -117,7 +122,9 @@ module ProjectCoordinationGraphqlSpec
         base_snapshots: [
           { "repository_id" => repository_id, "object_format" => "sha1", "commit_oid" => "a" * 40 }
         ],
-        started_at_domain: Time.utc(2026, 9, 1, 12, 4)
+        started_at_domain: Time.utc(2026, 9, 1, 12, 4),
+        created_at: Time.utc(2026, 9, 1, 12, 4),
+        updated_at: Time.utc(2026, 9, 1, 12, 4)
       )
       create(
         :coordinator_read_candidate,
@@ -134,7 +141,7 @@ module ProjectCoordinationGraphqlSpec
     it "aggregates ChangeSets and WorkItems across exact Project members" do
       change_sets = execute(CHANGE_SETS_QUERY, projectRef: project_ref, first: 20)
         .dig("data", "projectChangeSets", "nodes")
-      work_items = execute(WORK_ITEMS_QUERY, projectRef: project_ref, first: 20, sort: "WORK_ITEM_ID_ASC")
+      work_items = execute(WORK_ITEMS_QUERY, projectRef: project_ref, first: 20, sort: "UPDATED_AT_ASC")
         .dig("data", "projectWorkItems", "nodes")
 
       expect(change_sets.sole).to include(
@@ -150,6 +157,46 @@ module ProjectCoordinationGraphqlSpec
         "activeAttemptId" => "A-running",
         "attemptStatus" => "started"
       )
+    end
+
+    it "filters ChangeSets by exact lifecycle status and binds continuation to that filter" do
+      create_context(
+        change_set_id: "CS-completed",
+        change_set_status: "completed",
+        updated_at: Time.utc(2026, 9, 1, 12, 10),
+        work_items: [ work_item("W-completed", repository_id:, status: "completed", change_set_id: "CS-completed") ]
+      )
+      create_context(
+        change_set_id: "CS-active-newer",
+        change_set_status: "active",
+        updated_at: Time.utc(2026, 9, 1, 12, 11),
+        work_items: [ work_item("W-active-newer", repository_id:, status: "ready", change_set_id: "CS-active-newer") ]
+      )
+
+      active = execute(
+        CHANGE_SETS_QUERY,
+        projectRef: project_ref,
+        first: 1,
+        status: "ACTIVE"
+      ).dig("data", "projectChangeSets")
+      completed = execute(
+        CHANGE_SETS_QUERY,
+        projectRef: project_ref,
+        first: 20,
+        status: "COMPLETED"
+      ).dig("data", "projectChangeSets", "nodes")
+      mismatched = execute(
+        CHANGE_SETS_QUERY,
+        projectRef: project_ref,
+        first: 1,
+        after: active.dig("pageInfo", "endCursor"),
+        status: "COMPLETED"
+      )
+
+      expect(active.dig("nodes", 0, "id")).to eq("CS-active-newer")
+      expect(active.dig("pageInfo", "hasNextPage")).to be(true)
+      expect(completed.map { _1.fetch("id") }).to eq([ "CS-completed" ])
+      expect(mismatched.dig("errors", 0, "extensions", "code")).to eq("INVALID_CURSOR")
     end
 
     it "returns a project-bound WorkItem with its latest Attempt and checkpoint" do
@@ -189,28 +236,34 @@ module ProjectCoordinationGraphqlSpec
     end
 
     it "uses stable keyset continuation when another projected row appears" do
+      create_context(
+        change_set_id: "CS-page",
+        updated_at: Time.utc(2026, 8, 31, 10),
+        work_items: [ work_item("W-page-100", repository_id:, status: "ready", change_set_id: "CS-page") ]
+      )
       first_page = execute(
         WORK_ITEMS_QUERY,
         projectRef: project_ref,
         first: 1,
-        changeSetId: "CS-project",
-        sort: "WORK_ITEM_ID_ASC"
+        sort: "UPDATED_AT_ASC"
       ).dig("data", "projectWorkItems")
-      document = @project_context.document.deep_dup
-      document.fetch("work_items") << work_item("W-200", repository_id:, status: "ready")
-      document.fetch("work_item_ids") << "W-200"
-      @project_context.update!(document:, last_processed_at: Time.utc(2026, 9, 1, 12, 10))
+      create_context(
+        change_set_id: "CS-page-new",
+        updated_at: Time.utc(2026, 8, 31, 11),
+        work_items: [
+          work_item("W-page-200", repository_id:, status: "ready", change_set_id: "CS-page-new")
+        ]
+      )
       second_page = execute(
         WORK_ITEMS_QUERY,
         projectRef: project_ref,
         first: 1,
         after: first_page.dig("pageInfo", "endCursor"),
-        changeSetId: "CS-project",
-        sort: "WORK_ITEM_ID_ASC"
+        sort: "UPDATED_AT_ASC"
       ).dig("data", "projectWorkItems")
 
-      expect(first_page.dig("nodes", 0, "id")).to eq("W-100")
-      expect(second_page.dig("nodes", 0, "id")).to eq("W-200")
+      expect(first_page.dig("nodes", 0, "id")).to eq("W-page-100")
+      expect(second_page.dig("nodes", 0, "id")).to eq("W-page-200")
     end
 
     it "continues status and latest-activity ordering with the matching tuple key" do
@@ -243,7 +296,7 @@ module ProjectCoordinationGraphqlSpec
         WORK_ITEMS_QUERY,
         projectRef: project_ref,
         first: 1,
-        sort: "WORK_ITEM_ID_ASC"
+        sort: "UPDATED_AT_ASC"
       ).dig("data", "projectWorkItems")
       payload = execute(
         WORK_ITEMS_QUERY,
@@ -251,7 +304,7 @@ module ProjectCoordinationGraphqlSpec
         first: 1,
         after: first_page.dig("pageInfo", "endCursor"),
         statuses: [ "READY" ],
-        sort: "WORK_ITEM_ID_ASC"
+        sort: "UPDATED_AT_ASC"
       )
 
       expect(payload.dig("errors", 0, "extensions", "code")).to eq("INVALID_CURSOR")
@@ -264,7 +317,7 @@ module ProjectCoordinationGraphqlSpec
         projectRef: project_ref,
         first: 1,
         after: cursor,
-        sort: "WORK_ITEM_ID_ASC"
+        sort: "UPDATED_AT_ASC"
       )
 
       expect(payload.dig("errors", 0, "extensions", "code")).to eq("INVALID_CURSOR")
@@ -276,7 +329,13 @@ module ProjectCoordinationGraphqlSpec
       expect(payload.dig("errors", 0, "extensions", "code")).to eq("INVALID_PROJECT_REFERENCE")
     end
 
-    def create_context(change_set_id:, work_items:, dependencies: [])
+    def create_context(
+      change_set_id:,
+      work_items:,
+      dependencies: [],
+      change_set_status: "active",
+      updated_at: Time.utc(2026, 9, 1, 12)
+    )
       template = build(
         :coordinator_read_coord_context,
         change_set_id:,
@@ -285,19 +344,19 @@ module ProjectCoordinationGraphqlSpec
       )
       document = template.document.deep_dup
       document.fetch("change_set")["goal"] = "Coordinate #{change_set_id}"
-      document.fetch("change_set")["status"] = "active"
+      document.fetch("change_set")["status"] = change_set_status
       document["work_items"] = work_items
       document["work_item_ids"] = work_items.map { _1.fetch("work_item_id") }
       document["dependencies"] = dependencies
       document["attempts"] = []
-      create(:coordinator_read_coord_context, change_set_id:, document:)
+      create(:coordinator_read_coord_context, change_set_id:, document:, created_at: updated_at, updated_at:)
     end
 
-    def work_item(work_item_id, repository_id:, status:, attempt_id: nil)
+    def work_item(work_item_id, repository_id:, status:, attempt_id: nil, change_set_id: nil)
       timestamp = "2026-09-01T12:00:00.000000Z"
       {
         "work_item_id" => work_item_id,
-        "change_set_id" => work_item_id == "W-unrelated" ? "CS-unrelated" : "CS-project",
+        "change_set_id" => change_set_id || (work_item_id == "W-unrelated" ? "CS-unrelated" : "CS-project"),
         "repository_id" => repository_id,
         "goal" => "Coordinate #{work_item_id}",
         "acceptance_criteria" => [ "#{work_item_id} remains inspectable" ],

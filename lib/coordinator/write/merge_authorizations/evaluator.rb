@@ -9,6 +9,7 @@ module Coordinator::Write
         event_store:,
         stream_factory: StreamFactory.new,
         schema_registry: EventSchemaRegistry.new,
+        exact_loader: CandidateObligations::ExactEventLoader.new(event_store:, schema_registry:),
         candidate_loader: CandidateObligations::CandidateEvidenceLoader.new(event_store:),
         definition_loader: CandidateObligations::DecisionDefinitionLoader.new(event_store:),
         matcher: CandidateObligations::Matcher.new,
@@ -25,6 +26,7 @@ module Coordinator::Write
         @event_store = event_store
         @stream_factory = stream_factory
         @schema_registry = schema_registry
+        @exact_loader = exact_loader
         @candidate_loader = candidate_loader
         @definition_loader = definition_loader
         @matcher = matcher
@@ -342,7 +344,8 @@ module Coordinator::Write
           expected_digest:
         )
         return invalid_policy(partition, state.latest_event) if validation.failure?
-        return invalid_policy(partition, state.latest_event) if definition.document.validity.valid_from > decided_at
+        valid_from = definition.document.validity.valid_from || policy_head_created_at(head)
+        return invalid_policy(partition, state.latest_event) if valid_from > decided_at
 
         CurrentImpactPolicyV1.new(
           partition:,
@@ -351,8 +354,12 @@ module Coordinator::Write
           definition_digest: definition.digest,
           status: definition.document.enforcement.level,
           required_evidence: definition.document.value.items,
-          valid_from: definition.document.validity.valid_from
+          valid_from:
         )
+      end
+
+      def policy_head_created_at(head)
+        @exact_loader.call(head.event).event.created_at.utc.iso8601(6)
       end
 
       def absent_policy(partition)

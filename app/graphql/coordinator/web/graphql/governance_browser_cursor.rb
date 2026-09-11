@@ -2,7 +2,7 @@
 
 module Coordinator::Web::Graphql
   class GovernanceBrowserCursor
-    SCHEMA = "project-governance-cursor/v2"
+    SCHEMA = "project-governance-cursor/v3"
     KINDS = %w[decisions guidance choices impacts interpretations receipts].freeze
 
     def self.encode(kind, filters:, cursor:)
@@ -34,12 +34,10 @@ module Coordinator::Web::Graphql
 
     def self.valid_cursor?(kind, cursor)
       case kind
-      when "decisions", "guidance", "choices", "receipts"
-        cursor.is_a?(String) && Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(cursor)
-      when "impacts"
-        cursor.is_a?(Hash) && cursor.keys.sort == %w[assessment_id global_position] &&
-          cursor.fetch("global_position", nil).is_a?(Integer) && cursor.fetch("global_position") >= 0 &&
-          Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(cursor.fetch("assessment_id", ""))
+      when "decisions", "guidance", "choices", "impacts", "receipts"
+        cursor.is_a?(Hash) && cursor.keys.sort == %w[id updated_at] &&
+          Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(cursor.fetch("updated_at", "")) &&
+          Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(cursor.fetch("id", ""))
       when "interpretations"
         cursor.is_a?(Integer) && cursor >= -1
       else

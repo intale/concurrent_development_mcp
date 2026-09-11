@@ -11,6 +11,31 @@ module ProjectKnowledgeGraphqlSpec
       }
     GRAPHQL
 
+    GLOBAL_SKILLS_QUERY = <<~GRAPHQL.freeze
+      query Skills($projectScope: String, $first: Int, $name: String, $after: String) {
+        skills(projectScope: $projectScope, first: $first, name: $name, after: $after) {
+          nodes { id name scope revision description assetCount }
+          pageInfo { endCursor hasNextPage }
+        }
+      }
+    GRAPHQL
+
+    GLOBAL_SKILL_QUERY = <<~GRAPHQL.freeze
+      query Skill($skillId: ID!) {
+        skill(skillId: $skillId) {
+          skill { id name scope revision instructions assets { path } }
+        }
+      }
+    GRAPHQL
+
+    GLOBAL_SKILL_ASSET_QUERY = <<~GRAPHQL.freeze
+      query SkillAsset($skillId: ID!, $path: String!) {
+        skillAsset(skillId: $skillId, path: $path) {
+          asset { path revision encoding mediaType text }
+        }
+      }
+    GRAPHQL
+
     ARTIFACTS_QUERY = <<~GRAPHQL.freeze
       query ProjectArtifacts(
         $projectRef: ID!
@@ -139,9 +164,9 @@ module ProjectKnowledgeGraphqlSpec
         "revision" => 2,
         "assetCount" => 2
       )
-      expect(artifacts.fetch("nodes").map { _1.fetch("id") }).to eq([ PARENT_ID, CHILD_ID ])
-      expect(artifacts.dig("nodes", 0)).to include("kind" => "DOCUMENTATION", "labels" => %w[docs root])
-      expect(artifacts.dig("nodes", 0, "source")).to include("kind" => "LOCAL_FILE", "locator" => "README.md")
+      expect(artifacts.fetch("nodes").map { _1.fetch("id") }).to eq([ CHILD_ID, PARENT_ID ])
+      expect(artifacts.dig("nodes", 1)).to include("kind" => "DOCUMENTATION", "labels" => %w[docs root])
+      expect(artifacts.dig("nodes", 1, "source")).to include("kind" => "LOCAL_FILE", "locator" => "README.md")
     end
 
     it "returns only the current Skill revision and its current text or binary assets" do
@@ -175,6 +200,81 @@ module ProjectKnowledgeGraphqlSpec
       expect(obsolete.dig("data", "projectSkillAsset")).to be_nil
     end
 
+    it "browses Skills globally with exact Project and name filters and stable-ID detail links" do
+      newest_id = "018f0f4d-4e45-7abc-8def-000000000109"
+      newest = create(
+        :coordinator_read_skill,
+        skill_id: newest_id,
+        name: "event-sourcing",
+        scope: SCOPE,
+        revision: 1,
+        created_at: Time.utc(2026, 9, 1, 12, 10),
+        updated_at: Time.utc(2026, 9, 1, 12, 10)
+      )
+      create(:coordinator_read_skill_revision, skill: newest, instructions: "Newest exact-scope instructions")
+      create(
+        :coordinator_read_skill_asset,
+        skill: newest,
+        path: "SKILL.md",
+        media_type: "text/markdown",
+        content_text: "# Exact scoped Skill"
+      )
+
+      first = execute(
+        GLOBAL_SKILLS_QUERY,
+        projectScope: SCOPE,
+        first: 1
+      ).dig("data", "skills")
+      second = execute(
+        GLOBAL_SKILLS_QUERY,
+        projectScope: SCOPE,
+        first: 1,
+        after: first.dig("pageInfo", "endCursor")
+      ).dig("data", "skills")
+      exact = execute(
+        GLOBAL_SKILLS_QUERY,
+        projectScope: SCOPE,
+        name: "event-modeling",
+        first: 20
+      ).dig("data", "skills", "nodes")
+      partial = execute(
+        GLOBAL_SKILLS_QUERY,
+        projectScope: SCOPE,
+        name: "event",
+        first: 20
+      ).dig("data", "skills", "nodes")
+      detail = execute(GLOBAL_SKILL_QUERY, skillId: newest_id).dig("data", "skill", "skill")
+      asset = execute(
+        GLOBAL_SKILL_ASSET_QUERY,
+        skillId: newest_id,
+        path: "SKILL.md"
+      ).dig("data", "skillAsset", "asset")
+      mismatched = execute(
+        GLOBAL_SKILLS_QUERY,
+        projectScope: OTHER_SCOPE,
+        name: "event-modeling",
+        first: 1,
+        after: first.dig("pageInfo", "endCursor")
+      )
+
+      expect(first.dig("nodes", 0, "id")).to eq(newest_id)
+      expect(first.dig("pageInfo", "hasNextPage")).to be(true)
+      expect(second.dig("nodes", 0, "id")).to eq(SKILL_ID)
+      expect(exact.map { _1.fetch("id") }).to eq([ SKILL_ID ])
+      expect(partial).to be_empty
+      expect(detail).to include(
+        "id" => newest_id,
+        "scope" => SCOPE,
+        "instructions" => "Newest exact-scope instructions"
+      )
+      expect(asset).to include(
+        "path" => "SKILL.md",
+        "mediaType" => "text/markdown",
+        "text" => "# Exact scoped Skill"
+      )
+      expect(mismatched.dig("errors", 0, "extensions", "code")).to eq("INVALID_CURSOR")
+    end
+
     it "separates Artifact content from active relationship navigation" do
       parent = execute(ARTIFACT_QUERY, projectRef: project_ref, artifactId: PARENT_ID)
         .dig("data", "projectArtifact")
@@ -204,13 +304,13 @@ module ProjectKnowledgeGraphqlSpec
         .dig("data", "projectArtifacts")
       cursor = first.dig("pageInfo", "endCursor")
 
-      expect(first.dig("nodes", 0, "id")).to eq(PARENT_ID)
+      expect(first.dig("nodes", 0, "id")).to eq(CHILD_ID)
       expect(first.dig("pageInfo", "hasNextPage")).to be(true)
       expect(cursor).not_to include("801")
       expect(
         execute(ARTIFACTS_QUERY, projectRef: project_ref, first: 1, after: cursor)
           .dig("data", "projectArtifacts", "nodes", 0, "id")
-      ).to eq(CHILD_ID)
+      ).to eq(PARENT_ID)
 
       mismatched = execute(
         ARTIFACTS_QUERY,
@@ -256,7 +356,16 @@ module ProjectKnowledgeGraphqlSpec
     end
 
     def create_skill
-      skill = create(:coordinator_read_skill, skill_id: SKILL_ID, name: "event-modeling", scope: SCOPE, revision: 2)
+      initial_time = Time.utc(2026, 9, 1, 12)
+      skill = create(
+        :coordinator_read_skill,
+        skill_id: SKILL_ID,
+        name: "event-modeling",
+        scope: SCOPE,
+        revision: 2,
+        created_at: initial_time,
+        updated_at: initial_time
+      )
       create(
         :coordinator_read_skill_revision,
         skill:,
@@ -282,7 +391,13 @@ module ProjectKnowledgeGraphqlSpec
       )
       create(:coordinator_read_skill_asset, :binary, skill:, revision: 2, path: "assets/template.bin")
 
-      other = create(:coordinator_read_skill, name: "event-modeling", scope: OTHER_SCOPE)
+      other = create(
+        :coordinator_read_skill,
+        name: "event-modeling",
+        scope: OTHER_SCOPE,
+        created_at: initial_time,
+        updated_at: initial_time
+      )
       create(:coordinator_read_skill_revision, skill: other)
     end
 
@@ -300,6 +415,7 @@ module ProjectKnowledgeGraphqlSpec
     end
 
     def create_artifact(identifier, title, locator, position, labels)
+      projected_at = Time.utc(2026, 9, 1, 12) + position.seconds
       artifact = create(
         :coordinator_read_development_artifact,
         artifact_id: identifier,
@@ -308,7 +424,9 @@ module ProjectKnowledgeGraphqlSpec
         labels:,
         source_locator: locator,
         content_text: "# #{title}",
-        captured_global_position: position
+        captured_global_position: position,
+        created_at: projected_at,
+        updated_at: projected_at
       )
       create(
         :coordinator_read_development_artifact_observation,
@@ -320,7 +438,9 @@ module ProjectKnowledgeGraphqlSpec
         source_locator: locator,
         observed_global_position: position,
         classified_global_position: position,
-        current_global_position: position
+        current_global_position: position,
+        created_at: projected_at,
+        updated_at: projected_at
       )
     end
 

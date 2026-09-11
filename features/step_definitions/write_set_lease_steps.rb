@@ -62,10 +62,13 @@ Given(
 end
 
 When(
-  "both agents concurrently reserve initial write sets overlapping on {string}"
+  "both agents concurrently declare initial work intentions overlapping on {string}"
 ) do |shared_path|
   @shared_lease_path = shared_path
   @reservation_tasks = @lease_participants.map.with_index do |participant, index|
+    mode = index.zero? ? "shared" : "exclusive"
+    purpose = index.zero? ? "Append compatible schema changes" : "Replace the schema structure"
+    context = "#{participant.fetch(:attempt_id)} plans #{mode} work"
     arguments = {
       command_id: "cmd-cuc-lse-reserve-#{index + 1}",
       actor: { kind: "agent", id: participant.fetch(:agent_id) },
@@ -78,14 +81,24 @@ When(
         resource_target(
           kind: "file",
           path: participant.fetch(:unique_path),
+          mode:,
+          purpose:,
+          context:,
           actor_id: participant.fetch(:agent_id)
         ),
-        resource_target(kind: "file", path: shared_path, actor_id: participant.fetch(:agent_id))
+        resource_target(
+          kind: "file",
+          path: shared_path,
+          mode:,
+          purpose:,
+          context:,
+          actor_id: participant.fetch(:agent_id)
+        )
       ],
       lease_duration_seconds: 300
     }
     task_id = call_tool("write_set_reserve", arguments).dig("result", "taskId")
-    participant.merge(task_id:, arguments:)
+    participant.merge(task_id:, arguments:, mode:, purpose:, context:)
   end
 
   @reservation_tasks.map do |reservation|
@@ -107,38 +120,47 @@ Then("one reservation Task succeeds and the other completes busy") do
 
   @winning_reservation = @reservation_tasks.find { _1.dig(:outcome, "status") == "ok" }
   @losing_reservation = @reservation_tasks.find { _1.dig(:outcome, "status") == "busy" }
-  busy_details = @losing_reservation.dig(:outcome, "data", "details")
+  blocker = @losing_reservation.dig(:outcome, "data", "details", "blockers").sole
   assert_acceptance_equal(
     @winning_reservation.fetch(:attempt_id),
-    busy_details.fetch("owner_attempt_id"),
+    blocker.fetch("owner_attempt_id"),
     "Persisted busy owner"
   )
-  assert_acceptance_equal(1, busy_details.fetch("fencing_token"), "Winning fencing token")
+  assert_acceptance_equal(@winning_reservation.fetch(:mode), blocker.fetch("mode"), "Blocking mode")
+  assert_acceptance_equal(@winning_reservation.fetch(:purpose), blocker.fetch("purpose"), "Blocking purpose")
+  assert_acceptance_equal(@winning_reservation.fetch(:context), blocker.fetch("context"), "Blocking context")
+  assert_acceptance(blocker.fetch("expires_at"), "Blocking expiry must be supplied")
 end
 
 Then("the winner owns its complete write set") do
-  event = write_set_events(@winning_reservation.fetch(:attempt_id)).sole
   expected_paths = [ @winning_reservation.fetch(:unique_path), @shared_lease_path ].sort
   assert_acceptance_equal(
     expected_paths,
-    event.data.fetch("resources").map { _1.fetch("resource_path") }.sort,
-    "Winning write-set resources"
+    @winning_reservation.dig(:outcome, "data", "resources").map { _1.fetch("resource_path") }.sort,
+    "Winning intention-set resources"
   )
-  expected_paths.each do |path|
-    assert_acceptance_equal(1, lease_events(path).length, "Lease facts for #{path}")
-  end
+  assert_acceptance_equal(
+    [ "WorkIntentionSetCreated", "WorkIntentionAddedToSet", "WorkIntentionAddedToSet" ],
+    work_intention_set_events(@winning_reservation.fetch(:attempt_id)).map(&:type),
+    "Winning intention-set facts"
+  )
+  assert_acceptance_equal(
+    [ "ResourceWorkIntentionDeclared", "ResourceWorkIntentionDeclared" ],
+    work_intention_events_for_attempt(@winning_reservation.fetch(:attempt_id)).map(&:type),
+    "Winning intention facts"
+  )
 end
 
 Then("the loser owns no partial write set") do
   assert_acceptance_equal(
     [],
-    write_set_events(@losing_reservation.fetch(:attempt_id)),
-    "Losing Attempt write set"
+    work_intention_set_events(@losing_reservation.fetch(:attempt_id)),
+    "Losing Attempt intention set"
   )
   assert_acceptance_equal(
     [],
-    lease_events(@losing_reservation.fetch(:unique_path)),
-    "Losing unique resource lease"
+    work_intention_events_for_command(@losing_reservation.dig(:arguments, :command_id)),
+    "Losing command intention facts"
   )
   assert_acceptance_equal(
     %w[CommandRegistered CommandRejected],
@@ -618,7 +640,13 @@ Then("the release Task succeeds without changing lease identities or fencing tok
     "Release previous deadline"
   )
   assert_acceptance(data.fetch("released_at"), "Release timestamp is missing")
-  assert_acceptance_equal(1, write_set_release_events(@release_attempt_id).length, "Write-set release facts")
+  @release_reservation.fetch("resources").each do |reference|
+    assert_acceptance_equal(
+      [ "ResourceWorkIntentionDeclared", "ResourceWorkIntentionWithdrawn" ],
+      work_intention_events(reference.fetch("lease_id")).map(&:type),
+      "Withdrawn work-intention lifecycle"
+    )
+  end
   @release_result = data
 end
 
@@ -693,7 +721,16 @@ When(
       attempt_id: @expiry_predecessor.fetch(:attempt_id),
       repository_id: acceptance_repository_id,
       base_commit_oid: "a" * 40,
-      resources: [ resource_target(kind: "file", path:, actor_id: agent_id) ],
+      resources: [
+        resource_target(
+          kind: "file",
+          path:,
+          mode: "exclusive",
+          purpose: "Replace #{path}",
+          context: "The predecessor requires exclusive access for this operation.",
+          actor_id: agent_id
+        )
+      ],
       lease_duration_seconds: duration
     }
   ).dig("result", "taskId")
@@ -702,7 +739,9 @@ When(
   @expiry_predecessor_result = @expiry_predecessor_state.dig(
     "result", "result", "structuredContent", "data"
   )
-  @expiry_source = lease_events(path).sole
+  @expiry_source = work_intention_events(
+    @expiry_predecessor_result.fetch("resources").sole.fetch("lease_id")
+  ).sole
 end
 
 When("that reservation reaches the available read side") do
@@ -861,13 +900,21 @@ Then("both disjoint reservation Tasks succeed with complete write sets") do
     "Disjoint reservation outcomes"
   )
   @disjoint_reservations.each do |reservation|
-    write_set = write_set_events(reservation.fetch(:attempt_id)).sole
     assert_acceptance_equal(
       [ reservation.fetch(:unique_path) ],
-      write_set.data.fetch("resources").map { _1.fetch("resource_path") },
-      "Disjoint complete write set"
+      reservation.dig(:outcome, "data", "resources").map { _1.fetch("resource_path") },
+      "Disjoint complete intention set"
     )
-    assert_acceptance_equal(1, lease_events(reservation.fetch(:unique_path)).length, "Disjoint lease facts")
+    assert_acceptance_equal(
+      [ "WorkIntentionSetCreated", "WorkIntentionAddedToSet" ],
+      work_intention_set_events(reservation.fetch(:attempt_id)).map(&:type),
+      "Disjoint intention-set facts"
+    )
+    assert_acceptance_equal(
+      [ "ResourceWorkIntentionDeclared" ],
+      work_intention_events_for_attempt(reservation.fetch(:attempt_id)).map(&:type),
+      "Disjoint intention facts"
+    )
   end
 end
 
@@ -942,13 +989,17 @@ When(
   @cancelled_reservation_state = task_request("tasks/get", @cancelled_reservation_task_id)
 end
 
-Then("the cancelled reservation writes no lease fact") do
+Then("the cancelled reservation writes no work-intention fact") do
   assert_acceptance_equal("cancelled", @cancelled_reservation_state.dig("result", "status"), "Task status")
-  assert_acceptance_equal([], lease_events(@cancelled_reservation_path), "Cancelled lease facts")
   assert_acceptance_equal(
     [],
-    write_set_events(@cancelled_reservation_owner.fetch(:attempt_id)),
-    "Cancelled Attempt write set"
+    work_intention_set_events(@cancelled_reservation_owner.fetch(:attempt_id)),
+    "Cancelled Attempt intention set"
+  )
+  assert_acceptance_equal(
+    [],
+    work_intention_events_for_command(@cancelled_reservation_command_id),
+    "Cancelled command intention facts"
   )
   assert_acceptance_equal(
     [ "CommandRegistered" ],
@@ -1080,7 +1131,13 @@ Then("both release responses expose the original Task and one logical result") d
     @release_retry_task_state.dig("result", "result"),
     "Release replay result"
   )
-  assert_acceptance_equal(1, write_set_release_events(@release_attempt_id).length, "Write-set releases")
+  @release_reservation.fetch("resources").each do |reference|
+    assert_acceptance_equal(
+      1,
+      work_intention_events(reference.fetch("lease_id")).count { _1.type == "ResourceWorkIntentionWithdrawn" },
+      "Replayed withdrawal fact"
+    )
+  end
   assert_acceptance_equal(
     %w[CommandRegistered CommandSucceeded],
     command_events("cmd-cuc-release-set").map(&:type),
@@ -1111,9 +1168,11 @@ Then("the authoritative release succeeds") do
   assert_acceptance_equal("completed", @predecessor_release_state.dig("result", "status"), "Release Task")
   assert_acceptance_equal(false, @predecessor_release_state.dig("result", "result", "isError"), "Release error")
   assert_acceptance_equal(
-    [ "ResourceLeaseAcquired", "ResourceLeaseReleased" ],
-    lease_events(@expiry_path).map(&:type),
-    "Released lifecycle"
+    [ "ResourceWorkIntentionDeclared", "ResourceWorkIntentionWithdrawn" ],
+    work_intention_events(
+      @expiry_predecessor_result.fetch("resources").sole.fetch("lease_id")
+    ).map(&:type),
+    "Withdrawn intention lifecycle"
   )
 end
 
@@ -1244,20 +1303,15 @@ Then("the abandonment Task releases current fences and requeues the WorkItem") d
   assert_acceptance_equal(1, abandonment_events.length, "Attempt abandonment facts")
   assert_acceptance_equal(1, requeue_events.length, "WorkItem requeue facts")
   assert_acceptance_equal(
-    @release_reservation.fetch("resources").map { _1.fetch("resource_id") }.sort,
-    abandonment_events.sole.data.fetch("released_leases").map { _1.fetch("resource_id") }.sort,
-    "Released abandonment fences"
+    %w[attempt_id reason],
+    abandonment_events.sole.data.keys.sort,
+    "AttemptAbandoned fact boundary"
   )
-  assert_acceptance_equal(
-    [],
-    abandonment_events.sole.data.fetch("untouched_resource_ids"),
-    "Untouched abandonment fences"
-  )
-  @release_paths.each do |path|
+  @release_reservation.fetch("resources").each do |reference|
     assert_acceptance_equal(
-      [ "ResourceLeaseAcquired", "ResourceLeaseReleased" ],
-      lease_events(path).map(&:type),
-      "Abandoned lease lifecycle for #{path}"
+      [ "ResourceWorkIntentionDeclared", "ResourceWorkIntentionWithdrawn" ],
+      work_intention_events(reference.fetch("lease_id")).map(&:type),
+      "Abandoned work-intention lifecycle for #{reference.fetch("resource_path")}"
     )
   end
   assert_acceptance_equal(
@@ -1325,7 +1379,10 @@ end
 
 Then("the fresh Attempt starts from a new base declaration while the old Attempt remains terminal") do
   result = @fresh_acquisition_state.dig("result", "result")
-  fresh_events = attempt_events(@fresh_attempt_id)
+  fresh_events = event_store.read(
+    streams.attempt(@fresh_attempt_id),
+    Coordinator::Write::EventQueries::ATTEMPT_FOR_WORK_INTENTIONS
+  )
   abandonment = event_store.read(
     streams.attempt(@release_attempt_id),
     Coordinator::Write::EventReadCriteria.new(
@@ -1344,13 +1401,19 @@ Then("the fresh Attempt starts from a new base declaration while the old Attempt
 
   assert_acceptance_equal(false, result.fetch("isError"), "Fresh acquisition error flag")
   assert_acceptance_equal(
-    [ "AttemptAuthorized", "AttemptStarted" ],
+    [
+      "AttemptAuthorized",
+      "AttemptAssignedToWorkItem",
+      "AttemptAssignedToAgent",
+      "AttemptBaseSnapshotRecorded",
+      "AttemptStarted"
+    ],
     fresh_events.map(&:type),
     "Fresh Attempt lifecycle"
   )
   assert_acceptance_equal(
     @fresh_base_commit_oid,
-    fresh_events.first.data.fetch("base_snapshots").sole.fetch("commit_oid"),
+    fresh_events.find { _1.type == "AttemptBaseSnapshotRecorded" }.data.fetch("commit_oid"),
     "Fresh base snapshot"
   )
   assert_acceptance_equal(@release_attempt_id, abandonment.data.fetch("attempt_id"), "Terminal old Attempt")
@@ -1620,6 +1683,9 @@ module HierarchicalWriteSetAcceptance
     agent_id:,
     kind:,
     path:,
+    mode: "shared",
+    purpose: nil,
+    context: nil,
     command_suffix: nil,
     command_id: nil,
     await_terminal: true
@@ -1641,6 +1707,9 @@ module HierarchicalWriteSetAcceptance
           resource_target(
             kind:,
             path:,
+            mode:,
+            purpose: purpose || "Coordinate #{path}",
+            context:,
             client_id: agent_id,
             actor_id: agent_id
           )
@@ -1656,6 +1725,9 @@ module HierarchicalWriteSetAcceptance
       agent_id:,
       kind:,
       path:,
+      mode:,
+      purpose: purpose || "Coordinate #{path}",
+      context:,
       command_id:,
       task_id:,
       client_id: agent_id,
@@ -1663,23 +1735,11 @@ module HierarchicalWriteSetAcceptance
     }
   end
 
-  def hierarchical_lease_events(kind, path)
-    resource_id = (@acceptance_resource_ids || {}).fetch(
-      [ acceptance_repository_id, kind, path ]
-    )
-    event_store.read(
-      streams.resource_lease(resource_id),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: %w[
-          ResourceLeaseAcquired
-          ResourceLeaseRenewed
-          ResourceLeaseReleased
-          ResourceLeaseExpired
-        ],
-        maximum_count: 10,
-        direction: :asc
-      )
-    )
+  def hierarchical_intention_events(reservation)
+    data = hierarchical_outcome(reservation).fetch("data")
+    data.fetch("resources").flat_map do |reference|
+      work_intention_events(reference.fetch("lease_id"))
+    end
   end
 
   def hierarchical_outcome(reservation)
@@ -1697,12 +1757,15 @@ Given(
 end
 
 When(
-  "agent {string} reserves {word} {string} through a public Task"
-) do |agent_id, kind, path|
+  "agent {string} declares a(n) {word} intention for {word} {string} through a public Task"
+) do |agent_id, mode, kind, path|
   @hierarchical_reservations << submit_live_hierarchical_reservation(
     agent_id:,
     kind:,
     path:,
+    mode:,
+    purpose: "#{mode.capitalize} work on #{path}",
+    context: "Declared by #{agent_id} for #{@hierarchical_change_set_id}",
     command_suffix: @hierarchical_reservations.length + 1
   )
 end
@@ -1740,41 +1803,50 @@ Then("the first hierarchical reservation succeeds and the alternative kind is de
   )
 end
 
-Then("only the current file resource has a durable lease acquisition") do
+Then("only the current file resource has a durable intention declaration") do
   reservation = @hierarchical_reservations.sole
   assert_acceptance_equal("file", reservation.fetch(:kind), "Current Resource kind")
   assert_acceptance_equal(
-    [ "ResourceLeaseAcquired" ],
-    hierarchical_lease_events("file", reservation.fetch(:path)).map(&:type),
+    [ "ResourceWorkIntentionDeclared" ],
+    hierarchical_intention_events(reservation).map(&:type),
     "Current Resource lifecycle"
   )
 end
 
-Then("the first hierarchical reservation succeeds and the second completes busy") do
+Then("the first hierarchical intention succeeds and the second completes busy with its blocker context") do
   first, second = @hierarchical_reservations
   assert_acceptance_equal("completed", first.dig(:state, "result", "status"), "First Task status")
   assert_acceptance_equal("ok", hierarchical_outcome(first).fetch("status"), "First reservation")
   assert_acceptance_equal("completed", second.dig(:state, "result", "status"), "Second Task status")
   assert_acceptance_equal("busy", hierarchical_outcome(second).fetch("status"), "Second reservation")
+  blocker = hierarchical_outcome(second).dig("data", "details", "blockers").sole
+  assert_acceptance_equal(first.fetch(:agent_id), blocker.fetch("owner_agent_id"), "Blocking owner")
+  assert_acceptance_equal(first.fetch(:mode), blocker.fetch("mode"), "Blocking mode")
+  assert_acceptance_equal(first.fetch(:purpose), blocker.fetch("purpose"), "Blocking purpose")
+  assert_acceptance_equal(first.fetch(:context), blocker.fetch("context"), "Blocking context")
   assert_acceptance_equal(
-    first.fetch(:agent_id),
-    hierarchical_outcome(second).dig("data", "details", "owner_agent_id"),
-    "Blocking owner"
+    {
+      "repository_id" => acceptance_repository_id,
+      "change_set_id" => @hierarchical_change_set_id,
+      "work_item_id" => @hierarchical_participants.first.fetch(:work_item_id)
+    },
+    blocker.fetch("scope"),
+    "Blocking scope"
   )
 end
 
-Then("only the {word} resource has a durable lease acquisition") do |winning_kind|
+Then("only the {word} resource has a durable intention declaration") do |winning_kind|
   winning = @hierarchical_reservations.first
   losing = @hierarchical_reservations.last
   assert_acceptance_equal(winning_kind, winning.fetch(:kind), "Winning resource kind")
   assert_acceptance_equal(
-    [ "ResourceLeaseAcquired" ],
-    hierarchical_lease_events(winning.fetch(:kind), winning.fetch(:path)).map(&:type),
+    [ "ResourceWorkIntentionDeclared" ],
+    hierarchical_intention_events(winning).map(&:type),
     "Winning lifecycle"
   )
   assert_acceptance_equal(
     [],
-    hierarchical_lease_events(losing.fetch(:kind), losing.fetch(:path)),
+    work_intention_events_for_command(losing.fetch(:command_id)),
     "Losing lifecycle"
   )
 end
@@ -1807,7 +1879,7 @@ When("both agents submit public reservation Tasks for disjoint resources and rea
     )
   end
   install_contention_barrier(
-    operation: "write_set_reserve",
+    operation: "coordination_task_execute",
     command_ids: @hierarchical_reservations.map { _1.fetch(:internal_command_id) }
   )
   start_process_subscriptions
@@ -1840,8 +1912,8 @@ Then("both hierarchical reservation Tasks complete successfully") do
     assert_acceptance_equal("completed", reservation.dig(:state, "result", "status"), "Task status")
     assert_acceptance_equal("ok", hierarchical_outcome(reservation).fetch("status"), "Reservation status")
     assert_acceptance_equal(
-      [ "ResourceLeaseAcquired" ],
-      hierarchical_lease_events(reservation.fetch(:kind), reservation.fetch(:path)).map(&:type),
+      [ "ResourceWorkIntentionDeclared" ],
+      hierarchical_intention_events(reservation).map(&:type),
       "Resource lifecycle"
     )
   end
@@ -1872,17 +1944,17 @@ Then("MCP rejects the unsupported path before allocating a Task") do
   assert_acceptance_equal([], task_events_for_command(@literal_path_command_id), "Task facts")
 end
 
-Then("no lease is stored for either path spelling") do
+Then("no work intention is stored for either path spelling") do
   assert_acceptance_equal([], command_events(@literal_path_command_id), "Command facts")
-  lease = PgEventstore.client.read(
+  intentions = PgEventstore.client.read(
     PgEventstore::Stream.all_stream,
     options: {
       direction: :asc,
       max_count: 1,
-      filter: { event_types: [ { type: "ResourceLeaseAcquired" } ] }
+      filter: { event_types: [ { type: "ResourceWorkIntentionDeclared" } ] }
     }
   )
-  assert_acceptance_equal([], lease, "Lease facts")
+  assert_acceptance_equal([], intentions, "Work-intention facts")
 end
 
 When(

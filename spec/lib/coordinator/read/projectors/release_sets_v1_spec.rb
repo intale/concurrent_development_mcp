@@ -35,7 +35,14 @@ RSpec.describe Coordinator::Read::Projectors::ReleaseSetsV1, :read_model do
         Coordinator::Read::ReleaseSetMemberViewV1.new(
           position: index + 1,
           repository_id:,
-          candidate_id: candidate_ids.fetch(index)
+          merge_snapshot_id: "MS-release-#{index + 1}",
+          ordered_candidate_ids: [ candidate_ids.fetch(index) ],
+          authorization_event: source_reference(
+            "MergeAuthorizationGranted",
+            "MergeAuthorization",
+            SecureRandom.uuid_v7,
+            0
+          )
         )
       end,
       release_digest: digest("1"),
@@ -104,6 +111,35 @@ RSpec.describe Coordinator::Read::Projectors::ReleaseSetsV1, :read_model do
     expect(observed.completion).to have_attributes(outcome: "activated")
   end
 
+  it "projects each external repository compensation into the terminal view" do
+    [
+      prepared_event,
+      *integration_events,
+      compensation_request_event,
+      compensation_integration_link_event,
+      repository_compensation_event,
+      compensated_outcome_event,
+      compensated_completion_event
+    ].each do |event|
+      projector.call(event)
+      projector.call(event)
+    end
+
+    observed = repository.fetch(release_set_id)
+    evidence = observed.completion.compensation_evidence.sole
+    expect(observed).to have_attributes(status: "completed")
+    expect(observed.completion).to have_attributes(outcome: "compensated")
+    expect(evidence).to have_attributes(
+      repository_id: repository_ids.first,
+      integration_event: event_reference(integration_record_events.first),
+      action: "revert",
+      external_reference: "reverts/projection/1",
+      result_digest: digest("c"),
+      run_id: "release-compensation-projection"
+    )
+    expect(evidence.producer).to have_attributes(name: "release-reverter", version: "1.0")
+  end
+
   def preparation_events
     @preparation_events ||= [
         Coordinator::Write::Events::ReleaseSetCreatedV1.new(release_set_id:, change_set_id:),
@@ -112,7 +148,14 @@ RSpec.describe Coordinator::Read::Projectors::ReleaseSetsV1, :read_model do
             release_set_id:,
             member_position: index + 1,
             repository_id:,
-            candidate_id: candidate_ids.fetch(index)
+            merge_snapshot_id: "MS-release-#{index + 1}",
+            ordered_candidate_ids: [ candidate_ids.fetch(index) ],
+            authorization_event: source_reference(
+              "MergeAuthorizationGranted",
+              "MergeAuthorization",
+              SecureRandom.uuid_v7,
+              0
+            )
           )
         end,
         Coordinator::Write::Events::ReleaseSetPreparedV2.new(release_set_id:)
@@ -122,9 +165,9 @@ RSpec.describe Coordinator::Read::Projectors::ReleaseSetsV1, :read_model do
                        **metadata_attributes("release-set-preparation/v1"),
                        release_digest: digest("1")
                      )
-                   else
+        else
                      Coordinator::Write::EventMetadata.new(**metadata_attributes("release-set-preparation/v1"))
-                   end
+        end
         projection_event(
           payload,
           revision: index,
@@ -276,6 +319,89 @@ RSpec.describe Coordinator::Read::Projectors::ReleaseSetsV1, :read_model do
       policy_version: "release-set-completion/v1",
       actor_kind: "system",
       caused_by: outcome_event
+    )
+  end
+
+  def compensation_request_event
+    @compensation_request_event ||= projection_event(
+      Coordinator::Write::Events::ReleaseSetCompensationRequestedV2.new(
+        release_set_id:,
+        change_set_id:,
+        reason: "A later repository integration failed",
+        trigger_kind: "repository_integration_failed"
+      ),
+      revision: 8,
+      position: 500,
+      metadata: Coordinator::Write::Metadata::ReleaseSetCompensationV2.new(
+        **metadata_attributes("release-set-compensation/v1", actor_kind: "system"),
+        release_digest: digest("1"),
+        rule_version: "release-set-compensation/v1"
+      ),
+      actor_kind: "system",
+      caused_by: integration_events.last
+    )
+  end
+
+  def compensation_integration_link_event
+    @compensation_integration_link_event ||= projection_event(
+      Coordinator::Write::Events::ReleaseSetSuccessfulIntegrationLinkedV1.new(
+        release_set_id:,
+        integration_event: event_reference(integration_record_events.first)
+      ),
+      revision: 9,
+      position: 501,
+      policy_version: "release-set-compensation/v1",
+      actor_kind: "system",
+      caused_by: compensation_request_event
+    )
+  end
+
+  def repository_compensation_event
+    @repository_compensation_event ||= projection_event(
+      Coordinator::Write::Events::RepositoryCompensationRecordedV1.new(
+        release_set_id:,
+        repository_id: repository_ids.first,
+        integration_event: event_reference(integration_record_events.first),
+        action: "revert",
+        external_reference: "reverts/projection/1"
+      ),
+      revision: 10,
+      position: 502,
+      metadata: Coordinator::Write::Metadata::RepositoryCompensationV1.new(
+        **metadata_attributes("release-set-completion/v1"),
+        result_digest: digest("c"),
+        producer: producer("release-reverter"),
+        run_id: "release-compensation-projection"
+      ),
+      caused_by: compensation_integration_link_event
+    )
+  end
+
+  def compensated_outcome_event
+    @compensated_outcome_event ||= projection_event(
+      Coordinator::Write::Events::ReleaseSetOutcomeRecordedV1.new(
+        release_set_id:,
+        outcome: "compensated"
+      ),
+      revision: 11,
+      position: 503,
+      metadata: Coordinator::Write::Metadata::ReleaseSetOutcomeV1.new(
+        **metadata_attributes("release-set-completion/v1"),
+        completion_digest: digest("d"),
+        release_digest: digest("1"),
+        rule_version: "release-set-completion/v1"
+      ),
+      caused_by: repository_compensation_event
+    )
+  end
+
+  def compensated_completion_event
+    @compensated_completion_event ||= projection_event(
+      Coordinator::Write::Events::ReleaseSetCompletedV2.new(release_set_id:),
+      revision: 12,
+      position: 504,
+      policy_version: "release-set-completion/v1",
+      caused_by: compensated_outcome_event
     )
   end
 

@@ -31,6 +31,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteActivateDecision, :event_s
         a_string_starting_with("compound:decision-slot:v2|")
     )
     expect(activation.data.keys).to contain_exactly("decision_id", "interpretation_id", "rationale")
+    recorded = load(decision_events("D-1").first)
+    expect(recorded.definition.validity.valid_from).to be_nil
 
     slot = original.value!.data.slot
     expect(slot_events(slot.slot_id).map(&:type)).to eq(%w[DecisionSlotOpened DecisionSlotHeadChanged])

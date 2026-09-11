@@ -39,7 +39,7 @@ module Coordinator::Read::Web::Queries
           sort: values[:sort] || "newest_first",
           change_set_id: values[:change_set_id],
           checkpoint_kind: values[:checkpoint_kind],
-          after_position: values[:after_position],
+          after_updated_at: values[:after_updated_at],
           after_id: values[:after_id]
         )
       )
@@ -54,7 +54,7 @@ module Coordinator::Read::Web::Queries
           sort: values[:sort] || "newest_first",
           change_set_id: values[:change_set_id],
           status: values[:status],
-          after_position: values[:after_position],
+          after_updated_at: values[:after_updated_at],
           after_id: values[:after_id]
         )
       )
@@ -67,7 +67,7 @@ module Coordinator::Read::Web::Queries
           project_scope: project_scope(values),
           first: values[:first] || 20,
           sort: values[:sort] || "newest_first",
-          after_position: values[:after_position],
+          after_updated_at: values[:after_updated_at],
           after_id: values[:after_id]
         )
       )
@@ -82,7 +82,7 @@ module Coordinator::Read::Web::Queries
           sort: values[:sort] || "newest_first",
           change_set_id: values[:change_set_id],
           status: values[:status],
-          after_position: values[:after_position],
+          after_updated_at: values[:after_updated_at],
           after_id: values[:after_id]
         )
       )
@@ -108,7 +108,7 @@ module Coordinator::Read::Web::Queries
           project_scope: project_scope(values),
           obligation_id: values[:obligation_id],
           first: values[:first] || 20,
-          after_evidence_position: values[:after_evidence_position],
+          after_evidence_updated_at: values[:after_evidence_updated_at],
           after_evidence_id: values[:after_evidence_id]
         )
       )
@@ -121,7 +121,7 @@ module Coordinator::Read::Web::Queries
           project_scope: project_scope(values),
           merge_snapshot_id: values[:merge_snapshot_id],
           first: values[:first] || 20,
-          after_authorization_position: values[:after_authorization_position],
+          after_authorization_updated_at: values[:after_authorization_updated_at],
           after_authorization_id: values[:after_authorization_id]
         )
       )
@@ -145,7 +145,7 @@ module Coordinator::Read::Web::Queries
           sort: values[:sort] || "newest_first",
           target_tool: values[:target_tool],
           status: values[:status],
-          after_position: values[:after_position],
+          after_updated_at: values[:after_updated_at],
           after_id: values[:after_id]
         )
       )

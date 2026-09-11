@@ -10,6 +10,8 @@ module Coordinator::Write
 
         CompensationRequest: untyped
 
+        CompensationEvidence: untyped
+
         Completion: untyped
 
         def member: (untyped repository_id) -> untyped

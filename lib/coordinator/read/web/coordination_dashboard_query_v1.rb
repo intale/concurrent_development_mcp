@@ -3,7 +3,7 @@
 module Coordinator::Read::Web
   class CoordinationDashboardQueryV1
     KINDS = %w[change_sets work_items dependencies].freeze
-    WORK_ITEM_SORTS = %w[work_item_id_asc status_asc latest_activity_desc].freeze
+    WORK_ITEM_SORTS = %w[updated_at_desc updated_at_asc status_asc latest_activity_desc].freeze
 
     class Page < Coordinator::Shared::Value
       attribute :project_ref, Coordinator::Shared::Types::String
@@ -24,6 +24,7 @@ module Coordinator::Read::Web
                 ).constrained(max_size: 5)
       attribute :work_item_sort, Coordinator::Shared::Types::String.enum(*WORK_ITEM_SORTS)
       attribute :blocking, Coordinator::Shared::Types::Strict::Bool.optional
+      attribute :domain_status, Coordinator::Shared::Types::String.optional
       attribute :change_set_id, Coordinator::Shared::Types::String.optional
       attribute :agent_id, Coordinator::Shared::Types::String.optional
     end

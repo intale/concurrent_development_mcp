@@ -16,6 +16,7 @@ module Coordinator::Write
 
           event = Events::VerificationObligationInvalidatedV2.new(
             obligation_id: command.obligation_id,
+            superseding_partition_event: command.superseding_partition_event,
             reason: "policy_partition_advanced"
           )
           Success(

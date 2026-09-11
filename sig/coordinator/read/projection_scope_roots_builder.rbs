@@ -1,7 +1,17 @@
 module Coordinator
   module Read
     class ProjectionScopeRootsBuilder
-      def call: (Write::Events::Base | CandidateSubmissionViewV2 event) -> Array[ProjectionScopeRoot]
+      def call: (
+        Write::Events::Base |
+        CandidateSubmissionViewV2 |
+        ChangeSetDefinitionViewV1 |
+        WorkItemDefinitionViewV1 |
+        WorkItemCompletionViewV1 |
+        AttemptDefinitionViewV1 |
+        AttemptAbandonmentViewV1 |
+        AttemptCompletionViewV1 |
+        WorkIntentionSetViewV1 event
+      ) -> Array[ProjectionScopeRoot]
     end
   end
 end

@@ -1,0 +1,16 @@
+module Coordinator
+  module Read
+    module Decisions
+      class InterpretationEvidenceLoader
+        EVENT_TYPES: Array[String]
+
+        def initialize: (
+          event_store: Write::EventStore,
+          ?schema_registry: Write::EventSchemaRegistry,
+          ?stream_factory: Write::StreamFactory
+        ) -> void
+        def call: (String interpretation_id) -> DecisionInterpretationEvidenceV2
+      end
+    end
+  end
+end

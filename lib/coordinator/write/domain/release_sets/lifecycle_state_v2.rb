@@ -8,6 +8,7 @@ module Coordinator::Write
         Verification = Coordinator::Write::ReleaseSets::VerificationFactV2
         Activation = Coordinator::Write::ReleaseSets::ActivationFactV2
         CompensationRequest = Coordinator::Write::ReleaseSets::CompensationRequestFactV2
+        CompensationEvidence = Coordinator::Write::ReleaseSets::CompensationEvidenceV2
         Completion = Coordinator::Write::ReleaseSets::CompletionFactV2
 
         attribute :preparation, Coordinator::Write::ReleaseSets::PreparationFactV2.optional
@@ -22,6 +23,10 @@ module Coordinator::Write
                     .constrained(max_size: Types::RELEASE_SET_VERIFICATION_MAXIMUM_ATTEMPTS)
         attribute? :activation, Activation.optional
         attribute? :compensation_request, CompensationRequest.optional
+        attribute :compensation_evidence,
+                  Types::Array.of(CompensationEvidence)
+                    .constrained(max_size: Types::RELEASE_SET_MAXIMUM_MEMBERS)
+                    .default([].freeze)
         attribute? :completion, Completion.optional
 
         def member(repository_id)

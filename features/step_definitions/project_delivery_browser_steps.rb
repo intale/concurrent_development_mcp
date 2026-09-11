@@ -86,7 +86,7 @@ DELIVERY_RELEASE_DETAIL_QUERY = <<~GRAPHQL.freeze
   query Release($projectRef: ID!, $releaseSetId: ID!) {
     projectReleaseSet(projectRef: $projectRef, releaseSetId: $releaseSetId) {
       releaseSet { id }
-      members { repositoryId candidateId }
+      members { repositoryId mergeSnapshotId orderedCandidateIds }
       integrations { repositoryId attemptId outcome }
     }
   }

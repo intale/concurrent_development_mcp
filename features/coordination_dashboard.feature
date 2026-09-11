@@ -3,6 +3,12 @@ Feature: Inspect current project coordination
 
   Rule: Scheduled work is presented from exact WorkItem and Attempt facts
 
+    @UI-GWT-26
+    Scenario: ChangeSets are filtered by their exact lifecycle status
+      Given projected dashboard rows contain planning, active, and completed ChangeSets
+      When the browser filters projected ChangeSets by status "completed"
+      Then only the completed ChangeSet is presented
+
     @UI-GWT-02
     Scenario: A project presents pending, ready, and running scheduled work
       Given projected dashboard rows contain pending, ready, and running scheduled work

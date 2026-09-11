@@ -135,7 +135,8 @@ CREATE TABLE public.attempt_histories (
     write_set_previous_expires_at_domain timestamp(6) without time zone,
     write_set_expires_at_domain timestamp(6) without time zone,
     write_set_release_event jsonb,
-    write_set_released_at_domain timestamp(6) without time zone
+    write_set_released_at_domain timestamp(6) without time zone,
+    projection_version integer DEFAULT 4 NOT NULL
 );
 
 
@@ -314,7 +315,8 @@ CREATE VIEW public.coordination_dashboard_work_items AS
     ((context.document -> 'change_set'::text) ->> 'goal'::text) AS change_set_goal,
     COALESCE(((context.document -> 'change_set'::text) -> 'acceptance_criteria'::text), '[]'::jsonb) AS change_set_acceptance_criteria,
     ((context.document -> 'change_set'::text) ->> 'status'::text) AS change_set_status,
-    context.last_processed_at
+    context.last_processed_at,
+    GREATEST(context.updated_at, COALESCE(attempt.updated_at, context.updated_at)) AS updated_at
    FROM ((public.coordinator_contexts context
      CROSS JOIN LATERAL jsonb_array_elements(COALESCE((context.document -> 'work_items'::text), '[]'::jsonb)) work_item(value))
      LEFT JOIN public.attempt_histories attempt ON ((((attempt.attempt_id)::text = (work_item.value ->> 'active_attempt_id'::text)) AND ((attempt.change_set_id)::text = (work_item.value ->> 'change_set_id'::text)) AND ((attempt.work_item_id)::text = (work_item.value ->> 'work_item_id'::text)))));
@@ -333,7 +335,8 @@ CREATE VIEW public.coordination_dashboard_change_sets AS
     (count(*))::integer AS work_item_count,
     (count(*) FILTER (WHERE (presentation_status = 'running'::text)))::integer AS running_work_item_count,
     (count(*) FILTER (WHERE (presentation_status = ANY (ARRAY['pending'::text, 'ready'::text, 'assigned'::text]))))::integer AS open_work_item_count,
-    max(last_processed_at) AS last_processed_at
+    max(last_processed_at) AS last_processed_at,
+    max(updated_at) AS updated_at
    FROM public.coordination_dashboard_work_items work_item
   GROUP BY change_set_id, repository_id, change_set_goal, change_set_acceptance_criteria, change_set_status;
 
@@ -353,7 +356,8 @@ CREATE VIEW public.coordination_dashboard_dependencies AS
     (NULLIF((dependency.value ->> 'declared_at'::text), ''::text))::timestamp with time zone AS declared_at_domain,
     (NULLIF((dependency.value ->> 'satisfied_at'::text), ''::text))::timestamp with time zone AS satisfied_at_domain,
     ((dependency.value ->> 'satisfied_at'::text) IS NULL) AS blocking,
-    context.last_processed_at
+    context.last_processed_at,
+    context.updated_at
    FROM (((public.coordinator_contexts context
      CROSS JOIN LATERAL jsonb_array_elements(COALESCE((context.document -> 'dependencies'::text), '[]'::jsonb)) dependency(value))
      LEFT JOIN public.coordination_dashboard_work_items producer ON (((producer.change_set_id = (context.change_set_id)::text) AND (producer.work_item_id = (dependency.value ->> 'producer_work_item_id'::text)))))
@@ -1007,7 +1011,8 @@ CREATE TABLE public.processed_projection_events (
     stream_context character varying NOT NULL,
     stream_id character varying NOT NULL,
     stream_name character varying NOT NULL,
-    stream_revision bigint NOT NULL
+    stream_revision bigint NOT NULL,
+    updated_at timestamp(6) without time zone NOT NULL
 );
 
 
@@ -1677,6 +1682,20 @@ CREATE INDEX idx_agent_choice_impacts_attempt_position ON public.agent_choice_im
 
 
 --
+-- Name: idx_agent_choice_impacts_event_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_choice_impacts_event_time ON public.agent_choice_impacts USING btree (updated_at DESC, assessment_id DESC);
+
+
+--
+-- Name: idx_agent_choices_event_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_choices_event_time ON public.agent_choices USING btree (updated_at DESC, choice_id DESC);
+
+
+--
 -- Name: idx_artifact_observations_exact_locator; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1688,6 +1707,13 @@ CREATE INDEX idx_artifact_observations_exact_locator ON public.development_artif
 --
 
 CREATE INDEX idx_attempt_histories_current_write_sets ON public.attempt_histories USING btree (write_set_repository_id, write_set_expires_at_domain, attempt_id) WHERE ((write_set_lease_set_id IS NOT NULL) AND (write_set_released_at_domain IS NULL) AND (terminal_at_domain IS NULL));
+
+
+--
+-- Name: idx_attempt_histories_event_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_attempt_histories_event_time ON public.attempt_histories USING btree (updated_at DESC, attempt_id DESC);
 
 
 --
@@ -1754,10 +1780,87 @@ CREATE INDEX idx_candidates_attempt_position ON public.candidates USING btree (a
 
 
 --
+-- Name: idx_candidates_event_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_candidates_event_time ON public.candidates USING btree (updated_at DESC, candidate_id DESC);
+
+
+--
+-- Name: idx_command_receipts_event_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_command_receipts_event_time ON public.command_receipts USING btree (updated_at DESC, command_id DESC);
+
+
+--
 -- Name: idx_coordinator_context_scopes_identity; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX idx_coordinator_context_scopes_identity ON public.coordinator_context_scopes USING btree (scope_kind, scope_id);
+
+
+--
+-- Name: idx_coordinator_contexts_event_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_coordinator_contexts_event_time ON public.coordinator_contexts USING btree (updated_at DESC, change_set_id DESC);
+
+
+--
+-- Name: idx_decision_definitions_event_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_decision_definitions_event_time ON public.decision_definitions USING btree (updated_at DESC, decision_id DESC);
+
+
+--
+-- Name: idx_decision_interpretations_event_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_decision_interpretations_event_time ON public.decision_interpretations USING btree (updated_at DESC, interpretation_id DESC);
+
+
+--
+-- Name: idx_decision_interpretations_message_event_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_decision_interpretations_message_event_time ON public.decision_interpretations USING btree (message_id, updated_at DESC, interpretation_id DESC);
+
+
+--
+-- Name: idx_decision_partition_heads_event_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_decision_partition_heads_event_time ON public.decision_partition_heads USING btree (updated_at DESC, partition_id DESC);
+
+
+--
+-- Name: idx_decision_slot_heads_event_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_decision_slot_heads_event_time ON public.decision_slot_heads USING btree (updated_at DESC, slot_id DESC);
+
+
+--
+-- Name: idx_development_artifact_observations_event_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_development_artifact_observations_event_time ON public.development_artifact_observations USING btree (updated_at DESC, observation_id DESC);
+
+
+--
+-- Name: idx_development_artifact_relations_event_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_development_artifact_relations_event_time ON public.development_artifact_relations USING btree (updated_at DESC, relation_id DESC);
+
+
+--
+-- Name: idx_merge_authorizations_event_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_merge_authorizations_event_time ON public.merge_authorizations USING btree (updated_at DESC, authorization_id DESC);
 
 
 --
@@ -1772,6 +1875,13 @@ CREATE INDEX idx_merge_authorizations_snapshot_position ON public.merge_authoriz
 --
 
 CREATE UNIQUE INDEX idx_merge_snapshots_commit_identity ON public.merge_snapshots USING btree (repository_id, object_format, merge_commit_oid);
+
+
+--
+-- Name: idx_merge_snapshots_event_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_merge_snapshots_event_time ON public.merge_snapshots USING btree (updated_at DESC, merge_snapshot_id DESC);
 
 
 --
@@ -1807,13 +1917,6 @@ CREATE INDEX idx_on_current_global_position_ed0086fb2b ON public.development_art
 --
 
 CREATE INDEX idx_on_declared_global_position_66c5eb75e9 ON public.development_artifact_relations USING btree (declared_global_position);
-
-
---
--- Name: idx_on_message_id_stream_revision_4258fdb4a5; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_on_message_id_stream_revision_4258fdb4a5 ON public.decision_interpretations USING btree (message_id, stream_revision);
 
 
 --
@@ -1859,6 +1962,13 @@ CREATE INDEX idx_on_target_kind_target_id_389d0c51da ON public.development_artif
 
 
 --
+-- Name: idx_operation_batches_event_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_operation_batches_event_time ON public.operation_batches USING btree (updated_at DESC, batch_id DESC);
+
+
+--
 -- Name: idx_processed_projection_events_command; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1870,6 +1980,27 @@ CREATE INDEX idx_processed_projection_events_command ON public.processed_project
 --
 
 CREATE UNIQUE INDEX idx_processed_projection_events_identity ON public.processed_projection_events USING btree (projection_name, projection_version, stream_context, stream_name, stream_id, stream_revision);
+
+
+--
+-- Name: idx_release_sets_event_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_release_sets_event_time ON public.release_sets USING btree (updated_at DESC, release_set_id DESC);
+
+
+--
+-- Name: idx_repositories_event_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_repositories_event_time ON public.repositories USING btree (updated_at DESC, repository_id DESC);
+
+
+--
+-- Name: idx_resources_event_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_resources_event_time ON public.resources USING btree (updated_at DESC, resource_id DESC);
 
 
 --
@@ -1891,6 +2022,20 @@ CREATE UNIQUE INDEX idx_resources_on_repository_kind_path ON public.resources US
 --
 
 CREATE INDEX idx_resources_on_repository_status_id ON public.resources USING btree (repository_id, lifecycle_status, resource_id);
+
+
+--
+-- Name: idx_skills_event_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skills_event_time ON public.skills USING btree (updated_at DESC, skill_id DESC);
+
+
+--
+-- Name: idx_user_utterances_event_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_user_utterances_event_time ON public.user_utterances USING btree (updated_at DESC, message_id DESC);
 
 
 --
@@ -1947,6 +2092,13 @@ CREATE INDEX idx_verification_obligations_claimant ON public.verification_obliga
 --
 
 CREATE INDEX idx_verification_obligations_enforcement ON public.verification_obligations USING btree (enforcement, event_global_position);
+
+
+--
+-- Name: idx_verification_obligations_event_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_verification_obligations_event_time ON public.verification_obligations USING btree (updated_at DESC, obligation_id DESC);
 
 
 --
@@ -2492,6 +2644,10 @@ ALTER TABLE ONLY public.operation_batch_outcomes
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260911103000'),
+('20260911100000'),
+('20260904121000'),
+('20260904120000'),
 ('20260903150000'),
 ('20260903134500'),
 ('20260903123000'),

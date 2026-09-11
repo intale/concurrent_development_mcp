@@ -73,7 +73,7 @@ export function ProjectCatalogPage() {
   const changeSort = (value: string) => {
     const next = resetProjectPagination(searchParams);
     const selected = parseProjectSort(value);
-    if (selected === "SCOPE_ASC") next.delete("sort");
+    if (selected === "NEWEST_FIRST") next.delete("sort");
     else next.set("sort", selected);
     setSearchParams(next);
   };
@@ -132,8 +132,8 @@ export function ProjectCatalogPage() {
                   onChange={(event) => changeSort(event.target.value)}
                   value={sort}
                 >
-                  <option value="SCOPE_ASC">Scope A–Z</option>
-                  <option value="SCOPE_DESC">Scope Z–A</option>
+                  <option value="NEWEST_FIRST">Recently updated</option>
+                  <option value="OLDEST_FIRST">Least recently updated</option>
                 </select>
               </div>
               <div className="col-12 col-sm-5 col-lg-auto d-grid">

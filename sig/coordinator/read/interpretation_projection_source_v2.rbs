@@ -1,0 +1,14 @@
+module Coordinator
+  module Read
+    class InterpretationProjectionSourceV2 < Value
+      attr_reader proposal: Write::Events::DecisionInterpretationProposedV2
+      attr_reader source_event: Write::EventReference
+      attr_reader source_span: Write::Interpretations::SourceSpanV1
+      attr_reader classifier: Write::Interpretations::ClassifierAttributionV1
+      attr_reader scope_provenance: Write::Interpretations::DecisionScopeProvenanceV1
+      attr_reader ambiguities: Array[Write::Interpretations::InterpretationAmbiguityV1]
+      attr_reader assessment: Write::Interpretations::InterpretationAssessmentV1
+      attr_reader proposed_at: String
+    end
+  end
+end

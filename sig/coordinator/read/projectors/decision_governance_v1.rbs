@@ -4,7 +4,7 @@ module Coordinator
       class DecisionGovernanceV1
         PROJECTION: ProjectionDefinition
 
-        def initialize: (?contract: Contracts::DecisionGovernanceSourceEvent, ?schema_registry: Write::EventSchemaRegistry, ?governance: Repositories::DecisionGovernance, ?processed_events: Repositories::ProcessedProjectionEvents) -> void
+        def initialize: (?contract: Contracts::DecisionGovernanceSourceEvent, interpretation_evidence_loader: Decisions::InterpretationEvidenceLoader, ?schema_registry: Write::EventSchemaRegistry, ?governance: Repositories::DecisionGovernance, ?processed_events: Repositories::ProcessedProjectionEvents) -> void
         def call: (PgEventstore::Event event) -> void
       end
     end

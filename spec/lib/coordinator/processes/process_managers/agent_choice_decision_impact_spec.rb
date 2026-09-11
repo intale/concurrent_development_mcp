@@ -6,6 +6,27 @@ RSpec.describe Coordinator::Processes::ProcessManagers::AgentChoiceDecisionImpac
   let(:schemas) { Coordinator::Write::EventSchemaRegistry.new }
   subject(:process_manager) { described_class.new(event_store:) }
 
+  it "invalidates a previously policy-free Choice when a blocking Decision is activated" do
+    prepared = AgentChoiceImpactScenario.prepare_attempt(prefix: "impact-process-activation")
+    choice = AgentChoiceImpactScenario.record_choice(prepared:, option_id: "rspec")
+    source = AgentChoiceImpactScenario.activate_decision(
+      suffix: "impact-process-activation-change",
+      decision_id: "D-impact-process-activation",
+      option_id: "minitest",
+      scope: repository_scope
+    )
+
+    process_manager.call(source)
+    process_manager.call(scan_event(source, "AgentChoiceImpactScanStarted"))
+
+    assessment = load(assessment_events(choice, source).sole).assessment
+    expect(assessment).to have_attributes(
+      outcome: "invalidated",
+      reason: "blocking_policy_introduced"
+    )
+    expect(choice_events(choice).map(&:type)).to include("AgentChoiceInvalidatedByDecision")
+  end
+
   it "runs the lifecycle-to-page Saga with exact replay, tracing, and terminal invalidation" do
     prepared = AgentChoiceImpactScenario.prepare_attempt(prefix: "impact-process-direct")
     decision_id = "D-impact-process-direct"

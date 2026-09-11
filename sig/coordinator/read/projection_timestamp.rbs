@@ -1,0 +1,5 @@
+module Coordinator::Read
+  class ProjectionTimestamp
+    def call: (current: Time?, event: PgEventstore::Event) -> Time
+  end
+end

@@ -67,6 +67,19 @@ RSpec.describe Coordinator::Mcp::Schemas do
     end
   end
 
+  it "accepts the granular Decision-partition facts used to bind merge authorization" do
+    variants = described_class.merge_authorization_request
+      .dig(:properties, :expected_impact_policy, :anyOf)
+      .find { _1[:type] == "object" }
+      .dig(:properties, :partition_event, :anyOf)
+
+    expect(variants.map { _1.dig(:properties, :type, :const) }).to contain_exactly(
+      "DecisionPartitionAdvanced",
+      "DecisionAddedToPartition",
+      "DecisionRemovedFromPartition"
+    )
+  end
+
   it "reserves internal labels and coordinator-owned UUIDv7 identities in every public mutation schema" do
     mutation_tools = Coordinator::Mcp::ToolRegistry.all.select do |tool|
       tool < Coordinator::Mcp::MutationTool

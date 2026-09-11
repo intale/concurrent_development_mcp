@@ -36,7 +36,8 @@ module Coordinator::Read::Web::Repositories
       SUM(work_item_count)::integer AS work_item_count,
       SUM(running_work_item_count)::integer AS running_work_item_count,
       SUM(open_work_item_count)::integer AS open_work_item_count,
-      MAX(last_processed_at) AS last_processed_at
+      MAX(last_processed_at) AS last_processed_at,
+      MAX(updated_at) AS updated_at
     SQL
 
     def page(query)
@@ -69,12 +70,22 @@ module Coordinator::Read::Web::Repositories
 
     def change_set_page(query, repository_ids)
       relation = change_set_relation(repository_ids)
-      relation = relation.where("change_set_id > ?", query.after_id) if query.after_id
-      records, has_more = bounded(relation.order(:change_set_id), query.first)
+      relation = relation.where(domain_status: query.domain_status) if query.domain_status
+      if query.after_id
+        relation = relation.having(
+          "MAX(updated_at) < :updated_at OR (MAX(updated_at) = :updated_at AND change_set_id < :id)",
+          updated_at: query.after_sort_value,
+          id: query.after_id
+        )
+      end
+      records, has_more = bounded(
+        relation.order(Arel.sql("MAX(updated_at) DESC, change_set_id DESC")),
+        query.first
+      )
 
       Coordinator::Read::Web::CoordinationDashboardV1::ChangeSetPage.new(
         items: records.map { build_change_set(_1) },
-        next_cursor: page_cursor(records, has_more) { [ _1.change_set_id, nil ] },
+        next_cursor: page_cursor(records, has_more) { [ _1.change_set_id, timestamp(_1.updated_at) ] },
         has_more:
       )
     end
@@ -131,8 +142,18 @@ module Coordinator::Read::Web::Repositories
       return relation unless query.after_id
 
       case query.work_item_sort
-      when "work_item_id_asc"
-        relation.where("work_item_id > ?", query.after_id)
+      when "updated_at_desc"
+        relation.where(
+          "updated_at < :value OR (updated_at = :value AND work_item_id < :id)",
+          value: query.after_sort_value,
+          id: query.after_id
+        )
+      when "updated_at_asc"
+        relation.where(
+          "updated_at > :value OR (updated_at = :value AND work_item_id > :id)",
+          value: query.after_sort_value,
+          id: query.after_id
+        )
       when "status_asc"
         relation.where(
           "#{STATUS_RANK_SQL} > CAST(:value AS integer) OR " \
@@ -151,7 +172,8 @@ module Coordinator::Read::Web::Repositories
 
     def apply_work_item_order(relation, sort)
       case sort
-      when "work_item_id_asc" then relation.order(:work_item_id)
+      when "updated_at_desc" then relation.order(updated_at: :desc, work_item_id: :desc)
+      when "updated_at_asc" then relation.order(:updated_at, :work_item_id)
       when "status_asc" then relation.order(Arel.sql("#{STATUS_RANK_SQL} ASC, work_item_id ASC"))
       when "latest_activity_desc" then relation.order(Arel.sql("#{LATEST_ACTIVITY_SQL} DESC, work_item_id ASC"))
       end
@@ -159,7 +181,7 @@ module Coordinator::Read::Web::Repositories
 
     def work_item_sort_value(record, sort)
       case sort
-      when "work_item_id_asc" then nil
+      when "updated_at_desc", "updated_at_asc" then timestamp(record.updated_at)
       when "status_asc" then STATUS_RANKS.fetch(record.presentation_status).to_s
       when "latest_activity_desc" then timestamp(record.latest_activity_at)
       end
@@ -185,12 +207,18 @@ module Coordinator::Read::Web::Repositories
     def dependency_page(query, repository_ids)
       relation = dependency_relation(repository_ids)
       relation = relation.where(blocking: query.blocking) unless query.blocking.nil?
-      relation = relation.where("dependency_id > ?", query.after_id) if query.after_id
-      records, has_more = bounded(relation.order(:dependency_id), query.first)
+      if query.after_id
+        relation = relation.where(
+          "updated_at < :updated_at OR (updated_at = :updated_at AND dependency_id < :id)",
+          updated_at: query.after_sort_value,
+          id: query.after_id
+        )
+      end
+      records, has_more = bounded(relation.order(updated_at: :desc, dependency_id: :desc), query.first)
 
       Coordinator::Read::Web::CoordinationDashboardV1::DependencyPage.new(
         items: records.map { build_dependency(_1) },
-        next_cursor: page_cursor(records, has_more) { [ _1.dependency_id, nil ] },
+        next_cursor: page_cursor(records, has_more) { [ _1.dependency_id, timestamp(_1.updated_at) ] },
         has_more:
       )
     end

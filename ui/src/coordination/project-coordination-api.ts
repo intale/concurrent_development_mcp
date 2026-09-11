@@ -7,6 +7,7 @@ import {
   ProjectWorkItemsDocument
 } from "../gql/graphql.js";
 import type {
+  CoordinationChangeSetStatus,
   CoordinationPresentationStatus,
   ProjectChangeSetQuery,
   ProjectChangeSetsQuery,
@@ -20,6 +21,14 @@ import { executeGraphql } from "../graphql-client.js";
 
 export const COORDINATION_PAGE_SIZE = 20;
 
+export type ChangeSetStatus = "planning" | "active" | "completed";
+
+const GRAPHQL_CHANGE_SET_STATUS = {
+  planning: "PLANNING",
+  active: "ACTIVE",
+  completed: "COMPLETED"
+} as const satisfies Readonly<Record<ChangeSetStatus, CoordinationChangeSetStatus>>;
+
 export interface WorkItemFilters {
   readonly agentId?: string;
   readonly changeSetId?: string;
@@ -29,12 +38,14 @@ export interface WorkItemFilters {
 
 export function fetchProjectChangeSets(
   projectRef: string,
+  status: ChangeSetStatus | undefined,
   after: string | undefined,
   signal?: AbortSignal
 ): Promise<ProjectChangeSetsQuery> {
   return executeGraphql(ProjectChangeSetsDocument, {
     projectRef,
     first: COORDINATION_PAGE_SIZE,
+    ...(status ? { status: GRAPHQL_CHANGE_SET_STATUS[status] } : {}),
     ...(after ? { after } : {})
   }, signal);
 }

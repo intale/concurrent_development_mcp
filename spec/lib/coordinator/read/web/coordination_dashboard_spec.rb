@@ -17,7 +17,7 @@ RSpec.describe Coordinator::Read::Web::Queries::CoordinationDashboard, :read_mod
   end
 
   it "maps exact WorkItem and unbounded active Attempt facts to presentation states" do
-    work_items = page("work_items")
+    work_items = page("work_items", work_item_sort: "status_asc")
     change_sets = page("change_sets")
 
     expect(work_items.items.map(&:presentation_status)).to eq(

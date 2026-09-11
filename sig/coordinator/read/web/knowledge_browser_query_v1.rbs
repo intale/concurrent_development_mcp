@@ -3,11 +3,21 @@ module Coordinator
     module Web
       class KnowledgeBrowserQueryV1
         class Skills < Shared::Value
-          def project_ref: () -> String
-          def scope: () -> String
+          def project_ref: () -> String?
+          def scope: () -> String?
           def first: () -> Integer
           def name: () -> String?
+          def after_updated_at: () -> String?
           def after_skill_id: () -> String?
+        end
+
+        class SkillById < Shared::Value
+          def skill_id: () -> String
+        end
+
+        class SkillAssetById < Shared::Value
+          def skill_id: () -> String
+          def path: () -> String
         end
 
         class Artifacts < Shared::Value
@@ -17,7 +27,8 @@ module Coordinator
           def kind: () -> String?
           def labels: () -> Array[String]
           def source_kind: () -> String?
-          def after_global_position: () -> Integer?
+          def after_updated_at: () -> String?
+          def after_observation_id: () -> String?
         end
 
         class Skill < Shared::Value

@@ -14,6 +14,14 @@ module Coordinator::Read::Web::Contracts
           included_in?: Coordinator::Shared::Types::DECISION_POLICY_STATUSES
         )
         optional(:after_decision_id).maybe(:string)
+        optional(:after_updated_at).maybe(:string)
+      end
+
+      rule(:after_decision_id, :after_updated_at) do
+        base.failure("cursor coordinates must both be present or absent") unless
+          values[:after_decision_id].nil? == values[:after_updated_at].nil?
+        key(:after_updated_at).failure("must be an event timestamp") if values[:after_updated_at] &&
+          !Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(values[:after_updated_at])
       end
 
       %i[topic_id after_decision_id].each do |name|
@@ -33,6 +41,14 @@ module Coordinator::Read::Web::Contracts
         optional(:first).filled(:integer, gteq?: 1, lteq?: 50)
         optional(:source).maybe(:string, included_in?: Coordinator::Shared::Types::GUIDANCE_SOURCES)
         optional(:after_message_id).maybe(:string)
+        optional(:after_updated_at).maybe(:string)
+      end
+
+      rule(:after_message_id, :after_updated_at) do
+        base.failure("cursor coordinates must both be present or absent") unless
+          values[:after_message_id].nil? == values[:after_updated_at].nil?
+        key(:after_updated_at).failure("must be an event timestamp") if values[:after_updated_at] &&
+          !Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(values[:after_updated_at])
       end
 
       rule(:after_message_id) do
@@ -57,6 +73,14 @@ module Coordinator::Read::Web::Contracts
           included_in?: Coordinator::Shared::Types::AGENT_CHOICE_OBSERVATION_STATUSES
         )
         optional(:after_choice_id).maybe(:string)
+        optional(:after_updated_at).maybe(:string)
+      end
+
+      rule(:after_choice_id, :after_updated_at) do
+        base.failure("cursor coordinates must both be present or absent") unless
+          values[:after_choice_id].nil? == values[:after_updated_at].nil?
+        key(:after_updated_at).failure("must be an event timestamp") if values[:after_updated_at] &&
+          !Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(values[:after_updated_at])
       end
 
       rule(:after_choice_id) do
@@ -76,7 +100,7 @@ module Coordinator::Read::Web::Contracts
           :string,
           included_in?: Coordinator::Shared::Types::AGENT_CHOICE_IMPACT_ASSESSMENT_OUTCOMES
         )
-        optional(:after_global_position).maybe(:integer, gteq?: 0)
+        optional(:after_updated_at).maybe(:string)
         optional(:after_assessment_id).maybe(:string)
       end
 
@@ -86,10 +110,12 @@ module Coordinator::Read::Web::Contracts
         key.failure("must be an identifier") unless Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
       end
 
-      rule(:after_global_position, :after_assessment_id) do
-        position = values[:after_global_position]
+      rule(:after_updated_at, :after_assessment_id) do
+        position = values[:after_updated_at]
         identifier = values[:after_assessment_id]
         base.failure("impact cursor coordinates must both be present or absent") unless position.nil? == identifier.nil?
+        key(:after_updated_at).failure("must be an event timestamp") if position &&
+          !Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(position)
       end
     end
 
@@ -128,7 +154,7 @@ module Coordinator::Read::Web::Contracts
         required(:project_ref).filled(:string)
         required(:choice_id).filled(:string)
         optional(:first).filled(:integer, gteq?: 1, lteq?: 100)
-        optional(:after_impact_global_position).maybe(:integer, gteq?: 0)
+        optional(:after_impact_updated_at).maybe(:string)
         optional(:after_impact_assessment_id).maybe(:string)
       end
 
@@ -138,10 +164,12 @@ module Coordinator::Read::Web::Contracts
         key.failure("must be an identifier") unless Coordinator::Shared::Types::IDENTIFIER_PATTERN.match?(value)
       end
 
-      rule(:after_impact_global_position, :after_impact_assessment_id) do
-        position = values[:after_impact_global_position]
+      rule(:after_impact_updated_at, :after_impact_assessment_id) do
+        position = values[:after_impact_updated_at]
         identifier = values[:after_impact_assessment_id]
         base.failure("impact cursor coordinates must both be present or absent") unless position.nil? == identifier.nil?
+        key(:after_impact_updated_at).failure("must be an event timestamp") if position &&
+          !Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(position)
       end
     end
 
@@ -166,6 +194,14 @@ module Coordinator::Read::Web::Contracts
         optional(:tool_name).maybe(:string)
         optional(:status).maybe(:string, included_in?: [ "ok" ])
         optional(:after_command_id).maybe(:string)
+        optional(:after_updated_at).maybe(:string)
+      end
+
+      rule(:after_command_id, :after_updated_at) do
+        base.failure("cursor coordinates must both be present or absent") unless
+          values[:after_command_id].nil? == values[:after_updated_at].nil?
+        key(:after_updated_at).failure("must be an event timestamp") if values[:after_updated_at] &&
+          !Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(values[:after_updated_at])
       end
 
       %i[tool_name after_command_id].each do |name|

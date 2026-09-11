@@ -3,15 +3,16 @@
 module Coordinator::Read
   module Repositories
     class DecisionGovernance
+      include EventTimestamped
+
       def fetch(decision_id)
         record = Coordinator::Read::DecisionDefinition.find_by(decision_id:)
         record && build_decision(record)
       end
 
       def fetch_many(decision_ids)
-        Coordinator::Read::DecisionDefinition.where(decision_id: decision_ids)
-          .order(:decision_id)
-          .map { build_decision(_1) }
+        records = Coordinator::Read::DecisionDefinition.where(decision_id: decision_ids).index_by(&:decision_id)
+        decision_ids.filter_map { records[_1] && build_decision(records.fetch(_1)) }
       end
 
       def page(query)
@@ -46,7 +47,7 @@ module Coordinator::Read
       end
 
       def store_decision(event:, decision:)
-        Coordinator::Read::DecisionDefinition.create!(
+        create_from_event(Coordinator::Read::DecisionDefinition, event:, attributes: {
           decision_id: decision.decision_id,
           interpretation_id: decision.interpretation_id,
           source_message_id: decision.source_message_id,
@@ -77,12 +78,48 @@ module Coordinator::Read
           activated_at_domain: nil,
           recorded_at_store: event.created_at,
           activated_at_store: nil
-        )
+        })
+      end
+
+      def store_decision_v2(event:, decision:, interpretation:)
+        definition = normalize_definition(decision.definition)
+        create_from_event(Coordinator::Read::DecisionDefinition, event:, attributes: {
+          decision_id: decision.decision_id,
+          interpretation_id: decision.interpretation_id,
+          source_message_id: decision.source_message_id,
+          policy_status: "recorded",
+          definition_digest: definition.digest,
+          definition: definition.to_h,
+          slot: nil,
+          partitions: [],
+          classifier: interpretation.classifier.to_h,
+          scope_provenance: interpretation.scope_provenance.to_h,
+          source_event: interpretation.source_event.to_h,
+          proposal_event: interpretation.proposal_event.to_h,
+          acceptance_event: interpretation.acceptance_event.to_h,
+          recorded_event: event_reference(event).to_h,
+          activated_event: nil,
+          rationale: nil,
+          recorded_actor: actor(event).to_h,
+          activated_actor: nil,
+          recorded_markers: event.markers,
+          activated_markers: nil,
+          recorded_metadata: event.metadata,
+          activated_metadata: nil,
+          recorded_causation_id: event.causation_id,
+          recorded_correlation_id: event.correlation_id,
+          activated_causation_id: nil,
+          activated_correlation_id: nil,
+          recorded_at_domain: event.created_at,
+          activated_at_domain: nil,
+          recorded_at_store: event.created_at,
+          activated_at_store: nil
+        })
       end
 
       def activate_decision(event:, activation:)
         record = Coordinator::Read::DecisionDefinition.find(activation.decision_id)
-        record.update!(
+        save_from_event(record, event:, attributes: {
           policy_status: "active",
           slot: activation.slot&.to_h,
           partitions: activation.partitions.map(&:to_h),
@@ -95,12 +132,33 @@ module Coordinator::Read
           activated_correlation_id: event.correlation_id,
           activated_at_domain: activation.activated_at,
           activated_at_store: event.created_at
-        )
+        })
+      end
+
+      def activate_decision_v2(event:, activation:)
+        record = Coordinator::Read::DecisionDefinition.find(activation.decision_id)
+        definition = definition_from(record)
+        save_from_event(record, event:, attributes: {
+          policy_status: "active",
+          partitions: partition_builder.call(definition).map(&:to_h),
+          activated_event: event_reference(event).to_h,
+          rationale: {
+            code: "activated",
+            summary: activation.rationale
+          },
+          activated_actor: actor(event).to_h,
+          activated_markers: event.markers,
+          activated_metadata: event.metadata,
+          activated_causation_id: event.causation_id,
+          activated_correlation_id: event.correlation_id,
+          activated_at_domain: event.created_at,
+          activated_at_store: event.created_at
+        })
       end
 
       def correct_decision(event:, correction:)
         record = Coordinator::Read::DecisionDefinition.find(correction.decision_id)
-        record.update!(
+        save_from_event(record, event:, attributes: {
           interpretation_id: correction.interpretation_id,
           source_message_id: correction.source_message_id,
           definition_digest: correction.definition.digest,
@@ -123,11 +181,45 @@ module Coordinator::Read
           corrected_at_domain: correction.corrected_at,
           corrected_at_store: event.created_at,
           correction_count: record.correction_count + 1
-        )
+        })
+      end
+
+      def correct_decision_v2(event:, correction:, interpretation:)
+        record = Coordinator::Read::DecisionDefinition.find(correction.decision_id)
+        previous_definition_digest = record.definition_digest
+        definition = normalize_definition(correction.definition)
+        generated_slot = slot_builder.call(definition)
+        save_from_event(record, event:, attributes: {
+          interpretation_id: correction.interpretation_id,
+          source_message_id: correction.source_message_id,
+          definition_digest: definition.digest,
+          definition: definition.to_h,
+          slot: generated_slot ? record.slot : nil,
+          partitions: partition_builder.call(definition).map(&:to_h),
+          classifier: interpretation.classifier.to_h,
+          scope_provenance: interpretation.scope_provenance.to_h,
+          source_event: interpretation.source_event.to_h,
+          proposal_event: interpretation.proposal_event.to_h,
+          acceptance_event: interpretation.acceptance_event.to_h,
+          previous_definition_digest:,
+          correction_rationale: {
+            code: "corrected",
+            summary: correction.rationale
+          },
+          corrected_event: event_reference(event).to_h,
+          corrected_actor: actor(event).to_h,
+          corrected_markers: event.markers,
+          corrected_metadata: event.metadata,
+          corrected_causation_id: event.causation_id,
+          corrected_correlation_id: event.correlation_id,
+          corrected_at_domain: event.created_at,
+          corrected_at_store: event.created_at,
+          correction_count: record.correction_count + 1
+        })
       end
 
       def open_slot(event:, opening:)
-        Coordinator::Read::DecisionSlotHead.create!(
+        create_from_event(Coordinator::Read::DecisionSlotHead, event:, attributes: {
           slot_id: opening.slot.slot_id,
           decision_id: opening.opened_by.decision_id,
           slot: opening.slot.to_h,
@@ -142,12 +234,43 @@ module Coordinator::Read
           opened_at_domain: opening.opened_at,
           changed_at_domain: nil,
           event_created_at: event.created_at
+        })
+      end
+
+      def open_slot_v2(event:, opening:)
+        decision = Coordinator::Read::DecisionDefinition.find(opening.opened_by)
+        generated = slot_builder.call(definition_from(decision))
+        unless generated && generated.document == opening.slot
+          raise InvalidProjectionSource, "Decision slot opening does not match its Decision definition"
+        end
+
+        slot = Coordinator::Write::Decisions::DecisionSlotV1.new(
+          slot_id: opening.slot_id,
+          document: opening.slot,
+          compound_marker: generated.compound_marker
         )
+        create_from_event(Coordinator::Read::DecisionSlotHead, event:, attributes: {
+          slot_id: opening.slot_id,
+          decision_id: opening.opened_by,
+          slot: slot.to_h,
+          head: nil,
+          opened_event: event_reference(event).to_h,
+          changed_event: nil,
+          actor: actor(event).to_h,
+          markers: event.markers,
+          metadata: event.metadata,
+          causation_id: event.causation_id,
+          correlation_id: event.correlation_id,
+          opened_at_domain: event.created_at,
+          changed_at_domain: nil,
+          event_created_at: event.created_at
+        })
+        save_from_event(decision, event:, attributes: { slot: slot.to_h }) unless newer?(decision, event)
       end
 
       def change_slot_head(event:, change:)
         record = Coordinator::Read::DecisionSlotHead.find(change.slot_id)
-        record.update!(
+        save_from_event(record, event:, attributes: {
           decision_id: change.head&.decision_id,
           head: change.head&.to_h,
           changed_event: event_reference(event).to_h,
@@ -158,7 +281,33 @@ module Coordinator::Read
           correlation_id: event.correlation_id,
           changed_at_domain: change.changed_at,
           event_created_at: event.created_at
-        )
+        })
+      end
+
+      def change_slot_head_v2(event:, change:)
+        record = Coordinator::Read::DecisionSlotHead.find(change.slot_id)
+        previous_decision_id = record.decision_id
+        save_from_event(record, event:, attributes: {
+          decision_id: change.head&.decision_id,
+          head: change.head&.to_h,
+          changed_event: event_reference(event).to_h,
+          actor: actor(event).to_h,
+          markers: event.markers,
+          metadata: event.metadata,
+          causation_id: event.causation_id,
+          correlation_id: event.correlation_id,
+          changed_at_domain: event.created_at,
+          event_created_at: event.created_at
+        })
+
+        if previous_decision_id && previous_decision_id != change.head&.decision_id
+          previous = Coordinator::Read::DecisionDefinition.find_by(decision_id: previous_decision_id)
+          save_from_event(previous, event:, attributes: { slot: nil }) if previous && !newer?(previous, event)
+        end
+        return unless change.head
+
+        decision = Coordinator::Read::DecisionDefinition.find(change.head.decision_id)
+        save_from_event(decision, event:, attributes: { slot: record.slot }) unless newer?(decision, event)
       end
 
       def advance_partition(event:, advancement:)
@@ -183,10 +332,92 @@ module Coordinator::Read
           advanced_at_domain: advancement.advanced_at,
           event_created_at: event.created_at
         )
-        record.save!
+        save_from_event(record, event:)
+      end
+
+      def apply_partition_delta(event:, delta:)
+        record = Coordinator::Read::DecisionPartitionHead.find_or_initialize_by(
+          partition_id: delta.partition_id
+        )
+        return record if record.persisted? && record.partition_revision >= delta.partition_revision
+
+        decision_record = Coordinator::Read::DecisionDefinition.find(delta.decision_id)
+        decision_head = current_head(decision_record)
+        active = record.persisted? ? record.active_decisions.to_h { [ _1.fetch("decision_id"), _1 ] } : {}
+        if delta.is_a?(Coordinator::Write::Events::DecisionAddedToPartitionV1)
+          active[delta.decision_id] = decision_head.to_h
+        else
+          raise InvalidProjectionSource, "Decision partition removal precedes its addition" unless record.persisted?
+
+          active.delete(delta.decision_id)
+        end
+        partition = if record.persisted?
+                      Coordinator::Write::Decisions::DecisionPartitionV1.new(symbolize(record.partition))
+        else
+                      partition_builder.call(definition_from(decision_record)).find do
+                        _1.partition_id == delta.partition_id
+                      end
+        end
+        raise InvalidProjectionSource, "Decision partition cannot be reconstructed" unless partition
+
+        save_from_event(record, event:, attributes: {
+          decision_id: delta.decision_id,
+          partition: partition.to_h,
+          partition_revision: delta.partition_revision,
+          decision: decision_head.to_h,
+          active_decisions: active.values.sort_by { _1.fetch(:decision_id, _1["decision_id"]).b },
+          change_kind: decision_head.event.type == "DecisionDefinitionCorrected" ? "corrected" : "activated",
+          event: event_reference(event).to_h,
+          actor: actor(event).to_h,
+          markers: event.markers,
+          metadata: event.metadata,
+          causation_id: event.causation_id,
+          correlation_id: event.correlation_id,
+          advanced_at_domain: event.created_at,
+          event_created_at: event.created_at
+        })
       end
 
       private
+
+      def normalize_definition(document)
+        Coordinator::Write::Decisions::DecisionDefinitionV1.new(
+          document:,
+          digest: canonical_json.sha256(document.to_h)
+        )
+      end
+
+      def definition_from(record)
+        Coordinator::Write::Decisions::DecisionDefinitionV1.new(symbolize(record.definition))
+      end
+
+      def current_head(record)
+        reference = record.corrected_event || record.activated_event
+        raise InvalidProjectionSource, "Decision partition fact has no active Decision head" unless reference
+
+        event = Coordinator::Write::EventReference.new(symbolize(reference))
+        Coordinator::Write::Decisions::DecisionHeadV1.new(
+          decision_id: record.decision_id,
+          decision_revision: event.stream_revision,
+          event:
+        )
+      end
+
+      def newer?(record, event)
+        record.updated_at && record.updated_at > event.created_at
+      end
+
+      def partition_builder
+        @partition_builder ||= Coordinator::Write::Decisions::DecisionPartitionBuilder.new
+      end
+
+      def slot_builder
+        @slot_builder ||= Coordinator::Write::Decisions::DecisionSlotBuilder.new
+      end
+
+      def canonical_json
+        @canonical_json ||= Coordinator::Write::CanonicalJson.new
+      end
 
       def decisions_for_repository(repository_id)
         decision_ids = Coordinator::Read::DecisionRepositoryMembership.where(repository_id:)

@@ -3,8 +3,12 @@
 module Coordinator::Read
   module Repositories
     class CoordContexts
-      def initialize(state_loader: Projections::CoordContextStateLoader.new)
+      def initialize(
+        state_loader: Projections::CoordContextStateLoader.new,
+        projection_timestamp: ProjectionTimestamp.new
+      )
         @state_loader = state_loader
+        @projection_timestamp = projection_timestamp
       end
 
       def fetch(change_set_id)
@@ -19,12 +23,14 @@ module Coordinator::Read
         fetch(scope.change_set_id)
       end
 
-      def store_attempt_event(event:, payload:)
+      def store_attempt_event(event:, payload:, projection_version:)
         case payload
+        when Coordinator::Read::AttemptDefinitionViewV1
+          store_attempt_definition(event:, payload:, projection_version:)
         when Coordinator::Write::Events::AttemptAuthorizedV1
-          store_attempt_authorized(event:, payload:)
+          store_attempt_authorized(event:, payload:, projection_version:)
         when Coordinator::Write::Events::AttemptStartedV1
-          update_attempt_started(payload)
+          update_attempt_started(event:, payload:)
         when Coordinator::Write::Events::WriteSetReservedV2
           store_write_set_reserved(event:, payload:)
         when Coordinator::Write::Events::WriteSetExpandedV2
@@ -33,9 +39,15 @@ module Coordinator::Read
           update_write_set_renewed(event:, payload:)
         when Coordinator::Write::Events::WriteSetReleasedV2
           update_write_set_released(event:, payload:)
+        when Coordinator::Read::WorkIntentionSetViewV1
+          update_work_intention_set(event:, payload:)
         when Coordinator::Write::Events::AttemptAbandonedV2
           update_attempt_abandoned(event:, payload:)
+        when Coordinator::Read::AttemptAbandonmentViewV1
+          update_attempt_abandoned(event:, payload:)
         when Coordinator::Write::Events::AttemptCompletedV1
+          update_attempt_completed(event:, payload:)
+        when Coordinator::Read::AttemptCompletionViewV1
           update_attempt_completed(event:, payload:)
         end
 
@@ -61,8 +73,9 @@ module Coordinator::Read
 
       private
 
-      def store_attempt_authorized(event:, payload:)
+      def store_attempt_authorized(event:, payload:, projection_version:)
         record = Coordinator::Read::AttemptHistory.find_or_initialize_by(attempt_id: payload.attempt_id)
+        record = reset_for_projection(record, projection_version:)
         if record.persisted?
           verify_authorization!(record, event:, payload:)
           return
@@ -76,16 +89,43 @@ module Coordinator::Read
           status: "authorized",
           authorization_event: event_reference(event).to_h,
           authorized_global_position: event.global_position,
-          authorized_at_domain: payload.authorized_at
+          authorized_at_domain: payload.authorized_at,
+          projection_version:,
+          updated_at: projection_time(record, event)
         )
-        record.save!
+        record.save!(touch: false)
       end
 
-      def update_attempt_started(payload)
+      def store_attempt_definition(event:, payload:, projection_version:)
+        record = Coordinator::Read::AttemptHistory.find_or_initialize_by(attempt_id: payload.attempt_id)
+        record = reset_for_projection(record, projection_version:)
+        if record.persisted?
+          verify_attempt_definition!(record, payload:)
+          return
+        end
+
+        authorization = payload.authorization_event
+        record.assign_attributes(
+          change_set_id: payload.change_set_id,
+          work_item_id: payload.work_item_id,
+          agent_id: payload.agent_id,
+          base_snapshots: payload.base_snapshots.map(&:to_h),
+          status: "started",
+          authorization_event: event_reference(authorization).to_h,
+          authorized_global_position: authorization.global_position,
+          authorized_at_domain: payload.authorized_at,
+          started_at_domain: payload.started_at,
+          projection_version:,
+          updated_at: projection_time(record, event)
+        )
+        record.save!(touch: false)
+      end
+
+      def update_attempt_started(event:, payload:)
         record = attempt_history!(payload)
         return if record.started_at_domain&.utc&.iso8601(6) == payload.started_at
 
-        record.update!(
+        update_record(record, event,
           status: terminal_status?(record.status) ? record.status : "started",
           started_at_domain: payload.started_at
         )
@@ -98,7 +138,7 @@ module Coordinator::Read
           raise ProjectionStateError, "Attempt #{payload.attempt_id} has two write-set reservations"
         end
 
-        record.update!(
+        update_record(record, event,
           write_set_lease_set_id: payload.lease_set_id,
           write_set_repository_id: payload.repository_id,
           write_set_policy_version: payload.policy_version,
@@ -121,7 +161,7 @@ module Coordinator::Read
           raise ProjectionStateError, "Attempt #{payload.attempt_id} expanded write-set count changed"
         end
 
-        record.update!(
+        update_record(record, event,
           write_set_resources: resources,
           write_set_last_expanded_event: event_reference(event).to_h,
           write_set_last_expanded_at_domain: payload.expanded_at
@@ -139,7 +179,7 @@ module Coordinator::Read
           raise ProjectionStateError, "Attempt #{payload.attempt_id} renewal deadline is not contiguous"
         end
 
-        record.update!(
+        update_record(record, event,
           write_set_last_renewed_event: event_reference(event).to_h,
           write_set_last_renewed_at_domain: payload.renewed_at,
           write_set_previous_expires_at_domain: payload.previous_expires_at,
@@ -159,8 +199,30 @@ module Coordinator::Read
           raise ProjectionStateError, "Attempt #{payload.attempt_id} release is not contiguous"
         end
 
-        record.update!(
+        update_record(record, event,
           write_set_release_event: event_reference(event).to_h,
+          write_set_released_at_domain: payload.released_at
+        )
+      end
+
+      def update_work_intention_set(event:, payload:)
+        record = attempt_history!(payload)
+        update_record(record, event,
+          write_set_lease_set_id: payload.set_id,
+          write_set_repository_id: payload.repository_id,
+          write_set_policy_version: payload.policy_version,
+          write_set_resources: sorted_resources(payload.resources),
+          write_set_reserved_event: event_reference(payload.created_event).to_h,
+          write_set_reserved_at_domain: payload.reserved_at,
+          write_set_last_expanded_event: payload.last_expanded_event &&
+            event_reference(payload.last_expanded_event).to_h,
+          write_set_last_expanded_at_domain: payload.last_expanded_at,
+          write_set_last_renewed_event: payload.last_renewed_event &&
+            event_reference(payload.last_renewed_event).to_h,
+          write_set_last_renewed_at_domain: payload.last_renewed_at,
+          write_set_previous_expires_at_domain: payload.previous_expires_at,
+          write_set_expires_at_domain: payload.expires_at,
+          write_set_release_event: payload.release_event && event_reference(payload.release_event).to_h,
           write_set_released_at_domain: payload.released_at
         )
       end
@@ -171,7 +233,7 @@ module Coordinator::Read
           raise ProjectionStateError, "Completed Attempt #{payload.attempt_id} cannot be abandoned"
         end
 
-        record.update!(
+        update_record(record, event,
           status: "abandoned",
           abandonment_reason: payload.reason,
           terminal_event: event_reference(event).to_h,
@@ -185,7 +247,7 @@ module Coordinator::Read
           raise ProjectionStateError, "Abandoned Attempt #{payload.attempt_id} cannot be completed"
         end
 
-        record.update!(
+        update_record(record, event,
           status: "completed",
           selected_candidate_id: payload.candidate_id,
           selected_candidate_event: payload.candidate_event.to_h,
@@ -214,6 +276,28 @@ module Coordinator::Read
         raise ProjectionStateError, "Attempt #{payload.attempt_id} authorization evidence changed"
       end
 
+      def verify_attempt_definition!(record, payload:)
+        authorization = payload.authorization_event
+        expected = {
+          change_set_id: payload.change_set_id,
+          work_item_id: payload.work_item_id,
+          agent_id: payload.agent_id,
+          base_snapshots: payload.base_snapshots.map(&:to_h),
+          authorization_event: event_reference(authorization).to_h,
+          authorized_global_position: authorization.global_position,
+          authorized_at_domain: Time.iso8601(payload.authorized_at),
+          started_at_domain: Time.iso8601(payload.started_at)
+        }
+        actual = expected.keys.to_h do |attribute|
+          value = record.public_send(attribute)
+          value = deep_symbolize(value) if value.is_a?(Hash) || value.is_a?(Array)
+          [ attribute, value ]
+        end
+        return if actual == expected
+
+        raise ProjectionStateError, "Attempt #{payload.attempt_id} definition evidence changed"
+      end
+
       def attempt_history!(payload)
         record = Coordinator::Read::AttemptHistory.find_by(attempt_id: payload.attempt_id)
         raise ProjectionStateError, "Attempt #{payload.attempt_id} authorization is not projected" unless record
@@ -222,6 +306,14 @@ module Coordinator::Read
         end
 
         record
+      end
+
+      def reset_for_projection(record, projection_version:)
+        return record if record.new_record? || record.projection_version == projection_version
+
+        attempt_id = record.attempt_id
+        record.destroy!
+        Coordinator::Read::AttemptHistory.new(attempt_id:)
       end
 
       def terminal_status?(status)
@@ -287,6 +379,17 @@ module Coordinator::Read
           stream_id: event.stream.stream_id,
           stream_revision: event.stream_revision
         )
+      end
+
+      def update_record(record, event, **attributes)
+        record.assign_attributes(
+          attributes.merge(updated_at: projection_time(record, event))
+        )
+        record.save!(touch: false)
+      end
+
+      def projection_time(record, event)
+        @projection_timestamp.call(current: record.updated_at, event:)
       end
 
       def build_snapshot(record)

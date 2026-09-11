@@ -3,6 +3,8 @@
 module Coordinator::Read
   module Repositories
     class MergeSnapshots
+      include EventTimestamped
+
       def initialize(authorizations: MergeAuthorizations.new)
         @authorizations = authorizations
       end
@@ -13,7 +15,7 @@ module Coordinator::Read
       end
 
       def store(event:, snapshot:)
-        Coordinator::Read::MergeSnapshot.create!(
+        create_from_event(Coordinator::Read::MergeSnapshot, event:, attributes: {
           merge_snapshot_id: snapshot.merge_snapshot_id,
           repository_id: snapshot.repository_id,
           target_branch: snapshot.target_branch,
@@ -36,7 +38,7 @@ module Coordinator::Read
           registered_correlation_id: event.correlation_id,
           registered_global_position: event.global_position,
           registered_at_store: event.created_at
-        )
+        })
       end
 
       def record_submission(event:, submission:)
@@ -52,23 +54,23 @@ module Coordinator::Read
           source: event_source(event)
         )
         status = submission.assessment.conclusion == "passed" ? "unverified" : submission.assessment.conclusion
-        record.update!(
+        save_from_event(record, event:, attributes: {
           verification_status: status,
           verification_policy_version: event.metadata.fetch("policy_version"),
           verification_submissions: [ *record.verification_submissions, view.to_h ]
-        )
+        })
       end
 
       def record_selection(event:, selection:)
         record = Coordinator::Read::MergeSnapshot.find_by!(
           merge_snapshot_id: selection.merge_snapshot_id
         )
-        record.update!(
+        save_from_event(record, event:, attributes: {
           verified_decision: {
             verification_id: selection.verification_id,
             selected_event: event_reference(event).to_h
           }
-        )
+        })
       end
 
       def record_verified(event:, verified:)
@@ -101,18 +103,18 @@ module Coordinator::Read
           verified_at: event.created_at.utc.iso8601(6),
           source: event_source(event)
         )
-        record.update!(
+        save_from_event(record, event:, attributes: {
           verification_status: "verified",
           verification_policy_version: event.metadata.fetch("policy_version"),
           verified_decision: view.to_h
-        )
+        })
       end
 
       def record_observation(event:, observation:)
         record = Coordinator::Read::MergeSnapshot.find_by!(
           merge_snapshot_id: observation.merge_snapshot_id
         )
-        record.update!(observation: {
+        save_from_event(record, event:, attributes: { observation: {
           authorization_event: nil,
           authorization_decision_digest: event.metadata.fetch("authorization_decision_digest"),
           snapshot_binding: observation.snapshot_binding.to_h,
@@ -129,16 +131,16 @@ module Coordinator::Read
           evidence_status: "attributed_unverified",
           recorded_at: event.created_at.utc.iso8601(6),
           source: event_source(event).to_h
-        })
+        } })
       end
 
-      def link_observation_authorization(link:)
+      def link_observation_authorization(event:, link:)
         record = Coordinator::Read::MergeSnapshot.find_by!(merge_snapshot_id: link.merge_snapshot_id)
         observation = record.observation&.deep_dup
         raise ProjectionStateError, "Merge observation must precede its authorization link" unless observation
 
         observation["authorization_event"] = link.authorization_event.to_h
-        record.update!(observation:)
+        save_from_event(record, event:, attributes: { observation: })
       end
 
       private

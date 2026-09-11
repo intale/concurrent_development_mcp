@@ -7,11 +7,13 @@ module Coordinator::Read
 
       def initialize(
         contract: Contracts::DecisionInterpretationSourceEvent.new,
+        source_loader:,
         schema_registry: Coordinator::Write::EventSchemaRegistry.new,
         interpretations: Repositories::DecisionInterpretations.new,
         processed_events: Repositories::ProcessedProjectionEvents.new
       )
         @contract = contract
+        @source_loader = source_loader
         @schema_registry = schema_registry
         @interpretations = interpretations
         @processed_events = processed_events
@@ -26,7 +28,7 @@ module Coordinator::Read
           next unless @processed_events.claim(
             definition: PROJECTION,
             identity:,
-            processed_at: Time.now.utc
+            processed_at: event.created_at
           )
 
           project(event, payload)
@@ -58,7 +60,15 @@ module Coordinator::Read
       end
 
       def verify_stream_identity!(event, payload)
-        return if event.stream.stream_id == payload.source_message_id
+        expected_id = if payload.is_a?(Coordinator::Write::Events::DecisionInterpretationProposedV1) ||
+                         payload.is_a?(Coordinator::Write::Events::DecisionClarificationRequiredV1) ||
+                         payload.is_a?(Coordinator::Write::Events::DecisionInterpretationAcceptedV1) ||
+                         payload.is_a?(Coordinator::Write::Events::DecisionInterpretationRejectedV1)
+                        payload.source_message_id
+        else
+                        payload.interpretation_id
+        end
+        return if event.stream.stream_id == expected_id
 
         raise InvalidProjectionSource, "interpretation message does not match its source stream"
       end
@@ -67,6 +77,23 @@ module Coordinator::Read
         case payload
         when Coordinator::Write::Events::DecisionInterpretationProposedV1
           @interpretations.store_proposal(event:, proposal: payload)
+        when Coordinator::Write::Events::DecisionInterpretationProposedV2
+          @interpretations.store_proposal_v2(event:, source: @source_loader.call(event, payload))
+        when Coordinator::Write::Events::DecisionClarificationRequiredV1,
+             Coordinator::Write::Events::DecisionInterpretationAcceptedV1,
+             Coordinator::Write::Events::DecisionInterpretationRejectedV1
+          project_legacy_lifecycle(event, payload)
+        when Coordinator::Write::Events::DecisionClarificationRequiredV2
+          @interpretations.require_clarification(event:, clarification: payload)
+        when Coordinator::Write::Events::DecisionInterpretationAcceptedV2
+          @interpretations.accept(event:, acceptance: payload)
+        when Coordinator::Write::Events::DecisionInterpretationRejectedV2
+          @interpretations.reject(event:, rejection: payload)
+        end
+      end
+
+      def project_legacy_lifecycle(event, payload)
+        case payload
         when Coordinator::Write::Events::DecisionClarificationRequiredV1
           @interpretations.require_clarification(event:, clarification: payload)
         when Coordinator::Write::Events::DecisionInterpretationAcceptedV1

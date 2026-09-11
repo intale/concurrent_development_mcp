@@ -3,6 +3,8 @@
 module Coordinator::Read
   module Repositories
     class MergeAuthorizations
+      include EventTimestamped
+
       def latest_for(merge_snapshot_id)
         record = Coordinator::Read::MergeAuthorization
           .where(merge_snapshot_id:)
@@ -12,7 +14,7 @@ module Coordinator::Read
       end
 
       def store(event:, decision:)
-        Coordinator::Read::MergeAuthorization.create!(
+        create_from_event(Coordinator::Read::MergeAuthorization, event:, attributes: {
           authorization_id: decision.authorization_id,
           merge_snapshot_id: decision.merge_snapshot_id,
           outcome: outcome(decision),
@@ -31,7 +33,7 @@ module Coordinator::Read
           source_correlation_id: event.correlation_id,
           source_global_position: event.global_position,
           source_persisted_at: event.created_at
-        )
+        })
       end
 
       private

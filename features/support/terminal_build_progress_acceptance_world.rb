@@ -201,8 +201,11 @@ module TerminalBuildProgressAcceptanceWorld
         }
       end
     )
-    release = terminal_attempt_events(ids.fetch(:attempt_id)).find { _1.type == "WriteSetReleased" }
-    assert_acceptance(release, "Terminal write set has no release fact")
+    withdrawals = reservation.fetch("resources").map do |reference|
+      terminal_work_intention_events(reference.fetch("lease_id"))
+        .find { _1.type == "ResourceWorkIntentionWithdrawn" }
+    end
+    assert_acceptance(withdrawals.all?, "Terminal work-intention set has missing withdrawal facts")
     await_read_model("Terminal write set release to become available") do
       payload = terminal_context(attempt_id: ids.fetch(:attempt_id))
       attempt = payload.dig("data", "context", "attempts")&.find do |candidate|
@@ -285,6 +288,13 @@ module TerminalBuildProgressAcceptanceWorld
     )
   end
 
+  def terminal_work_intention_events(intention_id)
+    event_store.read_grouped(
+      streams.resource_work_intention(intention_id),
+      Coordinator::Write::EventQueries::WORK_INTENTION_STATE
+    )
+  end
+
   def terminal_change_set_events(change_set_id)
     event_store.read(
       streams.change_set(change_set_id),
@@ -296,9 +306,9 @@ module TerminalBuildProgressAcceptanceWorld
     )
   end
 
-  def terminal_dependency_events(change_set_id)
+  def terminal_dependency_events(work_item_id)
     event_store.read(
-      streams.change_set(change_set_id),
+      streams.work_item(work_item_id),
       Coordinator::Write::EventReadCriteria.new(
         event_types: [ "WorkItemDependencySatisfied" ],
         maximum_count: 500,

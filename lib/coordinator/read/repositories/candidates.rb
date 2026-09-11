@@ -3,16 +3,18 @@
 module Coordinator::Read
   module Repositories
     class Candidates
+      include EventTimestamped
+
       def fetch(candidate_id)
         record = Coordinator::Read::Candidate.find_by(candidate_id:)
         record && build_view(record)
       end
 
-      def store_submission(candidate:)
+      def store_submission(event:, candidate:)
         submitted_event = candidate.submitted_event
         manifest_event = candidate.manifest_event
         build_context_event = candidate.build_context_event
-        Coordinator::Read::Candidate.create!(
+        create_from_event(Coordinator::Read::Candidate, event:, attributes: {
           candidate_id: candidate.candidate_id,
           change_set_id: candidate.change_set_id,
           work_item_id: candidate.work_item_id,
@@ -40,7 +42,7 @@ module Coordinator::Read
           **source_columns(:manifest, manifest_event),
           build_context: build_context_document(candidate),
           **optional_source_columns(:build_context, build_context_event)
-        )
+        })
       end
 
       def page(query)

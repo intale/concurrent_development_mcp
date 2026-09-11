@@ -1,0 +1,32 @@
+module Coordinator::Read
+  module CoordContexts
+    interface _SourceLoader
+      def call: (PgEventstore::Event event, Coordinator::Write::Events::Base payload) -> (
+        Coordinator::Write::Events::Base |
+        Coordinator::Read::ChangeSetDefinitionViewV1 |
+        Coordinator::Read::WorkItemDefinitionViewV1 |
+        Coordinator::Read::WorkItemCompletionViewV1 |
+        Coordinator::Read::AttemptDefinitionViewV1 |
+        Coordinator::Read::AttemptAbandonmentViewV1 |
+        Coordinator::Read::AttemptCompletionViewV1 |
+        Coordinator::Read::WorkIntentionSetViewV1 |
+        Coordinator::Read::CandidateSubmissionViewV2 |
+        nil
+      )
+    end
+
+    class SourceLoader
+      include _SourceLoader
+
+      def initialize: (
+        event_store: Coordinator::Write::EventStore,
+        submission_loader: Coordinator::Read::Candidates::_SubmissionLoader,
+        ?change_set_definition_loader: Coordinator::Read::ChangeSets::DefinitionLoader,
+        ?work_item_definition_loader: Coordinator::Read::WorkItems::DefinitionLoader,
+        ?work_item_completion_loader: Coordinator::Read::WorkItems::CompletionLoader,
+        ?attempt_definition_loader: Coordinator::Read::Attempts::DefinitionLoader,
+        ?work_intention_set_loader: Coordinator::Read::CoordContexts::WorkIntentionSetLoader
+      ) -> void
+    end
+  end
+end

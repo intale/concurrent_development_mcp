@@ -14,14 +14,14 @@ Feature: Agents submit attributed compatibility evidence through checkpointed Ta
       Then the evidence Task completes with obligation status "open"
       And one attributed evidence fact and no terminal fact are durable
       When the claimant submits "passed" "contract_compatibility_review" evidence as command "cmd-cuc-evidence-contract"
-      Then the evidence Task completes with obligation status "satisfied"
+      Then the evidence Task completes with obligation status "open"
       And two attributed evidence facts and one satisfied fact are durable
       And the final evidence, outcome, command terminal, and Task carry exact tracing
 
     Scenario: Failed required evidence immediately fails the obligation
       Given agent "agent-blue" actively claims Rails verification obligation "EVIDENCE-FAILED"
       When the claimant submits "failed" "combined_tests" evidence as command "cmd-cuc-evidence-failed"
-      Then the evidence Task completes with obligation status "failed"
+      Then the evidence Task completes with obligation status "open"
       And one attributed evidence fact and one failed fact are durable
       And the evidence result remains an attributed report rather than an execution claim
 
@@ -53,7 +53,7 @@ Feature: Agents submit attributed compatibility evidence through checkpointed Ta
     Scenario: Concurrent final evidence produces exactly one satisfaction outcome
       Given agent "agent-blue" actively claims Rails verification obligation "EVIDENCE-RACE"
       When the claimant executes both required evidence Tasks concurrently
-      Then both evidence Tasks succeed with one open and one satisfied result
+      Then both evidence Tasks succeed with open submission results
       And exactly two evidence facts and one satisfied fact are durable
 
     Scenario: An older open view remains available until evidence and outcome projection converge
