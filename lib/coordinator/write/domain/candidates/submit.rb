@@ -97,8 +97,12 @@ module Coordinator::Write
             )
           end
 
-          expected = attempt.lease_resources.map { [ _1.resource_id, _1.lease_id, _1.fencing_token ] }
-          submitted = command.leases.map { [ _1.resource_id, _1.lease_id, _1.fencing_token ] }
+          expected = attempt.lease_resources
+            .map { [ _1.resource_id, _1.lease_id, _1.fencing_token ] }
+            .sort_by { _1.first.b }
+          submitted = command.leases
+            .map { [ _1.resource_id, _1.lease_id, _1.fencing_token ] }
+            .sort_by { _1.first.b }
           unless submitted == expected
             return failure(
               :lease_observations_mismatch,
@@ -109,8 +113,9 @@ module Coordinator::Write
             )
           end
 
-          observed_references = state.current_leases.map(&:reference)
-          unless observed_references == attempt.lease_resources
+          observed_references = state.current_leases.map(&:reference).sort_by { _1.resource_id.b }
+          expected_references = attempt.lease_resources.sort_by { _1.resource_id.b }
+          unless observed_references == expected_references
             return scoped_failure(
               :lease_not_active,
               "Current lease evidence is incomplete for the Attempt write set",

@@ -19,11 +19,11 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
       Coordinator::Write::Events::CandidateWorkIntentionSetAssignedV1,
       Coordinator::Write::Events::CandidateChangeManifestCapturedV2,
       Coordinator::Write::Events::CandidateSubmittedV3,
-      Coordinator::Write::Events::CandidateHeadRegisteredV2,
+      Coordinator::Write::Events::CandidateHeadRegisteredV2
     ])
     expect(plan.writes.map(&:stream)).to eq([
       *Array.new(9, streams.candidate("CAN-41")),
-      streams.candidate_head(head_identity.registry_id),
+      streams.candidate_head(head_identity.registry_id)
     ])
     expect(plan.events.fetch(6)).to have_attributes(
       candidate_id: "CAN-41",
@@ -53,7 +53,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
       Coordinator::Write::Events::CandidateChangeManifestCapturedV2,
       Coordinator::Write::Events::CandidateBuildContextCapturedV2,
       Coordinator::Write::Events::CandidateSubmittedV3,
-      Coordinator::Write::Events::CandidateHeadRegisteredV2,
+      Coordinator::Write::Events::CandidateHeadRegisteredV2
     ])
     expect(events.fetch(8)).to have_attributes(
       candidate_id: "CAN-41",
@@ -96,6 +96,30 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
     expect(decide(command: mismatched).failure.code).to eq(:lease_observations_mismatch)
     expect(decide(current_leases: []).failure.code).to eq(:lease_not_active)
     expect(decide(current_leases: [ expired ]).failure.code).to eq(:lease_not_active)
+  end
+
+  it "accepts the exact lease set independently of reservation and observation order" do
+    second_reference = lease_reference_for(
+      kind: "file",
+      path: "Gemfile",
+      base_blob_oid: "e" * 40,
+      resource_id: uuid("7"),
+      lease_id: uuid("8")
+    )
+    command = copy_command(
+      prepared_command,
+      leases: [ second_reference, lease_reference ].map do |reference|
+        Coordinator::Write::Candidates::LeaseObservationV1.new(
+          resource_id: reference.resource_id,
+          lease_id: reference.lease_id,
+          fencing_token: reference.fencing_token
+        )
+      end
+    )
+    attempt = attempt_state(references: [ lease_reference, second_reference ])
+    current_leases = [ current_lease(reference: second_reference), current_lease ]
+
+    expect(decide(command:, attempt:, current_leases:)).to be_success
   end
 
   it "denies undeclared resources and mismatched old-side base evidence" do
@@ -188,6 +212,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
   def attempt_state(
     status: "active",
     reference: lease_reference,
+    references: [ reference ],
     work_item_id: "W-1",
     agent_id: "agent-7"
   )
@@ -206,7 +231,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
       lease_set_id: uuid("1"),
       lease_repository_id: repository_id,
       lease_policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
-      lease_resources: [ reference ],
+      lease_resources: references,
       lease_reserved_at: "2026-08-23T11:00:00.000000Z",
       lease_renewed_at: nil,
       lease_expires_at: "2026-08-23T12:00:00.000000Z",
@@ -266,10 +291,16 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
     )
   end
 
-  def lease_reference_for(kind:, path:, base_blob_oid:)
+  def lease_reference_for(
+    kind:,
+    path:,
+    base_blob_oid:,
+    resource_id: kind == "file" ? uuid("5") : uuid("6"),
+    lease_id: uuid("2")
+  )
     Coordinator::Write::LeaseReferenceV2.new(
-      lease_id: uuid("2"),
-      resource_id: kind == "file" ? uuid("5") : uuid("6"),
+      lease_id:,
+      resource_id:,
       resource_kind: kind,
       resource_path: path,
       base_blob_oid:,
