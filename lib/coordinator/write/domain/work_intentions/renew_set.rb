@@ -46,7 +46,7 @@ module Coordinator::Write
           current_by_resource = member_states.to_h { [ _1.resource_id, _1 ] }
           requested_ids = command.leases.map(&:resource_id)
           current_ids = set_state.members.map(&:resource_id)
-          unless requested_ids == current_ids
+          unless requested_ids.sort_by(&:b) == current_ids.sort_by(&:b)
             return failure(
               :lease_set_snapshot_mismatch,
               "Submitted members do not equal the work-intention set",

@@ -71,6 +71,40 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReleaseLeaseSet, :event_st
     end
   end
 
+  it "withdraws an expanded set when canonical resource order differs from membership order" do
+    RepositoryScenario.register(event_store:)
+    earlier_resource_id = resolve("Gemfile")
+    reservation = setup_reservation
+    expansion = Coordinator::Write::Operations::ExecuteExpandWriteSet.new(event_store:).call(
+      command_id: "cmd-expand-before-withdrawal",
+      actor: { kind: "agent", id: "agent-a" },
+      change_set_id: "CS-LSE",
+      work_item_id: "W-LSE-A",
+      attempt_id: "A-LSE-A",
+      lease_set_id: reservation.receipt.lease_set_id,
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      base_commit_oid: "a" * 40,
+      resources: [ { resource_id: earlier_resource_id } ]
+    ).value!.data
+    references = [ *reservation.receipt.resources, *expansion.added_resources ]
+    input = release_input(reservation, command_id: "cmd-withdraw-expanded").merge(
+      leases: references.map do |reference|
+        {
+          resource_id: reference.resource_id,
+          lease_id: reference.lease_id,
+          fencing_token: reference.fencing_token
+        }
+      end
+    )
+
+    result = operation.call(input)
+
+    expect(result).to be_success
+    expect(result.value!.data.resources.map(&:resource_id)).to contain_exactly(
+      *references.map(&:resource_id)
+    )
+  end
+
   def setup_reservation
     ResourceLeaseOperationScenario.start_attempts(
       event_store:,
@@ -96,5 +130,14 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReleaseLeaseSet, :event_st
       streams.resource_work_intention(intention_id),
       Coordinator::Write::EventQueries::WORK_INTENTION_STATE
     ).reverse
+  end
+
+  def resolve(path)
+    ResourceScenario.resolve(
+      event_store:,
+      repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+      kind: "file",
+      path:
+    )
   end
 end
