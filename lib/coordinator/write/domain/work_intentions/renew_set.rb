@@ -48,7 +48,7 @@ module Coordinator::Write
           current_ids = set_state.members.map(&:resource_id)
           unless requested_ids.sort_by(&:b) == current_ids.sort_by(&:b)
             return failure(
-              :lease_set_snapshot_mismatch,
+              :work_intention_set_snapshot_mismatch,
               "Submitted members do not equal the work-intention set",
               command,
               current_resource_ids: current_ids,
@@ -63,12 +63,12 @@ module Coordinator::Write
           if mismatch
             state = current_by_resource[mismatch.resource_id]
             return failure(
-              :lease_reference_mismatch,
+              :work_intention_reference_mismatch,
               "Submitted work-intention identity or fencing token is stale",
               command,
               resource_id: mismatch.resource_id,
-              current_lease_id: state&.intention_id,
-              requested_lease_id: mismatch.lease_id,
+              current_intention_id: state&.intention_id,
+              requested_intention_id: mismatch.lease_id,
               current_fencing_token: state&.fencing_token || 0,
               requested_fencing_token: mismatch.fencing_token
             )
@@ -78,11 +78,11 @@ module Coordinator::Write
           return unless inactive
 
           failure(
-            :lease_set_expired,
+            :work_intention_set_inactive,
             "The work-intention set contains an inactive member",
             command,
             resource_id: inactive.resource_id,
-            lease_id: inactive.intention_id,
+            intention_id: inactive.intention_id,
             fencing_token: inactive.fencing_token,
             expires_at: inactive.expires_at
           )
@@ -98,14 +98,14 @@ module Coordinator::Write
           unless attempt_state.agent_id == command.actor.id
             return failure(:attempt_owner_mismatch, "Attempt belongs to another agent attribution", command)
           end
-          return failure(:write_set_not_reserved, "Attempt has no work-intention set", command) if set_state.absent?
+          return failure(:work_intention_set_missing, "Attempt has no work-intention set", command) if set_state.absent?
           unless set_state.set_id == command.lease_set_id
             return failure(
-              :lease_set_mismatch,
+              :work_intention_set_mismatch,
               "Work-intention set ID does not match",
               command,
-              current_lease_set_id: set_state.set_id,
-              requested_lease_set_id: command.lease_set_id
+              current_intention_set_id: set_state.set_id,
+              requested_intention_set_id: command.lease_set_id
             )
           end
           return if set_state.attempt_id == command.attempt_id &&

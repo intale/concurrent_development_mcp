@@ -48,18 +48,20 @@ module Coordinator
         and canonical Base64 only for binary assets;
         the coordinator never inspects or executes stored assets, so inspect and authorize them externally.
         Skill reads are available projections and may keep serving an older revision while projection catches up.
-        After acquiring a WorkItem, reserve its complete initial file write set before editing,
-        and expand that same set before editing any additional file. Expansion never renews expiry.
-        Renew the entire exact observed lease set before its deadline when more work time is needed;
-        a stale set, lease ID, or fencing token is safely rejected by authoritative event facts.
-        Release the entire exact observed lease set when editing is finished; partial release is not available.
+        After acquiring a WorkItem, declare its complete initial advisory Resource work-intention set before
+        editing, and expand that same set before editing any additional Resource. Shared is the default mode;
+        choose exclusive only after deciding that overlapping work is incompatible. Shared intentions may
+        overlap. Any overlap involving an exclusive intention fails immediately with the existing intentions'
+        owners, purpose, context, scope, and expiry; the coordinator never queues, waits, preempts, or promises
+        that shared changes will merge cleanly. Expansion never renews expiry. Renew or withdraw the entire exact
+        observed intention set; a stale set, intention ID, or fencing token is rejected by authoritative facts.
         A clean or replacement client that knows only an exact project scope uses coordination_list to discover
         available current/recent ChangeSets and follows its complete coord_context actions; this is not Task
         enumeration. Canonical coordination IDs are globally namespaced, while human/local labels may repeat in
         different project scopes. Use decision_list to discover projected policy by Repository UUID and extensible
         topic. decision_resolve currently evaluates registered single-choice topics and returns a typed result for
         strategies whose distinct merge semantics are not implemented.
-        After submitting the final Candidate and releasing the write set, use work_item_complete to select that
+        After submitting the final Candidate and withdrawing the work-intention set, use work_item_complete to select that
         exact Candidate and finish the active Attempt/WorkItem. Produced artifact/contract labels are attributed
         coordination facts. Dependency and ChangeSet progress then converge through idempotent process commands;
         coord_context may continue serving an older available view while they catch up.
@@ -80,9 +82,10 @@ module Coordinator
         resurrect the old Choice. Use agent_choice_impact_list with the Attempt ID to inspect paginated
         explicit invalidating and no-effect assessments. Both Choice queries may lag, and no observed status
         is a freshness or write-authorization claim.
-        Use candidate_submit to checkpoint an attributed commit only after passing the full exact lease set,
-        lease IDs, Resource IDs, fencing tokens, and a typed change manifest. The mutation is a durable Task;
-        stale or unauthorized observations are rejected from authoritative event-store facts. Candidate evidence
+        Use candidate_submit to checkpoint an attributed commit only after passing the full exact work-intention
+        set, intention IDs, Resource IDs, fencing tokens, and a typed change manifest. This records accountability
+        for every changed Resource; it does not promise conflict-free integration. The mutation is a durable Task;
+        stale or uncovered observations are rejected from authoritative event-store facts. Candidate evidence
         remains attributed_unverified because the coordinator does not inspect Git or run CI. candidate_get serves
         every currently observed evidence component, candidate_list retains bounded Attempt checkpoint history,
         and coord_context carries only the latest observed checkpoint per Attempt. These available views may lag

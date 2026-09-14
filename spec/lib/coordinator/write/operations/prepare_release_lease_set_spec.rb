@@ -3,10 +3,10 @@
 RSpec.describe Coordinator::Write::Operations::PrepareReleaseLeaseSet do
   subject(:prepare) { described_class.new }
 
-  let(:leases) do
+  let(:intentions) do
     [
-      { resource_id: "02919191-9191-7191-8191-919191919191", lease_id: "04919191-9191-7191-8191-919191919191", fencing_token: 3 },
-      { resource_id: "01919191-9191-7191-8191-919191919191", lease_id: "05919191-9191-7191-8191-919191919191", fencing_token: 1 }
+      { resource_id: "02919191-9191-7191-8191-919191919191", intention_id: "04919191-9191-7191-8191-919191919191", fencing_token: 3 },
+      { resource_id: "01919191-9191-7191-8191-919191919191", intention_id: "05919191-9191-7191-8191-919191919191", fencing_token: 1 }
     ]
   end
   let(:input) do
@@ -16,8 +16,8 @@ RSpec.describe Coordinator::Write::Operations::PrepareReleaseLeaseSet do
       change_set_id: "CS-LSE",
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
-      lease_set_id: "03919191-9191-7191-8191-919191919191",
-      leases:
+      intention_set_id: "03919191-9191-7191-8191-919191919191",
+      intentions:
     }
   end
 
@@ -25,23 +25,23 @@ RSpec.describe Coordinator::Write::Operations::PrepareReleaseLeaseSet do
     command = prepare.call(input).value!
 
     expect(command).to be_a(Coordinator::Write::Commands::ReleaseLeaseSet)
-    expect(command.leases.map(&:resource_id)).to eq(leases.map { _1.fetch(:resource_id) }.sort_by(&:b))
+    expect(command.leases.map(&:resource_id)).to eq(intentions.map { _1.fetch(:resource_id) }.sort_by(&:b))
     expect(command).to be_frozen
   end
 
   it "rejects duplicate Resources, duplicate leases, malformed references, and bounds" do
-    duplicate_resource = prepare.call(input.merge(leases: [ leases.first, leases.first.merge(lease_id: leases.last[:lease_id]) ]))
-    duplicate_lease = prepare.call(input.merge(leases: [ leases.first, leases.last.merge(lease_id: leases.first[:lease_id]) ]))
-    malformed = prepare.call(input.merge(leases: [ leases.first.merge(resource_id: "abc", lease_id: "abc", fencing_token: 0) ]))
-    over_bound = prepare.call(input.merge(leases: 33.times.map { lease_reference(_1) }))
+    duplicate_resource = prepare.call(input.merge(intentions: [ intentions.first, intentions.first.merge(intention_id: intentions.last[:intention_id]) ]))
+    duplicate_intention = prepare.call(input.merge(intentions: [ intentions.first, intentions.last.merge(intention_id: intentions.first[:intention_id]) ]))
+    malformed = prepare.call(input.merge(intentions: [ intentions.first.merge(resource_id: "abc", intention_id: "abc", fencing_token: 0) ]))
+    over_bound = prepare.call(input.merge(intentions: 33.times.map { intention_reference(_1) }))
 
-    expect([ duplicate_resource, duplicate_lease, malformed, over_bound ].map { _1.failure.code }).to all(eq(:invalid_input))
+    expect([ duplicate_resource, duplicate_intention, malformed, over_bound ].map { _1.failure.code }).to all(eq(:invalid_input))
   end
 
-  def lease_reference(index)
+  def intention_reference(index)
     {
       resource_id: format("%08x-9191-7191-8191-%012x", index + 1, index + 1),
-      lease_id: format("%08x-9292-7292-8292-%012x", index + 1, index + 1),
+      intention_id: format("%08x-9292-7292-8292-%012x", index + 1, index + 1),
       fencing_token: 1
     }
   end

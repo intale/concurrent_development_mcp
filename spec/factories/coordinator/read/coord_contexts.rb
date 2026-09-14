@@ -107,7 +107,7 @@ FactoryBot.define do
             "status" => "started",
             "authorized_at" => timestamp,
             "started_at" => timestamp,
-            "write_set" => nil,
+            "work_intention_set" => nil,
             "selected_candidate_id" => nil,
             "selected_candidate_event" => nil,
             "completed_at" => nil,

@@ -3,7 +3,7 @@ import test from "node:test";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
-import type { ProjectResource, ResourceLease } from "../src/resources/project-resources-model.js";
+import type { ProjectResource, ResourceWorkIntention } from "../src/resources/project-resources-model.js";
 import {
   applyFilters,
   detailLocation,
@@ -13,12 +13,12 @@ import {
 } from "../src/resources/project-resources-model.js";
 import {
   AvailableStale,
-  LeaseCards,
-  LeaseDetail,
   PaginationControls,
   ResourceCards,
   ResourceDetail,
-  ResourceNavigation
+  ResourceNavigation,
+  WorkIntentionCards,
+  WorkIntentionDetail
 } from "../src/resources/project-resources-view.js";
 
 const projectRef = "project-ref";
@@ -37,9 +37,9 @@ const resource = {
   latestTransitionActorId: "luna-binder",
   lastTransitionAt: timestamp
 } satisfies ProjectResource;
-const lease = {
+const intention = {
   id: "018f0f4d-4e45-7abc-8def-000000000065",
-  leaseSetId: "018f0f4d-4e45-7abc-8def-000000000066",
+  intentionSetId: "018f0f4d-4e45-7abc-8def-000000000066",
   resourceId: resource.id,
   repositoryId: resource.repositoryId,
   resourceKind: "FILE" as const,
@@ -47,42 +47,45 @@ const lease = {
   resourceLifecycleStatus: "CURRENT" as const,
   status: "EXPIRED" as const,
   baseBlobOid: "b".repeat(40),
+  mode: "SHARED" as const,
+  purpose: "Coordinate the Resource change",
+  context: "Another agent can safely work in parallel.",
   fencingToken: "7",
   policyVersion: "coordinator-resource-lease/v2",
   changeSetId: "CS-resources",
   workItemId: "W-owner",
   attemptId: "A-owner",
   agentId: "luna-owner",
-  reservedEventId: "018f0f4d-4e45-7abc-8def-000000000067",
+  declaredEventId: "018f0f4d-4e45-7abc-8def-000000000067",
   lastExpandedEventId: null,
   lastRenewedEventId: null,
-  releaseEventId: null,
+  withdrawalEventId: null,
   attemptTerminalEventId: null,
-  reservedAt: timestamp,
+  declaredAt: timestamp,
   lastExpandedAt: null,
   lastRenewedAt: null,
   previousExpiresAt: null,
   expiresAt: timestamp,
-  releasedAt: null,
+  withdrawnAt: null,
   attemptTerminalAt: null,
-  lastProjectedAt: timestamp
-} satisfies ResourceLease;
+  updatedAt: timestamp
+} satisfies ResourceWorkIntention;
 
 function render(node: ReactNode, route = "/") {
   return renderToStaticMarkup(<MemoryRouter initialEntries={[route]}>{node}</MemoryRouter>);
 }
 
-test("resource and active-lease collections lead with meaning and an adjacent primary action", () => {
+test("resource and active work-intention collections lead with meaning and an adjacent primary action", () => {
   const resourceMarkup = render(
     <ResourceCards
       connection={{ nodes: [resource], pageInfo: { endCursor: "next", hasNextPage: true } }}
       hrefFor={(id) => `/resources/${id}`}
     />
   );
-  const leaseMarkup = render(
-    <LeaseCards
-      connection={{ asOf: timestamp, nodes: [{ ...lease, status: "ACTIVE" }], pageInfo: { endCursor: null, hasNextPage: false } }}
-      hrefFor={(id) => `/leases/${id}`}
+  const intentionMarkup = render(
+    <WorkIntentionCards
+      connection={{ asOf: timestamp, nodes: [{ ...intention, status: "ACTIVE" }], pageInfo: { endCursor: null, hasNextPage: false } }}
+      hrefFor={(id) => `/work-intentions/${id}`}
     />
   );
 
@@ -90,25 +93,31 @@ test("resource and active-lease collections lead with meaning and an adjacent pr
   assert.match(resourceMarkup, /current/);
   assert.match(resourceMarkup, /View Resource/);
   assert.match(resourceMarkup, /class="btn btn-primary align-self-start mt-auto"/);
-  assert.match(leaseMarkup, /Holder:<\/strong> luna-owner/);
-  assert.match(leaseMarkup, /W-owner/);
-  assert.match(leaseMarkup, /View lease/);
-  assert.match(leaseMarkup, /Ownership comes only from projected lease facts/);
+  assert.match(intentionMarkup, /shared intention:<\/strong> Coordinate the Resource change/);
+  assert.match(intentionMarkup, /Agent:<\/strong> luna-owner/);
+  assert.match(intentionMarkup, /W-owner/);
+  assert.match(intentionMarkup, /View work intention/);
+  assert.match(intentionMarkup, /advisory intentions, not merge guarantees/);
 });
 
 test("focused details place Back and related navigation with the selected content", () => {
   const resourceMarkup = render(<ResourceDetail backTo="/inventory?path=app" resource={resource} />);
-  const leaseMarkup = render(
-    <LeaseDetail backTo="/leases?agent=luna-owner" lease={lease} projectPath={`/projects/${projectRef}`} />
+  const intentionMarkup = render(
+    <WorkIntentionDetail
+      backTo="/work-intentions?agent=luna-owner"
+      intention={intention}
+      projectPath={`/projects/${projectRef}`}
+    />
   );
 
   assert.match(resourceMarkup, /Registration/);
   assert.match(resourceMarkup, /luna-registrar/);
   assert.match(resourceMarkup, /Back to Resource inventory/);
-  assert.match(leaseMarkup, /expired/);
-  assert.match(leaseMarkup, /View WorkItem/);
-  assert.match(leaseMarkup, /View Resource/);
-  assert.match(leaseMarkup, /Back to active leases/);
+  assert.match(intentionMarkup, /expired/);
+  assert.match(intentionMarkup, /Purpose and accountability/);
+  assert.match(intentionMarkup, /View WorkItem/);
+  assert.match(intentionMarkup, /View Resource/);
+  assert.match(intentionMarkup, /Back to active work intentions/);
 });
 
 test("Resource subnavigation and recoverable pagination are explicit", () => {
@@ -122,7 +131,7 @@ test("Resource subnavigation and recoverable pagination are explicit", () => {
 
   assert.match(markup, /aria-label="Resource views"/);
   assert.match(markup, /Resource inventory/);
-  assert.match(markup, /Active leases/);
+  assert.match(markup, /Active work intentions/);
   assert.match(markup, /Previous/);
   assert.match(markup, /Next/);
 });

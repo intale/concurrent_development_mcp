@@ -14,7 +14,7 @@ module Coordinator::Write
         required(:change_set_id).filled(:string)
         required(:work_item_id).filled(:string)
         required(:attempt_id).filled(:string)
-        required(:lease_set_id).filled(:string)
+        required(:intention_set_id).filled(:string)
         required(:repository_id).filled(:string)
         required(:base_commit_oid).value(:string)
         required(:resources).array(:hash) do
@@ -37,7 +37,7 @@ module Coordinator::Write
         key([ :actor, :id ]).failure("must be a valid identifier") unless Types::IDENTIFIER_PATTERN.match?(actor_id)
       end
 
-      rule(:lease_set_id) do
+      rule(:intention_set_id) do
         key.failure("must be a UUIDv7") unless Types::UUID_V7_PATTERN.match?(value)
       end
 

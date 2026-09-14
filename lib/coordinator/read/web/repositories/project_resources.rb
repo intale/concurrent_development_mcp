@@ -39,38 +39,38 @@ module Coordinator::Read::Web::Repositories
       build_resource_view(view)
     end
 
-    def active_leases(query)
+    def active_work_intentions(query)
       repository_ids = project_repository_ids(query.scope)
       return if repository_ids.empty?
 
-      relation = lease_relation(repository_ids)
-        .where(released_at_domain: nil, attempt_terminal_at_domain: nil)
+      relation = work_intention_relation(repository_ids)
+        .where(withdrawn_at_domain: nil, attempt_terminal_at_domain: nil)
         .where("expires_at_domain > ?", Time.iso8601(query.as_of))
-      relation = apply_lease_filters(relation, query)
+      relation = apply_work_intention_filters(relation, query)
       records, has_more = event_time_page(
         relation:,
-        id_column: :lease_id,
-        timestamp_column: :last_projected_at,
+        id_column: :intention_id,
+        timestamp_column: :updated_at,
         after_updated_at: query.after_updated_at,
         after_id: query.after_id,
         limit: query.first
       )
 
-      Coordinator::Read::Web::ProjectResourcesV1::LeasePage.new(
-        items: records.map { build_lease(_1, query.as_of) },
-        next_lease_id: has_more ? records.last.lease_id : nil,
-        next_updated_at: has_more ? records.last.last_projected_at.utc.iso8601(6) : nil,
+      Coordinator::Read::Web::ProjectResourcesV1::WorkIntentionPage.new(
+        items: records.map { build_work_intention(_1, query.as_of) },
+        next_intention_id: has_more ? records.last.intention_id : nil,
+        next_updated_at: has_more ? records.last.updated_at.utc.iso8601(6) : nil,
         has_more:,
         as_of: query.as_of
       )
     end
 
-    def lease(query)
+    def work_intention(query)
       repository_ids = project_repository_ids(query.scope)
       return if repository_ids.empty?
 
-      record = lease_relation(repository_ids).find_by(lease_id: query.id)
-      build_lease(record, query.as_of) if record
+      record = work_intention_relation(repository_ids).find_by(intention_id: query.id)
+      build_work_intention(record, query.as_of) if record
     end
 
     private
@@ -79,15 +79,16 @@ module Coordinator::Read::Web::Repositories
       Coordinator::Read::Repository.where(scope:).pluck(:repository_id)
     end
 
-    def lease_relation(repository_ids)
-      Coordinator::Read::ResourceLeaseBrowserRow.where(repository_id: repository_ids)
+    def work_intention_relation(repository_ids)
+      Coordinator::Read::ResourceWorkIntentionBrowserRow.where(repository_id: repository_ids)
     end
 
-    def apply_lease_filters(relation, query)
+    def apply_work_intention_filters(relation, query)
       relation = relation.where(agent_id: query.agent_id) if query.agent_id
       relation = relation.where(change_set_id: query.change_set_id) if query.change_set_id
       relation = relation.where(work_item_id: query.work_item_id) if query.work_item_id
       relation = relation.where(attempt_id: query.attempt_id) if query.attempt_id
+      relation = relation.where(mode: query.mode) if query.mode
       relation
     end
 
@@ -130,41 +131,44 @@ module Coordinator::Read::Web::Repositories
       )
     end
 
-    def build_lease(record, as_of)
-      Coordinator::Read::Web::ProjectResourcesV1::Lease.new(
-        lease_id: record.lease_id,
-        lease_set_id: record.lease_set_id,
+    def build_work_intention(record, as_of)
+      Coordinator::Read::Web::ProjectResourcesV1::WorkIntention.new(
+        intention_id: record.intention_id,
+        intention_set_id: record.intention_set_id,
         resource_id: record.resource_id,
         repository_id: record.repository_id,
         resource_kind: record.resource_kind,
         resource_path: record.resource_path,
         resource_lifecycle_status: record.resource_lifecycle_status,
-        status: lease_status(record, as_of),
+        status: work_intention_status(record, as_of),
         base_blob_oid: record.base_blob_oid,
+        mode: record.mode,
+        purpose: record.purpose,
+        context: record.context,
         fencing_token: record.fencing_token,
         policy_version: record.policy_version,
         change_set_id: record.change_set_id,
         work_item_id: record.work_item_id,
         attempt_id: record.attempt_id,
         agent_id: record.agent_id,
-        reserved_event_id: record.reserved_event.fetch("event_id"),
+        declared_event_id: record.declared_event.fetch("event_id"),
         last_expanded_event_id: event_id(record.last_expanded_event),
         last_renewed_event_id: event_id(record.last_renewed_event),
-        release_event_id: event_id(record.release_event),
+        withdrawal_event_id: event_id(record.withdrawal_event),
         attempt_terminal_event_id: event_id(record.attempt_terminal_event),
-        reserved_at: timestamp(record.reserved_at_domain),
+        declared_at: timestamp(record.declared_at_domain),
         last_expanded_at: timestamp(record.last_expanded_at_domain),
         last_renewed_at: timestamp(record.last_renewed_at_domain),
         previous_expires_at: timestamp(record.previous_expires_at_domain),
         expires_at: timestamp(record.expires_at_domain),
-        released_at: timestamp(record.released_at_domain),
+        withdrawn_at: timestamp(record.withdrawn_at_domain),
         attempt_terminal_at: timestamp(record.attempt_terminal_at_domain),
-        last_projected_at: timestamp(record.last_projected_at)
+        updated_at: timestamp(record.updated_at)
       )
     end
 
-    def lease_status(record, as_of)
-      return "released" if record.released_at_domain
+    def work_intention_status(record, as_of)
+      return "withdrawn" if record.withdrawn_at_domain
       return "attempt_terminal" if record.attempt_terminal_at_domain
       return "expired" if record.expires_at_domain <= Time.iso8601(as_of)
 

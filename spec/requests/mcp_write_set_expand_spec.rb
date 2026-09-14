@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe "MCP write_set_expand Task boundary", :event_store do
+RSpec.describe "MCP work_intention_set_expand Task boundary", :event_store do
   EXPAND_PROTOCOL_VERSION = "2026-07-28"
   EXPAND_TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
   EXPAND_CHANGE_SET_ID = "CS-MCP-EXPAND"
@@ -20,12 +20,12 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
   it "durably expands the current set and exposes exact trace readers across the Saga" do
     seed_active_attempt
     reservation = reserve_initial_set.value!.data
-    existing_resource_id = reservation.resources.sole.resource_id
+    existing_resource_id = reservation.intentions.sole.resource_id
     added_resource_id = resolve_resource("app/b.rb")
 
     submitted_response = submit_expansion(
       command_id: "cmd-mcp-expand",
-      lease_set_id: reservation.lease_set_id,
+      intention_set_id: reservation.intention_set_id,
       resource_ids: [ existing_resource_id, added_resource_id ],
       request_id: 1
     )
@@ -48,10 +48,10 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
           "change_set_id" => EXPAND_CHANGE_SET_ID,
           "work_item_id" => EXPAND_WORK_ITEM_ID,
           "attempt_id" => EXPAND_ATTEMPT_ID,
-          "lease_set_id" => reservation.lease_set_id,
-          "resource_count" => 2,
+          "intention_set_id" => reservation.intention_set_id,
+          "intention_count" => 2,
           "expires_at" => reservation.expires_at,
-          "added_resources" => [ include("resource_id" => added_resource_id) ]
+          "added_intentions" => [ include("resource_id" => added_resource_id) ]
         )
       )
     )
@@ -76,10 +76,10 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
   it "completes an unchanged decision as a Task error and rejects malformed input before Task allocation" do
     seed_active_attempt
     reservation = reserve_initial_set.value!.data
-    existing_resource_id = reservation.resources.sole.resource_id
+    existing_resource_id = reservation.intentions.sole.resource_id
     unchanged_response = submit_expansion(
       command_id: "cmd-mcp-unchanged",
-      lease_set_id: reservation.lease_set_id,
+      intention_set_id: reservation.intention_set_id,
       resource_ids: [ existing_resource_id ],
       request_id: 1
     )
@@ -93,7 +93,7 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
       "isError" => true,
       "structuredContent" => include(
         "status" => "denied",
-        "data" => include("code" => "write_set_unchanged")
+        "data" => include("code" => "work_intention_set_unchanged")
       )
     )
     expect(CommandTraceFixture.events(task_id, event_store:).map(&:type)).to eq(
@@ -103,34 +103,34 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
 
     malformed = submit_expansion(
       command_id: "cmd-mcp-malformed",
-      lease_set_id: "not-a-uuid",
+      intention_set_id: "not-a-uuid",
       resource_ids: [ "not-a-uuid" ],
       request_id: 3
     )
 
     expect(malformed.dig("result", "resultType")).to eq("complete")
     expect(malformed.dig("result", "isError")).to be(true)
-    expect(malformed.dig("result", "content", 0, "text")).to include("lease_set_id")
+    expect(malformed.dig("result", "content", 0, "text")).to include("intention_set_id")
     expect(task_events_for_command("cmd-mcp-malformed")).to be_empty
   end
 
   private
 
-  def submit_expansion(command_id:, lease_set_id:, resource_ids:, request_id:, expected_status: 200)
+  def submit_expansion(command_id:, intention_set_id:, resource_ids:, request_id:, expected_status: 200)
     mcp_request(
       id: request_id,
       method: "tools/call",
-      name: "write_set_expand",
+      name: "work_intention_set_expand",
       expected_status:,
       params: {
-        name: "write_set_expand",
+        name: "work_intention_set_expand",
         arguments: {
           command_id:,
           actor: { kind: "agent", id: "agent-a" },
           change_set_id: EXPAND_CHANGE_SET_ID,
           work_item_id: EXPAND_WORK_ITEM_ID,
           attempt_id: EXPAND_ATTEMPT_ID,
-          lease_set_id:,
+          intention_set_id:,
           repository_id: MCP_EXPAND_REPOSITORY_ID,
           base_commit_oid: EXPAND_BASE_COMMIT_OID,
           resources: resource_ids.map { { resource_id: _1 } }
@@ -195,7 +195,7 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
       repository_id: MCP_EXPAND_REPOSITORY_ID,
       base_commit_oid: EXPAND_BASE_COMMIT_OID,
       resources: [ { resource_id: } ],
-      lease_duration_seconds: 300
+      ttl_seconds: 300
     )
   end
 
@@ -205,8 +205,8 @@ RSpec.describe "MCP write_set_expand Task boundary", :event_store do
       command_id: "seed-create-#{EXPAND_CHANGE_SET_ID}",
       actor: { kind: "agent", id: "planner-1" },
       change_set_id: EXPAND_CHANGE_SET_ID,
-      goal: "Coordinate MCP write-set expansion",
-      acceptance_criteria: [ "Additional files require the same lease set" ]
+      goal: "Coordinate MCP work-intention expansion",
+      acceptance_criteria: [ "Additional files join the same intention set" ]
     ).value!
     Coordinator::Write::Operations::ExecuteCreateWorkItem.new(event_store:).call(
       command_id: "seed-create-#{EXPAND_WORK_ITEM_ID}",

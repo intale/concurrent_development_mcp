@@ -95,9 +95,9 @@ When(
           actor_id: participant.fetch(:agent_id)
         )
       ],
-      lease_duration_seconds: 300
+      ttl_seconds: 300
     }
-    task_id = call_tool("write_set_reserve", arguments).dig("result", "taskId")
+    task_id = call_tool("work_intention_set_declare", arguments).dig("result", "taskId")
     participant.merge(task_id:, arguments:, mode:, purpose:, context:)
   end
 
@@ -136,7 +136,7 @@ Then("the winner owns its complete write set") do
   expected_paths = [ @winning_reservation.fetch(:unique_path), @shared_lease_path ].sort
   assert_acceptance_equal(
     expected_paths,
-    @winning_reservation.dig(:outcome, "data", "resources").map { _1.fetch("resource_path") }.sort,
+    @winning_reservation.dig(:outcome, "data", "intentions").map { _1.fetch("resource_path") }.sort,
     "Winning intention-set resources"
   )
   assert_acceptance_equal(
@@ -186,13 +186,13 @@ Then("available context exposes the observed lease evidence without a freshness 
   attempt = payload.dig("data", "context", "attempts").find do |candidate|
     candidate.fetch("attempt_id") == @winning_reservation.fetch(:attempt_id)
   end
-  write_set = attempt.fetch("write_set")
+  write_set = attempt.fetch("work_intention_set")
 
   assert_acceptance_equal("ok", payload.fetch("status"), "Available context status")
   assert_acceptance(!payload.key?("projection_status"), "Context must not expose a projection gate")
   assert_acceptance_equal(
     [ @shared_lease_path, @winning_reservation.fetch(:unique_path) ].sort,
-    write_set.fetch("resources").map { _1.fetch("resource_path") }.sort,
+    write_set.fetch("intentions").map { _1.fetch("resource_path") }.sort,
     "Projected resource evidence"
   )
   assert_acceptance(write_set.key?("expires_at"), "Projected write set must preserve expiry evidence")
@@ -247,7 +247,7 @@ Given(
     base_snapshots: [ { repository_id: acceptance_repository_id, commit_oid: "a" * 40 } ]
   )
   reservation_task_id = submit_and_execute(
-    "write_set_reserve",
+    "work_intention_set_declare",
     command_id: "cmd-cuc-expand-reserve",
     actor: { kind: "agent", id: agent_id },
     change_set_id:,
@@ -256,7 +256,7 @@ Given(
     repository_id: acceptance_repository_id,
     base_commit_oid: "a" * 40,
     resources: [ resource_target(kind: "file", path: initial_path, actor_id: agent_id) ],
-    lease_duration_seconds: 300
+    ttl_seconds: 300
   )
   @expansion_reservation = task_request("tasks/get", reservation_task_id).dig(
     "result", "result", "structuredContent", "data"
@@ -274,14 +274,14 @@ When("the agent expands the current write set with {string}") do |additional_pat
   @expansion_additional_path = additional_path
   @expansion_command_id = "cmd-cuc-expand-add"
   @expansion_task_id = call_tool(
-    "write_set_expand",
+    "work_intention_set_expand",
     {
       command_id: @expansion_command_id,
       actor: { kind: "agent", id: @expansion_agent_id },
       change_set_id: @expansion_change_set_id,
       work_item_id: @expansion_work_item_id,
       attempt_id: @expansion_attempt_id,
-      lease_set_id: @expansion_reservation.fetch("lease_set_id"),
+      intention_set_id: @expansion_reservation.fetch("intention_set_id"),
       repository_id: acceptance_repository_id,
       base_commit_oid: "a" * 40,
       resources: [ resource_target(kind: "file", path: additional_path, actor_id: @expansion_agent_id) ]
@@ -298,8 +298,8 @@ Then("the expansion Task succeeds without extending the lease deadline") do
   assert_acceptance_equal("completed", @expansion_task_state.dig("result", "status"), "Expansion Task status")
   assert_acceptance_equal(false, result.fetch("isError"), "Expansion tool error flag")
   assert_acceptance_equal(
-    @expansion_reservation.fetch("lease_set_id"),
-    data.fetch("lease_set_id"),
+    @expansion_reservation.fetch("intention_set_id"),
+    data.fetch("intention_set_id"),
     "Expansion lease-set identity"
   )
   assert_acceptance_equal(
@@ -309,7 +309,7 @@ Then("the expansion Task succeeds without extending the lease deadline") do
   )
   assert_acceptance_equal(
     [ @expansion_additional_path ],
-    data.fetch("added_resources").map { _1.fetch("resource_path") },
+    data.fetch("added_intentions").map { _1.fetch("resource_path") },
     "Expansion additions"
   )
 end
@@ -318,7 +318,7 @@ Then("the previous context remains available before expansion projection") do
   lagging = call_tool("coord_context", { attempt_id: @expansion_attempt_id })
   before_payload = @context_before_expansion.dig("result", "structuredContent")
   lagging_payload = lagging.dig("result", "structuredContent")
-  write_set = lagging_payload.dig("data", "context", "attempts", 0, "write_set")
+  write_set = lagging_payload.dig("data", "context", "attempts", 0, "work_intention_set")
 
   assert_acceptance_equal("ok", lagging_payload.fetch("status"), "Lagging context status")
   assert_acceptance_equal(
@@ -328,7 +328,7 @@ Then("the previous context remains available before expansion projection") do
   )
   assert_acceptance_equal(
     [ @expansion_initial_path ],
-    write_set.fetch("resources").map { _1.fetch("resource_path") },
+    write_set.fetch("intentions").map { _1.fetch("resource_path") },
     "Lagging write-set evidence"
   )
 end
@@ -337,7 +337,7 @@ When("the write-set expansion reaches the read side") do
   @expanded_context = await_read_model("Write-set expansion to become available") do
     response = call_tool("coord_context", { attempt_id: @expansion_attempt_id })
     resources = response.dig(
-      "result", "structuredContent", "data", "context", "attempts", 0, "write_set", "resources"
+      "result", "structuredContent", "data", "context", "attempts", 0, "work_intention_set", "intentions"
     ) || []
     [ resources.any? { _1.fetch("resource_path") == @expansion_additional_path }, response ]
   end
@@ -345,12 +345,12 @@ end
 
 Then("available context exposes both observed files without a freshness claim") do
   payload = @expanded_context.dig("result", "structuredContent")
-  write_set = payload.dig("data", "context", "attempts", 0, "write_set")
+  write_set = payload.dig("data", "context", "attempts", 0, "work_intention_set")
 
   assert_acceptance_equal("ok", payload.fetch("status"), "Expanded context status")
   assert_acceptance_equal(
     [ @expansion_initial_path, @expansion_additional_path ].sort,
-    write_set.fetch("resources").map { _1.fetch("resource_path") }.sort,
+    write_set.fetch("intentions").map { _1.fetch("resource_path") }.sort,
     "Expanded projected resources"
   )
   assert_acceptance_equal(
@@ -410,7 +410,7 @@ Given(
     base_snapshots: [ { repository_id: acceptance_repository_id, commit_oid: "a" * 40 } ]
   )
   reservation_task_id = submit_and_execute(
-    "write_set_reserve",
+    "work_intention_set_declare",
     command_id: "cmd-cuc-renew-reserve",
     actor: { kind: "agent", id: agent_id },
     change_set_id:,
@@ -419,7 +419,7 @@ Given(
     repository_id: acceptance_repository_id,
     base_commit_oid: "a" * 40,
     resources: @renewal_paths.map { resource_target(kind: "file", path: _1, actor_id: agent_id) },
-    lease_duration_seconds: 300
+    ttl_seconds: 300
   )
   @renewal_reservation = task_request("tasks/get", reservation_task_id).dig(
     "result", "result", "structuredContent", "data"
@@ -435,22 +435,22 @@ end
 
 When("the agent renews the complete observed lease set") do
   @renewal_task_id = call_tool(
-    "lease_renew",
+    "work_intention_set_renew",
     {
       command_id: "cmd-cuc-renew-set",
       actor: { kind: "agent", id: @renewal_agent_id },
       change_set_id: @renewal_change_set_id,
       work_item_id: @renewal_work_item_id,
       attempt_id: @renewal_attempt_id,
-      lease_set_id: @renewal_reservation.fetch("lease_set_id"),
-      leases: @renewal_reservation.fetch("resources").map do |reference|
+      intention_set_id: @renewal_reservation.fetch("intention_set_id"),
+      intentions: @renewal_reservation.fetch("intentions").map do |reference|
         {
           resource_id: reference.fetch("resource_id"),
-          lease_id: reference.fetch("lease_id"),
+          intention_id: reference.fetch("intention_id"),
           fencing_token: reference.fetch("fencing_token")
         }
       end,
-      lease_duration_seconds: 600
+      ttl_seconds: 600
     }
   ).dig("result", "taskId")
   execute_task(@renewal_task_id)
@@ -460,11 +460,11 @@ end
 Then("the renewal Task succeeds without changing lease identities or fencing tokens") do
   result = @renewal_task_state.dig("result", "result")
   data = result.fetch("structuredContent").fetch("data")
-  before_refs = @renewal_reservation.fetch("resources").map do |reference|
-    reference.values_at("resource_id", "lease_id", "fencing_token")
+  before_refs = @renewal_reservation.fetch("intentions").map do |reference|
+    reference.values_at("resource_id", "intention_id", "fencing_token")
   end
-  after_refs = data.fetch("resources").map do |reference|
-    reference.values_at("resource_id", "lease_id", "fencing_token")
+  after_refs = data.fetch("intentions").map do |reference|
+    reference.values_at("resource_id", "intention_id", "fencing_token")
   end
 
   assert_acceptance_equal("completed", @renewal_task_state.dig("result", "status"), "Renewal Task status")
@@ -486,7 +486,7 @@ Then("the previous context remains available before renewal projection") do
   lagging = call_tool("coord_context", { attempt_id: @renewal_attempt_id })
   before_payload = @context_before_renewal.dig("result", "structuredContent")
   lagging_payload = lagging.dig("result", "structuredContent")
-  write_set = lagging_payload.dig("data", "context", "attempts", 0, "write_set")
+  write_set = lagging_payload.dig("data", "context", "attempts", 0, "work_intention_set")
 
   assert_acceptance_equal("ok", lagging_payload.fetch("status"), "Lagging renewal context status")
   assert_acceptance_equal(
@@ -506,7 +506,7 @@ When("the write-set renewal reaches the read side") do
   @renewed_context = await_read_model("Write-set renewal to become available") do
     response = call_tool("coord_context", { attempt_id: @renewal_attempt_id })
     observed = response.dig(
-      "result", "structuredContent", "data", "context", "attempts", 0, "write_set", "expires_at"
+      "result", "structuredContent", "data", "context", "attempts", 0, "work_intention_set", "expires_at"
     )
     [ observed == @renewal_result.fetch("expires_at"), response ]
   end
@@ -514,7 +514,7 @@ end
 
 Then("available context exposes the later observed deadline without a freshness claim") do
   payload = @renewed_context.dig("result", "structuredContent")
-  write_set = payload.dig("data", "context", "attempts", 0, "write_set")
+  write_set = payload.dig("data", "context", "attempts", 0, "work_intention_set")
 
   assert_acceptance_equal("ok", payload.fetch("status"), "Renewed context status")
   assert_acceptance_equal(@renewal_result.fetch("expires_at"), write_set.fetch("expires_at"), "Observed deadline")
@@ -575,7 +575,7 @@ Given(
     base_snapshots: [ { repository_id: acceptance_repository_id, commit_oid: "a" * 40 } ]
   )
   reservation_task_id = submit_and_execute(
-    "write_set_reserve",
+    "work_intention_set_declare",
     command_id: "cmd-cuc-release-reserve",
     actor: { kind: "agent", id: agent_id },
     change_set_id:,
@@ -584,7 +584,7 @@ Given(
     repository_id: acceptance_repository_id,
     base_commit_oid: "a" * 40,
     resources: @release_paths.map { resource_target(kind: "file", path: _1, actor_id: agent_id) },
-    lease_duration_seconds: 300
+    ttl_seconds: 300
   )
   @release_reservation = task_request("tasks/get", reservation_task_id).dig(
     "result", "result", "structuredContent", "data"
@@ -600,18 +600,18 @@ end
 
 When("the agent releases the complete observed lease set") do
   @release_task_id = call_tool(
-    "lease_release",
+    "work_intention_set_withdraw",
     {
       command_id: "cmd-cuc-release-set",
       actor: { kind: "agent", id: @release_agent_id },
       change_set_id: @release_change_set_id,
       work_item_id: @release_work_item_id,
       attempt_id: @release_attempt_id,
-      lease_set_id: @release_reservation.fetch("lease_set_id"),
-      leases: @release_reservation.fetch("resources").map do |reference|
+      intention_set_id: @release_reservation.fetch("intention_set_id"),
+      intentions: @release_reservation.fetch("intentions").map do |reference|
         {
           resource_id: reference.fetch("resource_id"),
-          lease_id: reference.fetch("lease_id"),
+          intention_id: reference.fetch("intention_id"),
           fencing_token: reference.fetch("fencing_token")
         }
       end
@@ -624,11 +624,11 @@ end
 Then("the release Task succeeds without changing lease identities or fencing tokens") do
   result = @release_task_state.dig("result", "result")
   data = result.fetch("structuredContent").fetch("data")
-  before_refs = @release_reservation.fetch("resources").map do |reference|
-    reference.values_at("resource_id", "lease_id", "fencing_token")
+  before_refs = @release_reservation.fetch("intentions").map do |reference|
+    reference.values_at("resource_id", "intention_id", "fencing_token")
   end
-  after_refs = data.fetch("resources").map do |reference|
-    reference.values_at("resource_id", "lease_id", "fencing_token")
+  after_refs = data.fetch("intentions").map do |reference|
+    reference.values_at("resource_id", "intention_id", "fencing_token")
   end
 
   assert_acceptance_equal("completed", @release_task_state.dig("result", "status"), "Release Task status")
@@ -639,11 +639,11 @@ Then("the release Task succeeds without changing lease identities or fencing tok
     data.fetch("previous_expires_at"),
     "Release previous deadline"
   )
-  assert_acceptance(data.fetch("released_at"), "Release timestamp is missing")
-  @release_reservation.fetch("resources").each do |reference|
+  assert_acceptance(data.fetch("withdrawn_at"), "Release timestamp is missing")
+  @release_reservation.fetch("intentions").each do |reference|
     assert_acceptance_equal(
       [ "ResourceWorkIntentionDeclared", "ResourceWorkIntentionWithdrawn" ],
-      work_intention_events(reference.fetch("lease_id")).map(&:type),
+      work_intention_events(reference.fetch("intention_id")).map(&:type),
       "Withdrawn work-intention lifecycle"
     )
   end
@@ -654,7 +654,7 @@ Then("the previous context remains available before release projection") do
   lagging = call_tool("coord_context", { attempt_id: @release_attempt_id })
   before_payload = @context_before_release.dig("result", "structuredContent")
   lagging_payload = lagging.dig("result", "structuredContent")
-  write_set = lagging_payload.dig("data", "context", "attempts", 0, "write_set")
+  write_set = lagging_payload.dig("data", "context", "attempts", 0, "work_intention_set")
 
   assert_acceptance_equal("ok", lagging_payload.fetch("status"), "Lagging release context status")
   assert_acceptance_equal(
@@ -662,10 +662,10 @@ Then("the previous context remains available before release projection") do
     lagging_payload.fetch("context_token"),
     "Lagging release context token"
   )
-  assert_acceptance_equal(nil, write_set.fetch("released_at"), "Lagging observed release")
+  assert_acceptance_equal(nil, write_set.fetch("withdrawn_at"), "Lagging observed release")
   assert_acceptance_equal(
     @release_paths.sort,
-    write_set.fetch("resources").map { _1.fetch("resource_path") }.sort,
+    write_set.fetch("intentions").map { _1.fetch("resource_path") }.sort,
     "Lagging release resources"
   )
   assert_acceptance(!lagging_payload.key?("projection_status"), "Lagging context must remain available")
@@ -675,18 +675,18 @@ When("the write-set release reaches the read side") do
   @released_context = await_read_model("Write-set release to become available") do
     response = call_tool("coord_context", { attempt_id: @release_attempt_id })
     observed = response.dig(
-      "result", "structuredContent", "data", "context", "attempts", 0, "write_set", "released_at"
+      "result", "structuredContent", "data", "context", "attempts", 0, "work_intention_set", "withdrawn_at"
     )
-    [ observed == @release_result.fetch("released_at"), response ]
+    [ observed == @release_result.fetch("withdrawn_at"), response ]
   end
 end
 
 Then("available context exposes the observed release without a freshness claim") do
   payload = @released_context.dig("result", "structuredContent")
-  write_set = payload.dig("data", "context", "attempts", 0, "write_set")
+  write_set = payload.dig("data", "context", "attempts", 0, "work_intention_set")
 
   assert_acceptance_equal("ok", payload.fetch("status"), "Released context status")
-  assert_acceptance_equal(@release_result.fetch("released_at"), write_set.fetch("released_at"), "Observed release")
+  assert_acceptance_equal(@release_result.fetch("withdrawn_at"), write_set.fetch("withdrawn_at"), "Observed release")
   assert_acceptance_equal(
     @release_reservation.fetch("expires_at"),
     write_set.fetch("expires_at"),
@@ -694,7 +694,7 @@ Then("available context exposes the observed release without a freshness claim")
   )
   assert_acceptance_equal(
     @release_paths.sort,
-    write_set.fetch("resources").map { _1.fetch("resource_path") }.sort,
+    write_set.fetch("intentions").map { _1.fetch("resource_path") }.sort,
     "Retained released resources"
   )
   assert_acceptance(
@@ -712,7 +712,7 @@ When(
   @expiry_path = path
   @expiry_predecessor_command_id = "cmd-cuc-expiry-predecessor"
   @expiry_predecessor_task_id = call_tool(
-    "write_set_reserve",
+    "work_intention_set_declare",
     {
       command_id: @expiry_predecessor_command_id,
       actor: { kind: "agent", id: agent_id },
@@ -731,7 +731,7 @@ When(
           actor_id: agent_id
         )
       ],
-      lease_duration_seconds: duration
+      ttl_seconds: duration
     }
   ).dig("result", "taskId")
   execute_task(@expiry_predecessor_task_id)
@@ -740,7 +740,7 @@ When(
     "result", "result", "structuredContent", "data"
   )
   @expiry_source = work_intention_events(
-    @expiry_predecessor_result.fetch("resources").sole.fetch("lease_id")
+    @expiry_predecessor_result.fetch("intentions").sole.fetch("intention_id")
   ).sole
 end
 
@@ -768,7 +768,7 @@ When(
     [ now >= predecessor_expiry, now.iso8601(6) ]
   end
   @expiry_successor_task_id = call_tool(
-    "write_set_reserve",
+    "work_intention_set_declare",
     {
       command_id: "cmd-cuc-expiry-successor",
       actor: { kind: "agent", id: agent_id },
@@ -778,7 +778,7 @@ When(
       repository_id: acceptance_repository_id,
       base_commit_oid: "a" * 40,
       resources: [ resource_target(kind: "file", path: @expiry_path, actor_id: agent_id) ],
-      lease_duration_seconds: 300
+      ttl_seconds: 300
     }
   ).dig("result", "taskId")
   execute_task(@expiry_successor_task_id)
@@ -790,7 +790,7 @@ end
 
 Then("the successor reservation Task succeeds with the next fencing token") do
   result = @expiry_successor_state.dig("result", "result")
-  reference = @expiry_successor_result.fetch("resources").sole
+  reference = @expiry_successor_result.fetch("intentions").sole
 
   assert_acceptance_equal("completed", @expiry_successor_state.dig("result", "status"), "Successor Task")
   assert_acceptance_equal(false, result.fetch("isError"), "Successor tool error flag")
@@ -819,7 +819,7 @@ Then("the timer is superseded and cannot affect the successor") do
     process_name: "lease-expiry-policy",
     step_name: "expire-resource-lease",
     subject_kind: "resource-lease",
-    subject_id: @expiry_source.data.fetch("lease_id")
+    subject_id: @expiry_source.data.fetch("intention_id")
   )
   assert_acceptance(process_step, "The superseded timer has no persisted process step")
   assert_acceptance_equal(
@@ -844,11 +844,11 @@ Then("the predecessor's older context remains available without a freshness clai
   predecessor = payload.dig("data", "context", "attempts").find do |attempt|
     attempt.fetch("attempt_id") == @expiry_predecessor.fetch(:attempt_id)
   end
-  write_set = predecessor&.fetch("write_set")
+  write_set = predecessor&.fetch("work_intention_set")
 
   assert_acceptance_equal("ok", payload.fetch("status"), "Elapsed predecessor context status")
   assert_acceptance_equal(previous_payload.fetch("context_token"), payload.fetch("context_token"), "Context token")
-  assert_acceptance_equal(@expiry_path, write_set.fetch("resources").sole.fetch("resource_path"), "Observed file")
+  assert_acceptance_equal(@expiry_path, write_set.fetch("intentions").sole.fetch("resource_path"), "Observed file")
   assert_acceptance_equal(
     @expiry_predecessor_result.fetch("expires_at"),
     write_set.fetch("expires_at"),
@@ -878,9 +878,9 @@ When("both agents concurrently reserve their disjoint files") do
           actor_id: participant.fetch(:agent_id)
         )
       ],
-      lease_duration_seconds: 300
+      ttl_seconds: 300
     }
-    task_id = call_tool("write_set_reserve", arguments).dig("result", "taskId")
+    task_id = call_tool("work_intention_set_declare", arguments).dig("result", "taskId")
     participant.merge(task_id:, arguments:)
   end
 
@@ -902,7 +902,7 @@ Then("both disjoint reservation Tasks succeed with complete write sets") do
   @disjoint_reservations.each do |reservation|
     assert_acceptance_equal(
       [ reservation.fetch(:unique_path) ],
-      reservation.dig(:outcome, "data", "resources").map { _1.fetch("resource_path") },
+      reservation.dig(:outcome, "data", "intentions").map { _1.fetch("resource_path") },
       "Disjoint complete intention set"
     )
     assert_acceptance_equal(
@@ -932,9 +932,9 @@ When(
       repository_id: acceptance_repository_id,
       base_commit_oid: "a" * 40,
       resources: [ resource_target(kind: "file", path:, actor_id: participant.fetch(:agent_id)) ],
-      lease_duration_seconds: 300
+      ttl_seconds: 300
     }
-    task_id = call_tool("write_set_reserve", arguments).dig("result", "taskId")
+    task_id = call_tool("work_intention_set_declare", arguments).dig("result", "taskId")
     participant.merge(task_id:, arguments:)
   end
 
@@ -959,7 +959,7 @@ Then("one normalized reservation wins and the loser owns no lease") do
 
   assert_acceptance_equal(
     [ normalized_path ],
-    write_set_events(winner.fetch(:attempt_id)).sole.data.fetch("resources").map { _1.fetch("resource_path") },
+    write_set_events(winner.fetch(:attempt_id)).sole.data.fetch("intentions").map { _1.fetch("resource_path") },
     "Normalized winning path"
   )
   assert_acceptance_equal([], write_set_events(loser.fetch(:attempt_id)), "Alias loser write set")
@@ -981,9 +981,9 @@ When(
     repository_id: acceptance_repository_id,
     base_commit_oid: "a" * 40,
     resources: [ resource_target(kind: "file", path:, actor_id: agent_id) ],
-    lease_duration_seconds: 300
+    ttl_seconds: 300
   }
-  @cancelled_reservation_task_id = call_tool("write_set_reserve", arguments).dig("result", "taskId")
+  @cancelled_reservation_task_id = call_tool("work_intention_set_declare", arguments).dig("result", "taskId")
   task_request("tasks/cancel", @cancelled_reservation_task_id)
   execute_task(@cancelled_reservation_task_id)
   @cancelled_reservation_state = task_request("tasks/get", @cancelled_reservation_task_id)
@@ -1011,7 +1011,7 @@ end
 When("agent {string} deliberately reserves {string}") do |agent_id, path|
   participant = @lease_participants.find { _1.fetch(:agent_id) == agent_id }
   task_id = submit_and_execute(
-    "write_set_reserve",
+    "work_intention_set_declare",
     command_id: "cmd-cuc-lse-deliberate-reserve",
     actor: { kind: "agent", id: agent_id },
     change_set_id: @lease_change_set_id,
@@ -1020,7 +1020,7 @@ When("agent {string} deliberately reserves {string}") do |agent_id, path|
     repository_id: acceptance_repository_id,
     base_commit_oid: "a" * 40,
     resources: [ resource_target(kind: "file", path:, actor_id: agent_id) ],
-    lease_duration_seconds: 300
+    ttl_seconds: 300
   )
   @successor_result = task_request("tasks/get", task_id).dig(
     "result", "result", "structuredContent", "data"
@@ -1030,25 +1030,25 @@ end
 Then("the successor obtains fencing token {int}") do |expected_token|
   assert_acceptance_equal(
     expected_token,
-    @successor_result.fetch("resources").sole.fetch("fencing_token"),
+    @successor_result.fetch("intentions").sole.fetch("fencing_token"),
     "Successor fencing token"
   )
 end
 
 When("the predecessor renews its exact lease set before the old deadline") do
   @renewed_predecessor_task_id = call_tool(
-    "lease_renew",
+    "work_intention_set_renew",
     {
       command_id: "cmd-cuc-renew-predecessor",
       actor: { kind: "agent", id: @expiry_predecessor.fetch(:agent_id) },
       change_set_id: @lease_change_set_id,
       work_item_id: @expiry_predecessor.fetch(:work_item_id),
       attempt_id: @expiry_predecessor.fetch(:attempt_id),
-      lease_set_id: @expiry_predecessor_result.fetch("lease_set_id"),
-      leases: @expiry_predecessor_result.fetch("resources").map do |reference|
-        reference.slice("resource_id", "lease_id", "fencing_token").transform_keys(&:to_sym)
+      intention_set_id: @expiry_predecessor_result.fetch("intention_set_id"),
+      intentions: @expiry_predecessor_result.fetch("intentions").map do |reference|
+        reference.slice("resource_id", "intention_id", "fencing_token").transform_keys(&:to_sym)
       end,
-      lease_duration_seconds: 60
+      ttl_seconds: 60
     }
   ).dig("result", "taskId")
   execute_task(@renewed_predecessor_task_id)
@@ -1077,7 +1077,7 @@ When(
     [ now >= old_expiry, now.iso8601(6) ]
   end
   @renewal_contender_task_id = call_tool(
-    "write_set_reserve",
+    "work_intention_set_declare",
     {
       command_id: "cmd-cuc-renew-contender",
       actor: { kind: "agent", id: agent_id },
@@ -1087,7 +1087,7 @@ When(
       repository_id: acceptance_repository_id,
       base_commit_oid: "a" * 40,
       resources: [ resource_target(kind: "file", path: @expiry_path, actor_id: agent_id) ],
-      lease_duration_seconds: 300
+      ttl_seconds: 300
     }
   ).dig("result", "taskId")
   execute_task(@renewal_contender_task_id)
@@ -1114,12 +1114,12 @@ When("the exact release command is submitted again") do
     change_set_id: @release_change_set_id,
     work_item_id: @release_work_item_id,
     attempt_id: @release_attempt_id,
-    lease_set_id: @release_reservation.fetch("lease_set_id"),
-    leases: @release_reservation.fetch("resources").map do |reference|
-      reference.slice("resource_id", "lease_id", "fencing_token").transform_keys(&:to_sym)
+    intention_set_id: @release_reservation.fetch("intention_set_id"),
+    intentions: @release_reservation.fetch("intentions").map do |reference|
+      reference.slice("resource_id", "intention_id", "fencing_token").transform_keys(&:to_sym)
     end
   }
-  @release_retry_task_id = call_tool("lease_release", arguments).dig("result", "taskId")
+  @release_retry_task_id = call_tool("work_intention_set_withdraw", arguments).dig("result", "taskId")
   execute_task(@release_retry_task_id)
   @release_retry_task_state = task_request("tasks/get", @release_retry_task_id)
 end
@@ -1131,10 +1131,10 @@ Then("both release responses expose the original Task and one logical result") d
     @release_retry_task_state.dig("result", "result"),
     "Release replay result"
   )
-  @release_reservation.fetch("resources").each do |reference|
+  @release_reservation.fetch("intentions").each do |reference|
     assert_acceptance_equal(
       1,
-      work_intention_events(reference.fetch("lease_id")).count { _1.type == "ResourceWorkIntentionWithdrawn" },
+      work_intention_events(reference.fetch("intention_id")).count { _1.type == "ResourceWorkIntentionWithdrawn" },
       "Replayed withdrawal fact"
     )
   end
@@ -1147,16 +1147,16 @@ end
 
 When("the predecessor releases its exact lease set") do
   @predecessor_release_task_id = call_tool(
-    "lease_release",
+    "work_intention_set_withdraw",
     {
       command_id: "cmd-cuc-release-predecessor",
       actor: { kind: "agent", id: @expiry_predecessor.fetch(:agent_id) },
       change_set_id: @lease_change_set_id,
       work_item_id: @expiry_predecessor.fetch(:work_item_id),
       attempt_id: @expiry_predecessor.fetch(:attempt_id),
-      lease_set_id: @expiry_predecessor_result.fetch("lease_set_id"),
-      leases: @expiry_predecessor_result.fetch("resources").map do |reference|
-        reference.slice("resource_id", "lease_id", "fencing_token").transform_keys(&:to_sym)
+      intention_set_id: @expiry_predecessor_result.fetch("intention_set_id"),
+      intentions: @expiry_predecessor_result.fetch("intentions").map do |reference|
+        reference.slice("resource_id", "intention_id", "fencing_token").transform_keys(&:to_sym)
       end
     }
   ).dig("result", "taskId")
@@ -1170,7 +1170,7 @@ Then("the authoritative release succeeds") do
   assert_acceptance_equal(
     [ "ResourceWorkIntentionDeclared", "ResourceWorkIntentionWithdrawn" ],
     work_intention_events(
-      @expiry_predecessor_result.fetch("resources").sole.fetch("lease_id")
+      @expiry_predecessor_result.fetch("intentions").sole.fetch("intention_id")
     ).map(&:type),
     "Withdrawn intention lifecycle"
   )
@@ -1179,7 +1179,7 @@ end
 When("agent {string} deliberately reserves after the release") do |agent_id|
   participant = @lease_participants.find { _1.fetch(:agent_id) == agent_id }
   task_id = submit_and_execute(
-    "write_set_reserve",
+    "work_intention_set_declare",
     command_id: "cmd-cuc-release-successor",
     actor: { kind: "agent", id: agent_id },
     change_set_id: @lease_change_set_id,
@@ -1188,7 +1188,7 @@ When("agent {string} deliberately reserves after the release") do |agent_id|
     repository_id: acceptance_repository_id,
     base_commit_oid: "a" * 40,
     resources: [ resource_target(kind: "file", path: @expiry_path, actor_id: agent_id) ],
-    lease_duration_seconds: 300
+    ttl_seconds: 300
   )
   @successor_result = task_request("tasks/get", task_id).dig(
     "result", "result", "structuredContent", "data"
@@ -1197,18 +1197,18 @@ end
 
 When("the expired predecessor tries to renew its old fence") do
   @expired_predecessor_renewal_task_id = call_tool(
-    "lease_renew",
+    "work_intention_set_renew",
     {
       command_id: "cmd-cuc-expired-predecessor-renew",
       actor: { kind: "agent", id: @expiry_predecessor.fetch(:agent_id) },
       change_set_id: @lease_change_set_id,
       work_item_id: @expiry_predecessor.fetch(:work_item_id),
       attempt_id: @expiry_predecessor.fetch(:attempt_id),
-      lease_set_id: @expiry_predecessor_result.fetch("lease_set_id"),
-      leases: @expiry_predecessor_result.fetch("resources").map do |reference|
-        reference.slice("resource_id", "lease_id", "fencing_token").transform_keys(&:to_sym)
+      intention_set_id: @expiry_predecessor_result.fetch("intention_set_id"),
+      intentions: @expiry_predecessor_result.fetch("intentions").map do |reference|
+        reference.slice("resource_id", "intention_id", "fencing_token").transform_keys(&:to_sym)
       end,
-      lease_duration_seconds: 300
+      ttl_seconds: 300
     }
   ).dig("result", "taskId")
   execute_task(@expired_predecessor_renewal_task_id)
@@ -1225,16 +1225,16 @@ end
 
 When("the expired predecessor tries to release its old fence") do
   @expired_predecessor_release_task_id = call_tool(
-    "lease_release",
+    "work_intention_set_withdraw",
     {
       command_id: "cmd-cuc-expired-predecessor-release",
       actor: { kind: "agent", id: @expiry_predecessor.fetch(:agent_id) },
       change_set_id: @lease_change_set_id,
       work_item_id: @expiry_predecessor.fetch(:work_item_id),
       attempt_id: @expiry_predecessor.fetch(:attempt_id),
-      lease_set_id: @expiry_predecessor_result.fetch("lease_set_id"),
-      leases: @expiry_predecessor_result.fetch("resources").map do |reference|
-        reference.slice("resource_id", "lease_id", "fencing_token").transform_keys(&:to_sym)
+      intention_set_id: @expiry_predecessor_result.fetch("intention_set_id"),
+      intentions: @expiry_predecessor_result.fetch("intentions").map do |reference|
+        reference.slice("resource_id", "intention_id", "fencing_token").transform_keys(&:to_sym)
       end
     }
   ).dig("result", "taskId")
@@ -1307,10 +1307,10 @@ Then("the abandonment Task releases current fences and requeues the WorkItem") d
     abandonment_events.sole.data.keys.sort,
     "AttemptAbandoned fact boundary"
   )
-  @release_reservation.fetch("resources").each do |reference|
+  @release_reservation.fetch("intentions").each do |reference|
     assert_acceptance_equal(
       [ "ResourceWorkIntentionDeclared", "ResourceWorkIntentionWithdrawn" ],
-      work_intention_events(reference.fetch("lease_id")).map(&:type),
+      work_intention_events(reference.fetch("intention_id")).map(&:type),
       "Abandoned work-intention lifecycle for #{reference.fetch("resource_path")}"
     )
   end
@@ -1464,7 +1464,7 @@ Then("the abandonment requeues the predecessor and leaves the successor fence un
   assert_acceptance_equal(false, result.fetch("isError"), "Superseded abandonment error flag")
   assert_acceptance_equal([], abandonment.data.fetch("released_leases"), "Released predecessor fences")
   assert_acceptance_equal(
-    [ @expiry_predecessor_result.fetch("resources").sole.fetch("resource_id") ],
+    [ @expiry_predecessor_result.fetch("intentions").sole.fetch("resource_id") ],
     abandonment.data.fetch("untouched_resource_ids"),
     "Untouched predecessor fences"
   )
@@ -1694,7 +1694,7 @@ module HierarchicalWriteSetAcceptance
     assert_acceptance(participant, "Unknown hierarchy participant #{agent_id}")
     command_id ||= "#{@hierarchical_change_set_id.downcase}.reserve.#{command_suffix}"
     response = call_tool(
-      "write_set_reserve",
+      "work_intention_set_declare",
       {
         command_id:,
         actor: { kind: "agent", id: agent_id },
@@ -1714,12 +1714,12 @@ module HierarchicalWriteSetAcceptance
             actor_id: agent_id
           )
         ],
-        lease_duration_seconds: 300
+        ttl_seconds: 300
       },
       client_id: agent_id
     )
     task_id = response.dig("result", "taskId")
-    assert_acceptance(task_id, "write_set_reserve did not return a Task: #{response.inspect}")
+    assert_acceptance(task_id, "work_intention_set_declare did not return a Task: #{response.inspect}")
 
     {
       agent_id:,
@@ -1737,8 +1737,8 @@ module HierarchicalWriteSetAcceptance
 
   def hierarchical_intention_events(reservation)
     data = hierarchical_outcome(reservation).fetch("data")
-    data.fetch("resources").flat_map do |reference|
-      work_intention_events(reference.fetch("lease_id"))
+    data.fetch("intentions").flat_map do |reference|
+      work_intention_events(reference.fetch("intention_id"))
     end
   end
 
@@ -1965,7 +1965,7 @@ When(
   @system_identity_path = path
 
   task_id = submit_and_await(
-    "write_set_reserve",
+    "work_intention_set_declare",
     command_id: "cs-aud-lse-expiry-id.reserve.predecessor",
     actor: { kind: "agent", id: agent_id },
     change_set_id: @hierarchical_change_set_id,
@@ -1974,7 +1974,7 @@ When(
     repository_id: acceptance_repository_id,
     base_commit_oid: "a" * 40,
     resources: [ resource_target(kind: "file", path:, actor_id: agent_id) ],
-    lease_duration_seconds: 30
+    ttl_seconds: 30
   )
   state = task_request("tasks/get", task_id)
   assert_acceptance_equal(false, state.dig("result", "result", "isError"), "Predecessor reservation")
@@ -2012,7 +2012,7 @@ When("the real lease-expiry job handles the due source") do
     process_name: "lease-expiry-policy",
     step_name: "expire-resource-lease",
     subject_kind: "resource-lease",
-    subject_id: @system_identity_source.data.fetch("lease_id")
+    subject_id: @system_identity_source.data.fetch("intention_id")
   )
   assert_acceptance(@lease_expiry_process_step, "Lease expiry has no persisted process step")
   @internal_expiry_command_id = @lease_expiry_process_step.data.fetch("target_command_id")
@@ -2047,7 +2047,7 @@ end
 When("agent {string} reserves the expired file through a public Task") do |agent_id|
   participant = @hierarchical_participants.find { _1.fetch(:agent_id) == agent_id }
   @system_identity_successor_task_id = submit_and_await(
-    "write_set_reserve",
+    "work_intention_set_declare",
     command_id: "cs-aud-lse-expiry-id.reserve.successor",
     actor: { kind: "agent", id: agent_id },
     change_set_id: @hierarchical_change_set_id,
@@ -2056,7 +2056,7 @@ When("agent {string} reserves the expired file through a public Task") do |agent
     repository_id: acceptance_repository_id,
     base_commit_oid: "a" * 40,
     resources: [ resource_target(kind: "file", path: @system_identity_path, actor_id: agent_id) ],
-    lease_duration_seconds: 300
+    ttl_seconds: 300
   )
   @system_identity_successor_state = task_request("tasks/get", @system_identity_successor_task_id)
 end
@@ -2066,7 +2066,7 @@ Then("the successor receives a higher fencing token") do
   assert_acceptance_equal("ok", outcome.fetch("status"), "Successor reservation")
   assert_acceptance_equal(
     2,
-    outcome.dig("data", "resources").sole.fetch("fencing_token"),
+    outcome.dig("data", "intentions").sole.fetch("fencing_token"),
     "Successor fencing token"
   )
   assert_acceptance_equal(
@@ -2226,7 +2226,7 @@ module ResourceBoundaryRolloverAcceptance
       )
     end
     task_id = submit_and_execute(
-      "write_set_reserve",
+      "work_intention_set_declare",
       client_id: OWNER.fetch(:agent_id),
       command_id: "audit2-rollover.reserve.owner",
       actor: { kind: "agent", id: OWNER.fetch(:agent_id) },
@@ -2236,7 +2236,7 @@ module ResourceBoundaryRolloverAcceptance
       repository_id: acceptance_repository_id,
       base_commit_oid: "a" * 40,
       resources: targets,
-      lease_duration_seconds: 600
+      ttl_seconds: 600
     )
     successful_rollover_task_data(task_id, client_id: OWNER.fetch(:agent_id))
   end
@@ -2245,16 +2245,16 @@ module ResourceBoundaryRolloverAcceptance
     count.times.reduce(receipt) do |current, _index|
       @rollover_renewal_sequence = @rollover_renewal_sequence.to_i + 1
       task_id = submit_and_execute(
-        "lease_renew",
+        "work_intention_set_renew",
         client_id: OWNER.fetch(:agent_id),
         command_id: "audit2-rollover.renew.#{@rollover_renewal_sequence}",
         actor: { kind: "agent", id: OWNER.fetch(:agent_id) },
         change_set_id: ROLLOVER_CHANGE_SET_ID,
         work_item_id: OWNER.fetch(:work_item_id),
         attempt_id: OWNER.fetch(:attempt_id),
-        lease_set_id: current.fetch("lease_set_id"),
-        leases: lease_observations(current),
-        lease_duration_seconds: 600 + (@rollover_renewal_sequence * 60)
+        intention_set_id: current.fetch("intention_set_id"),
+        intentions: lease_observations(current),
+        ttl_seconds: 600 + (@rollover_renewal_sequence * 60)
       )
       successful_rollover_task_data(task_id, client_id: OWNER.fetch(:agent_id))
     end
@@ -2270,35 +2270,35 @@ module ResourceBoundaryRolloverAcceptance
       )
     end
     task_id = submit_and_execute(
-      "write_set_expand",
+      "work_intention_set_expand",
       client_id: OWNER.fetch(:agent_id),
       command_id: "audit2-rollover.expand.owner",
       actor: { kind: "agent", id: OWNER.fetch(:agent_id) },
       change_set_id: ROLLOVER_CHANGE_SET_ID,
       work_item_id: OWNER.fetch(:work_item_id),
       attempt_id: OWNER.fetch(:attempt_id),
-      lease_set_id: receipt.fetch("lease_set_id"),
+      intention_set_id: receipt.fetch("intention_set_id"),
       repository_id: acceptance_repository_id,
       base_commit_oid: "a" * 40,
       resources: targets
     )
     expansion = successful_rollover_task_data(task_id, client_id: OWNER.fetch(:agent_id))
-    all_resources = (receipt.fetch("resources") + expansion.fetch("added_resources"))
+    all_resources = (receipt.fetch("intentions") + expansion.fetch("added_intentions"))
       .sort_by { _1.fetch("resource_id").b }
-    receipt.merge("resources" => all_resources, "expires_at" => expansion.fetch("expires_at"))
+    receipt.merge("intentions" => all_resources, "expires_at" => expansion.fetch("expires_at"))
   end
 
   def release_rollover_resources(receipt)
     task_id = submit_and_execute(
-      "lease_release",
+      "work_intention_set_withdraw",
       client_id: OWNER.fetch(:agent_id),
       command_id: "audit2-rollover.release.owner",
       actor: { kind: "agent", id: OWNER.fetch(:agent_id) },
       change_set_id: ROLLOVER_CHANGE_SET_ID,
       work_item_id: OWNER.fetch(:work_item_id),
       attempt_id: OWNER.fetch(:attempt_id),
-      lease_set_id: receipt.fetch("lease_set_id"),
-      leases: lease_observations(receipt)
+      intention_set_id: receipt.fetch("intention_set_id"),
+      intentions: lease_observations(receipt)
     )
     successful_rollover_task_data(task_id, client_id: OWNER.fetch(:agent_id))
   end
@@ -2312,10 +2312,10 @@ module ResourceBoundaryRolloverAcceptance
   end
 
   def lease_observations(receipt)
-    receipt.fetch("resources").map do |reference|
+    receipt.fetch("intentions").map do |reference|
       {
         resource_id: reference.fetch("resource_id"),
-        lease_id: reference.fetch("lease_id"),
+        intention_id: reference.fetch("intention_id"),
         fencing_token: reference.fetch("fencing_token")
       }
     end
@@ -2397,7 +2397,7 @@ module ResourceBoundaryRolloverAcceptance
 
   def submit_rollover_contender(kind:, path:, await_terminal: true)
     response = call_tool(
-      "write_set_reserve",
+      "work_intention_set_declare",
       {
         command_id: "audit2-rollover.reserve.contender",
         actor: { kind: "agent", id: CONTENDER.fetch(:agent_id) },
@@ -2414,7 +2414,7 @@ module ResourceBoundaryRolloverAcceptance
             actor_id: CONTENDER.fetch(:agent_id)
           )
         ],
-        lease_duration_seconds: 600
+        ttl_seconds: 600
       },
       client_id: CONTENDER.fetch(:agent_id)
     )

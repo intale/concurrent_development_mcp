@@ -17,7 +17,7 @@ RSpec.describe Coordinator::Read::Web::Queries::ProjectResources, :read_model do
       018f0f4d-4e45-7abc-8def-000000000053
     ]
   end
-  let(:lease_ids) do
+  let(:intention_ids) do
     %w[
       018f0f4d-4e45-7abc-8def-000000000061
       018f0f4d-4e45-7abc-8def-000000000062
@@ -55,20 +55,22 @@ RSpec.describe Coordinator::Read::Web::Queries::ProjectResources, :read_model do
       "private/outside.rb"
     )
 
-    create_lease_attempt("A-active", resource_ids.fetch(0), lease_ids.fetch(0), "luna-owner")
-    create_lease_attempt(
+    create_work_intention_attempt("A-active", resource_ids.fetch(0), intention_ids.fetch(0), "luna-owner")
+    create_work_intention_attempt(
       "A-expired",
       resource_ids.fetch(1),
-      lease_ids.fetch(1),
+      intention_ids.fetch(1),
       "luna-expired",
       expires_at: Time.utc(2026, 8, 30, 12, 4)
     )
-    create_lease_attempt(
-      "A-released",
+    create_work_intention_attempt(
+      "A-withdrawn",
       resource_ids.fetch(2),
-      lease_ids.fetch(2),
-      "luna-released",
-      released: true
+      intention_ids.fetch(2),
+      "luna-withdrawn",
+      withdrawn: true,
+      mode: "exclusive",
+      context: "Wait for the translation rewrite to finish"
     )
   end
 
@@ -115,24 +117,27 @@ RSpec.describe Coordinator::Read::Web::Queries::ProjectResources, :read_model do
     expect(outside).to be_nil
   end
 
-  it "lists only factual active leases with server-side holder and coordination filters" do
-    active = described_class.new.active_leases(
+  it "lists active advisory work intentions with server-side mode and coordination filters" do
+    active = described_class.new.active_work_intentions(
       project_ref:,
       first: 20,
       as_of:,
       agent_id: "luna-owner",
-      work_item_id: "W-A-active"
+      work_item_id: "W-A-active",
+      mode: "shared"
     )
-    none = described_class.new.active_leases(
+    none = described_class.new.active_work_intentions(
       project_ref:,
       first: 20,
       as_of:,
-      attempt_id: "A-running-without-lease"
+      attempt_id: "A-running-without-intention"
     )
 
     expect(active.items.sole).to have_attributes(
-      lease_id: lease_ids.fetch(0),
+      intention_id: intention_ids.fetch(0),
       status: "active",
+      mode: "shared",
+      purpose: "Implement A-active",
       agent_id: "luna-owner",
       attempt_id: "A-active"
     )
@@ -140,22 +145,24 @@ RSpec.describe Coordinator::Read::Web::Queries::ProjectResources, :read_model do
     expect(none.items).to be_empty
   end
 
-  it "keeps expired and released lease history addressable without presenting it as active" do
-    expired = described_class.new.lease(project_ref:, id: lease_ids.fetch(1), as_of:)
-    released = described_class.new.lease(project_ref:, id: lease_ids.fetch(2), as_of:)
+  it "keeps expired and withdrawn intention history addressable without presenting it as active" do
+    expired = described_class.new.work_intention(project_ref:, id: intention_ids.fetch(1), as_of:)
+    withdrawn = described_class.new.work_intention(project_ref:, id: intention_ids.fetch(2), as_of:)
 
-    expect(expired).to have_attributes(status: "expired", agent_id: "luna-expired", released_at: nil)
-    expect(released).to have_attributes(
-      status: "released",
-      agent_id: "luna-released",
-      released_at: "2026-08-30T12:04:00.000000Z"
+    expect(expired).to have_attributes(status: "expired", agent_id: "luna-expired", withdrawn_at: nil)
+    expect(withdrawn).to have_attributes(
+      status: "withdrawn",
+      agent_id: "luna-withdrawn",
+      mode: "exclusive",
+      context: "Wait for the translation rewrite to finish",
+      withdrawn_at: "2026-08-30T12:04:00.000000Z"
     )
-    expect(released.release_event_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
+    expect(withdrawn.withdrawal_event_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
   end
 
   it "rejects malformed identifiers and canonical timestamps through dry contracts" do
     expect do
-      described_class.new.lease(project_ref:, id: "not-a-lease", as_of: "yesterday")
+      described_class.new.work_intention(project_ref:, id: "not-an-intention", as_of: "yesterday")
     end.to raise_error(Coordinator::Read::Web::ProjectResourcesQueryError) do |error|
       expect(error.details.keys).to contain_exactly(:id, :as_of)
     end
@@ -176,11 +183,20 @@ RSpec.describe Coordinator::Read::Web::Queries::ProjectResources, :read_model do
     )
   end
 
-  def create_lease_attempt(attempt_id, resource_id, lease_id, agent_id, expires_at: nil, released: false)
+  def create_work_intention_attempt(
+    attempt_id,
+    resource_id,
+    intention_id,
+    agent_id,
+    expires_at: nil,
+    withdrawn: false,
+    mode: "shared",
+    context: nil
+  )
     repository_id = Coordinator::Read::Resource.find(resource_id).repository_id
     create(
       :coordinator_read_attempt_history,
-      released ? :released_write_set : :with_write_set,
+      withdrawn ? :withdrawn_work_intention_set : :with_work_intention_set,
       attempt_id:,
       change_set_id: "CS-resource-browser",
       work_item_id: "W-#{attempt_id}",
@@ -188,12 +204,15 @@ RSpec.describe Coordinator::Read::Web::Queries::ProjectResources, :read_model do
       status: "started",
       base_snapshots: snapshots(repository_id),
       write_set_repository_id: repository_id,
-      write_set_resource_id: resource_id,
-      write_set_resource_path: Coordinator::Read::Resource.find(resource_id).normalized_path,
-      write_set_lease_id: lease_id,
+      work_intention_resource_id: resource_id,
+      work_intention_resource_path: Coordinator::Read::Resource.find(resource_id).normalized_path,
+      work_intention_id: intention_id,
+      work_intention_mode: mode,
+      work_intention_purpose: "Implement #{attempt_id}",
+      work_intention_context: context,
       write_set_lease_set_id: SecureRandom.uuid_v7,
       write_set_expires_at_domain: expires_at || Time.utc(2026, 8, 30, 12, 20),
-      write_set_released_at_domain: released ? Time.utc(2026, 8, 30, 12, 4) : nil
+      write_set_released_at_domain: withdrawn ? Time.utc(2026, 8, 30, 12, 4) : nil
     )
   end
 

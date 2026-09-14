@@ -1,4 +1,22 @@
 module Coordinator::Read
   class WorkIntentionSetViewV1 < Coordinator::Shared::Value
+    def set_id: () -> String
+    def change_set_id: () -> String
+    def work_item_id: () -> String
+    def attempt_id: () -> String
+    def repository_id: () -> String
+    def agent_id: () -> String
+    def policy_version: () -> String
+    def intentions: () -> Array[WorkIntentionViewV1]
+    def created_event: () -> PgEventstore::Event
+    def last_expanded_event: () -> PgEventstore::Event?
+    def last_renewed_event: () -> PgEventstore::Event?
+    def release_event: () -> PgEventstore::Event?
+    def declared_at: () -> String
+    def last_expanded_at: () -> String?
+    def last_renewed_at: () -> String?
+    def previous_expires_at: () -> String?
+    def expires_at: () -> String
+    def withdrawn_at: () -> String?
   end
 end

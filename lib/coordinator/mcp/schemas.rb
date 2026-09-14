@@ -306,7 +306,7 @@ module Coordinator
         )
       end
 
-      def write_set_reserve
+      def work_intention_set_declare
         object_schema(
           properties: common_mutation_properties.merge(
             actor: agent_actor,
@@ -317,85 +317,85 @@ module Coordinator
             base_commit_oid: git_oid,
             resources: {
               type: "array",
-              items: write_set_resource,
+              items: work_intention_target,
               minItems: 1,
               maxItems: 32
             },
-            lease_duration_seconds: { type: "integer", minimum: 30, maximum: 3_600 }
+            ttl_seconds: { type: "integer", minimum: 30, maximum: 3_600 }
           ),
           required: %w[
             command_id actor change_set_id work_item_id attempt_id repository_id
-            base_commit_oid resources lease_duration_seconds
+            base_commit_oid resources ttl_seconds
           ]
         )
       end
 
-      def write_set_expand
+      def work_intention_set_expand
         object_schema(
           properties: common_mutation_properties.merge(
             actor: agent_actor,
             change_set_id: identifier,
             work_item_id: identifier,
             attempt_id: identifier,
-            lease_set_id: uuid_v7,
+            intention_set_id: uuid_v7,
             repository_id: uuid_v7,
             base_commit_oid: git_oid,
             resources: {
               type: "array",
-              items: write_set_resource,
+              items: work_intention_target,
               minItems: 1,
               maxItems: 32
             }
           ),
           required: %w[
-            command_id actor change_set_id work_item_id attempt_id lease_set_id
+            command_id actor change_set_id work_item_id attempt_id intention_set_id
             repository_id base_commit_oid resources
           ]
         )
       end
 
-      def lease_renew
+      def work_intention_set_renew
         object_schema(
           properties: common_mutation_properties.merge(
             actor: agent_actor,
             change_set_id: identifier,
             work_item_id: identifier,
             attempt_id: identifier,
-            lease_set_id: uuid_v7,
-            leases: {
+            intention_set_id: uuid_v7,
+            intentions: {
               type: "array",
-              items: lease_renewal_reference,
+              items: work_intention_reference,
               minItems: 1,
               maxItems: 32,
               uniqueItems: true
             },
-            lease_duration_seconds: { type: "integer", minimum: 30, maximum: 3_600 }
+            ttl_seconds: { type: "integer", minimum: 30, maximum: 3_600 }
           ),
           required: %w[
-            command_id actor change_set_id work_item_id attempt_id lease_set_id
-            leases lease_duration_seconds
+            command_id actor change_set_id work_item_id attempt_id intention_set_id
+            intentions ttl_seconds
           ]
         )
       end
 
-      def lease_release
+      def work_intention_set_withdraw
         object_schema(
           properties: common_mutation_properties.merge(
             actor: agent_actor,
             change_set_id: identifier,
             work_item_id: identifier,
             attempt_id: identifier,
-            lease_set_id: uuid_v7,
-            leases: {
+            intention_set_id: uuid_v7,
+            intentions: {
               type: "array",
-              items: lease_release_reference,
+              items: work_intention_reference,
               minItems: 1,
               maxItems: 32,
               uniqueItems: true
             }
           ),
           required: %w[
-            command_id actor change_set_id work_item_id attempt_id lease_set_id leases
+            command_id actor change_set_id work_item_id attempt_id intention_set_id intentions
           ]
         )
       end
@@ -579,20 +579,20 @@ module Coordinator
             base_commit_oid: git_oid,
             head_commit_oid: git_oid,
             checkpoint_kind: { type: "string", enum: Types::CANDIDATE_CHECKPOINT_KINDS },
-            lease_set_id: uuid_v7,
-            leases: {
+            intention_set_id: uuid_v7,
+            intentions: {
               type: "array",
               minItems: 1,
               maxItems: 32,
               uniqueItems: true,
-              items: lease_renewal_reference
+              items: work_intention_reference
             },
             change_manifest: candidate_change_manifest,
             build_context: { anyOf: [ candidate_build_context, { type: "null" } ] }
           ),
           required: %w[
             command_id actor candidate_id change_set_id work_item_id attempt_id repository_id
-            target_branch base_commit_oid head_commit_oid checkpoint_kind lease_set_id leases
+            target_branch base_commit_oid head_commit_oid checkpoint_kind intention_set_id intentions
             change_manifest
           ]
         )
@@ -2442,12 +2442,12 @@ module Coordinator
         }
       end
 
-      def write_set_resource
+      def work_intention_target
         object_schema(
           properties: {
             resource_id: uuid_v7,
             base_blob_oid: { anyOf: [ git_oid, { type: "null" } ] },
-            mode: { type: "string", enum: %w[shared exclusive] },
+            mode: { type: "string", enum: %w[shared exclusive], default: "shared" },
             purpose: { type: "string", minLength: 1, maxLength: 1_000 },
             context: {
               anyOf: [
@@ -2460,19 +2460,15 @@ module Coordinator
         )
       end
 
-      def lease_renewal_reference
+      def work_intention_reference
         object_schema(
           properties: {
             resource_id: uuid_v7,
-            lease_id: uuid_v7,
+            intention_id: uuid_v7,
             fencing_token: { type: "integer", minimum: 1 }
           },
-          required: %w[resource_id lease_id fencing_token]
+          required: %w[resource_id intention_id fencing_token]
         )
-      end
-
-      def lease_release_reference
-        lease_renewal_reference
       end
 
       def candidate_change_manifest

@@ -3,7 +3,7 @@
 module Coordinator::Write
   module Operations
     class ExecuteReserveWriteSet < Dry::Operation
-      TOOL_NAME = "write_set_reserve"
+      TOOL_NAME = "work_intention_set_declare"
 
       def initialize(
         event_store:,
@@ -208,22 +208,26 @@ module Coordinator::Write
         declarations = plan.events.grep(Events::ResourceWorkIntentionDeclaredV1)
         references = declarations.map do |event|
           resource = resources.find { _1.resource_id == event.resource_id }
-          LeaseReferenceV2.new(
-            lease_id: event.intention_id,
+          target = prepared.resources.find { _1.intention_id == event.intention_id }.target
+          WorkIntentionReceiptReferenceV1.new(
+            intention_id: event.intention_id,
             resource_id: event.resource_id,
             resource_kind: resource.kind,
             resource_path: resource.path,
             base_blob_oid: event.base_blob_oid,
+            mode: target.mode,
+            purpose: target.purpose,
+            context: target.context,
             fencing_token: event.fencing_token
           )
         end
         WorkIntentionSetReceiptV1.new(
-          lease_set_id: prepared.lease_set_id,
+          intention_set_id: prepared.lease_set_id,
           repository_id: command.repository_id,
           policy_version: WorkIntentionPolicyV1::VERSION,
-          reserved_at: prepared.acquired_at,
+          declared_at: prepared.acquired_at,
           expires_at: prepared.expires_at,
-          resources: references
+          intentions: references
         )
       end
 

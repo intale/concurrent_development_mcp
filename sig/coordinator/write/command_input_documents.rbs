@@ -156,6 +156,9 @@ module Coordinator
       class ResourceLeaseTargetV1 < Shared::Value
         def resource_id: () -> String
         def base_blob_oid: () -> String?
+        def mode: () -> String
+        def purpose: () -> String
+        def context: () -> String?
       end
 
       class ReserveWriteSetInputV1 < Shared::Value
@@ -166,7 +169,7 @@ module Coordinator
         def repository_id: () -> String
         def base_commit_oid: () -> String
         def resources: () -> Array[ResourceLeaseTargetV1]
-        def lease_duration_seconds: () -> Integer
+        def ttl_seconds: () -> Integer
       end
 
       class ReserveWriteSetV1 < BaseV1
@@ -179,7 +182,7 @@ module Coordinator
         def change_set_id: () -> String
         def work_item_id: () -> String
         def attempt_id: () -> String
-        def lease_set_id: () -> String
+        def intention_set_id: () -> String
         def repository_id: () -> String
         def base_commit_oid: () -> String
         def resources: () -> Array[ResourceLeaseTargetV1]
@@ -192,7 +195,7 @@ module Coordinator
 
       class LeaseRenewalReferenceV1 < Shared::Value
         def resource_id: () -> String
-        def lease_id: () -> String
+        def intention_id: () -> String
         def fencing_token: () -> Integer
       end
 
@@ -201,9 +204,9 @@ module Coordinator
         def change_set_id: () -> String
         def work_item_id: () -> String
         def attempt_id: () -> String
-        def lease_set_id: () -> String
-        def leases: () -> Array[LeaseRenewalReferenceV1]
-        def lease_duration_seconds: () -> Integer
+        def intention_set_id: () -> String
+        def intentions: () -> Array[LeaseRenewalReferenceV1]
+        def ttl_seconds: () -> Integer
       end
 
       class RenewLeaseSetV1 < BaseV1
@@ -213,7 +216,7 @@ module Coordinator
 
       class LeaseReleaseReferenceV1 < Shared::Value
         def resource_id: () -> String
-        def lease_id: () -> String
+        def intention_id: () -> String
         def fencing_token: () -> Integer
       end
 
@@ -222,8 +225,8 @@ module Coordinator
         def change_set_id: () -> String
         def work_item_id: () -> String
         def attempt_id: () -> String
-        def lease_set_id: () -> String
-        def leases: () -> Array[LeaseReleaseReferenceV1]
+        def intention_set_id: () -> String
+        def intentions: () -> Array[LeaseReleaseReferenceV1]
       end
 
       class ReleaseLeaseSetV1 < BaseV1
@@ -337,7 +340,7 @@ module Coordinator
 
       class CandidateLeaseObservationV1 < Shared::Value
         def resource_id: () -> String
-        def lease_id: () -> String
+        def intention_id: () -> String
         def fencing_token: () -> Integer
       end
 
@@ -397,8 +400,8 @@ module Coordinator
         def base_commit_oid: () -> String
         def head_commit_oid: () -> String
         def checkpoint_kind: () -> String
-        def lease_set_id: () -> String
-        def leases: () -> Array[CandidateLeaseObservationV1]
+        def intention_set_id: () -> String
+        def intentions: () -> Array[CandidateLeaseObservationV1]
         def change_manifest: () -> CandidateChangeManifestV1
         def build_context: () -> CandidateBuildContextV1?
         def actual_resources: () -> Array[CandidateActualResourceV2]

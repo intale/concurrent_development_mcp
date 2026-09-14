@@ -172,11 +172,11 @@ module Coordinator::Write
       attribute :repository_id, Types::RepositoryId
       attribute :base_commit_oid, Types::GitOid
       attribute :resources, Types::Array.of(Resource).constrained(min_size: 1, max_size: 32)
-      attribute :lease_duration_seconds, Types::LeaseDurationSeconds
+      attribute :ttl_seconds, Types::LeaseDurationSeconds
     end
 
     class ReserveWriteSetV1 < BaseV1
-      attribute :tool_name, Types::String.enum("write_set_reserve")
+      attribute :tool_name, Types::String.enum("work_intention_set_declare")
       attribute :input, ReserveWriteSetInputV1
     end
 
@@ -187,20 +187,20 @@ module Coordinator::Write
       attribute :change_set_id, Types::Identifier
       attribute :work_item_id, Types::Identifier
       attribute :attempt_id, Types::Identifier
-      attribute :lease_set_id, Types::UuidV7
+      attribute :intention_set_id, Types::UuidV7
       attribute :repository_id, Types::RepositoryId
       attribute :base_commit_oid, Types::GitOid
       attribute :resources, Types::Array.of(Resource).constrained(min_size: 1, max_size: 32)
     end
 
     class ExpandWriteSetV1 < BaseV1
-      attribute :tool_name, Types::String.enum("write_set_expand")
+      attribute :tool_name, Types::String.enum("work_intention_set_expand")
       attribute :input, ExpandWriteSetInputV1
     end
 
     class LeaseRenewalReferenceV1 < Value
       attribute :resource_id, Types::ResourceId
-      attribute :lease_id, Types::UuidV7
+      attribute :intention_id, Types::UuidV7
       attribute :fencing_token, Types::FencingToken
     end
 
@@ -211,19 +211,19 @@ module Coordinator::Write
       attribute :change_set_id, Types::Identifier
       attribute :work_item_id, Types::Identifier
       attribute :attempt_id, Types::Identifier
-      attribute :lease_set_id, Types::UuidV7
-      attribute :leases, Types::Array.of(Reference).constrained(min_size: 1, max_size: 32)
-      attribute :lease_duration_seconds, Types::LeaseDurationSeconds
+      attribute :intention_set_id, Types::UuidV7
+      attribute :intentions, Types::Array.of(Reference).constrained(min_size: 1, max_size: 32)
+      attribute :ttl_seconds, Types::LeaseDurationSeconds
     end
 
     class RenewLeaseSetV1 < BaseV1
-      attribute :tool_name, Types::String.enum("lease_renew")
+      attribute :tool_name, Types::String.enum("work_intention_set_renew")
       attribute :input, RenewLeaseSetInputV1
     end
 
     class LeaseReleaseReferenceV1 < Value
       attribute :resource_id, Types::ResourceId
-      attribute :lease_id, Types::UuidV7
+      attribute :intention_id, Types::UuidV7
       attribute :fencing_token, Types::FencingToken
     end
 
@@ -234,12 +234,12 @@ module Coordinator::Write
       attribute :change_set_id, Types::Identifier
       attribute :work_item_id, Types::Identifier
       attribute :attempt_id, Types::Identifier
-      attribute :lease_set_id, Types::UuidV7
-      attribute :leases, Types::Array.of(Reference).constrained(min_size: 1, max_size: 32)
+      attribute :intention_set_id, Types::UuidV7
+      attribute :intentions, Types::Array.of(Reference).constrained(min_size: 1, max_size: 32)
     end
 
     class ReleaseLeaseSetV1 < BaseV1
-      attribute :tool_name, Types::String.enum("lease_release")
+      attribute :tool_name, Types::String.enum("work_intention_set_withdraw")
       attribute :input, ReleaseLeaseSetInputV1
     end
 
@@ -349,7 +349,7 @@ module Coordinator::Write
 
     class CandidateLeaseObservationV1 < Value
       attribute :resource_id, Types::ResourceId
-      attribute :lease_id, Types::UuidV7
+      attribute :intention_id, Types::UuidV7
       attribute :fencing_token, Types::FencingToken
     end
 
@@ -421,8 +421,8 @@ module Coordinator::Write
       attribute :base_commit_oid, Types::GitOid
       attribute :head_commit_oid, Types::GitOid
       attribute :checkpoint_kind, Types::CandidateCheckpointKind
-      attribute :lease_set_id, Types::UuidV7
-      attribute :leases, Types::Array.of(Lease).constrained(min_size: 1, max_size: 32)
+      attribute :intention_set_id, Types::UuidV7
+      attribute :intentions, Types::Array.of(Lease).constrained(min_size: 1, max_size: 32)
       attribute :change_manifest, CandidateChangeManifestV1
       attribute :build_context, CandidateBuildContextV1.optional
       attribute :actual_resources,

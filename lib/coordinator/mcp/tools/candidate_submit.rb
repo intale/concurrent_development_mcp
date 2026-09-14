@@ -6,9 +6,9 @@ module Coordinator
       class CandidateSubmit < MutationTool
         tool_name "candidate_submit"
         title "Submit a development Candidate checkpoint"
-        description "Submit one attributed Candidate commit with its exact lease observations, " \
-                    "canonical change manifest, and optional build context. Authoritative event-store " \
-                    "facts reject stale or unauthorized submissions."
+        description "Submit one attributed Candidate commit with its exact work-intention observations, " \
+                    "canonical change manifest, and optional build context. Every changed Resource must be " \
+                    "covered for accountability; coverage does not promise conflict-free integration."
         input_schema Schemas.candidate_submit
         operation "operations.submit_candidate_task"
       end

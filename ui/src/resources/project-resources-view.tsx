@@ -6,10 +6,10 @@ import { RetryRefresh } from "../retry-refresh.js";
 import type {
   ProjectResource,
   ProjectResourceConnection,
-  ResourceLease,
-  ResourceLeaseConnection
+  ResourceWorkIntention,
+  ResourceWorkIntentionConnection
 } from "./project-resources-model.js";
-import { leaseBadgeClass, lifecycleBadgeClass } from "./project-resources-model.js";
+import { lifecycleBadgeClass, workIntentionBadgeClass } from "./project-resources-model.js";
 
 export function useResourceHeading(title: string, focusKey: string): RefObject<HTMLHeadingElement> {
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -29,7 +29,7 @@ export function ResourceNavigation({ basePath }: { readonly basePath: string }) 
           <NavLink className={navClassName} to={`${basePath}/inventory`}>Resource inventory</NavLink>
         </li>
         <li className="nav-item">
-          <NavLink className={navClassName} to={`${basePath}/leases`}>Active leases</NavLink>
+          <NavLink className={navClassName} to={`${basePath}/work-intentions`}>Active work intentions</NavLink>
         </li>
       </ul>
     </nav>
@@ -138,35 +138,39 @@ export function ResourceCards({ connection, hrefFor }: {
   );
 }
 
-export function LeaseCards({ connection, hrefFor }: {
-  readonly connection: ResourceLeaseConnection;
+export function WorkIntentionCards({ connection, hrefFor }: {
+  readonly connection: ResourceWorkIntentionConnection;
   readonly hrefFor: (id: string) => string;
 }) {
   if (connection.nodes.length === 0) {
-    return <div className="alert alert-info" role="status">No active lease facts match these filters.</div>;
+    return <div className="alert alert-info" role="status">No active work intentions match these filters.</div>;
   }
   return (
-    <div aria-label="Active resource leases" className="row g-3">
-      {connection.nodes.map((lease) => (
-        <div className="col-12 col-xl-6" key={lease.id}>
-          <article className="card card-outline card-warning h-100">
+    <div aria-label="Active Resource work intentions" className="row g-3">
+      {connection.nodes.map((intention) => (
+        <div className="col-12 col-xl-6" key={intention.id}>
+          <article className={`card card-outline ${intention.mode === "EXCLUSIVE" ? "card-danger" : "card-info"} h-100`}>
             <div className="card-body d-flex flex-column gap-2">
               <div className="d-flex flex-wrap justify-content-between gap-2">
-                <h3 className="h5 text-break mb-0"><code>{lease.resourcePath}</code></h3>
-                <span className={`badge ${leaseBadgeClass(lease.status)}`}>{lease.status.toLowerCase()}</span>
+                <h3 className="h5 text-break mb-0"><code>{intention.resourcePath}</code></h3>
+                <span className={`badge ${workIntentionBadgeClass(intention.status)}`}>
+                  {intention.status.toLowerCase()}
+                </span>
               </div>
-              <div><strong>Holder:</strong> {lease.agentId}</div>
-              <div><strong>WorkItem:</strong> <code className="text-break">{lease.workItemId}</code></div>
-              <div className="small text-body-secondary text-break">Attempt {lease.attemptId}</div>
-              <Link className="btn btn-warning align-self-start mt-auto" to={hrefFor(lease.id)}>
-                View lease
+              <div><strong>{intention.mode.toLowerCase()} intention:</strong> {intention.purpose}</div>
+              {intention.context ? <div><strong>Context:</strong> {intention.context}</div> : null}
+              <div><strong>Agent:</strong> {intention.agentId}</div>
+              <div><strong>WorkItem:</strong> <code className="text-break">{intention.workItemId}</code></div>
+              <div className="small text-body-secondary text-break">Attempt {intention.attemptId}</div>
+              <Link className="btn btn-outline-primary align-self-start mt-auto" to={hrefFor(intention.id)}>
+                View work intention
               </Link>
             </div>
           </article>
         </div>
       ))}
       <p className="small text-body-secondary mb-0">
-        Active as of {formatted(connection.asOf)}. Ownership comes only from projected lease facts.
+        Active as of {formatted(connection.asOf)}. These are advisory intentions, not merge guarantees.
       </p>
     </div>
   );
@@ -209,52 +213,58 @@ export function ResourceDetail({ resource, backTo }: {
   );
 }
 
-export function LeaseDetail({ lease, backTo, projectPath }: {
-  readonly lease: ResourceLease;
+export function WorkIntentionDetail({ intention, backTo, projectPath }: {
+  readonly intention: ResourceWorkIntention;
   readonly backTo: string;
   readonly projectPath: string;
 }) {
   return (
     <article className="card card-outline card-warning">
       <div className="card-header d-flex flex-wrap justify-content-between gap-2">
-        <h3 className="card-title text-break"><code>{lease.resourcePath}</code></h3>
-        <span className={`badge ${leaseBadgeClass(lease.status)}`}>{lease.status.toLowerCase()}</span>
+        <h3 className="card-title text-break"><code>{intention.resourcePath}</code></h3>
+        <span className={`badge ${workIntentionBadgeClass(intention.status)}`}>
+          {intention.status.toLowerCase()}
+        </span>
       </div>
       <div className="card-body vstack gap-4">
-        <CopyIdentifier label="Resource path" value={lease.resourcePath} />
-        <CopyIdentifier label="Lease ID" value={lease.id} />
-        <DetailGroup title="Holder" rows={[
-          ["Agent", lease.agentId],
-          ["Attempt", lease.attemptId],
-          ["WorkItem", lease.workItemId],
-          ["ChangeSet", lease.changeSetId]
+        <CopyIdentifier label="Resource path" value={intention.resourcePath} />
+        <CopyIdentifier label="Work-intention ID" value={intention.id} />
+        <DetailGroup title="Purpose and accountability" rows={[
+          ["Mode", intention.mode.toLowerCase()],
+          ["Purpose", intention.purpose],
+          ["Context", intention.context],
+          ["Agent", intention.agentId],
+          ["Attempt", intention.attemptId],
+          ["WorkItem", intention.workItemId],
+          ["ChangeSet", intention.changeSetId]
         ]} />
         <div className="d-flex flex-wrap gap-2">
-          <Link className="btn btn-outline-primary" to={`${projectPath}/coordination/work-items/${encodeURIComponent(lease.workItemId)}`}>
+          <Link className="btn btn-outline-primary" to={`${projectPath}/coordination/work-items/${encodeURIComponent(intention.workItemId)}`}>
             View WorkItem
           </Link>
-          <Link className="btn btn-outline-primary" to={`${projectPath}/resources/inventory/${encodeURIComponent(lease.resourceId)}`}>
+          <Link className="btn btn-outline-primary" to={`${projectPath}/resources/inventory/${encodeURIComponent(intention.resourceId)}`}>
             View Resource
           </Link>
         </div>
-        <DetailGroup title="Lease" rows={[
-          ["Lease", lease.id],
-          ["Lease set", lease.leaseSetId],
-          ["Fencing token", lease.fencingToken],
-          ["Policy", lease.policyVersion],
-          ["Reserved", formatted(lease.reservedAt)],
-          ["Expires", formatted(lease.expiresAt)],
-          ["Released", formatted(lease.releasedAt)],
-          ["Attempt terminal", formatted(lease.attemptTerminalAt)]
+        <DetailGroup title="Work intention" rows={[
+          ["Intention", intention.id],
+          ["Intention set", intention.intentionSetId],
+          ["Fencing token", intention.fencingToken],
+          ["Policy", intention.policyVersion],
+          ["Declared", formatted(intention.declaredAt)],
+          ["Expires", formatted(intention.expiresAt)],
+          ["Withdrawn", formatted(intention.withdrawnAt)],
+          ["Attempt terminal", formatted(intention.attemptTerminalAt)],
+          ["Projection updated", formatted(intention.updatedAt)]
         ]} />
         <DetailGroup title="Event evidence" rows={[
-          ["Reserved event", lease.reservedEventId],
-          ["Expanded event", lease.lastExpandedEventId],
-          ["Renewed event", lease.lastRenewedEventId],
-          ["Release event", lease.releaseEventId],
-          ["Attempt terminal event", lease.attemptTerminalEventId]
+          ["Declared event", intention.declaredEventId],
+          ["Expanded event", intention.lastExpandedEventId],
+          ["Renewed event", intention.lastRenewedEventId],
+          ["Withdrawal event", intention.withdrawalEventId],
+          ["Attempt terminal event", intention.attemptTerminalEventId]
         ]} />
-        <Link className="btn btn-outline-secondary align-self-start" to={backTo}>Back to active leases</Link>
+        <Link className="btn btn-outline-secondary align-self-start" to={backTo}>Back to active work intentions</Link>
       </div>
     </article>
   );

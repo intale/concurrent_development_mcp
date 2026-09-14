@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import type { ResourceKind, ResourceLifecycleStatus } from "../gql/graphql.js";
+import type { ResourceKind, ResourceLifecycleStatus, ResourceWorkIntentionMode } from "../gql/graphql.js";
 import { useProjectWorkspace } from "../projects/project-workspace-shell.js";
 import {
-  fetchProjectActiveResourceLeases,
+  fetchProjectActiveResourceWorkIntentions,
   fetchProjectResource,
-  fetchProjectResourceLease,
+  fetchProjectResourceWorkIntention,
   fetchProjectResources
 } from "./project-resources-api.js";
-import type { LeaseFilters, ResourceFilters } from "./project-resources-api.js";
+import type { ResourceFilters, WorkIntentionFilters } from "./project-resources-api.js";
 import {
   applyFilters,
   detailLocation,
@@ -20,13 +20,14 @@ import {
   previousPageParams,
   RESOURCE_KINDS,
   RESOURCE_LIFECYCLE_STATUSES,
+  WORK_INTENTION_MODES,
   safeReturnTo
 } from "./project-resources-model.js";
 import {
   AvailableStale,
   InitialError,
-  LeaseCards,
-  LeaseDetail,
+  WorkIntentionCards,
+  WorkIntentionDetail,
   LoadingState,
   PaginationControls,
   ResourceCards,
@@ -46,13 +47,13 @@ export function ProjectResourceInventoryPage() {
     : <ResourceInventoryPage projectRef={projectRef} />;
 }
 
-export function ProjectResourceLeasesPage() {
+export function ProjectResourceWorkIntentionsPage() {
   const { projectRef } = useProjectWorkspace();
-  const { leaseId } = useParams<{ leaseId?: string }>();
+  const { intentionId } = useParams<{ intentionId?: string }>();
 
-  return leaseId
-    ? <LeaseDetailPage projectRef={projectRef} leaseId={leaseId} />
-    : <ActiveLeasePage projectRef={projectRef} />;
+  return intentionId
+    ? <WorkIntentionDetailPage projectRef={projectRef} intentionId={intentionId} />
+    : <ActiveWorkIntentionPage projectRef={projectRef} />;
 }
 
 function ResourceInventoryPage({ projectRef }: { readonly projectRef: string }) {
@@ -197,32 +198,35 @@ function ResourceDetailPage({ projectRef, resourceId }: {
   );
 }
 
-function ActiveLeasePage({ projectRef }: { readonly projectRef: string }) {
+function ActiveWorkIntentionPage({ projectRef }: { readonly projectRef: string }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const listPath = `/projects/${projectRef}/resources/leases`;
+  const listPath = `/projects/${projectRef}/resources/work-intentions`;
   const sectionPath = `/projects/${projectRef}/resources`;
   const current = {
     agent: searchParams.get("agent") ?? "",
     changeSet: searchParams.get("changeSet") ?? "",
     workItem: searchParams.get("workItem") ?? "",
-    attempt: searchParams.get("attempt") ?? ""
+    attempt: searchParams.get("attempt") ?? "",
+    mode: searchParams.get("mode") ?? ""
   };
   const [draft, setDraft] = useState(current);
   const after = searchParams.get("after");
-  const headingRef = useResourceHeading("Active Resource leases", "active-resource-leases");
+  const headingRef = useResourceHeading("Active Resource work intentions", "active-resource-work-intentions");
 
-  useEffect(() => { setDraft(current); }, [current.agent, current.changeSet, current.workItem, current.attempt]);
+  useEffect(() => { setDraft(current); }, [current.agent, current.changeSet, current.workItem, current.attempt, current.mode]);
 
-  const filters: LeaseFilters = {
+  const mode = validWorkIntentionMode(current.mode);
+  const filters: WorkIntentionFilters = {
     ...(current.agent ? { agentId: current.agent } : {}),
     ...(current.changeSet ? { changeSetId: current.changeSet } : {}),
     ...(current.workItem ? { workItemId: current.workItem } : {}),
-    ...(current.attempt ? { attemptId: current.attempt } : {})
+    ...(current.attempt ? { attemptId: current.attempt } : {}),
+    ...(mode ? { mode } : {})
   };
   const filterKey = JSON.stringify(filters);
   const query = useQuery({
-    queryKey: ["project-active-resource-leases", projectRef, filterKey, after],
-    queryFn: ({ signal }) => fetchProjectActiveResourceLeases(projectRef, filters, after, signal),
+    queryKey: ["project-active-resource-work-intentions", projectRef, filterKey, after],
+    queryFn: ({ signal }) => fetchProjectActiveResourceWorkIntentions(projectRef, filters, after, signal),
     placeholderData: (previousData, previousQuery) => preserveCollection(
       previousData,
       previousQuery?.queryKey,
@@ -231,7 +235,7 @@ function ActiveLeasePage({ projectRef }: { readonly projectRef: string }) {
     ),
     refetchInterval: REFRESH_INTERVAL_MS
   });
-  const connection = query.data?.projectActiveResourceLeases ?? null;
+  const connection = query.data?.projectActiveResourceWorkIntentions ?? null;
   const errorMessage = query.error instanceof Error ? query.error.message : null;
   const updateDraft = (key: keyof typeof draft, value: string) => setDraft((valueBefore) => ({ ...valueBefore, [key]: value }));
 
@@ -239,39 +243,51 @@ function ActiveLeasePage({ projectRef }: { readonly projectRef: string }) {
     <div className="vstack gap-3">
       <ResourceNavigation basePath={sectionPath} />
       <div>
-        <h2 className="h3 mb-1" ref={headingRef} tabIndex={-1}>Active Resource leases</h2>
-        <p className="text-body-secondary mb-0">Inspect factual current holders without inferring ownership from running Attempts.</p>
+        <h2 className="h3 mb-1" ref={headingRef} tabIndex={-1}>Active Resource work intentions</h2>
+        <p className="text-body-secondary mb-0">See who intends to change a Resource, why, and whether overlap is shared or exclusive.</p>
       </div>
       <form
-        aria-label="Active lease filters"
+        aria-label="Active work-intention filters"
         className="card card-body"
         onSubmit={(event) => { event.preventDefault(); setSearchParams(applyFilters(searchParams, draft)); }}
       >
         <div className="row g-3">
           {([
-            ["agent", "Agent", "lease-agent"],
-            ["changeSet", "ChangeSet", "lease-change-set"],
-            ["workItem", "WorkItem", "lease-work-item"],
-            ["attempt", "Attempt", "lease-attempt"]
+            ["agent", "Agent", "intention-agent"],
+            ["changeSet", "ChangeSet", "intention-change-set"],
+            ["workItem", "WorkItem", "intention-work-item"],
+            ["attempt", "Attempt", "intention-attempt"]
           ] as const).map(([key, label, id]) => (
             <div className="col-12 col-md-6" key={key}>
               <label className="form-label" htmlFor={id}>{label}</label>
               <input className="form-control" id={id} onChange={(event) => updateDraft(key, event.target.value)} value={draft[key]} />
             </div>
           ))}
+          <div className="col-12 col-md-6">
+            <label className="form-label" htmlFor="intention-mode">Mode</label>
+            <select
+              className="form-select"
+              id="intention-mode"
+              onChange={(event) => updateDraft("mode", event.target.value)}
+              value={draft.mode}
+            >
+              <option value="">All modes</option>
+              {WORK_INTENTION_MODES.map(({ label, value }) => <option key={value} value={value}>{label}</option>)}
+            </select>
+          </div>
         </div>
         <div className="d-flex gap-2 mt-3">
           <button className="btn btn-primary" type="submit">Apply</button>
           <button className="btn btn-outline-secondary" onClick={() => setSearchParams({})} type="button">Clear</button>
         </div>
       </form>
-      {query.isPending ? <LoadingState label="active Resource leases" /> : null}
-      {errorMessage && !connection ? <InitialError label="Active Resource leases" message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
+      {query.isPending ? <LoadingState label="active Resource work intentions" /> : null}
+      {errorMessage && !connection ? <InitialError label="Active Resource work intentions" message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
       {!query.isPending && !errorMessage && !connection ? <div className="alert alert-warning" role="status">This Project is not available in the latest projection.</div> : null}
       {connection ? (
         <>
           {errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
-          <LeaseCards
+          <WorkIntentionCards
             connection={connection}
             hrefFor={(id) => detailLocation(listPath, id, listLocation(listPath, searchParams))}
           />
@@ -287,40 +303,40 @@ function ActiveLeasePage({ projectRef }: { readonly projectRef: string }) {
   );
 }
 
-function LeaseDetailPage({ projectRef, leaseId }: {
+function WorkIntentionDetailPage({ projectRef, intentionId }: {
   readonly projectRef: string;
-  readonly leaseId: string;
+  readonly intentionId: string;
 }) {
   const [searchParams] = useSearchParams();
-  const listPath = `/projects/${projectRef}/resources/leases`;
+  const listPath = `/projects/${projectRef}/resources/work-intentions`;
   const backTo = safeReturnTo(searchParams.get("returnTo"), listPath);
-  const headingRef = useResourceHeading("Resource lease detail", leaseId);
+  const headingRef = useResourceHeading("Resource work-intention detail", intentionId);
   const query = useQuery({
-    queryKey: ["project-resource-lease", projectRef, leaseId],
-    queryFn: ({ signal }) => fetchProjectResourceLease(projectRef, leaseId, signal),
+    queryKey: ["project-resource-work-intention", projectRef, intentionId],
+    queryFn: ({ signal }) => fetchProjectResourceWorkIntention(projectRef, intentionId, signal),
     placeholderData: (previousData, previousQuery) => preserveDetail(
       previousData,
       previousQuery?.queryKey,
       projectRef,
-      leaseId
+      intentionId
     ),
     refetchInterval: REFRESH_INTERVAL_MS
   });
-  const lease = query.data?.projectResourceLease ?? null;
+  const intention = query.data?.projectResourceWorkIntention ?? null;
   const errorMessage = query.error instanceof Error ? query.error.message : null;
 
   return (
     <div className="vstack gap-3">
       <ResourceNavigation basePath={`/projects/${projectRef}/resources`} />
       <div>
-        <Link className="btn btn-outline-secondary mb-3" to={backTo}>← Back to active leases</Link>
-        <h2 className="h3 mt-2 mb-1" ref={headingRef} tabIndex={-1}>Resource lease detail</h2>
-        <p className="text-body-secondary mb-0">Historical lease facts remain available after release, expiry, or Attempt completion.</p>
+        <Link className="btn btn-outline-secondary mb-3" to={backTo}>← Back to active work intentions</Link>
+        <h2 className="h3 mt-2 mb-1" ref={headingRef} tabIndex={-1}>Resource work-intention detail</h2>
+        <p className="text-body-secondary mb-0">Historical intention facts remain available after withdrawal, expiry, or Attempt completion.</p>
       </div>
-      {query.isPending ? <LoadingState label="Resource lease detail" /> : null}
-      {errorMessage && !lease ? <InitialError label="Resource lease detail" message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
-      {!query.isPending && !errorMessage && !lease ? <div className="alert alert-info" role="status">This lease is not available inside the Project.</div> : null}
-      {lease ? <>{errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}<LeaseDetail backTo={backTo} lease={lease} projectPath={`/projects/${projectRef}`} /></> : null}
+      {query.isPending ? <LoadingState label="Resource work-intention detail" /> : null}
+      {errorMessage && !intention ? <InitialError label="Resource work-intention detail" message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}
+      {!query.isPending && !errorMessage && !intention ? <div className="alert alert-info" role="status">This work intention is not available inside the Project.</div> : null}
+      {intention ? <>{errorMessage ? <AvailableStale message={errorMessage} onRetry={() => { void query.refetch(); }} /> : null}<WorkIntentionDetail backTo={backTo} intention={intention} projectPath={`/projects/${projectRef}`} /></> : null}
     </div>
   );
 }
@@ -332,5 +348,11 @@ function validResourceKind(value: string | null): ResourceKind | undefined {
 function validLifecycle(value: string | null): ResourceLifecycleStatus | undefined {
   return RESOURCE_LIFECYCLE_STATUSES.some((item) => item.value === value)
     ? value as ResourceLifecycleStatus
+    : undefined;
+}
+
+function validWorkIntentionMode(value: string | null): ResourceWorkIntentionMode | undefined {
+  return WORK_INTENTION_MODES.some((item) => item.value === value)
+    ? value as ResourceWorkIntentionMode
     : undefined;
 }

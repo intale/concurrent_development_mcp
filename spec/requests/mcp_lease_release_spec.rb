@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe "MCP lease_release Task boundary", :event_store do
+RSpec.describe "MCP work_intention_set_withdraw Task boundary", :event_store do
   RELEASE_PROTOCOL_VERSION = "2026-07-28"
   RELEASE_TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
   RELEASE_CHANGE_SET_ID = "CS-MCP-RELEASE"
@@ -17,7 +17,7 @@ RSpec.describe "MCP lease_release Task boundary", :event_store do
     end
   end
 
-  it "durably releases the exact set, replays without duplicate facts, and preserves Saga trace identity" do
+  it "durably withdraws the exact set, replays without duplicate facts, and preserves Saga trace identity" do
     seed_active_attempt
     reservation = Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 0)) { reserve_initial_set.value!.data }
 
@@ -45,10 +45,10 @@ RSpec.describe "MCP lease_release Task boundary", :event_store do
           "change_set_id" => RELEASE_CHANGE_SET_ID,
           "work_item_id" => RELEASE_WORK_ITEM_ID,
           "attempt_id" => RELEASE_ATTEMPT_ID,
-          "lease_set_id" => reservation.lease_set_id,
-          "resource_count" => 2,
+          "intention_set_id" => reservation.intention_set_id,
+          "intention_count" => 2,
           "previous_expires_at" => "2026-08-22T10:10:00.000000Z",
-          "released_at" => match(Coordinator::Shared::Types::TIMESTAMP_PATTERN)
+          "withdrawn_at" => match(Coordinator::Shared::Types::TIMESTAMP_PATTERN)
         )
       )
     )
@@ -88,12 +88,12 @@ RSpec.describe "MCP lease_release Task boundary", :event_store do
   it "completes stale fencing evidence as a Task denial and rejects malformed input before Task allocation" do
     seed_active_attempt
     reservation = reserve_initial_set.value!.data
-    stale_leases = lease_inputs(reservation)
-    stale_leases.first[:fencing_token] += 1
+    stale_intentions = intention_inputs(reservation)
+    stale_intentions.first[:fencing_token] += 1
     stale_response = submit_release(
       command_id: "cmd-mcp-release-stale",
       reservation:,
-      leases: stale_leases,
+      intentions: stale_intentions,
       request_id: 1
     )
     task_id = stale_response.dig("result", "taskId")
@@ -105,8 +105,8 @@ RSpec.describe "MCP lease_release Task boundary", :event_store do
     expect(stale.dig("result", "result")).to include(
       "isError" => true,
       "structuredContent" => include(
-        "status" => "denied",
-        "data" => include("code" => "lease_reference_mismatch")
+        "status" => "conflict",
+        "data" => include("code" => "work_intention_reference_mismatch")
       )
     )
     expect(CommandTraceFixture.events(task_id, event_store:).map(&:type)).to eq(
@@ -117,43 +117,49 @@ RSpec.describe "MCP lease_release Task boundary", :event_store do
     malformed = submit_release(
       command_id: "cmd-mcp-release-malformed",
       reservation:,
-      lease_set_id: "not-a-uuid",
+      intention_set_id: "not-a-uuid",
       request_id: 3
     )
 
     expect(malformed.dig("result", "resultType")).to eq("complete")
     expect(malformed.dig("result", "isError")).to be(true)
-    expect(malformed.dig("result", "content", 0, "text")).to include("lease_set_id")
+    expect(malformed.dig("result", "content", 0, "text")).to include("intention_set_id")
     expect(task_events_for_command("cmd-mcp-release-malformed")).to be_empty
   end
 
   private
 
-  def submit_release(command_id:, reservation:, request_id:, leases: lease_inputs(reservation), lease_set_id: reservation.lease_set_id)
+  def submit_release(
+    command_id:,
+    reservation:,
+    request_id:,
+    intentions: intention_inputs(reservation),
+    intention_set_id: reservation.intention_set_id
+  )
     mcp_request(
       id: request_id,
       method: "tools/call",
-      name: "lease_release",
+      name: "work_intention_set_withdraw",
       params: {
-        name: "lease_release",
+        name: "work_intention_set_withdraw",
         arguments: {
           command_id:,
           actor: { kind: "agent", id: "agent-a" },
           change_set_id: RELEASE_CHANGE_SET_ID,
           work_item_id: RELEASE_WORK_ITEM_ID,
           attempt_id: RELEASE_ATTEMPT_ID,
-          lease_set_id:,
-          leases:
+          intention_set_id:,
+          intentions:
         }
       }
     )
   end
 
-  def lease_inputs(reservation)
-    reservation.resources.map do |reference|
+  def intention_inputs(reservation)
+    reservation.intentions.map do |reference|
       {
         resource_id: reference.resource_id,
-        lease_id: reference.lease_id,
+        intention_id: reference.intention_id,
         fencing_token: reference.fencing_token
       }
     end
@@ -215,7 +221,7 @@ RSpec.describe "MCP lease_release Task boundary", :event_store do
       repository_id:,
       base_commit_oid: RELEASE_BASE_COMMIT_OID,
       resources: resource_ids.map { { resource_id: _1 } },
-      lease_duration_seconds: 600
+      ttl_seconds: 600
     )
   end
 
@@ -225,8 +231,8 @@ RSpec.describe "MCP lease_release Task boundary", :event_store do
       command_id: "seed-create-#{RELEASE_CHANGE_SET_ID}",
       actor: { kind: "agent", id: "planner-1" },
       change_set_id: RELEASE_CHANGE_SET_ID,
-      goal: "Coordinate MCP lease release",
-      acceptance_criteria: [ "Every lease is released together" ]
+      goal: "Coordinate MCP work-intention withdrawal",
+      acceptance_criteria: [ "Every intention is withdrawn together" ]
     ).value!
     Coordinator::Write::Operations::ExecuteCreateWorkItem.new(event_store:).call(
       command_id: "seed-create-#{RELEASE_WORK_ITEM_ID}",
@@ -284,9 +290,9 @@ RSpec.describe "MCP lease_release Task boundary", :event_store do
   end
 
   def work_intention_withdrawal_events(reservation)
-    reservation.resources.flat_map do |reference|
+    reservation.intentions.flat_map do |reference|
       event_store.read_grouped(
-        streams.resource_work_intention(reference.lease_id),
+        streams.resource_work_intention(reference.intention_id),
         Coordinator::Write::EventQueries::WORK_INTENTION_STATE
       ).select { _1.type == "ResourceWorkIntentionWithdrawn" }
     end

@@ -124,17 +124,17 @@ module Coordinator::Read
           repository_id: created.repository_id,
           agent_id: members.first.state.agent_id,
           policy_version: members.first.declaration_event.metadata.fetch("policy_version"),
-          resources: members.map { reference(_1) }.sort_by { _1.resource_id.b },
+          intentions: members.map { reference(_1) }.sort_by { _1.resource_id.b },
           created_event:,
           last_expanded_event: expanded_event,
           last_renewed_event: renewed_event,
           release_event:,
-          reserved_at: timestamp(created_event),
+          declared_at: timestamp(created_event),
           last_expanded_at: expanded_event && timestamp(expanded_event),
           last_renewed_at: renewed_event && timestamp(renewed_event),
           previous_expires_at: previous_expirations.min,
           expires_at: current_expirations.min,
-          released_at: release_event && timestamp(release_event)
+          withdrawn_at: release_event && timestamp(release_event)
         )
       end
 
@@ -145,12 +145,15 @@ module Coordinator::Read
       end
 
       def reference(member)
-        Coordinator::Write::LeaseReferenceV2.new(
-          lease_id: member.state.intention_id,
+        WorkIntentionViewV1.new(
+          intention_id: member.state.intention_id,
           resource_id: member.state.resource_id,
           resource_kind: member.resource.kind,
           resource_path: member.resource.normalized_path,
           base_blob_oid: member.state.base_blob_oid,
+          mode: member.state.mode,
+          purpose: member.state.purpose,
+          context: member.state.context,
           fencing_token: member.state.fencing_token
         )
       end

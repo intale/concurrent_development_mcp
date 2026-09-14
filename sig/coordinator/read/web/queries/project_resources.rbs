@@ -13,8 +13,8 @@ module Coordinator
           ) -> void
           def resources: (command_input input) -> ProjectResourcesV1::ResourcePage?
           def resource: (command_input input) -> ProjectResourcesV1::Resource?
-          def active_leases: (command_input input) -> ProjectResourcesV1::LeasePage?
-          def lease: (command_input input) -> ProjectResourcesV1::Lease?
+          def active_work_intentions: (command_input input) -> ProjectResourcesV1::WorkIntentionPage?
+          def work_intention: (command_input input) -> ProjectResourcesV1::WorkIntention?
         end
       end
     end

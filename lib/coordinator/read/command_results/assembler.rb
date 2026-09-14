@@ -70,10 +70,10 @@ module Coordinator::Read
             candidate_event: selection.candidate_event
           )
         when "attempt_abandon" then abandonment_completion(source)
-        when "write_set_reserve" then write_set_reservation(source, args:)
-        when "write_set_expand" then write_set_expansion(source, args:)
-        when "lease_renew" then work_intention_set_renewal(source, args:)
-        when "lease_release" then work_intention_set_release(source, args:)
+        when "work_intention_set_declare", "write_set_reserve" then write_set_reservation(source, args:)
+        when "work_intention_set_expand", "write_set_expand" then write_set_expansion(source, args:)
+        when "work_intention_set_renew", "lease_renew" then work_intention_set_renewal(source, args:)
+        when "work_intention_set_withdraw", "lease_release" then work_intention_set_release(source, args:)
         when "guidance_record" then @completion_builder.guidance_record(**args)
         when "decision_interpretation_propose"
           proposal = payload!(source, Coordinator::Write::Events::DecisionInterpretationProposedV2)
@@ -319,16 +319,16 @@ module Coordinator::Read
         emitted_declarations = payloads(source).grep(
           Coordinator::Write::Events::ResourceWorkIntentionDeclaredV1
         )
-        added_resources = emitted_declarations.map { lease_reference_for(_1) }
+        added_intentions = emitted_declarations.map { work_intention_reference_for(_1) }
         expiration = declarations.map { |declared, latest| latest.expires_at || declared.expires_at }.min
         expansion = Coordinator::Write::WorkIntentionSetExpansionReceiptV1.new(
-          lease_set_id: command.lease_set_id,
+          intention_set_id: command.lease_set_id,
           repository_id: command.repository_id,
           policy_version: Coordinator::Write::WorkIntentionPolicyV1::VERSION,
           expanded_at: source.persisted_events.first&.created_at&.utc&.iso8601(6) || source.completed_at,
           expires_at: expiration,
-          added_resources:,
-          resource_count: memberships.length
+          added_intentions:,
+          intention_count: memberships.length
         )
         @completion_builder.write_set_expand(**args, expansion:)
       end
@@ -337,12 +337,12 @@ module Coordinator::Read
         created = payload!(source, Coordinator::Write::Events::WorkIntentionSetCreatedV1)
         evidence = work_intention_set_evidence(source, created.set_id)
         reservation = Coordinator::Write::WorkIntentionSetReceiptV1.new(
-          lease_set_id: evidence.set_id,
+          intention_set_id: evidence.set_id,
           repository_id: evidence.repository_id,
           policy_version: Coordinator::Write::WorkIntentionPolicyV1::VERSION,
-          reserved_at: evidence.created_at,
+          declared_at: evidence.created_at,
           expires_at: evidence.current_expires_at,
-          resources: evidence.resources
+          intentions: evidence.resources
         )
         @completion_builder.write_set_reserve(**args, reservation:)
       end
@@ -350,11 +350,11 @@ module Coordinator::Read
       def work_intention_set_renewal(source, args:)
         evidence = work_intention_set_evidence(source, source.command.lease_set_id)
         renewal = Coordinator::Write::WorkIntentionSetRenewalReceiptV1.new(
-          lease_set_id: evidence.set_id,
+          intention_set_id: evidence.set_id,
           repository_id: evidence.repository_id,
           policy_version: Coordinator::Write::WorkIntentionPolicyV1::VERSION,
-          resources: evidence.resources,
-          resource_count: evidence.resources.length,
+          intentions: evidence.resources,
+          intention_count: evidence.resources.length,
           renewed_at: source.completed_at,
           previous_expires_at: evidence.before_command_expires_at || evidence.current_expires_at,
           expires_at: evidence.current_expires_at
@@ -365,13 +365,13 @@ module Coordinator::Read
       def work_intention_set_release(source, args:)
         evidence = work_intention_set_evidence(source, source.command.lease_set_id)
         release = Coordinator::Write::WorkIntentionSetWithdrawalReceiptV1.new(
-          lease_set_id: evidence.set_id,
+          intention_set_id: evidence.set_id,
           repository_id: evidence.repository_id,
           policy_version: Coordinator::Write::WorkIntentionPolicyV1::VERSION,
-          resources: evidence.resources,
-          resource_count: evidence.resources.length,
+          intentions: evidence.resources,
+          intention_count: evidence.resources.length,
           previous_expires_at: evidence.current_expires_at,
-          released_at: source.completed_at
+          withdrawn_at: source.completed_at
         )
         @completion_builder.lease_release(**args, release:)
       end
@@ -383,14 +383,17 @@ module Coordinator::Read
         )
       end
 
-      def lease_reference_for(declaration)
+      def work_intention_reference_for(declaration)
         registration = load_payload(resource_registration(declaration.resource_id))
-        Coordinator::Write::LeaseReferenceV2.new(
-          lease_id: declaration.intention_id,
+        Coordinator::Write::WorkIntentionReceiptReferenceV1.new(
+          intention_id: declaration.intention_id,
           resource_id: declaration.resource_id,
           resource_kind: registration.kind,
           resource_path: registration.normalized_path,
           base_blob_oid: declaration.base_blob_oid,
+          mode: declaration.mode,
+          purpose: declaration.purpose,
+          context: declaration.context,
           fencing_token: declaration.fencing_token
         )
       end

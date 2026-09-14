@@ -17,6 +17,7 @@ module Coordinator
           def change_set_id: () -> String?
           def work_item_id: () -> String?
           def attempt_id: () -> String?
+          def mode: () -> String?
         end
 
         class Detail < Shared::Value

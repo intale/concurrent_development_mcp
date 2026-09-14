@@ -203,7 +203,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteCompleteWorkItem, :event_s
       repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: [ { resource_id:, base_blob_oid: "c" * 40 } ],
-      lease_duration_seconds: 900
+      ttl_seconds: 900
     }).data
 
     candidate.merge(ids:, reservation:)

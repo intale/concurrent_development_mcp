@@ -137,15 +137,16 @@ When("the person follows the live Resource routes") do
   browser_click_card("app/models/first.rb", "View Resource")
   @resource_browser_details = [ browser_record_refreshable_detail("Resource detail") ]
   click_link "Back to Resource inventory"
+  assert_selector("h2", text: "Resource inventory", exact_text: true, wait: 10)
 
-  click_link "Active leases", exact: true
-  browser_click_card("app/models/first.rb", "View lease")
-  @resource_browser_details << browser_record_refreshable_detail("Resource lease detail")
+  click_link "Active work intentions", exact: true
+  browser_click_card("app/models/first.rb", "View work intention")
+  @resource_browser_details << browser_record_refreshable_detail("Resource work-intention detail")
 end
 
-Then("Resource and lease details retain predictable Back routes") do
+Then("Resource and work-intention details retain predictable Back routes") do
   browser_assert_detail_records(@resource_browser_details, expected_count: 2)
-  assert_selector("a", text: "Back to active leases", exact_text: true)
+  assert_selector("a", text: "Back to active work intentions", exact_text: true)
 end
 
 When("the person follows the live Knowledge routes") do

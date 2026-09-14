@@ -16,7 +16,7 @@ RSpec.describe Coordinator::Write::Operations::PrepareExpandWriteSet do
       change_set_id: "CS-LSE",
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
-      lease_set_id: "03919191-9191-7191-8191-919191919191",
+      intention_set_id: "03919191-9191-7191-8191-919191919191",
       repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources:
@@ -40,7 +40,7 @@ RSpec.describe Coordinator::Write::Operations::PrepareExpandWriteSet do
   end
 
   it "rejects malformed set IDs, Resource IDs, bounds, and Git evidence" do
-    invalid_set = prepare.call(input.merge(lease_set_id: "not-a-uuid"))
+    invalid_set = prepare.call(input.merge(intention_set_id: "not-a-uuid"))
     invalid_resource = prepare.call(input.merge(resources: [ { resource_id: "not-a-uuid" } ]))
     over_bound = prepare.call(input.merge(resources: 33.times.map { { resource_id: test_uuid(_1) } }))
     bad_oid = prepare.call(input.merge(base_commit_oid: "ABC"))

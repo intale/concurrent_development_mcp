@@ -82,20 +82,24 @@ module Coordinator::Web::Graphql::Types
       argument :resource_id, ID, required: true
     end
 
-    field :project_active_resource_leases, ResourceLeaseConnectionType, null: true, connection: false do
-      description "Page factual active Resource leases for the exact Project scope."
+    field :project_active_resource_work_intentions,
+          ResourceWorkIntentionConnectionType,
+          null: true,
+          connection: false do
+      description "Page active advisory Resource work intentions for the exact Project scope."
       argument :after, String, required: false
       argument :agent_id, String, required: false
       argument :attempt_id, ID, required: false
       argument :change_set_id, ID, required: false
       argument :first, Integer, required: false, default_value: 20
+      argument :mode, ResourceWorkIntentionModeEnum, required: false
       argument :project_ref, ID, required: true
       argument :work_item_id, ID, required: false
     end
 
-    field :project_resource_lease, ResourceLeaseType, null: true do
-      description "Resolve one projected Resource lease, including released, terminal, or expired history."
-      argument :lease_id, ID, required: true
+    field :project_resource_work_intention, ResourceWorkIntentionType, null: true do
+      description "Resolve one projected Resource work intention, including withdrawn, terminal, or expired history."
+      argument :intention_id, ID, required: true
       argument :project_ref, ID, required: true
     end
 
@@ -554,14 +558,15 @@ module Coordinator::Web::Graphql::Types
       raise_project_resources_query_error(error)
     end
 
-    def project_active_resource_leases(
+    def project_active_resource_work_intentions(
       project_ref:,
       first:,
       after: nil,
       agent_id: nil,
       attempt_id: nil,
       change_set_id: nil,
-      work_item_id: nil
+      work_item_id: nil,
+      mode: nil
     )
       filters = resource_filters(
         project_ref:,
@@ -569,10 +574,11 @@ module Coordinator::Web::Graphql::Types
         agent_id:,
         attempt_id:,
         change_set_id:,
-        work_item_id:
+        work_item_id:,
+        mode:
       )
-      cursor = resource_cursor(after, "active-leases", filters:)
-      page = project_resources_query.active_leases(
+      cursor = resource_cursor(after, "active-work-intentions", filters:)
+      page = project_resources_query.active_work_intentions(
         project_ref:,
         first:,
         after_id: cursor&.fetch("after_id", nil),
@@ -581,9 +587,10 @@ module Coordinator::Web::Graphql::Types
         agent_id:,
         attempt_id:,
         change_set_id:,
-        work_item_id:
+        work_item_id:,
+        mode:
       )
-      resource_lease_connection(page, filters:)
+      resource_work_intention_connection(page, filters:)
     rescue Coordinator::Web::Graphql::InvalidCursor => error
       raise GraphQL::ExecutionError.new(error.message, extensions: { code: "INVALID_CURSOR" })
     rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
@@ -592,8 +599,8 @@ module Coordinator::Web::Graphql::Types
       raise_project_resources_query_error(error)
     end
 
-    def project_resource_lease(project_ref:, lease_id:)
-      project_resources_query.lease(project_ref:, id: lease_id)
+    def project_resource_work_intention(project_ref:, intention_id:)
+      project_resources_query.work_intention(project_ref:, id: intention_id)
     rescue Coordinator::Read::Web::ProjectReference::InvalidReference => error
       raise_invalid_project_reference(error)
     rescue Coordinator::Read::Web::ProjectResourcesQueryError => error
@@ -1284,18 +1291,18 @@ module Coordinator::Web::Graphql::Types
       }
     end
 
-    def resource_lease_connection(page, filters:)
+    def resource_work_intention_connection(page, filters:)
       return unless page
 
       {
         as_of: page.as_of,
         nodes: page.items,
         page_info: {
-          end_cursor: page.next_lease_id && Coordinator::Web::Graphql::ResourceBrowserCursor.encode(
-            "active-leases",
+          end_cursor: page.next_intention_id && Coordinator::Web::Graphql::ResourceBrowserCursor.encode(
+            "active-work-intentions",
             filters:,
             cursor: {
-              "after_id" => page.next_lease_id,
+              "after_id" => page.next_intention_id,
               "after_updated_at" => page.next_updated_at,
               "as_of" => page.as_of
             }

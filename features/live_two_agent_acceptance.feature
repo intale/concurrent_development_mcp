@@ -11,7 +11,7 @@ Feature: Live two-agent checkpointed coordination
     Then agent A declares the exclusive parent while agent B receives the blocker context
     And agent B can declare a disjoint intention while agent A remains active
     When both agents persist final Candidate checkpoints through MCP
-    And an available stale context is used for a command after its lease has been released
+    And an available stale context is used for a command after its intention set has been withdrawn
     Then the stale context remains available and the authoritative command is rejected
     When the agents persist the project Decision and reusable Skill through MCP
     And an external verifier merges, verifies, and activates the ReleaseSet through MCP

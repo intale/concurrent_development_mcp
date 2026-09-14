@@ -62,7 +62,7 @@ RSpec.describe "Read-only web boundaries" do
       "CREATE VIEW public.coordination_dashboard_change_sets",
       "CREATE VIEW public.coordination_dashboard_dependencies",
       "CREATE VIEW public.decision_repository_memberships",
-      "CREATE VIEW public.resource_lease_browser_rows"
+      "CREATE VIEW public.resource_work_intention_browser_rows"
     )
   end
 

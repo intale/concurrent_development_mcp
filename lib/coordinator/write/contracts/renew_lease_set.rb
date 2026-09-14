@@ -14,13 +14,13 @@ module Coordinator::Write
         required(:change_set_id).filled(:string)
         required(:work_item_id).filled(:string)
         required(:attempt_id).filled(:string)
-        required(:lease_set_id).filled(:string)
-        required(:leases).array(:hash) do
+        required(:intention_set_id).filled(:string)
+        required(:intentions).array(:hash) do
           required(:resource_id).filled(:string)
-          required(:lease_id).filled(:string)
+          required(:intention_id).filled(:string)
           required(:fencing_token).filled(:integer)
         end
-        required(:lease_duration_seconds).filled(:integer)
+        required(:ttl_seconds).filled(:integer)
       end
 
       rule(:command_id, :change_set_id, :work_item_id, :attempt_id) do
@@ -34,11 +34,11 @@ module Coordinator::Write
         key([ :actor, :id ]).failure("must be a valid identifier") unless Types::IDENTIFIER_PATTERN.match?(actor_id)
       end
 
-      rule(:lease_set_id) do
+      rule(:intention_set_id) do
         key.failure("must be a UUIDv7") unless Types::UUID_V7_PATTERN.match?(value)
       end
 
-      rule(:leases) do
+      rule(:intentions) do
         unless (1..32).cover?(value.length)
           key.failure("must contain between 1 and 32 entries")
           next
@@ -46,26 +46,26 @@ module Coordinator::Write
 
         value.each_with_index do |reference, index|
           resource_id = reference[:resource_id]
-          lease_id = reference[:lease_id]
+          intention_id = reference[:intention_id]
           token = reference[:fencing_token]
           unless resource_id.is_a?(String) && Types::UUID_V7_PATTERN.match?(resource_id)
-            key([ :leases, index, :resource_id ]).failure("must be a UUIDv7")
+            key([ :intentions, index, :resource_id ]).failure("must be a UUIDv7")
           end
-          unless lease_id.is_a?(String) && Types::UUID_V7_PATTERN.match?(lease_id)
-            key([ :leases, index, :lease_id ]).failure("must be a UUIDv7")
+          unless intention_id.is_a?(String) && Types::UUID_V7_PATTERN.match?(intention_id)
+            key([ :intentions, index, :intention_id ]).failure("must be a UUIDv7")
           end
           unless token.is_a?(Integer) && token >= 1
-            key([ :leases, index, :fencing_token ]).failure("must be at least 1")
+            key([ :intentions, index, :fencing_token ]).failure("must be at least 1")
           end
         end
 
         resource_ids = value.filter_map { _1[:resource_id] }
-        lease_ids = value.filter_map { _1[:lease_id] }
+        intention_ids = value.filter_map { _1[:intention_id] }
         key.failure("must not repeat a Resource ID") unless resource_ids.uniq.length == resource_ids.length
-        key.failure("must not repeat a lease ID") unless lease_ids.uniq.length == lease_ids.length
+        key.failure("must not repeat a work-intention ID") unless intention_ids.uniq.length == intention_ids.length
       end
 
-      rule(:lease_duration_seconds) do
+      rule(:ttl_seconds) do
         key.failure("must be between 30 and 3600") unless (30..3_600).cover?(value)
       end
     end

@@ -69,64 +69,64 @@ module Coordinator::Write
       attribute :completed_at, Types::Timestamp
     end
 
-    class LeaseSet < Value
-      Reference = LeaseReferenceV2
+    class WorkIntentionSetDeclaration < Value
+      Reference = WorkIntentionReceiptReferenceV1
 
       attribute :change_set_id, Types::Identifier
       attribute :work_item_id, Types::Identifier
       attribute :attempt_id, Types::Identifier
       attribute :repository_id, Types::RepositoryId
-      attribute :lease_set_id, Types::UuidV7
-      attribute :policy_version, Types::ResourceLeasePolicyVersion
-      attribute :acquired_at, Types::Timestamp
+      attribute :intention_set_id, Types::UuidV7
+      attribute :policy_version, Types::String.enum(WorkIntentionPolicyV1::VERSION)
+      attribute :declared_at, Types::Timestamp
       attribute :expires_at, Types::Timestamp
-      attribute :resources, Types::Array.of(Reference).constrained(min_size: 1, max_size: 32)
+      attribute :intentions, Types::Array.of(Reference).constrained(min_size: 1, max_size: 32)
     end
 
-    class LeaseSetExpansion < Value
-      Reference = LeaseReferenceV2
+    class WorkIntentionSetExpansion < Value
+      Reference = WorkIntentionReceiptReferenceV1
 
       attribute :change_set_id, Types::Identifier
       attribute :work_item_id, Types::Identifier
       attribute :attempt_id, Types::Identifier
       attribute :repository_id, Types::RepositoryId
-      attribute :lease_set_id, Types::UuidV7
-      attribute :policy_version, Types::ResourceLeasePolicyVersion
+      attribute :intention_set_id, Types::UuidV7
+      attribute :policy_version, Types::String.enum(WorkIntentionPolicyV1::VERSION)
       attribute :expanded_at, Types::Timestamp
       attribute :expires_at, Types::Timestamp
-      attribute :added_resources, Types::Array.of(Reference).constrained(max_size: 32)
-      attribute :resource_count, Types::WriteSetSize
+      attribute :added_intentions, Types::Array.of(Reference).constrained(max_size: 32)
+      attribute :intention_count, Types::WriteSetSize
     end
 
-    class LeaseSetRenewal < Value
-      Reference = LeaseReferenceV2
+    class WorkIntentionSetRenewal < Value
+      Reference = WorkIntentionReceiptReferenceV1
 
       attribute :change_set_id, Types::Identifier
       attribute :work_item_id, Types::Identifier
       attribute :attempt_id, Types::Identifier
       attribute :repository_id, Types::RepositoryId
-      attribute :lease_set_id, Types::UuidV7
-      attribute :policy_version, Types::ResourceLeasePolicyVersion
-      attribute :resources, Types::Array.of(Reference).constrained(min_size: 1, max_size: 32)
-      attribute :resource_count, Types::WriteSetSize
+      attribute :intention_set_id, Types::UuidV7
+      attribute :policy_version, Types::String.enum(WorkIntentionPolicyV1::VERSION)
+      attribute :intentions, Types::Array.of(Reference).constrained(min_size: 1, max_size: 32)
+      attribute :intention_count, Types::WriteSetSize
       attribute :renewed_at, Types::Timestamp
       attribute :previous_expires_at, Types::Timestamp
       attribute :expires_at, Types::Timestamp
     end
 
-    class LeaseSetRelease < Value
-      Reference = LeaseReferenceV2
+    class WorkIntentionSetWithdrawal < Value
+      Reference = WorkIntentionReceiptReferenceV1
 
       attribute :change_set_id, Types::Identifier
       attribute :work_item_id, Types::Identifier
       attribute :attempt_id, Types::Identifier
       attribute :repository_id, Types::RepositoryId
-      attribute :lease_set_id, Types::UuidV7
-      attribute :policy_version, Types::ResourceLeasePolicyVersion
-      attribute :resources, Types::Array.of(Reference).constrained(min_size: 1, max_size: 32)
-      attribute :resource_count, Types::WriteSetSize
+      attribute :intention_set_id, Types::UuidV7
+      attribute :policy_version, Types::String.enum(WorkIntentionPolicyV1::VERSION)
+      attribute :intentions, Types::Array.of(Reference).constrained(min_size: 1, max_size: 32)
+      attribute :intention_count, Types::WriteSetSize
       attribute :previous_expires_at, Types::Timestamp
-      attribute :released_at, Types::Timestamp
+      attribute :withdrawn_at, Types::Timestamp
     end
 
     class ResourceLeaseExpiry < Value
@@ -516,10 +516,10 @@ module Coordinator::Write
            Dependency |
            Attempt |
            WorkItemCompletion |
-           LeaseSet |
-           LeaseSetExpansion |
-           LeaseSetRenewal |
-           LeaseSetRelease |
+           WorkIntentionSetDeclaration |
+           WorkIntentionSetExpansion |
+           WorkIntentionSetRenewal |
+           WorkIntentionSetWithdrawal |
            ResourceLeaseExpiry |
            Guidance |
            InterpretationProposal |

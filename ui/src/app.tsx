@@ -28,7 +28,7 @@ import { ProjectOverviewPage } from "./projects/project-overview-page.js";
 import { ProjectWorkspaceShell } from "./projects/project-workspace-shell.js";
 import {
   ProjectResourceInventoryPage,
-  ProjectResourceLeasesPage
+  ProjectResourceWorkIntentionsPage
 } from "./resources/project-resources-page.js";
 
 const COMPACT_NAVIGATION_QUERY = "(max-width: 991.98px)";
@@ -290,8 +290,8 @@ export function App() {
             <Route path="resources" element={<Navigate replace to="inventory" />} />
             <Route path="resources/inventory" element={<ProjectResourceInventoryPage />} />
             <Route path="resources/inventory/:resourceId" element={<ProjectResourceInventoryPage />} />
-            <Route path="resources/leases" element={<ProjectResourceLeasesPage />} />
-            <Route path="resources/leases/:leaseId" element={<ProjectResourceLeasesPage />} />
+            <Route path="resources/work-intentions" element={<ProjectResourceWorkIntentionsPage />} />
+            <Route path="resources/work-intentions/:intentionId" element={<ProjectResourceWorkIntentionsPage />} />
             <Route path="knowledge" element={<Navigate replace to="skills" />} />
             <Route path="knowledge/skills" element={<ProjectSkillsPage />} />
             <Route path="knowledge/skills/:skillName" element={<ProjectSkillsPage />} />

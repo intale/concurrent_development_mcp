@@ -86,6 +86,11 @@ module Coordinator::Write
         attribute :requested_lease_set_id, Types::UuidV7
       end
 
+      class WorkIntentionSetMismatchDetails < AttemptDetails
+        attribute :current_intention_set_id, Types::UuidV7
+        attribute :requested_intention_set_id, Types::UuidV7
+      end
+
       class ResourceEvidenceConflictDetails < AttemptDetails
         attribute :resource_id, Types::ResourceId
         attribute :current_base_blob_oid, Types::GitOid.optional
@@ -146,6 +151,11 @@ module Coordinator::Write
         attribute :requested_addition_count, Types::WriteSetSize
       end
 
+      class WorkIntentionSetLimitDetails < AttemptDetails
+        attribute :current_resource_count, Types::WriteSetSize
+        attribute :requested_addition_count, Types::WriteSetSize
+      end
+
       class ResourceBoundaryMaintenanceDetails < Value
         attribute :repository_id, Types::UuidV7
         attribute :boundary_marker_count, Types::Integer.constrained(gteq: 1)
@@ -156,6 +166,13 @@ module Coordinator::Write
       class LeaseSetExpiredDetails < AttemptDetails
         attribute :resource_id, Types::ResourceId
         attribute :lease_id, Types::UuidV7
+        attribute :fencing_token, Types::FencingToken
+        attribute :expires_at, Types::Timestamp
+      end
+
+      class WorkIntentionSetInactiveDetails < AttemptDetails
+        attribute :resource_id, Types::ResourceId
+        attribute :intention_id, Types::UuidV7
         attribute :fencing_token, Types::FencingToken
         attribute :expires_at, Types::Timestamp
       end
@@ -177,7 +194,16 @@ module Coordinator::Write
         attribute :released_at, Types::Timestamp
       end
 
+      class WorkIntentionSetWithdrawnDetails < AttemptDetails
+        attribute :withdrawn_at, Types::Timestamp
+      end
+
       class LeaseSetSnapshotMismatchDetails < AttemptDetails
+        attribute :current_resource_ids, Types::Array.of(Types::ResourceId).constrained(max_size: 32)
+        attribute :requested_resource_ids, Types::Array.of(Types::ResourceId).constrained(max_size: 32)
+      end
+
+      class WorkIntentionSetSnapshotMismatchDetails < AttemptDetails
         attribute :current_resource_ids, Types::Array.of(Types::ResourceId).constrained(max_size: 32)
         attribute :requested_resource_ids, Types::Array.of(Types::ResourceId).constrained(max_size: 32)
       end
@@ -187,6 +213,14 @@ module Coordinator::Write
         attribute :current_lease_id, Types::UuidV7
         attribute :requested_lease_id, Types::UuidV7
         attribute :current_fencing_token, Types::FencingToken
+        attribute :requested_fencing_token, Types::FencingToken
+      end
+
+      class WorkIntentionReferenceMismatchDetails < AttemptDetails
+        attribute :resource_id, Types::ResourceId
+        attribute :current_intention_id, Types::UuidV7.optional
+        attribute :requested_intention_id, Types::UuidV7
+        attribute :current_fencing_token, Types::Integer.constrained(gteq: 0)
         attribute :requested_fencing_token, Types::FencingToken
       end
 
@@ -385,6 +419,15 @@ module Coordinator::Write
         attribute :expires_at, Types::Timestamp.optional
       end
 
+      class CandidateWorkIntentionNotActiveDetails < Value
+        attribute :attempt_id, Types::Identifier
+        attribute :resource_id, Types::ResourceId
+        attribute :submitted_intention_id, Types::UuidV7
+        attribute :current_intention_id, Types::UuidV7.optional
+        attribute :current_fencing_token, Types::Integer.constrained(gteq: 0)
+        attribute :expires_at, Types::Timestamp.optional
+      end
+
       class CandidateUnauthorizedResource < Value
         attribute :path, Types::ResourcePath
       end
@@ -523,6 +566,9 @@ module Coordinator::Write
           "attempt_scope_mismatch",
           "attempt_actor_mismatch",
           "attempt_owner_mismatch",
+          "work_intention_set_already_declared",
+          "work_intention_set_missing",
+          "work_intention_set_unchanged",
           "write_set_already_reserved",
           "write_set_not_reserved",
           "write_set_unchanged"
@@ -546,6 +592,7 @@ module Coordinator::Write
           "candidate_scope_mismatch",
           "candidate_actor_mismatch",
           "candidate_not_final",
+          "work_intention_set_missing",
           "write_set_not_reserved"
         )
         attribute :message, Types::String
@@ -574,6 +621,12 @@ module Coordinator::Write
         attribute :code, Types::String.enum("work_intention_conflict")
         attribute :message, Types::String
         attribute :details, WorkIntentionConflictDetails
+      end
+
+      class WorkIntentionSetMismatchError < Value
+        attribute :code, Types::String.enum("work_intention_set_mismatch")
+        attribute :message, Types::String
+        attribute :details, WorkIntentionSetMismatchDetails
       end
 
       class LeaseSetMismatchError < Value
@@ -630,6 +683,12 @@ module Coordinator::Write
         attribute :details, WriteSetLimitDetails
       end
 
+      class WorkIntentionSetLimitError < Value
+        attribute :code, Types::String.enum("work_intention_set_limit_reached")
+        attribute :message, Types::String
+        attribute :details, WorkIntentionSetLimitDetails
+      end
+
       class ResourceBoundaryMaintenanceRequiredError < Value
         attribute :code, Types::String.enum("resource_boundary_maintenance_required")
         attribute :message, Types::String
@@ -640,6 +699,12 @@ module Coordinator::Write
         attribute :code, Types::String.enum("lease_set_expired")
         attribute :message, Types::String
         attribute :details, LeaseSetExpiredDetails
+      end
+
+      class WorkIntentionSetInactiveError < Value
+        attribute :code, Types::String.enum("work_intention_set_inactive")
+        attribute :message, Types::String
+        attribute :details, WorkIntentionSetInactiveDetails
       end
 
       class LeaseSetNotCurrentError < Value
@@ -654,16 +719,34 @@ module Coordinator::Write
         attribute :details, WriteSetReleasedDetails
       end
 
+      class WorkIntentionSetWithdrawnError < Value
+        attribute :code, Types::String.enum("work_intention_set_withdrawn")
+        attribute :message, Types::String
+        attribute :details, WorkIntentionSetWithdrawnDetails
+      end
+
       class LeaseSetSnapshotMismatchError < Value
         attribute :code, Types::String.enum("lease_set_snapshot_mismatch")
         attribute :message, Types::String
         attribute :details, LeaseSetSnapshotMismatchDetails
       end
 
+      class WorkIntentionSetSnapshotMismatchError < Value
+        attribute :code, Types::String.enum("work_intention_set_snapshot_mismatch")
+        attribute :message, Types::String
+        attribute :details, WorkIntentionSetSnapshotMismatchDetails
+      end
+
       class LeaseReferenceMismatchError < Value
         attribute :code, Types::String.enum("lease_reference_mismatch")
         attribute :message, Types::String
         attribute :details, LeaseReferenceMismatchDetails
+      end
+
+      class WorkIntentionReferenceMismatchError < Value
+        attribute :code, Types::String.enum("work_intention_reference_mismatch")
+        attribute :message, Types::String
+        attribute :details, WorkIntentionReferenceMismatchDetails
       end
 
       class LeaseDeadlineNotExtendedError < Value
@@ -900,6 +983,12 @@ module Coordinator::Write
         attribute :details, CandidateLeaseObservationsMismatchDetails
       end
 
+      class CandidateWorkIntentionObservationsMismatchError < Value
+        attribute :code, Types::String.enum("work_intention_observations_mismatch")
+        attribute :message, Types::String
+        attribute :details, CandidateLeaseObservationsMismatchDetails
+      end
+
       class CandidateLeaseNotActiveScopeError < Value
         attribute :code, Types::String.enum("lease_not_active")
         attribute :message, Types::String
@@ -912,8 +1001,26 @@ module Coordinator::Write
         attribute :details, CandidateLeaseNotActiveDetails
       end
 
+      class CandidateWorkIntentionNotActiveScopeError < Value
+        attribute :code, Types::String.enum("work_intention_not_active")
+        attribute :message, Types::String
+        attribute :details, AttemptDetails
+      end
+
+      class CandidateWorkIntentionNotActiveError < Value
+        attribute :code, Types::String.enum("work_intention_not_active")
+        attribute :message, Types::String
+        attribute :details, CandidateWorkIntentionNotActiveDetails
+      end
+
       class CandidateUnauthorizedResourcesError < Value
         attribute :code, Types::String.enum("actual_write_set_not_authorized")
+        attribute :message, Types::String
+        attribute :details, CandidateUnauthorizedResourcesDetails
+      end
+
+      class CandidateResourcesNotCoveredError < Value
+        attribute :code, Types::String.enum("candidate_resources_not_covered")
         attribute :message, Types::String
         attribute :details, CandidateUnauthorizedResourcesDetails
       end

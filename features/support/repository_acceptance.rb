@@ -113,7 +113,7 @@ module RepositoryAcceptance
     change_set_id, participants = prepare_shared_repository_lease_attempts(repository_id)
     participants.map do |participant|
       task_id = submit_and_execute(
-        "write_set_reserve",
+        "work_intention_set_declare",
         client_id: participant.fetch(:agent_id),
         command_id: "audit2.repository-namespace.#{participant.fetch(:agent_id)}.reserve",
         actor: { kind: "agent", id: participant.fetch(:agent_id) },
@@ -132,7 +132,7 @@ module RepositoryAcceptance
             actor_id: participant.fetch(:agent_id)
           )
         ],
-        lease_duration_seconds: 300
+        ttl_seconds: 300
       )
       task_request("tasks/get", task_id, client_id: participant.fetch(:agent_id))
         .dig("result", "result", "structuredContent")

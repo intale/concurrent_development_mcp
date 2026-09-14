@@ -1,0 +1,13 @@
+module Coordinator::Read
+  class WorkIntentionViewV1 < Coordinator::Shared::Value
+    def intention_id: () -> String
+    def resource_id: () -> String
+    def resource_kind: () -> String
+    def resource_path: () -> String
+    def base_blob_oid: () -> String?
+    def mode: () -> String
+    def purpose: () -> String
+    def context: () -> String?
+    def fencing_token: () -> Integer
+  end
+end

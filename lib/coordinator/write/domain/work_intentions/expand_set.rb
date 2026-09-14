@@ -35,14 +35,14 @@ module Coordinator::Write
           end
           if additions.empty?
             return failure(
-              :write_set_unchanged,
+              :work_intention_set_unchanged,
               "Every requested resource is already in the work-intention set",
               command
             )
           end
           if set_state.members.length + additions.length > WorkIntentionPolicyV1::MAXIMUM_SET_SIZE
             return failure(
-              :write_set_limit_reached,
+              :work_intention_set_limit_reached,
               "The expanded work-intention set would exceed 32 resources",
               command,
               current_resource_count: set_state.members.length,
@@ -85,11 +85,11 @@ module Coordinator::Write
           end
           if stale
             return failure(
-              :lease_set_expired,
+              :work_intention_set_inactive,
               "The work-intention set contains an inactive member",
               command,
               resource_id: stale.resource_id,
-              lease_id: stale.intention_id,
+              intention_id: stale.intention_id,
               fencing_token: member_states.find { _1.intention_id == stale.intention_id }&.fencing_token || 0,
               expires_at: member_states.find { _1.intention_id == stale.intention_id }&.expires_at || expanded_at
             )
@@ -123,14 +123,14 @@ module Coordinator::Write
           unless attempt_state.agent_id == command.actor.id
             return failure(:attempt_owner_mismatch, "Attempt belongs to another agent attribution", command)
           end
-          return failure(:write_set_not_reserved, "Attempt has no work-intention set", command) if set_state.absent?
+          return failure(:work_intention_set_missing, "Attempt has no work-intention set", command) if set_state.absent?
           unless set_state.set_id == command.lease_set_id
             return failure(
-              :lease_set_mismatch,
+              :work_intention_set_mismatch,
               "Work-intention set ID does not match",
               command,
-              current_lease_set_id: set_state.set_id,
-              requested_lease_set_id: command.lease_set_id
+              current_intention_set_id: set_state.set_id,
+              requested_intention_set_id: command.lease_set_id
             )
           end
           unless set_state.attempt_id == command.attempt_id &&

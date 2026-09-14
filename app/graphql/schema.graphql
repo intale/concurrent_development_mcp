@@ -863,9 +863,9 @@ type Query {
   project(projectRef: ID!, repositoriesAfter: String, repositoriesFirst: Int = 20): ProjectOverview
 
   """
-  Page factual active Resource leases for the exact Project scope.
+  Page active advisory Resource work intentions for the exact Project scope.
   """
-  projectActiveResourceLeases(after: String, agentId: String, attemptId: ID, changeSetId: ID, first: Int = 20, projectRef: ID!, workItemId: ID): ResourceLeaseConnection
+  projectActiveResourceWorkIntentions(after: String, agentId: String, attemptId: ID, changeSetId: ID, first: Int = 20, mode: ResourceWorkIntentionMode, projectRef: ID!, workItemId: ID): ResourceWorkIntentionConnection
 
   """
   One project AgentChoice and its bounded decision-impact assessments.
@@ -978,9 +978,9 @@ type Query {
   projectResource(projectRef: ID!, resourceId: ID!): ProjectResource
 
   """
-  Resolve one projected Resource lease, including released, terminal, or expired history.
+  Resolve one projected Resource work intention, including withdrawn, terminal, or expired history.
   """
-  projectResourceLease(leaseId: ID!, projectRef: ID!): ResourceLease
+  projectResourceWorkIntention(intentionId: ID!, projectRef: ID!): ResourceWorkIntention
 
   """
   Page the latest available Resource inventory for the exact Project scope.
@@ -1079,54 +1079,62 @@ enum ResourceKind {
   FILE
 }
 
-type ResourceLease {
+enum ResourceLifecycleStatus {
+  CURRENT
+  INACTIVE
+  REGISTERED
+}
+
+type ResourceWorkIntention {
   agentId: String!
   attemptId: ID!
   attemptTerminalAt: String
   attemptTerminalEventId: ID
   baseBlobOid: String
   changeSetId: ID!
+  context: String
+  declaredAt: String!
+  declaredEventId: ID!
   expiresAt: String!
   fencingToken: String!
   id: ID!
+  intentionSetId: ID!
   lastExpandedAt: String
   lastExpandedEventId: ID
-  lastProjectedAt: String!
   lastRenewedAt: String
   lastRenewedEventId: ID
-  leaseSetId: ID!
+  mode: ResourceWorkIntentionMode!
   policyVersion: String!
   previousExpiresAt: String
-  releaseEventId: ID
-  releasedAt: String
+  purpose: String!
   repositoryId: ID!
-  reservedAt: String!
-  reservedEventId: ID!
   resourceId: ID!
   resourceKind: ResourceKind!
   resourceLifecycleStatus: ResourceLifecycleStatus
   resourcePath: String!
-  status: ResourceLeaseStatus!
+  status: ResourceWorkIntentionStatus!
+  updatedAt: String!
+  withdrawalEventId: ID
+  withdrawnAt: String
   workItemId: ID!
 }
 
-type ResourceLeaseConnection {
+type ResourceWorkIntentionConnection {
   asOf: String!
-  nodes: [ResourceLease!]!
+  nodes: [ResourceWorkIntention!]!
   pageInfo: PageInfo!
 }
 
-enum ResourceLeaseStatus {
+enum ResourceWorkIntentionMode {
+  EXCLUSIVE
+  SHARED
+}
+
+enum ResourceWorkIntentionStatus {
   ACTIVE
   ATTEMPT_TERMINAL
   EXPIRED
-  RELEASED
-}
-
-enum ResourceLifecycleStatus {
-  CURRENT
-  INACTIVE
-  REGISTERED
+  WITHDRAWN
 }
 
 type Skill {

@@ -5,7 +5,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
   let(:streams) { Coordinator::Write::StreamFactory.new }
   subject(:operation) { described_class.new(event_store:) }
 
-  it "atomically submits a Candidate whose authority is expressed only by Resource UUID leases" do
+  it "atomically submits a Candidate whose authority is expressed only by Resource UUID work intentions" do
     reservation = setup_reservation
     result = operation.call(candidate_input(reservation, command_id: "cmd-candidate-v2", candidate_id: "CAN-V2"))
 
@@ -28,7 +28,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
     intention = events.fetch(6)
     expect(intention.data).to eq(
       "candidate_id" => "CAN-V2",
-      "intention_set_id" => reservation.receipt.lease_set_id
+      "intention_set_id" => reservation.receipt.intention_set_id
     )
     expect(intention.metadata).to include(
       "schema_version" => 1,
@@ -64,7 +64,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
 
     result = operation.call(input)
 
-    expect(result.failure).to have_attributes(code: :actual_write_set_not_authorized)
+    expect(result.failure).to have_attributes(code: :candidate_resources_not_covered)
     expect(result.failure.details.fetch(:resources)).to contain_exactly(path: "lib/unleased.rb")
     expect(candidate_events("CAN-ESCAPE")).to be_empty
   end
@@ -77,15 +77,15 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
       change_set_id: "CS-LSE",
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
-      lease_set_id: reservation.receipt.lease_set_id,
-      leases: ResourceLeaseOperationScenario.lease_inputs(reservation.receipt)
+      intention_set_id: reservation.receipt.intention_set_id,
+      intentions: ResourceLeaseOperationScenario.work_intention_inputs(reservation.receipt)
     ).value!
 
     result = operation.call(
       candidate_input(reservation, command_id: "cmd-candidate-after-release", candidate_id: "CAN-STALE")
     )
 
-    expect(result.failure).to have_attributes(code: :lease_set_released)
+    expect(result.failure).to have_attributes(code: :work_intention_set_withdrawn)
     expect(candidate_events("CAN-STALE")).to be_empty
   end
 
@@ -113,8 +113,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
       base_commit_oid: "a" * 40,
       head_commit_oid: "d" * 40,
       checkpoint_kind: "final",
-      lease_set_id: reservation.receipt.lease_set_id,
-      leases: ResourceLeaseOperationScenario.lease_inputs(reservation.receipt),
+      intention_set_id: reservation.receipt.intention_set_id,
+      intentions: ResourceLeaseOperationScenario.work_intention_inputs(reservation.receipt),
       change_manifest: {
         collector_version: "git-evidence-v1",
         files: [

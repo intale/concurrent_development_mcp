@@ -21,7 +21,7 @@ module Coordinator::Write
         Failure(
           OutcomeError.new(
             code: :invalid_input,
-            message: "ReleaseLeaseSet input is invalid",
+            message: "WithdrawWorkIntentionSet input is invalid",
             details: result.errors.to_h
           )
         )
@@ -29,8 +29,12 @@ module Coordinator::Write
 
       def build_command(attributes)
         actor = attributes.fetch(:actor)
-        leases = attributes.fetch(:leases).map do |reference|
-          LeaseReleaseReferenceV2.new(reference)
+        leases = attributes.fetch(:intentions).map do |reference|
+          LeaseReleaseReferenceV2.new(
+            resource_id: reference.fetch(:resource_id),
+            lease_id: reference.fetch(:intention_id),
+            fencing_token: reference.fetch(:fencing_token)
+          )
         end.sort_by { _1.resource_id.b }
 
         Success(
@@ -40,7 +44,7 @@ module Coordinator::Write
             change_set_id: attributes.fetch(:change_set_id),
             work_item_id: attributes.fetch(:work_item_id),
             attempt_id: attributes.fetch(:attempt_id),
-            lease_set_id: attributes.fetch(:lease_set_id),
+            lease_set_id: attributes.fetch(:intention_set_id),
             leases:
           )
         )

@@ -53,7 +53,7 @@ module CandidateAcceptanceWorld
       base_snapshots: [ { repository_id:, commit_oid: BASE_COMMIT_OID } ]
     )
     reservation_task_id = complete_candidate_setup_task(
-      "write_set_reserve",
+      "work_intention_set_declare",
       command_id: "cmd-cuc-can-#{prefix}-reserve",
       actor: { kind: "agent", id: agent_id },
       change_set_id: ids.fetch(:change_set_id),
@@ -70,7 +70,7 @@ module CandidateAcceptanceWorld
           actor_id: agent_id
         )
       ],
-      lease_duration_seconds: 900
+      ttl_seconds: 900
     )
     reservation = task_request("tasks/get", reservation_task_id).dig(
       "result", "result", "structuredContent", "data"
@@ -111,11 +111,11 @@ module CandidateAcceptanceWorld
       base_commit_oid: BASE_COMMIT_OID,
       head_commit_oid: head_character * 40,
       checkpoint_kind: "final",
-      lease_set_id: reservation.fetch("lease_set_id"),
-      leases: reservation.fetch("resources").map do |reference|
+      intention_set_id: reservation.fetch("intention_set_id"),
+      intentions: reservation.fetch("intentions").map do |reference|
         {
           resource_id: reference.fetch("resource_id"),
-          lease_id: reference.fetch("lease_id"),
+          intention_id: reference.fetch("intention_id"),
           fencing_token: reference.fetch("fencing_token")
         }
       end,
@@ -175,9 +175,9 @@ module CandidateAcceptanceWorld
   end
 
   def candidate_work_intention_events(coordination)
-    coordination.fetch(:reservation).fetch("resources").flat_map do |resource|
+    coordination.fetch(:reservation).fetch("intentions").flat_map do |resource|
       event_store.read_grouped(
-        streams.resource_work_intention(resource.fetch("lease_id")),
+        streams.resource_work_intention(resource.fetch("intention_id")),
         Coordinator::Write::EventQueries::WORK_INTENTION_STATE
       ).reverse
     end

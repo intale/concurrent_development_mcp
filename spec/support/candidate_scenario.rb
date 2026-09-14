@@ -27,7 +27,7 @@ module CandidateScenario
       repository_id: REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: [ { resource_id:, base_blob_oid: "c" * 40 } ],
-      lease_duration_seconds: 900
+      ttl_seconds: 900
     }).data
 
     {
@@ -102,11 +102,11 @@ module CandidateScenario
       change_set_id: input.fetch(:change_set_id),
       work_item_id: input.fetch(:work_item_id),
       attempt_id: input.fetch(:attempt_id),
-      lease_set_id: reservation.lease_set_id,
-      leases: reservation.resources.map do |reference|
+      intention_set_id: reservation.intention_set_id,
+      intentions: reservation.intentions.map do |reference|
         {
           resource_id: reference.resource_id,
-          lease_id: reference.lease_id,
+          intention_id: reference.intention_id,
           fencing_token: reference.fencing_token
         }
       end
@@ -146,11 +146,11 @@ module CandidateScenario
       base_commit_oid: "a" * 40,
       head_commit_oid:,
       checkpoint_kind: "final",
-      lease_set_id: reservation.lease_set_id,
-      leases: reservation.resources.map do |reference|
+      intention_set_id: reservation.intention_set_id,
+      intentions: reservation.intentions.map do |reference|
         {
           resource_id: reference.resource_id,
-          lease_id: reference.lease_id,
+          intention_id: reference.intention_id,
           fencing_token: reference.fencing_token
         }
       end,

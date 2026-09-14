@@ -3,7 +3,7 @@
 module Coordinator::Read
   module CommandResults
     class WorkIntentionSetEvidenceV1 < Value
-      Reference = Coordinator::Write::LeaseReferenceV2
+      Reference = Coordinator::Write::WorkIntentionReceiptReferenceV1
 
       attribute :set_id, Types::UuidV7
       attribute :repository_id, Types::RepositoryId

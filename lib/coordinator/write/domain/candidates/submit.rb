@@ -72,28 +72,30 @@ module Coordinator::Write
 
         def denied_write_set(state, command, submitted_at:)
           attempt = state.attempt
-          return scoped_failure(:write_set_not_reserved, "Attempt has no reserved write set", command) unless attempt.lease_set_id
+          unless attempt.lease_set_id
+            return scoped_failure(:work_intention_set_missing, "Attempt has no declared work-intention set", command)
+          end
           if attempt.lease_released_at
             return failure(
-              :lease_set_released,
-              "Attempt write set has been released",
+              :work_intention_set_withdrawn,
+              "Attempt work-intention set has been withdrawn",
               change_set_id: command.change_set_id,
               work_item_id: command.work_item_id,
               attempt_id: command.attempt_id,
-              released_at: attempt.lease_released_at
+              withdrawn_at: attempt.lease_released_at
             )
           end
           unless attempt.lease_set_id == command.lease_set_id &&
                  attempt.lease_repository_id == command.repository_id &&
                  attempt.lease_policy_version == LeaseResourceV2::POLICY_VERSION
             return failure(
-              :lease_set_mismatch,
-              "Lease set does not match the Attempt",
+              :work_intention_set_mismatch,
+              "Work-intention set does not match the Attempt",
               change_set_id: command.change_set_id,
               work_item_id: command.work_item_id,
               attempt_id: command.attempt_id,
-              current_lease_set_id: attempt.lease_set_id,
-              requested_lease_set_id: command.lease_set_id
+              current_intention_set_id: attempt.lease_set_id,
+              requested_intention_set_id: command.lease_set_id
             )
           end
 
@@ -105,8 +107,8 @@ module Coordinator::Write
             .sort_by { _1.first.b }
           unless submitted == expected
             return failure(
-              :lease_observations_mismatch,
-              "Submitted lease observations are not the exact Attempt lease set",
+              :work_intention_observations_mismatch,
+              "Submitted intention observations are not the exact Attempt work-intention set",
               attempt_id: command.attempt_id,
               expected_resource_ids: expected.map(&:first),
               submitted_resource_ids: submitted.map(&:first)
@@ -117,8 +119,8 @@ module Coordinator::Write
           expected_references = attempt.lease_resources.sort_by { _1.resource_id.b }
           unless observed_references == expected_references
             return scoped_failure(
-              :lease_not_active,
-              "Current lease evidence is incomplete for the Attempt write set",
+              :work_intention_not_active,
+              "Current intention evidence is incomplete for the Attempt work-intention set",
               command
             )
           end
@@ -127,12 +129,12 @@ module Coordinator::Write
           return unless invalid
 
           failure(
-            :lease_not_active,
-            "A submitted lease observation is stale or inactive",
+            :work_intention_not_active,
+            "A submitted work-intention observation is stale or inactive",
             attempt_id: command.attempt_id,
             resource_id: invalid.reference.resource_id,
-            submitted_lease_id: invalid.reference.lease_id,
-            current_lease_id: invalid.state.lease_id,
+            submitted_intention_id: invalid.reference.lease_id,
+            current_intention_id: invalid.state.lease_id,
             current_fencing_token: invalid.state.fencing_token,
             expires_at: invalid.state.expires_at
           )
@@ -161,8 +163,8 @@ module Coordinator::Write
           missing = command.actual_resources.reject { covering_lease(leased, _1) }
           unless missing.empty?
             return failure(
-              :actual_write_set_not_authorized,
-              "Candidate manifest includes resources outside the reserved write set",
+              :candidate_resources_not_covered,
+              "Candidate manifest includes resources outside the declared work-intention set",
               candidate_id: command.candidate_id,
               resources: missing.map { { path: _1.path } }
             )
@@ -179,7 +181,7 @@ module Coordinator::Write
           reference = leased.find { _1.resource_kind == "file" && _1.resource_path == mismatch.path }
           failure(
             :manifest_base_evidence_mismatch,
-            "Candidate manifest old-side evidence differs from the reserved base",
+            "Candidate manifest old-side evidence differs from the declared base",
             candidate_id: command.candidate_id,
             resource_id: reference.resource_id,
             path: mismatch.path,

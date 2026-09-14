@@ -28,7 +28,7 @@ module Coordinator::Write
         Failure(
           OutcomeError.new(
             code: :invalid_input,
-            message: "ExpandWriteSet input is invalid",
+            message: "ExpandWorkIntentionSet input is invalid",
             details: result.errors.to_h
           )
         )
@@ -43,7 +43,7 @@ module Coordinator::Write
         Failure(
           OutcomeError.new(
             code: :invalid_git_oid,
-            message: "Write-set expansion evidence contains an invalid Git object ID",
+            message: "Work-intention expansion evidence contains an invalid Git object ID",
             details: result.errors.to_h
           )
         )
@@ -102,7 +102,7 @@ module Coordinator::Write
             change_set_id: attributes.fetch(:change_set_id),
             work_item_id: attributes.fetch(:work_item_id),
             attempt_id: attributes.fetch(:attempt_id),
-            lease_set_id: attributes.fetch(:lease_set_id),
+            lease_set_id: attributes.fetch(:intention_set_id),
             repository_id: attributes.fetch(:repository_id),
             base_commit_oid: attributes.fetch(:base_commit_oid),
             resources:

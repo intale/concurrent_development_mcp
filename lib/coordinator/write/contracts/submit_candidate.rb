@@ -20,10 +20,10 @@ module Coordinator::Write
         required(:base_commit_oid).filled(:string)
         required(:head_commit_oid).filled(:string)
         required(:checkpoint_kind).filled(:string, included_in?: Types::CANDIDATE_CHECKPOINT_KINDS)
-        required(:lease_set_id).filled(:string)
-        required(:leases).array(:hash) do
+        required(:intention_set_id).filled(:string)
+        required(:intentions).array(:hash) do
           required(:resource_id).filled(:string)
-          required(:lease_id).filled(:string)
+          required(:intention_id).filled(:string)
           required(:fencing_token).filled(:integer)
         end
         required(:change_manifest).hash do
@@ -81,21 +81,21 @@ module Coordinator::Write
         key(:head_commit_oid).failure("must differ from base_commit_oid") if base == head
       end
 
-      rule(:lease_set_id) do
+      rule(:intention_set_id) do
         key.failure("must be a UUIDv7") unless Types::UUID_V7_PATTERN.match?(value)
       end
 
-      rule(:leases) do
+      rule(:intentions) do
         key.failure("must contain between 1 and 32 entries") unless (1..32).cover?(value.length)
-        keys = value.map { [ _1[:resource_id], _1[:lease_id], _1[:fencing_token] ] }
-        key.failure("must not contain duplicate lease observations") unless keys.uniq.length == keys.length
+        keys = value.map { [ _1[:resource_id], _1[:intention_id], _1[:fencing_token] ] }
+        key.failure("must not contain duplicate work-intention observations") unless keys.uniq.length == keys.length
         resource_ids = value.map { _1[:resource_id] }
         key.failure("must not contain duplicate Resource IDs") unless resource_ids.uniq.length == resource_ids.length
 
-        value.each_with_index do |lease, index|
-          key([ :leases, index, :resource_id ]).failure("must be a UUIDv7") unless Types::UUID_V7_PATTERN.match?(lease[:resource_id])
-          key([ :leases, index, :lease_id ]).failure("must be a UUIDv7") unless Types::UUID_V7_PATTERN.match?(lease[:lease_id])
-          key([ :leases, index, :fencing_token ]).failure("must be positive") unless lease[:fencing_token].positive?
+        value.each_with_index do |intention, index|
+          key([ :intentions, index, :resource_id ]).failure("must be a UUIDv7") unless Types::UUID_V7_PATTERN.match?(intention[:resource_id])
+          key([ :intentions, index, :intention_id ]).failure("must be a UUIDv7") unless Types::UUID_V7_PATTERN.match?(intention[:intention_id])
+          key([ :intentions, index, :fencing_token ]).failure("must be positive") unless intention[:fencing_token].positive?
         end
       end
 

@@ -3,7 +3,7 @@
 module Coordinator::Web::Graphql
   class ResourceBrowserCursor
     SCHEMA = "project-resource-cursor/v3"
-    KINDS = %w[resources active-leases].freeze
+    KINDS = %w[resources active-work-intentions].freeze
 
     def self.encode(kind, filters:, cursor:)
       validate_kind!(kind)
@@ -36,12 +36,12 @@ module Coordinator::Web::Graphql
     end
 
     def self.valid_cursor?(cursor, kind)
-      keys = kind == "active-leases" ? %w[after_id after_updated_at as_of] : %w[after_id after_updated_at]
+      keys = kind == "active-work-intentions" ? %w[after_id after_updated_at as_of] : %w[after_id after_updated_at]
       valid = cursor.keys.sort == keys &&
         Coordinator::Shared::Types::UUID_V7_PATTERN.match?(cursor.fetch("after_id", "")) &&
         Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(cursor.fetch("after_updated_at", ""))
       valid &&= Coordinator::Shared::Types::TIMESTAMP_PATTERN.match?(cursor.fetch("as_of", "")) if
-        kind == "active-leases"
+        kind == "active-work-intentions"
       valid
     end
     private_class_method :valid_cursor?

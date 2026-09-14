@@ -108,11 +108,11 @@ module CoordinationDiscoveryAcceptanceWorld
       base_commit_oid: DISCOVERY_BASE_COMMIT,
       head_commit_oid: DISCOVERY_HEAD_COMMIT,
       checkpoint_kind: "intermediate",
-      lease_set_id: reservation.fetch("lease_set_id"),
-      leases: reservation.fetch("resources").map do |reference|
+      intention_set_id: reservation.fetch("intention_set_id"),
+      intentions: reservation.fetch("intentions").map do |reference|
         {
           resource_id: reference.fetch("resource_id"),
-          lease_id: reference.fetch("lease_id"),
+          intention_id: reference.fetch("intention_id"),
           fencing_token: reference.fetch("fencing_token")
         }
       end,
@@ -259,7 +259,7 @@ module CoordinationDiscoveryAcceptanceWorld
     suffix = coordination.fetch(:suffix)
     ids = coordination.fetch(:ids)
     state = discovery_submit(
-      "write_set_reserve",
+      "work_intention_set_declare",
       client_id: "agent-#{suffix}",
       command_id: "disc.#{suffix}.write-set.reserve",
       actor: { kind: "agent", id: "agent-#{suffix}" },
@@ -277,7 +277,7 @@ module CoordinationDiscoveryAcceptanceWorld
           client_id: "agent-#{suffix}"
         )
       ],
-      lease_duration_seconds: 900
+      ttl_seconds: 900
     )
     state.dig("result", "result", "structuredContent", "data")
   end

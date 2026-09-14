@@ -18,7 +18,7 @@ FactoryBot.define do
       ]
     end
     status { "authorized" }
-    projection_version { 6 }
+    projection_version { 7 }
     authorization_event do
       {
         "event_id" => SecureRandom.uuid_v7,
@@ -66,6 +66,64 @@ FactoryBot.define do
       end
       write_set_reserved_at_domain { Time.utc(2026, 8, 30, 12, 2) }
       write_set_expires_at_domain { Time.utc(2026, 8, 30, 12, 12) }
+    end
+
+    trait :with_work_intention_set do
+      transient do
+        work_intention_resource_id { SecureRandom.uuid_v7 }
+        work_intention_resource_kind { "file" }
+        work_intention_resource_path { "app/models/factory_intention.rb" }
+        work_intention_id { SecureRandom.uuid_v7 }
+        work_intention_mode { "shared" }
+        work_intention_purpose { "Implement the assigned WorkItem" }
+        work_intention_context { nil }
+      end
+
+      write_set_lease_set_id { SecureRandom.uuid_v7 }
+      write_set_repository_id { base_snapshots.sole.fetch("repository_id") }
+      write_set_policy_version { "coordinator-work-intention/v1" }
+      write_set_resources do
+        [
+          {
+            "intention_id" => work_intention_id,
+            "resource_id" => work_intention_resource_id,
+            "resource_kind" => work_intention_resource_kind,
+            "resource_path" => work_intention_resource_path,
+            "base_blob_oid" => "b" * 40,
+            "mode" => work_intention_mode,
+            "purpose" => work_intention_purpose,
+            "context" => work_intention_context,
+            "fencing_token" => 1
+          }
+        ]
+      end
+      write_set_reserved_event do
+        {
+          "event_id" => SecureRandom.uuid_v7,
+          "type" => "ResourceWorkIntentionDeclared",
+          "stream_context" => "DevelopmentCoordination",
+          "stream_name" => "ResourceWorkIntention",
+          "stream_id" => work_intention_id,
+          "stream_revision" => 0
+        }
+      end
+      write_set_reserved_at_domain { Time.utc(2026, 8, 30, 12, 2) }
+      write_set_expires_at_domain { Time.utc(2026, 8, 30, 12, 12) }
+    end
+
+    trait :withdrawn_work_intention_set do
+      with_work_intention_set
+      write_set_release_event do
+        {
+          "event_id" => SecureRandom.uuid_v7,
+          "type" => "ResourceWorkIntentionWithdrawn",
+          "stream_context" => "DevelopmentCoordination",
+          "stream_name" => "ResourceWorkIntention",
+          "stream_id" => work_intention_id,
+          "stream_revision" => 1
+        }
+      end
+      write_set_released_at_domain { Time.utc(2026, 8, 30, 12, 5) }
     end
 
     trait :released_write_set do

@@ -303,7 +303,7 @@ Then("both shared intentions coexist in the canonical Repository namespace") do
     @repository_race_lease_outcomes.map { _1.fetch("status") }.sort,
     "Shared intention results"
   )
-  set_ids = @repository_race_lease_outcomes.map { _1.dig("data", "lease_set_id") }
+  set_ids = @repository_race_lease_outcomes.map { _1.dig("data", "intention_set_id") }
   assert_acceptance_equal(2, set_ids.compact.uniq.length, "Independent work-intention sets")
 end
 
@@ -409,10 +409,10 @@ Then("agent-only mutation families advertise only agent attribution") do
     work_item_acquire
     work_item_complete
     attempt_abandon
-    write_set_reserve
-    write_set_expand
-    lease_renew
-    lease_release
+    work_intention_set_declare
+    work_intention_set_expand
+    work_intention_set_renew
+    work_intention_set_withdraw
     candidate_submit
     candidate_impact_surface_submit
     verification_obligation_claim

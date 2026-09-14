@@ -28,7 +28,7 @@ module Coordinator::Write
         Failure(
           OutcomeError.new(
             code: :invalid_input,
-            message: "ReserveWriteSet input is invalid",
+            message: "DeclareWorkIntentionSet input is invalid",
             details: result.errors.to_h
           )
         )
@@ -43,7 +43,7 @@ module Coordinator::Write
         Failure(
           OutcomeError.new(
             code: :invalid_git_oid,
-            message: "Write-set base evidence contains an invalid Git object ID",
+            message: "Work-intention base evidence contains an invalid Git object ID",
             details: result.errors.to_h
           )
         )
@@ -105,7 +105,7 @@ module Coordinator::Write
             repository_id: attributes.fetch(:repository_id),
             base_commit_oid: attributes.fetch(:base_commit_oid),
             resources:,
-            lease_duration_seconds: attributes.fetch(:lease_duration_seconds)
+            lease_duration_seconds: attributes.fetch(:ttl_seconds)
           )
         )
       end

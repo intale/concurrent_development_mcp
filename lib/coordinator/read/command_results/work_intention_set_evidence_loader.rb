@@ -107,12 +107,15 @@ module Coordinator::Read
         raise InvalidProjectionSource, "Work-intention Resource registration is missing" unless event
 
         registration = load_event(event)
-        Coordinator::Write::LeaseReferenceV2.new(
-          lease_id: declaration.intention_id,
+        Coordinator::Write::WorkIntentionReceiptReferenceV1.new(
+          intention_id: declaration.intention_id,
           resource_id: declaration.resource_id,
           resource_kind: registration.kind,
           resource_path: registration.normalized_path,
           base_blob_oid: declaration.base_blob_oid,
+          mode: declaration.mode,
+          purpose: declaration.purpose,
+          context: declaration.context,
           fencing_token: declaration.fencing_token
         )
       end

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe "MCP lease_renew Task boundary", :event_store do
+RSpec.describe "MCP work_intention_set_renew Task boundary", :event_store do
   RENEW_PROTOCOL_VERSION = "2026-07-28"
   RENEW_TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
   RENEW_CHANGE_SET_ID = "CS-MCP-RENEW"
@@ -45,8 +45,8 @@ RSpec.describe "MCP lease_renew Task boundary", :event_store do
           "change_set_id" => RENEW_CHANGE_SET_ID,
           "work_item_id" => RENEW_WORK_ITEM_ID,
           "attempt_id" => RENEW_ATTEMPT_ID,
-          "lease_set_id" => reservation.lease_set_id,
-          "resource_count" => 2,
+          "intention_set_id" => reservation.intention_set_id,
+          "intention_count" => 2,
           "previous_expires_at" => "2026-08-22T10:10:00.000000Z",
           "expires_at" => "2026-08-22T10:20:00.000000Z"
         )
@@ -71,12 +71,12 @@ RSpec.describe "MCP lease_renew Task boundary", :event_store do
   it "completes stale fencing evidence as a Task denial and rejects malformed input before Task allocation" do
     seed_active_attempt
     reservation = reserve_initial_set.value!.data
-    stale_leases = lease_inputs(reservation)
-    stale_leases.first[:fencing_token] += 1
+    stale_intentions = intention_inputs(reservation)
+    stale_intentions.first[:fencing_token] += 1
     stale_response = submit_renewal(
       command_id: "cmd-mcp-renew-stale",
       reservation:,
-      leases: stale_leases,
+      intentions: stale_intentions,
       request_id: 1
     )
     task_id = stale_response.dig("result", "taskId")
@@ -88,8 +88,8 @@ RSpec.describe "MCP lease_renew Task boundary", :event_store do
     expect(stale.dig("result", "result")).to include(
       "isError" => true,
       "structuredContent" => include(
-        "status" => "denied",
-        "data" => include("code" => "lease_reference_mismatch")
+        "status" => "conflict",
+        "data" => include("code" => "work_intention_reference_mismatch")
       )
     )
     expect(CommandTraceFixture.events(task_id, event_store:).map(&:type)).to eq(
@@ -101,44 +101,50 @@ RSpec.describe "MCP lease_renew Task boundary", :event_store do
     malformed = submit_renewal(
       command_id: "cmd-mcp-renew-malformed",
       reservation:,
-      lease_set_id: "not-a-uuid",
+      intention_set_id: "not-a-uuid",
       request_id: 3
     )
 
     expect(malformed.dig("result", "resultType")).to eq("complete")
     expect(malformed.dig("result", "isError")).to be(true)
-    expect(malformed.dig("result", "content", 0, "text")).to include("lease_set_id")
+    expect(malformed.dig("result", "content", 0, "text")).to include("intention_set_id")
     expect(task_events_for_command("cmd-mcp-renew-malformed")).to be_empty
   end
 
   private
 
-  def submit_renewal(command_id:, reservation:, request_id:, leases: lease_inputs(reservation), lease_set_id: reservation.lease_set_id)
+  def submit_renewal(
+    command_id:,
+    reservation:,
+    request_id:,
+    intentions: intention_inputs(reservation),
+    intention_set_id: reservation.intention_set_id
+  )
     mcp_request(
       id: request_id,
       method: "tools/call",
-      name: "lease_renew",
+      name: "work_intention_set_renew",
       params: {
-        name: "lease_renew",
+        name: "work_intention_set_renew",
         arguments: {
           command_id:,
           actor: { kind: "agent", id: "agent-a" },
           change_set_id: RENEW_CHANGE_SET_ID,
           work_item_id: RENEW_WORK_ITEM_ID,
           attempt_id: RENEW_ATTEMPT_ID,
-          lease_set_id:,
-          leases:,
-          lease_duration_seconds: 900
+          intention_set_id:,
+          intentions:,
+          ttl_seconds: 900
         }
       }
     )
   end
 
-  def lease_inputs(reservation)
-    reservation.resources.map do |reference|
+  def intention_inputs(reservation)
+    reservation.intentions.map do |reference|
       {
         resource_id: reference.resource_id,
-        lease_id: reference.lease_id,
+        intention_id: reference.intention_id,
         fencing_token: reference.fencing_token
       }
     end
@@ -200,7 +206,7 @@ RSpec.describe "MCP lease_renew Task boundary", :event_store do
       repository_id:,
       base_commit_oid: RENEW_BASE_COMMIT_OID,
       resources: resource_ids.map { { resource_id: _1 } },
-      lease_duration_seconds: 600
+      ttl_seconds: 600
     )
   end
 
@@ -210,8 +216,8 @@ RSpec.describe "MCP lease_renew Task boundary", :event_store do
       command_id: "seed-create-#{RENEW_CHANGE_SET_ID}",
       actor: { kind: "agent", id: "planner-1" },
       change_set_id: RENEW_CHANGE_SET_ID,
-      goal: "Coordinate MCP lease renewal",
-      acceptance_criteria: [ "Every lease remains owned together" ]
+      goal: "Coordinate MCP work-intention renewal",
+      acceptance_criteria: [ "Every intention remains attributed together" ]
     ).value!
     Coordinator::Write::Operations::ExecuteCreateWorkItem.new(event_store:).call(
       command_id: "seed-create-#{RENEW_WORK_ITEM_ID}",

@@ -226,7 +226,7 @@ RSpec.describe Coordinator::Container do
         "agent-choice-impacts-v1",
         "agent-choices-v1",
         "candidates-v1",
-        "coord-context-v6",
+        "coord-context-v7",
         "decision-governance-v1",
         "decision-interpretations-v1",
         "development-artifacts-v3",

@@ -15,9 +15,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReleaseLeaseSet, :event_st
     expect(first).to be_success
     expect(replay).to be_success
     expect(replay.value!.emitted_events).to be_empty
-    expect(first.value!.data.resources.map(&:resource_id)).to eq(reservation.resource_ids)
-    reservation.receipt.resources.each do |reference|
-      events = read_intention(reference.lease_id)
+    expect(first.value!.data.intentions.map(&:resource_id)).to eq(reservation.resource_ids)
+    reservation.receipt.intentions.each do |reference|
+      events = read_intention(reference.intention_id)
       expect(events.map(&:type)).to eq(
         [ "ResourceWorkIntentionDeclared", "ResourceWorkIntentionWithdrawn" ]
       )
@@ -52,22 +52,22 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReleaseLeaseSet, :event_st
           purpose: "Replace the shared implementation"
         }
       ],
-      lease_duration_seconds: 900
+      ttl_seconds: 900
     )
 
     expect(successor).to be_success
-    expect(successor.value!.data.resources.sole.fencing_token).to eq(2)
+    expect(successor.value!.data.intentions.sole.fencing_token).to eq(2)
   end
 
   it "rejects incomplete membership without withdrawing any intention" do
     reservation = setup_reservation
     input = release_input(reservation, command_id: "cmd-withdraw-incomplete")
 
-    result = operation.call(input.merge(leases: input.fetch(:leases).first(1)))
+    result = operation.call(input.merge(intentions: input.fetch(:intentions).first(1)))
 
-    expect(result.failure).to have_attributes(code: :lease_set_snapshot_mismatch)
-    reservation.receipt.resources.each do |reference|
-      expect(read_intention(reference.lease_id).map(&:type)).to eq([ "ResourceWorkIntentionDeclared" ])
+    expect(result.failure).to have_attributes(code: :work_intention_set_snapshot_mismatch)
+    reservation.receipt.intentions.each do |reference|
+      expect(read_intention(reference.intention_id).map(&:type)).to eq([ "ResourceWorkIntentionDeclared" ])
     end
   end
 
@@ -81,17 +81,17 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReleaseLeaseSet, :event_st
       change_set_id: "CS-LSE",
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
-      lease_set_id: reservation.receipt.lease_set_id,
+      intention_set_id: reservation.receipt.intention_set_id,
       repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: [ { resource_id: earlier_resource_id } ]
     ).value!.data
-    references = [ *reservation.receipt.resources, *expansion.added_resources ]
+    references = [ *reservation.receipt.intentions, *expansion.added_intentions ]
     input = release_input(reservation, command_id: "cmd-withdraw-expanded").merge(
-      leases: references.map do |reference|
+      intentions: references.map do |reference|
         {
           resource_id: reference.resource_id,
-          lease_id: reference.lease_id,
+          intention_id: reference.intention_id,
           fencing_token: reference.fencing_token
         }
       end
@@ -100,7 +100,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReleaseLeaseSet, :event_st
     result = operation.call(input)
 
     expect(result).to be_success
-    expect(result.value!.data.resources.map(&:resource_id)).to contain_exactly(
+    expect(result.value!.data.intentions.map(&:resource_id)).to contain_exactly(
       *references.map(&:resource_id)
     )
   end
@@ -120,8 +120,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReleaseLeaseSet, :event_st
       change_set_id: "CS-LSE",
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
-      lease_set_id: reservation.receipt.lease_set_id,
-      leases: ResourceLeaseOperationScenario.lease_inputs(reservation.receipt)
+      intention_set_id: reservation.receipt.intention_set_id,
+      intentions: ResourceLeaseOperationScenario.work_intention_inputs(reservation.receipt)
     }
   end
 

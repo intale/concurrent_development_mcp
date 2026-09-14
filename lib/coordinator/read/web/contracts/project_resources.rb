@@ -4,8 +4,8 @@ module Coordinator::Read::Web::Contracts
   class ProjectResources
     RESOURCE_KINDS = %w[file directory].freeze
     RESOURCE_LIFECYCLES = %w[registered current inactive].freeze
-    COLLECTION_KINDS = %w[resources active_leases].freeze
-    DETAIL_KINDS = %w[resource lease].freeze
+    COLLECTION_KINDS = %w[resources active_work_intentions].freeze
+    DETAIL_KINDS = %w[resource work_intention].freeze
 
     class Collection < Dry::Validation::Contract
       config.validate_keys = true
@@ -24,10 +24,11 @@ module Coordinator::Read::Web::Contracts
         optional(:change_set_id).maybe(:string, max_size?: 255)
         optional(:work_item_id).maybe(:string, max_size?: 255)
         optional(:attempt_id).maybe(:string, max_size?: 255)
+        optional(:mode).maybe(:string, included_in?: %w[shared exclusive])
       end
 
       rule(:kind) do
-        key.failure("must be resources or active_leases") unless COLLECTION_KINDS.include?(value)
+        key.failure("must be resources or active_work_intentions") unless COLLECTION_KINDS.include?(value)
       end
 
       rule(:after_id) do
@@ -69,7 +70,7 @@ module Coordinator::Read::Web::Contracts
       end
 
       rule(:kind) do
-        key.failure("must be resource or lease") unless DETAIL_KINDS.include?(value)
+        key.failure("must be resource or work_intention") unless DETAIL_KINDS.include?(value)
       end
 
       rule(:id) do

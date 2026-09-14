@@ -1,15 +1,33 @@
 # frozen_string_literal: true
 
 RSpec.describe Coordinator::Mcp::Schemas do
-  it "advertises independent Candidate-file and write-set resource boundaries" do
-    write_set_maximum = described_class.write_set_reserve
+  it "advertises independent Candidate-file and work-intention resource boundaries" do
+    intention_set = described_class.work_intention_set_declare
+    intention_set_maximum = intention_set
       .dig(:properties, :resources, :maxItems)
     candidate_maximum = described_class.candidate_submit
       .dig(:properties, :change_manifest, :properties, :files, :maxItems)
 
-    expect(write_set_maximum).to eq(Coordinator::Shared::Types::WRITE_SET_RESOURCE_MAXIMUM_COUNT)
+    expect(intention_set_maximum).to eq(Coordinator::Shared::Types::WRITE_SET_RESOURCE_MAXIMUM_COUNT)
     expect(candidate_maximum).to eq(Coordinator::Shared::Types::CANDIDATE_MANIFEST_MAXIMUM_FILE_COUNT)
-    expect(candidate_maximum).to be > write_set_maximum
+    expect(candidate_maximum).to be > intention_set_maximum
+    expect(intention_set.dig(:properties, :resources, :items, :properties, :mode)).to include(
+      default: "shared",
+      enum: %w[shared exclusive]
+    )
+    expect(intention_set.dig(:properties, :ttl_seconds)).to include(minimum: 30, maximum: 3_600)
+  end
+
+  it "publishes only the work-intention command vocabulary" do
+    names = Coordinator::Mcp::ToolRegistry.all.map(&:tool_name)
+
+    expect(names).to include(
+      "work_intention_set_declare",
+      "work_intention_set_expand",
+      "work_intention_set_renew",
+      "work_intention_set_withdraw"
+    )
+    expect(names).not_to include("write_set_reserve", "write_set_expand", "lease_renew", "lease_release")
   end
 
   it "requires one exact scope and bounds the Repository discovery cursor" do

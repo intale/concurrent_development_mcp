@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 Given(
-  "Candidate coordination {string} gives agent {string} an active lease on {string}"
+  "Candidate coordination {string} gives agent {string} an active work intention on {string}"
 ) do |prefix, agent_id, path|
   @candidate_coordination = prepare_candidate_coordination(prefix:, agent_id:, path:)
 end
@@ -200,7 +200,7 @@ When("the agent submits Candidate {string} with stale fencing evidence") do |can
     command_id: "cmd-cuc-can-stale",
     head_character: "b"
   )
-  @candidate_arguments[:leases] = @candidate_arguments.fetch(:leases).map do |reference|
+  @candidate_arguments[:intentions] = @candidate_arguments.fetch(:intentions).map do |reference|
     reference.merge(fencing_token: reference.fetch(:fencing_token) + 1)
   end
   @candidate_task_id = submit_candidate_task(@candidate_arguments)
@@ -221,13 +221,13 @@ Then("denied Candidate {string} writes no target facts") do |candidate_id|
   assert_candidate_target_absent(candidate_id, @candidate_arguments)
 end
 
-When("the agent attempts Candidate {string} without lease observations") do |candidate_id|
+When("the agent attempts Candidate {string} without work-intention observations") do |candidate_id|
   @candidate_arguments = candidate_arguments(
     @candidate_coordination,
     candidate_id:,
     command_id: "cmd-cuc-can-invalid",
     head_character: "b"
-  ).merge(leases: [])
+  ).merge(intentions: [])
   @candidate_invalid_response = call_tool("candidate_submit", @candidate_arguments)
 end
 
@@ -358,7 +358,7 @@ Then(
 end
 
 Given(
-  "Candidate coordinations {string} and {string} give two agents independent leases"
+  "Candidate coordinations {string} and {string} give two agents independent work intentions"
 ) do |first_prefix, second_prefix|
   @candidate_race = [
     prepare_candidate_coordination(

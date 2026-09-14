@@ -30,12 +30,12 @@ module Coordinator::Read::Web::Queries
       @repository.resource(query, result.data.resource)
     end
 
-    def active_leases(input)
-      @repository.active_leases(collection_query(input.merge(kind: "active_leases")))
+    def active_work_intentions(input)
+      @repository.active_work_intentions(collection_query(input.merge(kind: "active_work_intentions")))
     end
 
-    def lease(input)
-      @repository.lease(detail_query(input.merge(kind: "lease")))
+    def work_intention(input)
+      @repository.work_intention(detail_query(input.merge(kind: "work_intention")))
     end
 
     private
@@ -58,7 +58,8 @@ module Coordinator::Read::Web::Queries
         agent_id: values[:agent_id],
         change_set_id: values[:change_set_id],
         work_item_id: values[:work_item_id],
-        attempt_id: values[:attempt_id]
+        attempt_id: values[:attempt_id],
+        mode: values[:mode]
       )
     end
 

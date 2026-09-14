@@ -35,12 +35,12 @@ module DependencyProgressScenario
       change_set_id: ids.fetch(:change_set_id),
       work_item_id: ids.fetch(:producer_work_item_id),
       attempt_id: ids.fetch(:attempt_id),
-      lease_set_id: reservation.lease_set_id,
-      leases: reservation.resources.map do |lease|
+      intention_set_id: reservation.intention_set_id,
+      intentions: reservation.intentions.map do |intention|
         {
-          resource_id: lease.resource_id,
-          lease_id: lease.lease_id,
-          fencing_token: lease.fencing_token
+          resource_id: intention.resource_id,
+          intention_id: intention.intention_id,
+          fencing_token: intention.fencing_token
         }
       end
     })
@@ -186,7 +186,7 @@ module DependencyProgressScenario
       repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: [ { resource_id:, base_blob_oid: "c" * 40 } ],
-      lease_duration_seconds: 900
+      ttl_seconds: 900
     }).data
   end
 
@@ -203,12 +203,12 @@ module DependencyProgressScenario
       base_commit_oid: "a" * 40,
       head_commit_oid: "b" * 40,
       checkpoint_kind: "final",
-      lease_set_id: reservation.lease_set_id,
-      leases: reservation.resources.map do |lease|
+      intention_set_id: reservation.intention_set_id,
+      intentions: reservation.intentions.map do |intention|
         {
-          resource_id: lease.resource_id,
-          lease_id: lease.lease_id,
-          fencing_token: lease.fencing_token
+          resource_id: intention.resource_id,
+          intention_id: intention.intention_id,
+          fencing_token: intention.fencing_token
         }
       end,
       change_manifest: {

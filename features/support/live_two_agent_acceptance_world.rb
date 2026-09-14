@@ -149,7 +149,7 @@ module LiveTwoAgentAcceptanceWorld
       key, entry, resource = participants_by_client.fetch(client_id)
       command_id = "two-luna.reserve.overlap.#{key}.#{round}"
       luna_task_handle(
-        "write_set_reserve",
+        "work_intention_set_declare",
         reservation_arguments(entry, command_id:, resources: [ resource ]),
         client_id:
       ).merge(key:, command_id:)
@@ -244,8 +244,8 @@ module LiveTwoAgentAcceptanceWorld
           base_commit_oid: BASE_COMMIT,
           head_commit_oid: CANDIDATE_HEADS.fetch(key),
           checkpoint_kind: "final",
-          lease_set_id: reservation.fetch("lease_set_id"),
-          leases: luna_lease_references(reservation),
+          intention_set_id: reservation.fetch("intention_set_id"),
+          intentions: luna_lease_references(reservation),
           change_manifest: {
             collector_version: "git-evidence-v1",
             files: [
@@ -279,7 +279,7 @@ module LiveTwoAgentAcceptanceWorld
       client_id: agent_a.fetch(:client_id)
     )
     before_attempt = luna_attempt(before, agent_a.fetch(:attempt_id))
-    assert_acceptance(before_attempt.dig("write_set", "released_at").nil?, "Agent A lease is already released")
+    assert_acceptance(before_attempt.dig("work_intention_set", "withdrawn_at").nil?, "Agent A intention set is already withdrawn")
 
     stop_read_model_subscriptions
     release_luna_write_set(:agent_a)
@@ -291,27 +291,27 @@ module LiveTwoAgentAcceptanceWorld
     stale_attempt = luna_attempt(stale, agent_a.fetch(:attempt_id))
     assert_acceptance_equal("ok", stale.fetch("status"), "Available stale read model")
     assert_acceptance_equal(before.fetch("context_token"), stale.fetch("context_token"), "Stale context token")
-    assert_acceptance(stale_attempt.dig("write_set", "released_at").nil?, "Read side advanced while stopped")
+    assert_acceptance(stale_attempt.dig("work_intention_set", "withdrawn_at").nil?, "Read side advanced while stopped")
     assert_acceptance(
       (stale.keys & %w[fresh pending projection_status stream_revision]).empty?,
       "The stale response exposed a freshness availability gate"
     )
 
     renewal = luna_task(
-      "lease_renew",
+      "work_intention_set_renew",
       {
         command_id: "two-luna.lease.renew-from-stale-view",
         actor: luna_actor(agent_a),
         change_set_id: @luna_change_set_id,
         work_item_id: agent_a.fetch(:work_item_id),
         attempt_id: agent_a.fetch(:attempt_id),
-        lease_set_id: @luna_reservations.dig(:agent_a, "lease_set_id"),
-        leases: luna_lease_references(@luna_reservations.fetch(:agent_a)),
-        lease_duration_seconds: 600
+        intention_set_id: @luna_reservations.dig(:agent_a, "intention_set_id"),
+        intentions: luna_lease_references(@luna_reservations.fetch(:agent_a)),
+        ttl_seconds: 600
       },
       client_id: agent_a.fetch(:client_id)
     )
-    assert_acceptance_equal("denied", renewal.fetch("status"), "Authoritative stale-command status")
+    assert_acceptance_equal("conflict", renewal.fetch("status"), "Authoritative stale-command status")
     assert_acceptance(
       renewal.dig("data", "code").to_s.length.positive?,
       "Authoritative stale-command rejection must expose a typed reason"
@@ -323,7 +323,7 @@ module LiveTwoAgentAcceptanceWorld
       attempt = context.fetch("attempts").find do
         _1.fetch("attempt_id") == agent_a.fetch(:attempt_id)
       end
-      !attempt.dig("write_set", "released_at").nil?
+      !attempt.dig("work_intention_set", "withdrawn_at").nil?
     end
     release_luna_write_set(:agent_b)
     release_luna_write_set(:integration)
@@ -660,14 +660,14 @@ module LiveTwoAgentAcceptanceWorld
       repository_id: entry.fetch(:repository_id),
       base_commit_oid: BASE_COMMIT,
       resources:,
-      lease_duration_seconds: 600
+      ttl_seconds: 600
     }
   end
 
   def reserve_luna_disjoint_resource(key, resource)
     entry = @luna_participants.fetch(key)
     luna_successful_task(
-      "write_set_reserve",
+      "work_intention_set_declare",
       reservation_arguments(
         entry,
         command_id: "two-luna.reserve.disjoint.#{key}",
@@ -681,23 +681,23 @@ module LiveTwoAgentAcceptanceWorld
     entry = @luna_participants.fetch(key)
     reservation = @luna_reservations.fetch(key)
     luna_successful_task(
-      "lease_release",
+      "work_intention_set_withdraw",
       {
         command_id: "two-luna.lease.release.#{key}",
         actor: luna_actor(entry),
         change_set_id: @luna_change_set_id,
         work_item_id: entry.fetch(:work_item_id),
         attempt_id: entry.fetch(:attempt_id),
-        lease_set_id: reservation.fetch("lease_set_id"),
-        leases: luna_lease_references(reservation)
+        intention_set_id: reservation.fetch("intention_set_id"),
+        intentions: luna_lease_references(reservation)
       },
       client_id: entry.fetch(:client_id)
     )
   end
 
   def luna_lease_references(reservation)
-    reservation.fetch("resources").map do |resource|
-      resource.slice("resource_id", "lease_id", "fencing_token")
+    reservation.fetch("intentions").map do |resource|
+      resource.slice("resource_id", "intention_id", "fencing_token")
     end
   end
 

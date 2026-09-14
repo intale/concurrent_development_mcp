@@ -23,7 +23,7 @@ module Coordinator::Write
           optional(:purpose).filled(:string, max_size?: 1_000)
           optional(:context).maybe(:string, max_size?: 4_000)
         end
-        required(:lease_duration_seconds).value(:integer)
+        required(:ttl_seconds).value(:integer)
       end
 
       rule(:command_id, :change_set_id, :work_item_id, :attempt_id) do
@@ -64,7 +64,7 @@ module Coordinator::Write
         end
       end
 
-      rule(:lease_duration_seconds) do
+      rule(:ttl_seconds) do
         key.failure("must be between 30 and 3600 seconds") unless (30..3_600).cover?(value)
       end
     end

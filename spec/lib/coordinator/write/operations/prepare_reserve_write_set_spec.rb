@@ -19,7 +19,7 @@ RSpec.describe Coordinator::Write::Operations::PrepareReserveWriteSet do
       repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources:,
-      lease_duration_seconds: 900
+      ttl_seconds: 900
     }
   end
 
@@ -46,7 +46,7 @@ RSpec.describe Coordinator::Write::Operations::PrepareReserveWriteSet do
   it "rejects malformed targets, bounds, duration, and Git evidence before a command exists" do
     malformed = prepare.call(input.merge(resources: [ { resource_id: "not-a-uuid" } ]))
     over_bound = prepare.call(input.merge(resources: 33.times.map { { resource_id: test_uuid(_1) } }))
-    bad_duration = prepare.call(input.merge(lease_duration_seconds: 29))
+    bad_duration = prepare.call(input.merge(ttl_seconds: 29))
     bad_oid = prepare.call(input.merge(base_commit_oid: "ABC"))
 
     expect(malformed.failure.code).to eq(:invalid_input)

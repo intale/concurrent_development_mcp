@@ -10,7 +10,7 @@ RSpec.describe Coordinator::Write::Contracts::SubmitCandidate do
     expect(result.to_h.keys).to contain_exactly(
       :command_id, :actor, :candidate_id, :change_set_id, :work_item_id,
       :attempt_id, :repository_id, :target_branch, :base_commit_oid,
-      :head_commit_oid, :checkpoint_kind, :lease_set_id, :leases,
+      :head_commit_oid, :checkpoint_kind, :intention_set_id, :intentions,
       :change_manifest
     )
   end
@@ -40,9 +40,12 @@ RSpec.describe Coordinator::Write::Contracts::SubmitCandidate do
     cases.each { expect(contract.call(_1)).to be_failure }
   end
 
-  it "rejects duplicate lease resources and out-of-format evidence OIDs" do
+  it "rejects duplicate work-intention resources and out-of-format evidence OIDs" do
     duplicate = valid_input
-    duplicate[:leases] = [ duplicate[:leases].first, duplicate[:leases].first.merge(lease_id: uuid("2")) ]
+    duplicate[:intentions] = [
+      duplicate[:intentions].first,
+      duplicate[:intentions].first.merge(intention_id: uuid("2"))
+    ]
     foreign_oid = valid_input(
       build_context: {
         collector_version: "build-context-v1",
@@ -84,11 +87,11 @@ RSpec.describe Coordinator::Write::Contracts::SubmitCandidate do
       base_commit_oid: "a" * 40,
       head_commit_oid: "b" * 40,
       checkpoint_kind: "final",
-      lease_set_id: uuid("1"),
-      leases: [
+      intention_set_id: uuid("1"),
+      intentions: [
         {
           resource_id: uuid("3"),
-          lease_id: uuid("2"),
+          intention_id: uuid("2"),
           fencing_token: 1
         }
       ],

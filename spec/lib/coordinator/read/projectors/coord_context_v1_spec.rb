@@ -317,23 +317,23 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model do
       status: "started",
       base_snapshots: [ { repository_id:, object_format: "sha1", commit_oid: "a" * 40 } ]
     )
-    write_set = snapshot.state.attempts.sole.write_set
-    expect(write_set.to_h).to include(repository_id:, policy_version: "coordinator-resource-lease/v2")
-    expect(write_set.lease_set_id).to eq(lease_set_id)
-    expect(write_set.resources).to eq(write_set.resources.sort_by { _1.resource_id.b })
-    expect(write_set.resources.map(&:resource_path)).to contain_exactly(
+    intention_set = snapshot.state.attempts.sole.work_intention_set
+    expect(intention_set.to_h).to include(repository_id:, policy_version: "coordinator-resource-lease/v2")
+    expect(intention_set.intention_set_id).to eq(lease_set_id)
+    expect(intention_set.intentions).to eq(intention_set.intentions.sort_by { _1.resource_id.b })
+    expect(intention_set.intentions.map(&:resource_path)).to contain_exactly(
       "app/models/invoice.rb", "app/services/tax.rb", "db/schema.rb"
     )
-    expect(write_set.resources.map(&:fencing_token)).to eq([ 1, 1, 1 ])
-    expect(write_set).to have_attributes(
-      reserved_at: "2026-08-30T12:02:00.000000Z",
+    expect(intention_set.intentions.map(&:fencing_token)).to eq([ 1, 1, 1 ])
+    expect(intention_set).to have_attributes(
+      declared_at: "2026-08-30T12:02:00.000000Z",
       last_expanded_at: "2026-08-30T12:03:00.000000Z",
       last_renewed_at: "2026-08-30T12:04:00.000000Z",
       previous_expires_at: "2026-08-30T12:10:00.000000Z",
       expires_at: "2026-08-30T12:20:00.000000Z",
-      released_at: "2026-08-30T12:05:00.000000Z"
+      withdrawn_at: "2026-08-30T12:05:00.000000Z"
     )
-    expect(write_set.to_h.keys & %i[active fresh pending]).to be_empty
+    expect(intention_set.to_h.keys & %i[active fresh pending]).to be_empty
 
     history = Coordinator::Read::AttemptHistory.find("A-WRITE")
     expect(history).to have_attributes(
@@ -563,7 +563,7 @@ RSpec.describe Coordinator::Read::Projectors::CoordContextV1, :read_model do
     )
     expect(converged.data.context.attempts.sole).to have_attributes(
       status: "completed",
-      write_set: nil,
+      work_intention_set: nil,
       selected_candidate_id: candidate_id,
       completed_at: be_present
     )

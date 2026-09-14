@@ -2,7 +2,7 @@
 
 PROJECT_RESOURCE_BROWSER_QUERY = <<~GRAPHQL.freeze
   query ProjectResourceBrowser($projectRef: ID!) {
-    projectActiveResourceLeases(projectRef: $projectRef, first: 100) {
+    projectActiveResourceWorkIntentions(projectRef: $projectRef, first: 100) {
       nodes {
         id
         resourceId
@@ -15,9 +15,9 @@ PROJECT_RESOURCE_BROWSER_QUERY = <<~GRAPHQL.freeze
     }
   }
 GRAPHQL
-PROJECT_RESOURCE_LEASE_DETAIL_QUERY = <<~GRAPHQL.freeze
-  query ProjectResourceLeaseDetail($projectRef: ID!, $leaseId: ID!) {
-    projectResourceLease(projectRef: $projectRef, leaseId: $leaseId) {
+PROJECT_RESOURCE_WORK_INTENTION_DETAIL_QUERY = <<~GRAPHQL.freeze
+  query ProjectResourceWorkIntentionDetail($projectRef: ID!, $intentionId: ID!) {
+    projectResourceWorkIntention(projectRef: $projectRef, intentionId: $intentionId) {
       id
       agentId
       resourcePath
@@ -27,7 +27,7 @@ PROJECT_RESOURCE_LEASE_DETAIL_QUERY = <<~GRAPHQL.freeze
   }
 GRAPHQL
 
-Given("projected resource rows contain two running agents but only one active lease") do
+Given("projected resource rows contain two running agents but only one active work intention") do
   create_resource_browser_project
   leased = create_resource_browser_resource("app/models/owned.rb")
   create_resource_browser_attempt(
@@ -47,7 +47,7 @@ Given("projected resource rows contain two running agents but only one active le
   )
 end
 
-Given("projected resource rows represent expanded renewed released and expired lease lifecycles") do
+Given("projected resource rows represent expanded renewed withdrawn and expired work-intention lifecycles") do
   create_resource_browser_project
   first = create_resource_browser_resource("app/models/first.rb")
   second = create_resource_browser_resource("app/models/second.rb")
@@ -69,18 +69,18 @@ Given("projected resource rows represent expanded renewed released and expired l
     expanded_resource: released_second,
     trait: :completed_write_set_lifecycle
   )
-  @expired_resource_browser_lease_id = SecureRandom.uuid_v7
+  @expired_resource_browser_intention_id = SecureRandom.uuid_v7
   create_resource_browser_attempt(
     "A-ui-lifecycle-expired",
     "luna-expired",
     resource: expired,
     trait: :with_write_set,
-    lease_id: @expired_resource_browser_lease_id,
+    intention_id: @expired_resource_browser_intention_id,
     expires_at: Time.utc(2020, 8, 31, 12)
   )
 end
 
-Given("projected resource rows retain an old active lease and one hundred one newer terminal Attempts") do
+Given("projected resource rows retain an old active work intention and one hundred one newer terminal Attempts") do
   create_resource_browser_project
   resource = create_resource_browser_resource("app/models/old_active.rb")
   create_resource_browser_attempt(
@@ -103,30 +103,30 @@ Given("projected resource rows retain an old active lease and one hundred one ne
   end
 end
 
-When("the browser queries the projected active Resource leases") do
-  query_project_resource_leases
+When("the browser queries the projected active Resource work intentions") do
+  query_project_resource_work_intentions
 end
 
-When("the browser queries active leases and the expired lease detail") do
-  query_project_resource_leases
+When("the browser queries active work intentions and the expired intention detail") do
+  query_project_resource_work_intentions
   session = ActionDispatch::Integration::Session.new(Rails.application)
   session.host! "localhost"
   session.post(
     "/graphql",
     params: {
-      query: PROJECT_RESOURCE_LEASE_DETAIL_QUERY,
+      query: PROJECT_RESOURCE_WORK_INTENTION_DETAIL_QUERY,
       variables: {
         projectRef: @resource_browser_project_ref,
-        leaseId: @expired_resource_browser_lease_id
+        intentionId: @expired_resource_browser_intention_id
       }
     },
     as: :json
   )
-  assert_acceptance(session.response.status == 200, "Lease detail GraphQL returned HTTP #{session.response.status}")
-  @resource_browser_lease_detail_payload = JSON.parse(session.response.body)
+  assert_acceptance(session.response.status == 200, "Work-intention detail GraphQL returned HTTP #{session.response.status}")
+  @resource_browser_intention_detail_payload = JSON.parse(session.response.body)
 end
 
-def query_project_resource_leases
+def query_project_resource_work_intentions
   session = ActionDispatch::Integration::Session.new(Rails.application)
   session.host! "localhost"
   session.post(
@@ -141,38 +141,38 @@ def query_project_resource_leases
   @resource_browser_payload = JSON.parse(session.response.body)
 end
 
-Then("only the agent with the active lease is presented as the owner") do
-  owners = resource_browser_leases.map { [ _1.fetch("agentId"), _1.fetch("attemptId") ] }
-  assert_acceptance_equal([ [ "luna-owner", "A-ui-owner" ] ], owners, "Active lease owners")
+Then("only the agent with the active work intention is presented as an owner") do
+  owners = resource_browser_work_intentions.map { [ _1.fetch("agentId"), _1.fetch("attemptId") ] }
+  assert_acceptance_equal([ [ "luna-owner", "A-ui-owner" ] ], owners, "Active work-intention owners")
 end
 
-Then("every active membership is presented once while released and expired leases are absent") do
-  leases = resource_browser_leases
-  paths = leases.map { _1.fetch("resourcePath") }
+Then("every active membership is presented once while withdrawn and expired intentions are absent") do
+  intentions = resource_browser_work_intentions
+  paths = intentions.map { _1.fetch("resourcePath") }
 
   assert_acceptance_equal(%w[app/models/first.rb app/models/second.rb], paths.sort, "Active memberships")
   assert_acceptance_equal(paths.uniq, paths, "Unique active memberships")
   assert_acceptance(
-    leases.all? { _1.fetch("lastExpandedEventId") && _1.fetch("lastRenewedEventId") },
+    intentions.all? { _1.fetch("lastExpandedEventId") && _1.fetch("lastRenewedEventId") },
     "Expanded and renewed evidence must remain attached"
   )
-  assert_acceptance(!leases.any? { _1.fetch("agentId") == "luna-released" }, "Released lease set is active")
-  assert_acceptance(!leases.any? { _1.fetch("agentId") == "luna-expired" }, "Expired lease is active")
+  assert_acceptance(!intentions.any? { _1.fetch("agentId") == "luna-released" }, "Withdrawn intention set is active")
+  assert_acceptance(!intentions.any? { _1.fetch("agentId") == "luna-expired" }, "Expired intention is active")
 end
 
-Then("the expired lease detail remains addressable as historical evidence") do
-  errors = @resource_browser_lease_detail_payload.fetch("errors", [])
-  assert_acceptance(errors.empty?, "Lease detail GraphQL failed: #{errors.inspect}")
-  detail = @resource_browser_lease_detail_payload.dig("data", "projectResourceLease")
-  assert_acceptance_equal(@expired_resource_browser_lease_id, detail.fetch("id"), "Expired lease identity")
-  assert_acceptance_equal("EXPIRED", detail.fetch("status"), "Expired lease status")
-  assert_acceptance_equal("luna-expired", detail.fetch("agentId"), "Expired lease holder")
+Then("the expired work-intention detail remains addressable as historical evidence") do
+  errors = @resource_browser_intention_detail_payload.fetch("errors", [])
+  assert_acceptance(errors.empty?, "Work-intention detail GraphQL failed: #{errors.inspect}")
+  detail = @resource_browser_intention_detail_payload.dig("data", "projectResourceWorkIntention")
+  assert_acceptance_equal(@expired_resource_browser_intention_id, detail.fetch("id"), "Expired intention identity")
+  assert_acceptance_equal("EXPIRED", detail.fetch("status"), "Expired intention status")
+  assert_acceptance_equal("luna-expired", detail.fetch("agentId"), "Expired intention owner")
 end
 
-Then("the old active lease remains addressable in the browser") do
-  lease = resource_browser_leases.sole
-  assert_acceptance_equal("A-ui-old-active", lease.fetch("attemptId"), "Retained active Attempt")
-  assert_acceptance_equal("app/models/old_active.rb", lease.fetch("resourcePath"), "Retained resource")
+Then("the old active work intention remains addressable in the browser") do
+  intention = resource_browser_work_intentions.sole
+  assert_acceptance_equal("A-ui-old-active", intention.fetch("attemptId"), "Retained active Attempt")
+  assert_acceptance_equal("app/models/old_active.rb", intention.fetch("resourcePath"), "Retained resource")
 end
 
 def create_resource_browser_project
@@ -203,7 +203,7 @@ def create_resource_browser_attempt(
   resource:,
   trait:,
   expanded_resource: nil,
-  lease_id: SecureRandom.uuid_v7,
+  intention_id: SecureRandom.uuid_v7,
   expires_at: Time.utc(2099, 8, 31, 12)
 )
   attributes = {
@@ -216,7 +216,7 @@ def create_resource_browser_attempt(
     write_set_repository_id: @resource_browser_repository_id,
     write_set_resource_id: resource.resource_id,
     write_set_resource_path: resource.normalized_path,
-    write_set_lease_id: lease_id,
+    write_set_lease_id: intention_id,
     write_set_lease_set_id: SecureRandom.uuid_v7,
     write_set_expires_at_domain: expires_at
   }
@@ -239,8 +239,8 @@ def resource_browser_snapshots
   ]
 end
 
-def resource_browser_leases
+def resource_browser_work_intentions
   errors = @resource_browser_payload.fetch("errors", [])
   assert_acceptance(errors.empty?, "Resource GraphQL failed: #{errors.inspect}")
-  @resource_browser_payload.dig("data", "projectActiveResourceLeases", "nodes")
+  @resource_browser_payload.dig("data", "projectActiveResourceWorkIntentions", "nodes")
 end

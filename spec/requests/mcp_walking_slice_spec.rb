@@ -28,7 +28,7 @@ module McpWalkingSliceSpec
     instructions = discovered.dig("result", "instructions")
     expect(instructions).to include("skill_asset_get returns text for UTF-8 assets")
     expect(instructions).to include("canonical Base64 only for binary assets")
-    expect(instructions).to include("lease IDs, Resource IDs, fencing tokens")
+    expect(instructions).to include("intention IDs, Resource IDs, fencing tokens")
     expect(instructions).not_to include("resource hashes")
     expect(instructions).not_to include("passive Base64 content")
 
@@ -101,10 +101,10 @@ module McpWalkingSliceSpec
       "change_set_activate",
       "work_item_acquire",
       "work_item_complete",
-      "write_set_reserve",
-      "write_set_expand",
-      "lease_renew",
-      "lease_release",
+      "work_intention_set_declare",
+      "work_intention_set_expand",
+      "work_intention_set_renew",
+      "work_intention_set_withdraw",
       "guidance_record",
       "decision_interpretation_propose"
     )

@@ -184,7 +184,8 @@ module McpAcceptanceWorld
       matches = context&.dig("change_set", "change_set_id") == change_set_id &&
                 context.fetch("work_items", []).any? { _1.fetch("work_item_id") == work_item_id } &&
                 attempt &&
-                (!expected_intention_set_id || attempt.dig("write_set", "lease_set_id") == expected_intention_set_id)
+                (!expected_intention_set_id ||
+                  attempt.dig("work_intention_set", "intention_set_id") == expected_intention_set_id)
       [ matches, payload ]
     end
   end

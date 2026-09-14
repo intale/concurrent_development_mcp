@@ -254,7 +254,7 @@ module Coordinator::Write
       CommandInputDocuments::ReserveWriteSetV1.new(
         schema: "command-input/v1",
         command_id: command.command_id,
-        tool_name: "write_set_reserve",
+        tool_name: "work_intention_set_declare",
         input: CommandInputDocuments::ReserveWriteSetInputV1.new(
           actor: actor_document(command.actor),
           change_set_id: command.change_set_id,
@@ -265,7 +265,7 @@ module Coordinator::Write
           resources: command.resources.map do |resource|
             CommandInputDocuments::ResourceLeaseTargetV1.new(resource.to_h)
           end,
-          lease_duration_seconds: command.lease_duration_seconds
+          ttl_seconds: command.lease_duration_seconds
         )
       )
     end
@@ -278,13 +278,13 @@ module Coordinator::Write
       CommandInputDocuments::ExpandWriteSetV1.new(
         schema: "command-input/v1",
         command_id: command.command_id,
-        tool_name: "write_set_expand",
+        tool_name: "work_intention_set_expand",
         input: CommandInputDocuments::ExpandWriteSetInputV1.new(
           actor: actor_document(command.actor),
           change_set_id: command.change_set_id,
           work_item_id: command.work_item_id,
           attempt_id: command.attempt_id,
-          lease_set_id: command.lease_set_id,
+          intention_set_id: command.lease_set_id,
           repository_id: command.repository_id,
           base_commit_oid: command.base_commit_oid,
           resources: command.resources.map do |resource|
@@ -302,17 +302,21 @@ module Coordinator::Write
       CommandInputDocuments::RenewLeaseSetV1.new(
         schema: "command-input/v1",
         command_id: command.command_id,
-        tool_name: "lease_renew",
+        tool_name: "work_intention_set_renew",
         input: CommandInputDocuments::RenewLeaseSetInputV1.new(
           actor: actor_document(command.actor),
           change_set_id: command.change_set_id,
           work_item_id: command.work_item_id,
           attempt_id: command.attempt_id,
-          lease_set_id: command.lease_set_id,
-          leases: command.leases.map do |reference|
-            CommandInputDocuments::LeaseRenewalReferenceV1.new(reference.to_h)
+          intention_set_id: command.lease_set_id,
+          intentions: command.leases.map do |reference|
+            CommandInputDocuments::LeaseRenewalReferenceV1.new(
+              resource_id: reference.resource_id,
+              intention_id: reference.lease_id,
+              fencing_token: reference.fencing_token
+            )
           end,
-          lease_duration_seconds: command.lease_duration_seconds
+          ttl_seconds: command.lease_duration_seconds
         )
       )
     end
@@ -325,15 +329,19 @@ module Coordinator::Write
       CommandInputDocuments::ReleaseLeaseSetV1.new(
         schema: "command-input/v1",
         command_id: command.command_id,
-        tool_name: "lease_release",
+        tool_name: "work_intention_set_withdraw",
         input: CommandInputDocuments::ReleaseLeaseSetInputV1.new(
           actor: actor_document(command.actor),
           change_set_id: command.change_set_id,
           work_item_id: command.work_item_id,
           attempt_id: command.attempt_id,
-          lease_set_id: command.lease_set_id,
-          leases: command.leases.map do |reference|
-            CommandInputDocuments::LeaseReleaseReferenceV1.new(reference.to_h)
+          intention_set_id: command.lease_set_id,
+          intentions: command.leases.map do |reference|
+            CommandInputDocuments::LeaseReleaseReferenceV1.new(
+              resource_id: reference.resource_id,
+              intention_id: reference.lease_id,
+              fencing_token: reference.fencing_token
+            )
           end
         )
       )
@@ -500,11 +508,11 @@ module Coordinator::Write
           base_commit_oid: command.base_commit_oid,
           head_commit_oid: command.head_commit_oid,
           checkpoint_kind: command.checkpoint_kind,
-          lease_set_id: command.lease_set_id,
-          leases: command.leases.map do |lease|
+          intention_set_id: command.lease_set_id,
+          intentions: command.leases.map do |lease|
             CommandInputDocuments::CandidateLeaseObservationV1.new(
               resource_id: lease.resource_id,
-              lease_id: lease.lease_id,
+              intention_id: lease.lease_id,
               fencing_token: lease.fencing_token
             )
           end,

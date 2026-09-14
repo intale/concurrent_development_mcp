@@ -12,11 +12,11 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRenewLeaseSet, :event_stor
 
     expect(result).to be_success
     receipt = result.value!.data
-    expect(receipt.resources.map(&:lease_id)).to eq(reservation.receipt.resources.map(&:lease_id))
-    expect(receipt.resources.map(&:fencing_token)).to eq([ 1, 1 ])
+    expect(receipt.intentions.map(&:intention_id)).to eq(reservation.receipt.intentions.map(&:intention_id))
+    expect(receipt.intentions.map(&:fencing_token)).to eq([ 1, 1 ])
     expect(receipt.expires_at).to be > receipt.previous_expires_at
-    receipt.resources.each do |reference|
-      events = read_intention(reference.lease_id)
+    receipt.intentions.each do |reference|
+      events = read_intention(reference.intention_id)
       expect(events.map(&:type)).to eq(
         [ "ResourceWorkIntentionDeclared", "ResourceWorkIntentionRenewed" ]
       )
@@ -25,7 +25,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRenewLeaseSet, :event_stor
         "intention_id", "resource_id", "fencing_token", "expires_at"
       )
       expect(renewal.data).to include(
-        "intention_id" => reference.lease_id,
+        "intention_id" => reference.intention_id,
         "resource_id" => reference.resource_id,
         "fencing_token" => reference.fencing_token
       )
@@ -35,21 +35,21 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRenewLeaseSet, :event_stor
 
   it "rejects incomplete and stale member observations without partial renewal" do
     reservation = setup_reservation
-    leases = ResourceLeaseOperationScenario.lease_inputs(reservation.receipt)
+    intentions = ResourceLeaseOperationScenario.work_intention_inputs(reservation.receipt)
 
     incomplete = operation.call(
-      renew_input(reservation, command_id: "cmd-renew-incomplete").merge(leases: leases.first(1))
+      renew_input(reservation, command_id: "cmd-renew-incomplete").merge(intentions: intentions.first(1))
     )
     stale = operation.call(
       renew_input(reservation, command_id: "cmd-renew-stale").merge(
-        leases: leases.map.with_index { |entry, index| index.zero? ? entry.merge(fencing_token: 2) : entry }
+        intentions: intentions.map.with_index { |entry, index| index.zero? ? entry.merge(fencing_token: 2) : entry }
       )
     )
 
-    expect(incomplete.failure).to have_attributes(code: :lease_set_snapshot_mismatch)
-    expect(stale.failure).to have_attributes(code: :lease_reference_mismatch)
-    reservation.receipt.resources.each do |reference|
-      expect(read_intention(reference.lease_id).map(&:type)).to eq([ "ResourceWorkIntentionDeclared" ])
+    expect(incomplete.failure).to have_attributes(code: :work_intention_set_snapshot_mismatch)
+    expect(stale.failure).to have_attributes(code: :work_intention_reference_mismatch)
+    reservation.receipt.intentions.each do |reference|
+      expect(read_intention(reference.intention_id).map(&:type)).to eq([ "ResourceWorkIntentionDeclared" ])
     end
   end
 
@@ -62,15 +62,15 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRenewLeaseSet, :event_stor
     result = Timecop.freeze(Time.utc(2026, 9, 1, 10, 0, 10)) do
       operation.call(
         renew_input(reservation, command_id: "cmd-renew-shorter").merge(
-          lease_duration_seconds: 30
+          ttl_seconds: 30
         )
       )
     end
 
     expect(result).to be_success
     expect(result.value!.emitted_events).to be_empty
-    reservation.receipt.resources.each do |reference|
-      expect(read_intention(reference.lease_id).map(&:type)).to eq([ "ResourceWorkIntentionDeclared" ])
+    reservation.receipt.intentions.each do |reference|
+      expect(read_intention(reference.intention_id).map(&:type)).to eq([ "ResourceWorkIntentionDeclared" ])
     end
   end
 
@@ -84,17 +84,17 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRenewLeaseSet, :event_stor
       change_set_id: "CS-LSE",
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
-      lease_set_id: reservation.receipt.lease_set_id,
+      intention_set_id: reservation.receipt.intention_set_id,
       repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: [ { resource_id: earlier_resource_id } ]
     ).value!.data
-    references = [ *reservation.receipt.resources, *expansion.added_resources ]
+    references = [ *reservation.receipt.intentions, *expansion.added_intentions ]
     input = renew_input(reservation, command_id: "cmd-renew-expanded").merge(
-      leases: references.map do |reference|
+      intentions: references.map do |reference|
         {
           resource_id: reference.resource_id,
-          lease_id: reference.lease_id,
+          intention_id: reference.intention_id,
           fencing_token: reference.fencing_token
         }
       end
@@ -103,7 +103,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRenewLeaseSet, :event_stor
     result = operation.call(input)
 
     expect(result).to be_success
-    expect(result.value!.data.resources.map(&:resource_id)).to contain_exactly(
+    expect(result.value!.data.intentions.map(&:resource_id)).to contain_exactly(
       *references.map(&:resource_id)
     )
   end
@@ -123,9 +123,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRenewLeaseSet, :event_stor
       change_set_id: "CS-LSE",
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
-      lease_set_id: reservation.receipt.lease_set_id,
-      leases: ResourceLeaseOperationScenario.lease_inputs(reservation.receipt),
-      lease_duration_seconds: 900
+      intention_set_id: reservation.receipt.intention_set_id,
+      intentions: ResourceLeaseOperationScenario.work_intention_inputs(reservation.receipt),
+      ttl_seconds: 900
     }
   end
 

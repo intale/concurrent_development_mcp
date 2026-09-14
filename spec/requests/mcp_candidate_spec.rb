@@ -114,11 +114,11 @@ RSpec.describe "CAN-01 MCP Candidate coordination" do
     )
   end
 
-  it "completes a stale lease Task as a conflict without target facts", :event_store do
+  it "completes a stale work-intention Task as a conflict without target facts", :event_store do
     prepared = CandidateScenario.prepare(prefix: "mcp-candidate-stale")
     arguments = prepared.fetch(:input)
-    arguments[:leases] = arguments.fetch(:leases).map do |lease|
-      lease.merge(fencing_token: lease.fetch(:fencing_token) + 1)
+    arguments[:intentions] = arguments.fetch(:intentions).map do |intention|
+      intention.merge(fencing_token: intention.fetch(:fencing_token) + 1)
     end
 
     created = call_tool("candidate_submit", arguments, id: 1)
@@ -134,7 +134,7 @@ RSpec.describe "CAN-01 MCP Candidate coordination" do
       "isError" => true,
       "structuredContent" => include(
         "status" => "conflict",
-        "data" => include("code" => "lease_observations_mismatch")
+        "data" => include("code" => "work_intention_observations_mismatch")
       )
     )
     expect(CandidateScenario.candidate_events("CAN-mcp-candidate-stale")).to be_empty
@@ -143,13 +143,13 @@ RSpec.describe "CAN-01 MCP Candidate coordination" do
 
   it "rejects malformed evidence before allocating a Task", :event_store do
     arguments = CandidateScenario.prepare(prefix: "mcp-candidate-invalid").fetch(:input)
-    arguments[:leases] = []
+    arguments[:intentions] = []
 
     response = call_tool("candidate_submit", arguments, id: 1)
 
     expect(response.dig("result")).to include(
       "isError" => true,
-      "content" => [ include("text" => include("array size at `/leases` is less than: 1")) ]
+      "content" => [ include("text" => include("array size at `/intentions` is less than: 1")) ]
     )
     expect(task_events_for_command("cmd-mcp-candidate-invalid")).to be_empty
   end

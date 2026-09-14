@@ -17,10 +17,10 @@ module Coordinator
       def self.work_item_acquire: () -> json_schema
       def self.work_item_complete: () -> json_schema
       def self.attempt_abandon: () -> json_schema
-      def self.write_set_reserve: () -> json_schema
-      def self.write_set_expand: () -> json_schema
-      def self.lease_renew: () -> json_schema
-      def self.lease_release: () -> json_schema
+      def self.work_intention_set_declare: () -> json_schema
+      def self.work_intention_set_expand: () -> json_schema
+      def self.work_intention_set_renew: () -> json_schema
+      def self.work_intention_set_withdraw: () -> json_schema
       def self.guidance_record: () -> json_schema
       def self.decision_interpretation_propose: () -> json_schema
       def self.decision_interpretation_adjudicate: () -> json_schema
@@ -93,9 +93,8 @@ module Coordinator
       def self.git_oid: () -> json_schema
       def self.uuid_v7: () -> json_schema
       def self.canonical_timestamp: () -> json_schema
-      def self.write_set_resource: () -> json_schema
-      def self.lease_renewal_reference: () -> json_schema
-      def self.lease_release_reference: () -> json_schema
+      def self.work_intention_target: () -> json_schema
+      def self.work_intention_reference: () -> json_schema
       def self.candidate_change_manifest: () -> json_schema
       def self.candidate_manifest_file: () -> json_schema
       def self.candidate_build_context: () -> json_schema

@@ -125,18 +125,18 @@ module Coordinator::Write
     def write_set_reserve(command:, reservation:, input_digest:, persisted_events:, completed_at:)
       build_completion(
         command:,
-        tool_name: "write_set_reserve",
-        summary: "Write set reserved.",
-        data: CommandReceiptData::LeaseSet.new(
+        tool_name: "work_intention_set_declare",
+        summary: "Resource work intentions declared.",
+        data: CommandReceiptData::WorkIntentionSetDeclaration.new(
           change_set_id: command.change_set_id,
           work_item_id: command.work_item_id,
           attempt_id: command.attempt_id,
           repository_id: command.repository_id,
-          lease_set_id: reservation.lease_set_id,
+          intention_set_id: reservation.intention_set_id,
           policy_version: reservation.policy_version,
-          acquired_at: reservation.reserved_at,
+          declared_at: reservation.declared_at,
           expires_at: reservation.expires_at,
-          resources: reservation.resources
+          intentions: reservation.intentions
         ),
         next_actions: [
           NextAction.new(
@@ -153,19 +153,19 @@ module Coordinator::Write
     def write_set_expand(command:, expansion:, input_digest:, persisted_events:, completed_at:)
       build_completion(
         command:,
-        tool_name: "write_set_expand",
-        summary: "Write set expanded.",
-        data: CommandReceiptData::LeaseSetExpansion.new(
+        tool_name: "work_intention_set_expand",
+        summary: "Work-intention set expanded.",
+        data: CommandReceiptData::WorkIntentionSetExpansion.new(
           change_set_id: command.change_set_id,
           work_item_id: command.work_item_id,
           attempt_id: command.attempt_id,
           repository_id: command.repository_id,
-          lease_set_id: expansion.lease_set_id,
+          intention_set_id: expansion.intention_set_id,
           policy_version: expansion.policy_version,
           expanded_at: expansion.expanded_at,
           expires_at: expansion.expires_at,
-          added_resources: expansion.added_resources,
-          resource_count: expansion.resource_count
+          added_intentions: expansion.added_intentions,
+          intention_count: expansion.intention_count
         ),
         next_actions: [
           NextAction.new(
@@ -182,17 +182,17 @@ module Coordinator::Write
     def lease_renew(command:, renewal:, input_digest:, persisted_events:, completed_at:)
       build_completion(
         command:,
-        tool_name: "lease_renew",
-        summary: "Lease set renewed.",
-        data: CommandReceiptData::LeaseSetRenewal.new(
+        tool_name: "work_intention_set_renew",
+        summary: "Work-intention set renewed.",
+        data: CommandReceiptData::WorkIntentionSetRenewal.new(
           change_set_id: command.change_set_id,
           work_item_id: command.work_item_id,
           attempt_id: command.attempt_id,
           repository_id: renewal.repository_id,
-          lease_set_id: renewal.lease_set_id,
+          intention_set_id: renewal.intention_set_id,
           policy_version: renewal.policy_version,
-          resources: renewal.resources,
-          resource_count: renewal.resource_count,
+          intentions: renewal.intentions,
+          intention_count: renewal.intention_count,
           renewed_at: renewal.renewed_at,
           previous_expires_at: renewal.previous_expires_at,
           expires_at: renewal.expires_at
@@ -212,19 +212,19 @@ module Coordinator::Write
     def lease_release(command:, release:, input_digest:, persisted_events:, completed_at:)
       build_completion(
         command:,
-        tool_name: "lease_release",
-        summary: "Lease set released.",
-        data: CommandReceiptData::LeaseSetRelease.new(
+        tool_name: "work_intention_set_withdraw",
+        summary: "Work-intention set withdrawn.",
+        data: CommandReceiptData::WorkIntentionSetWithdrawal.new(
           change_set_id: command.change_set_id,
           work_item_id: command.work_item_id,
           attempt_id: command.attempt_id,
           repository_id: release.repository_id,
-          lease_set_id: release.lease_set_id,
+          intention_set_id: release.intention_set_id,
           policy_version: release.policy_version,
-          resources: release.resources,
-          resource_count: release.resource_count,
+          intentions: release.intentions,
+          intention_count: release.intention_count,
           previous_expires_at: release.previous_expires_at,
-          released_at: release.released_at
+          withdrawn_at: release.withdrawn_at
         ),
         next_actions: [
           NextAction.new(

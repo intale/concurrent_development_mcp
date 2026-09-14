@@ -12,8 +12,8 @@ module ResourceLeaseOperationScenario
       command_id: "seed-create-CS-LSE",
       actor: { kind: "agent", id: "planner-1" },
       change_set_id: "CS-LSE",
-      goal: "Coordinate resource leases",
-      acceptance_criteria: [ "Overlapping agents cannot both write" ]
+      goal: "Coordinate resource work intentions",
+      acceptance_criteria: [ "Exclusive overlapping work intentions cannot coexist" ]
     ).value!
     attempts.each do |work_item_id, _attempt_id, _agent_id|
       Coordinator::Write::Operations::ExecuteCreateWorkItem.new(event_store:).call(
@@ -55,7 +55,7 @@ module ResourceLeaseOperationScenario
     agent_id: "agent-a",
     work_item_id: "W-LSE-A",
     attempt_id: "A-LSE-A",
-    lease_duration_seconds: 900,
+    ttl_seconds: 900,
     repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID
   )
     targets = paths.map do |entry|
@@ -84,17 +84,17 @@ module ResourceLeaseOperationScenario
       repository_id:,
       base_commit_oid: "a" * 40,
       resources: targets,
-      lease_duration_seconds:
+      ttl_seconds:
     )
 
     Reservation.new(receipt: result.value!.data, resource_ids:)
   end
 
-  def lease_inputs(receipt)
-    receipt.resources.map do |reference|
+  def work_intention_inputs(receipt)
+    receipt.intentions.map do |reference|
       {
         resource_id: reference.resource_id,
-        lease_id: reference.lease_id,
+        intention_id: reference.intention_id,
         fencing_token: reference.fencing_token
       }
     end

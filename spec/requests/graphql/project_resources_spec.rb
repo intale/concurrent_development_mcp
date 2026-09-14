@@ -15,25 +15,28 @@ RSpec.describe "Project resource GraphQL", :read_model do
     latestTransitionActorId
     lastTransitionAt
   GRAPHQL
-  LEASE_FIELDS = <<~GRAPHQL.freeze
+  WORK_INTENTION_FIELDS = <<~GRAPHQL.freeze
     id
-    leaseSetId
+    intentionSetId
     resourceId
     repositoryId
     resourceKind
     resourcePath
     resourceLifecycleStatus
     status
+    mode
+    purpose
+    context
     fencingToken
     changeSetId
     workItemId
     attemptId
     agentId
-    reservedEventId
-    releaseEventId
-    reservedAt
+    declaredEventId
+    withdrawalEventId
+    declaredAt
     expiresAt
-    releasedAt
+    withdrawnAt
     attemptTerminalAt
   GRAPHQL
   RESOURCES_QUERY = <<~GRAPHQL.freeze
@@ -63,8 +66,8 @@ RSpec.describe "Project resource GraphQL", :read_model do
       projectResource(projectRef: $projectRef, resourceId: $resourceId) { #{RESOURCE_FIELDS} }
     }
   GRAPHQL
-  LEASES_QUERY = <<~GRAPHQL.freeze
-    query ProjectActiveResourceLeases(
+  WORK_INTENTIONS_QUERY = <<~GRAPHQL.freeze
+    query ProjectActiveResourceWorkIntentions(
       $projectRef: ID!
       $first: Int
       $after: String
@@ -72,8 +75,9 @@ RSpec.describe "Project resource GraphQL", :read_model do
       $changeSetId: ID
       $workItemId: ID
       $attemptId: ID
+      $mode: ResourceWorkIntentionMode
     ) {
-      projectActiveResourceLeases(
+      projectActiveResourceWorkIntentions(
         projectRef: $projectRef
         first: $first
         after: $after
@@ -81,16 +85,17 @@ RSpec.describe "Project resource GraphQL", :read_model do
         changeSetId: $changeSetId
         workItemId: $workItemId
         attemptId: $attemptId
+        mode: $mode
       ) {
         asOf
-        nodes { #{LEASE_FIELDS} }
+        nodes { #{WORK_INTENTION_FIELDS} }
         pageInfo { endCursor hasNextPage }
       }
     }
   GRAPHQL
-  LEASE_QUERY = <<~GRAPHQL.freeze
-    query ProjectResourceLease($projectRef: ID!, $leaseId: ID!) {
-      projectResourceLease(projectRef: $projectRef, leaseId: $leaseId) { #{LEASE_FIELDS} }
+  WORK_INTENTION_QUERY = <<~GRAPHQL.freeze
+    query ProjectResourceWorkIntention($projectRef: ID!, $intentionId: ID!) {
+      projectResourceWorkIntention(projectRef: $projectRef, intentionId: $intentionId) { #{WORK_INTENTION_FIELDS} }
     }
   GRAPHQL
 
@@ -109,7 +114,7 @@ RSpec.describe "Project resource GraphQL", :read_model do
       018f0f4d-4e45-7abc-8def-000000000083
     ]
   end
-  let(:lease_ids) do
+  let(:intention_ids) do
     %w[
       018f0f4d-4e45-7abc-8def-000000000091
       018f0f4d-4e45-7abc-8def-000000000092
@@ -138,8 +143,8 @@ RSpec.describe "Project resource GraphQL", :read_model do
       "018f0f4d-4e45-7abc-8def-000000000079",
       "private/outside.rb"
     )
-    create_lease("A-held", resource_ids.fetch(0), lease_ids.fetch(0), "luna-owner", Time.utc(2099, 1, 1))
-    create_lease("A-expired", resource_ids.fetch(1), lease_ids.fetch(1), "luna-former", Time.utc(2020, 1, 1))
+    create_work_intention("A-held", resource_ids.fetch(0), intention_ids.fetch(0), "luna-owner", Time.utc(2099, 1, 1))
+    create_work_intention("A-expired", resource_ids.fetch(1), intention_ids.fetch(1), "luna-former", Time.utc(2020, 1, 1))
   end
 
   it "pages exact-Project resources with opaque filter-bound cursors" do
@@ -188,28 +193,32 @@ RSpec.describe "Project resource GraphQL", :read_model do
     expect(hidden).to be_nil
   end
 
-  it "filters factual active leases and keeps an expired lease detail addressable" do
+  it "filters active advisory work intentions and keeps expired detail addressable" do
     active = execute(
-      LEASES_QUERY,
+      WORK_INTENTIONS_QUERY,
       projectRef: project_ref,
       first: 20,
       agentId: "luna-owner",
-      workItemId: "W-A-held"
-    ).dig("data", "projectActiveResourceLeases")
+      workItemId: "W-A-held",
+      mode: "SHARED"
+    ).dig("data", "projectActiveResourceWorkIntentions")
     expired = execute(
-      LEASE_QUERY,
+      WORK_INTENTION_QUERY,
       projectRef: project_ref,
-      leaseId: lease_ids.fetch(1)
-    ).dig("data", "projectResourceLease")
+      intentionId: intention_ids.fetch(1)
+    ).dig("data", "projectResourceWorkIntention")
 
     expect(active.fetch("nodes").sole).to include(
-      "id" => lease_ids.fetch(0),
+      "id" => intention_ids.fetch(0),
       "status" => "ACTIVE",
-      "agentId" => "luna-owner"
+      "agentId" => "luna-owner",
+      "mode" => "SHARED",
+      "purpose" => "Implement A-held",
+      "context" => "Keep the intent visible to peers"
     )
     expect(active.fetch("asOf")).to match(Coordinator::Shared::Types::TIMESTAMP_PATTERN)
     expect(expired).to include(
-      "id" => lease_ids.fetch(1),
+      "id" => intention_ids.fetch(1),
       "status" => "EXPIRED",
       "agentId" => "luna-former"
     )
@@ -236,11 +245,11 @@ RSpec.describe "Project resource GraphQL", :read_model do
     )
   end
 
-  def create_lease(attempt_id, resource_id, lease_id, agent_id, expires_at)
+  def create_work_intention(attempt_id, resource_id, intention_id, agent_id, expires_at)
     resource = Coordinator::Read::Resource.find(resource_id)
     create(
       :coordinator_read_attempt_history,
-      :with_write_set,
+      :with_work_intention_set,
       attempt_id:,
       change_set_id: "CS-graphql-resources",
       work_item_id: "W-#{attempt_id}",
@@ -250,9 +259,12 @@ RSpec.describe "Project resource GraphQL", :read_model do
         { "repository_id" => resource.repository_id, "object_format" => "sha1", "commit_oid" => "a" * 40 }
       ],
       write_set_repository_id: resource.repository_id,
-      write_set_resource_id: resource_id,
-      write_set_resource_path: resource.normalized_path,
-      write_set_lease_id: lease_id,
+      work_intention_resource_id: resource_id,
+      work_intention_resource_path: resource.normalized_path,
+      work_intention_id: intention_id,
+      work_intention_mode: "shared",
+      work_intention_purpose: "Implement #{attempt_id}",
+      work_intention_context: "Keep the intent visible to peers",
       write_set_lease_set_id: SecureRandom.uuid_v7,
       write_set_expires_at_domain: expires_at
     )

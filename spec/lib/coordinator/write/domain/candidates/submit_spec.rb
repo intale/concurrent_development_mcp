@@ -81,7 +81,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
     expect(decide(attempt: wrong_owner).failure.code).to eq(:attempt_actor_mismatch)
   end
 
-  it "denies incomplete, stale, and inactive lease observations" do
+  it "denies incomplete, stale, and inactive work-intention observations" do
     command = prepared_command
     mismatched = copy_command(
       command,
@@ -93,9 +93,9 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
     )
     expired = current_lease(expires_at: "2026-08-23T11:29:59.000000Z")
 
-    expect(decide(command: mismatched).failure.code).to eq(:lease_observations_mismatch)
-    expect(decide(current_leases: []).failure.code).to eq(:lease_not_active)
-    expect(decide(current_leases: [ expired ]).failure.code).to eq(:lease_not_active)
+    expect(decide(command: mismatched).failure.code).to eq(:work_intention_observations_mismatch)
+    expect(decide(current_leases: []).failure.code).to eq(:work_intention_not_active)
+    expect(decide(current_leases: [ expired ]).failure.code).to eq(:work_intention_not_active)
   end
 
   it "accepts the exact lease set independently of reservation and observation order" do
@@ -132,7 +132,7 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
     mismatched_attempt = attempt_state(reference: mismatched_reference)
     mismatched_lease = current_lease(reference: mismatched_reference, base_blob_oid: "e" * 40)
 
-    expect(decide(command: undeclared_command).failure.code).to eq(:actual_write_set_not_authorized)
+    expect(decide(command: undeclared_command).failure.code).to eq(:candidate_resources_not_covered)
     expect(
       decide(attempt: mismatched_attempt, current_leases: [ mismatched_lease ]).failure.code
     ).to eq(:manifest_base_evidence_mismatch)
@@ -188,11 +188,11 @@ RSpec.describe Coordinator::Write::Domain::Candidates::Submit do
       base_commit_oid: "a" * 40,
       head_commit_oid: "b" * 40,
       checkpoint_kind: "final",
-      lease_set_id: uuid("1"),
-      leases: [
+      intention_set_id: uuid("1"),
+      intentions: [
         {
           resource_id: reference.resource_id,
-          lease_id: reference.lease_id,
+          intention_id: reference.lease_id,
           fencing_token: reference.fencing_token
         }
       ],

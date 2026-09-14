@@ -1,4 +1,4 @@
-@wip @work-intentions @concurrency
+@work-intentions @concurrency
 Feature: Advisory resource work intentions
   Agents disclose why they intend to edit resources while the coordinator prevents only
   combinations that planning has declared incompatible.
@@ -42,4 +42,3 @@ Feature: Advisory resource work intentions
       When another agent deliberately declares an overlapping shared intention
       Then the write side rebuilds current intention state from pg_eventstore
       And the new intention succeeds without waiting for a read model or expiry audit
-

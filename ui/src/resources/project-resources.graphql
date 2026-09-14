@@ -13,9 +13,9 @@ fragment ProjectResourceFields on ProjectResource {
   lastTransitionAt
 }
 
-fragment ResourceLeaseFields on ResourceLease {
+fragment ResourceWorkIntentionFields on ResourceWorkIntention {
   id
-  leaseSetId
+  intentionSetId
   resourceId
   repositoryId
   resourceKind
@@ -23,25 +23,28 @@ fragment ResourceLeaseFields on ResourceLease {
   resourceLifecycleStatus
   status
   baseBlobOid
+  mode
+  purpose
+  context
   fencingToken
   policyVersion
   changeSetId
   workItemId
   attemptId
   agentId
-  reservedEventId
+  declaredEventId
   lastExpandedEventId
   lastRenewedEventId
-  releaseEventId
+  withdrawalEventId
   attemptTerminalEventId
-  reservedAt
+  declaredAt
   lastExpandedAt
   lastRenewedAt
   previousExpiresAt
   expiresAt
-  releasedAt
+  withdrawnAt
   attemptTerminalAt
-  lastProjectedAt
+  updatedAt
 }
 
 query ProjectResources(
@@ -71,7 +74,7 @@ query ProjectResource($projectRef: ID!, $resourceId: ID!) {
   }
 }
 
-query ProjectActiveResourceLeases(
+query ProjectActiveResourceWorkIntentions(
   $projectRef: ID!
   $first: Int
   $after: String
@@ -79,8 +82,9 @@ query ProjectActiveResourceLeases(
   $changeSetId: ID
   $workItemId: ID
   $attemptId: ID
+  $mode: ResourceWorkIntentionMode
 ) {
-  projectActiveResourceLeases(
+  projectActiveResourceWorkIntentions(
     projectRef: $projectRef
     first: $first
     after: $after
@@ -88,15 +92,16 @@ query ProjectActiveResourceLeases(
     changeSetId: $changeSetId
     workItemId: $workItemId
     attemptId: $attemptId
+    mode: $mode
   ) {
     asOf
-    nodes { ...ResourceLeaseFields }
+    nodes { ...ResourceWorkIntentionFields }
     pageInfo { endCursor hasNextPage }
   }
 }
 
-query ProjectResourceLease($projectRef: ID!, $leaseId: ID!) {
-  projectResourceLease(projectRef: $projectRef, leaseId: $leaseId) {
-    ...ResourceLeaseFields
+query ProjectResourceWorkIntention($projectRef: ID!, $intentionId: ID!) {
+  projectResourceWorkIntention(projectRef: $projectRef, intentionId: $intentionId) {
+    ...ResourceWorkIntentionFields
   }
 }

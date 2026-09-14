@@ -3,7 +3,7 @@
 module Coordinator::Write
   module Operations
     class ExecuteRenewLeaseSet < Dry::Operation
-      TOOL_NAME = "lease_renew"
+      TOOL_NAME = "work_intention_set_renew"
 
       def initialize(
         event_store:,
@@ -190,21 +190,24 @@ module Coordinator::Write
       def renewal_receipt(set_state:, member_states:, resources:, prepared:)
         references = member_states.map do |state|
           resource = resources.find { _1.resource_id == state.resource_id }
-          LeaseReferenceV2.new(
-            lease_id: state.intention_id,
+          WorkIntentionReceiptReferenceV1.new(
+            intention_id: state.intention_id,
             resource_id: state.resource_id,
             resource_kind: resource.kind,
             resource_path: resource.path,
             base_blob_oid: state.base_blob_oid,
+            mode: state.mode,
+            purpose: state.purpose,
+            context: state.context,
             fencing_token: state.fencing_token
           )
         end
         WorkIntentionSetRenewalReceiptV1.new(
-          lease_set_id: set_state.set_id,
+          intention_set_id: set_state.set_id,
           repository_id: set_state.repository_id,
           policy_version: WorkIntentionPolicyV1::VERSION,
-          resources: references,
-          resource_count: references.length,
+          intentions: references,
+          intention_count: references.length,
           renewed_at: prepared.renewed_at,
           previous_expires_at: member_states.map(&:expires_at).min,
           expires_at: member_states.map { [ _1.expires_at, prepared.expires_at ].max }.min

@@ -289,7 +289,7 @@ module ReleaseSetScenario
       repository_id:,
       base_commit_oid: base_oid,
       resources: [ { resource_id:, base_blob_oid: "a" * 40 } ],
-      lease_duration_seconds: 900
+      ttl_seconds: 900
     }).data
     input = {
       command_id: "seed-release-candidate-#{prefix}-#{index}",
@@ -303,11 +303,11 @@ module ReleaseSetScenario
       base_commit_oid: base_oid,
       head_commit_oid: head_oid,
       checkpoint_kind: "final",
-      lease_set_id: reservation.lease_set_id,
-      leases: reservation.resources.map do |reference|
+      intention_set_id: reservation.intention_set_id,
+      intentions: reservation.intentions.map do |reference|
         {
           resource_id: reference.resource_id,
-          lease_id: reference.lease_id,
+          intention_id: reference.intention_id,
           fencing_token: reference.fencing_token
         }
       end,
@@ -334,12 +334,12 @@ module ReleaseSetScenario
       change_set_id: input.fetch(:change_set_id),
       work_item_id: input.fetch(:work_item_id),
       attempt_id: input.fetch(:attempt_id),
-      lease_set_id: reservation.lease_set_id,
-      leases: reservation.resources.map do |lease|
+      intention_set_id: reservation.intention_set_id,
+      intentions: reservation.intentions.map do |intention|
         {
-          resource_id: lease.resource_id,
-          lease_id: lease.lease_id,
-          fencing_token: lease.fencing_token
+          resource_id: intention.resource_id,
+          intention_id: intention.intention_id,
+          fencing_token: intention.fencing_token
         }
       end
     })

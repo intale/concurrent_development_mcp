@@ -17,9 +17,9 @@ module Coordinator
           def last_transition_at: () -> String?
         end
 
-        class Lease < Shared::Value
-          def lease_id: () -> String
-          def lease_set_id: () -> String
+        class WorkIntention < Shared::Value
+          def intention_id: () -> String
+          def intention_set_id: () -> String
           def resource_id: () -> String
           def repository_id: () -> String
           def resource_kind: () -> String
@@ -27,25 +27,28 @@ module Coordinator
           def resource_lifecycle_status: () -> String?
           def status: () -> String
           def base_blob_oid: () -> String?
+          def mode: () -> String
+          def purpose: () -> String
+          def context: () -> String?
           def fencing_token: () -> Integer
           def policy_version: () -> String
           def change_set_id: () -> String
           def work_item_id: () -> String
           def attempt_id: () -> String
           def agent_id: () -> String
-          def reserved_event_id: () -> String
+          def declared_event_id: () -> String
           def last_expanded_event_id: () -> String?
           def last_renewed_event_id: () -> String?
-          def release_event_id: () -> String?
+          def withdrawal_event_id: () -> String?
           def attempt_terminal_event_id: () -> String?
-          def reserved_at: () -> String
+          def declared_at: () -> String
           def last_expanded_at: () -> String?
           def last_renewed_at: () -> String?
           def previous_expires_at: () -> String?
           def expires_at: () -> String
-          def released_at: () -> String?
+          def withdrawn_at: () -> String?
           def attempt_terminal_at: () -> String?
-          def last_projected_at: () -> String
+          def updated_at: () -> String
         end
 
         class ResourcePage < Shared::Value
@@ -55,9 +58,9 @@ module Coordinator
           def has_more: () -> bool
         end
 
-        class LeasePage < Shared::Value
-          def items: () -> Array[Lease]
-          def next_lease_id: () -> String?
+        class WorkIntentionPage < Shared::Value
+          def items: () -> Array[WorkIntention]
+          def next_intention_id: () -> String?
           def next_updated_at: () -> String?
           def has_more: () -> bool
           def as_of: () -> String

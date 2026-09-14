@@ -1,20 +1,21 @@
 import {
-  ProjectActiveResourceLeasesDocument,
+  ProjectActiveResourceWorkIntentionsDocument,
   ProjectResourceDocument,
-  ProjectResourceLeaseDocument,
+  ProjectResourceWorkIntentionDocument,
   ProjectResourcesDocument
 } from "../gql/graphql.js";
 import type {
-  ProjectActiveResourceLeasesQuery,
-  ProjectActiveResourceLeasesQueryVariables,
-  ProjectResourceLeaseQuery,
-  ProjectResourceLeaseQueryVariables,
+  ProjectActiveResourceWorkIntentionsQuery,
+  ProjectActiveResourceWorkIntentionsQueryVariables,
+  ProjectResourceWorkIntentionQuery,
+  ProjectResourceWorkIntentionQueryVariables,
   ProjectResourceQuery,
   ProjectResourceQueryVariables,
   ProjectResourcesQuery,
   ProjectResourcesQueryVariables,
   ResourceKind,
-  ResourceLifecycleStatus
+  ResourceLifecycleStatus,
+  ResourceWorkIntentionMode
 } from "../gql/graphql.js";
 import { executeGraphql } from "../graphql-client.js";
 
@@ -26,11 +27,12 @@ export interface ResourceFilters {
   readonly resourceLifecycleStatus?: ResourceLifecycleStatus;
 }
 
-export interface LeaseFilters {
+export interface WorkIntentionFilters {
   readonly agentId?: string;
   readonly changeSetId?: string;
   readonly workItemId?: string;
   readonly attemptId?: string;
+  readonly mode?: ResourceWorkIntentionMode;
 }
 
 export function fetchProjectResources(
@@ -57,26 +59,26 @@ export function fetchProjectResource(
   return executeGraphql(ProjectResourceDocument, variables, signal);
 }
 
-export function fetchProjectActiveResourceLeases(
+export function fetchProjectActiveResourceWorkIntentions(
   projectRef: string,
-  filters: LeaseFilters,
+  filters: WorkIntentionFilters,
   after: string | null,
   signal?: AbortSignal
-): Promise<ProjectActiveResourceLeasesQuery> {
-  const variables: ProjectActiveResourceLeasesQueryVariables = {
+): Promise<ProjectActiveResourceWorkIntentionsQuery> {
+  const variables: ProjectActiveResourceWorkIntentionsQueryVariables = {
     projectRef,
     first: RESOURCE_PAGE_SIZE,
     ...filters,
     ...(after ? { after } : {})
   };
-  return executeGraphql(ProjectActiveResourceLeasesDocument, variables, signal);
+  return executeGraphql(ProjectActiveResourceWorkIntentionsDocument, variables, signal);
 }
 
-export function fetchProjectResourceLease(
+export function fetchProjectResourceWorkIntention(
   projectRef: string,
-  leaseId: string,
+  intentionId: string,
   signal?: AbortSignal
-): Promise<ProjectResourceLeaseQuery> {
-  const variables: ProjectResourceLeaseQueryVariables = { projectRef, leaseId };
-  return executeGraphql(ProjectResourceLeaseDocument, variables, signal);
+): Promise<ProjectResourceWorkIntentionQuery> {
+  const variables: ProjectResourceWorkIntentionQueryVariables = { projectRef, intentionId };
+  return executeGraphql(ProjectResourceWorkIntentionDocument, variables, signal);
 }

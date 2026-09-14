@@ -102,7 +102,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
         "agent-choice-impacts-v1",
         "agent-choices-v1",
         "candidates-v1",
-        "coord-context-v6",
+        "coord-context-v7",
         "decision-governance-v1",
         "decision-interpretations-v1",
         "development-artifacts-v3",
@@ -118,7 +118,7 @@ RSpec.describe Coordinator::Read::Subscriptions::ReadModelSet do
     )
     expect(context_registration.definition.identity.to_h).to eq(
       set_name: "coordinator-read-models-v1",
-      subscription_name: "coord-context-v6"
+      subscription_name: "coord-context-v7"
     )
     expect(context_registration.definition.event_types).to include(
       "CandidateSubmitted",

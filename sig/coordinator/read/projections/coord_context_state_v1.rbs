@@ -44,26 +44,29 @@ module Coordinator
           def satisfied_at: () -> String?
         end
 
-        class WriteSetResource < Shared::Value
-          def lease_id: () -> String
+        class WorkIntention < Shared::Value
+          def intention_id: () -> String
           def resource_id: () -> String
           def resource_kind: () -> String
           def resource_path: () -> String
           def base_blob_oid: () -> String?
+          def mode: () -> String
+          def purpose: () -> String
+          def context: () -> String?
           def fencing_token: () -> Integer
         end
 
-        class WriteSet < Shared::Value
-          def lease_set_id: () -> String
+        class WorkIntentionSet < Shared::Value
+          def intention_set_id: () -> String
           def repository_id: () -> String
           def policy_version: () -> String
-          def resources: () -> Array[WriteSetResource]
-          def reserved_at: () -> String
+          def intentions: () -> Array[WorkIntention]
+          def declared_at: () -> String
           def last_expanded_at: () -> String?
           def last_renewed_at: () -> String?
           def previous_expires_at: () -> String?
           def expires_at: () -> String
-          def released_at: () -> String?
+          def withdrawn_at: () -> String?
         end
 
         class Attempt < Shared::Value
@@ -75,7 +78,7 @@ module Coordinator
           def status: () -> String
           def authorized_at: () -> String
           def started_at: () -> String?
-          def write_set: () -> WriteSet?
+          def work_intention_set: () -> WorkIntentionSet?
           def selected_candidate_id: () -> String?
           def selected_candidate_event: () -> Write::EventReference?
           def completed_at: () -> String?

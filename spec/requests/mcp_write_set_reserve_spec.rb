@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
+RSpec.describe "MCP work_intention_set_declare Task boundary", :event_store do
   WRITE_SET_PROTOCOL_VERSION = "2026-07-28"
   WRITE_SET_TASKS_EXTENSION = "io.modelcontextprotocol/tasks"
   CHANGE_SET_ID = "CS-MCP-LSE"
@@ -57,7 +57,7 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
           "attempt_id" => "A-MCP-LSE-A",
           "repository_id" => MCP_RESERVE_REPOSITORY_ID,
           "policy_version" => "coordinator-work-intention/v1",
-          "resources" => contain_exactly(
+          "intentions" => contain_exactly(
             include("resource_id" => invoice_resource_id),
             include("resource_id" => schema_resource_id)
           )
@@ -155,10 +155,10 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
     mcp_request(
       id: request_id,
       method: "tools/call",
-      name: "write_set_reserve",
+      name: "work_intention_set_declare",
       expected_status:,
       params: {
-        name: "write_set_reserve",
+        name: "work_intention_set_declare",
         arguments: {
           command_id:,
           actor: { kind: "agent", id: agent_id },
@@ -168,7 +168,7 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
           repository_id: MCP_RESERVE_REPOSITORY_ID,
           base_commit_oid: BASE_COMMIT_OID,
           resources: resource_ids.map { { resource_id: _1, mode: } },
-          lease_duration_seconds: 300
+          ttl_seconds: 300
         }
       }
     )
@@ -220,8 +220,8 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
       command_id: "seed-create-#{CHANGE_SET_ID}",
       actor: { kind: "agent", id: "planner-1" },
       change_set_id: CHANGE_SET_ID,
-      goal: "Coordinate MCP resource leases",
-      acceptance_criteria: [ "Overlapping agents cannot both write" ]
+      goal: "Coordinate MCP work intentions",
+      acceptance_criteria: [ "Incompatible overlapping intentions are rejected" ]
     ).value!
     attempts.each do |work_item_id, _attempt_id, _agent_id|
       Coordinator::Write::Operations::ExecuteCreateWorkItem.new(event_store:).call(
@@ -326,12 +326,12 @@ RSpec.describe "MCP write_set_reserve Task boundary", :event_store do
 
   def work_intention_events(receipt)
     set_events = event_store.read(
-      streams.work_intention_set(receipt.fetch("lease_set_id")),
+      streams.work_intention_set(receipt.fetch("intention_set_id")),
       Coordinator::Write::EventQueries::WORK_INTENTION_SET_STATE
     )
-    member_events = receipt.fetch("resources").flat_map do |reference|
+    member_events = receipt.fetch("intentions").flat_map do |reference|
       event_store.read_grouped(
-        streams.resource_work_intention(reference.fetch("lease_id")),
+        streams.resource_work_intention(reference.fetch("intention_id")),
         Coordinator::Write::EventQueries::WORK_INTENTION_STATE
       )
     end

@@ -79,7 +79,7 @@ module CandidateObligationScenario
           base_blob_oid: "c" * 40
         )
       end,
-      lease_duration_seconds: 900
+      ttl_seconds: 900
     }).data
     source = submit_candidate(
       prefix:,
@@ -240,7 +240,7 @@ module CandidateObligationScenario
       repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources: [ resource ],
-      lease_duration_seconds: 900
+      ttl_seconds: 900
     }).data
   end
 

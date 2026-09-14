@@ -234,7 +234,7 @@ module Coordinator::Read
           status: "authorized",
           authorized_at: event.authorized_at,
           started_at: nil,
-          write_set: nil,
+          work_intention_set: nil,
           selected_candidate_id: nil,
           selected_candidate_event: nil,
           completed_at: nil,
@@ -256,7 +256,7 @@ module Coordinator::Read
           status: "started",
           authorized_at: event.authorized_at,
           started_at: event.started_at,
-          write_set: nil,
+          work_intention_set: nil,
           selected_candidate_id: nil,
           selected_candidate_event: nil,
           completed_at: nil,
@@ -300,7 +300,7 @@ module Coordinator::Read
             CoordContextStateV1::Attempt.new(
               attempt.attributes.merge(
                 status: "abandoned",
-                write_set: nil,
+                work_intention_set: nil,
                 abandonment_reason: event.reason,
                 abandoned_at: event.abandoned_at
               )
@@ -315,19 +315,19 @@ module Coordinator::Read
 
       def apply_write_set_reserved(state, event)
         attempt = require_attempt(state, event.attempt_id, event.change_set_id, event.work_item_id)
-        write_set = CoordContextStateV1::WriteSet.new(
-          lease_set_id: event.lease_set_id,
+        intention_set = CoordContextStateV1::WorkIntentionSet.new(
+          intention_set_id: event.lease_set_id,
           repository_id: event.repository_id,
           policy_version: event.policy_version,
-          resources: event.resources.map do |resource|
-            projected_write_set_resource(resource)
+          intentions: event.resources.map do |resource|
+            projected_work_intention(resource)
           end,
-          reserved_at: event.reserved_at,
+          declared_at: event.reserved_at,
           last_expanded_at: nil,
           last_renewed_at: nil,
           previous_expires_at: nil,
           expires_at: event.expires_at,
-          released_at: nil
+          withdrawn_at: nil
         )
 
         replace(
@@ -335,32 +335,32 @@ module Coordinator::Read
           attempts: upsert(
             state.attempts,
             :attempt_id,
-            CoordContextStateV1::Attempt.new(attempt.attributes.merge(write_set:))
+            CoordContextStateV1::Attempt.new(attempt.attributes.merge(work_intention_set: intention_set))
           )
         )
       end
 
       def apply_write_set_expanded(state, event)
         attempt = require_attempt(state, event.attempt_id, event.change_set_id, event.work_item_id)
-        write_set = attempt.write_set
-        raise ProjectionStateError, "Attempt #{event.attempt_id} has no projected write set" unless write_set
-        unless write_set.lease_set_id == event.lease_set_id &&
-               write_set.repository_id == event.repository_id &&
-               write_set.policy_version == event.policy_version &&
-               write_set.expires_at == event.expires_at
+        intention_set = attempt.work_intention_set
+        raise ProjectionStateError, "Attempt #{event.attempt_id} has no projected work-intention set" unless intention_set
+        unless intention_set.intention_set_id == event.lease_set_id &&
+               intention_set.repository_id == event.repository_id &&
+               intention_set.policy_version == event.policy_version &&
+               intention_set.expires_at == event.expires_at
           raise ProjectionStateError, "Attempt #{event.attempt_id} write-set identity changed"
         end
 
-        resources = event.added_resources.reduce(write_set.resources) do |observed, reference|
-          upsert_write_set_resource(observed, projected_write_set_resource(reference))
-        end.sort_by { write_set_resource_identity(_1).b }
-        unless resources.length == event.resource_count
+        intentions = event.added_resources.reduce(intention_set.intentions) do |observed, reference|
+          upsert_work_intention(observed, projected_work_intention(reference))
+        end.sort_by { _1.resource_id.b }
+        unless intentions.length == event.resource_count
           raise ProjectionStateError, "Attempt #{event.attempt_id} write-set count changed"
         end
 
-        expanded = CoordContextStateV1::WriteSet.new(
-          write_set.attributes.merge(
-            resources:,
+        expanded = CoordContextStateV1::WorkIntentionSet.new(
+          intention_set.attributes.merge(
+            intentions:,
             last_expanded_at: event.expanded_at,
             expires_at: event.expires_at
           )
@@ -370,30 +370,30 @@ module Coordinator::Read
           attempts: upsert(
             state.attempts,
             :attempt_id,
-            CoordContextStateV1::Attempt.new(attempt.attributes.merge(write_set: expanded))
+            CoordContextStateV1::Attempt.new(attempt.attributes.merge(work_intention_set: expanded))
           )
         )
       end
 
       def apply_write_set_renewed(state, event)
         attempt = require_attempt(state, event.attempt_id, event.change_set_id, event.work_item_id)
-        write_set = attempt.write_set
-        raise ProjectionStateError, "Attempt #{event.attempt_id} has no projected write set" unless write_set
-        unless write_set.lease_set_id == event.lease_set_id &&
-               write_set.repository_id == event.repository_id &&
-               write_set.policy_version == event.policy_version
+        intention_set = attempt.work_intention_set
+        raise ProjectionStateError, "Attempt #{event.attempt_id} has no projected work-intention set" unless intention_set
+        unless intention_set.intention_set_id == event.lease_set_id &&
+               intention_set.repository_id == event.repository_id &&
+               intention_set.policy_version == event.policy_version
           raise ProjectionStateError, "Attempt #{event.attempt_id} write-set identity changed"
         end
-        unless write_set.resources.map(&:to_h) == event.resources.map(&:to_h) &&
-               write_set.resources.length == event.resource_count
+        unless legacy_intention_identities(intention_set.intentions) == event.resources.map(&:to_h) &&
+               intention_set.intentions.length == event.resource_count
           raise ProjectionStateError, "Attempt #{event.attempt_id} write-set membership changed during renewal"
         end
-        unless write_set.expires_at == event.previous_expires_at && event.expires_at > event.previous_expires_at
+        unless intention_set.expires_at == event.previous_expires_at && event.expires_at > event.previous_expires_at
           raise ProjectionStateError, "Attempt #{event.attempt_id} renewal deadline is not contiguous"
         end
 
-        renewed = CoordContextStateV1::WriteSet.new(
-          write_set.attributes.merge(
+        renewed = CoordContextStateV1::WorkIntentionSet.new(
+          intention_set.attributes.merge(
             last_renewed_at: event.renewed_at,
             previous_expires_at: event.previous_expires_at,
             expires_at: event.expires_at
@@ -404,37 +404,37 @@ module Coordinator::Read
           attempts: upsert(
             state.attempts,
             :attempt_id,
-            CoordContextStateV1::Attempt.new(attempt.attributes.merge(write_set: renewed))
+            CoordContextStateV1::Attempt.new(attempt.attributes.merge(work_intention_set: renewed))
           )
         )
       end
 
       def apply_write_set_released(state, event)
         attempt = require_attempt(state, event.attempt_id, event.change_set_id, event.work_item_id)
-        write_set = attempt.write_set
-        raise ProjectionStateError, "Attempt #{event.attempt_id} has no projected write set" unless write_set
-        unless write_set.lease_set_id == event.lease_set_id &&
-               write_set.repository_id == event.repository_id &&
-               write_set.policy_version == event.policy_version
+        intention_set = attempt.work_intention_set
+        raise ProjectionStateError, "Attempt #{event.attempt_id} has no projected work-intention set" unless intention_set
+        unless intention_set.intention_set_id == event.lease_set_id &&
+               intention_set.repository_id == event.repository_id &&
+               intention_set.policy_version == event.policy_version
           raise ProjectionStateError, "Attempt #{event.attempt_id} write-set identity changed"
         end
-        unless write_set.resources.map(&:to_h) == event.resources.map(&:to_h) &&
-               write_set.resources.length == event.resource_count
+        unless legacy_intention_identities(intention_set.intentions) == event.resources.map(&:to_h) &&
+               intention_set.intentions.length == event.resource_count
           raise ProjectionStateError, "Attempt #{event.attempt_id} write-set membership changed during release"
         end
-        unless write_set.expires_at == event.previous_expires_at && write_set.released_at.nil?
+        unless intention_set.expires_at == event.previous_expires_at && intention_set.withdrawn_at.nil?
           raise ProjectionStateError, "Attempt #{event.attempt_id} release is not contiguous"
         end
 
-        released = CoordContextStateV1::WriteSet.new(
-          write_set.attributes.merge(released_at: event.released_at)
+        withdrawn = CoordContextStateV1::WorkIntentionSet.new(
+          intention_set.attributes.merge(withdrawn_at: event.released_at)
         )
         replace(
           state,
           attempts: upsert(
             state.attempts,
             :attempt_id,
-            CoordContextStateV1::Attempt.new(attempt.attributes.merge(write_set: released))
+            CoordContextStateV1::Attempt.new(attempt.attributes.merge(work_intention_set: withdrawn))
           )
         )
       end
@@ -445,24 +445,24 @@ module Coordinator::Read
           raise ProjectionStateError, "Attempt #{event.attempt_id} work-intention attribution changed"
         end
 
-        write_set = CoordContextStateV1::WriteSet.new(
-          lease_set_id: event.set_id,
+        intention_set = CoordContextStateV1::WorkIntentionSet.new(
+          intention_set_id: event.set_id,
           repository_id: event.repository_id,
           policy_version: event.policy_version,
-          resources: event.resources.map { projected_write_set_resource(_1) },
-          reserved_at: event.reserved_at,
+          intentions: event.intentions.map { projected_work_intention(_1) },
+          declared_at: event.declared_at,
           last_expanded_at: event.last_expanded_at,
           last_renewed_at: event.last_renewed_at,
           previous_expires_at: event.previous_expires_at,
           expires_at: event.expires_at,
-          released_at: event.released_at
+          withdrawn_at: event.withdrawn_at
         )
         replace(
           state,
           attempts: upsert(
             state.attempts,
             :attempt_id,
-            CoordContextStateV1::Attempt.new(attempt.attributes.merge(write_set:))
+            CoordContextStateV1::Attempt.new(attempt.attributes.merge(work_intention_set: intention_set))
           )
         )
       end
@@ -535,7 +535,7 @@ module Coordinator::Read
             CoordContextStateV1::Attempt.new(
               attempt.attributes.merge(
                 status: "completed",
-                write_set: nil,
+                work_intention_set: nil,
                 selected_candidate_id: event.candidate_id,
                 selected_candidate_event: event.candidate_event,
                 completed_at: event.completed_at
@@ -634,17 +634,34 @@ module Coordinator::Read
         CoordContextStateV1.new(state.attributes.merge(changes))
       end
 
-      def projected_write_set_resource(reference)
-        CoordContextStateV1::WriteSetResource.new(reference.to_h)
+      def projected_work_intention(reference)
+        attributes = reference.to_h
+        if attributes.key?(:lease_id)
+          attributes = attributes.merge(
+            intention_id: attributes.delete(:lease_id),
+            mode: "exclusive",
+            purpose: "Legacy Resource reservation",
+            context: nil
+          )
+        end
+        CoordContextStateV1::WorkIntention.new(attributes)
       end
 
-      def write_set_resource_identity(resource)
-        resource.resource_id
+      def legacy_intention_identities(intentions)
+        intentions.map do |intention|
+          intention.to_h.slice(
+            :intention_id,
+            :resource_id,
+            :resource_kind,
+            :resource_path,
+            :base_blob_oid,
+            :fencing_token
+          ).transform_keys { _1 == :intention_id ? :lease_id : _1 }
+        end
       end
 
-      def upsert_write_set_resource(collection, replacement)
-        identity = write_set_resource_identity(replacement)
-        existing_index = collection.index { write_set_resource_identity(_1) == identity }
+      def upsert_work_intention(collection, replacement)
+        existing_index = collection.index { _1.resource_id == replacement.resource_id }
         return collection + [ replacement ] unless existing_index
 
         collection.each_with_index.map { |value, index| index == existing_index ? replacement : value }

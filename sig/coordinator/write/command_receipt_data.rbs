@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandReceiptData
-      type value = RepositoryRegistration | ResourceResolution | ResourceRemoval | ChangeSet | WorkItem | Dependency | Attempt | WorkItemCompletion | LeaseSet | LeaseSetExpansion | LeaseSetRenewal | LeaseSetRelease | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver | MergeSnapshotRegistration | MergeSnapshotVerification | MergeAuthorization | MergeObservation | ReleaseSetPreparation | RepositoryIntegration | ReleaseSetVerification | ReleaseSetActivation | ReleaseSetCompensationRequest | ReleaseSetCompletion | DependencySatisfaction | ChangeSetCompletion | SkillPublication | DevelopmentArtifactCapture | DevelopmentArtifactUpdate | DevelopmentArtifactClassification | DevelopmentArtifactRelation | OperationBatchAcceptance | OperationBatchCancellation | OperationBatchTransition
+      type value = RepositoryRegistration | ResourceResolution | ResourceRemoval | ChangeSet | WorkItem | Dependency | Attempt | WorkItemCompletion | WorkIntentionSetDeclaration | WorkIntentionSetExpansion | WorkIntentionSetRenewal | WorkIntentionSetWithdrawal | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver | MergeSnapshotRegistration | MergeSnapshotVerification | MergeAuthorization | MergeObservation | ReleaseSetPreparation | RepositoryIntegration | ReleaseSetVerification | ReleaseSetActivation | ReleaseSetCompensationRequest | ReleaseSetCompletion | DependencySatisfaction | ChangeSetCompletion | SkillPublication | DevelopmentArtifactCapture | DevelopmentArtifactUpdate | DevelopmentArtifactClassification | DevelopmentArtifactRelation | OperationBatchAcceptance | OperationBatchCancellation | OperationBatchTransition
 
       class RepositoryRegistration < Shared::Value
         def repository_id: () -> String
@@ -86,56 +86,56 @@ module Coordinator
       end
 
 
-      class LeaseSet < Shared::Value
+      class WorkIntentionSetDeclaration < Shared::Value
         def change_set_id: () -> String
         def work_item_id: () -> String
         def attempt_id: () -> String
         def repository_id: () -> String
-        def lease_set_id: () -> String
+        def intention_set_id: () -> String
         def policy_version: () -> String
-        def acquired_at: () -> String
+        def declared_at: () -> String
         def expires_at: () -> String
-        def resources: () -> Array[LeaseReferenceV2]
+        def intentions: () -> Array[WorkIntentionReceiptReferenceV1]
       end
 
-      class LeaseSetExpansion < Shared::Value
+      class WorkIntentionSetExpansion < Shared::Value
         def change_set_id: () -> String
         def work_item_id: () -> String
         def attempt_id: () -> String
         def repository_id: () -> String
-        def lease_set_id: () -> String
+        def intention_set_id: () -> String
         def policy_version: () -> String
         def expanded_at: () -> String
         def expires_at: () -> String
-        def added_resources: () -> Array[LeaseReferenceV2]
-        def resource_count: () -> Integer
+        def added_intentions: () -> Array[WorkIntentionReceiptReferenceV1]
+        def intention_count: () -> Integer
       end
 
-      class LeaseSetRenewal < Shared::Value
+      class WorkIntentionSetRenewal < Shared::Value
         def change_set_id: () -> String
         def work_item_id: () -> String
         def attempt_id: () -> String
         def repository_id: () -> String
-        def lease_set_id: () -> String
+        def intention_set_id: () -> String
         def policy_version: () -> String
-        def resources: () -> Array[LeaseReferenceV2]
-        def resource_count: () -> Integer
+        def intentions: () -> Array[WorkIntentionReceiptReferenceV1]
+        def intention_count: () -> Integer
         def renewed_at: () -> String
         def previous_expires_at: () -> String
         def expires_at: () -> String
       end
 
-      class LeaseSetRelease < Shared::Value
+      class WorkIntentionSetWithdrawal < Shared::Value
         def change_set_id: () -> String
         def work_item_id: () -> String
         def attempt_id: () -> String
         def repository_id: () -> String
-        def lease_set_id: () -> String
+        def intention_set_id: () -> String
         def policy_version: () -> String
-        def resources: () -> Array[LeaseReferenceV2]
-        def resource_count: () -> Integer
+        def intentions: () -> Array[WorkIntentionReceiptReferenceV1]
+        def intention_count: () -> Integer
         def previous_expires_at: () -> String
-        def released_at: () -> String
+        def withdrawn_at: () -> String
       end
 
       class ResourceLeaseExpiry < Shared::Value

@@ -95,7 +95,7 @@ module CandidateImpactAcceptanceWorld
       ]
     )
     reservation_task_id = complete_candidate_setup_task(
-      "write_set_reserve",
+      "work_intention_set_declare",
       command_id: "cmd-cuc-imp-#{prefix.downcase}-reserve-#{sequence}",
       actor: { kind: "agent", id: coordination.fetch(:agent_id) },
       change_set_id:,
@@ -112,7 +112,7 @@ module CandidateImpactAcceptanceWorld
           actor_id: coordination.fetch(:agent_id)
         )
       ],
-      lease_duration_seconds: 900
+      ttl_seconds: 900
     )
     coordination[:reservation] = task_request("tasks/get", reservation_task_id).dig(
       "result", "result", "structuredContent", "data"

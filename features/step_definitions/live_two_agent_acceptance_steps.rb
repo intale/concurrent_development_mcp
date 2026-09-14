@@ -26,14 +26,14 @@ When("both agents persist final Candidate checkpoints through MCP") do
   checkpoint_luna_candidates
 end
 
-When("an available stale context is used for a command after its lease has been released") do
+When("an available stale context is used for a command after its intention set has been withdrawn") do
   demonstrate_luna_ap_lag_and_complete_work
 end
 
 Then("the stale context remains available and the authoritative command is rejected") do
   assert_acceptance_equal("ok", @luna_lag_observation.dig(:stale, "status"), "Stale read")
   assert_acceptance_equal(
-    "denied",
+    "conflict",
     @luna_lag_observation.dig(:renewal, "status"),
     "Stale write"
   )

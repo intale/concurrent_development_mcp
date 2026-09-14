@@ -47,28 +47,31 @@ module Coordinator::Read
         attribute :satisfied_at, Types::Timestamp.optional
       end
 
-      class WriteSetResource < Value
-        attribute :lease_id, Types::UuidV7
+      class WorkIntention < Value
+        attribute :intention_id, Types::UuidV7
         attribute :resource_id, Types::ResourceId
         attribute :resource_kind, Types::ResourceKind
         attribute :resource_path, Types::ResourcePath
         attribute :base_blob_oid, Types::GitOid.optional
+        attribute :mode, Types::WorkIntentionMode
+        attribute :purpose, Types::WorkIntentionPurpose
+        attribute :context, Types::WorkIntentionContext.optional
         attribute :fencing_token, Types::FencingToken
       end
 
-      class WriteSet < Value
-        Resource = WriteSetResource
+      class WorkIntentionSet < Value
+        Intention = WorkIntention
 
-        attribute :lease_set_id, Types::UuidV7
+        attribute :intention_set_id, Types::UuidV7
         attribute :repository_id, Types::RepositoryId
-        attribute :policy_version, Types::ResourceLeasePolicyVersion
-        attribute :resources, Types::Array.of(Resource).constrained(min_size: 1, max_size: 32)
-        attribute :reserved_at, Types::Timestamp
+        attribute :policy_version, Types::String
+        attribute :intentions, Types::Array.of(Intention).constrained(min_size: 1, max_size: 32)
+        attribute :declared_at, Types::Timestamp
         attribute :last_expanded_at, Types::Timestamp.optional
         attribute :last_renewed_at, Types::Timestamp.optional
         attribute :previous_expires_at, Types::Timestamp.optional
         attribute :expires_at, Types::Timestamp
-        attribute :released_at, Types::Timestamp.optional
+        attribute :withdrawn_at, Types::Timestamp.optional
       end
 
       class Attempt < Value
@@ -80,7 +83,7 @@ module Coordinator::Read
         attribute :status, Types::String.enum("authorized", "started", "abandoned", "completed")
         attribute :authorized_at, Types::Timestamp
         attribute :started_at, Types::Timestamp.optional
-        attribute :write_set, WriteSet.optional
+        attribute :work_intention_set, WorkIntentionSet.optional
         attribute :selected_candidate_id, Types::Identifier.optional
         attribute :selected_candidate_event, Coordinator::Write::EventReference.optional
         attribute :completed_at, Types::Timestamp.optional

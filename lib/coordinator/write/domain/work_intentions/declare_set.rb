@@ -64,7 +64,7 @@ module Coordinator::Write
           end
           return if existing_set_state.absent?
 
-          failure(:write_set_already_reserved, "Attempt already has an initial work-intention set", command)
+          failure(:work_intention_set_already_declared, "Attempt already has an initial work-intention set", command)
         end
 
         def build_plan(attempt_state:, boundary:, command:, requests:, set_id:, expires_at:)

@@ -123,11 +123,11 @@ RSpec.describe Coordinator::Write::Operations::PrepareSubmitCandidate do
       base_commit_oid: "a" * 40,
       head_commit_oid: "b" * 40,
       checkpoint_kind: "final",
-      lease_set_id: "01919191-9191-7191-8191-919191919191",
-      leases: [
+      intention_set_id: "01919191-9191-7191-8191-919191919191",
+      intentions: [
         {
           resource_id: "02919191-9191-7191-8191-919191919191",
-          lease_id: "01919191-9191-7191-8191-919191919192",
+          intention_id: "01919191-9191-7191-8191-919191919192",
           fencing_token: 1
         }
       ],

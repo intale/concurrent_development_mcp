@@ -23,10 +23,10 @@ Feature: Navigate the read-only coordination workspace in a real browser
       Then each coordination detail is focused and independently refreshable
 
     @UI-GWT-21
-    Scenario: Resource inventory and active leases lead to separate details
-      Given projected resource rows represent expanded renewed released and expired lease lifecycles
+    Scenario: Resource inventory and active work intentions lead to separate details
+      Given projected resource rows represent expanded renewed withdrawn and expired work-intention lifecycles
       When the person follows the live Resource routes
-      Then Resource and lease details retain predictable Back routes
+      Then Resource and work-intention details retain predictable Back routes
 
     @UI-GWT-22
     Scenario: Current Skills assets Artifacts and relationships remain spatially connected

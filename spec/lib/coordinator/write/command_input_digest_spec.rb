@@ -183,7 +183,7 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
     )
   end
 
-  it "freezes the lease-set identity and normalized additions in the expansion digest" do
+  it "freezes the intention-set identity and normalized additions in the expansion digest" do
     resource = Coordinator::Write::ResourceLeaseTargetV1.new(
       resource_id: "01919191-9191-7191-8191-919191919198",
       base_blob_oid: "b" * 40
@@ -206,7 +206,7 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
       Coordinator::Write::CommandInputDocuments::ExpandWriteSetV1.new(
         schema: "command-input/v1",
         command_id: "cmd-expand-300",
-        tool_name: "write_set_expand",
+        tool_name: "work_intention_set_expand",
         input: Coordinator::Write::CommandInputDocuments::ExpandWriteSetInputV1.new(
           actor: Coordinator::Write::CommandInputDocuments::ActorV1.new(
             actor_kind: "agent",
@@ -215,7 +215,7 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
           change_set_id: "CS-100",
           work_item_id: "W-200",
           attempt_id: "A-300",
-          lease_set_id: "01919191-9191-7191-8191-919191919191",
+          intention_set_id: "01919191-9191-7191-8191-919191919191",
           repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
           base_commit_oid: "a" * 40,
           resources: [ Coordinator::Write::CommandInputDocuments::ResourceLeaseTargetV1.new(resource.to_h) ]
@@ -279,11 +279,11 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
       base_commit_oid: "a" * 40,
       head_commit_oid: "b" * 40,
       checkpoint_kind: "final",
-      lease_set_id: "01919191-9191-7191-8191-919191919191",
-      leases: [
+      intention_set_id: "01919191-9191-7191-8191-919191919191",
+      intentions: [
         {
           resource_id: "01919191-9191-7191-8191-919191919198",
-          lease_id: "01919191-9191-7191-8191-919191919192",
+          intention_id: "01919191-9191-7191-8191-919191919192",
           fencing_token: 3
         }
       ],
@@ -323,12 +323,12 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
       Coordinator::Write::CommandInputDocuments::CandidateBuildContextV1
     )
     expect(digest.candidate_submit(candidate_command)).to eq(
-      "sha256:6827bccd13037ba63c37404b0a36729d6c8ba27e7680dfb268be610d2b9b0def"
+      "sha256:b970de63f34be81be2365817bf2a5b5ef6ef04a85b99b045e3e310009a4db17e"
     )
     expect(digest.call(candidate_command)).to eq(digest.candidate_submit(candidate_command))
   end
 
-  it "persists Candidate command input with more changed files than leased resources" do
+  it "persists Candidate command input with more changed files than declared Resource intentions" do
     input = {
       command_id: "cmd-candidate-directory-lease",
       actor: { kind: "agent", id: "agent-7" },
@@ -341,11 +341,11 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
       base_commit_oid: "a" * 40,
       head_commit_oid: "b" * 40,
       checkpoint_kind: "final",
-      lease_set_id: "01919191-9191-7191-8191-919191919191",
-      leases: [
+      intention_set_id: "01919191-9191-7191-8191-919191919191",
+      intentions: [
         {
           resource_id: "01919191-9191-7191-8191-919191919198",
-          lease_id: "01919191-9191-7191-8191-919191919192",
+          intention_id: "01919191-9191-7191-8191-919191919192",
           fencing_token: 3
         }
       ],
@@ -365,7 +365,7 @@ RSpec.describe Coordinator::Write::CommandInputDigest do
     command = Coordinator::Write::Operations::PrepareSubmitCandidate.new.call(input).value!
     document = digest.candidate_submit_document(command)
 
-    expect(document.input.leases.length).to eq(1)
+    expect(document.input.intentions.length).to eq(1)
     expect(document.input.actual_resources.length).to eq(33)
   end
 end

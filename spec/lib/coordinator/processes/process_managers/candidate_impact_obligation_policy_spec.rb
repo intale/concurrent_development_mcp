@@ -209,7 +209,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CandidateImpactObligatio
           base_blob_oid: "c" * 40
         )
       end,
-      lease_duration_seconds: 900
+      ttl_seconds: 900
     }).data
     source = CandidateObligationScenario.submit_candidate(
       prefix:,

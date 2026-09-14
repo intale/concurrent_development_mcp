@@ -27,9 +27,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
       policy_version: Coordinator::Write::WorkIntentionPolicyV1::VERSION,
       repository_id: REPOSITORY_ID
     )
-    expect(receipt.resources.map(&:resource_id)).to contain_exactly(*resources)
+    expect(receipt.intentions.map(&:resource_id)).to contain_exactly(*resources)
 
-    set_events = read_set(receipt.lease_set_id)
+    set_events = read_set(receipt.intention_set_id)
     expect(set_events.map(&:type)).to eq(
       [ "WorkIntentionSetCreated", "WorkIntentionAddedToSet", "WorkIntentionAddedToSet" ]
     )
@@ -37,10 +37,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
       "set_id", "attempt_id", "work_item_id", "change_set_id", "repository_id"
     )
 
-    receipt.resources.each do |reference|
-      event = read_intention(reference.lease_id).sole
+    receipt.intentions.each do |reference|
+      event = read_intention(reference.intention_id).sole
       expect(event).to have_attributes(type: "ResourceWorkIntentionDeclared", stream_revision: 0)
-      expect(event.stream.stream_id).to eq(reference.lease_id)
+      expect(event.stream.stream_id).to eq(reference.intention_id)
       expect(event.data.keys).to contain_exactly(
         "intention_id", "set_id", "resource_id", "repository_id", "change_set_id",
         "work_item_id", "attempt_id", "agent_id", "mode", "purpose", "context",
@@ -52,8 +52,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
         "purpose" => "Implement the scoped change"
       )
       expect(event.markers).to include(
-        "work-intention:#{reference.lease_id}",
-        "work-intention-set:#{receipt.lease_set_id}",
+        "work-intention:#{reference.intention_id}",
+        "work-intention-set:#{receipt.intention_set_id}",
         "resource:#{reference.resource_id}"
       )
       expect(event.markers).to include(a_string_matching(/role=\d+:resource-exact(?:\||$)/))
@@ -91,7 +91,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
     end.map(&:value)
 
     expect(results).to all(be_success)
-    fences = results.map { _1.value!.data.resources.sole.fencing_token }
+    fences = results.map { _1.value!.data.intentions.sole.fencing_token }
     expect(fences).to contain_exactly(1, 2)
   end
 
@@ -170,7 +170,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
     )
 
     expect(result).to be_success
-    expect(result.value!.data.resources.length).to eq(2)
+    expect(result.value!.data.intentions.length).to eq(2)
   end
 
   it "rejects duplicate declaration and invalid resource identities without partial facts" do
@@ -198,9 +198,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
     )
 
     expect(original).to be_success
-    expect(duplicate.failure).to have_attributes(code: :write_set_already_reserved)
+    expect(duplicate.failure).to have_attributes(code: :work_intention_set_already_declared)
     expect(missing.failure).to have_attributes(code: :resource_not_found, details: { resource_id: missing_id })
-    expect(read_intention(original.value!.data.resources.sole.lease_id).length).to eq(1)
+    expect(read_intention(original.value!.data.intentions.sole.intention_id).length).to eq(1)
   end
 
   def start_attempts(attempts)
@@ -221,7 +221,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
       repository_id: REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources:,
-      lease_duration_seconds: 900
+      ttl_seconds: 900
     }
   end
 

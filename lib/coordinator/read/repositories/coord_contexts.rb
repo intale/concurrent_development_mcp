@@ -211,9 +211,9 @@ module Coordinator::Read
           write_set_lease_set_id: payload.set_id,
           write_set_repository_id: payload.repository_id,
           write_set_policy_version: payload.policy_version,
-          write_set_resources: sorted_resources(payload.resources),
+          write_set_resources: sorted_resources(payload.intentions),
           write_set_reserved_event: event_reference(payload.created_event).to_h,
-          write_set_reserved_at_domain: payload.reserved_at,
+          write_set_reserved_at_domain: payload.declared_at,
           write_set_last_expanded_event: payload.last_expanded_event &&
             event_reference(payload.last_expanded_event).to_h,
           write_set_last_expanded_at_domain: payload.last_expanded_at,
@@ -223,7 +223,7 @@ module Coordinator::Read
           write_set_previous_expires_at_domain: payload.previous_expires_at,
           write_set_expires_at_domain: payload.expires_at,
           write_set_release_event: payload.release_event && event_reference(payload.release_event).to_h,
-          write_set_released_at_domain: payload.released_at
+          write_set_released_at_domain: payload.withdrawn_at
         )
       end
 

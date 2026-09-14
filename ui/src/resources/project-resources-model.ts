@@ -1,12 +1,13 @@
 import type {
-  ProjectActiveResourceLeasesQuery,
+  ProjectActiveResourceWorkIntentionsQuery,
   ProjectResourceFieldsFragment,
-  ProjectResourceLeaseQuery,
+  ProjectResourceWorkIntentionQuery,
   ProjectResourceQuery,
   ProjectResourcesQuery,
   ResourceKind,
-  ResourceLeaseFieldsFragment,
-  ResourceLeaseStatus,
+  ResourceWorkIntentionFieldsFragment,
+  ResourceWorkIntentionMode,
+  ResourceWorkIntentionStatus,
   ResourceLifecycleStatus
 } from "../gql/graphql.js";
 
@@ -24,16 +25,26 @@ export const RESOURCE_LIFECYCLE_STATUSES: ReadonlyArray<{
   { label: "Inactive", value: "INACTIVE" }
 ];
 
+export const WORK_INTENTION_MODES: ReadonlyArray<{
+  readonly label: string;
+  readonly value: ResourceWorkIntentionMode;
+}> = [
+  { label: "Shared", value: "SHARED" },
+  { label: "Exclusive", value: "EXCLUSIVE" }
+];
+
 export const PAGE_START = "__resource_page_start__";
 
 export type ProjectResource = ProjectResourceFieldsFragment;
-export type ResourceLease = ResourceLeaseFieldsFragment;
+export type ResourceWorkIntention = ResourceWorkIntentionFieldsFragment;
 export type ProjectResourceConnection = NonNullable<ProjectResourcesQuery["projectResources"]>;
 export type ProjectResourceDetail = NonNullable<ProjectResourceQuery["projectResource"]>;
-export type ResourceLeaseConnection = NonNullable<
-  ProjectActiveResourceLeasesQuery["projectActiveResourceLeases"]
+export type ResourceWorkIntentionConnection = NonNullable<
+  ProjectActiveResourceWorkIntentionsQuery["projectActiveResourceWorkIntentions"]
 >;
-export type ResourceLeaseDetail = NonNullable<ProjectResourceLeaseQuery["projectResourceLease"]>;
+export type ResourceWorkIntentionDetail = NonNullable<
+  ProjectResourceWorkIntentionQuery["projectResourceWorkIntention"]
+>;
 
 export function lifecycleBadgeClass(status: ResourceLifecycleStatus): string {
   return {
@@ -43,11 +54,11 @@ export function lifecycleBadgeClass(status: ResourceLifecycleStatus): string {
   }[status];
 }
 
-export function leaseBadgeClass(status: ResourceLeaseStatus): string {
+export function workIntentionBadgeClass(status: ResourceWorkIntentionStatus): string {
   return {
     ACTIVE: "text-bg-warning",
     EXPIRED: "text-bg-secondary",
-    RELEASED: "text-bg-success",
+    WITHDRAWN: "text-bg-success",
     ATTEMPT_TERMINAL: "text-bg-dark"
   }[status];
 }

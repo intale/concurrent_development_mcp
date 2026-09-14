@@ -19,12 +19,12 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_sto
 
     expect(result).to be_success
     receipt = result.value!.data
-    reference = receipt.added_resources.sole
+    reference = receipt.added_intentions.sole
     expect(reference.resource_id).to eq(resource_id)
     expect(receipt.expires_at).to eq(reservation.receipt.expires_at)
-    expect(receipt.resource_count).to eq(2)
-    expect(read_intention(reference.lease_id).map(&:type)).to eq([ "ResourceWorkIntentionDeclared" ])
-    expect(read_set(receipt.lease_set_id).map(&:type)).to eq(
+    expect(receipt.intention_count).to eq(2)
+    expect(read_intention(reference.intention_id).map(&:type)).to eq([ "ResourceWorkIntentionDeclared" ])
+    expect(read_set(receipt.intention_set_id).map(&:type)).to eq(
       [ "WorkIntentionSetCreated", "WorkIntentionAddedToSet", "WorkIntentionAddedToSet" ]
     )
     expect(result.value!.emitted_events.map(&:type)).not_to include("WriteSetExpanded")
@@ -41,9 +41,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_sto
     first = operation.call(input)
     second = operation.call(input)
 
-    expect(first.failure).to have_attributes(code: :write_set_unchanged)
-    expect(second.failure).to have_attributes(code: :write_set_unchanged)
-    expect(read_set(reservation.receipt.lease_set_id).length).to eq(2)
+    expect(first.failure).to have_attributes(code: :work_intention_set_unchanged)
+    expect(second.failure).to have_attributes(code: :work_intention_set_unchanged)
+    expect(read_set(reservation.receipt.intention_set_id).length).to eq(2)
   end
 
   it "rejects the entire expansion when a new shared intention overlaps active exclusive work" do
@@ -89,7 +89,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_sto
       purpose: "Replace the implementation",
       context: "Other edits would be discarded"
     )
-    expect(read_set(owner.receipt.lease_set_id).length).to eq(2)
+    expect(read_set(owner.receipt.intention_set_id).length).to eq(2)
   end
 
   it "rejects an inactive Resource before changing set membership" do
@@ -111,7 +111,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_sto
     )
 
     expect(result.failure).to have_attributes(code: :resource_not_active)
-    expect(read_set(reservation.receipt.lease_set_id).length).to eq(2)
+    expect(read_set(reservation.receipt.intention_set_id).length).to eq(2)
   end
 
   def setup_reservation
@@ -129,7 +129,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_sto
       change_set_id: "CS-LSE",
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
-      lease_set_id: reservation.receipt.lease_set_id,
+      intention_set_id: reservation.receipt.intention_set_id,
       repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
       base_commit_oid: "a" * 40,
       resources:

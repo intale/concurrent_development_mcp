@@ -3,7 +3,7 @@
 RSpec.describe Coordinator::Read::Repositories::CoordContexts, :read_model do
   subject(:repository) { described_class.new }
 
-  it "replaces earlier lease evidence with the latest observed work-intention set" do
+  it "replaces earlier work-intention evidence with the latest observed set" do
     attempt_id = SecureRandom.uuid_v7
     change_set_id = SecureRandom.uuid_v7
     work_item_id = SecureRandom.uuid_v7
@@ -53,13 +53,16 @@ RSpec.describe Coordinator::Read::Repositories::CoordContexts, :read_model do
       repository_id:,
       agent_id: "agent-rebuild",
       policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
-      resources: [
-        Coordinator::Write::LeaseReferenceV2.new(
-          lease_id: intention_id,
+      intentions: [
+        Coordinator::Read::WorkIntentionViewV1.new(
+          intention_id:,
           resource_id:,
           resource_kind: "file",
           resource_path: "app/models/example.rb",
           base_blob_oid: "b" * 40,
+          mode: "shared",
+          purpose: "Continue the same Attempt after earlier coordination expired",
+          context: "The latest available projection observes a replacement set.",
           fencing_token: 2
         )
       ],
@@ -67,12 +70,12 @@ RSpec.describe Coordinator::Read::Repositories::CoordContexts, :read_model do
       last_expanded_event: nil,
       last_renewed_event: nil,
       release_event: nil,
-      reserved_at: "2026-09-11T12:00:00.000000Z",
+      declared_at: "2026-09-11T12:00:00.000000Z",
       last_expanded_at: nil,
       last_renewed_at: nil,
       previous_expires_at: nil,
       expires_at: "2026-09-11T13:00:00.000000Z",
-      released_at: nil
+      withdrawn_at: nil
     )
 
     repository.store_attempt_event(
@@ -89,7 +92,7 @@ RSpec.describe Coordinator::Read::Repositories::CoordContexts, :read_model do
       write_set_expires_at_domain: Time.utc(2026, 9, 11, 13)
     )
     expect(history.write_set_resources.sole).to include(
-      "lease_id" => intention_id,
+      "intention_id" => intention_id,
       "resource_id" => resource_id,
       "resource_path" => "app/models/example.rb",
       "fencing_token" => 2

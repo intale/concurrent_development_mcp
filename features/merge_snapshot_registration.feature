@@ -7,7 +7,7 @@ Feature: Attributed merge snapshot registration
     Given an MCP agent supports checkpointed Tasks
 
   Scenario: Registration is authoritative while its available projection converges later
-    Given Candidate coordination "MERGE-SNAPSHOT" gives agent "agent-a" an active lease on "lib/merge_snapshot.rb"
+    Given Candidate coordination "MERGE-SNAPSHOT" gives agent "agent-a" an active work intention on "lib/merge_snapshot.rb"
     When the agent submits Candidate "CAN-CUC-MERGE-SNAPSHOT" with command "cmd-cuc-merge-candidate" at head "b" without build context
     Then the Candidate Task completes with an attributed unverified checkpoint
     When the agent registers merge snapshot "MS-CUC-MERGE-SNAPSHOT" with command "cmd-cuc-merge-snapshot"
@@ -17,7 +17,7 @@ Feature: Attributed merge snapshot registration
     Then merge snapshot "MS-CUC-MERGE-SNAPSHOT" is available without a freshness gate
 
   Scenario: A qualifying combined-test report verifies one exact snapshot while the view converges
-    Given Candidate coordination "MERGE-VERIFY" gives agent "agent-a" an active lease on "lib/merge_verify.rb"
+    Given Candidate coordination "MERGE-VERIFY" gives agent "agent-a" an active work intention on "lib/merge_verify.rb"
     When the agent submits Candidate "CAN-CUC-MERGE-VERIFY" with command "cmd-cuc-merge-verify-candidate" at head "b" without build context
     Then the Candidate Task completes with an attributed unverified checkpoint
     When the agent registers merge snapshot "MS-CUC-MERGE-VERIFY" with command "cmd-cuc-merge-verify-snapshot"
@@ -31,7 +31,7 @@ Feature: Attributed merge snapshot registration
     Then the available merge snapshot reports "verified" without a freshness gate
 
   Scenario: A failed report remains durable and a later qualifying report can recover
-    Given Candidate coordination "MERGE-RECOVER" gives agent "agent-a" an active lease on "lib/merge_recover.rb"
+    Given Candidate coordination "MERGE-RECOVER" gives agent "agent-a" an active work intention on "lib/merge_recover.rb"
     When the agent submits Candidate "CAN-CUC-MERGE-RECOVER" with command "cmd-cuc-merge-recover-candidate" at head "b" without build context
     Then the Candidate Task completes with an attributed unverified checkpoint
     When the agent registers merge snapshot "MS-CUC-MERGE-RECOVER" with command "cmd-cuc-merge-recover-snapshot"
@@ -42,7 +42,7 @@ Feature: Attributed merge snapshot registration
     And 2 submitted reports and 1 verified fact are durable for the exact snapshot
 
   Scenario: A stale snapshot binding is rejected from authoritative events
-    Given Candidate coordination "MERGE-STALE" gives agent "agent-a" an active lease on "lib/merge_stale.rb"
+    Given Candidate coordination "MERGE-STALE" gives agent "agent-a" an active work intention on "lib/merge_stale.rb"
     When the agent submits Candidate "CAN-CUC-MERGE-STALE" with command "cmd-cuc-merge-stale-candidate" at head "b" without build context
     Then the Candidate Task completes with an attributed unverified checkpoint
     When the agent registers merge snapshot "MS-CUC-MERGE-STALE" with command "cmd-cuc-merge-stale-snapshot"
@@ -50,7 +50,7 @@ Feature: Attributed merge snapshot registration
     Then the merge verification Task reports "merge_snapshot_verification_binding_stale" without verification facts
 
   Scenario: Exact verified evidence grants authorization while its available view catches up
-    Given Candidate coordination "MERGE-AUTH-GRANT" gives agent "agent-a" an active lease on "lib/merge_auth_grant.rb"
+    Given Candidate coordination "MERGE-AUTH-GRANT" gives agent "agent-a" an active work intention on "lib/merge_auth_grant.rb"
     When the agent submits Candidate "CAN-CUC-MERGE-AUTH-GRANT" with command "cmd-cuc-merge-auth-grant-candidate" at head "b" without build context
     And the agent registers merge snapshot "MS-CUC-MERGE-AUTH-GRANT" with command "cmd-cuc-merge-auth-grant-snapshot"
     And merge snapshot "MS-CUC-MERGE-AUTH-GRANT" reaches the read side
@@ -64,7 +64,7 @@ Feature: Attributed merge snapshot registration
     Then the available merge snapshot reports authorization "granted" without a freshness gate
 
   Scenario: A changed target base is a durable authorization denial, not a Task failure
-    Given Candidate coordination "MERGE-AUTH-STALE" gives agent "agent-a" an active lease on "lib/merge_auth_stale.rb"
+    Given Candidate coordination "MERGE-AUTH-STALE" gives agent "agent-a" an active work intention on "lib/merge_auth_stale.rb"
     When the agent submits Candidate "CAN-CUC-MERGE-AUTH-STALE" with command "cmd-cuc-merge-auth-stale-candidate" at head "b" without build context
     And the agent registers merge snapshot "MS-CUC-MERGE-AUTH-STALE" with command "cmd-cuc-merge-auth-stale-snapshot"
     And merge snapshot "MS-CUC-MERGE-AUTH-STALE" reaches the read side
@@ -89,7 +89,7 @@ Feature: Attributed merge snapshot registration
     And the authorization explains "required_obligation_open"
 
   Scenario: An exact current grant permits one attributed external merge observation
-    Given Candidate coordination "MERGE-OBSERVED" gives agent "agent-a" an active lease on "lib/merge_observed.rb"
+    Given Candidate coordination "MERGE-OBSERVED" gives agent "agent-a" an active work intention on "lib/merge_observed.rb"
     When the agent submits Candidate "CAN-CUC-MERGE-OBSERVED" with command "cmd-cuc-merge-observed-candidate" at head "b" without build context
     And the agent registers merge snapshot "MS-CUC-MERGE-OBSERVED" with command "cmd-cuc-merge-observed-snapshot"
     And merge snapshot "MS-CUC-MERGE-OBSERVED" reaches the read side

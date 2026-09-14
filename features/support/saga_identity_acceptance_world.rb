@@ -195,7 +195,7 @@ module SagaIdentityAcceptanceWorld
       ]
     )
     reservation_state = complete_saga_task(
-      "write_set_reserve",
+      "work_intention_set_declare",
       command_id: "cmd-cuc-saga-rel-#{prefix}-reserve-#{index + 1}",
       actor: { kind: "agent", id: agent_id },
       change_set_id:,
@@ -212,7 +212,7 @@ module SagaIdentityAcceptanceWorld
           actor_id: agent_id
         )
       ],
-      lease_duration_seconds: 900
+      ttl_seconds: 900
     )
     reservation = reservation_state.dig("result", "result", "structuredContent", "data")
     coordination = {
@@ -239,17 +239,17 @@ module SagaIdentityAcceptanceWorld
       "Release member Candidate"
     )
     complete_saga_task(
-      "lease_release",
+      "work_intention_set_withdraw",
       command_id: "cmd-cuc-saga-rel-#{prefix}-release-#{index + 1}",
       actor: { kind: "agent", id: agent_id },
       change_set_id:,
       work_item_id: item.fetch(:work_item_id),
       attempt_id: item.fetch(:attempt_id),
-      lease_set_id: reservation.fetch("lease_set_id"),
-      leases: reservation.fetch("resources").map do |reference|
+      intention_set_id: reservation.fetch("intention_set_id"),
+      intentions: reservation.fetch("intentions").map do |reference|
         {
           resource_id: reference.fetch("resource_id"),
-          lease_id: reference.fetch("lease_id"),
+          intention_id: reference.fetch("intention_id"),
           fencing_token: reference.fetch("fencing_token")
         }
       end

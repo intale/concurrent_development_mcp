@@ -12,24 +12,24 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpireResourceLease, :even
       reservation = ResourceLeaseOperationScenario.reserve(
         event_store:,
         paths: [ "app/expiring.rb" ],
-        lease_duration_seconds: 30
+        ttl_seconds: 30
       )
     end
-    reference = reservation.receipt.resources.sole
-    source = read_intention(reference.lease_id).sole
+    reference = reservation.receipt.intentions.sole
+    source = read_intention(reference.intention_id).sole
 
     result = Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 30)) do
       operation.call(expiry_command(reference, reservation.receipt), caused_by: source)
     end
 
     expect(result).to be_success
-    expiration = read_intention(reference.lease_id).last
+    expiration = read_intention(reference.intention_id).last
     expect(expiration.type).to eq("ResourceWorkIntentionExpired")
     expect(expiration.data.keys).to contain_exactly(
       "intention_id", "resource_id", "fencing_token", "expires_at"
     )
     expect(expiration.data).to include(
-      "intention_id" => reference.lease_id,
+      "intention_id" => reference.intention_id,
       "resource_id" => reference.resource_id,
       "expires_at" => reservation.receipt.expires_at
     )
@@ -43,11 +43,11 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpireResourceLease, :even
       reservation = ResourceLeaseOperationScenario.reserve(
         event_store:,
         paths: [ "app/renewed.rb" ],
-        lease_duration_seconds: 30
+        ttl_seconds: 30
       )
     end
-    reference = reservation.receipt.resources.sole
-    source = read_intention(reference.lease_id).sole
+    reference = reservation.receipt.intentions.sole
+    source = read_intention(reference.intention_id).sole
     Timecop.freeze(Time.utc(2026, 8, 22, 10, 0, 10)) do
       Coordinator::Write::Operations::ExecuteRenewLeaseSet.new(event_store:).call(
         command_id: "cmd-renew-before-expiry",
@@ -55,9 +55,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpireResourceLease, :even
         change_set_id: "CS-LSE",
         work_item_id: "W-LSE-A",
         attempt_id: "A-LSE-A",
-        lease_set_id: reservation.receipt.lease_set_id,
-        leases: ResourceLeaseOperationScenario.lease_inputs(reservation.receipt),
-        lease_duration_seconds: 60
+        intention_set_id: reservation.receipt.intention_set_id,
+        intentions: ResourceLeaseOperationScenario.work_intention_inputs(reservation.receipt),
+        ttl_seconds: 60
       ).value!
     end
 
@@ -67,7 +67,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpireResourceLease, :even
 
     expect(result).to be_success
     expect(result.value!.emitted_events).to be_empty
-    expect(read_intention(reference.lease_id).map(&:type)).to eq(
+    expect(read_intention(reference.intention_id).map(&:type)).to eq(
       [ "ResourceWorkIntentionDeclared", "ResourceWorkIntentionRenewed" ]
     )
   end
@@ -84,8 +84,8 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpireResourceLease, :even
       command_id: SecureRandom.uuid_v7,
       actor: Coordinator::Write::Commands::Actor.new(kind: "system", id: "lease-expiry-policy-v1"),
       resource_id: reference.resource_id,
-      lease_id: reference.lease_id,
-      lease_set_id: receipt.lease_set_id,
+      lease_id: reference.intention_id,
+      lease_set_id: receipt.intention_set_id,
       fencing_token: reference.fencing_token,
       expected_expires_at: receipt.expires_at
     )

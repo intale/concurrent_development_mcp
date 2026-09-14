@@ -72,7 +72,7 @@ module TerminalBuildProgressAcceptanceWorld
       base_snapshots: [ { repository_id:, commit_oid: "a" * 40 } ]
     )
     reservation_task_id = complete_terminal_task(
-      "write_set_reserve",
+      "work_intention_set_declare",
       command_id: "cmd-cuc-terminal-#{prefix}-reserve",
       actor: { kind: "agent", id: agent_id },
       change_set_id: ids.fetch(:change_set_id),
@@ -89,7 +89,7 @@ module TerminalBuildProgressAcceptanceWorld
           actor_id: agent_id
         )
       ],
-      lease_duration_seconds: 900
+      ttl_seconds: 900
     )
     reservation = terminal_task_data(reservation_task_id)
     candidate_coordination = {
@@ -135,7 +135,7 @@ module TerminalBuildProgressAcceptanceWorld
         base_snapshots: [ { repository_id:, commit_oid: "a" * 40 } ]
       )
       reservation_task_id = complete_terminal_task(
-        "write_set_reserve",
+        "work_intention_set_declare",
         command_id: "cmd-cuc-terminal-#{prefix}-reserve-recovery-#{index}",
         actor: { kind: "agent", id: recovered.fetch(:agent_id) },
         change_set_id: ids.fetch(:change_set_id),
@@ -152,7 +152,7 @@ module TerminalBuildProgressAcceptanceWorld
             actor_id: recovered.fetch(:agent_id)
           )
         ],
-        lease_duration_seconds: 900
+        ttl_seconds: 900
       )
       recovered = recovered.merge(
         ids: ids.merge(attempt_id: next_attempt_id),
@@ -186,23 +186,23 @@ module TerminalBuildProgressAcceptanceWorld
     ids = coordination.fetch(:ids)
     reservation = coordination.fetch(:reservation)
     task_id = complete_terminal_task(
-      "lease_release",
+      "work_intention_set_withdraw",
       command_id: "cmd-cuc-terminal-#{prefix}-release",
       actor: { kind: "agent", id: coordination.fetch(:agent_id) },
       change_set_id: ids.fetch(:change_set_id),
       work_item_id: ids.fetch(:work_item_id),
       attempt_id: ids.fetch(:attempt_id),
-      lease_set_id: reservation.fetch("lease_set_id"),
-      leases: reservation.fetch("resources").map do |reference|
+      intention_set_id: reservation.fetch("intention_set_id"),
+      intentions: reservation.fetch("intentions").map do |reference|
         {
           resource_id: reference.fetch("resource_id"),
-          lease_id: reference.fetch("lease_id"),
+          intention_id: reference.fetch("intention_id"),
           fencing_token: reference.fetch("fencing_token")
         }
       end
     )
-    withdrawals = reservation.fetch("resources").map do |reference|
-      terminal_work_intention_events(reference.fetch("lease_id"))
+    withdrawals = reservation.fetch("intentions").map do |reference|
+      terminal_work_intention_events(reference.fetch("intention_id"))
         .find { _1.type == "ResourceWorkIntentionWithdrawn" }
     end
     assert_acceptance(withdrawals.all?, "Terminal work-intention set has missing withdrawal facts")
@@ -211,7 +211,7 @@ module TerminalBuildProgressAcceptanceWorld
       attempt = payload.dig("data", "context", "attempts")&.find do |candidate|
         candidate.fetch("attempt_id") == ids.fetch(:attempt_id)
       end
-      observed = attempt&.dig("write_set", "released_at")
+      observed = attempt&.dig("work_intention_set", "withdrawn_at")
       [ !observed.nil?, payload ]
     end
     task_id

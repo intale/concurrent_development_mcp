@@ -146,7 +146,7 @@ module Coordinator::Write
           repository_id: input.repository_id,
           base_commit_oid: input.base_commit_oid,
           resources: input.resources.map { ResourceLeaseTargetV1.new(_1.to_h) },
-          lease_duration_seconds: input.lease_duration_seconds
+          lease_duration_seconds: input.ttl_seconds
         )
       end
 
@@ -158,7 +158,7 @@ module Coordinator::Write
           change_set_id: input.change_set_id,
           work_item_id: input.work_item_id,
           attempt_id: input.attempt_id,
-          lease_set_id: input.lease_set_id,
+          lease_set_id: input.intention_set_id,
           repository_id: input.repository_id,
           base_commit_oid: input.base_commit_oid,
           resources: input.resources.map { ResourceLeaseTargetV1.new(_1.to_h) }
@@ -173,9 +173,15 @@ module Coordinator::Write
           change_set_id: input.change_set_id,
           work_item_id: input.work_item_id,
           attempt_id: input.attempt_id,
-          lease_set_id: input.lease_set_id,
-          leases: input.leases.map { LeaseRenewalReferenceV2.new(_1.to_h) },
-          lease_duration_seconds: input.lease_duration_seconds
+          lease_set_id: input.intention_set_id,
+          leases: input.intentions.map do |reference|
+            LeaseRenewalReferenceV2.new(
+              resource_id: reference.resource_id,
+              lease_id: reference.intention_id,
+              fencing_token: reference.fencing_token
+            )
+          end,
+          lease_duration_seconds: input.ttl_seconds
         )
       end
 
@@ -187,8 +193,14 @@ module Coordinator::Write
           change_set_id: input.change_set_id,
           work_item_id: input.work_item_id,
           attempt_id: input.attempt_id,
-          lease_set_id: input.lease_set_id,
-          leases: input.leases.map { LeaseReleaseReferenceV2.new(_1.to_h) }
+          lease_set_id: input.intention_set_id,
+          leases: input.intentions.map do |reference|
+            LeaseReleaseReferenceV2.new(
+              resource_id: reference.resource_id,
+              lease_id: reference.intention_id,
+              fencing_token: reference.fencing_token
+            )
+          end
         )
       end
 
@@ -286,8 +298,14 @@ module Coordinator::Write
           base_commit_oid: input.base_commit_oid,
           head_commit_oid: input.head_commit_oid,
           checkpoint_kind: input.checkpoint_kind,
-          lease_set_id: input.lease_set_id,
-          leases: input.leases.map { Candidates::LeaseObservationV1.new(_1.to_h) },
+          lease_set_id: input.intention_set_id,
+          leases: input.intentions.map do |intention|
+            Candidates::LeaseObservationV1.new(
+              resource_id: intention.resource_id,
+              lease_id: intention.intention_id,
+              fencing_token: intention.fencing_token
+            )
+          end,
           manifest: candidate_manifest(input.change_manifest, actor:),
           build_context: candidate_build_context(input.build_context, actor:),
           actual_resources: input.actual_resources.map { Candidates::ActualResourceV2.new(_1.to_h) }

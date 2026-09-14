@@ -167,7 +167,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
       event_store:,
       paths: [ "app/a.rb" ],
       command_id: "cmd-reserve-a",
-      lease_duration_seconds: duration
+      ttl_seconds: duration
     )
   end
 
@@ -178,14 +178,14 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
       change_set_id: "CS-LSE",
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
-      lease_set_id: reservation.receipt.lease_set_id,
-      leases: ResourceLeaseOperationScenario.lease_inputs(reservation.receipt),
-      lease_duration_seconds: duration
+      intention_set_id: reservation.receipt.intention_set_id,
+      intentions: ResourceLeaseOperationScenario.work_intention_inputs(reservation.receipt),
+      ttl_seconds: duration
     ).value!
   end
 
   def intention_events(reservation)
-    intention_id = reservation.receipt.resources.sole.lease_id
+    intention_id = reservation.receipt.intentions.sole.intention_id
     event_store.read_grouped(
       Coordinator::Write::StreamFactory.new.resource_work_intention(intention_id),
       Coordinator::Write::EventQueries::WORK_INTENTION_STATE

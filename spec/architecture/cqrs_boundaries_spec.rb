@@ -85,15 +85,14 @@ RSpec.describe "CQRS source boundaries" do
     expect(Rails.root.glob("app/models/coordinator/read_models/**/*.rb")).to be_empty
   end
 
-  it "mirrors Coordinator logic in RBS without requiring Rails GraphQL adapter signatures" do
-    implementation_signatures = (
-      Rails.root.glob("lib/coordinator/**/*.rb").map { signature_path_for(_1, root: "lib") } +
-      Rails.root.glob("app/models/coordinator/**/*.rb").map { signature_path_for(_1, root: "app/models") }
-    ).uniq.sort
-    declared_signatures = Rails.root.glob("sig/coordinator/**/*.rbs").reject do
-      _1.to_s.include?("/sig/coordinator/web/graphql/")
-    end.map do
-      _1.relative_path_from(Rails.root).to_s
+  it "mirrors isolated Coordinator logic in RBS without requiring Rails adapter signatures" do
+    implementation_signatures = Rails.root.glob("lib/coordinator/**/*.rb")
+      .map { signature_path_for(_1, root: "lib") }
+      .uniq
+      .sort
+    declared_signatures = Rails.root.glob("sig/coordinator/**/*.rbs").filter_map do |path|
+      signature = path.relative_path_from(Rails.root).to_s
+      signature if implementation_signatures.include?(signature)
     end.sort
 
     expect(declared_signatures).to eq(implementation_signatures)

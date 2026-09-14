@@ -492,17 +492,17 @@ def complete_merge_candidate_work_item(candidate)
   reservation = coordination.fetch(:reservation)
   suffix = arguments.fetch(:candidate_id).downcase
   release_task_id = submit_and_execute(
-    "lease_release",
+    "work_intention_set_withdraw",
     command_id: "cmd-cuc-merge-release-#{suffix}",
     actor: arguments.fetch(:actor),
     change_set_id: arguments.fetch(:change_set_id),
     work_item_id: arguments.fetch(:work_item_id),
     attempt_id: arguments.fetch(:attempt_id),
-    lease_set_id: reservation.fetch("lease_set_id"),
-    leases: reservation.fetch("resources").map do |reference|
+    intention_set_id: reservation.fetch("intention_set_id"),
+    intentions: reservation.fetch("intentions").map do |reference|
       {
         resource_id: reference.fetch("resource_id"),
-        lease_id: reference.fetch("lease_id"),
+        intention_id: reference.fetch("intention_id"),
         fencing_token: reference.fetch("fencing_token")
       }
     end
