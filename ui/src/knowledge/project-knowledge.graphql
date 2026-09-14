@@ -35,8 +35,8 @@ fragment ArtifactSummaryFields on DevelopmentArtifactSummary {
   }
 }
 
-query Skills($first: Int, $name: String, $projectScope: String, $after: String) {
-  skills(first: $first, name: $name, projectScope: $projectScope, after: $after) {
+query Skills($first: Int, $name: String, $projectScope: String, $after: String, $sort: LatestUpdateSort) {
+  skills(first: $first, name: $name, projectScope: $projectScope, after: $after, sort: $sort) {
     nodes {
       ...SkillSummaryFields
     }
@@ -85,8 +85,8 @@ query SkillAsset($skillId: ID!, $path: String!) {
   }
 }
 
-query ProjectSkills($projectRef: ID!, $first: Int, $name: String, $after: String) {
-  projectSkills(projectRef: $projectRef, first: $first, name: $name, after: $after) {
+query ProjectSkills($projectRef: ID!, $first: Int, $name: String, $after: String, $sort: LatestUpdateSort) {
+  projectSkills(projectRef: $projectRef, first: $first, name: $name, after: $after, sort: $sort) {
     nodes { ...SkillSummaryFields }
     pageInfo { endCursor hasNextPage }
   }
@@ -121,6 +121,7 @@ query ProjectArtifacts(
   $labels: [String!]
   $sourceKind: DevelopmentArtifactSourceKind
   $after: String
+  $sort: LatestUpdateSort
 ) {
   projectArtifacts(
     projectRef: $projectRef
@@ -129,6 +130,7 @@ query ProjectArtifacts(
     labels: $labels
     sourceKind: $sourceKind
     after: $after
+    sort: $sort
   ) {
     nodes { ...ArtifactSummaryFields }
     pageInfo { endCursor hasNextPage }

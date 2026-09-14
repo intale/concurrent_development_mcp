@@ -34,7 +34,8 @@ module Coordinator::Read::Web::Repositories
         id_column: :decision_id,
         after_updated_at: query.after_updated_at,
         after_id: query.after_decision_id,
-        limit: query.first
+        limit: query.first,
+        sort: query.sort
       )
       page_ids = rows.map(&:decision_id)
 
@@ -57,7 +58,8 @@ module Coordinator::Read::Web::Repositories
         id_column: :message_id,
         after_updated_at: query.after_updated_at,
         after_id: query.after_message_id,
-        limit: query.first
+        limit: query.first,
+        sort: query.sort
       )
       page_ids = rows.map(&:message_id)
 
@@ -81,7 +83,8 @@ module Coordinator::Read::Web::Repositories
         id_column: :choice_id,
         after_updated_at: query.after_updated_at,
         after_id: query.after_choice_id,
-        limit: query.first
+        limit: query.first,
+        sort: query.sort
       )
       page_ids = rows.map(&:choice_id)
 
@@ -102,7 +105,8 @@ module Coordinator::Read::Web::Repositories
         outcome: query.outcome,
         after_updated_at: query.after_updated_at,
         after_assessment_id: query.after_assessment_id,
-        limit: query.first
+        limit: query.first,
+        sort: query.sort
       )
     end
 
@@ -161,7 +165,8 @@ module Coordinator::Read::Web::Repositories
           outcome: nil,
           after_updated_at: query.after_impact_updated_at,
           after_assessment_id: query.after_impact_assessment_id,
-          limit: query.first
+          limit: query.first,
+          sort: "newest_first"
         )
       )
     end
@@ -187,7 +192,8 @@ module Coordinator::Read::Web::Repositories
         id_column: :command_id,
         after_updated_at: query.after_updated_at,
         after_id: query.after_command_id,
-        limit: query.first
+        limit: query.first,
+        sort: query.sort
       )
 
       Coordinator::Read::Web::GovernanceBrowserV1::ReceiptPage.new(
@@ -218,17 +224,19 @@ module Coordinator::Read::Web::Repositories
       Coordinator::Read::DecisionDefinition.where(decision_id: decision_ids)
     end
 
-    def impact_page(relation:, outcome:, after_updated_at:, after_assessment_id:, limit:)
+    def impact_page(relation:, outcome:, after_updated_at:, after_assessment_id:, limit:, sort:)
       relation = relation.where(outcome:) if outcome
       if after_updated_at && after_assessment_id
+        comparator = sort == "oldest_first" ? ">" : "<"
         relation = relation.where(
-          "updated_at < ? OR (updated_at = ? AND assessment_id < ?)",
+          "updated_at #{comparator} ? OR (updated_at = ? AND assessment_id #{comparator} ?)",
           after_updated_at,
           after_updated_at,
           after_assessment_id
         )
       end
-      rows = relation.order(updated_at: :desc, assessment_id: :desc).limit(limit + 1).to_a
+      direction = sort == "oldest_first" ? :asc : :desc
+      rows = relation.order(updated_at: direction, assessment_id: direction).limit(limit + 1).to_a
       has_more = rows.length > limit
       page_rows = rows.first(limit)
       last = page_rows.last

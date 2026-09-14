@@ -130,8 +130,9 @@ test("keeps stale facts visible and provides contextual initial states", () => {
 test("binds available-data preservation and cursor history to receipt filters", () => {
   const response: AuditCommandReceiptsQuery = { commandReceipts: page };
   const detail: AuditCommandReceiptQuery = { commandReceipt: receipt };
-  assert.equal(preserveReceiptPage(response, ["audit", "work_item_acquire", "OK"], "work_item_acquire", "OK"), response);
-  assert.equal(preserveReceiptPage(response, ["audit", "other", "OK"], "work_item_acquire", "OK"), undefined);
+  assert.equal(preserveReceiptPage(response, ["audit", "work_item_acquire", "OK", "NEWEST_FIRST"], "work_item_acquire", "OK", "NEWEST_FIRST"), response);
+  assert.equal(preserveReceiptPage(response, ["audit", "other", "OK", "NEWEST_FIRST"], "work_item_acquire", "OK", "NEWEST_FIRST"), undefined);
+  assert.equal(preserveReceiptPage(response, ["audit", "work_item_acquire", "OK", "OLDEST_FIRST"], "work_item_acquire", "OK", "NEWEST_FIRST"), undefined);
   assert.equal(preserveReceiptDetail(detail, ["audit", receipt.commandId], receipt.commandId), detail);
   assert.equal(preserveReceiptDetail(detail, ["audit", "other"], receipt.commandId), undefined);
 

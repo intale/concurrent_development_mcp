@@ -27,6 +27,7 @@ module Coordinator::Read::Web::Queries
           first: validated[:first] || 20,
           after_id: validated[:after_id],
           after_sort_value: validated[:after_sort_value],
+          sort: validated[:sort] || "newest_first",
           presentation_statuses: validated[:presentation_statuses] || [],
           work_item_sort: validated[:work_item_sort] || "updated_at_desc",
           blocking: validated[:blocking],

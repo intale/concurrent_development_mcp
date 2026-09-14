@@ -318,16 +318,18 @@ module Coordinator::Read
           )
         end
         if query.after_updated_at
+          comparator = query.sort == "oldest_first" ? ">" : "<"
           relation = relation.where(
-            "#{OBSERVATION_TABLE_SQL}.updated_at < :updated_at OR " \
+            "#{OBSERVATION_TABLE_SQL}.updated_at #{comparator} :updated_at OR " \
             "(#{OBSERVATION_TABLE_SQL}.updated_at = :updated_at AND " \
-            "#{OBSERVATION_TABLE_SQL}.observation_id < :observation_id)",
+            "#{OBSERVATION_TABLE_SQL}.observation_id #{comparator} :observation_id)",
             updated_at: query.after_updated_at,
             observation_id: query.after_observation_id
           )
         end
+        direction = query.sort == "oldest_first" ? "ASC" : "DESC"
         rows = relation
-          .order("#{OBSERVATION_TABLE_SQL}.updated_at DESC", "#{OBSERVATION_TABLE_SQL}.observation_id DESC")
+          .order("#{OBSERVATION_TABLE_SQL}.updated_at #{direction}", "#{OBSERVATION_TABLE_SQL}.observation_id #{direction}")
           .limit(query.first + 1)
           .to_a
         has_more = rows.length > query.first

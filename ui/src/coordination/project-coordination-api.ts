@@ -9,6 +9,7 @@ import {
 import type {
   CoordinationChangeSetStatus,
   CoordinationPresentationStatus,
+  LatestUpdateSort,
   ProjectChangeSetQuery,
   ProjectChangeSetsQuery,
   ProjectDependenciesQuery,
@@ -39,12 +40,14 @@ export interface WorkItemFilters {
 export function fetchProjectChangeSets(
   projectRef: string,
   status: ChangeSetStatus | undefined,
+  sort: LatestUpdateSort,
   after: string | undefined,
   signal?: AbortSignal
 ): Promise<ProjectChangeSetsQuery> {
   return executeGraphql(ProjectChangeSetsDocument, {
     projectRef,
     first: COORDINATION_PAGE_SIZE,
+    sort,
     ...(status ? { status: GRAPHQL_CHANGE_SET_STATUS[status] } : {}),
     ...(after ? { after } : {})
   }, signal);
@@ -86,12 +89,14 @@ export function fetchProjectWorkItem(
 export function fetchProjectDependencies(
   projectRef: string,
   blocking: boolean | undefined,
+  sort: LatestUpdateSort,
   after: string | undefined,
   signal?: AbortSignal
 ): Promise<ProjectDependenciesQuery> {
   return executeGraphql(ProjectDependenciesDocument, {
     projectRef,
     first: COORDINATION_PAGE_SIZE,
+    sort,
     ...(after ? { after } : {}),
     ...(blocking === undefined ? {} : { blocking })
   }, signal);

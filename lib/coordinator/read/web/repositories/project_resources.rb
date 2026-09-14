@@ -22,7 +22,8 @@ module Coordinator::Read::Web::Repositories
         id_column: :resource_id,
         after_updated_at: query.after_updated_at,
         after_id: query.after_id,
-        limit: query.first
+        limit: query.first,
+        sort: query.sort
       )
 
       Coordinator::Read::Web::ProjectResourcesV1::ResourcePage.new(
@@ -53,7 +54,8 @@ module Coordinator::Read::Web::Repositories
         timestamp_column: :updated_at,
         after_updated_at: query.after_updated_at,
         after_id: query.after_id,
-        limit: query.first
+        limit: query.first,
+        sort: query.sort
       )
 
       Coordinator::Read::Web::ProjectResourcesV1::WorkIntentionPage.new(

@@ -52,6 +52,7 @@ module Coordinator::Read::Web::Queries
         first: values[:first] || 20,
         after_id: values[:after_id],
         after_updated_at: values[:after_updated_at],
+        sort: values[:sort] || "newest_first",
         path: values[:path],
         resource_kind: values[:resource_kind],
         resource_lifecycle_status: values[:resource_lifecycle_status],

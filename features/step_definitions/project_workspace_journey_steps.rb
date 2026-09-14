@@ -109,6 +109,7 @@ When("the person follows the live Coordination routes") do
   browser_open_project(@coordination_dashboard_project_ref)
   click_link "Coordination", exact: true
   assert_selector("h2", text: "ChangeSets", exact_text: true)
+  browser_assert_latest_update_sort
 
   browser_click_card("CS-detail", "View ChangeSet")
   @coordination_browser_details = [ browser_record_refreshable_detail("ChangeSet detail") ]
@@ -121,6 +122,7 @@ When("the person follows the live Coordination routes") do
   click_link "Back to WorkItems"
 
   click_link "Dependencies", exact: true
+  browser_assert_latest_update_sort
   browser_click_card("D-browser-detail", "View dependency")
   @coordination_browser_details << browser_record_refreshable_detail("Dependency detail")
 end
@@ -133,6 +135,7 @@ When("the person follows the live Resource routes") do
   browser_open_project(@resource_browser_project_ref)
   click_link "Resources", exact: true
   assert_selector("h2", text: "Resource inventory", exact_text: true)
+  browser_assert_latest_update_sort
 
   browser_click_card("app/models/first.rb", "View Resource")
   @resource_browser_details = [ browser_record_refreshable_detail("Resource detail") ]
@@ -140,6 +143,7 @@ When("the person follows the live Resource routes") do
   assert_selector("h2", text: "Resource inventory", exact_text: true, wait: 10)
 
   click_link "Active work intentions", exact: true
+  browser_assert_latest_update_sort
   browser_click_card("app/models/first.rb", "View work intention")
   @resource_browser_details << browser_record_refreshable_detail("Resource work-intention detail")
 end
@@ -153,6 +157,7 @@ When("the person follows the live Knowledge routes") do
   browser_open_project(@knowledge_browser_project_ref)
   click_link "Knowledge", exact: true
   assert_selector("h2", text: "Skills", exact_text: true)
+  browser_assert_latest_update_sort
 
   browser_click_card("event-modeling", "View Skill")
   @knowledge_browser_details = [ browser_record_refreshable_detail("Skill detail") ]
@@ -164,6 +169,7 @@ When("the person follows the live Knowledge routes") do
   click_link "Back to Skill"
 
   click_link "Development Artifacts", exact: true
+  browser_assert_latest_update_sort
   browser_click_card("Parent README", "View Artifact")
   @knowledge_browser_details << browser_record_refreshable_detail("Artifact detail")
   click_link "View 1 relationships"
@@ -192,6 +198,7 @@ When("the person follows the live Governance routes") do
   browser_open_project(@governance_browser_project_ref)
   click_link "Governance", exact: true
   assert_selector("h2", text: "Decisions", exact_text: true)
+  browser_assert_latest_update_sort
 
   @governance_browser_details = []
   browser_click_card(governance_decision_id, "View Decision")
@@ -199,16 +206,19 @@ When("the person follows the live Governance routes") do
   click_link "Back to Decisions", match: :first
 
   click_link "Guidance", exact: true
+  browser_assert_latest_update_sort
   browser_click_card(governance_message_id, "View Guidance")
   @governance_browser_details << browser_record_refreshable_detail("Guidance detail")
   click_link "Back to Guidance", match: :first
 
   click_link "AgentChoices", exact: true
+  browser_assert_latest_update_sort
   click_link "View AgentChoice", match: :first
   @governance_browser_details << browser_record_refreshable_detail("AgentChoice detail")
   click_link "Back to AgentChoices", match: :first
 
   click_link "Decision impacts", exact: true
+  browser_assert_latest_update_sort
   click_link "View impact", match: :first
   @governance_browser_details << browser_record_refreshable_detail("Decision impact detail")
 end
@@ -251,6 +261,13 @@ Then("Candidate obligation merge and ReleaseSet details stay independently addre
 end
 
 Given("projected global audit and operation facts are available") do
+  global_skill_scope = "project:test/ui-global-skill"
+  FactoryBot.create(
+    :coordinator_read_repository,
+    repository_key: "ui-global-skill",
+    scope: global_skill_scope,
+    display_name: "UI global Skill"
+  )
   @browser_command_id = "adj.20260826.candidate.1.submit.with-a-long-coordination-identity"
   FactoryBot.create(
     :coordinator_read_command_receipt,
@@ -276,11 +293,52 @@ Given("projected global audit and operation facts are available") do
       command_id: item.command_id
     )
   end
+  @browser_skill = FactoryBot.create(
+    :coordinator_read_skill,
+    name: "browser-gfm",
+    scope: global_skill_scope
+  )
+  FactoryBot.create(
+    :coordinator_read_skill_revision,
+    skill: @browser_skill,
+    description: "A globally discoverable Skill",
+    instructions: "Use the linked GFM reference.",
+    asset_count: 1
+  )
+  FactoryBot.create(
+    :coordinator_read_skill_asset,
+    skill: @browser_skill,
+    path: "references/status.md",
+    media_type: "text/markdown",
+    content_text: "| State | Owner |\n| --- | --- |\n| ready | agent |\n\n- [x] verified\n\n~~obsolete~~\n\n<script>alert('unsafe')</script>"
+  )
 end
 
 When("the person follows the live global routes") do
   browser_resize_to(1_440, 1_000)
   visit "/projects"
+  click_link "Skills", exact: true
+  assert_selector("h1", text: "Skills", exact_text: true)
+  browser_assert_latest_update_sort
+  fill_in "Exact Project scope", with: @browser_skill.scope
+  fill_in "Exact Skill name", with: @browser_skill.name
+  click_button "Apply"
+  assert_selector("article", text: @browser_skill.name, count: 1)
+  select "Oldest first", from: "Latest update"
+  assert_current_path(/sort=OLDEST_FIRST/, ignore_query: false)
+  page.refresh
+  assert_selector("article", text: @browser_skill.name, count: 1)
+  browser_click_card(@browser_skill.name, "View Skill")
+  @global_skill_details = [ browser_record_refreshable_detail("Skill detail", selector: "h1") ]
+  find(".list-group-item", text: "references/status.md").click_link("View asset")
+  @global_skill_details << browser_record_refreshable_detail("Skill asset", selector: "h1")
+  @global_skill_gfm = {
+    table: page.has_css?("table.table.table-striped"),
+    task: page.has_css?("input[type='checkbox'][checked][disabled]"),
+    deleted: page.has_css?("del", text: "obsolete"),
+    script: page.has_css?("script", text: "unsafe", visible: :all)
+  }
+
   click_link "Command receipts", exact: true
   assert_selector("h1", text: "Command receipts", exact_text: true)
   @browser_receipt_card = find("article", text: @browser_command_id)
@@ -321,6 +379,14 @@ When("the person follows the live global routes") do
   @global_browser_details << browser_record_refreshable_detail("Operation batch", selector: "h1")
 end
 
+Then("global Skills remain filterable and render safe GFM on focused pages") do
+  browser_assert_detail_records(@global_skill_details, expected_count: 2)
+  assert_acceptance(@global_skill_gfm.fetch(:table), "GFM table was not rendered")
+  assert_acceptance(@global_skill_gfm.fetch(:task), "GFM task-list checkbox was not rendered")
+  assert_acceptance(@global_skill_gfm.fetch(:deleted), "GFM strikethrough was not rendered")
+  assert_acceptance(!@global_skill_gfm.fetch(:script), "Unsafe Skill asset HTML was rendered")
+end
+
 Then("the long command identity does not collide with its tool or status") do
   assert_acceptance(@browser_receipt_layout.fetch("identityWithinHeader"), "Command identity escaped its card header")
   assert_acceptance(@browser_receipt_layout.fetch("identityBelowBadge"), "Command identity collided with the status")
@@ -346,6 +412,10 @@ end
 
 def browser_click_card(identity, action)
   find("article", text: identity, match: :first, wait: 10).click_link(action)
+end
+
+def browser_assert_latest_update_sort(value = "NEWEST_FIRST")
+  assert_acceptance_equal(value, find_field("Latest update").value, "Latest update sort")
 end
 
 def browser_record_refreshable_detail(heading, selector: "h2")

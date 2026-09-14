@@ -7,6 +7,8 @@ module Coordinator::Read::Web
       attribute :scope, Coordinator::Shared::Types::String.optional
       attribute :first, Coordinator::Shared::Types::Integer.constrained(gteq: 1, lteq: 100)
       attribute :name, Coordinator::Shared::Types::SkillName.optional
+      attribute :sort,
+                Coordinator::Shared::Types::String.default("newest_first".freeze).enum("newest_first", "oldest_first")
       attribute :after_updated_at, Coordinator::Shared::Types::String.optional
       attribute :after_skill_id, Coordinator::Read::ProjectedSkillId.optional
     end
@@ -27,6 +29,8 @@ module Coordinator::Read::Web
       attribute :kind, Coordinator::Shared::Types::DevelopmentArtifactKind.optional
       attribute :labels, Coordinator::Shared::Types::DevelopmentArtifactLabels
       attribute :source_kind, Coordinator::Shared::Types::DevelopmentArtifactSourceKind.optional
+      attribute :sort,
+                Coordinator::Shared::Types::String.default("newest_first".freeze).enum("newest_first", "oldest_first")
       attribute :after_updated_at, Coordinator::Shared::Types::Timestamp.optional
       attribute :after_observation_id, Coordinator::Shared::Types::UuidV7.optional
     end

@@ -9,6 +9,8 @@ module Coordinator::Read::Web
       attribute :policy_status, Coordinator::Shared::Types::DecisionPolicyStatus.optional
       attribute :after_decision_id, Coordinator::Shared::Types::Identifier.optional
       attribute :after_updated_at, Coordinator::Shared::Types::Timestamp.optional
+      attribute :sort,
+                Coordinator::Shared::Types::String.default("newest_first".freeze).enum("newest_first", "oldest_first")
     end
 
     class GuidanceList < Coordinator::Shared::Value
@@ -17,6 +19,8 @@ module Coordinator::Read::Web
       attribute :source, Coordinator::Shared::Types::GuidanceSource.optional
       attribute :after_message_id, Coordinator::Shared::Types::Identifier.optional
       attribute :after_updated_at, Coordinator::Shared::Types::Timestamp.optional
+      attribute :sort,
+                Coordinator::Shared::Types::String.default("newest_first".freeze).enum("newest_first", "oldest_first")
     end
 
     class Choices < Coordinator::Shared::Value
@@ -26,6 +30,8 @@ module Coordinator::Read::Web
       attribute :status, Coordinator::Shared::Types::AgentChoiceObservationStatus.optional
       attribute :after_choice_id, Coordinator::Shared::Types::Identifier.optional
       attribute :after_updated_at, Coordinator::Shared::Types::Timestamp.optional
+      attribute :sort,
+                Coordinator::Shared::Types::String.default("newest_first".freeze).enum("newest_first", "oldest_first")
     end
 
     class Impacts < Coordinator::Shared::Value
@@ -34,6 +40,8 @@ module Coordinator::Read::Web
       attribute :outcome, Coordinator::Shared::Types::AgentChoiceImpactAssessmentOutcome.optional
       attribute :after_updated_at, Coordinator::Shared::Types::Timestamp.optional
       attribute :after_assessment_id, Coordinator::Shared::Types::Identifier.optional
+      attribute :sort,
+                Coordinator::Shared::Types::String.default("newest_first".freeze).enum("newest_first", "oldest_first")
     end
 
     class Decision < Coordinator::Shared::Value
@@ -67,6 +75,8 @@ module Coordinator::Read::Web
       attribute :status, Coordinator::Shared::Types::String.enum("ok").optional
       attribute :after_command_id, Coordinator::Shared::Types::Identifier.optional
       attribute :after_updated_at, Coordinator::Shared::Types::Timestamp.optional
+      attribute :sort,
+                Coordinator::Shared::Types::String.default("newest_first".freeze).enum("newest_first", "oldest_first")
     end
 
     class Receipt < Coordinator::Shared::Value

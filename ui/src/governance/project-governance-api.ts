@@ -14,6 +14,7 @@ import type {
   AgentChoiceStatus,
   DecisionPolicyStatus,
   GuidanceSource,
+  LatestUpdateSort,
   ProjectGovernanceAgentChoiceQuery,
   ProjectGovernanceAgentChoiceQueryVariables,
   ProjectGovernanceAgentChoicesQuery,
@@ -38,19 +39,23 @@ export const GOVERNANCE_PAGE_SIZE = 20;
 export interface DecisionFilters {
   readonly policyStatus?: DecisionPolicyStatus;
   readonly topicId?: string;
+  readonly sort: LatestUpdateSort;
 }
 
 export interface GuidanceFilters {
   readonly source?: GuidanceSource;
+  readonly sort: LatestUpdateSort;
 }
 
 export interface ChoiceFilters {
   readonly choiceType?: AgentChoiceKind;
   readonly status?: AgentChoiceStatus;
+  readonly sort: LatestUpdateSort;
 }
 
 export interface ImpactFilters {
   readonly outcome?: AgentChoiceImpactOutcome;
+  readonly sort: LatestUpdateSort;
 }
 
 export function fetchGovernanceDecisions(

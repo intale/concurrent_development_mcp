@@ -72,14 +72,17 @@ module Coordinator::Read::Web::Repositories
       relation = change_set_relation(repository_ids)
       relation = relation.where(domain_status: query.domain_status) if query.domain_status
       if query.after_id
+        comparator = event_time_comparator(query.sort)
         relation = relation.having(
-          "MAX(updated_at) < :updated_at OR (MAX(updated_at) = :updated_at AND change_set_id < :id)",
+          "MAX(updated_at) #{comparator} :updated_at OR " \
+          "(MAX(updated_at) = :updated_at AND change_set_id #{comparator} :id)",
           updated_at: query.after_sort_value,
           id: query.after_id
         )
       end
       records, has_more = bounded(
-        relation.order(Arel.sql("MAX(updated_at) DESC, change_set_id DESC")),
+        relation.order(Arel.sql("MAX(updated_at) #{event_time_direction(query.sort)}, " \
+          "change_set_id #{event_time_direction(query.sort)}")),
         query.first
       )
 
@@ -208,13 +211,16 @@ module Coordinator::Read::Web::Repositories
       relation = dependency_relation(repository_ids)
       relation = relation.where(blocking: query.blocking) unless query.blocking.nil?
       if query.after_id
+        comparator = event_time_comparator(query.sort)
         relation = relation.where(
-          "updated_at < :updated_at OR (updated_at = :updated_at AND dependency_id < :id)",
+          "updated_at #{comparator} :updated_at OR " \
+          "(updated_at = :updated_at AND dependency_id #{comparator} :id)",
           updated_at: query.after_sort_value,
           id: query.after_id
         )
       end
-      records, has_more = bounded(relation.order(updated_at: :desc, dependency_id: :desc), query.first)
+      direction = query.sort == "oldest_first" ? :asc : :desc
+      records, has_more = bounded(relation.order(updated_at: direction, dependency_id: direction), query.first)
 
       Coordinator::Read::Web::CoordinationDashboardV1::DependencyPage.new(
         items: records.map { build_dependency(_1) },
@@ -238,6 +244,14 @@ module Coordinator::Read::Web::Repositories
     def bounded(relation, limit)
       records = relation.limit(limit + 1).to_a
       [ records.first(limit), records.length > limit ]
+    end
+
+    def event_time_comparator(sort)
+      sort == "oldest_first" ? ">" : "<"
+    end
+
+    def event_time_direction(sort)
+      sort == "oldest_first" ? "ASC" : "DESC"
     end
 
     def page_cursor(records, has_more)

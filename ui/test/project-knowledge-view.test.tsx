@@ -163,6 +163,22 @@ test("Skill, asset, Artifact, and relationship details stay on focused pages", (
   assert.match(relationshipMarkup, /View related Artifact/);
 });
 
+test("Markdown content renders GFM without executing embedded HTML or unsafe links", () => {
+  const markdownAsset = {
+    asset: {
+      ...asset.asset,
+      text: "| State | Owner |\n| --- | --- |\n| ready | agent |\n\n- [x] checked\n\n~~obsolete~~\n\n<script>alert('unsafe')</script>\n\n[unsafe](javascript:alert('unsafe'))"
+    }
+  } satisfies ProjectSkillAsset;
+  const markup = render(<SkillAssetDetail backTo="/skills/event-modeling" detail={markdownAsset} />);
+
+  assert.match(markup, /class="table table-striped table-bordered"/);
+  assert.match(markup, /type="checkbox"/);
+  assert.match(markup, /<del>obsolete<\/del>/);
+  assert.doesNotMatch(markup, /<script>/);
+  assert.doesNotMatch(markup, /javascript:/);
+});
+
 test("Knowledge subnavigation and recoverable pagination are explicit", () => {
   const markup = render(
     <><KnowledgeNavigation basePath={`/projects/${projectRef}/knowledge`} /><PaginationControls canPrevious nextCursor="next" onNext={() => undefined} onPrevious={() => undefined} /></>,

@@ -29,9 +29,10 @@ module Coordinator
           def impact_page: (
             relation: untyped,
             outcome: String?,
-            after_global_position: Integer?,
+            after_updated_at: String?,
             after_assessment_id: String?,
-            limit: Integer
+            limit: Integer,
+            sort: String
           ) -> GovernanceBrowserV1::ImpactPage
           def guidance_for_project: (Array[String] repository_ids) -> untyped
           def choices_for_project: (Array[String] repository_ids) -> untyped

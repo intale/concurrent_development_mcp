@@ -14,8 +14,9 @@ module ProjectCoordinationGraphqlSpec
         $first: Int
         $after: String
         $status: CoordinationChangeSetStatus
+        $sort: LatestUpdateSort
       ) {
-        projectChangeSets(projectRef: $projectRef, first: $first, after: $after, status: $status) {
+        projectChangeSets(projectRef: $projectRef, first: $first, after: $after, status: $status, sort: $sort) {
           nodes { id goal domainStatus workItemCount runningWorkItemCount openWorkItemCount }
           pageInfo { endCursor hasNextPage }
         }
@@ -55,8 +56,8 @@ module ProjectCoordinationGraphqlSpec
       }
     GRAPHQL
     DEPENDENCIES_QUERY = <<~GRAPHQL.freeze
-      query Dependencies($projectRef: ID!, $blocking: Boolean) {
-        projectDependencies(projectRef: $projectRef, first: 20, blocking: $blocking) {
+      query Dependencies($projectRef: ID!, $blocking: Boolean, $sort: LatestUpdateSort) {
+        projectDependencies(projectRef: $projectRef, first: 20, blocking: $blocking, sort: $sort) {
           nodes { id producerWorkItemId consumerWorkItemId blocking requiredOutput { kind key } }
         }
       }
@@ -185,6 +186,13 @@ module ProjectCoordinationGraphqlSpec
         first: 20,
         status: "COMPLETED"
       ).dig("data", "projectChangeSets", "nodes")
+      oldest = execute(
+        CHANGE_SETS_QUERY,
+        projectRef: project_ref,
+        first: 1,
+        status: "ACTIVE",
+        sort: "OLDEST_FIRST"
+      ).dig("data", "projectChangeSets")
       mismatched = execute(
         CHANGE_SETS_QUERY,
         projectRef: project_ref,
@@ -196,6 +204,17 @@ module ProjectCoordinationGraphqlSpec
       expect(active.dig("nodes", 0, "id")).to eq("CS-active-newer")
       expect(active.dig("pageInfo", "hasNextPage")).to be(true)
       expect(completed.map { _1.fetch("id") }).to eq([ "CS-completed" ])
+      expect(oldest.dig("nodes", 0, "id")).to eq("CS-project")
+      expect(
+        execute(
+          CHANGE_SETS_QUERY,
+          projectRef: project_ref,
+          first: 1,
+          after: active.dig("pageInfo", "endCursor"),
+          status: "ACTIVE",
+          sort: "OLDEST_FIRST"
+        ).dig("errors", 0, "extensions", "code")
+      ).to eq("INVALID_CURSOR")
       expect(mismatched.dig("errors", 0, "extensions", "code")).to eq("INVALID_CURSOR")
     end
 

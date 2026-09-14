@@ -6,6 +6,7 @@ module Coordinator
       def after_updated_at: () -> String?
       def after_skill_id: () -> String?
       def order: () -> String
+      def sort: () -> String
       def limit: () -> Integer
     end
   end

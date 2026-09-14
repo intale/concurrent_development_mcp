@@ -26,6 +26,7 @@ module Coordinator::Web::Graphql::Types
       argument :after, String, required: false
       argument :first, Integer, required: false, default_value: 20
       argument :project_ref, ID, required: true
+      argument :sort, LatestUpdateSortEnum, required: false, default_value: "newest_first"
       argument :status, CoordinationChangeSetStatusEnum, required: false
     end
 
@@ -58,6 +59,7 @@ module Coordinator::Web::Graphql::Types
       argument :blocking, Boolean, required: false
       argument :first, Integer, required: false, default_value: 20
       argument :project_ref, ID, required: true
+      argument :sort, LatestUpdateSortEnum, required: false, default_value: "newest_first"
     end
 
     field :project_dependency, CoordinationDependencyType, null: true do
@@ -74,6 +76,7 @@ module Coordinator::Web::Graphql::Types
       argument :project_ref, ID, required: true
       argument :resource_kind, ResourceKindEnum, required: false
       argument :resource_lifecycle_status, ResourceLifecycleStatusEnum, required: false
+      argument :sort, LatestUpdateSortEnum, required: false, default_value: "newest_first"
     end
 
     field :project_resource, ProjectResourceType, null: true do
@@ -94,6 +97,7 @@ module Coordinator::Web::Graphql::Types
       argument :first, Integer, required: false, default_value: 20
       argument :mode, ResourceWorkIntentionModeEnum, required: false
       argument :project_ref, ID, required: true
+      argument :sort, LatestUpdateSortEnum, required: false, default_value: "newest_first"
       argument :work_item_id, ID, required: false
     end
 
@@ -109,6 +113,7 @@ module Coordinator::Web::Graphql::Types
       argument :first, Integer, required: false, default_value: 20
       argument :name, String, required: false
       argument :project_ref, ID, required: true
+      argument :sort, LatestUpdateSortEnum, required: false, default_value: "newest_first"
     end
 
     field :project_skill, ProjectSkillType, null: true do
@@ -130,6 +135,7 @@ module Coordinator::Web::Graphql::Types
       argument :first, Integer, required: false, default_value: 20
       argument :name, String, required: false
       argument :project_scope, String, required: false
+      argument :sort, LatestUpdateSortEnum, required: false, default_value: "newest_first"
     end
 
     field :skill, ProjectSkillType, null: true do
@@ -151,6 +157,7 @@ module Coordinator::Web::Graphql::Types
       argument :labels, [ String ], required: false
       argument :project_ref, ID, required: true
       argument :source_kind, DevelopmentArtifactSourceKindEnum, required: false
+      argument :sort, LatestUpdateSortEnum, required: false, default_value: "newest_first"
     end
 
     field :project_artifact, ProjectArtifactType, null: true do
@@ -178,6 +185,7 @@ module Coordinator::Web::Graphql::Types
       argument :first, Integer, required: false, default_value: 20
       argument :policy_status, GovernanceTypes::DecisionPolicyStatusEnum, required: false
       argument :project_ref, ID, required: true
+      argument :sort, LatestUpdateSortEnum, required: false, default_value: "newest_first"
       argument :topic_id, String, required: false
     end
 
@@ -186,6 +194,7 @@ module Coordinator::Web::Graphql::Types
       argument :after, String, required: false
       argument :first, Integer, required: false, default_value: 20
       argument :project_ref, ID, required: true
+      argument :sort, LatestUpdateSortEnum, required: false, default_value: "newest_first"
       argument :source, GovernanceTypes::GuidanceSourceEnum, required: false
     end
 
@@ -195,6 +204,7 @@ module Coordinator::Web::Graphql::Types
       argument :choice_type, GovernanceTypes::AgentChoiceTypeEnum, required: false
       argument :first, Integer, required: false, default_value: 20
       argument :project_ref, ID, required: true
+      argument :sort, LatestUpdateSortEnum, required: false, default_value: "newest_first"
       argument :status, GovernanceTypes::AgentChoiceStatusEnum, required: false
     end
 
@@ -207,6 +217,7 @@ module Coordinator::Web::Graphql::Types
       argument :first, Integer, required: false, default_value: 20
       argument :outcome, GovernanceTypes::AgentChoiceImpactOutcomeEnum, required: false
       argument :project_ref, ID, required: true
+      argument :sort, LatestUpdateSortEnum, required: false, default_value: "newest_first"
     end
 
     field :project_decision, GovernanceTypes::ProjectDecisionType, null: true do
@@ -242,6 +253,7 @@ module Coordinator::Web::Graphql::Types
       argument :after, String, required: false
       argument :first, Integer, required: false, default_value: 20
       argument :status, GovernanceTypes::CommandReceiptStatusEnum, required: false
+      argument :sort, LatestUpdateSortEnum, required: false, default_value: "newest_first"
       argument :tool_name, String, required: false
     end
 
@@ -413,8 +425,8 @@ module Coordinator::Web::Graphql::Types
       )
     end
 
-    def project_change_sets(project_ref:, first:, after: nil, status: nil)
-      filters = coordination_filters(project_ref:, first:, status:)
+    def project_change_sets(project_ref:, first:, sort:, after: nil, status: nil)
+      filters = coordination_filters(project_ref:, first:, sort:, status:)
       cursor = coordination_cursor(after, "change-sets", filters:)
       page = coordination_dashboard.page(
         project_ref:,
@@ -422,6 +434,7 @@ module Coordinator::Web::Graphql::Types
         first:,
         after_id: cursor&.fetch("id", nil),
         after_sort_value: cursor&.fetch("sort_value", nil),
+        sort:,
         domain_status: status
       )
       coordination_connection(page, "change-sets", filters:)
@@ -488,8 +501,8 @@ module Coordinator::Web::Graphql::Types
       raise_coordination_query_error(error)
     end
 
-    def project_dependencies(project_ref:, first:, after: nil, blocking: nil)
-      filters = coordination_filters(project_ref:, first:, blocking:)
+    def project_dependencies(project_ref:, first:, sort:, after: nil, blocking: nil)
+      filters = coordination_filters(project_ref:, first:, sort:, blocking:)
       cursor = coordination_cursor(after, "dependencies", filters:)
       page = coordination_dashboard.page(
         project_ref:,
@@ -497,6 +510,7 @@ module Coordinator::Web::Graphql::Types
         first:,
         after_id: cursor&.fetch("id", nil),
         after_sort_value: cursor&.fetch("sort_value", nil),
+        sort:,
         blocking:
       )
       coordination_connection(page, "dependencies", filters:)
@@ -522,14 +536,16 @@ module Coordinator::Web::Graphql::Types
       after: nil,
       path: nil,
       resource_kind: nil,
-      resource_lifecycle_status: nil
+      resource_lifecycle_status: nil,
+      sort:
     )
       filters = resource_filters(
         project_ref:,
         first:,
         path:,
         resource_kind:,
-        resource_lifecycle_status:
+        resource_lifecycle_status:,
+        sort:
       )
       cursor = resource_cursor(after, "resources", filters:)
       page = project_resources_query.resources(
@@ -539,7 +555,8 @@ module Coordinator::Web::Graphql::Types
         after_updated_at: cursor&.fetch("after_updated_at", nil),
         path:,
         resource_kind:,
-        resource_lifecycle_status:
+        resource_lifecycle_status:,
+        sort:
       )
       resource_connection(page, filters:)
     rescue Coordinator::Web::Graphql::InvalidCursor => error
@@ -566,7 +583,8 @@ module Coordinator::Web::Graphql::Types
       attempt_id: nil,
       change_set_id: nil,
       work_item_id: nil,
-      mode: nil
+      mode: nil,
+      sort:
     )
       filters = resource_filters(
         project_ref:,
@@ -575,7 +593,8 @@ module Coordinator::Web::Graphql::Types
         attempt_id:,
         change_set_id:,
         work_item_id:,
-        mode:
+        mode:,
+        sort:
       )
       cursor = resource_cursor(after, "active-work-intentions", filters:)
       page = project_resources_query.active_work_intentions(
@@ -588,7 +607,8 @@ module Coordinator::Web::Graphql::Types
         attempt_id:,
         change_set_id:,
         work_item_id:,
-        mode:
+        mode:,
+        sort:
       )
       resource_work_intention_connection(page, filters:)
     rescue Coordinator::Web::Graphql::InvalidCursor => error
@@ -607,13 +627,14 @@ module Coordinator::Web::Graphql::Types
       raise_project_resources_query_error(error)
     end
 
-    def project_skills(project_ref:, first:, after: nil, name: nil)
-      filters = knowledge_filters(project_ref:, name:)
+    def project_skills(project_ref:, first:, sort:, after: nil, name: nil)
+      filters = knowledge_filters(project_ref:, name:, sort:)
       cursor = Coordinator::Web::Graphql::KnowledgeBrowserCursor.decode(after, "skills", filters:)
       page = knowledge_browser.skills(
         project_ref:,
         first:,
         name:,
+        sort:,
         after_skill_id: cursor&.fetch("after_id", nil),
         after_updated_at: cursor&.fetch("after_updated_at", nil)
       )
@@ -627,13 +648,14 @@ module Coordinator::Web::Graphql::Types
     end
 
 
-    def skills(first:, after: nil, name: nil, project_scope: nil)
-      filters = knowledge_filters(project_scope:, name:)
+    def skills(first:, sort:, after: nil, name: nil, project_scope: nil)
+      filters = knowledge_filters(project_scope:, name:, sort:)
       cursor = Coordinator::Web::Graphql::KnowledgeBrowserCursor.decode(after, "skills", filters:)
       page = knowledge_browser.skills(
         scope: project_scope,
         first:,
         name:,
+        sort:,
         after_skill_id: cursor&.fetch("after_id", nil),
         after_updated_at: cursor&.fetch("after_updated_at", nil)
       )
@@ -674,9 +696,9 @@ module Coordinator::Web::Graphql::Types
       raise_knowledge_query_error(error)
     end
 
-    def project_artifacts(project_ref:, first:, after: nil, kind: nil, labels: nil, source_kind: nil)
+    def project_artifacts(project_ref:, first:, sort:, after: nil, kind: nil, labels: nil, source_kind: nil)
       normalized_labels = labels || []
-      filters = knowledge_filters(project_ref:, kind:, labels: normalized_labels, source_kind:)
+      filters = knowledge_filters(project_ref:, kind:, labels: normalized_labels, source_kind:, sort:)
       cursor = Coordinator::Web::Graphql::KnowledgeBrowserCursor.decode(after, "artifacts", filters:)
       page = knowledge_browser.artifacts(
         project_ref:,
@@ -684,6 +706,7 @@ module Coordinator::Web::Graphql::Types
         kind:,
         labels: normalized_labels,
         source_kind:,
+        sort:,
         after_updated_at: cursor&.fetch("after_updated_at", nil),
         after_observation_id: cursor&.fetch("after_id", nil)
       )
@@ -736,14 +759,15 @@ module Coordinator::Web::Graphql::Types
       raise_knowledge_query_error(error)
     end
 
-    def project_decisions(project_ref:, first:, after: nil, policy_status: nil, topic_id: nil)
-      filters = governance_filters(project_ref:, policy_status:, topic_id:)
+    def project_decisions(project_ref:, first:, sort:, after: nil, policy_status: nil, topic_id: nil)
+      filters = governance_filters(project_ref:, policy_status:, topic_id:, sort:)
       cursor = Coordinator::Web::Graphql::GovernanceBrowserCursor.decode(after, "decisions", filters:)
       page = governance_browser.decisions(
         project_ref:,
         first:,
         policy_status:,
         topic_id:,
+        sort:,
         after_decision_id: cursor&.fetch("id", nil),
         after_updated_at: cursor&.fetch("updated_at", nil)
       )
@@ -756,13 +780,14 @@ module Coordinator::Web::Graphql::Types
       raise_governance_query_error(error)
     end
 
-    def project_guidance_messages(project_ref:, first:, after: nil, source: nil)
-      filters = governance_filters(project_ref:, source:)
+    def project_guidance_messages(project_ref:, first:, sort:, after: nil, source: nil)
+      filters = governance_filters(project_ref:, source:, sort:)
       cursor = Coordinator::Web::Graphql::GovernanceBrowserCursor.decode(after, "guidance", filters:)
       page = governance_browser.guidance_list(
         project_ref:,
         first:,
         source:,
+        sort:,
         after_message_id: cursor&.fetch("id", nil),
         after_updated_at: cursor&.fetch("updated_at", nil)
       )
@@ -775,14 +800,15 @@ module Coordinator::Web::Graphql::Types
       raise_governance_query_error(error)
     end
 
-    def project_agent_choices(project_ref:, first:, after: nil, choice_type: nil, status: nil)
-      filters = governance_filters(project_ref:, choice_type:, status:)
+    def project_agent_choices(project_ref:, first:, sort:, after: nil, choice_type: nil, status: nil)
+      filters = governance_filters(project_ref:, choice_type:, status:, sort:)
       cursor = Coordinator::Web::Graphql::GovernanceBrowserCursor.decode(after, "choices", filters:)
       page = governance_browser.choices(
         project_ref:,
         first:,
         choice_type:,
         status:,
+        sort:,
         after_choice_id: cursor&.fetch("id", nil),
         after_updated_at: cursor&.fetch("updated_at", nil)
       )
@@ -795,13 +821,14 @@ module Coordinator::Web::Graphql::Types
       raise_governance_query_error(error)
     end
 
-    def project_decision_impacts(project_ref:, first:, after: nil, outcome: nil)
-      filters = governance_filters(project_ref:, outcome:)
+    def project_decision_impacts(project_ref:, first:, sort:, after: nil, outcome: nil)
+      filters = governance_filters(project_ref:, outcome:, sort:)
       cursor = Coordinator::Web::Graphql::GovernanceBrowserCursor.decode(after, "impacts", filters:)
       page = governance_browser.impacts(
         project_ref:,
         first:,
         outcome:,
+        sort:,
         after_updated_at: cursor&.fetch("updated_at", nil),
         after_assessment_id: cursor&.fetch("id", nil)
       )
@@ -884,13 +911,14 @@ module Coordinator::Web::Graphql::Types
       raise_governance_query_error(error)
     end
 
-    def command_receipts(first:, after: nil, status: nil, tool_name: nil)
-      filters = governance_filters(status:, tool_name:)
+    def command_receipts(first:, sort:, after: nil, status: nil, tool_name: nil)
+      filters = governance_filters(status:, tool_name:, sort:)
       cursor = Coordinator::Web::Graphql::GovernanceBrowserCursor.decode(after, "receipts", filters:)
       page = governance_browser.receipts(
         first:,
         status:,
         tool_name:,
+        sort:,
         after_command_id: cursor&.fetch("id", nil),
         after_updated_at: cursor&.fetch("updated_at", nil)
       )

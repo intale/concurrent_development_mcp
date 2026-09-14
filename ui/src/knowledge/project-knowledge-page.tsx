@@ -8,6 +8,7 @@ import type {
   DevelopmentArtifactSourceKind
 } from "../gql/graphql.js";
 import { useProjectWorkspace } from "../projects/project-workspace-shell.js";
+import { LatestUpdateSortControl, latestUpdateSortParams, parseLatestUpdateSort } from "../latest-update-sort.js";
 import {
   fetchProjectArtifact,
   fetchProjectArtifactRelationships,
@@ -76,14 +77,15 @@ function SkillsPage({ projectRef }: { readonly projectRef: string }) {
   const sectionPath = `/projects/${projectRef}/knowledge`;
   const name = searchParams.get("name") ?? "";
   const after = searchParams.get("after");
+  const sort = parseLatestUpdateSort(searchParams.get("sort"));
   const [draftName, setDraftName] = useState(name);
   const headingRef = useKnowledgeHeading("Project Skills", "project-skills");
 
   useEffect(() => { setDraftName(name); }, [name]);
-  const filterKey = JSON.stringify({ name });
+  const filterKey = JSON.stringify({ name, sort });
   const query = useQuery({
     queryKey: ["project-skills", projectRef, filterKey, after],
-    queryFn: ({ signal }) => fetchProjectSkills(projectRef, name || undefined, after, signal),
+    queryFn: ({ signal }) => fetchProjectSkills(projectRef, name || undefined, sort, after, signal),
     placeholderData: (previousData, previousQuery) => preserveCollection(previousData, previousQuery?.queryKey, projectRef, filterKey),
     refetchInterval: REFRESH_INTERVAL_MS
   });
@@ -96,7 +98,8 @@ function SkillsPage({ projectRef }: { readonly projectRef: string }) {
       <div><h2 className="h3 mb-1" ref={headingRef} tabIndex={-1}>Skills</h2><p className="text-body-secondary mb-0">Browse current Skills shared by this exact Project scope.</p></div>
       <form aria-label="Skill filters" className="card card-body" onSubmit={(event) => { event.preventDefault(); setSearchParams(applyFilters(searchParams, { name: draftName })); }}>
         <div className="row g-3 align-items-end">
-          <div className="col-12 col-lg-8"><label className="form-label" htmlFor="skill-name">Exact Skill name</label><input className="form-control" id="skill-name" onChange={(event) => setDraftName(event.target.value)} value={draftName} /></div>
+          <div className="col-12 col-lg-5"><label className="form-label" htmlFor="skill-name">Exact Skill name</label><input className="form-control" id="skill-name" onChange={(event) => setDraftName(event.target.value)} value={draftName} /></div>
+          <LatestUpdateSortControl id="project-skill-sort" onChange={(value) => setSearchParams(latestUpdateSortParams(searchParams, value))} value={sort} />
           <div className="col-12 col-lg-4 d-flex gap-2"><button className="btn btn-primary" type="submit">Apply</button><button className="btn btn-outline-secondary" onClick={() => setSearchParams({})} type="button">Clear</button></div>
         </div>
       </form>
@@ -180,12 +183,13 @@ function ArtifactsPage({ projectRef }: { readonly projectRef: string }) {
   const labelValue = searchParams.get("labels") ?? "";
   const labels = labelValue.split(",").map((label) => label.trim()).filter(Boolean);
   const after = searchParams.get("after");
+  const sort = parseLatestUpdateSort(searchParams.get("sort"));
   const current = { kind: kind ?? "", source: sourceKind ?? "", labels: labelValue };
   const [draft, setDraft] = useState(current);
   const headingRef = useKnowledgeHeading("Development Artifacts", "development-artifacts");
   useEffect(() => { setDraft(current); }, [current.kind, current.source, current.labels]);
 
-  const filters: ArtifactFilters = { labels, ...(kind ? { kind } : {}), ...(sourceKind ? { sourceKind } : {}) };
+  const filters: ArtifactFilters = { labels, sort, ...(kind ? { kind } : {}), ...(sourceKind ? { sourceKind } : {}) };
   const filterKey = JSON.stringify(filters);
   const query = useQuery({
     queryKey: ["project-artifacts", projectRef, filterKey, after],
@@ -205,6 +209,7 @@ function ArtifactsPage({ projectRef }: { readonly projectRef: string }) {
           <div className="col-12 col-md-6 col-xl-3"><label className="form-label" htmlFor="artifact-kind">Kind</label><select className="form-select" id="artifact-kind" onChange={(event) => setDraft((value) => ({ ...value, kind: event.target.value as DevelopmentArtifactKind | "" }))} value={draft.kind}><option value="">All kinds</option>{ARTIFACT_KINDS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
           <div className="col-12 col-md-6 col-xl-3"><label className="form-label" htmlFor="artifact-source">Source</label><select className="form-select" id="artifact-source" onChange={(event) => setDraft((value) => ({ ...value, source: event.target.value as DevelopmentArtifactSourceKind | "" }))} value={draft.source}><option value="">All sources</option>{ARTIFACT_SOURCE_KINDS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
           <div className="col-12 col-xl-4"><label className="form-label" htmlFor="artifact-labels">Labels</label><input className="form-control" id="artifact-labels" onChange={(event) => setDraft((value) => ({ ...value, labels: event.target.value }))} placeholder="Comma separated" value={draft.labels} /></div>
+          <LatestUpdateSortControl id="artifact-sort" onChange={(value) => setSearchParams(latestUpdateSortParams(searchParams, value))} value={sort} />
           <div className="col-12 col-xl-2 d-flex gap-2"><button className="btn btn-info" type="submit">Apply</button><button className="btn btn-outline-secondary" onClick={() => setSearchParams({})} type="button">Clear</button></div>
         </div>
       </form>

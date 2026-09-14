@@ -53,5 +53,6 @@ Feature: Navigate the read-only coordination workspace in a real browser
     Scenario: Long receipt identities and operation batches remain readable and navigable
       Given projected global audit and operation facts are available
       When the person follows the live global routes
+      Then global Skills remain filterable and render safe GFM on focused pages
       Then the long command identity does not collide with its tool or status
       And receipt and batch details have predictable Back routes

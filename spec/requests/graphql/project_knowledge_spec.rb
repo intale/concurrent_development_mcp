@@ -3,8 +3,8 @@
 module ProjectKnowledgeGraphqlSpec
   RSpec.describe "GraphQL project knowledge", :read_model do
     SKILLS_QUERY = <<~GRAPHQL.freeze
-      query ProjectSkills($projectRef: ID!, $first: Int, $name: String, $after: String) {
-        projectSkills(projectRef: $projectRef, first: $first, name: $name, after: $after) {
+      query ProjectSkills($projectRef: ID!, $first: Int, $name: String, $after: String, $sort: LatestUpdateSort) {
+        projectSkills(projectRef: $projectRef, first: $first, name: $name, after: $after, sort: $sort) {
           nodes { id name scope revision description assetCount contentDigest publishedAt }
           pageInfo { endCursor hasNextPage }
         }
@@ -12,8 +12,8 @@ module ProjectKnowledgeGraphqlSpec
     GRAPHQL
 
     GLOBAL_SKILLS_QUERY = <<~GRAPHQL.freeze
-      query Skills($projectScope: String, $first: Int, $name: String, $after: String) {
-        skills(projectScope: $projectScope, first: $first, name: $name, after: $after) {
+      query Skills($projectScope: String, $first: Int, $name: String, $after: String, $sort: LatestUpdateSort) {
+        skills(projectScope: $projectScope, first: $first, name: $name, after: $after, sort: $sort) {
           nodes { id name scope revision description assetCount }
           pageInfo { endCursor hasNextPage }
         }
@@ -44,6 +44,7 @@ module ProjectKnowledgeGraphqlSpec
         $labels: [String!]
         $sourceKind: DevelopmentArtifactSourceKind
         $after: String
+        $sort: LatestUpdateSort
       ) {
         projectArtifacts(
           projectRef: $projectRef
@@ -52,6 +53,7 @@ module ProjectKnowledgeGraphqlSpec
           labels: $labels
           sourceKind: $sourceKind
           after: $after
+          sort: $sort
         ) {
           nodes {
             id observationId scope title kind labels mediaType encoding contentDigest byteSize
@@ -231,6 +233,12 @@ module ProjectKnowledgeGraphqlSpec
         first: 1,
         after: first.dig("pageInfo", "endCursor")
       ).dig("data", "skills")
+      oldest = execute(
+        GLOBAL_SKILLS_QUERY,
+        projectScope: SCOPE,
+        first: 1,
+        sort: "OLDEST_FIRST"
+      ).dig("data", "skills")
       exact = execute(
         GLOBAL_SKILLS_QUERY,
         projectScope: SCOPE,
@@ -260,6 +268,7 @@ module ProjectKnowledgeGraphqlSpec
       expect(first.dig("nodes", 0, "id")).to eq(newest_id)
       expect(first.dig("pageInfo", "hasNextPage")).to be(true)
       expect(second.dig("nodes", 0, "id")).to eq(SKILL_ID)
+      expect(oldest.dig("nodes", 0, "id")).to eq(SKILL_ID)
       expect(exact.map { _1.fetch("id") }).to eq([ SKILL_ID ])
       expect(partial).to be_empty
       expect(detail).to include(
@@ -273,6 +282,15 @@ module ProjectKnowledgeGraphqlSpec
         "text" => "# Exact scoped Skill"
       )
       expect(mismatched.dig("errors", 0, "extensions", "code")).to eq("INVALID_CURSOR")
+      expect(
+        execute(
+          GLOBAL_SKILLS_QUERY,
+          projectScope: SCOPE,
+          first: 1,
+          after: first.dig("pageInfo", "endCursor"),
+          sort: "OLDEST_FIRST"
+        ).dig("errors", 0, "extensions", "code")
+      ).to eq("INVALID_CURSOR")
     end
 
     it "separates Artifact content from active relationship navigation" do
@@ -309,6 +327,10 @@ module ProjectKnowledgeGraphqlSpec
       expect(cursor).not_to include("801")
       expect(
         execute(ARTIFACTS_QUERY, projectRef: project_ref, first: 1, after: cursor)
+          .dig("data", "projectArtifacts", "nodes", 0, "id")
+      ).to eq(PARENT_ID)
+      expect(
+        execute(ARTIFACTS_QUERY, projectRef: project_ref, first: 1, sort: "OLDEST_FIRST")
           .dig("data", "projectArtifacts", "nodes", 0, "id")
       ).to eq(PARENT_ID)
 

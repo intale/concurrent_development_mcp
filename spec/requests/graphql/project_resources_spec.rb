@@ -47,6 +47,7 @@ RSpec.describe "Project resource GraphQL", :read_model do
       $path: String
       $resourceKind: ResourceKind
       $resourceLifecycleStatus: ResourceLifecycleStatus
+      $sort: LatestUpdateSort
     ) {
       projectResources(
         projectRef: $projectRef
@@ -55,6 +56,7 @@ RSpec.describe "Project resource GraphQL", :read_model do
         path: $path
         resourceKind: $resourceKind
         resourceLifecycleStatus: $resourceLifecycleStatus
+        sort: $sort
       ) {
         nodes { #{RESOURCE_FIELDS} }
         pageInfo { endCursor hasNextPage }
@@ -76,6 +78,7 @@ RSpec.describe "Project resource GraphQL", :read_model do
       $workItemId: ID
       $attemptId: ID
       $mode: ResourceWorkIntentionMode
+      $sort: LatestUpdateSort
     ) {
       projectActiveResourceWorkIntentions(
         projectRef: $projectRef
@@ -86,6 +89,7 @@ RSpec.describe "Project resource GraphQL", :read_model do
         workItemId: $workItemId
         attemptId: $attemptId
         mode: $mode
+        sort: $sort
       ) {
         asOf
         nodes { #{WORK_INTENTION_FIELDS} }
@@ -163,12 +167,28 @@ RSpec.describe "Project resource GraphQL", :read_model do
       after: cursor,
       path: "services"
     )
+    oldest = execute(
+      RESOURCES_QUERY,
+      projectRef: project_ref,
+      first: 1,
+      sort: "OLDEST_FIRST"
+    ).dig("data", "projectResources")
 
     expect(first.fetch("nodes").map { _1.fetch("id") }).to eq([ resource_ids.fetch(0) ])
     expect(first.dig("pageInfo", "hasNextPage")).to be(true)
     expect(cursor).not_to include(resource_ids.fetch(0))
     expect(second.fetch("nodes").map { _1.fetch("id") }).to eq([ resource_ids.fetch(1) ])
+    expect(oldest.fetch("nodes").map { _1.fetch("id") }).to eq([ resource_ids.fetch(1) ])
     expect(mismatched.dig("errors", 0, "extensions", "code")).to eq("INVALID_CURSOR")
+    expect(
+      execute(
+        RESOURCES_QUERY,
+        projectRef: project_ref,
+        first: 1,
+        after: cursor,
+        sort: "OLDEST_FIRST"
+      ).dig("errors", 0, "extensions", "code")
+    ).to eq("INVALID_CURSOR")
   end
 
   it "exposes ResourceGet detail evidence only inside the exact Project" do

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { LatestUpdateSortControl, latestUpdateSortParams, parseLatestUpdateSort } from "../latest-update-sort.js";
 import { fetchCommandReceipt, fetchCommandReceipts } from "./command-receipts-api.js";
 import {
   COMMAND_RECEIPT_STATUSES,
@@ -25,6 +26,7 @@ export function CommandReceiptsPage() {
   const toolName = searchParams.get("tool")?.trim() ?? "";
   const status = parseCommandReceiptStatus(searchParams.get("status"));
   const after = searchParams.get("after");
+  const sort = parseLatestUpdateSort(searchParams.get("sort"));
   const pageNumber = searchParams.getAll("trail").length + 1;
   const [toolDraft, setToolDraft] = useState(toolName);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -37,17 +39,19 @@ export function CommandReceiptsPage() {
 
   const filters = useMemo(() => ({
     ...(toolName ? { toolName } : {}),
-    ...(status ? { status } : {})
-  }), [status, toolName]);
+    ...(status ? { status } : {}),
+    sort
+  }), [sort, status, toolName]);
   const receipts = useQuery({
-    queryKey: ["audit-command-receipts", toolName, status, after],
+    queryKey: ["audit-command-receipts", toolName, status, sort, after],
     queryFn: ({ signal }) => fetchCommandReceipts(filters, after, signal),
     enabled: commandId === undefined,
     placeholderData: (previousData, previousQuery) => preserveReceiptPage(
       previousData,
       previousQuery?.queryKey,
       toolName,
-      status
+      status,
+      sort
     ),
     refetchInterval: REFRESH_INTERVAL_MS
   });
@@ -128,6 +132,7 @@ export function CommandReceiptsPage() {
                       {COMMAND_RECEIPT_STATUSES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                     </select>
                   </div>
+                  <LatestUpdateSortControl id="receipt-sort" onChange={(value) => setSearchParams(latestUpdateSortParams(searchParams, value))} value={sort} />
                   <div className="col-12 col-sm-5 col-lg-auto d-grid">
                     <button className="btn btn-primary" type="submit">Apply tool</button>
                   </div>

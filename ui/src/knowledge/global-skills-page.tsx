@@ -3,6 +3,7 @@ import type { RefObject } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { fetchSkill, fetchSkillAsset, fetchSkills } from "./project-knowledge-api.js";
+import { LatestUpdateSortControl, latestUpdateSortParams, parseLatestUpdateSort } from "../latest-update-sort.js";
 import {
   applyFilters,
   listLocation,
@@ -37,6 +38,7 @@ function GlobalSkillListPage() {
   const projectScope = searchParams.get("project") ?? "";
   const name = searchParams.get("name") ?? "";
   const after = searchParams.get("after");
+  const sort = parseLatestUpdateSort(searchParams.get("sort"));
   const [draft, setDraft] = useState({ project: projectScope, name });
   const headingRef = useRef<HTMLHeadingElement>(null);
 
@@ -47,10 +49,11 @@ function GlobalSkillListPage() {
   }, []);
 
   const query = useQuery({
-    queryKey: ["skills", projectScope, name, after],
+    queryKey: ["skills", projectScope, name, sort, after],
     queryFn: ({ signal }) => fetchSkills(
       projectScope || undefined,
       name || undefined,
+      sort,
       after,
       signal
     ),
@@ -96,7 +99,8 @@ function GlobalSkillListPage() {
                   value={draft.name}
                 />
               </div>
-              <div className="col-12 col-lg-2 d-flex gap-2">
+              <LatestUpdateSortControl id="global-skill-sort" onChange={(value) => setSearchParams(latestUpdateSortParams(searchParams, value))} value={sort} />
+              <div className="col-12 col-lg-auto d-flex gap-2">
                 <button className="btn btn-primary" type="submit">Apply</button>
                 <button className="btn btn-outline-secondary" onClick={() => setSearchParams({})} type="button">Clear</button>
               </div>

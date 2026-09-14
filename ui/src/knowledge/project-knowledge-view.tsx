@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Link, NavLink } from "react-router-dom";
 import { CopyIdentifier } from "../copy-identifier.js";
 import { RetryRefresh } from "../retry-refresh.js";
@@ -283,7 +284,16 @@ function Content({ base64, mediaType, text }: {
   if (text !== null && text !== undefined && markdownMediaType(mediaType)) {
     return (
       <div className="border rounded bg-body-tertiary p-3 overflow-auto">
-        <ReactMarkdown skipHtml>{text}</ReactMarkdown>
+        <ReactMarkdown
+          components={{
+            table: ({ children }) => <table className="table table-striped table-bordered">{children}</table>,
+            input: ({ checked, ...properties }) => <input checked={checked} className="form-check-input me-2" disabled {...properties} />
+          }}
+          remarkPlugins={[remarkGfm]}
+          skipHtml
+        >
+          {text}
+        </ReactMarkdown>
       </div>
     );
   }

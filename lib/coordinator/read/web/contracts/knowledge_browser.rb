@@ -10,6 +10,7 @@ module Coordinator::Read::Web::Contracts
         optional(:scope).maybe(:string)
         optional(:first).filled(:integer, gteq?: 1, lteq?: 100)
         optional(:name).maybe(:string)
+        optional(:sort).filled(:string, included_in?: %w[newest_first oldest_first])
         optional(:after_updated_at).maybe(:string)
         optional(:after_skill_id).maybe(:string)
       end
@@ -74,6 +75,7 @@ module Coordinator::Read::Web::Contracts
         optional(:kind).maybe(:string)
         optional(:labels).array(:string)
         optional(:source_kind).maybe(:string)
+        optional(:sort).filled(:string, included_in?: %w[newest_first oldest_first])
         optional(:after_updated_at).maybe(:string)
         optional(:after_observation_id).maybe(:string)
       end

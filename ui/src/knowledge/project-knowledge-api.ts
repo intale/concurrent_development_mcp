@@ -14,6 +14,7 @@ import type {
   DevelopmentArtifactKind,
   DevelopmentArtifactRelationKind,
   DevelopmentArtifactSourceKind,
+  LatestUpdateSort,
   ProjectArtifactQuery,
   ProjectArtifactQueryVariables,
   ProjectArtifactRelationshipsQuery,
@@ -39,6 +40,7 @@ export interface ArtifactFilters {
   readonly kind?: DevelopmentArtifactKind;
   readonly labels: readonly string[];
   readonly sourceKind?: DevelopmentArtifactSourceKind;
+  readonly sort: LatestUpdateSort;
 }
 
 export interface RelationshipFilters {
@@ -49,11 +51,13 @@ export interface RelationshipFilters {
 export function fetchSkills(
   projectScope: string | undefined,
   name: string | undefined,
+  sort: LatestUpdateSort,
   after: string | null,
   signal: AbortSignal
 ): Promise<SkillsQuery> {
   const variables: SkillsQueryVariables = {
     first: 20,
+    sort,
     ...(projectScope ? { projectScope } : {}),
     ...(name ? { name } : {}),
     ...(after ? { after } : {})
@@ -78,10 +82,11 @@ export function fetchSkillAsset(
 export function fetchProjectSkills(
   projectRef: string,
   name: string | undefined,
+  sort: LatestUpdateSort,
   after: string | null,
   signal: AbortSignal
 ): Promise<ProjectSkillsQuery> {
-  const variables: ProjectSkillsQueryVariables = { projectRef, first: 20, name, after };
+  const variables: ProjectSkillsQueryVariables = { projectRef, first: 20, name, sort, after };
   return executeGraphql(ProjectSkillsDocument, variables, signal);
 }
 

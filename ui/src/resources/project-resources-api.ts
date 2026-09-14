@@ -13,6 +13,7 @@ import type {
   ProjectResourceQueryVariables,
   ProjectResourcesQuery,
   ProjectResourcesQueryVariables,
+  LatestUpdateSort,
   ResourceKind,
   ResourceLifecycleStatus,
   ResourceWorkIntentionMode
@@ -25,6 +26,7 @@ export interface ResourceFilters {
   readonly path?: string;
   readonly resourceKind?: ResourceKind;
   readonly resourceLifecycleStatus?: ResourceLifecycleStatus;
+  readonly sort: LatestUpdateSort;
 }
 
 export interface WorkIntentionFilters {
@@ -33,6 +35,7 @@ export interface WorkIntentionFilters {
   readonly workItemId?: string;
   readonly attemptId?: string;
   readonly mode?: ResourceWorkIntentionMode;
+  readonly sort: LatestUpdateSort;
 }
 
 export function fetchProjectResources(

@@ -3,8 +3,9 @@ query AuditCommandReceipts(
   $after: String
   $status: CommandReceiptStatus
   $toolName: String
+  $sort: LatestUpdateSort
 ) {
-  commandReceipts(first: $first, after: $after, status: $status, toolName: $toolName) {
+  commandReceipts(first: $first, after: $after, status: $status, toolName: $toolName, sort: $sort) {
     nodes {
       commandId
       toolName

@@ -17,6 +17,7 @@ module Coordinator::Read::Web::Contracts
         optional(:first).filled(:integer, gteq?: 1, lteq?: 100)
         optional(:after_id).maybe(:string)
         optional(:after_updated_at).maybe(:string)
+        optional(:sort).filled(:string, included_in?: %w[newest_first oldest_first])
         optional(:path).maybe(:string, max_size?: 2_048)
         optional(:resource_kind).maybe(:string)
         optional(:resource_lifecycle_status).maybe(:string)

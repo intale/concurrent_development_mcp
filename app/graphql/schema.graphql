@@ -597,6 +597,14 @@ type InterpretationClarificationQuestion {
   prompt: String!
 }
 
+"""
+Stable ordering by the latest projected event timestamp and entity identifier.
+"""
+enum LatestUpdateSort {
+  NEWEST_FIRST
+  OLDEST_FIRST
+}
+
 type MergeAuthorization {
   decidedAt: String!
   decisionDigest: String!
@@ -845,7 +853,7 @@ type Query {
   """
   Global command-completion audit facts without inferred project attribution.
   """
-  commandReceipts(after: String, first: Int = 20, status: CommandReceiptStatus, toolName: String): CommandReceiptConnection!
+  commandReceipts(after: String, first: Int = 20, sort: LatestUpdateSort = NEWEST_FIRST, status: CommandReceiptStatus, toolName: String): CommandReceiptConnection!
 
   """
   One global operation batch with bounded typed item outcomes.
@@ -865,7 +873,7 @@ type Query {
   """
   Page active advisory Resource work intentions for the exact Project scope.
   """
-  projectActiveResourceWorkIntentions(after: String, agentId: String, attemptId: ID, changeSetId: ID, first: Int = 20, mode: ResourceWorkIntentionMode, projectRef: ID!, workItemId: ID): ResourceWorkIntentionConnection
+  projectActiveResourceWorkIntentions(after: String, agentId: String, attemptId: ID, changeSetId: ID, first: Int = 20, mode: ResourceWorkIntentionMode, projectRef: ID!, sort: LatestUpdateSort = NEWEST_FIRST, workItemId: ID): ResourceWorkIntentionConnection
 
   """
   One project AgentChoice and its bounded decision-impact assessments.
@@ -875,7 +883,7 @@ type Query {
   """
   Page AgentChoices associated with any Repository member of the exact Project scope.
   """
-  projectAgentChoices(after: String, choiceType: AgentChoiceKind, first: Int = 20, projectRef: ID!, status: AgentChoiceStatus): AgentChoiceConnection
+  projectAgentChoices(after: String, choiceType: AgentChoiceKind, first: Int = 20, projectRef: ID!, sort: LatestUpdateSort = NEWEST_FIRST, status: AgentChoiceStatus): AgentChoiceConnection
 
   """
   One Project-scoped Artifact with its passive projected content.
@@ -890,7 +898,7 @@ type Query {
   """
   Page current Development Artifacts shared by the exact Project scope.
   """
-  projectArtifacts(after: String, first: Int = 20, kind: DevelopmentArtifactKind, labels: [String!], projectRef: ID!, sourceKind: DevelopmentArtifactSourceKind): DevelopmentArtifactConnection
+  projectArtifacts(after: String, first: Int = 20, kind: DevelopmentArtifactKind, labels: [String!], projectRef: ID!, sort: LatestUpdateSort = NEWEST_FIRST, sourceKind: DevelopmentArtifactSourceKind): DevelopmentArtifactConnection
 
   """
   One project Candidate checkpoint and one bounded semantic impact direction.
@@ -910,7 +918,7 @@ type Query {
   """
   Page current ChangeSets whose WorkItems belong to the exact Project scope.
   """
-  projectChangeSets(after: String, first: Int = 20, projectRef: ID!, status: CoordinationChangeSetStatus): CoordinationChangeSetConnection
+  projectChangeSets(after: String, first: Int = 20, projectRef: ID!, sort: LatestUpdateSort = NEWEST_FIRST, status: CoordinationChangeSetStatus): CoordinationChangeSetConnection
 
   """
   One Decision associated with the exact Project scope.
@@ -925,17 +933,17 @@ type Query {
   """
   Page AgentChoice impact assessments associated with the exact Project scope.
   """
-  projectDecisionImpacts(after: String, first: Int = 20, outcome: AgentChoiceImpactOutcome, projectRef: ID!): AgentChoiceImpactConnection
+  projectDecisionImpacts(after: String, first: Int = 20, outcome: AgentChoiceImpactOutcome, projectRef: ID!, sort: LatestUpdateSort = NEWEST_FIRST): AgentChoiceImpactConnection
 
   """
   Page Decisions associated with any Repository member of the exact Project scope.
   """
-  projectDecisions(after: String, first: Int = 20, policyStatus: DecisionPolicyStatus, projectRef: ID!, topicId: String): GovernanceDecisionConnection
+  projectDecisions(after: String, first: Int = 20, policyStatus: DecisionPolicyStatus, projectRef: ID!, sort: LatestUpdateSort = NEWEST_FIRST, topicId: String): GovernanceDecisionConnection
 
   """
   Page current WorkItem dependencies touching the exact Project scope.
   """
-  projectDependencies(after: String, blocking: Boolean, first: Int = 20, projectRef: ID!): CoordinationDependencyConnection
+  projectDependencies(after: String, blocking: Boolean, first: Int = 20, projectRef: ID!, sort: LatestUpdateSort = NEWEST_FIRST): CoordinationDependencyConnection
 
   """
   Resolve one dependency only when a producer or consumer belongs to the Project.
@@ -950,7 +958,7 @@ type Query {
   """
   Page Guidance associated with any Repository member of the exact Project scope.
   """
-  projectGuidanceMessages(after: String, first: Int = 20, projectRef: ID!, source: GuidanceSource): GuidanceConnection
+  projectGuidanceMessages(after: String, first: Int = 20, projectRef: ID!, sort: LatestUpdateSort = NEWEST_FIRST, source: GuidanceSource): GuidanceConnection
 
   """
   One project merge snapshot with candidates and bounded authorization decisions.
@@ -985,7 +993,7 @@ type Query {
   """
   Page the latest available Resource inventory for the exact Project scope.
   """
-  projectResources(after: String, first: Int = 20, path: String, projectRef: ID!, resourceKind: ResourceKind, resourceLifecycleStatus: ResourceLifecycleStatus): ProjectResourceConnection
+  projectResources(after: String, first: Int = 20, path: String, projectRef: ID!, resourceKind: ResourceKind, resourceLifecycleStatus: ResourceLifecycleStatus, sort: LatestUpdateSort = NEWEST_FIRST): ProjectResourceConnection
 
   """
   Current projected revision of one Skill in the exact Project scope.
@@ -1000,7 +1008,7 @@ type Query {
   """
   Page current Skills shared by the exact Project scope.
   """
-  projectSkills(after: String, first: Int = 20, name: String, projectRef: ID!): SkillConnection
+  projectSkills(after: String, first: Int = 20, name: String, projectRef: ID!, sort: LatestUpdateSort = NEWEST_FIRST): SkillConnection
 
   """
   One project-related verification obligation with bounded evidence facts.
@@ -1040,7 +1048,7 @@ type Query {
   """
   Page all current Skills, optionally filtered by exact Project and exact name.
   """
-  skills(after: String, first: Int = 20, name: String, projectScope: String): SkillConnection!
+  skills(after: String, first: Int = 20, name: String, projectScope: String, sort: LatestUpdateSort = NEWEST_FIRST): SkillConnection!
 }
 
 type ReleaseIntegration {

@@ -63,6 +63,9 @@ RSpec.describe "Projects UI shell", :read_model do
         "#{project_path}/delivery/release-sets/RS-shell",
         "/audit/command-receipts",
         "/audit/command-receipts/adj.20260826.candidate.1.submit",
+        "/skills",
+        "/skills/018f0f4d-4e45-7abc-8def-000000000031",
+        "/skills/018f0f4d-4e45-7abc-8def-000000000031/assets/references/example.md",
         "/operations/batches",
         "/operations/batches/BATCH-shell"
       ]

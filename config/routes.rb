@@ -7,6 +7,10 @@ Rails.application.routes.draw do
   get "projects/:project_ref/*client_path" => "projects#index",
       format: false,
       defaults: { format: :html }
+  get "skills" => "projects#index"
+  get "skills/*client_path" => "projects#index",
+      format: false,
+      defaults: { format: :html }
   get "audit/command-receipts" => "projects#index"
   get "audit/command-receipts/:command_id" => "projects#index",
       constraints: { command_id: /[^\/]+/ },

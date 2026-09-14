@@ -4,6 +4,7 @@ module Coordinator
       class CoordinationDashboardQueryV1
         KINDS: Array[String]
         WORK_ITEM_SORTS: Array[String]
+        LATEST_UPDATE_SORTS: Array[String]
 
         class Page < Shared::Value
           def project_ref: () -> String
@@ -12,6 +13,7 @@ module Coordinator
           def first: () -> Integer
           def after_id: () -> String?
           def after_sort_value: () -> String?
+          def sort: () -> String
           def presentation_statuses: () -> Array[String]
           def work_item_sort: () -> String
           def blocking: () -> bool?

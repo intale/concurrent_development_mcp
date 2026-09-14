@@ -1,7 +1,8 @@
 import type {
   AuditCommandReceiptQuery,
   AuditCommandReceiptsQuery,
-  CommandReceiptStatus
+  CommandReceiptStatus,
+  LatestUpdateSort
 } from "../gql/graphql.js";
 
 export const COMMAND_RECEIPT_STATUSES: ReadonlyArray<{
@@ -14,6 +15,7 @@ export const COMMAND_RECEIPT_STATUSES: ReadonlyArray<{
 export interface CommandReceiptFilters {
   readonly status?: CommandReceiptStatus;
   readonly toolName?: string;
+  readonly sort: LatestUpdateSort;
 }
 
 export type CommandReceiptPage = AuditCommandReceiptsQuery["commandReceipts"];
@@ -27,9 +29,10 @@ export function preserveReceiptPage(
   previousData: AuditCommandReceiptsQuery | undefined,
   previousQueryKey: readonly unknown[] | undefined,
   toolName: string,
-  status: CommandReceiptStatus | undefined
+  status: CommandReceiptStatus | undefined,
+  sort: LatestUpdateSort
 ): AuditCommandReceiptsQuery | undefined {
-  return previousQueryKey?.[1] === toolName && previousQueryKey?.[2] === status
+  return previousQueryKey?.[1] === toolName && previousQueryKey?.[2] === status && previousQueryKey?.[3] === sort
     ? previousData
     : undefined;
 }

@@ -33,6 +33,7 @@ module Coordinator::Read::Web::Queries
           **optional_project(values),
           first: values[:first] || 20,
           name: values[:name],
+          sort: values[:sort] || "newest_first",
           after_updated_at: values[:after_updated_at],
           after_skill_id: values[:after_skill_id]
         )
@@ -62,6 +63,7 @@ module Coordinator::Read::Web::Queries
           kind: values[:kind],
           labels: values[:labels] || [],
           source_kind: values[:source_kind],
+          sort: values[:sort] || "newest_first",
           after_updated_at: values[:after_updated_at],
           after_observation_id: values[:after_observation_id]
         )

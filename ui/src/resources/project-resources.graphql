@@ -54,6 +54,7 @@ query ProjectResources(
   $path: String
   $resourceKind: ResourceKind
   $resourceLifecycleStatus: ResourceLifecycleStatus
+  $sort: LatestUpdateSort
 ) {
   projectResources(
     projectRef: $projectRef
@@ -62,6 +63,7 @@ query ProjectResources(
     path: $path
     resourceKind: $resourceKind
     resourceLifecycleStatus: $resourceLifecycleStatus
+    sort: $sort
   ) {
     nodes { ...ProjectResourceFields }
     pageInfo { endCursor hasNextPage }
@@ -83,6 +85,7 @@ query ProjectActiveResourceWorkIntentions(
   $workItemId: ID
   $attemptId: ID
   $mode: ResourceWorkIntentionMode
+  $sort: LatestUpdateSort
 ) {
   projectActiveResourceWorkIntentions(
     projectRef: $projectRef
@@ -93,6 +96,7 @@ query ProjectActiveResourceWorkIntentions(
     workItemId: $workItemId
     attemptId: $attemptId
     mode: $mode
+    sort: $sort
   ) {
     asOf
     nodes { ...ResourceWorkIntentionFields }

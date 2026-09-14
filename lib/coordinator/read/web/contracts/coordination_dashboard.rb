@@ -12,6 +12,7 @@ module Coordinator::Read::Web::Contracts
         optional(:first).filled(:integer, gteq?: 1, lteq?: 100)
         optional(:after_id).maybe(:string)
         optional(:after_sort_value).maybe(:string)
+        optional(:sort).filled(:string, included_in?: Coordinator::Read::Web::CoordinationDashboardQueryV1::LATEST_UPDATE_SORTS)
         optional(:presentation_statuses).array(:string)
         optional(:work_item_sort).filled(:string)
         optional(:blocking).maybe(:bool)

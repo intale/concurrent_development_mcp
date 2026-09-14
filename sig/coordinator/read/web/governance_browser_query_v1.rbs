@@ -9,6 +9,7 @@ module Coordinator
           def policy_status: () -> String?
           def after_decision_id: () -> String?
           def after_updated_at: () -> String?
+          def sort: () -> String
         end
 
         class GuidanceList < Shared::Value
@@ -17,6 +18,7 @@ module Coordinator
           def source: () -> String?
           def after_message_id: () -> String?
           def after_updated_at: () -> String?
+          def sort: () -> String
         end
 
         class Choices < Shared::Value
@@ -26,6 +28,7 @@ module Coordinator
           def status: () -> String?
           def after_choice_id: () -> String?
           def after_updated_at: () -> String?
+          def sort: () -> String
         end
 
         class Impacts < Shared::Value
@@ -34,6 +37,7 @@ module Coordinator
           def outcome: () -> String?
           def after_updated_at: () -> String?
           def after_assessment_id: () -> String?
+          def sort: () -> String
         end
 
         class Decision < Shared::Value
@@ -67,6 +71,7 @@ module Coordinator
           def status: () -> String?
           def after_command_id: () -> String?
           def after_updated_at: () -> String?
+          def sort: () -> String
         end
 
         class Receipt < Shared::Value

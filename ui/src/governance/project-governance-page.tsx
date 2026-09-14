@@ -9,6 +9,7 @@ import type {
   GuidanceSource
 } from "../gql/graphql.js";
 import { useProjectWorkspace } from "../projects/project-workspace-shell.js";
+import { LatestUpdateSortControl, latestUpdateSortParams, parseLatestUpdateSort } from "../latest-update-sort.js";
 import {
   fetchGovernanceAgentChoice,
   fetchGovernanceAgentChoices,
@@ -85,12 +86,13 @@ function DecisionsPage({ projectRef }: { readonly projectRef: string }) {
   const basePath = `/projects/${projectRef}/governance`;
   const topicId = searchParams.get("topic") ?? "";
   const policyStatus = matching<DecisionPolicyStatus>(searchParams.get("status"), DECISION_POLICY_STATUSES);
+  const sort = parseLatestUpdateSort(searchParams.get("sort"));
   const [draft, setDraft] = useState({ topic: topicId, status: policyStatus ?? "" });
   const after = searchParams.get("after");
   const headingRef = useGovernanceHeading("Project Decisions", "project-decisions");
   useEffect(() => { setDraft({ topic: topicId, status: policyStatus ?? "" }); }, [topicId, policyStatus]);
 
-  const filters: DecisionFilters = { ...(topicId ? { topicId } : {}), ...(policyStatus ? { policyStatus } : {}) };
+  const filters: DecisionFilters = { sort, ...(topicId ? { topicId } : {}), ...(policyStatus ? { policyStatus } : {}) };
   const filterKey = JSON.stringify(filters);
   const query = useQuery({
     queryKey: ["project-governance-decisions", projectRef, filterKey, after],
@@ -109,6 +111,7 @@ function DecisionsPage({ projectRef }: { readonly projectRef: string }) {
         <div className="row g-3 align-items-end">
           <div className="col-12 col-lg-7"><label className="form-label" htmlFor="decision-topic">Topic</label><input className="form-control" id="decision-topic" onChange={(event) => setDraft((value) => ({ ...value, topic: event.target.value }))} placeholder="testing.framework" value={draft.topic} /></div>
           <div className="col-12 col-sm-6 col-lg-3"><label className="form-label" htmlFor="decision-status">Policy status</label><select className="form-select" id="decision-status" onChange={(event) => setDraft((value) => ({ ...value, status: event.target.value as DecisionPolicyStatus | "" }))} value={draft.status}><option value="">All statuses</option>{DECISION_POLICY_STATUSES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
+          <LatestUpdateSortControl id="decision-sort" onChange={(value) => setSearchParams(latestUpdateSortParams(searchParams, value))} value={sort} />
           <FilterActions clear={() => setSearchParams({})} />
         </div>
       </form>
@@ -124,9 +127,10 @@ function GuidanceListPage({ projectRef }: { readonly projectRef: string }) {
   const listPath = `/projects/${projectRef}/governance/guidance`;
   const basePath = `/projects/${projectRef}/governance`;
   const source = matching<GuidanceSource>(searchParams.get("source"), GUIDANCE_SOURCES);
+  const sort = parseLatestUpdateSort(searchParams.get("sort"));
   const after = searchParams.get("after");
   const headingRef = useGovernanceHeading("Project Guidance", "project-guidance");
-  const filters: GuidanceFilters = { ...(source ? { source } : {}) };
+  const filters: GuidanceFilters = { sort, ...(source ? { source } : {}) };
   const filterKey = JSON.stringify(filters);
   const query = useQuery({
     queryKey: ["project-governance-guidance", projectRef, filterKey, after],
@@ -142,7 +146,7 @@ function GuidanceListPage({ projectRef }: { readonly projectRef: string }) {
       <GovernanceNavigation basePath={basePath} />
       <PageHeading description="Read user guidance, its actors, anchors, and interpretation proposals." headingRef={headingRef} title="Guidance" />
       <form aria-label="Guidance filters" className="card card-body">
-        <div className="row g-3 align-items-end"><div className="col-12 col-md-8"><label className="form-label" htmlFor="guidance-source">Source</label><select className="form-select" id="guidance-source" onChange={(event) => setSearchParams(applyFilters(searchParams, { source: event.target.value }))} value={source ?? ""}><option value="">All sources</option>{GUIDANCE_SOURCES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div><div className="col-12 col-md-4"><button className="btn btn-outline-secondary" onClick={() => setSearchParams({})} type="button">Clear</button></div></div>
+        <div className="row g-3 align-items-end"><div className="col-12 col-md-5"><label className="form-label" htmlFor="guidance-source">Source</label><select className="form-select" id="guidance-source" onChange={(event) => setSearchParams(applyFilters(searchParams, { source: event.target.value }))} value={source ?? ""}><option value="">All sources</option>{GUIDANCE_SOURCES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div><LatestUpdateSortControl id="guidance-sort" onChange={(value) => setSearchParams(latestUpdateSortParams(searchParams, value))} value={sort} /><div className="col-12 col-md-4"><button className="btn btn-outline-secondary" onClick={() => setSearchParams({})} type="button">Clear</button></div></div>
       </form>
       <CollectionState connection={connection} errorMessage={errorMessage} label="Guidance" loading={query.isPending} retry={() => { void query.refetch(); }}>
         {connection ? <><GuidanceCards connection={connection} hrefFor={(id) => detailLocation(listPath, id, listLocation(listPath, searchParams))} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={connection.pageInfo.hasNextPage ? connection.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}
@@ -157,9 +161,10 @@ function ChoicesPage({ projectRef }: { readonly projectRef: string }) {
   const basePath = `/projects/${projectRef}/governance`;
   const choiceType = matching<AgentChoiceKind>(searchParams.get("type"), AGENT_CHOICE_KINDS);
   const status = matching<AgentChoiceStatus>(searchParams.get("status"), AGENT_CHOICE_STATUSES);
+  const sort = parseLatestUpdateSort(searchParams.get("sort"));
   const after = searchParams.get("after");
   const headingRef = useGovernanceHeading("Project AgentChoices", "project-agent-choices");
-  const filters: ChoiceFilters = { ...(choiceType ? { choiceType } : {}), ...(status ? { status } : {}) };
+  const filters: ChoiceFilters = { sort, ...(choiceType ? { choiceType } : {}), ...(status ? { status } : {}) };
   const filterKey = JSON.stringify(filters);
   const query = useQuery({
     queryKey: ["project-governance-choices", projectRef, filterKey, after],
@@ -177,6 +182,7 @@ function ChoicesPage({ projectRef }: { readonly projectRef: string }) {
       <form aria-label="AgentChoice filters" className="card card-body"><div className="row g-3 align-items-end">
         <div className="col-12 col-md-5"><label className="form-label" htmlFor="choice-type">Type</label><select className="form-select" id="choice-type" onChange={(event) => setSearchParams(applyFilters(searchParams, { type: event.target.value, status: status ?? "" }))} value={choiceType ?? ""}><option value="">All types</option>{AGENT_CHOICE_KINDS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
         <div className="col-12 col-md-5"><label className="form-label" htmlFor="choice-status">Status</label><select className="form-select" id="choice-status" onChange={(event) => setSearchParams(applyFilters(searchParams, { type: choiceType ?? "", status: event.target.value }))} value={status ?? ""}><option value="">All statuses</option>{AGENT_CHOICE_STATUSES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
+        <LatestUpdateSortControl id="choice-sort" onChange={(value) => setSearchParams(latestUpdateSortParams(searchParams, value))} value={sort} />
         <div className="col-12 col-md-2"><button className="btn btn-outline-secondary" onClick={() => setSearchParams({})} type="button">Clear</button></div>
       </div></form>
       <CollectionState connection={connection} errorMessage={errorMessage} label="AgentChoices" loading={query.isPending} retry={() => { void query.refetch(); }}>
@@ -191,9 +197,10 @@ function ImpactsPage({ projectRef }: { readonly projectRef: string }) {
   const listPath = `/projects/${projectRef}/governance/impacts`;
   const basePath = `/projects/${projectRef}/governance`;
   const outcome = matching<AgentChoiceImpactOutcome>(searchParams.get("outcome"), IMPACT_OUTCOMES);
+  const sort = parseLatestUpdateSort(searchParams.get("sort"));
   const after = searchParams.get("after");
   const headingRef = useGovernanceHeading("Project decision impacts", "project-decision-impacts");
-  const filters: ImpactFilters = { ...(outcome ? { outcome } : {}) };
+  const filters: ImpactFilters = { sort, ...(outcome ? { outcome } : {}) };
   const filterKey = JSON.stringify(filters);
   const query = useQuery({
     queryKey: ["project-governance-impacts", projectRef, filterKey, after],
@@ -208,7 +215,7 @@ function ImpactsPage({ projectRef }: { readonly projectRef: string }) {
     <div className="vstack gap-3">
       <GovernanceNavigation basePath={basePath} />
       <PageHeading description="Review how Decision changes affected previously recorded AgentChoices." headingRef={headingRef} title="Decision impacts" />
-      <form aria-label="Decision impact filters" className="card card-body"><div className="row g-3 align-items-end"><div className="col-12 col-md-8"><label className="form-label" htmlFor="impact-outcome">Outcome</label><select className="form-select" id="impact-outcome" onChange={(event) => setSearchParams(applyFilters(searchParams, { outcome: event.target.value }))} value={outcome ?? ""}><option value="">All outcomes</option>{IMPACT_OUTCOMES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div><div className="col-12 col-md-4"><button className="btn btn-outline-secondary" onClick={() => setSearchParams({})} type="button">Clear</button></div></div></form>
+      <form aria-label="Decision impact filters" className="card card-body"><div className="row g-3 align-items-end"><div className="col-12 col-md-5"><label className="form-label" htmlFor="impact-outcome">Outcome</label><select className="form-select" id="impact-outcome" onChange={(event) => setSearchParams(applyFilters(searchParams, { outcome: event.target.value }))} value={outcome ?? ""}><option value="">All outcomes</option>{IMPACT_OUTCOMES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div><LatestUpdateSortControl id="impact-sort" onChange={(value) => setSearchParams(latestUpdateSortParams(searchParams, value))} value={sort} /><div className="col-12 col-md-4"><button className="btn btn-outline-secondary" onClick={() => setSearchParams({})} type="button">Clear</button></div></div></form>
       <CollectionState connection={connection} errorMessage={errorMessage} label="Decision impacts" loading={query.isPending} retry={() => { void query.refetch(); }}>
         {connection ? <><ImpactCards connection={connection} hrefFor={(id) => detailLocation(listPath, id, listLocation(listPath, searchParams))} /><PaginationControls canPrevious={searchParams.getAll("trail").length > 0} nextCursor={connection.pageInfo.hasNextPage ? connection.pageInfo.endCursor : null} onNext={(cursor) => setSearchParams(nextPageParams(searchParams, cursor))} onPrevious={() => setSearchParams(previousPageParams(searchParams))} /></> : null}
       </CollectionState>

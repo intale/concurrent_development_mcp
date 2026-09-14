@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useProjectWorkspace } from "../projects/project-workspace-shell.js";
+import { LatestUpdateSortControl, latestUpdateSortParams, parseLatestUpdateSort } from "../latest-update-sort.js";
 import { fetchProjectChangeSet, fetchProjectChangeSets } from "./project-coordination-api.js";
 import type { ChangeSetStatus } from "./project-coordination-api.js";
 import {
@@ -32,6 +33,7 @@ function ChangeSetListPage() {
   const { project, projectRef } = useProjectWorkspace();
   const [searchParams, setSearchParams] = useSearchParams();
   const after = searchParams.get("after") ?? undefined;
+  const sort = parseLatestUpdateSort(searchParams.get("sort"));
   const requestedStatus = searchParams.get("status") ?? "";
   const status: ChangeSetStatus | undefined = requestedStatus === "planning" ||
     requestedStatus === "active" || requestedStatus === "completed"
@@ -41,8 +43,8 @@ function ChangeSetListPage() {
   const listPath = `${basePath}/change-sets`;
   const headingRef = useCoordinationHeading(`ChangeSets · ${project.displayLabel}`, after ?? "first");
   const query = useQuery({
-    queryKey: ["project-change-sets", projectRef, status, after],
-    queryFn: ({ signal }) => fetchProjectChangeSets(projectRef, status, after, signal),
+    queryKey: ["project-change-sets", projectRef, status, sort, after],
+    queryFn: ({ signal }) => fetchProjectChangeSets(projectRef, status, sort, after, signal),
     refetchInterval: REFRESH_INTERVAL_MS
   });
   const connection = query.data?.projectChangeSets;
@@ -75,6 +77,7 @@ function ChangeSetListPage() {
               <option value="completed">Completed</option>
             </select>
           </div>
+          <LatestUpdateSortControl id="change-set-sort" onChange={(value) => setSearchParams(latestUpdateSortParams(searchParams, value))} value={sort} />
         </div>
       </form>
       {query.isPending ? <LoadingState label="ChangeSets" /> : null}

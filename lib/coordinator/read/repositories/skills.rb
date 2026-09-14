@@ -52,13 +52,15 @@ module Coordinator::Read
         relation = relation.where(name: query.name) if query.name
         relation = relation.where(scope: query.scope) if query.scope
         if query.order == "updated_at" && query.after_skill_id
+          comparator = query.sort == "oldest_first" ? ">" : "<"
           relation = relation.where(
-            "updated_at < :updated_at OR (updated_at = :updated_at AND skill_id < :id)",
+            "updated_at #{comparator} :updated_at OR (updated_at = :updated_at AND skill_id #{comparator} :id)",
             updated_at: query.after_updated_at,
             id: query.after_skill_id
           )
         end
-        relation = query.order == "updated_at" ? relation.order(updated_at: :desc, skill_id: :desc) : relation.order(:skill_id)
+        direction = query.sort == "oldest_first" ? :asc : :desc
+        relation = query.order == "updated_at" ? relation.order(updated_at: direction, skill_id: direction) : relation.order(:skill_id)
         if query.order == "skill_id" && query.after_skill_id
           relation = relation.where("skill_id > ?", query.after_skill_id)
         end

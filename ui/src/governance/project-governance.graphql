@@ -58,6 +58,7 @@ query ProjectGovernanceDecisions(
   $topicId: String
   $policyStatus: DecisionPolicyStatus
   $after: String
+  $sort: LatestUpdateSort
 ) {
   projectDecisions(
     projectRef: $projectRef
@@ -65,6 +66,7 @@ query ProjectGovernanceDecisions(
     topicId: $topicId
     policyStatus: $policyStatus
     after: $after
+    sort: $sort
   ) {
     nodes { ...GovernanceDecisionSummary }
     pageInfo { endCursor hasNextPage }
@@ -76,8 +78,9 @@ query ProjectGovernanceGuidanceMessages(
   $first: Int
   $source: GuidanceSource
   $after: String
+  $sort: LatestUpdateSort
 ) {
-  projectGuidanceMessages(projectRef: $projectRef, first: $first, source: $source, after: $after) {
+  projectGuidanceMessages(projectRef: $projectRef, first: $first, source: $source, after: $after, sort: $sort) {
     nodes { ...GovernanceGuidanceSummary }
     pageInfo { endCursor hasNextPage }
   }
@@ -89,6 +92,7 @@ query ProjectGovernanceAgentChoices(
   $choiceType: AgentChoiceKind
   $status: AgentChoiceStatus
   $after: String
+  $sort: LatestUpdateSort
 ) {
   projectAgentChoices(
     projectRef: $projectRef
@@ -96,6 +100,7 @@ query ProjectGovernanceAgentChoices(
     choiceType: $choiceType
     status: $status
     after: $after
+    sort: $sort
   ) {
     nodes { ...GovernanceChoiceSummary }
     pageInfo { endCursor hasNextPage }
@@ -107,8 +112,9 @@ query ProjectGovernanceDecisionImpacts(
   $first: Int
   $outcome: AgentChoiceImpactOutcome
   $after: String
+  $sort: LatestUpdateSort
 ) {
-  projectDecisionImpacts(projectRef: $projectRef, first: $first, outcome: $outcome, after: $after) {
+  projectDecisionImpacts(projectRef: $projectRef, first: $first, outcome: $outcome, after: $after, sort: $sort) {
     nodes { ...GovernanceImpactSummary }
     pageInfo { endCursor hasNextPage }
   }

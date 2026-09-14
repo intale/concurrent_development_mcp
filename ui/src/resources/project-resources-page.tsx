@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import type { ResourceKind, ResourceLifecycleStatus, ResourceWorkIntentionMode } from "../gql/graphql.js";
 import { useProjectWorkspace } from "../projects/project-workspace-shell.js";
+import { LatestUpdateSortControl, latestUpdateSortParams, parseLatestUpdateSort } from "../latest-update-sort.js";
 import {
   fetchProjectActiveResourceWorkIntentions,
   fetchProjectResource,
@@ -64,6 +65,7 @@ function ResourceInventoryPage({ projectRef }: { readonly projectRef: string }) 
   const resourceKind = validResourceKind(searchParams.get("kind"));
   const lifecycle = validLifecycle(searchParams.get("lifecycle"));
   const after = searchParams.get("after");
+  const sort = parseLatestUpdateSort(searchParams.get("sort"));
   const [draftPath, setDraftPath] = useState(path);
   const [draftKind, setDraftKind] = useState<ResourceKind | "">(resourceKind ?? "");
   const [draftLifecycle, setDraftLifecycle] = useState<ResourceLifecycleStatus | "">(lifecycle ?? "");
@@ -76,6 +78,7 @@ function ResourceInventoryPage({ projectRef }: { readonly projectRef: string }) 
   }, [path, resourceKind, lifecycle]);
 
   const filters: ResourceFilters = {
+    sort,
     ...(path ? { path } : {}),
     ...(resourceKind ? { resourceKind } : {}),
     ...(lifecycle ? { resourceLifecycleStatus: lifecycle } : {})
@@ -136,6 +139,7 @@ function ResourceInventoryPage({ projectRef }: { readonly projectRef: string }) 
             <button className="btn btn-primary" type="submit">Apply</button>
             <button className="btn btn-outline-secondary" onClick={() => setSearchParams({})} type="button">Clear</button>
           </div>
+          <LatestUpdateSortControl id="resource-sort" onChange={(value) => setSearchParams(latestUpdateSortParams(searchParams, value))} value={sort} />
         </div>
       </form>
       {query.isPending ? <LoadingState label="Resource inventory" /> : null}
@@ -211,12 +215,14 @@ function ActiveWorkIntentionPage({ projectRef }: { readonly projectRef: string }
   };
   const [draft, setDraft] = useState(current);
   const after = searchParams.get("after");
+  const sort = parseLatestUpdateSort(searchParams.get("sort"));
   const headingRef = useResourceHeading("Active Resource work intentions", "active-resource-work-intentions");
 
   useEffect(() => { setDraft(current); }, [current.agent, current.changeSet, current.workItem, current.attempt, current.mode]);
 
   const mode = validWorkIntentionMode(current.mode);
   const filters: WorkIntentionFilters = {
+    sort,
     ...(current.agent ? { agentId: current.agent } : {}),
     ...(current.changeSet ? { changeSetId: current.changeSet } : {}),
     ...(current.workItem ? { workItemId: current.workItem } : {}),
@@ -275,6 +281,7 @@ function ActiveWorkIntentionPage({ projectRef }: { readonly projectRef: string }
               {WORK_INTENTION_MODES.map(({ label, value }) => <option key={value} value={value}>{label}</option>)}
             </select>
           </div>
+          <LatestUpdateSortControl id="work-intention-sort" onChange={(value) => setSearchParams(latestUpdateSortParams(searchParams, value))} value={sort} />
         </div>
         <div className="d-flex gap-2 mt-3">
           <button className="btn btn-primary" type="submit">Apply</button>

@@ -20,6 +20,7 @@ module Coordinator::Read::Web::Repositories
           after_updated_at: query.after_updated_at,
           after_skill_id: query.after_skill_id,
           order: "updated_at",
+          sort: query.sort,
           limit: query.first
         )
       )

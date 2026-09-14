@@ -15,6 +15,7 @@ module Coordinator::Read::Web::Contracts
         )
         optional(:after_decision_id).maybe(:string)
         optional(:after_updated_at).maybe(:string)
+        optional(:sort).filled(:string, included_in?: %w[newest_first oldest_first])
       end
 
       rule(:after_decision_id, :after_updated_at) do
@@ -42,6 +43,7 @@ module Coordinator::Read::Web::Contracts
         optional(:source).maybe(:string, included_in?: Coordinator::Shared::Types::GUIDANCE_SOURCES)
         optional(:after_message_id).maybe(:string)
         optional(:after_updated_at).maybe(:string)
+        optional(:sort).filled(:string, included_in?: %w[newest_first oldest_first])
       end
 
       rule(:after_message_id, :after_updated_at) do
@@ -74,6 +76,7 @@ module Coordinator::Read::Web::Contracts
         )
         optional(:after_choice_id).maybe(:string)
         optional(:after_updated_at).maybe(:string)
+        optional(:sort).filled(:string, included_in?: %w[newest_first oldest_first])
       end
 
       rule(:after_choice_id, :after_updated_at) do
@@ -102,6 +105,7 @@ module Coordinator::Read::Web::Contracts
         )
         optional(:after_updated_at).maybe(:string)
         optional(:after_assessment_id).maybe(:string)
+        optional(:sort).filled(:string, included_in?: %w[newest_first oldest_first])
       end
 
       rule(:after_assessment_id) do
@@ -195,6 +199,7 @@ module Coordinator::Read::Web::Contracts
         optional(:status).maybe(:string, included_in?: [ "ok" ])
         optional(:after_command_id).maybe(:string)
         optional(:after_updated_at).maybe(:string)
+        optional(:sort).filled(:string, included_in?: %w[newest_first oldest_first])
       end
 
       rule(:after_command_id, :after_updated_at) do

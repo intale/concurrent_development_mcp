@@ -13,6 +13,7 @@ module ProjectGovernanceGraphqlSpec
         $choiceType: AgentChoiceKind
         $choiceStatus: AgentChoiceStatus
         $impactOutcome: AgentChoiceImpactOutcome
+        $sort: LatestUpdateSort
       ) {
         projectDecisions(
           projectRef: $projectRef
@@ -20,6 +21,7 @@ module ProjectGovernanceGraphqlSpec
           after: $afterDecision
           policyStatus: $decisionStatus
           topicId: $decisionTopic
+          sort: $sort
         ) {
           nodes {
             id topicId policyStatus statementKind effect modality currentAt
@@ -28,7 +30,7 @@ module ProjectGovernanceGraphqlSpec
           }
           pageInfo { endCursor hasNextPage }
         }
-        projectGuidanceMessages(projectRef: $projectRef, first: $first, source: $guidanceSource) {
+        projectGuidanceMessages(projectRef: $projectRef, first: $first, source: $guidanceSource, sort: $sort) {
           nodes { id excerpt source policyStatus recordedAt actor { kind id } }
           pageInfo { endCursor hasNextPage }
         }
@@ -37,6 +39,7 @@ module ProjectGovernanceGraphqlSpec
           first: $first
           choiceType: $choiceType
           status: $choiceStatus
+          sort: $sort
         ) {
           nodes {
             id choiceType observationStatus reasonSummary recordedAt
@@ -45,7 +48,7 @@ module ProjectGovernanceGraphqlSpec
           }
           pageInfo { endCursor hasNextPage }
         }
-        projectDecisionImpacts(projectRef: $projectRef, first: $first, outcome: $impactOutcome) {
+        projectDecisionImpacts(projectRef: $projectRef, first: $first, outcome: $impactOutcome, sort: $sort) {
           nodes {
             assessmentId choiceId attemptId outcome reason policyVersion
             decisionId decisionChangeKind beforeStatus afterStatus assessedAt
@@ -253,6 +256,13 @@ module ProjectGovernanceGraphqlSpec
         decisionStatus: "RECORDED",
         afterDecision: cursor
       )
+      sort_mismatched = execute(
+        COLLECTIONS_QUERY,
+        projectRef: project_ref,
+        first: 1,
+        afterDecision: cursor,
+        sort: "OLDEST_FIRST"
+      )
       isolated = execute(
         ISOLATED_COLLECTION_QUERY,
         projectRef: project_ref,
@@ -267,6 +277,7 @@ module ProjectGovernanceGraphqlSpec
 
       expect(cursor).not_to include("D-history")
       expect(mismatched.dig("errors", 0, "extensions", "code")).to eq("INVALID_CURSOR")
+      expect(sort_mismatched.dig("errors", 0, "extensions", "code")).to eq("INVALID_CURSOR")
       expect(isolated.dig("data", "projectDecisions", "nodes")).not_to be_empty
       expect(isolated.dig("data", "projectGuidanceMessages")).to be_nil
       expect(isolated.dig("errors", 0, "extensions", "code")).to eq("INVALID_CURSOR")
