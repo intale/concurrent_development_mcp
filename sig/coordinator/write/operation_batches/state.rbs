@@ -2,13 +2,18 @@ module Coordinator
   module Write
     module OperationBatches
       type outcome = Events::OperationBatchItemSucceededV2 | Events::OperationBatchItemRejectedV2
+      type completion_link = Events::OperationBatchItemCompletionLinkedV1
       type terminal = Events::OperationBatchCompletedV2 | Events::OperationBatchCancelledV2
 
       class State < Shared::Value
         def self.initial: () -> State
-        def self.reduce: (Array[Events::Base] events) -> State
+        def self.reduce: (Array[Events::Base] events, ?items: Array[ItemV2], ?page_size: Integer?) -> State
         def creation: () -> Events::OperationBatchCreatedV2?
+        def target_selection: () -> Events::OperationBatchTargetSelectedV1?
+        def items: () -> Array[ItemV2]
+        def page_size: () -> Integer?
         def outcomes: () -> Array[outcome]
+        def completion_links: () -> Array[completion_link]
         def cancellation: () -> Events::OperationBatchCancellationRequestedV2?
         def terminal: () -> terminal?
         def item: (Integer index) -> ItemV2?
@@ -17,6 +22,7 @@ module Coordinator
         def succeeded_count: () -> Integer
         def rejected_count: () -> Integer
         def running?: () -> bool
+        def processing_page_size: () -> Integer
       end
     end
   end

@@ -20,6 +20,10 @@ module Coordinator::Write
           items: items.map(&:to_h)
         ).bytesize
       end
+
+      def item_encoded_byte_size(input)
+        @canonical_json.encode(input.to_h).bytesize
+      end
     end
   end
 end

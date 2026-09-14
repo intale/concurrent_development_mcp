@@ -64,12 +64,10 @@ RSpec.describe "MCP work_intention_set_declare Task boundary", :event_store do
         )
       )
     )
-    winner_data = result.fetch("structuredContent").fetch("data")
-
     submitted, started, task_completed = task_events(winner_task_id)
     command_terminal = command_events_for_task(winner_task_id).last
-    target_events = work_intention_events(winner_data) + [ command_terminal ]
-    expect(target_events.map(&:type)).to contain_exactly(
+    target_events = CommandTraceFixture.domain_events(winner_task_id, event_store:)
+    expect([ *target_events, command_terminal ].map(&:type)).to contain_exactly(
       "WorkIntentionSetCreated",
       "WorkIntentionAddedToSet",
       "WorkIntentionAddedToSet",
@@ -79,8 +77,9 @@ RSpec.describe "MCP work_intention_set_declare Task boundary", :event_store do
     )
     expect(started.causation_id).to eq(submitted.id)
     expect(target_events.map(&:causation_id).uniq).to eq([ started.id ])
+    expect(command_terminal.causation_id).to eq(target_events.last.id)
     expect(task_completed.causation_id).to eq(command_terminal.id)
-    expect(([ submitted, started, task_completed ] + target_events).map(&:correlation_id).uniq).to eq(
+    expect(([ submitted, started, command_terminal, task_completed ] + target_events).map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
     )
 
@@ -324,17 +323,4 @@ RSpec.describe "MCP work_intention_set_declare Task boundary", :event_store do
     end
   end
 
-  def work_intention_events(receipt)
-    set_events = event_store.read(
-      streams.work_intention_set(receipt.fetch("intention_set_id")),
-      Coordinator::Write::EventQueries::WORK_INTENTION_SET_STATE
-    )
-    member_events = receipt.fetch("intentions").flat_map do |reference|
-      event_store.read_grouped(
-        streams.resource_work_intention(reference.fetch("intention_id")),
-        Coordinator::Write::EventQueries::WORK_INTENTION_STATE
-      )
-    end
-    set_events + member_events
-  end
 end

@@ -13,18 +13,28 @@ RSpec.describe Coordinator::Write::Operations::ExecuteOperationBatchCommand, :ev
     first = operation.call_command(command)
 
     expect(first).to be_success
-    expect(first.value!.emitted_events.map(&:type)).to eq([ "OperationBatchCreated" ])
+    expect(first.value!.emitted_events.map(&:type)).to eq([
+      "OperationBatchCreated",
+      "OperationBatchTargetSelected",
+      "OperationBatchItemEnqueued",
+      "OperationBatchItemEnqueued"
+    ])
     expect(first.value!.data).to have_attributes(
       batch_id: command.batch_id,
       target_tool: "skill_publish",
       total: 2,
       status: "accepted"
     )
-    created = batch_events(command.batch_id).sole
+    events = batch_events(command.batch_id)
+    created = events.find { _1.type == "OperationBatchCreated" }
     expect(created.type).to eq("OperationBatchCreated")
     expect(created.metadata.fetch("schema_version")).to eq(2)
-    expect(created.data.keys).to contain_exactly("batch_id", "target_tool", "page_size", "items")
-    items = load(created).items
+    expect(created.data.keys).to contain_exactly("batch_id")
+    target = events.find { _1.type == "OperationBatchTargetSelected" }
+    expect(load(target)).to have_attributes(batch_id: command.batch_id, target_tool: "skill_publish")
+    enqueued = events.select { _1.type == "OperationBatchItemEnqueued" }
+    expect(enqueued.map { _1.metadata.keys }).to all(include("canonical_input_digest", "encoded_byte_size"))
+    items = Coordinator::Write::OperationBatches::Loader.new(event_store:).call(command.batch_id).state.items
     expect(items.map(&:request_id)).to eq(%w[item-1 item-2])
     expect(items.map(&:command_id)).to all(match(Coordinator::Shared::Types::UUID_V7_PATTERN))
     expect(items.map { command_events(_1.command_id).map(&:type) }).to eq([
@@ -46,18 +56,20 @@ RSpec.describe Coordinator::Write::Operations::ExecuteOperationBatchCommand, :ev
     expect(operation.call_command(original).failure.code).to eq(:operation_batch_id_conflict)
     expect(operation.call_command(changed_command).failure.code).to eq(:operation_batch_id_conflict)
     expect(operation.call_command(conflicting_batch).failure.code).to eq(:operation_batch_id_conflict)
-    expect(batch_events(original.batch_id).length).to eq(1)
+    expect(batch_events(original.batch_id).length).to eq(4)
   end
 
   it "projects a batch-item result from its persisted Batch instruction without a Task submission" do
     batch_command = preparer.call(input(items: [ item ])).value!
     expect(operation.call_command(batch_command)).to be_success
-    created = batch_events(batch_command.batch_id).sole
-    batch_item = load(created).items.sole
+    events = batch_events(batch_command.batch_id)
+    created = events.find { _1.type == "OperationBatchCreated" }
+    enqueued = events.find { _1.type == "OperationBatchItemEnqueued" }
+    batch_item = Coordinator::Write::OperationBatches::Loader.new(event_store:).call(batch_command.batch_id).state.items.sole
     target = Coordinator::Write::Tasks::TargetCommandBuilder.new.call(batch_item.command_input)
     execution = Coordinator::Write::Tasks::TargetExecutor.new(event_store:).call(
       target,
-      caused_by: created
+      caused_by: enqueued
     ).value!
 
     source = Coordinator::Read::CommandResults::SourceLoader.new(event_store:).call(

@@ -9,6 +9,7 @@ module Coordinator::Write
       attribute :boundary_marker, Types::ResourceMarker
       attribute :source_event_id, Types::UuidV7
       attribute :source_global_position, Types::GlobalPosition
+      attribute :source_created_at, Types::Timestamp
     end
   end
 end

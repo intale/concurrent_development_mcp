@@ -6,8 +6,9 @@ module Coordinator
 
         def initialize: (
           event_store: _EventStore,
-          ?loader: ResourceBoundaryLoader,
-          ?clock: Shared::_Clock,
+          ?loader: WorkIntentionBoundaryLoader,
+          ?rollover_policy: WorkIntentionBoundaryRolloverPolicy,
+          ?stream_factory: StreamFactory,
           ?id_generator: Shared::_IdGenerator,
           ?event_factory: EventFactory
         ) -> void

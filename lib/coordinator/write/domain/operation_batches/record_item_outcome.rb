@@ -15,17 +15,21 @@ module Coordinator::Write
           return Failure(terminal(command)) if state.terminal
           return Failure(item_not_found(command)) unless state.item(command.index)
           return Failure(already_recorded(command)) if state.outcome(command.index)
+          return Failure(rejection_mismatch(command)) unless rejection_matches_outcome?(command)
 
           event = if command.outcome == "rejected"
                     rejected_event(command)
           else
                     succeeded_event(command)
           end
-          Success(
-            EventPlan.new(
-              writes: [ EventWrite.new(stream: @stream_factory.operation_batch(command.batch_id), event:) ]
-            )
+          completion = Events::OperationBatchItemCompletionLinkedV1.new(
+            batch_id: command.batch_id,
+            index: command.index,
+            command_id: command.item_command_id,
+            completion: command.target_event
           )
+          stream = @stream_factory.operation_batch(command.batch_id)
+          Success(EventPlan.new(writes: [ event, completion ].map { EventWrite.new(stream:, event: _1) }))
         end
 
         private
@@ -39,10 +43,14 @@ module Coordinator::Write
         end
 
         def rejected_event(command)
+          rejection = command.rejection
           Events::OperationBatchItemRejectedV2.new(
             batch_id: command.batch_id,
             index: command.index,
-            command_id: command.item_command_id
+            command_id: command.item_command_id,
+            code: rejection.code,
+            reason: rejection.reason,
+            retryable: rejection.retryable
           )
         end
 
@@ -60,6 +68,19 @@ module Coordinator::Write
 
         def already_recorded(command)
           error(:operation_batch_item_already_recorded, "Batch item already has an outcome", command, index: command.index)
+        end
+
+        def rejection_matches_outcome?(command)
+          command.outcome == "rejected" ? !command.rejection.nil? : command.rejection.nil?
+        end
+
+        def rejection_mismatch(command)
+          error(
+            :operation_batch_item_rejection_mismatch,
+            "Batch item rejection details do not match its outcome",
+            command,
+            index: command.index
+          )
         end
 
         def error(code, message, command, details = {})

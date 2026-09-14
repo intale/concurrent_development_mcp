@@ -5,7 +5,7 @@ FactoryBot.define do
     batch_id { SecureRandom.uuid_v7 }
     target_tool { "skill_publish" }
     total { 2 }
-    page_size { 1_000 }
+    page_size { Coordinator::Shared::Types::OPERATION_BATCH_PAGE_SIZE }
     manifest_digest { "sha256:#{'a' * 64}" }
     encoded_byte_size { 1_024 }
     status { "completed_with_errors" }
@@ -17,7 +17,7 @@ FactoryBot.define do
       {
         "event_id" => SecureRandom.uuid_v7,
         "type" => "OperationBatchCreated",
-        "stream_context" => "CoordinatorControl",
+        "stream_context" => "DevelopmentCoordination",
         "stream_name" => "OperationBatch",
         "stream_id" => batch_id,
         "stream_revision" => 0
@@ -25,7 +25,7 @@ FactoryBot.define do
     end
     created_actor { { "kind" => "agent", "id" => "factory-agent", "authenticated" => false } }
     created_markers { [ "operation-batch:#{batch_id}" ] }
-    created_metadata { { "schema_version" => 1 } }
+    created_metadata { { "schema_version" => 2 } }
     sequence(:created_global_position, 1_500)
     created_at_domain { Time.utc(2026, 8, 30, 12) }
     created_at_store { Time.utc(2026, 8, 30, 12, 0, 1) }
@@ -33,7 +33,7 @@ FactoryBot.define do
       {
         "event_id" => SecureRandom.uuid_v7,
         "type" => "OperationBatchCompleted",
-        "stream_context" => "CoordinatorControl",
+        "stream_context" => "DevelopmentCoordination",
         "stream_name" => "OperationBatch",
         "stream_id" => batch_id,
         "stream_revision" => 3
@@ -41,7 +41,7 @@ FactoryBot.define do
     end
     terminal_actor { { "kind" => "system", "id" => "operation-batch-runner", "authenticated" => false } }
     terminal_markers { created_markers }
-    terminal_metadata { { "schema_version" => 1 } }
+    terminal_metadata { { "schema_version" => 2 } }
     terminal_global_position { created_global_position + 3 }
     terminal_at_domain { Time.utc(2026, 8, 30, 12, 3) }
     terminal_at_store { Time.utc(2026, 8, 30, 12, 3, 1) }
@@ -54,6 +54,7 @@ FactoryBot.define do
     target_tool { "skill_publish" }
     sequence(:command_id) { "item-factory-#{_1}" }
     canonical_input_digest { "sha256:#{'b' * 64}" }
+    encoded_byte_size { 512 }
     arguments do
       {
         "command_id" => command_id,
@@ -108,7 +109,7 @@ FactoryBot.define do
       {
         "event_id" => SecureRandom.uuid_v7,
         "type" => status == "succeeded" ? "OperationBatchItemSucceeded" : "OperationBatchItemRejected",
-        "stream_context" => "CoordinatorControl",
+        "stream_context" => "DevelopmentCoordination",
         "stream_name" => "OperationBatch",
         "stream_id" => batch_id,
         "stream_revision" => item_index + 1
@@ -116,7 +117,7 @@ FactoryBot.define do
     end
     outcome_actor { { "kind" => "system", "id" => "operation-batch-runner", "authenticated" => false } }
     outcome_markers { [ "operation-batch:#{batch_id}" ] }
-    outcome_metadata { { "schema_version" => 1 } }
+    outcome_metadata { { "schema_version" => 2 } }
     sequence(:outcome_global_position, 1_600)
     finished_at_domain { Time.utc(2026, 8, 30, 12, 1) }
     finished_at_store { Time.utc(2026, 8, 30, 12, 1, 1) }

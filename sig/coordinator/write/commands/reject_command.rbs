@@ -3,8 +3,7 @@ module Coordinator
     module Commands
       class RejectCommand < Shared::Value
         def command_id: () -> String
-        def code: () -> String
-        def reason: () -> String
+        def error: () -> Tasks::DomainErrorV1::domain_error
         def retryable: () -> bool
       end
     end

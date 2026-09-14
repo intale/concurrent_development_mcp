@@ -99,23 +99,46 @@ module Coordinator::Write
     end
 
     def read_global_marked(criteria)
+      options = {
+        direction: criteria.direction,
+        max_count: criteria.query_max_count,
+        filter: {
+          streams: [ { context: criteria.stream_context, stream_name: criteria.stream_name } ],
+          event_types: criteria.event_types.map do |event_type|
+            { type: event_type, markers: criteria.markers }
+          end
+        }
+      }
+      options[:from_position] = criteria.from_position unless criteria.from_position.nil?
+      options[:to_position] = criteria.to_position unless criteria.to_position.nil?
       events = @client.read(
         PgEventstore::Stream.all_stream,
-        options: {
-          direction: criteria.direction,
-          max_count: criteria.query_max_count,
-          filter: {
-            streams: [ { context: criteria.stream_context, stream_name: criteria.stream_name } ],
-            event_types: criteria.event_types.map do |event_type|
-              { type: event_type, markers: criteria.markers }
-            end
-          }
-        }
+        options:
       )
       return events if events.length <= criteria.maximum_count
 
       raise EventHistoryLimitExceeded,
             "Global marked event read exceeded #{criteria.maximum_count} relevant events for #{criteria.markers.inspect}"
+    end
+
+    def read_command_events(criteria)
+      events = @client.read(
+        PgEventstore::Stream.all_stream,
+        options: {
+          direction: :asc,
+          from_position: 0,
+          to_position: criteria.through_global_position,
+          max_count: criteria.query_max_count,
+          filter: {
+            event_types: [ { markers: [ criteria.marker ] } ]
+          }
+        }
+      )
+      domain_events = events.reject { control_command_event?(_1) }
+      return domain_events if domain_events.length <= criteria.maximum_count
+
+      raise EventHistoryLimitExceeded,
+            "Command event read exceeded #{criteria.maximum_count} domain events for #{criteria.command_id}"
     end
 
     def read_latest_global_marked(criteria)
@@ -187,6 +210,13 @@ module Coordinator::Write
       options = expected_revision.nil? ? {} : { expected_revision: }
 
       @client.append_to_stream(stream, events, options:)
+    end
+
+    private
+
+    def control_command_event?(event)
+      event.stream.context == "CoordinatorControl" &&
+        %w[Command CoordinationTask].include?(event.stream.stream_name)
     end
   end
 end

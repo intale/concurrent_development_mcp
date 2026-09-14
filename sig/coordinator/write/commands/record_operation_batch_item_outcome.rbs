@@ -9,6 +9,7 @@ module Coordinator
         def item_command_id: () -> String
         def outcome: () -> String
         def target_event: () -> EventReference
+        def rejection: () -> OperationBatches::RejectionV1?
       end
     end
   end

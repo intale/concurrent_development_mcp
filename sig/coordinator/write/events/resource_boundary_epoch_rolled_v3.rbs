@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Events
+      class ResourceBoundaryEpochRolledV3 < Base
+        def repository_id: () -> String
+        def boundary_marker: () -> String
+        def epoch: () -> Integer
+        def through_global_position: () -> Integer
+      end
+    end
+  end
+end

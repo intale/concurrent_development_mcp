@@ -71,7 +71,9 @@ RSpec.describe "GDN-02/03 MCP interpretation lifecycle" do
       DecisionClarificationRequired
     ])
     expect([ proposal, clarification ].map(&:stream_revision)).to eq([ 0, 1 ])
-    expect([ proposal, clarification, command_terminal ].map(&:causation_id).uniq).to eq([ started.id ])
+    expect([ proposal, clarification ].map(&:causation_id).uniq).to eq([ started.id ])
+    command_facts = CommandTraceFixture.domain_events(task_id, event_store:)
+    expect(command_terminal.causation_id).to eq(command_facts.last.id)
     expect(task_completed.causation_id).to eq(command_terminal.id)
     expect(
       [ submitted, started, proposal, clarification, command_terminal, task_completed ]
@@ -140,7 +142,9 @@ RSpec.describe "GDN-02/03 MCP interpretation lifecycle" do
     acceptance = interpretation_events.find { _1.type == "DecisionInterpretationAccepted" }
     command_terminal = CommandTraceFixture.terminal(task_id, event_store:)
     expect(acceptance).not_to be_nil
-    expect([ acceptance, command_terminal ].map(&:causation_id).uniq).to eq([ started.id ])
+    expect(acceptance.causation_id).to eq(started.id)
+    command_facts = CommandTraceFixture.domain_events(task_id, event_store:)
+    expect(command_terminal.causation_id).to eq(command_facts.last.id)
     expect(task_completed.causation_id).to eq(command_terminal.id)
     expect([ submitted, started, acceptance, command_terminal, task_completed ].map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]

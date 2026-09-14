@@ -48,9 +48,7 @@ module Coordinator::Processes
         return result.value! if result.success?
         return if HANDLED_CODES.include?(result.failure.code)
 
-        failure = result.failure
-        raise VerificationEvidenceOutcomeProcessRejected,
-              "Verification outcome dispatch failed: #{failure.code} - #{failure.message}"
+        @process_step_planner.record_dispatch_failure(process_step:, failure: result.failure)
       end
 
       private

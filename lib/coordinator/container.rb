@@ -1493,7 +1493,7 @@ module Coordinator
     register("operations.execute_roll_resource_boundary_epoch") do
       Write::Operations::ExecuteRollResourceBoundaryEpoch.new(
         event_store: self["event_store"],
-        clock: self["clock"],
+        stream_factory: self["stream_factory"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"]
       )
@@ -2567,9 +2567,7 @@ module Coordinator
       Processes::ProcessManagers::ResourceBoundaryMaintenance.new(
         event_store: self["event_store"],
         schema_registry: self["event_schema_registry"],
-        marker_builder: Write::RepositoryMarkerBuilder.new(
-          compound_marker_builder: self["compound_marker_builder"]
-        ),
+        intention_loader: Write::WorkIntentionLoader.new(event_store: self["event_store"]),
         operation: self["operations.execute_roll_resource_boundary_epoch"]
       )
     end

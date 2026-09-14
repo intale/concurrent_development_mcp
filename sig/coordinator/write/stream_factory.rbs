@@ -17,6 +17,9 @@ module Coordinator
       def work_item: (String work_item_id) -> StreamReference
       def attempt: (String attempt_id) -> StreamReference
       def resource_lease: (String resource_id) -> StreamReference
+      def work_intention_set: (String set_id) -> StreamReference
+      def resource_work_intention: (String intention_id) -> StreamReference
+      def resource_boundary_epoch: (String repository_id) -> StreamReference
       def conversation: (String conversation_id) -> StreamReference
       def interpretation: (String message_id) -> StreamReference
       def decision: (String decision_id) -> StreamReference

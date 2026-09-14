@@ -54,7 +54,10 @@ RSpec.describe "CAN-01 MCP Candidate coordination" do
       CandidateBuildContextCaptured
       CandidateSubmitted
     ])
-    expect([ *candidate_facts, command_terminal ].map(&:causation_id).uniq).to eq([ started.id ])
+    expect(candidate_facts.map(&:causation_id).uniq).to eq([ started.id ])
+    command_facts = CommandTraceFixture.domain_events(task_id, event_store:)
+    expect(command_facts.map(&:causation_id).uniq).to eq([ started.id ])
+    expect(command_terminal.causation_id).to eq(command_facts.last.id)
     expect(task_completed.causation_id).to eq(command_terminal.id)
     expect([ submitted, started, *candidate_facts, command_terminal, task_completed ].map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]

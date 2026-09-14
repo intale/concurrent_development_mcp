@@ -51,13 +51,15 @@ module Coordinator::Processes
           execute!(
             @request_compensation.call_command(command, caused_by: process_step.event),
             handled_codes: HANDLED_COMPENSATION_CODES,
-            transition: "request compensation"
+            transition: "request compensation",
+            process_step:
           )
         when Coordinator::Write::Commands::CompleteActivatedReleaseSet
           execute!(
             @complete_activated.call_command(command, caused_by: process_step.event),
             handled_codes: HANDLED_COMPLETION_CODES,
-            transition: "complete activated ReleaseSet"
+            transition: "complete activated ReleaseSet",
+            process_step:
           )
         end
         nil
@@ -75,13 +77,11 @@ module Coordinator::Processes
         )
       end
 
-      def execute!(result, handled_codes:, transition:)
+      def execute!(result, handled_codes:, transition:, process_step:)
         return result.value! if result.success?
         return if handled_codes.include?(result.failure.code)
 
-        failure = result.failure
-        raise ReleaseSetLifecycleProcessRejected,
-              "ReleaseSet lifecycle process could not #{transition}: #{failure.code} - #{failure.message}"
+        @process_step_planner.record_dispatch_failure(process_step:, failure: result.failure)
       end
     end
   end

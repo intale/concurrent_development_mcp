@@ -3,9 +3,6 @@ module Coordinator
     module Events
       class OperationBatchCreatedV2 < Base
         def batch_id: () -> String
-        def target_tool: () -> String
-        def page_size: () -> Integer
-        def items: () -> Array[OperationBatches::ItemV2]
       end
     end
   end

@@ -17,7 +17,8 @@ module Coordinator::Read
         terminal = payloads.last
         status = case terminal
                  when Coordinator::Write::Events::CommandSucceededV1 then "succeeded"
-                 when Coordinator::Write::Events::CommandRejectedV1 then "rejected"
+                 when Coordinator::Write::Events::CommandRejectedV1,
+                      Coordinator::Write::Events::CommandRejectedV2 then "rejected"
                  else "registered"
                  end
         new(

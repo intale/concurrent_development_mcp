@@ -2,6 +2,14 @@ module Coordinator
   module Write
     type command_input = Hash[String | Symbol, untyped]
     type event_data = Hash[String | Symbol, untyped]
+    type expected_revision = Integer |
+                             Symbol |
+                             Hash[
+                               String,
+                               Integer |
+                               Symbol |
+                               { expected_revision: Integer | Symbol, ?markers: Array[String] }
+                             ]
     type coordination_command = Commands::RegisterRepository |
                                 Commands::ResolveResource |
                                 Commands::RemoveResource |
@@ -75,6 +83,8 @@ module Coordinator
 
       def read_global_marked: (GlobalMarkedEventReadCriteria) -> Array[PgEventstore::Event]
 
+      def read_command_events: (CommandEventReadCriteria) -> Array[PgEventstore::Event]
+
       def read_latest_global_marked: (GlobalMarkedEventReadCriteria) -> PgEventstore::Event?
 
       def read_global_marked_page: (GlobalMarkedEventPageCriteria) -> Array[PgEventstore::Event]
@@ -86,7 +96,7 @@ module Coordinator
       def append: (
         StreamReference,
         Array[PgEventstore::Event],
-        ?expected_revision: Integer | Symbol | nil
+        ?expected_revision: expected_revision?
       ) -> Array[PgEventstore::Event]
     end
   end

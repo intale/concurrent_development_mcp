@@ -214,7 +214,7 @@ RSpec.describe Coordinator::Container do
         "merge-snapshot-verification-v1",
         "operation-batch-runner-v1",
         "release-set-lifecycle-v1",
-        "resource-boundary-maintenance-v1",
+        "resource-boundary-maintenance-v2",
         "verification-evidence-outcome-v1",
         "verification-obligation-validity-v1"
       ]

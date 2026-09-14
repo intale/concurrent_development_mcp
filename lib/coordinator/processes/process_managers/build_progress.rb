@@ -63,7 +63,7 @@ module Coordinator::Processes
           )
           command = @command_builder.call(source:, dependency:, command_id: process_step.target_command_id)
           result = @satisfy_dependency.call_command(command, caused_by: process_step.event)
-          handle_result!(result, identifier: command.dependency_id)
+          handle_result!(result, identifier: command.dependency_id, process_step:)
         end
         complete(source) if completion_source?(source)
         nil
@@ -89,7 +89,7 @@ module Coordinator::Processes
         )
         command = @command_builder.completion(source:, command_id: process_step.target_command_id)
         result = @complete_change_set.call_command(command, caused_by: process_step.event)
-        handle_result!(result, identifier: command.change_set_id)
+        handle_result!(result, identifier: command.change_set_id, process_step:)
       end
 
       def dependencies_for(source)
@@ -99,13 +99,11 @@ module Coordinator::Processes
         end
       end
 
-      def handle_result!(result, identifier:)
+      def handle_result!(result, identifier:, process_step:)
         return if result.success?
         return if HANDLED_OUTCOME_CODES.include?(result.failure.code)
 
-        failure = result.failure
-        raise BuildProgressProcessRejected,
-              "#{identifier}: #{failure.code} - #{failure.message}"
+        @process_step_planner.record_dispatch_failure(process_step:, failure: result.failure)
       end
     end
   end

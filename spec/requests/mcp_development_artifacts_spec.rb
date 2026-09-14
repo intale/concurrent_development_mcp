@@ -987,13 +987,8 @@ RSpec.describe "ART-01 MCP Development Artifacts" do
   end
 
   def batch_item_command_id(batch_id, request_id:)
-    created = batch_events(batch_id).find { _1.type == "OperationBatchCreated" }
-    payload = Coordinator::Write::EventSchemaRegistry.new.load(
-      type: created.type,
-      schema_version: created.metadata.fetch("schema_version"),
-      data: created.data
-    )
-    payload.items.find { _1.request_id == request_id }.command_id
+    snapshot = Coordinator::Write::OperationBatches::Loader.new(event_store:).call(batch_id)
+    snapshot.state.items.find { _1.request_id == request_id }.command_id
   end
 
   def load_result(command_id)

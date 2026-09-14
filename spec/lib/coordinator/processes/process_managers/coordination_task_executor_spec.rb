@@ -98,14 +98,15 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
 
     submitted, started, completed = task_events(task_id)
     registration, command_terminal = command_events(task_id)
-    target_events = change_set_events + [ command_terminal ]
+    target_events = CommandTraceFixture.domain_events(task_id, event_store:)
 
     expect(registration.causation_id).to be_nil
     expect(submitted.causation_id).to eq(registration.id)
     expect(started.causation_id).to eq(submitted.id)
     expect(target_events.map(&:causation_id).uniq).to eq([ started.id ])
+    expect(command_terminal.causation_id).to eq(target_events.last.id)
     expect(completed.causation_id).to eq(command_terminal.id)
-    expect(([ registration, submitted, started, completed ] + target_events).map(&:correlation_id).uniq).to eq(
+    expect(([ registration, submitted, started, command_terminal, completed ] + target_events).map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
     )
   end
@@ -139,7 +140,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
     expect(state.status).to eq("completed")
     rejected = command_events(task_id).last
     expect(rejected).to have_attributes(type: "CommandRejected")
-    expect(rejected.data).to include("code" => "change_set_already_exists")
+    expect(rejected.data.dig("error", "code")).to eq("change_set_already_exists")
     expect(completed.causation_id).to eq(rejected.id)
     expect([ submitted, started, rejected, completed ].map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
@@ -164,7 +165,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::CoordinationTaskExecutor
         %w[CoordinationTaskSubmitted CoordinationTaskExecutionStarted CoordinationTaskCompleted]
       )
       terminal = command_events(task_id).last
-      expect(terminal.data).to include("code" => code)
+      expect(terminal.data.dig("error", "code")).to eq(code)
     end
   end
 

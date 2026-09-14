@@ -39,13 +39,20 @@ RSpec.describe "BAT-01 MCP Operation Batches" do
       )
     )
 
-    created_event = batch_events(batch_id).sole
-    created_payload = load_event(created_event)
+    creation_events = batch_events(batch_id)
+    created_event = creation_events.find { _1.type == "OperationBatchCreated" }
     expect(created_event.metadata.fetch("schema_version")).to eq(2)
-    expect(created_event.data.keys).to match_array(%w[batch_id items page_size target_tool])
-    expect(created_payload.items.map(&:request_id)).to eq(%w[item-1 item-2])
-    expect(created_payload.items.map(&:command_id)).to all(match(Coordinator::Write::Types::UUID_V7_PATTERN))
-    created_payload.items.each do |item|
+    expect(created_event.data.keys).to eq([ "batch_id" ])
+    expect(creation_events.map(&:type)).to eq(%w[
+      OperationBatchCreated
+      OperationBatchTargetSelected
+      OperationBatchItemEnqueued
+      OperationBatchItemEnqueued
+    ])
+    items = Coordinator::Write::OperationBatches::Loader.new(event_store:).call(batch_id).state.items
+    expect(items.map(&:request_id)).to eq(%w[item-1 item-2])
+    expect(items.map(&:command_id)).to all(match(Coordinator::Write::Types::UUID_V7_PATTERN))
+    items.each do |item|
       expect(command_events(item.command_id).map(&:type)).to eq([ "CommandRegistered" ])
     end
 
@@ -53,19 +60,28 @@ RSpec.describe "BAT-01 MCP Operation Batches" do
     persisted_batch_events = batch_events(batch_id)
     expect(persisted_batch_events.map(&:type)).to eq(%w[
       OperationBatchCreated
+      OperationBatchTargetSelected
+      OperationBatchItemEnqueued
+      OperationBatchItemEnqueued
       OperationBatchItemSucceeded
+      OperationBatchItemCompletionLinked
       OperationBatchItemRejected
+      OperationBatchItemCompletionLinked
       OperationBatchCompleted
     ])
     expect(persisted_batch_events.map(&:correlation_id).uniq).to contain_exactly(created_event.correlation_id)
 
-    outcomes = persisted_batch_events.select { _1.type.start_with?("OperationBatchItem") }
-    expect(outcomes.map { _1.data.keys }).to all(match_array(%w[batch_id command_id index]))
+    succeeded = persisted_batch_events.find { _1.type == "OperationBatchItemSucceeded" }
+    rejected = persisted_batch_events.find { _1.type == "OperationBatchItemRejected" }
+    links = persisted_batch_events.select { _1.type == "OperationBatchItemCompletionLinked" }
+    expect(succeeded.data.keys).to match_array(%w[batch_id command_id index])
+    expect(rejected.data.keys).to match_array(%w[batch_id code command_id index reason retryable])
+    expect(links.map { _1.data.keys }).to all(match_array(%w[batch_id command_id completion index]))
     expect(persisted_batch_events.last.data.keys).to eq([ "batch_id" ])
-    expect(command_events(created_payload.items.fetch(0).command_id).map(&:type)).to eq(
+    expect(command_events(items.fetch(0).command_id).map(&:type)).to eq(
       %w[CommandRegistered CommandSucceeded]
     )
-    expect(command_events(created_payload.items.fetch(1).command_id).map(&:type)).to eq(
+    expect(command_events(items.fetch(1).command_id).map(&:type)).to eq(
       %w[CommandRegistered CommandRejected]
     )
   end

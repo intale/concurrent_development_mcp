@@ -15,7 +15,7 @@ module Coordinator
           event_store: Write::_EventStore,
           ?contract: SourceContract,
           ?schema_registry: Write::EventSchemaRegistry,
-          ?marker_builder: Write::RepositoryMarkerBuilder,
+          ?intention_loader: Write::WorkIntentionLoader,
           ?process_step_planner: Coordinator::Processes::ProcessStepPlanner,
           ?operation: Write::Operations::ExecuteRollResourceBoundaryEpoch
         ) -> void

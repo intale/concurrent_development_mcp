@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module OperationBatches
+      class ItemBuilder
+        def call: (event: PgEventstore::Event, payload: Events::OperationBatchItemEnqueuedV1) -> ItemV2
+      end
+    end
+  end
+end

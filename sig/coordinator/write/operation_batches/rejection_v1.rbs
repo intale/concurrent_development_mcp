@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module OperationBatches
+      class RejectionV1 < Shared::Value
+        def code: () -> String
+        def reason: () -> String
+        def retryable: () -> bool
+      end
+    end
+  end
+end

@@ -27,6 +27,21 @@ module Coordinator::Write
         base.failure("target Command terminal state must match the Batch item outcome") unless matches
       end
 
+      rule(:command, :command_state) do
+        command = values[:command]
+        state = values[:command_state]
+        rejection = command.rejection
+        matches = if command.outcome == "rejected"
+                    rejection &&
+                      rejection.code == state.rejection_code &&
+                      rejection.reason == state.rejection_reason &&
+                      rejection.retryable == state.rejection_retryable
+        else
+                    rejection.nil?
+        end
+        base.failure("rejection details must exactly match the target Command") unless matches
+      end
+
       rule(:command, :physical_target_event) do
         reference = values[:command].target_event
         physical = values[:physical_target_event]

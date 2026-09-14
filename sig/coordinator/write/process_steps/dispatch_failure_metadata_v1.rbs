@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module ProcessSteps
+      class DispatchFailureMetadataV1 < Shared::Value
+        def command_id: () -> String
+        def actor_kind: () -> String
+        def actor_id: () -> String
+        def actor_authenticated: () -> bool
+        def recorded_by: () -> String
+        def policy_version: () -> String
+        def diagnostic_source: () -> String
+      end
+    end
+  end
+end

@@ -2,7 +2,7 @@ module Coordinator
   module Write
     class WorkIntentionBoundaryLoader
       def initialize: (event_store: _EventStore, ?schema_registry: EventSchemaRegistry, ?resource_loader: WorkIntentionResourceLoader) -> void
-      def call: (Array[String] markers, repository_id: String, at: String) -> Dry::Monads::Result
+      def call: (Array[String] markers, repository_id: String, at: String, ?maximum_count: Integer, ?to_position: Integer, ?resolve_active_observations: bool) -> Dry::Monads::Result
     end
   end
 end

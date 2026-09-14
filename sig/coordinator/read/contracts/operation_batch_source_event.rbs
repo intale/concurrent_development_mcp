@@ -2,6 +2,8 @@ module Coordinator
   module Read
     module Contracts
       class OperationBatchSourceEvent < Dry::Validation::Contract
+        EVENT_VERSIONS: Hash[String, Integer]
+
         def call: (Hash[Symbol, untyped] input) -> Dry::Validation::Result
       end
     end

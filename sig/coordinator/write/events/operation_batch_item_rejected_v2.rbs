@@ -5,6 +5,9 @@ module Coordinator
         def batch_id: () -> String
         def index: () -> Integer
         def command_id: () -> String
+        def code: () -> String
+        def reason: () -> String
+        def retryable: () -> bool
       end
     end
   end

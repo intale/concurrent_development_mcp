@@ -55,13 +55,20 @@ module Coordinator::Read
 
       def store(event:, payload:)
         record = Coordinator::Read::OperationBatch.lock.find_or_initialize_by(batch_id: payload.batch_id)
+        save_from_event(record, event:) if record.new_record?
         case payload
         when Coordinator::Write::Events::OperationBatchCreatedV2
           store_creation(record, event, payload)
+        when Coordinator::Write::Events::OperationBatchTargetSelectedV1
+          store_target_selection(record, event, payload)
+        when Coordinator::Write::Events::OperationBatchItemEnqueuedV1
+          store_item(record, payload, event:)
         when Coordinator::Write::Events::OperationBatchItemSucceededV2
           store_outcome(record, event, payload, status: "succeeded")
         when Coordinator::Write::Events::OperationBatchItemRejectedV2
           store_outcome(record, event, payload, status: "rejected")
+        when Coordinator::Write::Events::OperationBatchItemCompletionLinkedV1
+          store_completion_link(record, event, payload)
         when Coordinator::Write::Events::OperationBatchCancellationRequestedV2
           store_cancellation(record, event, payload)
         when Coordinator::Write::Events::OperationBatchCompletedV2
@@ -100,11 +107,8 @@ module Coordinator::Read
         end
 
         save_from_event(record, event:, attributes: {
-          target_tool: payload.target_tool,
-          total: payload.items.length,
-          page_size: payload.page_size,
+          page_size: event.metadata.fetch("page_size"),
           manifest_digest:,
-          encoded_byte_size: event.metadata.fetch("encoded_byte_size"),
           created_event: event_reference(event).to_h,
           created_actor: actor(event).to_h,
           created_markers: event.markers,
@@ -115,26 +119,36 @@ module Coordinator::Read
           created_at_domain: event.created_at,
           created_at_store: event.created_at
         })
-        payload.items.each { store_item(record, _1, event:) }
       end
 
-      def store_item(batch, item, event:)
+      def store_target_selection(record, event, payload)
+        if record.target_tool && record.target_tool != payload.target_tool
+          raise ProjectionStateError, "Operation Batch target changed for one stream"
+        end
+
+        save_from_event(record, event:, attributes: { target_tool: payload.target_tool })
+      end
+
+      def store_item(batch, payload, event:)
+        input = payload.input
         record = Coordinator::Read::OperationBatchItem.find_or_initialize_by(
           batch_id: batch.batch_id,
-          item_index: item.index
+          item_index: payload.index
         )
         attributes = {
-          target_tool: item.command_input.tool_name,
-          command_id: item.request_id,
-          target_command_id: item.command_id,
-          canonical_input_digest: item.canonical_input_digest,
-          arguments: @arguments_builder.call(item.command_input).merge(command_id: item.request_id)
+          target_tool: input.tool_name,
+          command_id: input.command_id,
+          target_command_id: payload.command_id,
+          canonical_input_digest: event.metadata.fetch("canonical_input_digest"),
+          encoded_byte_size: event.metadata.fetch("encoded_byte_size"),
+          arguments: @arguments_builder.call(input)
         }
         if record.persisted?
           matches = record.target_tool == attributes.fetch(:target_tool) &&
                     record.command_id == attributes.fetch(:command_id) &&
                     record.target_command_id == attributes.fetch(:target_command_id) &&
                     record.canonical_input_digest == attributes.fetch(:canonical_input_digest) &&
+                    record.encoded_byte_size == attributes.fetch(:encoded_byte_size) &&
                     record.arguments == attributes.fetch(:arguments).deep_stringify_keys
           unless matches
             raise ProjectionStateError, "Operation Batch manifest item changed for one stream"
@@ -145,6 +159,7 @@ module Coordinator::Read
 
         save_from_event(record, event:, attributes:)
         backfill_outcome(record, event:)
+        refresh_manifest(batch, event:)
       end
 
       def store_outcome(record, event, payload, status:)
@@ -166,7 +181,7 @@ module Coordinator::Read
           target_command_id: payload.command_id,
           canonical_input_digest: item&.canonical_input_digest,
           status:,
-          result: {},
+          result: outcome_result(payload),
           outcome_event: event_reference(event).to_h,
           outcome_actor: actor(event).to_h,
           outcome_markers: event.markers,
@@ -181,10 +196,52 @@ module Coordinator::Read
       end
 
       def verify_outcome!(outcome, payload, status:)
-        matches = outcome.target_command_id == payload.command_id && outcome.status == status
+        matches = outcome.target_command_id == payload.command_id &&
+                  outcome.status == status &&
+                  outcome.result == outcome_result(payload).deep_stringify_keys
         return if matches
 
         raise ProjectionStateError, "Operation Batch item has conflicting outcomes"
+      end
+
+      def store_completion_link(record, event, payload)
+        outcome = Coordinator::Read::OperationBatchOutcome.find_by(
+          batch_id: record.batch_id,
+          item_index: payload.index
+        )
+        unless outcome && outcome.target_command_id == payload.command_id
+          raise ProjectionStateError, "Operation Batch completion link has no matching item outcome"
+        end
+
+        attributes = {
+          completion_event: payload.completion.to_h,
+          completion_link_event: event_reference(event).to_h
+        }
+        if outcome.completion_event && outcome.completion_event != attributes.fetch(:completion_event).deep_stringify_keys
+          raise ProjectionStateError, "Operation Batch item has conflicting completion links"
+        end
+
+        save_from_event(outcome, event:, attributes:)
+      end
+
+      def outcome_result(payload)
+        return {} unless payload.is_a?(Coordinator::Write::Events::OperationBatchItemRejectedV2)
+
+        { code: payload.code, reason: payload.reason, retryable: payload.retryable }
+      end
+
+      def refresh_manifest(record, event:)
+        relation = Coordinator::Read::OperationBatchItem.where(batch_id: record.batch_id)
+        target_tools = relation.distinct.pluck(:target_tool)
+        if target_tools.many? || (record.target_tool && target_tools.any? && !target_tools.include?(record.target_tool))
+          raise ProjectionStateError, "Operation Batch items do not match its selected target"
+        end
+
+        save_from_event(record, event:, attributes: {
+          target_tool: record.target_tool || target_tools.first,
+          total: relation.count,
+          encoded_byte_size: relation.sum(:encoded_byte_size)
+        })
       end
 
       def backfill_outcome(item, event:)

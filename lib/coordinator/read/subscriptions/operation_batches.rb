@@ -14,8 +14,11 @@ module Coordinator::Read
         ],
         event_types: %w[
           OperationBatchCreated
+          OperationBatchTargetSelected
+          OperationBatchItemEnqueued
           OperationBatchItemSucceeded
           OperationBatchItemRejected
+          OperationBatchItemCompletionLinked
           OperationBatchContinuationRequested
           OperationBatchCancellationRequested
           OperationBatchCancelled

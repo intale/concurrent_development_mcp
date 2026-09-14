@@ -1,0 +1,20 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecuteRecordProcessStepDispatchFailure
+        def initialize: (
+          event_store: _EventStore,
+          ?decider: Domain::ProcessSteps::RecordDispatchFailure,
+          ?stream_factory: StreamFactory,
+          ?schema_registry: EventSchemaRegistry,
+          ?event_factory: EventFactory,
+          ?id_generator: IdGenerator
+        ) -> void
+        def call_command: (
+          Commands::RecordProcessStepDispatchFailure command,
+          caused_by: PgEventstore::Event
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

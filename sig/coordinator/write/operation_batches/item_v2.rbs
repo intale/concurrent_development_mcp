@@ -7,6 +7,7 @@ module Coordinator
         def command_input: () -> (CommandInputDocuments::PublishSkillRevisionV2 | CommandInputDocuments::CaptureDevelopmentArtifactV2 | CommandInputDocuments::DeclareDevelopmentArtifactRelationV1)
         def canonical_input_digest: () -> String
         def command_id: () -> String
+        def submitted_input: () -> (CommandInputDocuments::PublishSkillRevisionV2 | CommandInputDocuments::CaptureDevelopmentArtifactV2 | CommandInputDocuments::DeclareDevelopmentArtifactRelationV1)
       end
     end
   end

@@ -29,10 +29,7 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
     register_command
     append_task_submission
     domain_events = append_change_set_facts
-    terminal = append_terminal(
-      Coordinator::Write::Events::CommandSucceededV1.new(command_id:),
-      emitted_events: domain_events.map { event_reference(_1) }
-    )
+    terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
 
     result = assemble.call(terminal)
 
@@ -59,13 +56,11 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
       )
     )
     terminal = append_terminal(
-      Coordinator::Write::Events::CommandRejectedV1.new(
+      Coordinator::Write::Events::CommandRejectedV2.new(
         command_id:,
-        code: rejection.code,
-        reason: rejection.message,
+        error: rejection,
         retryable: false
-      ),
-      rejection:
+      )
     )
 
     result = assemble.call(terminal)
@@ -173,10 +168,7 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
       register_command
       append_task_submission
       observation = append_canonical_artifact_observation
-      terminal = append_terminal(
-        Coordinator::Write::Events::CommandSucceededV1.new(command_id:),
-        emitted_events: [ event_reference(observation) ]
-      )
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
 
       result = assemble.call(terminal)
 
@@ -261,12 +253,9 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
           artifact_id:, title: "Updated"
         ),
         metadata: command_metadata(policy_version: "development-artifact-repository/v2"),
-        markers: [ "development-artifact:#{artifact_id}" ]
+        markers: [ "development-artifact:#{artifact_id}", "command:#{command_id}" ]
       )
-      terminal = append_terminal(
-        Coordinator::Write::Events::CommandSucceededV1.new(command_id:),
-        emitted_events: [ event_reference(fact) ]
-      )
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
 
       result = assemble.call(terminal)
 
@@ -320,12 +309,9 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
           normalized_locator: nil
         ),
         metadata: command_metadata(policy_version: "development-artifact-repository/v2"),
-        markers: [ "development-artifact-relation:#{relation_id}" ]
+        markers: [ "development-artifact-relation:#{relation_id}", "command:#{command_id}" ]
       )
-      terminal = append_terminal(
-        Coordinator::Write::Events::CommandSucceededV1.new(command_id:),
-        emitted_events: [ event_reference(declaration) ]
-      )
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
 
       result = assemble.call(terminal)
 
@@ -374,12 +360,9 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
           reason: command.reason
         ),
         metadata: command_metadata(policy_version: "development-artifact-repository/v2"),
-        markers: [ "development-artifact:#{artifact_id}" ]
+        markers: [ "development-artifact:#{artifact_id}", "command:#{command_id}" ]
       )
-      terminal = append_terminal(
-        Coordinator::Write::Events::CommandSucceededV1.new(command_id:),
-        emitted_events: [ event_reference(correction) ]
-      )
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
 
       result = assemble.call(terminal)
 
@@ -415,11 +398,8 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
       append_work_intention_set
       register_command
       append_task_submission
-      domain_events = append_abandonment_facts
-      terminal = append_terminal(
-        Coordinator::Write::Events::CommandSucceededV1.new(command_id:),
-        emitted_events: domain_events.map { event_reference(_1) }
-      )
+      append_abandonment_facts
+      terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
 
       result = assemble.call(terminal)
 
@@ -641,18 +621,16 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
     )
   end
 
-  def append_terminal(payload, emitted_events: [], rejection: nil)
+  def append_terminal(payload)
     append(
       streams.command(command_id),
       payload,
-      metadata: Coordinator::Write::Metadata::CommandTerminalV1.new(
+      metadata: Coordinator::Write::EventMetadata.new(
         command_id:,
         actor_kind: "agent",
         actor_id: "assembly-spec",
         recorded_by: "coordinator",
-        policy_version: "command-lifecycle/v1",
-        emitted_events:,
-        rejection:
+        policy_version: "command-lifecycle/v1"
       ),
       markers: [ "command:#{command_id}", "tool:#{tool_name}" ],
       expected_revision: 0
@@ -695,14 +673,4 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
     )
   end
 
-  def event_reference(event)
-    Coordinator::Write::EventReference.new(
-      event_id: event.id,
-      type: event.type,
-      stream_context: event.stream.context,
-      stream_name: event.stream.stream_name,
-      stream_id: event.stream.stream_id,
-      stream_revision: event.stream_revision
-    )
-  end
 end

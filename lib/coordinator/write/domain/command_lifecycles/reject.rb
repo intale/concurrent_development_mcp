@@ -19,18 +19,17 @@ module Coordinator::Write
 
         def reject_registered(command)
           Success(
-            Events::CommandRejectedV1.new(
+            Events::CommandRejectedV2.new(
               command_id: command.command_id,
-              code: command.code,
-              reason: command.reason,
+              error: command.error,
               retryable: command.retryable
             )
           )
         end
 
         def same_rejection?(state, command)
-          state.rejection_code == command.code &&
-            state.rejection_reason == command.reason &&
+          state.rejection_code == command.error.code &&
+            state.rejection_reason == command.error.message &&
             state.rejection_retryable == command.retryable
         end
 
@@ -57,7 +56,7 @@ module Coordinator::Write
             details: {
               command_id: state.command_id,
               existing_code: state.rejection_code,
-              requested_code: command.code
+              requested_code: command.error.code
             }
           )
         end

@@ -13,15 +13,25 @@ module Coordinator::Write
         def call(state:, command:, items:)
           return Failure(conflict(command)) if state.creation
 
-          event = Events::OperationBatchCreatedV2.new(
-            batch_id: command.batch_id,
-            target_tool: command.target_tool,
-            page_size: command.page_size,
-            items:
-          )
+          stream = @stream_factory.operation_batch(command.batch_id)
+          events = [
+            Events::OperationBatchCreatedV2.new(batch_id: command.batch_id),
+            Events::OperationBatchTargetSelectedV1.new(
+              batch_id: command.batch_id,
+              target_tool: command.target_tool
+            ),
+            *items.map do |item|
+              Events::OperationBatchItemEnqueuedV1.new(
+                batch_id: command.batch_id,
+                index: item.index,
+                command_id: item.command_id,
+                input: item.submitted_input
+              )
+            end
+          ]
           Success(
             EventPlan.new(
-              writes: [ EventWrite.new(stream: @stream_factory.operation_batch(command.batch_id), event:) ]
+              writes: events.map { EventWrite.new(stream:, event: _1) }
             )
           )
         end

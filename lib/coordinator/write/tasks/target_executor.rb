@@ -138,10 +138,9 @@ module Coordinator::Write
           transition = if result.success?
                          succeed(
                            command,
-                           completion: result.value!,
                            actor: command.actor,
                            tool_name: contract.tool_name,
-                           caused_by:
+                           caused_by: terminal_parent(result.value!, fallback: caused_by)
                          )
                        else
                          reject(
@@ -182,14 +181,13 @@ module Coordinator::Write
         end
       end
 
-      def succeed(command, completion:, actor:, tool_name:, caused_by:)
+      def succeed(command, actor:, tool_name:, caused_by:)
         @command_transition.call(
           command: Commands::SucceedCommand.new(command_id: command.command_id),
           decider: @succeed_command,
           actor:,
           tool_name:,
-          caused_by:,
-          emitted_events: completion.emitted_events
+          caused_by:
         )
       end
 
@@ -197,27 +195,39 @@ module Coordinator::Write
         @command_transition.call(
           command: Commands::RejectCommand.new(
             command_id: command.command_id,
-            code: error.code.to_s,
-            reason: error.message,
+            error: DomainErrorV1::Type[
+              {
+                code: error.code.to_s,
+                message: error.message,
+                details: error.details
+              }
+            ],
             retryable: @rejection_retryability.call(error)
           ),
           decider: @reject_command,
           actor:,
           tool_name:,
-          caused_by:,
-          rejection: domain_error(error)
+          caused_by:
         )
       end
 
-      def domain_error(error)
-        DomainErrorV1::Type[
-          {
-            code: error.code.to_s,
-            message: error.message,
-            details: error.details
-          }
-        ]
+      def terminal_parent(completion, fallback:)
+        reference = completion.emitted_events.last
+        return fallback unless reference
+
+        event = @event_store.read_at(
+          StreamReference.new(
+            context: reference.stream_context,
+            stream_name: reference.stream_name,
+            stream_id: reference.stream_id
+          ),
+          reference.stream_revision
+        )
+        return event if event&.id == reference.event_id && event.type == reference.type
+
+        raise InvalidCommandHistory, "Command completion references a missing terminal parent"
       end
+
     end
   end
 end

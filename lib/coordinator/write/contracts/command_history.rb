@@ -27,7 +27,8 @@ module Coordinator::Write
         next if terminal.empty?
         next if terminal.one? && (
           terminal.first.is_a?(Events::CommandSucceededV1) ||
-          terminal.first.is_a?(Events::CommandRejectedV1)
+          terminal.first.is_a?(Events::CommandRejectedV1) ||
+          terminal.first.is_a?(Events::CommandRejectedV2)
         )
 
         key.failure("must contain at most one supported terminal fact")

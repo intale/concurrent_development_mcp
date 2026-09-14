@@ -8,12 +8,12 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
   let(:stream) { Coordinator::Write::StreamFactory.new.operation_batch(batch_id) }
   let(:correlation_id) { SecureRandom.uuid_v7 }
 
-  it "converges idempotently under reversed delivery and serves the immutable manifest in bounded pages" do
-    created, succeeded, rejected, completed = completed_events
-    events = [ created, succeeded, rejected, completed ]
+  it "converges idempotently under redelivery and serves the immutable manifest in bounded pages" do
+    events = completed_events
+    created = events.find { _1.type == "OperationBatchCreated" }
 
-    events.reverse_each { projector.call(_1) }
     events.each { projector.call(_1) }
+    events.reverse_each { projector.call(_1) }
 
     first = fetch(limit: 1)
     expect(first).to have_attributes(
@@ -46,15 +46,16 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
   end
 
   it "exposes accepted cancellation before terminal completion and marks only terminal remainder not run" do
-    created = batch_event(created_payload(skill_items), revision: 0, position: 100)
+    manifest = manifest_events(skill_items)
+    created = manifest.first
     cancellation = batch_event(
       Coordinator::Write::Events::OperationBatchCancellationRequestedV2.new(batch_id:),
-      revision: 1,
+      revision: manifest.length,
       position: 200,
       causation_id: created.id
     )
 
-    projector.call(created)
+    manifest.each { projector.call(_1) }
     projector.call(cancellation)
     cancelling = fetch(limit: 100)
     expect(cancelling).to have_attributes(status: "cancelling", pending: 2, not_run: 0)
@@ -64,7 +65,7 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
 
     cancelled = batch_event(
       Coordinator::Write::Events::OperationBatchCancelledV2.new(batch_id:),
-      revision: 2,
+      revision: manifest.length + 1,
       position: 300,
       causation_id: cancellation.id
     )
@@ -78,13 +79,9 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
 
   it "projects a Development Artifact relation batch using its current command envelope" do
     item = relation_item
-    event = batch_event(
-      created_payload([ item ], target_tool: "development_artifact_relation_declare"),
-      revision: 0,
-      position: 100
-    )
-
-    projector.call(event)
+    manifest_events([ item ], target_tool: "development_artifact_relation_declare").each do |event|
+      projector.call(event)
+    end
 
     batch = fetch(limit: 100)
     expect(batch).to have_attributes(
@@ -103,34 +100,49 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
 
   def completed_events
     items = skill_items
-    created = batch_event(created_payload(items), revision: 0, position: 100)
+    events = manifest_events(items)
     succeeded = batch_event(
       Coordinator::Write::Events::OperationBatchItemSucceededV2.new(
         batch_id:,
         index: 0,
         command_id: items.fetch(0).command_id
       ),
-      revision: 1,
+      revision: events.length,
       position: 200,
-      causation_id: created.id
+      causation_id: events.first.id
+    )
+    succeeded_link = completion_link_event(
+      item: items.fetch(0),
+      revision: events.length + 1,
+      position: 250,
+      causation_id: succeeded.id
     )
     rejected = batch_event(
       Coordinator::Write::Events::OperationBatchItemRejectedV2.new(
         batch_id:,
         index: 1,
-        command_id: items.fetch(1).command_id
+        command_id: items.fetch(1).command_id,
+        code: "skill_revision_conflict",
+        reason: "Skill revision changed",
+        retryable: false
       ),
-      revision: 2,
+      revision: events.length + 2,
       position: 300,
-      causation_id: created.id
+      causation_id: events.first.id
+    )
+    rejected_link = completion_link_event(
+      item: items.fetch(1),
+      revision: events.length + 3,
+      position: 350,
+      causation_id: rejected.id
     )
     completed = batch_event(
       Coordinator::Write::Events::OperationBatchCompletedV2.new(batch_id:),
-      revision: 3,
+      revision: events.length + 4,
       position: 400,
-      causation_id: created.id
+      causation_id: events.first.id
     )
-    [ created, succeeded, rejected, completed ]
+    [ *events, succeeded, succeeded_link, rejected, rejected_link, completed ]
   end
 
   def skill_items
@@ -198,12 +210,42 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
     )
   end
 
-  def created_payload(items, target_tool: "skill_publish")
-    Coordinator::Write::Events::OperationBatchCreatedV2.new(
-      batch_id:,
-      target_tool:,
-      page_size: Coordinator::Shared::Types::OPERATION_BATCH_PAGE_SIZE,
-      items:
+  def manifest_events(items, target_tool: "skill_publish")
+    payloads = [
+      Coordinator::Write::Events::OperationBatchCreatedV2.new(batch_id:),
+      Coordinator::Write::Events::OperationBatchTargetSelectedV1.new(batch_id:, target_tool:),
+      *items.map do |item|
+        Coordinator::Write::Events::OperationBatchItemEnqueuedV1.new(
+          batch_id:,
+          index: item.index,
+          command_id: item.command_id,
+          input: item.submitted_input
+        )
+      end
+    ]
+    payloads.each_with_index.map do |payload, revision|
+      batch_event(payload, revision:, position: 100 + revision)
+    end
+  end
+
+  def completion_link_event(item:, revision:, position:, causation_id:)
+    batch_event(
+      Coordinator::Write::Events::OperationBatchItemCompletionLinkedV1.new(
+        batch_id:,
+        index: item.index,
+        command_id: item.command_id,
+        completion: Coordinator::Write::EventReference.new(
+          event_id: SecureRandom.uuid_v7,
+          type: "CommandSucceeded",
+          stream_context: "CoordinatorControl",
+          stream_name: "Command",
+          stream_id: item.command_id,
+          stream_revision: 1
+        )
+      ),
+      revision:,
+      position:,
+      causation_id:
     )
   end
 
@@ -231,16 +273,22 @@ RSpec.describe Coordinator::Read::Projectors::OperationBatchesV2, :read_model do
       recorded_by: "coordinator",
       policy_version: "operation-batch/v2"
     }
-    return Coordinator::Write::EventMetadata.new(common) unless payload.is_a?(
-      Coordinator::Write::Events::OperationBatchCreatedV2
-    )
-
-    Coordinator::Write::Metadata::OperationBatchCreationV2.new(
-      **common,
-      canonical_input_digest: "sha256:#{'c' * 64}",
-      manifest_digest: "sha256:#{'d' * 64}",
-      encoded_byte_size: 1_000
-    )
+    case payload
+    when Coordinator::Write::Events::OperationBatchCreatedV2
+      Coordinator::Write::Metadata::OperationBatchCreationV2.new(
+        **common,
+        manifest_digest: "sha256:#{'d' * 64}",
+        page_size: Coordinator::Shared::Types::OPERATION_BATCH_PAGE_SIZE
+      )
+    when Coordinator::Write::Events::OperationBatchItemEnqueuedV1
+      Coordinator::Write::Metadata::OperationBatchItemV1.new(
+        **common,
+        canonical_input_digest: "sha256:#{payload.index.zero? ? 'a' * 64 : 'b' * 64}",
+        encoded_byte_size: 500
+      )
+    else
+      Coordinator::Write::EventMetadata.new(common)
+    end
   end
 
   def fetch(after_index: nil, limit:)

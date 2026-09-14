@@ -46,7 +46,8 @@ RSpec.describe "VER-02 MCP compatibility assessments", :event_store do
     evidence = evidence_events(created).sole
     command_terminal = CommandTraceFixture.terminal(task_id, event_store:)
     expect(evidence.causation_id).to eq(started.id)
-    expect(command_terminal.causation_id).to eq(started.id)
+    command_facts = CommandTraceFixture.domain_events(task_id, event_store:)
+    expect(command_terminal.causation_id).to eq(command_facts.last.id)
     expect(task_completed.causation_id).to eq(command_terminal.id)
     expect([ submitted, started, evidence, command_terminal, task_completed ].map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]

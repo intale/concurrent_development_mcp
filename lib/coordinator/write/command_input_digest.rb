@@ -1100,7 +1100,10 @@ module Coordinator::Write
           index: command.index,
           item_command_id: command.item_command_id,
           outcome: command.outcome,
-          target_event: CommandInputDocuments::EventReferenceV1.new(command.target_event.to_h)
+          target_event: CommandInputDocuments::EventReferenceV1.new(command.target_event.to_h),
+          rejection: command.rejection && CommandInputDocuments::OperationBatchItemRejectionV1.new(
+            command.rejection.to_h
+          )
         )
       )
     end

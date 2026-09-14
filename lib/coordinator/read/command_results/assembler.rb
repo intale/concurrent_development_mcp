@@ -255,10 +255,11 @@ module Coordinator::Read
       end
 
       def rejected(source)
-        attributes = source.terminal_event.metadata["rejection"]
-        raise InvalidProjectionSource, "CommandRejected has no typed rejection evidence" unless attributes
-
-        error = Coordinator::Write::Tasks::DomainErrorV1::Type[deep_symbolize(attributes)]
+        rejection = load_payload(source.terminal_event)
+        unless rejection.is_a?(Coordinator::Write::Events::CommandRejectedV2)
+          raise InvalidProjectionSource, "CommandRejected has no typed rejection evidence"
+        end
+        error = rejection.error
         @semantic_result_mapper.call(
           Failure(
             Coordinator::Write::OutcomeError.new(
@@ -1067,13 +1068,6 @@ module Coordinator::Read
         )
       end
 
-      def deep_symbolize(value)
-        case value
-        when Hash then value.to_h { |key, nested| [ key.to_sym, deep_symbolize(nested) ] }
-        when Array then value.map { deep_symbolize(_1) }
-        else value
-        end
-      end
     end
   end
 end

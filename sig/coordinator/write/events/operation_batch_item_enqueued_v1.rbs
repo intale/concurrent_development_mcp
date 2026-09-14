@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Events
+      class OperationBatchItemEnqueuedV1 < Base
+        def batch_id: () -> String
+        def index: () -> Integer
+        def command_id: () -> String
+        def input: () -> (CommandInputDocuments::PublishSkillRevisionV2 | CommandInputDocuments::CaptureDevelopmentArtifactV2 | CommandInputDocuments::DeclareDevelopmentArtifactRelationV1)
+      end
+    end
+  end
+end

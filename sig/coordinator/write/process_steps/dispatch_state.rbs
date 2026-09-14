@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module ProcessSteps
+      class DispatchState < Shared::Value
+        def self.reduce: (Array[Events::Base] events) -> DispatchState
+        def planned: () -> Events::ProcessStepPlannedV1
+        def failure: () -> Events::ProcessStepDispatchFailedV1?
+      end
+    end
+  end
+end

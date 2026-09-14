@@ -10,6 +10,7 @@ module Coordinator::Write
       attribute :item_command_id, Types::CommandId
       attribute :outcome, Types::String.enum("succeeded", "rejected")
       attribute :target_event, EventReference
+      attribute :rejection, OperationBatches::RejectionV1.optional
     end
   end
 end

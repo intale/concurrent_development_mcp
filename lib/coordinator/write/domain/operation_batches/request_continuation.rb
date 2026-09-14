@@ -35,7 +35,7 @@ module Coordinator::Write
 
         def valid_page?(state, command)
           first = state.pending_indexes.min
-          expected_end = [ first + state.creation.page_size - 1, state.creation.items.length - 1 ].min
+          expected_end = [ first + state.processing_page_size - 1, state.items.length - 1 ].min
           command.page_start == first && command.page_end == expected_end
         end
 

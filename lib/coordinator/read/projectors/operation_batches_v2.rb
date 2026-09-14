@@ -54,7 +54,11 @@ module Coordinator::Read
           actor_kind: event.metadata["actor_kind"],
           actor_id: event.metadata["actor_id"],
           recorded_by: event.metadata["recorded_by"],
-          policy_version: event.metadata["policy_version"]
+          policy_version: event.metadata["policy_version"],
+          manifest_digest: event.metadata["manifest_digest"],
+          page_size: event.metadata["page_size"],
+          canonical_input_digest: event.metadata["canonical_input_digest"],
+          encoded_byte_size: event.metadata["encoded_byte_size"]
         )
         raise InvalidProjectionSource, result.errors.to_h.inspect if result.failure?
       end

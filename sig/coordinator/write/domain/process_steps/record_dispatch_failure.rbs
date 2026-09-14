@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Domain
+      module ProcessSteps
+        class RecordDispatchFailure
+          def call: (
+            state: Coordinator::Write::ProcessSteps::DispatchState,
+            command: Commands::RecordProcessStepDispatchFailure
+          ) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

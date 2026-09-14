@@ -4,8 +4,7 @@ module Coordinator::Write
   module Commands
     class RejectCommand < Value
       attribute :command_id, Types::CommandId
-      attribute :code, Types::Identifier
-      attribute :reason, Types::String.constrained(min_size: 1, max_size: 2_000)
+      attribute :error, Tasks::DomainErrorV1::Type
       attribute :retryable, Types::Strict::Bool
     end
   end

@@ -28,10 +28,15 @@ RSpec.describe Coordinator::Write::Domain::CommandLifecycles::State do
   end
 
   it "folds the reason and retry signal of a rejected command" do
-    rejected = Coordinator::Write::Events::CommandRejectedV1.new(
+    rejected = Coordinator::Write::Events::CommandRejectedV2.new(
       command_id:,
-      code: "lease_busy",
-      reason: "Resource is already reserved",
+      error: Coordinator::Write::Tasks::DomainErrorV1::ChangeSetError.new(
+        code: "change_set_already_exists",
+        message: "ChangeSet already exists",
+        details: Coordinator::Write::Tasks::DomainErrorV1::ChangeSetDetails.new(
+          change_set_id: "CS-command-state"
+        )
+      ),
       retryable: true
     )
 
@@ -39,8 +44,8 @@ RSpec.describe Coordinator::Write::Domain::CommandLifecycles::State do
 
     expect(state.to_h).to include(
       status: "rejected",
-      rejection_code: "lease_busy",
-      rejection_reason: "Resource is already reserved",
+      rejection_code: "change_set_already_exists",
+      rejection_reason: "ChangeSet already exists",
       rejection_retryable: true
     )
   end

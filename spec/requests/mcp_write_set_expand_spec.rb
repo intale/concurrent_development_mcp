@@ -58,17 +58,16 @@ RSpec.describe "MCP work_intention_set_expand Task boundary", :event_store do
 
     submitted, started, task_completed = task_events(task_id)
     command_terminal = CommandTraceFixture.terminal(task_id, event_store:)
-    target_events = lease_events(added_resource_id) +
-                    expansion_events +
-                    [ command_terminal ]
+    target_events = CommandTraceFixture.domain_events(task_id, event_store:)
 
     expect(started.causation_id).to eq(submitted.id)
     expect(target_events.map(&:causation_id).uniq).to eq([ started.id ])
+    expect(command_terminal.causation_id).to eq(target_events.last.id)
     expect(task_completed.causation_id).to eq(command_terminal.id)
-    expect(([ submitted, started, task_completed ] + target_events).map(&:correlation_id).uniq).to eq(
+    expect(([ submitted, started, command_terminal, task_completed ] + target_events).map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
     )
-    expect(target_events).to all(satisfy do |event|
+    expect([ *target_events, command_terminal ]).to all(satisfy do |event|
       !event.metadata.key?("correlation_id") && !event.metadata.key?("causation_id")
     end)
   end
@@ -99,7 +98,7 @@ RSpec.describe "MCP work_intention_set_expand Task boundary", :event_store do
     expect(CommandTraceFixture.events(task_id, event_store:).map(&:type)).to eq(
       [ "CommandRegistered", "CommandRejected" ]
     )
-    expect(expansion_events).to be_empty
+    expect(CommandTraceFixture.domain_events(task_id, event_store:)).to be_empty
 
     malformed = submit_expansion(
       command_id: "cmd-mcp-malformed",
@@ -263,13 +262,6 @@ RSpec.describe "MCP work_intention_set_expand Task boundary", :event_store do
     event_store.read(streams.command(command_id), Coordinator::Write::EventQueries::COMMAND_HISTORY)
   end
 
-  def expansion_events
-    event_store.read(
-      streams.attempt(EXPAND_ATTEMPT_ID),
-      Coordinator::Write::EventQueries::ATTEMPT_FOR_WRITE_SET_EXPANSION
-    ).select { _1.type == "WriteSetExpanded" }
-  end
-
   def resolve_resource(path)
     @resource_ids ||= {}
     @resource_ids[path] ||= ResourceScenario.resolve(
@@ -280,14 +272,4 @@ RSpec.describe "MCP work_intention_set_expand Task boundary", :event_store do
     )
   end
 
-  def lease_events(resource_id)
-    event_store.read(
-      streams.resource_lease(resource_id),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "ResourceLeaseAcquired" ],
-        maximum_count: 10,
-        direction: :asc
-      )
-    )
-  end
 end

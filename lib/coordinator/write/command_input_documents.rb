@@ -879,6 +879,12 @@ module Coordinator::Write
       attribute :input, CancelOperationBatchInputV1
     end
 
+    class OperationBatchItemRejectionV1 < Value
+      attribute :code, Types::Identifier
+      attribute :reason, Types::String.constrained(min_size: 1, max_size: 2_000)
+      attribute :retryable, Types::Strict::Bool
+    end
+
     class RecordOperationBatchItemOutcomeInputV1 < Value
       attribute :actor, ActorV1
       attribute :batch_id, Types::OperationBatchId
@@ -886,6 +892,7 @@ module Coordinator::Write
       attribute :item_command_id, Types::CommandId
       attribute :outcome, Types::String.enum("succeeded", "rejected")
       attribute :target_event, EventReferenceV1
+      attribute :rejection, OperationBatchItemRejectionV1.optional
     end
 
     class RecordOperationBatchItemOutcomeV1 < BaseV1

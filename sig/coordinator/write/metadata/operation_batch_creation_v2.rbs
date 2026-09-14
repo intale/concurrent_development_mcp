@@ -2,9 +2,8 @@ module Coordinator
   module Write
     module Metadata
       class OperationBatchCreationV2 < EventMetadata
-        def canonical_input_digest: () -> String
         def manifest_digest: () -> String
-        def encoded_byte_size: () -> Integer
+        def page_size: () -> Integer
       end
     end
   end

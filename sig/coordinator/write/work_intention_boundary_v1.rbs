@@ -1,9 +1,19 @@
 module Coordinator
   module Write
     class WorkIntentionBoundaryV1 < Shared::Value
+      class EpochV1 < Shared::Value
+        def marker: () -> String
+        def epoch: () -> Integer
+        def through_global_position: () -> Integer?
+        def event: () -> PgEventstore::Event?
+      end
+
       State: singleton(Domain::WorkIntentions::State)
       Observation: singleton(WorkIntentionObservationV1)
 
+      def epochs: () -> Array[EpochV1]
+      def delta_event_count: () -> Integer
+      def active_state_count: () -> Integer
       def states: () -> Array[Domain::WorkIntentions::State]
       def active_observations: () -> Array[WorkIntentionObservationV1]
     end

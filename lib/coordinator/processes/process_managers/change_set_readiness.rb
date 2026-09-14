@@ -61,7 +61,7 @@ module Coordinator::Processes
               caused_by: process_step.event
             )
           )
-          handle_result!(result, command:)
+          handle_result!(result, command:, process_step:)
         end
 
         nil
@@ -88,12 +88,11 @@ module Coordinator::Processes
         end
       end
 
-      def handle_result!(result, command:)
+      def handle_result!(result, command:, process_step:)
         return if result.success?
         return if HANDLED_OUTCOME_CODES.include?(result.failure.code)
 
-        raise ReadinessTargetRejected,
-              "#{command.work_item_id}: #{result.failure.code} - #{result.failure.message}"
+        @process_step_planner.record_dispatch_failure(process_step:, failure: result.failure)
       end
     end
   end

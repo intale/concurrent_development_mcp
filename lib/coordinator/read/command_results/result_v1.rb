@@ -28,7 +28,9 @@ module Coordinator::Read
       attribute :next_actions,
                 Types::Array.of(Coordinator::Write::NextAction).constrained(max_size: 100)
       attribute :emitted_events,
-                Types::Array.of(Coordinator::Write::EventReference).constrained(max_size: 128)
+                Types::Array.of(Coordinator::Write::EventReference).constrained(
+                  max_size: Types::OPERATION_BATCH_MAXIMUM_HISTORY_EVENTS
+                )
       attribute :completed_at, Types::Timestamp
 
       def self.from_semantic(semantic_result:, tool_name:, canonical_input_digest:, emitted_events:, completed_at:)

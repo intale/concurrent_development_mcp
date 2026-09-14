@@ -11,9 +11,13 @@ module Coordinator::Read
       attribute :command_state, Types.Instance(CommandState)
       attribute :command, CommandType
       attribute :persisted_events,
-                Types::Array.of(Types.Instance(PgEventstore::Event)).constrained(max_size: 128)
+                Types::Array.of(Types.Instance(PgEventstore::Event)).constrained(
+                  max_size: Types::OPERATION_BATCH_MAXIMUM_HISTORY_EVENTS
+                )
       attribute :payloads,
-                Types::Array.of(Types.Instance(Coordinator::Write::Events::Base)).constrained(max_size: 128)
+                Types::Array.of(Types.Instance(Coordinator::Write::Events::Base)).constrained(
+                  max_size: Types::OPERATION_BATCH_MAXIMUM_HISTORY_EVENTS
+                )
 
       def completed_at
         terminal_event.created_at.utc.iso8601(6)

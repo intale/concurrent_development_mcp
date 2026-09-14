@@ -16,7 +16,8 @@ module Coordinator::Write
         outcome_contract: Contracts::OperationBatchItemOutcome.new,
         command_loader: CommandLifecycle::Loader.new(event_store:),
         request_marker: CommandLifecycle::RequestMarker.new,
-        target_builder: Tasks::TargetCommandBuilder.new
+        target_builder: Tasks::TargetCommandBuilder.new,
+        manifest_builder: OperationBatches::ManifestBuilder.new
       )
         @event_store = event_store
         @loader = loader
@@ -31,11 +32,13 @@ module Coordinator::Write
         @command_loader = command_loader
         @request_marker = request_marker
         @target_builder = target_builder
+        @manifest_builder = manifest_builder
       end
 
       def call_command(command, caused_by: nil)
         input_digest = @input_digest.call(command)
-        domain_event_id = @id_generator.uuid_v7
+        domain_event_ids = allocate_domain_event_ids(command)
+        correlation_id = caused_by&.correlation_id || @id_generator.uuid_v7
         allocations = item_allocations(command)
 
         steps do
@@ -43,7 +46,8 @@ module Coordinator::Write
             execute_attempt(
               command:,
               input_digest:,
-              domain_event_id:,
+              domain_event_ids:,
+              correlation_id:,
               allocations:,
               caused_by:
             )
@@ -53,7 +57,7 @@ module Coordinator::Write
 
       private
 
-      def execute_attempt(command:, input_digest:, domain_event_id:, allocations:, caused_by:)
+      def execute_attempt(command:, input_digest:, domain_event_ids:, correlation_id:, allocations:, caused_by:)
         snapshot = @loader.call(command.batch_id)
         verify_outcome!(snapshot.state, command) if command.is_a?(Commands::RecordOperationBatchItemOutcome)
         registrations = step registration_plans(command, state: snapshot.state, allocations:)
@@ -64,22 +68,23 @@ module Coordinator::Write
         )
         return decision if decision.failure?
 
-        domain_event = decision.value!.events.sole
-        batch_event = persist_domain(
+        domain_event = decision.value!.events.first
+        batch_events = persist_domain(
           decision.value!,
           command:,
-          event_id: domain_event_id,
+          event_ids: domain_event_ids,
+          correlation_id:,
           input_digest:,
           caused_by:
-        ).sole
-        persist_registrations(registrations, batch_event:)
+        )
+        persist_registrations(registrations, batch_events:)
         Success(
           build_completion(
             command:,
             event: domain_event,
             input_digest:,
-            persisted_events: [ batch_event ],
-            completed_at: batch_event.created_at.utc.iso8601(6)
+            persisted_events: batch_events,
+            completed_at: batch_events.last.created_at.utc.iso8601(6)
           )
         )
       end
@@ -153,23 +158,31 @@ module Coordinator::Write
         raise InvalidOperationBatchItemOutcome, result.errors.to_h.inspect
       end
 
-      def persist_domain(plan, command:, event_id:, input_digest:, caused_by:)
+      def persist_domain(plan, command:, event_ids:, correlation_id:, input_digest:, caused_by:)
         expected_stream = @stream_factory.operation_batch(command.batch_id)
-        unless plan.writes.length == 1 && plan.writes.first.stream == expected_stream
-          raise InvalidOperationBatchEventPlan, "Batch command must emit once to its own static stream"
+        unless plan.writes.all? { _1.stream == expected_stream } && plan.writes.length == event_ids.length
+          raise InvalidOperationBatchEventPlan, "Batch command must emit its complete plan to its own static stream"
         end
 
-        event = @event_factory.build!(
-          event: plan.events.sole,
-          event_id:,
-          metadata: domain_metadata(command, input_digest:),
-          markers: markers(command),
-          caused_by:
-        )
-        @event_store.append(expected_stream, [ event ])
+        events = plan.events.zip(event_ids).map do |event, event_id|
+          @event_factory.build!(
+            event:,
+            event_id:,
+            metadata: domain_metadata(command, event:, input_digest:),
+            markers: markers(command, event:),
+            caused_by:,
+            correlation_id:
+          )
+        end
+        @event_store.append(expected_stream, events)
       end
 
-      def persist_registrations(plans, batch_event:)
+      def persist_registrations(plans, batch_events:)
+        enqueued_by_index = batch_events.filter_map do |event|
+          next unless event.type == "OperationBatchItemEnqueued"
+
+          [ event.data.fetch("index"), event ]
+        end.to_h
         plans.filter_map do |plan|
           next unless plan.register
 
@@ -191,12 +204,12 @@ module Coordinator::Write
             ),
             markers: [
               "command:#{item.command_id}",
-              "operation-batch:#{batch_event.stream.stream_id}",
-              "batch-item:#{batch_event.stream.stream_id}:#{item.index}",
+              "operation-batch:#{batch_events.first.stream.stream_id}",
+              "batch-item:#{batch_events.first.stream.stream_id}:#{item.index}",
               "tool:#{item.command_input.tool_name}",
               @request_marker.call(actor: plan.actor, request_id: item.request_id)
             ],
-            caused_by: batch_event
+            caused_by: enqueued_by_index.fetch(item.index)
           )
           @event_store.append(@stream_factory.command(item.command_id), [ event ]).sole
         end
@@ -240,7 +253,16 @@ module Coordinator::Write
         end
       end
 
-      def domain_metadata(command, input_digest:)
+      def allocate_domain_event_ids(command)
+        count = case command
+                when Commands::CreateOperationBatch then command.items.length + 2
+                when Commands::RecordOperationBatchItemOutcome then 2
+                else 1
+                end
+        Array.new(count) { @id_generator.uuid_v7 }
+      end
+
+      def domain_metadata(command, event:, input_digest:)
         common = {
           command_id: command.command_id,
           actor_kind: command.actor.kind,
@@ -250,18 +272,29 @@ module Coordinator::Write
         }
         return EventMetadata.new(common) unless command.is_a?(Commands::CreateOperationBatch)
 
-        Metadata::OperationBatchCreationV2.new(
-          **common,
-          canonical_input_digest: input_digest,
-          manifest_digest: command.manifest_digest,
-          encoded_byte_size: command.encoded_byte_size
-        )
+        case event
+        when Events::OperationBatchCreatedV2
+          Metadata::OperationBatchCreationV2.new(
+            **common,
+            manifest_digest: command.manifest_digest,
+            page_size: command.page_size
+          )
+        when Events::OperationBatchItemEnqueuedV1
+          item = command.items.fetch(event.index)
+          Metadata::OperationBatchItemV1.new(
+            **common,
+            canonical_input_digest: item.canonical_input_digest,
+            encoded_byte_size: @manifest_builder.item_encoded_byte_size(event.input)
+          )
+        else
+          EventMetadata.new(common)
+        end
       end
 
-      def markers(command)
+      def markers(command, event:)
         values = [ "operation-batch:#{command.batch_id}", "command:#{command.command_id}" ]
-        if command.is_a?(Commands::RecordOperationBatchItemOutcome)
-          values << "batch-item:#{command.batch_id}:#{command.index}"
+        if event.respond_to?(:index)
+          values << "batch-item:#{command.batch_id}:#{event.index}"
         end
         values
       end

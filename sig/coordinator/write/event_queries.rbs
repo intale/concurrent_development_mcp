@@ -8,6 +8,10 @@ module Coordinator
       RESOURCE_BOUNDARY_ROLLOVER_DELTA_MAXIMUM_COUNT: Integer
       RESOURCE_BOUNDARY_ACTIVE_LEASE_MAXIMUM_COUNT: Integer
       RESOURCE_BOUNDARY_MAXIMUM_GLOBAL_POSITION: Integer
+      WORK_INTENTION_LIFECYCLE_EVENT_TYPES: Array[String]
+      WORK_INTENTION_BOUNDARY_MAXIMUM_COUNT: Integer
+      WORK_INTENTION_BOUNDARY_ROLLOVER_SOFT_COUNT: Integer
+      WORK_INTENTION_BOUNDARY_ROLLOVER_MAXIMUM_COUNT: Integer
 
       def self.guidance_message: (String marker) -> GlobalMarkedEventReadCriteria
       def self.interpretation_proposal: (String marker) -> GlobalMarkedEventReadCriteria
@@ -22,6 +26,7 @@ module Coordinator
         to_position: Integer,
         maximum_count: Integer
       ) -> Array[GlobalMarkedEventPageCriteria]
+      def self.work_intention_boundary: (Array[String] markers) -> GlobalMarkedEventReadCriteria
 
       COMMAND_REGISTRATION: EventReadCriteria
       COMMAND_HISTORY: EventReadCriteria

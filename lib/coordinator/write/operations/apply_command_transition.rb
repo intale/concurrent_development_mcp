@@ -19,7 +19,7 @@ module Coordinator::Write
         @id_generator = id_generator
       end
 
-      def call(command:, decider:, actor:, tool_name:, caused_by:, emitted_events: [], rejection: nil)
+      def call(command:, decider:, actor:, tool_name:, caused_by:)
         snapshot = @loader.call(command.command_id)
         decision = decider.call(state: snapshot.state, command:)
         return decision if decision.failure?
@@ -39,9 +39,7 @@ module Coordinator::Write
           latest_revision: snapshot.latest_revision,
           actor:,
           tool_name:,
-          caused_by:,
-          emitted_events:,
-          rejection:
+          caused_by:
         )
         Success(
           CommandLifecycle::Transition.new(
@@ -61,18 +59,16 @@ module Coordinator::Write
 
       private
 
-      def append(event:, latest_revision:, actor:, tool_name:, caused_by:, emitted_events:, rejection:)
+      def append(event:, latest_revision:, actor:, tool_name:, caused_by:)
         persisted = @event_factory.build!(
           event:,
           event_id: @id_generator.uuid_v7,
-          metadata: Metadata::CommandTerminalV1.new(
+          metadata: EventMetadata.new(
             command_id: event.command_id,
             actor_kind: actor.kind,
             actor_id: actor.id,
             recorded_by: "coordinator",
-            policy_version: "command-lifecycle/v1",
-            emitted_events:,
-            rejection:
+            policy_version: "command-lifecycle/v1"
           ),
           markers: [ "command:#{event.command_id}", "tool:#{tool_name}" ],
           caused_by:

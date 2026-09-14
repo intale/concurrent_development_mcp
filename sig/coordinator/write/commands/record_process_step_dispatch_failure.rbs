@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module Commands
+      class RecordProcessStepDispatchFailure < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def process_step_id: () -> String
+        def target_command_id: () -> String
+        def code: () -> String
+        def reason: () -> String
+        def retryable: () -> bool
+      end
+    end
+  end
+end

@@ -2,7 +2,10 @@ module Coordinator::Processes
   class ProcessStepPlanner
     def initialize: (
       event_store: Coordinator::Write::_EventStore,
-      ?planner: Coordinator::Write::ProcessSteps::Planner
+      ?planner: Coordinator::Write::ProcessSteps::Planner,
+      ?failure_operation: Coordinator::Write::Operations::ExecuteRecordProcessStepDispatchFailure,
+      ?id_generator: Coordinator::Shared::IdGenerator,
+      ?retryability: Coordinator::Write::Tasks::CommandRejectionRetryability
     ) -> void
     def call: (
       source_event: PgEventstore::Event,
@@ -13,5 +16,9 @@ module Coordinator::Processes
       rule_version: String,
       allocate_target_entity: bool
     ) -> Coordinator::Write::ProcessSteps::PlannedV1
+    def record_dispatch_failure: (
+      process_step: Coordinator::Write::ProcessSteps::PlannedV1,
+      failure: Coordinator::Write::OutcomeError
+    ) -> PgEventstore::Event?
   end
 end

@@ -18,7 +18,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
       )
     ).value!
     expect(batch_executor.call_command(command)).to be_success
-    created = batch_events(command.batch_id).sole
+    created = batch_events(command.batch_id).find { _1.type == "OperationBatchCreated" }
 
     runner.call(created)
     first_history = batch_events(command.batch_id)
@@ -26,8 +26,13 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
 
     expect(first_history.map(&:type)).to eq([
       "OperationBatchCreated",
+      "OperationBatchTargetSelected",
+      "OperationBatchItemEnqueued",
+      "OperationBatchItemEnqueued",
       "OperationBatchItemSucceeded",
+      "OperationBatchItemCompletionLinked",
       "OperationBatchItemRejected",
+      "OperationBatchItemCompletionLinked",
       "OperationBatchCompleted"
     ])
     expect(batch_events(command.batch_id).map(&:id)).to eq(first_history.map(&:id))
@@ -43,7 +48,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
   it "observes a cancellation from the authoritative Batch stream before starting an item" do
     command = preparer.call(input(items: [ item ])).value!
     expect(batch_executor.call_command(command)).to be_success
-    created = batch_events(command.batch_id).sole
+    created = batch_events(command.batch_id).find { _1.type == "OperationBatchCreated" }
     cancellation = Coordinator::Write::Commands::CancelOperationBatch.new(
       command_id: "cancel-command",
       actor: Coordinator::Write::Commands::Actor.new(kind: "user", id: "user-1"),
@@ -55,6 +60,8 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
 
     expect(batch_events(command.batch_id).map(&:type)).to eq([
       "OperationBatchCreated",
+      "OperationBatchTargetSelected",
+      "OperationBatchItemEnqueued",
       "OperationBatchCancellationRequested",
       "OperationBatchCancelled"
     ])
@@ -64,7 +71,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
   it "replays a target that committed before its Batch outcome and converges once" do
     command = preparer.call(input(items: [ item ])).value!
     expect(batch_executor.call_command(command)).to be_success
-    created = batch_events(command.batch_id).sole
+    created = batch_events(command.batch_id).find { _1.type == "OperationBatchCreated" }
     unrelated_command = preparer.call(
       input(
         command_id: "unrelated-batch-command",
@@ -73,8 +80,9 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
       )
     ).value!
     expect(batch_executor.call_command(unrelated_command)).to be_success
-    unrelated_created = batch_events(unrelated_command.batch_id).sole
-    target = Coordinator::Write::Tasks::TargetCommandBuilder.new.call(load(created).items.sole.command_input)
+    unrelated_created = batch_events(unrelated_command.batch_id).find { _1.type == "OperationBatchCreated" }
+    item = Coordinator::Write::OperationBatches::Loader.new(event_store:).call(command.batch_id).state.items.sole
+    target = Coordinator::Write::Tasks::TargetCommandBuilder.new.call(item.command_input)
     target_executor = Coordinator::Write::Tasks::TargetExecutor.new(event_store:)
 
     expect(target_executor.call(target, caused_by: unrelated_created)).to be_success
@@ -88,10 +96,13 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
     history = batch_events(command.batch_id)
     expect(history.map(&:type)).to eq([
       "OperationBatchCreated",
+      "OperationBatchTargetSelected",
+      "OperationBatchItemEnqueued",
       "OperationBatchItemSucceeded",
+      "OperationBatchItemCompletionLinked",
       "OperationBatchCompleted"
     ])
-    outcome = history.fetch(1)
+    outcome = history.find { _1.type == "OperationBatchItemSucceeded" }
     step = ProcessStepExamples.event(
       event_store:,
       source_event: created,
@@ -102,7 +113,10 @@ RSpec.describe Coordinator::Processes::ProcessManagers::OperationBatchRunner, :e
     )
     expect(outcome.causation_id).to eq(step.id)
     expect(history.map(&:correlation_id).uniq).to eq([ created.correlation_id ])
-    expect(history.drop(1).map { _1.metadata.fetch("command_id") }).to all(
+    process_facts = history.select do |event|
+      %w[OperationBatchItemSucceeded OperationBatchItemCompletionLinked OperationBatchCompleted].include?(event.type)
+    end
+    expect(process_facts.map { _1.metadata.fetch("command_id") }).to all(
       match(Coordinator::Shared::Types::UUID_V7_PATTERN)
     )
     expect(skill_events.length).to eq(1)

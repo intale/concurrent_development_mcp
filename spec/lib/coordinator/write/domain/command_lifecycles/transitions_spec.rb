@@ -42,13 +42,13 @@ RSpec.describe "Command terminal transitions" do
     )
 
     expect(result.value!).to eq(
-      Coordinator::Write::Events::CommandRejectedV1.new(command.to_h)
+      Coordinator::Write::Events::CommandRejectedV2.new(command.to_h)
     )
   end
 
   it "Given the same rejection already recorded, when rejection is retried, then it emits nothing" do
     state = Coordinator::Write::Domain::CommandLifecycles::State.reduce(
-      [ registered, Coordinator::Write::Events::CommandRejectedV1.new(rejection_command.to_h) ]
+      [ registered, Coordinator::Write::Events::CommandRejectedV2.new(rejection_command.to_h) ]
     )
 
     expect(
@@ -76,8 +76,13 @@ RSpec.describe "Command terminal transitions" do
   def rejection_command
     Coordinator::Write::Commands::RejectCommand.new(
       command_id:,
-      code: "lease_busy",
-      reason: "Resource is already reserved",
+      error: Coordinator::Write::Tasks::DomainErrorV1::ChangeSetError.new(
+        code: "change_set_already_exists",
+        message: "ChangeSet already exists",
+        details: Coordinator::Write::Tasks::DomainErrorV1::ChangeSetDetails.new(
+          change_set_id: "CS-command-transition"
+        )
+      ),
       retryable: true
     )
   end

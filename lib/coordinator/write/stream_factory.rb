@@ -130,6 +130,14 @@ module Coordinator::Write
       )
     end
 
+    def resource_boundary_epoch(repository_id)
+      StreamReference.new(
+        context: "DevelopmentCoordination",
+        stream_name: "ResourceBoundaryEpoch",
+        stream_id: repository_id
+      )
+    end
+
     def conversation(conversation_id)
       StreamReference.new(
         context: "HumanGuidance",

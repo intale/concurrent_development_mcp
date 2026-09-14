@@ -880,7 +880,8 @@ CREATE TABLE public.operation_batch_items (
     item_index integer NOT NULL,
     target_tool character varying NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    target_command_id character varying
+    target_command_id character varying,
+    encoded_byte_size bigint
 );
 
 
@@ -926,7 +927,9 @@ CREATE TABLE public.operation_batch_outcomes (
     result jsonb NOT NULL,
     status character varying NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
-    target_command_id character varying
+    target_command_id character varying,
+    completion_event jsonb,
+    completion_link_event jsonb
 );
 
 
@@ -2654,6 +2657,7 @@ ALTER TABLE ONLY public.operation_batch_outcomes
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260914125000'),
 ('20260914070000'),
 ('20260911103000'),
 ('20260911100000'),

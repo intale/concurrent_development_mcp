@@ -125,7 +125,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
         "merge-snapshot-verification-v1",
         "operation-batch-runner-v1",
         "release-set-lifecycle-v1",
-        "resource-boundary-maintenance-v1",
+        "resource-boundary-maintenance-v2",
         "verification-evidence-outcome-v1",
         "verification-obligation-validity-v1"
       ]
@@ -137,14 +137,14 @@ RSpec.describe Coordinator::Processes::ProcessManagers::LeaseExpiryScheduler, :e
 
     expect(definition.to_h).to eq(
       set_name: "coordinator-process-managers-v1",
-      subscription_name: "resource-boundary-maintenance-v1",
+      subscription_name: "resource-boundary-maintenance-v2",
       stream_context: "DevelopmentCoordination",
-      stream_name: "ResourceLease",
+      stream_name: "ResourceWorkIntention",
       event_types: %w[
-        ResourceLeaseAcquired
-        ResourceLeaseRenewed
-        ResourceLeaseReleased
-        ResourceLeaseExpired
+        ResourceWorkIntentionDeclared
+        ResourceWorkIntentionRenewed
+        ResourceWorkIntentionWithdrawn
+        ResourceWorkIntentionExpired
       ],
       event_markers: []
     )

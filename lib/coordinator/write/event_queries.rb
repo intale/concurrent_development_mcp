@@ -101,6 +101,8 @@ module Coordinator::Write
       ResourceWorkIntentionExpired
     ].freeze
     WORK_INTENTION_BOUNDARY_MAXIMUM_COUNT = 4_096
+    WORK_INTENTION_BOUNDARY_ROLLOVER_SOFT_COUNT = 2_048
+    WORK_INTENTION_BOUNDARY_ROLLOVER_MAXIMUM_COUNT = 8_192
 
     def self.work_intention_boundary(markers)
       GlobalMarkedEventReadCriteria.new(
@@ -193,8 +195,11 @@ module Coordinator::Write
     OPERATION_BATCH_HISTORY = EventReadCriteria.new(
       event_types: [
         "OperationBatchCreated",
+        "OperationBatchTargetSelected",
+        "OperationBatchItemEnqueued",
         "OperationBatchItemSucceeded",
         "OperationBatchItemRejected",
+        "OperationBatchItemCompletionLinked",
         "OperationBatchContinuationRequested",
         "OperationBatchCancellationRequested",
         "OperationBatchCancelled",

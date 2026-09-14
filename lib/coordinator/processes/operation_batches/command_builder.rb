@@ -9,6 +9,13 @@ module Coordinator::Processes
       )
 
       def record_outcome(source:, item:, execution:, command_id:)
+        rejection = if execution.command_state.rejected?
+                      Coordinator::Write::OperationBatches::RejectionV1.new(
+                        code: execution.command_state.rejection_code,
+                        reason: execution.command_state.rejection_reason,
+                        retryable: execution.command_state.rejection_retryable
+                      )
+        end
         Coordinator::Write::Commands::RecordOperationBatchItemOutcome.new(
           command_id:,
           actor: SYSTEM_ACTOR,
@@ -16,7 +23,8 @@ module Coordinator::Processes
           index: item.index,
           item_command_id: item.command_id,
           outcome: execution.command_state.status,
-          target_event: event_reference(execution.terminal_event)
+          target_event: event_reference(execution.terminal_event),
+          rejection:
         )
       end
 

@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    class WorkIntentionBoundaryRolloverPolicy
+      def initialize: (?minimum_delta_event_count: Integer) -> void
+      def call: (
+        boundary: WorkIntentionBoundaryV1,
+        epoch: WorkIntentionBoundaryV1::EpochV1,
+        through_global_position: Integer
+      ) -> bool
+    end
+  end
+end

@@ -70,6 +70,13 @@ module Coordinator::Write
                            rejection_reason: event.reason,
                            rejection_retryable: event.retryable
                          }
+                       when Events::CommandRejectedV2
+                         {
+                           status: "rejected",
+                           rejection_code: event.error.code,
+                           rejection_reason: event.error.message,
+                           rejection_retryable: event.retryable
+                         }
                        end
 
           self.class.new(to_h.merge(attributes))

@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class OperationBatchTargetSelectedV1 < Base
+        def batch_id: () -> String
+        def target_tool: () -> String
+      end
+    end
+  end
+end

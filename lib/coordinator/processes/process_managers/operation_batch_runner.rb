@@ -44,7 +44,8 @@ module Coordinator::Processes
 
       def process_page(source)
         instrument_page_boundary("operation_batch_page_start", source)
-        bounds(source).each do |index|
+        initial_snapshot = @loader.call(source.payload.batch_id)
+        bounds(source, initial_snapshot.state).each do |index|
           snapshot = @loader.call(source.payload.batch_id)
           return if snapshot.state.terminal
           return complete_observed_cancellation(snapshot) if snapshot.state.cancellation
@@ -86,7 +87,8 @@ module Coordinator::Processes
               command_id: process_step.target_command_id
             ),
             caused_by: process_step.event
-          )
+          ),
+          process_step:
         )
       end
 
@@ -108,15 +110,16 @@ module Coordinator::Processes
             @batch_executor.call_command(
               @command_builder.complete(source:, command_id: process_step.target_command_id),
               caused_by: process_step.event
-            )
+            ),
+            process_step:
           )
           return
         end
 
         page_start = pending.min
         page_end = [
-          page_start + snapshot.state.creation.page_size - 1,
-          snapshot.state.creation.items.length - 1
+          page_start + snapshot.state.processing_page_size - 1,
+          snapshot.state.items.length - 1
         ].min
         process_step = plan(
           source_event: source.event,
@@ -134,7 +137,8 @@ module Coordinator::Processes
               command_id: process_step.target_command_id
             ),
             caused_by: process_step.event
-          )
+          ),
+          process_step:
         )
       end
 
@@ -167,26 +171,25 @@ module Coordinator::Processes
               command_id: process_step.target_command_id
             ),
             caused_by: process_step.event
-          )
+          ),
+          process_step:
         )
       end
 
-      def bounds(source)
+      def bounds(source, state)
         payload = source.payload
         if payload.is_a?(Coordinator::Write::Events::OperationBatchCreatedV2)
-          0..([ payload.page_size - 1, payload.items.length - 1 ].min)
+          0..([ state.processing_page_size - 1, state.items.length - 1 ].min)
         else
           payload.page_start..payload.page_end
         end
       end
 
-      def execute!(result)
+      def execute!(result, process_step:)
         return result.value! if result.success?
         return if HANDLED_CODES.include?(result.failure.code)
 
-        failure = result.failure
-        raise OperationBatchProcessRejected,
-              "Batch process rejected: #{failure.code} - #{failure.message}"
+        @process_step_planner.record_dispatch_failure(process_step:, failure: result.failure)
       end
 
       def plan(source_event:, step_name:, subject_kind:, subject_id:, rule_version:)

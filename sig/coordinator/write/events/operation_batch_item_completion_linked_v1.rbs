@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Events
+      class OperationBatchItemCompletionLinkedV1 < Base
+        def batch_id: () -> String
+        def index: () -> Integer
+        def command_id: () -> String
+        def completion: () -> EventReference
+      end
+    end
+  end
+end

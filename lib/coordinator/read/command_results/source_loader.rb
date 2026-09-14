@@ -8,13 +8,15 @@ module Coordinator::Read
         contract: Contracts::CommandTerminalSourceEvent.new,
         schema_registry: Coordinator::Write::EventSchemaRegistry.new,
         stream_factory: Coordinator::Write::StreamFactory.new,
-        target_command_builder: Coordinator::Write::Tasks::TargetCommandBuilder.new
+        target_command_builder: Coordinator::Write::Tasks::TargetCommandBuilder.new,
+        batch_item_builder: Coordinator::Write::OperationBatches::ItemBuilder.new
       )
         @event_store = event_store
         @contract = contract
         @schema_registry = schema_registry
         @stream_factory = stream_factory
         @target_command_builder = target_command_builder
+        @batch_item_builder = batch_item_builder
       end
 
       def call(event)
@@ -91,20 +93,27 @@ module Coordinator::Read
       end
 
       def find_batch_item(command_id, registration:)
-        markers = registration.markers.grep(/\Aoperation-batch:/)
-        return unless markers.one?
+        batch_markers = registration.markers.grep(/\Aoperation-batch:/)
+        item_markers = registration.markers.grep(/\Abatch-item:/)
+        return unless batch_markers.one? && item_markers.one?
 
-        batch_id = markers.sole.delete_prefix("operation-batch:")
-        event = @event_store.read(
+        batch_id = batch_markers.sole.delete_prefix("operation-batch:")
+        event = @event_store.read_marked(
           @stream_factory.operation_batch(batch_id),
-          Coordinator::Write::EventQueries::OPERATION_BATCH_EXISTENCE
+          Coordinator::Write::MarkedEventReadCriteria.new(
+            event_type: "OperationBatchItemEnqueued",
+            marker: item_markers.sole,
+            maximum_count: 1,
+            direction: :asc
+          )
         ).first
         return unless event
 
         payload = load_payload(event)
-        return unless payload.is_a?(Coordinator::Write::Events::OperationBatchCreatedV2)
+        return unless payload.is_a?(Coordinator::Write::Events::OperationBatchItemEnqueuedV1)
 
-        payload.items.find { _1.command_id == command_id }
+        item = @batch_item_builder.call(event:, payload:)
+        item if item.command_id == command_id
       end
 
       def validated_command_input(command_input, command_state:, registration:)
@@ -120,25 +129,18 @@ module Coordinator::Read
       end
 
       def load_persisted_events(terminal)
-        references = terminal.metadata.fetch("emitted_events", []).map do |attributes|
-          Coordinator::Write::EventReference.new(deep_symbolize(attributes))
-        end
-
-        references.map do |reference|
-          event = @event_store.read_at(
-            Coordinator::Write::StreamReference.new(
-              context: reference.stream_context,
-              stream_name: reference.stream_name,
-              stream_id: reference.stream_id
-            ),
-            reference.stream_revision
+        events = @event_store.read_command_events(
+          Coordinator::Write::CommandEventReadCriteria.new(
+            command_id: terminal.stream.stream_id,
+            through_global_position: terminal.global_position,
+            maximum_count: Coordinator::Shared::Types::OPERATION_BATCH_MAXIMUM_HISTORY_EVENTS
           )
-          unless event && event.id == reference.event_id && event.type == reference.type
-            raise InvalidProjectionSource, "Command terminal references a missing or mismatched event"
-          end
-
-          event
+        )
+        unless events.all? { _1.metadata.fetch("command_id") == terminal.stream.stream_id }
+          raise InvalidProjectionSource, "Command marker resolved a fact owned by another command"
         end
+
+        events
       end
 
       def load_payload(event)
@@ -149,13 +151,6 @@ module Coordinator::Read
         )
       end
 
-      def deep_symbolize(value)
-        case value
-        when Hash then value.to_h { |key, nested| [ key.to_sym, deep_symbolize(nested) ] }
-        when Array then value.map { deep_symbolize(_1) }
-        else value
-        end
-      end
     end
   end
 end

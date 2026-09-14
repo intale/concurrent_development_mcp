@@ -55,15 +55,16 @@ RSpec.describe "MCP work_intention_set_withdraw Task boundary", :event_store do
 
     submitted, started, task_completed = task_events(task_id)
     command_terminal = CommandTraceFixture.terminal(task_id, event_store:)
-    target_events = work_intention_withdrawal_events(reservation) + [ command_terminal ]
+    target_events = CommandTraceFixture.domain_events(task_id, event_store:)
 
     expect(started.causation_id).to eq(submitted.id)
     expect(target_events.map(&:causation_id).uniq).to eq([ started.id ])
+    expect(command_terminal.causation_id).to eq(target_events.last.id)
     expect(task_completed.causation_id).to eq(command_terminal.id)
-    expect(([ submitted, started, task_completed ] + target_events).map(&:correlation_id).uniq).to eq(
+    expect(([ submitted, started, command_terminal, task_completed ] + target_events).map(&:correlation_id).uniq).to eq(
       [ submitted.correlation_id ]
     )
-    expect(target_events).to all(satisfy do |event|
+    expect([ *target_events, command_terminal ]).to all(satisfy do |event|
       !event.metadata.key?("correlation_id") && !event.metadata.key?("causation_id")
     end)
 

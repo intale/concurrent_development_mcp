@@ -5,6 +5,7 @@ module Coordinator
         def initialize: (?canonical_json: Shared::CanonicalJson) -> void
         def digest: (Array[ItemV1] items) -> String
         def encoded_byte_size: (command_id: String, actor: Commands::Actor, batch_id: String, target_tool: String, items: Array[ItemV1]) -> Integer
+        def item_encoded_byte_size: (CommandInputDocuments::PublishSkillRevisionV2 | CommandInputDocuments::CaptureDevelopmentArtifactV2 | CommandInputDocuments::DeclareDevelopmentArtifactRelationV1 input) -> Integer
       end
     end
   end

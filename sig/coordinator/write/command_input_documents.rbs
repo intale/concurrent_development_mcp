@@ -818,6 +818,12 @@ module Coordinator
         def input: () -> CancelOperationBatchInputV1
       end
 
+      class OperationBatchItemRejectionV1 < Shared::Value
+        def code: () -> String
+        def reason: () -> String
+        def retryable: () -> bool
+      end
+
       class RecordOperationBatchItemOutcomeInputV1 < Shared::Value
         def actor: () -> ActorV1
         def batch_id: () -> String
@@ -825,6 +831,7 @@ module Coordinator
         def item_command_id: () -> String
         def outcome: () -> String
         def target_event: () -> EventReferenceV1
+        def rejection: () -> OperationBatchItemRejectionV1?
       end
 
       class RecordOperationBatchItemOutcomeV1 < BaseV1

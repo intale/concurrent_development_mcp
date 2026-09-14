@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    class CommandEventReadCriteria < Shared::Value
+      CONTROL_EVENT_ALLOWANCE: Integer
+
+      def command_id: () -> String
+      def through_global_position: () -> Integer
+      def maximum_count: () -> Integer
+      def marker: () -> String
+      def query_max_count: () -> Integer
+    end
+  end
+end

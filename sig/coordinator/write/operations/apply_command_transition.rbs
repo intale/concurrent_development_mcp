@@ -15,9 +15,7 @@ module Coordinator
           decider: Domain::CommandLifecycles::Succeed | Domain::CommandLifecycles::Reject,
           actor: Commands::Actor,
           tool_name: String,
-          caused_by: PgEventstore::Event,
-          ?emitted_events: Array[EventReference],
-          ?rejection: Tasks::DomainErrorV1::domain_error?
+          caused_by: PgEventstore::Event
         ) -> Dry::Monads::Result
       end
     end

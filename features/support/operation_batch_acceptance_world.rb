@@ -159,8 +159,7 @@ module OperationBatchAcceptanceWorld
   end
 
   def operation_batch_outcome_counts(events)
-    creation = events.find { _1.type == "OperationBatchCreated" }
-    total = creation ? creation.data.fetch("items").length : 0
+    total = events.count { _1.type == "OperationBatchItemEnqueued" }
     succeeded = events.count { _1.type == "OperationBatchItemSucceeded" }
     rejected = events.count { _1.type == "OperationBatchItemRejected" }
 

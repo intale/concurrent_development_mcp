@@ -15,6 +15,10 @@ module Coordinator::Write
       def command_id
         command_input.command_id
       end
+
+      def submitted_input
+        command_input.class.new(command_input.attributes.merge(command_id: request_id))
+      end
     end
   end
 end
