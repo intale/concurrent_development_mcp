@@ -1,0 +1,49 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      module LegacyEvents
+        class CommandCompletedV1 < Events::Base
+        end
+
+        class CoordinationTaskCancellationRequestedV1 < Events::Base
+        end
+
+        class CoordinationTaskCancelledV1 < Events::Base
+        end
+
+        class CoordinationTaskCompletedV2 < Events::Base
+        end
+
+        class CoordinationTaskExecutionStartedV1 < Events::Base
+        end
+
+        class CoordinationTaskFailedV1 < Events::Base
+        end
+
+        class CoordinationTaskSubmittedV2 < Events::Base
+        end
+
+        class OperationBatchCancellationRequestedV1 < Events::Base
+        end
+
+        class OperationBatchCancelledV1 < Events::Base
+        end
+
+        class OperationBatchCompletedV1 < Events::Base
+        end
+
+        class OperationBatchContinuationRequestedV1 < Events::Base
+        end
+
+        class OperationBatchCreatedV1 < Events::Base
+        end
+
+        class OperationBatchItemRejectedV1 < Events::Base
+        end
+
+        class OperationBatchItemSucceededV1 < Events::Base
+        end
+      end
+    end
+  end
+end
