@@ -1,0 +1,19 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class EventDispatcher
+        def initialize: (
+          transformer_registry: TransformerRegistry,
+          fact_planner: FactPlanner,
+          target_writer: TargetWriter
+        ) -> void
+
+        def call: (
+          migration_id: String,
+          source_config_name: String,
+          source_event: PgEventstore::Event
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class TransformedFactV1 < Shared::Value
+        def target_stream: () -> StreamReference
+        def event: () -> Events::Base
+        def markers: () -> Array[String]
+        def step_name: () -> String
+      end
+    end
+  end
+end

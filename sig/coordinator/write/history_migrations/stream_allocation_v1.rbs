@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class StreamAllocationV1 < Shared::Value
+        def target_stream: () -> StreamReference
+        def allocation_event: () -> PgEventstore::Event
+        def outcome: () -> String
+      end
+    end
+  end
+end

@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class TransformationErrorV1 < Shared::Value
+        def code: () -> Symbol
+        def message: () -> String
+        def event_type: () -> String
+        def schema_version: () -> Integer?
+        def source_event_id: () -> String
+      end
+    end
+  end
+end

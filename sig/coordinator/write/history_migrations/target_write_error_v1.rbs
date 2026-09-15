@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class TargetWriteErrorV1 < Shared::Value
+        def code: () -> Symbol
+        def message: () -> String
+        def target_event_id: () -> String
+        def existing_event_id: () -> String
+      end
+    end
+  end
+end

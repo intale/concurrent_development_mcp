@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class PlannedFactV1 < Shared::Value
+        def target_stream: () -> StreamReference
+        def event: () -> PgEventstore::Event
+        def target_event_marker: () -> String
+        def process_step: () -> ProcessSteps::PlannedV1
+      end
+    end
+  end
+end

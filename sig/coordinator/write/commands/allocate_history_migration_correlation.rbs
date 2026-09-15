@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module Commands
+      class AllocateHistoryMigrationCorrelation < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def event_id: () -> String
+        def migration_id: () -> String
+        def source_config_name: () -> String
+        def source_correlation_id: () -> String
+        def target_correlation_id: () -> String
+      end
+    end
+  end
+end

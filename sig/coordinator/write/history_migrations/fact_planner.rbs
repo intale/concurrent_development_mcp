@@ -1,0 +1,23 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class FactPlanner
+        PROCESS_RULE_VERSION: String
+
+        def initialize: (
+          correlation_allocator: CorrelationAllocator,
+          process_step_planner: Coordinator::Processes::ProcessStepPlanner,
+          ?source_builder: MigrationSourceBuilder,
+          ?event_factory: EventFactory
+        ) -> void
+
+        def call: (
+          migration_id: String,
+          source_config_name: String,
+          source_event: PgEventstore::Event,
+          transformed_facts: Array[TransformedFactV1]
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

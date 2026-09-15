@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class TargetWriteResultV1 < Shared::Value
+        def events: () -> Array[PgEventstore::Event]
+        def outcome: () -> String
+      end
+    end
+  end
+end

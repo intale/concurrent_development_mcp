@@ -79,6 +79,8 @@ module Coordinator
 
       def read_at: (StreamReference, Integer stream_revision) -> PgEventstore::Event?
 
+      def stream_starting_position: (StreamReference) -> Integer?
+
       def read_marked: (StreamReference, MarkedEventReadCriteria) -> Array[PgEventstore::Event]
       def read_latest_marked: (StreamReference, LatestMarkedEventReadCriteria) -> Array[PgEventstore::Event]
 

@@ -95,8 +95,7 @@ RSpec.configure do |config|
   config.order = :random
 
   config.before(:each, event_store: true) do
-    EventStoreTestSafety.verify!
-    PgEventstore::TestHelpers.clean_up_db
+    EventStoreTestSafety.clean!
     ReadModelTestSafety.clean!
   end
 

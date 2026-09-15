@@ -36,6 +36,8 @@ module Coordinator::Write
       [ "HistoryMigrationSourceRangeFrozen", 1 ] => Events::HistoryMigrationSourceRangeFrozenV1,
       [ "HistoryMigrationPageSizeSelected", 1 ] => Events::HistoryMigrationPageSizeSelectedV1,
       [ "HistoryMigrationStarted", 1 ] => Events::HistoryMigrationStartedV1,
+      [ "HistoryMigrationStreamIdentityAllocated", 1 ] => Events::HistoryMigrationStreamIdentityAllocatedV1,
+      [ "HistoryMigrationCorrelationAllocated", 1 ] => Events::HistoryMigrationCorrelationAllocatedV1,
       [ "SkillRegistered", 1 ] => Events::SkillRegisteredV1,
       [ "SkillRevisionCreated", 1 ] => Events::SkillRevisionCreatedV1,
       [ "SkillRevisionDescriptionDefined", 1 ] => Events::SkillRevisionDescriptionDefinedV1,

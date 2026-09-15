@@ -7,8 +7,7 @@ require Rails.root.join("spec/support/read_model_test_safety").to_s
 Before do
   stop_live_subscriptions
   ReadModelTestSafety.clean!
-  EventStoreTestSafety.verify!
-  PgEventstore::TestHelpers.clean_up_db
+  EventStoreTestSafety.clean!
   reset_acceptance_repositories!
   register_acceptance_repository
 end

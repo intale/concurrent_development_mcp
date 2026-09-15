@@ -1,0 +1,18 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class TransformerRegistry
+        def initialize: (
+          ?schema_registry: EventSchemaRegistry,
+          repository_registered_v1: RepositoryRegisteredV1Transformer
+        ) -> void
+
+        def call: (
+          migration_id: String,
+          source_config_name: String,
+          source_event: PgEventstore::Event
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

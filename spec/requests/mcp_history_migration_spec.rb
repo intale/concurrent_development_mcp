@@ -10,16 +10,6 @@ RSpec.describe "MCP history migration start", :event_store do
     ActionDispatch::Integration::Session.new(Rails.application).tap { _1.host! "localhost" }
   end
 
-  before do
-    source_config = PgEventstore.config
-    PgEventstore.configure(name: :migration_target) do |config|
-      config.pg_uri = source_config.pg_uri
-      config.connection_pool_size = source_config.connection_pool_size
-      config.eventstore_role = source_config.eventstore_role
-      config.middlewares = source_config.middlewares
-    end
-  end
-
   it "freezes the source before Task facts and replays by caller input rather than derived values" do
     anchor = event_store.append(
       Coordinator::Write::StreamReference.new(

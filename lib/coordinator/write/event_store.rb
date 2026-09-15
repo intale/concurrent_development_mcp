@@ -60,6 +60,15 @@ module Coordinator::Write
       nil
     end
 
+    def stream_starting_position(reference)
+      @client.read(
+        @pg_stream_factory.call(reference),
+        options: { direction: :asc, max_count: 1 }
+      ).first&.global_position
+    rescue PgEventstore::StreamNotFoundError
+      nil
+    end
+
     def read_marked(reference, criteria)
       stream = @pg_stream_factory.call(reference)
 

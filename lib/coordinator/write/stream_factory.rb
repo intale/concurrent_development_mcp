@@ -22,6 +22,22 @@ module Coordinator::Write
       )
     end
 
+    def history_migration_identity(identity_id)
+      StreamReference.new(
+        context: "CoordinatorMaintenance",
+        stream_name: "HistoryMigrationIdentity",
+        stream_id: identity_id
+      )
+    end
+
+    def history_migration_correlation(correlation_id)
+      StreamReference.new(
+        context: "CoordinatorMaintenance",
+        stream_name: "HistoryMigrationCorrelation",
+        stream_id: correlation_id
+      )
+    end
+
     def skill(skill_id)
       StreamReference.new(context: "AgentKnowledge", stream_name: "Skill", stream_id: skill_id)
     end
