@@ -38,6 +38,14 @@ module Coordinator::Write
       )
     end
 
+    def history_migration_target_stream_plan(plan_id)
+      StreamReference.new(
+        context: "CoordinatorMaintenance",
+        stream_name: "HistoryMigrationTargetStreamPlan",
+        stream_id: plan_id
+      )
+    end
+
     def history_migration_page(page_id)
       StreamReference.new(
         context: "CoordinatorMaintenance",

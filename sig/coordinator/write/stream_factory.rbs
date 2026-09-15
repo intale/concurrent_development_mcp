@@ -7,6 +7,7 @@ module Coordinator
       def history_migration: (String migration_id) -> StreamReference
       def history_migration_identity: (String identity_id) -> StreamReference
       def history_migration_correlation: (String correlation_id) -> StreamReference
+      def history_migration_target_stream_plan: (String plan_id) -> StreamReference
       def history_migration_page: (String page_id) -> StreamReference
       def skill: (String skill_id) -> StreamReference
       def skill_revision: (String skill_revision_id) -> StreamReference

@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class TargetEventPlanV1 < Shared::Value
+        def source_event_id: () -> String
+        def source_global_position: () -> Integer
+        def transformation_step: () -> String
+        def target_event: () -> EventReference
+        def planning_event: () -> PgEventstore::Event
+        def marker: () -> String
+        def outcome: () -> String
+      end
+    end
+  end
+end

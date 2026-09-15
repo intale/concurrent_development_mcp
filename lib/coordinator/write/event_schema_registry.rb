@@ -38,6 +38,9 @@ module Coordinator::Write
       [ "HistoryMigrationStarted", 1 ] => Events::HistoryMigrationStartedV1,
       [ "HistoryMigrationStreamIdentityAllocated", 1 ] => Events::HistoryMigrationStreamIdentityAllocatedV1,
       [ "HistoryMigrationCorrelationAllocated", 1 ] => Events::HistoryMigrationCorrelationAllocatedV1,
+      [ "HistoryMigrationTargetStreamPlanCreated", 1 ] =>
+        Events::HistoryMigrationTargetStreamPlanCreatedV1,
+      [ "HistoryMigrationTargetEventPlanned", 1 ] => Events::HistoryMigrationTargetEventPlannedV1,
       [ "HistoryMigrationPageCreated", 1 ] => Events::HistoryMigrationPageCreatedV1,
       [ "HistoryMigrationPageAddedToMigration", 1 ] => Events::HistoryMigrationPageAddedToMigrationV1,
       [ "HistoryMigrationPageSourceRangeSelected", 1 ] => Events::HistoryMigrationPageSourceRangeSelectedV1,
