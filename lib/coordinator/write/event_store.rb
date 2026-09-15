@@ -60,6 +60,19 @@ module Coordinator::Write
       nil
     end
 
+    def read_latest(reference, criteria)
+      @client.read(
+        @pg_stream_factory.call(reference),
+        options: {
+          direction: :desc,
+          max_count: 1,
+          filter: { event_types: criteria.event_types }
+        }
+      ).first
+    rescue PgEventstore::StreamNotFoundError
+      nil
+    end
+
     def stream_starting_position(reference)
       @client.read(
         @pg_stream_factory.call(reference),

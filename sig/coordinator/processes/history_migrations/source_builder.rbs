@@ -1,0 +1,10 @@
+module Coordinator
+  module Processes
+    module HistoryMigrations
+      class SourceBuilder
+        def initialize: (event_store: Write::_EventStore, ?contract: Contracts::HistoryMigrationSourceEvent, ?schema_registry: Write::EventSchemaRegistry) -> void
+        def call: (PgEventstore::Event event) -> SourceV1
+      end
+    end
+  end
+end

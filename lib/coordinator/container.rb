@@ -91,10 +91,156 @@ module Coordinator
       Write::HistoryMigrations::StoreRegistry.new
     end
 
+    register("history_migrations.source_reader", memoize: true) do
+      Write::HistoryMigrations::SourceReader.new(
+        client: self["history_migrations.store_registry"].client(
+          Write::HistoryMigrations::StoreRegistry::SOURCE_CONFIG_NAME
+        )
+      )
+    end
+
+    register("history_migrations.target_event_store", memoize: true) do
+      Write::EventStore.new(
+        client: self["history_migrations.store_registry"].client(
+          Write::HistoryMigrations::StoreRegistry::TARGET_CONFIG_NAME
+        )
+      )
+    end
+
+    register("history_migrations.migration_loader", memoize: true) do
+      Write::HistoryMigrations::MigrationLoader.new(
+        event_store: self["event_store"],
+        stream_factory: self["stream_factory"],
+        schema_registry: self["event_schema_registry"]
+      )
+    end
+
+    register("history_migrations.page_loader", memoize: true) do
+      Write::HistoryMigrations::PageLoader.new(
+        event_store: self["event_store"],
+        stream_factory: self["stream_factory"],
+        schema_registry: self["event_schema_registry"]
+      )
+    end
+
+    register("history_migrations.page_source_loader", memoize: true) do
+      Write::HistoryMigrations::PageSourceLoader.new(
+        source_reader: self["history_migrations.source_reader"]
+      )
+    end
+
+    register("history_migrations.process_step_planner", memoize: true) do
+      Processes::ProcessStepPlanner.new(event_store: self["event_store"])
+    end
+
+    register("history_migrations.stream_identity_allocator", memoize: true) do
+      Write::HistoryMigrations::StreamIdentityAllocator.new(
+        event_store: self["event_store"],
+        id_generator: self["id_generator"],
+        stream_factory: self["stream_factory"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"]
+      )
+    end
+
+    register("history_migrations.correlation_allocator", memoize: true) do
+      Write::HistoryMigrations::CorrelationAllocator.new(
+        event_store: self["event_store"],
+        id_generator: self["id_generator"],
+        stream_factory: self["stream_factory"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"]
+      )
+    end
+
+    register("history_migrations.repository_registered_v1_transformer", memoize: true) do
+      Write::HistoryMigrations::RepositoryRegisteredV1Transformer.new(
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        compound_marker_builder: self["compound_marker_builder"]
+      )
+    end
+
+    register("history_migrations.transformer_registry", memoize: true) do
+      Write::HistoryMigrations::TransformerRegistry.new(
+        schema_registry: self["event_schema_registry"],
+        repository_registered_v1: self["history_migrations.repository_registered_v1_transformer"]
+      )
+    end
+
+    register("history_migrations.fact_planner", memoize: true) do
+      Write::HistoryMigrations::FactPlanner.new(
+        correlation_allocator: self["history_migrations.correlation_allocator"],
+        process_step_planner: self["history_migrations.process_step_planner"],
+        event_factory: self["event_factory"]
+      )
+    end
+
+    register("history_migrations.target_writer", memoize: true) do
+      Write::HistoryMigrations::TargetWriter.new(
+        event_store: self["history_migrations.target_event_store"]
+      )
+    end
+
+    register("history_migrations.event_dispatcher", memoize: true) do
+      Write::HistoryMigrations::EventDispatcher.new(
+        transformer_registry: self["history_migrations.transformer_registry"],
+        fact_planner: self["history_migrations.fact_planner"],
+        target_writer: self["history_migrations.target_writer"]
+      )
+    end
+
+    register("history_migrations.page_dispatcher", memoize: true) do
+      Write::HistoryMigrations::PageDispatcher.new(
+        source_loader: self["history_migrations.page_source_loader"],
+        event_dispatcher: self["history_migrations.event_dispatcher"]
+      )
+    end
+
     register("operations.prepare_start_history_migration", memoize: true) do
       Write::Operations::PrepareStartHistoryMigration.new(
         store_registry: self["history_migrations.store_registry"],
         id_generator: self["id_generator"]
+      )
+    end
+
+    register("operations.execute_create_history_migration_page") do
+      Write::Operations::ExecuteCreateHistoryMigrationPage.new(
+        event_store: self["event_store"],
+        loader: self["history_migrations.page_loader"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("operations.execute_apply_history_migration_page") do
+      Write::Operations::ExecuteApplyHistoryMigrationPage.new(
+        event_store: self["event_store"],
+        loader: self["history_migrations.page_loader"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("operations.execute_advance_history_migration") do
+      Write::Operations::ExecuteAdvanceHistoryMigration.new(
+        event_store: self["event_store"],
+        migration_loader: self["history_migrations.migration_loader"],
+        page_loader: self["history_migrations.page_loader"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("operations.execute_complete_history_migration") do
+      Write::Operations::ExecuteCompleteHistoryMigration.new(
+        event_store: self["event_store"],
+        loader: self["history_migrations.migration_loader"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        stream_factory: self["stream_factory"]
       )
     end
 
@@ -2673,6 +2819,28 @@ module Coordinator
       )
     end
 
+    register("history_migrations.source_builder", memoize: true) do
+      Processes::HistoryMigrations::SourceBuilder.new(
+        event_store: self["event_store"],
+        schema_registry: self["event_schema_registry"]
+      )
+    end
+
+    register("process_managers.history_migration", memoize: true) do
+      Processes::ProcessManagers::HistoryMigration.new(
+        source_builder: self["history_migrations.source_builder"],
+        migration_loader: self["history_migrations.migration_loader"],
+        page_loader: self["history_migrations.page_loader"],
+        source_reader: self["history_migrations.source_reader"],
+        page_dispatcher: self["history_migrations.page_dispatcher"],
+        create_page: self["operations.execute_create_history_migration_page"],
+        apply_page: self["operations.execute_apply_history_migration_page"],
+        advance_migration: self["operations.execute_advance_history_migration"],
+        complete_migration: self["operations.execute_complete_history_migration"],
+        process_step_planner: self["history_migrations.process_step_planner"]
+      )
+    end
+
     register("subscriptions.change_set_readiness", memoize: true) do
       Processes::Subscriptions::ChangeSetReadiness.new(handler: self["process_managers.change_set_readiness"])
     end
@@ -2743,6 +2911,18 @@ module Coordinator
     register("subscriptions.build_progress", memoize: true) do
       Processes::Subscriptions::BuildProgress.new(
         handler: self["process_managers.build_progress"]
+      )
+    end
+
+    register("subscriptions.history_migration_page_planner", memoize: true) do
+      Processes::Subscriptions::HistoryMigrationPagePlanner.new(
+        handler: self["process_managers.history_migration"]
+      )
+    end
+
+    register("subscriptions.history_migration_page_lifecycle", memoize: true) do
+      Processes::Subscriptions::HistoryMigrationPageLifecycle.new(
+        handler: self["process_managers.history_migration"]
       )
     end
 
@@ -2833,7 +3013,7 @@ module Coordinator
     end
 
     register("subscription_registrations.process_managers", memoize: true) do
-      [
+      registrations = [
         self["subscriptions.change_set_readiness"],
         *self["subscriptions.coordination_task_executors"],
         self["subscriptions.operation_batch_runner"],
@@ -2846,7 +3026,18 @@ module Coordinator
         self["subscriptions.merge_snapshot_verification"],
         self["subscriptions.release_set_lifecycle"],
         self["subscriptions.build_progress"]
-      ].freeze
+      ]
+      store_registry = self["history_migrations.store_registry"]
+      if store_registry.available?(Write::HistoryMigrations::StoreRegistry::SOURCE_CONFIG_NAME) &&
+          store_registry.available?(Write::HistoryMigrations::StoreRegistry::TARGET_CONFIG_NAME)
+        registrations.concat(
+          [
+            self["subscriptions.history_migration_page_planner"],
+            self["subscriptions.history_migration_page_lifecycle"]
+          ]
+        )
+      end
+      registrations.freeze
     end
 
     register("subscription_set_factories.process_managers", memoize: true) do

@@ -1,0 +1,12 @@
+module Coordinator
+  module Processes
+    module HistoryMigrations
+      class SourceV1 < Shared::Value
+        Payload: untyped
+
+        attr_reader event: PgEventstore::Event
+        attr_reader payload: Write::Events::HistoryMigrationStartedV1 | Write::Events::HistoryMigrationCursorAdvancedV1 | Write::Events::HistoryMigrationPageSourceEventCountRecordedV1 | Write::Events::HistoryMigrationPageAppliedV1
+      end
+    end
+  end
+end

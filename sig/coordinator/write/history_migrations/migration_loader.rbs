@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class MigrationLoader
+        START_HISTORY: EventReadCriteria
+        PROGRESS_HISTORY: LatestEventReadCriteria
+
+        def initialize: (event_store: _EventStore, ?stream_factory: StreamFactory, ?schema_registry: EventSchemaRegistry) -> void
+        def call: (String migration_id) -> MigrationSnapshotV1
+      end
+    end
+  end
+end

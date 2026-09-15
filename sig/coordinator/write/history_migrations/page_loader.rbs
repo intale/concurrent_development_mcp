@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class PageLoader
+        EVENT_TYPES: Array[String]
+        HISTORY: EventReadCriteria
+
+        def initialize: (event_store: _EventStore, ?stream_factory: StreamFactory, ?schema_registry: EventSchemaRegistry) -> void
+        def call: (String page_id) -> PageSnapshotV1
+      end
+    end
+  end
+end

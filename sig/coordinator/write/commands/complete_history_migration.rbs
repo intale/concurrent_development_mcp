@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Commands
+      class CompleteHistoryMigration < Shared::Value
+        attr_reader command_id: String
+        attr_reader actor: Actor
+        attr_reader migration_id: String
+      end
+    end
+  end
+end

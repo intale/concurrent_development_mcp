@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class PageSnapshotV1 < Shared::Value
+        attr_reader state: Domain::HistoryMigrationPages::State
+        attr_reader physical_events: Array[PgEventstore::Event]
+        attr_reader latest_revision: Integer?
+
+        def event: (String type) -> PgEventstore::Event?
+      end
+    end
+  end
+end

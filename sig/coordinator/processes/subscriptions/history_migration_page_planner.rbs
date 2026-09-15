@@ -1,0 +1,11 @@
+module Coordinator
+  module Processes
+    module Subscriptions
+      class HistoryMigrationPagePlanner < Shared::Subscriptions::Registration
+        DEFINITION: ProcessDefinition
+
+        def initialize: (handler: ProcessManagers::HistoryMigration, ?pull_interval: Integer | Float) -> void
+      end
+    end
+  end
+end

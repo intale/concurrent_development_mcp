@@ -210,6 +210,8 @@ RSpec.describe Coordinator::Container do
         "change-set-readiness-v1",
         "coordination-task-executor-lane-0-v2",
         "coordination-task-executor-lane-1-v2",
+        "history-migration-page-lifecycle-v1",
+        "history-migration-page-planner-v1",
         "lease-expiry-scheduler-v1",
         "merge-snapshot-verification-v1",
         "operation-batch-runner-v1",

@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class HistoryMigrationPageAddedToMigrationV1 < Base
+        attr_reader page_id: String
+        attr_reader migration_id: String
+      end
+    end
+  end
+end

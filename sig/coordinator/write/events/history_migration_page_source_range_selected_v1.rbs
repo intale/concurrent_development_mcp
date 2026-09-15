@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module Events
+      class HistoryMigrationPageSourceRangeSelectedV1 < Base
+        attr_reader page_id: String
+        attr_reader from_position: Integer
+        attr_reader to_position: Integer
+      end
+    end
+  end
+end

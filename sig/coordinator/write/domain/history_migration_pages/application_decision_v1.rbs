@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Domain
+      module HistoryMigrationPages
+        class ApplicationDecisionV1 < Shared::Value
+          attr_reader outcome: String
+          attr_reader plan: EventPlan?
+        end
+      end
+    end
+  end
+end

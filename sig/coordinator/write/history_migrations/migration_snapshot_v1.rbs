@@ -1,0 +1,19 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class MigrationSnapshotV1 < Shared::Value
+        attr_reader migration_id: String
+        attr_reader source_config_name: String
+        attr_reader target_config_name: String
+        attr_reader source_upper_position: Integer?
+        attr_reader page_size: Integer
+        attr_reader next_from_position: Integer
+        attr_reader completed: bool
+        attr_reader checkpoint_event: PgEventstore::Event
+        attr_reader latest_revision: Integer
+
+        def completed?: () -> bool
+      end
+    end
+  end
+end

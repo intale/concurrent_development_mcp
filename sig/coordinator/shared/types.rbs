@@ -390,6 +390,8 @@ module Coordinator
       CandidateTargetBranch: untyped
       GlobalPosition: untyped
       HistoryMigrationPageSize: untyped
+      HistoryMigrationSourceEventCount: untyped
+      HistoryMigrationTargetEventCount: untyped
       AgentChoiceImpactPageSize: untyped
       AgentChoiceImpactPageChoiceCount: untyped
       AgentChoiceImpactListLimit: untyped

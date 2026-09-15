@@ -827,6 +827,11 @@ module Coordinator::Shared
     CandidateTargetBranch = String.constrained(min_size: 1, max_size: 255)
     GlobalPosition = Integer.constrained(gteq: 0)
     HistoryMigrationPageSize = Integer.constrained(gteq: 1, lteq: HISTORY_MIGRATION_PAGE_SIZE_MAXIMUM)
+    HistoryMigrationSourceEventCount = Integer.constrained(
+      gteq: 1,
+      lteq: HISTORY_MIGRATION_PAGE_SIZE_MAXIMUM
+    )
+    HistoryMigrationTargetEventCount = Integer.constrained(gteq: 1, lteq: 100_000)
     AgentChoiceImpactPageSize = Integer.enum(50)
     AgentChoiceImpactPageChoiceCount = Integer.constrained(gteq: 0, lteq: 50)
     AgentChoiceImpactListLimit = Integer.constrained(gteq: 1, lteq: 100)

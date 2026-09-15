@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecuteAdvanceHistoryMigration
+        include Dry::Monads::Result::Mixin
+
+        def initialize: (event_store: _EventStore, ?migration_loader: HistoryMigrations::MigrationLoader, ?page_loader: HistoryMigrations::PageLoader, ?decider: Domain::HistoryMigrations::Advance, ?id_generator: Shared::IdGenerator, ?event_factory: EventFactory, ?stream_factory: StreamFactory) -> void
+        def call_command: (Commands::AdvanceHistoryMigration command, caused_by: PgEventstore::Event) -> Dry::Monads::Result
+      end
+    end
+  end
+end

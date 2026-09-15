@@ -1,0 +1,14 @@
+module Coordinator
+  module Processes
+    module ProcessManagers
+      class HistoryMigration
+        ACTOR: Write::Commands::Actor
+        RULE_VERSION: String
+        HANDLED_CODES: Array[Symbol]
+
+        def initialize: (source_builder: HistoryMigrations::SourceBuilder, migration_loader: Write::HistoryMigrations::MigrationLoader, page_loader: Write::HistoryMigrations::PageLoader, source_reader: Write::HistoryMigrations::SourceReader, page_dispatcher: Write::HistoryMigrations::PageDispatcher, create_page: Write::Operations::ExecuteCreateHistoryMigrationPage, apply_page: Write::Operations::ExecuteApplyHistoryMigrationPage, advance_migration: Write::Operations::ExecuteAdvanceHistoryMigration, complete_migration: Write::Operations::ExecuteCompleteHistoryMigration, process_step_planner: ProcessStepPlanner) -> void
+        def call: (PgEventstore::Event event) -> nil
+      end
+    end
+  end
+end

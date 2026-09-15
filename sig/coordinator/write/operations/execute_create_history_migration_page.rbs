@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecuteCreateHistoryMigrationPage
+        include Dry::Monads::Result::Mixin
+
+        EVENT_TYPES: Array[String]
+
+        def initialize: (event_store: _EventStore, ?loader: HistoryMigrations::PageLoader, ?decider: Domain::HistoryMigrationPages::Create, ?id_generator: Shared::IdGenerator, ?event_factory: EventFactory, ?stream_factory: StreamFactory) -> void
+        def call_command: (Commands::CreateHistoryMigrationPage command, caused_by: PgEventstore::Event) -> Dry::Monads::Result
+      end
+    end
+  end
+end

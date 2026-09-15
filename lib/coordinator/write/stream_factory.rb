@@ -38,6 +38,14 @@ module Coordinator::Write
       )
     end
 
+    def history_migration_page(page_id)
+      StreamReference.new(
+        context: "CoordinatorMaintenance",
+        stream_name: "HistoryMigrationPage",
+        stream_id: page_id
+      )
+    end
+
     def skill(skill_id)
       StreamReference.new(context: "AgentKnowledge", stream_name: "Skill", stream_id: skill_id)
     end

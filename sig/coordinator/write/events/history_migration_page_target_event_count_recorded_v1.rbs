@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class HistoryMigrationPageTargetEventCountRecordedV1 < Base
+        attr_reader page_id: String
+        attr_reader target_event_count: Integer
+      end
+    end
+  end
+end

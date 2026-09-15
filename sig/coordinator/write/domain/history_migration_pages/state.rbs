@@ -1,0 +1,27 @@
+module Coordinator
+  module Write
+    module Domain
+      module HistoryMigrationPages
+        class State < Shared::Value
+          EVENT_CLASSES: Array[Class]
+
+          attr_reader step: Integer
+          attr_reader page_id: String?
+          attr_reader migration_id: String?
+          attr_reader from_position: Integer?
+          attr_reader to_position: Integer?
+          attr_reader source_event_count: Integer?
+          attr_reader target_event_count: Integer?
+
+          def self.initial: () -> State
+          def self.reduce: (Array[Events::Base] events) -> State
+          def absent?: () -> bool
+          def planned?: () -> bool
+          def applied?: () -> bool
+          def matches_creation?: (Commands::CreateHistoryMigrationPage command) -> bool
+          def apply: (Events::Base event) -> State
+        end
+      end
+    end
+  end
+end

@@ -38,6 +38,16 @@ module Coordinator::Write
       [ "HistoryMigrationStarted", 1 ] => Events::HistoryMigrationStartedV1,
       [ "HistoryMigrationStreamIdentityAllocated", 1 ] => Events::HistoryMigrationStreamIdentityAllocatedV1,
       [ "HistoryMigrationCorrelationAllocated", 1 ] => Events::HistoryMigrationCorrelationAllocatedV1,
+      [ "HistoryMigrationPageCreated", 1 ] => Events::HistoryMigrationPageCreatedV1,
+      [ "HistoryMigrationPageAddedToMigration", 1 ] => Events::HistoryMigrationPageAddedToMigrationV1,
+      [ "HistoryMigrationPageSourceRangeSelected", 1 ] => Events::HistoryMigrationPageSourceRangeSelectedV1,
+      [ "HistoryMigrationPageSourceEventCountRecorded", 1 ] =>
+        Events::HistoryMigrationPageSourceEventCountRecordedV1,
+      [ "HistoryMigrationPageTargetEventCountRecorded", 1 ] =>
+        Events::HistoryMigrationPageTargetEventCountRecordedV1,
+      [ "HistoryMigrationPageApplied", 1 ] => Events::HistoryMigrationPageAppliedV1,
+      [ "HistoryMigrationCursorAdvanced", 1 ] => Events::HistoryMigrationCursorAdvancedV1,
+      [ "HistoryMigrationCompleted", 1 ] => Events::HistoryMigrationCompletedV1,
       [ "SkillRegistered", 1 ] => Events::SkillRegisteredV1,
       [ "SkillRevisionCreated", 1 ] => Events::SkillRevisionCreatedV1,
       [ "SkillRevisionDescriptionDefined", 1 ] => Events::SkillRevisionDescriptionDefinedV1,

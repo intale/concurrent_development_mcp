@@ -1,0 +1,7 @@
+module Coordinator
+  module Write
+    class LatestEventReadCriteria < Shared::Value
+      attr_reader event_types: Array[String]
+    end
+  end
+end
