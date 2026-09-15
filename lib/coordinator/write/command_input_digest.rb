@@ -22,6 +22,7 @@ module Coordinator::Write
       when Commands::UpdateDevelopmentArtifact then development_artifact_update_document(command)
       when Commands::DeclareDevelopmentArtifactRelation
         development_artifact_relation_declare_canonical_document(command)
+      when Commands::StartHistoryMigration then history_migration_start_canonical_document(command)
       else
         document(command)
       end
@@ -125,6 +126,7 @@ module Coordinator::Write
       when Commands::CompleteOperationBatch then operation_batch_completion_document(command)
       when Commands::CompleteOperationBatchCancellation then operation_batch_cancellation_completion_document(command)
       when Commands::ExpireResourceLease then lease_expire_policy_document(command)
+      when Commands::StartHistoryMigration then history_migration_start_document(command)
       else
         raise ArgumentError, "Unsupported coordination command: #{command.class.name}"
       end
@@ -1192,6 +1194,34 @@ module Coordinator::Write
           source_event: CommandInputDocuments::EventReferenceV1.new(command.source_event.to_h),
           release_set_id: command.release_set_id,
           rule_version: command.rule_version
+        )
+      )
+    end
+
+    def history_migration_start_document(command)
+      CommandInputDocuments::StartHistoryMigrationV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "history_migration_start",
+        input: CommandInputDocuments::StartHistoryMigrationInputV1.new(
+          actor: actor_document(command.actor),
+          page_size: command.page_size,
+          migration_id: command.migration_id,
+          source_config_name: command.source_config_name,
+          target_config_name: command.target_config_name,
+          source_upper_position: command.source_upper_position
+        )
+      )
+    end
+
+    def history_migration_start_canonical_document(command)
+      CommandInputDocuments::StartHistoryMigrationCanonicalV1.new(
+        schema: "command-input/v1",
+        command_id: command.command_id,
+        tool_name: "history_migration_start",
+        input: CommandInputDocuments::StartHistoryMigrationCanonicalInputV1.new(
+          actor: actor_document(command.actor),
+          page_size: command.page_size
         )
       )
     end

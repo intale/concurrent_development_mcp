@@ -16,7 +16,7 @@ module Coordinator
         def status: () -> String
         def summary: () -> String
         def receipt: () -> String?
-        def data: () -> (Write::CommandReceiptData::value | Write::Tasks::DomainErrorV1::domain_error)
+        def data: () -> (Write::CommandReceiptData::value | Write::Tasks::DomainErrorV1::domain_error | Write::Tasks::DomainErrorV1::history_migration_error)
         def warnings: () -> Array[String]
         def next_actions: () -> Array[Write::NextAction]
         def emitted_events: () -> Array[Write::EventReference]

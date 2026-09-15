@@ -1,7 +1,7 @@
 module Coordinator
   module Write
     module CommandReceiptData
-      type value = RepositoryRegistration | ResourceResolution | ResourceRemoval | ChangeSet | WorkItem | Dependency | Attempt | WorkItemCompletion | WorkIntentionSetDeclaration | WorkIntentionSetExpansion | WorkIntentionSetRenewal | WorkIntentionSetWithdrawal | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver | MergeSnapshotRegistration | MergeSnapshotVerification | MergeAuthorization | MergeObservation | ReleaseSetPreparation | RepositoryIntegration | ReleaseSetVerification | ReleaseSetActivation | ReleaseSetCompensationRequest | ReleaseSetCompletion | DependencySatisfaction | ChangeSetCompletion | SkillPublication | DevelopmentArtifactCapture | DevelopmentArtifactUpdate | DevelopmentArtifactClassification | DevelopmentArtifactRelation | OperationBatchAcceptance | OperationBatchCancellation | OperationBatchTransition
+      type value = RepositoryRegistration | ResourceResolution | ResourceRemoval | HistoryMigrationStart | ChangeSet | WorkItem | Dependency | Attempt | WorkItemCompletion | WorkIntentionSetDeclaration | WorkIntentionSetExpansion | WorkIntentionSetRenewal | WorkIntentionSetWithdrawal | ResourceLeaseExpiry | Guidance | InterpretationProposal | InterpretationAdjudication | DecisionActivation | DecisionCorrection | AgentChoice | CandidateSubmission | CandidateImpactSurface | VerificationObligationClaim | CompatibilityAssessment | VerificationObligationWaiver | MergeSnapshotRegistration | MergeSnapshotVerification | MergeAuthorization | MergeObservation | ReleaseSetPreparation | RepositoryIntegration | ReleaseSetVerification | ReleaseSetActivation | ReleaseSetCompensationRequest | ReleaseSetCompletion | DependencySatisfaction | ChangeSetCompletion | SkillPublication | DevelopmentArtifactCapture | DevelopmentArtifactUpdate | DevelopmentArtifactClassification | DevelopmentArtifactRelation | OperationBatchAcceptance | OperationBatchCancellation | OperationBatchTransition
 
       class RepositoryRegistration < Shared::Value
         def repository_id: () -> String
@@ -30,6 +30,17 @@ module Coordinator
         def outcome: () -> String
         def reason: () -> String
         def unbound_at: () -> String?
+      end
+
+      class HistoryMigrationStart < Shared::Value
+        def migration_id: () -> String
+        def source_config_name: () -> String
+        def target_config_name: () -> String
+        def source_upper_position: () -> Integer?
+        def page_size: () -> Integer
+        def outcome: () -> String
+        def start_event: () -> EventReference
+        def started_at: () -> String
       end
 
       class ChangeSet < Shared::Value

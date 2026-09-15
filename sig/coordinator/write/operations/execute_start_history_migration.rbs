@@ -1,0 +1,24 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecuteStartHistoryMigration
+        TOOL_NAME: String
+        EVENT_TYPES: Array[String]
+
+        def initialize: (
+          event_store: _EventStore,
+          ?preparer: PrepareStartHistoryMigration,
+          ?decider: Domain::HistoryMigrations::Start,
+          ?input_digest: CommandInputDigest,
+          ?id_generator: Shared::IdGenerator,
+          ?event_factory: EventFactory,
+          ?schema_registry: EventSchemaRegistry,
+          ?stream_factory: StreamFactory,
+          ?completion_builder: CommandResultBuilder
+        ) -> void
+        def call: (command_input input) -> Dry::Monads::Result
+        def call_command: (Commands::StartHistoryMigration command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
+      end
+    end
+  end
+end

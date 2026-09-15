@@ -87,6 +87,17 @@ module Coordinator
       self["operations.execute_remove_resource"].method(:prepare)
     end
 
+    register("history_migrations.store_registry", memoize: true) do
+      Write::HistoryMigrations::StoreRegistry.new
+    end
+
+    register("operations.prepare_start_history_migration", memoize: true) do
+      Write::Operations::PrepareStartHistoryMigration.new(
+        store_registry: self["history_migrations.store_registry"],
+        id_generator: self["id_generator"]
+      )
+    end
+
     register("operations.prepare_create_change_set", memoize: true) do
       Write::Operations::PrepareCreateChangeSet.new
     end
@@ -270,6 +281,10 @@ module Coordinator
 
     register("domain.repositories.register", memoize: true) do
       Write::Domain::Repositories::Register.new(stream_factory: self["stream_factory"])
+    end
+
+    register("domain.history_migrations.start", memoize: true) do
+      Write::Domain::HistoryMigrations::Start.new(stream_factory: self["stream_factory"])
     end
 
     register("domain.change_sets.create", memoize: true) do
@@ -1256,6 +1271,20 @@ module Coordinator
       )
     end
 
+    register("operations.execute_start_history_migration") do
+      Write::Operations::ExecuteStartHistoryMigration.new(
+        event_store: self["event_store"],
+        preparer: self["operations.prepare_start_history_migration"],
+        decider: self["domain.history_migrations.start"],
+        input_digest: self["command_input_digest"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"],
+        completion_builder: self["command_result_builder"]
+      )
+    end
+
     register("operations.execute_remove_resource") do
       Write::Operations::ExecuteRemoveResource.new(
         event_store: self["event_store"],
@@ -2099,6 +2128,7 @@ module Coordinator
         command_loader: self["commands.loader"],
         command_transition: self["operations.apply_command_transition"],
         input_digest: self["command_input_digest"],
+        start_history_migration: self["operations.execute_start_history_migration"],
         remove_resource: self["operations.execute_remove_resource"],
         create_change_set: self["operations.execute_create_change_set"],
         create_work_item: self["operations.execute_create_work_item"],
@@ -2196,6 +2226,13 @@ module Coordinator
     register("operations.submit_remove_resource_task") do
       Write::Operations::PrepareAndSubmitCoordinationTask.new(
         preparer: self["operations.prepare_remove_resource"],
+        submitter: self["operations.submit_coordination_task"]
+      )
+    end
+
+    register("operations.submit_start_history_migration_task") do
+      Write::Operations::PrepareAndSubmitCoordinationTask.new(
+        preparer: self["operations.prepare_start_history_migration"],
         submitter: self["operations.submit_coordination_task"]
       )
     end

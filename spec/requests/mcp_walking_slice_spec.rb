@@ -64,6 +64,7 @@ module McpWalkingSliceSpec
       "operation_batch_get",
       "verification_obligations_list",
       "merge_snapshot_get",
+      "history_migration_start",
       "repository_register",
       "resource_resolve",
       "resource_remove",

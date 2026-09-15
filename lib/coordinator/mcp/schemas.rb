@@ -197,6 +197,21 @@ module Coordinator
         )
       end
 
+      def history_migration_start
+        object_schema(
+          properties: common_mutation_properties.merge(
+            page_size: {
+              type: "integer",
+              minimum: 1,
+              maximum: Types::HISTORY_MIGRATION_PAGE_SIZE_MAXIMUM,
+              default: Types::HISTORY_MIGRATION_PAGE_SIZE_MAXIMUM,
+              description: "Maximum source events read per bounded migration page."
+            }
+          ),
+          required: %w[command_id actor]
+        )
+      end
+
       def work_item_create
         object_schema(
           properties: common_mutation_properties.merge(

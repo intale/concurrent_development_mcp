@@ -16,6 +16,7 @@ module Coordinator::Write
         reject_command: Domain::CommandLifecycles::Reject.new,
         input_digest: CommandInputDigest.new,
         rejection_retryability: CommandRejectionRetryability.new,
+        start_history_migration: Operations::ExecuteStartHistoryMigration.new(event_store:),
         remove_resource: Operations::ExecuteRemoveResource.new(event_store:),
         create_change_set: Operations::ExecuteCreateChangeSet.new(event_store:),
         create_work_item: Operations::ExecuteCreateWorkItem.new(event_store:),
@@ -80,6 +81,7 @@ module Coordinator::Write
         @reject_command = reject_command
         @input_digest = input_digest
         @rejection_retryability = rejection_retryability
+        @start_history_migration = start_history_migration
         @register_repository = Operations::ExecuteRegisterRepository.new(event_store:)
         @resolve_resource = Operations::ExecuteResolveResource.new(event_store:)
         @remove_resource = remove_resource
@@ -136,21 +138,21 @@ module Coordinator::Write
           contract.receipt_type[result.value!.data] if result.success?
 
           transition = if result.success?
-                         succeed(
-                           command,
-                           actor: command.actor,
-                           tool_name: contract.tool_name,
-                           caused_by: terminal_parent(result.value!, fallback: caused_by)
-                         )
-                       else
-                         reject(
-                           command,
-                           error: result.failure,
-                           actor: command.actor,
-                           tool_name: contract.tool_name,
-                           caused_by:
-                         )
-                       end
+            succeed(
+              command,
+              actor: command.actor,
+              tool_name: contract.tool_name,
+              caused_by: terminal_parent(result.value!, fallback: caused_by)
+            )
+          else
+            reject(
+              command,
+              error: result.failure,
+              actor: command.actor,
+              tool_name: contract.tool_name,
+              caused_by:
+            )
+          end
           next transition if transition.failure?
 
           Success(
@@ -170,7 +172,6 @@ module Coordinator::Write
           terminal_event: snapshot.persisted_events.last
         )
       end
-
       def validate_registration!(state, command:, contract:)
         requested_digest = @input_digest.request(command)
         unless state.command_id == command.command_id &&
@@ -227,7 +228,6 @@ module Coordinator::Write
 
         raise InvalidCommandHistory, "Command completion references a missing terminal parent"
       end
-
     end
   end
 end

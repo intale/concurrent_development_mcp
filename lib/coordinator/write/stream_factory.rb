@@ -14,6 +14,14 @@ module Coordinator::Write
       StreamReference.new(context: "CoordinatorControl", stream_name: "ProcessStep", stream_id: process_step_id)
     end
 
+    def history_migration(migration_id)
+      StreamReference.new(
+        context: "CoordinatorMaintenance",
+        stream_name: "HistoryMigration",
+        stream_id: migration_id
+      )
+    end
+
     def skill(skill_id)
       StreamReference.new(context: "AgentKnowledge", stream_name: "Skill", stream_id: skill_id)
     end

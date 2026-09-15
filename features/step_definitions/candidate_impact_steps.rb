@@ -33,6 +33,14 @@ end
 Then("the surface and successful command lifecycle preserve the Task trace") do
   candidate = @impact_candidates.fetch(@impact_role)
   surface = impact_events(candidate).sole
+  assignment = event_store.read(
+    streams.candidate(candidate.dig(:arguments, :candidate_id)),
+    Coordinator::Write::EventReadCriteria.new(
+      event_types: [ "CandidateImpactSurfaceAssigned" ],
+      maximum_count: 1,
+      direction: :asc
+    )
+  ).sole
   terminal = assert_command_succeeded(
     @impact_arguments.fetch(:command_id),
     context: "Impact command lifecycle"
@@ -42,11 +50,12 @@ Then("the surface and successful command lifecycle preserve the Task trace") do
   assert_acceptance(started, "Impact Task has no execution-started fact")
   assert_acceptance(completed, "Impact Task has no completion fact")
   assert_acceptance_equal(started.id, surface.causation_id, "Impact surface causation")
-  assert_acceptance_equal(started.id, terminal.causation_id, "Impact command causation")
+  assert_acceptance_equal(started.id, assignment.causation_id, "Impact assignment causation")
+  assert_acceptance_equal(assignment.id, terminal.causation_id, "Impact command causation")
   assert_acceptance_equal(terminal.id, completed.causation_id, "Impact Task completion causation")
   assert_acceptance_equal(
     [ started.correlation_id ],
-    [ surface, terminal, completed ].map(&:correlation_id).uniq,
+    [ surface, assignment, terminal, completed ].map(&:correlation_id).uniq,
     "Impact correlation"
   )
 end

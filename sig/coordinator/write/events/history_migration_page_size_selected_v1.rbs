@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class HistoryMigrationPageSizeSelectedV1 < Base
+        def migration_id: () -> String
+        def page_size: () -> Integer
+      end
+    end
+  end
+end

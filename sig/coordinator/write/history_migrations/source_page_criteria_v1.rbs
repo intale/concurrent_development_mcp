@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class SourcePageCriteriaV1 < Shared::Value
+        def from_position: () -> Integer
+        def to_position: () -> Integer
+        def page_size: () -> Integer
+      end
+    end
+  end
+end

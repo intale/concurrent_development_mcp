@@ -76,7 +76,7 @@ Then("the durable claim carries exact Task tracing") do
   command_terminal = command_terminal_event(attempt.fetch(:command_id))
   assert_acceptance_equal("CommandSucceeded", command_terminal&.type, "Claim command terminal")
   assert_acceptance_equal(started.id, claim.causation_id, "Claim immediate parent")
-  assert_acceptance_equal(started.id, command_terminal.causation_id, "Command terminal immediate parent")
+  assert_acceptance_equal(claim.id, command_terminal.causation_id, "Command terminal immediate parent")
   assert_acceptance_equal(command_terminal.id, task_completed.causation_id, "Task completion parent")
   assert_acceptance_equal(
     [ submitted.correlation_id ],

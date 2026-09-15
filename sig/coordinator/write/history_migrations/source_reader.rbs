@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class SourceReader
+        def initialize: (client: PgEventstore::Client) -> void
+        def head_position: () -> Integer?
+        def page: (SourcePageCriteriaV1 criteria) -> Array[PgEventstore::Event]
+      end
+    end
+  end
+end

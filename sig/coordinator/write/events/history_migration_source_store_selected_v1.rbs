@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class HistoryMigrationSourceStoreSelectedV1 < Base
+        def migration_id: () -> String
+        def source_config_name: () -> String
+      end
+    end
+  end
+end

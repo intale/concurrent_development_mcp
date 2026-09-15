@@ -77,11 +77,12 @@ Then(
   )
   assert_acceptance_equal(1, head_facts.length, "Candidate head registrations")
 
-  target_facts = [ *candidate_facts, *head_facts, terminal ]
+  target_facts = [ *candidate_facts, *head_facts ]
   assert_acceptance_equal([ started.id ], target_facts.map(&:causation_id).uniq, "Candidate causation")
+  assert_acceptance_equal(head_facts.sole.id, terminal.causation_id, "Candidate command causation")
   assert_acceptance_equal(
     [ started.correlation_id ],
-    target_facts.map(&:correlation_id).uniq,
+    [ *target_facts, terminal ].map(&:correlation_id).uniq,
     "Candidate correlation"
   )
 end

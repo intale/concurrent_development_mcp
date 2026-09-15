@@ -14,6 +14,8 @@ module Coordinator
       INSTRUCTIONS = <<~TEXT.freeze
         Coordinate checkpointed concurrent development across repositories.
         Actor fields are attribution labels, not authenticated identities.
+        Use history_migration_start only when a separately configured migration target store is available. It freezes
+        the source global position before its own Task facts and returns a durable Task for the cross-store Saga.
         Every application request requires the io.modelcontextprotocol/tasks capability.
         Mutations return durable Task handles: persist each taskId, poll tasks/get at
         pollIntervalMs, and use tasks/cancel for cooperative cancellation. Reuse command_id

@@ -53,9 +53,9 @@ Then("the granular preparation facts and command success preserve the Task trace
     "ReleaseSet preparation does not form one causal chain"
   )
   assert_acceptance_equal(
-    started.id,
+    change_set_link.id,
     completion.causation_id,
-    "Command success must share the Task execution as its causal parent"
+    "Command success must follow the final preparation fact"
   )
   assert_acceptance_equal(
     [ started.correlation_id ],
@@ -183,7 +183,7 @@ Then("the integration and verification Tasks preserve one ReleaseSet trace") do
     )
     terminal = command_events(command_id).find { _1.type == "CommandSucceeded" }
     assert_acceptance(terminal, "ReleaseSet command has no success fact")
-    assert_acceptance_equal(started.id, terminal.causation_id, "ReleaseSet command success causation")
+    assert_acceptance_equal(facts.last.id, terminal.causation_id, "ReleaseSet command success causation")
     assert_acceptance_equal(
       [ expected_correlation ],
       [ started, *facts, terminal ].map(&:correlation_id).uniq,

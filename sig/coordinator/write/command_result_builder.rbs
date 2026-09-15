@@ -3,6 +3,7 @@ module Coordinator
     class CommandResultBuilder
       def initialize: (?persisted_events_contract: Contracts::PersistedEvents) -> void
       def create_change_set: (command: Commands::CreateChangeSet, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> CommandResultV1
+      def history_migration_start: (command: Commands::StartHistoryMigration, outcome: String, start_event: PgEventstore::Event, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> CommandResultV1
       def work_item_create: (command: Commands::CreateWorkItem, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> CommandResultV1
       def work_item_dependency_declare: (command: Commands::DeclareWorkItemDependency, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> CommandResultV1
       def change_set_activate: (command: Commands::ActivateChangeSet, input_digest: String, persisted_events: Array[PgEventstore::Event], completed_at: String) -> CommandResultV1

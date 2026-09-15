@@ -223,7 +223,7 @@ module VerificationEvidenceOutcomeAcceptanceWorld
     assert_acceptance(outcome, "Traced outcome fact is missing")
     assert_acceptance_equal("CommandSucceeded", command_terminal&.type, "Evidence command terminal")
     assert_acceptance_equal(started.id, evidence.causation_id, "Evidence immediate parent")
-    assert_acceptance_equal(started.id, command_terminal.causation_id, "Command terminal immediate parent")
+    assert_acceptance_equal(evidence.id, command_terminal.causation_id, "Command terminal immediate parent")
     assert_acceptance_equal(command_terminal.id, task_completed.causation_id, "Task completion parent")
     process_step = process_step_event(
       source_event: evidence,

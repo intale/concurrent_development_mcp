@@ -58,6 +58,7 @@ module Coordinator
       COORDINATION_DISCOVERY_MAXIMUM_ITEMS: Integer
       DECISION_DISCOVERY_MAXIMUM_ITEMS: Integer
       OPERATION_BATCH_MAXIMUM_ITEMS: Integer
+      HISTORY_MIGRATION_PAGE_SIZE_MAXIMUM: Integer
       OPERATION_BATCH_PAGE_SIZE: Integer
       OPERATION_BATCH_QUERY_MAXIMUM_ITEMS: Integer
       OPERATION_BATCH_MAXIMUM_ENCODED_BYTES: Integer
@@ -388,6 +389,7 @@ module Coordinator
       CandidateEnvironmentValue: untyped
       CandidateTargetBranch: untyped
       GlobalPosition: untyped
+      HistoryMigrationPageSize: untyped
       AgentChoiceImpactPageSize: untyped
       AgentChoiceImpactPageChoiceCount: untyped
       AgentChoiceImpactListLimit: untyped

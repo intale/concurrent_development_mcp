@@ -6,6 +6,7 @@ module Coordinator
       def self.utf8_text: (maximum_bytes: Integer, ?minimum_bytes: Integer) -> json_schema
       def self.utf8_text_array: (max_items: Integer, maximum_bytes: Integer) -> json_schema
       def self.change_set_create: () -> json_schema
+      def self.history_migration_start: () -> json_schema
       def self.repository_register: () -> json_schema
       def self.repository_list: () -> json_schema
       def self.resource_get: () -> json_schema

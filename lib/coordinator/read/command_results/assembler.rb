@@ -55,6 +55,7 @@ module Coordinator::Read
       def successful_completion(source)
         args = common_args(source)
         completion = case source.command_state.tool_name
+        when "history_migration_start" then history_migration_start(source, args:)
         when "repository_register" then repository_registration(source)
         when "resource_resolve" then resource_resolution(source)
         when "resource_remove" then resource_removal(source)
@@ -252,6 +253,28 @@ module Coordinator::Read
           persisted_events: source.persisted_events,
           completed_at: source.completed_at
         }
+      end
+
+      def history_migration_start(source, args:)
+        start_event = source.persisted_events.find { _1.type == "HistoryMigrationStarted" }
+        outcome = "started"
+        unless start_event
+          outcome = "existing"
+          start_event = @event_store.read(
+            @stream_factory.history_migration(source.command.migration_id),
+            Coordinator::Write::EventReadCriteria.new(
+              event_types: [ "HistoryMigrationStarted" ],
+              maximum_count: 1,
+              direction: :asc
+            )
+          ).sole
+        end
+
+        @completion_builder.history_migration_start(
+          **args,
+          outcome:,
+          start_event:
+        )
       end
 
       def rejected(source)
@@ -1067,7 +1090,6 @@ module Coordinator::Read
           data: event.data
         )
       end
-
     end
   end
 end

@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module Commands
+      class StartHistoryMigration < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def migration_id: () -> String
+        def source_config_name: () -> String
+        def target_config_name: () -> String
+        def source_upper_position: () -> Integer?
+        def page_size: () -> Integer
+      end
+    end
+  end
+end

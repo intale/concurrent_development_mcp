@@ -1,0 +1,79 @@
+# frozen_string_literal: true
+
+module Coordinator::Write
+  module Operations
+    class PrepareStartHistoryMigration < Dry::Operation
+      def initialize(
+        contract: Contracts::StartHistoryMigration.new,
+        store_registry: HistoryMigrations::StoreRegistry.new,
+        id_generator: IdGenerator.new
+      )
+        @contract = contract
+        @store_registry = store_registry
+        @id_generator = id_generator
+      end
+
+      def call(input)
+        attributes = step validate(input)
+        source_config_name = HistoryMigrations::StoreRegistry::SOURCE_CONFIG_NAME
+        target_config_name = HistoryMigrations::StoreRegistry::TARGET_CONFIG_NAME
+
+        step ensure_store_available(source_config_name, role: "source")
+        step ensure_store_available(target_config_name, role: "target")
+
+        source_upper_position = HistoryMigrations::SourceReader.new(
+          client: @store_registry.client(source_config_name)
+        ).head_position
+
+        step build_command(
+          attributes,
+          source_config_name:,
+          target_config_name:,
+          source_upper_position:
+        )
+      end
+
+      private
+
+      def validate(input)
+        result = @contract.call(input)
+        return Success(result.to_h) if result.success?
+
+        Failure(
+          OutcomeError.new(
+            code: :invalid_input,
+            message: "StartHistoryMigration input is invalid",
+            details: result.errors.to_h
+          )
+        )
+      end
+
+      def ensure_store_available(config_name, role:)
+        return Success() if @store_registry.available?(config_name)
+
+        Failure(
+          OutcomeError.new(
+            code: :history_migration_store_unavailable,
+            message: "HistoryMigration #{role} store is not configured",
+            details: { config_name:, store_role: role }
+          )
+        )
+      end
+
+      def build_command(attributes, source_config_name:, target_config_name:, source_upper_position:)
+        actor = attributes.fetch(:actor)
+        Success(
+          Commands::StartHistoryMigration.new(
+            command_id: attributes.fetch(:command_id),
+            actor: Commands::Actor.new(kind: actor.fetch(:kind), id: actor.fetch(:id)),
+            migration_id: @id_generator.uuid_v7,
+            source_config_name:,
+            target_config_name:,
+            source_upper_position:,
+            page_size: attributes.fetch(:page_size, Types::HISTORY_MIGRATION_PAGE_SIZE_MAXIMUM)
+          )
+        )
+      end
+    end
+  end
+end
