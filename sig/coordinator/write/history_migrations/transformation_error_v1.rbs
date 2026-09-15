@@ -2,7 +2,11 @@ module Coordinator
   module Write
     module HistoryMigrations
       class TransformationErrorV1 < Shared::Value
-        def code: () -> Symbol
+        def code: () -> (
+          :unsupported_source_contract |
+          :invalid_source_event |
+          :ambiguous_source_reference
+        )
         def message: () -> String
         def event_type: () -> String
         def schema_version: () -> Integer?

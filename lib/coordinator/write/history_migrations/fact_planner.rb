@@ -78,7 +78,8 @@ module Coordinator::Write
             recorded_by: "coordinator",
             policy_version: PROCESS_RULE_VERSION,
             migration_id:,
-            migration_source: source
+            migration_source: source,
+            **(fact.metadata_extension&.to_h || {})
           ),
           markers: fact.markers + [
             target_event_marker,

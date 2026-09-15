@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class LegacyRequestIdMapper
+        def call: (command_id: String, source_position: Integer) -> (String | Integer)
+      end
+    end
+  end
+end

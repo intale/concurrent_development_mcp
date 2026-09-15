@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class LegacyTaskFailureMapper
+        CODES: Hash[Integer, String]
+        def code: (Integer value) -> String
+      end
+    end
+  end
+end

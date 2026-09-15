@@ -10,8 +10,13 @@ module Coordinator::Write
         @target_plan_builder = target_plan_builder
       end
 
-      def call(migration_id:, source_config_name:, source_event:)
-        transformation = @transformer_registry.call(migration_id:, source_config_name:, source_event:)
+      def call(migration_id:, source_config_name:, source_upper_position:, source_event:)
+        transformation = @transformer_registry.call(
+          migration_id:,
+          source_config_name:,
+          source_upper_position:,
+          source_event:
+        )
         return transformation if transformation.failure?
 
         @target_plan_builder.call(

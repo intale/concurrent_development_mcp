@@ -1,11 +1,14 @@
 module Coordinator
   module Write
     module HistoryMigrations
-      class RepositoryRegisteredV1Transformer
+      class CoordinationTaskSubmittedV2Transformer
         def initialize: (
           stream_identity_allocator: StreamIdentityAllocator,
-          ?compound_marker_builder: Shared::CompoundMarkerBuilder,
-          ?natural_key_marker: Repositories::NaturalKeyMarker
+          command_event_locator: LegacyCommandEventLocator,
+          ?command_input_rebinder: CommandInputRebinder,
+          ?request_id_mapper: LegacyRequestIdMapper,
+          ?request_marker: CommandLifecycle::RequestMarker,
+          ?execution_lane: Tasks::ExecutionLane
         ) -> void
 
         def call: (
@@ -13,7 +16,7 @@ module Coordinator
           source_config_name: String,
           source_upper_position: Integer?,
           source_event: PgEventstore::Event,
-          source_payload: Events::RepositoryRegisteredV1
+          source_payload: LegacyEvents::CoordinationTaskSubmittedV2
         ) -> Dry::Monads::Result
       end
     end

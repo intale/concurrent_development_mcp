@@ -15,7 +15,7 @@ module Coordinator::Write
         @natural_key_marker = natural_key_marker
       end
 
-      def call(migration_id:, source_config_name:, source_event:, source_payload:)
+      def call(migration_id:, source_config_name:, source_upper_position:, source_event:, source_payload:)
         allocation = @stream_identity_allocator.call(
           migration_id:,
           source_config_name:,

@@ -63,6 +63,7 @@ RSpec.describe "history migration target dispatch", :event_store do
     transformed = transformer.call(
       migration_id:,
       source_config_name: "default",
+      source_upper_position: source_event.global_position,
       source_event:,
       source_payload:
     ).value!

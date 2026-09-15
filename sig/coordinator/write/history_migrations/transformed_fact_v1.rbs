@@ -6,6 +6,7 @@ module Coordinator
         def event: () -> Events::Base
         def markers: () -> Array[String]
         def step_name: () -> String
+        def metadata_extension: () -> MigrationMetadataExtensionV1?
       end
     end
   end

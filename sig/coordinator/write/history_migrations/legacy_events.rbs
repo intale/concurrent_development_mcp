@@ -2,25 +2,48 @@ module Coordinator
   module Write
     module HistoryMigrations
       module LegacyEvents
+        type coordination_task_lifecycle = CoordinationTaskCancellationRequestedV1 |
+          CoordinationTaskCancelledV1 |
+          CoordinationTaskCompletedV2 |
+          CoordinationTaskExecutionStartedV1 |
+          CoordinationTaskFailedV1
+
         class CommandCompletedV1 < Events::Base
+          def command_id: () -> String
+          def tool_name: () -> String
+          def canonical_input_digest: () -> String
         end
 
         class CoordinationTaskCancellationRequestedV1 < Events::Base
+          def task_id: () -> String
         end
 
         class CoordinationTaskCancelledV1 < Events::Base
+          def task_id: () -> String
+          def reason: () -> String
         end
 
         class CoordinationTaskCompletedV2 < Events::Base
+          def task_id: () -> String
+          def result: () -> Tasks::SemanticResultV1::value
         end
 
         class CoordinationTaskExecutionStartedV1 < Events::Base
+          def task_id: () -> String
         end
 
         class CoordinationTaskFailedV1 < Events::Base
+          def task_id: () -> String
+          def error: () -> Tasks::JsonRpcErrorV1
         end
 
         class CoordinationTaskSubmittedV2 < Events::Base
+          def task_id: () -> String
+          def tool_name: () -> String
+          def command_id: () -> String
+          def command_input: () -> CommandInputDocuments::value
+          def ttl_ms: () -> nil
+          def poll_interval_ms: () -> Integer
         end
 
         class OperationBatchCancellationRequestedV1 < Events::Base

@@ -1,0 +1,21 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class LegacyCommandEventLocator
+        def initialize: (event_store: EventStore) -> void
+
+        def completion: (
+          command_id: String,
+          through_position: Integer?,
+          source_event: PgEventstore::Event
+        ) -> Dry::Monads::Result
+
+        def task_submission: (
+          command_id: String,
+          through_position: Integer?,
+          source_event: PgEventstore::Event
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

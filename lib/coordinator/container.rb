@@ -187,10 +187,39 @@ module Coordinator
       )
     end
 
+    register("history_migrations.legacy_command_event_locator", memoize: true) do
+      Write::HistoryMigrations::LegacyCommandEventLocator.new(event_store: self["event_store"])
+    end
+
+    register("history_migrations.coordination_task_submitted_v2_transformer", memoize: true) do
+      Write::HistoryMigrations::CoordinationTaskSubmittedV2Transformer.new(
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        command_event_locator: self["history_migrations.legacy_command_event_locator"]
+      )
+    end
+
+    register("history_migrations.coordination_task_lifecycle_transformer", memoize: true) do
+      Write::HistoryMigrations::CoordinationTaskLifecycleTransformer.new(
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"]
+      )
+    end
+
+    register("history_migrations.command_completed_v1_transformer", memoize: true) do
+      Write::HistoryMigrations::CommandCompletedV1Transformer.new(
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        command_event_locator: self["history_migrations.legacy_command_event_locator"]
+      )
+    end
+
     register("history_migrations.transformer_registry", memoize: true) do
       Write::HistoryMigrations::TransformerRegistry.new(
         schema_registry: Write::HistoryMigrations::LegacyEventSchemaRegistry.new,
-        repository_registered_v1: self["history_migrations.repository_registered_v1_transformer"]
+        repository_registered_v1: self["history_migrations.repository_registered_v1_transformer"],
+        coordination_task_submitted_v2:
+          self["history_migrations.coordination_task_submitted_v2_transformer"],
+        coordination_task_lifecycle:
+          self["history_migrations.coordination_task_lifecycle_transformer"],
+        command_completed_v1: self["history_migrations.command_completed_v1_transformer"]
       )
     end
 

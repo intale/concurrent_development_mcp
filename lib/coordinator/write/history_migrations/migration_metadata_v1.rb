@@ -11,6 +11,7 @@ module Coordinator::Write
       attribute :policy_version, Types::String.constrained(min_size: 1, max_size: 200)
       attribute :migration_id, Types::UuidV7
       attribute :migration_source, MigrationSourceV1
+      attribute? :canonical_input_digest, Types::Sha256Digest.optional.default(nil)
     end
   end
 end

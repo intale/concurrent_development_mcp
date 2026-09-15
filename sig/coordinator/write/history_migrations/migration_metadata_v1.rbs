@@ -10,6 +10,7 @@ module Coordinator
         def policy_version: () -> String
         def migration_id: () -> String
         def migration_source: () -> MigrationSourceV1
+        def canonical_input_digest: () -> String?
       end
     end
   end

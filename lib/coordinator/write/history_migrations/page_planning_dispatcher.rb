@@ -16,6 +16,7 @@ module Coordinator::Write
           result = @event_planning_dispatcher.call(
             migration_id: migration.migration_id,
             source_config_name: migration.source_config_name,
+            source_upper_position: migration.source_upper_position,
             source_event:
           )
           return result if result.failure?

@@ -42,6 +42,7 @@ RSpec.describe Coordinator::Write::HistoryMigrations::RepositoryRegisteredV1Tran
     result = transformer.call(
       migration_id: SecureRandom.uuid_v7,
       source_config_name: "default",
+      source_upper_position: source_event.global_position,
       source_event:,
       source_payload:
     )

@@ -2,15 +2,7 @@
 
 RSpec.describe Coordinator::Write::HistoryMigrations::TransformerRegistry, :event_store do
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
-  let(:registry) do
-    described_class.new(
-      repository_registered_v1:
-        Coordinator::Write::HistoryMigrations::RepositoryRegisteredV1Transformer.new(
-          stream_identity_allocator:
-            Coordinator::Write::HistoryMigrations::StreamIdentityAllocator.new(event_store:)
-        )
-    )
-  end
+  let(:registry) { Coordinator::Container["history_migrations.transformer_registry"] }
 
   it "fails closed when a source contract has no reviewed mapping" do
     source = PgEventstore::Event.new(
@@ -23,6 +15,7 @@ RSpec.describe Coordinator::Write::HistoryMigrations::TransformerRegistry, :even
     result = registry.call(
       migration_id: SecureRandom.uuid_v7,
       source_config_name: "default",
+      source_upper_position: 0,
       source_event: source
     )
 
