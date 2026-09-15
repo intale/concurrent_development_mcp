@@ -201,6 +201,43 @@ module Coordinator
       )
     end
 
+    register("history_migrations.legacy_marked_event_locator", memoize: true) do
+      Write::HistoryMigrations::LegacyMarkedEventLocator.new(event_store: self["event_store"])
+    end
+
+    register("history_migrations.legacy_target_event_reference_resolver", memoize: true) do
+      Write::HistoryMigrations::LegacyTargetEventReferenceResolver.new(
+        event_store: self["event_store"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        process_step_planner: self["history_migrations.process_step_planner"],
+        target_event_planner: self["history_migrations.target_event_planner"]
+      )
+    end
+
+    register("history_migrations.change_set_v1_transformer", memoize: true) do
+      Write::HistoryMigrations::ChangeSetV1Transformer.new(
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"]
+      )
+    end
+
+    register("history_migrations.work_item_v1_transformer", memoize: true) do
+      Write::HistoryMigrations::WorkItemV1Transformer.new(
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"],
+        marked_event_locator: self["history_migrations.legacy_marked_event_locator"],
+        target_event_reference_resolver:
+          self["history_migrations.legacy_target_event_reference_resolver"]
+      )
+    end
+
+    register("history_migrations.attempt_v1_transformer", memoize: true) do
+      Write::HistoryMigrations::AttemptV1Transformer.new(
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"]
+      )
+    end
+
     register("history_migrations.legacy_command_event_locator", memoize: true) do
       Write::HistoryMigrations::LegacyCommandEventLocator.new(event_store: self["event_store"])
     end
@@ -230,6 +267,9 @@ module Coordinator
         schema_registry: Write::HistoryMigrations::LegacyEventSchemaRegistry.new,
         repository_registered_v1: self["history_migrations.repository_registered_v1_transformer"],
         guidance_message_v1: self["history_migrations.guidance_message_v1_transformer"],
+        change_set_v1: self["history_migrations.change_set_v1_transformer"],
+        work_item_v1: self["history_migrations.work_item_v1_transformer"],
+        attempt_v1: self["history_migrations.attempt_v1_transformer"],
         coordination_task_submitted_v2:
           self["history_migrations.coordination_task_submitted_v2_transformer"],
         coordination_task_lifecycle:

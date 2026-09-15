@@ -67,6 +67,7 @@ module Coordinator::Write
 
         event_id = target_plan.value!.target_event.event_id
         target_event_marker = "migration-target-event:#{event_id}"
+        metadata_extension = fact.metadata_extension
         event = @event_factory.build!(
           event: fact.event,
           event_id:,
@@ -76,10 +77,10 @@ module Coordinator::Write
             actor_id: "history-migration-dispatcher",
             actor_authenticated: false,
             recorded_by: "coordinator",
-            policy_version: PROCESS_RULE_VERSION,
+            policy_version: metadata_extension&.policy_version || PROCESS_RULE_VERSION,
             migration_id:,
             migration_source: source,
-            **(fact.metadata_extension&.to_h || {})
+            canonical_input_digest: metadata_extension&.canonical_input_digest
           ),
           markers: fact.markers + [
             target_event_marker,

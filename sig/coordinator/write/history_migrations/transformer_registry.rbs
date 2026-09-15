@@ -6,6 +6,9 @@ module Coordinator
           ?schema_registry: EventSchemaRegistry | LegacyEventSchemaRegistry,
           repository_registered_v1: RepositoryRegisteredV1Transformer,
           guidance_message_v1: GuidanceMessageV1Transformer,
+          change_set_v1: ChangeSetV1Transformer,
+          work_item_v1: WorkItemV1Transformer,
+          attempt_v1: AttemptV1Transformer,
           coordination_task_submitted_v2: CoordinationTaskSubmittedV2Transformer,
           coordination_task_lifecycle: CoordinationTaskLifecycleTransformer,
           command_completed_v1: CommandCompletedV1Transformer

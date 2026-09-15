@@ -3,6 +3,7 @@ module Coordinator
     module HistoryMigrations
       class MigrationMetadataExtensionV1 < Shared::Value
         def canonical_input_digest: () -> String?
+        def policy_version: () -> String?
       end
     end
   end
