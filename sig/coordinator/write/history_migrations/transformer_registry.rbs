@@ -5,6 +5,7 @@ module Coordinator
         def initialize: (
           ?schema_registry: EventSchemaRegistry | LegacyEventSchemaRegistry,
           repository_registered_v1: RepositoryRegisteredV1Transformer,
+          guidance_message_v1: GuidanceMessageV1Transformer,
           coordination_task_submitted_v2: CoordinationTaskSubmittedV2Transformer,
           coordination_task_lifecycle: CoordinationTaskLifecycleTransformer,
           command_completed_v1: CommandCompletedV1Transformer

@@ -1,0 +1,23 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class LegacyEntityReferenceResolver
+        def initialize: (
+          event_store: EventStore,
+          stream_identity_allocator: StreamIdentityAllocator
+        ) -> void
+
+        def call: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          source_stream: StreamReference,
+          target_stream_context: String,
+          target_stream_name: String,
+          identity_role: String
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

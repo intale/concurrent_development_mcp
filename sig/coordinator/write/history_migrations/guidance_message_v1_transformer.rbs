@@ -1,0 +1,22 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class GuidanceMessageV1Transformer
+        ANCHOR_TARGETS: Hash[String, [String, String, String]]
+
+        def initialize: (
+          stream_identity_allocator: StreamIdentityAllocator,
+          entity_reference_resolver: LegacyEntityReferenceResolver
+        ) -> void
+
+        def call: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          source_payload: Events::UserUtteranceRecordedV1 | Events::UserUtteranceForwardedByAgentV1
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

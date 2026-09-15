@@ -8,6 +8,7 @@ module Coordinator::Write
       def initialize(
         schema_registry: EventSchemaRegistry.new,
         repository_registered_v1:,
+        guidance_message_v1:,
         coordination_task_submitted_v2:,
         coordination_task_lifecycle:,
         command_completed_v1:
@@ -15,6 +16,8 @@ module Coordinator::Write
         @schema_registry = schema_registry
         @definitions = {
           [ "RepositoryRegistered", 1 ] => repository_registered_v1,
+          [ "UserUtteranceRecorded", 1 ] => guidance_message_v1,
+          [ "UserUtteranceForwardedByAgent", 1 ] => guidance_message_v1,
           [ "CoordinationTaskSubmitted", 2 ] => coordination_task_submitted_v2,
           [ "CoordinationTaskExecutionStarted", 1 ] => coordination_task_lifecycle,
           [ "CoordinationTaskCancellationRequested", 1 ] => coordination_task_lifecycle,

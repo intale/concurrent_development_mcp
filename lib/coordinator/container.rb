@@ -187,6 +187,20 @@ module Coordinator
       )
     end
 
+    register("history_migrations.legacy_entity_reference_resolver", memoize: true) do
+      Write::HistoryMigrations::LegacyEntityReferenceResolver.new(
+        event_store: self["event_store"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"]
+      )
+    end
+
+    register("history_migrations.guidance_message_v1_transformer", memoize: true) do
+      Write::HistoryMigrations::GuidanceMessageV1Transformer.new(
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"]
+      )
+    end
+
     register("history_migrations.legacy_command_event_locator", memoize: true) do
       Write::HistoryMigrations::LegacyCommandEventLocator.new(event_store: self["event_store"])
     end
@@ -215,6 +229,7 @@ module Coordinator
       Write::HistoryMigrations::TransformerRegistry.new(
         schema_registry: Write::HistoryMigrations::LegacyEventSchemaRegistry.new,
         repository_registered_v1: self["history_migrations.repository_registered_v1_transformer"],
+        guidance_message_v1: self["history_migrations.guidance_message_v1_transformer"],
         coordination_task_submitted_v2:
           self["history_migrations.coordination_task_submitted_v2_transformer"],
         coordination_task_lifecycle:
