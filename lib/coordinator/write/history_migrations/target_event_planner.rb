@@ -63,6 +63,37 @@ module Coordinator::Write
         Failure(error(:target_plan_changed, source_event:, transformation_step:, event_ids: []))
       end
 
+      def find(
+        migration_id:,
+        source_event:,
+        transformation_step:,
+        target_stream:,
+        target_event_id:,
+        target_event_type:
+      )
+        marker_result = marker_for(migration_id:, source_event:, transformation_step:)
+        return Failure(marker_result.failure) if marker_result.failure?
+
+        marker = marker_result.value!.marker
+        event = existing(marker)
+        unless event
+          return Failure(error(:target_plan_missing, source_event:, transformation_step:, event_ids: []))
+        end
+
+        resolve_existing(
+          event,
+          migration_id:,
+          source_event:,
+          transformation_step:,
+          target_stream:,
+          target_event_id:,
+          target_event_type:,
+          marker:
+        )
+      rescue EventHistoryLimitExceeded
+        Failure(error(:duplicate_target_plan, source_event:, transformation_step:, event_ids: []))
+      end
+
       private
 
       def resolve(
@@ -312,6 +343,7 @@ module Coordinator::Write
           message: {
             duplicate_target_plan: "A source event transformation step resolved more than one target plan",
             existing_target_plan_mismatch: "The persisted target plan differs from the requested transformation",
+            target_plan_missing: "The source event transformation step has not been planned",
             target_plan_changed: "The target stream plan changed concurrently; the request may succeed if retried",
             target_stream_plan_invalid: "The target stream plan has an invalid history"
           }.fetch(code),

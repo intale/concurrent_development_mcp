@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class PagePlanningDispatcher
+        def initialize: (source_loader: PageSourceLoader, event_planning_dispatcher: EventPlanningDispatcher) -> void
+        def call: (migration: MigrationSnapshotV1, page: Domain::HistoryMigrationPages::State) -> Dry::Monads::Result
+      end
+    end
+  end
+end

@@ -14,6 +14,7 @@ module Coordinator::Processes
         ],
         event_types: %w[
           HistoryMigrationPageSourceEventCountRecorded
+          HistoryMigrationPagePlanned
           HistoryMigrationPageApplied
         ]
       )

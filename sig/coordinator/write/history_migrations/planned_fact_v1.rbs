@@ -6,6 +6,7 @@ module Coordinator
         def event: () -> PgEventstore::Event
         def target_event_marker: () -> String
         def process_step: () -> ProcessSteps::PlannedV1
+        def target_event_plan: () -> TargetEventPlanV1
       end
     end
   end

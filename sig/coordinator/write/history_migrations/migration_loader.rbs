@@ -3,7 +3,8 @@ module Coordinator
     module HistoryMigrations
       class MigrationLoader
         START_HISTORY: EventReadCriteria
-        PROGRESS_HISTORY: LatestEventReadCriteria
+        PROGRESS_EVENT_TYPES: Array[String]
+        PROGRESS_HISTORIES: Hash[String, LatestEventReadCriteria]
 
         def initialize: (event_store: _EventStore, ?stream_factory: StreamFactory, ?schema_registry: EventSchemaRegistry) -> void
         def call: (String migration_id) -> MigrationSnapshotV1

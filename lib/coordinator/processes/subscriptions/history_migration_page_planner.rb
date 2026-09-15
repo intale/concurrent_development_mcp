@@ -12,7 +12,12 @@ module Coordinator::Processes
             stream_name: "HistoryMigration"
           )
         ],
-        event_types: %w[HistoryMigrationStarted HistoryMigrationCursorAdvanced]
+        event_types: %w[
+          HistoryMigrationStarted
+          HistoryMigrationCursorAdvanced
+          HistoryMigrationPlanCompleted
+          HistoryMigrationApplicationCursorAdvanced
+        ]
       )
 
       def initialize(handler:, pull_interval: 1.0)

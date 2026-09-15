@@ -5,7 +5,8 @@ module Coordinator
         def code: () -> Symbol
         def message: () -> String
         def target_event_id: () -> String
-        def existing_event_id: () -> String
+        def existing_event_id: () -> String?
+        def expected_target_revision: () -> Integer
       end
     end
   end

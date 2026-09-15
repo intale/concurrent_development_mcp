@@ -5,10 +5,7 @@ module Coordinator::Write
     class ExecuteApplyHistoryMigrationPage
       include Dry::Monads[:result]
 
-      EVENT_TYPES = [
-        "HistoryMigrationPageTargetEventCountRecorded",
-        "HistoryMigrationPageApplied"
-      ].freeze
+      EVENT_TYPES = [ "HistoryMigrationPageApplied" ].freeze
 
       def initialize(
         event_store:,
@@ -27,7 +24,7 @@ module Coordinator::Write
       end
 
       def call_command(command, caused_by:)
-        event_ids = EVENT_TYPES.map { @id_generator.uuid_v7 }.freeze
+        event_id = @id_generator.uuid_v7
         snapshot = @loader.call(command.page_id)
         decision = @decider.call(state: snapshot.state, command:)
         return decision if decision.failure?
@@ -36,32 +33,27 @@ module Coordinator::Write
         return Success(snapshot.event("HistoryMigrationPageApplied")) unless resolved.plan
 
         stream = @stream_factory.history_migration_page(command.page_id)
-        physical = build_events(resolved.plan, command:, caused_by:, event_ids:, expected_stream: stream)
-        persisted = @event_store.multiple do
-          @event_store.append(stream, physical, expected_revision: snapshot.latest_revision)
-        end
-        Success(persisted.last)
+        physical = build_event(resolved.plan, command:, caused_by:, event_id:, expected_stream: stream)
+        Success(@event_store.append(stream, [ physical ], expected_revision: snapshot.latest_revision).sole)
       rescue PgEventstore::WrongExpectedRevisionError
         Failure(changed(command))
       end
 
       private
 
-      def build_events(plan, command:, caused_by:, event_ids:, expected_stream:)
-        unless plan.writes.length == EVENT_TYPES.length && plan.writes.all? { _1.stream == expected_stream }
+      def build_event(plan, command:, caused_by:, event_id:, expected_stream:)
+        unless plan.writes.length == 1 && plan.writes.sole.stream == expected_stream
           raise InvalidHistoryMigrationHistory, "HistoryMigrationPage application plan is incomplete"
         end
 
-        plan.writes.zip(event_ids).map do |write, event_id|
-          @event_factory.build!(
-            event: write.event,
-            event_id:,
-            metadata: metadata(command),
-            markers: markers(command),
-            caused_by:,
-            correlation_id: caused_by.correlation_id
-          )
-        end
+        @event_factory.build!(
+          event: plan.writes.sole.event,
+          event_id:,
+          metadata: metadata(command),
+          markers: markers(command),
+          caused_by:,
+          correlation_id: caused_by.correlation_id
+        )
       end
 
       def metadata(command)

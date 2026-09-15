@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class HistoryMigrationApplicationCursorAdvancedV1 < Base
+        def migration_id: () -> String
+        def next_from_position: () -> Integer
+      end
+    end
+  end
+end

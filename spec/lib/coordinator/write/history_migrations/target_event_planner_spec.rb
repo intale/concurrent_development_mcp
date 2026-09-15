@@ -74,6 +74,21 @@ RSpec.describe Coordinator::Write::HistoryMigrations::TargetEventPlanner, :event
     expect(mismatch.failure.code).to eq(:existing_target_plan_mismatch)
   end
 
+  it "does not synthesize a plan while finding one" do
+    source = source_events.first
+    result = planner.find(
+      migration_id:,
+      source_event: source,
+      transformation_step: "register-repository",
+      target_stream:,
+      target_event_id: SecureRandom.uuid_v7,
+      target_event_type: "RepositoryRegistered"
+    )
+
+    expect(result).to be_failure
+    expect(result.failure.code).to eq(:target_plan_missing)
+  end
+
   private
 
   def plan(source_event, step:, event_id:, type:)

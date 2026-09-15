@@ -12,7 +12,7 @@ module Coordinator::Write
 
         def call(snapshot:, command:)
           return Success(ProgressDecisionV1.new(outcome: "existing", plan: nil)) if snapshot.completed?
-          return nonempty(command) unless snapshot.source_upper_position.nil?
+          return incomplete(command) unless application_complete?(snapshot)
 
           stream = @stream_factory.history_migration(command.migration_id)
           event = Events::HistoryMigrationCompletedV1.new(migration_id: command.migration_id)
@@ -26,11 +26,18 @@ module Coordinator::Write
 
         private
 
-        def nonempty(command)
+        def application_complete?(snapshot)
+          return false unless snapshot.plan_completed?
+          return snapshot.application_next_from_position.zero? if snapshot.source_upper_position.nil?
+
+          snapshot.application_next_from_position > snapshot.source_upper_position
+        end
+
+        def incomplete(command)
           Failure(
             OutcomeError.new(
-              code: :history_migration_page_required,
-              message: "HistoryMigration has source events and must advance through a page",
+              code: :history_migration_application_incomplete,
+              message: "HistoryMigration cannot complete before every planned page is applied",
               details: { migration_id: command.migration_id }
             )
           )

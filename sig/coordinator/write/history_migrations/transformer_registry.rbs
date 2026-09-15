@@ -3,7 +3,7 @@ module Coordinator
     module HistoryMigrations
       class TransformerRegistry
         def initialize: (
-          ?schema_registry: EventSchemaRegistry,
+          ?schema_registry: EventSchemaRegistry | LegacyEventSchemaRegistry,
           repository_registered_v1: RepositoryRegisteredV1Transformer
         ) -> void
 

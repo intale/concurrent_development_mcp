@@ -3,10 +3,11 @@
 module Coordinator::Write
   module HistoryMigrations
     class TargetWriteErrorV1 < Value
-      attribute :code, Types::Symbol.enum(:existing_target_mismatch)
+      attribute :code, Types::Symbol.enum(:existing_target_mismatch, :target_revision_changed)
       attribute :message, Types::String
       attribute :target_event_id, Types::UuidV7
-      attribute :existing_event_id, Types::String.constrained(min_size: 1, max_size: 255)
+      attribute :existing_event_id, Types::String.constrained(min_size: 1, max_size: 255).optional
+      attribute :expected_target_revision, Types::StreamRevision
     end
   end
 end

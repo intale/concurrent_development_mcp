@@ -5,7 +5,6 @@ module Coordinator
         attr_reader command_id: String
         attr_reader actor: Actor
         attr_reader page_id: String
-        attr_reader target_event_count: Integer
       end
     end
   end

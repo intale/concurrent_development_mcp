@@ -9,6 +9,7 @@ module Coordinator::Write
         "HistoryMigrationPageSourceRangeSelected",
         "HistoryMigrationPageSourceEventCountRecorded",
         "HistoryMigrationPageTargetEventCountRecorded",
+        "HistoryMigrationPagePlanned",
         "HistoryMigrationPageApplied"
       ].freeze
       HISTORY = EventReadCriteria.new(

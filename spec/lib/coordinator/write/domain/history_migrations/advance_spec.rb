@@ -14,6 +14,8 @@ RSpec.describe Coordinator::Write::Domain::HistoryMigrations::Advance do
       source_upper_position: 9,
       page_size: 10,
       next_from_position: 0,
+      plan_completed: false,
+      application_next_from_position: 0,
       completed: false,
       checkpoint_event:,
       latest_revision: 5
@@ -37,7 +39,7 @@ RSpec.describe Coordinator::Write::Domain::HistoryMigrations::Advance do
           page_id:,
           target_event_count: 12
         ),
-        Coordinator::Write::Events::HistoryMigrationPageAppliedV1.new(page_id:)
+        Coordinator::Write::Events::HistoryMigrationPagePlannedV1.new(page_id:)
       ]
     )
   end
@@ -51,10 +53,10 @@ RSpec.describe Coordinator::Write::Domain::HistoryMigrations::Advance do
     )
   end
 
-  it "advances the cursor and completes the migration in one command at the frozen upper bound" do
+  it "advances the planning cursor and closes the complete plan at the frozen upper bound" do
     decision = decider.call(snapshot:, page:, command:).value!
 
-    expect(decision.outcome).to eq("completed")
+    expect(decision.outcome).to eq("plan_completed")
     expect(decision.plan.events.map(&:to_h)).to eq(
       [ { migration_id:, next_from_position: 10 }, { migration_id: } ]
     )

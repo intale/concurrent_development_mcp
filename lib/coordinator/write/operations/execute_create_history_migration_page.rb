@@ -18,7 +18,8 @@ module Coordinator::Write
         decider: Domain::HistoryMigrationPages::Create.new,
         id_generator: IdGenerator.new,
         event_factory: EventFactory.new,
-        stream_factory: StreamFactory.new
+        stream_factory: StreamFactory.new,
+        page_locator: HistoryMigrations::PageLocator.new(event_store:)
       )
         @event_store = event_store
         @loader = loader
@@ -26,6 +27,7 @@ module Coordinator::Write
         @id_generator = id_generator
         @event_factory = event_factory
         @stream_factory = stream_factory
+        @page_locator = page_locator
       end
 
       def call_command(command, caused_by:)
@@ -54,12 +56,13 @@ module Coordinator::Write
           raise InvalidHistoryMigrationHistory, "HistoryMigrationPage creation plan is incomplete"
         end
 
+        event_markers = markers(command)
         plan.writes.zip(event_ids).map do |write, event_id|
           @event_factory.build!(
             event: write.event,
             event_id:,
             metadata: metadata(command),
-            markers: markers(command),
+            markers: event_markers,
             caused_by:,
             correlation_id: caused_by.correlation_id
           )
@@ -77,9 +80,18 @@ module Coordinator::Write
       end
 
       def markers(command)
+        encoded = @page_locator.marker(
+          migration_id: command.migration_id,
+          from_position: command.from_position
+        )
+        if encoded.failure?
+          raise InvalidHistoryMigrationHistory, "HistoryMigrationPage selector is invalid"
+        end
+
         [
           "history-migration:#{command.migration_id}",
           "history-migration-page:#{command.page_id}",
+          encoded.value!.marker,
           "command:#{command.command_id}"
         ].freeze
       end

@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Domain
+      module HistoryMigrations
+        class AdvanceApplication
+          def initialize: (?stream_factory: StreamFactory) -> void
+          def call: (snapshot: Write::HistoryMigrations::MigrationSnapshotV1, page: Domain::HistoryMigrationPages::State, command: Commands::AdvanceHistoryMigrationApplication) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

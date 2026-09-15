@@ -22,19 +22,27 @@ RSpec.describe Coordinator::Write::Domain::HistoryMigrationPages::Apply do
     Coordinator::Write::Commands::ApplyHistoryMigrationPage.new(
       command_id: SecureRandom.uuid_v7,
       actor: Coordinator::Write::Commands::Actor.new(kind: "system", id: "history-migration"),
-      page_id:,
-      target_event_count: 5
+      page_id:
     )
   end
 
-  it "records only the target count and applied fact, then no-ops exact redelivery" do
-    planned = Coordinator::Write::Domain::HistoryMigrationPages::State.reduce(creation)
+  it "records only the applied fact after planning, then no-ops redelivery" do
+    planning = Coordinator::Write::Domain::HistoryMigrationPages::Plan.new.call(
+      state: Coordinator::Write::Domain::HistoryMigrationPages::State.reduce(creation),
+      command: Coordinator::Write::Commands::PlanHistoryMigrationPage.new(
+        command_id: SecureRandom.uuid_v7,
+        actor: Coordinator::Write::Commands::Actor.new(kind: "system", id: "history-migration"),
+        page_id:,
+        target_event_count: 5
+      )
+    ).value!.plan.events
+    planned = Coordinator::Write::Domain::HistoryMigrationPages::State.reduce(creation + planning)
     decision = decider.call(state: planned, command:).value!
 
-    expect(decision.plan.events.map(&:to_h)).to eq(
-      [ { page_id:, target_event_count: 5 }, { page_id: } ]
+    expect(decision.plan.events.map(&:to_h)).to eq([ { page_id: } ])
+    applied = Coordinator::Write::Domain::HistoryMigrationPages::State.reduce(
+      creation + planning + decision.plan.events
     )
-    applied = Coordinator::Write::Domain::HistoryMigrationPages::State.reduce(creation + decision.plan.events)
     expect(decider.call(state: applied, command:).value!.to_h).to eq(outcome: "existing", plan: nil)
   end
 end

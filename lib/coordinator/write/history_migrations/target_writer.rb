@@ -11,6 +11,17 @@ module Coordinator::Write
 
       def call(planned_facts:)
         @event_store.multiple { write(planned_facts) }
+      rescue PgEventstore::WrongExpectedRevisionError
+        current_fact = planned_facts.first
+        Failure(
+          TargetWriteErrorV1.new(
+            code: :target_revision_changed,
+            message: "The target stream revision differs from the complete migration plan",
+            target_event_id: current_fact.event.id,
+            existing_event_id: nil,
+            expected_target_revision: current_fact.target_event_plan.target_event.stream_revision
+          )
+        )
       end
 
       private
@@ -22,7 +33,13 @@ module Coordinator::Write
 
         pairs = resolved.map(&:value!)
         persisted = pairs.map do |planned_fact, existing|
-          existing || @event_store.append(planned_fact.target_stream, [ planned_fact.event ]).sole
+          next existing if existing
+
+          @event_store.append(
+            planned_fact.target_stream,
+            [ planned_fact.event ],
+            expected_revision: expected_revision(planned_fact)
+          ).sole
         end
         TargetWriteResultV1.new(events: persisted, outcome: outcome(pairs))
           .then { Success(_1) }
@@ -46,7 +63,8 @@ module Coordinator::Write
             code: :existing_target_mismatch,
             message: "A planned migration target marker resolves to different persisted facts",
             target_event_id: planned_fact.event.id,
-            existing_event_id: existing.id
+            existing_event_id: existing.id,
+            expected_target_revision: planned_fact.target_event_plan.target_event.stream_revision
           )
         )
       end
@@ -58,6 +76,7 @@ module Coordinator::Write
           existing.stream.context == planned_fact.target_stream.context &&
           existing.stream.stream_name == planned_fact.target_stream.stream_name &&
           existing.stream.stream_id == planned_fact.target_stream.stream_id &&
+          existing.stream_revision == planned_fact.target_event_plan.target_event.stream_revision &&
           existing.data == proposed.data &&
           existing.metadata.slice(*proposed.metadata.keys) == proposed.metadata &&
           existing.markers.sort == proposed.markers.sort &&
@@ -71,6 +90,11 @@ module Coordinator::Write
         return "existing" if existing_count == pairs.length
 
         "mixed"
+      end
+
+      def expected_revision(planned_fact)
+        revision = planned_fact.target_event_plan.target_event.stream_revision
+        revision.zero? ? :no_event : revision - 1
       end
     end
   end

@@ -16,6 +16,7 @@ module Coordinator
           def self.initial: () -> State
           def self.reduce: (Array[Events::Base] events) -> State
           def absent?: () -> bool
+          def created?: () -> bool
           def planned?: () -> bool
           def applied?: () -> bool
           def matches_creation?: (Commands::CreateHistoryMigrationPage command) -> bool

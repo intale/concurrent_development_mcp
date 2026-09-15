@@ -10,6 +10,7 @@ module Coordinator::Write
           Events::HistoryMigrationPageSourceRangeSelectedV1,
           Events::HistoryMigrationPageSourceEventCountRecordedV1,
           Events::HistoryMigrationPageTargetEventCountRecordedV1,
+          Events::HistoryMigrationPagePlannedV1,
           Events::HistoryMigrationPageAppliedV1
         ].freeze
 
@@ -41,8 +42,12 @@ module Coordinator::Write
           step.zero?
         end
 
-        def planned?
+        def created?
           step == 4
+        end
+
+        def planned?
+          step == 6
         end
 
         def applied?

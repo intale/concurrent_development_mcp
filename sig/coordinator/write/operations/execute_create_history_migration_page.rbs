@@ -6,7 +6,7 @@ module Coordinator
 
         EVENT_TYPES: Array[String]
 
-        def initialize: (event_store: _EventStore, ?loader: HistoryMigrations::PageLoader, ?decider: Domain::HistoryMigrationPages::Create, ?id_generator: Shared::IdGenerator, ?event_factory: EventFactory, ?stream_factory: StreamFactory) -> void
+        def initialize: (event_store: _EventStore, ?loader: HistoryMigrations::PageLoader, ?decider: Domain::HistoryMigrationPages::Create, ?id_generator: Shared::IdGenerator, ?event_factory: EventFactory, ?stream_factory: StreamFactory, ?page_locator: HistoryMigrations::PageLocator) -> void
         def call_command: (Commands::CreateHistoryMigrationPage command, caused_by: PgEventstore::Event) -> Dry::Monads::Result
       end
     end

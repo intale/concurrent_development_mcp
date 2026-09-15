@@ -6,6 +6,7 @@ module Coordinator::Write
       attribute :code, Types::Symbol.enum(
         :duplicate_target_plan,
         :existing_target_plan_mismatch,
+        :target_plan_missing,
         :target_plan_changed,
         :target_stream_plan_invalid
       )

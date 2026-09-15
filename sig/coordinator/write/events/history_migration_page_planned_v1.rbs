@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Events
+      class HistoryMigrationPagePlannedV1 < Base
+        def page_id: () -> String
+      end
+    end
+  end
+end

@@ -5,16 +5,18 @@ module Coordinator::Write
     class FactPlanner
       include Dry::Monads[:result]
 
-      PROCESS_RULE_VERSION = "history-migration-dispatch/v1"
+      PROCESS_RULE_VERSION = "history-migration-transformation/v1"
 
       def initialize(
         correlation_allocator:,
         process_step_planner:,
+        target_event_planner:,
         source_builder: MigrationSourceBuilder.new,
         event_factory: EventFactory.new
       )
         @correlation_allocator = correlation_allocator
         @process_step_planner = process_step_planner
+        @target_event_planner = target_event_planner
         @source_builder = source_builder
         @event_factory = event_factory
       end
@@ -25,17 +27,20 @@ module Coordinator::Write
 
         source = @source_builder.call(config_name: source_config_name, event: source_event)
         target_correlation_id = correlation.value!.target_correlation_id
-        Success(
-          transformed_facts.map do |fact|
-            plan_fact(
-              migration_id:,
-              source_event:,
-              source:,
-              fact:,
-              target_correlation_id:
-            )
-          end
-        )
+        planned_facts = []
+        transformed_facts.each do |fact|
+          planned = plan_fact(
+            migration_id:,
+            source_event:,
+            source:,
+            fact:,
+            target_correlation_id:
+          )
+          return planned if planned.failure?
+
+          planned_facts << planned.value!
+        end
+        Success(planned_facts.freeze)
       end
 
       private
@@ -50,7 +55,17 @@ module Coordinator::Write
           rule_version: PROCESS_RULE_VERSION,
           allocate_target_entity: true
         )
-        event_id = process_step.target_entity_id!
+        target_plan = @target_event_planner.find(
+          migration_id:,
+          source_event:,
+          transformation_step: fact.step_name,
+          target_stream: fact.target_stream,
+          target_event_id: process_step.target_entity_id!,
+          target_event_type: fact.event.class.event_type
+        )
+        return target_plan if target_plan.failure?
+
+        event_id = target_plan.value!.target_event.event_id
         target_event_marker = "migration-target-event:#{event_id}"
         event = @event_factory.build!(
           event: fact.event,
@@ -74,7 +89,15 @@ module Coordinator::Write
           correlation_id: target_correlation_id
         )
 
-        PlannedFactV1.new(target_stream: fact.target_stream, event:, target_event_marker:, process_step:)
+        Success(
+          PlannedFactV1.new(
+            target_stream: fact.target_stream,
+            event:,
+            target_event_marker:,
+            process_step:,
+            target_event_plan: target_plan.value!
+          )
+        )
       end
 
       def trace_parent(process_step_event, target_correlation_id:)

@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Domain
+      module HistoryMigrations
+        class CompletePlan
+          def initialize: (?stream_factory: StreamFactory) -> void
+          def call: (snapshot: Write::HistoryMigrations::MigrationSnapshotV1, command: Commands::CompleteHistoryMigrationPlan) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

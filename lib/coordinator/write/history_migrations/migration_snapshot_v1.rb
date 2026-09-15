@@ -9,9 +9,15 @@ module Coordinator::Write
       attribute :source_upper_position, Types::GlobalPosition.optional
       attribute :page_size, Types::HistoryMigrationPageSize
       attribute :next_from_position, Types::GlobalPosition
+      attribute :plan_completed, Types::Bool
+      attribute :application_next_from_position, Types::GlobalPosition
       attribute :completed, Types::Bool
       attribute :checkpoint_event, Types.Instance(PgEventstore::Event)
       attribute :latest_revision, Types::StreamRevision
+
+      def plan_completed?
+        plan_completed
+      end
 
       def completed?
         completed

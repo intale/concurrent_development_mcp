@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module Commands
+      class AdvanceHistoryMigrationApplication < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def migration_id: () -> String
+        def page_id: () -> String
+        def next_from_position: () -> Integer
+      end
+    end
+  end
+end

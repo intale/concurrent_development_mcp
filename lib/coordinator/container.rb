@@ -123,6 +123,13 @@ module Coordinator
       )
     end
 
+    register("history_migrations.page_locator", memoize: true) do
+      Write::HistoryMigrations::PageLocator.new(
+        event_store: self["event_store"],
+        schema_registry: self["event_schema_registry"]
+      )
+    end
+
     register("history_migrations.page_source_loader", memoize: true) do
       Write::HistoryMigrations::PageSourceLoader.new(
         source_reader: self["history_migrations.source_reader"]
@@ -153,6 +160,26 @@ module Coordinator
       )
     end
 
+    register("history_migrations.target_stream_plan_allocator", memoize: true) do
+      Write::HistoryMigrations::TargetStreamPlanAllocator.new(
+        event_store: self["event_store"],
+        id_generator: self["id_generator"],
+        stream_factory: self["stream_factory"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"]
+      )
+    end
+
+    register("history_migrations.target_event_planner", memoize: true) do
+      Write::HistoryMigrations::TargetEventPlanner.new(
+        event_store: self["event_store"],
+        target_stream_plan_allocator: self["history_migrations.target_stream_plan_allocator"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"]
+      )
+    end
+
     register("history_migrations.repository_registered_v1_transformer", memoize: true) do
       Write::HistoryMigrations::RepositoryRegisteredV1Transformer.new(
         stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
@@ -162,8 +189,15 @@ module Coordinator
 
     register("history_migrations.transformer_registry", memoize: true) do
       Write::HistoryMigrations::TransformerRegistry.new(
-        schema_registry: self["event_schema_registry"],
+        schema_registry: Write::HistoryMigrations::LegacyEventSchemaRegistry.new,
         repository_registered_v1: self["history_migrations.repository_registered_v1_transformer"]
+      )
+    end
+
+    register("history_migrations.target_plan_builder", memoize: true) do
+      Write::HistoryMigrations::TargetPlanBuilder.new(
+        process_step_planner: self["history_migrations.process_step_planner"],
+        target_event_planner: self["history_migrations.target_event_planner"]
       )
     end
 
@@ -171,6 +205,7 @@ module Coordinator
       Write::HistoryMigrations::FactPlanner.new(
         correlation_allocator: self["history_migrations.correlation_allocator"],
         process_step_planner: self["history_migrations.process_step_planner"],
+        target_event_planner: self["history_migrations.target_event_planner"],
         event_factory: self["event_factory"]
       )
     end
@@ -186,6 +221,20 @@ module Coordinator
         transformer_registry: self["history_migrations.transformer_registry"],
         fact_planner: self["history_migrations.fact_planner"],
         target_writer: self["history_migrations.target_writer"]
+      )
+    end
+
+    register("history_migrations.event_planning_dispatcher", memoize: true) do
+      Write::HistoryMigrations::EventPlanningDispatcher.new(
+        transformer_registry: self["history_migrations.transformer_registry"],
+        target_plan_builder: self["history_migrations.target_plan_builder"]
+      )
+    end
+
+    register("history_migrations.page_planning_dispatcher", memoize: true) do
+      Write::HistoryMigrations::PagePlanningDispatcher.new(
+        source_loader: self["history_migrations.page_source_loader"],
+        event_planning_dispatcher: self["history_migrations.event_planning_dispatcher"]
       )
     end
 
@@ -209,6 +258,17 @@ module Coordinator
         loader: self["history_migrations.page_loader"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
+        stream_factory: self["stream_factory"],
+        page_locator: self["history_migrations.page_locator"]
+      )
+    end
+
+    register("operations.execute_plan_history_migration_page") do
+      Write::Operations::ExecutePlanHistoryMigrationPage.new(
+        event_store: self["event_store"],
+        loader: self["history_migrations.page_loader"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
         stream_factory: self["stream_factory"]
       )
     end
@@ -228,6 +288,27 @@ module Coordinator
         event_store: self["event_store"],
         migration_loader: self["history_migrations.migration_loader"],
         page_loader: self["history_migrations.page_loader"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("operations.execute_advance_history_migration_application") do
+      Write::Operations::ExecuteAdvanceHistoryMigrationApplication.new(
+        event_store: self["event_store"],
+        migration_loader: self["history_migrations.migration_loader"],
+        page_loader: self["history_migrations.page_loader"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
+    register("operations.execute_complete_history_migration_plan") do
+      Write::Operations::ExecuteCompleteHistoryMigrationPlan.new(
+        event_store: self["event_store"],
+        loader: self["history_migrations.migration_loader"],
         id_generator: self["id_generator"],
         event_factory: self["event_factory"],
         stream_factory: self["stream_factory"]
@@ -2831,11 +2912,16 @@ module Coordinator
         source_builder: self["history_migrations.source_builder"],
         migration_loader: self["history_migrations.migration_loader"],
         page_loader: self["history_migrations.page_loader"],
+        page_locator: self["history_migrations.page_locator"],
         source_reader: self["history_migrations.source_reader"],
+        page_planning_dispatcher: self["history_migrations.page_planning_dispatcher"],
         page_dispatcher: self["history_migrations.page_dispatcher"],
         create_page: self["operations.execute_create_history_migration_page"],
+        plan_page: self["operations.execute_plan_history_migration_page"],
         apply_page: self["operations.execute_apply_history_migration_page"],
         advance_migration: self["operations.execute_advance_history_migration"],
+        advance_application: self["operations.execute_advance_history_migration_application"],
+        complete_plan: self["operations.execute_complete_history_migration_plan"],
         complete_migration: self["operations.execute_complete_history_migration"],
         process_step_planner: self["history_migrations.process_step_planner"]
       )

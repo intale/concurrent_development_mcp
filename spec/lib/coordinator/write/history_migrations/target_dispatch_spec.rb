@@ -43,7 +43,18 @@ RSpec.describe "history migration target dispatch", :event_store do
     Coordinator::Write::HistoryMigrations::FactPlanner.new(
       correlation_allocator:
         Coordinator::Write::HistoryMigrations::CorrelationAllocator.new(event_store: source_store),
-      process_step_planner: Coordinator::Processes::ProcessStepPlanner.new(event_store: source_store)
+      process_step_planner: process_step_planner,
+      target_event_planner:
+    )
+  end
+  let(:process_step_planner) { Coordinator::Processes::ProcessStepPlanner.new(event_store: source_store) }
+  let(:target_event_planner) do
+    Coordinator::Write::HistoryMigrations::TargetEventPlanner.new(event_store: source_store)
+  end
+  let(:target_plan_builder) do
+    Coordinator::Write::HistoryMigrations::TargetPlanBuilder.new(
+      process_step_planner:,
+      target_event_planner:
     )
   end
   let(:writer) { Coordinator::Write::HistoryMigrations::TargetWriter.new(event_store: target_store) }
@@ -54,6 +65,11 @@ RSpec.describe "history migration target dispatch", :event_store do
       source_config_name: "default",
       source_event:,
       source_payload:
+    ).value!
+    target_plan_builder.call(
+      migration_id:,
+      source_event:,
+      transformed_facts: transformed
     ).value!
     first_plan = planner.call(
       migration_id:,

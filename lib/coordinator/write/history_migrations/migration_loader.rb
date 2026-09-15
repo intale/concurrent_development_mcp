@@ -8,9 +8,15 @@ module Coordinator::Write
         maximum_count: Operations::ExecuteStartHistoryMigration::EVENT_TYPES.length,
         direction: :asc
       )
-      PROGRESS_HISTORY = LatestEventReadCriteria.new(
-        event_types: [ "HistoryMigrationCursorAdvanced", "HistoryMigrationCompleted" ]
-      )
+      PROGRESS_EVENT_TYPES = %w[
+        HistoryMigrationCursorAdvanced
+        HistoryMigrationPlanCompleted
+        HistoryMigrationApplicationCursorAdvanced
+        HistoryMigrationCompleted
+      ].freeze
+      PROGRESS_HISTORIES = PROGRESS_EVENT_TYPES.to_h do |event_type|
+        [ event_type, LatestEventReadCriteria.new(event_types: [ event_type ]) ]
+      end.freeze
 
       def initialize(
         event_store:,
@@ -30,10 +36,13 @@ module Coordinator::Write
           raise InvalidHistoryMigrationHistory, "HistoryMigration #{migration_id} has no complete start history"
         end
 
-        progress_event = @event_store.read_latest(stream, PROGRESS_HISTORY)
-        progress = load_event(progress_event) if progress_event
+        progress_events = PROGRESS_HISTORIES.values.filter_map do |criteria|
+          @event_store.read_latest(stream, criteria)
+        end
+        progress = progress_events.to_h { [ _1.type, [ _1, load_event(_1) ] ] }
         upper = start_state.source_upper_position
-        verify_progress!(progress, event: progress_event, stream:, migration_id:, upper:)
+        verify_progress!(progress, migration_id:, upper:)
+        checkpoint_event = progress_events.max_by(&:stream_revision) || start_events.last
 
         MigrationSnapshotV1.new(
           migration_id:,
@@ -41,10 +50,12 @@ module Coordinator::Write
           target_config_name: start_state.target_config_name,
           source_upper_position: upper,
           page_size: start_state.page_size,
-          next_from_position: next_from_position(progress, upper:),
-          completed: progress.is_a?(Events::HistoryMigrationCompletedV1),
-          checkpoint_event: progress_event || start_events.last,
-          latest_revision: [ start_events.last.stream_revision, progress_event&.stream_revision ].compact.max
+          next_from_position: planning_next_from_position(progress),
+          plan_completed: progress.key?("HistoryMigrationPlanCompleted"),
+          application_next_from_position: application_next_from_position(progress),
+          completed: progress.key?("HistoryMigrationCompleted"),
+          checkpoint_event:,
+          latest_revision: [ start_events.last.stream_revision, *progress_events.map(&:stream_revision) ].max
         )
       end
 
@@ -58,34 +69,47 @@ module Coordinator::Write
         )
       end
 
-      def verify_progress!(progress, event:, stream:, migration_id:, upper:)
-        return unless progress
-        unless progress.migration_id == migration_id
-          raise InvalidHistoryMigrationHistory, "HistoryMigration progress disagrees on migration_id"
-        end
-        if progress.is_a?(Events::HistoryMigrationCursorAdvancedV1)
-          unless upper && progress.next_from_position <= upper
-            raise InvalidHistoryMigrationHistory, "HistoryMigration has a terminal cursor without completion"
+      def verify_progress!(progress, migration_id:, upper:)
+        progress.each_value do |_event, payload|
+          unless payload.migration_id == migration_id
+            raise InvalidHistoryMigrationHistory, "HistoryMigration progress disagrees on migration_id"
           end
-          return
-        end
-        return if upper.nil?
-
-        predecessor = @event_store.read_at(stream, event.stream_revision - 1)
-        cursor = load_event(predecessor) if predecessor
-        if cursor.is_a?(Events::HistoryMigrationCursorAdvancedV1) &&
-            cursor.migration_id == migration_id && cursor.next_from_position == upper + 1
-          return
         end
 
-        raise InvalidHistoryMigrationHistory, "HistoryMigration completion has no final cursor"
+        planning = progress["HistoryMigrationCursorAdvanced"]&.last
+        plan_completed = progress["HistoryMigrationPlanCompleted"]
+        application = progress["HistoryMigrationApplicationCursorAdvanced"]&.last
+        completed = progress["HistoryMigrationCompleted"]
+
+        if plan_completed
+          terminal = upper.nil? ? planning.nil? : planning&.next_from_position == upper + 1
+          unless terminal && plan_completed.first.stream_revision > (progress["HistoryMigrationCursorAdvanced"]&.first&.stream_revision || -1)
+            raise InvalidHistoryMigrationHistory, "HistoryMigration plan completion has no final planning cursor"
+          end
+        elsif planning && (!upper || planning.next_from_position > upper)
+          raise InvalidHistoryMigrationHistory, "HistoryMigration has a terminal planning cursor without completion"
+        end
+
+        if application
+          unless plan_completed && upper && application.next_from_position <= upper + 1
+            raise InvalidHistoryMigrationHistory, "HistoryMigration application cursor is outside its planned range"
+          end
+        end
+
+        return unless completed
+        terminal_application = upper.nil? ? application.nil? : application&.next_from_position == upper + 1
+        unless plan_completed && terminal_application &&
+            completed.first.stream_revision > plan_completed.first.stream_revision
+          raise InvalidHistoryMigrationHistory, "HistoryMigration completion has no complete application"
+        end
       end
 
-      def next_from_position(progress, upper:)
-        return progress.next_from_position if progress.is_a?(Events::HistoryMigrationCursorAdvancedV1)
-        return upper ? upper + 1 : 0 if progress.is_a?(Events::HistoryMigrationCompletedV1)
+      def planning_next_from_position(progress)
+        progress["HistoryMigrationCursorAdvanced"]&.last&.next_from_position || 0
+      end
 
-        0
+      def application_next_from_position(progress)
+        progress["HistoryMigrationApplicationCursorAdvanced"]&.last&.next_from_position || 0
       end
     end
   end

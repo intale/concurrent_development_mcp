@@ -24,6 +24,15 @@ module Coordinator
           target_event_type: String,
           caused_by: PgEventstore::Event
         ) -> Dry::Monads::Result
+
+        def find: (
+          migration_id: String,
+          source_event: PgEventstore::Event,
+          transformation_step: String,
+          target_stream: StreamReference,
+          target_event_id: String,
+          target_event_type: String
+        ) -> Dry::Monads::Result
       end
     end
   end

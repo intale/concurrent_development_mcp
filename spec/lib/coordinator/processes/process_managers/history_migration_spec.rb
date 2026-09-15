@@ -7,23 +7,52 @@ RSpec.describe Coordinator::Processes::ProcessManagers::HistoryMigration, :event
   let(:manager) { Coordinator::Container["process_managers.history_migration"] }
   let(:migration_id) { SecureRandom.uuid_v7 }
 
-  it "plans, applies, acknowledges, and idempotently redelivers a bounded cross-store page" do
+  it "plans the complete range before applying and idempotently redelivers a bounded cross-store page" do
     legacy = append_legacy_repository
     started = start_migration(through: legacy.global_position)
 
     manager.call(started)
     source_count = page_event("HistoryMigrationPageSourceEventCountRecorded")
     manager.call(source_count)
-    applied = page_stream(source_count.stream.stream_id).last
+
+    page_id = source_count.stream.stream_id
+    planned = page_stream(page_id).last
+    expect(planned.type).to eq("HistoryMigrationPagePlanned")
+    expect(target_repositories).to be_empty
+    manager.call(planned)
+
+    plan_completed = migration_event("HistoryMigrationPlanCompleted")
+    manager.call(plan_completed)
+
+    applied = page_stream(page_id).last
     expect(applied.type).to eq("HistoryMigrationPageApplied")
     manager.call(applied)
+
+    application_advanced = migration_event("HistoryMigrationApplicationCursorAdvanced")
+    manager.call(application_advanced)
 
     migration = Coordinator::Container["history_migrations.migration_loader"].call(migration_id)
     expect(migration).to be_completed
     expect(page_stream(source_count.stream.stream_id).map(&:type)).to eq(
       Coordinator::Write::HistoryMigrations::PageLoader::EVENT_TYPES
     )
-    target_events = target_client.read(
+    target_events = target_repositories
+    expect(target_events.length).to eq(1)
+    expect(target_events.sole.stream.stream_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
+
+    [ started, source_count, planned, plan_completed, applied, application_advanced ].each do |event|
+      manager.call(event)
+    end
+    expect(page_stream(source_count.stream.stream_id).length).to eq(7)
+    expect(
+      Coordinator::Container["history_migrations.migration_loader"].call(migration_id)
+    ).to be_completed
+  end
+
+  private
+
+  def target_repositories
+    target_client.read(
       PgEventstore::Stream.all_stream,
       options: {
         direction: :asc,
@@ -34,19 +63,7 @@ RSpec.describe Coordinator::Processes::ProcessManagers::HistoryMigration, :event
         }
       }
     )
-    expect(target_events.length).to eq(1)
-    expect(target_events.sole.stream.stream_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
-
-    manager.call(started)
-    manager.call(source_count)
-    manager.call(applied)
-    expect(page_stream(source_count.stream.stream_id).length).to eq(6)
-    expect(
-      Coordinator::Container["history_migrations.migration_loader"].call(migration_id)
-    ).to be_completed
   end
-
-  private
 
   def append_legacy_repository
     payload = Coordinator::Write::Events::RepositoryRegisteredV1.new(
@@ -113,12 +130,23 @@ RSpec.describe Coordinator::Processes::ProcessManagers::HistoryMigration, :event
     ).sole
   end
 
+  def migration_event(type)
+    source_store.read(
+      streams.history_migration(migration_id),
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: [ type ],
+        maximum_count: 1,
+        direction: :asc
+      )
+    ).sole
+  end
+
   def page_stream(page_id)
     source_store.read(
       streams.history_migration_page(page_id),
       Coordinator::Write::EventReadCriteria.new(
         event_types: Coordinator::Write::HistoryMigrations::PageLoader::EVENT_TYPES,
-        maximum_count: 6,
+        maximum_count: 7,
         direction: :asc
       )
     )

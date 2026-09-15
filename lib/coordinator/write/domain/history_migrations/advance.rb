@@ -11,7 +11,7 @@ module Coordinator::Write
         end
 
         def call(snapshot:, page:, command:)
-          return Success(ProgressDecisionV1.new(outcome: "existing", plan: nil)) if snapshot.completed?
+          return Success(ProgressDecisionV1.new(outcome: "existing", plan: nil)) if snapshot.plan_completed?
           return mismatch(command) unless page_matches?(page, command)
 
           desired_cursor = page.to_position + 1
@@ -27,7 +27,7 @@ module Coordinator::Write
         private
 
         def page_matches?(page, command)
-          page.applied? && page.page_id == command.page_id && page.migration_id == command.migration_id
+          page.planned? && page.page_id == command.page_id && page.migration_id == command.migration_id
         end
 
         def progress(snapshot, command)
@@ -39,10 +39,10 @@ module Coordinator::Write
             )
           ]
           if snapshot.source_upper_position && command.next_from_position > snapshot.source_upper_position
-            events << Events::HistoryMigrationCompletedV1.new(migration_id: command.migration_id)
+            events << Events::HistoryMigrationPlanCompletedV1.new(migration_id: command.migration_id)
           end
           ProgressDecisionV1.new(
-            outcome: events.length == 2 ? "completed" : "advanced",
+            outcome: events.length == 2 ? "plan_completed" : "advanced",
             plan: EventPlan.new(writes: events.map { EventWrite.new(stream:, event: _1) })
           )
         end

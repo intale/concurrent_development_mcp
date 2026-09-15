@@ -1,0 +1,12 @@
+module Coordinator
+  module Write
+    module Domain
+      module HistoryMigrations
+        class ApplicationProgressDecisionV1 < Shared::Value
+          def outcome: () -> String
+          def plan: () -> EventPlan?
+        end
+      end
+    end
+  end
+end

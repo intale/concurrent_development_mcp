@@ -45,7 +45,7 @@ module Coordinator::Write
 
       def build_events(plan, command:, caused_by:, event_ids:, expected_stream:)
         unless (1..2).cover?(plan.writes.length) && plan.writes.all? { _1.stream == expected_stream }
-          raise InvalidHistoryMigrationHistory, "HistoryMigration progress plan is invalid"
+          raise InvalidHistoryMigrationHistory, "HistoryMigration planning progress is invalid"
         end
 
         plan.writes.zip(event_ids).map do |write, event_id|

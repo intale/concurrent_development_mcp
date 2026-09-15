@@ -5,7 +5,10 @@ module Coordinator::Processes
     class SourceV1 < Value
       Payload = Types.Instance(Coordinator::Write::Events::HistoryMigrationStartedV1) |
                 Types.Instance(Coordinator::Write::Events::HistoryMigrationCursorAdvancedV1) |
+                Types.Instance(Coordinator::Write::Events::HistoryMigrationPlanCompletedV1) |
+                Types.Instance(Coordinator::Write::Events::HistoryMigrationApplicationCursorAdvancedV1) |
                 Types.Instance(Coordinator::Write::Events::HistoryMigrationPageSourceEventCountRecordedV1) |
+                Types.Instance(Coordinator::Write::Events::HistoryMigrationPagePlannedV1) |
                 Types.Instance(Coordinator::Write::Events::HistoryMigrationPageAppliedV1)
 
       attribute :event, Types.Instance(PgEventstore::Event)

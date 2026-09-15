@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class EventPlanningDispatcher
+        def initialize: (transformer_registry: TransformerRegistry, target_plan_builder: TargetPlanBuilder) -> void
+        def call: (migration_id: String, source_config_name: String, source_event: PgEventstore::Event) -> Dry::Monads::Result
+      end
+    end
+  end
+end

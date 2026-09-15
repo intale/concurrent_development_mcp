@@ -48,8 +48,12 @@ module Coordinator::Write
         Events::HistoryMigrationPageSourceEventCountRecordedV1,
       [ "HistoryMigrationPageTargetEventCountRecorded", 1 ] =>
         Events::HistoryMigrationPageTargetEventCountRecordedV1,
+      [ "HistoryMigrationPagePlanned", 1 ] => Events::HistoryMigrationPagePlannedV1,
       [ "HistoryMigrationPageApplied", 1 ] => Events::HistoryMigrationPageAppliedV1,
       [ "HistoryMigrationCursorAdvanced", 1 ] => Events::HistoryMigrationCursorAdvancedV1,
+      [ "HistoryMigrationPlanCompleted", 1 ] => Events::HistoryMigrationPlanCompletedV1,
+      [ "HistoryMigrationApplicationCursorAdvanced", 1 ] =>
+        Events::HistoryMigrationApplicationCursorAdvancedV1,
       [ "HistoryMigrationCompleted", 1 ] => Events::HistoryMigrationCompletedV1,
       [ "SkillRegistered", 1 ] => Events::SkillRegisteredV1,
       [ "SkillRevisionCreated", 1 ] => Events::SkillRevisionCreatedV1,

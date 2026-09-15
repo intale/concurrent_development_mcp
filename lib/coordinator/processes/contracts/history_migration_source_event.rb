@@ -6,8 +6,11 @@ module Coordinator::Processes
       STREAM_BY_TYPE = {
         "HistoryMigrationStarted" => [ "CoordinatorMaintenance", "HistoryMigration" ],
         "HistoryMigrationCursorAdvanced" => [ "CoordinatorMaintenance", "HistoryMigration" ],
+        "HistoryMigrationPlanCompleted" => [ "CoordinatorMaintenance", "HistoryMigration" ],
+        "HistoryMigrationApplicationCursorAdvanced" => [ "CoordinatorMaintenance", "HistoryMigration" ],
         "HistoryMigrationPageSourceEventCountRecorded" =>
           [ "CoordinatorMaintenance", "HistoryMigrationPage" ],
+        "HistoryMigrationPagePlanned" => [ "CoordinatorMaintenance", "HistoryMigrationPage" ],
         "HistoryMigrationPageApplied" => [ "CoordinatorMaintenance", "HistoryMigrationPage" ]
       }.freeze
 
