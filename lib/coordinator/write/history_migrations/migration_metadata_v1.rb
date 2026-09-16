@@ -3,6 +3,9 @@
 module Coordinator::Write
   module HistoryMigrations
     class MigrationMetadataV1 < Value
+      Collector = Types.Instance(Candidates::EvidenceCollectorV1) |
+                  Types::DevelopmentArtifactCollector
+
       attribute :command_id, Types::UuidV7
       attribute :actor_kind, Types::ActorKind
       attribute :actor_id, Types::Identifier
@@ -12,7 +15,11 @@ module Coordinator::Write
       attribute :migration_id, Types::UuidV7
       attribute :migration_source, MigrationSourceV1
       attribute? :canonical_input_digest, Types::Sha256Digest.optional.default(nil)
-      attribute? :collector, Candidates::EvidenceCollectorV1.optional.default(nil)
+      attribute? :collector, Collector.optional.default(nil)
+      attribute? :encoding, Types::ContentEncoding.optional.default(nil)
+      attribute? :media_type, Types::ContentMediaType.optional.default(nil)
+      attribute? :byte_size, Types::ContentByteSize.optional.default(nil)
+      attribute? :content_sha256, Types::Sha256Digest.optional.default(nil)
       attribute? :manifest_digest, Types::Sha256Digest.optional.default(nil)
       attribute? :build_context_digest, Types::Sha256Digest.optional.default(nil)
       attribute? :dependency_graph_digest, Types::Sha256Digest.optional.default(nil)

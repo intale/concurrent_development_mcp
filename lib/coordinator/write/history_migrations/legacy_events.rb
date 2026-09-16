@@ -56,6 +56,33 @@ module Coordinator::Write
         attribute :opened_at, Types::Timestamp
       end
 
+      class DevelopmentArtifactCapturedV2 < Events::Base
+        contract type: "DevelopmentArtifactCaptured", version: 2
+
+        attribute :artifact, LegacyDevelopmentArtifacts::ArtifactV2
+        attribute :captured_at, Types::Timestamp
+      end
+
+      class DevelopmentArtifactObservedV1 < Events::Base
+        contract type: "DevelopmentArtifactObserved", version: 1
+
+        attribute :observation, LegacyDevelopmentArtifacts::ArtifactObservationV1
+        attribute :recorded_at, Types::Timestamp
+      end
+
+      class DevelopmentArtifactClassificationCorrectedV1 < Events::Base
+        contract type: "DevelopmentArtifactClassificationCorrected", version: 1
+
+        attribute :observation_id, LegacyDevelopmentArtifactTypes::ObservationId
+        attribute :artifact_id, LegacyDevelopmentArtifactTypes::ArtifactId
+        attribute :classification_revision, Types::DevelopmentArtifactClassificationRevision
+        attribute :title, Types::DevelopmentArtifactTitle
+        attribute :kind, Types::DevelopmentArtifactKind
+        attribute :labels, Types::DevelopmentArtifactLabels
+        attribute :reason, Types::String.constrained(min_size: 1, max_size: 1_000)
+        attribute :corrected_at, Types::Timestamp
+      end
+
       class CommandCompletedV1 < Events::Base
         contract type: "CommandCompleted", version: 1
 

@@ -22,7 +22,8 @@ module Coordinator
           agent_choice_impact_scan_v1: AgentChoiceImpactScanV1Transformer,
           coordination_task_submitted_v2: CoordinationTaskSubmittedV2Transformer,
           coordination_task_lifecycle: CoordinationTaskLifecycleTransformer,
-          command_completed_v1: CommandCompletedV1Transformer
+          command_completed_v1: CommandCompletedV1Transformer,
+          development_artifact_v1: DevelopmentArtifactV1Transformer
         ) -> void
 
         def call: (

@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      module LegacyDevelopmentArtifactTypes
+        ArtifactId: Dry::Types::Type
+        ObservationId: Dry::Types::Type
+        RelationId: Dry::Types::Type
+      end
+    end
+  end
+end

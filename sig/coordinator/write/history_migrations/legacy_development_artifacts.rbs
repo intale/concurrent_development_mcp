@@ -1,0 +1,27 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      module LegacyDevelopmentArtifacts
+        class ArtifactV2 < Shared::Value
+          def artifact_id: () -> String
+          def scope: () -> String
+          def title: () -> String
+          def kind: () -> String
+          def labels: () -> Array[String]
+          def content: () -> (Content::TextV1 | Content::BinaryV1)
+          def source: () -> DevelopmentArtifacts::SourceV1
+        end
+
+        class ArtifactObservationV1 < Shared::Value
+          def observation_id: () -> String
+          def artifact_id: () -> String
+          def scope: () -> String
+          def title: () -> String
+          def kind: () -> String
+          def labels: () -> Array[String]
+          def source: () -> DevelopmentArtifacts::SourceV1
+        end
+      end
+    end
+  end
+end

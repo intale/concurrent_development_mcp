@@ -32,6 +32,10 @@ module Coordinator::Write
         [ "DecisionActivated", 1 ] => LegacyEvents::DecisionActivatedV1,
         [ "DecisionDefinitionCorrected", 1 ] => LegacyEvents::DecisionDefinitionCorrectedV1,
         [ "DecisionSlotOpened", 1 ] => LegacyEvents::DecisionSlotOpenedV1,
+        [ "DevelopmentArtifactCaptured", 2 ] => LegacyEvents::DevelopmentArtifactCapturedV2,
+        [ "DevelopmentArtifactClassificationCorrected", 1 ] =>
+          LegacyEvents::DevelopmentArtifactClassificationCorrectedV1,
+        [ "DevelopmentArtifactObserved", 1 ] => LegacyEvents::DevelopmentArtifactObservedV1,
         [ "MergeAuthorizationDenied", 1 ] => Events::MergeAuthorizationDeniedV1,
         [ "MergeAuthorizationGranted", 1 ] => Events::MergeAuthorizationGrantedV1,
         [ "MergeObserved", 1 ] => Events::MergeObservedV1,

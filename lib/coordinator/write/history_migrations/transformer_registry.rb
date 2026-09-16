@@ -25,7 +25,8 @@ module Coordinator::Write
         agent_choice_impact_scan_v1:,
         coordination_task_submitted_v2:,
         coordination_task_lifecycle:,
-        command_completed_v1:
+        command_completed_v1:,
+        development_artifact_v1:
       )
         @schema_registry = schema_registry
         @definitions = {
@@ -88,7 +89,10 @@ module Coordinator::Write
           [ "CoordinationTaskCancelled", 1 ] => coordination_task_lifecycle,
           [ "CoordinationTaskCompleted", 2 ] => coordination_task_lifecycle,
           [ "CoordinationTaskFailed", 1 ] => coordination_task_lifecycle,
-          [ "CommandCompleted", 1 ] => command_completed_v1
+          [ "CommandCompleted", 1 ] => command_completed_v1,
+          [ "DevelopmentArtifactCaptured", 2 ] => development_artifact_v1,
+          [ "DevelopmentArtifactObserved", 1 ] => development_artifact_v1,
+          [ "DevelopmentArtifactClassificationCorrected", 1 ] => development_artifact_v1
         }.freeze
       end
 

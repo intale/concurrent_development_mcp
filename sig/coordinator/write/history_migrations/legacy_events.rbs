@@ -38,6 +38,27 @@ module Coordinator
           def opened_by: () -> Decisions::DecisionHeadV1
         end
 
+        class DevelopmentArtifactCapturedV2 < Events::Base
+          def artifact: () -> LegacyDevelopmentArtifacts::ArtifactV2
+          def captured_at: () -> String
+        end
+
+        class DevelopmentArtifactObservedV1 < Events::Base
+          def observation: () -> LegacyDevelopmentArtifacts::ArtifactObservationV1
+          def recorded_at: () -> String
+        end
+
+        class DevelopmentArtifactClassificationCorrectedV1 < Events::Base
+          def observation_id: () -> String
+          def artifact_id: () -> String
+          def classification_revision: () -> Integer
+          def title: () -> String
+          def kind: () -> String
+          def labels: () -> Array[String]
+          def reason: () -> String
+          def corrected_at: () -> String
+        end
+
         type coordination_task_lifecycle = CoordinationTaskCancellationRequestedV1 |
           CoordinationTaskCancelledV1 |
           CoordinationTaskCompletedV2 |
