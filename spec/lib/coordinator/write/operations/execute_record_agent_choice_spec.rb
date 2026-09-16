@@ -26,6 +26,9 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRecordAgentChoice, :event_
     )
     expect(choice_events.map(&:type)).to eq(%w[AgentChoiceRecorded AgentChoiceAccepted])
     expect(choice_events.map(&:stream_revision)).to eq([ 0, 1 ])
+    expect(choice_events.first.data.fetch("decision_context").keys).to contain_exactly("document")
+    expect(choice_events.first.metadata).not_to include("context_digest")
+    expect(choice_events.last.metadata.fetch("context_digest")).to eq(authoritative_context.digest)
     expect(choice_events).to all(
       have_attributes(
         markers: include(

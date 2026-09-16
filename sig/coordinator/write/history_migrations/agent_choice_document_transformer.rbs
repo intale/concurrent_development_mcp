@@ -1,0 +1,43 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class AgentChoiceDocumentTransformer
+        QUERY_TARGETS: Hash[Symbol, [String, String, String]]
+
+        def initialize: (
+          event_store: EventStore,
+          entity_reference_resolver: LegacyEntityReferenceResolver,
+          partition_identity_mapper: DecisionPartitionIdentityMapper,
+          partition_delta_resolver: DecisionPartitionDeltaResolver,
+          head_reference_resolver: DecisionHeadReferenceResolver,
+          target_event_reference_resolver: LegacyTargetEventReferenceResolver,
+          ?canonical_json: CanonicalJson
+        ) -> void
+
+        def query_context: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          context: DecisionContexts::QueryContextV1
+        ) -> Dry::Monads::Result
+
+        def decision_context: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          context: DecisionContexts::ContextV1
+        ) -> Dry::Monads::Result
+
+        def choice_assessment: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          assessment: AgentChoices::ChoiceAssessmentV1
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

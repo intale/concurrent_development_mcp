@@ -93,7 +93,12 @@ module Coordinator::Write
             index_policy_version: metadata_extension&.index_policy_version,
             classifier: metadata_extension&.classifier,
             scope_provenance: metadata_extension&.scope_provenance,
-            definition_digest: metadata_extension&.definition_digest
+            definition_digest: metadata_extension&.definition_digest,
+            context_digest: metadata_extension&.context_digest,
+            before_context_digest: metadata_extension&.before_context_digest,
+            after_context_digest: metadata_extension&.after_context_digest,
+            previous_context_digest: metadata_extension&.previous_context_digest,
+            resulting_context_digest: metadata_extension&.resulting_context_digest
           ),
           markers: fact.markers + [
             target_event_marker,

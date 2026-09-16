@@ -17,6 +17,11 @@ module Coordinator
         def classifier: () -> Interpretations::ClassifierAttributionV1?
         def scope_provenance: () -> Interpretations::DecisionScopeProvenanceV1?
         def definition_digest: () -> String?
+        def context_digest: () -> String?
+        def before_context_digest: () -> String?
+        def after_context_digest: () -> String?
+        def previous_context_digest: () -> String?
+        def resulting_context_digest: () -> String?
       end
     end
   end

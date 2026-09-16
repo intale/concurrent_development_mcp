@@ -5,6 +5,10 @@ module Coordinator::Read
     class AgentChoices
       include EventTimestamped
 
+      def initialize(canonical_json: CanonicalJson.new)
+        @canonical_json = canonical_json
+      end
+
       def fetch(choice_id)
         record = Coordinator::Read::AgentChoice.find_by(choice_id:)
         record && build(record)
@@ -16,6 +20,7 @@ module Coordinator::Read
       end
 
       def store_recorded(event:, choice:)
+        decision_context = projected_decision_context(event, choice)
         create_from_event(Coordinator::Read::AgentChoice, event:, attributes: {
           choice_id: choice.choice_id,
           choice_type: choice.choice_type,
@@ -24,8 +29,8 @@ module Coordinator::Read
           alternatives: choice.alternatives.map(&:to_h),
           reason_summary: choice.reason_summary,
           context: choice.context.to_h,
-          decision_context: choice.decision_context.to_h,
-          context_digest: choice.decision_context.digest,
+          decision_context: decision_context.to_h,
+          context_digest: decision_context.digest,
           assessment: nil,
           recorded_event: event_reference(event).to_h,
           accepted_event: nil,
@@ -50,7 +55,7 @@ module Coordinator::Read
         record = Coordinator::Read::AgentChoice.find_by(choice_id: acceptance.choice_id)
         raise ProjectionStateError, "AgentChoiceRecorded must be projected before AgentChoiceAccepted" unless record
 
-        verify_acceptance!(record, acceptance)
+        verify_acceptance!(record, event, acceptance)
         save_from_event(record, event:, attributes: {
           observation_status: "accepted",
           assessment: acceptance.assessment.to_h,
@@ -92,13 +97,29 @@ module Coordinator::Read
 
       private
 
-      def verify_acceptance!(record, acceptance)
-        return if acceptance.is_a?(Coordinator::Write::Events::AgentChoiceAcceptedV2)
+      def verify_acceptance!(record, event, acceptance)
+        if acceptance.is_a?(Coordinator::Write::Events::AgentChoiceAcceptedV2)
+          return if event.metadata["context_digest"] == record.context_digest
+
+          raise ProjectionStateError, "AgentChoiceAccepted does not match the projected Decision context"
+        end
 
         recorded_event = Coordinator::Write::EventReference.new(symbolize(record.recorded_event))
         return if recorded_event == acceptance.recorded_event && record.context_digest == acceptance.context_digest
 
         raise ProjectionStateError, "AgentChoiceAccepted does not reference the projected recorded choice"
+      end
+
+      def projected_decision_context(event, choice)
+        context = choice.decision_context
+        return context if context.is_a?(Coordinator::Write::DecisionContexts::ContextV1)
+
+        document = context.document
+        Coordinator::Write::DecisionContexts::ContextV1.new(
+          document:,
+          digest: @canonical_json.sha256(document.to_h),
+          resolved_at: event.created_at.utc.iso8601(6)
+        )
       end
 
       def verify_invalidation!(record, invalidation, assessment)

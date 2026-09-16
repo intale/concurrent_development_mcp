@@ -9,7 +9,7 @@ module Coordinator
         def selected: () -> AgentChoices::ChoiceOptionV1
         def alternatives: () -> Array[AgentChoices::ChoiceOptionV1]
         def context: () -> DecisionContexts::QueryContextV1
-        def decision_context: () -> DecisionContexts::ContextV1
+        def decision_context: () -> DecisionContexts::EvidenceV2
         def reason_summary: () -> String
       end
     end

@@ -27,6 +27,11 @@ module Coordinator::Write
       attribute? :scope_provenance,
                  Interpretations::DecisionScopeProvenanceV1.optional.default(nil)
       attribute? :definition_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :context_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :before_context_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :after_context_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :previous_context_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :resulting_context_digest, Types::Sha256Digest.optional.default(nil)
     end
   end
 end

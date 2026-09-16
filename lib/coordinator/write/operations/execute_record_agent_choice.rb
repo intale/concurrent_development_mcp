@@ -85,12 +85,20 @@ module Coordinator::Write
           command:,
           context: state.value!.current_context
         )
-        persisted_events = persist_domain_plan(plan, command:, preparation:, caused_by:)
+        context_digest = state.value!.current_context.digest
+        persisted_events = persist_domain_plan(
+          plan,
+          command:,
+          preparation:,
+          context_digest:,
+          caused_by:
+        )
         acceptance = plan.events.fetch(1)
         completion = @completion_builder.agent_choice_record(
           command:,
           recorded: plan.events.fetch(0),
           acceptance:,
+          context_digest:,
           input_digest: preparation.input_digest,
           persisted_events:,
           completed_at: preparation.recorded_at
@@ -403,7 +411,7 @@ module Coordinator::Write
         raise ArgumentError, "agent choice plan violates its dry-rb contract: #{result.errors.to_h.inspect}"
       end
 
-      def persist_domain_plan(plan, command:, preparation:, caused_by:)
+      def persist_domain_plan(plan, command:, preparation:, context_digest:, caused_by:)
         recorded = plan.events.fetch(0)
         assessment = plan.events.fetch(1).assessment
         event_ids = [ preparation.recorded_event_id, preparation.accepted_event_id ]
@@ -411,7 +419,7 @@ module Coordinator::Write
           @event_factory.build!(
             event: payload,
             event_id:,
-            metadata: command_metadata(command),
+            metadata: event_metadata(payload, command, context_digest:),
             markers: event_markers(command, assessment, recorded.decision_context),
             caused_by:
           )
@@ -445,6 +453,13 @@ module Coordinator::Write
           recorded_by: "coordinator",
           policy_version: "testing-framework-resolution/v1"
         )
+      end
+
+      def event_metadata(payload, command, context_digest:)
+        attributes = command_metadata(command).to_h
+        return EventMetadata.new(attributes) unless payload.is_a?(Events::AgentChoiceAcceptedV2)
+
+        Metadata::AgentChoiceAcceptanceV2.new(**attributes, context_digest:)
       end
 
       def event_reference(event)

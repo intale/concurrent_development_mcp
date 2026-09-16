@@ -23,6 +23,7 @@ module Coordinator::Read
         required(:actor_id).filled(:string)
         required(:recorded_by).filled(:string, eql?: "coordinator")
         required(:policy_version).filled(:string, eql?: "testing-framework-resolution/v1")
+        optional(:context_digest).maybe(:string)
       end
 
       rule(:event_type, :stream_revision) do
@@ -40,6 +41,15 @@ module Coordinator::Read
 
       rule(:actor_id) do
         key.failure("must be a valid identifier") unless Types::IDENTIFIER_PATTERN.match?(value)
+      end
+
+      rule(:event_type, :schema_version, :context_digest) do
+        next unless values[:event_type] == "AgentChoiceAccepted" && values[:schema_version] == 2
+
+        digest = values[:context_digest]
+        unless digest && Types::SHA256_DIGEST_PATTERN.match?(digest)
+          key(:context_digest).failure("must be the canonical Decision context digest")
+        end
       end
     end
   end

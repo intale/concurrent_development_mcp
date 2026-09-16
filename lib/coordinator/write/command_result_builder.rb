@@ -438,7 +438,15 @@ module Coordinator::Write
       )
     end
 
-    def agent_choice_record(command:, recorded:, acceptance:, input_digest:, persisted_events:, completed_at:)
+    def agent_choice_record(
+      command:,
+      recorded:,
+      acceptance:,
+      context_digest:,
+      input_digest:,
+      persisted_events:,
+      completed_at:
+    )
       build_completion(
         command:,
         tool_name: "agent_choice_record",
@@ -448,7 +456,7 @@ module Coordinator::Write
           choice_type: command.choice_type,
           outcome: "accepted",
           assessment_basis: acceptance.assessment.basis,
-          context_digest: recorded.decision_context.digest,
+          context_digest:,
           recorded_event: event_reference(persisted_events.fetch(0)),
           accepted_event: event_reference(persisted_events.fetch(1)),
           based_on_decisions: acceptance.assessment.based_on_decisions,

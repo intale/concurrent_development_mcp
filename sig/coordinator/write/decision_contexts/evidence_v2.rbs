@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module DecisionContexts
+      class EvidenceV2 < Shared::Value
+        def document: () -> ContextDocumentV1
+      end
+    end
+  end
+end

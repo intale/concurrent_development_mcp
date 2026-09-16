@@ -64,6 +64,25 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoicesV1, :read_model do
     expect(repository.fetch(choice_id)).to have_attributes(observation_status: "accepted")
   end
 
+  it "reconstructs projection-only context fields from narrow V2 evidence" do
+    recorded, accepted = choice_events_v2
+
+    projector.call(recorded)
+    projector.call(accepted)
+
+    projected = repository.fetch(choice_id)
+    expect(projected).to have_attributes(
+      observation_status: "accepted",
+      context_digest: decision_context.digest,
+      decision_context: have_attributes(
+        document: decision_context.document,
+        digest: decision_context.digest,
+        resolved_at: recorded.created_at.utc.iso8601(6)
+      )
+    )
+    expect(projected.accepted.metadata).to include("context_digest" => decision_context.digest)
+  end
+
   def choice_events
     recorded = ProjectionEventFactory.build(
       payload: recorded_payload,
@@ -98,6 +117,52 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoicesV1, :read_model do
       correlation_id:,
       causation_id: recorded.id,
       markers: [ "choice:#{choice_id}", "attempt:A-choice-project" ]
+    )
+    [ recorded, accepted ]
+  end
+
+  def choice_events_v2
+    recorded = ProjectionEventFactory.build(
+      payload: Coordinator::Write::Events::AgentChoiceRecordedV2.new(
+        choice_id:,
+        choice_type: "testing.framework",
+        selected: { option_id: "rspec", summary: "Use RSpec" },
+        alternatives: [],
+        reason_summary: "RSpec is already established in the project.",
+        context: query_context,
+        decision_context: Coordinator::Write::DecisionContexts::EvidenceV2.new(
+          document: decision_context.document
+        )
+      ),
+      stream:,
+      stream_revision: 0,
+      global_position: 100,
+      command_id: "cmd-choice-project-choice",
+      actor_id: "agent-a",
+      policy_version: "testing-framework-resolution/v1",
+      correlation_id:,
+      markers: [ "choice:#{choice_id}", "repository:#{repository_id}" ]
+    )
+    accepted = ProjectionEventFactory.build(
+      payload: Coordinator::Write::Events::AgentChoiceAcceptedV2.new(
+        choice_id:,
+        assessment: { basis: "no_policy", based_on_decisions: [], warnings: [] }
+      ),
+      stream:,
+      stream_revision: 1,
+      global_position: 200,
+      policy_version: "testing-framework-resolution/v1",
+      correlation_id:,
+      causation_id: recorded.id,
+      markers: [ "choice:#{choice_id}", "attempt:A-choice-project" ],
+      metadata: Coordinator::Write::Metadata::AgentChoiceAcceptanceV2.new(
+        command_id: "cmd-choice-project-choice",
+        actor_kind: "agent",
+        actor_id: "agent-a",
+        recorded_by: "coordinator",
+        policy_version: "testing-framework-resolution/v1",
+        context_digest: decision_context.digest
+      )
     )
     [ recorded, accepted ]
   end

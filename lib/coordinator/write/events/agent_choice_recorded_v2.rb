@@ -12,7 +12,7 @@ module Coordinator::Write
       attribute :selected, Option
       attribute :alternatives, Types::Array.of(Option).constrained(max_size: 10)
       attribute :context, DecisionContexts::QueryContextV1
-      attribute :decision_context, DecisionContexts::ContextV1
+      attribute :decision_context, DecisionContexts::EvidenceV2
       attribute :reason_summary, Types::String.constrained(min_size: 1, max_size: 4_000)
     end
   end

@@ -28,7 +28,7 @@ module Coordinator::Write
                recorded.alternatives == command.alternatives &&
                recorded.reason_summary == command.reason_summary &&
                recorded.context == command.context &&
-               recorded.decision_context == values[:context]
+               recorded.decision_context.document == values[:context].document
           key(:plan).failure("recorded choice must preserve the normalized command and authoritative context")
         end
         unless accepted.choice_id == command.choice_id

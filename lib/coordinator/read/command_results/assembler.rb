@@ -91,10 +91,12 @@ module Coordinator::Read
         when "decision_correct" then decision_correction(source, args:)
         when "agent_choice_record"
           recorded = payload!(source, Coordinator::Write::Events::AgentChoiceRecordedV2)
+          acceptance = payload!(source, Coordinator::Write::Events::AgentChoiceAcceptedV2)
           @completion_builder.agent_choice_record(
             **args,
             recorded:,
-            acceptance: payload!(source, Coordinator::Write::Events::AgentChoiceAcceptedV2)
+            acceptance:,
+            context_digest: event_for_payload(source, acceptance).metadata.fetch("context_digest")
           )
         when "candidate_submit"
           @completion_builder.candidate_submit(**args)

@@ -20,6 +20,7 @@ module Coordinator::Write
         interpretation_lifecycle_v1:,
         decision_lifecycle_v1:,
         decision_relation_v1:,
+        agent_choice_v1:,
         coordination_task_submitted_v2:,
         coordination_task_lifecycle:,
         command_completed_v1:
@@ -71,6 +72,8 @@ module Coordinator::Write
           [ "DecisionSlotOpened", 1 ] => decision_relation_v1,
           [ "DecisionSlotHeadChanged", 1 ] => decision_relation_v1,
           [ "DecisionPartitionAdvanced", 1 ] => decision_relation_v1,
+          [ "AgentChoiceRecorded", 1 ] => agent_choice_v1,
+          [ "AgentChoiceAccepted", 1 ] => agent_choice_v1,
           [ "CoordinationTaskSubmitted", 2 ] => coordination_task_submitted_v2,
           [ "CoordinationTaskExecutionStarted", 1 ] => coordination_task_lifecycle,
           [ "CoordinationTaskCancellationRequested", 1 ] => coordination_task_lifecycle,

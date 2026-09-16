@@ -2,6 +2,7 @@ module Coordinator
   module Read
     module Repositories
       class AgentChoices
+        def initialize: (?canonical_json: Shared::CanonicalJson) -> void
         def fetch: (String choice_id) -> AgentChoiceViewV1?
         def fetch_many: (Array[String] choice_ids) -> Array[AgentChoiceViewV1]
         def store_recorded: (event: PgEventstore::Event, choice: Write::Events::AgentChoiceRecordedV1 | Write::Events::AgentChoiceRecordedV2) -> AgentChoice

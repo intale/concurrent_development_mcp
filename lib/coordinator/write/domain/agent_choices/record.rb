@@ -165,7 +165,7 @@ module Coordinator::Write
                   alternatives: command.alternatives,
                   reason_summary: command.reason_summary,
                   context: command.context,
-                  decision_context: context
+                  decision_context: DecisionContexts::EvidenceV2.new(document: context.document)
                 )
               ),
               EventWrite.new(

@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    module Metadata
+      class AgentChoiceAcceptanceV2 < EventMetadata
+        def context_digest: () -> String
+      end
+    end
+  end
+end

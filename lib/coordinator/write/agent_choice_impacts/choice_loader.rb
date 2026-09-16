@@ -54,12 +54,12 @@ module Coordinator::Write
         accepted = payloads.fetch(1)
         recorded_reference = reference(events.fetch(0))
         accepted_reference = reference(events.fetch(1))
+        context_digest = accepted_context_digest(accepted, events.fetch(1))
         valid_identity = recorded.choice_id == choice_id &&
                          accepted.choice_id == choice_id &&
                          recorded_reference.stream_revision == 0 &&
                          accepted_reference.stream_revision == 1 &&
                          (!accepted.respond_to?(:recorded_event) || accepted.recorded_event == recorded_reference) &&
-                         (!accepted.respond_to?(:context_digest) || accepted.context_digest == recorded.decision_context.digest) &&
                          accepted_reference == expected_accepted
         unless valid_identity
           invalid!(
@@ -70,11 +70,11 @@ module Coordinator::Write
           )
         end
 
-        validate_context!(recorded)
+        validate_context!(recorded, context_digest:)
         validate_invalidation!(choice_id, accepted_reference, events, payloads)
       end
 
-      def validate_context!(recorded)
+      def validate_context!(recorded, context_digest:)
         context = recorded.decision_context
         document = context.document
         expected_partitions = @partition_selector.call(recorded.context)
@@ -82,14 +82,21 @@ module Coordinator::Write
         observations_valid = document.partitions.map(&:partition) == expected_partitions &&
                              document.partitions.all? { valid_observation?(_1) }
         unless document.query_context == recorded.context &&
-               context.digest == canonical_digest &&
+               context_digest == canonical_digest &&
+               (!context.respond_to?(:digest) || context.digest == canonical_digest) &&
                observations_valid
           invalid!(
             "recorded_context_invalid",
             choice_id: recorded.choice_id,
-            context_digest: context.digest
+            context_digest:
           )
         end
+      end
+
+      def accepted_context_digest(accepted, event)
+        return accepted.context_digest if accepted.is_a?(Events::AgentChoiceAcceptedV1)
+
+        event.metadata["context_digest"]
       end
 
       def valid_observation?(observation)
