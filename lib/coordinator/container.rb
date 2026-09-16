@@ -350,6 +350,26 @@ module Coordinator
       )
     end
 
+    register("history_migrations.agent_choice_impact_context_resolver", memoize: true) do
+      Write::HistoryMigrations::AgentChoiceImpactContextResolver.new(
+        event_store: self["event_store"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        target_event_reference_resolver:
+          self["history_migrations.legacy_target_event_reference_resolver"],
+        head_reference_resolver: self["history_migrations.decision_head_reference_resolver"],
+        document_transformer: self["history_migrations.agent_choice_document_transformer"]
+      )
+    end
+
+    register("history_migrations.agent_choice_impact_v1_transformer", memoize: true) do
+      Write::HistoryMigrations::AgentChoiceImpactV1Transformer.new(
+        event_store: self["event_store"],
+        context_resolver: self["history_migrations.agent_choice_impact_context_resolver"],
+        target_event_reference_resolver:
+          self["history_migrations.legacy_target_event_reference_resolver"]
+      )
+    end
+
     register("history_migrations.decision_lifecycle_v1_transformer", memoize: true) do
       Write::HistoryMigrations::DecisionLifecycleV1Transformer.new(
         event_store: self["event_store"],
@@ -439,6 +459,7 @@ module Coordinator
         decision_lifecycle_v1: self["history_migrations.decision_lifecycle_v1_transformer"],
         decision_relation_v1: self["history_migrations.decision_relation_v1_transformer"],
         agent_choice_v1: self["history_migrations.agent_choice_v1_transformer"],
+        agent_choice_impact_v1: self["history_migrations.agent_choice_impact_v1_transformer"],
         coordination_task_submitted_v2:
           self["history_migrations.coordination_task_submitted_v2_transformer"],
         coordination_task_lifecycle:

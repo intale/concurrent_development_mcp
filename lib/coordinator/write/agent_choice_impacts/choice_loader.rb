@@ -129,10 +129,12 @@ module Coordinator::Write
         return unless invalidation
 
         if invalidation.is_a?(Events::AgentChoiceInvalidatedByDecisionV2)
-          invalidation_reference = reference(events.fetch(2))
-          valid = invalidation_reference.stream_revision == 2 &&
-                  invalidation.choice_id == choice_id
-          invalid!("choice_invalidation_invalid", choice_id:) unless valid
+          validate_current_invalidation!(
+            choice_id,
+            accepted_reference,
+            events.fetch(2),
+            invalidation
+          )
           return
         end
 
@@ -154,6 +156,59 @@ module Coordinator::Write
                 assessment.assessment.after_context_digest == invalidation.resulting_context_digest &&
                 assessment.assessment.reason == invalidation.reason
         invalid!("choice_invalidation_invalid", choice_id:) unless valid
+      end
+
+      def validate_current_invalidation!(choice_id, accepted_reference, event, invalidation)
+        assessment_id = assessment_id_from(event)
+        assessment_events = assessment_id && @event_store.read(
+          @stream_factory.agent_choice_impact(assessment_id),
+          EventReadCriteria.new(
+            event_types: %w[AgentChoiceImpactAssessmentRecorded AgentChoiceImpactSourceLinked],
+            maximum_count: 3,
+            direction: :asc
+          )
+        )
+        assessment_payloads = assessment_events&.map { load(_1) }
+        assessment_event = assessment_events&.first
+        assessment = assessment_payloads&.fetch(0, nil)
+        links = assessment_payloads&.drop(1) || []
+        accepted_link = links.find { _1.is_a?(Events::AgentChoiceImpactSourceLinkedV1) && _1.role == "accepted_choice" }
+        decision_link = links.find { _1.is_a?(Events::AgentChoiceImpactSourceLinkedV1) && _1.role == "decision_change" }
+        before_digest = assessment_event&.metadata&.fetch("before_context_digest", nil)
+        after_digest = assessment_event&.metadata&.fetch("after_context_digest", nil)
+        valid = reference(event).stream_revision == 2 &&
+                invalidation.choice_id == choice_id &&
+                assessment_events&.map(&:stream_revision) == [ 0, 1, 2 ] &&
+                assessment.is_a?(Events::AgentChoiceImpactAssessmentRecordedV1) &&
+                assessment.assessment_id == assessment_id &&
+                assessment.choice_id == choice_id &&
+                links.all? { _1.assessment_id == assessment_id } &&
+                assessment.assessment.outcome == "invalidated" &&
+                assessment.assessment.reason == invalidation.reason &&
+                accepted_link&.source == accepted_reference &&
+                decision_link && valid_decision_change_reference?(decision_link.source) &&
+                event.markers.include?("decision:#{decision_link.source.stream_id}") &&
+                event.markers.include?("decision-change:#{decision_link.source.event_id}") &&
+                Types::SHA256_DIGEST_PATTERN.match?(before_digest.to_s) &&
+                Types::SHA256_DIGEST_PATTERN.match?(after_digest.to_s) &&
+                before_digest != after_digest &&
+                event.metadata["policy_version"] == assessment_event.metadata["policy_version"] &&
+                event.metadata["previous_context_digest"] == before_digest &&
+                event.metadata["resulting_context_digest"] == after_digest
+        invalid!("choice_invalidation_invalid", choice_id:) unless valid
+      end
+
+      def assessment_id_from(event)
+        markers = event.markers.grep(/\Aimpact-assessment:/)
+        return unless markers.length == 1
+
+        markers.sole.delete_prefix("impact-assessment:")
+      end
+
+      def valid_decision_change_reference?(source)
+        %w[DecisionActivated DecisionDefinitionCorrected].include?(source.type) &&
+          source.stream_context == "HumanGuidance" &&
+          source.stream_name == "Decision"
       end
 
       def read_reference(reference)

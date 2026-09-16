@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Metadata
+      class AgentChoiceImpactAssessmentV2 < EventMetadata
+        def before_context_digest: () -> String
+        def after_context_digest: () -> String
+      end
+    end
+  end
+end

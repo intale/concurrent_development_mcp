@@ -103,10 +103,16 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model 
       stream: Coordinator::Write::StreamFactory.new.agent_choice(choice_id),
       stream_revision: 2,
       global_position: 203,
-      command_id: "cmd-impact-assessment",
-      actor_kind: "system",
-      actor_id: "agent-choice-decision-impact",
       policy_version: "agent-choice-decision-impact/v1",
+      metadata: Coordinator::Write::Metadata::AgentChoiceInvalidationV2.new(
+        command_id: "cmd-impact-assessment",
+        actor_kind: "system",
+        actor_id: "agent-choice-decision-impact",
+        recorded_by: "coordinator",
+        policy_version: "agent-choice-decision-impact/v1",
+        previous_context_digest: before_context_digest,
+        resulting_context_digest: after_context_digest
+      ),
       correlation_id:,
       causation_id: assessment.id,
       markers: assessment_markers
@@ -125,10 +131,16 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model 
       stream: Coordinator::Write::StreamFactory.new.agent_choice_impact(assessment_id),
       stream_revision: 0,
       global_position: 200,
-      command_id: "cmd-impact-assessment",
-      actor_kind: "system",
-      actor_id: "agent-choice-decision-impact",
       policy_version: "agent-choice-decision-impact/v1",
+      metadata: Coordinator::Write::Metadata::AgentChoiceImpactAssessmentV2.new(
+        command_id: "cmd-impact-assessment",
+        actor_kind: "system",
+        actor_id: "agent-choice-decision-impact",
+        recorded_by: "coordinator",
+        policy_version: "agent-choice-decision-impact/v1",
+        before_context_digest:,
+        after_context_digest:
+      ),
       correlation_id:,
       causation_id: SecureRandom.uuid_v7,
       markers: assessment_markers
@@ -234,6 +246,14 @@ RSpec.describe Coordinator::Read::Projectors::AgentChoiceImpactsV1, :read_model 
 
   def assessment_markers
     [ "impact-assessment:#{assessment_id}", "choice:#{choice_id}", "attempt:#{attempt_id}" ]
+  end
+
+  def before_context_digest
+    "sha256:#{'a' * 64}"
+  end
+
+  def after_context_digest
+    "sha256:#{'b' * 64}"
   end
 
   def source_reference(type, stream_name, stream_id, revision)

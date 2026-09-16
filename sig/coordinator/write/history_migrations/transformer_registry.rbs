@@ -18,6 +18,7 @@ module Coordinator
           decision_lifecycle_v1: DecisionLifecycleV1Transformer,
           decision_relation_v1: DecisionRelationV1Transformer,
           agent_choice_v1: AgentChoiceV1Transformer,
+          agent_choice_impact_v1: AgentChoiceImpactV1Transformer,
           coordination_task_submitted_v2: CoordinationTaskSubmittedV2Transformer,
           coordination_task_lifecycle: CoordinationTaskLifecycleTransformer,
           command_completed_v1: CommandCompletedV1Transformer

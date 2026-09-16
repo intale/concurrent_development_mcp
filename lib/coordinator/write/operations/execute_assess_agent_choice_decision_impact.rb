@@ -156,7 +156,7 @@ module Coordinator::Write
           @event_factory.build!(
             event:,
             event_id: event_ids.fetch(index),
-            metadata: metadata(command),
+            metadata: metadata(event, command, state),
             markers: index.zero? ? assessment_markers(command, state) : invalidation_markers(command, state),
             caused_by: invocation.caused_by
           )
@@ -175,14 +175,30 @@ module Coordinator::Write
         Success(persisted_impact_events.first)
       end
 
-      def metadata(command)
-        EventMetadata.new(
+      def metadata(event, command, state)
+        attributes = {
           command_id: command.command_id,
           actor_kind: command.actor.kind,
           actor_id: command.actor.id,
           recorded_by: "coordinator",
           policy_version: command.policy_version
-        )
+        }
+        case event
+        when Events::AgentChoiceImpactAssessmentRecordedV1
+          Metadata::AgentChoiceImpactAssessmentV2.new(
+            **attributes,
+            before_context_digest: state.reconstruction.before_context.digest,
+            after_context_digest: state.reconstruction.after_context.digest
+          )
+        when Events::AgentChoiceInvalidatedByDecisionV2
+          Metadata::AgentChoiceInvalidationV2.new(
+            **attributes,
+            previous_context_digest: state.reconstruction.before_context.digest,
+            resulting_context_digest: state.reconstruction.after_context.digest
+          )
+        else
+          EventMetadata.new(attributes)
+        end
       end
 
       def assessment_markers(command, state)

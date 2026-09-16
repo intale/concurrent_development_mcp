@@ -44,6 +44,13 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAssessAgentChoiceDecisionI
       %w[AgentChoiceImpactAssessmentRecorded AgentChoiceImpactSourceLinked AgentChoiceImpactSourceLinked]
     )
     links = assessment_history.drop(1).map { load(_1) }
+    expect(assessment_event.metadata).to include(
+      "before_context_digest" => match(Coordinator::Shared::Types::SHA256_DIGEST_PATTERN),
+      "after_context_digest" => match(Coordinator::Shared::Types::SHA256_DIGEST_PATTERN)
+    )
+    expect(assessment_event.metadata.fetch("before_context_digest")).not_to eq(
+      assessment_event.metadata.fetch("after_context_digest")
+    )
     expect(links.map(&:role)).to contain_exactly("accepted_choice", "decision_change")
     expect(links.find { _1.role == "accepted_choice" }.source).to eq(
       AgentChoiceImpactScenario.reference(choice.fetch(:accepted))
@@ -60,6 +67,10 @@ RSpec.describe Coordinator::Write::Operations::ExecuteAssessAgentChoiceDecisionI
     expect(invalidation).to have_attributes(
       choice_id: choice_id(choice),
       reason: "blocking_policy_introduced"
+    )
+    expect(invalidation_event.metadata).to include(
+      "previous_context_digest" => assessment_event.metadata.fetch("before_context_digest"),
+      "resulting_context_digest" => assessment_event.metadata.fetch("after_context_digest")
     )
     expect([ assessment_event, invalidation_event ]).to all(
       have_attributes(

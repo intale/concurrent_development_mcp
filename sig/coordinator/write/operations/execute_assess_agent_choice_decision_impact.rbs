@@ -14,6 +14,7 @@ module Coordinator
           ?id_generator: Shared::_IdGenerator,
           ?event_factory: EventFactory,
           ?stream_factory: StreamFactory,
+          ?assessment_marker_builder: AgentChoiceImpacts::AssessmentMarkerBuilder,
           ?invocation_contract: Contracts::AgentChoiceImpactAssessmentInvocation,
           ?command_contract: Contracts::AgentChoiceImpactAssessmentCommand,
           ?event_plan_contract: Contracts::AgentChoiceImpactAssessmentEventPlan

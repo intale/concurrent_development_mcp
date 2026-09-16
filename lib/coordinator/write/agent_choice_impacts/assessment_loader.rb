@@ -37,14 +37,15 @@ module Coordinator::Write
         return unless event
 
         payload = load(event)
-        valid = case payload
-                when Events::AgentChoiceImpactAssessedV1
-                  valid_legacy?(event, payload, command)
-                when Events::AgentChoiceImpactAssessmentRecordedV1
-                  valid_current?(event, payload, command)
-                else
-                  false
-                end
+        valid =
+          case payload
+          when Events::AgentChoiceImpactAssessedV1
+            valid_legacy?(event, payload, command)
+          when Events::AgentChoiceImpactAssessmentRecordedV1
+            valid_current?(event, payload, command)
+          else
+            false
+          end
         replay_invalid!(event) unless valid
         event
       end
@@ -72,10 +73,15 @@ module Coordinator::Write
           )
         )
         links = events.drop(1).map { load(_1) }
+        before_digest = event.metadata["before_context_digest"]
+        after_digest = event.metadata["after_context_digest"]
         event.stream_revision == 0 &&
           payload.assessment_id == event.stream.stream_id &&
           payload.choice_id == command.choice_id &&
           event.metadata.fetch("policy_version") == command.policy_version &&
+          Types::SHA256_DIGEST_PATTERN.match?(before_digest.to_s) &&
+          Types::SHA256_DIGEST_PATTERN.match?(after_digest.to_s) &&
+          before_digest != after_digest &&
           links.length == 2 &&
           links.any? { _1.role == "accepted_choice" && _1.source == command.accepted_choice } &&
           links.any? do
