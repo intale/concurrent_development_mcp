@@ -9,7 +9,7 @@ module Coordinator::Write
       attribute :plan_id, Types::UuidV7
       attribute :target_stream_context, Types::String.constrained(min_size: 1, max_size: 200)
       attribute :target_stream_name, Types::String.constrained(min_size: 1, max_size: 200)
-      attribute :target_stream_id, Types::UuidV7
+      attribute :target_stream_id, Types::Identifier
     end
   end
 end

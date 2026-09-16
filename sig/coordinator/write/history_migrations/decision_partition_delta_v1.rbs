@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class DecisionPartitionDeltaV1 < Shared::Value
+        def source_event: () -> PgEventstore::Event
+        def source_payload: () -> Events::DecisionPartitionAdvancedV1
+        def remove: () -> bool
+        def add: () -> bool
+        def first_target_revision: () -> Integer
+      end
+    end
+  end
+end

@@ -1,0 +1,19 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class DecisionPartitionIdentityMapper
+        ANCHOR_TARGETS: Hash[String, [String, String, String]]
+
+        def initialize: (entity_reference_resolver: LegacyEntityReferenceResolver) -> void
+
+        def call: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          partition: Decisions::DecisionPartitionV1
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

@@ -14,6 +14,9 @@ module Coordinator
         def surface_digest: () -> String?
         def marker_codec_version: () -> String?
         def index_policy_version: () -> String?
+        def classifier: () -> Interpretations::ClassifierAttributionV1?
+        def scope_provenance: () -> Interpretations::DecisionScopeProvenanceV1?
+        def definition_digest: () -> String?
       end
     end
   end

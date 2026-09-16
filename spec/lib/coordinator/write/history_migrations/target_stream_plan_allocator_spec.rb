@@ -60,4 +60,17 @@ RSpec.describe Coordinator::Write::HistoryMigrations::TargetStreamPlanAllocator,
     expect(second).to be_success
     expect(second.value!.plan_stream).not_to eq(first.value!.plan_stream)
   end
+
+  it "plans a bounded natural target stream identity without replacing it" do
+    natural_target = Coordinator::Write::StreamReference.new(
+      context: "HumanGuidance",
+      stream_name: "DecisionPartition",
+      stream_id: "changeset:#{SecureRandom.uuid_v7}:candidate"
+    )
+
+    result = allocator.call(migration_id:, target_stream: natural_target, caused_by:)
+
+    expect(result).to be_success
+    expect(result.value!.target_stream).to eq(natural_target)
+  end
 end

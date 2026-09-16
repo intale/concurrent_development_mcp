@@ -11,6 +11,8 @@ module Coordinator
           entity_reference_resolver: LegacyEntityReferenceResolver,
           target_event_reference_resolver: LegacyTargetEventReferenceResolver,
           candidate_context_resolver: CandidateContextResolver,
+          decision_partition_identity_mapper: DecisionPartitionIdentityMapper,
+          decision_partition_delta_resolver: DecisionPartitionDeltaResolver,
           index_marker_builder: Candidates::ImpactIndexMarkerBuilder,
           ?schema_registry: LegacyEventSchemaRegistry
         ) -> void

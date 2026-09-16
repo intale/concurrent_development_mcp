@@ -22,6 +22,11 @@ module Coordinator::Write
       attribute? :marker_codec_version, Types::Identifier.optional.default(nil)
       attribute? :index_policy_version,
                  Types::CandidateImpactIndexPolicyVersion.optional.default(nil)
+      attribute? :classifier,
+                 Interpretations::ClassifierAttributionV1.optional.default(nil)
+      attribute? :scope_provenance,
+                 Interpretations::DecisionScopeProvenanceV1.optional.default(nil)
+      attribute? :definition_digest, Types::Sha256Digest.optional.default(nil)
     end
   end
 end

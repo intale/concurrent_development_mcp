@@ -2,6 +2,42 @@ module Coordinator
   module Write
     module HistoryMigrations
       module LegacyEvents
+        class DecisionSlotV1 < Shared::Value
+          def slot_id: () -> String
+          def document: () -> Decisions::DecisionSlotDocumentV1
+          def compound_marker: () -> Coordinator::Shared::CompoundMarker
+        end
+
+        class DecisionActivatedV1 < Events::Base
+          def decision_id: () -> String
+          def interpretation_id: () -> String
+          def recorded_event: () -> EventReference
+          def definition_digest: () -> String
+          def slot: () -> DecisionSlotV1?
+          def partitions: () -> Array[Decisions::DecisionPartitionV1]
+          def rationale: () -> Decisions::DecisionActivationRationaleV1
+        end
+
+        class DecisionDefinitionCorrectedV1 < Events::Base
+          def decision_id: () -> String
+          def interpretation_id: () -> String
+          def source_message_id: () -> String
+          def previous_head: () -> Decisions::DecisionHeadV1
+          def definition: () -> Decisions::DecisionDefinitionV1
+          def classifier: () -> Interpretations::ClassifierAttributionV1
+          def scope_provenance: () -> Interpretations::DecisionScopeProvenanceV1
+          def previous_slot: () -> DecisionSlotV1?
+          def slot: () -> DecisionSlotV1?
+          def previous_partitions: () -> Array[Decisions::DecisionPartitionV1]
+          def partitions: () -> Array[Decisions::DecisionPartitionV1]
+          def rationale: () -> Decisions::DecisionCorrectionRationaleV1
+        end
+
+        class DecisionSlotOpenedV1 < Events::Base
+          def slot: () -> DecisionSlotV1
+          def opened_by: () -> Decisions::DecisionHeadV1
+        end
+
         type coordination_task_lifecycle = CoordinationTaskCancellationRequestedV1 |
           CoordinationTaskCancelledV1 |
           CoordinationTaskCompletedV2 |

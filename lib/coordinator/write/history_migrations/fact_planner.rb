@@ -90,7 +90,10 @@ module Coordinator::Write
             analyzer: metadata_extension&.analyzer,
             surface_digest: metadata_extension&.surface_digest,
             marker_codec_version: metadata_extension&.marker_codec_version,
-            index_policy_version: metadata_extension&.index_policy_version
+            index_policy_version: metadata_extension&.index_policy_version,
+            classifier: metadata_extension&.classifier,
+            scope_provenance: metadata_extension&.scope_provenance,
+            definition_digest: metadata_extension&.definition_digest
           ),
           markers: fact.markers + [
             target_event_marker,

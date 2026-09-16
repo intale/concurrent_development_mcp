@@ -24,6 +24,8 @@ module Coordinator::Write
         entity_reference_resolver:,
         target_event_reference_resolver:,
         candidate_context_resolver:,
+        decision_partition_identity_mapper:,
+        decision_partition_delta_resolver:,
         index_marker_builder:,
         schema_registry: LegacyEventSchemaRegistry.new
       )
@@ -32,6 +34,8 @@ module Coordinator::Write
         @entity_reference_resolver = entity_reference_resolver
         @target_event_reference_resolver = target_event_reference_resolver
         @candidate_context_resolver = candidate_context_resolver
+        @decision_partition_identity_mapper = decision_partition_identity_mapper
+        @decision_partition_delta_resolver = decision_partition_delta_resolver
         @index_marker_builder = index_marker_builder
         @schema_registry = schema_registry
       end
@@ -194,42 +198,43 @@ module Coordinator::Write
         )
         return source_fact if source_fact.failure?
 
-        partition = source_fact.value!.payload
-        unless partition.is_a?(Events::DecisionPartitionAdvancedV1)
+        partition_event = source_fact.value!.payload
+        unless partition_event.is_a?(Events::DecisionPartitionAdvancedV1)
           return Failure(inconsistent(source_event, "Candidate impact policy partition reference is invalid"))
         end
 
-        allocation = @entity_reference_resolver.call(
+        target_partition = @decision_partition_identity_mapper.call(
           migration_id:,
           source_config_name:,
           source_upper_position:,
           source_event:,
-          source_stream: stream_for(source_reference),
-          target_stream_context: "HumanGuidance",
-          target_stream_name: "DecisionPartition",
-          identity_role: "decision-partition"
+          partition: partition_event.partition
         )
-        return allocation if allocation.failure?
+        return target_partition if target_partition.failure?
 
-        target_event_type, target_step_name = partition_target(partition, source_head)
+        membership = @decision_partition_delta_resolver.membership(
+          source_event: source_fact.value!.event,
+          source_upper_position:,
+          source_head:
+        )
+        return membership if membership.failure?
+
+        delta, target_step_name = membership.value!
+        target_event_type = target_step_name == "add-decision-to-partition" ?
+          "DecisionAddedToPartition" : "DecisionRemovedFromPartition"
         @target_event_reference_resolver.call_in_stream(
           migration_id:,
           source_upper_position:,
           source_event:,
-          source_reference:,
-          target_stream: allocation.value!.target_stream,
+          source_reference: event_reference(delta.source_event),
+          target_stream: StreamReference.new(
+            context: "HumanGuidance",
+            stream_name: "DecisionPartition",
+            stream_id: target_partition.value!.partition_id
+          ),
           target_event_type:,
           target_step_name:
         )
-      end
-
-      def partition_target(partition, source_head)
-        active = partition.active_decisions.any? do |head|
-          head.decision_id == source_head.decision_id && head.event == source_head.event
-        end
-        return [ "DecisionAddedToPartition", "add-decision-to-partition" ] if active
-
-        [ "DecisionRemovedFromPartition", "remove-decision-from-partition" ]
       end
 
       def resolve_registration(
@@ -348,6 +353,17 @@ module Coordinator::Write
           context: reference.stream_context,
           stream_name: reference.stream_name,
           stream_id: reference.stream_id
+        )
+      end
+
+      def event_reference(event)
+        EventReference.new(
+          event_id: event.id,
+          type: event.type,
+          stream_context: event.stream.context,
+          stream_name: event.stream.stream_name,
+          stream_id: event.stream.stream_id,
+          stream_revision: event.stream_revision
         )
       end
 

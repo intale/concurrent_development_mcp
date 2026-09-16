@@ -72,7 +72,11 @@ RSpec.describe "history migration Candidate impact scan transformer", :event_sto
       index_policy_version: Coordinator::Write::Candidates::ImpactIndexMarkerBuilder::POLICY_VERSION
     )
     expect(links.map { _1.event.role }).to eq(%w[source_registration policy_partition policy_head])
-    expect(links.map { _1.event.source.stream_id }).to all(match(Coordinator::Shared::Types::UUID_V7_PATTERN))
+    expect(links.fetch(0).event.source.stream_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
+    partition_kind, partition_anchor, partition_topic = links.fetch(1).event.source.stream_id.split(":", 3)
+    expect([ partition_kind, partition_topic ]).to eq(%w[changeset candidate])
+    expect(partition_anchor).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
+    expect(links.fetch(2).event.source.stream_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
     expect(links.map { _1.event.source.type }).to eq(
       %w[CandidateImpactSurfaceAssigned DecisionAddedToPartition DecisionActivated]
     )
@@ -301,16 +305,7 @@ RSpec.describe "history migration Candidate impact scan transformer", :event_sto
         target_step_name: "activate-decision"
       )
     ).to be_success
-    expect(
-      plan_reference(
-        policy.fetch(:partition_event),
-        upper_position:,
-        target_stream_name: "DecisionPartition",
-        identity_role: "decision-partition",
-        target_event_type: "DecisionAddedToPartition",
-        target_step_name: "add-decision-to-partition"
-      )
-    ).to be_success
+    expect(plan(policy.fetch(:partition_event), upper_position:)).to be_success
   end
 
   def plan_reference(

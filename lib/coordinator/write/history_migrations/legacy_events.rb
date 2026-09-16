@@ -3,6 +3,59 @@
 module Coordinator::Write
   module HistoryMigrations
     module LegacyEvents
+      class DecisionSlotV1 < Value
+        attribute :slot_id, Types::Identifier
+        attribute :document, Decisions::DecisionSlotDocumentV1
+        attribute :compound_marker, Coordinator::Shared::CompoundMarker
+      end
+
+      class DecisionActivatedV1 < Events::Base
+        contract type: "DecisionActivated", version: 1
+
+        Partition = Decisions::DecisionPartitionV1
+
+        attribute :decision_id, Types::Identifier
+        attribute :interpretation_id, Types::Identifier
+        attribute :recorded_event, EventReference
+        attribute :definition_digest, Types::Sha256Digest
+        attribute :slot, DecisionSlotV1.optional
+        attribute :partitions, Types::Array.of(Partition).constrained(min_size: 1, max_size: 32)
+        attribute :rationale, Decisions::DecisionActivationRationaleV1
+        attribute :activated_at, Types::Timestamp
+      end
+
+      class DecisionDefinitionCorrectedV1 < Events::Base
+        contract type: "DecisionDefinitionCorrected", version: 1
+
+        Partition = Decisions::DecisionPartitionV1
+
+        attribute :decision_id, Types::Identifier
+        attribute :interpretation_id, Types::Identifier
+        attribute :source_message_id, Types::Identifier
+        attribute :source_event, EventReference
+        attribute :proposal_event, EventReference
+        attribute :acceptance_event, EventReference
+        attribute :previous_head, Decisions::DecisionHeadV1
+        attribute :previous_definition_digest, Types::Sha256Digest
+        attribute :definition, Decisions::DecisionDefinitionV1
+        attribute :classifier, Interpretations::ClassifierAttributionV1
+        attribute :scope_provenance, Interpretations::DecisionScopeProvenanceV1
+        attribute :previous_slot, DecisionSlotV1.optional
+        attribute :slot, DecisionSlotV1.optional
+        attribute :previous_partitions, Types::Array.of(Partition).constrained(min_size: 1, max_size: 32)
+        attribute :partitions, Types::Array.of(Partition).constrained(min_size: 1, max_size: 32)
+        attribute :rationale, Decisions::DecisionCorrectionRationaleV1
+        attribute :corrected_at, Types::Timestamp
+      end
+
+      class DecisionSlotOpenedV1 < Events::Base
+        contract type: "DecisionSlotOpened", version: 1
+
+        attribute :slot, DecisionSlotV1
+        attribute :opened_by, Decisions::DecisionHeadV1
+        attribute :opened_at, Types::Timestamp
+      end
+
       class CommandCompletedV1 < Events::Base
         contract type: "CommandCompleted", version: 1
 
