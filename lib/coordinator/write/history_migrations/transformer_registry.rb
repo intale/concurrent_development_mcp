@@ -22,6 +22,7 @@ module Coordinator::Write
         decision_relation_v1:,
         agent_choice_v1:,
         agent_choice_impact_v1:,
+        agent_choice_impact_scan_v1:,
         coordination_task_submitted_v2:,
         coordination_task_lifecycle:,
         command_completed_v1:
@@ -77,6 +78,10 @@ module Coordinator::Write
           [ "AgentChoiceAccepted", 1 ] => agent_choice_v1,
           [ "AgentChoiceImpactAssessed", 1 ] => agent_choice_impact_v1,
           [ "AgentChoiceInvalidatedByDecision", 1 ] => agent_choice_impact_v1,
+          [ "AgentChoiceImpactScanStarted", 1 ] => agent_choice_impact_scan_v1,
+          [ "AgentChoiceImpactScanSkipped", 1 ] => agent_choice_impact_scan_v1,
+          [ "AgentChoiceImpactScanProgressed", 1 ] => agent_choice_impact_scan_v1,
+          [ "AgentChoiceImpactScanCompleted", 1 ] => agent_choice_impact_scan_v1,
           [ "CoordinationTaskSubmitted", 2 ] => coordination_task_submitted_v2,
           [ "CoordinationTaskExecutionStarted", 1 ] => coordination_task_lifecycle,
           [ "CoordinationTaskCancellationRequested", 1 ] => coordination_task_lifecycle,

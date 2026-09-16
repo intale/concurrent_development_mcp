@@ -142,10 +142,178 @@ RSpec.describe "history migration AgentChoice impact transformer", :event_store 
     expect(snapshot.invalidation).to eq(invalidation_fact.event)
   end
 
-  def persist_history
+  it "migrates one terminal legacy impact scan without its timestamps or progress counters" do
+    history = persist_history
+    scan = persist_completed_scan(history.fetch(:decision_change), caused_by: history.fetch(:corrected))
+    upper_position = scan.fetch(:completed).global_position
+    preplan_decision_lifecycle(history)
+    %i[started progressed completed].each do |name|
+      expect(plan(scan.fetch(name), upper_position:)).to be_success
+    end
+
+    started_facts = transform(scan.fetch(:started), upper_position:).value!
+    progressed_fact = transform(scan.fetch(:progressed), upper_position:).value!.sole
+    completed_fact = transform(scan.fetch(:completed), upper_position:).value!.sole
+    started, source_link = started_facts
+
+    expect(started_facts.map { _1.event.class }).to eq([
+      Coordinator::Write::Events::AgentChoiceImpactScanStartedV2,
+      Coordinator::Write::Events::AgentChoiceImpactScanSourceLinkedV1
+    ])
+    expect(started.target_stream.stream_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
+    expect(started.target_stream.stream_id).not_to eq(scan.fetch(:legacy_scan_id))
+    expect(started.event.to_h.keys).to contain_exactly(
+      :scan_id, :decision_change, :from_position, :to_position, :page_size
+    )
+    expect(started.event.decision_change.to_h.keys).not_to include(:changed_at)
+    expect(started.event.decision_change).to have_attributes(
+      source_event: have_attributes(
+        type: "DecisionDefinitionCorrected",
+        stream_id: match(Coordinator::Shared::Types::UUID_V7_PATTERN),
+        stream_revision: 3
+      ),
+      source_command_id: match(Coordinator::Shared::Types::UUID_V7_PATTERN),
+      decision_id: match(Coordinator::Shared::Types::UUID_V7_PATTERN),
+      affected_partitions: all(have_attributes(anchor_id: match(Coordinator::Shared::Types::UUID_V7_PATTERN)))
+    )
+    expect(started.event.decision_change.definition_digest).not_to eq(
+      history.fetch(:decision_change).definition_digest
+    )
+    expect(source_link.event).to have_attributes(
+      scan_id: started.event.scan_id,
+      role: "decision_change",
+      source: started.event.decision_change.source_event
+    )
+    expect(started.markers).to include(
+      "impact-scan:#{started.event.scan_id}",
+      "decision:#{started.event.decision_change.decision_id}",
+      "decision-change:#{started.event.decision_change.source_event.event_id}"
+    )
+
+    expect(progressed_fact.target_stream).to eq(started.target_stream)
+    expect(progressed_fact.event).to have_attributes(
+      scan_id: started.event.scan_id,
+      page_number: 1,
+      next_from_position: 1,
+      decision_change: started.event.decision_change,
+      from_position: 0,
+      to_position: history.fetch(:corrected).global_position,
+      page_size: 50
+    )
+    expect(progressed_fact.event.to_h.keys).to contain_exactly(
+      :scan_id, :page_number, :next_from_position, :decision_change,
+      :from_position, :to_position, :page_size
+    )
+    expect(completed_fact.event.to_h).to eq(scan_id: started.event.scan_id)
+
+    %i[started progressed completed].each do |name|
+      expect(dispatch(scan.fetch(name), upper_position:)).to be_success
+    end
+    target_events = target_store.read(
+      started.target_stream,
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[
+          AgentChoiceImpactScanStarted AgentChoiceImpactScanSourceLinked
+          AgentChoiceImpactScanProgressed AgentChoiceImpactScanCompleted
+        ],
+        maximum_count: 4,
+        direction: :asc
+      )
+    )
+    expect(target_events.map(&:stream_revision)).to eq([ 0, 1, 2, 3 ])
+    expect(target_events.map(&:type)).to eq(%w[
+      AgentChoiceImpactScanStarted AgentChoiceImpactScanSourceLinked
+      AgentChoiceImpactScanProgressed AgentChoiceImpactScanCompleted
+    ])
+    expect(target_events.first.data.keys).not_to include("started_at")
+    expect(target_events.fetch(2).data.keys).not_to include(
+      "previous_checkpoint", "page_choice_count", "total_choice_count", "progressed_at"
+    )
+    snapshot = Coordinator::Write::AgentChoiceImpacts::ScanLoader.new(event_store: target_store).call(
+      started.event.scan_id
+    )
+    expect(snapshot.state).to have_attributes(
+      status: "completed",
+      scan_id: started.event.scan_id,
+      decision_change: started.event.decision_change
+    )
+  end
+
+  it "migrates a policy-skipped scan as one cohesive terminal fact" do
+    history = persist_history(retroactivity: "future_only")
+    legacy_scan_id = "legacy-skipped-impact-scan"
+    skipped = persist_payload(
+      stream("AgentGovernance", "AgentChoiceImpactScan", legacy_scan_id),
+      Coordinator::Write::Events::AgentChoiceImpactScanSkippedV1.new(
+        scan_id: legacy_scan_id,
+        decision_change: history.fetch(:decision_change),
+        reason: "future_only",
+        policy_version: POLICY_VERSION,
+        skipped_at: "2026-08-01T10:06:00.000000Z"
+      ),
+      policy_version: POLICY_VERSION,
+      caused_by: history.fetch(:corrected)
+    )
+    upper_position = skipped.global_position
+    preplan_decision_lifecycle(history)
+    expect(plan(skipped, upper_position:)).to be_success
+
+    fact = transform(skipped, upper_position:).value!.sole
+    expect(fact.event).to be_a(Coordinator::Write::Events::AgentChoiceImpactScanSkippedV2)
+    expect(fact.event.to_h).to eq(scan_id: fact.target_stream.stream_id, reason: "future_only")
+    expect(fact.markers).to include("impact-scan:#{fact.target_stream.stream_id}")
+    expect(fact.markers.grep(/^decision:/).sole.delete_prefix("decision:")).to match(
+      Coordinator::Shared::Types::UUID_V7_PATTERN
+    )
+
+    expect(dispatch(skipped, upper_position:)).to be_success
+    target_events = target_store.read(
+      fact.target_stream,
+      Coordinator::Write::EventReadCriteria.new(
+        event_types: %w[AgentChoiceImpactScanSkipped AgentChoiceImpactScanSourceLinked],
+        maximum_count: 2,
+        direction: :asc
+      )
+    )
+    expect(target_events.map(&:type)).to eq([ "AgentChoiceImpactScanSkipped" ])
+    expect(target_events.sole.data.keys).to contain_exactly("scan_id", "reason")
+  end
+
+  it "rejects a nonterminal source scan instead of carrying a source cursor into the target database" do
+    history = persist_history
+    legacy_scan_id = "legacy-running-impact-scan"
+    started = persist_payload(
+      stream("AgentGovernance", "AgentChoiceImpactScan", legacy_scan_id),
+      Coordinator::Write::Events::AgentChoiceImpactScanStartedV1.new(
+        scan_id: legacy_scan_id,
+        decision_change: history.fetch(:decision_change),
+        from_position: 0,
+        to_position: history.fetch(:decision_change).source_global_position,
+        page_size: 50,
+        policy_version: POLICY_VERSION,
+        started_at: "2026-08-01T10:06:00.000000Z"
+      ),
+      policy_version: POLICY_VERSION,
+      caused_by: history.fetch(:corrected)
+    )
+
+    result = transform(started, upper_position: started.global_position)
+
+    expect(result).to be_failure
+    expect(result.failure).to have_attributes(
+      code: :ambiguous_source_reference,
+      message: include("frozen scan history is not terminal")
+    )
+  end
+
+  def persist_history(retroactivity: "active_attempts")
     persist_scope_roots
     initial_definition = decision_definition("rspec")
-    corrected_definition = decision_definition("minitest", corrects: [ legacy_decision_id ])
+    corrected_definition = decision_definition(
+      "minitest",
+      corrects: [ legacy_decision_id ],
+      retroactivity:
+    )
     partition = Coordinator::Write::Decisions::DecisionPartitionBuilder.new.call(initial_definition).sole
     slot = Coordinator::Write::Decisions::DecisionSlotBuilder.new.call(initial_definition)
     recorded_decision = persist_payload(
@@ -295,8 +463,63 @@ RSpec.describe "history migration AgentChoice impact transformer", :event_store 
 
     {
       recorded_decision:, activated:, partition_activated:, recorded_choice:, accepted_choice:,
-      corrected:, partition_corrected:, assessment:, invalidation:, reconstruction:
+      corrected:, partition_corrected:, assessment:, invalidation:, reconstruction:,
+      decision_change: legacy_change
     }
+  end
+
+  def persist_completed_scan(decision_change, caused_by:)
+    legacy_scan_id = "legacy-impact-scan"
+    target_stream = stream("AgentGovernance", "AgentChoiceImpactScan", legacy_scan_id)
+    started = persist_payload(
+      target_stream,
+      Coordinator::Write::Events::AgentChoiceImpactScanStartedV1.new(
+        scan_id: legacy_scan_id,
+        decision_change:,
+        from_position: 0,
+        to_position: decision_change.source_global_position,
+        page_size: 50,
+        policy_version: POLICY_VERSION,
+        started_at: "2026-08-01T10:06:00.000000Z"
+      ),
+      policy_version: POLICY_VERSION,
+      caused_by:
+    )
+    progressed = persist_payload(
+      target_stream,
+      Coordinator::Write::Events::AgentChoiceImpactScanProgressedV1.new(
+        scan_id: legacy_scan_id,
+        started_event: event_reference(started),
+        previous_checkpoint: event_reference(started),
+        previous_from_position: 0,
+        next_from_position: 1,
+        page_number: 1,
+        page_choice_count: 1,
+        total_choice_count: 1,
+        policy_version: POLICY_VERSION,
+        progressed_at: "2026-08-01T10:07:00.000000Z"
+      ),
+      policy_version: POLICY_VERSION,
+      caused_by: started
+    )
+    completed = persist_payload(
+      target_stream,
+      Coordinator::Write::Events::AgentChoiceImpactScanCompletedV1.new(
+        scan_id: legacy_scan_id,
+        started_event: event_reference(started),
+        previous_checkpoint: event_reference(progressed),
+        previous_from_position: 1,
+        final_from_position: decision_change.source_global_position + 1,
+        page_count: 2,
+        page_choice_count: 0,
+        total_choice_count: 1,
+        policy_version: POLICY_VERSION,
+        completed_at: "2026-08-01T10:08:00.000000Z"
+      ),
+      policy_version: POLICY_VERSION,
+      caused_by: progressed
+    )
+    { legacy_scan_id:, started:, progressed:, completed: }
   end
 
   def preplan_decision_lifecycle(history)
@@ -359,7 +582,7 @@ RSpec.describe "history migration AgentChoice impact transformer", :event_store 
     )
   end
 
-  def decision_definition(option_id, corrects: [])
+  def decision_definition(option_id, corrects: [], retroactivity: "active_attempts")
     input = InterpretationInput.build(
       statement_kind: "directive",
       effect: "require",
@@ -368,7 +591,7 @@ RSpec.describe "history migration AgentChoice impact transformer", :event_store 
       scope: InterpretationInput.scope(repository_ids: [ legacy_repository_id ]),
       enforcement: {
         level: "implementation_gate",
-        retroactivity: "active_attempts",
+        retroactivity:,
         on_violation: "block"
       },
       relations: { corrects:, supersedes: [], exception_to: [], revokes: [] }

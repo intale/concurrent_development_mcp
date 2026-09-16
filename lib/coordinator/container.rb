@@ -370,6 +370,33 @@ module Coordinator
       )
     end
 
+    register("history_migrations.agent_choice_decision_change_transformer", memoize: true) do
+      Write::HistoryMigrations::AgentChoiceDecisionChangeTransformer.new(
+        event_store: self["event_store"],
+        head_reference_resolver: self["history_migrations.decision_head_reference_resolver"],
+        document_transformer: self["history_migrations.decision_document_transformer"],
+        partition_identity_mapper:
+          self["history_migrations.decision_partition_identity_mapper"],
+        process_step_planner: self["history_migrations.process_step_planner"]
+      )
+    end
+
+    register("history_migrations.agent_choice_impact_scan_context_resolver", memoize: true) do
+      Write::HistoryMigrations::AgentChoiceImpactScanContextResolver.new(
+        event_store: self["event_store"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        decision_change_transformer:
+          self["history_migrations.agent_choice_decision_change_transformer"]
+      )
+    end
+
+    register("history_migrations.agent_choice_impact_scan_v1_transformer", memoize: true) do
+      Write::HistoryMigrations::AgentChoiceImpactScanV1Transformer.new(
+        context_resolver:
+          self["history_migrations.agent_choice_impact_scan_context_resolver"]
+      )
+    end
+
     register("history_migrations.decision_lifecycle_v1_transformer", memoize: true) do
       Write::HistoryMigrations::DecisionLifecycleV1Transformer.new(
         event_store: self["event_store"],
@@ -460,6 +487,8 @@ module Coordinator
         decision_relation_v1: self["history_migrations.decision_relation_v1_transformer"],
         agent_choice_v1: self["history_migrations.agent_choice_v1_transformer"],
         agent_choice_impact_v1: self["history_migrations.agent_choice_impact_v1_transformer"],
+        agent_choice_impact_scan_v1:
+          self["history_migrations.agent_choice_impact_scan_v1_transformer"],
         coordination_task_submitted_v2:
           self["history_migrations.coordination_task_submitted_v2_transformer"],
         coordination_task_lifecycle:
