@@ -12,22 +12,48 @@ module Coordinator::Write
       end
 
       def call(evidence:, surface:)
-        (role_markers(role: "source", evidence:, surface:) +
-          role_markers(role: "target", evidence:, surface:)).uniq.sort_by(&:b).freeze
+        call_documents(
+          repository_id: evidence.candidate.repository_id,
+          manifest: evidence.manifest,
+          build_context: evidence.build_context,
+          surface:
+        )
+      end
+
+      def call_documents(repository_id:, manifest:, build_context:, surface:)
+        (role_markers(
+          role: "source",
+          repository_id:,
+          manifest:,
+          build_context:,
+          surface:
+        ) + role_markers(
+          role: "target",
+          repository_id:,
+          manifest:,
+          build_context:,
+          surface:
+        )).uniq.sort_by(&:b).freeze
       end
 
       def counterpart(evidence:, surface:, direction:)
         role = direction == "outgoing" ? "target" : "source"
         values_role = direction == "outgoing" ? "source" : "target"
 
-        role_markers(role:, evidence:, surface:, values_role:).freeze
+        role_markers(
+          role:,
+          repository_id: evidence.candidate.repository_id,
+          manifest: evidence.manifest,
+          build_context: evidence.build_context,
+          surface:,
+          values_role:
+        ).freeze
       end
 
       private
 
-      def role_markers(role:, evidence:, surface:, values_role: role)
-        repository_id = evidence.candidate.repository_id
-        paths = path_values(evidence, values_role)
+      def role_markers(role:, repository_id:, manifest:, build_context:, surface:, values_role: role)
+        paths = path_values(manifest, build_context, values_role)
         semantics = semantic_values(surface, values_role)
 
         (
@@ -36,11 +62,11 @@ module Coordinator::Write
         ).uniq.sort_by(&:b)
       end
 
-      def path_values(evidence, role)
-        changed = changed_paths(evidence.manifest)
+      def path_values(manifest, build_context, role)
+        changed = changed_paths(manifest)
         return changed if role == "source"
 
-        changed + (evidence.build_context&.inputs&.map(&:path) || [])
+        changed + (build_context&.inputs&.map(&:path) || [])
       end
 
       def semantic_values(surface, role)

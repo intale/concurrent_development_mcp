@@ -2,8 +2,17 @@ module Coordinator
   module Write
     module HistoryMigrations
       class MigrationMetadataExtensionV1 < Shared::Value
+        def attributed_actor: () -> Commands::Actor?
         def canonical_input_digest: () -> String?
         def policy_version: () -> String?
+        def collector: () -> Candidates::EvidenceCollectorV1?
+        def manifest_digest: () -> String?
+        def build_context_digest: () -> String?
+        def dependency_graph_digest: () -> String?
+        def test_environment_digest: () -> String?
+        def analyzer: () -> Candidates::ImpactAnalyzerV1?
+        def surface_digest: () -> String?
+        def marker_codec_version: () -> String?
       end
     end
   end

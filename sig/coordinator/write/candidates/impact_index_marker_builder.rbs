@@ -10,6 +10,12 @@ module Coordinator::Write
         evidence: ImpactSurfaceEvidenceV2,
         surface: Coordinator::Write::Events::CandidateImpactSurfaceDerivedV2
       ) -> Array[String]
+      def call_documents: (
+        repository_id: String,
+        manifest: Coordinator::Write::Events::CandidateChangeManifestCapturedV1 | Coordinator::Write::Events::CandidateChangeManifestCapturedV2,
+        build_context: Coordinator::Write::Events::CandidateBuildContextCapturedV1? | Coordinator::Write::Events::CandidateBuildContextCapturedV2?,
+        surface: Coordinator::Write::Events::CandidateImpactSurfaceDerivedV1 | Coordinator::Write::Events::CandidateImpactSurfaceDerivedV2
+      ) -> Array[String]
       def counterpart: (
         evidence: ImpactSurfaceEvidenceV2,
         surface: Coordinator::Write::Events::CandidateImpactSurfaceDerivedV2,

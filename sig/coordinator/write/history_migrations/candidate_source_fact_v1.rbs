@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class CandidateSourceFactV1 < Shared::Value
+        def event: () -> PgEventstore::Event
+        def payload: () -> Events::Base
+      end
+    end
+  end
+end

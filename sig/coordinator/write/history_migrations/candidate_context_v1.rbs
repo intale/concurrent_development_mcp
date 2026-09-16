@@ -1,0 +1,18 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class CandidateContextV1 < Shared::Value
+        def source_candidate: () -> Events::CandidateSubmittedV2
+        def source_candidate_event: () -> PgEventstore::Event
+        def target_submission_event: () -> EventReference?
+        def candidate_stream: () -> StreamReference
+        def candidate_id: () -> String
+        def change_set_id: () -> String
+        def work_item_id: () -> String
+        def attempt_id: () -> String
+        def repository_id: () -> String
+        def markers: () -> Array[String]
+      end
+    end
+  end
+end

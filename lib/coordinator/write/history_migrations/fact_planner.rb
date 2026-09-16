@@ -68,19 +68,28 @@ module Coordinator::Write
         event_id = target_plan.value!.target_event.event_id
         target_event_marker = "migration-target-event:#{event_id}"
         metadata_extension = fact.metadata_extension
+        attributed_actor = metadata_extension&.attributed_actor
         event = @event_factory.build!(
           event: fact.event,
           event_id:,
           metadata: MigrationMetadataV1.new(
             command_id: process_step.target_command_id,
-            actor_kind: "system",
-            actor_id: "history-migration-dispatcher",
+            actor_kind: attributed_actor&.kind || "system",
+            actor_id: attributed_actor&.id || "history-migration-dispatcher",
             actor_authenticated: false,
             recorded_by: "coordinator",
             policy_version: metadata_extension&.policy_version || PROCESS_RULE_VERSION,
             migration_id:,
             migration_source: source,
-            canonical_input_digest: metadata_extension&.canonical_input_digest
+            canonical_input_digest: metadata_extension&.canonical_input_digest,
+            collector: metadata_extension&.collector,
+            manifest_digest: metadata_extension&.manifest_digest,
+            build_context_digest: metadata_extension&.build_context_digest,
+            dependency_graph_digest: metadata_extension&.dependency_graph_digest,
+            test_environment_digest: metadata_extension&.test_environment_digest,
+            analyzer: metadata_extension&.analyzer,
+            surface_digest: metadata_extension&.surface_digest,
+            marker_codec_version: metadata_extension&.marker_codec_version
           ),
           markers: fact.markers + [
             target_event_marker,

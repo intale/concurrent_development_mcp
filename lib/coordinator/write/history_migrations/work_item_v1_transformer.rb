@@ -106,6 +106,15 @@ module Coordinator::Write
             source:,
             target_stream:
           )
+        when Events::WorkItemCandidateSelectedV1
+          candidate_selected_fact(
+            migration_id:,
+            source_config_name:,
+            source_upper_position:,
+            source_event:,
+            source:,
+            target_stream:
+          )
         when Events::WorkItemCompletedV1
           Success(completed_facts(source, target_stream:))
         end
@@ -449,6 +458,60 @@ module Coordinator::Write
           step_name: "complete-work-item",
           policy_version: source.rule_version
         )
+      end
+
+      def candidate_selected_fact(
+        migration_id:,
+        source_config_name:,
+        source_upper_position:,
+        source_event:,
+        source:,
+        target_stream:
+      )
+        relationships = resolve_attempt_relationships(
+          migration_id:,
+          source_config_name:,
+          source_upper_position:,
+          source_event:,
+          source:
+        )
+        return relationships if relationships.failure?
+
+        candidate = @target_event_reference_resolver.call(
+          migration_id:,
+          source_config_name:,
+          source_upper_position:,
+          source_event:,
+          source_reference: source.candidate_event,
+          target_stream_context: "DevelopmentIntegration",
+          target_stream_name: "Candidate",
+          identity_role: "candidate",
+          target_event_type: "CandidateSubmitted",
+          target_step_name: "submit-candidate"
+        )
+        return candidate if candidate.failure?
+
+        change_set_id, attempt_id = relationships.value!
+        work_item_id = target_stream.stream_id
+        target_candidate = candidate.value!
+        Success([
+          fact(
+            target_stream:,
+            event: Events::WorkItemCandidateSelectedV2.new(
+              work_item_id:,
+              change_set_id:,
+              attempt_id:,
+              candidate_id: target_candidate.stream_id,
+              candidate_event: target_candidate
+            ),
+            markers: markers(
+              work_item_id:,
+              change_set_id:,
+              attempt_id:
+            ) + [ "candidate:#{target_candidate.stream_id}" ],
+            step_name: "select-work-item-candidate"
+          )
+        ])
       end
 
       def resolve_work_item(

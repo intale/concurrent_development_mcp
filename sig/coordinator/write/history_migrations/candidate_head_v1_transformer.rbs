@@ -1,0 +1,21 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class CandidateHeadV1Transformer
+        def initialize: (
+          context_resolver: CandidateContextResolver,
+          stream_identity_allocator: StreamIdentityAllocator,
+          compound_marker_builder: Shared::CompoundMarkerBuilder
+        ) -> void
+
+        def call: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          source_payload: Events::CandidateHeadRegisteredV1
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

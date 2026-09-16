@@ -11,6 +11,14 @@ module Coordinator
         def migration_id: () -> String
         def migration_source: () -> MigrationSourceV1
         def canonical_input_digest: () -> String?
+        def collector: () -> Candidates::EvidenceCollectorV1?
+        def manifest_digest: () -> String?
+        def build_context_digest: () -> String?
+        def dependency_graph_digest: () -> String?
+        def test_environment_digest: () -> String?
+        def analyzer: () -> Candidates::ImpactAnalyzerV1?
+        def surface_digest: () -> String?
+        def marker_codec_version: () -> String?
       end
     end
   end

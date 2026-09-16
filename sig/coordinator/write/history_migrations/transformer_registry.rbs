@@ -9,6 +9,10 @@ module Coordinator
           change_set_v1: ChangeSetV1Transformer,
           work_item_v1: WorkItemV1Transformer,
           attempt_v1: AttemptV1Transformer,
+          candidate_submission_v1: CandidateSubmissionV1Transformer,
+          candidate_evidence_v1: CandidateEvidenceV1Transformer,
+          candidate_head_v1: CandidateHeadV1Transformer,
+          candidate_impact_v1: CandidateImpactV1Transformer,
           coordination_task_submitted_v2: CoordinationTaskSubmittedV2Transformer,
           coordination_task_lifecycle: CoordinationTaskLifecycleTransformer,
           command_completed_v1: CommandCompletedV1Transformer

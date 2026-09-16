@@ -15,7 +15,7 @@ module Coordinator
           source_config_name: String,
           source_upper_position: Integer,
           source_event: PgEventstore::Event,
-          source_payload: Events::WorkItemCreatedV1 | Events::WorkItemAddedToChangeSetV1 | Events::WorkItemDependencyDeclaredV1 | Events::WorkItemDependencySatisfiedV1 | Events::WorkItemMadeReadyV1 | Events::WorkItemAcquiredV1 | Events::WorkItemRequeuedV1 | Events::WorkItemCompletedV1
+          source_payload: Events::WorkItemCreatedV1 | Events::WorkItemAddedToChangeSetV1 | Events::WorkItemDependencyDeclaredV1 | Events::WorkItemDependencySatisfiedV1 | Events::WorkItemMadeReadyV1 | Events::WorkItemAcquiredV1 | Events::WorkItemRequeuedV1 | Events::WorkItemCandidateSelectedV1 | Events::WorkItemCompletedV1
         ) -> Dry::Monads::Result
       end
     end

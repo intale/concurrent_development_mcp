@@ -1,0 +1,17 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class CandidateSubmissionV1Transformer
+        def initialize: (context_resolver: CandidateContextResolver) -> void
+
+        def call: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          source_payload: Events::CandidateSubmittedV2 | Events::CandidateAttachedToAttemptV1
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

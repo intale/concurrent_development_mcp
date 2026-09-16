@@ -238,6 +238,48 @@ module Coordinator
       )
     end
 
+    register("history_migrations.candidate_context_resolver", memoize: true) do
+      Write::HistoryMigrations::CandidateContextResolver.new(
+        event_store: self["event_store"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"],
+        target_event_reference_resolver:
+          self["history_migrations.legacy_target_event_reference_resolver"]
+      )
+    end
+
+    register("history_migrations.candidate_submission_v1_transformer", memoize: true) do
+      Write::HistoryMigrations::CandidateSubmissionV1Transformer.new(
+        context_resolver: self["history_migrations.candidate_context_resolver"]
+      )
+    end
+
+    register("history_migrations.candidate_evidence_v1_transformer", memoize: true) do
+      Write::HistoryMigrations::CandidateEvidenceV1Transformer.new(
+        context_resolver: self["history_migrations.candidate_context_resolver"]
+      )
+    end
+
+    register("history_migrations.candidate_head_v1_transformer", memoize: true) do
+      Write::HistoryMigrations::CandidateHeadV1Transformer.new(
+        context_resolver: self["history_migrations.candidate_context_resolver"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        compound_marker_builder: self["compound_marker_builder"]
+      )
+    end
+
+    register("history_migrations.candidate_impact_v1_transformer", memoize: true) do
+      Write::HistoryMigrations::CandidateImpactV1Transformer.new(
+        context_resolver: self["history_migrations.candidate_context_resolver"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        target_event_reference_resolver:
+          self["history_migrations.legacy_target_event_reference_resolver"],
+        index_marker_builder: Write::Candidates::ImpactIndexMarkerBuilder.new(
+          compound_marker_builder: self["compound_marker_builder"]
+        )
+      )
+    end
+
     register("history_migrations.legacy_command_event_locator", memoize: true) do
       Write::HistoryMigrations::LegacyCommandEventLocator.new(event_store: self["event_store"])
     end
@@ -270,6 +312,10 @@ module Coordinator
         change_set_v1: self["history_migrations.change_set_v1_transformer"],
         work_item_v1: self["history_migrations.work_item_v1_transformer"],
         attempt_v1: self["history_migrations.attempt_v1_transformer"],
+        candidate_submission_v1: self["history_migrations.candidate_submission_v1_transformer"],
+        candidate_evidence_v1: self["history_migrations.candidate_evidence_v1_transformer"],
+        candidate_head_v1: self["history_migrations.candidate_head_v1_transformer"],
+        candidate_impact_v1: self["history_migrations.candidate_impact_v1_transformer"],
         coordination_task_submitted_v2:
           self["history_migrations.coordination_task_submitted_v2_transformer"],
         coordination_task_lifecycle:
