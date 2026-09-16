@@ -21,6 +21,15 @@ module Coordinator
           def labels: () -> Array[String]
           def source: () -> DevelopmentArtifacts::SourceV1
         end
+
+        class RelationV1 < Shared::Value
+          def relation_id: () -> String
+          def source_artifact_id: () -> String
+          def relation: () -> String
+          def target: () -> DevelopmentArtifacts::RelationTargetV1
+          def attributes: () -> DevelopmentArtifacts::RelationAttributesV1
+          def relation_attributes: () -> DevelopmentArtifacts::RelationAttributesV1
+        end
       end
     end
   end

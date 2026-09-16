@@ -36,6 +36,10 @@ module Coordinator::Write
         [ "DevelopmentArtifactClassificationCorrected", 1 ] =>
           LegacyEvents::DevelopmentArtifactClassificationCorrectedV1,
         [ "DevelopmentArtifactObserved", 1 ] => LegacyEvents::DevelopmentArtifactObservedV1,
+        [ "DevelopmentArtifactRelationDeclared", 1 ] =>
+          LegacyEvents::DevelopmentArtifactRelationDeclaredV1,
+        [ "DevelopmentArtifactRelationSuperseded", 1 ] =>
+          LegacyEvents::DevelopmentArtifactRelationSupersededV1,
         [ "MergeAuthorizationDenied", 1 ] => Events::MergeAuthorizationDeniedV1,
         [ "MergeAuthorizationGranted", 1 ] => Events::MergeAuthorizationGrantedV1,
         [ "MergeObserved", 1 ] => Events::MergeObservedV1,

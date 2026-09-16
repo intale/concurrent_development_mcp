@@ -167,6 +167,109 @@ RSpec.describe "history migration Development Artifact transformers", :event_sto
     )
   end
 
+  it "moves relation declarations and supersessions into UUIDv7 relation streams" do
+    target_artifact_ids = [
+      "artifact:v1:#{'e' * 64}",
+      "artifact:v1:#{'f' * 64}"
+    ]
+    relation_ids = [
+      "artifact-relation:v1:#{'1' * 64}",
+      "artifact-relation:v1:#{'2' * 64}"
+    ]
+    source_capture = persist_artifact_capture(legacy_artifact_id, title: "Source Artifact")
+    target_captures = target_artifact_ids.each_with_index.map do |artifact_id, index|
+      persist_artifact_capture(artifact_id, title: "Target Artifact #{index + 1}")
+    end
+    declarations = relation_ids.each_with_index.map do |relation_id, index|
+      persist_relation_declaration(
+        relation_id:,
+        target_artifact_id: target_artifact_ids.fetch(index),
+        path: "references/#{index + 1}.md"
+      )
+    end
+    supersession = persist_relation_supersession(
+      superseded_relation_id: relation_ids.fetch(0),
+      replacement_relation_id: relation_ids.fetch(1)
+    )
+    upper_position = supersession.global_position
+
+    source_artifact_id = transform(source_capture, upper_position:).value!.first.target_stream.stream_id
+    target_artifact_ids = target_captures.map do |event|
+      transform(event, upper_position:).value!.first.target_stream.stream_id
+    end
+    relation_facts = declarations.map { transform(_1, upper_position:).value!.sole }
+    supersession_fact = transform(supersession, upper_position:).value!.sole
+
+    expect(relation_facts.map { _1.target_stream.stream_id }).to all(
+      match(Coordinator::Shared::Types::UUID_V7_PATTERN)
+    )
+    expect(relation_facts.map { _1.target_stream.stream_id }.uniq.length).to eq(2)
+    expect(relation_facts.map { _1.event.source_artifact_id }).to eq(
+      [ source_artifact_id, source_artifact_id ]
+    )
+    expect(relation_facts.map { _1.event.target_id }).to eq(target_artifact_ids)
+    expect(supersession_fact.target_stream).to eq(relation_facts.fetch(0).target_stream)
+    expect(supersession_fact.event).to have_attributes(
+      relation_id: relation_facts.fetch(0).target_stream.stream_id,
+      source_artifact_id:,
+      replacement_relation_id: relation_facts.fetch(1).target_stream.stream_id,
+      reason: "Replace the stale reference"
+    )
+    expect(
+      relation_facts.flat_map { _1.event.to_h.keys } + supersession_fact.event.to_h.keys
+    ).not_to include(:declared_at, :superseded_at)
+    expect((relation_facts + [ supersession_fact ]).flat_map(&:markers).join("\n")).not_to match(
+      /artifact(?:-relation)?:v1:/
+    )
+
+    [ *declarations, supersession ].each do |event|
+      expect(plan(event, upper_position:)).to be_success
+    end
+    [ *declarations, supersession ].each do |event|
+      expect(dispatch(event, upper_position:)).to be_success
+    end
+
+    superseded_events = target_events(relation_facts.fetch(0).target_stream, maximum_count: 2)
+    replacement_events = target_events(relation_facts.fetch(1).target_stream, maximum_count: 1)
+    expect(superseded_events.map(&:type)).to eq(
+      %w[DevelopmentArtifactRelationDeclared DevelopmentArtifactRelationSuperseded]
+    )
+    expect(superseded_events.map(&:stream_revision)).to eq([ 0, 1 ])
+    expect(replacement_events.map(&:type)).to eq([ "DevelopmentArtifactRelationDeclared" ])
+    expect(replacement_events.sole.stream_revision).to eq(0)
+    expect(superseded_events.flat_map { _1.data.keys }).not_to include("declared_at", "superseded_at")
+
+    state = Coordinator::Write::Domain::DevelopmentArtifacts::RelationStateV2.reduce(
+      superseded_events.map { load_target_event(_1) }
+    )
+    expect(state).not_to be_active
+    expect(state.declaration.target_id).to eq(target_artifact_ids.fetch(0))
+    expect(state.supersession.replacement_relation_id).to eq(
+      relation_facts.fetch(1).target_stream.stream_id
+    )
+  end
+
+  it "preserves an external target without treating it as an internal stream identity" do
+    persist_artifact_capture(legacy_artifact_id, title: "Source Artifact")
+    source_event = persist_relation_declaration(
+      relation_id: "artifact-relation:v1:#{'3' * 64}",
+      target: Coordinator::Write::DevelopmentArtifacts::RelationTargetV1.new(
+        kind: "external",
+        id: "https://example.test/reference",
+        status: "unverified"
+      ),
+      path: "reference"
+    )
+
+    fact = transform(source_event, upper_position: source_event.global_position).value!.sole
+
+    expect(fact.event).to have_attributes(
+      target_kind: "external",
+      target_id: "https://example.test/reference"
+    )
+    expect(fact.target_stream.stream_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
+  end
+
   def persist_history
     artifact = Coordinator::Write::HistoryMigrations::LegacyDevelopmentArtifacts::ArtifactV2.new(
       artifact_id: legacy_artifact_id,
@@ -236,7 +339,7 @@ RSpec.describe "history migration Development Artifact transformers", :event_sto
     )
   end
 
-  def persist(target_stream, payload)
+  def persist(target_stream, payload, markers: artifact_markers(target_stream))
     source_store.append(
       target_stream,
       [
@@ -252,11 +355,75 @@ RSpec.describe "history migration Development Artifact transformers", :event_sto
             "recorded_by" => "coordinator",
             "policy_version" => "development-artifact-repository/v1"
           },
-          markers: artifact_markers(target_stream),
+          markers:,
           correlation_id: SecureRandom.uuid_v7
         )
       ]
     ).sole
+  end
+
+  def persist_artifact_capture(artifact_id, title:)
+    artifact = Coordinator::Write::HistoryMigrations::LegacyDevelopmentArtifacts::ArtifactV2.new(
+      artifact_id:,
+      scope: "project:legacy",
+      title:,
+      kind: "documentation",
+      labels: [],
+      content:,
+      source: initial_source
+    )
+    persist(
+      stream("DevelopmentMemory", "DevelopmentArtifact", artifact_id),
+      Coordinator::Write::HistoryMigrations::LegacyEvents::DevelopmentArtifactCapturedV2.new(
+        artifact:,
+        captured_at: "2026-08-01T10:00:01.000000Z"
+      ),
+      markers: [ "development-artifact:#{artifact_id}" ]
+    )
+  end
+
+  def persist_relation_declaration(relation_id:, path:, target_artifact_id: nil, target: nil)
+    target ||= Coordinator::Write::DevelopmentArtifacts::RelationTargetV1.new(
+      kind: "artifact",
+      id: target_artifact_id,
+      status: "verified"
+    )
+    relation = Coordinator::Write::HistoryMigrations::LegacyDevelopmentArtifacts::RelationV1.new(
+      relation_id:,
+      source_artifact_id: legacy_artifact_id,
+      relation: "references",
+      target:,
+      attributes: Coordinator::Write::DevelopmentArtifacts::RelationAttributesV1.new(path:)
+    )
+    persist(
+      stream("DevelopmentMemory", "DevelopmentArtifact", legacy_artifact_id),
+      Coordinator::Write::HistoryMigrations::LegacyEvents::DevelopmentArtifactRelationDeclaredV1.new(
+        artifact_relation: relation,
+        declared_at: "2026-08-01T10:01:00.000000Z"
+      ),
+      markers: [
+        "development-artifact:#{legacy_artifact_id}",
+        "development-artifact-relation:#{relation_id}"
+      ]
+    )
+  end
+
+  def persist_relation_supersession(superseded_relation_id:, replacement_relation_id:)
+    persist(
+      stream("DevelopmentMemory", "DevelopmentArtifact", legacy_artifact_id),
+      Coordinator::Write::HistoryMigrations::LegacyEvents::DevelopmentArtifactRelationSupersededV1.new(
+        source_artifact_id: legacy_artifact_id,
+        superseded_relation_id:,
+        replacement_relation_id:,
+        reason: "Replace the stale reference",
+        superseded_at: "2026-08-01T10:02:00.000000Z"
+      ),
+      markers: [
+        "development-artifact:#{legacy_artifact_id}",
+        "development-artifact-relation:#{superseded_relation_id}",
+        "development-artifact-relation:#{replacement_relation_id}"
+      ]
+    )
   end
 
   def artifact_markers(target_stream)
@@ -302,6 +469,14 @@ RSpec.describe "history migration Development Artifact transformers", :event_sto
         maximum_count:,
         direction: :asc
       )
+    )
+  end
+
+  def load_target_event(event)
+    Coordinator::Write::EventSchemaRegistry.new.load(
+      type: event.type,
+      schema_version: event.metadata.fetch("schema_version"),
+      data: event.data
     )
   end
 

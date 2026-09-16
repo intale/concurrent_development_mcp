@@ -24,6 +24,18 @@ module Coordinator::Write
         attribute :labels, Types::DevelopmentArtifactLabels
         attribute :source, DevelopmentArtifacts::SourceV1
       end
+
+      class RelationV1 < Value
+        attribute :relation_id, LegacyDevelopmentArtifactTypes::RelationId
+        attribute :source_artifact_id, LegacyDevelopmentArtifactTypes::ArtifactId
+        attribute :relation, Types::DevelopmentArtifactRelationKind
+        attribute :target, DevelopmentArtifacts::RelationTargetV1
+        attribute :attributes, DevelopmentArtifacts::RelationAttributesV1
+
+        def relation_attributes
+          self[:attributes]
+        end
+      end
     end
   end
 end

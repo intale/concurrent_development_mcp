@@ -1,0 +1,27 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class DevelopmentArtifactRelationV1Transformer
+        SOURCE_TYPES: Hash[String, singleton(Events::Base)]
+        TARGET_STREAMS: Hash[String, Array[String]]
+
+        def initialize: (
+          event_store: EventStore,
+          stream_identity_allocator: StreamIdentityAllocator,
+          entity_reference_resolver: LegacyEntityReferenceResolver,
+          ?schema_registry: LegacyEventSchemaRegistry,
+          ?marker_builder: DevelopmentArtifacts::MarkerBuilder
+        ) -> void
+
+        def call: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          source_payload: LegacyEvents::DevelopmentArtifactRelationDeclaredV1 |
+                          LegacyEvents::DevelopmentArtifactRelationSupersededV1
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

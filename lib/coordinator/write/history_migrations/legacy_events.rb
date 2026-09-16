@@ -83,6 +83,23 @@ module Coordinator::Write
         attribute :corrected_at, Types::Timestamp
       end
 
+      class DevelopmentArtifactRelationDeclaredV1 < Events::Base
+        contract type: "DevelopmentArtifactRelationDeclared", version: 1
+
+        attribute :artifact_relation, LegacyDevelopmentArtifacts::RelationV1
+        attribute :declared_at, Types::Timestamp
+      end
+
+      class DevelopmentArtifactRelationSupersededV1 < Events::Base
+        contract type: "DevelopmentArtifactRelationSuperseded", version: 1
+
+        attribute :source_artifact_id, LegacyDevelopmentArtifactTypes::ArtifactId
+        attribute :superseded_relation_id, LegacyDevelopmentArtifactTypes::RelationId
+        attribute :replacement_relation_id, LegacyDevelopmentArtifactTypes::RelationId
+        attribute :reason, Types::DevelopmentArtifactRelationSupersessionReason
+        attribute :superseded_at, Types::Timestamp
+      end
+
       class CommandCompletedV1 < Events::Base
         contract type: "CommandCompleted", version: 1
 

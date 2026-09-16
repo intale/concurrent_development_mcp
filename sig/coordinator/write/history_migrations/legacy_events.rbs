@@ -59,6 +59,19 @@ module Coordinator
           def corrected_at: () -> String
         end
 
+        class DevelopmentArtifactRelationDeclaredV1 < Events::Base
+          def artifact_relation: () -> LegacyDevelopmentArtifacts::RelationV1
+          def declared_at: () -> String
+        end
+
+        class DevelopmentArtifactRelationSupersededV1 < Events::Base
+          def source_artifact_id: () -> String
+          def superseded_relation_id: () -> String
+          def replacement_relation_id: () -> String
+          def reason: () -> String
+          def superseded_at: () -> String
+        end
+
         type coordination_task_lifecycle = CoordinationTaskCancellationRequestedV1 |
           CoordinationTaskCancelledV1 |
           CoordinationTaskCompletedV2 |

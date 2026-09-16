@@ -484,6 +484,14 @@ module Coordinator
       )
     end
 
+    register("history_migrations.development_artifact_relation_v1_transformer", memoize: true) do
+      Write::HistoryMigrations::DevelopmentArtifactRelationV1Transformer.new(
+        event_store: self["event_store"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"]
+      )
+    end
+
     register("history_migrations.transformer_registry", memoize: true) do
       Write::HistoryMigrations::TransformerRegistry.new(
         schema_registry: Write::HistoryMigrations::LegacyEventSchemaRegistry.new,
@@ -511,7 +519,9 @@ module Coordinator
           self["history_migrations.coordination_task_lifecycle_transformer"],
         command_completed_v1: self["history_migrations.command_completed_v1_transformer"],
         development_artifact_v1:
-          self["history_migrations.development_artifact_v1_transformer"]
+          self["history_migrations.development_artifact_v1_transformer"],
+        development_artifact_relation_v1:
+          self["history_migrations.development_artifact_relation_v1_transformer"]
       )
     end
 
