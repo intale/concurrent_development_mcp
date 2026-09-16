@@ -37,14 +37,24 @@ module Coordinator::Write
       end
 
       def counterpart(evidence:, surface:, direction:)
+        counterpart_documents(
+          repository_id: evidence.candidate.repository_id,
+          manifest: evidence.manifest,
+          build_context: evidence.build_context,
+          surface:,
+          direction:
+        )
+      end
+
+      def counterpart_documents(repository_id:, manifest:, build_context:, surface:, direction:)
         role = direction == "outgoing" ? "target" : "source"
         values_role = direction == "outgoing" ? "source" : "target"
 
         role_markers(
           role:,
-          repository_id: evidence.candidate.repository_id,
-          manifest: evidence.manifest,
-          build_context: evidence.build_context,
+          repository_id:,
+          manifest:,
+          build_context:,
           surface:,
           values_role:
         ).freeze

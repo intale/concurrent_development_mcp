@@ -89,7 +89,8 @@ module Coordinator::Write
             test_environment_digest: metadata_extension&.test_environment_digest,
             analyzer: metadata_extension&.analyzer,
             surface_digest: metadata_extension&.surface_digest,
-            marker_codec_version: metadata_extension&.marker_codec_version
+            marker_codec_version: metadata_extension&.marker_codec_version,
+            index_policy_version: metadata_extension&.index_policy_version
           ),
           markers: fact.markers + [
             target_event_marker,

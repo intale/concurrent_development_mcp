@@ -20,6 +20,8 @@ module Coordinator::Write
       attribute? :analyzer, Candidates::ImpactAnalyzerV1.optional.default(nil)
       attribute? :surface_digest, Types::Sha256Digest.optional.default(nil)
       attribute? :marker_codec_version, Types::Identifier.optional.default(nil)
+      attribute? :index_policy_version,
+                 Types::CandidateImpactIndexPolicyVersion.optional.default(nil)
     end
   end
 end

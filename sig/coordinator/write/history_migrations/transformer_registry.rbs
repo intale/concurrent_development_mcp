@@ -13,6 +13,7 @@ module Coordinator
           candidate_evidence_v1: CandidateEvidenceV1Transformer,
           candidate_head_v1: CandidateHeadV1Transformer,
           candidate_impact_v1: CandidateImpactV1Transformer,
+          candidate_impact_scan_v1: CandidateImpactScanV1Transformer,
           coordination_task_submitted_v2: CoordinationTaskSubmittedV2Transformer,
           coordination_task_lifecycle: CoordinationTaskLifecycleTransformer,
           command_completed_v1: CommandCompletedV1Transformer

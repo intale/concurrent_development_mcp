@@ -21,6 +21,13 @@ module Coordinator::Write
         surface: Coordinator::Write::Events::CandidateImpactSurfaceDerivedV2,
         direction: String
       ) -> Array[String]
+      def counterpart_documents: (
+        repository_id: String,
+        manifest: Coordinator::Write::Events::CandidateChangeManifestCapturedV1 | Coordinator::Write::Events::CandidateChangeManifestCapturedV2,
+        build_context: Coordinator::Write::Events::CandidateBuildContextCapturedV1? | Coordinator::Write::Events::CandidateBuildContextCapturedV2?,
+        surface: Coordinator::Write::Events::CandidateImpactSurfaceDerivedV1 | Coordinator::Write::Events::CandidateImpactSurfaceDerivedV2,
+        direction: String
+      ) -> Array[String]
     end
   end
 end

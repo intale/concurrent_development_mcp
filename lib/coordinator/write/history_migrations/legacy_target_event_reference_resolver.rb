@@ -46,6 +46,41 @@ module Coordinator::Write
         )
         return allocation if allocation.failure?
 
+        resolve(
+          migration_id:,
+          referenced_event:,
+          target_stream: allocation.value!.target_stream,
+          target_event_type:,
+          target_step_name:
+        )
+      end
+
+      def call_in_stream(
+        migration_id:,
+        source_upper_position:,
+        source_event:,
+        source_reference:,
+        target_stream:,
+        target_event_type:,
+        target_step_name:
+      )
+        referenced_event = locate(source_reference)
+        unless valid_reference?(referenced_event, source_reference:, source_upper_position:)
+          return Failure(unresolved(source_event, source_reference:))
+        end
+
+        resolve(
+          migration_id:,
+          referenced_event:,
+          target_stream:,
+          target_event_type:,
+          target_step_name:
+        )
+      end
+
+      private
+
+      def resolve(migration_id:, referenced_event:, target_stream:, target_event_type:, target_step_name:)
         process_step = @process_step_planner.call(
           source_event: referenced_event,
           process_name: "history-migration-#{migration_id}",
@@ -59,7 +94,7 @@ module Coordinator::Write
           migration_id:,
           source_event: referenced_event,
           transformation_step: target_step_name,
-          target_stream: allocation.value!.target_stream,
+          target_stream:,
           target_event_id: process_step.target_entity_id!,
           target_event_type:
         )
@@ -67,8 +102,6 @@ module Coordinator::Write
 
         Success(target_plan.value!.target_event)
       end
-
-      private
 
       def locate(reference)
         @event_store.read_at(

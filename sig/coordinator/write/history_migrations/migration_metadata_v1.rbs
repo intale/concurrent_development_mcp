@@ -19,6 +19,7 @@ module Coordinator
         def analyzer: () -> Candidates::ImpactAnalyzerV1?
         def surface_digest: () -> String?
         def marker_codec_version: () -> String?
+        def index_policy_version: () -> String?
       end
     end
   end
