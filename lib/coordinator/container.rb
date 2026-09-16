@@ -298,6 +298,29 @@ module Coordinator
       )
     end
 
+    register("history_migrations.guidance_message_identity_resolver", memoize: true) do
+      Write::HistoryMigrations::GuidanceMessageIdentityResolver.new(
+        event_store: self["event_store"]
+      )
+    end
+
+    register("history_migrations.interpretation_context_resolver", memoize: true) do
+      Write::HistoryMigrations::InterpretationContextResolver.new(
+        event_store: self["event_store"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        guidance_message_identity_resolver:
+          self["history_migrations.guidance_message_identity_resolver"],
+        marked_event_locator: self["history_migrations.legacy_marked_event_locator"]
+      )
+    end
+
+    register("history_migrations.interpretation_lifecycle_v1_transformer", memoize: true) do
+      Write::HistoryMigrations::InterpretationLifecycleV1Transformer.new(
+        context_resolver: self["history_migrations.interpretation_context_resolver"],
+        document_transformer: self["history_migrations.decision_document_transformer"]
+      )
+    end
+
     register("history_migrations.decision_head_reference_resolver", memoize: true) do
       Write::HistoryMigrations::DecisionHeadReferenceResolver.new(
         target_event_reference_resolver:
@@ -309,7 +332,8 @@ module Coordinator
       Write::HistoryMigrations::DecisionLifecycleV1Transformer.new(
         event_store: self["event_store"],
         stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
-        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"],
+        interpretation_context_resolver:
+          self["history_migrations.interpretation_context_resolver"],
         target_event_reference_resolver:
           self["history_migrations.legacy_target_event_reference_resolver"],
         document_transformer: self["history_migrations.decision_document_transformer"]
@@ -388,6 +412,8 @@ module Coordinator
         candidate_head_v1: self["history_migrations.candidate_head_v1_transformer"],
         candidate_impact_v1: self["history_migrations.candidate_impact_v1_transformer"],
         candidate_impact_scan_v1: self["history_migrations.candidate_impact_scan_v1_transformer"],
+        interpretation_lifecycle_v1:
+          self["history_migrations.interpretation_lifecycle_v1_transformer"],
         decision_lifecycle_v1: self["history_migrations.decision_lifecycle_v1_transformer"],
         decision_relation_v1: self["history_migrations.decision_relation_v1_transformer"],
         coordination_task_submitted_v2:

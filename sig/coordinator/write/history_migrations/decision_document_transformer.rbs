@@ -5,7 +5,12 @@ module Coordinator
         SCOPE_TARGETS: Hash[Symbol, [String, String, String]]
         STREAM_TARGETS: Hash[[String, String], String]
 
-        def initialize: (entity_reference_resolver: LegacyEntityReferenceResolver) -> void
+        def initialize: (
+          entity_reference_resolver: LegacyEntityReferenceResolver,
+          ?canonical_json: CanonicalJson,
+          ?marker_component_builder: Shared::CanonicalMarkerComponentBuilder,
+          ?compound_marker_builder: Shared::CompoundMarkerBuilder
+        ) -> void
 
         def proposed_decision: (
           migration_id: String,
@@ -29,6 +34,15 @@ module Coordinator
           source_upper_position: Integer,
           source_event: PgEventstore::Event,
           document: Decisions::DecisionSlotDocumentV1
+        ) -> Dry::Monads::Result
+
+        def interpretation_slot: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          slot: Interpretations::InterpretationSlotV1,
+          source_message_id: String
         ) -> Dry::Monads::Result
       end
     end

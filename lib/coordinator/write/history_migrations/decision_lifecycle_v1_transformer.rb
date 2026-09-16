@@ -8,7 +8,7 @@ module Coordinator::Write
       def initialize(
         event_store:,
         stream_identity_allocator:,
-        entity_reference_resolver:,
+        interpretation_context_resolver:,
         target_event_reference_resolver:,
         document_transformer:,
         schema_registry: LegacyEventSchemaRegistry.new,
@@ -16,7 +16,7 @@ module Coordinator::Write
       )
         @event_store = event_store
         @stream_identity_allocator = stream_identity_allocator
-        @entity_reference_resolver = entity_reference_resolver
+        @interpretation_context_resolver = interpretation_context_resolver
         @target_event_reference_resolver = target_event_reference_resolver
         @document_transformer = document_transformer
         @schema_registry = schema_registry
@@ -24,18 +24,27 @@ module Coordinator::Write
       end
 
       def call(migration_id:, source_config_name:, source_upper_position:, source_event:, source_payload:)
-        context = resolve_context(
+        decision = resolve_decision(
           migration_id:,
           source_config_name:,
-          source_upper_position:,
           source_event:,
           source_payload:
         )
-        return context if context.failure?
+        return decision if decision.failure?
 
-        target_stream, decision_id, interpretation_id = context.value!
+        target_stream = decision.value!.target_stream
+        decision_id = target_stream.stream_id
         case source_payload
         when Events::DecisionRecordedV1
+          interpretation = resolve_interpretation(
+            migration_id:,
+            source_config_name:,
+            source_upper_position:,
+            source_event:,
+            source: source_payload
+          )
+          return interpretation if interpretation.failure?
+
           transform_recorded(
             migration_id:,
             source_config_name:,
@@ -44,20 +53,43 @@ module Coordinator::Write
             source: source_payload,
             target_stream:,
             decision_id:,
-            interpretation_id:
+            interpretation_id: interpretation.value!.interpretation_id,
+            source_message_id: interpretation.value!.source_message_id
           )
         when LegacyEvents::DecisionActivatedV1
+          recorded = load_recorded(source_event:, source_upper_position:, source: source_payload)
+          return recorded if recorded.failure?
+
+          interpretation = resolve_interpretation(
+            migration_id:,
+            source_config_name:,
+            source_upper_position:,
+            source_event:,
+            source: recorded.value!
+          )
+          return interpretation if interpretation.failure?
+
           transform_activated(
             migration_id:,
             source_config_name:,
             source_upper_position:,
             source_event:,
             source: source_payload,
+            recorded: recorded.value!,
             target_stream:,
             decision_id:,
-            interpretation_id:
+            interpretation_id: interpretation.value!.interpretation_id
           )
         when LegacyEvents::DecisionDefinitionCorrectedV1
+          interpretation = resolve_interpretation(
+            migration_id:,
+            source_config_name:,
+            source_upper_position:,
+            source_event:,
+            source: source_payload
+          )
+          return interpretation if interpretation.failure?
+
           transform_corrected(
             migration_id:,
             source_config_name:,
@@ -66,7 +98,8 @@ module Coordinator::Write
             source: source_payload,
             target_stream:,
             decision_id:,
-            interpretation_id:
+            interpretation_id: interpretation.value!.interpretation_id,
+            source_message_id: interpretation.value!.source_message_id
           )
         end
       rescue KeyError, ArgumentError, TypeError, Dry::Struct::Error => error
@@ -75,10 +108,9 @@ module Coordinator::Write
 
       private
 
-      def resolve_context(
+      def resolve_decision(
         migration_id:,
         source_config_name:,
-        source_upper_position:,
         source_event:,
         source_payload:
       )
@@ -86,7 +118,7 @@ module Coordinator::Write
           return Failure(inconsistent(source_event, "decision identity does not match its stream"))
         end
 
-        decision = @stream_identity_allocator.call(
+        @stream_identity_allocator.call(
           migration_id:,
           source_config_name:,
           source_event:,
@@ -94,30 +126,36 @@ module Coordinator::Write
           target_stream_name: "Decision",
           identity_role: "decision"
         )
-        return decision if decision.failure?
+      end
 
-        interpretation = @entity_reference_resolver.call(
+      def resolve_interpretation(
+        migration_id:,
+        source_config_name:,
+        source_upper_position:,
+        source_event:,
+        source:
+      )
+        context = @interpretation_context_resolver.from_reference(
           migration_id:,
           source_config_name:,
           source_upper_position:,
           source_event:,
-          source_stream: StreamReference.new(
-            context: "HumanGuidance",
-            stream_name: "Interpretation",
-            stream_id: source_payload.interpretation_id
-          ),
-          target_stream_context: "HumanGuidance",
-          target_stream_name: "Interpretation",
-          identity_role: "interpretation"
+          source_reference: source.proposal_event,
+          interpretation_id: source.interpretation_id,
+          source_message_id: source.source_message_id
         )
-        return interpretation if interpretation.failure?
+        return context if context.failure?
 
-        target_stream = decision.value!.target_stream
-        Success([
-          target_stream,
-          target_stream.stream_id,
-          interpretation.value!.target_stream.stream_id
-        ])
+        unless source.source_event == context.value!.source_proposal.source_event
+          return Failure(inconsistent(source_event, "Decision source message differs from its proposal"))
+        end
+
+        @interpretation_context_resolver.validate_acceptance(
+          source_event:,
+          source_upper_position:,
+          context: context.value!,
+          source_reference: source.acceptance_event
+        )
       end
 
       def transform_recorded(
@@ -128,7 +166,8 @@ module Coordinator::Write
         source:,
         target_stream:,
         decision_id:,
-        interpretation_id:
+        interpretation_id:,
+        source_message_id:
       )
         definition = transformed_definition(
           migration_id:,
@@ -146,14 +185,19 @@ module Coordinator::Write
           interpretation_role: "activation",
           document:
         )
-        metadata = definition_metadata(source_event, source:, document:)
+        metadata = definition_metadata(
+          source_event,
+          source:,
+          document:,
+          source_message_id:
+        )
         Success([
           fact(
             target_stream:,
             event: Events::DecisionRecordedV2.new(
               decision_id:,
               interpretation_id:,
-              source_message_id: source.source_message_id,
+              source_message_id:,
               definition: document
             ),
             markers:,
@@ -179,13 +223,11 @@ module Coordinator::Write
         source_upper_position:,
         source_event:,
         source:,
+        recorded:,
         target_stream:,
         decision_id:,
         interpretation_id:
       )
-        recorded = load_recorded(source_event:, source_upper_position:, source:)
-        return recorded if recorded.failure?
-
         target_record = @target_event_reference_resolver.call_in_stream(
           migration_id:,
           source_upper_position:,
@@ -202,7 +244,7 @@ module Coordinator::Write
           source_config_name:,
           source_upper_position:,
           source_event:,
-          source_definition: recorded.value!.definition
+          source_definition: recorded.definition
         )
         return definition if definition.failure?
 
@@ -238,7 +280,8 @@ module Coordinator::Write
         source:,
         target_stream:,
         decision_id:,
-        interpretation_id:
+        interpretation_id:,
+        source_message_id:
       )
         definition = transformed_definition(
           migration_id:,
@@ -256,7 +299,7 @@ module Coordinator::Write
             event: Events::DecisionDefinitionCorrectedV2.new(
               decision_id:,
               interpretation_id:,
-              source_message_id: source.source_message_id,
+              source_message_id:,
               definition: document,
               rationale: source.rationale.summary
             ),
@@ -267,7 +310,12 @@ module Coordinator::Write
               document:
             ),
             step_name: "correct-decision-definition",
-            metadata_extension: definition_metadata(source_event, source:, document:)
+            metadata_extension: definition_metadata(
+              source_event,
+              source:,
+              document:,
+              source_message_id:
+            )
           )
         ])
       end
@@ -301,7 +349,9 @@ module Coordinator::Write
           schema_version: persisted.metadata.fetch("schema_version"),
           data: persisted.data
         )
-        unless payload.is_a?(Events::DecisionRecordedV1) && payload.decision_id == source.decision_id
+        unless payload.is_a?(Events::DecisionRecordedV1) &&
+            payload.decision_id == source.decision_id &&
+            payload.interpretation_id == source.interpretation_id
           return Failure(inconsistent(source_event, "recorded Decision reference is inconsistent"))
         end
 
@@ -335,12 +385,14 @@ module Coordinator::Write
         )
       end
 
-      def definition_metadata(source_event, source:, document:)
+      def definition_metadata(source_event, source:, document:, source_message_id:)
         MigrationMetadataExtensionV1.new(
           attributed_actor: actor_from(source_event),
           policy_version: source_event.metadata["policy_version"],
           classifier: source.classifier,
-          scope_provenance: source.scope_provenance,
+          scope_provenance: Interpretations::DecisionScopeProvenanceV1.new(
+            source.scope_provenance.to_h.merge(source_message_id:)
+          ),
           definition_digest: @canonical_json.sha256(document.to_h)
         )
       end

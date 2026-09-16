@@ -23,8 +23,16 @@ module Coordinator::Write
         [ "HumanGuidance", "Decision" ] => "decision"
       }.freeze
 
-      def initialize(entity_reference_resolver:)
+      def initialize(
+        entity_reference_resolver:,
+        canonical_json: CanonicalJson.new,
+        marker_component_builder: Coordinator::Shared::CanonicalMarkerComponentBuilder.new,
+        compound_marker_builder: CompoundMarkerBuilder.new
+      )
         @entity_reference_resolver = entity_reference_resolver
+        @canonical_json = canonical_json
+        @marker_component_builder = marker_component_builder
+        @compound_marker_builder = compound_marker_builder
       end
 
       def proposed_decision(
@@ -97,6 +105,48 @@ module Coordinator::Write
         return scope if scope.failure?
 
         Success(Decisions::DecisionSlotDocumentV1.new(document.to_h.merge(exact_scope: scope.value!)))
+      end
+
+      def interpretation_slot(
+        migration_id:,
+        source_config_name:,
+        source_upper_position:,
+        source_event:,
+        slot:,
+        source_message_id:
+      )
+        scope = transform_scope(
+          migration_id:,
+          source_config_name:,
+          source_upper_position:,
+          source_event:,
+          scope: slot.document.exact_scope
+        )
+        return scope if scope.failure?
+
+        target_scope = scope.value!
+        document = Interpretations::InterpretationSlotDocumentV1.new(
+          slot.document.to_h.merge(source_message_id:, exact_scope: target_scope)
+        )
+        marker = @compound_marker_builder.call(
+          CompoundMarkerDefinitionV1.new(
+            purpose: "interpretation-slot",
+            components: [
+              "message:#{source_message_id}",
+              "topic:#{document.topic_id}",
+              "conflict-dimension:#{document.conflict_dimension}",
+              "resolution-strategy:#{document.resolution_strategy}"
+            ] + @marker_component_builder.call(dimension: "scope", value: target_scope.to_h)
+          )
+        )
+
+        Success(
+          Interpretations::InterpretationSlotV1.new(
+            document:,
+            scope_digest: @canonical_json.sha256(target_scope.to_h),
+            compound_marker: marker
+          )
+        )
       end
 
       private

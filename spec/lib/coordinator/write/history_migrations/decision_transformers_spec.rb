@@ -51,9 +51,10 @@ RSpec.describe "history migration Decision transformers", :event_store do
     expect(recorded.event.definition.validity.until_event.stream_id).to match(
       Coordinator::Shared::Types::UUID_V7_PATTERN
     )
+    expect(recorded.event.source_message_id).to eq(history.fetch(:first_guidance).id)
     expect(recorded.metadata_extension).to have_attributes(
       classifier: classifier,
-      scope_provenance: scope_provenance("legacy-message-one")
+      scope_provenance: have_attributes(source_message_id: history.fetch(:first_guidance).id)
     )
     expect(recorded.metadata_extension.definition_digest).to eq(
       canonical_json.sha256(recorded.event.definition.to_h)
@@ -69,6 +70,7 @@ RSpec.describe "history migration Decision transformers", :event_store do
       canonical_json.sha256(recorded.event.definition.to_h)
     )
     expect(corrected_fact.event).to be_a(Coordinator::Write::Events::DecisionDefinitionCorrectedV2)
+    expect(corrected_fact.event.source_message_id).to eq(history.fetch(:second_guidance).id)
     expect(corrected_fact.event.definition.relations.corrects).to eq([ recorded.event.decision_id ])
     expect(corrected_fact.event.to_h.keys).to contain_exactly(
       :decision_id, :interpretation_id, :source_message_id, :definition, :rationale
@@ -143,21 +145,23 @@ RSpec.describe "history migration Decision transformers", :event_store do
   def persist_history
     persist_scope_roots
     first_guidance = persist_guidance("legacy-conversation-one", "legacy-message-one")
-    first_proposal, first_acceptance = persist_interpretation(first_interpretation_id)
-    second_guidance = persist_guidance("legacy-conversation-two", "legacy-message-two")
-    second_proposal, second_acceptance = persist_interpretation(second_interpretation_id)
-
-    initial_definition = definition(
-      interpretation_id: first_interpretation_id,
+    first_proposal, first_acceptance, first_proposal_payload = persist_interpretation(
+      first_interpretation_id,
+      guidance: first_guidance,
       source_message_id: "legacy-message-one",
       name: "rspec"
     )
-    corrected_definition = definition(
-      interpretation_id: second_interpretation_id,
+    second_guidance = persist_guidance("legacy-conversation-two", "legacy-message-two")
+    second_proposal, second_acceptance, second_proposal_payload = persist_interpretation(
+      second_interpretation_id,
+      guidance: second_guidance,
       source_message_id: "legacy-message-two",
       name: "minitest",
       corrects: [ legacy_decision_id ]
     )
+
+    initial_definition = definition(first_proposal_payload)
+    corrected_definition = definition(second_proposal_payload)
     slot = legacy_slot(initial_definition)
     partition = Coordinator::Write::Decisions::DecisionPartitionBuilder.new.call(initial_definition).sole
 
@@ -263,12 +267,13 @@ RSpec.describe "history migration Decision transformers", :event_store do
     )
 
     {
+      first_guidance:, second_guidance:,
       recorded:, activated:, slot_opened:, slot_activated:, partition_activated:,
       corrected:, slot_corrected:, partition_corrected:
     }
   end
 
-  def definition(interpretation_id:, source_message_id:, name:, corrects: [])
+  def proposal_payload(interpretation_id:, source_message_id:, guidance:, name:, corrects: [])
     input = InterpretationInput.build(
       interpretation_id:,
       source_message_id:,
@@ -292,7 +297,7 @@ RSpec.describe "history migration Decision transformers", :event_store do
     proposal = Coordinator::Write::Events::DecisionInterpretationProposedV1.new(
       interpretation_id:,
       source_message_id:,
-      source_event: reference("UserUtteranceRecorded", "Conversation", "legacy-conversation", 0),
+      source_event: event_reference(guidance),
       source_span: input.fetch(:source_span),
       classifier: input.fetch(:classifier),
       proposed_decision: input.fetch(:proposed_decision),
@@ -301,6 +306,10 @@ RSpec.describe "history migration Decision transformers", :event_store do
       assessment: { status: "accepted_for_activation", reasons: [], questions: [] },
       proposed_at: "2026-08-01T09:59:00.000000Z"
     )
+    proposal
+  end
+
+  def definition(proposal)
     Coordinator::Write::Decisions::DecisionDefinitionBuilder.new.call(
       proposal:,
       valid_from_default: "2026-08-01T10:00:00.000000Z"
@@ -322,18 +331,57 @@ RSpec.describe "history migration Decision transformers", :event_store do
   end
 
   def persist_guidance(conversation_id, message_id)
-    persist_raw(
+    payload = Coordinator::Write::Events::UserUtteranceRecordedV1.new(
+      message_id:,
+      conversation_id:,
+      text: "Use the selected testing framework.",
+      source: "mcp_client",
+      anchors: {
+        repository_ids: [ legacy_repository_id ],
+        change_set_id: nil,
+        work_item_id: legacy_work_item_id,
+        attempt_id: nil
+      },
+      recorded_at: "2026-08-01T09:58:00.000000Z"
+    )
+    persist_payload(
       stream("HumanGuidance", "Conversation", conversation_id),
-      "UserUtteranceRecorded",
-      data: { "message_id" => message_id }
+      payload,
+      markers: [ "message:#{message_id}", "conversation:#{conversation_id}" ]
     )
   end
 
-  def persist_interpretation(interpretation_id)
-    target = stream("HumanGuidance", "Interpretation", interpretation_id)
-    proposal = persist_raw(target, "DecisionInterpretationProposed")
-    acceptance = persist_raw(target, "DecisionInterpretationAccepted", caused_by: proposal)
-    [ proposal, acceptance ]
+  def persist_interpretation(interpretation_id, guidance:, source_message_id:, name:, corrects: [])
+    target = stream("HumanGuidance", "Interpretation", source_message_id)
+    payload = proposal_payload(
+      interpretation_id:,
+      source_message_id:,
+      guidance:,
+      name:,
+      corrects:
+    )
+    proposal = persist_payload(
+      target,
+      payload,
+      markers: [ "message:#{source_message_id}", "interpretation:#{interpretation_id}" ]
+    )
+    acceptance = persist_payload(
+      target,
+      Coordinator::Write::Events::DecisionInterpretationAcceptedV1.new(
+        interpretation_id:,
+        source_message_id:,
+        proposal_event: event_reference(proposal),
+        slot: Coordinator::Write::Interpretations::InterpretationSlotBuilder.new.call(payload),
+        rationale: {
+          code: "user_confirmed",
+          summary: "The proposed reading matches the intended guidance."
+        },
+        accepted_at: "2026-08-01T09:59:30.000000Z"
+      ),
+      markers: [ "message:#{source_message_id}", "interpretation-lifecycle:#{interpretation_id}" ],
+      caused_by: proposal
+    )
+    [ proposal, acceptance, payload ]
   end
 
   def persist_partition(target_stream, partition:, head:, active_decisions:, change_kind:, caused_by:)
@@ -359,17 +407,18 @@ RSpec.describe "history migration Decision transformers", :event_store do
     latest ? latest.stream_revision + 1 : 0
   end
 
-  def persist_payload(target_stream, payload, caused_by: nil)
+  def persist_payload(target_stream, payload, markers: [], caused_by: nil)
     persist_raw(
       target_stream,
       payload.class.event_type,
       data: payload.to_h,
       schema_version: payload.class.schema_version,
+      markers:,
       caused_by:
     )
   end
 
-  def persist_raw(target_stream, type, data: {}, schema_version: 1, caused_by: nil)
+  def persist_raw(target_stream, type, data: {}, schema_version: 1, markers: [], caused_by: nil)
     source_store.append(
       target_stream,
       [
@@ -385,6 +434,7 @@ RSpec.describe "history migration Decision transformers", :event_store do
             "recorded_by" => "coordinator",
             "policy_version" => "decision-governance/v1"
           },
+          markers:,
           caused_by:,
           correlation_id:
         )
@@ -446,17 +496,6 @@ RSpec.describe "history migration Decision transformers", :event_store do
       stream_name: event.stream.stream_name,
       stream_id: event.stream.stream_id,
       stream_revision: event.stream_revision
-    )
-  end
-
-  def reference(type, stream_name, stream_id, stream_revision)
-    Coordinator::Write::EventReference.new(
-      event_id: SecureRandom.uuid_v7,
-      type:,
-      stream_context: "HumanGuidance",
-      stream_name:,
-      stream_id:,
-      stream_revision:
     )
   end
 

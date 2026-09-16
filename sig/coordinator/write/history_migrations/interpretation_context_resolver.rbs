@@ -1,0 +1,49 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class InterpretationContextResolver
+        def initialize: (
+          event_store: EventStore,
+          stream_identity_allocator: StreamIdentityAllocator,
+          guidance_message_identity_resolver: GuidanceMessageIdentityResolver,
+          marked_event_locator: LegacyMarkedEventLocator,
+          ?schema_registry: LegacyEventSchemaRegistry
+        ) -> void
+
+        def from_proposal: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          source_proposal: Events::DecisionInterpretationProposedV1
+        ) -> Dry::Monads::Result
+
+        def from_reference: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          source_reference: EventReference,
+          interpretation_id: String,
+          source_message_id: String
+        ) -> Dry::Monads::Result
+
+        def from_identity: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          interpretation_id: String,
+          source_message_id: String
+        ) -> Dry::Monads::Result
+
+        def validate_acceptance: (
+          source_event: PgEventstore::Event,
+          source_upper_position: Integer,
+          context: InterpretationContextV1,
+          source_reference: EventReference
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

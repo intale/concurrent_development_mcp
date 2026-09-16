@@ -14,6 +14,7 @@ module Coordinator
           candidate_head_v1: CandidateHeadV1Transformer,
           candidate_impact_v1: CandidateImpactV1Transformer,
           candidate_impact_scan_v1: CandidateImpactScanV1Transformer,
+          interpretation_lifecycle_v1: InterpretationLifecycleV1Transformer,
           decision_lifecycle_v1: DecisionLifecycleV1Transformer,
           decision_relation_v1: DecisionRelationV1Transformer,
           coordination_task_submitted_v2: CoordinationTaskSubmittedV2Transformer,
