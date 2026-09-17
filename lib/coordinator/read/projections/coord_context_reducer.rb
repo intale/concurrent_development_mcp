@@ -242,7 +242,7 @@ module Coordinator::Read
           abandoned_at: nil
         )
 
-        replace(state, attempts: bounded_attempts(upsert(state.attempts, :attempt_id, attempt)))
+        replace_with_attempts(state, bounded_attempts(upsert(state.attempts, :attempt_id, attempt)))
       end
 
       def apply_attempt_definition(state, event)
@@ -264,7 +264,7 @@ module Coordinator::Read
           abandoned_at: nil
         )
 
-        replace(state, attempts: bounded_attempts(upsert(state.attempts, :attempt_id, attempt)))
+        replace_with_attempts(state, bounded_attempts(upsert(state.attempts, :attempt_id, attempt)))
       end
 
       def apply_attempt_started(state, event)
@@ -488,10 +488,9 @@ module Coordinator::Read
 
         replace(
           state,
-          candidate_checkpoints: upsert(
-            state.candidate_checkpoints,
-            :attempt_id,
-            checkpoint
+          candidate_checkpoints: retained_candidate_checkpoints(
+            upsert(state.candidate_checkpoints, :attempt_id, checkpoint),
+            attempts: state.attempts
           )
         )
       end
@@ -632,6 +631,22 @@ module Coordinator::Read
 
       def replace(state, **changes)
         CoordContextStateV1.new(state.attributes.merge(changes))
+      end
+
+      def replace_with_attempts(state, attempts)
+        replace(
+          state,
+          attempts:,
+          candidate_checkpoints: retained_candidate_checkpoints(
+            state.candidate_checkpoints,
+            attempts:
+          )
+        )
+      end
+
+      def retained_candidate_checkpoints(checkpoints, attempts:)
+        retained_attempt_ids = attempts.to_set(&:attempt_id)
+        checkpoints.select { retained_attempt_ids.include?(_1.attempt_id) }
       end
 
       def projected_work_intention(reference)

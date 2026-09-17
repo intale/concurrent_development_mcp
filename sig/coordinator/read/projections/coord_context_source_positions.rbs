@@ -1,0 +1,14 @@
+module Coordinator
+  module Read
+    module Projections
+      class CoordContextSourcePositions
+        MAXIMUM_COUNT: Integer
+
+        def call: (
+          positions: Array[ProjectionBarrier | Hash[String, untyped] | Hash[Symbol, untyped]],
+          state: CoordContextStateV1
+        ) -> Array[ProjectionBarrier]
+      end
+    end
+  end
+end

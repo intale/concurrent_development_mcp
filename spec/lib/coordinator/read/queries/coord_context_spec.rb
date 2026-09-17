@@ -29,6 +29,36 @@ RSpec.describe Coordinator::Read::Queries::CoordContext, :read_model do
     expect(unchanged.context_token).to eq(current.context_token)
   end
 
+  it "ignores source barriers for history evicted from the bounded embedded context" do
+    stale_positions = Array.new(300) do |index|
+      {
+        "stream_context" => "DevelopmentExecution",
+        "stream_name" => "Attempt",
+        "stream_id" => "A-stale-#{index}",
+        "stream_revision" => 3
+      }
+    end
+    context = build(
+      :coordinator_read_coord_context,
+      change_set_id: "CS-bounded",
+      work_item_id: "W-bounded",
+      attempt_id: "A-current"
+    )
+    context.source_positions += stale_positions
+    context.save!
+    create(
+      :coordinator_read_coord_context_scope,
+      change_set_id: "CS-bounded",
+      scope_kind: "change_set",
+      scope_id: "CS-bounded"
+    )
+
+    result = query.call(change_set_id: "CS-bounded").value!
+
+    expect(result.status).to eq("ok")
+    expect(result.context_token).to match(/\Asha256:[0-9a-f]{64}\z/)
+  end
+
   it "resolves exact ChangeSet and Attempt projection scopes" do
     create(
       :coordinator_read_coord_context,

@@ -3,7 +3,11 @@
 module Coordinator::Read
   module Projections
     class CoordContextStateV1 < Value
+      WORK_ITEM_LIMIT = 100
       RECENT_ATTEMPT_LIMIT = 100
+      DEPENDENCY_LIMIT = 500
+      CANDIDATE_CHECKPOINT_LIMIT = 100
+      WORK_INTENTION_LIMIT = 32
 
       class ChangeSet < Value
         attribute :change_set_id, Types::Identifier
@@ -65,7 +69,8 @@ module Coordinator::Read
         attribute :intention_set_id, Types::UuidV7
         attribute :repository_id, Types::RepositoryId
         attribute :policy_version, Types::String
-        attribute :intentions, Types::Array.of(Intention).constrained(min_size: 1, max_size: 32)
+        attribute :intentions,
+                  Types::Array.of(Intention).constrained(min_size: 1, max_size: WORK_INTENTION_LIMIT)
         attribute :declared_at, Types::Timestamp
         attribute :last_expanded_at, Types::Timestamp.optional
         attribute :last_renewed_at, Types::Timestamp.optional
@@ -111,11 +116,11 @@ module Coordinator::Read
       attribute :schema, Types::String.enum("coord-context/v1")
       attribute :change_set, ChangeSet.optional
       attribute :work_item_ids, Types::WorkItemIds
-      attribute :work_items, Types::Array.of(WorkItem).constrained(max_size: 100)
-      attribute :dependencies, Types::Array.of(Dependency).constrained(max_size: 500)
+      attribute :work_items, Types::Array.of(WorkItem).constrained(max_size: WORK_ITEM_LIMIT)
+      attribute :dependencies, Types::Array.of(Dependency).constrained(max_size: DEPENDENCY_LIMIT)
       attribute :attempts, Types::Array.of(Attempt).constrained(max_size: RECENT_ATTEMPT_LIMIT)
       attribute :candidate_checkpoints,
-                Types::Array.of(CandidateCheckpoint).constrained(max_size: 100)
+                Types::Array.of(CandidateCheckpoint).constrained(max_size: CANDIDATE_CHECKPOINT_LIMIT)
 
       def self.initial
         new(

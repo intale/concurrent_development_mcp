@@ -4,6 +4,7 @@ module Coordinator
       class CoordContexts
         def initialize: (
           ?state_loader: Projections::CoordContextStateLoader,
+          ?source_positions: Projections::CoordContextSourcePositions,
           ?projection_timestamp: ProjectionTimestamp
         ) -> void
         def fetch: (String change_set_id) -> CoordContextSnapshot?

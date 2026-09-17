@@ -11,6 +11,7 @@ module Coordinator::Read
         schema_registry: Coordinator::Write::EventSchemaRegistry.new,
         reducer: Projections::CoordContextReducer.new,
         state_loader: Projections::CoordContextStateLoader.new,
+        source_positions: Projections::CoordContextSourcePositions.new,
         scope_roots_builder: ProjectionScopeRootsBuilder.new,
         contexts: Repositories::CoordContexts.new,
         processed_events: Repositories::ProcessedProjectionEvents.new,
@@ -21,6 +22,7 @@ module Coordinator::Read
         @schema_registry = schema_registry
         @reducer = reducer
         @state_loader = state_loader
+        @source_positions = source_positions
         @scope_roots_builder = scope_roots_builder
         @contexts = contexts
         @processed_events = processed_events
@@ -48,12 +50,13 @@ module Coordinator::Read
           record = locked_record(source.change_set_id, processed_at:)
           rebuild = record.persisted? && record.projection_version != PROJECTION.version
           state = rebuild ? Projections::CoordContextStateV1.initial : load_state(record)
-          positions = rebuild ? [ identity.barrier ] : update_source_positions(record, identity.barrier)
           updated = @reducer.apply(
             state,
             source,
             occurred_at: event.created_at.utc.iso8601(6)
           )
+          positions = rebuild ? [ identity.barrier ] : update_source_positions(record, identity.barrier)
+          positions = @source_positions.call(positions:, state: updated)
 
           projection_time = @projection_timestamp.call(current: record.updated_at, event:)
           record.assign_attributes(

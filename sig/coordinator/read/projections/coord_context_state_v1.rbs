@@ -2,7 +2,11 @@ module Coordinator
   module Read
     module Projections
       class CoordContextStateV1 < Shared::Value
+        WORK_ITEM_LIMIT: Integer
         RECENT_ATTEMPT_LIMIT: Integer
+        DEPENDENCY_LIMIT: Integer
+        CANDIDATE_CHECKPOINT_LIMIT: Integer
+        WORK_INTENTION_LIMIT: Integer
         class ChangeSet < Shared::Value
           def change_set_id: () -> String
           def goal: () -> String

@@ -22,6 +22,9 @@ module Coordinator::Read
     attribute :schema, Types::String.enum("context-token/v2")
     attribute :scope, Scope
     attribute :source_positions,
-              Types::Array.of(ProjectionBarrier).constrained(min_size: 1, max_size: 256)
+              Types::Array.of(ProjectionBarrier).constrained(
+                min_size: 1,
+                max_size: Projections::CoordContextSourcePositions::MAXIMUM_COUNT
+              )
   end
 end

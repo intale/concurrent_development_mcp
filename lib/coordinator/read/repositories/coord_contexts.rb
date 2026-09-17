@@ -5,9 +5,11 @@ module Coordinator::Read
     class CoordContexts
       def initialize(
         state_loader: Projections::CoordContextStateLoader.new,
+        source_positions: Projections::CoordContextSourcePositions.new,
         projection_timestamp: ProjectionTimestamp.new
       )
         @state_loader = state_loader
+        @source_positions = source_positions
         @projection_timestamp = projection_timestamp
       end
 
@@ -395,11 +397,10 @@ module Coordinator::Read
       def build_snapshot(record)
         return unless record
 
+        state = @state_loader.call(record.document)
         CoordContextSnapshot.new(
-          state: @state_loader.call(record.document),
-          source_positions: record.source_positions.map do |position|
-            ProjectionBarrier.new(deep_symbolize(position))
-          end,
+          state:,
+          source_positions: @source_positions.call(positions: record.source_positions, state:),
           last_processed_at: record.last_processed_at.utc.iso8601(6)
         )
       end
