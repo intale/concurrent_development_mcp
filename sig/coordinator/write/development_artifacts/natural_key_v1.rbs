@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module DevelopmentArtifacts
+      class NaturalKeyV1 < Shared::Value
+        def scope: () -> String
+        def source: () -> SourceV1
+      end
+    end
+  end
+end

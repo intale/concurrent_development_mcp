@@ -5,6 +5,9 @@ module Coordinator::Write
     class SourceEventSchemaRegistry
       POST_REMODEL_DEFINITIONS = EventSchemaRegistry::DEFAULT_DEFINITIONS.slice(
         *PostRemodelContractCatalog::SOURCE_CONTRACTS
+      ).merge(
+        [ "CandidateHeadRegistered", 2 ] => PostRemodelEvents::CandidateHeadRegisteredV2,
+        [ "CoordinationTaskSubmitted", 3 ] => PostRemodelEvents::CoordinationTaskSubmittedV3
       ).freeze
       DEFINITIONS = LegacyEventSchemaRegistry::DEFINITIONS.merge(POST_REMODEL_DEFINITIONS).freeze
 

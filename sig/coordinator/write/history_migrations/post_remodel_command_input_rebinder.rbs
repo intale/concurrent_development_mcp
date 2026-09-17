@@ -1,0 +1,32 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class PostRemodelCommandInputRebinder
+        TARGETS: Hash[Symbol, Array[String]]
+        RELATION_TARGETS: Hash[String, Symbol]
+
+        class ResolutionFailure < StandardError
+          def initialize: (TransformationErrorV1 failure) -> void
+          def failure: () -> TransformationErrorV1
+        end
+
+        def initialize: (
+          entity_reference_resolver: LegacyEntityReferenceResolver,
+          legacy_work_intention_context_resolver: LegacyWorkIntentionInputContextResolver,
+          guidance_identity_resolver: PostRemodelGuidanceIdentityResolver,
+          ?target_command_builder: Tasks::TargetCommandBuilder,
+          ?input_digest: CommandInputDigest
+        ) -> void
+
+        def call: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          document: PostRemodelCommandInputDocuments::value,
+          command_id: String
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

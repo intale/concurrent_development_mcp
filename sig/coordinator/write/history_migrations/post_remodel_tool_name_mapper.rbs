@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class PostRemodelToolNameMapper
+        RENAMES: Hash[String, String]
+
+        def call: (String tool_name) -> String
+      end
+    end
+  end
+end

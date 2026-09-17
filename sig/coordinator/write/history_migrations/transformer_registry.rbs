@@ -38,7 +38,10 @@ module Coordinator
           verification_obligation_validity_scan_v1: VerificationObligationValidityScanV1Transformer,
           post_remodel_work_item: PostRemodelWorkItemTransformer,
           post_remodel_attempt: PostRemodelAttemptTransformer,
-          post_remodel_candidate: PostRemodelCandidateTransformer
+          post_remodel_candidate: PostRemodelCandidateTransformer,
+          post_remodel_command_task: PostRemodelCommandTaskTransformer,
+          post_remodel_development_memory: PostRemodelDevelopmentMemoryTransformer,
+          post_remodel_work_intention: PostRemodelWorkIntentionTransformer
         ) -> void
 
         def call: (

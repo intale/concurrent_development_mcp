@@ -1,0 +1,126 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      module PostRemodelCommandInputDocuments
+        SOURCE_TYPES: Array[Class]
+        type value = CommandInputDocuments::value | LegacyReserveWriteSetV1 | LegacyExpandWriteSetV1 | LegacyRenewLeaseSetV1 | LegacyReleaseLeaseSetV1 | LegacySubmitCandidateV1
+
+        class LegacyResourceLeaseTargetV1 < Shared::Value
+          def resource_id: () -> String
+          def base_blob_oid: () -> String?
+          def mode: () -> String?
+          def purpose: () -> String?
+          def context: () -> String?
+        end
+
+        class LegacyResourceLeaseReferenceV1 < Shared::Value
+          def resource_id: () -> String
+          def lease_id: () -> String
+          def fencing_token: () -> Integer
+        end
+
+        class LegacyReserveWriteSetInputV1 < Shared::Value
+          Resource: singleton(LegacyResourceLeaseTargetV1)
+
+          def actor: () -> CommandInputDocuments::ActorV1
+          def change_set_id: () -> String
+          def work_item_id: () -> String
+          def attempt_id: () -> String
+          def repository_id: () -> String
+          def base_commit_oid: () -> String
+          def resources: () -> Array[LegacyResourceLeaseTargetV1]
+          def lease_duration_seconds: () -> Integer
+        end
+
+        class LegacyReserveWriteSetV1 < CommandInputDocuments::BaseV1
+          def tool_name: () -> String
+          def input: () -> LegacyReserveWriteSetInputV1
+        end
+
+        class LegacyExpandWriteSetInputV1 < Shared::Value
+          Resource: singleton(LegacyResourceLeaseTargetV1)
+
+          def actor: () -> CommandInputDocuments::ActorV1
+          def change_set_id: () -> String
+          def work_item_id: () -> String
+          def attempt_id: () -> String
+          def lease_set_id: () -> String
+          def repository_id: () -> String
+          def base_commit_oid: () -> String
+          def resources: () -> Array[LegacyResourceLeaseTargetV1]
+        end
+
+        class LegacyExpandWriteSetV1 < CommandInputDocuments::BaseV1
+          def tool_name: () -> String
+          def input: () -> LegacyExpandWriteSetInputV1
+        end
+
+        class LegacyRenewLeaseSetInputV1 < Shared::Value
+          Reference: singleton(LegacyResourceLeaseReferenceV1)
+
+          def actor: () -> CommandInputDocuments::ActorV1
+          def change_set_id: () -> String
+          def work_item_id: () -> String
+          def attempt_id: () -> String
+          def lease_set_id: () -> String
+          def leases: () -> Array[LegacyResourceLeaseReferenceV1]
+          def lease_duration_seconds: () -> Integer
+        end
+
+        class LegacyRenewLeaseSetV1 < CommandInputDocuments::BaseV1
+          def tool_name: () -> String
+          def input: () -> LegacyRenewLeaseSetInputV1
+        end
+
+        class LegacyReleaseLeaseSetInputV1 < Shared::Value
+          Reference: singleton(LegacyResourceLeaseReferenceV1)
+
+          def actor: () -> CommandInputDocuments::ActorV1
+          def change_set_id: () -> String
+          def work_item_id: () -> String
+          def attempt_id: () -> String
+          def lease_set_id: () -> String
+          def leases: () -> Array[LegacyResourceLeaseReferenceV1]
+        end
+
+        class LegacyReleaseLeaseSetV1 < CommandInputDocuments::BaseV1
+          def tool_name: () -> String
+          def input: () -> LegacyReleaseLeaseSetInputV1
+        end
+
+        class LegacyCandidateLeaseObservationV1 < Shared::Value
+          def resource_id: () -> String
+          def lease_id: () -> String
+          def fencing_token: () -> Integer
+        end
+
+        class LegacySubmitCandidateInputV1 < Shared::Value
+          Lease: singleton(LegacyCandidateLeaseObservationV1)
+          Resource: singleton(CommandInputDocuments::CandidateActualResourceV2)
+
+          def actor: () -> CommandInputDocuments::ActorV1
+          def candidate_id: () -> String
+          def change_set_id: () -> String
+          def work_item_id: () -> String
+          def attempt_id: () -> String
+          def repository_id: () -> String
+          def target_branch: () -> String
+          def object_format: () -> String
+          def base_commit_oid: () -> String
+          def head_commit_oid: () -> String
+          def checkpoint_kind: () -> String
+          def lease_set_id: () -> String
+          def leases: () -> Array[LegacyCandidateLeaseObservationV1]
+          def change_manifest: () -> CommandInputDocuments::CandidateChangeManifestV1
+          def build_context: () -> CommandInputDocuments::CandidateBuildContextV1?
+          def actual_resources: () -> Array[CommandInputDocuments::CandidateActualResourceV2]
+        end
+
+        class LegacySubmitCandidateV1 < CommandInputDocuments::BaseV1
+          def tool_name: () -> String
+          def input: () -> LegacySubmitCandidateInputV1
+        end
+      end
+    end
+  end
+end

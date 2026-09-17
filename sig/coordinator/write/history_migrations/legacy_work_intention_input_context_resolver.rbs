@@ -1,0 +1,22 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class LegacyWorkIntentionInputContextResolver
+        def initialize: (
+          event_store: EventStore,
+          context_resolver: WorkIntentionContextResolver,
+          ?schema_registry: LegacyEventSchemaRegistry
+        ) -> void
+
+        def call: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          attempt_id: String,
+          lease_set_id: String
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

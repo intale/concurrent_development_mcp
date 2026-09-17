@@ -180,6 +180,13 @@ module Coordinator
       )
     end
 
+    register("history_migrations.migration_source_event_plan_resolver", memoize: true) do
+      Write::HistoryMigrations::MigrationSourceEventPlanResolver.new(
+        event_store: self["event_store"],
+        schema_registry: self["event_schema_registry"]
+      )
+    end
+
     register("history_migrations.repository_registered_v1_transformer", memoize: true) do
       Write::HistoryMigrations::RepositoryRegisteredV1Transformer.new(
         stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
@@ -539,6 +546,64 @@ module Coordinator
       )
     end
 
+    register("history_migrations.legacy_work_intention_input_context_resolver", memoize: true) do
+      Write::HistoryMigrations::LegacyWorkIntentionInputContextResolver.new(
+        event_store: self["event_store"],
+        context_resolver: self["history_migrations.work_intention_context_resolver"]
+      )
+    end
+
+    register("history_migrations.post_remodel_guidance_identity_resolver", memoize: true) do
+      Write::HistoryMigrations::PostRemodelGuidanceIdentityResolver.new(
+        event_store: self["event_store"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"]
+      )
+    end
+
+    register("history_migrations.post_remodel_command_input_rebinder", memoize: true) do
+      Write::HistoryMigrations::PostRemodelCommandInputRebinder.new(
+        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"],
+        legacy_work_intention_context_resolver:
+          self["history_migrations.legacy_work_intention_input_context_resolver"],
+        guidance_identity_resolver:
+          self["history_migrations.post_remodel_guidance_identity_resolver"],
+        target_command_builder: Write::Tasks::TargetCommandBuilder.new,
+        input_digest: self["command_input_digest"]
+      )
+    end
+
+    register("history_migrations.post_remodel_command_task_transformer", memoize: true) do
+      Write::HistoryMigrations::PostRemodelCommandTaskTransformer.new(
+        event_store: self["event_store"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"],
+        source_event_plan_resolver:
+          self["history_migrations.migration_source_event_plan_resolver"],
+        command_input_rebinder:
+          self["history_migrations.post_remodel_command_input_rebinder"]
+      )
+    end
+
+    register("history_migrations.post_remodel_development_memory_transformer", memoize: true) do
+      Write::HistoryMigrations::PostRemodelDevelopmentMemoryTransformer.new(
+        event_store: self["event_store"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"],
+        target_event_reference_resolver:
+          self["history_migrations.legacy_target_event_reference_resolver"],
+        guidance_identity_resolver:
+          self["history_migrations.post_remodel_guidance_identity_resolver"]
+      )
+    end
+
+    register("history_migrations.post_remodel_work_intention_transformer", memoize: true) do
+      Write::HistoryMigrations::PostRemodelWorkIntentionTransformer.new(
+        event_store: self["event_store"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"]
+      )
+    end
+
     register("history_migrations.development_artifact_context_resolver", memoize: true) do
       Write::HistoryMigrations::DevelopmentArtifactContextResolver.new(
         event_store: self["event_store"],
@@ -782,7 +847,13 @@ module Coordinator
         post_remodel_attempt:
           self["history_migrations.post_remodel_attempt_transformer"],
         post_remodel_candidate:
-          self["history_migrations.post_remodel_candidate_transformer"]
+          self["history_migrations.post_remodel_candidate_transformer"],
+        post_remodel_command_task:
+          self["history_migrations.post_remodel_command_task_transformer"],
+        post_remodel_development_memory:
+          self["history_migrations.post_remodel_development_memory_transformer"],
+        post_remodel_work_intention:
+          self["history_migrations.post_remodel_work_intention_transformer"]
       )
     end
 

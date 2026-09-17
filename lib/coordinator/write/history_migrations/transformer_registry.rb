@@ -41,7 +41,10 @@ module Coordinator::Write
         verification_obligation_validity_scan_v1:,
         post_remodel_work_item:,
         post_remodel_attempt:,
-        post_remodel_candidate:
+        post_remodel_candidate:,
+        post_remodel_command_task:,
+        post_remodel_development_memory:,
+        post_remodel_work_intention:
       )
         @schema_registry = schema_registry
         @definitions = {
@@ -178,7 +181,33 @@ module Coordinator::Write
           [ "CandidateHeadRegistered", 2 ] => post_remodel_candidate,
           [ "CandidateSubmitted", 3 ] => post_remodel_candidate,
           [ "CandidateTargetBranchSelected", 1 ] => post_remodel_candidate,
-          [ "CandidateWorkIntentionSetAssigned", 1 ] => post_remodel_candidate
+          [ "CandidateWorkIntentionSetAssigned", 1 ] => post_remodel_candidate,
+          [ "CommandRegistered", 1 ] => post_remodel_command_task,
+          [ "CommandRejected", 1 ] => post_remodel_command_task,
+          [ "CommandRejected", 2 ] => post_remodel_command_task,
+          [ "CommandSucceeded", 1 ] => post_remodel_command_task,
+          [ "CoordinationTaskCompleted", 3 ] => post_remodel_command_task,
+          [ "CoordinationTaskExecutionStarted", 2 ] => post_remodel_command_task,
+          [ "CoordinationTaskSubmitted", 3 ] => post_remodel_command_task,
+          [ "ProcessStepPlanned", 1 ] => post_remodel_command_task,
+          [ "DevelopmentArtifactContentChanged", 1 ] => post_remodel_development_memory,
+          [ "DevelopmentArtifactCreated", 1 ] => post_remodel_development_memory,
+          [ "DevelopmentArtifactKindChanged", 1 ] => post_remodel_development_memory,
+          [ "DevelopmentArtifactLabelAdded", 1 ] => post_remodel_development_memory,
+          [ "DevelopmentArtifactObservationFactLinked", 1 ] => post_remodel_development_memory,
+          [ "DevelopmentArtifactObservationRecorded", 1 ] => post_remodel_development_memory,
+          [ "DevelopmentArtifactRelationDeclared", 2 ] => post_remodel_development_memory,
+          [ "DevelopmentArtifactScopeChanged", 1 ] => post_remodel_development_memory,
+          [ "DevelopmentArtifactSourceChanged", 1 ] => post_remodel_development_memory,
+          [ "DevelopmentArtifactTitleChanged", 1 ] => post_remodel_development_memory,
+          [ "GuidanceMessageAnchored", 1 ] => post_remodel_development_memory,
+          [ "UserUtteranceForwardedByAgent", 2 ] => post_remodel_development_memory,
+          [ "ResourceWorkIntentionDeclared", 1 ] => post_remodel_work_intention,
+          [ "ResourceWorkIntentionExpired", 1 ] => post_remodel_work_intention,
+          [ "ResourceWorkIntentionRenewed", 1 ] => post_remodel_work_intention,
+          [ "ResourceWorkIntentionWithdrawn", 1 ] => post_remodel_work_intention,
+          [ "WorkIntentionAddedToSet", 1 ] => post_remodel_work_intention,
+          [ "WorkIntentionSetCreated", 1 ] => post_remodel_work_intention
         }.freeze
       end
 
@@ -199,7 +228,7 @@ module Coordinator::Write
           source_event:,
           source_payload: payload
         )
-      rescue KeyError, ArgumentError, TypeError => error
+      rescue KeyError, ArgumentError, TypeError, Dry::Struct::Error => error
         Failure(invalid(source_event, error:, schema_version: defined?(schema_version) ? schema_version : nil))
       end
 

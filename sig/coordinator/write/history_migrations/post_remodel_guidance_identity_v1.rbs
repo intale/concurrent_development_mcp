@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class PostRemodelGuidanceIdentityV1 < Shared::Value
+        def target_stream: () -> StreamReference
+        def message_id: () -> String
+      end
+    end
+  end
+end

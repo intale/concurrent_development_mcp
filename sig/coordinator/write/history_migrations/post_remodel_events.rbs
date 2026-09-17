@@ -1,0 +1,21 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      module PostRemodelEvents
+        class CandidateHeadRegisteredV2 < Events::CandidateHeadRegisteredV2
+          def candidate_event: () -> EventReference?
+          def registered_at: () -> String?
+        end
+
+        class CoordinationTaskSubmittedV3 < Events::Base
+          def task_id: () -> String
+          def command_id: () -> String
+          def tool_name: () -> String
+          def command_input: () -> PostRemodelCommandInputDocuments::value
+          def poll_interval_ms: () -> Integer
+          def ttl_ms: () -> nil
+        end
+      end
+    end
+  end
+end

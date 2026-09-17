@@ -4,16 +4,16 @@ RSpec.describe Coordinator::Write::HistoryMigrations::TransformerRegistry, :even
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:registry) { Coordinator::Container["history_migrations.transformer_registry"] }
 
-  it "registers every frozen pre-remodel contract and the reviewed post-remodel planning slice" do
+  it "registers every frozen pre-remodel and post-remodel source contract" do
     expect(registry.registered_contracts).to match_array(
       [
         *Coordinator::Write::HistoryMigrations::LegacyContractCatalog::SOURCE_CONTRACTS,
-        *Coordinator::Write::HistoryMigrations::PostRemodelContractCatalog::PLANNING_CONTRACTS
+        *Coordinator::Write::HistoryMigrations::PostRemodelContractCatalog::SOURCE_CONTRACTS
       ]
     )
   end
 
-  it "keeps unreviewed post-remodel contracts fail closed" do
+  it "fails closed when a registered source contract has an invalid payload" do
     source = PgEventstore::Event.new(
       id: SecureRandom.uuid_v7,
       type: "DevelopmentArtifactContentChanged",
@@ -30,7 +30,7 @@ RSpec.describe Coordinator::Write::HistoryMigrations::TransformerRegistry, :even
 
     expect(result).to be_failure
     expect(result.failure).to have_attributes(
-      code: :unsupported_source_contract,
+      code: :invalid_source_event,
       event_type: "DevelopmentArtifactContentChanged",
       schema_version: 1
     )
