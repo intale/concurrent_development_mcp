@@ -468,6 +468,22 @@ module Coordinator
       )
     end
 
+    register("history_migrations.operation_batch_context_resolver", memoize: true) do
+      Write::HistoryMigrations::OperationBatchContextResolver.new(
+        event_store: self["event_store"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"]
+      )
+    end
+
+    register("history_migrations.operation_batch_v1_transformer", memoize: true) do
+      Write::HistoryMigrations::OperationBatchV1Transformer.new(
+        context_resolver: self["history_migrations.operation_batch_context_resolver"],
+        target_event_reference_resolver:
+          self["history_migrations.legacy_target_event_reference_resolver"],
+        target_plan_builder: self["history_migrations.target_plan_builder"]
+      )
+    end
+
     register("history_migrations.development_artifact_context_resolver", memoize: true) do
       Write::HistoryMigrations::DevelopmentArtifactContextResolver.new(
         event_store: self["event_store"],
@@ -685,6 +701,7 @@ module Coordinator
         coordination_task_lifecycle:
           self["history_migrations.coordination_task_lifecycle_transformer"],
         command_completed_v1: self["history_migrations.command_completed_v1_transformer"],
+        operation_batch_v1: self["history_migrations.operation_batch_v1_transformer"],
         development_artifact_v1:
           self["history_migrations.development_artifact_v1_transformer"],
         development_artifact_relation_v1:

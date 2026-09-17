@@ -11,6 +11,8 @@ module Coordinator
         def migration_id: () -> String
         def migration_source: () -> MigrationSourceV1
         def canonical_input_digest: () -> String?
+        def page_size: () -> Integer?
+        def encoded_byte_size: () -> Integer?
         def collector: () -> (Candidates::EvidenceCollectorV1 | String)?
         def encoding: () -> String?
         def media_type: () -> String?

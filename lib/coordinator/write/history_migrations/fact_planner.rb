@@ -82,6 +82,8 @@ module Coordinator::Write
             migration_id:,
             migration_source: source,
             canonical_input_digest: metadata_extension&.canonical_input_digest,
+            page_size: metadata_extension&.page_size,
+            encoded_byte_size: metadata_extension&.encoded_byte_size,
             collector: metadata_extension&.collector,
             encoding: metadata_extension&.encoding,
             media_type: metadata_extension&.media_type,

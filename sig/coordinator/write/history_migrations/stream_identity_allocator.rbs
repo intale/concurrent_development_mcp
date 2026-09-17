@@ -20,7 +20,8 @@ module Coordinator
           source_event: PgEventstore::Event,
           target_stream_context: String,
           target_stream_name: String,
-          identity_role: String
+          identity_role: String,
+          ?allocation_markers: Array[String]
         ) -> Dry::Monads::Result
       end
     end

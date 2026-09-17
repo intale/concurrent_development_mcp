@@ -40,14 +40,15 @@ module Coordinator::Write
             source_payload,
             source_event:,
             target_stream: allocation.value!.target_stream,
-            task_submitted: !submission.value!.nil?
+            task_submitted: !submission.value!.nil?,
+            batch_registered: operation_batch_registration?(allocation.value!)
           )
         )
       end
 
       private
 
-      def facts(source, source_event:, target_stream:, task_submitted:)
+      def facts(source, source_event:, target_stream:, task_submitted:, batch_registered:)
         command_id = target_stream.stream_id
         terminal = TransformedFactV1.new(
           target_stream:,
@@ -55,9 +56,15 @@ module Coordinator::Write
           markers: [ "command:#{command_id}", "tool:#{source.tool_name}" ],
           step_name: "succeed-command"
         )
-        return [ terminal ] if task_submitted
+        return [ terminal ] if task_submitted || batch_registered
 
         [ registration(source, source_event:, target_stream:), terminal ]
+      end
+
+      def operation_batch_registration?(allocation)
+        markers = allocation.allocation_event.markers
+        markers.one? { _1.start_with?("operation-batch:") } &&
+          markers.one? { _1.start_with?("batch-item:") }
       end
 
       def registration(source, source_event:, target_stream:)

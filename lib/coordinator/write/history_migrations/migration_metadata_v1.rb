@@ -15,6 +15,9 @@ module Coordinator::Write
       attribute :migration_id, Types::UuidV7
       attribute :migration_source, MigrationSourceV1
       attribute? :canonical_input_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :page_size, Types::OperationBatchPageSize.optional.default(nil)
+      attribute? :encoded_byte_size,
+                 Types::OperationBatchEncodedByteSize.optional.default(nil)
       attribute? :collector, Collector.optional.default(nil)
       attribute? :encoding, Types::ContentEncoding.optional.default(nil)
       attribute? :media_type, Types::ContentMediaType.optional.default(nil)

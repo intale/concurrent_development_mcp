@@ -8,6 +8,9 @@ module Coordinator::Write
 
       attribute? :attributed_actor, Commands::Actor.optional.default(nil)
       attribute? :canonical_input_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :page_size, Types::OperationBatchPageSize.optional.default(nil)
+      attribute? :encoded_byte_size,
+                 Types::OperationBatchEncodedByteSize.optional.default(nil)
       attribute? :policy_version,
                  Types::String.constrained(min_size: 1, max_size: 200).optional.default(nil)
       attribute? :collector, Collector.optional.default(nil)

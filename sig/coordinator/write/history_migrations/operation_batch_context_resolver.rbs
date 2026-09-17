@@ -1,0 +1,32 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class OperationBatchContextResolver
+        def initialize: (
+          event_store: EventStore,
+          stream_identity_allocator: StreamIdentityAllocator,
+          ?command_input_rebinder: CommandInputRebinder,
+          ?request_id_mapper: LegacyOperationBatchRequestIdMapper,
+          ?manifest_builder: OperationBatches::ManifestBuilder,
+          ?canonical_json: CanonicalJson,
+          ?schema_registry: LegacyEventSchemaRegistry
+        ) -> void
+
+        def from_creation: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer?,
+          source_event: PgEventstore::Event,
+          source_creation: LegacyEvents::OperationBatchCreatedV1
+        ) -> Dry::Monads::Result
+
+        def from_stream: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer?,
+          source_event: PgEventstore::Event
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

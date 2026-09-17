@@ -4,6 +4,8 @@ module Coordinator
       class MigrationMetadataExtensionV1 < Shared::Value
         def attributed_actor: () -> Commands::Actor?
         def canonical_input_digest: () -> String?
+        def page_size: () -> Integer?
+        def encoded_byte_size: () -> Integer?
         def policy_version: () -> String?
         def collector: () -> (Candidates::EvidenceCollectorV1 | String)?
         def encoding: () -> String?

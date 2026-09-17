@@ -25,7 +25,15 @@ module Coordinator::Write
         @stream_factory = stream_factory
       end
 
-      def call(migration_id:, source_config_name:, source_event:, target_stream_context:, target_stream_name:, identity_role:)
+      def call(
+        migration_id:,
+        source_config_name:,
+        source_event:,
+        target_stream_context:,
+        target_stream_name:,
+        identity_role:,
+        allocation_markers: []
+      )
         command = command_for(
           migration_id:,
           source_config_name:,
@@ -44,7 +52,14 @@ module Coordinator::Write
         @natural_key_registry.call(
           selector: selector(marker),
           proposed_stream: @stream_factory.history_migration_identity(command.target_stream_id),
-          build_event: -> { build_event(command, marker:, caused_by: source_event) },
+          build_event: -> {
+            build_event(
+              command,
+              marker:,
+              caused_by: source_event,
+              allocation_markers:
+            )
+          },
           identity_from: ->(event) { identity_from(event, command) }
         ).fmap { allocation(_1) }
       end
@@ -101,7 +116,7 @@ module Coordinator::Write
         )
       end
 
-      def build_event(command, marker:, caused_by:)
+      def build_event(command, marker:, caused_by:, allocation_markers:)
         @event_factory.build!(
           event: Events::HistoryMigrationStreamIdentityAllocatedV1.new(event_attributes(command)),
           event_id: command.event_id,
@@ -112,7 +127,12 @@ module Coordinator::Write
             recorded_by: "coordinator",
             policy_version: "history-migration-stream-identity/v1"
           ),
-          markers: [ marker, "history-migration:#{command.migration_id}", "target-stream:#{command.target_stream_id}" ],
+          markers: [
+            marker,
+            "history-migration:#{command.migration_id}",
+            "target-stream:#{command.target_stream_id}",
+            *allocation_markers
+          ],
           caused_by:
         )
       end
