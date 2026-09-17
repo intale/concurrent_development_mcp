@@ -569,6 +569,26 @@ module Coordinator
       )
     end
 
+    register("history_migrations.release_set_context_resolver", memoize: true) do
+      Write::HistoryMigrations::ReleaseSetContextResolver.new(
+        event_store: self["event_store"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"],
+        merge_snapshot_context_resolver:
+          self["history_migrations.merge_snapshot_context_resolver"],
+        merge_reference_resolver: self["history_migrations.merge_history_reference_resolver"],
+        target_event_reference_resolver:
+          self["history_migrations.legacy_target_event_reference_resolver"]
+      )
+    end
+
+    register("history_migrations.release_set_v1_transformer", memoize: true) do
+      Write::HistoryMigrations::ReleaseSetV1Transformer.new(
+        event_store: self["event_store"],
+        context_resolver: self["history_migrations.release_set_context_resolver"]
+      )
+    end
+
     register("history_migrations.candidate_subject_v1_transformer", memoize: true) do
       Write::HistoryMigrations::CandidateSubjectV1Transformer.new(
         context_resolver: self["history_migrations.candidate_context_resolver"],
@@ -678,6 +698,7 @@ module Coordinator
           self["history_migrations.merge_authorization_v1_transformer"],
         merge_observation_v1:
           self["history_migrations.merge_observation_v1_transformer"],
+        release_set_v1: self["history_migrations.release_set_v1_transformer"],
         verification_obligation_v1:
           self["history_migrations.verification_obligation_v1_transformer"],
         verification_obligation_validity_scan_v1:

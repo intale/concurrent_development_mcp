@@ -33,6 +33,7 @@ module Coordinator::Write
         merge_snapshot_verification_v1:,
         merge_authorization_v1:,
         merge_observation_v1:,
+        release_set_v1:,
         verification_obligation_v1:,
         verification_obligation_validity_scan_v1:
       )
@@ -111,6 +112,12 @@ module Coordinator::Write
           [ "MergeAuthorizationGranted", 1 ] => merge_authorization_v1,
           [ "MergeAuthorizationDenied", 1 ] => merge_authorization_v1,
           [ "MergeObserved", 1 ] => merge_observation_v1,
+          [ "ReleaseSetPrepared", 1 ] => release_set_v1,
+          [ "RepositoryIntegrationRecorded", 1 ] => release_set_v1,
+          [ "ReleaseSetVerificationRecorded", 1 ] => release_set_v1,
+          [ "ReleaseSetActivated", 1 ] => release_set_v1,
+          [ "ReleaseSetCompensationRequested", 1 ] => release_set_v1,
+          [ "ReleaseSetCompleted", 1 ] => release_set_v1,
           [ "VerificationObligationCreated", 1 ] => verification_obligation_v1,
           [ "VerificationObligationClaimed", 1 ] => verification_obligation_v1,
           [ "VerificationEvidenceSubmitted", 1 ] => verification_obligation_v1,

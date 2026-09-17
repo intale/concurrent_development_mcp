@@ -35,6 +35,13 @@ module Coordinator
         def input_digest: () -> String?
         def authorization_decision_digest: () -> String?
         def observation_digest: () -> String?
+        def release_digest: () -> String?
+        def integration_digest: () -> String?
+        def activation_digest: () -> String?
+        def completion_digest: () -> String?
+        def result_digest: () -> String?
+        def producer: () -> ReleaseSets::EvidenceProducerV1?
+        def run_id: () -> String?
         def policy: () -> CandidateObligations::ImpactPolicyEvidenceV1?
         def rule_version: () -> String?
         def validity_input_digest: () -> String?

@@ -75,6 +75,10 @@ module Coordinator::Write
         "MergeAuthorizationDenied" => [
           "DevelopmentIntegration", "MergeAuthorization", "merge-authorization",
           "MergeAuthorizationDenied", "deny-merge-authorization"
+        ],
+        "MergeObserved" => [
+          "DevelopmentIntegration", "MergeSnapshot", "merge-snapshot",
+          "MergeObserved", "record-merge-observation"
         ]
       }.freeze
 

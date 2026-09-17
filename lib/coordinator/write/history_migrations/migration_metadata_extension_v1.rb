@@ -44,6 +44,14 @@ module Coordinator::Write
       attribute? :input_digest, Types::Sha256Digest.optional.default(nil)
       attribute? :authorization_decision_digest, Types::Sha256Digest.optional.default(nil)
       attribute? :observation_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :release_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :integration_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :activation_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :completion_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :result_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :producer,
+                 ReleaseSets::EvidenceProducerV1.optional.default(nil)
+      attribute? :run_id, Types::Identifier.optional.default(nil)
       attribute? :policy,
                  CandidateObligations::ImpactPolicyEvidenceV1.optional.default(nil)
       attribute? :rule_version,

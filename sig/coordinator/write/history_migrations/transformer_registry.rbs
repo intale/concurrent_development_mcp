@@ -30,6 +30,7 @@ module Coordinator
           merge_snapshot_verification_v1: MergeSnapshotVerificationV1Transformer,
           merge_authorization_v1: MergeAuthorizationV1Transformer,
           merge_observation_v1: MergeObservationV1Transformer,
+          release_set_v1: ReleaseSetV1Transformer,
           verification_obligation_v1: VerificationObligationV1Transformer,
           verification_obligation_validity_scan_v1: VerificationObligationValidityScanV1Transformer
         ) -> void

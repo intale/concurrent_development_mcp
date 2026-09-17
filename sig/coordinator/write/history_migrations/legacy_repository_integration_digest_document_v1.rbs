@@ -1,0 +1,20 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class LegacyRepositoryIntegrationDigestDocumentV1 < Shared::Value
+        def schema: () -> String
+        def release_set_id: () -> String
+        def release_digest: () -> String
+        def repository_id: () -> String
+        def member_position: () -> Integer
+        def attempt_id: () -> String
+        def attempt_number: () -> Integer
+        def outcome: () -> String
+        def merge_observation_event: () -> EventReference?
+        def observation_digest: () -> String?
+        def failure: () -> ReleaseSets::IntegrationFailureV1?
+        def policy_version: () -> String
+      end
+    end
+  end
+end

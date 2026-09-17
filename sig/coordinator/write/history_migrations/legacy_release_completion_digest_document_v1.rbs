@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class LegacyReleaseCompletionDigestDocumentV1 < Shared::Value
+        def schema: () -> String
+        def release_set_id: () -> String
+        def release_digest: () -> String
+        def outcome: () -> String
+        def source_event: () -> EventReference
+        def compensation_evidence: () -> Array[ReleaseSets::CompensationEvidenceV1]
+        def rule_version: () -> String
+      end
+    end
+  end
+end

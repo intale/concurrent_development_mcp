@@ -1,0 +1,56 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class ReleaseSetContextResolver
+        def initialize: (
+          event_store: EventStore,
+          stream_identity_allocator: StreamIdentityAllocator,
+          entity_reference_resolver: LegacyEntityReferenceResolver,
+          merge_snapshot_context_resolver: MergeSnapshotContextResolver,
+          merge_reference_resolver: MergeHistoryReferenceResolver,
+          target_event_reference_resolver: LegacyTargetEventReferenceResolver,
+          ?schema_registry: LegacyEventSchemaRegistry
+        ) -> void
+
+        def from_preparation: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          source_preparation: Events::ReleaseSetPreparedV1
+        ) -> Dry::Monads::Result
+
+        def from_stream: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event
+        ) -> Dry::Monads::Result
+
+        def load_reference: (
+          source_event: PgEventstore::Event,
+          source_upper_position: Integer,
+          source_reference: EventReference
+        ) -> Dry::Monads::Result
+
+        def target_release_reference: (
+          migration_id: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          source_reference: EventReference,
+          context: ReleaseSetMigrationContextV1,
+          target_event_type: String,
+          target_step_name: String
+        ) -> Dry::Monads::Result
+
+        def target_merge_reference: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          source_reference: EventReference
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end
