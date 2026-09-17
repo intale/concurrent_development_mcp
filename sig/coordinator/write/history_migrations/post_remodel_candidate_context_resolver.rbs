@@ -1,0 +1,25 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class PostRemodelCandidateContextResolver
+        SOURCE_TYPES: Array[String]
+        SOURCE_HISTORY: EventReadCriteria
+
+        def initialize: (
+          event_store: EventStore,
+          stream_identity_allocator: StreamIdentityAllocator,
+          entity_reference_resolver: LegacyEntityReferenceResolver,
+          ?schema_registry: SourceEventSchemaRegistry
+        ) -> void
+
+        def call: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          source_candidate_id: String
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

@@ -1,0 +1,25 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class PostRemodelCandidateContextV1 < Coordinator::Shared::Value
+        attr_reader source_candidate_id: String
+        attr_reader source_change_set_id: String
+        attr_reader source_work_item_id: String
+        attr_reader source_attempt_id: String
+        attr_reader source_repository_id: String
+        attr_reader source_intention_set_id: String
+        attr_reader candidate_stream: StreamReference
+        attr_reader candidate_id: String
+        attr_reader change_set_id: String
+        attr_reader work_item_id: String
+        attr_reader attempt_id: String
+        attr_reader repository_id: String
+        attr_reader intention_set_id: String
+        attr_reader object_format: String
+        attr_reader head_commit_oid: String
+
+        def markers: () -> Array[String]
+      end
+    end
+  end
+end

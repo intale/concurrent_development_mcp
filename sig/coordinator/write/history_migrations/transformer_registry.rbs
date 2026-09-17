@@ -3,7 +3,7 @@ module Coordinator
     module HistoryMigrations
       class TransformerRegistry
         def initialize: (
-          ?schema_registry: EventSchemaRegistry | LegacyEventSchemaRegistry,
+          ?schema_registry: EventSchemaRegistry | LegacyEventSchemaRegistry | SourceEventSchemaRegistry,
           repository_registered_v1: RepositoryRegisteredV1Transformer,
           guidance_message_v1: GuidanceMessageV1Transformer,
           change_set_v1: ChangeSetV1Transformer,
@@ -35,7 +35,10 @@ module Coordinator
           merge_observation_v1: MergeObservationV1Transformer,
           release_set_v1: ReleaseSetV1Transformer,
           verification_obligation_v1: VerificationObligationV1Transformer,
-          verification_obligation_validity_scan_v1: VerificationObligationValidityScanV1Transformer
+          verification_obligation_validity_scan_v1: VerificationObligationValidityScanV1Transformer,
+          post_remodel_work_item: PostRemodelWorkItemTransformer,
+          post_remodel_attempt: PostRemodelAttemptTransformer,
+          post_remodel_candidate: PostRemodelCandidateTransformer
         ) -> void
 
         def call: (

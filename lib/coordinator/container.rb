@@ -268,6 +268,38 @@ module Coordinator
       )
     end
 
+    register("history_migrations.post_remodel_work_item_transformer", memoize: true) do
+      Write::HistoryMigrations::PostRemodelWorkItemTransformer.new(
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"],
+        target_event_reference_resolver:
+          self["history_migrations.legacy_target_event_reference_resolver"]
+      )
+    end
+
+    register("history_migrations.post_remodel_attempt_transformer", memoize: true) do
+      Write::HistoryMigrations::PostRemodelAttemptTransformer.new(
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"]
+      )
+    end
+
+    register("history_migrations.post_remodel_candidate_context_resolver", memoize: true) do
+      Write::HistoryMigrations::PostRemodelCandidateContextResolver.new(
+        event_store: self["event_store"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"]
+      )
+    end
+
+    register("history_migrations.post_remodel_candidate_transformer", memoize: true) do
+      Write::HistoryMigrations::PostRemodelCandidateTransformer.new(
+        context_resolver: self["history_migrations.post_remodel_candidate_context_resolver"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        compound_marker_builder: self["compound_marker_builder"]
+      )
+    end
+
     register("history_migrations.candidate_impact_v1_transformer", memoize: true) do
       Write::HistoryMigrations::CandidateImpactV1Transformer.new(
         context_resolver: self["history_migrations.candidate_context_resolver"],
@@ -700,7 +732,7 @@ module Coordinator
 
     register("history_migrations.transformer_registry", memoize: true) do
       Write::HistoryMigrations::TransformerRegistry.new(
-        schema_registry: Write::HistoryMigrations::LegacyEventSchemaRegistry.new,
+        schema_registry: Write::HistoryMigrations::SourceEventSchemaRegistry.new,
         repository_registered_v1: self["history_migrations.repository_registered_v1_transformer"],
         guidance_message_v1: self["history_migrations.guidance_message_v1_transformer"],
         change_set_v1: self["history_migrations.change_set_v1_transformer"],
@@ -744,7 +776,13 @@ module Coordinator
         verification_obligation_v1:
           self["history_migrations.verification_obligation_v1_transformer"],
         verification_obligation_validity_scan_v1:
-          self["history_migrations.verification_obligation_validity_scan_v1_transformer"]
+          self["history_migrations.verification_obligation_validity_scan_v1_transformer"],
+        post_remodel_work_item:
+          self["history_migrations.post_remodel_work_item_transformer"],
+        post_remodel_attempt:
+          self["history_migrations.post_remodel_attempt_transformer"],
+        post_remodel_candidate:
+          self["history_migrations.post_remodel_candidate_transformer"]
       )
     end
 

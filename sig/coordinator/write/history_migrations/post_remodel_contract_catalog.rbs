@@ -1,0 +1,16 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class PostRemodelContractCatalog
+        PLANNING_CONTRACTS: Array[[String, Integer]]
+        COMMAND_AND_TASK_CONTRACTS: Array[[String, Integer]]
+        DEVELOPMENT_MEMORY_CONTRACTS: Array[[String, Integer]]
+        WORK_INTENTION_CONTRACTS: Array[[String, Integer]]
+        SOURCE_CONTRACTS: Array[[String, Integer]]
+
+        def source_contracts: () -> Array[[String, Integer]]
+        def include?: (type: String, schema_version: Integer) -> bool
+      end
+    end
+  end
+end

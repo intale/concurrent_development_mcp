@@ -6,7 +6,7 @@ module Coordinator::Write
       include Dry::Monads[:result]
 
       def initialize(
-        schema_registry: EventSchemaRegistry.new,
+        schema_registry: SourceEventSchemaRegistry.new,
         repository_registered_v1:,
         guidance_message_v1:,
         change_set_v1:,
@@ -38,7 +38,10 @@ module Coordinator::Write
         merge_observation_v1:,
         release_set_v1:,
         verification_obligation_v1:,
-        verification_obligation_validity_scan_v1:
+        verification_obligation_validity_scan_v1:,
+        post_remodel_work_item:,
+        post_remodel_attempt:,
+        post_remodel_candidate:
       )
         @schema_registry = schema_registry
         @definitions = {
@@ -152,7 +155,30 @@ module Coordinator::Write
           [ "VerificationObligationValidityScanProgressed", 1 ] =>
             verification_obligation_validity_scan_v1,
           [ "VerificationObligationValidityScanCompleted", 1 ] =>
-            verification_obligation_validity_scan_v1
+            verification_obligation_validity_scan_v1,
+          [ "WorkItemAcquired", 2 ] => post_remodel_work_item,
+          [ "WorkItemCandidateSelected", 2 ] => post_remodel_work_item,
+          [ "WorkItemCompleted", 2 ] => post_remodel_work_item,
+          [ "WorkItemDependencySatisfied", 2 ] => post_remodel_work_item,
+          [ "WorkItemMadeReady", 2 ] => post_remodel_work_item,
+          [ "WorkItemRequeued", 2 ] => post_remodel_work_item,
+          [ "AttemptAbandoned", 3 ] => post_remodel_attempt,
+          [ "AttemptAssignedToAgent", 1 ] => post_remodel_attempt,
+          [ "AttemptAssignedToWorkItem", 1 ] => post_remodel_attempt,
+          [ "AttemptAuthorized", 2 ] => post_remodel_attempt,
+          [ "AttemptBaseSnapshotRecorded", 1 ] => post_remodel_attempt,
+          [ "AttemptCompleted", 2 ] => post_remodel_attempt,
+          [ "AttemptStarted", 2 ] => post_remodel_attempt,
+          [ "CandidateAssignedToAttempt", 1 ] => post_remodel_candidate,
+          [ "CandidateAssignedToRepository", 1 ] => post_remodel_candidate,
+          [ "CandidateChangeManifestCaptured", 2 ] => post_remodel_candidate,
+          [ "CandidateCheckpointKindSelected", 1 ] => post_remodel_candidate,
+          [ "CandidateCommitRangeDeclared", 1 ] => post_remodel_candidate,
+          [ "CandidateCreated", 1 ] => post_remodel_candidate,
+          [ "CandidateHeadRegistered", 2 ] => post_remodel_candidate,
+          [ "CandidateSubmitted", 3 ] => post_remodel_candidate,
+          [ "CandidateTargetBranchSelected", 1 ] => post_remodel_candidate,
+          [ "CandidateWorkIntentionSetAssigned", 1 ] => post_remodel_candidate
         }.freeze
       end
 
