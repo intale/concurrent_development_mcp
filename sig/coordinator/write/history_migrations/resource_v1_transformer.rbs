@@ -1,0 +1,26 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class ResourceV1Transformer
+        SOURCE_CLASSES: Hash[String, singleton(Events::Base)]
+
+        def initialize: (
+          event_store: EventStore,
+          stream_identity_allocator: StreamIdentityAllocator,
+          entity_reference_resolver: LegacyEntityReferenceResolver,
+          ?normalizer: ResourceIdentityNormalizer
+        ) -> void
+
+        def call: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          source_payload: Events::ResourceIdentityV1::Registered |
+                          Events::ResourceIdentityV1::Bound |
+                          Events::ResourceIdentityV1::Unbound
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

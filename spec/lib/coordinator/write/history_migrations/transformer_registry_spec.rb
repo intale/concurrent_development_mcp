@@ -4,6 +4,12 @@ RSpec.describe Coordinator::Write::HistoryMigrations::TransformerRegistry, :even
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:registry) { Coordinator::Container["history_migrations.transformer_registry"] }
 
+  it "registers every frozen historical source contract" do
+    expect(registry.registered_contracts).to match_array(
+      Coordinator::Write::HistoryMigrations::LegacyContractCatalog::SOURCE_CONTRACTS
+    )
+  end
+
   it "fails closed when a source contract has no reviewed mapping" do
     source = PgEventstore::Event.new(
       id: SecureRandom.uuid_v7,

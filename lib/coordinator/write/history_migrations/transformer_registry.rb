@@ -27,6 +27,8 @@ module Coordinator::Write
         coordination_task_lifecycle:,
         command_completed_v1:,
         operation_batch_v1:,
+        resource_v1:,
+        work_intention_v1:,
         development_artifact_v1:,
         development_artifact_relation_v1:,
         skill_revision_published_v2:,
@@ -107,6 +109,18 @@ module Coordinator::Write
           [ "OperationBatchCancellationRequested", 1 ] => operation_batch_v1,
           [ "OperationBatchCancelled", 1 ] => operation_batch_v1,
           [ "OperationBatchCompleted", 1 ] => operation_batch_v1,
+          [ "ResourceRegistered", 1 ] => resource_v1,
+          [ "ResourceBound", 1 ] => resource_v1,
+          [ "ResourceUnbound", 1 ] => resource_v1,
+          [ "ResourceLeaseAcquired", 2 ] => work_intention_v1,
+          [ "ResourceLeaseRenewed", 2 ] => work_intention_v1,
+          [ "ResourceLeaseReleased", 2 ] => work_intention_v1,
+          [ "ResourceLeaseExpired", 2 ] => work_intention_v1,
+          [ "ResourceBoundaryEpochRolled", 2 ] => work_intention_v1,
+          [ "WriteSetReserved", 2 ] => work_intention_v1,
+          [ "WriteSetExpanded", 2 ] => work_intention_v1,
+          [ "WriteSetRenewed", 2 ] => work_intention_v1,
+          [ "WriteSetReleased", 2 ] => work_intention_v1,
           [ "DevelopmentArtifactCaptured", 2 ] => development_artifact_v1,
           [ "DevelopmentArtifactObserved", 1 ] => development_artifact_v1,
           [ "DevelopmentArtifactClassificationCorrected", 1 ] => development_artifact_v1,
@@ -161,6 +175,10 @@ module Coordinator::Write
         )
       rescue KeyError, ArgumentError, TypeError => error
         Failure(invalid(source_event, error:, schema_version: defined?(schema_version) ? schema_version : nil))
+      end
+
+      def registered_contracts
+        @definitions.keys
       end
 
       private

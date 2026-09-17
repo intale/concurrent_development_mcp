@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class WorkIntentionMemberMigrationV1 < Shared::Value
+        def target_stream: () -> StreamReference
+        def intention_id: () -> String
+        def resource_id: () -> String
+        def resource_kind: () -> String
+        def resource_path: () -> String
+        def base_blob_oid: () -> String?
+        def fencing_token: () -> Integer
+      end
+    end
+  end
+end

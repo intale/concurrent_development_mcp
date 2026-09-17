@@ -24,6 +24,8 @@ module Coordinator
           coordination_task_lifecycle: CoordinationTaskLifecycleTransformer,
           command_completed_v1: CommandCompletedV1Transformer,
           operation_batch_v1: OperationBatchV1Transformer,
+          resource_v1: ResourceV1Transformer,
+          work_intention_v1: WorkIntentionV1Transformer,
           development_artifact_v1: DevelopmentArtifactV1Transformer,
           development_artifact_relation_v1: DevelopmentArtifactRelationV1Transformer,
           skill_revision_published_v2: SkillRevisionPublishedV2Transformer,
@@ -42,6 +44,8 @@ module Coordinator
           source_upper_position: Integer?,
           source_event: PgEventstore::Event
         ) -> Dry::Monads::Result
+
+        def registered_contracts: () -> Array[[String, Integer]]
       end
     end
   end

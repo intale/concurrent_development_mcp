@@ -10,6 +10,10 @@ module Coordinator::Write
       end
 
       def call(planned_facts:)
+        if planned_facts.empty?
+          return Success(TargetWriteResultV1.new(events: [], outcome: "skipped"))
+        end
+
         @event_store.multiple { write(planned_facts) }
       rescue PgEventstore::WrongExpectedRevisionError
         current_fact = planned_facts.first
