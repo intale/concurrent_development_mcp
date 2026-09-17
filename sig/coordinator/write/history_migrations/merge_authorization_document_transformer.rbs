@@ -1,0 +1,44 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class MergeAuthorizationDocumentTransformer
+        ENTITY_TARGETS: Hash[Symbol, [String, String, String]]
+
+        def initialize: (
+          entity_reference_resolver: LegacyEntityReferenceResolver,
+          reference_resolver: MergeHistoryReferenceResolver,
+          partition_identity_mapper: DecisionPartitionIdentityMapper,
+          head_reference_resolver: DecisionHeadReferenceResolver,
+          marked_event_locator: LegacyMarkedEventLocator,
+          ?schema_registry: LegacyEventSchemaRegistry
+        ) -> void
+
+        def snapshot_binding: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          context: MergeSnapshotMigrationContextV1,
+          binding: MergeAuthorizations::SnapshotBindingV1
+        ) -> Dry::Monads::Result
+
+        def expected_impact_policy: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          policy: MergeAuthorizations::ExpectedImpactPolicyV1?
+        ) -> Dry::Monads::Result
+
+        def evaluation: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          context: MergeSnapshotMigrationContextV1,
+          evaluation: MergeAuthorizations::EvaluationV1
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

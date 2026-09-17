@@ -103,7 +103,15 @@ module Coordinator::Write
             before_context_digest: metadata_extension&.before_context_digest,
             after_context_digest: metadata_extension&.after_context_digest,
             previous_context_digest: metadata_extension&.previous_context_digest,
-            resulting_context_digest: metadata_extension&.resulting_context_digest
+            resulting_context_digest: metadata_extension&.resulting_context_digest,
+            snapshot_digest: metadata_extension&.snapshot_digest,
+            verification_input_digest: metadata_extension&.verification_input_digest,
+            verification_digest: metadata_extension&.verification_digest,
+            decision_digest: metadata_extension&.decision_digest,
+            expected_impact_policy: metadata_extension&.expected_impact_policy,
+            input_digest: metadata_extension&.input_digest,
+            authorization_decision_digest: metadata_extension&.authorization_decision_digest,
+            observation_digest: metadata_extension&.observation_digest
           ),
           markers: fact.markers + [
             target_event_marker,

@@ -25,7 +25,11 @@ module Coordinator
           command_completed_v1: CommandCompletedV1Transformer,
           development_artifact_v1: DevelopmentArtifactV1Transformer,
           development_artifact_relation_v1: DevelopmentArtifactRelationV1Transformer,
-          skill_revision_published_v2: SkillRevisionPublishedV2Transformer
+          skill_revision_published_v2: SkillRevisionPublishedV2Transformer,
+          merge_snapshot_v1: MergeSnapshotV1Transformer,
+          merge_snapshot_verification_v1: MergeSnapshotVerificationV1Transformer,
+          merge_authorization_v1: MergeAuthorizationV1Transformer,
+          merge_observation_v1: MergeObservationV1Transformer
         ) -> void
 
         def call: (

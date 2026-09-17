@@ -28,7 +28,11 @@ module Coordinator::Write
         command_completed_v1:,
         development_artifact_v1:,
         development_artifact_relation_v1:,
-        skill_revision_published_v2:
+        skill_revision_published_v2:,
+        merge_snapshot_v1:,
+        merge_snapshot_verification_v1:,
+        merge_authorization_v1:,
+        merge_observation_v1:
       )
         @schema_registry = schema_registry
         @definitions = {
@@ -97,7 +101,14 @@ module Coordinator::Write
           [ "DevelopmentArtifactClassificationCorrected", 1 ] => development_artifact_v1,
           [ "DevelopmentArtifactRelationDeclared", 1 ] => development_artifact_relation_v1,
           [ "DevelopmentArtifactRelationSuperseded", 1 ] => development_artifact_relation_v1,
-          [ "SkillRevisionPublished", 2 ] => skill_revision_published_v2
+          [ "SkillRevisionPublished", 2 ] => skill_revision_published_v2,
+          [ "MergeSnapshotRegistered", 1 ] => merge_snapshot_v1,
+          [ "MergeSnapshotCommitRegistered", 1 ] => merge_snapshot_v1,
+          [ "MergeSnapshotVerificationSubmitted", 1 ] => merge_snapshot_verification_v1,
+          [ "MergeSnapshotVerified", 1 ] => merge_snapshot_verification_v1,
+          [ "MergeAuthorizationGranted", 1 ] => merge_authorization_v1,
+          [ "MergeAuthorizationDenied", 1 ] => merge_authorization_v1,
+          [ "MergeObserved", 1 ] => merge_observation_v1
         }.freeze
       end
 

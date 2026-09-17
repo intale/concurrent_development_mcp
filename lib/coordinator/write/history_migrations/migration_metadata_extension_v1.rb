@@ -35,6 +35,15 @@ module Coordinator::Write
       attribute? :after_context_digest, Types::Sha256Digest.optional.default(nil)
       attribute? :previous_context_digest, Types::Sha256Digest.optional.default(nil)
       attribute? :resulting_context_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :snapshot_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :verification_input_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :verification_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :decision_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :expected_impact_policy,
+                 MergeAuthorizations::ExpectedImpactPolicyV1.optional.default(nil)
+      attribute? :input_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :authorization_decision_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :observation_digest, Types::Sha256Digest.optional.default(nil)
     end
   end
 end

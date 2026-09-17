@@ -1,0 +1,21 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class MergeSnapshotV1Transformer
+        def initialize: (
+          context_resolver: MergeSnapshotContextResolver,
+          stream_identity_allocator: StreamIdentityAllocator,
+          ?commit_identity_builder: MergeSnapshots::CommitIdentityBuilder
+        ) -> void
+
+        def call: (
+          migration_id: String,
+          source_config_name: String,
+          source_upper_position: Integer,
+          source_event: PgEventstore::Event,
+          source_payload: Events::MergeSnapshotRegisteredV1 | Events::MergeSnapshotCommitRegisteredV1
+        ) -> Dry::Monads::Result
+      end
+    end
+  end
+end

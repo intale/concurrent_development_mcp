@@ -499,6 +499,76 @@ module Coordinator
       )
     end
 
+    register("history_migrations.merge_snapshot_context_resolver", memoize: true) do
+      Write::HistoryMigrations::MergeSnapshotContextResolver.new(
+        event_store: self["event_store"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"],
+        candidate_context_resolver: self["history_migrations.candidate_context_resolver"],
+        target_event_reference_resolver:
+          self["history_migrations.legacy_target_event_reference_resolver"]
+      )
+    end
+
+    register("history_migrations.merge_snapshot_v1_transformer", memoize: true) do
+      Write::HistoryMigrations::MergeSnapshotV1Transformer.new(
+        context_resolver: self["history_migrations.merge_snapshot_context_resolver"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"]
+      )
+    end
+
+    register("history_migrations.merge_history_reference_resolver", memoize: true) do
+      Write::HistoryMigrations::MergeHistoryReferenceResolver.new(
+        event_store: self["event_store"],
+        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"],
+        target_event_reference_resolver:
+          self["history_migrations.legacy_target_event_reference_resolver"],
+        partition_identity_mapper:
+          self["history_migrations.decision_partition_identity_mapper"],
+        partition_delta_resolver:
+          self["history_migrations.decision_partition_delta_resolver"]
+      )
+    end
+
+    register("history_migrations.merge_authorization_document_transformer", memoize: true) do
+      Write::HistoryMigrations::MergeAuthorizationDocumentTransformer.new(
+        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"],
+        reference_resolver: self["history_migrations.merge_history_reference_resolver"],
+        partition_identity_mapper:
+          self["history_migrations.decision_partition_identity_mapper"],
+        head_reference_resolver: self["history_migrations.decision_head_reference_resolver"],
+        marked_event_locator: self["history_migrations.legacy_marked_event_locator"]
+      )
+    end
+
+    register("history_migrations.merge_snapshot_verification_v1_transformer", memoize: true) do
+      Write::HistoryMigrations::MergeSnapshotVerificationV1Transformer.new(
+        event_store: self["event_store"],
+        context_resolver: self["history_migrations.merge_snapshot_context_resolver"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        target_event_reference_resolver:
+          self["history_migrations.legacy_target_event_reference_resolver"]
+      )
+    end
+
+    register("history_migrations.merge_authorization_v1_transformer", memoize: true) do
+      Write::HistoryMigrations::MergeAuthorizationV1Transformer.new(
+        context_resolver: self["history_migrations.merge_snapshot_context_resolver"],
+        document_transformer:
+          self["history_migrations.merge_authorization_document_transformer"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"]
+      )
+    end
+
+    register("history_migrations.merge_observation_v1_transformer", memoize: true) do
+      Write::HistoryMigrations::MergeObservationV1Transformer.new(
+        context_resolver: self["history_migrations.merge_snapshot_context_resolver"],
+        document_transformer:
+          self["history_migrations.merge_authorization_document_transformer"],
+        reference_resolver: self["history_migrations.merge_history_reference_resolver"]
+      )
+    end
+
     register("history_migrations.transformer_registry", memoize: true) do
       Write::HistoryMigrations::TransformerRegistry.new(
         schema_registry: Write::HistoryMigrations::LegacyEventSchemaRegistry.new,
@@ -530,7 +600,14 @@ module Coordinator
         development_artifact_relation_v1:
           self["history_migrations.development_artifact_relation_v1_transformer"],
         skill_revision_published_v2:
-          self["history_migrations.skill_revision_published_v2_transformer"]
+          self["history_migrations.skill_revision_published_v2_transformer"],
+        merge_snapshot_v1: self["history_migrations.merge_snapshot_v1_transformer"],
+        merge_snapshot_verification_v1:
+          self["history_migrations.merge_snapshot_verification_v1_transformer"],
+        merge_authorization_v1:
+          self["history_migrations.merge_authorization_v1_transformer"],
+        merge_observation_v1:
+          self["history_migrations.merge_observation_v1_transformer"]
       )
     end
 
