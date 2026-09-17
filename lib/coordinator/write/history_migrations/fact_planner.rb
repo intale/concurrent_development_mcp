@@ -111,7 +111,16 @@ module Coordinator::Write
             expected_impact_policy: metadata_extension&.expected_impact_policy,
             input_digest: metadata_extension&.input_digest,
             authorization_decision_digest: metadata_extension&.authorization_decision_digest,
-            observation_digest: metadata_extension&.observation_digest
+            observation_digest: metadata_extension&.observation_digest,
+            policy: metadata_extension&.policy,
+            rule_version: metadata_extension&.rule_version,
+            validity_input_digest: metadata_extension&.validity_input_digest,
+            assessment_input_digest: metadata_extension&.assessment_input_digest,
+            obligation_validity_input_digest: metadata_extension&.obligation_validity_input_digest,
+            outcome_digest: metadata_extension&.outcome_digest,
+            invalidated_policy: metadata_extension&.invalidated_policy,
+            invalidation_digest: metadata_extension&.invalidation_digest,
+            waiver_input_digest: metadata_extension&.waiver_input_digest
           ),
           markers: fact.markers + [
             target_event_marker,

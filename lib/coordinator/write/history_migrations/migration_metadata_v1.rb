@@ -49,6 +49,18 @@ module Coordinator::Write
       attribute? :input_digest, Types::Sha256Digest.optional.default(nil)
       attribute? :authorization_decision_digest, Types::Sha256Digest.optional.default(nil)
       attribute? :observation_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :policy,
+                 CandidateObligations::ImpactPolicyEvidenceV1.optional.default(nil)
+      attribute? :rule_version,
+                 Types::String.constrained(min_size: 1, max_size: 200).optional.default(nil)
+      attribute? :validity_input_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :assessment_input_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :obligation_validity_input_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :outcome_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :invalidated_policy,
+                 CandidateObligations::ImpactPolicyEvidenceV1.optional.default(nil)
+      attribute? :invalidation_digest, Types::Sha256Digest.optional.default(nil)
+      attribute? :waiver_input_digest, Types::Sha256Digest.optional.default(nil)
     end
   end
 end

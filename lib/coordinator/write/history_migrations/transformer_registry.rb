@@ -32,7 +32,9 @@ module Coordinator::Write
         merge_snapshot_v1:,
         merge_snapshot_verification_v1:,
         merge_authorization_v1:,
-        merge_observation_v1:
+        merge_observation_v1:,
+        verification_obligation_v1:,
+        verification_obligation_validity_scan_v1:
       )
         @schema_registry = schema_registry
         @definitions = {
@@ -108,7 +110,20 @@ module Coordinator::Write
           [ "MergeSnapshotVerified", 1 ] => merge_snapshot_verification_v1,
           [ "MergeAuthorizationGranted", 1 ] => merge_authorization_v1,
           [ "MergeAuthorizationDenied", 1 ] => merge_authorization_v1,
-          [ "MergeObserved", 1 ] => merge_observation_v1
+          [ "MergeObserved", 1 ] => merge_observation_v1,
+          [ "VerificationObligationCreated", 1 ] => verification_obligation_v1,
+          [ "VerificationObligationClaimed", 1 ] => verification_obligation_v1,
+          [ "VerificationEvidenceSubmitted", 1 ] => verification_obligation_v1,
+          [ "VerificationObligationSatisfied", 1 ] => verification_obligation_v1,
+          [ "VerificationObligationFailed", 1 ] => verification_obligation_v1,
+          [ "VerificationObligationInvalidated", 1 ] => verification_obligation_v1,
+          [ "VerificationObligationWaived", 1 ] => verification_obligation_v1,
+          [ "VerificationObligationValidityScanStarted", 1 ] =>
+            verification_obligation_validity_scan_v1,
+          [ "VerificationObligationValidityScanProgressed", 1 ] =>
+            verification_obligation_validity_scan_v1,
+          [ "VerificationObligationValidityScanCompleted", 1 ] =>
+            verification_obligation_validity_scan_v1
         }.freeze
       end
 

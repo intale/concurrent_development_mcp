@@ -1,0 +1,16 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class CandidateSubjectMigrationV1 < Shared::Value
+        def source_subject: () -> CandidateObligations::CandidateSubjectV1
+        def target_subject: () -> CandidateObligations::CandidateSubjectV1
+        def context: () -> CandidateContextV1
+        def manifest: () -> Events::CandidateChangeManifestCapturedV1
+        def build_context: () -> Events::CandidateBuildContextCapturedV1?
+        def surface: () -> Events::CandidateImpactSurfaceDerivedV1
+        def registration: () -> Events::CandidateImpactSurfaceRegisteredV1
+        def source_evidence: () -> CandidateObligations::CandidateEvidenceV1
+      end
+    end
+  end
+end

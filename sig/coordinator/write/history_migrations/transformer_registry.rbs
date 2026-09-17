@@ -29,7 +29,9 @@ module Coordinator
           merge_snapshot_v1: MergeSnapshotV1Transformer,
           merge_snapshot_verification_v1: MergeSnapshotVerificationV1Transformer,
           merge_authorization_v1: MergeAuthorizationV1Transformer,
-          merge_observation_v1: MergeObservationV1Transformer
+          merge_observation_v1: MergeObservationV1Transformer,
+          verification_obligation_v1: VerificationObligationV1Transformer,
+          verification_obligation_validity_scan_v1: VerificationObligationValidityScanV1Transformer
         ) -> void
 
         def call: (
