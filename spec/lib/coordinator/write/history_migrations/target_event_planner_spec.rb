@@ -44,6 +44,8 @@ RSpec.describe Coordinator::Write::HistoryMigrations::TargetEventPlanner, :event
     expect(second.value!.outcome).to eq("created")
     expect(first.value!.target_event.stream_revision).to eq(0)
     expect(second.value!.target_event.stream_revision).to eq(1)
+    expect(first.value!.dependency_wave).to eq(0)
+    expect(second.value!.dependency_wave).to eq(1)
     expect(first.value!.target_event.event_id).to eq(first_id)
     expect(second.value!.target_event.event_id).to eq(second_id)
     expect(target_events).to be_empty

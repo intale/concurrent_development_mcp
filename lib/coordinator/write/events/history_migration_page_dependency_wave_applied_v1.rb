@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
 module Coordinator::Write
-  module Commands
-    class ApplyHistoryMigrationPage < Value
-      attribute :command_id, Types::UuidV7
-      attribute :actor, Actor
+  module Events
+    class HistoryMigrationPageDependencyWaveAppliedV1 < Base
+      contract type: "HistoryMigrationPageDependencyWaveApplied", version: 1
+
       attribute :page_id, Types::UuidV7
       attribute :dependency_wave, Types::HistoryMigrationDependencyWave
       attribute :target_event_count, Types::HistoryMigrationWaveTargetEventCount

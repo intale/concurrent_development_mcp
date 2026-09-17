@@ -22,28 +22,39 @@ RSpec.describe Coordinator::Processes::ProcessManagers::HistoryMigration, :event
     manager.call(planned)
 
     plan_completed = migration_event("HistoryMigrationPlanCompleted")
-    manager.call(plan_completed)
+    application_events = []
+    source = plan_completed
+    4.times do |dependency_wave|
+      manager.call(source)
+      applied = page_stream(page_id).select do |event|
+        event.type == "HistoryMigrationPageDependencyWaveApplied"
+      end.fetch(dependency_wave)
+      expect(applied.data["dependency_wave"] || applied.data[:dependency_wave]).to eq(dependency_wave)
+      manager.call(applied)
 
-    applied = page_stream(page_id).last
-    expect(applied.type).to eq("HistoryMigrationPageApplied")
-    manager.call(applied)
-
-    application_advanced = migration_event("HistoryMigrationApplicationCursorAdvanced")
-    manager.call(application_advanced)
+      source = latest_migration_event("HistoryMigrationApplicationCursorAdvanced")
+      application_events << source
+    end
+    manager.call(source)
 
     migration = Coordinator::Container["history_migrations.migration_loader"].call(migration_id)
     expect(migration).to be_completed
     expect(page_stream(source_count.stream.stream_id).map(&:type)).to eq(
-      Coordinator::Write::HistoryMigrations::PageLoader::EVENT_TYPES
+      Coordinator::Write::HistoryMigrations::PageLoader::EVENT_TYPES.first(6) +
+        ([ "HistoryMigrationPageDependencyWaveApplied" ] * 4) +
+        [ "HistoryMigrationPageApplied" ]
     )
     target_events = target_repositories
     expect(target_events.length).to eq(1)
     expect(target_events.sole.stream.stream_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
 
-    [ started, source_count, planned, plan_completed, applied, application_advanced ].each do |event|
+    wave_events = page_stream(page_id).select do |event|
+      event.type == "HistoryMigrationPageDependencyWaveApplied"
+    end
+    [ started, source_count, planned, plan_completed, *wave_events, *application_events ].each do |event|
       manager.call(event)
     end
-    expect(page_stream(source_count.stream.stream_id).length).to eq(7)
+    expect(page_stream(source_count.stream.stream_id).length).to eq(11)
     expect(
       Coordinator::Container["history_migrations.migration_loader"].call(migration_id)
     ).to be_completed
@@ -141,12 +152,19 @@ RSpec.describe Coordinator::Processes::ProcessManagers::HistoryMigration, :event
     ).sole
   end
 
+  def latest_migration_event(type)
+    source_store.read_latest(
+      streams.history_migration(migration_id),
+      Coordinator::Write::LatestEventReadCriteria.new(event_types: [ type ])
+    )
+  end
+
   def page_stream(page_id)
     source_store.read(
       streams.history_migration_page(page_id),
       Coordinator::Write::EventReadCriteria.new(
         event_types: Coordinator::Write::HistoryMigrations::PageLoader::EVENT_TYPES,
-        maximum_count: 7,
+        maximum_count: Coordinator::Write::HistoryMigrations::PageLoader::MAXIMUM_EVENT_COUNT,
         direction: :asc
       )
     )

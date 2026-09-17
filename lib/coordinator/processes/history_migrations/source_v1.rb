@@ -9,7 +9,7 @@ module Coordinator::Processes
                 Types.Instance(Coordinator::Write::Events::HistoryMigrationApplicationCursorAdvancedV1) |
                 Types.Instance(Coordinator::Write::Events::HistoryMigrationPageSourceEventCountRecordedV1) |
                 Types.Instance(Coordinator::Write::Events::HistoryMigrationPagePlannedV1) |
-                Types.Instance(Coordinator::Write::Events::HistoryMigrationPageAppliedV1)
+                Types.Instance(Coordinator::Write::Events::HistoryMigrationPageDependencyWaveAppliedV1)
 
       attribute :event, Types.Instance(PgEventstore::Event)
       attribute :payload, Payload

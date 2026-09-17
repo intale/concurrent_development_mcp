@@ -11,7 +11,7 @@ module Coordinator::Processes
         "HistoryMigrationPageSourceEventCountRecorded" =>
           [ "CoordinatorMaintenance", "HistoryMigrationPage" ],
         "HistoryMigrationPagePlanned" => [ "CoordinatorMaintenance", "HistoryMigrationPage" ],
-        "HistoryMigrationPageApplied" => [ "CoordinatorMaintenance", "HistoryMigrationPage" ]
+        "HistoryMigrationPageDependencyWaveApplied" => [ "CoordinatorMaintenance", "HistoryMigrationPage" ]
       }.freeze
 
       params do

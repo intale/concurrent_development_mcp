@@ -52,6 +52,7 @@ module Coordinator::Write
           page_size: start_state.page_size,
           next_from_position: planning_next_from_position(progress),
           plan_completed: progress.key?("HistoryMigrationPlanCompleted"),
+          application_dependency_wave: application_dependency_wave(progress),
           application_next_from_position: application_next_from_position(progress),
           completed: progress.key?("HistoryMigrationCompleted"),
           checkpoint_event:,
@@ -91,13 +92,21 @@ module Coordinator::Write
         end
 
         if application
-          unless plan_completed && upper && application.next_from_position <= upper + 1
+          terminal = application.dependency_wave == Types::HISTORY_MIGRATION_DEPENDENCY_WAVE_MAXIMUM &&
+            application.next_from_position == upper.to_i + 1
+          unless plan_completed && upper &&
+              (application.next_from_position <= upper || terminal)
             raise InvalidHistoryMigrationHistory, "HistoryMigration application cursor is outside its planned range"
           end
         end
 
         return unless completed
-        terminal_application = upper.nil? ? application.nil? : application&.next_from_position == upper + 1
+        terminal_application = if upper.nil?
+          application.nil?
+        else
+          application&.dependency_wave == Types::HISTORY_MIGRATION_DEPENDENCY_WAVE_MAXIMUM &&
+            application.next_from_position == upper + 1
+        end
         unless plan_completed && terminal_application &&
             completed.first.stream_revision > plan_completed.first.stream_revision
           raise InvalidHistoryMigrationHistory, "HistoryMigration completion has no complete application"
@@ -110,6 +119,10 @@ module Coordinator::Write
 
       def application_next_from_position(progress)
         progress["HistoryMigrationApplicationCursorAdvanced"]&.last&.next_from_position || 0
+      end
+
+      def application_dependency_wave(progress)
+        progress["HistoryMigrationApplicationCursorAdvanced"]&.last&.dependency_wave || 0
       end
     end
   end

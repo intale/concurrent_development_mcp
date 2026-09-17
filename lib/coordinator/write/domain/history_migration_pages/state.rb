@@ -4,23 +4,27 @@ module Coordinator::Write
   module Domain
     module HistoryMigrationPages
       class State < Value
-        EVENT_CLASSES = [
+        PLANNING_EVENT_CLASSES = [
           Events::HistoryMigrationPageCreatedV1,
           Events::HistoryMigrationPageAddedToMigrationV1,
           Events::HistoryMigrationPageSourceRangeSelectedV1,
           Events::HistoryMigrationPageSourceEventCountRecordedV1,
           Events::HistoryMigrationPageTargetEventCountRecordedV1,
-          Events::HistoryMigrationPagePlannedV1,
-          Events::HistoryMigrationPageAppliedV1
+          Events::HistoryMigrationPagePlannedV1
         ].freeze
+        DEPENDENCY_WAVE_COUNT = Types::HISTORY_MIGRATION_DEPENDENCY_WAVE_MAXIMUM + 1
+        MAXIMUM_STEP = PLANNING_EVENT_CLASSES.length + DEPENDENCY_WAVE_COUNT + 1
 
-        attribute :step, Types::Integer.constrained(gteq: 0, lteq: EVENT_CLASSES.length)
+        attribute :step, Types::Integer.constrained(gteq: 0, lteq: MAXIMUM_STEP)
         attribute :page_id, Types::UuidV7.optional
         attribute :migration_id, Types::UuidV7.optional
         attribute :from_position, Types::GlobalPosition.optional
         attribute :to_position, Types::GlobalPosition.optional
         attribute :source_event_count, Types::HistoryMigrationSourceEventCount.optional
         attribute :target_event_count, Types::HistoryMigrationTargetEventCount.optional
+        attribute :applied_wave_target_event_counts,
+                  Types::Array.of(Types::HistoryMigrationWaveTargetEventCount)
+                    .constrained(max_size: DEPENDENCY_WAVE_COUNT)
 
         def self.initial
           new(
@@ -30,7 +34,8 @@ module Coordinator::Write
             from_position: nil,
             to_position: nil,
             source_event_count: nil,
-            target_event_count: nil
+            target_event_count: nil,
+            applied_wave_target_event_counts: []
           )
         end
 
@@ -47,11 +52,23 @@ module Coordinator::Write
         end
 
         def planned?
-          step == 6
+          step >= PLANNING_EVENT_CLASSES.length
         end
 
         def applied?
-          step == EVENT_CLASSES.length
+          step == MAXIMUM_STEP
+        end
+
+        def next_dependency_wave
+          applied_wave_target_event_counts.length
+        end
+
+        def dependency_wave_applied?(dependency_wave)
+          dependency_wave < next_dependency_wave
+        end
+
+        def target_event_count_for(dependency_wave)
+          applied_wave_target_event_counts.fetch(dependency_wave)
         end
 
         def matches_creation?(command)
@@ -64,7 +81,7 @@ module Coordinator::Write
         end
 
         def apply(event)
-          expected = EVENT_CLASSES[step]
+          expected = expected_event_class
           unless expected && event.is_a?(expected)
             raise InvalidHistoryMigrationHistory,
                   "Expected #{expected&.name || 'no further page event'}, got #{event.class.name}"
@@ -84,6 +101,11 @@ module Coordinator::Write
             changes[:source_event_count] = event.source_event_count
           when Events::HistoryMigrationPageTargetEventCountRecordedV1
             changes[:target_event_count] = event.target_event_count
+          when Events::HistoryMigrationPageDependencyWaveAppliedV1
+            unless event.dependency_wave == next_dependency_wave
+              raise InvalidHistoryMigrationHistory, "HistoryMigrationPage dependency waves are not contiguous"
+            end
+            changes[:applied_wave_target_event_counts] = applied_wave_target_event_counts + [ event.target_event_count ]
           end
 
           next_state = self.class.new(attributes.merge(changes))
@@ -91,8 +113,23 @@ module Coordinator::Write
               next_state.source_event_count > (next_state.to_position - next_state.from_position + 1)
             raise InvalidHistoryMigrationHistory, "HistoryMigrationPage count exceeds its source range"
           end
+          if event.is_a?(Events::HistoryMigrationPageDependencyWaveAppliedV1) &&
+              next_state.next_dependency_wave == DEPENDENCY_WAVE_COUNT &&
+              next_state.applied_wave_target_event_counts.sum != next_state.target_event_count
+            raise InvalidHistoryMigrationHistory, "HistoryMigrationPage applied count differs from its plan"
+          end
 
           next_state
+        end
+
+        private
+
+        def expected_event_class
+          return PLANNING_EVENT_CLASSES[step] if step < PLANNING_EVENT_CLASSES.length
+          return Events::HistoryMigrationPageDependencyWaveAppliedV1 if step < MAXIMUM_STEP - 1
+          return Events::HistoryMigrationPageAppliedV1 if step == MAXIMUM_STEP - 1
+
+          nil
         end
       end
     end

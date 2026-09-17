@@ -7,6 +7,8 @@ module Coordinator::Write
       attribute :actor, Actor
       attribute :migration_id, Types::UuidV7
       attribute :page_id, Types::UuidV7
+      attribute :dependency_wave, Types::HistoryMigrationDependencyWave
+      attribute :next_dependency_wave, Types::HistoryMigrationDependencyWave
       attribute :next_from_position, Types::GlobalPosition
     end
   end

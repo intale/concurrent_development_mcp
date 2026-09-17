@@ -10,6 +10,7 @@ module Coordinator
           event_store: EventStore,
           ?target_stream_plan_allocator: TargetStreamPlanAllocator,
           ?marker_codec: Shared::Markers::CodecV2,
+          ?dependency_wave_classifier: DependencyWaveClassifier,
           ?id_generator: Shared::IdGenerator,
           ?event_factory: EventFactory,
           ?schema_registry: EventSchemaRegistry

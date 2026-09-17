@@ -461,7 +461,8 @@ RSpec.describe "history migration Decision transformers", :event_store do
   end
 
   def dispatch(source_event, upper_position:)
-    dispatcher.call(
+    HistoryMigrationWaveDispatch.call(
+      dispatcher:,
       migration_id:,
       source_config_name: "default",
       source_upper_position: upper_position,

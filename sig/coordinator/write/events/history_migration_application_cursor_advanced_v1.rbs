@@ -3,6 +3,7 @@ module Coordinator
     module Events
       class HistoryMigrationApplicationCursorAdvancedV1 < Base
         def migration_id: () -> String
+        def dependency_wave: () -> Integer
         def next_from_position: () -> Integer
       end
     end

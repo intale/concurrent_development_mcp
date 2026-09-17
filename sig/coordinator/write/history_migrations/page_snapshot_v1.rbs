@@ -7,6 +7,7 @@ module Coordinator
         attr_reader latest_revision: Integer?
 
         def event: (String type) -> PgEventstore::Event?
+        def dependency_wave_event: (Integer dependency_wave) -> PgEventstore::Event
       end
     end
   end

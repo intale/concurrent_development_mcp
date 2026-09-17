@@ -15,18 +15,23 @@ module Coordinator::Write
           return plan_required(command) unless snapshot.plan_completed?
           return mismatch(command) unless page_matches?(page, command)
 
-          desired_cursor = page.to_position + 1
-          return mismatch(command) unless command.next_from_position == desired_cursor
-          if snapshot.application_next_from_position == desired_cursor
+          desired_wave, desired_cursor = desired_progress(snapshot, page, command.dependency_wave)
+          unless command.next_dependency_wave == desired_wave && command.next_from_position == desired_cursor
+            return mismatch(command)
+          end
+          if snapshot.application_dependency_wave == desired_wave &&
+              snapshot.application_next_from_position == desired_cursor
             return Success(ApplicationProgressDecisionV1.new(outcome: "existing", plan: nil))
           end
-          unless snapshot.application_next_from_position == page.from_position
+          unless snapshot.application_dependency_wave == command.dependency_wave &&
+              snapshot.application_next_from_position == page.from_position
             return checkpoint_changed(command)
           end
 
           stream = @stream_factory.history_migration(command.migration_id)
           event = Events::HistoryMigrationApplicationCursorAdvancedV1.new(
             migration_id: command.migration_id,
+            dependency_wave: command.next_dependency_wave,
             next_from_position: command.next_from_position
           )
           Success(
@@ -40,7 +45,19 @@ module Coordinator::Write
         private
 
         def page_matches?(page, command)
-          page.applied? && page.page_id == command.page_id && page.migration_id == command.migration_id
+          page.dependency_wave_applied?(command.dependency_wave) &&
+            page.page_id == command.page_id &&
+            page.migration_id == command.migration_id
+        end
+
+        def desired_progress(snapshot, page, dependency_wave)
+          next_position = page.to_position + 1
+          return [ dependency_wave, next_position ] if next_position <= snapshot.source_upper_position
+          if dependency_wave < Types::HISTORY_MIGRATION_DEPENDENCY_WAVE_MAXIMUM
+            return [ dependency_wave + 1, 0 ]
+          end
+
+          [ dependency_wave, next_position ]
         end
 
         def plan_required(command)

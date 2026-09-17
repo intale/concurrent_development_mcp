@@ -3,6 +3,7 @@ module Coordinator
     module HistoryMigrations
       class PageLoader
         EVENT_TYPES: Array[String]
+        MAXIMUM_EVENT_COUNT: Integer
         HISTORY: EventReadCriteria
 
         def initialize: (event_store: _EventStore, ?stream_factory: StreamFactory, ?schema_registry: EventSchemaRegistry) -> void

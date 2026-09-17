@@ -5,7 +5,7 @@ module Coordinator
         include Dry::Monads::Result::Mixin
 
         def initialize: (source_loader: PageSourceLoader, event_dispatcher: EventDispatcher) -> void
-        def call: (migration: MigrationSnapshotV1, page: Domain::HistoryMigrationPages::State) -> Dry::Monads::Result
+        def call: (migration: MigrationSnapshotV1, page: Domain::HistoryMigrationPages::State, dependency_wave: Integer) -> Dry::Monads::Result
       end
     end
   end

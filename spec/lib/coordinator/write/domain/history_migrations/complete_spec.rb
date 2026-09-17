@@ -28,6 +28,15 @@ RSpec.describe Coordinator::Write::Domain::HistoryMigrations::Complete do
     expect(failure.code).to eq(:history_migration_application_incomplete)
   end
 
+  it "rejects a terminal source cursor reached before the terminal dependency wave" do
+    failure = decider.call(
+      snapshot: snapshot(application_next_from_position: 10).new(application_dependency_wave: 2),
+      command:
+    ).failure
+
+    expect(failure.code).to eq(:history_migration_application_incomplete)
+  end
+
   def snapshot(application_next_from_position:)
     Coordinator::Write::HistoryMigrations::MigrationSnapshotV1.new(
       migration_id:,
@@ -37,6 +46,7 @@ RSpec.describe Coordinator::Write::Domain::HistoryMigrations::Complete do
       page_size: 10,
       next_from_position: 10,
       plan_completed: true,
+      application_dependency_wave: 3,
       application_next_from_position:,
       completed: false,
       checkpoint_event:,

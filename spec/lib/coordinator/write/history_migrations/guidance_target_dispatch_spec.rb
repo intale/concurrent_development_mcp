@@ -39,7 +39,8 @@ RSpec.describe "history migration guidance target dispatch", :event_store do
       )
     ).to be_success
 
-    write = dispatcher.call(
+    write = HistoryMigrationWaveDispatch.call(
+      dispatcher:,
       migration_id:,
       source_config_name: "default",
       source_upper_position: source_event.global_position,

@@ -6,6 +6,8 @@ module Coordinator
         def actor: () -> Actor
         def migration_id: () -> String
         def page_id: () -> String
+        def dependency_wave: () -> Integer
+        def next_dependency_wave: () -> Integer
         def next_from_position: () -> Integer
       end
     end

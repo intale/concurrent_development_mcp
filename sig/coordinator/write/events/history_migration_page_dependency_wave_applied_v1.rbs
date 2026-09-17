@@ -1,9 +1,7 @@
 module Coordinator
   module Write
-    module Commands
-      class ApplyHistoryMigrationPage < Shared::Value
-        attr_reader command_id: String
-        attr_reader actor: Actor
+    module Events
+      class HistoryMigrationPageDependencyWaveAppliedV1 < Base
         attr_reader page_id: String
         attr_reader dependency_wave: Integer
         attr_reader target_event_count: Integer

@@ -49,6 +49,8 @@ module Coordinator::Write
       [ "HistoryMigrationPageTargetEventCountRecorded", 1 ] =>
         Events::HistoryMigrationPageTargetEventCountRecordedV1,
       [ "HistoryMigrationPagePlanned", 1 ] => Events::HistoryMigrationPagePlannedV1,
+      [ "HistoryMigrationPageDependencyWaveApplied", 1 ] =>
+        Events::HistoryMigrationPageDependencyWaveAppliedV1,
       [ "HistoryMigrationPageApplied", 1 ] => Events::HistoryMigrationPageAppliedV1,
       [ "HistoryMigrationCursorAdvanced", 1 ] => Events::HistoryMigrationCursorAdvancedV1,
       [ "HistoryMigrationPlanCompleted", 1 ] => Events::HistoryMigrationPlanCompletedV1,

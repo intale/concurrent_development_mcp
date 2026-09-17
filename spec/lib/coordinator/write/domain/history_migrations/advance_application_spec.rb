@@ -17,6 +17,7 @@ RSpec.describe Coordinator::Write::Domain::HistoryMigrations::AdvanceApplication
       page_size: 10,
       next_from_position: 10,
       plan_completed: true,
+      application_dependency_wave: 0,
       application_next_from_position: 0,
       completed: false,
       checkpoint_event:,
@@ -42,7 +43,11 @@ RSpec.describe Coordinator::Write::Domain::HistoryMigrations::AdvanceApplication
           target_event_count: 12
         ),
         Coordinator::Write::Events::HistoryMigrationPagePlannedV1.new(page_id:),
-        Coordinator::Write::Events::HistoryMigrationPageAppliedV1.new(page_id:)
+        Coordinator::Write::Events::HistoryMigrationPageDependencyWaveAppliedV1.new(
+          page_id:,
+          dependency_wave: 0,
+          target_event_count: 12
+        )
       ]
     )
   end
@@ -52,7 +57,9 @@ RSpec.describe Coordinator::Write::Domain::HistoryMigrations::AdvanceApplication
       actor: Coordinator::Write::Commands::Actor.new(kind: "system", id: "history-migration"),
       migration_id:,
       page_id:,
-      next_from_position: 10
+      dependency_wave: 0,
+      next_dependency_wave: 1,
+      next_from_position: 0
     )
   end
 
@@ -60,7 +67,9 @@ RSpec.describe Coordinator::Write::Domain::HistoryMigrations::AdvanceApplication
     decision = decider.call(snapshot:, page:, command:).value!
 
     expect(decision.outcome).to eq("advanced")
-    expect(decision.plan.events.map(&:to_h)).to eq([ { migration_id:, next_from_position: 10 } ])
+    expect(decision.plan.events.map(&:to_h)).to eq(
+      [ { migration_id:, dependency_wave: 1, next_from_position: 0 } ]
+    )
   end
 
   it "rejects application before the complete-plan barrier" do

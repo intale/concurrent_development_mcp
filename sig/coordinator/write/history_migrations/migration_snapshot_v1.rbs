@@ -9,6 +9,7 @@ module Coordinator
         attr_reader page_size: Integer
         attr_reader next_from_position: Integer
         attr_reader plan_completed: bool
+        attr_reader application_dependency_wave: Integer
         attr_reader application_next_from_position: Integer
         attr_reader completed: bool
         attr_reader checkpoint_event: PgEventstore::Event

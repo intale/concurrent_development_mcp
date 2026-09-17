@@ -72,13 +72,15 @@ RSpec.describe "history migration command and Task target dispatch", :event_stor
       ).to be_success
     end
 
-    submitted_write = dispatcher.call(
+    submitted_write = HistoryMigrationWaveDispatch.call(
+      dispatcher:,
       migration_id:,
       source_config_name: "default",
       source_upper_position: upper_position,
       source_event: submitted_event
     ).value!
-    completion_write = dispatcher.call(
+    completion_write = HistoryMigrationWaveDispatch.call(
+      dispatcher:,
       migration_id:,
       source_config_name: "default",
       source_upper_position: upper_position,

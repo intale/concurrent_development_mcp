@@ -129,7 +129,8 @@ RSpec.describe "history migration Candidate transformers", :event_store do
     expect(head_fact.markers).not_to include("sha256:#{'e' * 64}")
 
     writes = [ submitted, manifest, context, head ].map do |event|
-      dispatcher.call(
+      HistoryMigrationWaveDispatch.call(
+        dispatcher:,
         migration_id:,
         source_config_name: "default",
         source_upper_position: upper_position,

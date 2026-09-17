@@ -54,7 +54,7 @@ module Coordinator::Processes
         when Coordinator::Write::Events::HistoryMigrationPlanCompletedV1,
              Coordinator::Write::Events::HistoryMigrationApplicationCursorAdvancedV1
           apply_next_page(source)
-        when Coordinator::Write::Events::HistoryMigrationPageAppliedV1
+        when Coordinator::Write::Events::HistoryMigrationPageDependencyWaveAppliedV1
           advance_application(source)
         end
         nil
@@ -169,8 +169,12 @@ module Coordinator::Processes
           raise HistoryMigrationProcessRejected, "HistoryMigration application started before plan completion"
         end
 
-        if migration.source_upper_position.nil? ||
-            migration.application_next_from_position > migration.source_upper_position
+        return complete_migration(source, migration:) if migration.source_upper_position.nil?
+        if migration.application_next_from_position > migration.source_upper_position
+          unless migration.application_dependency_wave ==
+              Coordinator::Shared::Types::HISTORY_MIGRATION_DEPENDENCY_WAVE_MAXIMUM
+            raise HistoryMigrationProcessRejected, "HistoryMigration dependency wave ended outside its source range"
+          end
           return complete_migration(source, migration:)
         end
 
@@ -181,28 +185,30 @@ module Coordinator::Processes
           )
         )
         page = @page_loader.call(location.page_id)
-        unless page.state.planned? || page.state.applied?
+        unless page.state.planned?
           raise HistoryMigrationProcessRejected, "HistoryMigration application located an unplanned page"
         end
 
+        dependency_wave = migration.application_dependency_wave
         process_step = plan(
           source_event: source.event,
-          step_name: "apply-page",
+          step_name: "apply-page-wave-#{dependency_wave}",
           subject_kind: "history-migration-page",
           subject_id: page.state.page_id,
           allocate_target_entity: false
         )
-        target_event_count = execute!(@page_dispatcher.call(migration:, page: page.state))
-        unless target_event_count == page.state.target_event_count
-          raise HistoryMigrationProcessRejected, "HistoryMigration application differs from its complete plan"
-        end
+        target_event_count = execute!(
+          @page_dispatcher.call(migration:, page: page.state, dependency_wave:)
+        )
 
         execute!(
           @apply_page.call_command(
             Coordinator::Write::Commands::ApplyHistoryMigrationPage.new(
               command_id: process_step.target_command_id,
               actor: ACTOR,
-              page_id: page.state.page_id
+              page_id: page.state.page_id,
+              dependency_wave:,
+              target_event_count:
             ),
             caused_by: process_step.event
           )
@@ -211,15 +217,20 @@ module Coordinator::Processes
 
       def advance_application(source)
         page = @page_loader.call(source.payload.page_id)
-        return unless page.state.applied?
-        return unless page.event("HistoryMigrationPageApplied")&.id == source.event.id
+        return unless page.state.dependency_wave_applied?(source.payload.dependency_wave)
+        return unless page.dependency_wave_event(source.payload.dependency_wave).id == source.event.id
 
         migration = @migration_loader.call(page.state.migration_id)
         return if migration.completed?
 
+        next_dependency_wave, next_from_position = next_application_progress(
+          migration:,
+          page: page.state,
+          dependency_wave: source.payload.dependency_wave
+        )
         process_step = plan(
           source_event: source.event,
-          step_name: "advance-application-cursor",
+          step_name: "advance-application-wave-#{source.payload.dependency_wave}",
           subject_kind: "history-migration-page",
           subject_id: page.state.page_id,
           allocate_target_entity: false
@@ -231,11 +242,23 @@ module Coordinator::Processes
               actor: ACTOR,
               migration_id: migration.migration_id,
               page_id: page.state.page_id,
-              next_from_position: page.state.to_position + 1
+              dependency_wave: source.payload.dependency_wave,
+              next_dependency_wave:,
+              next_from_position:
             ),
             caused_by: process_step.event
           )
         )
+      end
+
+      def next_application_progress(migration:, page:, dependency_wave:)
+        next_position = page.to_position + 1
+        return [ dependency_wave, next_position ] if next_position <= migration.source_upper_position
+        if dependency_wave < Coordinator::Shared::Types::HISTORY_MIGRATION_DEPENDENCY_WAVE_MAXIMUM
+          return [ dependency_wave + 1, 0 ]
+        end
+
+        [ dependency_wave, next_position ]
       end
 
       def complete_empty_plan(source, migration:)

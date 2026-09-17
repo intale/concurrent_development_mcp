@@ -66,6 +66,7 @@ module Coordinator::Shared
     DEVELOPMENT_ARTIFACT_TARGET_NAME_MAXIMUM_BYTES = 255
     DEVELOPMENT_ARTIFACT_TARGET_SCOPE_MAXIMUM_BYTES = 500
     DEVELOPMENT_ARTIFACT_QUERY_MAXIMUM_ITEMS = 100
+    HISTORY_MIGRATION_DEPENDENCY_WAVE_MAXIMUM = 3
     COORDINATION_DISCOVERY_MAXIMUM_ITEMS = 50
     DECISION_DISCOVERY_MAXIMUM_ITEMS = 50
     DEVELOPMENT_ARTIFACT_KINDS = %w[
@@ -832,6 +833,11 @@ module Coordinator::Shared
       lteq: HISTORY_MIGRATION_PAGE_SIZE_MAXIMUM
     )
     HistoryMigrationTargetEventCount = Integer.constrained(gteq: 1, lteq: 100_000)
+    HistoryMigrationWaveTargetEventCount = Integer.constrained(gteq: 0, lteq: 100_000)
+    HistoryMigrationDependencyWave = Integer.constrained(
+      gteq: 0,
+      lteq: HISTORY_MIGRATION_DEPENDENCY_WAVE_MAXIMUM
+    )
     AgentChoiceImpactPageSize = Integer.enum(50)
     AgentChoiceImpactPageChoiceCount = Integer.constrained(gteq: 0, lteq: 50)
     AgentChoiceImpactListLimit = Integer.constrained(gteq: 1, lteq: 100)

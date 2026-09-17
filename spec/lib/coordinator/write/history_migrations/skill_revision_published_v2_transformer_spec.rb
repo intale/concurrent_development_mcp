@@ -296,7 +296,8 @@ RSpec.describe Coordinator::Write::HistoryMigrations::SkillRevisionPublishedV2Tr
   end
 
   def dispatch(event, upper_position:)
-    dispatcher.call(
+    HistoryMigrationWaveDispatch.call(
+      dispatcher:,
       migration_id:,
       source_config_name: "default",
       source_upper_position: upper_position,

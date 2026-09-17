@@ -11,7 +11,7 @@ module Coordinator::Write
         @target_writer = target_writer
       end
 
-      def call(migration_id:, source_config_name:, source_upper_position:, source_event:)
+      def call(migration_id:, source_config_name:, source_upper_position:, source_event:, dependency_wave:)
         transformation = @transformer_registry.call(
           migration_id:,
           source_config_name:,
@@ -28,7 +28,11 @@ module Coordinator::Write
         )
         return plan if plan.failure?
 
-        @target_writer.call(planned_facts: plan.value!)
+        @target_writer.call(
+          planned_facts: plan.value!.select do |fact|
+            fact.target_event_plan.dependency_wave == dependency_wave
+          end
+        )
       end
     end
   end

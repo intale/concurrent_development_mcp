@@ -10,14 +10,15 @@ module Coordinator::Write
         @event_dispatcher = event_dispatcher
       end
 
-      def call(migration:, page:)
+      def call(migration:, page:, dependency_wave:)
         count = 0
         @source_loader.call(page).each do |source_event|
           result = @event_dispatcher.call(
             migration_id: migration.migration_id,
             source_config_name: migration.source_config_name,
             source_upper_position: migration.source_upper_position,
-            source_event:
+            source_event:,
+            dependency_wave:
           )
           return result if result.failure?
 

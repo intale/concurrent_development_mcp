@@ -35,6 +35,7 @@ RSpec.describe Coordinator::Write::Domain::HistoryMigrations::CompletePlan do
       page_size: 10,
       next_from_position: 0,
       plan_completed: false,
+      application_dependency_wave: 0,
       application_next_from_position: 0,
       completed: false,
       checkpoint_event:,

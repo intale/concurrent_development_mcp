@@ -392,6 +392,8 @@ module Coordinator
       HistoryMigrationPageSize: untyped
       HistoryMigrationSourceEventCount: untyped
       HistoryMigrationTargetEventCount: untyped
+      HistoryMigrationWaveTargetEventCount: untyped
+      HistoryMigrationDependencyWave: untyped
       AgentChoiceImpactPageSize: untyped
       AgentChoiceImpactPageChoiceCount: untyped
       AgentChoiceImpactListLimit: untyped

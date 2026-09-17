@@ -16,6 +16,7 @@ module Coordinator::Write
         event_store:,
         target_stream_plan_allocator: TargetStreamPlanAllocator.new(event_store:),
         marker_codec: Coordinator::Shared::Markers::CodecV2.new,
+        dependency_wave_classifier: DependencyWaveClassifier.new,
         id_generator: IdGenerator.new,
         event_factory: EventFactory.new,
         schema_registry: EventSchemaRegistry.new
@@ -23,6 +24,7 @@ module Coordinator::Write
         @event_store = event_store
         @target_stream_plan_allocator = target_stream_plan_allocator
         @marker_codec = marker_codec
+        @dependency_wave_classifier = dependency_wave_classifier
         @id_generator = id_generator
         @event_factory = event_factory
         @schema_registry = schema_registry
@@ -128,6 +130,7 @@ module Coordinator::Write
           )
         end
 
+        target_revision = next_target_revision(head)
         command = command_for(
           migration_id:,
           source_event:,
@@ -136,7 +139,12 @@ module Coordinator::Write
           target_event_id:,
           target_event_type:,
           plan_id: allocation.plan_stream.stream_id,
-          target_revision: next_target_revision(head)
+          target_revision:,
+          dependency_wave: @dependency_wave_classifier.call(
+            target_event_type:,
+            target_revision:,
+            previous_wave: previous_dependency_wave(head)
+          )
         )
         event = build_event(command, marker:, caused_by:)
         persisted = @event_store.append(
@@ -239,6 +247,12 @@ module Coordinator::Write
         load(head).target_event.stream_revision + 1
       end
 
+      def previous_dependency_wave(head)
+        return unless head.type == "HistoryMigrationTargetEventPlanned"
+
+        load(head).dependency_wave
+      end
+
       def command_for(
         migration_id:,
         source_event:,
@@ -247,7 +261,8 @@ module Coordinator::Write
         target_event_id:,
         target_event_type:,
         plan_id:,
-        target_revision:
+        target_revision:,
+        dependency_wave:
       )
         Commands::PlanHistoryMigrationTargetEvent.new(
           command_id: @id_generator.uuid_v7,
@@ -258,6 +273,7 @@ module Coordinator::Write
           source_event_id: source_event.id,
           source_global_position: source_event.global_position,
           transformation_step:,
+          dependency_wave:,
           target_event: EventReference.new(
             event_id: target_event_id,
             type: target_event_type,
@@ -277,6 +293,7 @@ module Coordinator::Write
             source_event_id: command.source_event_id,
             source_global_position: command.source_global_position,
             transformation_step: command.transformation_step,
+            dependency_wave: command.dependency_wave,
             target_event: command.target_event
           ),
           event_id: command.event_id,
@@ -291,6 +308,7 @@ module Coordinator::Write
             marker,
             "history-migration:#{command.migration_id}",
             "migration-source-event:#{command.source_event_id}",
+            "history-migration-wave:#{command.dependency_wave}",
             "target-event:#{command.target_event.event_id}"
           ],
           caused_by:
@@ -314,6 +332,7 @@ module Coordinator::Write
           source_event_id: payload.source_event_id,
           source_global_position: payload.source_global_position,
           transformation_step: payload.transformation_step,
+          dependency_wave: payload.dependency_wave,
           target_event: payload.target_event,
           planning_event: event,
           marker:,

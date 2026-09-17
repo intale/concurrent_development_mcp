@@ -5,7 +5,7 @@ module Coordinator
         Payload: untyped
 
         attr_reader event: PgEventstore::Event
-        attr_reader payload: Write::Events::HistoryMigrationStartedV1 | Write::Events::HistoryMigrationCursorAdvancedV1 | Write::Events::HistoryMigrationPlanCompletedV1 | Write::Events::HistoryMigrationApplicationCursorAdvancedV1 | Write::Events::HistoryMigrationPageSourceEventCountRecordedV1 | Write::Events::HistoryMigrationPagePlannedV1 | Write::Events::HistoryMigrationPageAppliedV1
+        attr_reader payload: Write::Events::HistoryMigrationStartedV1 | Write::Events::HistoryMigrationCursorAdvancedV1 | Write::Events::HistoryMigrationPlanCompletedV1 | Write::Events::HistoryMigrationApplicationCursorAdvancedV1 | Write::Events::HistoryMigrationPageSourceEventCountRecordedV1 | Write::Events::HistoryMigrationPagePlannedV1 | Write::Events::HistoryMigrationPageDependencyWaveAppliedV1
       end
     end
   end

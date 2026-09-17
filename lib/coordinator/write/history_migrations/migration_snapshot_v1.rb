@@ -10,6 +10,7 @@ module Coordinator::Write
       attribute :page_size, Types::HistoryMigrationPageSize
       attribute :next_from_position, Types::GlobalPosition
       attribute :plan_completed, Types::Bool
+      attribute :application_dependency_wave, Types::HistoryMigrationDependencyWave
       attribute :application_next_from_position, Types::GlobalPosition
       attribute :completed, Types::Bool
       attribute :checkpoint_event, Types.Instance(PgEventstore::Event)

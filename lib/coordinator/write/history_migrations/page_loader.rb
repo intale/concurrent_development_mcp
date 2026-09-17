@@ -10,11 +10,13 @@ module Coordinator::Write
         "HistoryMigrationPageSourceEventCountRecorded",
         "HistoryMigrationPageTargetEventCountRecorded",
         "HistoryMigrationPagePlanned",
+        "HistoryMigrationPageDependencyWaveApplied",
         "HistoryMigrationPageApplied"
       ].freeze
+      MAXIMUM_EVENT_COUNT = 11
       HISTORY = EventReadCriteria.new(
         event_types: EVENT_TYPES,
-        maximum_count: EVENT_TYPES.length,
+        maximum_count: MAXIMUM_EVENT_COUNT,
         direction: :asc
       )
 

@@ -231,7 +231,8 @@ RSpec.describe "history migration Candidate impact scan transformer", :event_sto
   end
 
   def dispatch(source_event, upper_position:)
-    dispatcher.call(
+    HistoryMigrationWaveDispatch.call(
+      dispatcher:,
       migration_id:,
       source_config_name: "default",
       source_upper_position: upper_position,

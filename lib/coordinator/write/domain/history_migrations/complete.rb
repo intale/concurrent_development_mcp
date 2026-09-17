@@ -30,7 +30,8 @@ module Coordinator::Write
           return false unless snapshot.plan_completed?
           return snapshot.application_next_from_position.zero? if snapshot.source_upper_position.nil?
 
-          snapshot.application_next_from_position > snapshot.source_upper_position
+          snapshot.application_dependency_wave == Types::HISTORY_MIGRATION_DEPENDENCY_WAVE_MAXIMUM &&
+            snapshot.application_next_from_position > snapshot.source_upper_position
         end
 
         def incomplete(command)

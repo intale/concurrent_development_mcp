@@ -3,7 +3,9 @@ module Coordinator
     module Domain
       module HistoryMigrationPages
         class State < Shared::Value
-          EVENT_CLASSES: Array[Class]
+          PLANNING_EVENT_CLASSES: Array[Class]
+          DEPENDENCY_WAVE_COUNT: Integer
+          MAXIMUM_STEP: Integer
 
           attr_reader step: Integer
           attr_reader page_id: String?
@@ -12,6 +14,7 @@ module Coordinator
           attr_reader to_position: Integer?
           attr_reader source_event_count: Integer?
           attr_reader target_event_count: Integer?
+          attr_reader applied_wave_target_event_counts: Array[Integer]
 
           def self.initial: () -> State
           def self.reduce: (Array[Events::Base] events) -> State
@@ -19,6 +22,9 @@ module Coordinator
           def created?: () -> bool
           def planned?: () -> bool
           def applied?: () -> bool
+          def next_dependency_wave: () -> Integer
+          def dependency_wave_applied?: (Integer dependency_wave) -> bool
+          def target_event_count_for: (Integer dependency_wave) -> Integer
           def matches_creation?: (Commands::CreateHistoryMigrationPage command) -> bool
           def apply: (Events::Base event) -> State
         end
