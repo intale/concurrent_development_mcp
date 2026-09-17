@@ -16,6 +16,7 @@ module Coordinator
         def media_type: () -> String?
         def byte_size: () -> Integer?
         def content_sha256: () -> String?
+        def content_digest: () -> String?
         def manifest_digest: () -> String?
         def build_context_digest: () -> String?
         def dependency_graph_digest: () -> String?

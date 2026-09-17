@@ -1,0 +1,13 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class SkillRevisionMigrationContextV1 < Shared::Value
+        def skill_stream: () -> StreamReference
+        def revision_stream: () -> StreamReference
+        def asset_streams: () -> Array[StreamReference]
+        def skill_id: () -> String
+        def skill_revision_id: () -> String
+      end
+    end
+  end
+end

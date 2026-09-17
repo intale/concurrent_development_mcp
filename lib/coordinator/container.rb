@@ -492,6 +492,13 @@ module Coordinator
       )
     end
 
+    register("history_migrations.skill_revision_published_v2_transformer", memoize: true) do
+      Write::HistoryMigrations::SkillRevisionPublishedV2Transformer.new(
+        event_store: self["event_store"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"]
+      )
+    end
+
     register("history_migrations.transformer_registry", memoize: true) do
       Write::HistoryMigrations::TransformerRegistry.new(
         schema_registry: Write::HistoryMigrations::LegacyEventSchemaRegistry.new,
@@ -521,7 +528,9 @@ module Coordinator
         development_artifact_v1:
           self["history_migrations.development_artifact_v1_transformer"],
         development_artifact_relation_v1:
-          self["history_migrations.development_artifact_relation_v1_transformer"]
+          self["history_migrations.development_artifact_relation_v1_transformer"],
+        skill_revision_published_v2:
+          self["history_migrations.skill_revision_published_v2_transformer"]
       )
     end
 

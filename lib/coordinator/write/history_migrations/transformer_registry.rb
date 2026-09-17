@@ -27,7 +27,8 @@ module Coordinator::Write
         coordination_task_lifecycle:,
         command_completed_v1:,
         development_artifact_v1:,
-        development_artifact_relation_v1:
+        development_artifact_relation_v1:,
+        skill_revision_published_v2:
       )
         @schema_registry = schema_registry
         @definitions = {
@@ -95,7 +96,8 @@ module Coordinator::Write
           [ "DevelopmentArtifactObserved", 1 ] => development_artifact_v1,
           [ "DevelopmentArtifactClassificationCorrected", 1 ] => development_artifact_v1,
           [ "DevelopmentArtifactRelationDeclared", 1 ] => development_artifact_relation_v1,
-          [ "DevelopmentArtifactRelationSuperseded", 1 ] => development_artifact_relation_v1
+          [ "DevelopmentArtifactRelationSuperseded", 1 ] => development_artifact_relation_v1,
+          [ "SkillRevisionPublished", 2 ] => skill_revision_published_v2
         }.freeze
       end
 

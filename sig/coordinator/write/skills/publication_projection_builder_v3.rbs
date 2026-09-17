@@ -6,7 +6,7 @@ module Coordinator
         ASSET_EVENT_TYPES: Array[String]
 
         def initialize: (event_store: _EventStore, ?schema_registry: EventSchemaRegistry, ?stream_factory: StreamFactory) -> void
-        def call: (PgEventstore::Event publication_event) -> Dry::Monads::Result[ProjectionPublicationV3, OutcomeError]
+        def call: (PgEventstore::Event publication_event) -> Dry::Monads::Result
       end
     end
   end

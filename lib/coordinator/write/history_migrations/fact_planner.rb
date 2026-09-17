@@ -87,6 +87,7 @@ module Coordinator::Write
             media_type: metadata_extension&.media_type,
             byte_size: metadata_extension&.byte_size,
             content_sha256: metadata_extension&.content_sha256,
+            content_digest: metadata_extension&.content_digest,
             manifest_digest: metadata_extension&.manifest_digest,
             build_context_digest: metadata_extension&.build_context_digest,
             dependency_graph_digest: metadata_extension&.dependency_graph_digest,

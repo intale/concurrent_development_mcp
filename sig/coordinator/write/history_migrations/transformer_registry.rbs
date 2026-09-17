@@ -24,7 +24,8 @@ module Coordinator
           coordination_task_lifecycle: CoordinationTaskLifecycleTransformer,
           command_completed_v1: CommandCompletedV1Transformer,
           development_artifact_v1: DevelopmentArtifactV1Transformer,
-          development_artifact_relation_v1: DevelopmentArtifactRelationV1Transformer
+          development_artifact_relation_v1: DevelopmentArtifactRelationV1Transformer,
+          skill_revision_published_v2: SkillRevisionPublishedV2Transformer
         ) -> void
 
         def call: (

@@ -15,6 +15,7 @@ module Coordinator::Write
       attribute? :media_type, Types::ContentMediaType.optional.default(nil)
       attribute? :byte_size, Types::ContentByteSize.optional.default(nil)
       attribute? :content_sha256, Types::Sha256Digest.optional.default(nil)
+      attribute? :content_digest, Types::Sha256Digest.optional.default(nil)
       attribute? :manifest_digest, Types::Sha256Digest.optional.default(nil)
       attribute? :build_context_digest, Types::Sha256Digest.optional.default(nil)
       attribute? :dependency_graph_digest, Types::Sha256Digest.optional.default(nil)
