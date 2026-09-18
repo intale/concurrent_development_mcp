@@ -233,6 +233,82 @@ RSpec.describe "history migration Resource and WorkIntention transformers", :eve
     expect(state).to have_attributes(expired: true, withdrawn: false)
   end
 
+  it "maps a release fanout owned directly by attempt abandonment" do
+    resource = resources.first
+    lease_id = SecureRandom.uuid_v7
+    correlation_id = SecureRandom.uuid_v7
+    acquisition = persist_lease(
+      lease_acquisition(
+        resource,
+        lease_id:,
+        lease_set_id:,
+        attempt_id:,
+        acquired_at: timestamp(10),
+        expires_at: timestamp(40)
+      ),
+      command_id: "legacy-abandon-reserve",
+      correlation_id:
+    )
+    reference = reference_for(load_source(acquisition))
+    reservation = persist_write_set(
+      Coordinator::Write::Events::WriteSetReservedV2.new(
+        lease_set_id:,
+        change_set_id:,
+        work_item_id:,
+        attempt_id:,
+        repository_id:,
+        policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
+        resources: [ reference ],
+        reserved_at: timestamp(10),
+        expires_at: timestamp(40)
+      ),
+      command_id: "legacy-abandon-reserve",
+      correlation_id:
+    )
+    release = persist_lease(
+      Coordinator::Write::Events::ResourceLeaseReleasedV2.new(
+        **load_source(acquisition).to_h.except(:expires_at),
+        previous_expires_at: timestamp(40),
+        released_at: timestamp(30)
+      ),
+      command_id: "legacy-abandon",
+      correlation_id: SecureRandom.uuid_v7
+    )
+    abandoned = persist(
+      Coordinator::Write::Events::AttemptAbandonedV2.new(
+        change_set_id:,
+        work_item_id:,
+        attempt_id:,
+        agent_id: actor.id,
+        reason: "Replace the attempt",
+        lease_set_id:,
+        released_leases: [ reference ],
+        untouched_resource_ids: [],
+        abandoned_at: timestamp(30)
+      ),
+      stream: stream("DevelopmentExecution", "Attempt", attempt_id),
+      markers: [
+        "attempt:#{attempt_id}",
+        "change-set:#{change_set_id}",
+        "work-item:#{work_item_id}",
+        "lease-set:#{lease_set_id}",
+        "command:legacy-abandon"
+      ],
+      command_id: "legacy-abandon",
+      actor:,
+      policy_version: "attempt/v2",
+      correlation_id: SecureRandom.uuid_v7
+    )
+
+    result = transform(release, upper_position: abandoned.global_position)
+
+    expect(result).to be_success
+    expect(result.value!.sole.event).to be_a(
+      Coordinator::Write::Events::ResourceWorkIntentionWithdrawnV1
+    )
+    expect(reservation.global_position).to be < release.global_position
+  end
+
   it "fails closed when a write-set member disagrees with its acquisition" do
     resource = resources.first
     lease_id = SecureRandom.uuid_v7

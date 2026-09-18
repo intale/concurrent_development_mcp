@@ -262,12 +262,46 @@ module Coordinator::Write
             direction: :asc
           )
         ).find { _1.global_position <= source_upper_position }
+        if event.nil? && source.is_a?(Events::ResourceLeaseReleasedV2)
+          return validate_abandonment_release!(
+            source_event,
+            source,
+            source_upper_position:
+          )
+        end
         aggregate = event && load(event)
         reference = aggregate&.resources&.find { _1.lease_id == source.lease_id }
         valid = aggregate && same_scope?(aggregate, source) &&
                 reference && reference_equal?(reference, reference_for(source)) &&
                 lifecycle_times_equal?(source, aggregate)
         raise ArgumentError, "resource lifecycle event has no matching set-level source fact" unless valid
+      end
+
+      def validate_abandonment_release!(source_event, source, source_upper_position:)
+        event = @event_store.read_marked(
+          attempt_stream(source.attempt_id),
+          MarkedEventReadCriteria.new(
+            event_type: "AttemptAbandoned",
+            marker: "command:#{source_event.metadata.fetch('command_id')}",
+            maximum_count: 1,
+            direction: :asc
+          )
+        ).find { _1.global_position <= source_upper_position }
+        abandonment = event && load(event)
+        reference = if abandonment.is_a?(Events::AttemptAbandonedV2)
+          abandonment.released_leases.find { _1.lease_id == source.lease_id }
+        end
+        valid = abandonment.is_a?(Events::AttemptAbandonedV2) &&
+                event.global_position > source_event.global_position &&
+                abandonment.change_set_id == source.change_set_id &&
+                abandonment.work_item_id == source.work_item_id &&
+                abandonment.attempt_id == source.attempt_id &&
+                abandonment.lease_set_id == source.lease_set_id &&
+                abandonment.abandoned_at == source.released_at &&
+                reference && reference_equal?(reference, reference_for(source))
+        unless valid
+          raise ArgumentError, "resource lifecycle event has no matching set-level source fact"
+        end
       end
 
       def validate_write_set_fanout!(source_event, source, event_type:)
