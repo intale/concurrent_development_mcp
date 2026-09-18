@@ -35,7 +35,10 @@ module Coordinator::Write
       end
 
       def find_complete(migration_id:, source_event:, transformed_facts:)
-        return Failure(inconsistent(source_event)) if transformed_facts.empty?
+        if transformed_facts.empty?
+          events = planned_events(source_event:, maximum_count: 1)
+          return events.empty? ? Success([].freeze) : Failure(inconsistent(source_event))
+        end
 
         facts_by_step = transformed_facts.to_h { [ _1.step_name, _1 ] }
         return Failure(inconsistent(source_event)) unless facts_by_step.length == transformed_facts.length

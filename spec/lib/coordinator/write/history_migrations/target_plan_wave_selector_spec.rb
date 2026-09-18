@@ -92,6 +92,25 @@ RSpec.describe Coordinator::Write::HistoryMigrations::TargetPlanWaveSelector, :e
     expect(result.value!.map(&:outcome).uniq).to contain_exactly("existing")
   end
 
+  it "treats an unplanned zero-fact transformation as complete for every wave" do
+    complete = selector.find_complete(
+      migration_id:,
+      source_event:,
+      transformed_facts: []
+    )
+    selected = selector.call(
+      migration_id:,
+      source_event:,
+      transformed_facts: [],
+      dependency_wave: 0
+    )
+
+    expect(complete).to be_success
+    expect(complete.value!).to be_empty
+    expect(selected).to be_success
+    expect(selected.value!).to be_empty
+  end
+
   it "rejects a persisted plan that does not cover the complete transformation" do
     target_plan_builder.call(
       migration_id:,
