@@ -5,8 +5,9 @@ module Coordinator::Write
     class EventDispatcher
       include Dry::Monads[:result]
 
-      def initialize(transformer_registry:, fact_planner:, target_writer:)
+      def initialize(transformer_registry:, target_plan_wave_selector:, fact_planner:, target_writer:)
         @transformer_registry = transformer_registry
+        @target_plan_wave_selector = target_plan_wave_selector
         @fact_planner = fact_planner
         @target_writer = target_writer
       end
@@ -20,19 +21,26 @@ module Coordinator::Write
         )
         return transformation if transformation.failure?
 
+        selection = @target_plan_wave_selector.call(
+          migration_id:,
+          source_event:,
+          transformed_facts: transformation.value!,
+          dependency_wave:
+        )
+        return selection if selection.failure?
+
+        selected_facts = selection.value!
+        return @target_writer.call(planned_facts: []) if selected_facts.empty?
+
         plan = @fact_planner.call(
           migration_id:,
           source_config_name:,
           source_event:,
-          transformed_facts: transformation.value!
+          transformed_facts: selected_facts
         )
         return plan if plan.failure?
 
-        @target_writer.call(
-          planned_facts: plan.value!.select do |fact|
-            fact.target_event_plan.dependency_wave == dependency_wave
-          end
-        )
+        @target_writer.call(planned_facts: plan.value!)
       end
     end
   end

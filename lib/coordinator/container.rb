@@ -899,9 +899,14 @@ module Coordinator
       )
     end
 
+    register("history_migrations.target_plan_wave_selector", memoize: true) do
+      Write::HistoryMigrations::TargetPlanWaveSelector.new(event_store: self["event_store"])
+    end
+
     register("history_migrations.event_dispatcher", memoize: true) do
       Write::HistoryMigrations::EventDispatcher.new(
         transformer_registry: self["history_migrations.transformer_registry"],
+        target_plan_wave_selector: self["history_migrations.target_plan_wave_selector"],
         fact_planner: self["history_migrations.fact_planner"],
         target_writer: self["history_migrations.target_writer"]
       )
