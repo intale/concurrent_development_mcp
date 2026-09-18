@@ -916,6 +916,7 @@ module Coordinator
 
     register("history_migrations.page_planning_dispatcher", memoize: true) do
       Write::HistoryMigrations::PagePlanningDispatcher.new(
+        event_store: self["event_store"],
         source_loader: self["history_migrations.page_source_loader"],
         event_planning_dispatcher: self["history_migrations.event_planning_dispatcher"]
       )
