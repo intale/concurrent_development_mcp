@@ -8,6 +8,9 @@ RSpec.describe "history migration Resource and WorkIntention transformers", :eve
   let(:registry) { Coordinator::Container["history_migrations.transformer_registry"] }
   let(:planner) { Coordinator::Container["history_migrations.event_planning_dispatcher"] }
   let(:dispatcher) { Coordinator::Container["history_migrations.event_dispatcher"] }
+  let(:legacy_input_context_resolver) do
+    Coordinator::Container["history_migrations.legacy_work_intention_input_context_resolver"]
+  end
   let(:migration_id) { SecureRandom.uuid_v7 }
   let(:repository_id) { SecureRandom.uuid_v7 }
   let(:change_set_id) { SecureRandom.uuid_v7 }
@@ -175,6 +178,27 @@ RSpec.describe "history migration Resource and WorkIntention transformers", :eve
       Coordinator::Write::EventQueries::WORK_INTENTION_SET_STATE
     )
     expect((reserve_targets + set_targets.take(3)).map(&:correlation_id).uniq.one?).to be(true)
+  end
+
+  it "resolves reservation and expansion members for later legacy command inputs" do
+    lifecycle = persist_write_set_lifecycle
+    source_event = lifecycle.fetch(:expansion)
+
+    result = legacy_input_context_resolver.call(
+      migration_id:,
+      source_config_name: "default",
+      source_upper_position: lifecycle.fetch(:ordered).last.global_position,
+      source_event:,
+      attempt_id:,
+      lease_set_id:
+    )
+
+    expect(result).to be_success
+    expect(result.value!.members).to have_attributes(
+      length: 3
+    )
+    expect(result.value!.members.map(&:intention_id).uniq.length).to eq(3)
+    expect(result.value!.members.map(&:resource_id).uniq.length).to eq(3)
   end
 
   it "maps expiry while discarding the legacy boundary snapshot dump" do
