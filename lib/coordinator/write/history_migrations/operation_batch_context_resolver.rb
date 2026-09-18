@@ -254,8 +254,8 @@ module Coordinator::Write
         source.items.map(&:index) == (0...source.total).to_a &&
           source.total == source.items.length &&
           source.items.all? { valid_source_item?(_1, source.target_tool) } &&
-          source.manifest_digest == @manifest_builder.digest(source.items) &&
-          source.encoded_byte_size == @manifest_builder.encoded_byte_size(
+          source.manifest_digest == legacy_manifest_digest(source.items) &&
+          source.encoded_byte_size == legacy_encoded_byte_size(
             command_id: event.metadata.fetch("command_id"),
             actor:,
             batch_id: source.batch_id,
@@ -272,6 +272,20 @@ module Coordinator::Write
           event.metadata.fetch("actor_kind") == source.requester.kind &&
           event.metadata.fetch("actor_id") == source.requester.id &&
           entries.first == [ event, source ]
+      end
+
+      def legacy_manifest_digest(items)
+        @canonical_json.sha256(items.map(&:to_h))
+      end
+
+      def legacy_encoded_byte_size(command_id:, actor:, batch_id:, target_tool:, items:)
+        @canonical_json.encode(
+          command_id:,
+          actor: actor.to_h,
+          batch_id:,
+          target_tool:,
+          items: items.map(&:to_h)
+        ).bytesize
       end
 
       def valid_source_item?(item, target_tool)
