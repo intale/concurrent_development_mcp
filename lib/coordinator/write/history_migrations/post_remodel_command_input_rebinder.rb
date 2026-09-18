@@ -264,7 +264,7 @@ module Coordinator::Write
           change_set_id: resolve(:change_set, source.change_set_id, context:),
           work_item_id: resolve(:work_item, source.work_item_id, context:),
           attempt_id: resolve(:attempt, source.attempt_id, context:),
-          candidate_id: resolve(:candidate, source.candidate_id, context:),
+          candidate_id: resolve_completion_candidate(document, context:),
           produced_outputs: source.produced_outputs
         )
         target(document, command_id:, input:)
@@ -759,6 +759,43 @@ module Coordinator::Write
 
       def optional_resolve(kind, source_id, context:)
         source_id && resolve(kind, source_id, context:)
+      end
+
+      def resolve_completion_candidate(document, context:)
+        source_id = document.input.candidate_id
+        source_stream = StreamReference.new(
+          context: "DevelopmentIntegration",
+          stream_name: "Candidate",
+          stream_id: source_id
+        )
+        event = @event_store.read_at(source_stream, 0)
+        if event && event.global_position <= context.fetch(:source_upper_position)
+          return resolve(:candidate, source_id, context:)
+        end
+        if source_command_succeeded?(document.command_id, context:)
+          raise ArgumentError, "successful work-item completion references an absent candidate"
+        end
+
+        source_id
+      end
+
+      def source_command_succeeded?(source_command_id, context:)
+        events = @event_store.read(
+          StreamReference.new(
+            context: "CoordinatorControl",
+            stream_name: "Command",
+            stream_id: source_command_id
+          ),
+          EventReadCriteria.new(
+            event_types: %w[CommandCompleted CommandSucceeded],
+            maximum_count: 2,
+            direction: :asc
+          )
+        )
+        events.any? do |event|
+          event.global_position <= context.fetch(:source_upper_position) &&
+            (event.type == "CommandSucceeded" || event.data["status"] == "ok")
+        end
       end
 
       def unwrap(result)

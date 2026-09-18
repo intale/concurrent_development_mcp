@@ -95,6 +95,64 @@ RSpec.describe "post-remodel Command, Task, and ProcessStep history migration", 
     expect(task_fact.metadata_extension.canonical_input_digest).to match(/\Asha256:[0-9a-f]{64}\z/)
   end
 
+  it "preserves an unresolved candidate reference only for a source command without success" do
+    seed_command_entities
+    command_id = SecureRandom.uuid_v7
+    task_id = SecureRandom.uuid_v7
+    missing_candidate_id = "MIGRATION-NONEXISTENT-CANDIDATE"
+    command_stream = stream("CoordinatorControl", "Command", command_id)
+    persist_payload(
+      command_stream,
+      Coordinator::Write::Events::CommandRegisteredV1.new(
+        command_id:,
+        request_id: "request-invalid-completion",
+        tool_name: "work_item_complete"
+      )
+    )
+    command_input = Coordinator::Write::CommandInputDocuments::CompleteWorkItemV1.new(
+      schema: "command-input/v1",
+      command_id:,
+      tool_name: "work_item_complete",
+      input: Coordinator::Write::CommandInputDocuments::CompleteWorkItemInputV1.new(
+        actor: Coordinator::Write::CommandInputDocuments::ActorV1.new(
+          actor_kind: "agent",
+          actor_id: "codex"
+        ),
+        change_set_id:,
+        work_item_id:,
+        attempt_id:,
+        candidate_id: missing_candidate_id,
+        produced_outputs: []
+      )
+    )
+    task = persist_payload(
+      stream("CoordinatorControl", "CoordinationTask", task_id),
+      Coordinator::Write::Events::CoordinationTaskSubmittedV3.new(
+        task_id:,
+        command_id:,
+        tool_name: "work_item_complete",
+        command_input:,
+        poll_interval_ms: 500,
+        ttl_ms: nil
+      )
+    )
+
+    migrated = transform(task, upper_position: task.global_position)
+
+    expect(migrated).to be_success
+    expect(migrated.value!.sole.event.command_input.input.candidate_id).to eq(missing_candidate_id)
+
+    succeeded = persist_payload(
+      command_stream,
+      Coordinator::Write::Events::CommandSucceededV1.new(command_id:)
+    )
+    inconsistent = transform(task, upper_position: succeeded.global_position)
+    expect(inconsistent).to be_failure
+    expect(inconsistent.failure.message).to include(
+      "successful work-item completion references an absent candidate"
+    )
+  end
+
   it "rebinds ProcessStep parents and subjects through the persisted migration plan" do
     persist_raw(stream("DevelopmentPlanning", "ChangeSet", change_set_id), type: "ChangeSetCreated")
     persist_raw(stream("DevelopmentExecution", "WorkItem", work_item_id), type: "WorkItemCreated")
