@@ -13,6 +13,14 @@ module Coordinator::Write
       end
 
       def call(migration_id:, source_config_name:, source_upper_position:, source_event:, dependency_wave:)
+        wave = @target_plan_wave_selector.includes_wave?(
+          migration_id:,
+          source_event:,
+          dependency_wave:
+        )
+        return wave if wave.failure?
+        return @target_writer.call(planned_facts: []) if wave.value! == false
+
         transformation = @transformer_registry.call(
           migration_id:,
           source_config_name:,

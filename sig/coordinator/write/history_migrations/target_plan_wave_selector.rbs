@@ -20,6 +20,12 @@ module Coordinator
           source_event: PgEventstore::Event,
           transformed_facts: Array[TransformedFactV1]
         ) -> Dry::Monads::Result
+
+        def includes_wave?: (
+          migration_id: String,
+          source_event: PgEventstore::Event,
+          dependency_wave: Integer
+        ) -> Dry::Monads::Result
       end
     end
   end

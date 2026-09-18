@@ -6,6 +6,7 @@ module Coordinator::Write
       include Dry::Monads[:result]
 
       MARKER_PURPOSE = "history-migration-target-event-plan"
+      PLAN_SCAN_MAXIMUM = 4_096
 
       def initialize(
         event_store:,
@@ -31,6 +32,20 @@ module Coordinator::Write
           end.freeze
         )
       rescue KeyError
+        Failure(inconsistent(source_event))
+      end
+
+      def includes_wave?(migration_id:, source_event:, dependency_wave:)
+        entries = planned_events(source_event:, maximum_count: PLAN_SCAN_MAXIMUM).map { [ _1, load(_1) ] }
+        return Success(nil) if entries.empty?
+        return Failure(inconsistent(source_event)) unless valid_source_plan?(
+          entries,
+          migration_id:,
+          source_event:
+        )
+
+        Success(entries.any? { _2.dependency_wave == dependency_wave })
+      rescue EventHistoryLimitExceeded, KeyError, ArgumentError, Dry::Struct::Error
         Failure(inconsistent(source_event))
       end
 
@@ -87,15 +102,22 @@ module Coordinator::Write
 
       def valid_plan?(entries, migration_id:, source_event:, facts_by_step:)
         return false unless entries.length == facts_by_step.length
-        return false unless entries.map { _2.transformation_step }.uniq.length == entries.length
+        return false unless valid_source_plan?(entries, migration_id:, source_event:)
 
         entries.all? do |_event, payload|
           fact = facts_by_step[payload.transformation_step]
+          fact && target_matches?(payload.target_event, fact)
+        end
+      end
+
+      def valid_source_plan?(entries, migration_id:, source_event:)
+        return false unless entries.map { _2.transformation_step }.uniq.length == entries.length
+
+        entries.all? do |_event, payload|
           payload.is_a?(Events::HistoryMigrationTargetEventPlannedV1) &&
             payload.migration_id == migration_id &&
             payload.source_event_id == source_event.id &&
-            payload.source_global_position == source_event.global_position &&
-            fact && target_matches?(payload.target_event, fact)
+            payload.source_global_position == source_event.global_position
         end
       end
 

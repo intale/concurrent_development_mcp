@@ -92,6 +92,39 @@ RSpec.describe Coordinator::Write::HistoryMigrations::TargetPlanWaveSelector, :e
     expect(result.value!.map(&:outcome).uniq).to contain_exactly("existing")
   end
 
+  it "detects whether a persisted source plan participates in a dependency wave" do
+    plans = target_plan_builder.call(
+      migration_id:,
+      source_event:,
+      transformed_facts:
+    ).value!
+
+    detected = (0..Coordinator::Shared::Types::HISTORY_MIGRATION_DEPENDENCY_WAVE_MAXIMUM)
+      .to_h do |dependency_wave|
+        result = selector.includes_wave?(
+          migration_id:,
+          source_event:,
+          dependency_wave:
+        )
+        expect(result).to be_success
+        [ dependency_wave, result.value! ]
+      end
+
+    expected_waves = plans.map(&:dependency_wave).uniq
+    expect(detected).to eq((0..3).to_h { [ _1, expected_waves.include?(_1) ] })
+  end
+
+  it "leaves an unplanned source undecided so zero-fact transformations remain validated" do
+    result = selector.includes_wave?(
+      migration_id:,
+      source_event:,
+      dependency_wave: 0
+    )
+
+    expect(result).to be_success
+    expect(result.value!).to be_nil
+  end
+
   it "treats an unplanned zero-fact transformation as complete for every wave" do
     complete = selector.find_complete(
       migration_id:,
