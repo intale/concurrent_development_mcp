@@ -26,6 +26,10 @@ if Rails.env.test?
   parsed_target_uri = URI.parse(migration_target_uri || pg_uri)
   parsed_target_uri.path = "/#{migration_target_database}"
   migration_target_uri = parsed_target_uri.to_s
+elsif Rails.env.development? && !migration_target_uri
+  parsed_target_uri = URI.parse(pg_uri)
+  parsed_target_uri.path = "/eventstore_migration_target"
+  migration_target_uri = parsed_target_uri.to_s
 end
 
 if migration_target_uri
