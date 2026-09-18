@@ -490,7 +490,11 @@ module Coordinator
     register("history_migrations.coordination_task_submitted_v2_transformer", memoize: true) do
       Write::HistoryMigrations::CoordinationTaskSubmittedV2Transformer.new(
         stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
-        command_event_locator: self["history_migrations.legacy_command_event_locator"]
+        command_event_locator: self["history_migrations.legacy_command_event_locator"],
+        command_input_rebinder:
+          self["history_migrations.post_remodel_command_input_rebinder"],
+        operation_batch_context_resolver:
+          self["history_migrations.operation_batch_context_resolver"]
       )
     end
 
@@ -510,7 +514,9 @@ module Coordinator
     register("history_migrations.operation_batch_context_resolver", memoize: true) do
       Write::HistoryMigrations::OperationBatchContextResolver.new(
         event_store: self["event_store"],
-        stream_identity_allocator: self["history_migrations.stream_identity_allocator"]
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        command_input_rebinder:
+          self["history_migrations.post_remodel_command_input_rebinder"]
       )
     end
 
@@ -567,6 +573,9 @@ module Coordinator
           self["history_migrations.legacy_work_intention_input_context_resolver"],
         guidance_identity_resolver:
           self["history_migrations.post_remodel_guidance_identity_resolver"],
+        event_store: self["event_store"],
+        decision_document_transformer:
+          self["history_migrations.decision_document_transformer"],
         target_command_builder: Write::Tasks::TargetCommandBuilder.new,
         input_digest: self["command_input_digest"]
       )

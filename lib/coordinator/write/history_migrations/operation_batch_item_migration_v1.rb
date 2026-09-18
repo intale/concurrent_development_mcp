@@ -3,7 +3,9 @@
 module Coordinator::Write
   module HistoryMigrations
     class OperationBatchItemMigrationV1 < Value
-      attribute :source_item, OperationBatches::ItemV1
+      SourceItem = LegacyCommandInputDocuments::OperationBatchItemV1 | OperationBatches::ItemV1
+
+      attribute :source_item, SourceItem
       attribute :target_item, OperationBatches::ItemV2
       attribute :target_command_stream, StreamReference
       attribute :source_completion_event, Types.Instance(PgEventstore::Event).optional

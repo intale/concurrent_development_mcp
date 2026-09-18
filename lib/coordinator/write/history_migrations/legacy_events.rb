@@ -102,6 +102,7 @@ module Coordinator::Write
 
       class CommandCompletedV1 < Events::Base
         contract type: "CommandCompleted", version: 1
+        Action = LegacyTaskResults::NextActionV1 | NextAction
 
         attribute :command_id, Types::Identifier
         attribute :tool_name, Types::String
@@ -109,9 +110,9 @@ module Coordinator::Write
         attribute :status, Types::String.enum("ok")
         attribute :summary, Types::String
         attribute :receipt, Types::Identifier
-        attribute :data, CommandReceiptData::Type
+        attribute :data, Types::Hash | CommandReceiptData::Type
         attribute :warnings, Types::Array.of(Types::String).constrained(max_size: 100)
-        attribute :next_actions, Types::Array.of(NextAction).constrained(max_size: 100)
+        attribute :next_actions, Types::Array.of(Action).constrained(max_size: 100)
         attribute :emitted_events, Types::Array.of(EventReference)
         attribute :completed_at, Types::Timestamp
       end
@@ -135,7 +136,7 @@ module Coordinator::Write
         contract type: "CoordinationTaskCompleted", version: 2
 
         attribute :task_id, Types::TaskId
-        attribute :result, Tasks::SemanticResultV1::Type
+        attribute :result, LegacyTaskResults::Type | Tasks::SemanticResultV1::Type
         attribute :completed_at, Types::Timestamp
       end
 
@@ -160,7 +161,7 @@ module Coordinator::Write
         attribute :task_id, Types::TaskId
         attribute :tool_name, Types::CoordinationToolName
         attribute :command_id, Types::Identifier
-        attribute :command_input, CommandInputDocuments::Type
+        attribute :command_input, Types::Hash | CommandInputDocuments::Type
         attribute :submitted_at, Types::Timestamp
         attribute :ttl_ms, Types::Nil
         attribute :poll_interval_ms, Types::Integer.constrained(eql: 500)
@@ -207,7 +208,7 @@ module Coordinator::Write
 
       class OperationBatchCreatedV1 < Events::Base
         contract type: "OperationBatchCreated", version: 1
-        Item = OperationBatches::ItemV1
+        Item = LegacyCommandInputDocuments::OperationBatchItemV1 | OperationBatches::ItemV1
 
         attribute :batch_id, Types::OperationBatchId
         attribute :target_tool, Types::OperationBatchTargetTool
@@ -230,7 +231,7 @@ module Coordinator::Write
         attribute :index, Types::OperationBatchItemIndex
         attribute :command_id, Types::Identifier
         attribute :canonical_input_digest, Types::Sha256Digest
-        attribute :result, Tasks::StructuredContentV1
+        attribute :result, LegacyTaskResults::StructuredContentV1 | Tasks::StructuredContentV1
         attribute :finished_at, Types::Timestamp
       end
 
@@ -242,7 +243,7 @@ module Coordinator::Write
         attribute :command_id, Types::Identifier
         attribute :canonical_input_digest, Types::Sha256Digest
         attribute :target_completion, EventReference
-        attribute :result, Tasks::StructuredContentV1
+        attribute :result, LegacyTaskResults::StructuredContentV1 | Tasks::StructuredContentV1
         attribute :finished_at, Types::Timestamp
       end
     end

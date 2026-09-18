@@ -26,6 +26,8 @@ module Coordinator::Write
           "DevelopmentMemory", "DevelopmentArtifactRelation", "development-artifact-relation"
         ],
         decision: [ "HumanGuidance", "Decision", "decision" ],
+        conversation: [ "HumanGuidance", "Conversation", "conversation" ],
+        interpretation: [ "HumanGuidance", "Interpretation", "interpretation" ],
         skill: [ "AgentKnowledge", "Skill", "skill" ],
         operation_batch: [ "DevelopmentCoordination", "OperationBatch", "operation-batch" ]
       }.freeze
@@ -55,12 +57,18 @@ module Coordinator::Write
         entity_reference_resolver:,
         legacy_work_intention_context_resolver:,
         guidance_identity_resolver:,
+        event_store:,
+        decision_document_transformer:,
+        command_input_loader: LegacyCommandInputLoader.new,
         target_command_builder: Tasks::TargetCommandBuilder.new,
         input_digest: CommandInputDigest.new
       )
         @entity_reference_resolver = entity_reference_resolver
         @legacy_work_intention_context_resolver = legacy_work_intention_context_resolver
         @guidance_identity_resolver = guidance_identity_resolver
+        @event_store = event_store
+        @decision_document_transformer = decision_document_transformer
+        @command_input_loader = command_input_loader
         @target_command_builder = target_command_builder
         @input_digest = input_digest
       end
@@ -79,14 +87,7 @@ module Coordinator::Write
           source_upper_position:,
           source_event:
         }
-        rebound = rebind(document, command_id:, context:)
-        command = @target_command_builder.call(rebound)
-        Success(
-          MigratedCommandInputV1.new(
-            document: rebound,
-            canonical_input_digest: @input_digest.request(command)
-          )
-        )
+        Success(migrate(document, command_id:, context:))
       rescue ResolutionFailure => error
         Failure(error.failure)
       rescue KeyError, ArgumentError, TypeError, Dry::Struct::Error => error
@@ -95,10 +96,30 @@ module Coordinator::Write
 
       private
 
+      def migrate(document, command_id:, context:)
+        source = @command_input_loader.call(document)
+        rebound = rebind(source, command_id:, context:)
+        command = @target_command_builder.call(rebound)
+        MigratedCommandInputV1.new(
+          document: rebound,
+          canonical_input_digest: @input_digest.request(command)
+        )
+      end
+
       def rebind(document, command_id:, context:)
         case document
+        when CommandInputDocuments::RegisterRepositoryV1
+          repository_register(document, command_id:, context:)
         when CommandInputDocuments::ResolveResourceV1
           resource_resolve(document, command_id:, context:)
+        when CommandInputDocuments::CreateChangeSetV1
+          change_set_create(document, command_id:, context:)
+        when CommandInputDocuments::CreateWorkItemV1
+          work_item_create(document, command_id:, context:)
+        when CommandInputDocuments::DeclareWorkItemDependencyV1
+          work_item_dependency_declare(document, command_id:, context:)
+        when CommandInputDocuments::ActivateChangeSetV1
+          change_set_activate(document, command_id:, context:)
         when CommandInputDocuments::AcquireWorkItemV1
           work_item_acquire(document, command_id:, context:)
         when CommandInputDocuments::CompleteWorkItemV1
@@ -115,12 +136,27 @@ module Coordinator::Write
           work_intention_set_withdraw(document, command_id:, context:)
         when CommandInputDocuments::RecordGuidanceV1
           guidance_record(document, command_id:, context:)
+        when LegacyCommandInputDocuments::RecordGuidanceV1
+          legacy_guidance_record(document, command_id:, context:)
+        when CommandInputDocuments::ProposeDecisionInterpretationV1
+          decision_interpretation_propose(document, command_id:, context:)
         when CommandInputDocuments::SubmitCandidateV1
           candidate_submit(document, command_id:, context:)
         when CommandInputDocuments::CaptureDevelopmentArtifactV2
           development_artifact_capture(document, command_id:, context:)
+        when LegacyCommandInputDocuments::CaptureDevelopmentArtifactV2
+          development_artifact_capture(document, command_id:, context:)
+        when CommandInputDocuments::UpdateDevelopmentArtifactV1
+          development_artifact_update(document, command_id:, context:)
         when CommandInputDocuments::DeclareDevelopmentArtifactRelationV1
           development_artifact_relation_declare(document, command_id:, context:)
+        when LegacyCommandInputDocuments::DeclareDevelopmentArtifactRelationV1
+          development_artifact_relation_declare(document, command_id:, context:)
+        when LegacyCommandInputDocuments::PublishSkillRevisionV2,
+             CommandInputDocuments::PublishSkillRevisionV2
+          skill_publish(document, command_id:, context:)
+        when CommandInputDocuments::CreateOperationBatchV1
+          target(document, command_id:, input: document.input)
         when PostRemodelCommandInputDocuments::LegacyReserveWriteSetV1
           legacy_work_intention_set_declare(document, command_id:, context:)
         when PostRemodelCommandInputDocuments::LegacyExpandWriteSetV1
@@ -134,6 +170,14 @@ module Coordinator::Write
         else
           raise ArgumentError, "unsupported post-remodel command input #{document.class.name}"
         end
+      end
+
+      def repository_register(document, command_id:, context:)
+        source = document.input
+        input = CommandInputDocuments::RegisterRepositoryInputV1.new(
+          source.to_h.merge(repository_id: resolve(:repository, source.repository_id, context:))
+        )
+        target(document, command_id:, input:)
       end
 
       def resource_resolve(document, command_id:, context:)
@@ -150,6 +194,48 @@ module Coordinator::Write
           tool_name: document.tool_name,
           input:
         )
+      end
+
+      def change_set_create(document, command_id:, context:)
+        source = document.input
+        input = CommandInputDocuments::CreateChangeSetInputV1.new(
+          source.to_h.merge(change_set_id: resolve(:change_set, source.change_set_id, context:))
+        )
+        target(document, command_id:, input:)
+      end
+
+      def work_item_create(document, command_id:, context:)
+        source = document.input
+        input = CommandInputDocuments::CreateWorkItemInputV1.new(
+          source.to_h.merge(
+            change_set_id: resolve(:change_set, source.change_set_id, context:),
+            work_item_id: resolve(:work_item, source.work_item_id, context:),
+            repository_id: resolve(:repository, source.repository_id, context:)
+          )
+        )
+        target(document, command_id:, input:)
+      end
+
+      def work_item_dependency_declare(document, command_id:, context:)
+        source = document.input
+        input = CommandInputDocuments::DeclareWorkItemDependencyInputV1.new(
+          source.to_h.merge(
+            change_set_id: resolve(:change_set, source.change_set_id, context:),
+            dependency_id: migrated_dependency_id(source.dependency_id, context:),
+            producer_work_item_id: resolve(:work_item, source.producer_work_item_id, context:),
+            consumer_work_item_id: resolve(:work_item, source.consumer_work_item_id, context:)
+          )
+        )
+        target(document, command_id:, input:)
+      end
+
+      def change_set_activate(document, command_id:, context:)
+        source = document.input
+        input = CommandInputDocuments::ActivateChangeSetInputV1.new(
+          actor: source.actor,
+          change_set_id: resolve(:change_set, source.change_set_id, context:)
+        )
+        target(document, command_id:, input:)
       end
 
       def work_item_acquire(document, command_id:, context:)
@@ -280,6 +366,57 @@ module Coordinator::Write
         target(document, command_id:, input:)
       end
 
+      def legacy_guidance_record(document, command_id:, context:)
+        source = document.input
+        source_message = legacy_message_event(
+          source.message_id,
+          source_conversation_id: source.conversation_id,
+          context:
+        )
+        anchors = source.anchors
+        input = CommandInputDocuments::RecordGuidanceInputV1.new(
+          actor: source.actor,
+          message_id: source_message.id,
+          conversation_id: resolve(:conversation, source.conversation_id, context:),
+          source: source.source,
+          text: source.text,
+          anchors: CommandInputDocuments::GuidanceAnchorsV1.new(
+            repository_ids: anchors.repository_ids.map { resolve(:repository, _1, context:) },
+            change_set_id: optional_resolve(:change_set, anchors.change_set_id, context:),
+            work_item_id: optional_resolve(:work_item, anchors.work_item_id, context:),
+            attempt_id: optional_resolve(:attempt, anchors.attempt_id, context:)
+          )
+        )
+        legacy_target(
+          document,
+          command_id:,
+          tool_name: document.tool_name,
+          input:,
+          target_class: CommandInputDocuments::RecordGuidanceV1
+        )
+      end
+
+      def decision_interpretation_propose(document, command_id:, context:)
+        source = document.input
+        transformed = unwrap(
+          @decision_document_transformer.proposed_decision(
+            migration_id: context.fetch(:migration_id),
+            source_config_name: context.fetch(:source_config_name),
+            source_upper_position: context.fetch(:source_upper_position),
+            source_event: context.fetch(:source_event),
+            proposed_decision: source.proposed_decision
+          )
+        )
+        input = CommandInputDocuments::ProposeDecisionInterpretationInputV1.new(
+          source.to_h.merge(
+            interpretation_id: resolve(:interpretation, source.interpretation_id, context:),
+            source_message_id: legacy_message_event(source.source_message_id, context:).id,
+            proposed_decision: Interpretations::SubmittedDecisionV1.new(transformed.to_h)
+          )
+        )
+        target(document, command_id:, input:)
+      end
+
       def candidate_submit(document, command_id:, context:)
         source = document.input
         input = CommandInputDocuments::SubmitCandidateInputV1.new(
@@ -319,6 +456,16 @@ module Coordinator::Write
         )
       end
 
+      def development_artifact_update(document, command_id:, context:)
+        source = document.input
+        input = CommandInputDocuments::UpdateDevelopmentArtifactInputV1.new(
+          source.to_h.merge(
+            artifact_id: resolve(:development_artifact, source.artifact_id, context:)
+          )
+        )
+        target(document, command_id:, input:)
+      end
+
       def development_artifact_relation_declare(document, command_id:, context:)
         source = document.input
         relation = source.artifact_relation
@@ -344,6 +491,19 @@ module Coordinator::Write
           supersession_reason: source.supersession_reason
         )
         target(document, command_id:, input:)
+      end
+
+      def skill_publish(document, command_id:, context:)
+        source = document.input
+        input = CommandInputDocuments::PublishSkillRevisionInputV2.new(
+          source.to_h.merge(skill_id: resolve(:skill, source.skill_id, context:))
+        )
+        CommandInputDocuments::PublishSkillRevisionV2.new(
+          schema: document.schema,
+          command_id:,
+          tool_name: document.tool_name,
+          input:
+        )
       end
 
       def legacy_work_intention_set_declare(document, command_id:, context:)
@@ -542,6 +702,43 @@ module Coordinator::Write
           resolve(RELATION_TARGETS.fetch(source.kind), source.id, context:)
         end
         CommandInputDocuments::DevelopmentArtifactRelationTargetV1.new(kind: source.kind, id:)
+      end
+
+      def migrated_dependency_id(source_dependency_id, context:)
+        events = @event_store.read_global_marked(
+          GlobalMarkedEventReadCriteria.new(
+            stream_context: "DevelopmentExecution",
+            stream_name: "WorkItem",
+            event_types: [ "WorkItemDependencyDeclared" ],
+            markers: [ "dependency:#{source_dependency_id}" ],
+            maximum_count: 1,
+            direction: :asc,
+            to_position: context.fetch(:source_upper_position)
+          )
+        )
+        events.first&.id || source_dependency_id
+      end
+
+      def legacy_message_event(source_message_id, context:, source_conversation_id: nil)
+        events = @event_store.read_global_marked(
+          GlobalMarkedEventReadCriteria.new(
+            stream_context: "HumanGuidance",
+            stream_name: "Conversation",
+            event_types: [ "UserUtteranceRecorded", "UserUtteranceForwardedByAgent" ],
+            markers: [ "message:#{source_message_id}" ],
+            maximum_count: 2,
+            direction: :asc,
+            to_position: context.fetch(:source_upper_position)
+          )
+        )
+        event = events.one? ? events.first : nil
+        data = event&.data
+        valid = event && event.metadata["schema_version"] == 1 &&
+          data["message_id"] == source_message_id &&
+          (!source_conversation_id || data["conversation_id"] == source_conversation_id)
+        raise ArgumentError, "legacy guidance message is absent or ambiguous" unless valid
+
+        event
       end
 
       def resolve(kind, source_id, context:)

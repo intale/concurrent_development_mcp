@@ -4,7 +4,7 @@ module Coordinator
       class OperationBatchItemMigrationV1 < Shared::Value
         type input = CommandInputDocuments::PublishSkillRevisionV2 | CommandInputDocuments::CaptureDevelopmentArtifactV2 | CommandInputDocuments::DeclareDevelopmentArtifactRelationV1
 
-        def source_item: () -> OperationBatches::ItemV1
+        def source_item: () -> (LegacyCommandInputDocuments::OperationBatchItemV1 | OperationBatches::ItemV1)
         def target_item: () -> OperationBatches::ItemV2
         def target_command_stream: () -> StreamReference
         def source_completion_event: () -> PgEventstore::Event?

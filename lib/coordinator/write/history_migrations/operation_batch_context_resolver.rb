@@ -8,7 +8,8 @@ module Coordinator::Write
       def initialize(
         event_store:,
         stream_identity_allocator:,
-        command_input_rebinder: CommandInputRebinder.new,
+        command_input_rebinder:,
+        command_input_loader: LegacyCommandInputLoader.new,
         request_id_mapper: LegacyOperationBatchRequestIdMapper.new,
         manifest_builder: OperationBatches::ManifestBuilder.new,
         canonical_json: CanonicalJson.new,
@@ -17,6 +18,7 @@ module Coordinator::Write
         @event_store = event_store
         @stream_identity_allocator = stream_identity_allocator
         @command_input_rebinder = command_input_rebinder
+        @command_input_loader = command_input_loader
         @request_id_mapper = request_id_mapper
         @manifest_builder = manifest_builder
         @canonical_json = canonical_json
@@ -63,6 +65,44 @@ module Coordinator::Write
         Failure(inconsistent(source_event, error.message))
       end
 
+      def from_identity(
+        migration_id:,
+        source_config_name:,
+        source_upper_position:,
+        source_event:,
+        source_batch_id:
+      )
+        creation_event = @event_store.read_at(
+          StreamReference.new(
+            context: "DevelopmentCoordination",
+            stream_name: "OperationBatch",
+            stream_id: source_batch_id
+          ),
+          0
+        )
+        unless creation_event && within_frozen_range?(creation_event, source_upper_position)
+          return Failure(inconsistent(source_event, "OperationBatch creation is absent from the frozen source range"))
+        end
+
+        source_creation = load(creation_event)
+        unless source_creation.is_a?(LegacyEvents::OperationBatchCreatedV1) &&
+            source_creation.batch_id == source_batch_id
+          return Failure(inconsistent(source_event, "OperationBatch identity does not resolve to OperationBatchCreated@1"))
+        end
+
+        resolve(
+          migration_id:,
+          source_config_name:,
+          source_upper_position:,
+          source_event:,
+          source_creation_event: creation_event,
+          source_creation:,
+          membership_event: creation_event
+        )
+      rescue KeyError, ArgumentError, TypeError, Dry::Struct::Error => error
+        Failure(inconsistent(source_event, error.message))
+      end
+
       private
 
       def resolve(
@@ -71,13 +111,15 @@ module Coordinator::Write
         source_upper_position:,
         source_event:,
         source_creation_event:,
-        source_creation:
+        source_creation:,
+        membership_event: source_event
       )
         history = source_history(
           source_event:,
           source_upper_position:,
           source_creation_event:,
-          source_creation:
+          source_creation:,
+          membership_event:
         )
         return history if history.failure?
 
@@ -95,6 +137,7 @@ module Coordinator::Write
         items = resolve_items(
           migration_id:,
           source_config_name:,
+          source_upper_position:,
           source_event:,
           source_creation_event:,
           source_creation:,
@@ -116,10 +159,16 @@ module Coordinator::Write
         Failure(inconsistent(source_event, error.message))
       end
 
-      def source_history(source_event:, source_upper_position:, source_creation_event:, source_creation:)
+      def source_history(
+        source_event:,
+        source_upper_position:,
+        source_creation_event:,
+        source_creation:,
+        membership_event:
+      )
         events = @event_store.read(stream_for(source_creation_event), EventQueries::OPERATION_BATCH_HISTORY)
           .select { within_frozen_range?(_1, source_upper_position) }
-        unless events.any? { same_event?(_1, source_event) }
+        unless events.any? { same_event?(_1, membership_event) }
           return Failure(inconsistent(source_event, "source event is absent from its frozen OperationBatch history"))
         end
         unless events.map(&:stream_revision) == (0...events.length).to_a
@@ -226,8 +275,9 @@ module Coordinator::Write
       end
 
       def valid_source_item?(item, target_tool)
-        item.command_input.tool_name == target_tool &&
-          item.canonical_input_digest == @canonical_json.sha256(item.command_input.to_h)
+        document = command_document(item)
+        document.tool_name == target_tool &&
+          item.canonical_input_digest == @canonical_json.sha256(document.to_h)
       end
 
       def valid_common_event?(event, payload, source_creation:)
@@ -241,8 +291,9 @@ module Coordinator::Write
 
       def validate_outcome(source_event:, source_creation:, event:, payload:, outcomes:)
         item = source_creation.items.find { _1.index == payload.index }
+        document = item && command_document(item)
         unless item && !outcomes.key?(payload.index) &&
-            payload.command_id == item.command_input.command_id &&
+            payload.command_id == document.command_id &&
             payload.canonical_input_digest == item.canonical_input_digest &&
             event.markers.include?("batch-item:#{source_creation.batch_id}:#{payload.index}")
           return Failure(inconsistent(source_event, "OperationBatch item outcome disagrees with its manifest"))
@@ -266,10 +317,11 @@ module Coordinator::Write
         end
 
         completion = load(completion_event)
+        document = command_document(item)
         result = payload.result
         valid = completion.is_a?(LegacyEvents::CommandCompletedV1) &&
-                completion.command_id == item.command_input.command_id &&
-                completion.tool_name == item.command_input.tool_name &&
+                completion.command_id == document.command_id &&
+                completion.tool_name == document.tool_name &&
                 completion.canonical_input_digest == item.canonical_input_digest &&
                 completion.status == "ok" &&
                 result.status == "ok" &&
@@ -279,7 +331,7 @@ module Coordinator::Write
                 result.summary == completion.summary &&
                 result.data == completion.data &&
                 result.warnings == completion.warnings &&
-                result.next_actions == completion.next_actions
+                result.next_actions.map(&:to_h) == completion.next_actions.map(&:to_h)
         return Success() if valid
 
         Failure(inconsistent(source_event, "successful item result disagrees with its Command completion"))
@@ -289,12 +341,22 @@ module Coordinator::Write
 
       def validate_rejection(source_event:, payload:)
         result = payload.result
+        error = result.data
+        message = if error.respond_to?(:message)
+          error.message
+        else
+          error["message"] || error[:message]
+        end
+        code = error.respond_to?(:code) ? error.code : error["code"] || error[:code]
+        details = error.respond_to?(:details) ? error.details : error["details"] || error[:details]
         valid = result.status != "ok" &&
                 result.command_id == payload.command_id &&
                 result.receipt.nil? &&
                 result.context_token.nil? &&
-                Tasks::DomainErrorV1::Type.valid?(result.data) &&
-                result.summary == result.data.message
+                Types::Identifier.valid?(code) &&
+                message.is_a?(String) &&
+                details.is_a?(Hash) &&
+                result.summary == message
         return Success() if valid
 
         Failure(inconsistent(source_event, "rejected item result is not a typed domain rejection"))
@@ -378,6 +440,7 @@ module Coordinator::Write
       def resolve_items(
         migration_id:,
         source_config_name:,
+        source_upper_position:,
         source_event:,
         source_creation_event:,
         source_creation:,
@@ -410,11 +473,18 @@ module Coordinator::Write
 
           target_stream = allocation.value!.target_stream
           migrated = @command_input_rebinder.call(
+            migration_id:,
+            source_config_name:,
+            source_upper_position:,
+            source_event:,
             document: source_item.command_input,
             command_id: target_stream.stream_id
           )
+          return migrated if migrated.failure?
+          migrated = migrated.value!
+          source_document = command_document(source_item)
           request_id = @request_id_mapper.call(
-            command_id: source_item.command_input.command_id,
+            command_id: source_document.command_id,
             source_position: allocation_source.global_position,
             item_index: source_item.index,
             command_history_present: !completion_event.nil?
@@ -442,6 +512,10 @@ module Coordinator::Write
         return unless outcome.is_a?(LegacyEvents::OperationBatchItemSucceededV1)
 
         locate(outcome.target_completion)
+      end
+
+      def command_document(item)
+        @command_input_loader.call(item.command_input)
       end
 
       def locate(reference)

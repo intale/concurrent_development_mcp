@@ -258,15 +258,25 @@ module Coordinator::Write
         item = context.item(source.index)
         return Failure(inconsistent(source_event, "rejected item is absent from the migrated manifest")) unless item
 
-        error = source.result.data
+        error = domain_error(source.result.data)
         retryable = @rejection_retryability.call(error.code)
-        terminal = TransformedFactV1.new(
-          target_stream: item.target_command_stream,
-          event: Events::CommandRejectedV2.new(
+        rejection = if error.is_a?(LegacyTaskResults::DomainErrorV1)
+          Events::CommandRejectedV1.new(
+            command_id: item.command_id,
+            code: error.code,
+            reason: error.message,
+            retryable:
+          )
+        else
+          Events::CommandRejectedV2.new(
             command_id: item.command_id,
             error:,
             retryable:
-          ),
+          )
+        end
+        terminal = TransformedFactV1.new(
+          target_stream: item.target_command_stream,
+          event: rejection,
           markers: [
             "command:#{item.command_id}",
             "tool:#{item.target_item.command_input.tool_name}"
@@ -310,6 +320,14 @@ module Coordinator::Write
             )
           ].freeze
         )
+      end
+
+      def domain_error(value)
+        return value unless value.is_a?(Hash)
+
+        Tasks::DomainErrorV1::Type[value]
+      rescue Dry::Types::ConstraintError, Dry::Struct::Error
+        LegacyTaskResults::DomainErrorV1.new(value)
       end
 
       def outcome_facts(

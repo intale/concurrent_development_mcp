@@ -99,7 +99,10 @@ module Coordinator::Write
 
       def domain_rejection?(source)
         source.is_a?(LegacyEvents::CoordinationTaskCompletedV2) &&
-          source.result.is_a?(Tasks::SemanticResultV1::DomainRejection)
+          (
+            source.result.is_a?(LegacyTaskResults::DomainRejectionV1) ||
+            source.result.is_a?(Tasks::SemanticResultV1::DomainRejection)
+          )
       end
 
       def rejection_fact(result, target_stream:)

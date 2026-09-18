@@ -17,7 +17,7 @@ module Coordinator
           source_config_name: String,
           source_upper_position: Integer,
           source_event: PgEventstore::Event,
-          proposed_decision: Interpretations::ProposedDecisionV1
+          proposed_decision: (Interpretations::ProposedDecisionV1 | Interpretations::SubmittedDecisionV1)
         ) -> Dry::Monads::Result
 
         def definition: (

@@ -14,6 +14,9 @@ module Coordinator
           entity_reference_resolver: LegacyEntityReferenceResolver,
           legacy_work_intention_context_resolver: LegacyWorkIntentionInputContextResolver,
           guidance_identity_resolver: PostRemodelGuidanceIdentityResolver,
+          event_store: EventStore,
+          decision_document_transformer: DecisionDocumentTransformer,
+          ?command_input_loader: LegacyCommandInputLoader,
           ?target_command_builder: Tasks::TargetCommandBuilder,
           ?input_digest: CommandInputDigest
         ) -> void
@@ -23,7 +26,7 @@ module Coordinator
           source_config_name: String,
           source_upper_position: Integer,
           source_event: PgEventstore::Event,
-          document: PostRemodelCommandInputDocuments::value,
+          document: LegacyCommandInputLoader::input,
           command_id: String
         ) -> Dry::Monads::Result
       end

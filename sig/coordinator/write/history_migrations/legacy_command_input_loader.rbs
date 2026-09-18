@@ -1,0 +1,18 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class LegacyCommandInputLoader
+        type input = Hash[untyped, untyped] |
+          CommandInputDocuments::value |
+          PostRemodelCommandInputDocuments::value |
+          LegacyCommandInputDocuments::value
+
+        type output = CommandInputDocuments::value |
+          PostRemodelCommandInputDocuments::value |
+          LegacyCommandInputDocuments::value
+
+        def call: (input document) -> output
+      end
+    end
+  end
+end

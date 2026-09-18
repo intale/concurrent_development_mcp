@@ -95,7 +95,7 @@ module Coordinator
 
         class CoordinationTaskCompletedV2 < Events::Base
           def task_id: () -> String
-          def result: () -> Tasks::SemanticResultV1::value
+          def result: () -> (LegacyTaskResults::value | Tasks::SemanticResultV1::value)
         end
 
         class CoordinationTaskExecutionStartedV1 < Events::Base
@@ -111,7 +111,7 @@ module Coordinator
           def task_id: () -> String
           def tool_name: () -> String
           def command_id: () -> String
-          def command_input: () -> CommandInputDocuments::value
+          def command_input: () -> (Hash[untyped, untyped] | CommandInputDocuments::value)
           def ttl_ms: () -> nil
           def poll_interval_ms: () -> Integer
         end

@@ -13,10 +13,7 @@ RSpec.describe "history migration command and Task transformations", :event_stor
     Coordinator::Write::HistoryMigrations::LegacyCommandEventLocator.new(event_store:)
   end
   let(:submitted_transformer) do
-    Coordinator::Write::HistoryMigrations::CoordinationTaskSubmittedV2Transformer.new(
-      stream_identity_allocator: allocator,
-      command_event_locator: locator
-    )
+    Coordinator::Container["history_migrations.coordination_task_submitted_v2_transformer"]
   end
   let(:completed_transformer) do
     Coordinator::Write::HistoryMigrations::CommandCompletedV1Transformer.new(
@@ -56,6 +53,8 @@ RSpec.describe "history migration command and Task transformations", :event_stor
       poll_interval_ms: 500
     )
   end
+
+  before { persist_change_set }
 
   it "Given a successful legacy Task, when facts are transformed, then one UUIDv7 command links its request and terminal state" do
     submitted_event = persist_task(submitted_payload)
@@ -266,6 +265,23 @@ RSpec.describe "history migration command and Task transformations", :event_stor
         stream_id: old_task_id
       ),
       markers: [ "task:#{old_task_id}", "command:#{old_command_id}" ]
+    )
+  end
+
+  def persist_change_set
+    payload = Coordinator::Write::Events::ChangeSetCreatedV1.new(
+      change_set_id: "legacy-change-set",
+      goal: "Migrate the command history",
+      created_at: "2026-08-01T09:59:00.000000Z"
+    )
+    persist(
+      payload,
+      stream: Coordinator::Write::StreamReference.new(
+        context: "DevelopmentPlanning",
+        stream_name: "ChangeSet",
+        stream_id: "legacy-change-set"
+      ),
+      markers: [ "change-set:legacy-change-set" ]
     )
   end
 

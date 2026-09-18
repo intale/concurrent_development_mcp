@@ -1,0 +1,99 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      module LegacyCommandInputDocuments
+        LegacySkillId: untyped
+        DEFINITIONS: Hash[String, (Class | Array[Class])]
+
+        type value = PublishSkillRevisionV2 |
+          CaptureDevelopmentArtifactV2 |
+          DeclareDevelopmentArtifactRelationV1 |
+          RecordGuidanceV1 |
+          CreateOperationBatchV1
+
+        class PublishSkillRevisionInputV2 < Shared::Value
+          def actor: () -> CommandInputDocuments::ActorV1
+          def name: () -> String
+          def scope: () -> String
+          def skill_id: () -> String
+          def expected_revision: () -> Integer
+          def description: () -> String
+          def instructions: () -> String
+          def assets: () -> Array[CommandInputDocuments::SkillAssetV2]
+          def content_digest: () -> String
+        end
+
+        class PublishSkillRevisionV2 < CommandInputDocuments::PublishSkillRevisionBase
+          def input: () -> PublishSkillRevisionInputV2
+        end
+
+        class DevelopmentArtifactV2 < Shared::Value
+          def artifact_id: () -> String
+          def observation_id: () -> String
+          def scope: () -> String
+          def title: () -> String
+          def kind: () -> String
+          def labels: () -> Array[String]
+          def content: () -> (Content::TextV1 | Content::BinaryV1)
+          def source: () -> CommandInputDocuments::DevelopmentArtifactSourceV1
+        end
+
+        class CaptureDevelopmentArtifactInputV2 < Shared::Value
+          def actor: () -> CommandInputDocuments::ActorV1
+          def artifact: () -> DevelopmentArtifactV2
+        end
+
+        class CaptureDevelopmentArtifactV2 < CommandInputDocuments::CaptureDevelopmentArtifactBase
+          def input: () -> CaptureDevelopmentArtifactInputV2
+        end
+
+        class DevelopmentArtifactRelationV1 < Shared::Value
+          def relation_id: () -> String
+          def source_artifact_id: () -> String
+          def relation: () -> String
+          def target: () -> CommandInputDocuments::DevelopmentArtifactRelationTargetV1
+          def attributes: () -> CommandInputDocuments::DevelopmentArtifactRelationAttributesV1
+          def relation_attributes: () -> CommandInputDocuments::DevelopmentArtifactRelationAttributesV1
+        end
+
+        class DeclareDevelopmentArtifactRelationInputV1 < Shared::Value
+          def actor: () -> CommandInputDocuments::ActorV1
+          def artifact_relation: () -> DevelopmentArtifactRelationV1
+          def supersedes_relation_id: () -> String?
+          def supersession_reason: () -> String?
+        end
+
+        class DeclareDevelopmentArtifactRelationV1 < CommandInputDocuments::BaseV1
+          def tool_name: () -> String
+          def input: () -> DeclareDevelopmentArtifactRelationInputV1
+        end
+
+        class RecordGuidanceV1 < CommandInputDocuments::BaseV1
+          def tool_name: () -> String
+          def input: () -> CommandInputDocuments::RecordGuidanceInputV1
+        end
+
+        class OperationBatchItemV1 < Shared::Value
+          def index: () -> Integer
+          def command_input: () -> Hash[untyped, untyped]
+          def canonical_input_digest: () -> String
+        end
+
+        class CreateOperationBatchInputV1 < Shared::Value
+          def actor: () -> CommandInputDocuments::ActorV1
+          def batch_id: () -> String
+          def target_tool: () -> String
+          def items: () -> Array[OperationBatchItemV1]
+          def manifest_digest: () -> String
+          def encoded_byte_size: () -> Integer
+          def page_size: () -> Integer
+        end
+
+        class CreateOperationBatchV1 < CommandInputDocuments::BaseV1
+          def tool_name: () -> String
+          def input: () -> CreateOperationBatchInputV1
+        end
+      end
+    end
+  end
+end

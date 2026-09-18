@@ -151,6 +151,7 @@ RSpec.describe "history migration OperationBatch transformers", :event_store do
 
   it "maps continuation only after the complete preceding page was recorded" do
     items = build_source_items(51)
+    persist_source_skills(items)
     creation_event = persist_batch(legacy_creation(items:), actor:)
     preceding_outcomes = items.take(50).map do |item|
       persist_batch(
@@ -188,6 +189,7 @@ RSpec.describe "history migration OperationBatch transformers", :event_store do
 
   it "maps a requested cancellation and its terminal fact without retaining counters" do
     items = build_source_items(1)
+    persist_source_skills(items)
     creation_event = persist_batch(legacy_creation(items:), actor:)
     request = Coordinator::Write::HistoryMigrations::LegacyEvents::OperationBatchCancellationRequestedV1.new(
       batch_id: source_batch_id,
@@ -229,6 +231,7 @@ RSpec.describe "history migration OperationBatch transformers", :event_store do
   private
 
   def persist_completed_batch
+    persist_source_skills(source_items)
     creation_event = persist_batch(legacy_creation, actor:)
     command_completion = legacy_command_completion(creation_event)
     completion_event = persist_command(command_completion)
@@ -374,6 +377,33 @@ RSpec.describe "history migration OperationBatch transformers", :event_store do
       instructions: "Preserve the modeled facts.",
       assets: []
     }
+  end
+
+  def persist_source_skills(items)
+    items.each do |item|
+      input = item.command_input.input
+      payload = Coordinator::Write::Events::SkillRevisionPublishedV2.new(
+        skill_id: input.skill_id,
+        name: input.name,
+        scope: input.scope,
+        revision: 1,
+        description: input.description,
+        instructions: input.instructions,
+        assets: [],
+        content_digest: input.content_digest,
+        published_at: timestamp(0)
+      )
+      persist(
+        payload,
+        stream: Coordinator::Write::StreamReference.new(
+          context: "AgentKnowledge",
+          stream_name: "Skill",
+          stream_id: input.skill_id
+        ),
+        markers: [ "skill:#{input.skill_id}" ],
+        actor:
+      )
+    end
   end
 
   def persist_batch(payload, actor:, index: nil, caused_by: nil)

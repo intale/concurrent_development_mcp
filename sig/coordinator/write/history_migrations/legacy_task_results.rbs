@@ -1,0 +1,51 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      module LegacyTaskResults
+        type value = SuccessV1 | DomainRejectionV1
+
+        class NextActionV1 < Shared::Value
+          def tool: () -> String
+          def arguments: () -> Hash[untyped, untyped]
+        end
+
+        class DomainErrorV1 < Shared::Value
+          def code: () -> String
+          def message: () -> String
+          def details: () -> Hash[untyped, untyped]
+        end
+
+        class SuccessV1 < Shared::Value
+          def kind: () -> String
+          def status: () -> String?
+          def summary: () -> String
+          def command_id: () -> String
+          def receipt: () -> String
+          def data: () -> Hash[untyped, untyped]
+          def warnings: () -> Array[String]
+          def next_actions: () -> Array[NextActionV1]
+        end
+
+        class DomainRejectionV1 < Shared::Value
+          def kind: () -> String
+          def status: () -> String
+          def summary: () -> String
+          def command_id: () -> String
+          def error: () -> DomainErrorV1
+          def next_actions: () -> Array[NextActionV1]
+        end
+
+        class StructuredContentV1 < Shared::Value
+          def status: () -> String
+          def summary: () -> String
+          def command_id: () -> String
+          def receipt: () -> String?
+          def context_token: () -> String?
+          def data: () -> Hash[untyped, untyped]
+          def warnings: () -> Array[String]
+          def next_actions: () -> Array[NextActionV1]
+        end
+      end
+    end
+  end
+end
