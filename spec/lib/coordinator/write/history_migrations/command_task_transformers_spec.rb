@@ -12,6 +12,12 @@ RSpec.describe "history migration command and Task transformations", :event_stor
   let(:locator) do
     Coordinator::Write::HistoryMigrations::LegacyCommandEventLocator.new(event_store:)
   end
+  let(:submission_resolver) do
+    Coordinator::Write::HistoryMigrations::LegacyCoordinationTaskSubmissionResolver.new(
+      event_store:,
+      command_event_locator: locator
+    )
+  end
   let(:submitted_transformer) do
     Coordinator::Container["history_migrations.coordination_task_submitted_v2_transformer"]
   end
@@ -23,7 +29,8 @@ RSpec.describe "history migration command and Task transformations", :event_stor
   end
   let(:lifecycle_transformer) do
     Coordinator::Write::HistoryMigrations::CoordinationTaskLifecycleTransformer.new(
-      stream_identity_allocator: allocator
+      stream_identity_allocator: allocator,
+      submission_resolver:
     )
   end
   let(:command_input) do
@@ -156,6 +163,92 @@ RSpec.describe "history migration command and Task transformations", :event_stor
     expect(facts.flat_map { _1.event.to_h.keys }).not_to include(:result, :completed_at)
   end
 
+  it "Given identical legacy retries, when their Task histories are transformed, then only the earliest Task remains" do
+    first_submission = persist_task(submitted_payload)
+    completion = persist_command(command_completion_payload)
+    retry_task_id = SecureRandom.uuid_v7
+    retry_payload = submitted_payload.class.new(
+      submitted_payload.to_h.merge(task_id: retry_task_id)
+    )
+    retry_submission = persist_task(retry_payload)
+    retry_started_payload = Coordinator::Write::HistoryMigrations::LegacyEvents::
+      CoordinationTaskExecutionStartedV1.new(
+        task_id: retry_task_id,
+        started_at: "2026-08-01T10:03:00.000000Z"
+      )
+    retry_started = persist_task(retry_started_payload)
+    upper_position = retry_started.global_position
+
+    first_facts = submitted_transformer.call(
+      migration_id:,
+      source_config_name: "default",
+      source_upper_position: upper_position,
+      source_event: first_submission,
+      source_payload: submitted_payload
+    ).value!
+    retry_facts = submitted_transformer.call(
+      migration_id:,
+      source_config_name: "default",
+      source_upper_position: upper_position,
+      source_event: retry_submission,
+      source_payload: retry_payload
+    ).value!
+    retry_lifecycle_facts = lifecycle_transformer.call(
+      migration_id:,
+      source_config_name: "default",
+      source_upper_position: upper_position,
+      source_event: retry_started,
+      source_payload: retry_started_payload
+    ).value!
+    terminal = completed_transformer.call(
+      migration_id:,
+      source_config_name: "default",
+      source_upper_position: upper_position,
+      source_event: completion,
+      source_payload: command_completion_payload
+    ).value!
+
+    expect(first_facts.map { _1.event.class }).to eq(
+      [
+        Coordinator::Write::Events::CommandRegisteredV1,
+        Coordinator::Write::Events::CoordinationTaskSubmittedV3
+      ]
+    )
+    expect(retry_facts).to be_empty
+    expect(retry_lifecycle_facts).to be_empty
+    expect(terminal.map { _1.event.class }).to eq([ Coordinator::Write::Events::CommandSucceededV1 ])
+  end
+
+  it "Given a legacy Command ID reused with different input, when its retry is transformed, then migration fails closed" do
+    persist_task(submitted_payload)
+    retry_task_id = SecureRandom.uuid_v7
+    conflicting_input = command_input.class.new(
+      command_input.to_h.merge(
+        input: command_input.input.class.new(
+          command_input.input.to_h.merge(goal: "A different request under the reused Command ID")
+        )
+      )
+    )
+    retry_payload = submitted_payload.class.new(
+      submitted_payload.to_h.merge(task_id: retry_task_id, command_input: conflicting_input)
+    )
+    retry_submission = persist_task(retry_payload)
+
+    result = submitted_transformer.call(
+      migration_id:,
+      source_config_name: "default",
+      source_upper_position: retry_submission.global_position,
+      source_event: retry_submission,
+      source_payload: retry_payload
+    )
+
+    expect(result).to be_failure
+    expect(result.failure).to have_attributes(
+      code: :ambiguous_source_reference,
+      message: include("reused with a different Task request")
+    )
+  end
+
   it "Given a standalone legacy command, when it is transformed, then a valid registration precedes its terminal fact" do
     source_payload = command_completion_payload(command_id: "internal:standalone-command")
     source_event = persist_command(source_payload)
@@ -184,6 +277,7 @@ RSpec.describe "history migration command and Task transformations", :event_stor
   end
 
   it "Given legacy Task lifecycle facts, when they are transformed, then occurrence copies are removed and failure semantics remain" do
+    persist_task(submitted_payload)
     payloads = [
       Coordinator::Write::HistoryMigrations::LegacyEvents::CoordinationTaskExecutionStartedV1.new(
         task_id: old_task_id,
@@ -262,9 +356,9 @@ RSpec.describe "history migration command and Task transformations", :event_stor
       stream: Coordinator::Write::StreamReference.new(
         context: "CoordinatorControl",
         stream_name: "CoordinationTask",
-        stream_id: old_task_id
+        stream_id: payload.task_id
       ),
-      markers: [ "task:#{old_task_id}", "command:#{old_command_id}" ]
+      markers: [ "task:#{payload.task_id}", "command:#{old_command_id}" ]
     )
   end
 

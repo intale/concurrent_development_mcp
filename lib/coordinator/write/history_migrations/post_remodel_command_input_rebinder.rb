@@ -90,7 +90,7 @@ module Coordinator::Write
         Success(migrate(document, command_id:, context:))
       rescue ResolutionFailure => error
         Failure(error.failure)
-      rescue KeyError, ArgumentError, TypeError, Dry::Struct::Error => error
+      rescue KeyError, ArgumentError, TypeError, Dry::Struct::Error, EventHistoryLimitExceeded => error
         Failure(invalid(source_event, document:, error:))
       end
 

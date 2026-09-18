@@ -487,10 +487,19 @@ module Coordinator
       Write::HistoryMigrations::LegacyCommandEventLocator.new(event_store: self["event_store"])
     end
 
+    register("history_migrations.legacy_coordination_task_submission_resolver", memoize: true) do
+      Write::HistoryMigrations::LegacyCoordinationTaskSubmissionResolver.new(
+        event_store: self["event_store"],
+        command_event_locator: self["history_migrations.legacy_command_event_locator"]
+      )
+    end
+
     register("history_migrations.coordination_task_submitted_v2_transformer", memoize: true) do
       Write::HistoryMigrations::CoordinationTaskSubmittedV2Transformer.new(
         stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
         command_event_locator: self["history_migrations.legacy_command_event_locator"],
+        submission_resolver:
+          self["history_migrations.legacy_coordination_task_submission_resolver"],
         command_input_rebinder:
           self["history_migrations.post_remodel_command_input_rebinder"],
         operation_batch_context_resolver:
@@ -500,7 +509,9 @@ module Coordinator
 
     register("history_migrations.coordination_task_lifecycle_transformer", memoize: true) do
       Write::HistoryMigrations::CoordinationTaskLifecycleTransformer.new(
-        stream_identity_allocator: self["history_migrations.stream_identity_allocator"]
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        submission_resolver:
+          self["history_migrations.legacy_coordination_task_submission_resolver"]
       )
     end
 

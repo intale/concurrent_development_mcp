@@ -10,7 +10,7 @@ module Coordinator::Write
       end
 
       def completion(command_id:, through_position:, source_event:)
-        locate(
+        locate_unique(
           command_id:,
           through_position:,
           source_event:,
@@ -20,18 +20,24 @@ module Coordinator::Write
       end
 
       def task_submission(command_id:, through_position:, source_event:)
-        locate(
-          command_id:,
-          through_position:,
-          source_event:,
-          stream_name: "CoordinationTask",
-          event_type: "CoordinationTaskSubmitted"
+        events = @event_store.read_global_marked_page(
+          GlobalMarkedEventPageCriteria.new(
+            stream_context: "CoordinatorControl",
+            stream_name: "CoordinationTask",
+            event_type: "CoordinationTaskSubmitted",
+            markers: [ "command:#{command_id}" ],
+            from_position: 0,
+            to_position: through_position || source_event.global_position,
+            page_size: 1,
+            direction: :asc
+          )
         )
+        Success(events.first)
       end
 
       private
 
-      def locate(command_id:, through_position:, source_event:, stream_name:, event_type:)
+      def locate_unique(command_id:, through_position:, source_event:, stream_name:, event_type:)
         events = @event_store.read_global_marked(
           GlobalMarkedEventReadCriteria.new(
             stream_context: "CoordinatorControl",

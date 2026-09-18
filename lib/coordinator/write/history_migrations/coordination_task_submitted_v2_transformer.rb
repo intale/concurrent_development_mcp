@@ -8,6 +8,7 @@ module Coordinator::Write
       def initialize(
         stream_identity_allocator:,
         command_event_locator:,
+        submission_resolver:,
         command_input_rebinder:,
         operation_batch_context_resolver:,
         command_input_loader: LegacyCommandInputLoader.new,
@@ -18,6 +19,7 @@ module Coordinator::Write
       )
         @stream_identity_allocator = stream_identity_allocator
         @command_event_locator = command_event_locator
+        @submission_resolver = submission_resolver
         @command_input_rebinder = command_input_rebinder
         @operation_batch_context_resolver = operation_batch_context_resolver
         @command_input_loader = command_input_loader
@@ -28,6 +30,10 @@ module Coordinator::Write
       end
 
       def call(migration_id:, source_config_name:, source_upper_position:, source_event:, source_payload:)
+        submission = @submission_resolver.call(source_event:, source_upper_position:)
+        return submission if submission.failure?
+        return Success([]) unless submission.value!.canonical?
+
         completion = @command_event_locator.completion(
           command_id: source_payload.command_id,
           through_position: source_upper_position,

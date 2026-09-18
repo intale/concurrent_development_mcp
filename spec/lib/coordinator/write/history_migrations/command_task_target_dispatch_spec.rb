@@ -55,6 +55,7 @@ RSpec.describe "history migration command and Task target dispatch", :event_stor
   end
 
   it "Given a completely planned source pair, when it is applied, then target streams contain cohesive facts and typed provenance" do
+    persist_change_set
     submitted_event = persist(submitted_payload, stream_name: "CoordinationTask", stream_id: old_task_id)
     completion_event = persist(completion_payload, stream_name: "Command", stream_id: old_command_id)
     upper_position = completion_event.global_position
@@ -62,14 +63,13 @@ RSpec.describe "history migration command and Task target dispatch", :event_stor
     dispatcher = Coordinator::Container["history_migrations.event_dispatcher"]
 
     [ submitted_event, completion_event ].each do |event|
-      expect(
-        planner.call(
-          migration_id:,
-          source_config_name: "default",
-          source_upper_position: upper_position,
-          source_event: event
-        )
-      ).to be_success
+      result = planner.call(
+        migration_id:,
+        source_config_name: "default",
+        source_upper_position: upper_position,
+        source_event: event
+      )
+      expect(result).to be_success, result.failure.to_h.inspect
     end
 
     submitted_write = HistoryMigrationWaveDispatch.call(
@@ -117,6 +117,37 @@ RSpec.describe "history migration command and Task target dispatch", :event_stor
       "created_at" => submitted_event.created_at.utc.iso8601(6)
     )
     expect(command_events.flat_map { _1.data.keys }).not_to include("completed_at", "submitted_at")
+  end
+
+  def persist_change_set
+    payload = Coordinator::Write::Events::ChangeSetCreatedV1.new(
+      change_set_id: "legacy-change-set",
+      goal: "Migrate command facts",
+      created_at: "2026-08-01T09:59:00.000000Z"
+    )
+    source_store.append(
+      Coordinator::Write::StreamReference.new(
+        context: "DevelopmentPlanning",
+        stream_name: "ChangeSet",
+        stream_id: payload.change_set_id
+      ),
+      [
+        PgEventstore::Event.new(
+          id: SecureRandom.uuid_v7,
+          type: payload.class.event_type,
+          data: payload.to_h,
+          metadata: {
+            "schema_version" => payload.class.schema_version,
+            "command_id" => old_command_id,
+            "actor_kind" => "agent",
+            "actor_id" => "agent-luna-a",
+            "recorded_by" => "coordinator"
+          },
+          markers: [ "change-set:#{payload.change_set_id}" ],
+          correlation_id:
+        )
+      ]
+    )
   end
 
   def persist(payload, stream_name:, stream_id:)

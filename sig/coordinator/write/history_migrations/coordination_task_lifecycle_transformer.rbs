@@ -4,6 +4,7 @@ module Coordinator
       class CoordinationTaskLifecycleTransformer
         def initialize: (
           stream_identity_allocator: StreamIdentityAllocator,
+          submission_resolver: LegacyCoordinationTaskSubmissionResolver,
           ?rejection_retryability: LegacyCommandRejectionRetryability,
           ?task_failure_mapper: LegacyTaskFailureMapper
         ) -> void

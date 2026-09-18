@@ -7,15 +7,21 @@ module Coordinator::Write
 
       def initialize(
         stream_identity_allocator:,
+        submission_resolver:,
         rejection_retryability: LegacyCommandRejectionRetryability.new,
         task_failure_mapper: LegacyTaskFailureMapper.new
       )
         @stream_identity_allocator = stream_identity_allocator
+        @submission_resolver = submission_resolver
         @rejection_retryability = rejection_retryability
         @task_failure_mapper = task_failure_mapper
       end
 
       def call(migration_id:, source_config_name:, source_upper_position:, source_event:, source_payload:)
+        submission = @submission_resolver.call(source_event:, source_upper_position:)
+        return submission if submission.failure?
+        return Success([]) unless submission.value!.canonical?
+
         task = allocate(
           migration_id:,
           source_config_name:,
