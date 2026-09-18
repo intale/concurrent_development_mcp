@@ -585,7 +585,13 @@ module Coordinator::Write
       end
 
       def references_equal?(left, right)
-        left.map(&:to_h) == right.map(&:to_h)
+        normalize_references(left) == normalize_references(right)
+      end
+
+      def normalize_references(references)
+        references.map(&:to_h).sort_by do |reference|
+          [ reference.fetch(:resource_id), reference.fetch(:lease_id) ]
+        end
       end
 
       def lease_event?(source)

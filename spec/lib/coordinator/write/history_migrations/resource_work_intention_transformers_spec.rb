@@ -510,6 +510,7 @@ RSpec.describe "history migration Resource and WorkIntention transformers", :eve
       )
     end
     references = acquisitions.map { reference_for(load_source(_1)) }
+    lifecycle_references = references.rotate(-1)
     set_renewal = persist_write_set(
       Coordinator::Write::Events::WriteSetRenewedV2.new(
         lease_set_id:,
@@ -518,7 +519,7 @@ RSpec.describe "history migration Resource and WorkIntention transformers", :eve
         attempt_id:,
         repository_id:,
         policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
-        resources: references,
+        resources: lifecycle_references,
         resource_count: 3,
         renewed_at: timestamp(20),
         previous_expires_at: timestamp(40),
@@ -545,7 +546,7 @@ RSpec.describe "history migration Resource and WorkIntention transformers", :eve
         attempt_id:,
         repository_id:,
         policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
-        resources: references,
+        resources: lifecycle_references,
         resource_count: 3,
         previous_expires_at: timestamp(50),
         released_at: timestamp(30)
