@@ -73,6 +73,25 @@ RSpec.describe Coordinator::Write::HistoryMigrations::TargetPlanWaveSelector, :e
     expect(selected).to eq((0..3).to_h { [ _1, expected.fetch(_1, []) ] })
   end
 
+  it "resolves a complete persisted source plan without replanning its process steps" do
+    transformed = transformed_facts
+    created = target_plan_builder.call(
+      migration_id:,
+      source_event:,
+      transformed_facts: transformed
+    ).value!
+
+    result = selector.find_complete(
+      migration_id:,
+      source_event:,
+      transformed_facts: transformed
+    )
+
+    expect(result).to be_success
+    expect(result.value!.map(&:target_event)).to eq(created.map(&:target_event))
+    expect(result.value!.map(&:outcome).uniq).to contain_exactly("existing")
+  end
+
   it "rejects a persisted plan that does not cover the complete transformation" do
     target_plan_builder.call(
       migration_id:,

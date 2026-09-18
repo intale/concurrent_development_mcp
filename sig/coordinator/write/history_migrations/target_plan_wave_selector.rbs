@@ -4,7 +4,8 @@ module Coordinator
       class TargetPlanWaveSelector
         def initialize: (
           event_store: EventStore,
-          ?schema_registry: EventSchemaRegistry
+          ?schema_registry: EventSchemaRegistry,
+          ?marker_codec: Shared::Markers::CodecV2
         ) -> void
 
         def call: (
@@ -12,6 +13,12 @@ module Coordinator
           source_event: PgEventstore::Event,
           transformed_facts: Array[TransformedFactV1],
           dependency_wave: Integer
+        ) -> Dry::Monads::Result
+
+        def find_complete: (
+          migration_id: String,
+          source_event: PgEventstore::Event,
+          transformed_facts: Array[TransformedFactV1]
         ) -> Dry::Monads::Result
       end
     end

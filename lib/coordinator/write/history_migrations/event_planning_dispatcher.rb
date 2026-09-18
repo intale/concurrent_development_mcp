@@ -5,8 +5,9 @@ module Coordinator::Write
     class EventPlanningDispatcher
       include Dry::Monads[:result]
 
-      def initialize(transformer_registry:, target_plan_builder:)
+      def initialize(transformer_registry:, target_plan_wave_selector:, target_plan_builder:)
         @transformer_registry = transformer_registry
+        @target_plan_wave_selector = target_plan_wave_selector
         @target_plan_builder = target_plan_builder
       end
 
@@ -18,6 +19,13 @@ module Coordinator::Write
           source_event:
         )
         return transformation if transformation.failure?
+
+        existing = @target_plan_wave_selector.find_complete(
+          migration_id:,
+          source_event:,
+          transformed_facts: transformation.value!
+        )
+        return existing if existing.failure? || existing.value!
 
         @target_plan_builder.call(
           migration_id:,

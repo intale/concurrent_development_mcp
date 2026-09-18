@@ -915,6 +915,7 @@ module Coordinator
     register("history_migrations.event_planning_dispatcher", memoize: true) do
       Write::HistoryMigrations::EventPlanningDispatcher.new(
         transformer_registry: self["history_migrations.transformer_registry"],
+        target_plan_wave_selector: self["history_migrations.target_plan_wave_selector"],
         target_plan_builder: self["history_migrations.target_plan_builder"]
       )
     end
