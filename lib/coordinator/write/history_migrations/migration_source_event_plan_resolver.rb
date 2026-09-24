@@ -16,7 +16,7 @@ module Coordinator::Write
             stream_context: "CoordinatorMaintenance",
             stream_name: "HistoryMigrationTargetStreamPlan",
             event_types: [ "HistoryMigrationTargetEventPlanned" ],
-            markers: [ "migration-source-event:#{source_event_id}" ],
+            markers: [ MigrationSourceEventPlanMarker.call(migration_id:, source_event_id:) ],
             maximum_count: 2,
             direction: :asc
           )

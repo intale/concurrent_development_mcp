@@ -54,6 +54,12 @@ RSpec.describe Coordinator::Write::HistoryMigrations::TargetEventPlanner, :event
     expect(marker).to start_with("compound:history-migration-target-event-plan:v2")
     expect(marker).to include("source-event=")
     expect(marker).not_to match(/sha|md5/i)
+    expect(first.value!.planning_event.markers).to include(
+      Coordinator::Write::HistoryMigrations::MigrationSourceEventPlanMarker.call(
+        migration_id:,
+        source_event_id: source_events.first.id
+      )
+    )
   end
 
   it "rejects a different target for an existing source transformation step" do

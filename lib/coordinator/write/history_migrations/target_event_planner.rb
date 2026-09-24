@@ -286,6 +286,10 @@ module Coordinator::Write
       end
 
       def build_event(command, marker:, caused_by:)
+        source_event_marker = MigrationSourceEventPlanMarker.call(
+          migration_id: command.migration_id,
+          source_event_id: command.source_event_id
+        )
         @event_factory.build!(
           event: Events::HistoryMigrationTargetEventPlannedV1.new(
             migration_id: command.migration_id,
@@ -306,6 +310,7 @@ module Coordinator::Write
           ),
           markers: [
             marker,
+            source_event_marker,
             "history-migration:#{command.migration_id}",
             "migration-source-event:#{command.source_event_id}",
             "history-migration-wave:#{command.dependency_wave}",

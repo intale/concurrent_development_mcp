@@ -92,6 +92,37 @@ RSpec.describe Coordinator::Write::HistoryMigrations::TargetPlanWaveSelector, :e
     expect(result.value!.map(&:outcome).uniq).to contain_exactly("existing")
   end
 
+  it "isolates plans for the same source event across migrations" do
+    first_facts = transformed_facts
+    other_migration_id = SecureRandom.uuid_v7
+    other_facts = transformer.call(
+      migration_id: other_migration_id,
+      source_config_name: "default",
+      source_upper_position: source_event.global_position,
+      source_event:,
+      source_payload:
+    ).value!
+    target_plan_builder.call(
+      migration_id:,
+      source_event:,
+      transformed_facts: first_facts
+    ).value!
+    other_plans = target_plan_builder.call(
+      migration_id: other_migration_id,
+      source_event:,
+      transformed_facts: other_facts
+    ).value!
+
+    result = selector.find_complete(
+      migration_id: other_migration_id,
+      source_event:,
+      transformed_facts: other_facts
+    )
+
+    expect(result).to be_success
+    expect(result.value!.map(&:target_event)).to eq(other_plans.map(&:target_event))
+  end
+
   it "detects whether a persisted source plan participates in a dependency wave" do
     plans = target_plan_builder.call(
       migration_id:,

@@ -36,7 +36,8 @@ module Coordinator::Write
       end
 
       def includes_wave?(migration_id:, source_event:, dependency_wave:)
-        entries = planned_events(source_event:, maximum_count: PLAN_SCAN_MAXIMUM).map { [ _1, load(_1) ] }
+        entries = planned_events(migration_id:, source_event:, maximum_count: PLAN_SCAN_MAXIMUM)
+          .map { [ _1, load(_1) ] }
         return Success(nil) if entries.empty?
         return Failure(inconsistent(source_event)) unless valid_source_plan?(
           entries,
@@ -51,14 +52,14 @@ module Coordinator::Write
 
       def find_complete(migration_id:, source_event:, transformed_facts:)
         if transformed_facts.empty?
-          events = planned_events(source_event:, maximum_count: 1)
+          events = planned_events(migration_id:, source_event:, maximum_count: 1)
           return events.empty? ? Success([].freeze) : Failure(inconsistent(source_event))
         end
 
         facts_by_step = transformed_facts.to_h { [ _1.step_name, _1 ] }
         return Failure(inconsistent(source_event)) unless facts_by_step.length == transformed_facts.length
 
-        events = planned_events(source_event:, maximum_count: transformed_facts.length)
+        events = planned_events(migration_id:, source_event:, maximum_count: transformed_facts.length)
         return Success(nil) if events.empty?
 
         entries = events.map { [ _1, load(_1) ] }
@@ -88,13 +89,18 @@ module Coordinator::Write
 
       private
 
-      def planned_events(source_event:, maximum_count:)
+      def planned_events(migration_id:, source_event:, maximum_count:)
         @event_store.read_global_marked(
           GlobalMarkedEventReadCriteria.new(
             stream_context: "CoordinatorMaintenance",
             stream_name: "HistoryMigrationTargetStreamPlan",
             event_types: [ "HistoryMigrationTargetEventPlanned" ],
-            markers: [ "migration-source-event:#{source_event.id}" ],
+            markers: [
+              MigrationSourceEventPlanMarker.call(
+                migration_id:,
+                source_event_id: source_event.id
+              )
+            ],
             maximum_count:,
             direction: :asc
           )

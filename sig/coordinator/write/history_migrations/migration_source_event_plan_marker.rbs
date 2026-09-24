@@ -1,0 +1,11 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class MigrationSourceEventPlanMarker
+        PURPOSE: String
+
+        def self.call: (migration_id: String, source_event_id: String) -> String
+      end
+    end
+  end
+end
