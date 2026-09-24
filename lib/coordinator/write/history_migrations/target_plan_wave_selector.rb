@@ -62,12 +62,13 @@ module Coordinator::Write
         return Success(nil) if events.empty?
 
         entries = events.map { [ _1, load(_1) ] }
-        return Failure(inconsistent(source_event)) unless valid_plan?(
+        return Failure(inconsistent(source_event)) unless valid_partial_plan?(
           entries,
           migration_id:,
           source_event:,
           facts_by_step:
         )
+        return Success(nil) if entries.length < transformed_facts.length
 
         entries_by_step = entries.to_h do |event, payload|
           [ payload.transformation_step, [ event, payload ] ]
@@ -100,8 +101,8 @@ module Coordinator::Write
         )
       end
 
-      def valid_plan?(entries, migration_id:, source_event:, facts_by_step:)
-        return false unless entries.length == facts_by_step.length
+      def valid_partial_plan?(entries, migration_id:, source_event:, facts_by_step:)
+        return false if entries.length > facts_by_step.length
         return false unless valid_source_plan?(entries, migration_id:, source_event:)
 
         entries.all? do |_event, payload|

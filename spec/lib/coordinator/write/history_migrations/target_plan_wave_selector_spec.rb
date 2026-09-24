@@ -165,6 +165,23 @@ RSpec.describe Coordinator::Write::HistoryMigrations::TargetPlanWaveSelector, :e
     )
   end
 
+  it "leaves an exact partial plan open so one transformation can preplan referenced facts" do
+    target_plan_builder.call(
+      migration_id:,
+      source_event:,
+      transformed_facts: transformed_facts.first(1)
+    ).value!
+
+    result = selector.find_complete(
+      migration_id:,
+      source_event:,
+      transformed_facts:
+    )
+
+    expect(result).to be_success
+    expect(result.value!).to be_nil
+  end
+
   def transformed_facts
     @transformed_facts ||= transformer.call(
       migration_id:,
