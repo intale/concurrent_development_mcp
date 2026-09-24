@@ -2,15 +2,11 @@ module Coordinator
   module Write
     module HistoryMigrations
       class LegacyCommandEventLocator
+        MAXIMUM_TASK_SUBMISSIONS_PER_COMMAND: Integer
+
         def initialize: (event_store: EventStore) -> void
 
-        def completion: (
-          command_id: String,
-          through_position: Integer?,
-          source_event: PgEventstore::Event
-        ) -> Dry::Monads::Result
-
-        def task_submission: (
+        def task_submissions: (
           command_id: String,
           through_position: Integer?,
           source_event: PgEventstore::Event

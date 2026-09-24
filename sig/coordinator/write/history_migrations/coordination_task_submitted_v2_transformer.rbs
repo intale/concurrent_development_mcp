@@ -4,13 +4,11 @@ module Coordinator
       class CoordinationTaskSubmittedV2Transformer
         def initialize: (
           stream_identity_allocator: StreamIdentityAllocator,
-          command_event_locator: LegacyCommandEventLocator,
           submission_resolver: LegacyCoordinationTaskSubmissionResolver,
           command_input_rebinder: PostRemodelCommandInputRebinder,
           operation_batch_context_resolver: OperationBatchContextResolver,
           ?command_input_loader: LegacyCommandInputLoader,
           ?manifest_builder: OperationBatches::ManifestBuilder,
-          ?request_id_mapper: LegacyRequestIdMapper,
           ?request_marker: CommandLifecycle::RequestMarker,
           ?execution_lane: Tasks::ExecutionLane
         ) -> void

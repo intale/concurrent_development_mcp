@@ -497,7 +497,6 @@ module Coordinator
     register("history_migrations.coordination_task_submitted_v2_transformer", memoize: true) do
       Write::HistoryMigrations::CoordinationTaskSubmittedV2Transformer.new(
         stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
-        command_event_locator: self["history_migrations.legacy_command_event_locator"],
         submission_resolver:
           self["history_migrations.legacy_coordination_task_submission_resolver"],
         command_input_rebinder:
@@ -518,7 +517,8 @@ module Coordinator
     register("history_migrations.command_completed_v1_transformer", memoize: true) do
       Write::HistoryMigrations::CommandCompletedV1Transformer.new(
         stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
-        command_event_locator: self["history_migrations.legacy_command_event_locator"]
+        submission_resolver:
+          self["history_migrations.legacy_coordination_task_submission_resolver"]
       )
     end
 

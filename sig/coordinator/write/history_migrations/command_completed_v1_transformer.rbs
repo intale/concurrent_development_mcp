@@ -4,7 +4,7 @@ module Coordinator
       class CommandCompletedV1Transformer
         def initialize: (
           stream_identity_allocator: StreamIdentityAllocator,
-          command_event_locator: LegacyCommandEventLocator,
+          submission_resolver: LegacyCoordinationTaskSubmissionResolver,
           ?request_id_mapper: LegacyRequestIdMapper,
           ?request_marker: CommandLifecycle::RequestMarker
         ) -> void

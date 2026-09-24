@@ -7,24 +7,20 @@ module Coordinator::Write
 
       def initialize(
         stream_identity_allocator:,
-        command_event_locator:,
         submission_resolver:,
         command_input_rebinder:,
         operation_batch_context_resolver:,
         command_input_loader: LegacyCommandInputLoader.new,
         manifest_builder: OperationBatches::ManifestBuilder.new,
-        request_id_mapper: LegacyRequestIdMapper.new,
         request_marker: CommandLifecycle::RequestMarker.new,
         execution_lane: Tasks::ExecutionLane.new
       )
         @stream_identity_allocator = stream_identity_allocator
-        @command_event_locator = command_event_locator
         @submission_resolver = submission_resolver
         @command_input_rebinder = command_input_rebinder
         @operation_batch_context_resolver = operation_batch_context_resolver
         @command_input_loader = command_input_loader
         @manifest_builder = manifest_builder
-        @request_id_mapper = request_id_mapper
         @request_marker = request_marker
         @execution_lane = execution_lane
       end
@@ -34,17 +30,10 @@ module Coordinator::Write
         return submission if submission.failure?
         return Success([]) unless submission.value!.canonical?
 
-        completion = @command_event_locator.completion(
-          command_id: source_payload.command_id,
-          through_position: source_upper_position,
-          source_event:
-        )
-        return completion if completion.failure?
-
         command = allocate(
           migration_id:,
           source_config_name:,
-          source_event: completion.value! || source_event,
+          source_event: submission.value!.canonical_event,
           target_stream_name: "Command",
           identity_role: "command"
         )
@@ -96,10 +85,7 @@ module Coordinator::Write
       def facts(source, source_event:, command:, task:, migrated_input:)
         command_id = command.target_stream.stream_id
         task_id = task.target_stream.stream_id
-        request_id = @request_id_mapper.call(
-          command_id: source.command_id,
-          source_position: source_event.global_position
-        )
+        request_id = source_event.global_position
         actor = actor_from(migrated_input.document)
         request_marker = @request_marker.call(actor:, request_id:)
         metadata_extension = MigrationMetadataExtensionV1.new(

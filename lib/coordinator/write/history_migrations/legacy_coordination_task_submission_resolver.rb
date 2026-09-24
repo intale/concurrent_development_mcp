@@ -21,29 +21,39 @@ module Coordinator::Write
         submission_event = submission_event_for(source_event)
         submission = load_submission(submission_event)
         validate_submission!(submission_event, submission)
-
-        canonical = @command_event_locator.task_submission(
+        pairs = submission_pairs(
           command_id: submission.command_id,
-          through_position: source_upper_position,
+          source_upper_position:,
           source_event:
         )
-        return canonical if canonical.failure?
+        return pairs if pairs.failure?
 
-        canonical_event = canonical.value!
-        raise ArgumentError, "legacy Command has no Task submission" unless canonical_event
+        Success(resolve(submission_event:, submission:, pairs: pairs.value!))
+      rescue KeyError, ArgumentError, TypeError, Dry::Struct::Error, EventHistoryLimitExceeded => error
+        Failure(invalid(source_event, error.message))
+      end
 
-        canonical_submission = load_submission(canonical_event)
-        validate_submission!(canonical_event, canonical_submission)
-        validate_replay!(submission, canonical_submission)
+      def for_completion(source_event:, source_upper_position:, command_id:)
+        pairs = submission_pairs(command_id:, source_upper_position:, source_event:)
+        return pairs if pairs.failure?
+        return Success(nil) if pairs.value!.empty?
 
-        Success(
-          LegacyCoordinationTaskSubmissionResolutionV1.new(
-            submission_event:,
-            submission:,
-            canonical_event:,
-            canonical_submission:
-          )
-        )
+        correlated = pairs.value!.select do |event, _submission|
+          source_event.correlation_id && event.correlation_id == source_event.correlation_id
+        end
+        candidates = if correlated.empty?
+          grouped = pairs.value!.group_by { |_event, submission| request_key(submission) }
+          raise ArgumentError, "legacy Command completion cannot be assigned to one Task request" unless grouped.one?
+
+          grouped.values.sole
+        else
+          correlated
+        end
+        keys = candidates.map { |_event, submission| request_key(submission) }.uniq
+        raise ArgumentError, "legacy Command completion matches different Task requests" unless keys.one?
+
+        submission_event, submission = candidates.first
+        Success(resolve(submission_event:, submission:, pairs: pairs.value!))
       rescue KeyError, ArgumentError, TypeError, Dry::Struct::Error, EventHistoryLimitExceeded => error
         Failure(invalid(source_event, error.message))
       end
@@ -91,15 +101,47 @@ module Coordinator::Write
         raise ArgumentError, "legacy Task submission identity is invalid" unless valid
       end
 
-      def validate_replay!(submission, canonical)
-        valid = submission.command_id == canonical.command_id &&
-                submission.tool_name == canonical.tool_name &&
-                submission.poll_interval_ms == canonical.poll_interval_ms &&
-                submission.ttl_ms == canonical.ttl_ms &&
-                canonical_input(submission) == canonical_input(canonical)
-        return if valid
+      def submission_pairs(command_id:, source_upper_position:, source_event:)
+        events = @command_event_locator.task_submissions(
+          command_id:,
+          through_position: source_upper_position,
+          source_event:
+        )
+        return events if events.failure?
 
-        raise ArgumentError, "legacy Command ID was reused with a different Task request"
+        Success(
+          events.value!.filter_map do |event|
+            next unless event.metadata["schema_version"] == 2
+
+            submission = load_submission(event)
+            validate_submission!(event, submission)
+            [ event, submission ]
+          end
+        )
+      end
+
+      def resolve(submission_event:, submission:, pairs:)
+        canonical_event, canonical_submission = pairs.find do |_event, candidate|
+          request_key(candidate) == request_key(submission)
+        end
+        raise ArgumentError, "legacy Command has no matching Task submission" unless canonical_event
+
+        LegacyCoordinationTaskSubmissionResolutionV1.new(
+          submission_event:,
+          submission:,
+          canonical_event:,
+          canonical_submission:
+        )
+      end
+
+      def request_key(submission)
+        [
+          submission.command_id,
+          submission.tool_name,
+          submission.poll_interval_ms,
+          submission.ttl_ms,
+          canonical_input(submission)
+        ]
       end
 
       def canonical_input(submission)

@@ -5,51 +5,26 @@ module Coordinator::Write
     class LegacyCommandEventLocator
       include Dry::Monads[:result]
 
+      MAXIMUM_TASK_SUBMISSIONS_PER_COMMAND = 1_000
+
       def initialize(event_store:)
         @event_store = event_store
       end
 
-      def completion(command_id:, through_position:, source_event:)
-        locate_unique(
-          command_id:,
-          through_position:,
-          source_event:,
-          stream_name: "Command",
-          event_type: "CommandCompleted"
-        )
-      end
-
-      def task_submission(command_id:, through_position:, source_event:)
-        events = @event_store.read_global_marked_page(
-          GlobalMarkedEventPageCriteria.new(
-            stream_context: "CoordinatorControl",
-            stream_name: "CoordinationTask",
-            event_type: "CoordinationTaskSubmitted",
-            markers: [ "command:#{command_id}" ],
-            from_position: 0,
-            to_position: through_position || source_event.global_position,
-            page_size: 1,
-            direction: :asc
-          )
-        )
-        Success(events.first)
-      end
-
-      private
-
-      def locate_unique(command_id:, through_position:, source_event:, stream_name:, event_type:)
+      def task_submissions(command_id:, through_position:, source_event:)
         events = @event_store.read_global_marked(
           GlobalMarkedEventReadCriteria.new(
             stream_context: "CoordinatorControl",
-            stream_name:,
-            event_types: [ event_type ],
+            stream_name: "CoordinationTask",
+            event_types: [ "CoordinationTaskSubmitted" ],
             markers: [ "command:#{command_id}" ],
-            maximum_count: 1,
-            direction: :asc,
-            to_position: through_position
+            maximum_count: MAXIMUM_TASK_SUBMISSIONS_PER_COMMAND,
+            from_position: 0,
+            to_position: through_position || source_event.global_position,
+            direction: :asc
           )
         )
-        Success(events.first)
+        Success(events)
       rescue EventHistoryLimitExceeded => error
         Failure(
           TransformationErrorV1.new(

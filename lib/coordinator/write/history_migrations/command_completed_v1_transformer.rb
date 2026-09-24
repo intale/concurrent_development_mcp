@@ -7,28 +7,29 @@ module Coordinator::Write
 
       def initialize(
         stream_identity_allocator:,
-        command_event_locator:,
+        submission_resolver:,
         request_id_mapper: LegacyRequestIdMapper.new,
         request_marker: CommandLifecycle::RequestMarker.new
       )
         @stream_identity_allocator = stream_identity_allocator
-        @command_event_locator = command_event_locator
+        @submission_resolver = submission_resolver
         @request_id_mapper = request_id_mapper
         @request_marker = request_marker
       end
 
       def call(migration_id:, source_config_name:, source_upper_position:, source_event:, source_payload:)
-        submission = @command_event_locator.task_submission(
+        submission = @submission_resolver.for_completion(
+          source_event:,
+          source_upper_position:,
           command_id: source_payload.command_id,
-          through_position: source_upper_position,
-          source_event:
         )
         return submission if submission.failure?
+        resolution = submission.value!
 
         allocation = @stream_identity_allocator.call(
           migration_id:,
           source_config_name:,
-          source_event:,
+          source_event: resolution&.canonical_event || source_event,
           target_stream_context: "CoordinatorControl",
           target_stream_name: "Command",
           identity_role: "command"
@@ -40,7 +41,7 @@ module Coordinator::Write
             source_payload,
             source_event:,
             target_stream: allocation.value!.target_stream,
-            task_submitted: !submission.value!.nil?,
+            task_submitted: !resolution.nil?,
             batch_registered: operation_batch_registration?(allocation.value!)
           )
         )

@@ -24,7 +24,7 @@ RSpec.describe "history migration command and Task transformations", :event_stor
   let(:completed_transformer) do
     Coordinator::Write::HistoryMigrations::CommandCompletedV1Transformer.new(
       stream_identity_allocator: allocator,
-      command_event_locator: locator
+      submission_resolver:
     )
   end
   let(:lifecycle_transformer) do
@@ -98,7 +98,7 @@ RSpec.describe "history migration command and Task transformations", :event_stor
     expect(task.event.command_input.command_id).to eq(registration.event.command_id)
     expect(task.event.task_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
     expect(task.event.task_id).not_to eq(old_task_id)
-    expect(registration.event.request_id).to eq(old_command_id)
+    expect(registration.event.request_id).to eq(submitted_event.global_position)
     expect(registration.metadata_extension.canonical_input_digest).to eq(
       task.metadata_extension.canonical_input_digest
     )
@@ -111,23 +111,9 @@ RSpec.describe "history migration command and Task transformations", :event_stor
 
   it "Given a legacy domain rejection, when the completed Task is transformed, then its command becomes terminal without retaining its result dump" do
     submitted_event = persist_task(submitted_payload)
-    rejection = Coordinator::Write::Tasks::SemanticResultV1::DomainRejection.new(
-      kind: "domain_rejection",
-      status: "denied",
-      summary: "ChangeSet already exists",
-      command_id: old_command_id,
-      error: Coordinator::Write::Tasks::DomainErrorV1::ChangeSetError.new(
-        code: "change_set_already_exists",
-        message: "ChangeSet already exists",
-        details: Coordinator::Write::Tasks::DomainErrorV1::ChangeSetDetails.new(
-          change_set_id: "legacy-change-set"
-        )
-      ),
-      next_actions: []
-    )
     completed_payload = Coordinator::Write::HistoryMigrations::LegacyEvents::CoordinationTaskCompletedV2.new(
       task_id: old_task_id,
-      result: rejection,
+      result: domain_rejection,
       completed_at: "2026-08-01T10:02:00.000000Z"
     )
     completed_event = persist_task(completed_payload)
@@ -219,8 +205,20 @@ RSpec.describe "history migration command and Task transformations", :event_stor
     expect(terminal.map { _1.event.class }).to eq([ Coordinator::Write::Events::CommandSucceededV1 ])
   end
 
-  it "Given a legacy Command ID reused with different input, when its retry is transformed, then migration fails closed" do
-    persist_task(submitted_payload)
+  it "Given a legacy Command ID reused with different input, when both requests are transformed, then each has its own command lifecycle" do
+    first_correlation_id = SecureRandom.uuid_v7
+    retry_correlation_id = SecureRandom.uuid_v7
+    first_submission = persist_task(submitted_payload, correlation_id: first_correlation_id)
+    first_completed_payload = Coordinator::Write::HistoryMigrations::LegacyEvents::
+      CoordinationTaskCompletedV2.new(
+        task_id: old_task_id,
+        result: domain_rejection,
+        completed_at: "2026-08-01T10:02:00.000000Z"
+      )
+    first_completed = persist_task(
+      first_completed_payload,
+      correlation_id: first_correlation_id
+    )
     retry_task_id = SecureRandom.uuid_v7
     conflicting_input = command_input.class.new(
       command_input.to_h.merge(
@@ -232,20 +230,52 @@ RSpec.describe "history migration command and Task transformations", :event_stor
     retry_payload = submitted_payload.class.new(
       submitted_payload.to_h.merge(task_id: retry_task_id, command_input: conflicting_input)
     )
-    retry_submission = persist_task(retry_payload)
+    retry_submission = persist_task(retry_payload, correlation_id: retry_correlation_id)
+    completion_payload = command_completion_payload
+    completion = persist_command(completion_payload, correlation_id: retry_correlation_id)
+    upper_position = completion.global_position
 
-    result = submitted_transformer.call(
+    first_request = submitted_transformer.call(
       migration_id:,
       source_config_name: "default",
-      source_upper_position: retry_submission.global_position,
+      source_upper_position: upper_position,
+      source_event: first_submission,
+      source_payload: submitted_payload
+    ).value!
+    first_terminal = lifecycle_transformer.call(
+      migration_id:,
+      source_config_name: "default",
+      source_upper_position: upper_position,
+      source_event: first_completed,
+      source_payload: first_completed_payload
+    ).value!.first
+    retry_request = submitted_transformer.call(
+      migration_id:,
+      source_config_name: "default",
+      source_upper_position: upper_position,
       source_event: retry_submission,
       source_payload: retry_payload
-    )
+    ).value!
+    retry_terminal = completed_transformer.call(
+      migration_id:,
+      source_config_name: "default",
+      source_upper_position: upper_position,
+      source_event: completion,
+      source_payload: completion_payload
+    ).value!.sole
 
-    expect(result).to be_failure
-    expect(result.failure).to have_attributes(
-      code: :ambiguous_source_reference,
-      message: include("reused with a different Task request")
+    first_registration = first_request.first
+    retry_registration = retry_request.first
+    expect(first_registration.target_stream).to eq(first_terminal.target_stream)
+    expect(retry_registration.target_stream).to eq(retry_terminal.target_stream)
+    expect(first_registration.target_stream).not_to eq(retry_registration.target_stream)
+    expect(first_registration.event.request_id).to eq(first_submission.global_position)
+    expect(retry_registration.event.request_id).to eq(retry_submission.global_position)
+    expect([ first_terminal.event.class, retry_terminal.event.class ]).to eq(
+      [
+        Coordinator::Write::Events::CommandRejectedV1,
+        Coordinator::Write::Events::CommandSucceededV1
+      ]
     )
   end
 
@@ -350,7 +380,24 @@ RSpec.describe "history migration command and Task transformations", :event_stor
     )
   end
 
-  def persist_task(payload)
+  def domain_rejection
+    Coordinator::Write::Tasks::SemanticResultV1::DomainRejection.new(
+      kind: "domain_rejection",
+      status: "denied",
+      summary: "ChangeSet already exists",
+      command_id: old_command_id,
+      error: Coordinator::Write::Tasks::DomainErrorV1::ChangeSetError.new(
+        code: "change_set_already_exists",
+        message: "ChangeSet already exists",
+        details: Coordinator::Write::Tasks::DomainErrorV1::ChangeSetDetails.new(
+          change_set_id: "legacy-change-set"
+        )
+      ),
+      next_actions: []
+    )
+  end
+
+  def persist_task(payload, correlation_id: self.correlation_id)
     persist(
       payload,
       stream: Coordinator::Write::StreamReference.new(
@@ -358,7 +405,8 @@ RSpec.describe "history migration command and Task transformations", :event_stor
         stream_name: "CoordinationTask",
         stream_id: payload.task_id
       ),
-      markers: [ "task:#{payload.task_id}", "command:#{old_command_id}" ]
+      markers: [ "task:#{payload.task_id}", "command:#{old_command_id}" ],
+      correlation_id:
     )
   end
 
@@ -379,7 +427,7 @@ RSpec.describe "history migration command and Task transformations", :event_stor
     )
   end
 
-  def persist_command(payload)
+  def persist_command(payload, correlation_id: self.correlation_id)
     persist(
       payload,
       stream: Coordinator::Write::StreamReference.new(
@@ -387,11 +435,12 @@ RSpec.describe "history migration command and Task transformations", :event_stor
         stream_name: "Command",
         stream_id: payload.command_id
       ),
-      markers: [ "command:#{payload.command_id}" ]
+      markers: [ "command:#{payload.command_id}" ],
+      correlation_id:
     )
   end
 
-  def persist(payload, stream:, markers:)
+  def persist(payload, stream:, markers:, correlation_id: self.correlation_id)
     event_store.append(
       stream,
       [

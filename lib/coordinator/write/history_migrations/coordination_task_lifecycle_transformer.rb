@@ -25,7 +25,7 @@ module Coordinator::Write
         task = allocate(
           migration_id:,
           source_config_name:,
-          source_event:,
+          source_event: submission.value!.canonical_event,
           target_stream_name: "CoordinationTask",
           identity_role: "coordination-task"
         )
@@ -37,7 +37,7 @@ module Coordinator::Write
         command = allocate(
           migration_id:,
           source_config_name:,
-          source_event:,
+          source_event: submission.value!.canonical_event,
           target_stream_name: "Command",
           identity_role: "command"
         )
