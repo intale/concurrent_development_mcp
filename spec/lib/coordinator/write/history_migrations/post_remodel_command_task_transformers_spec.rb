@@ -95,6 +95,129 @@ RSpec.describe "post-remodel Command, Task, and ProcessStep history migration", 
     expect(task_fact.metadata_extension.canonical_input_digest).to match(/\Asha256:[0-9a-f]{64}\z/)
   end
 
+  it "rebinds a legacy renewal after its fencing token advances from acquisition" do
+    seed_command_entities
+    lease_set_id = SecureRandom.uuid_v7
+    lease_id = SecureRandom.uuid_v7
+    reservation_command_id = SecureRandom.uuid_v7
+    initial_reference = Coordinator::Write::LeaseReferenceV2.new(
+      lease_id:,
+      resource_id:,
+      resource_kind: "file",
+      resource_path: "README.md",
+      base_blob_oid: nil,
+      fencing_token: 1
+    )
+    scope_markers = [
+      "command:#{reservation_command_id}",
+      "change-set:#{change_set_id}",
+      "work-item:#{work_item_id}",
+      "attempt:#{attempt_id}",
+      "lease-set:#{lease_set_id}",
+      "repository:#{repository_id}"
+    ]
+    persist_payload(
+      stream("DevelopmentExecution", "Attempt", attempt_id),
+      Coordinator::Write::Events::WriteSetReservedV2.new(
+        lease_set_id:,
+        change_set_id:,
+        work_item_id:,
+        attempt_id:,
+        repository_id:,
+        policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
+        resources: [ initial_reference ],
+        reserved_at: "2026-09-01T00:00:00.000000Z",
+        expires_at: "2026-09-01T01:00:00.000000Z"
+      ),
+      metadata: { "command_id" => reservation_command_id },
+      markers: scope_markers
+    )
+    persist_payload(
+      stream("DevelopmentCoordination", "ResourceLease", resource_id),
+      Coordinator::Write::Events::ResourceLeaseAcquiredV2.new(
+        lease_id:,
+        lease_set_id:,
+        resource_id:,
+        resource_kind: "file",
+        resource_path: "README.md",
+        policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
+        mode: "exclusive",
+        change_set_id:,
+        work_item_id:,
+        attempt_id:,
+        agent_id: "codex",
+        repository_id:,
+        object_format: "sha1",
+        base_commit_oid: "a" * 40,
+        base_blob_oid: nil,
+        fencing_token: 1,
+        acquired_at: "2026-09-01T00:00:00.000000Z",
+        expires_at: "2026-09-01T01:00:00.000000Z"
+      ),
+      metadata: { "command_id" => reservation_command_id },
+      markers: [ *scope_markers, "resource:#{resource_id}", "resource-kind:file" ]
+    )
+
+    command_id = SecureRandom.uuid_v7
+    persist_payload(
+      stream("CoordinatorControl", "Command", command_id),
+      Coordinator::Write::Events::CommandRegisteredV1.new(
+        command_id:,
+        request_id: "request-legacy-renewal",
+        tool_name: "lease_renew"
+      )
+    )
+    task_id = SecureRandom.uuid_v7
+    task = persist_raw(
+      stream("CoordinatorControl", "CoordinationTask", task_id),
+      type: "CoordinationTaskSubmitted",
+      schema_version: 3,
+      data: {
+        task_id:,
+        command_id:,
+        tool_name: "lease_renew",
+        command_input: {
+          schema: "command-input/v1",
+          command_id:,
+          tool_name: "lease_renew",
+          input: {
+            actor: { actor_kind: "agent", actor_id: "codex" },
+            change_set_id:,
+            work_item_id:,
+            attempt_id:,
+            lease_set_id:,
+            leases: [
+              {
+                lease_id:,
+                resource_id:,
+                fencing_token: 2
+              }
+            ],
+            lease_duration_seconds: 3_600
+          }
+        },
+        poll_interval_ms: 500,
+        ttl_ms: nil
+      }
+    )
+
+    result = transform(task, upper_position: task.global_position)
+
+    expect(result).to be_success
+    migrated = result.value!.sole.event.command_input
+    reference = migrated.input.intentions.sole
+    expect(migrated).to be_a(Coordinator::Write::CommandInputDocuments::RenewLeaseSetV1)
+    expect(migrated).to have_attributes(tool_name: "work_intention_set_renew")
+    expect(migrated.input).to have_attributes(ttl_seconds: 3_600)
+    expect(reference).to have_attributes(
+      resource_id: a_string_matching(Coordinator::Shared::Types::UUID_V7_PATTERN),
+      intention_id: a_string_matching(Coordinator::Shared::Types::UUID_V7_PATTERN),
+      fencing_token: 2
+    )
+    expect(reference.resource_id).not_to eq(resource_id)
+    expect(reference.intention_id).not_to eq(lease_id)
+  end
+
   it "preserves an unresolved candidate reference only for a source command without success" do
     seed_command_entities
     command_id = SecureRandom.uuid_v7

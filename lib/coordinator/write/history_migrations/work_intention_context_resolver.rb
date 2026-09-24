@@ -494,6 +494,7 @@ module Coordinator::Write
         Success(
           WorkIntentionMemberMigrationV1.new(
             target_stream:,
+            source_lease_id: source.lease_id,
             intention_id: target_stream.stream_id,
             resource_id: resource.value!.target_stream.stream_id,
             resource_kind: source.resource_kind,

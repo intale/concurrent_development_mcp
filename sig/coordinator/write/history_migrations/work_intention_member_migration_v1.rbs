@@ -3,6 +3,7 @@ module Coordinator
     module HistoryMigrations
       class WorkIntentionMemberMigrationV1 < Shared::Value
         def target_stream: () -> StreamReference
+        def source_lease_id: () -> String
         def intention_id: () -> String
         def resource_id: () -> String
         def resource_kind: () -> String

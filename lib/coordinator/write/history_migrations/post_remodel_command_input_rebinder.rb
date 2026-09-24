@@ -660,10 +660,9 @@ module Coordinator::Write
         references.map do |reference|
           resource_id = resolve(:resource, reference.resource_id, context:)
           member = legacy.members.find do |candidate|
-            candidate.resource_id == resource_id &&
-              candidate.fencing_token == reference.fencing_token
+            candidate.source_lease_id == reference.lease_id
           end
-          unless member
+          unless member && member.resource_id == resource_id
             raise ArgumentError, "legacy work-intention reference cannot be mapped"
           end
 

@@ -4,6 +4,7 @@ module Coordinator::Write
   module HistoryMigrations
     class WorkIntentionMemberMigrationV1 < Value
       attribute :target_stream, StreamReference
+      attribute :source_lease_id, Types::UuidV7
       attribute :intention_id, Types::UuidV7
       attribute :resource_id, Types::ResourceId
       attribute :resource_kind, Types::ResourceKind
