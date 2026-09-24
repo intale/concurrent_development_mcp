@@ -780,6 +780,7 @@ module Coordinator::Write
       end
 
       def source_command_succeeded?(source_command_id, context:)
+        source_correlation_id = context.fetch(:source_event).correlation_id
         events = @event_store.read(
           StreamReference.new(
             context: "CoordinatorControl",
@@ -794,6 +795,7 @@ module Coordinator::Write
         )
         events.any? do |event|
           event.global_position <= context.fetch(:source_upper_position) &&
+            event.correlation_id == source_correlation_id &&
             (event.type == "CommandSucceeded" || event.data["status"] == "ok")
         end
       end

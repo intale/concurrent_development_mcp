@@ -125,6 +125,7 @@ RSpec.describe "post-remodel Command, Task, and ProcessStep history migration", 
         produced_outputs: []
       )
     )
+    task_correlation_id = SecureRandom.uuid_v7
     task = persist_payload(
       stream("CoordinatorControl", "CoordinationTask", task_id),
       Coordinator::Write::Events::CoordinationTaskSubmittedV3.new(
@@ -134,7 +135,8 @@ RSpec.describe "post-remodel Command, Task, and ProcessStep history migration", 
         command_input:,
         poll_interval_ms: 500,
         ttl_ms: nil
-      )
+      ),
+      correlation_id: task_correlation_id
     )
 
     migrated = transform(task, upper_position: task.global_position)
@@ -142,9 +144,20 @@ RSpec.describe "post-remodel Command, Task, and ProcessStep history migration", 
     expect(migrated).to be_success
     expect(migrated.value!.sole.event.command_input.input.candidate_id).to eq(missing_candidate_id)
 
-    succeeded = persist_payload(
+    reused_command_success = persist_payload(
       command_stream,
       Coordinator::Write::Events::CommandSucceededV1.new(command_id:)
+    )
+    still_unresolved = transform(task, upper_position: reused_command_success.global_position)
+    expect(still_unresolved).to be_success
+    expect(still_unresolved.value!.sole.event.command_input.input.candidate_id).to eq(
+      missing_candidate_id
+    )
+
+    succeeded = persist_payload(
+      command_stream,
+      Coordinator::Write::Events::CommandSucceededV1.new(command_id:),
+      correlation_id: task_correlation_id
     )
     inconsistent = transform(task, upper_position: succeeded.global_position)
     expect(inconsistent).to be_failure
@@ -309,18 +322,33 @@ RSpec.describe "post-remodel Command, Task, and ProcessStep history migration", 
     )
   end
 
-  def persist_payload(target_stream, payload, metadata: {}, markers: [])
+  def persist_payload(
+    target_stream,
+    payload,
+    metadata: {},
+    markers: [],
+    correlation_id: SecureRandom.uuid_v7
+  )
     persist_raw(
       target_stream,
       type: payload.class.event_type,
       data: payload.to_h,
       schema_version: payload.class.schema_version,
       metadata:,
-      markers:
+      markers:,
+      correlation_id:
     )
   end
 
-  def persist_raw(target_stream, type:, data: {}, schema_version: 1, metadata: {}, markers: [])
+  def persist_raw(
+    target_stream,
+    type:,
+    data: {},
+    schema_version: 1,
+    metadata: {},
+    markers: [],
+    correlation_id: SecureRandom.uuid_v7
+  )
     event_store.append(
       target_stream,
       [
@@ -336,7 +364,7 @@ RSpec.describe "post-remodel Command, Task, and ProcessStep history migration", 
             "recorded_by" => "coordinator"
           }.merge(metadata),
           markers:,
-          correlation_id: SecureRandom.uuid_v7
+          correlation_id:
         )
       ]
     ).sole
