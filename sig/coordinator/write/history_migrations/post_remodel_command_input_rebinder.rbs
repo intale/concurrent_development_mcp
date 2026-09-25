@@ -12,6 +12,7 @@ module Coordinator
 
         def initialize: (
           entity_reference_resolver: LegacyEntityReferenceResolver,
+          relation_identity_resolver: DevelopmentArtifactRelationIdentityResolver,
           legacy_work_intention_context_resolver: LegacyWorkIntentionInputContextResolver,
           guidance_identity_resolver: PostRemodelGuidanceIdentityResolver,
           event_store: EventStore,

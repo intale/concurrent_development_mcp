@@ -22,9 +22,6 @@ module Coordinator::Write
         development_artifact_observation: [
           "DevelopmentMemory", "DevelopmentArtifactObservation", "development-artifact-observation"
         ],
-        development_artifact_relation: [
-          "DevelopmentMemory", "DevelopmentArtifactRelation", "development-artifact-relation"
-        ],
         decision: [ "HumanGuidance", "Decision", "decision" ],
         conversation: [ "HumanGuidance", "Conversation", "conversation" ],
         interpretation: [ "HumanGuidance", "Interpretation", "interpretation" ],
@@ -55,6 +52,7 @@ module Coordinator::Write
 
       def initialize(
         entity_reference_resolver:,
+        relation_identity_resolver:,
         legacy_work_intention_context_resolver:,
         guidance_identity_resolver:,
         event_store:,
@@ -64,6 +62,7 @@ module Coordinator::Write
         input_digest: CommandInputDigest.new
       )
         @entity_reference_resolver = entity_reference_resolver
+        @relation_identity_resolver = relation_identity_resolver
         @legacy_work_intention_context_resolver = legacy_work_intention_context_resolver
         @guidance_identity_resolver = guidance_identity_resolver
         @event_store = event_store
@@ -473,7 +472,11 @@ module Coordinator::Write
         source = document.input
         relation = source.artifact_relation
         target_relation = CommandInputDocuments::DevelopmentArtifactRelationV1.new(
-          relation_id: resolve(:development_artifact_relation, relation.relation_id, context:),
+          relation_id: resolve_relation(
+            relation.relation_id,
+            source_artifact_id: relation.source_artifact_id,
+            context:
+          ),
           source_artifact_id: resolve(
             :development_artifact,
             relation.source_artifact_id,
@@ -486,14 +489,19 @@ module Coordinator::Write
         input = CommandInputDocuments::DeclareDevelopmentArtifactRelationInputV1.new(
           actor: source.actor,
           artifact_relation: target_relation,
-          supersedes_relation_id: optional_resolve(
-            :development_artifact_relation,
+          supersedes_relation_id: optional_resolve_relation(
             source.supersedes_relation_id,
+            source_artifact_id: relation.source_artifact_id,
             context:
           ),
           supersession_reason: source.supersession_reason
         )
-        target(document, command_id:, input:)
+        CommandInputDocuments::DeclareDevelopmentArtifactRelationV1.new(
+          schema: document.schema,
+          command_id:,
+          tool_name: document.tool_name,
+          input:
+        )
       end
 
       def skill_publish(document, command_id:, context:)
@@ -767,6 +775,23 @@ module Coordinator::Write
 
       def optional_resolve(kind, source_id, context:)
         source_id && resolve(kind, source_id, context:)
+      end
+
+      def optional_resolve_relation(source_id, source_artifact_id:, context:)
+        source_id && resolve_relation(source_id, source_artifact_id:, context:)
+      end
+
+      def resolve_relation(source_relation_id, source_artifact_id:, context:)
+        result = @relation_identity_resolver.call(
+          **migration_context(context),
+          source_relation_id:,
+          source_artifact_id:
+        )
+        if result.failure? && !source_command_succeeded?(context.fetch(:source_command_id), context:)
+          return source_relation_id
+        end
+
+        unwrap(result).target_stream.stream_id
       end
 
       def migration_context(context)

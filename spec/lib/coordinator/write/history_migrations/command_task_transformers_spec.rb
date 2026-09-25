@@ -21,6 +21,7 @@ RSpec.describe "history migration command and Task transformations", :event_stor
   let(:submitted_transformer) do
     Coordinator::Container["history_migrations.coordination_task_submitted_v2_transformer"]
   end
+  let(:transformer_registry) { Coordinator::Container["history_migrations.transformer_registry"] }
   let(:completed_transformer) do
     Coordinator::Write::HistoryMigrations::CommandCompletedV1Transformer.new(
       stream_identity_allocator: allocator,
@@ -220,6 +221,62 @@ RSpec.describe "history migration command and Task transformations", :event_stor
     expect(result).to be_failure
     expect(result.failure).to have_attributes(code: :ambiguous_source_reference)
     expect(result.failure.message).to include("Historical source reference is absent")
+  end
+
+  it "rebinds an embedded legacy Artifact relation to its transformed relation stream" do
+    artifact_id = "artifact:v1:#{'b' * 64}"
+    relation_id = "artifact-relation:v1:#{'c' * 64}"
+    artifact_stream = Coordinator::Write::StreamReference.new(
+      context: "DevelopmentMemory",
+      stream_name: "DevelopmentArtifact",
+      stream_id: artifact_id
+    )
+    persist(
+      legacy_artifact_capture(artifact_id),
+      stream: artifact_stream,
+      markers: [ "development-artifact:#{artifact_id}" ]
+    )
+    command_input = legacy_relation_command_input(artifact_id:, relation_id:)
+    source = submitted_payload.class.new(
+      submitted_payload.to_h.merge(
+        tool_name: "development_artifact_relation_declare",
+        command_input: command_input.to_h
+      )
+    )
+    submitted_event = persist_task(source)
+    declaration = legacy_relation_declaration(artifact_id:, relation_id:)
+    declaration_event = persist(
+      declaration,
+      stream: artifact_stream,
+      markers: [
+        "development-artifact:#{artifact_id}",
+        "development-artifact-relation:#{relation_id}"
+      ],
+      metadata: { "policy_version" => "development-artifact-repository/v1" }
+    )
+    upper_position = declaration_event.global_position
+
+    relation_fact = transformer_registry.call(
+      migration_id:,
+      source_config_name: "default",
+      source_upper_position: upper_position,
+      source_event: declaration_event
+    ).value!.sole
+    task_fact = submitted_transformer.call(
+      migration_id:,
+      source_config_name: "default",
+      source_upper_position: upper_position,
+      source_event: submitted_event,
+      source_payload: source
+    ).value!.last
+    migrated_relation = task_fact.event.command_input.input.artifact_relation
+
+    expect(migrated_relation).to have_attributes(
+      relation_id: relation_fact.target_stream.stream_id,
+      source_artifact_id: relation_fact.event.source_artifact_id
+    )
+    expect(migrated_relation.relation_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
+    expect(migrated_relation.relation_id).not_to eq(relation_id)
   end
 
   it "Given identical legacy retries, when their Task histories are transformed, then only the earliest Task remains" do
@@ -487,6 +544,87 @@ RSpec.describe "history migration command and Task transformations", :event_stor
     )
   end
 
+  def legacy_artifact_capture(artifact_id)
+    content = Coordinator::Write::Content::TextV1.new(
+      encoding: "utf-8",
+      media_type: "text/markdown",
+      text: "Artifact\n",
+      content_sha256: "sha256:#{'d' * 64}",
+      byte_size: 9
+    )
+    source = Coordinator::Write::DevelopmentArtifacts::SourceV1.new(
+      kind: "local_file",
+      locator: "docs/artifact.md",
+      revision: nil,
+      observed_at: "2026-08-01T10:00:00.000000Z",
+      collector: "legacy-import/v1"
+    )
+    artifact = Coordinator::Write::HistoryMigrations::LegacyDevelopmentArtifacts::ArtifactV2.new(
+      artifact_id:,
+      scope: "project:test",
+      title: "Artifact",
+      kind: "documentation",
+      labels: [],
+      content:,
+      source:
+    )
+    Coordinator::Write::HistoryMigrations::LegacyEvents::DevelopmentArtifactCapturedV2.new(
+      artifact:,
+      captured_at: "2026-08-01T10:00:00.000000Z"
+    )
+  end
+
+  def legacy_relation_command_input(artifact_id:, relation_id:)
+    relation = Coordinator::Write::HistoryMigrations::LegacyCommandInputDocuments::
+      DevelopmentArtifactRelationV1.new(
+        relation_id:,
+        source_artifact_id: artifact_id,
+        relation: "references",
+        target: Coordinator::Write::CommandInputDocuments::DevelopmentArtifactRelationTargetV1.new(
+          kind: "external",
+          id: "https://example.test/reference"
+        ),
+        attributes: Coordinator::Write::CommandInputDocuments::
+          DevelopmentArtifactRelationAttributesV1.new(path: "reference")
+      )
+    Coordinator::Write::HistoryMigrations::LegacyCommandInputDocuments::
+      DeclareDevelopmentArtifactRelationV1.new(
+        schema: "command-input/v1",
+        command_id: old_command_id,
+        tool_name: "development_artifact_relation_declare",
+        input: Coordinator::Write::HistoryMigrations::LegacyCommandInputDocuments::
+          DeclareDevelopmentArtifactRelationInputV1.new(
+            actor: Coordinator::Write::CommandInputDocuments::ActorV1.new(
+              actor_kind: "agent",
+              actor_id: "agent-luna-a"
+            ),
+            artifact_relation: relation,
+            supersedes_relation_id: nil,
+            supersession_reason: nil
+          )
+      )
+  end
+
+  def legacy_relation_declaration(artifact_id:, relation_id:)
+    relation = Coordinator::Write::HistoryMigrations::LegacyDevelopmentArtifacts::RelationV1.new(
+      relation_id:,
+      source_artifact_id: artifact_id,
+      relation: "references",
+      target: Coordinator::Write::DevelopmentArtifacts::RelationTargetV1.new(
+        kind: "external",
+        id: "https://example.test/reference",
+        status: "verified"
+      ),
+      attributes: Coordinator::Write::DevelopmentArtifacts::RelationAttributesV1.new(
+        path: "reference"
+      )
+    )
+    Coordinator::Write::HistoryMigrations::LegacyEvents::DevelopmentArtifactRelationDeclaredV1.new(
+      artifact_relation: relation,
+      declared_at: "2026-08-01T10:01:00.000000Z"
+    )
+  end
+
   def persist_task(payload, correlation_id: self.correlation_id)
     persist(
       payload,
@@ -530,7 +668,7 @@ RSpec.describe "history migration command and Task transformations", :event_stor
     )
   end
 
-  def persist(payload, stream:, markers:, correlation_id: self.correlation_id)
+  def persist(payload, stream:, markers:, correlation_id: self.correlation_id, metadata: {})
     event_store.append(
       stream,
       [
@@ -544,7 +682,7 @@ RSpec.describe "history migration command and Task transformations", :event_stor
             "actor_kind" => "agent",
             "actor_id" => "agent-luna-a",
             "recorded_by" => "coordinator"
-          },
+          }.merge(metadata),
           markers:,
           correlation_id:
         )

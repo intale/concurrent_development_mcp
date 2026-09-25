@@ -24,13 +24,13 @@ module Coordinator::Write
 
       def initialize(
         event_store:,
-        stream_identity_allocator:,
+        relation_identity_resolver:,
         entity_reference_resolver:,
         schema_registry: LegacyEventSchemaRegistry.new,
         marker_builder: DevelopmentArtifacts::MarkerBuilder.new
       )
         @event_store = event_store
-        @stream_identity_allocator = stream_identity_allocator
+        @relation_identity_resolver = relation_identity_resolver
         @entity_reference_resolver = entity_reference_resolver
         @schema_registry = schema_registry
         @marker_builder = marker_builder
@@ -87,7 +87,10 @@ module Coordinator::Write
         relation_allocation = allocate_relation(
           migration_id:,
           source_config_name:,
-          declaration_event: source_event
+          source_upper_position:,
+          source_event:,
+          source_relation_id: source.artifact_relation.relation_id,
+          source_artifact_id: source.artifact_relation.source_artifact_id
         )
         return relation_allocation if relation_allocation.failure?
 
@@ -142,7 +145,7 @@ module Coordinator::Write
         source_artifact_id:
       )
         declarations = [ source.superseded_relation_id, source.replacement_relation_id ].map do |relation_id|
-          declaration = relation_declaration(
+          relation_declaration(
             source_event,
             relation_id:,
             source_artifact_id: source.source_artifact_id,
@@ -151,7 +154,10 @@ module Coordinator::Write
           allocation = allocate_relation(
             migration_id:,
             source_config_name:,
-            declaration_event: declaration
+            source_upper_position:,
+            source_event:,
+            source_relation_id: relation_id,
+            source_artifact_id: source.source_artifact_id
           )
           return allocation if allocation.failure?
 
@@ -241,14 +247,21 @@ module Coordinator::Write
         Success(allocation.value!.target_stream.stream_id)
       end
 
-      def allocate_relation(migration_id:, source_config_name:, declaration_event:)
-        @stream_identity_allocator.call(
+      def allocate_relation(
+        migration_id:,
+        source_config_name:,
+        source_upper_position:,
+        source_event:,
+        source_relation_id:,
+        source_artifact_id:
+      )
+        @relation_identity_resolver.call(
           migration_id:,
           source_config_name:,
-          source_event: declaration_event,
-          target_stream_context: "DevelopmentMemory",
-          target_stream_name: "DevelopmentArtifactRelation",
-          identity_role: "development-artifact-relation-#{declaration_event.stream_revision}"
+          source_upper_position:,
+          source_event:,
+          source_relation_id:,
+          source_artifact_id:
         )
       end
 

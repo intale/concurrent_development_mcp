@@ -212,6 +212,13 @@ module Coordinator
       Write::HistoryMigrations::LegacyMarkedEventLocator.new(event_store: self["event_store"])
     end
 
+    register("history_migrations.development_artifact_relation_identity_resolver", memoize: true) do
+      Write::HistoryMigrations::DevelopmentArtifactRelationIdentityResolver.new(
+        event_store: self["event_store"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"]
+      )
+    end
+
     register("history_migrations.legacy_target_event_reference_resolver", memoize: true) do
       Write::HistoryMigrations::LegacyTargetEventReferenceResolver.new(
         event_store: self["event_store"],
@@ -580,6 +587,8 @@ module Coordinator
     register("history_migrations.post_remodel_command_input_rebinder", memoize: true) do
       Write::HistoryMigrations::PostRemodelCommandInputRebinder.new(
         entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"],
+        relation_identity_resolver:
+          self["history_migrations.development_artifact_relation_identity_resolver"],
         legacy_work_intention_context_resolver:
           self["history_migrations.legacy_work_intention_input_context_resolver"],
         guidance_identity_resolver:
@@ -643,7 +652,8 @@ module Coordinator
     register("history_migrations.development_artifact_relation_v1_transformer", memoize: true) do
       Write::HistoryMigrations::DevelopmentArtifactRelationV1Transformer.new(
         event_store: self["event_store"],
-        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        relation_identity_resolver:
+          self["history_migrations.development_artifact_relation_identity_resolver"],
         entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"]
       )
     end
