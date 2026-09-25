@@ -149,6 +149,79 @@ RSpec.describe "history migration command and Task transformations", :event_stor
     expect(facts.flat_map { _1.event.to_h.keys }).not_to include(:result, :completed_at)
   end
 
+  it "preserves an absent entity reference submitted by a rejected legacy Task" do
+    missing_repository_id = SecureRandom.uuid_v7
+    input = resource_resolution_input(missing_repository_id)
+    source = submitted_payload.class.new(
+      submitted_payload.to_h.merge(tool_name: "resource_resolve", command_input: input)
+    )
+    submitted_event = persist_task(source)
+    completed_payload = Coordinator::Write::HistoryMigrations::LegacyEvents::
+      CoordinationTaskCompletedV2.new(
+        task_id: old_task_id,
+        result: domain_rejection,
+        completed_at: "2026-08-01T10:02:00.000000Z"
+      )
+    completed_event = persist_task(completed_payload)
+
+    result = submitted_transformer.call(
+      migration_id:,
+      source_config_name: "default",
+      source_upper_position: completed_event.global_position,
+      source_event: submitted_event,
+      source_payload: source
+    )
+
+    expect(result).to be_success
+    migrated = result.value!.last.event.command_input
+    expect(migrated).to be_a(Coordinator::Write::CommandInputDocuments::ResolveResourceV1)
+    expect(migrated.input.repository_id).to eq(missing_repository_id)
+  end
+
+  it "rejects an absent entity reference attributed to a successful legacy Task" do
+    missing_repository_id = SecureRandom.uuid_v7
+    input = resource_resolution_input(missing_repository_id)
+    source = submitted_payload.class.new(
+      submitted_payload.to_h.merge(tool_name: "resource_resolve", command_input: input)
+    )
+    submitted_event = persist_task(source)
+    completed_payload = Coordinator::Write::HistoryMigrations::LegacyEvents::
+      CoordinationTaskCompletedV2.new(
+        task_id: old_task_id,
+        result: Coordinator::Write::Tasks::SemanticResultV1::Success.new(
+          kind: "success",
+          summary: "Resource resolved",
+          command_id: old_command_id,
+          receipt: old_command_id,
+          data: Coordinator::Write::CommandReceiptData::ResourceResolution.new(
+            resource_id: SecureRandom.uuid_v7,
+            repository_id: missing_repository_id,
+            kind: "file",
+            normalized_path: "README.md",
+            outcome: "registered",
+            registered_at: "2026-08-01T10:02:00.000000Z",
+            bound_at: "2026-08-01T10:02:00.000000Z"
+          ),
+          warnings: [],
+          next_actions: []
+        ),
+        completed_at: "2026-08-01T10:02:00.000000Z"
+      )
+    completed_event = persist_task(completed_payload)
+
+    result = submitted_transformer.call(
+      migration_id:,
+      source_config_name: "default",
+      source_upper_position: completed_event.global_position,
+      source_event: submitted_event,
+      source_payload: source
+    )
+
+    expect(result).to be_failure
+    expect(result.failure).to have_attributes(code: :ambiguous_source_reference)
+    expect(result.failure.message).to include("Historical source reference is absent")
+  end
+
   it "Given identical legacy retries, when their Task histories are transformed, then only the earliest Task remains" do
     first_submission = persist_task(submitted_payload)
     completion = persist_command(command_completion_payload)
@@ -394,6 +467,23 @@ RSpec.describe "history migration command and Task transformations", :event_stor
         )
       ),
       next_actions: []
+    )
+  end
+
+  def resource_resolution_input(repository_id)
+    Coordinator::Write::CommandInputDocuments::ResolveResourceV1.new(
+      schema: "command-input/v1",
+      command_id: old_command_id,
+      tool_name: "resource_resolve",
+      input: Coordinator::Write::CommandInputDocuments::ResolveResourceInputV1.new(
+        actor: Coordinator::Write::CommandInputDocuments::ActorV1.new(
+          actor_kind: "agent",
+          actor_id: "agent-luna-a"
+        ),
+        repository_id:,
+        kind: "file",
+        path: "README.md"
+      )
     )
   end
 

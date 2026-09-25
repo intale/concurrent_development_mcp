@@ -98,6 +98,9 @@ module Coordinator::Write
 
       def migrate(document, command_id:, context:)
         source = @command_input_loader.call(document)
+        context = context.merge(
+          source_command_id: context.fetch(:source_event).data["command_id"] || source.command_id
+        )
         rebound = rebind(source, command_id:, context:)
         command = @target_command_builder.call(rebound)
         MigratedCommandInputV1.new(
@@ -343,7 +346,7 @@ module Coordinator::Write
         source = document.input
         guidance = unwrap(
           @guidance_identity_resolver.call(
-            **context,
+            **migration_context(context),
             source_conversation_id: source.conversation_id,
             source_message_id: source.message_id
           )
@@ -687,7 +690,7 @@ module Coordinator::Write
 
       def legacy_work_intention_context(source, context:)
         result = @legacy_work_intention_context_resolver.call(
-          **context,
+          **migration_context(context),
           attempt_id: source.attempt_id,
           lease_set_id: source.lease_set_id
         )
@@ -742,13 +745,19 @@ module Coordinator::Write
 
       def resolve(kind, source_id, context:)
         target = TARGETS.fetch(kind)
+        source_stream = StreamReference.new(
+          context: target.fetch(0),
+          stream_name: target.fetch(1),
+          stream_id: source_id
+        )
+        source_event = @event_store.read_at(source_stream, 0)
+        unless source_event && source_event.global_position <= context.fetch(:source_upper_position)
+          return source_id unless source_command_succeeded?(context.fetch(:source_command_id), context:)
+        end
+
         result = @entity_reference_resolver.call(
-          **context,
-          source_stream: StreamReference.new(
-            context: target.fetch(0),
-            stream_name: target.fetch(1),
-            stream_id: source_id
-          ),
+          **migration_context(context),
+          source_stream:,
           target_stream_context: target.fetch(0),
           target_stream_name: target.fetch(1),
           identity_role: target.fetch(2)
@@ -758,6 +767,15 @@ module Coordinator::Write
 
       def optional_resolve(kind, source_id, context:)
         source_id && resolve(kind, source_id, context:)
+      end
+
+      def migration_context(context)
+        {
+          migration_id: context.fetch(:migration_id),
+          source_config_name: context.fetch(:source_config_name),
+          source_upper_position: context.fetch(:source_upper_position),
+          source_event: context.fetch(:source_event)
+        }
       end
 
       def resolve_completion_candidate(document, context:)
@@ -771,7 +789,7 @@ module Coordinator::Write
         if event && event.global_position <= context.fetch(:source_upper_position)
           return resolve(:candidate, source_id, context:)
         end
-        if source_command_succeeded?(document.command_id, context:)
+        if source_command_succeeded?(context.fetch(:source_command_id), context:)
           raise ArgumentError, "successful work-item completion references an absent candidate"
         end
 
@@ -779,6 +797,8 @@ module Coordinator::Write
       end
 
       def source_command_succeeded?(source_command_id, context:)
+        return true if source_task_succeeded?(context:)
+
         source_correlation_id = context.fetch(:source_event).correlation_id
         events = @event_store.read(
           StreamReference.new(
@@ -796,6 +816,32 @@ module Coordinator::Write
           event.global_position <= context.fetch(:source_upper_position) &&
             event.correlation_id == source_correlation_id &&
             (event.type == "CommandSucceeded" || event.data["status"] == "ok")
+        end
+      end
+
+      def source_task_succeeded?(context:)
+        source_event = context.fetch(:source_event)
+        return false unless source_event.stream.context == "CoordinatorControl" &&
+          source_event.stream.stream_name == "CoordinationTask"
+
+        events = @event_store.read(
+          StreamReference.new(
+            context: source_event.stream.context,
+            stream_name: source_event.stream.stream_name,
+            stream_id: source_event.stream.stream_id
+          ),
+          EventReadCriteria.new(
+            event_types: [ "CoordinationTaskCompleted" ],
+            maximum_count: 1,
+            direction: :asc
+          )
+        )
+        events.any? do |event|
+          result = event.data["result"]
+          event.global_position <= context.fetch(:source_upper_position) &&
+            event.correlation_id == source_event.correlation_id &&
+            result.is_a?(Hash) &&
+            (result["kind"] == "success" || result["status"] == "ok")
         end
       end
 
