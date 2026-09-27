@@ -5,13 +5,29 @@ module Coordinator::Write
     class PostRemodelCandidateTransformer
       include Dry::Monads[:result]
 
-      def initialize(context_resolver:, stream_identity_allocator:, compound_marker_builder:)
+      def initialize(
+        context_resolver:,
+        legacy_head_transformer:,
+        stream_identity_allocator:,
+        compound_marker_builder:
+      )
         @context_resolver = context_resolver
+        @legacy_head_transformer = legacy_head_transformer
         @stream_identity_allocator = stream_identity_allocator
         @compound_marker_builder = compound_marker_builder
       end
 
       def call(migration_id:, source_config_name:, source_upper_position:, source_event:, source_payload:)
+        if legacy_head?(source_payload)
+          return @legacy_head_transformer.call(
+            migration_id:,
+            source_config_name:,
+            source_upper_position:,
+            source_event:,
+            source_payload:
+          )
+        end
+
         context = @context_resolver.call(
           migration_id:,
           source_config_name:,
@@ -31,6 +47,10 @@ module Coordinator::Write
       end
 
       private
+
+      def legacy_head?(source)
+        source.is_a?(PostRemodelEvents::CandidateHeadRegisteredV2) && source.candidate_event
+      end
 
       def transform(migration_id:, source_config_name:, source_event:, source:, context:)
         unless source.candidate_id == context.source_candidate_id

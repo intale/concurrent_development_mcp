@@ -309,6 +309,7 @@ module Coordinator
     register("history_migrations.post_remodel_candidate_transformer", memoize: true) do
       Write::HistoryMigrations::PostRemodelCandidateTransformer.new(
         context_resolver: self["history_migrations.post_remodel_candidate_context_resolver"],
+        legacy_head_transformer: self["history_migrations.candidate_head_v1_transformer"],
         stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
         compound_marker_builder: self["compound_marker_builder"]
       )

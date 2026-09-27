@@ -158,6 +158,39 @@ RSpec.describe "history migration Candidate transformers", :event_store do
     expect(target_store.read_at(head_fact.target_stream, 0).id).to eq(persisted_head.id)
   end
 
+  it "routes a transitional V2 head reference through its legacy Candidate submission" do
+    submitted = persist_payload(candidate_stream, candidate_payload)
+    head = persist_payload(
+      stream("DevelopmentIntegration", "CandidateHead", SecureRandom.uuid_v7),
+      Coordinator::Write::HistoryMigrations::PostRemodelEvents::CandidateHeadRegisteredV2.new(
+        registry_id: SecureRandom.uuid_v7,
+        candidate_id: legacy_candidate_id,
+        attempt_id: legacy_attempt_id,
+        repository_id: legacy_repository_id,
+        object_format: "sha1",
+        head_commit_oid:,
+        candidate_event: event_reference(submitted),
+        registered_at: "2001-07-01T00:02:00.000000Z"
+      )
+    )
+    upper_position = head.global_position
+    expect(plan(submitted, upper_position:)).to be_success
+
+    submitted_facts = transform(submitted, upper_position:).value!
+    result = transform(head, upper_position:)
+
+    expect(result).to be_success
+    fact = result.value!.sole
+    expect(fact.event).to have_attributes(
+      candidate_id: submitted_facts.first.target_stream.stream_id,
+      attempt_id: submitted_facts.fetch(1).event.attempt_id,
+      repository_id: submitted_facts.fetch(2).event.repository_id,
+      object_format: "sha1",
+      head_commit_oid:
+    )
+    expect(fact.event.registry_id).to eq(fact.target_stream.stream_id)
+  end
+
   it "moves an impact surface to its own UUIDv7 stream and rebuilds the Candidate assignment index" do
     submitted = persist_payload(candidate_stream, candidate_payload)
     manifest = persist_payload(candidate_stream, manifest_payload)
