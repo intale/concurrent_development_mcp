@@ -223,6 +223,60 @@ RSpec.describe "history migration command and Task transformations", :event_stor
     )
   end
 
+  it "preserves an absent legacy lease set and its references in a rejected Task" do
+    work_item_id = "legacy-work-item"
+    attempt_id = "legacy-attempt"
+    lease_set_id = SecureRandom.uuid_v7
+    lease_id = SecureRandom.uuid_v7
+    resource_id = SecureRandom.uuid_v7
+    persist_reference_root("DevelopmentExecution", "WorkItem", work_item_id, "WorkItemCreated")
+    persist_reference_root("DevelopmentExecution", "Attempt", attempt_id, "AttemptAuthorized")
+    persist_reference_root(
+      "DevelopmentCoordination",
+      "Resource",
+      resource_id,
+      "ResourceRegistered"
+    )
+    input = legacy_lease_renewal_command_input(
+      work_item_id:,
+      attempt_id:,
+      lease_set_id:,
+      lease_id:,
+      resource_id:
+    )
+    source = submitted_payload.class.new(
+      submitted_payload.to_h.merge(tool_name: "lease_renew", command_input: input.to_h)
+    )
+    submitted_event = persist_task(source)
+    completed_payload = Coordinator::Write::HistoryMigrations::LegacyEvents::
+      CoordinationTaskCompletedV2.new(
+        task_id: old_task_id,
+        result: domain_rejection,
+        completed_at: "2026-08-01T10:02:00.000000Z"
+      )
+    completed_event = persist_task(completed_payload)
+
+    result = submitted_transformer.call(
+      migration_id:,
+      source_config_name: "default",
+      source_upper_position: completed_event.global_position,
+      source_event: submitted_event,
+      source_payload: source
+    )
+
+    expect(result).to be_success
+    migrated = result.value!.last.event.command_input
+    reference = migrated.input.intentions.sole
+    expect(migrated).to be_a(Coordinator::Write::CommandInputDocuments::RenewLeaseSetV1)
+    expect(migrated.input.intention_set_id).to eq(lease_set_id)
+    expect(reference).to have_attributes(
+      intention_id: lease_id,
+      resource_id: a_string_matching(Coordinator::Shared::Types::UUID_V7_PATTERN),
+      fencing_token: 17
+    )
+    expect(reference.resource_id).not_to eq(resource_id)
+  end
+
   it "rejects an absent entity reference attributed to a successful legacy Task" do
     missing_repository_id = SecureRandom.uuid_v7
     input = resource_resolution_input(missing_repository_id)
@@ -660,6 +714,42 @@ RSpec.describe "history migration command and Task transformations", :event_stor
       )
   end
 
+  def legacy_lease_renewal_command_input(
+    work_item_id:,
+    attempt_id:,
+    lease_set_id:,
+    lease_id:,
+    resource_id:
+  )
+    input = Coordinator::Write::HistoryMigrations::PostRemodelCommandInputDocuments::
+      LegacyRenewLeaseSetInputV1.new(
+        actor: Coordinator::Write::CommandInputDocuments::ActorV1.new(
+          actor_kind: "agent",
+          actor_id: "agent-luna-a"
+        ),
+        change_set_id: "legacy-change-set",
+        work_item_id:,
+        attempt_id:,
+        lease_set_id:,
+        leases: [
+          Coordinator::Write::HistoryMigrations::PostRemodelCommandInputDocuments::
+            LegacyResourceLeaseReferenceV1.new(
+              resource_id:,
+              lease_id:,
+              fencing_token: 17
+            )
+        ],
+        lease_duration_seconds: 3_600
+      )
+    Coordinator::Write::HistoryMigrations::PostRemodelCommandInputDocuments::
+      LegacyRenewLeaseSetV1.new(
+        schema: "command-input/v1",
+        command_id: old_command_id,
+        tool_name: "lease_renew",
+        input:
+      )
+  end
+
   def legacy_relation_command_input(artifact_id:, relation_id:)
     relation = Coordinator::Write::HistoryMigrations::LegacyCommandInputDocuments::
       DevelopmentArtifactRelationV1.new(
@@ -752,6 +842,28 @@ RSpec.describe "history migration command and Task transformations", :event_stor
       markers: [ "command:#{payload.command_id}" ],
       correlation_id:
     )
+  end
+
+  def persist_reference_root(context, stream_name, stream_id, event_type)
+    event_store.append(
+      Coordinator::Write::StreamReference.new(context:, stream_name:, stream_id:),
+      [
+        PgEventstore::Event.new(
+          id: SecureRandom.uuid_v7,
+          type: event_type,
+          data: {},
+          metadata: {
+            "schema_version" => 1,
+            "command_id" => old_command_id,
+            "actor_kind" => "agent",
+            "actor_id" => "agent-luna-a",
+            "recorded_by" => "coordinator"
+          },
+          markers: [],
+          correlation_id:
+        )
+      ]
+    ).sole
   end
 
   def persist(payload, stream:, markers:, correlation_id: self.correlation_id, metadata: {})

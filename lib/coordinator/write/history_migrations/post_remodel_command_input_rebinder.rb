@@ -563,7 +563,7 @@ module Coordinator::Write
           change_set_id: resolve(:change_set, source.change_set_id, context:),
           work_item_id: resolve(:work_item, source.work_item_id, context:),
           attempt_id: resolve(:attempt, source.attempt_id, context:),
-          intention_set_id: legacy.set_id,
+          intention_set_id: legacy&.set_id || source.lease_set_id,
           repository_id: resolve(:repository, source.repository_id, context:),
           base_commit_oid: source.base_commit_oid,
           resources: rebind_resources(source.resources, context:)
@@ -580,7 +580,7 @@ module Coordinator::Write
           change_set_id: resolve(:change_set, source.change_set_id, context:),
           work_item_id: resolve(:work_item, source.work_item_id, context:),
           attempt_id: resolve(:attempt, source.attempt_id, context:),
-          intention_set_id: legacy.set_id,
+          intention_set_id: legacy&.set_id || source.lease_set_id,
           intentions: legacy_references(
             source.leases,
             legacy:,
@@ -601,7 +601,7 @@ module Coordinator::Write
           change_set_id: resolve(:change_set, source.change_set_id, context:),
           work_item_id: resolve(:work_item, source.work_item_id, context:),
           attempt_id: resolve(:attempt, source.attempt_id, context:),
-          intention_set_id: legacy.set_id,
+          intention_set_id: legacy&.set_id || source.lease_set_id,
           intentions: legacy_references(
             source.leases,
             legacy:,
@@ -618,7 +618,7 @@ module Coordinator::Write
         legacy = legacy_work_intention_context(source, context:)
         input = CommandInputDocuments::SubmitCandidateInputV1.new(
           **candidate_attributes(source, context:),
-          intention_set_id: legacy.set_id,
+          intention_set_id: legacy&.set_id || source.lease_set_id,
           intentions: legacy_references(
             source.leases,
             legacy:,
@@ -690,6 +690,17 @@ module Coordinator::Write
       end
 
       def legacy_references(references, legacy:, context:, reference_class:)
+        unless legacy
+          return references.map do |reference|
+            intention_reference(
+              resource_id: resolve(:resource, reference.resource_id, context:),
+              intention_id: reference.lease_id,
+              fencing_token: reference.fencing_token,
+              reference_class:
+            )
+          end
+        end
+
         references.map do |reference|
           resource_id = resolve(:resource, reference.resource_id, context:)
           member = legacy.members.find do |candidate|
@@ -724,6 +735,9 @@ module Coordinator::Write
           attempt_id: source.attempt_id,
           lease_set_id: source.lease_set_id
         )
+        return result.value! if result.success?
+        return unless source_command_succeeded?(context.fetch(:source_command_id), context:)
+
         unwrap(result)
       end
 
