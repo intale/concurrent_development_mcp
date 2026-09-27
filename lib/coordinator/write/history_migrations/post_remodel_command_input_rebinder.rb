@@ -55,6 +55,7 @@ module Coordinator::Write
         relation_identity_resolver:,
         legacy_work_intention_context_resolver:,
         guidance_identity_resolver:,
+        stream_identity_allocator:,
         event_store:,
         decision_document_transformer:,
         command_input_loader: LegacyCommandInputLoader.new,
@@ -65,6 +66,7 @@ module Coordinator::Write
         @relation_identity_resolver = relation_identity_resolver
         @legacy_work_intention_context_resolver = legacy_work_intention_context_resolver
         @guidance_identity_resolver = guidance_identity_resolver
+        @stream_identity_allocator = stream_identity_allocator
         @event_store = event_store
         @decision_document_transformer = decision_document_transformer
         @command_input_loader = command_input_loader
@@ -433,8 +435,12 @@ module Coordinator::Write
         source = document.input
         artifact = source.artifact
         target_artifact = CommandInputDocuments::DevelopmentArtifactV2.new(
-          artifact_id: resolve(:development_artifact, artifact.artifact_id, context:),
-          observation_id: resolve(
+          artifact_id: resolve_capture_identity(
+            :development_artifact,
+            artifact.artifact_id,
+            context:
+          ),
+          observation_id: resolve_capture_identity(
             :development_artifact_observation,
             artifact.observation_id,
             context:
@@ -456,6 +462,22 @@ module Coordinator::Write
           tool_name: document.tool_name,
           input:
         )
+      end
+
+      def resolve_capture_identity(kind, source_id, context:)
+        resolved_id = resolve(kind, source_id, context:)
+        return resolved_id if Types::UUID_V7_PATTERN.match?(resolved_id)
+
+        target = TARGETS.fetch(kind)
+        allocation = @stream_identity_allocator.call(
+          migration_id: context.fetch(:migration_id),
+          source_config_name: context.fetch(:source_config_name),
+          source_event: context.fetch(:source_event),
+          target_stream_context: target.fetch(0),
+          target_stream_name: target.fetch(1),
+          identity_role: "unresolved-command-input-#{target.fetch(2)}"
+        )
+        unwrap(allocation).target_stream.stream_id
       end
 
       def development_artifact_update(document, command_id:, context:)

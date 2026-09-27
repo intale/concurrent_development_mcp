@@ -593,6 +593,7 @@ module Coordinator
           self["history_migrations.legacy_work_intention_input_context_resolver"],
         guidance_identity_resolver:
           self["history_migrations.post_remodel_guidance_identity_resolver"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
         event_store: self["event_store"],
         decision_document_transformer:
           self["history_migrations.decision_document_transformer"],

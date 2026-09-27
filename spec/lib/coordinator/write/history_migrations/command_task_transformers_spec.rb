@@ -179,6 +179,50 @@ RSpec.describe "history migration command and Task transformations", :event_stor
     expect(migrated.input.repository_id).to eq(missing_repository_id)
   end
 
+  it "allocates stable UUIDv7 references for absent legacy Artifacts in a rejected Task" do
+    source = submitted_payload.class.new(
+      submitted_payload.to_h.merge(
+        tool_name: "development_artifact_capture",
+        command_input: legacy_artifact_capture_command_input.to_h
+      )
+    )
+    submitted_event = persist_task(source)
+    completed_payload = Coordinator::Write::HistoryMigrations::LegacyEvents::
+      CoordinationTaskCompletedV2.new(
+        task_id: old_task_id,
+        result: domain_rejection,
+        completed_at: "2026-08-01T10:02:00.000000Z"
+      )
+    completed_event = persist_task(completed_payload)
+
+    transformations = 2.times.map do
+      submitted_transformer.call(
+        migration_id:,
+        source_config_name: "default",
+        source_upper_position: completed_event.global_position,
+        source_event: submitted_event,
+        source_payload: source
+      )
+    end
+
+    expect(transformations).to all(be_success)
+    facts = transformations.map(&:value!)
+    artifacts = facts.map { _1.last.event.command_input.input.artifact }
+    expect(artifacts.map(&:artifact_id).uniq.one?).to be(true)
+    expect(artifacts.map(&:observation_id).uniq.one?).to be(true)
+    expect(artifacts.first.artifact_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
+    expect(artifacts.first.observation_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
+    expect(artifacts.first.artifact_id).not_to eq(artifacts.first.observation_id)
+    expect(facts.flatten.map { _1.event.class }).to all(
+      be_in(
+        [
+          Coordinator::Write::Events::CommandRegisteredV1,
+          Coordinator::Write::Events::CoordinationTaskSubmittedV3
+        ]
+      )
+    )
+  end
+
   it "rejects an absent entity reference attributed to a successful legacy Task" do
     missing_repository_id = SecureRandom.uuid_v7
     input = resource_resolution_input(missing_repository_id)
@@ -572,6 +616,48 @@ RSpec.describe "history migration command and Task transformations", :event_stor
       artifact:,
       captured_at: "2026-08-01T10:00:00.000000Z"
     )
+  end
+
+  def legacy_artifact_capture_command_input
+    content = Coordinator::Write::Content::TextV1.new(
+      encoding: "utf-8",
+      media_type: "text/markdown",
+      text: "Artifact\n",
+      content_sha256: "sha256:#{'d' * 64}",
+      byte_size: 9
+    )
+    source = Coordinator::Write::CommandInputDocuments::DevelopmentArtifactSourceV1.new(
+      kind: "local_file",
+      locator: "docs/artifact.md",
+      revision: nil,
+      observed_at: "2026-08-01T10:00:00.000000Z",
+      collector: "legacy-import/v1"
+    )
+    artifact = Coordinator::Write::HistoryMigrations::LegacyCommandInputDocuments::
+      DevelopmentArtifactV2.new(
+        artifact_id: "artifact:v1:#{'b' * 64}",
+        observation_id: "artifact-observation:v1:#{'c' * 64}",
+        scope: "project:test",
+        title: "Artifact",
+        kind: "documentation",
+        labels: [],
+        content:,
+        source:
+      )
+    Coordinator::Write::HistoryMigrations::LegacyCommandInputDocuments::
+      CaptureDevelopmentArtifactV2.new(
+        schema: "command-input/v2",
+        command_id: old_command_id,
+        tool_name: "development_artifact_capture",
+        input: Coordinator::Write::HistoryMigrations::LegacyCommandInputDocuments::
+          CaptureDevelopmentArtifactInputV2.new(
+            actor: Coordinator::Write::CommandInputDocuments::ActorV1.new(
+              actor_kind: "agent",
+              actor_id: "agent-luna-a"
+            ),
+            artifact:
+          )
+      )
   end
 
   def legacy_relation_command_input(artifact_id:, relation_id:)
