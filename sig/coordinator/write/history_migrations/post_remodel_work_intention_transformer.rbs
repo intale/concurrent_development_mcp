@@ -3,11 +3,8 @@ module Coordinator
     module HistoryMigrations
       class PostRemodelWorkIntentionTransformer
         def initialize: (
-          event_store: EventStore,
-          stream_identity_allocator: StreamIdentityAllocator,
-          entity_reference_resolver: LegacyEntityReferenceResolver,
-          ?repository_marker_builder: RepositoryMarkerBuilder,
-          ?schema_registry: EventSchemaRegistry
+          context_resolver: PostRemodelWorkIntentionContextResolver,
+          ?repository_marker_builder: RepositoryMarkerBuilder
         ) -> void
 
         def call: (

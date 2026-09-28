@@ -3,6 +3,9 @@
 RSpec.describe "post-remodel work-intention history migration", :event_store do
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:registry) { Coordinator::Container["history_migrations.transformer_registry"] }
+  let(:input_context_resolver) do
+    Coordinator::Container["history_migrations.legacy_work_intention_input_context_resolver"]
+  end
   let(:migration_id) { SecureRandom.uuid_v7 }
   let(:repository_id) { SecureRandom.uuid_v7 }
   let(:change_set_id) { "source-change-set" }
@@ -134,6 +137,34 @@ RSpec.describe "post-remodel work-intention history migration", :event_store do
       change_set_id,
       work_item_id,
       attempt_id
+    )
+
+    input_context = input_context_resolver.call(
+      migration_id:,
+      source_config_name: "default",
+      source_upper_position: upper_position,
+      source_event: renewed,
+      attempt_id:,
+      lease_set_id: set_id
+    )
+    expect(input_context).to be_success
+    expect(input_context.value!).to have_attributes(
+      target_set_stream: created_fact.target_stream,
+      set_id: target_set_id,
+      repository_id: created_fact.event.repository_id,
+      change_set_id: created_fact.event.change_set_id,
+      work_item_id: created_fact.event.work_item_id,
+      attempt_id: created_fact.event.attempt_id
+    )
+    expect(input_context.value!.members.sole).to have_attributes(
+      target_stream: declared_fact.target_stream,
+      source_lease_id: intention_id,
+      intention_id: target_intention_id,
+      resource_id: target_resource_id,
+      resource_kind: "file",
+      resource_path: "app/models/user.rb",
+      base_blob_oid: "b" * 40,
+      fencing_token: 7
     )
   end
 

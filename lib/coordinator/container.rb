@@ -571,10 +571,20 @@ module Coordinator
       )
     end
 
+    register("history_migrations.post_remodel_work_intention_context_resolver", memoize: true) do
+      Write::HistoryMigrations::PostRemodelWorkIntentionContextResolver.new(
+        event_store: self["event_store"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
+        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"]
+      )
+    end
+
     register("history_migrations.legacy_work_intention_input_context_resolver", memoize: true) do
       Write::HistoryMigrations::LegacyWorkIntentionInputContextResolver.new(
         event_store: self["event_store"],
-        context_resolver: self["history_migrations.work_intention_context_resolver"]
+        context_resolver: self["history_migrations.work_intention_context_resolver"],
+        post_remodel_context_resolver:
+          self["history_migrations.post_remodel_work_intention_context_resolver"]
       )
     end
 
@@ -629,9 +639,8 @@ module Coordinator
 
     register("history_migrations.post_remodel_work_intention_transformer", memoize: true) do
       Write::HistoryMigrations::PostRemodelWorkIntentionTransformer.new(
-        event_store: self["event_store"],
-        stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
-        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"]
+        context_resolver:
+          self["history_migrations.post_remodel_work_intention_context_resolver"]
       )
     end
 

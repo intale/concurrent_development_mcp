@@ -5,7 +5,8 @@ module Coordinator
         def initialize: (
           event_store: EventStore,
           context_resolver: WorkIntentionContextResolver,
-          ?schema_registry: LegacyEventSchemaRegistry
+          post_remodel_context_resolver: PostRemodelWorkIntentionContextResolver,
+          ?schema_registry: SourceEventSchemaRegistry
         ) -> void
 
         def call: (
