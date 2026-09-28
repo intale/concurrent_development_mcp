@@ -15,6 +15,7 @@ module Coordinator
           relation_identity_resolver: DevelopmentArtifactRelationIdentityResolver,
           legacy_work_intention_context_resolver: LegacyWorkIntentionInputContextResolver,
           guidance_identity_resolver: PostRemodelGuidanceIdentityResolver,
+          guidance_anchor_resolver: PostRemodelGuidanceAnchorResolver,
           stream_identity_allocator: StreamIdentityAllocator,
           event_store: EventStore,
           decision_document_transformer: DecisionDocumentTransformer,

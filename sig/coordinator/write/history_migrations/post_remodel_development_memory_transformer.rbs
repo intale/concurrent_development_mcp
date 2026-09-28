@@ -5,7 +5,6 @@ module Coordinator
         ARTIFACT_EVENTS: Array[singleton(Events::Base)]
         ARTIFACT_REFERENCE_STEPS: Hash[String, String]
         RELATION_TARGETS: Hash[String, Array[String]]
-        GUIDANCE_TARGETS: Hash[String, Array[String]]
 
         def initialize: (
           event_store: EventStore,
@@ -13,6 +12,7 @@ module Coordinator
           entity_reference_resolver: LegacyEntityReferenceResolver,
           target_event_reference_resolver: LegacyTargetEventReferenceResolver,
           guidance_identity_resolver: PostRemodelGuidanceIdentityResolver,
+          guidance_anchor_resolver: PostRemodelGuidanceAnchorResolver,
           ?marker_builder: DevelopmentArtifacts::MarkerBuilder,
           ?schema_registry: EventSchemaRegistry
         ) -> void

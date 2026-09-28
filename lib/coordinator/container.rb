@@ -595,6 +595,13 @@ module Coordinator
       )
     end
 
+    register("history_migrations.post_remodel_guidance_anchor_resolver", memoize: true) do
+      Write::HistoryMigrations::PostRemodelGuidanceAnchorResolver.new(
+        event_store: self["event_store"],
+        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"]
+      )
+    end
+
     register("history_migrations.post_remodel_command_input_rebinder", memoize: true) do
       Write::HistoryMigrations::PostRemodelCommandInputRebinder.new(
         entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"],
@@ -604,6 +611,8 @@ module Coordinator
           self["history_migrations.legacy_work_intention_input_context_resolver"],
         guidance_identity_resolver:
           self["history_migrations.post_remodel_guidance_identity_resolver"],
+        guidance_anchor_resolver:
+          self["history_migrations.post_remodel_guidance_anchor_resolver"],
         stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
         event_store: self["event_store"],
         decision_document_transformer:
@@ -633,7 +642,9 @@ module Coordinator
         target_event_reference_resolver:
           self["history_migrations.legacy_target_event_reference_resolver"],
         guidance_identity_resolver:
-          self["history_migrations.post_remodel_guidance_identity_resolver"]
+          self["history_migrations.post_remodel_guidance_identity_resolver"],
+        guidance_anchor_resolver:
+          self["history_migrations.post_remodel_guidance_anchor_resolver"]
       )
     end
 

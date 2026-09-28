@@ -55,6 +55,7 @@ module Coordinator::Write
         relation_identity_resolver:,
         legacy_work_intention_context_resolver:,
         guidance_identity_resolver:,
+        guidance_anchor_resolver:,
         stream_identity_allocator:,
         event_store:,
         decision_document_transformer:,
@@ -66,6 +67,7 @@ module Coordinator::Write
         @relation_identity_resolver = relation_identity_resolver
         @legacy_work_intention_context_resolver = legacy_work_intention_context_resolver
         @guidance_identity_resolver = guidance_identity_resolver
+        @guidance_anchor_resolver = guidance_anchor_resolver
         @stream_identity_allocator = stream_identity_allocator
         @event_store = event_store
         @decision_document_transformer = decision_document_transformer
@@ -354,10 +356,18 @@ module Coordinator::Write
         )
         anchors = source.anchors
         target_anchors = CommandInputDocuments::GuidanceAnchorsV1.new(
-          repository_ids: anchors.repository_ids.map { resolve(:repository, _1, context:) },
-          change_set_id: optional_resolve(:change_set, anchors.change_set_id, context:),
-          work_item_id: optional_resolve(:work_item, anchors.work_item_id, context:),
-          attempt_id: optional_resolve(:attempt, anchors.attempt_id, context:)
+          repository_ids: anchors.repository_ids.map do |anchor_id|
+            resolve_guidance_anchor("repository", anchor_id, source:, context:)
+          end,
+          change_set_id: optional_resolve_guidance_anchor(
+            "change_set", anchors.change_set_id, source:, context:
+          ),
+          work_item_id: optional_resolve_guidance_anchor(
+            "work_item", anchors.work_item_id, source:, context:
+          ),
+          attempt_id: optional_resolve_guidance_anchor(
+            "attempt", anchors.attempt_id, source:, context:
+          )
         )
         input = CommandInputDocuments::RecordGuidanceInputV1.new(
           actor: source.actor,
@@ -811,6 +821,25 @@ module Coordinator::Write
 
       def optional_resolve(kind, source_id, context:)
         source_id && resolve(kind, source_id, context:)
+      end
+
+      def optional_resolve_guidance_anchor(kind, source_id, source:, context:)
+        source_id && resolve_guidance_anchor(kind, source_id, source:, context:)
+      end
+
+      def resolve_guidance_anchor(kind, source_id, source:, context:)
+        result = @guidance_anchor_resolver.call(
+          **migration_context(context),
+          source_conversation_id: source.conversation_id,
+          source_message_id: source.message_id,
+          anchor_kind: kind,
+          source_anchor_id: source_id
+        )
+        if result.failure? && !source_command_succeeded?(context.fetch(:source_command_id), context:)
+          return source_id
+        end
+
+        unwrap(result).target_stream.stream_id
       end
 
       def optional_resolve_relation(source_id, source_artifact_id:, context:)

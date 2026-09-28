@@ -35,12 +35,6 @@ module Coordinator::Write
         "resource" => [ "DevelopmentCoordination", "Resource", "resource" ],
         "operation_batch" => [ "DevelopmentCoordination", "OperationBatch", "operation-batch" ]
       }.freeze
-      GUIDANCE_TARGETS = {
-        "repository" => [ "DevelopmentPlanning", "Repository", "repository" ],
-        "change_set" => [ "DevelopmentPlanning", "ChangeSet", "change-set" ],
-        "work_item" => [ "DevelopmentExecution", "WorkItem", "work-item" ],
-        "attempt" => [ "DevelopmentExecution", "Attempt", "attempt" ]
-      }.freeze
 
       def initialize(
         event_store:,
@@ -48,6 +42,7 @@ module Coordinator::Write
         entity_reference_resolver:,
         target_event_reference_resolver:,
         guidance_identity_resolver:,
+        guidance_anchor_resolver:,
         marker_builder: DevelopmentArtifacts::MarkerBuilder.new,
         schema_registry: EventSchemaRegistry.new
       )
@@ -56,6 +51,7 @@ module Coordinator::Write
         @entity_reference_resolver = entity_reference_resolver
         @target_event_reference_resolver = target_event_reference_resolver
         @guidance_identity_resolver = guidance_identity_resolver
+        @guidance_anchor_resolver = guidance_anchor_resolver
         @marker_builder = marker_builder
         @schema_registry = schema_registry
       end
@@ -379,18 +375,15 @@ module Coordinator::Write
         )
         return guidance if guidance.failure?
 
-        target = GUIDANCE_TARGETS.fetch(source.anchor_kind)
-        anchor = resolve_entity(
+        anchor = @guidance_anchor_resolver.call(
           migration_id:,
           source_config_name:,
           source_upper_position:,
           source_event:,
-          source_context: target.fetch(0),
-          source_name: target.fetch(1),
-          source_id: source.anchor_id,
-          target_context: target.fetch(0),
-          target_name: target.fetch(1),
-          identity_role: target.fetch(2)
+          source_conversation_id: source.conversation_id,
+          source_message_id: source.message_id,
+          anchor_kind: source.anchor_kind,
+          source_anchor_id: source.anchor_id
         )
         return anchor if anchor.failure?
 

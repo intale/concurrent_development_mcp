@@ -490,6 +490,115 @@ RSpec.describe "post-remodel Command, Task, and ProcessStep history migration", 
     expect(migrated_input.message_id).not_to eq(message_id)
   end
 
+  it "repairs an orphan repository guidance anchor from its unambiguous Attempt context" do
+    seed_command_entities
+    attempt_stream = stream("DevelopmentExecution", "Attempt", attempt_id)
+    persist_payload(
+      attempt_stream,
+      Coordinator::Write::Events::AttemptAssignedToWorkItemV1.new(
+        attempt_id:,
+        work_item_id:,
+        change_set_id:
+      )
+    )
+    persist_payload(
+      attempt_stream,
+      Coordinator::Write::Events::AttemptBaseSnapshotRecordedV1.new(
+        attempt_id:,
+        repository_id:,
+        object_format: "sha1",
+        commit_oid: "a" * 40
+      )
+    )
+    orphan_repository_id = SecureRandom.uuid_v7
+    command_id = SecureRandom.uuid_v7
+    persist_payload(
+      stream("CoordinatorControl", "Command", command_id),
+      Coordinator::Write::Events::CommandRegisteredV1.new(
+        command_id:,
+        request_id: "request-guidance-orphan-repository",
+        tool_name: "guidance_record"
+      )
+    )
+    conversation_id = "source-orphan-anchor-conversation"
+    message_id = "source-orphan-anchor-message"
+    command_input = Coordinator::Write::CommandInputDocuments::RecordGuidanceV1.new(
+      schema: "command-input/v1",
+      command_id:,
+      tool_name: "guidance_record",
+      input: Coordinator::Write::CommandInputDocuments::RecordGuidanceInputV1.new(
+        actor: Coordinator::Write::CommandInputDocuments::ActorV1.new(
+          actor_kind: "agent",
+          actor_id: "codex"
+        ),
+        message_id:,
+        conversation_id:,
+        source: "agent_forwarded",
+        text: "Preserve this instruction",
+        anchors: Coordinator::Write::CommandInputDocuments::GuidanceAnchorsV1.new(
+          repository_ids: [ orphan_repository_id ],
+          change_set_id:,
+          work_item_id:,
+          attempt_id:
+        )
+      )
+    )
+    task_id = SecureRandom.uuid_v7
+    task = persist_payload(
+      stream("CoordinatorControl", "CoordinationTask", task_id),
+      Coordinator::Write::Events::CoordinationTaskSubmittedV3.new(
+        task_id:,
+        command_id:,
+        tool_name: "guidance_record",
+        command_input:,
+        poll_interval_ms: 500,
+        ttl_ms: nil
+      )
+    )
+    conversation_stream = stream("HumanGuidance", "Conversation", conversation_id)
+    persist_payload(
+      conversation_stream,
+      Coordinator::Write::Events::UserUtteranceForwardedByAgentV2.new(
+        conversation_id:,
+        message_id:,
+        source: "agent_forwarded",
+        text: "Preserve this instruction"
+      ),
+      markers: [ "message:#{message_id}" ]
+    )
+    anchors = {
+      "repository" => orphan_repository_id,
+      "change_set" => change_set_id,
+      "work_item" => work_item_id,
+      "attempt" => attempt_id
+    }.map do |kind, id|
+      persist_payload(
+        conversation_stream,
+        Coordinator::Write::Events::GuidanceMessageAnchoredV1.new(
+          conversation_id:,
+          message_id:,
+          anchor_kind: kind,
+          anchor_id: id
+        ),
+        markers: [ "message:#{message_id}" ]
+      )
+    end
+    upper_position = anchors.last.global_position
+    repository = event_store.read_at(
+      stream("DevelopmentPlanning", "Repository", repository_id),
+      0
+    )
+
+    task_fact = transform(task, upper_position:).value!.sole
+    repository_fact = transform(repository, upper_position:).value!.sole
+    repository_anchor_fact = transform(anchors.first, upper_position:).value!.sole
+    migrated_repository_id = task_fact.event.command_input.input.anchors.repository_ids.sole
+
+    expect(migrated_repository_id).to eq(repository_fact.event.repository_id)
+    expect(repository_anchor_fact.event.anchor_id).to eq(migrated_repository_id)
+    expect(migrated_repository_id).not_to eq(orphan_repository_id)
+  end
+
   def seed_command_entities
     persist_repository
     persist_raw(stream("DevelopmentPlanning", "ChangeSet", change_set_id), type: "ChangeSetCreated")
