@@ -60,6 +60,19 @@ module Coordinator::Write
       nil
     end
 
+    def read_global_at(global_position)
+      event = @client.read(
+        PgEventstore::Stream.all_stream,
+        options: {
+          direction: :asc,
+          from_position: global_position,
+          max_count: 1
+        }
+      ).first
+
+      event if event&.global_position == global_position
+    end
+
     def read_latest(reference, criteria)
       @client.read(
         @pg_stream_factory.call(reference),

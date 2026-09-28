@@ -78,6 +78,7 @@ module Coordinator
       def read_grouped: (StreamReference, GroupedEventReadCriteria) -> Array[PgEventstore::Event]
 
       def read_at: (StreamReference, Integer stream_revision) -> PgEventstore::Event?
+      def read_global_at: (Integer global_position) -> PgEventstore::Event?
       def read_latest: (StreamReference, LatestEventReadCriteria) -> PgEventstore::Event?
 
       def stream_starting_position: (StreamReference) -> Integer?

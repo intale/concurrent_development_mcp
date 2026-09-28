@@ -70,6 +70,16 @@ RSpec.describe Coordinator::Write::EventStore, :event_store do
     expect(event_store.read_at(stream, 9)).to be_nil
   end
 
+  it "reloads one exact global position without scanning the global stream" do
+    target = event_store.append(stream, [ build_event(type: "GlobalTargetProbe") ]).sole
+
+    expect(event_store.read_global_at(target.global_position)).to have_attributes(
+      id: target.id,
+      global_position: target.global_position
+    )
+    expect(event_store.read_global_at(target.global_position + 1_000_000)).to be_nil
+  end
+
   it "reads one latest matching event without treating older matches as overflow" do
     newest = build_event(type: "TargetProbe")
     event_store.append(
