@@ -2,10 +2,13 @@ module Coordinator
   module Write
     module HistoryMigrations
       class LegacyCoordinationTaskSubmissionResolutionV1 < Shared::Value
+        type submission = LegacyEvents::CoordinationTaskSubmittedV2 | PostRemodelEvents::CoordinationTaskSubmittedV3
+
         def submission_event: () -> PgEventstore::Event
-        def submission: () -> LegacyEvents::CoordinationTaskSubmittedV2
+        def submission: () -> submission
         def canonical_event: () -> PgEventstore::Event
-        def canonical_submission: () -> LegacyEvents::CoordinationTaskSubmittedV2
+        def canonical_submission: () -> submission
+        def command_identity_event: () -> PgEventstore::Event
         def canonical?: () -> bool
       end
     end

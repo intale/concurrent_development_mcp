@@ -5,7 +5,7 @@ module Coordinator
         def initialize: (
           event_store: EventStore,
           command_event_locator: LegacyCommandEventLocator,
-          ?schema_registry: LegacyEventSchemaRegistry,
+          ?schema_registry: SourceEventSchemaRegistry,
           ?canonical_json: Shared::CanonicalJson
         ) -> void
 

@@ -29,7 +29,7 @@ module Coordinator::Write
         allocation = @stream_identity_allocator.call(
           migration_id:,
           source_config_name:,
-          source_event: resolution&.canonical_event || source_event,
+          source_event: resolution&.command_identity_event || source_event,
           target_stream_context: "CoordinatorControl",
           target_stream_name: "Command",
           identity_role: "command"

@@ -110,6 +110,111 @@ RSpec.describe "history migration command and Task transformations", :event_stor
     expect(submission.flat_map { _1.event.to_h.keys }).not_to include(:submitted_at)
   end
 
+  it "migrates legacy lifecycle facts attached to a current Task without splitting its command or Task identity" do
+    command_id = SecureRandom.uuid_v7
+    task_id = SecureRandom.uuid_v7
+    input = command_input.class.new(command_input.to_h.merge(command_id:))
+    registered_payload = Coordinator::Write::Events::CommandRegisteredV1.new(
+      command_id:,
+      request_id: "transitional-task-request",
+      tool_name: "change_set_create"
+    )
+    registered_event = persist(
+      registered_payload,
+      stream: Coordinator::Write::StreamReference.new(
+        context: "CoordinatorControl",
+        stream_name: "Command",
+        stream_id: command_id
+      ),
+      markers: [ "command:#{command_id}", "task:#{task_id}" ],
+      metadata: { "command_id" => command_id }
+    )
+    submitted_payload = Coordinator::Write::HistoryMigrations::PostRemodelEvents::
+      CoordinationTaskSubmittedV3.new(
+        task_id:,
+        command_id:,
+        tool_name: "change_set_create",
+        command_input: input,
+        poll_interval_ms: 500,
+        ttl_ms: nil
+      )
+    task_stream = Coordinator::Write::StreamReference.new(
+      context: "CoordinatorControl",
+      stream_name: "CoordinationTask",
+      stream_id: task_id
+    )
+    submitted_event = persist(
+      submitted_payload,
+      stream: task_stream,
+      markers: [ "task:#{task_id}", "command:#{command_id}" ],
+      metadata: { "command_id" => command_id }
+    )
+    started_payload = Coordinator::Write::HistoryMigrations::LegacyEvents::
+      CoordinationTaskExecutionStartedV1.new(
+        task_id:,
+        started_at: "2026-08-01T10:01:00.000000Z"
+      )
+    started_event = persist(
+      started_payload,
+      stream: task_stream,
+      markers: [ "task:#{task_id}" ],
+      metadata: { "command_id" => "task:#{task_id}:start" }
+    )
+    command_completed_payload = command_completion_payload(command_id:)
+    command_completed_event = persist_command(command_completed_payload)
+    task_completed_payload = Coordinator::Write::HistoryMigrations::LegacyEvents::
+      CoordinationTaskCompletedV2.new(
+        task_id:,
+        result: Coordinator::Write::Tasks::SemanticResultV1::Success.new(
+          kind: "success",
+          summary: "ChangeSet created.",
+          command_id:,
+          receipt: command_id,
+          data: Coordinator::Write::CommandReceiptData::ChangeSet.new(
+            change_set_id: "legacy-change-set"
+          ),
+          warnings: [],
+          next_actions: []
+        ),
+        completed_at: "2026-08-01T10:02:00.000000Z"
+      )
+    task_completed_event = persist(
+      task_completed_payload,
+      stream: task_stream,
+      markers: [ "task:#{task_id}" ],
+      metadata: { "command_id" => "task:#{task_id}:outcome" }
+    )
+    upper_position = task_completed_event.global_position
+
+    transformed = [
+      registered_event,
+      submitted_event,
+      started_event,
+      command_completed_event,
+      task_completed_event
+    ].map do |event|
+      transformer_registry.call(
+        migration_id:,
+        source_config_name: "default",
+        source_upper_position: upper_position,
+        source_event: event
+      )
+    end
+
+    expect(transformed).to all(be_success)
+    registration = transformed.fetch(0).value!.sole
+    submission = transformed.fetch(1).value!.sole
+    started = transformed.fetch(2).value!.sole
+    command_terminal = transformed.fetch(3).value!.sole
+    task_terminal = transformed.fetch(4).value!.sole
+    expect(command_terminal.event).to be_a(Coordinator::Write::Events::CommandSucceededV1)
+    expect(command_terminal.target_stream).to eq(registration.target_stream)
+    expect([ started.target_stream, task_terminal.target_stream ]).to all(eq(submission.target_stream))
+    expect([ submission.event.task_id, started.event.task_id, task_terminal.event.task_id ].uniq).to eq(
+      [ submission.target_stream.stream_id ]
+    )
+  end
+
   it "Given a legacy domain rejection, when the completed Task is transformed, then its command becomes terminal without retaining its result dump" do
     submitted_event = persist_task(submitted_payload)
     completed_payload = Coordinator::Write::HistoryMigrations::LegacyEvents::CoordinationTaskCompletedV2.new(
@@ -840,7 +945,8 @@ RSpec.describe "history migration command and Task transformations", :event_stor
         stream_id: payload.command_id
       ),
       markers: [ "command:#{payload.command_id}" ],
-      correlation_id:
+      correlation_id:,
+      metadata: { "command_id" => payload.command_id }
     )
   end
 

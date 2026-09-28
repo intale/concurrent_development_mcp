@@ -33,7 +33,7 @@ module Coordinator::Write
         command = allocate(
           migration_id:,
           source_config_name:,
-          source_event: submission.value!.canonical_event,
+          source_event: submission.value!.command_identity_event,
           target_stream_name: "Command",
           identity_role: "command"
         )
