@@ -95,6 +95,92 @@ RSpec.describe "post-remodel Command, Task, and ProcessStep history migration", 
     expect(task_fact.metadata_extension.canonical_input_digest).to match(/\Asha256:[0-9a-f]{64}\z/)
   end
 
+  it "keeps a relation command aligned with its later post-remodel relation fact" do
+    seed_command_entities
+    artifact_id = SecureRandom.uuid_v7
+    relation_id = SecureRandom.uuid_v7
+    persist_payload(
+      stream("DevelopmentMemory", "DevelopmentArtifact", artifact_id),
+      Coordinator::Write::Events::DevelopmentArtifactCreatedV1.new(artifact_id:)
+    )
+    command_id = SecureRandom.uuid_v7
+    persist_payload(
+      stream("CoordinatorControl", "Command", command_id),
+      Coordinator::Write::Events::CommandRegisteredV1.new(
+        command_id:,
+        request_id: "request-current-relation",
+        tool_name: "development_artifact_relation_declare"
+      )
+    )
+    document = Coordinator::Write::CommandInputDocuments::DeclareDevelopmentArtifactRelationV1.new(
+      schema: "command-input/v1",
+      command_id:,
+      tool_name: "development_artifact_relation_declare",
+      input: Coordinator::Write::CommandInputDocuments::DeclareDevelopmentArtifactRelationInputV1.new(
+        actor: Coordinator::Write::CommandInputDocuments::ActorV1.new(
+          actor_kind: "agent",
+          actor_id: "codex"
+        ),
+        artifact_relation: Coordinator::Write::CommandInputDocuments::DevelopmentArtifactRelationV1.new(
+          relation_id:,
+          source_artifact_id: artifact_id,
+          relation: "documents",
+          target: Coordinator::Write::CommandInputDocuments::DevelopmentArtifactRelationTargetV1.new(
+            kind: "attempt",
+            id: attempt_id
+          ),
+          attributes:
+            Coordinator::Write::CommandInputDocuments::DevelopmentArtifactRelationAttributesV1.new(
+              path: nil
+            )
+        ),
+        supersedes_relation_id: nil,
+        supersession_reason: nil
+      )
+    )
+    task_id = SecureRandom.uuid_v7
+    task = persist_payload(
+      stream("CoordinatorControl", "CoordinationTask", task_id),
+      Coordinator::Write::Events::CoordinationTaskSubmittedV3.new(
+        task_id:,
+        command_id:,
+        tool_name: "development_artifact_relation_declare",
+        command_input: document,
+        poll_interval_ms: 500,
+        ttl_ms: nil
+      )
+    )
+    relation = persist_payload(
+      stream("DevelopmentMemory", "DevelopmentArtifactRelation", relation_id),
+      Coordinator::Write::Events::DevelopmentArtifactRelationDeclaredV2.new(
+        relation_id:,
+        source_artifact_id: artifact_id,
+        relation: "documents",
+        target_kind: "attempt",
+        target_id: attempt_id,
+        path: nil,
+        fragment: nil,
+        normalized_locator: nil
+      ),
+      markers: [
+        "development-artifact:#{artifact_id}",
+        "development-artifact-relation:#{relation_id}"
+      ]
+    )
+    upper_position = relation.global_position
+
+    task_fact = transform(task, upper_position:).value!.sole
+    relation_fact = transform(relation, upper_position:).value!.sole
+    migrated = task_fact.event.command_input.input.artifact_relation
+
+    expect(migrated).to have_attributes(
+      relation_id: relation_fact.event.relation_id,
+      source_artifact_id: relation_fact.event.source_artifact_id
+    )
+    expect(migrated.target.id).to eq(relation_fact.event.target_id)
+    expect(migrated.relation_id).not_to eq(relation_id)
+  end
+
   it "rebinds a legacy renewal after its fencing token advances from acquisition" do
     seed_command_entities
     lease_set_id = SecureRandom.uuid_v7
