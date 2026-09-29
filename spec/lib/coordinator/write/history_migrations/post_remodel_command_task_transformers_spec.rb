@@ -304,6 +304,167 @@ RSpec.describe "post-remodel Command, Task, and ProcessStep history migration", 
     expect(reference.intention_id).not_to eq(lease_id)
   end
 
+  it "Given a rejected legacy Candidate with a forged lease, when its Task is migrated, then the rejected input is preserved" do
+    seed_command_entities
+    lease_set_id = SecureRandom.uuid_v7
+    lease_id = SecureRandom.uuid_v7
+    forged_lease_id = SecureRandom.uuid_v7
+    reservation_command_id = SecureRandom.uuid_v7
+    reference = Coordinator::Write::LeaseReferenceV2.new(
+      lease_id:,
+      resource_id:,
+      resource_kind: "file",
+      resource_path: "README.md",
+      base_blob_oid: nil,
+      fencing_token: 1
+    )
+    scope_markers = [
+      "command:#{reservation_command_id}",
+      "change-set:#{change_set_id}",
+      "work-item:#{work_item_id}",
+      "attempt:#{attempt_id}",
+      "lease-set:#{lease_set_id}",
+      "repository:#{repository_id}"
+    ]
+    persist_payload(
+      stream("DevelopmentExecution", "Attempt", attempt_id),
+      Coordinator::Write::Events::WriteSetReservedV2.new(
+        lease_set_id:,
+        change_set_id:,
+        work_item_id:,
+        attempt_id:,
+        repository_id:,
+        policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
+        resources: [ reference ],
+        reserved_at: "2026-09-01T00:00:00.000000Z",
+        expires_at: "2026-09-01T01:00:00.000000Z"
+      ),
+      metadata: { "command_id" => reservation_command_id },
+      markers: scope_markers
+    )
+    persist_payload(
+      stream("DevelopmentCoordination", "ResourceLease", resource_id),
+      Coordinator::Write::Events::ResourceLeaseAcquiredV2.new(
+        lease_id:,
+        lease_set_id:,
+        resource_id:,
+        resource_kind: "file",
+        resource_path: "README.md",
+        policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
+        mode: "exclusive",
+        change_set_id:,
+        work_item_id:,
+        attempt_id:,
+        agent_id: "codex",
+        repository_id:,
+        object_format: "sha1",
+        base_commit_oid: "a" * 40,
+        base_blob_oid: nil,
+        fencing_token: 1,
+        acquired_at: "2026-09-01T00:00:00.000000Z",
+        expires_at: "2026-09-01T01:00:00.000000Z"
+      ),
+      metadata: { "command_id" => reservation_command_id },
+      markers: [ *scope_markers, "resource:#{resource_id}", "resource-kind:file" ]
+    )
+
+    command_id = SecureRandom.uuid_v7
+    persist_payload(
+      stream("CoordinatorControl", "Command", command_id),
+      Coordinator::Write::Events::CommandRegisteredV1.new(
+        command_id:,
+        request_id: "request-rejected-candidate",
+        tool_name: "candidate_submit"
+      )
+    )
+    task_id = SecureRandom.uuid_v7
+    correlation_id = SecureRandom.uuid_v7
+    task_stream = stream("CoordinatorControl", "CoordinationTask", task_id)
+    task = persist_raw(
+      task_stream,
+      type: "CoordinationTaskSubmitted",
+      schema_version: 3,
+      correlation_id:,
+      data: {
+        task_id:,
+        command_id:,
+        tool_name: "candidate_submit",
+        command_input: {
+          schema: "command-input/v1",
+          command_id:,
+          tool_name: "candidate_submit",
+          input: {
+            actor: { actor_kind: "agent", actor_id: "codex" },
+            candidate_id: "rejected-source-candidate",
+            change_set_id:,
+            work_item_id:,
+            attempt_id:,
+            repository_id:,
+            target_branch: "main",
+            object_format: "sha1",
+            base_commit_oid: "a" * 40,
+            head_commit_oid: "b" * 40,
+            checkpoint_kind: "final",
+            lease_set_id:,
+            leases: [ { resource_id:, lease_id: forged_lease_id, fencing_token: 1 } ],
+            change_manifest: {
+              policy_version: "candidate-change-manifest/v1",
+              digest: "sha256:#{'c' * 64}",
+              collector_version: "codex-git-plumbing/v1",
+              files: [
+                {
+                  status: "modified",
+                  old_path: "README.md",
+                  new_path: "README.md",
+                  old_blob_oid: "a" * 40,
+                  new_blob_oid: "b" * 40,
+                  old_mode: "100644",
+                  new_mode: "100644"
+                }
+              ]
+            },
+            build_context: nil,
+            actual_resources: [
+              { kind: "file", path: "README.md", base_blob_oid: "a" * 40 }
+            ]
+          }
+        },
+        poll_interval_ms: 500,
+        ttl_ms: nil
+      }
+    )
+    completion = persist_raw(
+      task_stream,
+      type: "CoordinationTaskCompleted",
+      schema_version: 2,
+      correlation_id:,
+      data: {
+        task_id:,
+        result: {
+          kind: "domain_rejection",
+          status: "conflict",
+          summary: "Submitted lease observations are not the exact Attempt lease set",
+          command_id:,
+          next_actions: []
+        },
+        completed_at: "2026-09-01T00:05:00.000000Z"
+      }
+    )
+
+    result = transform(task, upper_position: completion.global_position)
+
+    expect(result).to be_success
+    migrated = result.value!.sole.event.command_input.input
+    expect(migrated.intention_set_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
+    expect(migrated.intention_set_id).not_to eq(lease_set_id)
+    expect(migrated.intentions.sole).to have_attributes(
+      intention_id: forged_lease_id,
+      resource_id: a_string_matching(Coordinator::Shared::Types::UUID_V7_PATTERN),
+      fencing_token: 1
+    )
+    expect(migrated.intentions.sole.resource_id).not_to eq(resource_id)
+  end
+
   it "preserves an unresolved candidate reference only for a source command without success" do
     seed_command_entities
     command_id = SecureRandom.uuid_v7

@@ -717,6 +717,15 @@ module Coordinator::Write
             candidate.source_lease_id == reference.lease_id
           end
           unless member && member.resource_id == resource_id
+            unless source_command_succeeded?(context.fetch(:source_command_id), context:)
+              next intention_reference(
+                resource_id:,
+                intention_id: reference.lease_id,
+                fencing_token: reference.fencing_token,
+                reference_class:
+              )
+            end
+
             raise ArgumentError, "legacy work-intention reference cannot be mapped"
           end
 
