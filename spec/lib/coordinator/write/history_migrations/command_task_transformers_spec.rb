@@ -370,9 +370,13 @@ RSpec.describe "history migration command and Task transformations", :event_stor
     )
 
     expect(result).to be_success
-    migrated = result.value!.last.event.command_input
+    registration, task = result.value!
+    migrated = task.event.command_input
     reference = migrated.input.intentions.sole
     expect(migrated).to be_a(Coordinator::Write::CommandInputDocuments::RenewLeaseSetV1)
+    expect(registration.event.tool_name).to eq("work_intention_set_renew")
+    expect(task.event.tool_name).to eq(migrated.tool_name)
+    expect(task.markers).to include("tool:work_intention_set_renew")
     expect(migrated.input.intention_set_id).to eq(lease_set_id)
     expect(reference).to have_attributes(
       intention_id: lease_id,

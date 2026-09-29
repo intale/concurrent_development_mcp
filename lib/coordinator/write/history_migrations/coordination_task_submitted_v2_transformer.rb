@@ -87,6 +87,7 @@ module Coordinator::Write
         task_id = task.target_stream.stream_id
         request_id = source_event.global_position
         actor = actor_from(migrated_input.document)
+        tool_name = migrated_input.document.tool_name
         request_marker = @request_marker.call(actor:, request_id:)
         metadata_extension = MigrationMetadataExtensionV1.new(
           canonical_input_digest: migrated_input.canonical_input_digest
@@ -98,7 +99,7 @@ module Coordinator::Write
             event: Events::CommandRegisteredV1.new(
               command_id:,
               request_id:,
-              tool_name: source.tool_name
+              tool_name:
             ),
             markers: [ "command:#{command_id}", "task:#{task_id}", request_marker ],
             step_name: "register-command",
@@ -109,7 +110,7 @@ module Coordinator::Write
             event: Events::CoordinationTaskSubmittedV3.new(
               task_id:,
               command_id:,
-              tool_name: source.tool_name,
+              tool_name:,
               command_input: migrated_input.document,
               poll_interval_ms: source.poll_interval_ms,
               ttl_ms: source.ttl_ms
@@ -119,7 +120,7 @@ module Coordinator::Write
               "command:#{command_id}",
               request_marker,
               @execution_lane.marker(task_id),
-              "tool:#{source.tool_name}"
+              "tool:#{tool_name}"
             ],
             step_name: "submit-coordination-task",
             metadata_extension:
