@@ -7,7 +7,7 @@ module Coordinator
         def initialize: (
           correlation_allocator: CorrelationAllocator,
           process_step_planner: Coordinator::Processes::ProcessStepPlanner,
-          target_event_planner: TargetEventPlanner,
+          source_trace_planner: SourceTracePlanner,
           ?source_builder: MigrationSourceBuilder,
           ?event_factory: EventFactory
         ) -> void
@@ -16,7 +16,8 @@ module Coordinator
           migration_id: String,
           source_config_name: String,
           source_event: PgEventstore::Event,
-          transformed_facts: Array[TransformedFactV1]
+          transformed_facts: Array[TransformedFactV1],
+          target_plans: Array[TargetEventPlanV1]
         ) -> Dry::Monads::Result
       end
     end

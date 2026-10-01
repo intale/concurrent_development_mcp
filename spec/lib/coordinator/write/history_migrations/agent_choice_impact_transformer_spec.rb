@@ -524,13 +524,23 @@ RSpec.describe "history migration AgentChoice impact transformer", :event_store 
 
   def preplan_decision_lifecycle(history)
     target_stream = decision_target_stream(history.fetch(:recorded_decision))
-    [
+    plans_by_source = [
       [ history.fetch(:recorded_decision), "record-decision", "DecisionRecorded" ],
       [ history.fetch(:recorded_decision), "derive-decision-from-interpretation", "DecisionDerivedFromInterpretation" ],
       [ history.fetch(:activated), "activate-decision", "DecisionActivated" ],
       [ history.fetch(:corrected), "correct-decision-definition", "DecisionDefinitionCorrected" ]
-    ].each do |source_event, step_name, event_type|
-      preplan_target(source_event, target_stream:, step_name:, event_type:)
+    ].each_with_object({}) do |(source_event, step_name, event_type), result|
+      plan = preplan_target(source_event, target_stream:, step_name:, event_type:)
+      (result[source_event] ||= []) << plan
+    end
+    plans_by_source.each do |source_event, target_plans|
+      expect(
+        Coordinator::Container["history_migrations.source_trace_planner"].call(
+          migration_id:,
+          source_event:,
+          target_plans:
+        )
+      ).to be_success
     end
   end
 
@@ -554,6 +564,7 @@ RSpec.describe "history migration AgentChoice impact transformer", :event_store 
       caused_by: process_step.event
     )
     expect(result).to be_success
+    result.value!
   end
 
   def decision_target_stream(source_event)

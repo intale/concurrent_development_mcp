@@ -29,22 +29,25 @@ module Coordinator::Write
         )
         return transformation if transformation.failure?
 
-        selection = @target_plan_wave_selector.call(
+        plans = @target_plan_wave_selector.find_complete(
           migration_id:,
           source_event:,
-          transformed_facts: transformation.value!,
-          dependency_wave:
+          transformed_facts: transformation.value!
         )
-        return selection if selection.failure?
+        return plans if plans.failure?
 
-        selected_facts = selection.value!
+        waves_by_step = plans.value!.to_h { [ _1.transformation_step, _1.dependency_wave ] }
+        selected_facts = transformation.value!.select do |fact|
+          waves_by_step.fetch(fact.step_name) == dependency_wave
+        end
         return @target_writer.call(planned_facts: []) if selected_facts.empty?
 
         plan = @fact_planner.call(
           migration_id:,
           source_config_name:,
           source_event:,
-          transformed_facts: selected_facts
+          transformed_facts: selected_facts,
+          target_plans: plans.value!
         )
         return plan if plan.failure?
 

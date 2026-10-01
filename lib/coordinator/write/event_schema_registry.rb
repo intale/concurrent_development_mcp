@@ -41,6 +41,7 @@ module Coordinator::Write
       [ "HistoryMigrationTargetStreamPlanCreated", 1 ] =>
         Events::HistoryMigrationTargetStreamPlanCreatedV1,
       [ "HistoryMigrationTargetEventPlanned", 1 ] => Events::HistoryMigrationTargetEventPlannedV1,
+      [ "HistoryMigrationSourceTraceResolved", 1 ] => Events::HistoryMigrationSourceTraceResolvedV1,
       [ "HistoryMigrationPageCreated", 1 ] => Events::HistoryMigrationPageCreatedV1,
       [ "HistoryMigrationPageAddedToMigration", 1 ] => Events::HistoryMigrationPageAddedToMigrationV1,
       [ "HistoryMigrationPageSourceRangeSelected", 1 ] => Events::HistoryMigrationPageSourceRangeSelectedV1,

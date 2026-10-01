@@ -44,7 +44,7 @@ RSpec.describe "history migration target dispatch", :event_store do
       correlation_allocator:
         Coordinator::Write::HistoryMigrations::CorrelationAllocator.new(event_store: source_store),
       process_step_planner: process_step_planner,
-      target_event_planner:
+      source_trace_planner:
     )
   end
   let(:process_step_planner) { Coordinator::Processes::ProcessStepPlanner.new(event_store: source_store) }
@@ -57,6 +57,9 @@ RSpec.describe "history migration target dispatch", :event_store do
       target_event_planner:
     )
   end
+  let(:source_trace_planner) do
+    Coordinator::Write::HistoryMigrations::SourceTracePlanner.new(event_store: source_store)
+  end
   let(:writer) { Coordinator::Write::HistoryMigrations::TargetWriter.new(event_store: target_store) }
 
   it "plans IDs before dispatch and idempotently persists cohesive facts with source provenance" do
@@ -67,29 +70,38 @@ RSpec.describe "history migration target dispatch", :event_store do
       source_event:,
       source_payload:
     ).value!
-    target_plan_builder.call(
+    target_plans = target_plan_builder.call(
       migration_id:,
       source_event:,
       transformed_facts: transformed
+    ).value!
+    source_trace_planner.call(
+      migration_id:,
+      source_event:,
+      target_plans:
     ).value!
     first_plan = planner.call(
       migration_id:,
       source_config_name: "default",
       source_event:,
-      transformed_facts: transformed
+      transformed_facts: transformed,
+      target_plans:
     ).value!
     replay_plan = planner.call(
       migration_id:,
       source_config_name: "default",
       source_event:,
-      transformed_facts: transformed
+      transformed_facts: transformed,
+      target_plans:
     ).value!
 
     expect(replay_plan.map { _1.event.id }).to eq(first_plan.map { _1.event.id })
     expect(first_plan.map { _1.event.correlation_id }.uniq).to contain_exactly(
       first_plan.first.event.correlation_id
     )
-    expect(first_plan.map { _1.event.caused_by.id }).to eq(first_plan.map { _1.process_step.event.id })
+    expect(first_plan.map { _1.event.caused_by&.id }).to eq(
+      [ nil, *first_plan.first(2).map { _1.event.id } ]
+    )
 
     first_write = writer.call(planned_facts: first_plan)
     replay_write = writer.call(planned_facts: replay_plan)
@@ -99,7 +111,9 @@ RSpec.describe "history migration target dispatch", :event_store do
     expect(replay_write.value!.outcome).to eq("existing")
     expect(replay_write.value!.events.map(&:id)).to eq(first_write.value!.events.map(&:id))
     expect(first_write.value!.events.map(&:stream_revision)).to eq([ 0, 1, 2 ])
-    expect(first_write.value!.events.map(&:causation_id)).to eq(first_plan.map { _1.process_step.event.id })
+    expect(first_write.value!.events.map(&:causation_id)).to eq(
+      [ nil, *first_write.value!.events.first(2).map(&:id) ]
+    )
 
     metadata = first_write.value!.events.first.metadata
     expect(metadata).not_to have_key("correlation_id")

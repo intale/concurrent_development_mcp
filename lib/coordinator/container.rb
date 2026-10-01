@@ -180,6 +180,16 @@ module Coordinator
       )
     end
 
+    register("history_migrations.source_trace_planner", memoize: true) do
+      Write::HistoryMigrations::SourceTracePlanner.new(
+        event_store: self["event_store"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        schema_registry: self["event_schema_registry"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
     register("history_migrations.migration_source_event_plan_resolver", memoize: true) do
       Write::HistoryMigrations::MigrationSourceEventPlanResolver.new(
         event_store: self["event_store"],
@@ -920,7 +930,7 @@ module Coordinator
       Write::HistoryMigrations::FactPlanner.new(
         correlation_allocator: self["history_migrations.correlation_allocator"],
         process_step_planner: self["history_migrations.process_step_planner"],
-        target_event_planner: self["history_migrations.target_event_planner"],
+        source_trace_planner: self["history_migrations.source_trace_planner"],
         event_factory: self["event_factory"]
       )
     end
@@ -948,7 +958,8 @@ module Coordinator
       Write::HistoryMigrations::EventPlanningDispatcher.new(
         transformer_registry: self["history_migrations.transformer_registry"],
         target_plan_wave_selector: self["history_migrations.target_plan_wave_selector"],
-        target_plan_builder: self["history_migrations.target_plan_builder"]
+        target_plan_builder: self["history_migrations.target_plan_builder"],
+        source_trace_planner: self["history_migrations.source_trace_planner"]
       )
     end
 

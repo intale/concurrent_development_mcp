@@ -1,0 +1,17 @@
+module Coordinator
+  module Write
+    module Commands
+      class ResolveHistoryMigrationSourceTrace < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def event_id: () -> String
+        def trace_id: () -> String
+        def migration_id: () -> String
+        def source_event_id: () -> String
+        def source_global_position: () -> Integer
+        def source_causation_id: () -> String?
+        def target_endpoint: () -> EventReference?
+      end
+    end
+  end
+end

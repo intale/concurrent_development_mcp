@@ -5,7 +5,8 @@ module Coordinator
         def initialize: (
           transformer_registry: TransformerRegistry,
           target_plan_wave_selector: TargetPlanWaveSelector,
-          target_plan_builder: TargetPlanBuilder
+          target_plan_builder: TargetPlanBuilder,
+          source_trace_planner: SourceTracePlanner
         ) -> void
         def call: (
           migration_id: String,

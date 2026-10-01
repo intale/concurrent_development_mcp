@@ -46,6 +46,14 @@ module Coordinator::Write
       )
     end
 
+    def history_migration_source_trace(trace_id)
+      StreamReference.new(
+        context: "CoordinatorMaintenance",
+        stream_name: "HistoryMigrationSourceTrace",
+        stream_id: trace_id
+      )
+    end
+
     def history_migration_page(page_id)
       StreamReference.new(
         context: "CoordinatorMaintenance",

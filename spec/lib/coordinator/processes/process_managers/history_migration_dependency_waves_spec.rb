@@ -45,6 +45,16 @@ RSpec.describe "history migration dependency waves", :event_store do
 
     expect(repository.global_position).to be < assignment.global_position
     expect(work_item.global_position).to be < assignment.global_position
+
+    migrated = target_client.read(
+      PgEventstore::Stream.all_stream,
+      options: { direction: :asc, max_count: 100 }
+    ).select { _1.markers.include?("history-migration:#{migration_id}") }
+    migrated.group_by { _1.metadata.dig("migration_source", "event_id") }.each_value do |facts|
+      ids = facts.map(&:id)
+      expect(facts.count { _1.causation_id.nil? }).to eq(1)
+      expect(facts.filter_map(&:causation_id)).to match_array(ids - [ chain_endpoint_id(facts) ])
+    end
   end
 
   private
@@ -177,5 +187,10 @@ RSpec.describe "history migration dependency waves", :event_store do
 
   def stream(context, stream_name, stream_id)
     Coordinator::Write::StreamReference.new(context:, stream_name:, stream_id:)
+  end
+
+  def chain_endpoint_id(facts)
+    caused_ids = facts.filter_map(&:causation_id)
+    (facts.map(&:id) - caused_ids).sole
   end
 end

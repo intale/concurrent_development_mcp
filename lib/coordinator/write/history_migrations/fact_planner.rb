@@ -10,23 +10,31 @@ module Coordinator::Write
       def initialize(
         correlation_allocator:,
         process_step_planner:,
-        target_event_planner:,
+        source_trace_planner:,
         source_builder: MigrationSourceBuilder.new,
         event_factory: EventFactory.new
       )
         @correlation_allocator = correlation_allocator
         @process_step_planner = process_step_planner
-        @target_event_planner = target_event_planner
+        @source_trace_planner = source_trace_planner
         @source_builder = source_builder
         @event_factory = event_factory
       end
 
-      def call(migration_id:, source_config_name:, source_event:, transformed_facts:)
+      def call(migration_id:, source_config_name:, source_event:, transformed_facts:, target_plans:)
         correlation = @correlation_allocator.call(migration_id:, source_config_name:, source_event:)
         return correlation if correlation.failure?
 
+        source_parent = @source_trace_planner.causal_parent(migration_id:, source_event:)
+        return source_parent if source_parent.failure?
+
         source = @source_builder.call(config_name: source_config_name, event: source_event)
         target_correlation_id = correlation.value!.target_correlation_id
+        plans_by_step = target_plans.to_h { [ _1.transformation_step, _1 ] }
+        parents_by_step = target_plans.each_with_index.to_h do |target_plan, index|
+          parent = index.zero? ? source_parent.value! : target_plans.fetch(index - 1).target_event
+          [ target_plan.transformation_step, parent ]
+        end
         planned_facts = []
         transformed_facts.each do |fact|
           planned = plan_fact(
@@ -34,6 +42,8 @@ module Coordinator::Write
             source_event:,
             source:,
             fact:,
+            target_plan: plans_by_step.fetch(fact.step_name),
+            causal_parent: parents_by_step.fetch(fact.step_name),
             target_correlation_id:
           )
           return planned if planned.failure?
@@ -45,7 +55,15 @@ module Coordinator::Write
 
       private
 
-      def plan_fact(migration_id:, source_event:, source:, fact:, target_correlation_id:)
+      def plan_fact(
+        migration_id:,
+        source_event:,
+        source:,
+        fact:,
+        target_plan:,
+        causal_parent:,
+        target_correlation_id:
+      )
         process_step = @process_step_planner.call(
           source_event:,
           process_name: "history-migration-#{migration_id}",
@@ -55,17 +73,7 @@ module Coordinator::Write
           rule_version: PROCESS_RULE_VERSION,
           allocate_target_entity: true
         )
-        target_plan = @target_event_planner.find(
-          migration_id:,
-          source_event:,
-          transformation_step: fact.step_name,
-          target_stream: fact.target_stream,
-          target_event_id: process_step.target_entity_id!,
-          target_event_type: fact.event.class.event_type
-        )
-        return target_plan if target_plan.failure?
-
-        event_id = target_plan.value!.target_event.event_id
+        event_id = target_plan.target_event.event_id
         target_event_marker = "migration-target-event:#{event_id}"
         metadata_extension = fact.metadata_extension
         attributed_actor = metadata_extension&.attributed_actor
@@ -136,7 +144,7 @@ module Coordinator::Write
             "history-migration:#{migration_id}",
             "command:#{process_step.target_command_id}"
           ],
-          caused_by: trace_parent(process_step.event, target_correlation_id:),
+          caused_by: trace_parent(causal_parent, target_correlation_id:),
           correlation_id: target_correlation_id
         )
 
@@ -146,15 +154,17 @@ module Coordinator::Write
             event:,
             target_event_marker:,
             process_step:,
-            target_event_plan: target_plan.value!
+            target_event_plan: target_plan
           )
         )
       end
 
-      def trace_parent(process_step_event, target_correlation_id:)
+      def trace_parent(event_reference, target_correlation_id:)
+        return unless event_reference
+
         PgEventstore::Event.new(
-          id: process_step_event.id,
-          type: process_step_event.type,
+          id: event_reference.event_id,
+          type: event_reference.type,
           correlation_id: target_correlation_id
         )
       end

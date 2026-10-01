@@ -243,6 +243,13 @@ RSpec.describe "history migration AgentChoice transformers", :event_store do
       caused_by: process_step.event
     )
     expect(result).to be_success
+    expect(
+      Coordinator::Container["history_migrations.source_trace_planner"].call(
+        migration_id:,
+        source_event:,
+        target_plans: [ result.value! ]
+      )
+    ).to be_success
     expect(source_event.global_position).to be <= upper_position
   end
 

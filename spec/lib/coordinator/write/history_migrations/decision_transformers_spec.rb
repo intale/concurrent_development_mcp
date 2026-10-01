@@ -267,7 +267,8 @@ RSpec.describe "history migration Decision transformers", :event_store do
     )
 
     {
-      first_guidance:, second_guidance:,
+      first_guidance:, first_proposal:, first_acceptance:,
+      second_guidance:, second_proposal:, second_acceptance:,
       recorded:, activated:, slot_opened:, slot_activated:, partition_activated:,
       corrected:, slot_corrected:, partition_corrected:
     }
