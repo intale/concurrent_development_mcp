@@ -12,11 +12,13 @@ module Coordinator
         attr_reader application_dependency_wave: Integer
         attr_reader application_next_from_position: Integer
         attr_reader completed: bool
+        attr_reader abandoned: bool
         attr_reader checkpoint_event: PgEventstore::Event
         attr_reader latest_revision: Integer
 
         def plan_completed?: () -> bool
         def completed?: () -> bool
+        def abandoned?: () -> bool
       end
     end
   end

@@ -11,6 +11,7 @@ module Coordinator::Write
         end
 
         def call(snapshot:, page:, command:)
+          return abandoned(command) if snapshot.abandoned?
           return Success(ApplicationProgressDecisionV1.new(outcome: "existing", plan: nil)) if snapshot.completed?
           return plan_required(command) unless snapshot.plan_completed?
           return mismatch(command) unless page_matches?(page, command)
@@ -86,6 +87,16 @@ module Coordinator::Write
               code: :history_migration_checkpoint_changed,
               message: "HistoryMigration application cursor changed; this page may already be superseded",
               details: { migration_id: command.migration_id, page_id: command.page_id }
+            )
+          )
+        end
+
+        def abandoned(command)
+          Failure(
+            OutcomeError.new(
+              code: :history_migration_abandoned,
+              message: "Abandoned HistoryMigration cannot advance application",
+              details: { migration_id: command.migration_id }
             )
           )
         end

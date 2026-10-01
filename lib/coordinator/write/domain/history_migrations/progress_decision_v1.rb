@@ -4,7 +4,8 @@ module Coordinator::Write
   module Domain
     module HistoryMigrations
       class ProgressDecisionV1 < Value
-        attribute :outcome, Types::String.enum("advanced", "plan_completed", "completed", "existing")
+        attribute :outcome,
+                  Types::String.enum("advanced", "plan_completed", "completed", "abandoned", "existing")
         attribute :plan, EventPlan.optional
       end
     end

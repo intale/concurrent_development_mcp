@@ -60,6 +60,28 @@ RSpec.describe Coordinator::Processes::ProcessManagers::HistoryMigration, :event
     ).to be_completed
   end
 
+  it "does not plan or apply more work after the migration is abandoned" do
+    legacy = append_legacy_repository
+    started = start_migration(through: legacy.global_position)
+    abandonment = Coordinator::Container["operations.execute_abandon_history_migration"].call_command(
+      Coordinator::Write::Commands::AbandonHistoryMigration.new(
+        command_id: "abandon-duplicate-history-migration",
+        actor: Coordinator::Write::Commands::Actor.new(kind: "agent", id: "migration-operator"),
+        migration_id:,
+        reason: "Accidental duplicate migration"
+      )
+    )
+    expect(abandonment).to be_success
+
+    manager.call(started)
+
+    expect(history_migration_pages).to be_empty
+    expect(target_repositories).to be_empty
+    expect(
+      Coordinator::Container["history_migrations.migration_loader"].call(migration_id)
+    ).to be_abandoned
+  end
+
   private
 
   def target_repositories
@@ -139,6 +161,19 @@ RSpec.describe Coordinator::Processes::ProcessManagers::HistoryMigration, :event
         direction: :asc
       )
     ).sole
+  end
+
+  def history_migration_pages
+    source_store.read_global_marked(
+      Coordinator::Write::GlobalMarkedEventReadCriteria.new(
+        stream_context: "CoordinatorMaintenance",
+        stream_name: "HistoryMigrationPage",
+        event_types: [ "HistoryMigrationPageCreated" ],
+        markers: [ "history-migration:#{migration_id}" ],
+        maximum_count: 1,
+        direction: :asc
+      )
+    )
   end
 
   def migration_event(type)

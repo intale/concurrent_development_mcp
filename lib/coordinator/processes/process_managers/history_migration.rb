@@ -64,6 +64,7 @@ module Coordinator::Processes
 
       def create_next_page(source)
         migration = @migration_loader.call(source.payload.migration_id)
+        return if migration.abandoned?
         return if migration.plan_completed?
         return unless migration.checkpoint_event.id == source.event.id
         return complete_empty_plan(source, migration:) if migration.source_upper_position.nil?
@@ -111,6 +112,7 @@ module Coordinator::Processes
         return unless page.event("HistoryMigrationPageSourceEventCountRecorded")&.id == source.event.id
 
         migration = @migration_loader.call(page.state.migration_id)
+        return if migration.abandoned?
         process_step = plan(
           source_event: source.event,
           step_name: "plan-page",
@@ -138,6 +140,7 @@ module Coordinator::Processes
         return unless page.event("HistoryMigrationPagePlanned")&.id == source.event.id
 
         migration = @migration_loader.call(page.state.migration_id)
+        return if migration.abandoned?
         return if migration.plan_completed?
 
         process_step = plan(
@@ -163,6 +166,7 @@ module Coordinator::Processes
 
       def apply_next_page(source)
         migration = @migration_loader.call(source.payload.migration_id)
+        return if migration.abandoned?
         return if migration.completed?
         return unless migration.checkpoint_event.id == source.event.id
         unless migration.plan_completed?
@@ -221,6 +225,7 @@ module Coordinator::Processes
         return unless page.dependency_wave_event(source.payload.dependency_wave).id == source.event.id
 
         migration = @migration_loader.call(page.state.migration_id)
+        return if migration.abandoned?
         return if migration.completed?
 
         next_dependency_wave, next_from_position = next_application_progress(

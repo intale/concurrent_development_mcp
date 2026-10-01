@@ -11,6 +11,7 @@ module Coordinator::Write
         end
 
         def call(snapshot:, command:)
+          return abandoned(command) if snapshot.abandoned?
           return Success(ProgressDecisionV1.new(outcome: "existing", plan: nil)) if snapshot.completed?
           return incomplete(command) unless application_complete?(snapshot)
 
@@ -39,6 +40,16 @@ module Coordinator::Write
             OutcomeError.new(
               code: :history_migration_application_incomplete,
               message: "HistoryMigration cannot complete before every planned page is applied",
+              details: { migration_id: command.migration_id }
+            )
+          )
+        end
+
+        def abandoned(command)
+          Failure(
+            OutcomeError.new(
+              code: :history_migration_abandoned,
+              message: "Abandoned HistoryMigration cannot complete",
               details: { migration_id: command.migration_id }
             )
           )

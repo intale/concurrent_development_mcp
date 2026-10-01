@@ -58,6 +58,7 @@ module Coordinator::Write
       [ "HistoryMigrationApplicationCursorAdvanced", 1 ] =>
         Events::HistoryMigrationApplicationCursorAdvancedV1,
       [ "HistoryMigrationCompleted", 1 ] => Events::HistoryMigrationCompletedV1,
+      [ "HistoryMigrationAbandoned", 1 ] => Events::HistoryMigrationAbandonedV1,
       [ "SkillRegistered", 1 ] => Events::SkillRegisteredV1,
       [ "SkillRevisionCreated", 1 ] => Events::SkillRevisionCreatedV1,
       [ "SkillRevisionDescriptionDefined", 1 ] => Events::SkillRevisionDescriptionDefinedV1,

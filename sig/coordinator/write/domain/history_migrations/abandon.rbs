@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Domain
+      module HistoryMigrations
+        class Abandon
+          include Dry::Monads::Result::Mixin
+
+          def initialize: (?stream_factory: StreamFactory) -> void
+          def call: (snapshot: Write::HistoryMigrations::MigrationSnapshotV1, command: Commands::AbandonHistoryMigration) -> Dry::Monads::Result
+        end
+      end
+    end
+  end
+end

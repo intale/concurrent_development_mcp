@@ -13,6 +13,7 @@ module Coordinator::Write
         HistoryMigrationPlanCompleted
         HistoryMigrationApplicationCursorAdvanced
         HistoryMigrationCompleted
+        HistoryMigrationAbandoned
       ].freeze
       PROGRESS_HISTORIES = PROGRESS_EVENT_TYPES.to_h do |event_type|
         [ event_type, LatestEventReadCriteria.new(event_types: [ event_type ]) ]
@@ -55,6 +56,7 @@ module Coordinator::Write
           application_dependency_wave: application_dependency_wave(progress),
           application_next_from_position: application_next_from_position(progress),
           completed: progress.key?("HistoryMigrationCompleted"),
+          abandoned: progress.key?("HistoryMigrationAbandoned"),
           checkpoint_event:,
           latest_revision: [ start_events.last.stream_revision, *progress_events.map(&:stream_revision) ].max
         )
@@ -81,6 +83,14 @@ module Coordinator::Write
         plan_completed = progress["HistoryMigrationPlanCompleted"]
         application = progress["HistoryMigrationApplicationCursorAdvanced"]&.last
         completed = progress["HistoryMigrationCompleted"]
+        abandoned = progress["HistoryMigrationAbandoned"]
+
+        if completed && abandoned
+          raise InvalidHistoryMigrationHistory, "HistoryMigration cannot be both completed and abandoned"
+        end
+        if abandoned && progress_events_after(progress, abandoned.first.stream_revision).any?
+          raise InvalidHistoryMigrationHistory, "HistoryMigration progressed after abandonment"
+        end
 
         if plan_completed
           terminal = upper.nil? ? planning.nil? : planning&.next_from_position == upper + 1
@@ -110,6 +120,12 @@ module Coordinator::Write
         unless plan_completed && terminal_application &&
             completed.first.stream_revision > plan_completed.first.stream_revision
           raise InvalidHistoryMigrationHistory, "HistoryMigration completion has no complete application"
+        end
+      end
+
+      def progress_events_after(progress, revision)
+        progress.except("HistoryMigrationAbandoned").values.filter_map do |event, _payload|
+          event if event.stream_revision > revision
         end
       end
 

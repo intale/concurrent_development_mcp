@@ -13,6 +13,7 @@ module Coordinator::Write
       attribute :application_dependency_wave, Types::HistoryMigrationDependencyWave
       attribute :application_next_from_position, Types::GlobalPosition
       attribute :completed, Types::Bool
+      attribute :abandoned, Types::Bool
       attribute :checkpoint_event, Types.Instance(PgEventstore::Event)
       attribute :latest_revision, Types::StreamRevision
 
@@ -22,6 +23,10 @@ module Coordinator::Write
 
       def completed?
         completed
+      end
+
+      def abandoned?
+        abandoned
       end
     end
   end

@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module Events
+      class HistoryMigrationAbandonedV1 < Base
+        attr_reader migration_id: String
+        attr_reader reason: String
+      end
+    end
+  end
+end

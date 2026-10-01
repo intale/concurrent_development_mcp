@@ -11,6 +11,7 @@ module Coordinator::Write
         end
 
         def call(snapshot:, command:)
+          return abandoned(command) if snapshot.abandoned?
           return Success(ProgressDecisionV1.new(outcome: "existing", plan: nil)) if snapshot.plan_completed?
           return nonempty(command) unless snapshot.source_upper_position.nil?
 
@@ -31,6 +32,16 @@ module Coordinator::Write
             OutcomeError.new(
               code: :history_migration_page_required,
               message: "HistoryMigration has source events and must plan every page",
+              details: { migration_id: command.migration_id }
+            )
+          )
+        end
+
+        def abandoned(command)
+          Failure(
+            OutcomeError.new(
+              code: :history_migration_abandoned,
+              message: "Abandoned HistoryMigration cannot complete planning",
               details: { migration_id: command.migration_id }
             )
           )

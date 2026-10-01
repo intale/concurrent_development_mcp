@@ -1058,6 +1058,17 @@ module Coordinator
       )
     end
 
+    register("operations.execute_abandon_history_migration") do
+      Write::Operations::ExecuteAbandonHistoryMigration.new(
+        event_store: self["event_store"],
+        loader: self["history_migrations.migration_loader"],
+        decider: self["domain.history_migrations.abandon"],
+        id_generator: self["id_generator"],
+        event_factory: self["event_factory"],
+        stream_factory: self["stream_factory"]
+      )
+    end
+
     register("operations.prepare_create_change_set", memoize: true) do
       Write::Operations::PrepareCreateChangeSet.new
     end
@@ -1245,6 +1256,10 @@ module Coordinator
 
     register("domain.history_migrations.start", memoize: true) do
       Write::Domain::HistoryMigrations::Start.new(stream_factory: self["stream_factory"])
+    end
+
+    register("domain.history_migrations.abandon", memoize: true) do
+      Write::Domain::HistoryMigrations::Abandon.new(stream_factory: self["stream_factory"])
     end
 
     register("domain.change_sets.create", memoize: true) do

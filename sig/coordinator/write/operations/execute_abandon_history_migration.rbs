@@ -1,0 +1,14 @@
+module Coordinator
+  module Write
+    module Operations
+      class ExecuteAbandonHistoryMigration
+        include Dry::Monads::Result::Mixin
+
+        POLICY_VERSION: String
+
+        def initialize: (event_store: _EventStore, ?loader: HistoryMigrations::MigrationLoader, ?decider: Domain::HistoryMigrations::Abandon, ?id_generator: Shared::IdGenerator, ?event_factory: EventFactory, ?stream_factory: StreamFactory) -> void
+        def call_command: (Commands::AbandonHistoryMigration command, ?caused_by: PgEventstore::Event?) -> Dry::Monads::Result
+      end
+    end
+  end
+end

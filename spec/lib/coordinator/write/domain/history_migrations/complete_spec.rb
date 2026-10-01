@@ -49,6 +49,7 @@ RSpec.describe Coordinator::Write::Domain::HistoryMigrations::Complete do
       application_dependency_wave: 3,
       application_next_from_position:,
       completed: false,
+      abandoned: false,
       checkpoint_event:,
       latest_revision: 8
     )
