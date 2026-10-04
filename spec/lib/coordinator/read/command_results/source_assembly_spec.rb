@@ -78,6 +78,27 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
     )
   end
 
+  it "does not build a public receipt for an internal policy command" do
+    append(
+      streams.command(command_id),
+      Coordinator::Write::Events::CommandRegisteredV1.new(
+        command_id:, request_id: "policy-request", tool_name: "coordination-policy"
+      ),
+      metadata: canonical_metadata, markers: [ "command:#{command_id}" ]
+    )
+    terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+
+    expect(Coordinator::Read::CommandResults::SourceLoader.new(event_store:).call(terminal)).to be_nil
+  end
+
+  it "rejects a public Command whose client instruction is missing" do
+    register_command
+    terminal = append_terminal(Coordinator::Write::Events::CommandSucceededV1.new(command_id:))
+
+    expect { Coordinator::Read::CommandResults::SourceLoader.new(event_store:).call(terminal) }
+      .to raise_error(Coordinator::Read::InvalidProjectionSource, "Command has no Task or Operation Batch instruction")
+  end
+
   context "when another Repository command won the same natural key" do
     let(:canonical_repository_id) { SecureRandom.uuid_v7 }
     let(:command) do
@@ -672,5 +693,4 @@ RSpec.describe Coordinator::Read::CommandResults::Assembler, :event_store do
       policy_version:
     )
   end
-
 end

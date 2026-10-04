@@ -3,8 +3,9 @@
 RSpec.describe Coordinator::Write::HistoryMigrations::PostRemodelContractCatalog do
   subject(:catalog) { described_class.new }
 
-  it "freezes the complete post-remodel delta observed before MIGRATION-01 planning" do
-    expect(catalog.source_contracts.size).to eq(49)
+  it "freezes the reviewed post-remodel contracts used by migration and replay" do
+    expect(catalog.source_contracts.size).to eq(55)
+    expect(catalog).to be_include(type: "RepositoryRegistered", schema_version: 2)
     expect(catalog.source_contracts.uniq).to eq(catalog.source_contracts)
     expect(catalog).to be_include(type: "AttemptAuthorized", schema_version: 2)
     expect(catalog).to be_include(type: "DevelopmentArtifactContentChanged", schema_version: 1)

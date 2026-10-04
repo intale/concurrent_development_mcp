@@ -138,6 +138,11 @@ RSpec.describe "history migration Candidate transformers", :event_store do
       ).value!
     end
     target_events = writes.flat_map(&:events)
+    candidate_contract = Coordinator::Read::Contracts::CandidateSourceEvent.new
+    target_events.select { candidate_contract.class::EVENT_TYPES.include?(_1.type) }.each do |event|
+      validation = HistoryMigrationProjectionContract.call(event, candidate_contract)
+      expect(validation).to be_success, validation.errors.to_h.inspect
+    end
     persisted_manifest = target_events.find { _1.type == "CandidateChangeManifestCaptured" }
     persisted_context = target_events.find { _1.type == "CandidateBuildContextCaptured" }
     persisted_head = target_events.find { _1.type == "CandidateHeadRegistered" }

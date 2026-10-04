@@ -21,9 +21,19 @@ module Coordinator::Write
         step ensure_store_available(source_config_name, role: "source")
         step ensure_store_available(target_config_name, role: "target")
 
-        source_upper_position = HistoryMigrations::SourceReader.new(
+        source_head = HistoryMigrations::SourceReader.new(
           client: @store_registry.client(source_config_name)
         ).head_position
+        source_upper_position = attributes.fetch(:source_upper_position, source_head)
+        if source_upper_position && (!source_head || source_upper_position > source_head)
+          step Failure(
+            OutcomeError.new(
+              code: :invalid_input,
+              message: "Frozen source upper position exceeds the current source head",
+              details: { source_upper_position:, source_head: }
+            )
+          )
+        end
 
         step build_command(
           attributes,

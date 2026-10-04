@@ -27,7 +27,10 @@ RSpec.describe "history migration target dispatch", :event_store do
           id: SecureRandom.uuid_v7,
           type: "RepositoryRegistered",
           data: source_payload.to_h,
-          metadata: { "schema_version" => 1 },
+          metadata: {
+            "schema_version" => 1, "actor_kind" => "agent", "actor_id" => "repository-agent",
+            "policy_version" => "repository-registration/v1"
+          },
           correlation_id: SecureRandom.uuid_v7
         )
       ]
@@ -44,7 +47,8 @@ RSpec.describe "history migration target dispatch", :event_store do
       correlation_allocator:
         Coordinator::Write::HistoryMigrations::CorrelationAllocator.new(event_store: source_store),
       process_step_planner: process_step_planner,
-      source_trace_planner:
+      source_trace_planner:,
+      command_owner_resolver: Coordinator::Container["history_migrations.command_owner_resolver"]
     )
   end
   let(:process_step_planner) { Coordinator::Processes::ProcessStepPlanner.new(event_store: source_store) }
@@ -85,6 +89,7 @@ RSpec.describe "history migration target dispatch", :event_store do
       source_config_name: "default",
       source_event:,
       transformed_facts: transformed,
+      source_upper_position: source_event.global_position,
       target_plans:
     ).value!
     replay_plan = planner.call(
@@ -92,6 +97,7 @@ RSpec.describe "history migration target dispatch", :event_store do
       source_config_name: "default",
       source_event:,
       transformed_facts: transformed,
+      source_upper_position: source_event.global_position,
       target_plans:
     ).value!
 
@@ -116,6 +122,13 @@ RSpec.describe "history migration target dispatch", :event_store do
     )
 
     metadata = first_write.value!.events.first.metadata
+    first_write.value!.events.each do |event|
+      validation = HistoryMigrationProjectionContract.call(event, Coordinator::Read::Contracts::RepositorySourceEvent.new)
+      expect(validation).to be_success, validation.errors.to_h.inspect
+    end
+    expect(metadata).to include(
+      "actor_kind" => "agent", "actor_id" => "repository-agent", "policy_version" => "repository-registration/v1"
+    )
     expect(metadata).not_to have_key("correlation_id")
     expect(metadata.fetch("migration_source")).to include(
       "event_id" => source_event.id,

@@ -34,6 +34,8 @@ module Coordinator::Read
         end
 
         command_input = load_command_input(command_state, registration: command_events.first)
+        return unless command_input
+
         persisted_events = load_persisted_events(event)
         Source.new(
           terminal_event: event,
@@ -67,7 +69,13 @@ module Coordinator::Read
         ) if task_submission
 
         batch_item = find_batch_item(command_state.command_id, registration:)
-        raise InvalidProjectionSource, "Command has no Task or Operation Batch instruction" unless batch_item
+        unless batch_item
+          # Internal policy commands have no client instruction or public result.
+          # A missing instruction for a public command is still corrupt history.
+          return unless Coordinator::Write::Tasks::TargetContractRegistry.tool_names.include?(command_state.tool_name)
+
+          raise InvalidProjectionSource, "Command has no Task or Operation Batch instruction"
+        end
 
         unless batch_item.request_id == command_state.request_id &&
                batch_item.canonical_input_digest == command_state.canonical_input_digest
@@ -150,7 +158,6 @@ module Coordinator::Read
           data: event.data
         )
       end
-
     end
   end
 end

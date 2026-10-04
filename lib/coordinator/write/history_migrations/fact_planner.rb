@@ -11,17 +11,22 @@ module Coordinator::Write
         correlation_allocator:,
         process_step_planner:,
         source_trace_planner:,
+        command_owner_resolver:,
         source_builder: MigrationSourceBuilder.new,
         event_factory: EventFactory.new
       )
         @correlation_allocator = correlation_allocator
         @process_step_planner = process_step_planner
         @source_trace_planner = source_trace_planner
+        @command_owner_resolver = command_owner_resolver
         @source_builder = source_builder
         @event_factory = event_factory
       end
 
-      def call(migration_id:, source_config_name:, source_event:, transformed_facts:, target_plans:)
+      def call(migration_id:, source_config_name:, source_upper_position:, source_event:, transformed_facts:, target_plans:)
+        owner = @command_owner_resolver.call(migration_id:, source_config_name:, source_upper_position:, source_event:)
+        return owner if owner.failure?
+
         correlation = @correlation_allocator.call(migration_id:, source_config_name:, source_event:)
         return correlation if correlation.failure?
 
@@ -44,7 +49,8 @@ module Coordinator::Write
             fact:,
             target_plan: plans_by_step.fetch(fact.step_name),
             causal_parent: parents_by_step.fetch(fact.step_name),
-            target_correlation_id:
+            target_correlation_id:,
+            command_owner_id: owner.value!
           )
           return planned if planned.failure?
 
@@ -62,7 +68,8 @@ module Coordinator::Write
         fact:,
         target_plan:,
         causal_parent:,
-        target_correlation_id:
+        target_correlation_id:,
+        command_owner_id:
       )
         process_step = @process_step_planner.call(
           source_event:,
@@ -77,16 +84,21 @@ module Coordinator::Write
         target_event_marker = "migration-target-event:#{event_id}"
         metadata_extension = fact.metadata_extension
         attributed_actor = metadata_extension&.attributed_actor
+        command_id = if fact.target_stream.context == "CoordinatorControl" && fact.target_stream.stream_name == "Command"
+                       fact.target_stream.stream_id
+        else
+                       command_owner_id || process_step.target_command_id
+        end
         event = @event_factory.build!(
           event: fact.event,
           event_id:,
           metadata: MigrationMetadataV1.new(
-            command_id: process_step.target_command_id,
-            actor_kind: attributed_actor&.kind || "system",
-            actor_id: attributed_actor&.id || "history-migration-dispatcher",
+            command_id:,
+            actor_kind: attributed_actor&.kind || source_event.metadata["actor_kind"] || "system",
+            actor_id: attributed_actor&.id || source_event.metadata["actor_id"] || "history-migration-dispatcher",
             actor_authenticated: false,
             recorded_by: "coordinator",
-            policy_version: metadata_extension&.policy_version || PROCESS_RULE_VERSION,
+            policy_version: metadata_extension ? metadata_extension.policy_version : source_event.metadata["policy_version"],
             migration_id:,
             migration_source: source,
             canonical_input_digest: metadata_extension&.canonical_input_digest,
@@ -139,11 +151,11 @@ module Coordinator::Write
             invalidation_digest: metadata_extension&.invalidation_digest,
             waiver_input_digest: metadata_extension&.waiver_input_digest
           ),
-          markers: fact.markers + [
+          markers: (fact.markers + [
             target_event_marker,
             "history-migration:#{migration_id}",
-            "command:#{process_step.target_command_id}"
-          ],
+            "command:#{command_id}"
+          ]).uniq,
           caused_by: trace_parent(causal_parent, target_correlation_id:),
           correlation_id: target_correlation_id
         )

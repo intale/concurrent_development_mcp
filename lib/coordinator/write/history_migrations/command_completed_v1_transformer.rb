@@ -88,6 +88,7 @@ module Coordinator::Write
           markers: [ "command:#{command_id}", @request_marker.call(actor:, request_id:) ],
           step_name: "register-standalone-command",
           metadata_extension: MigrationMetadataExtensionV1.new(
+            attributed_actor: actor,
             canonical_input_digest: source.canonical_input_digest
           )
         )

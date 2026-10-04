@@ -99,7 +99,7 @@ RSpec.describe "history migration command and Task transformations", :event_stor
     expect(task.event.command_input.command_id).to eq(registration.event.command_id)
     expect(task.event.task_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
     expect(task.event.task_id).not_to eq(old_task_id)
-    expect(registration.event.request_id).to eq(submitted_event.global_position)
+    expect(registration.event.request_id).to eq("historical-request:#{submitted_event.global_position}")
     expect(registration.metadata_extension.canonical_input_digest).to eq(
       task.metadata_extension.canonical_input_digest
     )
@@ -606,8 +606,8 @@ RSpec.describe "history migration command and Task transformations", :event_stor
     expect(first_registration.target_stream).to eq(first_terminal.target_stream)
     expect(retry_registration.target_stream).to eq(retry_terminal.target_stream)
     expect(first_registration.target_stream).not_to eq(retry_registration.target_stream)
-    expect(first_registration.event.request_id).to eq(first_submission.global_position)
-    expect(retry_registration.event.request_id).to eq(retry_submission.global_position)
+    expect(first_registration.event.request_id).to eq("historical-request:#{first_submission.global_position}")
+    expect(retry_registration.event.request_id).to eq("historical-request:#{retry_submission.global_position}")
     expect([ first_terminal.event.class, retry_terminal.event.class ]).to eq(
       [
         Coordinator::Write::Events::CommandRejectedV1,
@@ -630,7 +630,7 @@ RSpec.describe "history migration command and Task transformations", :event_stor
 
     registration, terminal = facts
     expect(registration.event).to be_a(Coordinator::Write::Events::CommandRegisteredV1)
-    expect(registration.event.request_id).to eq(source_event.global_position)
+    expect(registration.event.request_id).to eq("historical-request:#{source_event.global_position}")
     expect(terminal.event).to eq(
       Coordinator::Write::Events::CommandSucceededV1.new(command_id: registration.event.command_id)
     )

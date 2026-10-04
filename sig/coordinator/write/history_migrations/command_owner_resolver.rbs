@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class CommandOwnerResolver
+        def initialize: (event_store: EventStore, submission_resolver: LegacyCoordinationTaskSubmissionResolver, stream_identity_allocator: StreamIdentityAllocator) -> void
+        def call: (migration_id: String, source_config_name: String, source_upper_position: Integer, source_event: PgEventstore::Event) -> Dry::Monads::Result
+      end
+    end
+  end
+end

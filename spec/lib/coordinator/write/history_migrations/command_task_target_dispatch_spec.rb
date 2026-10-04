@@ -55,14 +55,14 @@ RSpec.describe "history migration command and Task target dispatch", :event_stor
   end
 
   it "Given a completely planned source pair, when it is applied, then target streams contain cohesive facts and typed provenance" do
-    persist_change_set
+    change_set_event = persist_change_set.sole
     submitted_event = persist(submitted_payload, stream_name: "CoordinationTask", stream_id: old_task_id)
     completion_event = persist(completion_payload, stream_name: "Command", stream_id: old_command_id)
     upper_position = completion_event.global_position
     planner = Coordinator::Container["history_migrations.event_planning_dispatcher"]
     dispatcher = Coordinator::Container["history_migrations.event_dispatcher"]
 
-    [ submitted_event, completion_event ].each do |event|
+    [ change_set_event, submitted_event, completion_event ].each do |event|
       result = planner.call(
         migration_id:,
         source_config_name: "default",
@@ -71,6 +71,11 @@ RSpec.describe "history migration command and Task target dispatch", :event_stor
       )
       expect(result).to be_success, result.failure.to_h.inspect
     end
+
+    creation_write = HistoryMigrationWaveDispatch.call(
+      dispatcher:, migration_id:, source_config_name: "default",
+      source_upper_position: upper_position, source_event: change_set_event
+    ).value!
 
     submitted_write = HistoryMigrationWaveDispatch.call(
       dispatcher:,
@@ -107,6 +112,15 @@ RSpec.describe "history migration command and Task target dispatch", :event_stor
     )
 
     expect(command_events.map(&:type)).to eq(%w[CommandRegistered CommandSucceeded])
+    expect(command_events.first.metadata).to include("actor_kind" => "agent", "actor_id" => "agent-luna-a")
+    expect(command_events.map { _1.metadata.fetch("command_id") }.uniq).to eq([ command_id ])
+    expect(creation_write.events.map { _1.metadata.fetch("command_id") }.uniq).to eq([ command_id ])
+    attributed = target_store.read_command_events(
+      Coordinator::Write::CommandEventReadCriteria.new(
+        command_id:, through_global_position: command_events.last.global_position, maximum_count: 10
+      )
+    )
+    expect(attributed.map(&:id)).to match_array(creation_write.events.map(&:id))
     expect(task_events.map(&:type)).to eq([ "CoordinationTaskSubmitted" ])
     expect(completion_write.events.sole.id).to eq(command_events.last.id)
     expect(command_events.first.metadata.fetch("canonical_input_digest")).to match(

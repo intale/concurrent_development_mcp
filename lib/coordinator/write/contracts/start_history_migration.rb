@@ -16,6 +16,7 @@ module Coordinator::Write
           gteq?: 1,
           lteq?: Types::HISTORY_MIGRATION_PAGE_SIZE_MAXIMUM
         )
+        optional(:source_upper_position).filled(:integer, gteq?: 0)
       end
 
       rule(:command_id) do

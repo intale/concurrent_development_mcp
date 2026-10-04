@@ -51,6 +51,10 @@ module Coordinator::Write
       private
 
       def minimum_wave(event_type, revision)
+        # The coordination view materializes an Attempt on AttemptStarted, not on
+        # its creation fact. Its intentions must follow it in source chronology.
+        return TERMINAL_WAVE if event_type == "ResourceWorkIntentionDeclared"
+
         return TERMINAL_WAVE if TERMINAL_PATTERNS.any? { event_type.include?(_1) }
         return RELATION_WAVE if RELATION_PATTERNS.any? { event_type.include?(_1) }
         return CREATION_WAVE if revision.zero?

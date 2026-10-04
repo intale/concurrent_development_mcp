@@ -387,7 +387,7 @@ module Coordinator::Write
       end
 
       def actor_metadata(source_event, **attributes)
-        attributes[:policy_version] ||= source_event.metadata["policy_version"]
+        attributes[:policy_version] ||= "operation-batch/v2"
         MigrationMetadataExtensionV1.new(
           attributed_actor: Commands::Actor.new(
             kind: source_event.metadata.fetch("actor_kind"),

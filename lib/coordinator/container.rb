@@ -861,6 +861,7 @@ module Coordinator
       Write::HistoryMigrations::TransformerRegistry.new(
         schema_registry: Write::HistoryMigrations::SourceEventSchemaRegistry.new,
         repository_registered_v1: self["history_migrations.repository_registered_v1_transformer"],
+        post_remodel_repository: self["history_migrations.post_remodel_repository_transformer"],
         guidance_message_v1: self["history_migrations.guidance_message_v1_transformer"],
         change_set_v1: self["history_migrations.change_set_v1_transformer"],
         work_item_v1: self["history_migrations.work_item_v1_transformer"],
@@ -926,12 +927,27 @@ module Coordinator
       )
     end
 
+    register("history_migrations.command_owner_resolver", memoize: true) do
+      Write::HistoryMigrations::CommandOwnerResolver.new(
+        event_store: self["event_store"],
+        submission_resolver: self["history_migrations.legacy_coordination_task_submission_resolver"],
+        stream_identity_allocator: self["history_migrations.stream_identity_allocator"]
+      )
+    end
+
     register("history_migrations.fact_planner", memoize: true) do
       Write::HistoryMigrations::FactPlanner.new(
         correlation_allocator: self["history_migrations.correlation_allocator"],
         process_step_planner: self["history_migrations.process_step_planner"],
         source_trace_planner: self["history_migrations.source_trace_planner"],
+        command_owner_resolver: self["history_migrations.command_owner_resolver"],
         event_factory: self["event_factory"]
+      )
+    end
+
+    register("history_migrations.post_remodel_repository_transformer", memoize: true) do
+      Write::HistoryMigrations::PostRemodelRepositoryTransformer.new(
+        event_store: self["event_store"], stream_identity_allocator: self["history_migrations.stream_identity_allocator"]
       )
     end
 
@@ -3916,6 +3932,25 @@ module Coordinator
     register("subscription_sets.task_results", memoize: true) do
       self["subscription_set_factories.task_results"].call(
         manager: self["subscription_managers.task_results"]
+      )
+    end
+
+    register("subscription_set_factories.migration_repositories", memoize: true) do
+      Shared::Subscriptions::SetFactory.new(
+        set_class: Read::Subscriptions::ReadModelSet, set_name: Read::Subscriptions::ReadModelSet::SET_NAME,
+        registrations: [ self["subscriptions.repositories"] ]
+      )
+    end
+
+    register("subscription_set_factories.migration_task_results", memoize: true) do
+      target_store = self["history_migrations.target_event_store"]
+      handler = Read::Projectors::CommandReceiptsV2.new(
+        source_loader: Read::CommandResults::SourceLoader.new(event_store: target_store),
+        assembler: Read::CommandResults::Assembler.new(event_store: target_store)
+      )
+      Shared::Subscriptions::SetFactory.new(
+        set_class: Read::Subscriptions::TaskResultSet, set_name: Read::Subscriptions::TaskResultSet::SET_NAME,
+        registrations: [ Read::Subscriptions::CommandReceipts.new(handler:) ]
       )
     end
 

@@ -62,6 +62,7 @@ RSpec.describe "history migration OperationBatch transformers", :event_store do
       Coordinator::Write::Events::CommandRegisteredV1
     ])
     target_batch_id = creation_facts.first.target_stream.stream_id
+    expect(creation_facts.first.metadata_extension.policy_version).to eq("operation-batch/v2")
     expect(target_batch_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
     expect(target_batch_id).not_to eq(source_batch_id)
     registrations = creation_facts.select do |fact|
@@ -100,7 +101,12 @@ RSpec.describe "history migration OperationBatch transformers", :event_store do
       :items
     )
 
-    source_events.each { expect(dispatch(_1, upper_position:)).to be_success }
+    writes = source_events.map { dispatch(_1, upper_position:) }
+    writes.each { expect(_1).to be_success }
+    writes.flat_map { _1.value!.events }.select { _1.stream.stream_name == "OperationBatch" }.each do |event|
+      validation = HistoryMigrationProjectionContract.call(event, Coordinator::Read::Contracts::OperationBatchSourceEvent.new)
+      expect(validation).to be_success, validation.errors.to_h.inspect
+    end
     source_events.each { expect(dispatch(_1, upper_position:).value!.outcome).to eq("existing") }
 
     batch = Coordinator::Write::OperationBatches::Loader.new(event_store: target_store).call(target_batch_id)

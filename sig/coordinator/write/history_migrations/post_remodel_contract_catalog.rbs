@@ -2,6 +2,7 @@ module Coordinator
   module Write
     module HistoryMigrations
       class PostRemodelContractCatalog
+        REPOSITORY_CONTRACTS: Array[[String, Integer]]
         PLANNING_CONTRACTS: Array[[String, Integer]]
         COMMAND_AND_TASK_CONTRACTS: Array[[String, Integer]]
         DEVELOPMENT_MEMORY_CONTRACTS: Array[[String, Integer]]

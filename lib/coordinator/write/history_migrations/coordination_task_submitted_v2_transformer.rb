@@ -85,11 +85,12 @@ module Coordinator::Write
       def facts(source, source_event:, command:, task:, migrated_input:)
         command_id = command.target_stream.stream_id
         task_id = task.target_stream.stream_id
-        request_id = source_event.global_position
+        request_id = "historical-request:#{source_event.global_position}"
         actor = actor_from(migrated_input.document)
         tool_name = migrated_input.document.tool_name
         request_marker = @request_marker.call(actor:, request_id:)
         metadata_extension = MigrationMetadataExtensionV1.new(
+          attributed_actor: actor,
           canonical_input_digest: migrated_input.canonical_input_digest
         )
 

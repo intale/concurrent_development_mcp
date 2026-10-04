@@ -8,6 +8,7 @@ module Coordinator::Write
       def initialize(
         schema_registry: SourceEventSchemaRegistry.new,
         repository_registered_v1:,
+        post_remodel_repository:,
         guidance_message_v1:,
         change_set_v1:,
         work_item_v1:,
@@ -49,6 +50,12 @@ module Coordinator::Write
         @schema_registry = schema_registry
         @definitions = {
           [ "RepositoryRegistered", 1 ] => repository_registered_v1,
+          [ "RepositoryRegistered", 2 ] => post_remodel_repository,
+          [ "RepositoryDisplayNameChanged", 1 ] => post_remodel_repository,
+          [ "RepositoryPathAdded", 1 ] => post_remodel_repository,
+          [ "RepositoryPathRemoved", 1 ] => post_remodel_repository,
+          [ "RepositoryRemoteAdded", 1 ] => post_remodel_repository,
+          [ "RepositoryRemoteRemoved", 1 ] => post_remodel_repository,
           [ "UserUtteranceRecorded", 1 ] => guidance_message_v1,
           [ "UserUtteranceForwardedByAgent", 1 ] => guidance_message_v1,
           [ "ChangeSetCreated", 1 ] => change_set_v1,

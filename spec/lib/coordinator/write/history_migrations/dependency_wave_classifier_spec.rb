@@ -20,4 +20,9 @@ RSpec.describe Coordinator::Write::HistoryMigrations::DependencyWaveClassifier d
       )
     ).to eq(3)
   end
+
+  it "keeps intentions with execution facts so their Attempt is already projected" do
+    expect(classifier.call(target_event_type: "ResourceWorkIntentionDeclared", target_revision: 0)).to eq(3)
+    expect(classifier.call(target_event_type: "AttemptStarted", target_revision: 4)).to eq(3)
+  end
 end

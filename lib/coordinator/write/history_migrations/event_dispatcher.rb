@@ -45,6 +45,7 @@ module Coordinator::Write
         plan = @fact_planner.call(
           migration_id:,
           source_config_name:,
+          source_upper_position:,
           source_event:,
           transformed_facts: selected_facts,
           target_plans: plans.value!

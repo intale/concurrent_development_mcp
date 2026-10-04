@@ -28,7 +28,20 @@ module LiveSubscriptions
     start_subscription_set(:task_results, "subscription_set_factories.task_results")
   end
 
+  def start_history_replay_subscriptions
+    start_subscription_set(
+      :history_replay_repositories, "subscription_set_factories.migration_repositories",
+      manager: PgEventstore.subscriptions_manager(:migration_target, subscription_set: Coordinator::Read::Subscriptions::ReadModelSet::SET_NAME)
+    )
+    start_subscription_set(
+      :history_replay_receipts, "subscription_set_factories.migration_task_results",
+      manager: PgEventstore.subscriptions_manager(:migration_target, subscription_set: Coordinator::Read::Subscriptions::TaskResultSet::SET_NAME)
+    )
+  end
+
   def stop_live_subscriptions
+    stop_subscription_set(:history_replay_repositories)
+    stop_subscription_set(:history_replay_receipts)
     stop_read_model_subscriptions
     stop_task_result_subscriptions
     stop_process_subscriptions
@@ -103,11 +116,11 @@ module LiveSubscriptions
     @live_subscription_sets&.key?(key) || false
   end
 
-  def start_subscription_set(key, factory_key)
+  def start_subscription_set(key, factory_key, manager: nil)
     @live_subscription_sets ||= {}
     return @live_subscription_sets.fetch(key) if @live_subscription_sets.key?(key)
 
-    subscription_set = Coordinator::Container[factory_key].call
+    subscription_set = Coordinator::Container[factory_key].call(manager:)
     subscription_set.start
     @live_subscription_sets[key] = subscription_set
   rescue StandardError

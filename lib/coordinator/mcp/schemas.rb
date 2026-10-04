@@ -200,6 +200,10 @@ module Coordinator
       def history_migration_start
         object_schema(
           properties: common_mutation_properties.merge(
+            source_upper_position: {
+              type: "integer", minimum: 0,
+              description: "Optional previously verified frozen global upper position for a clean-target rebuild. Must not exceed the current source head. Omit to freeze the current head. Migration-maintenance events after this boundary are not imported."
+            },
             page_size: {
               type: "integer",
               minimum: 1,

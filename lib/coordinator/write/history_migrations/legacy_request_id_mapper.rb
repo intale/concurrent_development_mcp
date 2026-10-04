@@ -6,7 +6,7 @@ module Coordinator::Write
       def call(command_id:, source_position:)
         return command_id if Types::PublicCommandId.valid?(command_id)
 
-        source_position
+        "historical-request:#{source_position}"
       end
     end
   end

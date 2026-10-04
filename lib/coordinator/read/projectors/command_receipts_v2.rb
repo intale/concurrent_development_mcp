@@ -18,7 +18,10 @@ module Coordinator::Read
       end
 
       def call(event)
-        result = @assembler.call(@source_loader.call(event))
+        source = @source_loader.call(event)
+        return unless source
+
+        result = @assembler.call(source)
         identity = ProjectionEventIdentity.from_event(event)
 
         ApplicationRecord.transaction do

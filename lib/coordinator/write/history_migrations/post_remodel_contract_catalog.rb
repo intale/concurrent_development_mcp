@@ -3,6 +3,14 @@
 module Coordinator::Write
   module HistoryMigrations
     class PostRemodelContractCatalog
+      REPOSITORY_CONTRACTS = %w[
+        RepositoryRegistered@2 RepositoryDisplayNameChanged@1 RepositoryPathAdded@1
+        RepositoryPathRemoved@1 RepositoryRemoteAdded@1 RepositoryRemoteRemoved@1
+      ].map do |contract|
+        type, version = contract.split("@", 2)
+        [ type.freeze, Integer(version) ].freeze
+      end.freeze
+
       PLANNING_CONTRACTS = %w[
         AttemptAbandoned@3 AttemptAssignedToAgent@1 AttemptAssignedToWorkItem@1 AttemptAuthorized@2
         AttemptBaseSnapshotRecorded@1 AttemptCompleted@2 AttemptStarted@2 CandidateAssignedToAttempt@1
@@ -45,6 +53,7 @@ module Coordinator::Write
       end.freeze
 
       SOURCE_CONTRACTS = [
+        *REPOSITORY_CONTRACTS,
         *PLANNING_CONTRACTS,
         *COMMAND_AND_TASK_CONTRACTS,
         *DEVELOPMENT_MEMORY_CONTRACTS,
