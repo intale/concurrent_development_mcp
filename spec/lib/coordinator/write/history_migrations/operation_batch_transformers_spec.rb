@@ -103,6 +103,9 @@ RSpec.describe "history migration OperationBatch transformers", :event_store do
 
     writes = source_events.map { dispatch(_1, upper_position:) }
     writes.each { expect(_1).to be_success }
+    writes.flat_map { _1.value!.events }.each do |event|
+      expect(event.markers.grep(/\Acommand:/)).to eq([ "command:#{event.metadata.fetch('command_id')}" ])
+    end
     writes.flat_map { _1.value!.events }.select { _1.stream.stream_name == "OperationBatch" }.each do |event|
       validation = HistoryMigrationProjectionContract.call(event, Coordinator::Read::Contracts::OperationBatchSourceEvent.new)
       expect(validation).to be_success, validation.errors.to_h.inspect
@@ -118,6 +121,12 @@ RSpec.describe "history migration OperationBatch transformers", :event_store do
     )
     expect(batch.state.items.map(&:request_id)).to eq(%w[legacy-item-0 legacy-item-1])
     terminal_events = target_command_terminals(batch.state.items)
+    terminal_events.each do |terminal|
+      source = Coordinator::Read::CommandResults::SourceLoader.new(event_store: target_store).call(terminal)
+      expect(source).not_to be_nil
+      expect(source.persisted_events.map(&:type)).not_to include("OperationBatchItemEnqueued")
+      expect(source.persisted_events.map { _1.metadata.fetch("command_id") }).to all(eq(terminal.stream.stream_id))
+    end
     expect(batch.state.completion_links.map(&:completion)).to contain_exactly(
       *terminal_events.map { event_reference(_1) }
     )

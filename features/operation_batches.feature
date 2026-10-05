@@ -27,6 +27,7 @@ Feature: Bounded command batches for checkpointed agent imports
       Then the available Batch remains running with no observed item outcome
       When the Batch decision boundary is released and terminal facts reach the read side
       Then the available Batch completes with one success and one rejection
+      And both child command results are independently available through MCP
 
   Rule: Cooperative cancellation preserves committed item outcomes
 

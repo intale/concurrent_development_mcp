@@ -172,7 +172,6 @@ module Coordinator::Write
               input: item.submitted_input
             ),
             markers: context.item_markers(item.index) + [
-              "command:#{item.command_id}",
               "tool:#{source.target_tool}"
             ],
             step_name: "enqueue-operation-batch-item-#{suffix}",
@@ -343,7 +342,7 @@ module Coordinator::Write
           batch_fact(
             context:,
             event: outcome,
-            markers: context.item_markers(item.index) + [ "command:#{item.command_id}" ],
+            markers: context.item_markers(item.index),
             step_name: outcome_step,
             metadata_extension:
           ),
@@ -356,7 +355,6 @@ module Coordinator::Write
               completion:
             ),
             markers: context.item_markers(item.index) + [
-              "command:#{item.command_id}",
               "command-completion-event:#{completion.event_id}"
             ],
             step_name: "link-operation-batch-item-completion",

@@ -98,6 +98,26 @@ Then("the available Batch completes with one success and one rejection") do
   assert_acceptance_equal(0, view.fetch("not_run"), "Terminal unprocessed count")
 end
 
+Then("both child command results are independently available through MCP") do
+  items = operation_batch_manifest.fetch(:items)
+  items.each do |item|
+    request_id = item.fetch("arguments").fetch("command_id")
+    result = eventually("child command #{request_id} receipt") do
+      result = call_tool("operation_get", { command_id: request_id }).dig("result", "structuredContent")
+      [ result && result.fetch("status") != "not_found", result ]
+    end
+    assert_acceptance_equal(request_id, result.fetch("command_id"), "Child receipt identity")
+    if item.fetch("status") == "succeeded"
+      assert_acceptance_equal("ok", result.fetch("status"), "Child success receipt")
+      types = result.dig("data", "emitted_events").map { _1.fetch("type") }
+      assert_acceptance(types.include?("SkillRevisionPublished"), "Child receipt must include its Skill publication")
+      assert_acceptance(types.none? { _1.start_with?("OperationBatch") }, "Parent batch facts must not be child output")
+    else
+      assert_acceptance_equal("skill_revision_conflict", result.dig("data", "code"), "Child conflict receipt")
+    end
+  end
+end
+
 When("the first Batch process page completes") do
   await_contention_evidence
 end

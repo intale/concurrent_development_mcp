@@ -25,6 +25,29 @@ RSpec.describe "history migration Candidate transformers", :event_store do
 
   before { persist_scope_roots }
 
+  it "rejects a Candidate reference to an absent or future work-intention reservation" do
+    source = candidate_payload.new(lease_set_id: SecureRandom.uuid_v7)
+    submitted = persist_payload(candidate_stream, source)
+    upper_position = submitted.global_position
+    missing = transform(submitted, upper_position:)
+    expect(missing).to be_failure
+    expect(missing.failure.message).to include("reservation is absent or inconsistent")
+
+    HistoryMigrationCandidateFixture.persist_reservation(event_store: source_store, candidate: source)
+    future = transform(submitted, upper_position:)
+    expect(future).to be_failure
+    expect(future.failure.code).to eq(:ambiguous_source_reference)
+  end
+
+  it "rejects a reservation whose scope disagrees with the Candidate" do
+    source = candidate_payload.new(lease_set_id: SecureRandom.uuid_v7)
+    HistoryMigrationCandidateFixture.persist_reservation(event_store: source_store, candidate: source.new(repository_id: SecureRandom.uuid_v7))
+    submitted = persist_payload(candidate_stream, source)
+    result = transform(submitted, upper_position: submitted.global_position)
+    expect(result).to be_failure
+    expect(result.failure.message).to include("reservation is absent or inconsistent")
+  end
+
   it "splits a legacy submission, coalesces its duplicate Attempt attachment, and rebinds WorkItem selection" do
     submitted = persist_payload(candidate_stream, candidate_payload)
     expect(plan(submitted, upper_position: submitted.global_position)).to be_success
@@ -47,7 +70,19 @@ RSpec.describe "history migration Candidate transformers", :event_store do
     expect(facts.fetch(1).event.to_h.values_at(:attempt_id, :work_item_id, :change_set_id)).to all(
       match(Coordinator::Shared::Types::UUID_V7_PATTERN)
     )
-    expect(facts.fetch(6).event.intention_set_id).to eq(intention_set_id)
+    reservation = source_store.read_marked(
+      stream("DevelopmentExecution", "Attempt", legacy_attempt_id),
+      Coordinator::Write::MarkedEventReadCriteria.new(event_type: "WriteSetReserved", marker: "lease-set:#{intention_set_id}", maximum_count: 1, direction: :asc)
+    ).sole
+    allocation = Coordinator::Container["history_migrations.stream_identity_allocator"].call(
+      migration_id:, source_config_name: "default", source_event: reservation,
+      target_stream_context: "DevelopmentCoordination", target_stream_name: "WorkIntentionSet",
+      identity_role: "work-intention-set:#{intention_set_id}"
+    ).value!.target_stream.stream_id
+    expect(facts.fetch(6).event.intention_set_id).to eq(allocation)
+    expect(allocation).not_to eq(intention_set_id)
+    expect(facts.flat_map(&:markers)).to include("work-intention-set:#{allocation}")
+    expect(facts.flat_map(&:markers)).not_to include("work-intention-set:#{intention_set_id}")
     expect(facts.fetch(6).metadata_extension.policy_version).to eq(
       Coordinator::Write::LeaseResourceV2::POLICY_VERSION
     )
@@ -255,6 +290,7 @@ RSpec.describe "history migration Candidate transformers", :event_store do
     persist_raw(stream("DevelopmentPlanning", "ChangeSet", legacy_change_set_id), type: "ChangeSetCreated")
     persist_raw(stream("DevelopmentExecution", "WorkItem", legacy_work_item_id), type: "WorkItemCreated")
     persist_raw(stream("DevelopmentExecution", "Attempt", legacy_attempt_id), type: "AttemptAuthorized")
+    HistoryMigrationCandidateFixture.persist_reservation(event_store: source_store, candidate: candidate_payload)
   end
 
   def candidate_payload

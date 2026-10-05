@@ -249,7 +249,9 @@ RSpec.describe "history migration Candidate impact scan transformer", :event_sto
 
   def persist_candidate_evidence
     candidate_stream = stream("DevelopmentIntegration", "Candidate", legacy_candidate_id)
-    submitted = persist_payload(candidate_stream, candidate_payload)
+    source_candidate = candidate_payload
+    HistoryMigrationCandidateFixture.persist_reservation(event_store: source_store, candidate: source_candidate)
+    submitted = persist_payload(candidate_stream, source_candidate)
     manifest = persist_payload(candidate_stream, manifest_payload)
     surface = persist_payload(candidate_stream, surface_payload)
     registration = persist_payload(

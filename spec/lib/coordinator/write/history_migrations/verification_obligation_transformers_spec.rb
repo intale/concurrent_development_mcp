@@ -359,6 +359,7 @@ RSpec.describe "history migration verification-obligation transformers", :event_
   def persist_candidate(role, produces: [], consumes: [])
     candidate_stream = stream("DevelopmentIntegration", "Candidate", candidate_id(role))
     submitted_payload = candidate_payload(role)
+    HistoryMigrationCandidateFixture.persist_reservation(event_store: source_store, candidate: submitted_payload)
     submitted = persist_payload(candidate_stream, submitted_payload)
     manifest_payload = candidate_manifest_payload(role)
     manifest = persist_payload(candidate_stream, manifest_payload)

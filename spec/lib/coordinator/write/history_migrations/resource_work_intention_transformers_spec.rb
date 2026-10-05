@@ -35,6 +35,31 @@ RSpec.describe "history migration Resource and WorkIntention transformers", :eve
     resources.each { persist_resource_identity(_1) }
   end
 
+  it "binds a legacy Candidate to the same allocated set as the migrated reservation" do
+    lifecycle = persist_write_set_lifecycle
+    candidate = Coordinator::Write::Events::CandidateSubmittedV2.new(
+      candidate_id: "legacy-intention-candidate", change_set_id:, work_item_id:, attempt_id:,
+      agent_id: actor.id, repository_id:, target_branch: "main", object_format: "sha1",
+      base_commit_oid:, head_commit_oid: "5" * 40, checkpoint_kind: "intermediate",
+      lease_set_id:, lease_policy_version: Coordinator::Write::LeaseResourceV2::POLICY_VERSION,
+      lease_references: lifecycle.fetch(:acquisitions).map { reference_for(load_source(_1)) },
+      manifest_digest: "sha256:#{'a' * 64}", build_context_digest: nil,
+      evidence_status: "attributed_unverified", submitted_at: timestamp(20)
+    )
+    source = source_store.append(
+      stream("DevelopmentIntegration", "Candidate", candidate.candidate_id),
+      [ PgEventstore::Event.new(id: SecureRandom.uuid_v7, type: "CandidateSubmitted", data: candidate.to_h, metadata: { "schema_version" => 2 }) ]
+    ).sole
+    upper_position = source.global_position
+    set = transform(lifecycle.fetch(:reservation), upper_position:).value!.first
+    assignment = transform(source, upper_position:).value!.find { _1.event.is_a?(Coordinator::Write::Events::CandidateWorkIntentionSetAssignedV1) }
+
+    expect(assignment.event.intention_set_id).to eq(set.event.set_id)
+    expect(assignment.event.intention_set_id).to eq(set.target_stream.stream_id)
+    expect(assignment.markers).to include("work-intention-set:#{set.event.set_id}")
+    expect(assignment.event.intention_set_id).not_to eq(lease_set_id)
+  end
+
   it "migrates Resource identity facts to a UUIDv7 stream without occurrence timestamps" do
     resource = resources.first
     identity_events = resource_identity_events(resource)

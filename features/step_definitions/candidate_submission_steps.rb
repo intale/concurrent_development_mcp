@@ -131,6 +131,13 @@ Then(
   page = candidate_page(@candidate_coordination.dig(:ids, :attempt_id))
   context = candidate_context(@candidate_coordination.dig(:ids, :attempt_id))
   checkpoint = context.dig("data", "context", "candidate_checkpoints").sole
+  attempt = context.dig("data", "context", "attempts").find { _1.fetch("attempt_id") == candidate.fetch("attempt_id") }
+  assert_acceptance(attempt, "Candidate must reference its available Attempt")
+  assert_acceptance_equal(
+    attempt.fetch("work_intention_set").fetch("intention_set_id"),
+    candidate.fetch("lease_set_id"),
+    "Candidate and Attempt work-intention set identity"
+  )
 
   assert_acceptance_equal("ok", payload.fetch("status"), "Available Candidate status")
   assert_acceptance_equal([], payload.fetch("warnings"), "Available Candidate warnings")

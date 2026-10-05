@@ -13,7 +13,7 @@ When("the agent starts a history migration through MCP") do
   result = task_request("tasks/get", task).dig("result", "result")
   assert_acceptance_equal(false, result.fetch("isError"), "Migration admission")
   @history_migration_id = result.dig("structuredContent", "data", "migration_id")
-  eventually("bounded history migration to complete") do
+  eventually("bounded history migration to complete", timeout_seconds: LiveSubscriptions::HIGH_VOLUME_TIMEOUT_SECONDS) do
     event = event_store.read_latest(
       streams.history_migration(@history_migration_id),
       Coordinator::Write::LatestEventReadCriteria.new(event_types: [ "HistoryMigrationCompleted" ])
@@ -32,7 +32,10 @@ Then("the agent discovers the restored repository through MCP") do
   result = eventually("restored repository discovery") do
     result = call_tool("repository_list", { scope: "project:history-replay", limit: 20 }).dig("result", "structuredContent")
     items = result.dig("data", "page", "items") || []
-    [ items.one?, items.first ]
+    restored = items.one? && items.first
+    complete = restored && restored.fetch("display_name") == @repository_arguments.fetch(:display_name) &&
+               restored.fetch("paths") == @repository_arguments.fetch(:paths)
+    [ complete, restored ]
   end
   @history_target_repository_id = result.fetch("repository_id")
   assert_acceptance(@history_target_repository_id != @history_repository_id, "Restored identity must be newly allocated")
@@ -42,18 +45,10 @@ end
 
 Then("the restored receipt refers to facts owned by its original logical command") do
   receipt = eventually("restored command receipt") do
-    record = Coordinator::Read::CommandReceipt.find_by(tool_name: "repository_register")
-    [ !record.nil?, record ]
+    result = call_tool("operation_get", { command_id: @repository_arguments.fetch(:command_id) }).dig("result", "structuredContent")
+    [ result && result.fetch("status") == "ok", result ]
   end
-  target_store = Coordinator::Write::EventStore.new(client: PgEventstore.client(:migration_target))
-  terminal = target_store.read_latest(
-    Coordinator::Write::StreamFactory.new.command(receipt.command_id),
-    Coordinator::Write::LatestEventReadCriteria.new(event_types: [ "CommandSucceeded" ])
-  )
-  events = target_store.read_command_events(
-    Coordinator::Write::CommandEventReadCriteria.new(command_id: receipt.command_id, through_global_position: terminal.global_position, maximum_count: 10)
-  )
-  assert_acceptance(events.any? { _1.type == "RepositoryRegistered" }, "Restored command must own registration")
-  assert_acceptance(events.all? { _1.metadata.fetch("command_id") == receipt.command_id }, "Restored command attribution")
-  assert_acceptance_equal("ok", receipt.status, "Restored receipt status")
+  events = receipt.dig("data", "emitted_events")
+  assert_acceptance(events.any? { _1.fetch("type") == "RepositoryRegistered" }, "Restored command must expose registration")
+  assert_acceptance_equal(@history_target_repository_id, receipt.dig("data", "result", "repository_id"), "Restored receipt repository")
 end

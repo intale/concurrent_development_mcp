@@ -109,7 +109,7 @@ module Coordinator::Write
             context,
             Events::CandidateWorkIntentionSetAssignedV1.new(
               candidate_id: context.candidate_id,
-              intention_set_id: source.lease_set_id
+              intention_set_id: context.intention_set_id
             ),
             "assign-candidate-work-intention-set",
             intention_extension

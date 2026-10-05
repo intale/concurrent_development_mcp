@@ -198,7 +198,9 @@ RSpec.describe "history migration ReleaseSet transformers", :event_store do
 
   def build_member(index)
     repository_id = repository_id(index)
-    candidate = persist_payload(candidate_stream(index), candidate_payload(index))
+    source_candidate = candidate_payload(index)
+    HistoryMigrationCandidateFixture.persist_reservation(event_store: source_store, candidate: source_candidate)
+    candidate = persist_payload(candidate_stream(index), source_candidate)
     manifest = persist_payload(candidate_stream(index), manifest_payload(index))
     registration = persist_payload(
       snapshot_stream(index),

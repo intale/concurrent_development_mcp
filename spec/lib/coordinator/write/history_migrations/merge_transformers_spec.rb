@@ -33,7 +33,9 @@ RSpec.describe "history migration merge transformers", :event_store do
   before { persist_scope_roots }
 
   it "maps the complete legacy merge chronology into cohesive UUIDv7 target facts" do
-    submitted = persist_payload(candidate_stream, candidate_payload)
+    source_candidate = candidate_payload
+    HistoryMigrationCandidateFixture.persist_reservation(event_store: source_store, candidate: source_candidate)
+    submitted = persist_payload(candidate_stream, source_candidate)
     manifest = persist_payload(candidate_stream, manifest_payload)
     registration = persist_payload(
       snapshot_stream,
@@ -198,7 +200,9 @@ RSpec.describe "history migration merge transformers", :event_store do
   end
 
   it "fails closed when a verification points at a different snapshot registration" do
-    submitted = persist_payload(candidate_stream, candidate_payload)
+    source_candidate = candidate_payload
+    HistoryMigrationCandidateFixture.persist_reservation(event_store: source_store, candidate: source_candidate)
+    submitted = persist_payload(candidate_stream, source_candidate)
     manifest = persist_payload(candidate_stream, manifest_payload)
     registration = persist_payload(
       snapshot_stream,

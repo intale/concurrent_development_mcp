@@ -207,6 +207,11 @@ module Coordinator::Write
         )
         return repository if repository.failure?
 
+        intention_set = resolve_intention_set(
+          migration_id:, source_config_name:, source_upper_position:, source_event:, source_candidate:
+        )
+        return intention_set if intention_set.failure?
+
         Success(
           CandidateContextV1.new(
             source_candidate:,
@@ -217,8 +222,36 @@ module Coordinator::Write
             change_set_id: change_set.value!.target_stream.stream_id,
             work_item_id: work_item.value!.target_stream.stream_id,
             attempt_id: attempt.value!.target_stream.stream_id,
-            repository_id: repository.value!.target_stream.stream_id
+            repository_id: repository.value!.target_stream.stream_id,
+            intention_set_id: intention_set.value!.target_stream.stream_id
           )
+        )
+      end
+
+      def resolve_intention_set(migration_id:, source_config_name:, source_upper_position:, source_event:, source_candidate:)
+        reservation = @event_store.read_marked(
+          StreamReference.new(context: "DevelopmentExecution", stream_name: "Attempt", stream_id: source_candidate.attempt_id),
+          MarkedEventReadCriteria.new(
+            event_type: "WriteSetReserved", marker: "lease-set:#{source_candidate.lease_set_id}",
+            maximum_count: 1, direction: :asc
+          )
+        ).first
+        payload = reservation && load_payload(reservation)
+        valid = reservation && reservation.global_position <= source_upper_position &&
+                payload.is_a?(Events::WriteSetReservedV2) &&
+                payload.lease_set_id == source_candidate.lease_set_id &&
+                payload.attempt_id == source_candidate.attempt_id &&
+                payload.work_item_id == source_candidate.work_item_id &&
+                payload.change_set_id == source_candidate.change_set_id &&
+                payload.repository_id == source_candidate.repository_id
+        unless valid
+          return Failure(inconsistent(source_event, "Candidate work-intention reservation is absent or inconsistent in the frozen source range"))
+        end
+
+        @stream_identity_allocator.call(
+          migration_id:, source_config_name:, source_event: reservation,
+          target_stream_context: "DevelopmentCoordination", target_stream_name: "WorkIntentionSet",
+          identity_role: "work-intention-set:#{source_candidate.lease_set_id}"
         )
       end
 
