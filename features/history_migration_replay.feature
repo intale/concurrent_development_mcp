@@ -10,3 +10,4 @@ Feature: Migrated history remains usable through the public read side
     And the migrated repository and command receipts are replayed
     Then the agent discovers the restored repository through MCP
     And the restored receipt refers to facts owned by its original logical command
+    And the migration does not copy its own maintenance facts into restored history

@@ -82,6 +82,13 @@ module Coordinator::Processes
         if events.empty?
           raise HistoryMigrationProcessRejected, "HistoryMigration source page unexpectedly resolved no events"
         end
+        # The final page covers an excluded tail too, so all existing wave cursors
+        # can reach the original frozen upper bound without creating an empty page.
+        to_position = if events.last.global_position == @source_reader.head_position(to_position: migration.source_upper_position)
+          migration.source_upper_position
+        else
+          events.last.global_position
+        end
 
         process_step = plan(
           source_event: source.event,
@@ -98,7 +105,7 @@ module Coordinator::Processes
               migration_id: migration.migration_id,
               page_id: process_step.target_entity_id!,
               from_position: migration.next_from_position,
-              to_position: events.last.global_position,
+              to_position:,
               source_event_count: events.length
             ),
             caused_by: process_step.event

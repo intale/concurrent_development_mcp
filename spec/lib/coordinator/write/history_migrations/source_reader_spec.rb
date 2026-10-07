@@ -16,8 +16,8 @@ RSpec.describe Coordinator::Write::HistoryMigrations::SourceReader, :event_store
     first, second = event_store.append(
       stream,
       [
-        PgEventstore::Event.new(id: SecureRandom.uuid_v7, type: "MigrationSourceProbe", data: { "number" => 1 }),
-        PgEventstore::Event.new(id: SecureRandom.uuid_v7, type: "MigrationSourceProbe", data: { "number" => 2 })
+        PgEventstore::Event.new(id: SecureRandom.uuid_v7, type: "RepositoryRegistered", data: { "number" => 1 }),
+        PgEventstore::Event.new(id: SecureRandom.uuid_v7, type: "RepositoryRegistered", data: { "number" => 2 })
       ]
     )
 
@@ -30,6 +30,7 @@ RSpec.describe Coordinator::Write::HistoryMigrations::SourceReader, :event_store
     )
 
     expect(reader.head_position).to eq(second.global_position)
+    expect(reader.head_position(to_position: first.global_position)).to eq(first.global_position)
     expect(page.map(&:id)).to eq([ first.id ])
     expect(
       reader.page(
@@ -40,5 +41,29 @@ RSpec.describe Coordinator::Write::HistoryMigrations::SourceReader, :event_store
         )
       )
     ).to be_empty
+  end
+
+  it "excludes maintenance and unknown event types in the database query, before paging or freezing the head" do
+    first, maintenance, second, excluded_tail = event_store.append(stream, [
+      PgEventstore::Event.new(type: "RepositoryRegistered", data: {}),
+      PgEventstore::Event.new(type: "HistoryMigrationStarted", data: {}),
+      PgEventstore::Event.new(type: "RepositoryDisplayNameChanged", data: {}),
+      PgEventstore::Event.new(type: "MigrationSourceProbe", data: {})
+    ])
+
+    page = reader.page(Coordinator::Write::HistoryMigrations::SourcePageCriteriaV1.new(
+      from_position: first.global_position, to_position: excluded_tail.global_position, page_size: 2
+    ))
+    expect(page.map(&:id)).to eq([ first.id, second.id ])
+    expect(reader.head_position).to eq(second.global_position)
+    expect(reader.page(Coordinator::Write::HistoryMigrations::SourcePageCriteriaV1.new(
+      from_position: maintenance.global_position, to_position: excluded_tail.global_position, page_size: 1
+    )).map(&:id)).to eq([ second.id ])
+  end
+
+  it "keeps the fixed allowlist aligned with all explicitly supported source contracts" do
+    expected = Coordinator::Write::HistoryMigrations::SourceEventSchemaRegistry::DEFINITIONS.keys.map(&:first).uniq
+    expect(described_class::EVENT_TYPES).to match_array(expected)
+    expect(described_class::EVENT_TYPES.grep(/\AHistoryMigration/)).to be_empty
   end
 end

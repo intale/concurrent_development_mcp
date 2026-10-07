@@ -164,6 +164,37 @@ RSpec.describe "history migration OperationBatch transformers", :event_store do
     )
   end
 
+  it "resolves only the requested item while keeping its UUID and input aligned with full creation" do
+    events = persist_completed_batch
+    resolver = Coordinator::Container["history_migrations.operation_batch_context_resolver"]
+    common = { migration_id:, source_config_name: "default", source_upper_position: events.last.global_position }
+
+    selected = resolver.from_stream(**common, source_event: events.fetch(2), item_indexes: [ 0 ]).value!
+    lifecycle = resolver.from_stream(**common, source_event: events.last, item_indexes: []).value!
+    complete = resolver.from_creation(**common, source_event: events.first,
+      source_creation: legacy_creation).value!
+
+    expect(selected.items.map(&:index)).to eq([ 0 ])
+    expect(selected.items.sole).to eq(complete.item(0))
+    expect(lifecycle.items).to be_empty
+    expect(lifecycle.batch_id).to eq(complete.batch_id)
+  end
+
+  it "still verifies the exact completion revision after loading completion evidence in one bounded query" do
+    persist_source_skills(source_items)
+    creation = persist_batch(legacy_creation, actor:)
+    completion = legacy_command_completion(creation)
+    completion_event = persist_command(completion)
+    outcome = success_outcome(completion, completion_event:)
+    forged = outcome.new(target_completion: outcome.target_completion.new(stream_revision: 1))
+    event = persist_batch(forged, actor: system_actor, index: 0, caused_by: completion_event)
+
+    result = transform(event, upper_position: event.global_position)
+
+    expect(result).to be_failure
+    expect(result.failure.message).to include("target completion reference is not exact")
+  end
+
   it "maps continuation only after the complete preceding page was recorded" do
     items = build_source_items(51)
     persist_source_skills(items)

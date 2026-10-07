@@ -25,7 +25,8 @@ module Coordinator
           migration_id: String,
           source_config_name: String,
           source_upper_position: Integer?,
-          source_event: PgEventstore::Event
+          source_event: PgEventstore::Event,
+          ?item_indexes: Array[Integer]?
         ) -> Dry::Monads::Result
 
         def from_identity: (

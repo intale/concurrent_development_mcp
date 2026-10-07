@@ -42,7 +42,7 @@ module Coordinator::Write
         )
       end
 
-      def from_stream(migration_id:, source_config_name:, source_upper_position:, source_event:)
+      def from_stream(migration_id:, source_config_name:, source_upper_position:, source_event:, item_indexes: nil)
         creation_event = @event_store.read_at(stream_for(source_event), 0)
         unless creation_event && within_frozen_range?(creation_event, source_upper_position)
           return Failure(inconsistent(source_event, "OperationBatch creation is absent from the frozen source range"))
@@ -59,7 +59,8 @@ module Coordinator::Write
           source_upper_position:,
           source_event:,
           source_creation_event: creation_event,
-          source_creation:
+          source_creation:,
+          item_indexes:
         )
       rescue KeyError, ArgumentError, TypeError, Dry::Struct::Error => error
         Failure(inconsistent(source_event, error.message))
@@ -112,6 +113,7 @@ module Coordinator::Write
         source_event:,
         source_creation_event:,
         source_creation:,
+        item_indexes: nil,
         membership_event: source_event
       )
         history = source_history(
@@ -142,7 +144,8 @@ module Coordinator::Write
           source_creation_event:,
           source_creation:,
           target_batch_id: target_stream.stream_id,
-          entries: history.value!
+          entries: history.value!,
+          item_indexes:
         )
         return items if items.failure?
 
@@ -176,18 +179,38 @@ module Coordinator::Write
         end
 
         entries = events.map { [ _1, load(_1) ].freeze }.freeze
+        completions = completion_events(entries, source_upper_position:)
         validation = validate_history(
           source_event:,
           source_creation_event:,
           source_creation:,
-          entries:
+          entries:,
+          completions:
         )
         validation.failure? ? validation : Success(entries)
       rescue EventHistoryLimitExceeded, KeyError, ArgumentError, TypeError, Dry::Struct::Error => error
         Failure(inconsistent(source_event, error.message))
       end
 
-      def validate_history(source_event:, source_creation_event:, source_creation:, entries:)
+      def completion_events(entries, source_upper_position:)
+        references = entries.filter_map do |_event, payload|
+          payload.target_completion if payload.is_a?(LegacyEvents::OperationBatchItemSucceededV1)
+        end
+        return {} if references.empty?
+
+        @event_store.read_global_marked(GlobalMarkedEventReadCriteria.new(
+          stream_context: "CoordinatorControl",
+          stream_name: "Command",
+          event_types: [ "CommandCompleted" ],
+          markers: references.map { "command:#{_1.stream_id}" }.uniq,
+          maximum_count: Types::OPERATION_BATCH_MAXIMUM_HISTORY_EVENTS,
+          from_position: 0,
+          to_position: source_upper_position || entries.last.first.global_position,
+          direction: :asc
+        )).to_h { [ _1.id, _1 ] }
+      end
+
+      def validate_history(source_event:, source_creation_event:, source_creation:, entries:, completions:)
         unless valid_creation?(source_creation_event, source_creation, entries:)
           return Failure(inconsistent(source_event, "OperationBatch creation identity or manifest is inconsistent"))
         end
@@ -212,7 +235,8 @@ module Coordinator::Write
               source_creation:,
               event:,
               payload:,
-              outcomes:
+              outcomes:,
+              completions:
             )
           when LegacyEvents::OperationBatchContinuationRequestedV1
             continuations << [ event, payload ].freeze
@@ -303,7 +327,7 @@ module Coordinator::Write
           payload.batch_id == source_creation.batch_id
       end
 
-      def validate_outcome(source_event:, source_creation:, event:, payload:, outcomes:)
+      def validate_outcome(source_event:, source_creation:, event:, payload:, outcomes:, completions:)
         item = source_creation.items.find { _1.index == payload.index }
         document = item && command_document(item)
         unless item && !outcomes.key?(payload.index) &&
@@ -314,7 +338,7 @@ module Coordinator::Write
         end
 
         validation = if payload.is_a?(LegacyEvents::OperationBatchItemSucceededV1)
-                       validate_success(source_event:, item:, payload:)
+                       validate_success(source_event:, item:, payload:, completions:)
         else
                        validate_rejection(source_event:, payload:)
         end
@@ -324,8 +348,8 @@ module Coordinator::Write
         Success()
       end
 
-      def validate_success(source_event:, item:, payload:)
-        completion_event = locate(payload.target_completion)
+      def validate_success(source_event:, item:, payload:, completions:)
+        completion_event = completions[payload.target_completion.event_id]
         unless completion_event && exact_reference?(completion_event, payload.target_completion)
           return Failure(inconsistent(source_event, "successful item target completion reference is not exact"))
         end
@@ -459,13 +483,19 @@ module Coordinator::Write
         source_creation_event:,
         source_creation:,
         target_batch_id:,
-        entries:
+        entries:,
+        item_indexes:
       )
         outcomes = entries.filter_map do |event, payload|
           [ payload.index, [ event, payload ] ] if payload.respond_to?(:index)
         end.to_h
         items = []
-        source_creation.items.each do |source_item|
+        selected_items = if item_indexes
+          source_creation.items.select { item_indexes.include?(_1.index) }
+        else
+          source_creation.items
+        end
+        selected_items.each do |source_item|
           outcome = outcomes[source_item.index]&.last
           completion_event = source_completion(outcome)
           allocation_source = completion_event || source_creation_event

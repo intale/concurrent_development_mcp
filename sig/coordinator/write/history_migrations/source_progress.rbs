@@ -1,0 +1,10 @@
+module Coordinator
+  module Write
+    module HistoryMigrations
+      class SourceProgress
+        def initialize: (source_reader: SourceReader) -> void
+        def call: (MigrationSnapshotV1 migration) -> Float
+      end
+    end
+  end
+end

@@ -9,13 +9,20 @@ RSpec.describe Coordinator::Processes::ProcessManagers::HistoryMigration, :event
 
   it "plans the complete range before applying and idempotently redelivers a bounded cross-store page" do
     legacy = append_legacy_repository
-    started = start_migration(through: legacy.global_position)
+    excluded_tail = source_store.append(
+      streams.history_migration(SecureRandom.uuid_v7),
+      [ PgEventstore::Event.new(type: "HistoryMigrationOperatorProbe", data: {}) ]
+    ).sole
+    started = start_migration(through: excluded_tail.global_position)
 
     manager.call(started)
     source_count = page_event("HistoryMigrationPageSourceEventCountRecorded")
     manager.call(source_count)
 
     page_id = source_count.stream.stream_id
+    page = Coordinator::Container["history_migrations.page_loader"].call(page_id)
+    expect(page.state.source_event_count).to eq(1)
+    expect(page.state.to_position).to eq(excluded_tail.global_position)
     planned = page_stream(page_id).last
     expect(planned.type).to eq("HistoryMigrationPagePlanned")
     expect(target_repositories).to be_empty

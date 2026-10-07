@@ -158,7 +158,15 @@ module Coordinator::Write
         when Events::CommandSucceededV1
           Events::CommandSucceededV1.new(command_id:)
         when Events::CommandRejectedV1
-          return Failure(invalid(source_event, "CommandRejected@1 lacks typed rejection details; cannot emit a current terminal fact"))
+          Events::CommandRejectedV2.new(
+            command_id:,
+            error: Tasks::DomainErrorV1::HistoricalCommandRejectionError.new(
+              code: "historical_command_rejection",
+              message: source.reason,
+              details: Tasks::DomainErrorV1::HistoricalCommandRejectionDetails.new(original_code: source.code)
+            ),
+            retryable: source.retryable
+          )
         when Events::CommandRejectedV2
           Events::CommandRejectedV2.new(
             command_id:,

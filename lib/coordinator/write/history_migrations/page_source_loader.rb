@@ -17,7 +17,7 @@ module Coordinator::Write
         )
         valid = events.length == state.source_event_count &&
           events.first&.global_position.to_i >= state.from_position &&
-          events.last&.global_position == state.to_position
+          events.last&.global_position == @source_reader.head_position(to_position: state.to_position)
         return events if valid
 
         raise InvalidHistoryMigrationHistory,

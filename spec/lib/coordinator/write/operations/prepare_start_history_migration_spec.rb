@@ -32,9 +32,13 @@ RSpec.describe Coordinator::Write::Operations::PrepareStartHistoryMigration, :ev
   end
 
   def append_probe
+    repository_id = SecureRandom.uuid_v7
+    payload = Coordinator::Write::Events::RepositoryRegisteredV2.new(
+      repository_id:, scope: "project:migration-start", repository_key: "probe"
+    )
     store.append(
-      Coordinator::Write::StreamReference.new(context: "MigrationEvidence", stream_name: "Probe", stream_id: SecureRandom.uuid_v7),
-      [ PgEventstore::Event.new(id: SecureRandom.uuid_v7, type: "Probe", data: {}) ]
+      Coordinator::Write::StreamFactory.new.repository(repository_id),
+      [ PgEventstore::Event.new(type: "RepositoryRegistered", data: payload.to_h, metadata: { "schema_version" => 2 }) ]
     ).sole
   end
 end

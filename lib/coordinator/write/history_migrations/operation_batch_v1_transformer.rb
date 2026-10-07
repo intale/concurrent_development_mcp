@@ -59,7 +59,8 @@ module Coordinator::Write
         if source_payload.is_a?(LegacyEvents::OperationBatchCreatedV1)
           @context_resolver.from_creation(**common, source_creation: source_payload)
         else
-          @context_resolver.from_stream(**common)
+          item_indexes = source_payload.respond_to?(:index) ? [ source_payload.index ] : []
+          @context_resolver.from_stream(**common, item_indexes:)
         end
       end
 

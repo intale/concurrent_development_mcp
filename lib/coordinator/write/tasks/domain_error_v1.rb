@@ -3,6 +3,18 @@
 module Coordinator::Write
   module Tasks
     module DomainErrorV1
+      class HistoricalCommandRejectionDetails < Value
+        attribute :original_code, Types::Identifier
+      end
+
+      # The historical denial was recorded, but its original detailed evidence was not.
+      # Do not manufacture contemporary business-error details from present-day state.
+      class HistoricalCommandRejectionError < Value
+        attribute :code, Types::String.enum("historical_command_rejection")
+        attribute :message, Types::String
+        attribute :details, HistoricalCommandRejectionDetails
+      end
+
       class ChangeSetDetails < Value
         attribute :change_set_id, Types::Identifier
       end

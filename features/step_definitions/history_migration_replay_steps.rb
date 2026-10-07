@@ -52,3 +52,14 @@ Then("the restored receipt refers to facts owned by its original logical command
   assert_acceptance(events.any? { _1.fetch("type") == "RepositoryRegistered" }, "Restored command must expose registration")
   assert_acceptance_equal(@history_target_repository_id, receipt.dig("data", "result", "repository_id"), "Restored receipt repository")
 end
+
+Then("the migration does not copy its own maintenance facts into restored history") do
+  restored = PgEventstore.client(:migration_target).read(
+    PgEventstore::Stream.all_stream,
+    options: {
+      max_count: 1,
+      filter: { event_types: %w[HistoryMigrationStarted HistoryMigrationPageCreated HistoryMigrationCompleted] }
+    }
+  )
+  assert_acceptance(restored.empty?, "Restored domain history must not contain migration-control facts")
+end

@@ -11,13 +11,13 @@ RSpec.describe "MCP history migration start", :event_store do
   end
 
   it "freezes the source before Task facts and replays by caller input rather than derived values" do
+    repository_id = SecureRandom.uuid_v7
+    payload = Coordinator::Write::Events::RepositoryRegisteredV2.new(
+      repository_id:, scope: "project:migration-start", repository_key: "probe"
+    )
     anchor = event_store.append(
-      Coordinator::Write::StreamReference.new(
-        context: "CoordinatorMaintenance",
-        stream_name: "MigrationSourceProbe",
-        stream_id: SecureRandom.uuid_v7
-      ),
-      [ PgEventstore::Event.new(id: SecureRandom.uuid_v7, type: "MigrationSourceProbe", data: {}) ]
+      streams.repository(repository_id),
+      [ PgEventstore::Event.new(type: "RepositoryRegistered", data: payload.to_h, metadata: { "schema_version" => 2 }) ]
     ).sole
     arguments = {
       command_id: "migration-public-start-1",
