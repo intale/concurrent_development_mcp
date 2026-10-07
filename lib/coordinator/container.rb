@@ -528,7 +528,8 @@ module Coordinator
       Write::HistoryMigrations::CoordinationTaskLifecycleTransformer.new(
         stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
         submission_resolver:
-          self["history_migrations.legacy_coordination_task_submission_resolver"]
+          self["history_migrations.legacy_coordination_task_submission_resolver"],
+        rejection_builder: self["history_migrations.legacy_command_rejection_builder"]
       )
     end
 
@@ -554,7 +555,14 @@ module Coordinator
         context_resolver: self["history_migrations.operation_batch_context_resolver"],
         target_event_reference_resolver:
           self["history_migrations.legacy_target_event_reference_resolver"],
-        target_plan_builder: self["history_migrations.target_plan_builder"]
+        target_plan_builder: self["history_migrations.target_plan_builder"],
+        rejection_builder: self["history_migrations.legacy_command_rejection_builder"]
+      )
+    end
+
+    register("history_migrations.legacy_command_rejection_builder", memoize: true) do
+      Write::HistoryMigrations::LegacyCommandRejectionBuilder.new(
+        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"]
       )
     end
 

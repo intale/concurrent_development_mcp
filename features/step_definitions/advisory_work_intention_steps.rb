@@ -118,6 +118,13 @@ Then("the result identifies every blocker with its resource, mode, owner, Attemp
   assert_acceptance_equal(reference.fetch("context"), blocker.fetch("context"), "Blocker context")
   assert_acceptance_equal(@advisory_existing.dig(:outcome, "data", "expires_at"), blocker.fetch("expires_at"), "Blocker expiry")
   assert_acceptance_equal(acceptance_repository_id, blocker.dig("scope", "repository_id"), "Blocker Repository")
+
+  receipt = await_read_model("The rejected intention receipt to become available") do
+    payload = call_tool("operation_get", { command_id: @advisory_requested.fetch(:command_id) })
+      .dig("result", "structuredContent")
+    [ payload["status"] == "busy", payload ]
+  end
+  assert_acceptance_equal(@advisory_requested.dig(:outcome, "data"), receipt.fetch("data"), "Rejection evidence")
 end
 
 Then("no partial intention set is recorded for agent B") do
@@ -140,6 +147,46 @@ Given("another agent has a shared intention with context explaining its current 
     command_id: "cuc-advisory-withdrawal-existing",
     purpose: "Correct one paragraph",
     context: "The paragraph changes preserve the chapter structure"
+  )
+end
+
+When("agent A renews that intention twice and withdraws it while read projections are stopped") do
+  stop_read_model_subscriptions
+  agent = @advisory_existing.fetch(:agent)
+  data = @advisory_existing.dig(:outcome, "data")
+  [ 600, 900 ].each_with_index do |ttl_seconds, index|
+    task_id = submit_and_execute(
+      "work_intention_set_renew",
+      client_id: agent.fetch(:client_id),
+      command_id: "cuc-advisory-replay-renew-#{index}",
+      actor: { kind: "agent", id: agent.fetch(:agent_id) },
+      change_set_id: @advisory_existing.dig(:arguments, :change_set_id),
+      work_item_id: agent.fetch(:work_item_id),
+      attempt_id: agent.fetch(:attempt_id),
+      intention_set_id: data.fetch("intention_set_id"),
+      intentions: data.fetch("intentions").map { _1.slice("resource_id", "intention_id", "fencing_token") },
+      ttl_seconds:
+    )
+    state = task_request("tasks/get", task_id, client_id: agent.fetch(:client_id))
+    assert_acceptance_equal(false, state.dig("result", "result", "isError"), "Renewal Task result")
+    @advisory_latest_expiry = state.dig("result", "result", "structuredContent", "data", "expires_at")
+  end
+  withdraw_advisory_intention(@advisory_existing, command_id: "cuc-advisory-replay-withdraw")
+end
+
+Then("available Attempt context reflects the latest renewal and withdrawal") do
+  attempt_id = @advisory_existing.dig(:agent, :attempt_id)
+  context = await_read_model("Repeated intention renewals and withdrawal to become available") do
+    payload = coordination_context(attempt_id:)
+    attempt = payload.dig("data", "context", "attempts")&.find { _1.fetch("attempt_id") == attempt_id }
+    observed = attempt&.fetch("work_intention_set")
+    [ observed && observed["expires_at"] == @advisory_latest_expiry && observed["withdrawn_at"], payload ]
+  end
+  view = context.dig("data", "context", "attempts").find { _1.fetch("attempt_id") == attempt_id }.fetch("work_intention_set")
+  assert_acceptance(@advisory_latest_expiry, "Latest renewal deadline")
+  assert_acceptance(view.fetch("last_renewed_at"), "Latest renewal timestamp")
+  assert_acceptance_equal(
+    @advisory_existing.dig(:outcome, "data", "intention_set_id"), view.fetch("intention_set_id"), "Intention set identity"
   )
 end
 

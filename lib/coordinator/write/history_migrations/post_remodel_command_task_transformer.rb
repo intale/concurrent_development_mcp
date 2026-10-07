@@ -158,12 +158,7 @@ module Coordinator::Write
         when Events::CommandSucceededV1
           Events::CommandSucceededV1.new(command_id:)
         when Events::CommandRejectedV1
-          Events::CommandRejectedV1.new(
-            command_id:,
-            code: source.code,
-            reason: source.reason,
-            retryable: source.retryable
-          )
+          return Failure(invalid(source_event, "CommandRejected@1 lacks typed rejection details; cannot emit a current terminal fact"))
         when Events::CommandRejectedV2
           Events::CommandRejectedV2.new(
             command_id:,

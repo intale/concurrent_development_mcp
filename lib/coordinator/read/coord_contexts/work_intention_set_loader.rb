@@ -16,11 +16,15 @@ module Coordinator::Read
       end
 
       def call(event, payload)
-        triggering_history = intention_history(payload.intention_id)
-        declaration_event, declaration = declaration_pair(triggering_history)
-        unless triggering_history.any? { |physical, _logical| physical.id == event.id }
+        trigger = @event_store.read_at(
+          @stream_factory.resource_work_intention(payload.intention_id), event.stream_revision
+        )
+        unless trigger&.id == event.id
           raise InvalidProjectionSource, "Work-intention trigger is absent from its source stream"
         end
+
+        triggering_history = intention_history(payload.intention_id)
+        declaration_event, declaration = declaration_pair(triggering_history)
 
         set_events = @event_store.read(
           @stream_factory.work_intention_set(declaration.set_id),

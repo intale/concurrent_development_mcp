@@ -6,6 +6,7 @@ module Coordinator
           context_resolver: OperationBatchContextResolver,
           target_event_reference_resolver: LegacyTargetEventReferenceResolver,
           target_plan_builder: TargetPlanBuilder,
+          rejection_builder: LegacyCommandRejectionBuilder,
           ?request_marker: CommandLifecycle::RequestMarker,
           ?rejection_retryability: LegacyCommandRejectionRetryability,
           ?manifest_builder: OperationBatches::ManifestBuilder

@@ -8,11 +8,13 @@ module Coordinator::Write
       def initialize(
         stream_identity_allocator:,
         submission_resolver:,
+        rejection_builder:,
         rejection_retryability: LegacyCommandRejectionRetryability.new,
         task_failure_mapper: LegacyTaskFailureMapper.new
       )
         @stream_identity_allocator = stream_identity_allocator
         @submission_resolver = submission_resolver
+        @rejection_builder = rejection_builder
         @rejection_retryability = rejection_retryability
         @task_failure_mapper = task_failure_mapper
       end
@@ -43,9 +45,14 @@ module Coordinator::Write
         )
         return command if command.failure?
 
-        Success(
-          [ rejection_fact(source_payload.result, target_stream: command.value!.target_stream) ] + facts
+        rejection = @rejection_builder.call(
+          migration_id:, source_config_name:, source_upper_position:, source_event:,
+          command_id: command.value!.target_stream.stream_id, error: source_payload.result.error,
+          retryable: @rejection_retryability.call(source_payload.result.error.code)
         )
+        return rejection if rejection.failure?
+
+        Success([ rejection_fact(rejection.value!, target_stream: command.value!.target_stream) ] + facts)
       end
 
       private
@@ -111,16 +118,11 @@ module Coordinator::Write
           )
       end
 
-      def rejection_fact(result, target_stream:)
+      def rejection_fact(event, target_stream:)
         command_id = target_stream.stream_id
         TransformedFactV1.new(
           target_stream:,
-          event: Events::CommandRejectedV1.new(
-            command_id:,
-            code: result.error.code,
-            reason: result.error.message,
-            retryable: @rejection_retryability.call(result.error.code)
-          ),
+          event:,
           markers: [ "command:#{command_id}" ],
           step_name: "reject-command"
         )

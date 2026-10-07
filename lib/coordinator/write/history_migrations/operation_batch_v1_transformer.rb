@@ -9,6 +9,7 @@ module Coordinator::Write
         context_resolver:,
         target_event_reference_resolver:,
         target_plan_builder:,
+        rejection_builder:,
         request_marker: CommandLifecycle::RequestMarker.new,
         rejection_retryability: LegacyCommandRejectionRetryability.new,
         manifest_builder: OperationBatches::ManifestBuilder.new
@@ -16,6 +17,7 @@ module Coordinator::Write
         @context_resolver = context_resolver
         @target_event_reference_resolver = target_event_reference_resolver
         @target_plan_builder = target_plan_builder
+        @rejection_builder = rejection_builder
         @request_marker = request_marker
         @rejection_retryability = rejection_retryability
         @manifest_builder = manifest_builder
@@ -82,7 +84,7 @@ module Coordinator::Write
             context:
           )
         when LegacyEvents::OperationBatchItemRejectedV1
-          rejection_facts(migration_id:, source_event:, source:, context:)
+          rejection_facts(migration_id:, source_config_name:, source_upper_position:, source_event:, source:, context:)
         when LegacyEvents::OperationBatchContinuationRequestedV1
           Success(
             batch_fact(
@@ -253,29 +255,20 @@ module Coordinator::Write
         )
       end
 
-      def rejection_facts(migration_id:, source_event:, source:, context:)
+      def rejection_facts(migration_id:, source_config_name:, source_upper_position:, source_event:, source:, context:)
         item = context.item(source.index)
         return Failure(inconsistent(source_event, "rejected item is absent from the migrated manifest")) unless item
 
-        error = domain_error(source.result.data)
-        retryable = @rejection_retryability.call(error.code)
-        rejection = if error.is_a?(LegacyTaskResults::DomainErrorV1)
-          Events::CommandRejectedV1.new(
-            command_id: item.command_id,
-            code: error.code,
-            reason: error.message,
-            retryable:
-          )
-        else
-          Events::CommandRejectedV2.new(
-            command_id: item.command_id,
-            error:,
-            retryable:
-          )
-        end
+        error = source.result.data.to_h
+        code = error.fetch(:code) { error.fetch("code") }
+        rejection = @rejection_builder.call(
+          migration_id:, source_config_name:, source_upper_position:, source_event:,
+          command_id: item.command_id, error:, retryable: @rejection_retryability.call(code)
+        )
+        return rejection if rejection.failure?
         terminal = TransformedFactV1.new(
           target_stream: item.target_command_stream,
-          event: rejection,
+          event: rejection.value!,
           markers: [
             "command:#{item.command_id}",
             "tool:#{item.target_item.command_input.tool_name}"
@@ -298,9 +291,9 @@ module Coordinator::Write
           batch_id: context.batch_id,
           index: item.index,
           command_id: item.command_id,
-          code: error.code,
-          reason: error.message,
-          retryable:
+          code: rejection.value!.error.code,
+          reason: rejection.value!.error.message,
+          retryable: rejection.value!.retryable
         )
         Success(
           [
@@ -319,14 +312,6 @@ module Coordinator::Write
             )
           ].freeze
         )
-      end
-
-      def domain_error(value)
-        return value unless value.is_a?(Hash)
-
-        Tasks::DomainErrorV1::Type[value]
-      rescue Dry::Types::ConstraintError, Dry::Struct::Error
-        LegacyTaskResults::DomainErrorV1.new(value)
       end
 
       def outcome_facts(

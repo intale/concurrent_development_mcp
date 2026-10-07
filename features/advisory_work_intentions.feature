@@ -30,6 +30,11 @@ Feature: Advisory resource work intentions
 
   Rule: Contention is information for the agent, not a writer queue
 
+    Scenario: Repeated renewals and withdrawal remain visible when projections catch up
+      Given agent A has an active shared intention for file README.md
+      When agent A renews that intention twice and withdraws it while read projections are stopped
+      Then available Attempt context reflects the latest renewal and withdrawal
+
     Scenario: A blocked exclusive request can be reconsidered after withdrawal
       Given another agent has a shared intention with context explaining its current edit
       When an agent requests an overlapping exclusive intention

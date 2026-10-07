@@ -29,9 +29,10 @@ RSpec.describe "history migration command and Task transformations", :event_stor
     )
   end
   let(:lifecycle_transformer) do
-    Coordinator::Write::HistoryMigrations::CoordinationTaskLifecycleTransformer.new(
-      stream_identity_allocator: allocator,
-      submission_resolver:
+      Coordinator::Write::HistoryMigrations::CoordinationTaskLifecycleTransformer.new(
+        stream_identity_allocator: allocator,
+        submission_resolver:,
+        rejection_builder: Coordinator::Container["history_migrations.legacy_command_rejection_builder"]
     )
   end
   let(:command_input) do
@@ -242,10 +243,9 @@ RSpec.describe "history migration command and Task transformations", :event_stor
     rejected, completed = facts
     expect(rejected.target_stream).to eq(registration.target_stream)
     expect(rejected.event).to eq(
-      Coordinator::Write::Events::CommandRejectedV1.new(
+      Coordinator::Write::Events::CommandRejectedV2.new(
         command_id: registration.event.command_id,
-        code: "change_set_already_exists",
-        reason: "ChangeSet already exists",
+        error: domain_rejection.error,
         retryable: false
       )
     )
@@ -610,7 +610,7 @@ RSpec.describe "history migration command and Task transformations", :event_stor
     expect(retry_registration.event.request_id).to eq("historical-request:#{retry_submission.global_position}")
     expect([ first_terminal.event.class, retry_terminal.event.class ]).to eq(
       [
-        Coordinator::Write::Events::CommandRejectedV1,
+        Coordinator::Write::Events::CommandRejectedV2,
         Coordinator::Write::Events::CommandSucceededV1
       ]
     )

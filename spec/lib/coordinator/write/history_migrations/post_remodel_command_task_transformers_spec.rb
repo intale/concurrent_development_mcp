@@ -11,6 +11,19 @@ RSpec.describe "post-remodel Command, Task, and ProcessStep history migration", 
   let(:attempt_id) { "source-attempt" }
   let(:resource_id) { SecureRandom.uuid_v7 }
 
+  it "refuses a historical rejection that discarded the details needed by the current receipt contract" do
+    command_id = SecureRandom.uuid_v7
+    persist_payload(stream("CoordinatorControl", "Command", command_id),
+      Coordinator::Write::Events::CommandRegisteredV1.new(command_id:, request_id: "missing-error-evidence", tool_name: "skill_publish"))
+    event = persist_payload(stream("CoordinatorControl", "Command", command_id),
+      Coordinator::Write::Events::CommandRejectedV1.new(command_id:, code: "skill_revision_conflict", reason: "Revision changed", retryable: false))
+
+    result = transform(event, upper_position: event.global_position)
+
+    expect(result).to be_failure
+    expect(result.failure.message).to include("lacks typed rejection details")
+  end
+
   it "rebinds a legacy lease Task to a current work-intention command document" do
     seed_command_entities
     command_id = SecureRandom.uuid_v7
