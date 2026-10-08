@@ -1,6 +1,0 @@
-module Coordinator
-  module Processes
-    class HistoryMigrationProcessRejected < StandardError
-    end
-  end
-end

@@ -64,7 +64,6 @@ module McpWalkingSliceSpec
       "operation_batch_get",
       "verification_obligations_list",
       "merge_snapshot_get",
-      "history_migration_start",
       "repository_register",
       "resource_resolve",
       "resource_remove",
@@ -124,6 +123,39 @@ module McpWalkingSliceSpec
       "idempotentHint" => true,
       "destructiveHint" => false
     )
+  end
+
+  it "rejects the retired history-transfer tool before command or Task admission", :event_store do
+    actor = { kind: "agent", id: "migration-retirement-spec" }
+    request_id = "cmd-retired-history-transfer"
+    response = mcp_request(
+      id: 1,
+      method: "tools/call",
+      name: "history_migration_start",
+      params: { name: "history_migration_start", arguments: { command_id: request_id, actor: } },
+      expected_status: 400
+    )
+
+    expect(response.fetch("error")).to include(
+      "code" => -32_602,
+      "data" => "Tool not found: history_migration_start"
+    )
+    expect(response.dig("result", "taskId")).to be_nil
+    marker = Coordinator::Write::CommandLifecycle::RequestMarker.new.call(
+      actor: Coordinator::Write::Commands::Actor.new(**actor),
+      request_id:
+    )
+    registered = event_store.read_global_marked(
+      Coordinator::Write::GlobalMarkedEventReadCriteria.new(
+        stream_context: "CoordinatorControl",
+        stream_name: "Command",
+        event_types: [ "CommandRegistered" ],
+        markers: [ marker ],
+        maximum_count: 1,
+        direction: :asc
+      )
+    )
+    expect(registered).to be_empty
   end
 
   it "registers one exact scoped UUIDv7 repository through a replayable durable Task", :event_store do

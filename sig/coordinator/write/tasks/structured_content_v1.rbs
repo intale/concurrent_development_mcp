@@ -2,7 +2,7 @@ module Coordinator
   module Write
     module Tasks
       class StructuredContentV1 < Shared::Value
-        type data = DomainErrorV1::domain_error | DomainErrorV1::history_migration_error | CommandReceiptData::value
+        type data = DomainErrorV1::domain_error | CommandReceiptData::value
 
         def status: () -> String
         def summary: () -> String

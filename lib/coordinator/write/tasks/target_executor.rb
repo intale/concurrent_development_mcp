@@ -16,7 +16,6 @@ module Coordinator::Write
         reject_command: Domain::CommandLifecycles::Reject.new,
         input_digest: CommandInputDigest.new,
         rejection_retryability: CommandRejectionRetryability.new,
-        start_history_migration: Operations::ExecuteStartHistoryMigration.new(event_store:),
         remove_resource: Operations::ExecuteRemoveResource.new(event_store:),
         create_change_set: Operations::ExecuteCreateChangeSet.new(event_store:),
         create_work_item: Operations::ExecuteCreateWorkItem.new(event_store:),
@@ -81,7 +80,6 @@ module Coordinator::Write
         @reject_command = reject_command
         @input_digest = input_digest
         @rejection_retryability = rejection_retryability
-        @start_history_migration = start_history_migration
         @register_repository = Operations::ExecuteRegisterRepository.new(event_store:)
         @resolve_resource = Operations::ExecuteResolveResource.new(event_store:)
         @remove_resource = remove_resource

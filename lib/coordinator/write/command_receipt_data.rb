@@ -23,17 +23,6 @@ module Coordinator::Write
       attribute :bound_at, Types::Timestamp
     end
 
-    class HistoryMigrationStart < Value
-      attribute :migration_id, Types::UuidV7
-      attribute :source_config_name, Types::Identifier
-      attribute :target_config_name, Types::Identifier
-      attribute :source_upper_position, Types::GlobalPosition.optional
-      attribute :page_size, Types::HistoryMigrationPageSize
-      attribute :outcome, Types::String.enum("started", "existing")
-      attribute :start_event, EventReference
-      attribute :started_at, Types::Timestamp
-    end
-
     class ResourceRemoval < Value
       attribute :resource_id, Types::ResourceId
       attribute :repository_id, Types::RepositoryId
@@ -522,7 +511,6 @@ module Coordinator::Write
     Type = RepositoryRegistration |
            ResourceResolution |
            ResourceRemoval |
-           HistoryMigrationStart |
            ChangeSet |
            WorkItem |
            Dependency |

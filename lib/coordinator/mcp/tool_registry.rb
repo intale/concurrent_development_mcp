@@ -35,7 +35,6 @@ module Coordinator
           Tools::OperationBatchGet,
           Tools::VerificationObligationsList,
           Tools::MergeSnapshotGet,
-          Tools::HistoryMigrationStart,
           Tools::RepositoryRegister,
           Tools::ResourceResolve,
           Tools::ResourceRemove,

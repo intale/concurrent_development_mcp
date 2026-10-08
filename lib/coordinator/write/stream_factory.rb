@@ -14,54 +14,6 @@ module Coordinator::Write
       StreamReference.new(context: "CoordinatorControl", stream_name: "ProcessStep", stream_id: process_step_id)
     end
 
-    def history_migration(migration_id)
-      StreamReference.new(
-        context: "CoordinatorMaintenance",
-        stream_name: "HistoryMigration",
-        stream_id: migration_id
-      )
-    end
-
-    def history_migration_identity(identity_id)
-      StreamReference.new(
-        context: "CoordinatorMaintenance",
-        stream_name: "HistoryMigrationIdentity",
-        stream_id: identity_id
-      )
-    end
-
-    def history_migration_correlation(correlation_id)
-      StreamReference.new(
-        context: "CoordinatorMaintenance",
-        stream_name: "HistoryMigrationCorrelation",
-        stream_id: correlation_id
-      )
-    end
-
-    def history_migration_target_stream_plan(plan_id)
-      StreamReference.new(
-        context: "CoordinatorMaintenance",
-        stream_name: "HistoryMigrationTargetStreamPlan",
-        stream_id: plan_id
-      )
-    end
-
-    def history_migration_source_trace(trace_id)
-      StreamReference.new(
-        context: "CoordinatorMaintenance",
-        stream_name: "HistoryMigrationSourceTrace",
-        stream_id: trace_id
-      )
-    end
-
-    def history_migration_page(page_id)
-      StreamReference.new(
-        context: "CoordinatorMaintenance",
-        stream_name: "HistoryMigrationPage",
-        stream_id: page_id
-      )
-    end
-
     def skill(skill_id)
       StreamReference.new(context: "AgentKnowledge", stream_name: "Skill", stream_id: skill_id)
     end

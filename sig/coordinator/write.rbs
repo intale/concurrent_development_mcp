@@ -11,7 +11,6 @@ module Coordinator
                                { expected_revision: Integer | Symbol, ?markers: Array[String] }
                              ]
     type coordination_command = Commands::RegisterRepository |
-                                Commands::StartHistoryMigration |
                                 Commands::ResolveResource |
                                 Commands::RemoveResource |
                                 Commands::CreateChangeSet |

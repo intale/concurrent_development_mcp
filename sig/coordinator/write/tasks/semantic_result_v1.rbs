@@ -19,7 +19,7 @@ module Coordinator
           def status: () -> String
           def summary: () -> String
           def command_id: () -> String
-          def error: () -> (DomainErrorV1::domain_error | DomainErrorV1::history_migration_error)
+          def error: () -> (DomainErrorV1::domain_error)
           def next_actions: () -> Array[NextAction]
         end
       end

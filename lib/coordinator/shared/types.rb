@@ -66,7 +66,6 @@ module Coordinator::Shared
     DEVELOPMENT_ARTIFACT_TARGET_NAME_MAXIMUM_BYTES = 255
     DEVELOPMENT_ARTIFACT_TARGET_SCOPE_MAXIMUM_BYTES = 500
     DEVELOPMENT_ARTIFACT_QUERY_MAXIMUM_ITEMS = 100
-    HISTORY_MIGRATION_DEPENDENCY_WAVE_MAXIMUM = 3
     COORDINATION_DISCOVERY_MAXIMUM_ITEMS = 50
     DECISION_DISCOVERY_MAXIMUM_ITEMS = 50
     DEVELOPMENT_ARTIFACT_KINDS = %w[
@@ -121,7 +120,6 @@ module Coordinator::Shared
     DEVELOPMENT_ARTIFACT_TARGET_KINDS = DEVELOPMENT_ARTIFACT_CANONICAL_TARGET_KINDS
     DEVELOPMENT_ARTIFACT_TARGET_STATUSES = %w[verified unverified].freeze
     OPERATION_BATCH_MAXIMUM_ITEMS = 1_000
-    HISTORY_MIGRATION_PAGE_SIZE_MAXIMUM = 1_000
     OPERATION_BATCH_PAGE_SIZE = 50
     OPERATION_BATCH_QUERY_MAXIMUM_ITEMS = 100
     OPERATION_BATCH_MAXIMUM_ENCODED_BYTES = 3_145_728
@@ -827,17 +825,6 @@ module Coordinator::Shared
     CandidateEnvironmentValue = String.constrained(min_size: 1, max_size: 500)
     CandidateTargetBranch = String.constrained(min_size: 1, max_size: 255)
     GlobalPosition = Integer.constrained(gteq: 0)
-    HistoryMigrationPageSize = Integer.constrained(gteq: 1, lteq: HISTORY_MIGRATION_PAGE_SIZE_MAXIMUM)
-    HistoryMigrationSourceEventCount = Integer.constrained(
-      gteq: 1,
-      lteq: HISTORY_MIGRATION_PAGE_SIZE_MAXIMUM
-    )
-    HistoryMigrationTargetEventCount = Integer.constrained(gteq: 1, lteq: 100_000)
-    HistoryMigrationWaveTargetEventCount = Integer.constrained(gteq: 0, lteq: 100_000)
-    HistoryMigrationDependencyWave = Integer.constrained(
-      gteq: 0,
-      lteq: HISTORY_MIGRATION_DEPENDENCY_WAVE_MAXIMUM
-    )
     AgentChoiceImpactPageSize = Integer.enum(50)
     AgentChoiceImpactPageChoiceCount = Integer.constrained(gteq: 0, lteq: 50)
     AgentChoiceImpactListLimit = Integer.constrained(gteq: 1, lteq: 100)

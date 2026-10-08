@@ -28,20 +28,7 @@ module LiveSubscriptions
     start_subscription_set(:task_results, "subscription_set_factories.task_results")
   end
 
-  def start_history_replay_subscriptions
-    start_subscription_set(
-      :history_replay_repositories, "subscription_set_factories.migration_repositories",
-      manager: PgEventstore.subscriptions_manager(:migration_target, subscription_set: Coordinator::Read::Subscriptions::ReadModelSet::SET_NAME)
-    )
-    start_subscription_set(
-      :history_replay_receipts, "subscription_set_factories.migration_task_results",
-      manager: PgEventstore.subscriptions_manager(:migration_target, subscription_set: Coordinator::Read::Subscriptions::TaskResultSet::SET_NAME)
-    )
-  end
-
   def stop_live_subscriptions
-    stop_subscription_set(:history_replay_repositories)
-    stop_subscription_set(:history_replay_receipts)
     stop_read_model_subscriptions
     stop_task_result_subscriptions
     stop_process_subscriptions

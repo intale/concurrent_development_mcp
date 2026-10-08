@@ -35,12 +35,6 @@ module Coordinator::Write
     module TargetContractRegistry
       CONTRACTS = [
         TargetContractV1.new(
-          tool_name: "history_migration_start",
-          input_document_class: CommandInputDocuments::StartHistoryMigrationBase,
-          command_class: Commands::StartHistoryMigration,
-          receipt_class: CommandReceiptData::HistoryMigrationStart
-        ),
-        TargetContractV1.new(
           tool_name: "repository_register",
           input_document_class: CommandInputDocuments::RegisterRepositoryV1,
           command_class: Commands::RegisterRepository,

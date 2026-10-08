@@ -2,7 +2,6 @@ module Coordinator
   module Write
     module Tasks
       module DomainErrorV1
-        type history_migration_error = HistoryMigrationError | HistoryMigrationStoreError
         type domain_error = HistoricalCommandRejectionError | ChangeSetError | ActivationDependencyError | WorkItemError | DependencyError | AttemptError | WorkItemCompletionError | WorkItemCompletionActiveWriteSetError | CommandIdReusedError | LeaseBusyError | WorkIntentionConflictError | WorkIntentionSetMismatchError | WorkIntentionSetLimitError | WorkIntentionSetInactiveError | WorkIntentionSetWithdrawnError | WorkIntentionSetSnapshotMismatchError | WorkIntentionReferenceMismatchError | LeaseSetMismatchError | ResourceEvidenceConflictError | ResourceHistoryCorruptError | ResourceStreamHistoryCorruptError | ResourceNotFoundError | ResourceRepositoryMismatchError | ResourceNotActiveError | ResourcePathConflictError | WriteSetLimitError | ResourceBoundaryMaintenanceRequiredError | LeaseSetExpiredError | LeaseSetNotCurrentError | WriteSetReleasedError | LeaseSetSnapshotMismatchError | LeaseReferenceMismatchError | LeaseDeadlineNotExtendedError | MessageAlreadyRecordedError | GuidanceMessageNotFoundError | InterpretationAlreadyProposedError | InterpretationNotFoundError | InterpretationAlreadyAcceptedError | InterpretationAlreadyRejectedError | InterpretationSlotAlreadyAcceptedError | SourceSpanMismatchError | TopicNotSupportedError | TopicValueInvalidError | InterpretationNotAcceptedError | DecisionAlreadyExistsError | InterpretationAlreadyActivatedError | DecisionDefinitionNotActivatableError | DecisionSlotOccupiedError | DecisionPartitionLimitReachedError | DecisionPartitionCapacityReachedError | DecisionPartitionStateInvalidError | DecisionNotFoundError | DecisionNotActiveError | InterpretationNotACorrectionError | DecisionDefinitionNotCorrectableError | DecisionRevisionChangedError | DecisionSlotStateInvalidError | AgentChoiceAlreadyExistsError | StaleDecisionContextError | DecisionContextMismatchError | DecisionContextConflictError | DecisionContextLimitReachedError | UnsupportedDecisionContextError | AgentChoiceBlockedByDecisionError | AgentChoiceConfirmationRequiredError | AgentChoicePartitionSnapshotInvalidError | AgentChoiceDecisionHeadInvalidError | AgentChoiceUnresolvedHeadsError | CandidateAlreadyExistsError | CandidateHeadAlreadyRegisteredError | CandidateWorkIntentionObservationsMismatchError | CandidateWorkIntentionNotActiveScopeError | CandidateWorkIntentionNotActiveError | CandidateResourcesNotCoveredError | CandidateLeaseObservationsMismatchError | CandidateLeaseNotActiveScopeError | CandidateLeaseNotActiveError | CandidateUnauthorizedResourcesError | CandidateManifestBaseMismatchError | CandidateNotFoundError | CandidateImpactIdentityMismatchError | CandidateImpactSourceEvidenceMismatchError | CandidateImpactSurfaceAlreadyRecordedError | RepositoryRegistrationError | RepositoryNotRegisteredError | SkillIdentityConflictError | SkillRevisionConflictError | DevelopmentArtifactIdentityConflictError | DevelopmentArtifactObservationIdentityConflictError | DevelopmentArtifactClassificationCorrectionRequiredError | DevelopmentArtifactObservationNotFoundError | DevelopmentArtifactClassificationRevisionConflictError | DevelopmentArtifactClassificationRevisionLimitReachedError | DevelopmentArtifactRevisionConflictError | DevelopmentArtifactNotFoundError | DevelopmentArtifactTargetNotFoundError | DevelopmentArtifactRelationLimitReachedError | DevelopmentArtifactRelationNotFoundError | DevelopmentArtifactRelationSelfSupersessionError | DevelopmentArtifactRelationSupersededError | DevelopmentArtifactRelationAlreadySupersededError | DevelopmentArtifactRelationSupersessionNotAllowedError | VerificationObligationNotFoundError | VerificationObligationAlreadyClaimedError | VerificationObligationPolicyStaleError | VerificationObligationUnclaimedError | VerificationObligationClaimStaleError | VerificationObligationClaimNotOwnedError | VerificationObligationClaimExpiredError | VerificationObligationBindingStaleError | VerificationEvidenceKindNotRequiredError | VerificationEvidenceAlreadySubmittedError | VerificationEvidenceLimitReachedError | VerificationObligationTerminalError | VerificationObligationWaiverRequiresUserError | VerificationObligationAlreadyWaivedError | MergeSnapshotExistingError | MergeSnapshotCandidateError | MergeSnapshotStateError | MergeSnapshotVerificationBindingStaleError | MergeSnapshotVerificationAlreadySubmittedError | MergeSnapshotVerificationLimitReachedError | OperationBatchError | OperationBatchItemError | MergeObservationExistingError | MergeObservationStateError | MergeAuthorizationStaleError | MergeObservationMismatchError | ReleaseSetExistingError | ReleaseSetError
 
         class HistoricalCommandRejectionDetails < Shared::Value
@@ -503,31 +502,10 @@ module Coordinator
           def status: () -> String
         end
 
-        class HistoryMigrationDetails < Shared::Value
-          def migration_id: () -> String
-        end
-
-        class HistoryMigrationStoreDetails < Shared::Value
-          def config_name: () -> String
-          def store_role: () -> String
-        end
-
         class ChangeSetError < Shared::Value
           def code: () -> String
           def message: () -> String
           def details: () -> ChangeSetDetails
-        end
-
-        class HistoryMigrationError < Shared::Value
-          def code: () -> String
-          def message: () -> String
-          def details: () -> HistoryMigrationDetails
-        end
-
-        class HistoryMigrationStoreError < Shared::Value
-          def code: () -> String
-          def message: () -> String
-          def details: () -> HistoryMigrationStoreDetails
         end
 
         class ActivationDependencyError < Shared::Value

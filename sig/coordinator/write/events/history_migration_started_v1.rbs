@@ -1,9 +1,0 @@
-module Coordinator
-  module Write
-    module Events
-      class HistoryMigrationStartedV1 < Base
-        def migration_id: () -> String
-      end
-    end
-  end
-end

@@ -521,15 +521,6 @@ module Coordinator::Write
         attribute :status, Types::VerificationObligationStatus
       end
 
-      class HistoryMigrationDetails < Value
-        attribute :migration_id, Types::UuidV7
-      end
-
-      class HistoryMigrationStoreDetails < Value
-        attribute :config_name, Types::Identifier
-        attribute :store_role, Types::String.enum("source", "target")
-      end
-
       class ChangeSetError < Value
         attribute :code, Types::String.enum(
           "change_set_already_exists",
@@ -541,18 +532,6 @@ module Coordinator::Write
         )
         attribute :message, Types::String
         attribute :details, ChangeSetDetails
-      end
-
-      class HistoryMigrationError < Value
-        attribute :code, Types::String.enum("history_migration_conflict", "history_migration_changed")
-        attribute :message, Types::String
-        attribute :details, HistoryMigrationDetails
-      end
-
-      class HistoryMigrationStoreError < Value
-        attribute :code, Types::String.enum("history_migration_store_unavailable")
-        attribute :message, Types::String
-        attribute :details, HistoryMigrationStoreDetails
       end
 
       class ActivationDependencyError < Value
@@ -1592,8 +1571,6 @@ module Coordinator::Write
       end
 
       BaseType = ChangeSetError |
-             HistoryMigrationError |
-             HistoryMigrationStoreError |
              ActivationDependencyError |
              WorkItemError |
              DependencyError |

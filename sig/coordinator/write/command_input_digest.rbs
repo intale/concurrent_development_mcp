@@ -8,8 +8,6 @@ module Coordinator
       def canonical_document: (write_command command) -> CommandInputDocuments::canonical_digest_value
       def create_change_set: (Commands::CreateChangeSet command) -> String
       def create_change_set_document: (Commands::CreateChangeSet command) -> CommandInputDocuments::CreateChangeSetV1
-      def history_migration_start_document: (Commands::StartHistoryMigration command) -> CommandInputDocuments::StartHistoryMigrationV1
-      def history_migration_start_canonical_document: (Commands::StartHistoryMigration command) -> CommandInputDocuments::StartHistoryMigrationCanonicalV1
       def work_item_create: (Commands::CreateWorkItem command) -> String
       def work_item_create_document: (Commands::CreateWorkItem command) -> CommandInputDocuments::CreateWorkItemV1
       def work_item_dependency_declare: (Commands::DeclareWorkItemDependency command) -> String

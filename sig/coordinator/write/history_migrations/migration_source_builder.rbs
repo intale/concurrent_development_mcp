@@ -1,9 +1,0 @@
-module Coordinator
-  module Write
-    module HistoryMigrations
-      class MigrationSourceBuilder
-        def call: (config_name: String, event: PgEventstore::Event) -> MigrationSourceV1
-      end
-    end
-  end
-end

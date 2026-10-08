@@ -972,35 +972,6 @@ module Coordinator::Write
       attribute :input, CompleteChangeSetInputV1
     end
 
-    class StartHistoryMigrationBase < Value
-      attribute :schema, Types::String.enum("command-input/v1")
-      attribute :command_id, Types::Identifier
-      attribute :tool_name, Types::String.enum("history_migration_start")
-    end
-
-    class StartHistoryMigrationCanonicalInputV1 < Value
-      attribute :actor, ActorV1
-      attribute :page_size, Types::HistoryMigrationPageSize
-      attribute :source_after_position, Types::GlobalPosition.optional.default(nil)
-      attribute :source_command_ids, Types::Array.of(Types::UuidV7).constrained(max_size: 100).default([].freeze)
-      attribute :source_upper_position, Types::GlobalPosition.optional.default(nil)
-    end
-
-    class StartHistoryMigrationInputV1 < StartHistoryMigrationCanonicalInputV1
-      attribute :migration_id, Types::UuidV7
-      attribute :source_config_name, Types::Identifier
-      attribute :target_config_name, Types::Identifier
-      attribute :source_upper_position, Types::GlobalPosition.optional
-    end
-
-    class StartHistoryMigrationCanonicalV1 < StartHistoryMigrationBase
-      attribute :input, StartHistoryMigrationCanonicalInputV1
-    end
-
-    class StartHistoryMigrationV1 < StartHistoryMigrationBase
-      attribute :input, StartHistoryMigrationInputV1
-    end
-
     TARGET_TYPES = [
       RegisterRepositoryV1,
       ResolveResourceV1,
@@ -1042,8 +1013,7 @@ module Coordinator::Write
       CorrectDevelopmentArtifactClassificationV1,
       DeclareDevelopmentArtifactRelationV1,
       CreateOperationBatchV1,
-      CancelOperationBatchV1,
-      StartHistoryMigrationV1
+      CancelOperationBatchV1
     ].freeze
     Type = TARGET_TYPES.reduce { _1 | _2 }
 
@@ -1062,7 +1032,6 @@ module Coordinator::Write
                           PublishSkillRevisionCanonicalV2 |
                           CaptureDevelopmentArtifactCanonicalV2 |
                           UpdateDevelopmentArtifactV1 |
-                          DeclareDevelopmentArtifactRelationCanonicalV1 |
-                          StartHistoryMigrationCanonicalV1
+                          DeclareDevelopmentArtifactRelationCanonicalV1
   end
 end

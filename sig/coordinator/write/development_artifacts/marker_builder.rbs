@@ -28,7 +28,7 @@ module Coordinator
         def capture: (event: Events::DevelopmentArtifactCapturedV2 | Events::DevelopmentArtifactObservedV1 | Events::DevelopmentArtifactCreatedV1, command_id: String) -> Array[String]
         def artifact: (event: artifact_event, command_id: String, ?natural_key: String?) -> Array[String]
         def observation: (event: observation_event, command_id: String) -> Array[String]
-        def natural_key: (ArtifactV2 | NaturalKeyV1 | HistoryMigrations::LegacyDevelopmentArtifacts::ArtifactV2 artifact) -> String
+        def natural_key: (ArtifactV2 | NaturalKeyV1 artifact) -> String
         def classification: (event: classification_event, command_id: String) -> Array[String]
         def relation: (artifact_relation: RelationV1, command_id: String) -> Array[String]
         def relation_v2: (artifact_relation: RelationV1, command_id: String) -> Array[String]

@@ -21,28 +21,6 @@ module Coordinator::Write
       )
     end
 
-    def history_migration_start(command:, outcome:, start_event:, input_digest:, persisted_events:, completed_at:)
-      build_completion(
-        command:,
-        tool_name: "history_migration_start",
-        summary: outcome == "started" ? "History migration started." : "Existing history migration resolved.",
-        data: CommandReceiptData::HistoryMigrationStart.new(
-          migration_id: command.migration_id,
-          source_config_name: command.source_config_name,
-          target_config_name: command.target_config_name,
-          source_upper_position: command.source_upper_position,
-          page_size: command.page_size,
-          outcome:,
-          start_event: event_reference(start_event),
-          started_at: start_event.created_at.utc.iso8601(6)
-        ),
-        next_actions: [],
-        input_digest:,
-        persisted_events:,
-        completed_at:
-      )
-    end
-
     def work_item_create(command:, input_digest:, persisted_events:, completed_at:)
       build_completion(
         command:,

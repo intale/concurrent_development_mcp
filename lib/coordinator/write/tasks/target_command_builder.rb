@@ -12,21 +12,6 @@ module Coordinator::Write
 
       private
 
-      def build_start_history_migration(document)
-        input = document.input
-        Commands::StartHistoryMigration.new(
-          command_id: document.command_id,
-          actor: build_actor(input.actor),
-          migration_id: input.migration_id,
-          source_config_name: input.source_config_name,
-          target_config_name: input.target_config_name,
-          source_after_position: input.source_after_position,
-          source_command_ids: input.source_command_ids,
-          source_upper_position: input.source_upper_position,
-          page_size: input.page_size
-        )
-      end
-
       def build_register_repository(document)
         input = document.input
         Commands::RegisterRepository.new(

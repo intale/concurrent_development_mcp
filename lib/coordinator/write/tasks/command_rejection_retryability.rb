@@ -5,7 +5,6 @@ module Coordinator::Write
     class CommandRejectionRetryability
       RETRYABLE_CODES = %i[
         concurrency_conflict
-        history_migration_changed
         lease_busy
         work_intention_conflict
         resource_boundary_maintenance_required

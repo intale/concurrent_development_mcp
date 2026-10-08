@@ -21,7 +21,5 @@ parallel_test_worker=1
 while [ "$parallel_test_worker" -le "$parallel_test_processes" ]; do
   PG_EVENTSTORE_URI="postgresql://postgres:postgres@localhost:5532/eventstore${parallel_test_worker}_test" \
     bundle exec rake pg_eventstore:create pg_eventstore:migrate
-  PG_EVENTSTORE_URI="postgresql://postgres:postgres@localhost:5532/eventstore${parallel_test_worker}_migration_target_test" \
-    bundle exec rake pg_eventstore:create pg_eventstore:migrate
   parallel_test_worker=$((parallel_test_worker + 1))
 done

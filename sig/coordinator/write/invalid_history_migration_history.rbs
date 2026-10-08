@@ -1,6 +1,0 @@
-module Coordinator
-  module Write
-    class InvalidHistoryMigrationHistory < StandardError
-    end
-  end
-end
