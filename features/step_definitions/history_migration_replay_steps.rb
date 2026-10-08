@@ -86,11 +86,26 @@ When("the agent records and updates an Artifact after the accepted history cutof
   assert_acceptance_equal("ok", result.fetch("status"), "Tail update")
 end
 
+When("the agent cancels another Artifact capture before execution") do
+  stop_process_subscriptions
+  response = call_tool("development_artifact_capture", {
+    command_id: "history-tail-cancelled", actor: { kind: "agent", id: "history-agent" },
+    scope: "project:history-tail", title: "Cancelled documentation", kind: "documentation", labels: [],
+    content: { encoding: "utf-8", media_type: "text/markdown", text: "Never captured" },
+    source: { kind: "generated", locator: "mcp://history-tail/cancelled", revision: nil,
+              observed_at: "2026-08-25T16:00:00.000000Z", collector: "cucumber/v1" }
+  })
+  @history_tail_cancelled_task_id = response.dig("result", "taskId")
+  task_request("tasks/cancel", @history_tail_cancelled_task_id)
+  assert_acceptance_equal("cancelled", task_request("tasks/get", @history_tail_cancelled_task_id).dig("result", "status"), "Source cancelled Task")
+  start_process_subscriptions
+end
+
 When("the agent requests the closed development-memory suffix through MCP") do
   commands = PgEventstore.client.read(PgEventstore::Stream.all_stream, options: {
     max_count: 20, filter: { event_types: [ "CommandRegistered" ] }
-  }).select { %w[history-tail-capture history-tail-update].include?(_1.data.fetch("request_id")) }.map { _1.data.fetch("command_id") }.sort
-  assert_acceptance_equal(2, commands.size, "Selected artifact command membership")
+  }).select { %w[history-tail-capture history-tail-update history-tail-cancelled].include?(_1.data.fetch("request_id")) }.map { _1.data.fetch("command_id") }.sort
+  assert_acceptance_equal(3, commands.size, "Selected artifact command membership")
   reader = Coordinator::Write::HistoryMigrations::SourceReader.new(client: PgEventstore.client)
   upper = reader.head_position(source_command_ids: commands, source_after_position: @history_tail_after)
   task = submit_and_execute("history_migration_start",
@@ -128,4 +143,18 @@ Then("the accepted base history is unchanged and maintenance history is excluded
   assert_acceptance(events.none? { _1.type.start_with?("HistoryMigration") || (_1.type == "ProcessStepPlanned" && _1.data.fetch("process_name").start_with?("history-migration")) }, "Maintenance history must be excluded")
   assert_acceptance(events.any? { _1.type == "DevelopmentArtifactObservationFactLinked" }, "Immutable observation references must be preserved")
   assert_acceptance(events.any? { _1.type == "DevelopmentArtifactLabelRemoved" && _1.data.fetch("label") == "initial" }, "Label removal facts must be preserved")
+  assert_acceptance_equal(1, events.count { _1.type == "DevelopmentArtifactCreated" }, "Cancelled capture must not manufacture an Artifact")
+end
+
+Then("the cancelled capture retains terminal history without target work") do
+  cancelled = PgEventstore.client(:migration_target).read(PgEventstore::Stream.all_stream, options: {
+    max_count: 2, filter: { event_types: [ { type: "CoordinationTaskCancelled", markers: [ "history-migration:#{@history_migration_id}" ] } ] }
+  }).sole
+  task_id = cancelled.data.fetch("task_id")
+  target_store = Coordinator::Write::EventStore.new(client: PgEventstore.client(:migration_target))
+  loader = Coordinator::Write::Tasks::Loader.new(event_store: target_store)
+  task = Coordinator::Write::Operations::GetCoordinationTask.new(loader:).call(task_id:).value!
+  assert_acceptance(task_id != @history_tail_cancelled_task_id, "Restored Task identity must be newly allocated")
+  assert_acceptance_equal("cancelled", task.status, "Restored cancellation status")
+  assert_acceptance_equal("Cancelled before execution", task.status_message, "Restored cancellation reason")
 end

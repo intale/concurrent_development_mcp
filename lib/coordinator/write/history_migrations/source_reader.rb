@@ -13,6 +13,7 @@ module Coordinator::Write
         DevelopmentArtifactScopeChanged DevelopmentArtifactSourceChanged DevelopmentArtifactTitleChanged
         CommandRegistered CommandSucceeded CommandRejected
         CoordinationTaskSubmitted CoordinationTaskExecutionStarted CoordinationTaskCompleted
+        CoordinationTaskCancellationRequested CoordinationTaskCancelled CoordinationTaskFailed
       ].freeze
 
       def initialize(client:)
@@ -66,7 +67,7 @@ module Coordinator::Write
         end
         task_markers = submissions.map { "task:#{_1.data.fetch('task_id')}" }
         SELECTION_EVENT_TYPES.filter_map do |type|
-          lifecycle = %w[CoordinationTaskExecutionStarted CoordinationTaskCompleted].include?(type)
+          lifecycle = type.start_with?("CoordinationTask") && type != "CoordinationTaskSubmitted"
           next if lifecycle && task_markers.empty?
 
           { type:, markers: lifecycle ? task_markers : markers }

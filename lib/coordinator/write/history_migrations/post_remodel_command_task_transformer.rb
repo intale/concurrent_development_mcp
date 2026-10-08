@@ -10,6 +10,13 @@ module Coordinator::Write
         Events::CommandRejectedV2,
         Events::CommandSucceededV1
       ].freeze
+      TASK_LIFECYCLE_STEPS = {
+        Events::CoordinationTaskExecutionStartedV2 => "start-coordination-task",
+        Events::CoordinationTaskCancellationRequestedV2 => "request-coordination-task-cancellation",
+        Events::CoordinationTaskCancelledV2 => "cancel-coordination-task",
+        Events::CoordinationTaskCompletedV3 => "complete-coordination-task",
+        Events::CoordinationTaskFailedV2 => "fail-coordination-task"
+      }.freeze
 
       def initialize(
         event_store:,
@@ -65,7 +72,7 @@ module Coordinator::Write
             source_event:,
             source: source_payload
           )
-        when Events::CoordinationTaskExecutionStartedV2, Events::CoordinationTaskCompletedV3
+        when *TASK_LIFECYCLE_STEPS.keys
           task_lifecycle(
             migration_id:,
             source_config_name:,
@@ -287,11 +294,8 @@ module Coordinator::Write
         return task if task.failure?
 
         task_id = task.value!.target_stream.stream_id
-        target, step_name = if source.is_a?(Events::CoordinationTaskExecutionStartedV2)
-          [ Events::CoordinationTaskExecutionStartedV2.new(task_id:), "start-coordination-task" ]
-        else
-          [ Events::CoordinationTaskCompletedV3.new(task_id:), "complete-coordination-task" ]
-        end
+        target = source.new(task_id:)
+        step_name = TASK_LIFECYCLE_STEPS.fetch(source.class)
         Success([
           fact(
             target_stream: task.value!.target_stream,

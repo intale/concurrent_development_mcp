@@ -4,6 +4,7 @@ module Coordinator
       class SourceSelectionValidator
         MAXIMUM_FACTS: Integer
         TOOLS: Array[String]
+        TASK_TERMINALS: Array[String]
         REFERENCE_KEYS: Array[String]
         def initialize: (source_reader: SourceReader, ?schema_registry: SourceEventSchemaRegistry) -> void
         def call: (after_position: Integer, upper_position: Integer, command_ids: Array[String]) -> Dry::Monads::Result

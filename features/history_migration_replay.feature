@@ -17,7 +17,9 @@ Feature: Migrated history remains usable through the public read side
     And frozen historical repository and Task evidence exists
     When the agent starts a history migration through MCP
     And the agent records and updates an Artifact after the accepted history cutoff
+    And the agent cancels another Artifact capture before execution
     And the agent requests the closed development-memory suffix through MCP
     And the migrated repository and command receipts are replayed
     Then the agent retrieves the current and original observed Artifact content through MCP
+    And the cancelled capture retains terminal history without target work
     And the accepted base history is unchanged and maintenance history is excluded

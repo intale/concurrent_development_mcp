@@ -11,6 +11,25 @@ RSpec.describe "post-remodel Command, Task, and ProcessStep history migration", 
   let(:attempt_id) { "source-attempt" }
   let(:resource_id) { SecureRandom.uuid_v7 }
 
+  [
+    [ Coordinator::Write::Events::CoordinationTaskCancellationRequestedV2, { reason: "Stop this request" } ],
+    [ Coordinator::Write::Events::CoordinationTaskCancelledV2, { reason: "Cancelled before execution" } ],
+    [ Coordinator::Write::Events::CoordinationTaskFailedV2, { code: "internal_error", reason: "Execution failed", retryable: false } ]
+  ].each do |event_class, attributes|
+    it "preserves #{event_class.event_type} without manufacturing a command outcome" do
+      task_id = SecureRandom.uuid_v7
+      payload = event_class.new(task_id:, **attributes)
+      event = persist_payload(stream("CoordinatorControl", "CoordinationTask", task_id), payload)
+      fact = transform(event, upper_position: event.global_position).value!.sole
+
+      expect(fact.event).to be_a(event_class)
+      expect(fact.event.to_h.except(:task_id)).to eq(attributes)
+      expect(fact.event.task_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
+      expect(fact.event.task_id).not_to eq(task_id)
+      expect(transform(event, upper_position: event.global_position).value!.sole.event).to eq(fact.event)
+    end
+  end
+
   it "preserves an evidence-limited historical rejection without manufacturing business details" do
     command_id = SecureRandom.uuid_v7
     persist_payload(stream("CoordinatorControl", "Command", command_id),

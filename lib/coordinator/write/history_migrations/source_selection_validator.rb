@@ -7,6 +7,7 @@ module Coordinator::Write
 
       MAXIMUM_FACTS = 1000
       TOOLS = %w[development_artifact_capture development_artifact_update].freeze
+      TASK_TERMINALS = %w[CoordinationTaskCompleted CoordinationTaskCancelled CoordinationTaskFailed].freeze
       REFERENCE_KEYS = %w[event_id type stream_context stream_name stream_id stream_revision].freeze
 
       def initialize(source_reader:, schema_registry: SourceEventSchemaRegistry.new)
@@ -30,7 +31,17 @@ module Coordinator::Write
           return invalid("Selection requires complete artifact capture/update commands")
         end
         terminals = events.select { %w[CommandSucceeded CommandRejected].include?(_1.type) }
-        unless terminals.map { _1.data.fetch("command_id") }.sort == command_ids.sort
+        task_histories = events.select { _1.type.start_with?("CoordinationTask") }.group_by { _1.data.fetch("task_id") }
+        commands_without_outcome = task_histories.values.filter_map do |history|
+          terminal = history.last.type
+          next unless terminal == "CoordinationTaskFailed" ||
+            (terminal == "CoordinationTaskCancelled" && history.none? { _1.type == "CoordinationTaskExecutionStarted" })
+
+          history.first.data.fetch("command_id")
+        end
+        terminal_ids = terminals.map { _1.data.fetch("command_id") }.sort
+        unless (command_ids - terminal_ids - commands_without_outcome).empty? &&
+            (terminal_ids - command_ids).empty? && terminal_ids.uniq == terminal_ids
           return invalid("Selection requires terminal command outcomes")
         end
         streams = events.group_by { [ _1.stream.context, _1.stream.stream_name, _1.stream.stream_id ] }
@@ -38,7 +49,7 @@ module Coordinator::Write
           !(
             history.map(&:stream_revision) == (0...history.length).to_a &&
               history.last.global_position == @source_reader.stream_tail_position(history.last, to_position: upper_position) &&
-              (history.first.stream.stream_name != "CoordinationTask" || history.last.type == "CoordinationTaskCompleted")
+              (history.first.stream.stream_name != "CoordinationTask" || TASK_TERMINALS.include?(history.last.type))
           )
         end
         if incomplete

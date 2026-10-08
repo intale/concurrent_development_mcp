@@ -62,6 +62,50 @@ RSpec.describe Coordinator::Write::HistoryMigrations::SourceSelectionValidator, 
     expect(validate(last.global_position).failure.message).to include("exceeds 1000")
   end
 
+  it "preserves cancellation before execution without inventing a command outcome" do
+    last = task_history(terminal: "CoordinationTaskCancelled")
+    expect(validate(last.global_position)).to be_success
+  end
+
+  it "preserves a terminal failed Task without a target command outcome" do
+    last = task_history(terminal: "CoordinationTaskFailed", started: true)
+    expect(validate(last.global_position)).to be_success
+  end
+
+  it "rejects a genuinely unfinished Task" do
+    last = task_history(terminal: nil)
+    expect(validate(last.global_position)).to be_failure
+  end
+
+  it "rejects a completed Task with no command outcome" do
+    last = task_history(terminal: "CoordinationTaskCompleted", started: true)
+    expect(validate(last.global_position)).to be_failure
+  end
+
+  def task_history(terminal:, started: false)
+    anchor
+    registered = store.append(streams.command(command_id), [
+      PgEventstore::Event.new(type: "CommandRegistered", data: { command_id:, request_id: "cancelled-suffix-probe", tool_name: "development_artifact_capture" }, metadata: { schema_version: 1 }, markers: [ "command:#{command_id}" ])
+    ]).sole
+    command = Coordinator::Write::Operations::PrepareCaptureDevelopmentArtifact.new.call(
+      command_id: "cancelled-suffix-probe", actor: { kind: "agent", id: "migration-agent" }, scope: "project:tail", title: "Probe", kind: "documentation", labels: [],
+      content: { encoding: "utf-8", media_type: "text/markdown", text: "Never captured" },
+      source: { kind: "generated", locator: "mcp://tail/cancelled", revision: nil, observed_at: "2026-10-08T00:00:00.000000Z", collector: "spec/v1" }
+    ).value!.new(command_id:)
+    task_id = SecureRandom.uuid_v7
+    submitted = Coordinator::Write::Events::CoordinationTaskSubmittedV3.new(task_id:, command_id:, tool_name: "development_artifact_capture", command_input: Coordinator::Write::CommandInputDigest.new.document(command), poll_interval_ms: 500, ttl_ms: nil)
+    payloads = [ submitted ]
+    payloads << Coordinator::Write::Events::CoordinationTaskExecutionStartedV2.new(task_id:) if started
+    payloads << case terminal
+    when "CoordinationTaskCancelled" then Coordinator::Write::Events::CoordinationTaskCancelledV2.new(task_id:, reason: "Cancelled before execution")
+    when "CoordinationTaskCompleted" then Coordinator::Write::Events::CoordinationTaskCompletedV3.new(task_id:)
+    when "CoordinationTaskFailed" then Coordinator::Write::Events::CoordinationTaskFailedV2.new(task_id:, code: "internal_error", reason: "Execution failed", retryable: false)
+    end if terminal
+    store.append(streams.coordination_task(task_id), payloads.map { |payload|
+      PgEventstore::Event.new(type: payload.class.event_type, data: payload.to_h, metadata: { schema_version: payload.class.schema_version }, markers: [ "command:#{command_id}", "task:#{task_id}" ], caused_by: registered)
+    }).last
+  end
+
   def command_facts(tool: "development_artifact_capture")
     anchor
     store.append(streams.command(command_id), [

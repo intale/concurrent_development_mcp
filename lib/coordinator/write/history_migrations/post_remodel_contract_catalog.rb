@@ -26,7 +26,8 @@ module Coordinator::Write
 
       COMMAND_AND_TASK_CONTRACTS = %w[
         CommandRegistered@1 CommandRejected@1 CommandRejected@2 CommandSucceeded@1
-        CoordinationTaskCompleted@3 CoordinationTaskExecutionStarted@2 CoordinationTaskSubmitted@3
+        CoordinationTaskCancellationRequested@2 CoordinationTaskCancelled@2 CoordinationTaskCompleted@3
+        CoordinationTaskExecutionStarted@2 CoordinationTaskFailed@2 CoordinationTaskSubmitted@3
         ProcessStepPlanned@1
       ].map do |contract|
         type, version = contract.split("@", 2)
