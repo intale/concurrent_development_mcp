@@ -25,7 +25,6 @@ RSpec.describe "Read-model test fixture boundaries", :read_model do
     /Coordinator::Read::Subscriptions::/,
     /Coordinator::Write::Operations::/,
     /Coordinator::Processes::/,
-    /PgEventstore/,
     /\b[A-Z][A-Za-z0-9]*Scenario\b/
   )
   SUBSCRIPTION_DELIVERY_CROSSING = Regexp.union(
@@ -104,9 +103,9 @@ RSpec.describe "Read-model test fixture boundaries", :read_model do
     end
     fixture_crossings = crossing_paths
 
-    expect(dual_store_specs).to match_array(inventory::LEGACY_FULL_CHAIN)
-    expect(fixture_crossings - inventory::LEGACY_FULL_CHAIN).to be_empty,
-      "unplanned read-fixture crossings: #{(fixture_crossings - inventory::LEGACY_FULL_CHAIN).join(', ')}"
+    expect(dual_store_specs).to match_array(inventory::PERSISTED_SOURCE_PROJECTOR_SPECS)
+    expect(fixture_crossings).to be_empty,
+      "unplanned read-fixture crossings: #{fixture_crossings.join(', ')}"
   end
 
   it "keeps projector setup direct and subscription delivery in Cucumber" do
@@ -116,7 +115,13 @@ RSpec.describe "Read-model test fixture boundaries", :read_model do
       source = path.read
       reasons = []
       reasons << "indirect setup" if source.match?(PROJECTOR_SETUP_CROSSING)
-      reasons << "missing ProjectionEventFactory" unless source.include?("ProjectionEventFactory")
+      if inventory::PERSISTED_SOURCE_PROJECTOR_SPECS.include?(relative_path)
+        reasons << "missing concrete event factory" unless source.include?("EventFactory")
+        reasons << "missing persisted source facts" unless source.include?("event_store.append")
+      else
+        reasons << "unexpected persisted setup" if source.include?("PgEventstore")
+        reasons << "missing ProjectionEventFactory" unless source.include?("ProjectionEventFactory")
+      end
       "#{relative_path}: #{reasons.join(', ')}" if reasons.any?
     end
     subscription_violations = inventory::SUBSCRIPTION_CONTRACT_SPECS.filter_map do |relative_path|

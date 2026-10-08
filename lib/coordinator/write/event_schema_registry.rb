@@ -39,7 +39,6 @@ module Coordinator::Write
       [ "SkillAssetContentDefined", 1 ] => Events::SkillAssetContentDefinedV1,
       [ "SkillAssetExecutabilityDefined", 1 ] => Events::SkillAssetExecutabilityDefinedV1,
       [ "SkillAssetAddedToRevision", 1 ] => Events::SkillAssetAddedToRevisionV1,
-      [ "SkillRevisionPublished", 2 ] => Events::SkillRevisionPublishedV2,
       [ "SkillRevisionPublished", 3 ] => Events::SkillRevisionPublishedV3,
       [ "DevelopmentArtifactCaptured", 2 ] => Events::DevelopmentArtifactCapturedV2,
       [ "DevelopmentArtifactCreated", 1 ] => Events::DevelopmentArtifactCreatedV1,

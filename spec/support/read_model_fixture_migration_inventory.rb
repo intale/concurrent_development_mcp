@@ -71,5 +71,10 @@ module ReadModelFixtureMigrationInventory
   }.freeze
 
   ALL = BY_TARGET_BOUNDARY.values.flatten.freeze
-  LEGACY_FULL_CHAIN = [].freeze
+  # These projectors reconstruct a current projection from concrete facts in
+  # several streams. Their source/envelope fixtures use the real event store,
+  # not commands, subscriptions or a full write-to-read fixture journey.
+  PERSISTED_SOURCE_PROJECTOR_SPECS = %w[
+    spec/lib/coordinator/read/projectors/skills_v1_spec.rb
+  ].freeze
 end

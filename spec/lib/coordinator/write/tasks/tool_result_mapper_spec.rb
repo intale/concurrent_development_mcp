@@ -5,6 +5,34 @@ RSpec.describe Coordinator::Write::Tasks::ToolResultMapper do
 
   subject(:mapper) { described_class.new }
 
+  it "preserves the current work-intention history limit as a modeled tool denial" do
+    limit = Coordinator::Write::EventQueries::WORK_INTENTION_BOUNDARY_MAXIMUM_COUNT
+    error = Coordinator::Write::OutcomeError.new(
+      code: :resource_boundary_maintenance_required,
+      message: "Work-intention boundary history exceeded its decision limit",
+      details: {
+        repository_id: RepositoryScenario::DEFAULT_REPOSITORY_ID,
+        boundary_marker_count: 6,
+        maximum_delta_event_count: limit
+      }
+    )
+
+    result = mapper.call(
+      Failure(error),
+      command_id: "cmd-current-intention-history-limit",
+      tool_name: "work_intention_set_declare"
+    )
+
+    expect(result).to have_attributes(is_error: true)
+    expect(result.structured_content).to have_attributes(
+      status: "limit_reached",
+      data: have_attributes(
+        code: "resource_boundary_maintenance_required",
+        details: have_attributes(maximum_delta_event_count: limit)
+      )
+    )
+  end
+
   it "preserves a modeled relation-capacity denial as limit_reached" do
     error = Coordinator::Write::OutcomeError.new(
       code: :development_artifact_relation_limit_reached,

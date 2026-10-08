@@ -1,8 +1,0 @@
-module Coordinator::Write
-  module Skills
-    class PersistedPublicationLoader
-      def initialize: (?schema_registry: EventSchemaRegistry) -> void
-      def call: (PgEventstore::Event event) -> Dry::Monads::Result
-    end
-  end
-end

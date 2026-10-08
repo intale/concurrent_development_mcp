@@ -78,14 +78,6 @@ module Coordinator::Write
             name: registration.name,
             scope: registration.scope
           )
-        when Events::SkillRevisionPublishedV2
-          RelationTargetV1.new(
-            kind: target.kind,
-            id: target.id,
-            status: "verified",
-            name: publication.name,
-            scope: publication.scope
-          )
         end
       end
 

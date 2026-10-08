@@ -5,6 +5,36 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWriteSet, :event_sto
   let(:streams) { Coordinator::Write::StreamFactory.new }
   subject(:operation) { described_class.new(event_store:) }
 
+  it "preserves existing membership when a new resource exceeds its real boundary budget" do
+    ResourceLeaseOperationScenario.start_attempts(
+      event_store:,
+      attempts: [ [ "W-LSE-A", "A-LSE-A", "agent-a" ], [ "W-LSE-B", "A-LSE-B", "agent-b" ] ]
+    )
+    reservation = ResourceLeaseOperationScenario.reserve(event_store:, paths: [ "capacity/owned.rb" ])
+    other = ResourceLeaseOperationScenario.reserve(
+      event_store:, paths: [ "capacity/addition.rb" ], command_id: "seed-capacity-b",
+      agent_id: "agent-b", work_item_id: "W-LSE-B", attempt_id: "A-LSE-B"
+    )
+    declaration = read_intention(other.receipt.intentions.sole.intention_id).sole
+    WorkIntentionHistoryFixture.exhaust_boundary(event_store:, declaration:)
+
+    result = operation.call(
+      expand_input(
+        reservation, command_id: "cmd-expand-capacity", resources: [ { resource_id: other.resource_ids.sole } ]
+      )
+    )
+
+    expect(result.failure).to have_attributes(code: :resource_boundary_maintenance_required)
+    expect(read_set(reservation.receipt.intention_set_id).map(&:type)).to eq(
+      [ "WorkIntentionSetCreated", "WorkIntentionAddedToSet" ]
+    )
+    mapped = Coordinator::Write::Tasks::ToolResultMapper.new.call(
+      result, command_id: "cmd-expand-capacity", tool_name: "work_intention_set_expand"
+    )
+    expect(mapped).to have_attributes(is_error: true)
+    expect(mapped.structured_content.status).to eq("limit_reached")
+  end
+
   it "atomically declares and links each new intention without an expansion snapshot" do
     reservation = setup_reservation
     resource_id = resolve("app/models/b.rb")

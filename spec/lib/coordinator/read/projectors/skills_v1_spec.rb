@@ -1,9 +1,15 @@
 # frozen_string_literal: true
 
-RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model do
-  subject(:projector) { described_class.new }
+RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model, :event_store do
+  subject(:projector) do
+    described_class.new(
+      projection_builder: Coordinator::Write::Skills::PublicationProjectionBuilderV3.new(event_store:)
+    )
+  end
 
   let(:repository) { Coordinator::Read::Repositories::Skills.new }
+  let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
+  let(:streams) { Coordinator::Write::StreamFactory.new }
   let(:identity) do
     Coordinator::Write::Skills::IdentityBuilder.new.call(name: "review", scope: "project:alpha")
   end
@@ -36,7 +42,7 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model do
       revision: 2,
       instructions: "Inspect behavior and contracts.",
       published: have_attributes(
-        event: have_attributes(event_id: second_event.id, stream_revision: 1),
+        event: have_attributes(event_id: second_event.id, stream_revision: 2),
         global_position: second_event.global_position,
         causation_id: second_event.causation_id,
         correlation_id: second_event.correlation_id
@@ -57,9 +63,12 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model do
     expect(Coordinator::Read::SkillAsset.count).to eq(1)
     expect(processed_events.count).to eq(2)
     expect(current.to_h.keys & %i[fresh pending projection_status]).to be_empty
+    [ Coordinator::Read::Skill, Coordinator::Read::SkillRevision, Coordinator::Read::SkillAsset ].each do |model|
+      expect(model.sole.updated_at).to eq(second_event.created_at)
+    end
   end
 
-  it "accepts a newer full snapshot first and never regresses on delayed older delivery" do
+  it "builds the newer granular revision first and never regresses on delayed older delivery" do
     first_event = publication_event(
       revision: 1,
       instructions: "Inspect the complete diff.",
@@ -81,27 +90,41 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model do
     expect(current).to have_attributes(revision: 2, instructions: "Newest.")
     expect(historical).to be_nil
     expect(processed_events.count).to eq(2)
+    expect(Coordinator::Read::Skill.sole.updated_at).to eq(second_event.created_at)
   end
 
-  it "replays a pre-cutover publication until MIGRATION-01 transforms history" do
-    legacy_skill_id = "skill:v1:#{'a' * 64}"
+  it "preserves attributed historical policy evidence on a current granular publication" do
     event = publication_event(
       revision: 1,
       instructions: "Model cohesive facts.",
       path: "SKILL.md",
-      content: "Legacy source.\n",
-      skill_id: legacy_skill_id
+      content: "Observed source.\n",
+      policy_version: "skill-repository/v1"
     )
 
     projector.call(event)
 
     expect(repository.fetch(name: "review", scope: "project:alpha")).to have_attributes(
-      skill_id: legacy_skill_id,
+      skill_id: identity.skill_id,
       instructions: "Model cohesive facts."
     )
+    expect(repository.fetch(name: "review", scope: "project:alpha").published.metadata)
+      .to include("policy_version" => "skill-repository/v1", "schema_version" => 3)
   end
 
-  def publication_event(revision:, instructions:, path:, content:, skill_id: identity.skill_id)
+  it "rejects a superseded schema before claiming or creating a projection" do
+    event = publication_event(revision: 1, instructions: "Current.", path: "SKILL.md", content: "Current.")
+    event.metadata = event.metadata.merge("schema_version" => 2)
+
+    expect { projector.call(event) }.to raise_error(Coordinator::Read::InvalidProjectionSource)
+    expect(Coordinator::Read::Skill.count).to eq(0)
+    expect(processed_events.count).to eq(0)
+    expect do
+      Coordinator::Write::EventSchemaRegistry.new.load(type: "SkillRevisionPublished", schema_version: 2, data: {})
+    end.to raise_error(Coordinator::Write::EventSchemaRegistry::UnknownSchema)
+  end
+
+  def publication_event(revision:, instructions:, path:, content:, policy_version: "skill-repository/v2")
     asset_input = {
       path:,
       executable: false,
@@ -117,30 +140,53 @@ RSpec.describe Coordinator::Read::Projectors::SkillsV1, :read_model do
       instructions:,
       assets: [ asset_input ]
     ).value!
-    payload = Coordinator::Write::Events::SkillRevisionPublishedV2.new(
-      skill_id:,
-      name: identity.name,
-      scope: identity.scope,
-      revision:,
-      description: revision_content.description,
-      instructions: revision_content.instructions,
-      assets: revision_content.assets,
-      content_digest: revision_content.content_digest,
-      published_at: "2026-08-30T12:0#{revision}:00.000000Z"
+    skill_id = identity.skill_id
+    revision_id = SecureRandom.uuid_v7
+    asset_id = SecureRandom.uuid_v7
+    metadata = Coordinator::Write::EventMetadata.new(
+      command_id: "cmd-skill-#{revision}", actor_kind: "agent", actor_id: "agent-1",
+      recorded_by: "coordinator", policy_version:
     )
-    ProjectionEventFactory.build(
-      payload:,
-      stream: Coordinator::Write::StreamReference.new(
-        context: "AgentKnowledge",
-        stream_name: "Skill",
-        stream_id: skill_id
-      ),
-      stream_revision: revision - 1,
-      global_position: 100 * revision,
-      command_id: "cmd-skill-#{revision}",
-      policy_version: "skill-repository/v1",
-      actor_id: "agent-1",
-      markers: [ "skill:#{identity.skill_id}" ]
+    events = Coordinator::Write::Events
+    if revision == 1
+      append_facts(streams.skill(skill_id), [
+        events::SkillRegisteredV1.new(skill_id:, name: identity.name, scope: identity.scope)
+      ], metadata)
+    end
+    append_facts(streams.skill_revision(revision_id), [
+      events::SkillRevisionCreatedV1.new(skill_revision_id: revision_id, skill_id:, revision:),
+      events::SkillRevisionDescriptionDefinedV1.new(skill_revision_id: revision_id, description: revision_content.description),
+      events::SkillRevisionInstructionsDefinedV1.new(skill_revision_id: revision_id, instructions:)
+    ], metadata)
+    append_facts(streams.skill_asset(asset_id), [
+      events::SkillAssetCreatedV1.new(asset_id:),
+      events::SkillAssetPathDefinedV1.new(asset_id:, path:),
+      events::SkillAssetExecutabilityDefinedV1.new(asset_id:, executable: false)
+    ], metadata)
+    asset_content = revision_content.assets.sole.content
+    append_facts(streams.skill_asset(asset_id), [
+      events::SkillAssetContentDefinedV1.new(asset_id:, content:)
+    ], Coordinator::Write::Metadata::ContentV1.new(
+      **metadata.to_h, encoding: "utf-8", media_type: asset_content.media_type,
+      content_sha256: asset_content.content_sha256, byte_size: asset_content.byte_size
+    ))
+    append_facts(streams.skill_revision(revision_id), [
+      events::SkillAssetAddedToRevisionV1.new(skill_revision_id: revision_id, skill_id:, revision:, asset_id:)
+    ], metadata)
+    append_facts(streams.skill(skill_id), [
+      events::SkillRevisionPublishedV3.new(skill_id:, skill_revision_id: revision_id, revision:)
+    ], Coordinator::Write::Metadata::SkillPublicationV3.new(
+      **metadata.to_h, content_digest: revision_content.content_digest
+    )).sole
+  end
+
+  def append_facts(stream, payloads, metadata)
+    factory = Coordinator::Write::EventFactory.new
+    event_store.append(
+      stream,
+      payloads.map do |payload|
+        factory.build!(event: payload, event_id: SecureRandom.uuid_v7, metadata:, markers: [])
+      end
     )
   end
 

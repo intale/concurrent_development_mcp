@@ -55,6 +55,7 @@ Feature: Scoped AI Skill repository
       When the agent publishes Skill "release-check" with script asset "scripts/check.sh"
       And the Skill publication reaches the read side
       Then the Skill publication contains granular revision and asset facts
+      And the Skill view reports the native publication time without payload timestamps
       And the exact script asset content and digest are available through MCP
       And the Skill view exposes the asset manifest without embedding its content
 

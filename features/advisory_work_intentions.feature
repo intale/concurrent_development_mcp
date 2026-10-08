@@ -30,6 +30,15 @@ Feature: Advisory resource work intentions
 
   Rule: Contention is information for the agent, not a writer queue
 
+    Scenario: Exhausted authoritative history denies declaration and expansion without partial writes
+      Given compatible shared work has accumulated more than the intention boundary budget
+      When agent B requests a shared intention set declaration over that history
+      Then the history-budget Task completes with a typed limit result rather than an execution failure
+      And the denied request records no partial intentions or membership changes
+      When agent B requests a shared intention set expansion over that history
+      Then the history-budget Task completes with a typed limit result rather than an execution failure
+      And the denied request records no partial intentions or membership changes
+
     Scenario: Repeated renewals and withdrawal remain visible when projections catch up
       Given agent A has an active shared intention for file README.md
       When agent A renews that intention twice and withdraws it while read projections are stopped

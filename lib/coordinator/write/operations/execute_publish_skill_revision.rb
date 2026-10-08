@@ -211,18 +211,6 @@ module Coordinator::Write
             ),
             publication_event
           ])
-        when Events::SkillRevisionPublishedV2
-          Success([
-            Skills::SkillStateV1.new(
-              skill_id: publication.skill_id,
-              name: publication.name,
-              scope: publication.scope,
-              skill_revision_id: nil,
-              revision: publication.revision,
-              content_digest: publication.content_digest
-            ),
-            publication_event
-          ])
         else
           Failure(
             OutcomeError.new(

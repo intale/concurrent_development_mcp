@@ -115,4 +115,44 @@ RSpec.describe Coordinator::Write::Domain::Skills::GranularPublish do
       executable: false
     )
   end
+
+  it "returns no new facts for identical content at the current revision" do
+    current = Coordinator::Write::Skills::SkillStateV1.new(
+      skill_id:, name: identity.name, scope: identity.scope,
+      skill_revision_id: revision_id, revision: 1, content_digest: command.content_digest
+    )
+    result = decide(current, command.class.new(**command.to_h, assets: command.assets, expected_revision: 1))
+
+    expect(result.value!).to have_attributes(
+      outcome: "existing", revision: 1, skill_revision_id: revision_id, event_plan: nil, publication: nil
+    )
+  end
+
+  it "denies a stale expected revision even when the content is identical" do
+    current = Coordinator::Write::Skills::SkillStateV1.new(
+      skill_id:, name: identity.name, scope: identity.scope,
+      skill_revision_id: revision_id, revision: 1, content_digest: command.content_digest
+    )
+    result = decide(current, command)
+
+    expect(result.failure).to have_attributes(code: :skill_revision_conflict)
+    expect(result.failure.details).to include(expected_revision: 0, current_revision: 1)
+  end
+
+  it "does not let another name or scope reuse the registered Skill stream" do
+    current = Coordinator::Write::Skills::SkillStateV1.new(
+      skill_id:, name: identity.name, scope: identity.scope,
+      skill_revision_id: revision_id, revision: 1, content_digest: command.content_digest
+    )
+    result = decide(current, command.class.new(**command.to_h, assets: command.assets, scope: "home", expected_revision: 1))
+
+    expect(result.failure).to have_attributes(code: :skill_identity_conflict)
+  end
+
+  def decide(state, requested)
+    decider.call(
+      state:, command: requested, skill_stream:, revision_stream:,
+      asset_streams: [ asset_stream ], revision_id:
+    )
+  end
 end

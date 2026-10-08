@@ -35,6 +35,7 @@ module Coordinator::Processes
         kind: "system",
         id: "resource-boundary-maintenance-v3"
       )
+      ACTIVE_SOURCE_EVENT_TYPES = %w[ResourceWorkIntentionDeclared ResourceWorkIntentionRenewed].freeze
 
       def initialize(
         event_store:,
@@ -62,6 +63,11 @@ module Coordinator::Processes
         )
         state = @intention_loader.call(payload.intention_id).state
         raise Rejected, "ResourceWorkIntention history is missing its declaration" if state.absent?
+
+        # At this immutable cutoff the source itself proves a nonempty boundary.
+        # Later withdrawal or expiry cannot make that historical cutoff empty.
+        return nil if ACTIVE_SOURCE_EVENT_TYPES.include?(event.type) &&
+          Time.iso8601(payload.expires_at) > event.created_at
 
         boundary_markers(event).each_with_index do |marker, boundary_index|
           process_step = @process_step_planner.call(

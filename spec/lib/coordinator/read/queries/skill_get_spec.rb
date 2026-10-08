@@ -59,25 +59,4 @@ RSpec.describe Coordinator::Read::Queries::SkillGet, :read_model do
     expect(absent).to have_attributes(status: "not_found")
     expect(absent.data.details).to include(revision: 3)
   end
-
-  it "serves a pre-cutover projected identity until the migration rebuilds the read side" do
-    skill = create(
-      :coordinator_read_skill,
-      skill_id: "skill:v1:#{'a' * 64}",
-      name: "event-modeling",
-      scope: "project:concurrent_development_mcp"
-    )
-    create(:coordinator_read_skill_revision, skill:, instructions: "Model cohesive facts.")
-
-    result = query.call(
-      name: "event-modeling",
-      scope: "project:concurrent_development_mcp"
-    ).value!
-
-    expect(result).to have_attributes(status: "ok")
-    expect(result.data.skill).to have_attributes(
-      skill_id: skill.skill_id,
-      instructions: "Model cohesive facts."
-    )
-  end
 end

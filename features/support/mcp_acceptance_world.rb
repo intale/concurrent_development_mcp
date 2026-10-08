@@ -58,12 +58,12 @@ module McpAcceptanceWorld
     await_task_terminal(task_id)
   end
 
-  def submit_and_execute(tool, client_id: "default", **arguments)
+  def submit_and_execute(tool, client_id: "default", task_timeout_seconds: LiveSubscriptions::DEFAULT_TIMEOUT_SECONDS, **arguments)
     response = call_tool(tool, arguments, client_id:)
     task_id = response.dig("result", "taskId")
     assert_acceptance(task_id, "#{tool} did not return a Task handle: #{response.inspect}")
     start_process_subscriptions
-    await_task_terminal(task_id, client_id:)
+    await_task_terminal(task_id, client_id:, timeout_seconds: task_timeout_seconds)
     task_id
   end
 

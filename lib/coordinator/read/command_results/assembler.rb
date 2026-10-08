@@ -490,8 +490,7 @@ module Coordinator::Read
       def skill_publication(source, args:)
         publication_event = event_for_any_payload(
           source,
-          Coordinator::Write::Events::SkillRevisionPublishedV3,
-          Coordinator::Write::Events::SkillRevisionPublishedV2
+          Coordinator::Write::Events::SkillRevisionPublishedV3
         ) || load_first_event(
           @stream_factory.skill(source.command.skill_id),
           Coordinator::Write::EventQueries::SKILL_LATEST_REVISION

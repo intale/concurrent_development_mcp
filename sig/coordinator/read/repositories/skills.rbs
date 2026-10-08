@@ -5,7 +5,7 @@ module Coordinator
         def fetch: (name: String, scope: String, ?revision: Integer?) -> SkillViewV1?
         def fetch_asset: (name: String, scope: String, path: String, ?revision: Integer?) -> (SkillTextAssetViewV2 | SkillBinaryAssetViewV2)?
         def page: (SkillListQueryV1 query) -> SkillPageV1
-        def store_revision: (event: PgEventstore::Event, publication: Write::Events::SkillRevisionPublishedV2 | Write::Skills::ProjectionPublicationV3) -> Skill
+        def store_revision: (event: PgEventstore::Event, publication: Write::Skills::ProjectionPublicationV3) -> Skill
       end
     end
   end

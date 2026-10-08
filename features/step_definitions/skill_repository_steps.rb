@@ -492,3 +492,20 @@ Then("the Skill publication contains granular revision and asset facts") do
     "Publication fact data"
   )
 end
+
+Then("the Skill view reports the native publication time without payload timestamps") do
+  facts = skill_fact_events(name: @asset_skill_name, scope: @asset_skill_scope)
+  publication = facts.find { _1.type == "SkillRevisionPublished" }
+  assert_acceptance_equal(3, publication.metadata.fetch("schema_version"), "Current publication schema")
+  assert_acceptance(
+    Coordinator::Shared::Types::UUID_V7_PATTERN.match?(publication.stream.stream_id),
+    "The Skill stream must use its allocated UUIDv7 identity"
+  )
+  facts.each do |event|
+    assert_acceptance(event.data.keys.none? { _1.end_with?("_at") }, "Skill fact must not duplicate occurrence time")
+  end
+  view = skill_view(name: @asset_skill_name, scope: @asset_skill_scope).dig("data", "skill")
+  expected = publication.created_at.utc.iso8601(6)
+  assert_acceptance_equal(expected, view.dig("published", "occurred_at"), "Native publication occurrence time")
+  assert_acceptance_equal(expected, view.dig("published", "persisted_at"), "Native publication persistence time")
+end

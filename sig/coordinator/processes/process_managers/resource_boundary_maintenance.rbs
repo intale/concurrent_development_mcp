@@ -10,6 +10,7 @@ module Coordinator
         end
 
         SYSTEM_ACTOR: Write::Commands::Actor
+        ACTIVE_SOURCE_EVENT_TYPES: Array[String]
 
         def initialize: (
           event_store: Write::_EventStore,

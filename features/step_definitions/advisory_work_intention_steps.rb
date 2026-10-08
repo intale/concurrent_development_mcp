@@ -4,6 +4,47 @@ Given("two MCP agents have active Attempts in the same project") do
   prepare_advisory_work_intention_agents
 end
 
+Given("compatible shared work has accumulated more than the intention boundary budget") do
+  prepare_exhausted_advisory_boundary
+end
+
+When("agent B requests a shared intention set {word} over that history") do |operation|
+  submit_exhausted_advisory_request(operation)
+end
+
+Then("the history-budget Task completes with a typed limit result rather than an execution failure") do
+  result = @advisory_capacity_task.fetch("result")
+  assert_acceptance_equal("completed", result.fetch("status"), "History-budget Task status")
+  assert_acceptance_equal(true, result.dig("result", "isError"), "History-budget tool denial")
+  outcome = result.dig("result", "structuredContent")
+  assert_acceptance_equal("limit_reached", outcome.fetch("status"), "History-budget semantic status")
+  assert_acceptance_equal("resource_boundary_maintenance_required", outcome.dig("data", "code"), "History-budget code")
+  assert_acceptance_equal(
+    Coordinator::Write::EventQueries::WORK_INTENTION_BOUNDARY_MAXIMUM_COUNT,
+    outcome.dig("data", "details", "maximum_delta_event_count"),
+    "History-budget bound"
+  )
+end
+
+Then("the denied request records no partial intentions or membership changes") do
+  events = work_intention_events_for_attempt(advisory_agent("B").fetch(:attempt_id))
+  declarations = events.select { _1.type == "ResourceWorkIntentionDeclared" }
+  if @advisory_capacity_operation == "expansion"
+    expected = advisory_intention_reference(@advisory_capacity_existing)
+    assert_acceptance_equal([ expected.fetch("intention_id") ], declarations.map { _1.data.fetch("intention_id") }, "Existing intentions")
+    set = Coordinator::Write::WorkIntentionSetLoader.new(event_store: event_store).call(
+      @advisory_capacity_existing.dig(:outcome, "data", "intention_set_id")
+    )
+    assert_acceptance_equal([ expected.fetch("resource_id") ], set.members.map(&:resource_id), "Unchanged membership")
+  else
+    assert_acceptance_equal([], declarations, "No partial declaration")
+    set = Coordinator::Write::WorkIntentionSetLoader.new(event_store: event_store).find_by_attempt(
+      advisory_agent("B").fetch(:attempt_id)
+    )
+    assert_acceptance_equal(nil, set, "No partial set")
+  end
+end
+
 When("both agents concurrently declare shared intentions for {string}") do |path|
   resource_a = advisory_resource("file", path, agent: advisory_agent("A"))
   resource_b = resource_a.merge(

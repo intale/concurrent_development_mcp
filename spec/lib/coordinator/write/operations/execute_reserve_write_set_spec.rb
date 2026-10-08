@@ -7,6 +7,40 @@ RSpec.describe Coordinator::Write::Operations::ExecuteReserveWriteSet, :event_st
   let(:streams) { Coordinator::Write::StreamFactory.new }
   subject(:operation) { described_class.new(event_store:) }
 
+  it "denies an exhausted real marker boundary without recording a partial set" do
+    start_attempts([
+      [ "W-INT-A", "A-INT-A", "agent-a" ],
+      [ "W-INT-B", "A-INT-B", "agent-b" ]
+    ])
+    resource_id = resolve("capacity/shared.rb")
+    owner = operation.call(
+      reserve_input(
+        command_id: "cmd-capacity-owner", agent_id: "agent-a",
+        work_item_id: "W-INT-A", attempt_id: "A-INT-A", resources: [ { resource_id: } ]
+      )
+    ).value!.data
+    declaration = read_intention(owner.intentions.sole.intention_id).sole
+    WorkIntentionHistoryFixture.exhaust_boundary(event_store:, declaration:)
+
+    result = operation.call(
+      reserve_input(
+        command_id: "cmd-capacity-requester", agent_id: "agent-b",
+        work_item_id: "W-INT-B", attempt_id: "A-INT-B", resources: [ { resource_id: } ]
+      )
+    )
+
+    expect(result.failure).to have_attributes(code: :resource_boundary_maintenance_required)
+    expect(result.failure.details).to include(
+      maximum_delta_event_count: Coordinator::Write::EventQueries::WORK_INTENTION_BOUNDARY_MAXIMUM_COUNT
+    )
+    expect(Coordinator::Write::WorkIntentionSetLoader.new(event_store:).find_by_attempt("A-INT-B")).to be_nil
+    mapped = Coordinator::Write::Tasks::ToolResultMapper.new.call(
+      result, command_id: "cmd-capacity-requester", tool_name: "work_intention_set_declare"
+    )
+    expect(mapped).to have_attributes(is_error: true)
+    expect(mapped.structured_content.status).to eq("limit_reached")
+  end
+
   it "records one cohesive intention plus one set-membership fact per resource" do
     start_attempts([ [ "W-INT-A", "A-INT-A", "agent-a" ] ])
     resources = [ resolve("app/services/capture.rb"), resolve("db/schema.rb") ]

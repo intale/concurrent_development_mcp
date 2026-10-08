@@ -172,7 +172,10 @@ module Coordinator::Write
         attribute :repository_id, Types::UuidV7
         attribute :boundary_marker_count, Types::Integer.constrained(gteq: 1)
         attribute :maximum_delta_event_count,
-                  Types::Integer.constrained(eql: EventQueries::RESOURCE_BOUNDARY_DECISION_DELTA_MAXIMUM_COUNT)
+                  Types::Integer.enum(
+                    EventQueries::RESOURCE_BOUNDARY_DECISION_DELTA_MAXIMUM_COUNT,
+                    EventQueries::WORK_INTENTION_BOUNDARY_MAXIMUM_COUNT
+                  )
       end
 
       class LeaseSetExpiredDetails < AttemptDetails

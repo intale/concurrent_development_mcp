@@ -14,7 +14,7 @@ module Coordinator
         format: Regexp.new("\\A#{Regexp.escape(prefix)}:v1:[0-9a-f]{64}\\z")
       )
     end
-    ProjectedSkillId = Types::SkillId | precutover_id.call("skill")
+    ProjectedSkillId = Types::SkillId
     ProjectedDevelopmentArtifactId =
       Types::DevelopmentArtifactId | precutover_id.call("artifact")
     ProjectedDevelopmentArtifactObservationId =

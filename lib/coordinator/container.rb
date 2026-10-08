@@ -16,11 +16,6 @@ module Coordinator
     register("skills.revision_builder", memoize: true) do
       Write::Skills::RevisionBuilder.new(canonical_json: self["canonical_json"])
     end
-    register("skills.persisted_publication_loader", memoize: true) do
-      Write::Skills::PersistedPublicationLoader.new(
-        schema_registry: self["event_schema_registry"]
-      )
-    end
     register("skills.marker_builder", memoize: true) do
       Write::Skills::MarkerBuilder.new
     end
@@ -977,7 +972,6 @@ module Coordinator
 
     register("projectors.skills_v1", memoize: true) do
       Read::Projectors::SkillsV1.new(
-        publication_loader: self["skills.persisted_publication_loader"],
         projection_builder: Write::Skills::PublicationProjectionBuilderV3.new(
           event_store: self["event_store"],
           schema_registry: self["event_schema_registry"],
