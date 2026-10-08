@@ -297,7 +297,8 @@ module Coordinator
         stream_identity_allocator: self["history_migrations.stream_identity_allocator"],
         entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"],
         target_event_reference_resolver:
-          self["history_migrations.legacy_target_event_reference_resolver"]
+          self["history_migrations.legacy_target_event_reference_resolver"],
+        marked_event_locator: self["history_migrations.legacy_marked_event_locator"]
       )
     end
 
@@ -650,7 +651,8 @@ module Coordinator
           self["history_migrations.migration_source_event_plan_resolver"],
         command_input_rebinder:
           self["history_migrations.post_remodel_command_input_rebinder"],
-        rejection_builder: self["history_migrations.legacy_command_rejection_builder"]
+        rejection_builder: self["history_migrations.legacy_command_rejection_builder"],
+        marked_event_locator: self["history_migrations.legacy_marked_event_locator"]
       )
     end
 

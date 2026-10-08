@@ -18,6 +18,7 @@ module Coordinator::Write
         source_event_plan_resolver:,
         command_input_rebinder:,
         rejection_builder:,
+        marked_event_locator:,
         request_marker: CommandLifecycle::RequestMarker.new,
         execution_lane: Tasks::ExecutionLane.new,
         tool_name_mapper: PostRemodelToolNameMapper.new,
@@ -30,6 +31,7 @@ module Coordinator::Write
         @source_event_plan_resolver = source_event_plan_resolver
         @command_input_rebinder = command_input_rebinder
         @rejection_builder = rejection_builder
+        @marked_event_locator = marked_event_locator
         @request_marker = request_marker
         @execution_lane = execution_lane
         @tool_name_mapper = tool_name_mapper
@@ -468,7 +470,7 @@ module Coordinator::Write
             identity_role: "change-set"
           ).fmap { _1.target_stream.stream_id }
         when "work-item-dependency"
-          Success(migrated_dependency_id(source.subject_id, source_upper_position:))
+          migrated_dependency_id(source.subject_id, source_event:, source_upper_position:)
         else
           Failure(invalid(source_event, "unsupported ProcessStep subject #{source.subject_kind.inspect}"))
         end
@@ -480,19 +482,12 @@ module Coordinator::Write
         source_kind
       end
 
-      def migrated_dependency_id(source_dependency_id, source_upper_position:)
-        event = @event_store.read_global_marked(
-          GlobalMarkedEventReadCriteria.new(
-            stream_context: "DevelopmentExecution",
-            stream_name: "WorkItem",
-            event_types: [ "WorkItemDependencyDeclared" ],
-            markers: [ "dependency:#{source_dependency_id}" ],
-            maximum_count: 1,
-            direction: :asc,
-            to_position: source_upper_position
-          )
-        ).first
-        event ? event.id : source_dependency_id
+      def migrated_dependency_id(source_dependency_id, source_event:, source_upper_position:)
+        @marked_event_locator.call(
+          source_event:, source_upper_position:,
+          stream_context: "DevelopmentPlanning", stream_name: "ChangeSet",
+          event_type: "WorkItemDependencyDeclared", marker: "dependency:#{source_dependency_id}"
+        ).fmap(&:id)
       end
 
       def task_for_command(

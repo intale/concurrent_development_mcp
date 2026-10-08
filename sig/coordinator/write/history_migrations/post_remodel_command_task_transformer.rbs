@@ -11,6 +11,7 @@ module Coordinator
           source_event_plan_resolver: MigrationSourceEventPlanResolver,
           command_input_rebinder: PostRemodelCommandInputRebinder,
           rejection_builder: LegacyCommandRejectionBuilder,
+          marked_event_locator: LegacyMarkedEventLocator,
           ?request_marker: CommandLifecycle::RequestMarker,
           ?execution_lane: Tasks::ExecutionLane,
           ?tool_name_mapper: PostRemodelToolNameMapper,
@@ -25,6 +26,10 @@ module Coordinator
           source_event: PgEventstore::Event,
           source_payload: Events::CommandRegisteredV1 | Events::CommandRejectedV1 | Events::CommandRejectedV2 | Events::CommandSucceededV1 | PostRemodelEvents::CoordinationTaskSubmittedV3 | Events::CoordinationTaskExecutionStartedV2 | Events::CoordinationTaskCompletedV3 | Events::ProcessStepPlannedV1
         ) -> Dry::Monads::Result
+
+        private
+
+        def migrated_dependency_id: (String, source_event: PgEventstore::Event, source_upper_position: Integer) -> Dry::Monads::Result
       end
     end
   end

@@ -772,8 +772,8 @@ module Coordinator::Write
       def migrated_dependency_id(source_dependency_id, context:)
         events = @event_store.read_global_marked(
           GlobalMarkedEventReadCriteria.new(
-            stream_context: "DevelopmentExecution",
-            stream_name: "WorkItem",
+            stream_context: "DevelopmentPlanning",
+            stream_name: "ChangeSet",
             event_types: [ "WorkItemDependencyDeclared" ],
             markers: [ "dependency:#{source_dependency_id}" ],
             maximum_count: 1,
@@ -781,6 +781,7 @@ module Coordinator::Write
             to_position: context.fetch(:source_upper_position)
           )
         )
+        # A rejected declaration request may have no committed definition.
         events.first&.id || source_dependency_id
       end
 

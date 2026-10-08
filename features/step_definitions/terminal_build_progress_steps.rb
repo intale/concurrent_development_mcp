@@ -213,3 +213,30 @@ Then("available context exposes the exact ready consumer without inventing an ac
   end
   assert_acceptance_equal([], acquisition_actions, "Incomplete acquisition actions")
 end
+
+Then("the satisfied dependency retains its declaration identity and exact producer completion evidence") do
+  ids = @dependency_terminal.fetch(:ids)
+  declaration = event_store.read(
+    streams.work_item(ids.fetch(:consumer_work_item_id)),
+    Coordinator::Write::EventReadCriteria.new(event_types: [ "WorkItemDependencyDeclared" ], maximum_count: 1, direction: :asc)
+  ).sole
+  satisfaction = terminal_dependency_events(ids.fetch(:consumer_work_item_id)).sole
+  dependency_id = declaration.data.fetch("dependency_id")
+  assert_acceptance_equal(dependency_id, satisfaction.data.fetch("dependency_id"), "Declared dependency identity")
+  assert_acceptance(satisfaction.markers.include?("dependency:#{dependency_id}"), "Satisfied dependency marker")
+  projected = @dependency_converged.dig("data", "context", "dependencies").find do |dependency|
+    dependency.fetch("dependency_id") == dependency_id
+  end
+  assert_acceptance(projected, "The original dependency must remain present after completion")
+  reference = satisfaction.data.fetch("source")
+  assert_acceptance_equal(reference, projected.fetch("source_event"), "Projected dependency evidence")
+  completion = event_store.read_at(
+    Coordinator::Write::StreamReference.new(context: reference.fetch("stream_context"),
+      stream_name: reference.fetch("stream_name"), stream_id: reference.fetch("stream_id")),
+    reference.fetch("stream_revision")
+  )
+  assert_acceptance(completion, "Dependency evidence must resolve to a persisted completion")
+  assert_acceptance_equal(reference.fetch("event_id"), completion.id, "Exact producer completion")
+  assert_acceptance_equal("WorkItemCompleted", completion.type, "Producer completion fact")
+  assert_acceptance_equal(ids.fetch(:producer_work_item_id), completion.stream.stream_id, "Completed producer")
+end

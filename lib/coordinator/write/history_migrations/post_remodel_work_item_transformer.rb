@@ -13,11 +13,13 @@ module Coordinator::Write
       def initialize(
         stream_identity_allocator:,
         entity_reference_resolver:,
-        target_event_reference_resolver:
+        target_event_reference_resolver:,
+        marked_event_locator:
       )
         @stream_identity_allocator = stream_identity_allocator
         @entity_reference_resolver = entity_reference_resolver
         @target_event_reference_resolver = target_event_reference_resolver
+        @marked_event_locator = marked_event_locator
       end
 
       def call(migration_id:, source_config_name:, source_upper_position:, source_event:, source_payload:)
@@ -274,6 +276,16 @@ module Coordinator::Write
         source:,
         target_stream:
       )
+        declaration = @marked_event_locator.call(
+          source_event:, source_upper_position:,
+          stream_context: "DevelopmentPlanning", stream_name: "ChangeSet",
+          event_type: "WorkItemDependencyDeclared", marker: "dependency:#{source.dependency_id}"
+        )
+        return declaration if declaration.failure?
+        unless matching_dependency_declaration?(declaration.value!, source)
+          return Failure(invalid_dependency_declaration(source_event, source))
+        end
+
         change_set = resolve_entity(
           migration_id:,
           source_config_name:,
@@ -322,11 +334,12 @@ module Coordinator::Write
         change_set_id = change_set.value!.target_stream.stream_id
         producer_work_item_id = producer.value!.target_stream.stream_id
         consumer_work_item_id = target_stream.stream_id
+        dependency_id = declaration.value!.id
         Success([
           build(
             target_stream:,
             event: Events::WorkItemDependencySatisfiedV2.new(
-              dependency_id: source.dependency_id,
+              dependency_id:,
               change_set_id:,
               producer_work_item_id:,
               consumer_work_item_id:,
@@ -336,7 +349,7 @@ module Coordinator::Write
             ),
             markers: [
               "change-set:#{change_set_id}",
-              "dependency:#{source.dependency_id}",
+              "dependency:#{dependency_id}",
               "work-item:#{producer_work_item_id}",
               "work-item:#{consumer_work_item_id}"
             ],
@@ -344,6 +357,29 @@ module Coordinator::Write
             source_event:
           )
         ])
+      end
+
+      def matching_dependency_declaration?(event, source)
+        return false unless event.metadata["schema_version"] == 1
+
+        declaration = Events::WorkItemDependencyDeclaredV1.new(event.data.deep_symbolize_keys)
+        declaration.change_set_id == event.stream.stream_id &&
+          declaration.dependency_id == source.dependency_id &&
+          declaration.change_set_id == source.change_set_id &&
+          declaration.producer_work_item_id == source.producer_work_item_id &&
+          declaration.consumer_work_item_id == source.consumer_work_item_id &&
+          declaration.dependency_kind == source.dependency_kind &&
+          declaration.required_output == source.required_output
+      end
+
+      def invalid_dependency_declaration(source_event, source)
+        TransformationErrorV1.new(
+          code: :ambiguous_source_reference,
+          message: "Historical dependency declaration does not match #{source.dependency_id}",
+          event_type: source_event.type,
+          schema_version: source_event.metadata["schema_version"],
+          source_event_id: source_event.id
+        )
       end
 
       def resolve_change_set_and_attempt(

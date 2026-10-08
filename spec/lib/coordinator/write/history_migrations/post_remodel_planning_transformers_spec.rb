@@ -154,47 +154,142 @@ RSpec.describe "post-remodel history migration planning transformers", :event_st
     expect(fact.event.candidate_event.stream_id).not_to eq(candidate_id)
   end
 
-  it "targets the consumer WorkItem and rebinds dependency evidence emitted on a ChangeSet stream" do
-    producer_id = "source-producer"
-    consumer_id = "source-consumer"
-    persist_raw(stream("DevelopmentPlanning", "ChangeSet", change_set_id), type: "ChangeSetCreated")
-    persist_raw(stream("DevelopmentExecution", "WorkItem", producer_id), type: "WorkItemCreated")
-    persist_raw(stream("DevelopmentExecution", "WorkItem", consumer_id), type: "WorkItemCreated")
-    completion = persist_payload(
-      stream("DevelopmentExecution", "WorkItem", producer_id),
-      Coordinator::Write::Events::WorkItemCompletedV2.new(work_item_id: producer_id)
-    )
-    planned = planning_dispatcher.call(
-      migration_id:,
-      source_config_name: "default",
-      source_upper_position: completion.global_position,
-      source_event: completion
-    )
-    expect(planned).to be_success
-
-    satisfaction = persist_payload(
-      stream("DevelopmentPlanning", "ChangeSet", change_set_id),
-      Coordinator::Write::Events::WorkItemDependencySatisfiedV2.new(
-        dependency_id: SecureRandom.uuid_v7,
-        change_set_id:,
-        producer_work_item_id: producer_id,
-        consumer_work_item_id: consumer_id,
-        dependency_kind: "requires_completion",
-        required_output: nil,
-        source: event_reference(completion)
+  context "a native satisfaction of a historical dependency" do
+    let(:producer_id) { "source-producer" }
+    let(:consumer_id) { "source-consumer" }
+    let(:dependency_id) { SecureRandom.uuid_v7 }
+    let(:declaration_payload) do
+      Coordinator::Write::Events::WorkItemDependencyDeclaredV1.new(
+        dependency_id:, change_set_id:, producer_work_item_id: producer_id,
+        consumer_work_item_id: consumer_id, dependency_kind: "requires_completion",
+        required_output: nil, declared_at: "2026-09-02T09:08:54.000000Z"
       )
-    )
+    end
+    let(:declaration) do
+      persist_payload(stream("DevelopmentPlanning", "ChangeSet", change_set_id), declaration_payload,
+        markers: [ "dependency:#{dependency_id}" ])
+    end
+    let(:completion) do
+      persist_payload(stream("DevelopmentExecution", "WorkItem", producer_id),
+        Coordinator::Write::Events::WorkItemCompletedV2.new(work_item_id: producer_id))
+    end
+    let(:satisfaction_payload) do
+      Coordinator::Write::Events::WorkItemDependencySatisfiedV2.new(
+        dependency_id:, change_set_id:, producer_work_item_id: producer_id,
+        consumer_work_item_id: consumer_id, dependency_kind: "requires_completion",
+        required_output: nil, source: event_reference(completion)
+      )
+    end
+    let(:satisfaction) do
+      persist_payload(stream("DevelopmentExecution", "WorkItem", consumer_id), satisfaction_payload)
+    end
+    let(:planned_completion) do
+      planning_dispatcher.call(migration_id:, source_config_name: "default",
+        source_upper_position: completion.global_position, source_event: completion).value!.sole
+    end
 
-    fact = transform(satisfaction, upper_position: satisfaction.global_position).value!.sole
+    before do
+      persist_raw(stream("DevelopmentPlanning", "ChangeSet", change_set_id), type: "ChangeSetCreated")
+      persist_raw(stream("DevelopmentExecution", "WorkItem", producer_id), type: "WorkItemCreated")
+      persist_raw(stream("DevelopmentExecution", "WorkItem", consumer_id), type: "WorkItemCreated")
+      declaration
+      planned_completion
+    end
 
-    expect(fact.target_stream).to have_attributes(
-      context: "DevelopmentExecution",
-      stream_name: "WorkItem",
-      stream_id: fact.event.consumer_work_item_id
-    )
-    expect(fact.event.consumer_work_item_id).not_to eq(consumer_id)
-    expect(fact.event.producer_work_item_id).not_to eq(producer_id)
-    expect(fact.event.source).to eq(planned.value!.sole.target_event)
+    it "uses the same canonical dependency identity and marker as its declaration on every retry" do
+      declaration_fact = transform(declaration, upper_position: satisfaction.global_position).value!.sole
+      fact = transform(satisfaction, upper_position: satisfaction.global_position).value!.sole
+
+      expect(fact.event).to have_attributes(
+        dependency_id: declaration_fact.event.dependency_id,
+        change_set_id: declaration_fact.event.change_set_id,
+        producer_work_item_id: declaration_fact.event.producer_work_item_id,
+        consumer_work_item_id: declaration_fact.event.consumer_work_item_id,
+        source: planned_completion.target_event
+      )
+      expect(fact.event.dependency_id).to eq(declaration.id)
+      expect(fact.event.dependency_id).not_to eq(dependency_id)
+      expect(fact.markers).to include("dependency:#{declaration.id}")
+      expect(fact.markers).not_to include("dependency:#{dependency_id}")
+      expect(transform(satisfaction, upper_position: satisfaction.global_position).value!).to eq([ fact ])
+    end
+
+    it "targets the consumer when historical satisfaction was emitted on a ChangeSet stream" do
+      event = persist_payload(stream("DevelopmentPlanning", "ChangeSet", change_set_id), satisfaction_payload)
+      fact = transform(event, upper_position: event.global_position).value!.sole
+
+      expect(fact.target_stream).to have_attributes(context: "DevelopmentExecution", stream_name: "WorkItem",
+        stream_id: fact.event.consumer_work_item_id)
+      expect(fact.event.dependency_id).to eq(declaration.id)
+      expect(fact.event.source).to eq(planned_completion.target_event)
+    end
+
+    it "rejects an absent or out-of-range declaration instead of preserving its old ID" do
+      result = transform(satisfaction, upper_position: declaration.global_position - 1)
+
+      expect(result).to be_failure
+      expect(result.failure.code).to eq(:ambiguous_source_reference)
+    end
+
+    it "rejects a satisfaction whose definition disagrees with its declaration" do
+      event = persist_payload(stream("DevelopmentExecution", "WorkItem", consumer_id),
+        satisfaction_payload.new(dependency_kind: "requires_contract"))
+      result = transform(event, upper_position: event.global_position)
+
+      expect(result).to be_failure
+      expect(result.failure.code).to eq(:ambiguous_source_reference)
+    end
+
+    it "rejects repeated declarations selected by the same marker" do
+      persist_payload(stream("DevelopmentPlanning", "ChangeSet", change_set_id), declaration_payload,
+        markers: [ "dependency:#{dependency_id}" ])
+      result = transform(satisfaction, upper_position: satisfaction.global_position)
+
+      expect(result).to be_failure
+      expect(result.failure.code).to eq(:ambiguous_source_reference)
+    end
+
+    it "keeps a Saga dependency subject aligned with the migrated definition" do
+      process_step_id = SecureRandom.uuid_v7
+      step = persist_payload(stream("CoordinatorControl", "ProcessStep", process_step_id),
+        Coordinator::Write::Events::ProcessStepPlannedV1.new(
+          process_step_id:, process_name: "dependency-progress", step_name: "satisfy-work-item-dependency",
+          source_event_id: completion.id, subject_kind: "work-item-dependency", subject_id: dependency_id,
+          target_command_id: SecureRandom.uuid_v7, target_entity_id: nil))
+      fact = transform(step, upper_position: step.global_position).value!.sole
+
+      expect(fact.event.subject_id).to eq(declaration.id)
+      expect(fact.event.source_event_id).to eq(planned_completion.target_event.event_id)
+      expect(fact.markers.sole).to include(declaration.id)
+    end
+
+    it "rejects a Saga subject with no uniquely declared dependency" do
+      process_step_id = SecureRandom.uuid_v7
+      step = persist_payload(stream("CoordinatorControl", "ProcessStep", process_step_id),
+        Coordinator::Write::Events::ProcessStepPlannedV1.new(
+          process_step_id:, process_name: "dependency-progress", step_name: "satisfy-work-item-dependency",
+          source_event_id: completion.id, subject_kind: "work-item-dependency", subject_id: SecureRandom.uuid_v7,
+          target_command_id: SecureRandom.uuid_v7, target_entity_id: nil))
+      result = transform(step, upper_position: step.global_position)
+
+      expect(result).to be_failure
+      expect(result.failure.code).to eq(:ambiguous_source_reference)
+    end
+
+    it "rebinds a declaration request to the identity of its committed historical definition" do
+      document = Coordinator::Write::CommandInputDocuments::DeclareWorkItemDependencyV1.new(
+        schema: "command-input/v1", command_id: SecureRandom.uuid_v7, tool_name: "work_item_dependency_declare",
+        input: Coordinator::Write::CommandInputDocuments::DeclareWorkItemDependencyInputV1.new(
+          actor: Coordinator::Write::CommandInputDocuments::ActorV1.new(actor_kind: "agent", actor_id: "codex"),
+          change_set_id:, dependency_id:, producer_work_item_id: producer_id, consumer_work_item_id: consumer_id,
+          dependency_kind: "requires_completion", required_output: nil))
+      result = Coordinator::Container["history_migrations.post_remodel_command_input_rebinder"].call(
+        migration_id:, source_config_name: "default", source_upper_position: declaration.global_position,
+        source_event: declaration, document:, command_id: SecureRandom.uuid_v7)
+
+      expect(result).to be_success
+      expect(result.value!.document.input.dependency_id).to eq(declaration.id)
+    end
   end
 
   def seed_execution_relationships
@@ -293,17 +388,18 @@ RSpec.describe "post-remodel history migration planning transformers", :event_st
     )
   end
 
-  def persist_payload(target_stream, payload, metadata: {})
+  def persist_payload(target_stream, payload, metadata: {}, markers: [])
     persist_raw(
       target_stream,
       type: payload.class.event_type,
       data: payload.to_h,
       schema_version: payload.class.schema_version,
-      metadata:
+      metadata:,
+      markers:
     )
   end
 
-  def persist_raw(target_stream, type:, data: {}, schema_version: 1, metadata: {})
+  def persist_raw(target_stream, type:, data: {}, schema_version: 1, metadata: {}, markers: [])
     event_store.append(
       target_stream,
       [
@@ -311,6 +407,7 @@ RSpec.describe "post-remodel history migration planning transformers", :event_st
           id: SecureRandom.uuid_v7,
           type:,
           data:,
+          markers:,
           metadata: {
             "schema_version" => schema_version,
             "command_id" => SecureRandom.uuid_v7,

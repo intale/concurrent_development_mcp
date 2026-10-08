@@ -34,3 +34,4 @@ Feature: Available terminal build progress
       Then the consumer's older blocked context remains available
       When downstream readiness reaches the read side
       Then available context exposes the exact ready consumer without inventing an acquisition command
+      And the satisfied dependency retains its declaration identity and exact producer completion evidence

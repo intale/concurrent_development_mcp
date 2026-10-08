@@ -7,7 +7,8 @@ module Coordinator
         def initialize: (
           stream_identity_allocator: StreamIdentityAllocator,
           entity_reference_resolver: LegacyEntityReferenceResolver,
-          target_event_reference_resolver: LegacyTargetEventReferenceResolver
+          target_event_reference_resolver: LegacyTargetEventReferenceResolver,
+          marked_event_locator: LegacyMarkedEventLocator
         ) -> void
 
         def call: (
@@ -17,6 +18,11 @@ module Coordinator
           source_event: PgEventstore::Event,
           source_payload: Events::WorkItemAcquiredV2 | Events::WorkItemCandidateSelectedV2 | Events::WorkItemCompletedV2 | Events::WorkItemDependencySatisfiedV2 | Events::WorkItemMadeReadyV2 | Events::WorkItemRequeuedV2
         ) -> Dry::Monads::Result
+
+        private
+
+        def matching_dependency_declaration?: (PgEventstore::Event, Events::WorkItemDependencySatisfiedV2) -> bool
+        def invalid_dependency_declaration: (PgEventstore::Event, Events::WorkItemDependencySatisfiedV2) -> TransformationErrorV1
       end
     end
   end
