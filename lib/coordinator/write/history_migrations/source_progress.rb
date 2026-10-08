@@ -15,10 +15,11 @@ module Coordinator::Write
         total = 0
         planned = 0
         applied = 0
-        from_position = 0
+        from_position = migration.source_from_position
         while from_position <= migration.source_upper_position
           events = @source_reader.page(SourcePageCriteriaV1.new(
-            from_position:, to_position: migration.source_upper_position, page_size: 1_000
+            from_position:, to_position: migration.source_upper_position, page_size: 1_000,
+            source_command_ids: migration.source_command_ids
           ))
           break if events.empty?
 

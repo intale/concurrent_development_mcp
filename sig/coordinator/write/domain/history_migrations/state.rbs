@@ -13,6 +13,8 @@ module Coordinator
           def target_config_name: () -> String?
           def source_upper_position: () -> Integer?
           def page_size: () -> Integer?
+          def source_after_position: () -> Integer?
+          def source_command_ids: () -> Array[String]
           def absent?: () -> bool
           def started?: () -> bool
           def matches?: (Commands::StartHistoryMigration command) -> bool

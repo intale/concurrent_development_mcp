@@ -34,6 +34,7 @@ module Coordinator::Write
       [ "HistoryMigrationSourceStoreSelected", 1 ] => Events::HistoryMigrationSourceStoreSelectedV1,
       [ "HistoryMigrationTargetStoreSelected", 1 ] => Events::HistoryMigrationTargetStoreSelectedV1,
       [ "HistoryMigrationSourceRangeFrozen", 1 ] => Events::HistoryMigrationSourceRangeFrozenV1,
+      [ "HistoryMigrationSourceSelectionFrozen", 1 ] => Events::HistoryMigrationSourceSelectionFrozenV1,
       [ "HistoryMigrationPageSizeSelected", 1 ] => Events::HistoryMigrationPageSizeSelectedV1,
       [ "HistoryMigrationStarted", 1 ] => Events::HistoryMigrationStartedV1,
       [ "HistoryMigrationStreamIdentityAllocated", 1 ] => Events::HistoryMigrationStreamIdentityAllocatedV1,

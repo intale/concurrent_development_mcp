@@ -50,11 +50,13 @@ module Coordinator::Write
           source_config_name: start_state.source_config_name,
           target_config_name: start_state.target_config_name,
           source_upper_position: upper,
+          source_after_position: start_state.source_after_position,
+          source_command_ids: start_state.source_command_ids,
           page_size: start_state.page_size,
-          next_from_position: planning_next_from_position(progress),
+          next_from_position: planning_next_from_position(progress, start_state:),
           plan_completed: progress.key?("HistoryMigrationPlanCompleted"),
           application_dependency_wave: application_dependency_wave(progress),
-          application_next_from_position: application_next_from_position(progress),
+          application_next_from_position: application_next_from_position(progress, start_state:),
           completed: progress.key?("HistoryMigrationCompleted"),
           abandoned: progress.key?("HistoryMigrationAbandoned"),
           checkpoint_event:,
@@ -129,12 +131,16 @@ module Coordinator::Write
         end
       end
 
-      def planning_next_from_position(progress)
-        progress["HistoryMigrationCursorAdvanced"]&.last&.next_from_position || 0
+      def planning_next_from_position(progress, start_state:)
+        progress["HistoryMigrationCursorAdvanced"]&.last&.next_from_position || initial_position(start_state)
       end
 
-      def application_next_from_position(progress)
-        progress["HistoryMigrationApplicationCursorAdvanced"]&.last&.next_from_position || 0
+      def application_next_from_position(progress, start_state:)
+        progress["HistoryMigrationApplicationCursorAdvanced"]&.last&.next_from_position || initial_position(start_state)
+      end
+
+      def initial_position(state)
+        state.source_after_position ? state.source_after_position + 1 : 0
       end
 
       def application_dependency_wave(progress)

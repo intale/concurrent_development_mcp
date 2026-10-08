@@ -23,7 +23,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteStartHistoryMigration, :ev
     events = history
 
     expect(result).to be_success
-    expect(events.map(&:type)).to eq(described_class::EVENT_TYPES)
+    expect(events.map(&:type)).to eq(described_class::EVENT_TYPES - [ "HistoryMigrationSourceSelectionFrozen" ])
     expect(events.map(&:stream_revision)).to eq((0..5).to_a)
     expect(events.map(&:id)).to all(match(Coordinator::Shared::Types::UUID_V7_PATTERN))
     expect(events.map(&:correlation_id).uniq).to contain_exactly(
@@ -55,12 +55,26 @@ RSpec.describe Coordinator::Write::Operations::ExecuteStartHistoryMigration, :ev
     expect(history.length).to eq(6)
   end
 
+  it "freezes the positive suffix selector and initializes both cursors after the cutoff" do
+    selected = command.new(source_after_position: 20, source_command_ids: [ SecureRandom.uuid_v7 ])
+    expect(operation.call_command(selected)).to be_success
+    expect(operation.call_command(selected).value!.emitted_events).to be_empty
+
+    snapshot = Coordinator::Write::HistoryMigrations::MigrationLoader.new(event_store:).call(migration_id)
+    expect(history.map(&:type)).to eq(described_class::EVENT_TYPES)
+    expect(snapshot.source_command_ids).to eq(selected.source_command_ids)
+    expect(snapshot.source_from_position).to eq(21)
+    expect(snapshot.next_from_position).to eq(21)
+    expect(snapshot.application_next_from_position).to eq(21)
+    expect(operation.call_command(selected.new(source_after_position: 19)).failure.code).to eq(:history_migration_conflict)
+  end
+
   def history
     event_store.read(
       streams.history_migration(migration_id),
       Coordinator::Write::EventReadCriteria.new(
         event_types: described_class::EVENT_TYPES,
-        maximum_count: 6,
+        maximum_count: 7,
         direction: :asc
       )
     )

@@ -55,7 +55,7 @@ module Coordinator::Write
           next_position = page.to_position + 1
           return [ dependency_wave, next_position ] if next_position <= snapshot.source_upper_position
           if dependency_wave < Types::HISTORY_MIGRATION_DEPENDENCY_WAVE_MAXIMUM
-            return [ dependency_wave + 1, 0 ]
+            return [ dependency_wave + 1, snapshot.source_from_position ]
           end
 
           [ dependency_wave, next_position ]

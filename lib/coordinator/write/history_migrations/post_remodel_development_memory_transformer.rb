@@ -10,6 +10,7 @@ module Coordinator::Write
         Events::DevelopmentArtifactCreatedV1,
         Events::DevelopmentArtifactKindChangedV1,
         Events::DevelopmentArtifactLabelAddedV1,
+        Events::DevelopmentArtifactLabelRemovedV1,
         Events::DevelopmentArtifactScopeChangedV1,
         Events::DevelopmentArtifactSourceChangedV1,
         Events::DevelopmentArtifactTitleChangedV1
@@ -19,6 +20,7 @@ module Coordinator::Write
         "DevelopmentArtifactCreated" => "create-development-artifact",
         "DevelopmentArtifactKindChanged" => "change-development-artifact-kind",
         "DevelopmentArtifactLabelAdded" => "add-development-artifact-label",
+        "DevelopmentArtifactLabelRemoved" => "remove-development-artifact-label",
         "DevelopmentArtifactScopeChanged" => "change-development-artifact-scope",
         "DevelopmentArtifactSourceChanged" => "change-development-artifact-source",
         "DevelopmentArtifactTitleChanged" => "change-development-artifact-title"
@@ -424,6 +426,8 @@ module Coordinator::Write
           Events::DevelopmentArtifactKindChangedV1.new(artifact_id:, kind: source.kind)
         when Events::DevelopmentArtifactLabelAddedV1
           Events::DevelopmentArtifactLabelAddedV1.new(artifact_id:, label: source.label)
+        when Events::DevelopmentArtifactLabelRemovedV1
+          Events::DevelopmentArtifactLabelRemovedV1.new(artifact_id:, label: source.label)
         when Events::DevelopmentArtifactSourceChangedV1
           Events::DevelopmentArtifactSourceChangedV1.new(
             artifact_id:,

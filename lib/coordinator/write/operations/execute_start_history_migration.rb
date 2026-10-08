@@ -10,6 +10,7 @@ module Coordinator::Write
         "HistoryMigrationTargetStoreSelected",
         "HistoryMigrationSourceRangeFrozen",
         "HistoryMigrationPageSizeSelected",
+        "HistoryMigrationSourceSelectionFrozen",
         "HistoryMigrationStarted"
       ].freeze
 
@@ -108,8 +109,9 @@ module Coordinator::Write
 
       def persist(plan, stream:, command:, event_ids:, caused_by:, correlation_id:, expected_revision:)
         return [] unless plan
-        unless plan.writes.length == event_ids.length && plan.writes.all? { _1.stream == stream }
-          raise InvalidHistoryMigrationHistory, "HistoryMigration start plan must contain its six cohesive facts"
+        expected_count = command.source_after_position ? 7 : 6
+        unless plan.writes.length == expected_count && plan.writes.all? { _1.stream == stream }
+          raise InvalidHistoryMigrationHistory, "HistoryMigration start plan has an incomplete frozen definition"
         end
 
         metadata = EventMetadata.new(

@@ -63,3 +63,69 @@ Then("the migration does not copy its own maintenance facts into restored histor
   )
   assert_acceptance(restored.empty?, "Restored domain history must not contain migration-control facts")
 end
+
+When("the agent records and updates an Artifact after the accepted history cutoff") do
+  @history_base_id = @history_migration_id
+  @history_base_events = PgEventstore.client(:migration_target).read(PgEventstore::Stream.all_stream, options: { max_count: 1000 }).map(&:id)
+  @history_tail_after = Coordinator::Write::HistoryMigrations::SourceReader.new(client: PgEventstore.client).head_position
+  captured = capture_artifact_task(
+    command_id: "history-tail-capture", title: "Tail documentation", kind: "documentation",
+    labels: [ "initial" ], locator: "mcp://history-tail/document", source_kind: "generated",
+    content: { encoding: "utf-8", media_type: "text/markdown", text: "# Original" }, scope: "project:history-tail"
+  )
+  @history_tail_artifact_id = captured.dig("data", "artifact_id")
+  @history_tail_observation_id = captured.dig("data", "observation_id")
+  source = event_store.read_latest(streams.development_artifact(@history_tail_artifact_id), Coordinator::Write::LatestEventReadCriteria.new(
+    event_types: %w[DevelopmentArtifactCreated DevelopmentArtifactLabelAdded DevelopmentArtifactContentChanged]
+  ))
+  result = update_artifact_task(
+    command_id: "history-tail-update", artifact_id: @history_tail_artifact_id,
+    expected_revision: source.stream_revision,
+    changes: { content: { encoding: "utf-8", media_type: "text/markdown", text: "# Updated" }, labels: [ "updated" ] }
+  )
+  assert_acceptance_equal("ok", result.fetch("status"), "Tail update")
+end
+
+When("the agent requests the closed development-memory suffix through MCP") do
+  commands = PgEventstore.client.read(PgEventstore::Stream.all_stream, options: {
+    max_count: 20, filter: { event_types: [ "CommandRegistered" ] }
+  }).select { %w[history-tail-capture history-tail-update].include?(_1.data.fetch("request_id")) }.map { _1.data.fetch("command_id") }.sort
+  assert_acceptance_equal(2, commands.size, "Selected artifact command membership")
+  reader = Coordinator::Write::HistoryMigrations::SourceReader.new(client: PgEventstore.client)
+  upper = reader.head_position(source_command_ids: commands, source_after_position: @history_tail_after)
+  task = submit_and_execute("history_migration_start",
+    command_id: "history-tail-start", actor: { kind: "agent", id: "history-agent" }, page_size: 1000,
+    source_after_position: @history_tail_after, source_upper_position: upper, source_command_ids: commands)
+  result = task_request("tasks/get", task).dig("result", "result")
+  assert_acceptance_equal(false, result.fetch("isError"), "Suffix admission")
+  @history_migration_id = result.dig("structuredContent", "data", "migration_id")
+  eventually("closed history suffix transfer", timeout_seconds: LiveSubscriptions::HIGH_VOLUME_TIMEOUT_SECONDS) do
+    event = event_store.read_latest(streams.history_migration(@history_migration_id), Coordinator::Write::LatestEventReadCriteria.new(event_types: [ "HistoryMigrationCompleted" ]))
+    [ !event.nil?, event&.type ]
+  end
+end
+
+Then("the agent retrieves the current and original observed Artifact content through MCP") do
+  artifact = eventually("restored suffix Artifact") do
+    result = call_tool("development_artifact_list", { scope: "project:history-tail", limit: 10 }).dig("result", "structuredContent")
+    items = result.dig("data", "page", "items") || []
+    restored = items.one? && items.first
+    [ restored && restored.fetch("labels") == [ "initial" ], restored && restored.slice("artifact_id", "observation_id", "labels") ]
+  end
+  current = eventually("restored current Artifact content") do
+    content = call_tool("development_artifact_content_get", { artifact_id: artifact.fetch("artifact_id") }).dig("result", "structuredContent", "data", "content", "text")
+    [ content == "# Updated", content ]
+  end
+  original = call_tool("development_artifact_content_get", { artifact_id: artifact.fetch("artifact_id"), observation_id: artifact.fetch("observation_id") }).dig("result", "structuredContent", "data", "content", "text")
+  assert_acceptance_equal("# Updated", current, "Latest artifact content")
+  assert_acceptance_equal("# Original", original, "Immutable observed content")
+end
+
+Then("the accepted base history is unchanged and maintenance history is excluded") do
+  events = PgEventstore.client(:migration_target).read(PgEventstore::Stream.all_stream, options: { max_count: 1000 })
+  assert_acceptance((@history_base_events - events.map(&:id)).empty?, "Base facts must remain unchanged")
+  assert_acceptance_equal(1, events.count { _1.type == "RepositoryRegistered" }, "Base repository must not be duplicated")
+  assert_acceptance(events.none? { _1.type.start_with?("HistoryMigration") || (_1.type == "ProcessStepPlanned" && _1.data.fetch("process_name").start_with?("history-migration")) }, "Maintenance history must be excluded")
+  assert_acceptance(events.any? { _1.type == "DevelopmentArtifactObservationFactLinked" }, "Immutable observation references must be preserved")
+  assert_acceptance(events.any? { _1.type == "DevelopmentArtifactLabelRemoved" && _1.data.fetch("label") == "initial" }, "Label removal facts must be preserved")
+end

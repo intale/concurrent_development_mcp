@@ -20,6 +20,8 @@ module Coordinator::Write
           migration_id: input.migration_id,
           source_config_name: input.source_config_name,
           target_config_name: input.target_config_name,
+          source_after_position: input.source_after_position,
+          source_command_ids: input.source_command_ids,
           source_upper_position: input.source_upper_position,
           page_size: input.page_size
         )

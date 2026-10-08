@@ -25,6 +25,9 @@ module Coordinator
       class StartHistoryMigrationCanonicalInputV1 < Shared::Value
         def actor: () -> ActorV1
         def page_size: () -> Integer
+        def source_after_position: () -> Integer?
+        def source_command_ids: () -> Array[String]
+        def source_upper_position: () -> Integer?
       end
 
       class StartHistoryMigrationInputV1 < StartHistoryMigrationCanonicalInputV1

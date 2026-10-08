@@ -31,6 +31,19 @@ RSpec.describe Coordinator::Write::Operations::PrepareStartHistoryMigration, :ev
     expect(prepare.call(input).value!.source_upper_position).to eq(anchor.global_position)
   end
 
+  it "rejects partial suffix definitions, inverted ranges, malformed IDs, and duplicate selectors" do
+    uuid = SecureRandom.uuid_v7
+    invalid = [
+      { source_after_position: 1 },
+      { source_after_position: 4, source_upper_position: 3, source_command_ids: [ uuid ] },
+      { source_after_position: 1, source_upper_position: 3, source_command_ids: [ "request-label" ] },
+      { source_after_position: 1, source_upper_position: 3, source_command_ids: [ uuid, uuid ] }
+    ]
+    invalid.each do |attributes|
+      expect(prepare.call(input.merge(attributes)).failure.code).to eq(:invalid_input)
+    end
+  end
+
   def append_probe
     repository_id = SecureRandom.uuid_v7
     payload = Coordinator::Write::Events::RepositoryRegisteredV2.new(

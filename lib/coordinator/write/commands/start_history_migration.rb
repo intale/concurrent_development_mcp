@@ -10,6 +10,8 @@ module Coordinator::Write
       attribute :target_config_name, Types::Identifier
       attribute :source_upper_position, Types::GlobalPosition.optional
       attribute :page_size, Types::HistoryMigrationPageSize
+      attribute :source_after_position, Types::GlobalPosition.optional.default(nil)
+      attribute :source_command_ids, Types::Array.of(Types::UuidV7).constrained(max_size: 100).default([].freeze)
     end
   end
 end

@@ -66,4 +66,36 @@ RSpec.describe Coordinator::Write::HistoryMigrations::SourceReader, :event_store
     expect(described_class::EVENT_TYPES).to match_array(expected)
     expect(described_class::EVENT_TYPES.grep(/\AHistoryMigration/)).to be_empty
   end
+
+  it "applies the same positive command selection before paging and head lookup" do
+    command_id = SecureRandom.uuid_v7
+    first, maintenance, second, unrelated = event_store.append(stream, [
+      PgEventstore::Event.new(type: "DevelopmentArtifactCreated", data: {}, markers: [ "command:#{command_id}" ]),
+      PgEventstore::Event.new(type: "ProcessStepPlanned", data: {}, markers: [ "command:#{command_id}" ]),
+      PgEventstore::Event.new(type: "DevelopmentArtifactContentChanged", data: {}, markers: [ "command:#{command_id}" ]),
+      PgEventstore::Event.new(type: "DevelopmentArtifactCreated", data: {}, markers: [ "command:#{SecureRandom.uuid_v7}" ])
+    ])
+    criteria = Coordinator::Write::HistoryMigrations::SourcePageCriteriaV1.new(
+      from_position: first.global_position, to_position: unrelated.global_position,
+      page_size: 2, source_command_ids: [ command_id ]
+    )
+    expect(reader.page(criteria).map(&:id)).to eq([ first.id, second.id ])
+    expect(reader.head_position(to_position: unrelated.global_position, source_command_ids: [ command_id ])).to eq(second.global_position)
+    expect(reader.head_position(to_position: unrelated.global_position, source_after_position: second.global_position, source_command_ids: [ command_id ])).to be_nil
+    expect(reader.page(criteria.new(from_position: maintenance.global_position, page_size: 1)).map(&:id)).to eq([ second.id ])
+  end
+
+  it "includes Task lifecycle commands through the immutable submitted Task identity" do
+    command_id = SecureRandom.uuid_v7
+    task_id = SecureRandom.uuid_v7
+    submitted, completed = event_store.append(stream, [
+      PgEventstore::Event.new(type: "CoordinationTaskSubmitted", data: { task_id: }, markers: [ "command:#{command_id}" ]),
+      PgEventstore::Event.new(type: "CoordinationTaskCompleted", data: { task_id: }, markers: [ "command:#{SecureRandom.uuid_v7}", "task:#{task_id}" ])
+    ])
+    events = reader.page(Coordinator::Write::HistoryMigrations::SourcePageCriteriaV1.new(
+      from_position: submitted.global_position, to_position: completed.global_position,
+      page_size: 10, source_command_ids: [ command_id ]
+    ))
+    expect(events.map(&:id)).to eq([ submitted.id, completed.id ])
+  end
 end

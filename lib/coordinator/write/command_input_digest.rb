@@ -1205,6 +1205,8 @@ module Coordinator::Write
         tool_name: "history_migration_start",
         input: CommandInputDocuments::StartHistoryMigrationInputV1.new(
           actor: actor_document(command.actor),
+          source_after_position: command.source_after_position,
+          source_command_ids: command.source_command_ids,
           page_size: command.page_size,
           migration_id: command.migration_id,
           source_config_name: command.source_config_name,
@@ -1221,6 +1223,9 @@ module Coordinator::Write
         tool_name: "history_migration_start",
         input: CommandInputDocuments::StartHistoryMigrationCanonicalInputV1.new(
           actor: actor_document(command.actor),
+          source_after_position: command.source_after_position,
+          source_command_ids: command.source_command_ids,
+          source_upper_position: command.source_after_position ? command.source_upper_position : nil,
           page_size: command.page_size
         )
       )

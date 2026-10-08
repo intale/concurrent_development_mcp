@@ -201,6 +201,7 @@ module Coordinator::Write
           [ "DevelopmentArtifactCreated", 1 ] => post_remodel_development_memory,
           [ "DevelopmentArtifactKindChanged", 1 ] => post_remodel_development_memory,
           [ "DevelopmentArtifactLabelAdded", 1 ] => post_remodel_development_memory,
+          [ "DevelopmentArtifactLabelRemoved", 1 ] => post_remodel_development_memory,
           [ "DevelopmentArtifactObservationFactLinked", 1 ] => post_remodel_development_memory,
           [ "DevelopmentArtifactObservationRecorded", 1 ] => post_remodel_development_memory,
           [ "DevelopmentArtifactRelationDeclared", 2 ] => post_remodel_development_memory,

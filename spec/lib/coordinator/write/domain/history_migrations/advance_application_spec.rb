@@ -80,4 +80,12 @@ RSpec.describe Coordinator::Write::Domain::HistoryMigrations::AdvanceApplication
 
     expect(failure.code).to eq(:history_migration_plan_required)
   end
+
+  it "resets every subsequent wave to the frozen suffix start, never to zero" do
+    suffix = snapshot.new(source_after_position: 3, source_command_ids: [ SecureRandom.uuid_v7 ], application_next_from_position: 4)
+    suffix_page = page.new(from_position: 4)
+    result = decider.call(snapshot: suffix, page: suffix_page, command: command.new(next_from_position: 4))
+    expect(result.value!.plan.events.sole.next_from_position).to eq(4)
+    expect(decider.call(snapshot: suffix, page: suffix_page, command:).failure.code).to eq(:history_migration_page_conflict)
+  end
 end

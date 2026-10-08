@@ -200,6 +200,14 @@ module Coordinator
       def history_migration_start
         object_schema(
           properties: common_mutation_properties.merge(
+            source_after_position: {
+              type: "integer", minimum: 0,
+              description: "Exclusive global lower bound for a self-contained new Development Artifact history suffix. Requires an explicit upper bound and source_command_ids; does not remigrate base entities."
+            },
+            source_command_ids: {
+              type: "array", minItems: 1, maxItems: 100, uniqueItems: true, items: uuid_v7,
+              description: "Exact canonical UUIDv7 artifact capture/update command IDs, not request labels. The server accepts only complete new streams and closed event references/causation, at most 1000 facts. This positive selector excludes maintenance and unrelated history."
+            },
             source_upper_position: {
               type: "integer", minimum: 0,
               description: "Optional previously verified frozen global upper position for a clean-target rebuild. Must not exceed the current source head. Omit to freeze the current head. Migration-maintenance events after this boundary are not imported."

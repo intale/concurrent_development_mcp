@@ -47,6 +47,13 @@ module Coordinator::Write
             ),
             Events::HistoryMigrationStartedV1.new(migration_id: command.migration_id)
           ]
+          if command.source_after_position
+            events.insert(-2, Events::HistoryMigrationSourceSelectionFrozenV1.new(
+              migration_id: command.migration_id,
+              source_after_position: command.source_after_position,
+              source_command_ids: command.source_command_ids
+            ))
+          end
 
           StartDecisionV1.new(
             outcome: "started",

@@ -21,6 +21,16 @@ module Coordinator::Write
         step ensure_store_available(source_config_name, role: "source")
         step ensure_store_available(target_config_name, role: "target")
 
+        if attributes.key?(:source_after_position)
+          step HistoryMigrations::SourceSelectionValidator.new(
+            source_reader: HistoryMigrations::SourceReader.new(client: @store_registry.client(source_config_name))
+          ).call(
+            after_position: attributes.fetch(:source_after_position),
+            upper_position: attributes.fetch(:source_upper_position),
+            command_ids: attributes.fetch(:source_command_ids)
+          )
+        end
+
         source_head = HistoryMigrations::SourceReader.new(
           client: @store_registry.client(source_config_name)
         ).head_position
@@ -80,7 +90,9 @@ module Coordinator::Write
             source_config_name:,
             target_config_name:,
             source_upper_position:,
-            page_size: attributes.fetch(:page_size, Types::HISTORY_MIGRATION_PAGE_SIZE_MAXIMUM)
+            page_size: attributes.fetch(:page_size, Types::HISTORY_MIGRATION_PAGE_SIZE_MAXIMUM),
+            source_after_position: attributes[:source_after_position],
+            source_command_ids: attributes.fetch(:source_command_ids, []).sort
           )
         )
       end

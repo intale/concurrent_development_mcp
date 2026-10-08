@@ -981,6 +981,9 @@ module Coordinator::Write
     class StartHistoryMigrationCanonicalInputV1 < Value
       attribute :actor, ActorV1
       attribute :page_size, Types::HistoryMigrationPageSize
+      attribute :source_after_position, Types::GlobalPosition.optional.default(nil)
+      attribute :source_command_ids, Types::Array.of(Types::UuidV7).constrained(max_size: 100).default([].freeze)
+      attribute :source_upper_position, Types::GlobalPosition.optional.default(nil)
     end
 
     class StartHistoryMigrationInputV1 < StartHistoryMigrationCanonicalInputV1

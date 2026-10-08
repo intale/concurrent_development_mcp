@@ -16,6 +16,12 @@ module Coordinator::Write
       attribute :abandoned, Types::Bool
       attribute :checkpoint_event, Types.Instance(PgEventstore::Event)
       attribute :latest_revision, Types::StreamRevision
+      attribute :source_after_position, Types::GlobalPosition.optional.default(nil)
+      attribute :source_command_ids, Types::Array.of(Types::UuidV7).constrained(max_size: 100).default([].freeze)
+
+      def source_from_position
+        source_after_position ? source_after_position + 1 : 0
+      end
 
       def plan_completed?
         plan_completed

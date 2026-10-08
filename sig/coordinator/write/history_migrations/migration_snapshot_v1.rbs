@@ -15,6 +15,9 @@ module Coordinator
         attr_reader abandoned: bool
         attr_reader checkpoint_event: PgEventstore::Event
         attr_reader latest_revision: Integer
+        attr_reader source_after_position: Integer?
+        attr_reader source_command_ids: Array[String]
+        def source_from_position: () -> Integer
 
         def plan_completed?: () -> bool
         def completed?: () -> bool

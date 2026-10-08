@@ -4,7 +4,7 @@ RSpec.describe Coordinator::Write::HistoryMigrations::PostRemodelContractCatalog
   subject(:catalog) { described_class.new }
 
   it "freezes the reviewed post-remodel contracts used by migration and replay" do
-    expect(catalog.source_contracts.size).to eq(55)
+    expect(catalog.source_contracts.size).to eq(56)
     expect(catalog).to be_include(type: "RepositoryRegistered", schema_version: 2)
     expect(catalog.source_contracts.uniq).to eq(catalog.source_contracts)
     expect(catalog).to be_include(type: "AttemptAuthorized", schema_version: 2)

@@ -35,7 +35,7 @@ module Coordinator::Write
 
       DEVELOPMENT_MEMORY_CONTRACTS = %w[
         DevelopmentArtifactContentChanged@1 DevelopmentArtifactCreated@1 DevelopmentArtifactKindChanged@1
-        DevelopmentArtifactLabelAdded@1 DevelopmentArtifactObservationFactLinked@1
+        DevelopmentArtifactLabelAdded@1 DevelopmentArtifactLabelRemoved@1 DevelopmentArtifactObservationFactLinked@1
         DevelopmentArtifactObservationRecorded@1 DevelopmentArtifactRelationDeclared@2
         DevelopmentArtifactScopeChanged@1 DevelopmentArtifactSourceChanged@1 DevelopmentArtifactTitleChanged@1
         GuidanceMessageAnchored@1 UserUtteranceForwardedByAgent@2

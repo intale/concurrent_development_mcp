@@ -76,7 +76,8 @@ module Coordinator::Processes
           Coordinator::Write::HistoryMigrations::SourcePageCriteriaV1.new(
             from_position: migration.next_from_position,
             to_position: migration.source_upper_position,
-            page_size: migration.page_size
+            page_size: migration.page_size,
+            source_command_ids: migration.source_command_ids
           )
         )
         if events.empty?
@@ -84,7 +85,11 @@ module Coordinator::Processes
         end
         # The final page covers an excluded tail too, so all existing wave cursors
         # can reach the original frozen upper bound without creating an empty page.
-        to_position = if events.last.global_position == @source_reader.head_position(to_position: migration.source_upper_position)
+        to_position = if events.last.global_position == @source_reader.head_position(
+          to_position: migration.source_upper_position,
+          source_command_ids: migration.source_command_ids,
+          source_after_position: migration.source_after_position
+        )
           migration.source_upper_position
         else
           events.last.global_position
@@ -267,7 +272,7 @@ module Coordinator::Processes
         next_position = page.to_position + 1
         return [ dependency_wave, next_position ] if next_position <= migration.source_upper_position
         if dependency_wave < Coordinator::Shared::Types::HISTORY_MIGRATION_DEPENDENCY_WAVE_MAXIMUM
-          return [ dependency_wave + 1, 0 ]
+          return [ dependency_wave + 1, migration.source_from_position ]
         end
 
         [ dependency_wave, next_position ]

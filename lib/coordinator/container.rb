@@ -132,7 +132,8 @@ module Coordinator
 
     register("history_migrations.page_source_loader", memoize: true) do
       Write::HistoryMigrations::PageSourceLoader.new(
-        source_reader: self["history_migrations.source_reader"]
+        source_reader: self["history_migrations.source_reader"],
+        migration_loader: self["history_migrations.migration_loader"]
       )
     end
 
@@ -3948,9 +3949,12 @@ module Coordinator
     end
 
     register("subscription_set_factories.migration_repositories", memoize: true) do
+      artifacts = Read::Subscriptions::DevelopmentArtifacts.new(
+        handler: Read::Projectors::DevelopmentArtifactsV1.new(event_store: self["history_migrations.target_event_store"])
+      )
       Shared::Subscriptions::SetFactory.new(
         set_class: Read::Subscriptions::ReadModelSet, set_name: Read::Subscriptions::ReadModelSet::SET_NAME,
-        registrations: [ self["subscriptions.repositories"] ]
+        registrations: [ self["subscriptions.repositories"], artifacts ]
       )
     end
 

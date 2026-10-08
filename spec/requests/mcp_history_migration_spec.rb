@@ -56,7 +56,7 @@ RSpec.describe "MCP history migration start", :event_store do
       "page_size" => 250,
       "outcome" => "started"
     )
-    expect(history.map(&:type)).to eq(Coordinator::Write::Operations::ExecuteStartHistoryMigration::EVENT_TYPES)
+    expect(history.map(&:type)).to eq(Coordinator::Write::Operations::ExecuteStartHistoryMigration::EVENT_TYPES - [ "HistoryMigrationSourceSelectionFrozen" ])
     expect(history.first.global_position).to be > anchor.global_position
   ensure
     Rails.error.unsubscribe(collector) if collector
