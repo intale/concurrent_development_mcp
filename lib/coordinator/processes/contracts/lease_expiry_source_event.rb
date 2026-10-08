@@ -44,8 +44,8 @@ module Coordinator::Processes
 
       def matching_provenance?(event)
         command_id = event.metadata["command_id"]
-        Types::IDENTIFIER_PATTERN.match?(command_id.to_s) &&
-          event.metadata["policy_version"] == Coordinator::Write::WorkIntentionPolicyV1::VERSION
+        # The source policy records its origin; expiry decides against current facts.
+        Types::IDENTIFIER_PATTERN.match?(command_id.to_s)
       end
 
       def matching_markers?(event)
