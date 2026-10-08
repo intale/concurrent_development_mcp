@@ -27,7 +27,7 @@ default: &default
 
 development:
   <<: *default
-  database: concurrent_development_mcp_development
+  database: concurrent_development_mcp_migration_target_v7
 
   # The specified database role being used to connect to PostgreSQL.
   # To create additional roles in PostgreSQL see `$ createuser --help`.

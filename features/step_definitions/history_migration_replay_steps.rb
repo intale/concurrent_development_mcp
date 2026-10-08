@@ -151,10 +151,15 @@ Then("the cancelled capture retains terminal history without target work") do
     max_count: 2, filter: { event_types: [ { type: "CoordinationTaskCancelled", markers: [ "history-migration:#{@history_migration_id}" ] } ] }
   }).sole
   task_id = cancelled.data.fetch("task_id")
-  target_store = Coordinator::Write::EventStore.new(client: PgEventstore.client(:migration_target))
-  loader = Coordinator::Write::Tasks::Loader.new(event_store: target_store)
-  task = Coordinator::Write::Operations::GetCoordinationTask.new(loader:).call(task_id:).value!
+  history = PgEventstore.client(:migration_target).read(
+    PgEventstore::Stream.new(context: "CoordinatorControl", stream_name: "CoordinationTask", stream_id: task_id),
+    options: {
+      max_count: 3,
+      direction: :asc,
+      filter: { event_types: %w[CoordinationTaskSubmitted CoordinationTaskExecutionStarted CoordinationTaskCompleted CoordinationTaskCancelled CoordinationTaskFailed] }
+    }
+  )
   assert_acceptance(task_id != @history_tail_cancelled_task_id, "Restored Task identity must be newly allocated")
-  assert_acceptance_equal("cancelled", task.status, "Restored cancellation status")
-  assert_acceptance_equal("Cancelled before execution", task.status_message, "Restored cancellation reason")
+  assert_acceptance_equal(%w[CoordinationTaskSubmitted CoordinationTaskCancelled], history.map(&:type), "Restored terminal history")
+  assert_acceptance_equal("Cancelled before execution", cancelled.data.fetch("reason"), "Restored cancellation reason")
 end
