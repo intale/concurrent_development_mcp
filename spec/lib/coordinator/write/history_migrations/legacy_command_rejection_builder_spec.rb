@@ -1,7 +1,10 @@
 # frozen_string_literal: true
 
 RSpec.describe Coordinator::Write::HistoryMigrations::LegacyCommandRejectionBuilder, :event_store do
-  subject(:builder) { described_class.new(entity_reference_resolver: resolver) }
+  subject(:builder) do
+    described_class.new(entity_reference_resolver: resolver,
+      target_event_reference_resolver: Coordinator::Container["history_migrations.legacy_target_event_reference_resolver"])
+  end
 
   let(:event_store) { Coordinator::Write::EventStore.new(client: PgEventstore.client) }
   let(:allocator) { Coordinator::Write::HistoryMigrations::StreamIdentityAllocator.new(event_store:) }

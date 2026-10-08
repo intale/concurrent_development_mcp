@@ -562,7 +562,8 @@ module Coordinator
 
     register("history_migrations.legacy_command_rejection_builder", memoize: true) do
       Write::HistoryMigrations::LegacyCommandRejectionBuilder.new(
-        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"]
+        entity_reference_resolver: self["history_migrations.legacy_entity_reference_resolver"],
+        target_event_reference_resolver: self["history_migrations.legacy_target_event_reference_resolver"]
       )
     end
 
@@ -648,7 +649,8 @@ module Coordinator
         source_event_plan_resolver:
           self["history_migrations.migration_source_event_plan_resolver"],
         command_input_rebinder:
-          self["history_migrations.post_remodel_command_input_rebinder"]
+          self["history_migrations.post_remodel_command_input_rebinder"],
+        rejection_builder: self["history_migrations.legacy_command_rejection_builder"]
       )
     end
 

@@ -59,4 +59,5 @@ Feature: Attributed Candidate checkpoints
       Given Candidate coordinations "RACE-A" and "RACE-B" give two agents independent work intentions
       When both agents concurrently submit Candidates for the same repository head
       Then one Candidate Task succeeds and the other reports a registered-head conflict
+      And the head-conflict receipt resolves exactly to the winning ownership fact
       And the winning Candidate owns one complete checkpoint while the loser owns no target facts

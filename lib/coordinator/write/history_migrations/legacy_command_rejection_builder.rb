@@ -5,8 +5,9 @@ module Coordinator::Write
     class LegacyCommandRejectionBuilder
       include Dry::Monads[:result]
 
-      def initialize(entity_reference_resolver:, schema_registry: EventSchemaRegistry.new)
+      def initialize(entity_reference_resolver:, target_event_reference_resolver:, schema_registry: EventSchemaRegistry.new)
         @entity_reference_resolver = entity_reference_resolver
+        @target_event_reference_resolver = target_event_reference_resolver
         @schema_registry = schema_registry
       end
 
@@ -22,6 +23,27 @@ module Coordinator::Write
           return skill if skill.failure?
 
           document = document.merge(details: details.merge(skill_id: skill.value!.target_stream.stream_id))
+        elsif document.fetch(:code) == "candidate_head_already_registered"
+          details = document.fetch(:details).to_h.transform_keys(&:to_sym)
+          reference = @target_event_reference_resolver.call(
+            migration_id:, source_config_name:, source_upper_position:, source_event:,
+            source_reference: EventReference.new(details.fetch(:existing_event).to_h.transform_keys(&:to_sym)),
+            target_stream_context: "DevelopmentIntegration", target_stream_name: "CandidateHead",
+            identity_role: "candidate-head", target_event_type: "CandidateHeadRegistered",
+            target_step_name: "register-candidate-head"
+          )
+          return reference if reference.failure?
+
+          repository = @entity_reference_resolver.call(
+            migration_id:, source_config_name:, source_upper_position:, source_event:,
+            source_stream: StreamReference.new(context: "DevelopmentPlanning", stream_name: "Repository", stream_id: details.fetch(:repository_id)),
+            target_stream_context: "DevelopmentPlanning", target_stream_name: "Repository", identity_role: "repository"
+          )
+          return repository if repository.failure?
+
+          document = document.merge(details: details.merge(
+            existing_event: reference.value!.to_h, repository_id: repository.value!.target_stream.stream_id
+          ))
         end
 
         Success(@schema_registry.load(

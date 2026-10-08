@@ -25,6 +25,83 @@ RSpec.describe "history migration Candidate transformers", :event_store do
 
   before { persist_scope_roots }
 
+  context "historical head-conflict rejection evidence" do
+    let(:submitted) { persist_payload(candidate_stream, candidate_payload) }
+    let(:head) do
+      persist_payload(stream("DevelopmentIntegration", "CandidateHead", "sha256:#{'e' * 64}"), head_payload(submitted))
+    end
+    let(:rejection_command_id) { SecureRandom.uuid_v7 }
+    let(:target_rejection_command_id) { SecureRandom.uuid_v7 }
+    let(:head_error) do
+      Coordinator::Write::Tasks::DomainErrorV1::CandidateHeadAlreadyRegisteredError.new(
+        code: "candidate_head_already_registered", message: "Repository head already belongs to another Candidate",
+        details: Coordinator::Write::Tasks::DomainErrorV1::CandidateHeadExistingDetails.new(
+          candidate_id: "denied-candidate", existing_event: event_reference(head),
+          repository_id: legacy_repository_id, object_format: "sha1", head_commit_oid:))
+    end
+    let(:rejected) do
+      command_stream = stream("CoordinatorControl", "Command", rejection_command_id)
+      persist_payload(command_stream, Coordinator::Write::Events::CommandRegisteredV1.new(
+        command_id: rejection_command_id, request_id: "head-conflict-request", tool_name: "candidate_submit"))
+      persist_payload(command_stream, Coordinator::Write::Events::CommandRejectedV2.new(
+        command_id: rejection_command_id, error: head_error, retryable: false))
+    end
+    let(:rejection_builder) { Coordinator::Container["history_migrations.legacy_command_rejection_builder"] }
+
+    before do
+      expect(plan(submitted, upper_position: rejected.global_position)).to be_success
+      expect(plan(head, upper_position: rejected.global_position)).to be_success
+    end
+
+    it "rebinds legacy Task/Batch error references to the exact current ownership plan idempotently" do
+      result = build_head_rejection.value!
+      target_head = plan(head, upper_position: rejected.global_position).value!.sole.target_event
+      target_repository = transform(head, upper_position: rejected.global_position).value!.sole.event.repository_id
+
+      expect(result.error.details).to have_attributes(existing_event: target_head, repository_id: target_repository,
+        candidate_id: "denied-candidate", object_format: "sha1", head_commit_oid:)
+      expect(result).to have_attributes(retryable: false)
+      expect(result.error).to have_attributes(code: head_error.code, message: head_error.message)
+      expect(target_head.stream_id).to match(Coordinator::Shared::Types::UUID_V7_PATTERN)
+      expect(target_head.event_id).not_to eq(head.id)
+      expect(build_head_rejection.value!).to eq(result)
+    end
+
+    it "uses the same reference remapping for native CommandRejected@2" do
+      fact = transform(rejected, upper_position: rejected.global_position).value!.sole
+
+      expect(fact.event.error).to eq(build_head_rejection.value!.error)
+      expect(fact.event.error.details.existing_event.event_id).not_to eq(head.id)
+    end
+
+    it "rejects forged head references rather than carrying them into the target" do
+      error = head_error.to_h.deep_merge(details: { existing_event: { event_id: SecureRandom.uuid_v7 } })
+      result = build_head_rejection(error:)
+
+      expect(result).to be_failure
+      expect(result.failure.code).to eq(:ambiguous_source_reference)
+    end
+
+    it "rejects head evidence outside the frozen source range" do
+      result = build_head_rejection(upper_position: head.global_position - 1)
+
+      expect(result).to be_failure
+      expect(result.failure.code).to eq(:ambiguous_source_reference)
+    end
+
+    it "refuses to invent a target reference when the head has no migration-owned plan" do
+      result = build_head_rejection(migration: SecureRandom.uuid_v7)
+
+      expect(result).to be_failure
+      expect(result.failure.code).to eq(:target_plan_missing)
+    end
+
+    def build_head_rejection(error: head_error.to_h, upper_position: rejected.global_position, migration: migration_id)
+      rejection_builder.call(migration_id: migration, source_config_name: "default", source_upper_position: upper_position,
+        source_event: rejected, command_id: target_rejection_command_id, error:, retryable: false)
+    end
+  end
+
   it "rejects a Candidate reference to an absent or future work-intention reservation" do
     source = candidate_payload.new(lease_set_id: SecureRandom.uuid_v7)
     submitted = persist_payload(candidate_stream, source)

@@ -17,6 +17,7 @@ module Coordinator::Write
         entity_reference_resolver:,
         source_event_plan_resolver:,
         command_input_rebinder:,
+        rejection_builder:,
         request_marker: CommandLifecycle::RequestMarker.new,
         execution_lane: Tasks::ExecutionLane.new,
         tool_name_mapper: PostRemodelToolNameMapper.new,
@@ -28,6 +29,7 @@ module Coordinator::Write
         @entity_reference_resolver = entity_reference_resolver
         @source_event_plan_resolver = source_event_plan_resolver
         @command_input_rebinder = command_input_rebinder
+        @rejection_builder = rejection_builder
         @request_marker = request_marker
         @execution_lane = execution_lane
         @tool_name_mapper = tool_name_mapper
@@ -168,11 +170,14 @@ module Coordinator::Write
             retryable: source.retryable
           )
         when Events::CommandRejectedV2
-          Events::CommandRejectedV2.new(
-            command_id:,
-            error: source.error,
+          rejection = @rejection_builder.call(
+            migration_id:, source_config_name:, source_upper_position:, source_event:,
+            command_id:, error: source.error,
             retryable: source.retryable
           )
+          return rejection if rejection.failure?
+
+          rejection.value!
         end
         Success([
           fact(

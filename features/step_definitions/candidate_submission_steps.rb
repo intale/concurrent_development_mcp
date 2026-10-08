@@ -421,6 +421,30 @@ Then("one Candidate Task succeeds and the other reports a registered-head confli
   )
 end
 
+Then("the head-conflict receipt resolves exactly to the winning ownership fact") do
+  loser = @candidate_race_loser.fetch(:arguments)
+  start_task_result_subscriptions
+  receipt = eventually("projected head-conflict receipt") do
+    result = call_tool("operation_get", { command_id: loser.fetch(:command_id) }).dig("result", "structuredContent")
+    [ result&.dig("data", "code") == "candidate_head_already_registered", result ]
+  end
+  details = receipt.dig("data", "details")
+  reference = details.fetch("existing_event")
+  target = event_store.read_at(
+    Coordinator::Write::StreamReference.new(context: reference.fetch("stream_context"),
+      stream_name: reference.fetch("stream_name"), stream_id: reference.fetch("stream_id")),
+    reference.fetch("stream_revision")
+  )
+  assert_acceptance(!target.nil?, "Head-conflict reference must resolve to persisted ownership")
+  assert_acceptance_equal(reference.fetch("event_id"), target.id, "Exact ownership event")
+  assert_acceptance_equal("CandidateHeadRegistered", target.type, "Ownership event type")
+  assert_acceptance_equal(reference.fetch("stream_revision"), target.stream_revision, "Ownership revision")
+  assert_acceptance_equal(@candidate_race_winner.dig(:arguments, :candidate_id), target.data.fetch("candidate_id"), "Winning Candidate")
+  assert_acceptance_equal(details.fetch("repository_id"), target.data.fetch("repository_id"), "Repository identity")
+  assert_acceptance_equal(loser.fetch(:head_commit_oid), target.data.fetch("head_commit_oid"), "Contested head")
+  assert_acceptance_equal(loser.fetch(:candidate_id), details.fetch("candidate_id"), "Denied request attribution")
+end
+
 Then("the winning Candidate owns one complete checkpoint while the loser owns no target facts") do
   winner = @candidate_race_winner.fetch(:arguments)
   loser = @candidate_race_loser.fetch(:arguments)

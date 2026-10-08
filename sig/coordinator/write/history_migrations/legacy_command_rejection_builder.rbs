@@ -1,11 +1,11 @@
 module Coordinator::Write::HistoryMigrations
   class LegacyCommandRejectionBuilder
-    def initialize: (entity_reference_resolver: LegacyEntityReferenceResolver, ?schema_registry: Coordinator::Write::EventSchemaRegistry) -> void
+    def initialize: (entity_reference_resolver: LegacyEntityReferenceResolver, target_event_reference_resolver: LegacyTargetEventReferenceResolver, ?schema_registry: Coordinator::Write::EventSchemaRegistry) -> void
 
     def call: (
       migration_id: String,
       source_config_name: String,
-      source_upper_position: Integer?,
+      source_upper_position: Integer,
       source_event: PgEventstore::Event,
       command_id: String,
       error: LegacyTaskResults::DomainErrorV1 | Coordinator::Write::Tasks::DomainErrorV1::domain_error | Hash[String | Symbol, untyped],

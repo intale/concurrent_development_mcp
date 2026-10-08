@@ -10,6 +10,7 @@ module Coordinator
           entity_reference_resolver: LegacyEntityReferenceResolver,
           source_event_plan_resolver: MigrationSourceEventPlanResolver,
           command_input_rebinder: PostRemodelCommandInputRebinder,
+          rejection_builder: LegacyCommandRejectionBuilder,
           ?request_marker: CommandLifecycle::RequestMarker,
           ?execution_lane: Tasks::ExecutionLane,
           ?tool_name_mapper: PostRemodelToolNameMapper,
