@@ -1,0 +1,7 @@
+module Coordinator
+  module Processes
+    class WorkIntentionExpiryRescheduleV1 < Shared::Value
+      def reschedule_at: () -> String
+    end
+  end
+end

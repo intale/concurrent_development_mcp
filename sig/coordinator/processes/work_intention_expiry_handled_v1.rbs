@@ -1,0 +1,7 @@
+module Coordinator
+  module Processes
+    class WorkIntentionExpiryHandledV1 < Shared::Value
+      def outcome: () -> String
+    end
+  end
+end

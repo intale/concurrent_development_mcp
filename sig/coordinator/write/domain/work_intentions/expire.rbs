@@ -6,7 +6,7 @@ module Coordinator
           def initialize: (?stream_factory: StreamFactory) -> void
           def call: (
             state: State,
-            command: Commands::ExpireResourceLease,
+            command: Commands::ExpireWorkIntention,
             observed_at: String
           ) -> Dry::Monads::Result
         end

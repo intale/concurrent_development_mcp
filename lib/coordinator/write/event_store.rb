@@ -74,13 +74,16 @@ module Coordinator::Write
     end
 
     def read_latest(reference, criteria)
+      options = {
+        direction: :desc,
+        max_count: 1,
+        filter: { event_types: criteria.event_types }
+      }
+      options[:from_revision] = criteria.from_revision unless criteria.from_revision.nil?
+
       @client.read(
         @pg_stream_factory.call(reference),
-        options: {
-          direction: :desc,
-          max_count: 1,
-          filter: { event_types: criteria.event_types }
-        }
+        options:
       ).first
     rescue PgEventstore::StreamNotFoundError
       nil

@@ -11,12 +11,12 @@ module Coordinator::Write
         end
 
         def call(state:, command:, observed_at:)
-          return failure(:lease_not_found, "Work intention does not exist", command, state) if state.absent?
+          return failure(:work_intention_not_found, "Work intention does not exist", command, state) if state.absent?
           return Success(WorkIntentionDecisionV1.no_change) unless exact_observation?(state:, command:)
           return Success(WorkIntentionDecisionV1.no_change) if state.withdrawn || state.expired
           if observed_at < state.expires_at
             return failure(
-              :lease_deadline_not_reached,
+              :work_intention_deadline_not_reached,
               "Work intention has not reached its expiry deadline",
               command,
               state
@@ -44,8 +44,8 @@ module Coordinator::Write
 
         def exact_observation?(state:, command:)
           state.resource_id == command.resource_id &&
-            state.intention_id == command.lease_id &&
-            state.set_id == command.lease_set_id &&
+            state.intention_id == command.intention_id &&
+            state.set_id == command.intention_set_id &&
             state.fencing_token == command.fencing_token &&
             state.expires_at == command.expected_expires_at
         end
@@ -57,16 +57,14 @@ module Coordinator::Write
               message:,
               details: {
                 resource_id: command.resource_id,
-                expected_lease_id: command.lease_id,
-                current_lease_id: state.intention_id,
-                expected_lease_set_id: command.lease_set_id,
-                current_lease_set_id: state.set_id,
+                expected_intention_id: command.intention_id,
+                current_intention_id: state.intention_id,
+                expected_intention_set_id: command.intention_set_id,
+                current_intention_set_id: state.set_id,
                 expected_fencing_token: command.fencing_token,
                 current_fencing_token: state.fencing_token,
                 expected_expires_at: command.expected_expires_at,
-                current_expires_at: state.expires_at,
-                current_released_at: state.withdrawn ? state.expires_at : nil,
-                current_expired_at: state.expired ? state.expires_at : nil
+                current_expires_at: state.expires_at
               }
             )
           )

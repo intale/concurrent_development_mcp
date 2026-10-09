@@ -3,9 +3,9 @@
 module LiveJobs
   include ActiveJob::TestHelper
 
-  def perform_scheduled_lease_expiry(source_event)
+  def perform_scheduled_work_intention_expiry(source_event)
     filter = lambda do |job|
-      job.fetch(:job) == Coordinator::Processes::Jobs::ExpireResourceLease &&
+      job.fetch(:job) == Coordinator::Processes::Jobs::ExpireWorkIntention &&
         job.fetch(:args).first == source_event.id
     end
     eventually("Lease-expiry job for #{source_event.id} to be scheduled") do

@@ -129,10 +129,10 @@ module Coordinator::Write
       attribute :withdrawn_at, Types::Timestamp
     end
 
-    class ResourceLeaseExpiry < Value
+    class WorkIntentionExpiry < Value
       attribute :resource_id, Types::ResourceId
-      attribute :lease_id, Types::UuidV7
-      attribute :lease_set_id, Types::UuidV7
+      attribute :intention_id, Types::UuidV7
+      attribute :intention_set_id, Types::UuidV7
       attribute :fencing_token, Types::FencingToken
       attribute :expires_at, Types::Timestamp
       attribute :expired_at, Types::Timestamp
@@ -520,7 +520,7 @@ module Coordinator::Write
            WorkIntentionSetExpansion |
            WorkIntentionSetRenewal |
            WorkIntentionSetWithdrawal |
-           ResourceLeaseExpiry |
+           WorkIntentionExpiry |
            Guidance |
            InterpretationProposal |
            InterpretationAdjudication |

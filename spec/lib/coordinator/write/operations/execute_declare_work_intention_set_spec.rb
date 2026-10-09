@@ -238,7 +238,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteDeclareWorkIntentionSet, :
   end
 
   def start_attempts(attempts)
-    ResourceLeaseOperationScenario.start_attempts(event_store:, attempts:)
+    WorkIntentionOperationScenario.start_attempts(event_store:, attempts:)
   end
 
   def resolve(path, kind: "file")

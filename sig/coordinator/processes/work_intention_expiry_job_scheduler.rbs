@@ -1,0 +1,7 @@
+module Coordinator
+  module Processes
+    class WorkIntentionExpiryJobScheduler
+      def call: (WorkIntentionExpirySourceLocatorV1 locator, wait_until: String) -> untyped
+    end
+  end
+end

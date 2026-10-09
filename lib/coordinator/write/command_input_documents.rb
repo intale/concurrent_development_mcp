@@ -932,18 +932,18 @@ module Coordinator::Write
       attribute :input, CompleteOperationBatchCancellationInputV1
     end
 
-    class ExpireResourceLeaseInputV1 < Value
+    class ExpireWorkIntentionInputV1 < Value
       attribute :actor, ActorV1
       attribute :resource_id, Types::ResourceId
-      attribute :lease_id, Types::UuidV7
-      attribute :lease_set_id, Types::UuidV7
+      attribute :intention_id, Types::UuidV7
+      attribute :intention_set_id, Types::UuidV7
       attribute :fencing_token, Types::FencingToken
       attribute :expected_expires_at, Types::Timestamp
     end
 
-    class ExpireResourceLeaseV1 < BaseV1
-      attribute :tool_name, Types::String.enum("lease_expire_policy")
-      attribute :input, ExpireResourceLeaseInputV1
+    class ExpireWorkIntentionV1 < BaseV1
+      attribute :tool_name, Types::String.enum("work_intention_expire_policy")
+      attribute :input, ExpireWorkIntentionInputV1
     end
 
     class SatisfyWorkItemDependencyInputV1 < Value
@@ -1018,7 +1018,7 @@ module Coordinator::Write
     Type = TARGET_TYPES.reduce { _1 | _2 }
 
     DigestType = Type |
-                 ExpireResourceLeaseV1 |
+                 ExpireWorkIntentionV1 |
                  RequestReleaseSetCompensationV1 |
                  CompleteActivatedReleaseSetV1 |
                  SatisfyWorkItemDependencyV1 |

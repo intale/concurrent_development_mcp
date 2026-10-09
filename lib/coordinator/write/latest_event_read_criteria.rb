@@ -3,5 +3,6 @@
 module Coordinator::Write
   class LatestEventReadCriteria < Value
     attribute :event_types, Types::Array.of(Types::String).constrained(min_size: 1, max_size: 100)
+    attribute? :from_revision, Types::StreamRevision.optional.default(nil)
   end
 end

@@ -35,7 +35,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRenewWorkIntentionSet, :ev
 
   it "rejects incomplete and stale member observations without partial renewal" do
     reservation = setup_reservation
-    intentions = ResourceLeaseOperationScenario.work_intention_inputs(reservation.receipt)
+    intentions = WorkIntentionOperationScenario.work_intention_inputs(reservation.receipt)
 
     incomplete = operation.call(
       renew_input(reservation, command_id: "cmd-renew-incomplete").merge(intentions: intentions.first(1))
@@ -109,11 +109,11 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRenewWorkIntentionSet, :ev
   end
 
   def setup_reservation
-    ResourceLeaseOperationScenario.start_attempts(
+    WorkIntentionOperationScenario.start_attempts(
       event_store:,
       attempts: [ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ]
     )
-    ResourceLeaseOperationScenario.reserve(event_store:, paths: [ "app/a.rb", "app/b.rb" ])
+    WorkIntentionOperationScenario.declare(event_store:, paths: [ "app/a.rb", "app/b.rb" ])
   end
 
   def renew_input(reservation, command_id:)
@@ -124,7 +124,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteRenewWorkIntentionSet, :ev
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
       intention_set_id: reservation.receipt.intention_set_id,
-      intentions: ResourceLeaseOperationScenario.work_intention_inputs(reservation.receipt),
+      intentions: WorkIntentionOperationScenario.work_intention_inputs(reservation.receipt),
       ttl_seconds: 900
     }
   end

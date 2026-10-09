@@ -6,12 +6,12 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWorkIntentionSet, :e
   subject(:operation) { described_class.new(event_store:) }
 
   it "preserves existing membership when a new resource exceeds its real boundary budget" do
-    ResourceLeaseOperationScenario.start_attempts(
+    WorkIntentionOperationScenario.start_attempts(
       event_store:,
       attempts: [ [ "W-LSE-A", "A-LSE-A", "agent-a" ], [ "W-LSE-B", "A-LSE-B", "agent-b" ] ]
     )
-    reservation = ResourceLeaseOperationScenario.reserve(event_store:, paths: [ "capacity/owned.rb" ])
-    other = ResourceLeaseOperationScenario.reserve(
+    reservation = WorkIntentionOperationScenario.declare(event_store:, paths: [ "capacity/owned.rb" ])
+    other = WorkIntentionOperationScenario.declare(
       event_store:, paths: [ "capacity/addition.rb" ], command_id: "seed-capacity-b",
       agent_id: "agent-b", work_item_id: "W-LSE-B", attempt_id: "A-LSE-B"
     )
@@ -77,16 +77,16 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWorkIntentionSet, :e
   end
 
   it "rejects the entire expansion when a new shared intention overlaps active exclusive work" do
-    ResourceLeaseOperationScenario.start_attempts(
+    WorkIntentionOperationScenario.start_attempts(
       event_store:,
       attempts: [ [ "W-LSE-A", "A-LSE-A", "agent-a" ], [ "W-LSE-B", "A-LSE-B", "agent-b" ] ]
     )
-    owner = ResourceLeaseOperationScenario.reserve(
+    owner = WorkIntentionOperationScenario.declare(
       event_store:,
       paths: [ "app/a.rb" ],
       command_id: "seed-shared-a"
     )
-    exclusive = ResourceLeaseOperationScenario.reserve(
+    exclusive = WorkIntentionOperationScenario.declare(
       event_store:,
       paths: [
         {
@@ -145,11 +145,11 @@ RSpec.describe Coordinator::Write::Operations::ExecuteExpandWorkIntentionSet, :e
   end
 
   def setup_reservation
-    ResourceLeaseOperationScenario.start_attempts(
+    WorkIntentionOperationScenario.start_attempts(
       event_store:,
       attempts: [ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ]
     )
-    ResourceLeaseOperationScenario.reserve(event_store:, paths: [ "app/models/a.rb" ])
+    WorkIntentionOperationScenario.declare(event_store:, paths: [ "app/models/a.rb" ])
   end
 
   def expand_input(reservation, command_id:, resources:)

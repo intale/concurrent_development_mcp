@@ -1,0 +1,15 @@
+module Coordinator
+  module Processes
+    module Contracts
+      class WorkIntentionExpirySourceEvent < Dry::Validation::Contract
+        SUPPORTED_TYPES: Array[String]
+
+        def initialize: (
+          ?compound_marker_builder: Shared::CompoundMarkerBuilder,
+          ?repository_marker_builder: Write::RepositoryMarkerBuilder
+        ) -> void
+        def call: ({ event: PgEventstore::Event } input) -> Dry::Validation::Result
+      end
+    end
+  end
+end

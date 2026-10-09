@@ -301,36 +301,6 @@ module McpAcceptanceWorld
     )
   end
 
-  def write_set_events(attempt_id)
-    attempt_events(attempt_id).select { _1.type == "WriteSetReserved" }
-  end
-
-  def write_set_expansion_events(attempt_id)
-    attempt_events(attempt_id).select { _1.type == "WriteSetExpanded" }
-  end
-
-  def write_set_renewal_events(attempt_id)
-    event_store.read(
-      streams.attempt(attempt_id),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "WriteSetRenewed" ],
-        maximum_count: 10,
-        direction: :asc
-      )
-    )
-  end
-
-  def write_set_release_events(attempt_id)
-    event_store.read(
-      streams.attempt(attempt_id),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: [ "WriteSetReleased" ],
-        maximum_count: 10,
-        direction: :asc
-      )
-    )
-  end
-
   def work_intention_set_state(attempt_id)
     Coordinator::Write::WorkIntentionSetLoader.new(event_store:).find_by_attempt(attempt_id)
   end
@@ -1025,25 +995,6 @@ module McpAcceptanceWorld
       value:,
       command_id: "cmd-cuc-decision-correction-#{suffix}"
     }
-  end
-
-  def lease_events(path, kind: "file", repository_id: acceptance_repository_id)
-    resource_id = (@acceptance_resource_ids || {}).fetch([ repository_id, kind, path ]) do
-      raise "Resource #{repository_id}/#{kind}/#{path} was not resolved through MCP"
-    end
-    event_store.read(
-      streams.resource_lease(resource_id),
-      Coordinator::Write::EventReadCriteria.new(
-        event_types: [
-          "ResourceLeaseAcquired",
-          "ResourceLeaseRenewed",
-          "ResourceLeaseReleased",
-          "ResourceLeaseExpired"
-        ],
-        maximum_count: 10,
-        direction: :asc
-      )
-    )
   end
 
   def work_item_arguments(agent_id:, work_item_id:, change_set_id:, command_id:)

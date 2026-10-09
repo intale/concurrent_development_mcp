@@ -30,11 +30,11 @@ RSpec.describe Coordinator::Write::Operations::ExecuteWithdrawWorkIntentionSet, 
   end
 
   it "allows an exclusive successor after withdrawal and advances the resource fence" do
-    ResourceLeaseOperationScenario.start_attempts(
+    WorkIntentionOperationScenario.start_attempts(
       event_store:,
       attempts: [ [ "W-LSE-A", "A-LSE-A", "agent-a" ], [ "W-LSE-B", "A-LSE-B", "agent-b" ] ]
     )
-    reservation = ResourceLeaseOperationScenario.reserve(event_store:, paths: [ "app/shared.rb" ])
+    reservation = WorkIntentionOperationScenario.declare(event_store:, paths: [ "app/shared.rb" ])
     operation.call(release_input(reservation, command_id: "cmd-withdraw-owner")).value!
 
     successor = Coordinator::Write::Operations::ExecuteDeclareWorkIntentionSet.new(event_store:).call(
@@ -106,11 +106,11 @@ RSpec.describe Coordinator::Write::Operations::ExecuteWithdrawWorkIntentionSet, 
   end
 
   def setup_reservation
-    ResourceLeaseOperationScenario.start_attempts(
+    WorkIntentionOperationScenario.start_attempts(
       event_store:,
       attempts: [ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ]
     )
-    ResourceLeaseOperationScenario.reserve(event_store:, paths: [ "app/a.rb", "app/b.rb" ])
+    WorkIntentionOperationScenario.declare(event_store:, paths: [ "app/a.rb", "app/b.rb" ])
   end
 
   def release_input(reservation, command_id:)
@@ -121,7 +121,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteWithdrawWorkIntentionSet, 
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
       intention_set_id: reservation.receipt.intention_set_id,
-      intentions: ResourceLeaseOperationScenario.work_intention_inputs(reservation.receipt)
+      intentions: WorkIntentionOperationScenario.work_intention_inputs(reservation.receipt)
     }
   end
 

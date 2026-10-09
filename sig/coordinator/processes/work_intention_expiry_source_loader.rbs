@@ -1,0 +1,14 @@
+module Coordinator
+  module Processes
+    class WorkIntentionExpirySourceLoader
+      def initialize: (
+        event_store: Write::_EventStore,
+        ?source_builder: WorkIntentionExpirySourceBuilder,
+        ?stream_factory: Write::StreamFactory,
+        ?reloaded_source_contract: Contracts::ReloadedWorkIntentionExpirySource
+      ) -> void
+
+      def call: (WorkIntentionExpirySourceLocatorV1 locator) -> WorkIntentionExpirySource
+    end
+  end
+end

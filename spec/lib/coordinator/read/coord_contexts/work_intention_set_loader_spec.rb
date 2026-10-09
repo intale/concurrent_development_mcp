@@ -44,6 +44,7 @@ RSpec.describe Coordinator::Read::CoordContexts::WorkIntentionSetLoader, :event_
     2.times do
       view = loader.call(first, renewal("01"))
       expect(view).to have_attributes(set_id:, last_renewed_event: last, withdrawal_event: withdrawn,
+        previous_expires_at: "2026-12-01T01:00:00.000000Z",
         expires_at: "2026-12-01T02:00:00.000000Z")
     end
   end

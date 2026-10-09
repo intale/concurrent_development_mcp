@@ -1,0 +1,9 @@
+module Coordinator
+  module Write
+    class PreparedWorkIntentionExpiry < Shared::Value
+      def expired_at: () -> String
+      def input_digest: () -> String
+      def expiration_event_id: () -> String
+    end
+  end
+end

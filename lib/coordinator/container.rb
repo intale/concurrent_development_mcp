@@ -307,23 +307,23 @@ module Coordinator
       Write::Domain::Attempts::Abandon.new(stream_factory: self["stream_factory"])
     end
 
-    register("domain.resource_leases.reserve", memoize: true) do
+    register("domain.work_intentions.declare", memoize: true) do
       Write::Domain::WorkIntentions::DeclareSet.new(stream_factory: self["stream_factory"])
     end
 
-    register("domain.resource_leases.expand", memoize: true) do
+    register("domain.work_intentions.expand", memoize: true) do
       Write::Domain::WorkIntentions::ExpandSet.new(stream_factory: self["stream_factory"])
     end
 
-    register("domain.resource_leases.renew", memoize: true) do
+    register("domain.work_intentions.renew", memoize: true) do
       Write::Domain::WorkIntentions::RenewSet.new(stream_factory: self["stream_factory"])
     end
 
-    register("domain.resource_leases.release", memoize: true) do
+    register("domain.work_intentions.withdraw", memoize: true) do
       Write::Domain::WorkIntentions::WithdrawSet.new(stream_factory: self["stream_factory"])
     end
 
-    register("domain.resource_leases.expire", memoize: true) do
+    register("domain.work_intentions.expire", memoize: true) do
       Write::Domain::WorkIntentions::Expire.new(stream_factory: self["stream_factory"])
     end
 
@@ -639,17 +639,17 @@ module Coordinator
       Processes::ChangeSetActivationSourceBuilder.new(schema_registry: self["event_schema_registry"])
     end
 
-    register("lease_expiry_source_builder", memoize: true) do
-      Processes::LeaseExpirySourceBuilder.new(
-        contract: Processes::Contracts::LeaseExpirySourceEvent.new(
+    register("work_intention_expiry_source_builder", memoize: true) do
+      Processes::WorkIntentionExpirySourceBuilder.new(
+        contract: Processes::Contracts::WorkIntentionExpirySourceEvent.new(
           compound_marker_builder: self["compound_marker_builder"]
         ),
         schema_registry: self["event_schema_registry"]
       )
     end
 
-    register("lease_expiry_command_builder", memoize: true) do
-      Processes::LeaseExpiryCommandBuilder.new
+    register("work_intention_expiry_command_builder", memoize: true) do
+      Processes::WorkIntentionExpiryCommandBuilder.new
     end
 
     register("readiness_command_builder", memoize: true) do
@@ -699,16 +699,16 @@ module Coordinator
       )
     end
 
-    register("lease_expiry_source_loader", memoize: true) do
-      Processes::LeaseExpirySourceLoader.new(
+    register("work_intention_expiry_source_loader", memoize: true) do
+      Processes::WorkIntentionExpirySourceLoader.new(
         event_store: self["event_store"],
-        source_builder: self["lease_expiry_source_builder"],
+        source_builder: self["work_intention_expiry_source_builder"],
         stream_factory: self["stream_factory"]
       )
     end
 
-    register("lease_expiry_job_scheduler", memoize: true) do
-      Processes::LeaseExpiryJobScheduler.new
+    register("work_intention_expiry_job_scheduler", memoize: true) do
+      Processes::WorkIntentionExpiryJobScheduler.new
     end
 
     register("tasks.loader", memoize: true) do
@@ -1416,7 +1416,7 @@ module Coordinator
       Write::Operations::ExecuteDeclareWorkIntentionSet.new(
         event_store: self["event_store"],
         preparer: self["operations.prepare_declare_work_intention_set"],
-        decider: self["domain.resource_leases.reserve"],
+        decider: self["domain.work_intentions.declare"],
         input_digest: self["command_input_digest"],
         clock: self["clock"],
         id_generator: self["id_generator"],
@@ -1430,7 +1430,7 @@ module Coordinator
       Write::Operations::ExecuteExpandWorkIntentionSet.new(
         event_store: self["event_store"],
         preparer: self["operations.prepare_expand_work_intention_set"],
-        decider: self["domain.resource_leases.expand"],
+        decider: self["domain.work_intentions.expand"],
         input_digest: self["command_input_digest"],
         clock: self["clock"],
         id_generator: self["id_generator"],
@@ -1445,7 +1445,7 @@ module Coordinator
       Write::Operations::ExecuteRenewWorkIntentionSet.new(
         event_store: self["event_store"],
         preparer: self["operations.prepare_renew_work_intention_set"],
-        decider: self["domain.resource_leases.renew"],
+        decider: self["domain.work_intentions.renew"],
         input_digest: self["command_input_digest"],
         clock: self["clock"],
         id_generator: self["id_generator"],
@@ -1460,7 +1460,7 @@ module Coordinator
       Write::Operations::ExecuteWithdrawWorkIntentionSet.new(
         event_store: self["event_store"],
         preparer: self["operations.prepare_withdraw_work_intention_set"],
-        decider: self["domain.resource_leases.release"],
+        decider: self["domain.work_intentions.withdraw"],
         input_digest: self["command_input_digest"],
         clock: self["clock"],
         id_generator: self["id_generator"],
@@ -1471,10 +1471,10 @@ module Coordinator
       )
     end
 
-    register("operations.execute_expire_resource_lease") do
-      Write::Operations::ExecuteExpireResourceLease.new(
+    register("operations.execute_expire_work_intention") do
+      Write::Operations::ExecuteExpireWorkIntention.new(
         event_store: self["event_store"],
-        decider: self["domain.resource_leases.expire"],
+        decider: self["domain.work_intentions.expire"],
         input_digest: self["command_input_digest"],
         clock: self["clock"],
         id_generator: self["id_generator"],
@@ -2078,12 +2078,12 @@ module Coordinator
       Write::Operations::ExecuteFailVerificationObligation.new(event_store: self["event_store"])
     end
 
-    register("lease_expiry_policy", memoize: true) do
-      Processes::LeaseExpiryPolicy.new(
+    register("work_intention_expiry_policy", memoize: true) do
+      Processes::WorkIntentionExpiryPolicy.new(
         event_store: self["event_store"],
-        source_loader: self["lease_expiry_source_loader"],
-        command_builder: self["lease_expiry_command_builder"],
-        operation: self["operations.execute_expire_resource_lease"]
+        source_loader: self["work_intention_expiry_source_loader"],
+        command_builder: self["work_intention_expiry_command_builder"],
+        operation: self["operations.execute_expire_work_intention"]
       )
     end
 
@@ -2550,10 +2550,10 @@ module Coordinator
       )
     end
 
-    register("process_managers.lease_expiry_scheduler", memoize: true) do
-      Processes::ProcessManagers::LeaseExpiryScheduler.new(
-        source_builder: self["lease_expiry_source_builder"],
-        job_scheduler: self["lease_expiry_job_scheduler"]
+    register("process_managers.work_intention_expiry_scheduler", memoize: true) do
+      Processes::ProcessManagers::WorkIntentionExpiryScheduler.new(
+        source_builder: self["work_intention_expiry_source_builder"],
+        job_scheduler: self["work_intention_expiry_job_scheduler"]
       )
     end
 
@@ -2649,9 +2649,9 @@ module Coordinator
       )
     end
 
-    register("subscriptions.lease_expiry_scheduler", memoize: true) do
-      Processes::Subscriptions::LeaseExpiryScheduler.new(
-        handler: self["process_managers.lease_expiry_scheduler"]
+    register("subscriptions.work_intention_expiry_scheduler", memoize: true) do
+      Processes::Subscriptions::WorkIntentionExpiryScheduler.new(
+        handler: self["process_managers.work_intention_expiry_scheduler"]
       )
     end
 
@@ -2794,7 +2794,7 @@ module Coordinator
         self["subscriptions.change_set_readiness"],
         *self["subscriptions.coordination_task_executors"],
         self["subscriptions.operation_batch_runner"],
-        self["subscriptions.lease_expiry_scheduler"],
+        self["subscriptions.work_intention_expiry_scheduler"],
         self["subscriptions.resource_boundary_maintenance"],
         self["subscriptions.agent_choice_decision_impact"],
         self["subscriptions.candidate_impact_obligation_policy"],

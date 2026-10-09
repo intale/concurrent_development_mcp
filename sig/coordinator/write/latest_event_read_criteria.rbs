@@ -2,6 +2,7 @@ module Coordinator
   module Write
     class LatestEventReadCriteria < Shared::Value
       attr_reader event_types: Array[String]
+      attr_reader from_revision: Integer?
     end
   end
 end

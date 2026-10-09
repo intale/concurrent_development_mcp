@@ -3,7 +3,7 @@ module Coordinator
     module CommandInputDocuments
       TARGET_TYPES: Array[Class]
       type value = RegisterRepositoryV1 | ResolveResourceV1 | RemoveResourceV1 | CreateChangeSetV1 | CreateWorkItemV1 | DeclareWorkItemDependencyV1 | ActivateChangeSetV1 | AcquireWorkItemV1 | CompleteWorkItemV1 | AbandonAttemptV1 | DeclareWorkIntentionSetV1 | ExpandWorkIntentionSetV1 | RenewWorkIntentionSetV1 | WithdrawWorkIntentionSetV1 | RecordGuidanceV1 | ProposeDecisionInterpretationV1 | AdjudicateDecisionInterpretationV1 | ActivateDecisionV1 | CorrectDecisionV1 | RecordAgentChoiceV1 | SubmitCandidateV1 | SubmitCandidateImpactSurfaceV1 | ClaimVerificationObligationV1 | SubmitCompatibilityAssessmentV1 | WaiveVerificationObligationV1 | RegisterMergeSnapshotV1 | SubmitMergeSnapshotVerificationV1 | RequestMergeAuthorizationV1 | RecordMergeObservationV1 | PrepareReleaseSetV1 | RecordRepositoryIntegrationV1 | RecordReleaseSetVerificationV1 | RecordReleaseSetActivationV1 | CompleteCompensatedReleaseSetV1 | PublishSkillRevisionV2 | CaptureDevelopmentArtifactV2 | UpdateDevelopmentArtifactV1 | CorrectDevelopmentArtifactClassificationV1 | DeclareDevelopmentArtifactRelationV1 | CreateOperationBatchV1 | CancelOperationBatchV1
-      type digest_value = value | ExpireResourceLeaseV1 | RequestReleaseSetCompensationV1 | CompleteActivatedReleaseSetV1 | SatisfyWorkItemDependencyV1 | CompleteChangeSetV1 | RecordOperationBatchItemOutcomeV1 | RequestOperationBatchContinuationV1 | CompleteOperationBatchV1 | CompleteOperationBatchCancellationV1
+      type digest_value = value | ExpireWorkIntentionV1 | RequestReleaseSetCompensationV1 | CompleteActivatedReleaseSetV1 | SatisfyWorkItemDependencyV1 | CompleteChangeSetV1 | RecordOperationBatchItemOutcomeV1 | RequestOperationBatchContinuationV1 | CompleteOperationBatchV1 | CompleteOperationBatchCancellationV1
       type canonical_digest_value = digest_value | PublishSkillRevisionCanonicalV2 | CaptureDevelopmentArtifactCanonicalV2 | DeclareDevelopmentArtifactRelationCanonicalV1
 
       class ActorV1 < Shared::Value
@@ -877,18 +877,18 @@ module Coordinator
         def input: () -> CompleteOperationBatchCancellationInputV1
       end
 
-      class ExpireResourceLeaseInputV1 < Shared::Value
+      class ExpireWorkIntentionInputV1 < Shared::Value
         def actor: () -> ActorV1
         def resource_id: () -> String
-        def lease_id: () -> String
-        def lease_set_id: () -> String
+        def intention_id: () -> String
+        def intention_set_id: () -> String
         def fencing_token: () -> Integer
         def expected_expires_at: () -> String
       end
 
-      class ExpireResourceLeaseV1 < BaseV1
+      class ExpireWorkIntentionV1 < BaseV1
         def tool_name: () -> String
-        def input: () -> ExpireResourceLeaseInputV1
+        def input: () -> ExpireWorkIntentionInputV1
       end
 
       class SatisfyWorkItemDependencyInputV1 < Shared::Value

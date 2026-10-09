@@ -1,8 +1,0 @@
-module Coordinator
-  module Processes
-    class LeaseExpirySourceBuilder
-      def initialize: (?contract: Contracts::LeaseExpirySourceEvent, ?schema_registry: Write::EventSchemaRegistry) -> void
-      def call: (PgEventstore::Event event) -> LeaseExpirySource
-    end
-  end
-end

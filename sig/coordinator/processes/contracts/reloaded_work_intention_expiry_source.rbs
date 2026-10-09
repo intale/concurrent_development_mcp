@@ -1,0 +1,9 @@
+module Coordinator
+  module Processes
+    module Contracts
+      class ReloadedWorkIntentionExpirySource < Dry::Validation::Contract
+        def call: ({ locator: WorkIntentionExpirySourceLocatorV1, source: WorkIntentionExpirySource } input) -> Dry::Validation::Result
+      end
+    end
+  end
+end

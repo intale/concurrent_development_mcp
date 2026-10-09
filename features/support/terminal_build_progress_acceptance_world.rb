@@ -281,8 +281,8 @@ module TerminalBuildProgressAcceptanceWorld
     event_store.read(
       streams.attempt(attempt_id),
       Coordinator::Write::EventReadCriteria.new(
-        event_types: %w[WriteSetReleased AttemptCompleted],
-        maximum_count: 2,
+        event_types: [ "AttemptCompleted" ],
+        maximum_count: 1,
         direction: :asc
       )
     )

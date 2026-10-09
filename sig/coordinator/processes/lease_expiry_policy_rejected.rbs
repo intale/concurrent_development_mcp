@@ -1,6 +1,0 @@
-module Coordinator
-  module Processes
-    class LeaseExpiryPolicyRejected < StandardError
-    end
-  end
-end

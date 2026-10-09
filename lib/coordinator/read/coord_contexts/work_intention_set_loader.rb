@@ -112,13 +112,8 @@ module Coordinator::Read
         renewed_event = lifecycle_events(members, "ResourceWorkIntentionRenewed").max_by(&:created_at)
         withdrawal_events = lifecycle_events(members, "ResourceWorkIntentionWithdrawn")
         withdrawal_event = withdrawal_events.max_by(&:created_at) if withdrawal_events.length == members.length
-        expiration_histories = members.map do |member|
-          member.history.filter_map do |_physical, logical|
-            logical.expires_at if logical.respond_to?(:expires_at)
-          end
-        end
-        current_expirations = expiration_histories.map(&:last)
-        previous_expirations = expiration_histories.filter_map { _1[-2] }
+        current_expirations = members.map { _1.state.expires_at }
+        previous_expirations = members.filter_map { previous_expiration(_1) }
 
         WorkIntentionSetViewV1.new(
           set_id: created.set_id,
@@ -140,6 +135,22 @@ module Coordinator::Read
           expires_at: current_expirations.min,
           withdrawn_at: withdrawal_event && timestamp(withdrawal_event)
         )
+      end
+
+      def previous_expiration(member)
+        renewed = member.history.find { |physical, _logical| physical.type == "ResourceWorkIntentionRenewed" }
+        return unless renewed
+
+        previous_event = @event_store.read_latest(
+          @stream_factory.resource_work_intention(member.state.intention_id),
+          Coordinator::Write::LatestEventReadCriteria.new(
+            event_types: [ "ResourceWorkIntentionDeclared", "ResourceWorkIntentionRenewed" ],
+            from_revision: renewed.first.stream_revision - 1
+          )
+        )
+        raise InvalidProjectionSource, "Work-intention renewal is missing its preceding deadline" unless previous_event
+
+        load_event(previous_event).expires_at
       end
 
       def lifecycle_events(members, type)

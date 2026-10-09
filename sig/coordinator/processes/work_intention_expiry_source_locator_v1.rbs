@@ -1,0 +1,11 @@
+module Coordinator
+  module Processes
+    class WorkIntentionExpirySourceLocatorV1 < Shared::Value
+      def self.from_source: (WorkIntentionExpirySource source) -> WorkIntentionExpirySourceLocatorV1
+
+      def source_event_id: () -> String
+      def resource_stream_id: () -> String
+      def stream_revision: () -> Integer
+    end
+  end
+end

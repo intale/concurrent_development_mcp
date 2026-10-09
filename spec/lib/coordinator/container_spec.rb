@@ -20,7 +20,7 @@ RSpec.describe Coordinator::Container do
     expansion_operation = described_class["operations.execute_expand_work_intention_set"]
     renewal_operation = described_class["operations.execute_renew_work_intention_set"]
     release_operation = described_class["operations.execute_withdraw_work_intention_set"]
-    expiry_operation = described_class["operations.execute_expire_resource_lease"]
+    expiry_operation = described_class["operations.execute_expire_work_intention"]
     guidance_operation = described_class["operations.execute_record_guidance"]
     interpretation_operation = described_class["operations.execute_propose_decision_interpretation"]
     adjudication_operation = described_class["operations.execute_adjudicate_decision_interpretation"]
@@ -126,7 +126,7 @@ RSpec.describe Coordinator::Container do
     expect(expansion_operation).to be_a(Coordinator::Write::Operations::ExecuteExpandWorkIntentionSet)
     expect(renewal_operation).to be_a(Coordinator::Write::Operations::ExecuteRenewWorkIntentionSet)
     expect(release_operation).to be_a(Coordinator::Write::Operations::ExecuteWithdrawWorkIntentionSet)
-    expect(expiry_operation).to be_a(Coordinator::Write::Operations::ExecuteExpireResourceLease)
+    expect(expiry_operation).to be_a(Coordinator::Write::Operations::ExecuteExpireWorkIntention)
     expect(guidance_operation).to be_a(Coordinator::Write::Operations::ExecuteRecordGuidance)
     expect(interpretation_operation).to be_a(
       Coordinator::Write::Operations::ExecuteProposeDecisionInterpretation

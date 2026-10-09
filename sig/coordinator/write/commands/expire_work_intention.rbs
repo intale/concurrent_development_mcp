@@ -1,0 +1,15 @@
+module Coordinator
+  module Write
+    module Commands
+      class ExpireWorkIntention < Shared::Value
+        def command_id: () -> String
+        def actor: () -> Actor
+        def resource_id: () -> String
+        def intention_id: () -> String
+        def intention_set_id: () -> String
+        def fencing_token: () -> Integer
+        def expected_expires_at: () -> String
+      end
+    end
+  end
+end

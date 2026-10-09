@@ -1,0 +1,13 @@
+module Coordinator
+  module Processes
+    module Jobs
+      class ExpireWorkIntention < ApplicationJob
+        def self.policy: () -> WorkIntentionExpiryPolicy
+        def self.job_scheduler: () -> WorkIntentionExpiryJobScheduler
+        def self.configure: (policy: WorkIntentionExpiryPolicy, job_scheduler: WorkIntentionExpiryJobScheduler) -> void
+
+        def perform: (String source_event_id, String resource_stream_id, Integer stream_revision) -> ActiveJob::Base?
+      end
+    end
+  end
+end

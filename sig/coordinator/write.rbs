@@ -52,7 +52,7 @@ module Coordinator
                                 Commands::CreateOperationBatch |
                                 Commands::CancelOperationBatch
     type write_command = coordination_command |
-                         Commands::ExpireResourceLease |
+                         Commands::ExpireWorkIntention |
                          Commands::RequestReleaseSetCompensation |
                          Commands::CompleteActivatedReleaseSet |
                          Commands::SatisfyWorkItemDependency |

@@ -124,7 +124,7 @@ module Coordinator::Write
       when Commands::RequestOperationBatchContinuation then operation_batch_continuation_document(command)
       when Commands::CompleteOperationBatch then operation_batch_completion_document(command)
       when Commands::CompleteOperationBatchCancellation then operation_batch_cancellation_completion_document(command)
-      when Commands::ExpireResourceLease then lease_expire_policy_document(command)
+      when Commands::ExpireWorkIntention then work_intention_expire_policy_document(command)
       else
         raise ArgumentError, "Unsupported coordination command: #{command.class.name}"
       end
@@ -347,20 +347,20 @@ module Coordinator::Write
       )
     end
 
-    def lease_expire_policy(command)
-      @canonical_json.sha256(lease_expire_policy_document(command).to_h)
+    def work_intention_expire_policy(command)
+      @canonical_json.sha256(work_intention_expire_policy_document(command).to_h)
     end
 
-    def lease_expire_policy_document(command)
-      CommandInputDocuments::ExpireResourceLeaseV1.new(
+    def work_intention_expire_policy_document(command)
+      CommandInputDocuments::ExpireWorkIntentionV1.new(
         schema: "command-input/v1",
         command_id: command.command_id,
-        tool_name: "lease_expire_policy",
-        input: CommandInputDocuments::ExpireResourceLeaseInputV1.new(
+        tool_name: "work_intention_expire_policy",
+        input: CommandInputDocuments::ExpireWorkIntentionInputV1.new(
           actor: actor_document(command.actor),
           resource_id: command.resource_id,
-          lease_id: command.lease_id,
-          lease_set_id: command.lease_set_id,
+          intention_id: command.intention_id,
+          intention_set_id: command.intention_set_id,
           fencing_token: command.fencing_token,
           expected_expires_at: command.expected_expires_at
         )

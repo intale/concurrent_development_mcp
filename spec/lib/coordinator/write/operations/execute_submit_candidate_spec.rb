@@ -80,7 +80,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
       work_item_id: "W-LSE-A",
       attempt_id: "A-LSE-A",
       intention_set_id: reservation.receipt.intention_set_id,
-      intentions: ResourceLeaseOperationScenario.work_intention_inputs(reservation.receipt)
+      intentions: WorkIntentionOperationScenario.work_intention_inputs(reservation.receipt)
     ).value!
 
     result = operation.call(
@@ -92,11 +92,11 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
   end
 
   def setup_reservation
-    ResourceLeaseOperationScenario.start_attempts(
+    WorkIntentionOperationScenario.start_attempts(
       event_store:,
       attempts: [ [ "W-LSE-A", "A-LSE-A", "agent-a" ] ]
     )
-    ResourceLeaseOperationScenario.reserve(
+    WorkIntentionOperationScenario.declare(
       event_store:,
       paths: [ { kind: "file", path: "lib/example.rb", base_blob_oid: "c" * 40 } ]
     )
@@ -116,7 +116,7 @@ RSpec.describe Coordinator::Write::Operations::ExecuteSubmitCandidate, :event_st
       head_commit_oid: "d" * 40,
       checkpoint_kind: "final",
       intention_set_id: reservation.receipt.intention_set_id,
-      intentions: ResourceLeaseOperationScenario.work_intention_inputs(reservation.receipt),
+      intentions: WorkIntentionOperationScenario.work_intention_inputs(reservation.receipt),
       change_manifest: {
         collector_version: "git-evidence-v1",
         files: [

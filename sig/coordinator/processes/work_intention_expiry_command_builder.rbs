@@ -1,0 +1,8 @@
+module Coordinator
+  module Processes
+    class WorkIntentionExpiryCommandBuilder
+      POLICY_ID: String
+      def call: (WorkIntentionExpirySource source, command_id: String) -> Write::Commands::ExpireWorkIntention
+    end
+  end
+end

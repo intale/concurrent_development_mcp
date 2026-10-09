@@ -1,7 +1,0 @@
-module Coordinator
-  module Processes
-    class LeaseExpiryRescheduleV1 < Shared::Value
-      def reschedule_at: () -> String
-    end
-  end
-end

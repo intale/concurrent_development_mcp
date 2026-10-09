@@ -91,6 +91,17 @@ RSpec.describe Coordinator::Write::EventStore, :event_store do
     expect(event_store.read_latest(stream, criteria)).to have_attributes(id: newest.id, stream_revision: 2)
   end
 
+  it "reads one latest matching event at or before an explicit stream revision" do
+    prior = build_event(type: "TargetProbe")
+    event_store.append(
+      stream,
+      [ build_event(type: "TargetProbe"), prior, build_event(type: "IgnoredProbe"), build_event(type: "TargetProbe") ]
+    )
+    criteria = Coordinator::Write::LatestEventReadCriteria.new(event_types: [ "TargetProbe" ], from_revision: 2)
+
+    expect(event_store.read_latest(stream, criteria)).to have_attributes(id: prior.id, stream_revision: 1)
+  end
+
   it "uses one compound marker as a bounded conjunctive event selector" do
     target = build_event(
       type: "RealStoreProbe",

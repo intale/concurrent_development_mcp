@@ -1,0 +1,8 @@
+module Coordinator
+  module Processes
+    class WorkIntentionExpirySourceBuilder
+      def initialize: (?contract: Contracts::WorkIntentionExpirySourceEvent, ?schema_registry: Write::EventSchemaRegistry) -> void
+      def call: (PgEventstore::Event event) -> WorkIntentionExpirySource
+    end
+  end
+end

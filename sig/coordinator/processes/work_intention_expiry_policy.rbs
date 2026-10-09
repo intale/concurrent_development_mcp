@@ -1,0 +1,19 @@
+module Coordinator
+  module Processes
+    class WorkIntentionExpiryPolicy
+      def initialize: (
+        event_store: Write::_EventStore,
+        source_loader: WorkIntentionExpirySourceLoader,
+        ?command_builder: WorkIntentionExpiryCommandBuilder,
+        ?process_step_planner: ProcessStepPlanner,
+        operation: Write::Operations::ExecuteExpireWorkIntention
+      ) -> void
+
+      def call: (WorkIntentionExpirySourceLocatorV1 locator) -> Dry::Monads::Result
+
+      private
+
+      def map_failure: (Write::OutcomeError) -> Dry::Monads::Result
+    end
+  end
+end
